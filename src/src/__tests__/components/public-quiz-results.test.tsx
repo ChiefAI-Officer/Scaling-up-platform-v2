@@ -349,6 +349,67 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
     expect(body.referringCoachEmail).toBe("coach@example.com");
   });
 
+  it("uses only the server-verified coach email in the results CTA", async () => {
+    mockSearchParams = { coach: "forged@example.com" };
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        success: true,
+        data: {
+          submissionId: "sub_1",
+          scoreResult: scoreResultFixture,
+          referringCoachEmail: "verified@example.com",
+          redirectUrl: `/quiz/${ALIAS}/thank-you`,
+        },
+      }),
+    });
+
+    render(<PublicQuizClient {...baseProps} />);
+    reachFormStep();
+    fireEvent.change(screen.getByRole("slider"), { target: { value: "6" } });
+    fireEvent.click(screen.getByRole("button", { name: /submit/i }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("quiz-results")).toBeInTheDocument(),
+    );
+
+    expect(screen.getByText(/jane@example\.com/)).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /talk to a coach/i }),
+    ).toHaveAttribute("href", "mailto:verified%40example.com");
+    expect(document.querySelector('a[href="mailto:forged%40example.com"]')).toBeNull();
+  });
+
+  it("does not trust the query email when the server does not verify a coach", async () => {
+    mockSearchParams = { coach: "forged@example.com" };
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        success: true,
+        data: {
+          submissionId: "sub_1",
+          scoreResult: scoreResultFixture,
+          referringCoachEmail: null,
+          redirectUrl: `/quiz/${ALIAS}/thank-you`,
+        },
+      }),
+    });
+
+    render(<PublicQuizClient {...baseProps} />);
+    reachFormStep();
+    fireEvent.change(screen.getByRole("slider"), { target: { value: "6" } });
+    fireEvent.click(screen.getByRole("button", { name: /submit/i }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("quiz-results")).toBeInTheDocument(),
+    );
+    expect(
+      screen.getByRole("link", { name: /talk to a coach/i }),
+    ).toHaveAttribute("href", "https://scalingup.com/coaches");
+  });
+
   it("omits referringCoachEmail entirely when no ?coach= param is present", async () => {
     // mockSearchParams reset to {} in beforeEach → no coach.
     global.fetch = jest.fn().mockResolvedValue({

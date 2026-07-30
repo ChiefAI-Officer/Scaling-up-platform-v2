@@ -27,6 +27,7 @@ import type { ScoreResult } from "@/lib/assessments/scoring";
 function baseReport(overrides: Partial<RespondentReport> = {}): RespondentReport {
   return {
     respondentName: "Monks Koala",
+    respondentEmail: "monks@example.com",
     jobTitle: null,
     companyName: "Acme Corp",
     assessmentName: "Scaling Up 4 Decisions Assessment",
@@ -327,6 +328,50 @@ describe("buildReportEmailHtml — coach CTA gating (#81)", () => {
       recipientRole: "TAKER_COPY",
     });
     expect(bodyHtml).not.toContain(CTA);
+  });
+
+  it("five-dysfunctions Coach copy still offers Contact the Taker", () => {
+    const { bodyHtml } = buildReportEmailHtml({
+      report: fourDecisionsReport({
+        templateAlias: "five-dysfunctions",
+        respondentEmail: "taker@example.com",
+      }),
+      recipientRole: "REFERRING_COACH",
+    });
+
+    expect(bodyHtml).toContain("Contact the Taker");
+    expect(bodyHtml).toContain('href="mailto:taker%40example.com"');
+    expect(bodyHtml).not.toContain(CTA);
+  });
+});
+
+describe("buildReportEmailHtml — report identity and next steps", () => {
+  it("shows the taker's email plus Learn More and the verified coach link", () => {
+    const { bodyHtml } = buildReportEmailHtml({
+      report: fourDecisionsReport({
+        respondentEmail: "taker@example.com",
+        referringCoachEmail: "coach@example.com",
+      }),
+      recipientRole: "TAKER_COPY",
+    });
+
+    expect(bodyHtml).toContain("taker@example.com");
+    expect(bodyHtml).toContain('href="https://scalingup.com"');
+    expect(bodyHtml).toContain('href="mailto:coach%40example.com"');
+  });
+
+  it("gives the coach a taker-contact link instead of emailing themselves", () => {
+    const { bodyHtml } = buildReportEmailHtml({
+      report: fourDecisionsReport({
+        respondentEmail: "taker@example.com",
+        referringCoachEmail: "coach@example.com",
+      }),
+      recipientRole: "REFERRING_COACH",
+    });
+
+    expect(bodyHtml).toContain("Contact the Taker");
+    expect(bodyHtml).toContain('href="mailto:taker%40example.com"');
+    expect(bodyHtml).not.toContain('href="mailto:coach%40example.com"');
   });
 });
 

@@ -89,6 +89,7 @@ const GOOD_SUBMISSION = {
     id: "resp-1",
     firstName: "Alice",
     lastName: "Smith",
+    email: "alice@example.com",
     jobTitle: "CEO",
   },
   campaign: {
@@ -161,6 +162,7 @@ test("buildStoredRespondentReport exposes the shared pure frozen-report seam", (
   });
 
   expect(report.result).toBe(GOOD_SCORE_RESULT);
+  expect(report.respondentEmail).toBe("alice@example.com");
   expect(report.rawAnswers).toBe(GOOD_SUBMISSION.answers);
   expect(report.provenance).toEqual({
     submissionId: "sub-1",
@@ -188,6 +190,7 @@ test("1. owning coach + submission → status:ok, all fields populated, provenan
 
   // Respondent fields
   expect(report.respondentName).toBe("Alice Smith");
+  expect(report.respondentEmail).toBe("alice@example.com");
   expect(report.jobTitle).toBe("CEO");
   expect(report.companyName).toBe("Acme Corp");
 

@@ -6,6 +6,29 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-07-30 — Jeff public-survey closure implemented: report identity, verified actions, and Coach CSV <!-- ENTRY_ISO:2026-07-30 ENTRY_SLUG:jeff-public-survey-closure-pr-ready -->
+
+**Status: IMPLEMENTED + LOCALLY VERIFIED; PR-ready, not yet merged or launched.** This closes the remaining product gaps in Jeff Verdun's public-survey screenshot while preserving the already-launched delivery fix from PR #250.
+
+- **Duplicate result emails:** no new delivery code is introduced here. PR #250 already launched atomic PostgreSQL outbox leases plus same-mailbox suppression and completed its controlled Inngest cutover. This branch adds no schedule, cron, worker, migration, or Azure requirement.
+- **Taker identity:** scored and qualitative on-screen reports and their email equivalents now show the submitted email separately from the display name. Legacy rows with no email remain blank rather than inventing an `"Anonymous"` address.
+- **Two next steps:** both report families show **Learn More** linking to `https://scalingup.com`. **Talk to a Coach** is shown only from the server-verified, currently eligible referring Coach address (with the existing directory fallback where applicable); Five Dysfunctions continues to suppress only the Coach action. Coach notification email instead offers **Contact the Taker**, so it does not mail the Coach back to themself.
+- **Verified referral boundary:** the public client never trusts the raw `?coach=` value. The submit transaction rechecks current Coach certification before persisting referral ownership, queuing the Coach notification, or returning a contact address. Unique-key recovery is bound to the original campaign/taker/answers so a reused idempotency key with different input returns `409`.
+- **Coach export:** the existing flag-gated Referred Results screen now offers a filtered CSV with exactly `Taker Name`, `Taker Email`, `Assessment`, `Result`, and `Submitted At`. The Coach-only endpoint preserves immutable `referringCoachId` ownership and current-certification checks, caps exports at 5,000 rows, applies RFC 4180 quoting and spreadsheet-formula protection, sends private/no-store responses, rate-limits by immutable Coach ID through a distributed fail-closed limiter, and refuses the CSV when its PII-free audit row cannot be persisted.
+
+**Design/process receipt.** The approved grill-with-docs design and implementation plan live under `docs/superpowers/`; the visual review artifact and rendered mockup live under `docs/specs/v7.6/mockups/`. Two substantive Claudex passes were incorporated before implementation; a third pass was unavailable because that external account reached its usage limit. The actual production `BrandedReport` component was rendered and inspected at desktop and 390px mobile widths; the retained receipts are `jeff-public-survey-closure-actual-desktop.png` and `jeff-public-survey-closure-actual-mobile.png` beside the mockup. The approved Referred Results mockup was also inspected at both widths. Independent standards and spec-compliance reviewers found the export-eligibility sentinel, role-specific CTA, qualitative-policy, audit-deduplication, and pruned-idempotency edge cases; every finding was corrected, and both final re-reviews returned **CLEAN**.
+
+**Local verification against fixed point `48b68d37`.**
+
+- Focused report, email, submit, referral, export, presentation, and adjacent submit-regression coverage: **19 suites / 317 tests passed**.
+- Complete branch Jest: **583 passing suites / 6,905 passing tests**, with **8 failing suites / 22 failing tests**. The failed suite names and failed assertion names exactly match the untouched-main baseline (**580 passing suites / 6,861 passing tests**, the same 8/22 failures); the branch adds **3 passing suites / 44 passing tests** and zero full-suite regressions.
+- Changed-file ESLint, `git diff --check`, and migration safety passed; migration safety inspected **42 migrations** with no unapproved destructive operation.
+- `CI=true npx next build --turbopack` completed successfully, including type checking and generation of the new `/api/assessments/referred-results/export.csv` route. Local static collection emitted the expected missing `DATABASE_URL`/Inngest-key warnings; the command exited `0`.
+
+**Rollback:** revert the eventual merge commit. No data cleanup, environment-variable change, flag operation, or scheduler action is required.
+
+---
+
 ### 2026-07-30 — Consolidated mapping correction: GH #238 is a Jeff #64 follow-up, not a new PDF item <!-- ENTRY_ISO:2026-07-30 ENTRY_SLUG:issue-238-jeff-number-mapping-corrected -->
 
 **Status: SOURCE-OF-TRUTH CORRECTED; no runtime change.** The July-10 feedback report and GitHub use independent number spaces. The work launched in PR [#255](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/255) closed **GitHub issue #238**, but there is no numbered “#238” item in `Scaling-Up-Assessment-Feedback-Report-2026-07-10.pdf`.

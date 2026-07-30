@@ -27,7 +27,11 @@
  */
 
 import type { RespondentReport } from "@/lib/assessments/respondent-report";
-import { greetingName } from "@/lib/assessments/respondent-display-name";
+import { reportConfigFor } from "@/lib/assessments/report-config";
+import {
+  greetingName,
+  respondentNameMatchesEmail,
+} from "@/lib/assessments/respondent-display-name";
 import {
   buildQualitativeModel,
   type QualItem,
@@ -44,6 +48,7 @@ import { isFindingsLogicEnabled } from "@/lib/assessments/wave-u-flags";
 import { CoachLogo } from "@/components/assessments/CoachLogo";
 import { ReportFooter } from "@/components/assessments/ReportFooter";
 import { ImportedBadge } from "@/components/assessments/ImportedBadge";
+import { ReportNextSteps } from "@/components/assessments/ReportNextSteps";
 import { Fragment } from "react";
 
 const LOGO_SRC = "/brand/su-logo-white.svg";
@@ -414,8 +419,11 @@ function SectionBody({ section, who }: { section: QualSection; who: string }) {
 export function QualitativeReport({
   report,
   peerComparison,
+  contactEmail,
 }: {
   report: RespondentReport;
+  /** Server-verified current coach email for the contact link. */
+  contactEmail?: string | null;
   /**
    * Wave S (Jeff #12/#13) — the OPTIONAL "compared to peers" section, built
    * server-side by `buildPeerComparisonSection` (flag + render-enabled-alias
@@ -437,6 +445,10 @@ export function QualitativeReport({
   const who = attribution(report.respondentName, report.jobTitle);
   const firstName = greetingName(report.respondentName);
   const submitted = formatSubmittedAt(report.submittedAt);
+  const respondentNameIsEmail = respondentNameMatchesEmail(
+    report.respondentName,
+    report.respondentEmail,
+  );
 
   // Wave U — build the findings section from the frozen snapshot (total-
   // tolerant: absent/malformed → null → no section). Flag-gated at render.
@@ -475,10 +487,17 @@ export function QualitativeReport({
             Your {report.assessmentName} Report
           </h1>
           <div className="su-report-cover-meta">
-            <div className="su-report-for">
-              {report.assessmentName} for: {report.respondentName}
-              {report.jobTitle ? ` · ${report.jobTitle}` : ""}
-            </div>
+            {!respondentNameIsEmail ? (
+              <div className="su-report-for">
+                {report.assessmentName} for: {report.respondentName}
+                {report.jobTitle ? ` · ${report.jobTitle}` : ""}
+              </div>
+            ) : null}
+            {report.respondentEmail ? (
+              <div className="su-report-email">
+                Email: {report.respondentEmail}
+              </div>
+            ) : null}
             <div className="su-report-sub">
               {report.companyName ? `${report.companyName} · ` : ""}
               {submitted}
@@ -536,6 +555,23 @@ export function QualitativeReport({
           shared with the respondent results email, which must never carry
           findings (D7; same isolation as Wave S peers). */}
       {findingsSection && <FindingsBlock section={findingsSection} />}
+
+      <section
+        className="su-report-conclusion"
+        data-testid="report-conclusion"
+      >
+        <h3 className="su-h2 su-report-conclude-title">What&apos;s next?</h3>
+        <p>
+          Learn more about Scaling Up or connect with a coach to turn these
+          answers into action.
+        </p>
+        <ReportNextSteps
+          contactEmail={contactEmail ?? report.referringCoachEmail}
+          showCoachLink={
+            reportConfigFor(report.templateAlias).showCoachCta !== false
+          }
+        />
+      </section>
 
       {/* ── 4. Footer (matches the cleaned BrandedReport footer) ───────────── */}
       <ReportFooter

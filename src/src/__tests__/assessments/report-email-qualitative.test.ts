@@ -46,6 +46,7 @@ function qualReport(args: QualFixtureArgs): RespondentReport {
     );
   return {
     respondentName: "Jane Doe",
+    respondentEmail: "jane@example.com",
     jobTitle: null,
     companyName: "Acme Corp",
     assessmentName: "Leadership Vision Alignment",
@@ -71,6 +72,25 @@ function qualReport(args: QualFixtureArgs): RespondentReport {
 // ── Dispatch ─────────────────────────────────────────────────────────────────
 
 describe("buildReportEmailHtml — qualitative dispatch", () => {
+  it("includes the taker's email and next-step links", () => {
+    const report = qualReport({
+      templateAlias: "qsp-v2",
+      sections: [],
+      questionsByKey: {},
+      rawAnswers: [],
+    });
+    report.referringCoachEmail = "coach@example.com";
+
+    const { bodyHtml } = buildReportEmailHtml({
+      report,
+      recipientRole: "TAKER_COPY",
+    });
+
+    expect(bodyHtml).toContain("jane@example.com");
+    expect(bodyHtml).toContain('href="https://scalingup.com"');
+    expect(bodyHtml).toContain('href="mailto:coach%40example.com"');
+  });
+
   it("renders the respondent's answer text (qsp-v2 qualitative alias)", () => {
     const { bodyHtml } = buildReportEmailHtml({
       report: qualReport({

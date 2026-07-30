@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Jeff public survey closure — visual review</title>
+  <style>
+    :root {
+      --purple: #522583;
+      --purple-deep: #3d1a63;
+      --ink: #2b2440;
+      --muted: #6b6480;
+      --line: #e8e2ef;
+      --soft: #f8f5fb;
+      --orange: #f7a600;
+      --blue: #008bd2;
+      --brown: #946b36;
+      --green: #95c11f;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #eef0f4;
+      color: var(--ink);
+      font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .page { width: min(1240px, calc(100% - 40px)); margin: 28px auto 48px; }
+    .kicker { color: var(--purple); font-weight: 800; letter-spacing: .12em; text-transform: uppercase; font-size: 11px; }
+    h1 { font: 500 32px/1.1 Georgia, serif; margin: 7px 0; }
+    .lede { color: var(--muted); margin: 0 0 22px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+    .frame { background: white; border: 1px solid #ddd5e7; border-radius: 18px; overflow: hidden; box-shadow: 0 12px 34px rgba(43,36,64,.09); }
+    .frame-label { padding: 12px 16px; border-bottom: 1px solid var(--line); background: #fff; font-weight: 800; font-size: 12px; }
+    .report { background: white; }
+    .stripes { display: grid; grid-template-columns: repeat(4, 1fr); height: 5px; }
+    .stripes span:nth-child(1) { background: var(--orange); }
+    .stripes span:nth-child(2) { background: var(--blue); }
+    .stripes span:nth-child(3) { background: var(--brown); }
+    .stripes span:nth-child(4) { background: var(--green); }
+    .cover { padding: 30px 32px; color: white; background: linear-gradient(135deg, var(--purple), var(--purple-deep)); }
+    .brand { font-weight: 900; letter-spacing: .08em; margin-bottom: 17px; }
+    .cover h2 { font: 600 27px/1.15 Georgia, serif; margin: 0 0 12px; }
+    .identity { opacity: .92; margin-top: 3px; }
+    .identity strong { display: inline-block; width: 82px; }
+    .body { padding: 28px 32px 12px; }
+    .result-card { border: 1px solid var(--line); border-radius: 14px; padding: 20px; background: var(--soft); }
+    .result-card h3 { margin: 0 0 8px; font: 600 21px Georgia, serif; }
+    .result-card p { margin: 0; color: var(--muted); }
+    .next { margin: 22px 32px 0; border: 1px solid var(--line); border-radius: 14px; padding: 20px; text-align: center; background: var(--soft); }
+    .next h3 { margin: 0 0 5px; font: 600 20px Georgia, serif; }
+    .next p { margin: 0 0 16px; color: var(--muted); }
+    .actions { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+    .button { display: inline-block; border: 1px solid var(--purple); border-radius: 10px; padding: 10px 17px; color: var(--purple); text-decoration: none; font-weight: 800; }
+    .button.primary { background: var(--purple); color: white; }
+    .footer { display: flex; justify-content: space-between; gap: 12px; padding: 24px 32px 28px; color: var(--muted); font-size: 11px; }
+    .footer b { color: var(--purple); letter-spacing: .08em; }
+    .portal { padding: 22px; }
+    .portal h2 { margin: 0; font: 600 27px Georgia, serif; }
+    .portal .sub { color: var(--muted); margin: 4px 0 18px; }
+    .link-card { border: 1px solid #d4c2e5; border-left: 4px solid var(--purple); border-radius: 12px; padding: 16px; background: linear-gradient(90deg, #fff, #fbf8fd); }
+    .link-card strong { display: block; margin-bottom: 4px; }
+    .link-card code { display: block; margin-top: 10px; border: 1px solid var(--line); background: white; padding: 9px; border-radius: 7px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
+    .tools { display: grid; grid-template-columns: minmax(160px, 1fr) 190px auto; gap: 10px; align-items: end; margin: 18px 0 12px; }
+    label { display: block; font-size: 11px; font-weight: 800; color: var(--muted); margin-bottom: 4px; }
+    input, select { width: 100%; padding: 10px; border: 1px solid #d9d2e1; border-radius: 8px; background: white; color: var(--ink); }
+    .export { white-space: nowrap; background: var(--purple); color: white; text-decoration: none; border-radius: 8px; padding: 10px 14px; font-weight: 800; }
+    .count { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
+    table { width: 100%; border-collapse: collapse; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+    th { padding: 10px; background: var(--soft); text-align: left; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
+    td { padding: 13px 10px; border-top: 1px solid var(--line); vertical-align: top; }
+    td small { display: block; color: var(--muted); margin-top: 2px; }
+    .score { color: var(--purple); font-weight: 900; }
+    .view { color: var(--purple); font-weight: 800; text-decoration: none; white-space: nowrap; }
+    .mobile-note { display: none; }
+    @media (max-width: 860px) {
+      .page { width: min(100% - 24px, 620px); }
+      .grid { grid-template-columns: 1fr; }
+      .tools { grid-template-columns: 1fr; }
+      .export { text-align: center; }
+      .footer { flex-direction: column; }
+      .table-wrap { overflow-x: auto; }
+      .mobile-note { display: block; color: var(--muted); font-size: 12px; margin-top: 8px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="kicker">Visual review · Jeff public survey closure</div>
+    <h1>One clear identity, two next steps, one filtered export</h1>
+    <p class="lede">Approved Scaling Up report language and the existing Referred Results surface, extended without creating a CRM.</p>
+
+    <div class="grid">
+      <section class="frame">
+        <div class="frame-label">Public result · screen and email anatomy</div>
+        <div class="report">
+          <div class="stripes"><span></span><span></span><span></span><span></span></div>
+          <header class="cover">
+            <div class="brand">SCALING UP</div>
+            <h2>Scaling Up 4 Decisions Assessment</h2>
+            <div class="identity"><strong>Report for:</strong> Jordan Lee</div>
+            <div class="identity"><strong>Email:</strong> jordan@example.com</div>
+            <div class="identity"><strong>Submitted:</strong> July 30, 2026</div>
+          </header>
+          <div class="body">
+            <div class="kicker">Your results</div>
+            <div class="result-card">
+              <h3>Keep scaling, Jordan.</h3>
+              <p>Your complete result content remains here. The closure changes only the identity and final actions.</p>
+            </div>
+          </div>
+          <section class="next">
+            <h3>Keep the momentum going</h3>
+            <p>Explore Scaling Up resources or turn these results into a 90-day plan with a coach.</p>
+            <div class="actions">
+              <a class="button" href="https://scalingup.com/">Learn More</a>
+              <a class="button primary" href="mailto:alex.coach@example.com">Talk to a Coach</a>
+            </div>
+          </section>
+          <footer class="footer">
+            <b>SCALING UP</b>
+            <span>July 30, 2026</span>
+            <span>Generated by Scaling Up Platform</span>
+          </footer>
+        </div>
+      </section>
+
+      <section class="frame">
+        <div class="frame-label">Coach portal · Referred Results</div>
+        <div class="portal">
+          <h2>Referred Results</h2>
+          <p class="sub">People who completed a public assessment through your verified coach link.</p>
+          <div class="link-card">
+            <strong>Your Quick Assessment link</strong>
+            Share this link. Completed assessments appear below.
+            <code>platformtest.scalingup.com/quiz/quick?coach=alex.coach@example.com</code>
+          </div>
+          <div class="tools">
+            <div>
+              <label for="search">Search by name or email</label>
+              <input id="search" value="Jordan" readonly>
+            </div>
+            <div>
+              <label for="assessment">Assessment</label>
+              <select id="assessment"><option>All assessments</option></select>
+            </div>
+            <a class="export" href="#" aria-label="Export filtered referred results as CSV">Export CSV</a>
+          </div>
+          <div class="count">1 filtered result · newest first</div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Taker</th><th>Assessment</th><th>Result</th><th>Submitted</th><th></th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>Jordan Lee</strong><small>jordan@example.com</small></td>
+                  <td>Scaling Up 4 Decisions<small>Public assessment</small></td>
+                  <td><span class="score">7.4</span><small>Accelerating</small></td>
+                  <td>Jul 30, 2026<small>2:54 PM</small></td>
+                  <td><a class="view" href="#">View report</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="mobile-note">On narrow screens, the existing mobile cards remain; the export action stacks beneath the filter.</p>
+        </div>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

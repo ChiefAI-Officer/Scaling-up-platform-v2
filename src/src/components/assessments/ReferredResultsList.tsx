@@ -252,6 +252,15 @@ export function ReferredResultsList({
   const [ownedTotalCount, setOwnedTotalCount] = useState<number | null>(null);
   const [cursorTrail, setCursorTrail] = useState(initialState.cursorTrail);
   const pageIndex = cursorTrail.length;
+  const exportHref = useMemo(() => {
+    const params = new URLSearchParams();
+    if (appliedQuery) params.set("query", appliedQuery);
+    if (templateId) params.set("templateId", templateId);
+    const suffix = params.toString();
+    return `/api/assessments/referred-results/export.csv${
+      suffix ? `?${suffix}` : ""
+    }`;
+  }, [appliedQuery, templateId]);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [templates, setTemplates] = useState<
     Map<string, { id: string; name: string }>
@@ -494,6 +503,24 @@ export function ReferredResultsList({
             ))}
           </select>
         </div>
+        {!loading && !error && totalCount !== null && totalCount > 0 ? (
+          <a
+            href={exportHref}
+            aria-label="Export filtered referred results as CSV"
+            className="rounded-md bg-primary px-3 py-2 text-center text-sm font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Export CSV
+          </a>
+        ) : (
+          <button
+            type="button"
+            disabled
+            aria-label="Export filtered referred results as CSV"
+            className="cursor-not-allowed rounded-md border border-border px-3 py-2 text-sm font-semibold text-muted-foreground opacity-60"
+          >
+            Export CSV
+          </button>
+        )}
         <p className="pb-2 text-xs text-muted-foreground md:ml-auto">
           {loading
             ? "Loading…"

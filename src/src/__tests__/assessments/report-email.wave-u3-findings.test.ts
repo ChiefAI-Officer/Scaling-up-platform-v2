@@ -74,6 +74,7 @@ function scoredReport(withFindings: boolean): RespondentReport {
 function qualReport(withFindings: boolean): RespondentReport {
   return {
     respondentName: "Jane Doe",
+    respondentEmail: "jane@example.com",
     jobTitle: null,
     companyName: "Acme Corp",
     assessmentName: "Leadership Vision Alignment",

@@ -772,6 +772,32 @@
   transition: background 0.15s;
 }
 
+.su-public-brand .su-report-email {
+  margin-top: 4px;
+  font-size: 13px;
+  color: #ffffff;
+  opacity: 0.9;
+  overflow-wrap: anywhere;
+}
+
+.su-public-brand .su-report-next-steps {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+.su-public-brand .su-report-cta-secondary {
+  background: #ffffff;
+  color: #522583;
+  border: 1px solid #522583;
+}
+
+.su-public-brand .su-report-cta-secondary:hover {
+  background: #f0e9fa;
+  color: #3d1a63;
+}
+
 .su-public-brand .su-report-cta:hover {
   background: #3d1a63;
   color: #ffffff;

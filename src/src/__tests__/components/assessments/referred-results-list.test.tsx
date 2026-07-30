@@ -346,6 +346,14 @@ describe("ReferredResultsList", () => {
     expect(screen.getByRole("button", { name: "Copy link" })).toBeInTheDocument();
     expect(await screen.findByText("18")).toBeInTheDocument();
     expect(screen.getByText("18 results · newest first")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", {
+        name: "Export filtered referred results as CSV",
+      }),
+    ).toHaveAttribute(
+      "href",
+      "/api/assessments/referred-results/export.csv",
+    );
     expect(screen.getByText("Showing 1–1 of 18")).toBeInTheDocument();
 
     expect(screen.getAllByText("Jordan Lee")).not.toHaveLength(0);

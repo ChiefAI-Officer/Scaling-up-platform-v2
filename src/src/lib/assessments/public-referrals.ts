@@ -89,6 +89,7 @@ interface RawPublicSubmission {
   referringCoachId: string | null;
   referringCoach: {
     id: string;
+    email: string;
     certificationStatus: string;
     certificationExpiry: Date | null;
   } | null;
@@ -152,6 +153,247 @@ export interface PublicReferralListItem {
   summary: PublicResultSummary;
 }
 
+export interface PublicReferralExportRow {
+  takerName: string;
+  takerEmail: string;
+  assessmentName: string;
+  resultLabel: string;
+  submittedAt: Date;
+}
+
+interface RawPublicReferralExportDataRow {
+  coachEligible: true;
+  isResultRow: true;
+  rowOrder: number;
+  takerName: string;
+  takerEmail: string;
+  assessmentName: string;
+  templateAlias: string;
+  overallScore: number | null;
+  tierLabel: string | null;
+  submittedAt: Date;
+  totalCount: number;
+}
+
+interface RawPublicReferralExportSentinel {
+  coachEligible: boolean;
+  isResultRow: false;
+  rowOrder: null;
+  takerName: null;
+  takerEmail: null;
+  assessmentName: null;
+  templateAlias: null;
+  overallScore: null;
+  tierLabel: null;
+  submittedAt: null;
+  totalCount: 0;
+}
+
+type RawPublicReferralExportRow =
+  | RawPublicReferralExportDataRow
+  | RawPublicReferralExportSentinel;
+
+export type PublicReferralExportOutcome =
+  | {
+      status: "ok";
+      rows: PublicReferralExportRow[];
+      totalCount: number;
+    }
+  | { status: "forbidden" }
+  | { status: "too-many"; totalCount: number; maxAllowed: number };
+
+interface PublicReferralExportDb {
+  $queryRaw: <T>(query: unknown) => Promise<T>;
+}
+
+export const MAX_PUBLIC_REFERRAL_EXPORT_ROWS = 5_000;
+
+function publicReferralExportResultLabel(
+  row: Pick<
+    RawPublicReferralExportDataRow,
+    "templateAlias" | "overallScore" | "tierLabel"
+  >,
+): string {
+  const config = reportConfigFor(row.templateAlias);
+  if (config.reportType === "qualitative") {
+    return "Completed";
+  }
+  if (row.overallScore === null || !Number.isFinite(row.overallScore)) {
+    return "Result unavailable";
+  }
+
+  const score = Number(row.overallScore.toFixed(2)).toString();
+  const tier =
+    config.showTier && row.tierLabel?.trim()
+      ? row.tierLabel.trim()
+      : null;
+  return tier ? `${score} — ${tier}` : score;
+}
+
+/**
+ * Exports only display scalars for the signed-in, currently certified Coach.
+ * Eligibility, immutable ownership, filters, total count, and the 5,001-row
+ * overflow sentinel are resolved by one parameterized PostgreSQL statement.
+ */
+export async function exportPublicReferrals(
+  db: PublicReferralExportDb,
+  actor: ApiActor,
+  input: Pick<PublicReferralListInput, "query" | "templateId">,
+): Promise<PublicReferralExportOutcome> {
+  if (actor.role !== "COACH" || !actor.coachId) {
+    return { status: "forbidden" };
+  }
+
+  const query = normalizeSearchQuery(input.query);
+  const templateId = input.templateId?.trim() ?? "";
+  const templateConstraint = templateId
+    ? Prisma.sql`AND c."templateId" = ${templateId}`
+    : Prisma.empty;
+  const searchConstraint = query
+    ? Prisma.sql`
+        AND (
+          LOWER(
+            REGEXP_REPLACE(
+              CONCAT_WS(
+                ' ',
+                NULLIF(BTRIM(COALESCE(s."publicTaker"->>'firstName', '')), ''),
+                NULLIF(BTRIM(COALESCE(s."publicTaker"->>'lastName', '')), '')
+              ),
+              '[[:space:]]+',
+              ' ',
+              'g'
+            )
+          ) LIKE ${`%${escapeLikePattern(query)}%`} ESCAPE E'\\\\'
+          OR LOWER(BTRIM(COALESCE(s."publicTaker"->>'email', '')))
+            LIKE ${`%${escapeLikePattern(query)}%`} ESCAPE E'\\\\'
+        )
+      `
+    : Prisma.empty;
+
+  const rows = await db.$queryRaw<RawPublicReferralExportRow[]>(Prisma.sql`
+    WITH eligible_coach AS (
+      SELECT "id"
+      FROM "coaches"
+      WHERE "id" = ${actor.coachId}
+        AND "certificationStatus" = 'ACTIVE'
+        AND (
+          "certificationExpiry" IS NULL
+          OR "certificationExpiry" > CURRENT_TIMESTAMP
+        )
+    )
+    , matched_referrals AS (
+    SELECT
+      ROW_NUMBER() OVER (
+        ORDER BY s."submittedAt" DESC, s."id" DESC
+      )::int AS "rowOrder",
+      COALESCE(
+        NULLIF(
+          BTRIM(
+            CONCAT_WS(
+              ' ',
+              NULLIF(BTRIM(COALESCE(s."publicTaker"->>'firstName', '')), ''),
+              NULLIF(BTRIM(COALESCE(s."publicTaker"->>'lastName', '')), '')
+            )
+          ),
+          ''
+        ),
+        BTRIM(COALESCE(s."publicTaker"->>'email', ''))
+      ) AS "takerName",
+      BTRIM(COALESCE(s."publicTaker"->>'email', '')) AS "takerEmail",
+      t."name" AS "assessmentName",
+      t."alias" AS "templateAlias",
+      CASE
+        WHEN JSONB_TYPEOF(s."result"->'perSection') IS DISTINCT FROM 'array'
+          OR JSONB_TYPEOF(s."result"->'perQuestion') IS DISTINCT FROM 'array'
+          THEN NULL
+        WHEN JSONB_TYPEOF(s."result"->'scaleUpScore') = 'number'
+          THEN (s."result"->>'scaleUpScore')::double precision
+        WHEN JSONB_TYPEOF(s."result"->'overallAverage') = 'number'
+          THEN (s."result"->>'overallAverage')::double precision
+        ELSE NULL
+      END AS "overallScore",
+      CASE
+        WHEN JSONB_TYPEOF(s."result"->'tier'->'label') = 'string'
+          THEN s."result"->'tier'->>'label'
+        ELSE NULL
+      END AS "tierLabel",
+      s."submittedAt" AS "submittedAt",
+      COUNT(*) OVER()::int AS "totalCount"
+    FROM "assessment_submissions" AS s
+    INNER JOIN eligible_coach AS ec
+      ON ec."id" = s."referringCoachId"
+    INNER JOIN "assessment_campaigns" AS c
+      ON c."id" = s."campaignId"
+    INNER JOIN "assessment_templates" AS t
+      ON t."id" = c."templateId"
+    WHERE c."accessMode" = 'PUBLIC'
+      AND c."deletedAt" IS NULL
+      ${templateConstraint}
+      ${searchConstraint}
+    ORDER BY s."submittedAt" DESC, s."id" DESC
+    LIMIT ${MAX_PUBLIC_REFERRAL_EXPORT_ROWS + 1}
+    )
+    SELECT
+      TRUE AS "coachEligible",
+      TRUE AS "isResultRow",
+      mr."rowOrder",
+      mr."takerName",
+      mr."takerEmail",
+      mr."assessmentName",
+      mr."templateAlias",
+      mr."overallScore",
+      mr."tierLabel",
+      mr."submittedAt",
+      mr."totalCount"
+    FROM matched_referrals AS mr
+    UNION ALL
+    SELECT
+      EXISTS(SELECT 1 FROM eligible_coach) AS "coachEligible",
+      FALSE AS "isResultRow",
+      NULL::int AS "rowOrder",
+      NULL::text AS "takerName",
+      NULL::text AS "takerEmail",
+      NULL::text AS "assessmentName",
+      NULL::text AS "templateAlias",
+      NULL::double precision AS "overallScore",
+      NULL::text AS "tierLabel",
+      NULL::timestamptz AS "submittedAt",
+      0::int AS "totalCount"
+    WHERE NOT EXISTS (SELECT 1 FROM matched_referrals)
+    ORDER BY "isResultRow" DESC, "rowOrder" ASC NULLS LAST
+  `);
+
+  if (!rows[0]?.coachEligible) {
+    return { status: "forbidden" };
+  }
+  const resultRows = rows.filter(
+    (row): row is RawPublicReferralExportDataRow => row.isResultRow,
+  );
+  if (resultRows.length === 0) {
+    return { status: "ok", rows: [], totalCount: 0 };
+  }
+  const totalCount = Number(resultRows[0].totalCount) || 0;
+  if (totalCount > MAX_PUBLIC_REFERRAL_EXPORT_ROWS) {
+    return {
+      status: "too-many",
+      totalCount,
+      maxAllowed: MAX_PUBLIC_REFERRAL_EXPORT_ROWS,
+    };
+  }
+
+  return {
+    status: "ok",
+    totalCount,
+    rows: resultRows.map((row) => ({
+      takerName: row.takerName,
+      takerEmail: row.takerEmail,
+      assessmentName: row.assessmentName,
+      resultLabel: publicReferralExportResultLabel(row),
+      submittedAt: row.submittedAt,
+    })),
+  };
+}
+
 export type PublicReferralListOutcome =
   | {
       status: "ok";
@@ -198,7 +440,7 @@ function publicTakerForReport(value: unknown): {
   return {
     firstName: stringField(taker, "firstName"),
     lastName: stringField(taker, "lastName"),
-    email: email || "Anonymous",
+    email,
     jobTitle: stringField(taker, "jobTitle") || null,
   };
 }
@@ -518,7 +760,7 @@ export async function listPublicReferrals(
           takerName:
             `${taker.firstName} ${taker.lastName}`.trim() ||
             taker.email,
-          takerEmail: taker.email === "Anonymous" ? null : taker.email,
+          takerEmail: taker.email || null,
           template: row.campaign.template,
           summary: summarizePublicResult(
             row.campaign.template.alias,
@@ -574,6 +816,7 @@ export async function getPublicReferralReport(
           referringCoach: {
             select: {
               id: true,
+              email: true,
               certificationStatus: true,
               certificationExpiry: true,
             },
@@ -646,6 +889,8 @@ export async function getPublicReferralReport(
           importManifest: submission.campaign.importManifest,
         },
       });
+      report.referringCoachEmail =
+        submission.referringCoach?.email.trim().toLowerCase() || null;
 
       return { status: "ok", report } as const;
     },

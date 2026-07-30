@@ -1,9 +1,204 @@
 import type { ApiActor } from "@/lib/auth/access-control";
 import {
+  exportPublicReferrals,
   getPublicReferralReport,
   listPublicReferrals,
   summarizePublicResult,
 } from "@/lib/assessments/public-referrals";
+
+describe("exportPublicReferrals", () => {
+  it("returns only the five display scalars from one bounded query", async () => {
+    const $queryRaw = jest.fn().mockResolvedValue([
+      {
+        coachEligible: true,
+        isResultRow: true,
+        rowOrder: 1,
+        takerName: "Avery Leader",
+        takerEmail: "avery@example.com",
+        assessmentName: "Scaling Up Full",
+        templateAlias: "scaling-up-4-decisions",
+        overallScore: 7.4,
+        tierLabel: "Accelerating",
+        submittedAt: new Date("2026-07-29T08:30:00.000Z"),
+        totalCount: 1,
+      },
+    ]);
+
+    await expect(
+      exportPublicReferrals(
+        { $queryRaw },
+        actor(),
+        { query: "avery", templateId: "template-four-decisions" },
+      ),
+    ).resolves.toEqual({
+      status: "ok",
+      totalCount: 1,
+      rows: [
+        {
+          takerName: "Avery Leader",
+          takerEmail: "avery@example.com",
+          assessmentName: "Scaling Up Full",
+          resultLabel: "7.4 — Accelerating",
+          submittedAt: new Date("2026-07-29T08:30:00.000Z"),
+        },
+      ],
+    });
+    expect($queryRaw).toHaveBeenCalledTimes(1);
+    const sql = $queryRaw.mock.calls[0][0] as {
+      sql: string;
+      values: unknown[];
+    };
+    expect(sql.sql).toContain("COUNT(*) OVER()");
+    expect(sql.sql).toContain(
+      "JSONB_TYPEOF(s.\"result\"->'perSection') IS DISTINCT FROM 'array'",
+    );
+    expect(sql.sql).toContain(
+      "JSONB_TYPEOF(s.\"result\"->'perQuestion') IS DISTINCT FROM 'array'",
+    );
+    expect(sql.sql).toContain("LIMIT");
+    expect(sql.values).toContain(5001);
+    expect(sql.values).toContain("coach-owner");
+    expect(sql.values).toContain("template-four-decisions");
+    expect(sql.values).toContain("%avery%");
+  });
+
+  it("returns a structured overflow instead of materializing an export", async () => {
+    const $queryRaw = jest.fn().mockResolvedValue([
+      {
+        coachEligible: true,
+        isResultRow: true,
+        rowOrder: 1,
+        takerName: "First",
+        takerEmail: "first@example.com",
+        assessmentName: "Assessment",
+        templateAlias: "qsp-v2",
+        overallScore: null,
+        tierLabel: null,
+        submittedAt: new Date(),
+        totalCount: 5001,
+      },
+    ]);
+
+    await expect(
+      exportPublicReferrals({ $queryRaw }, actor(), {}),
+    ).resolves.toEqual({
+      status: "too-many",
+      totalCount: 5001,
+      maxAllowed: 5000,
+    });
+  });
+
+  it("allows exactly 5,000 rows and formats scored, qualitative, and degraded results", async () => {
+    const baseRow = {
+      coachEligible: true,
+      isResultRow: true,
+      rowOrder: 1,
+      takerName: "Avery Leader",
+      takerEmail: "avery@example.com",
+      assessmentName: "Assessment",
+      templateAlias: "scaling-up-4-decisions",
+      overallScore: 7.4,
+      tierLabel: "Accelerating",
+      submittedAt: new Date("2026-07-29T08:30:00.000Z"),
+      totalCount: 5000,
+    };
+    const $queryRaw = jest.fn().mockResolvedValue(
+      Array.from({ length: 5000 }, (_, index) => ({
+        ...baseRow,
+        rowOrder: index + 1,
+        takerName: `Taker ${index}`,
+        ...(index === 0
+          ? { overallScore: 0, tierLabel: null }
+          : index === 1
+            ? { overallScore: 7, tierLabel: null }
+            : index === 2
+              ? { overallScore: 10, tierLabel: "Top" }
+              : index === 3
+                ? {
+                    templateAlias: "qsp-v2",
+                    overallScore: null,
+                    tierLabel: null,
+                  }
+                : index === 4
+                  ? { overallScore: null, tierLabel: "Stale tier" }
+                  : {}),
+      })),
+    );
+
+    const outcome = await exportPublicReferrals(
+      { $queryRaw },
+      actor(),
+      {},
+    );
+
+    expect(outcome.status).toBe("ok");
+    if (outcome.status !== "ok") return;
+    expect(outcome.rows).toHaveLength(5000);
+    expect(outcome.rows.slice(0, 5).map((row) => row.resultLabel)).toEqual([
+      "0",
+      "7",
+      "10 — Top",
+      "Completed",
+      "Result unavailable",
+    ]);
+  });
+
+  it("rejects actors without an immutable Coach ID before querying", async () => {
+    const $queryRaw = jest.fn();
+    await expect(
+      exportPublicReferrals(
+        { $queryRaw },
+        actor({ coachId: null }),
+        {},
+      ),
+    ).resolves.toEqual({ status: "forbidden" });
+    expect($queryRaw).not.toHaveBeenCalled();
+  });
+
+  it("forbids an inactive or expired Coach from the query eligibility sentinel", async () => {
+    const $queryRaw = jest.fn().mockResolvedValue([
+      {
+        coachEligible: false,
+        isResultRow: false,
+        rowOrder: null,
+        takerName: null,
+        takerEmail: null,
+        assessmentName: null,
+        templateAlias: null,
+        overallScore: null,
+        tierLabel: null,
+        submittedAt: null,
+        totalCount: 0,
+      },
+    ]);
+
+    await expect(
+      exportPublicReferrals({ $queryRaw }, actor(), {}),
+    ).resolves.toEqual({ status: "forbidden" });
+  });
+
+  it("returns an empty export for an eligible Coach with no matching rows", async () => {
+    const $queryRaw = jest.fn().mockResolvedValue([
+      {
+        coachEligible: true,
+        isResultRow: false,
+        rowOrder: null,
+        takerName: null,
+        takerEmail: null,
+        assessmentName: null,
+        templateAlias: null,
+        overallScore: null,
+        tierLabel: null,
+        submittedAt: null,
+        totalCount: 0,
+      },
+    ]);
+
+    await expect(
+      exportPublicReferrals({ $queryRaw }, actor(), {}),
+    ).resolves.toEqual({ status: "ok", rows: [], totalCount: 0 });
+  });
+});
 
 const FROZEN_RESULT = {
   perQuestion: [{ stableKey: "q1", value: 7.4, achieved: true }],
@@ -49,6 +244,7 @@ const PUBLIC_SUBMISSION = {
   referringCoachId: "coach-owner",
   referringCoach: {
     id: "coach-owner",
+    email: "current-owner@example.com",
     certificationStatus: "ACTIVE",
     certificationExpiry: new Date("2027-07-29T00:00:00.000Z"),
   },
@@ -124,6 +320,8 @@ describe("getPublicReferralReport", () => {
     if (outcome.status !== "ok") return;
     expect(outcome.report).toMatchObject({
       respondentName: "Avery Leader",
+      respondentEmail: "avery@example.com",
+      referringCoachEmail: "current-owner@example.com",
       companyName: "",
       assessmentName: "Scaling Up Full",
       templateAlias: "scaling-up-full",
@@ -138,6 +336,9 @@ describe("getPublicReferralReport", () => {
     expect(
       db.findFirst.mock.calls[0][0].select.campaign.select,
     ).not.toHaveProperty("organization");
+    expect(
+      db.findFirst.mock.calls[0][0].select.referringCoach.select,
+    ).toHaveProperty("email", true);
     expect(db.$transaction).toHaveBeenCalledTimes(1);
   });
 

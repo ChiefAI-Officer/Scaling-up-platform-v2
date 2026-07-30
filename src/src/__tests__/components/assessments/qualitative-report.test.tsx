@@ -21,6 +21,7 @@ import type { ScoreResult } from "@/lib/assessments/scoring";
 function baseReport(overrides: Partial<RespondentReport> = {}): RespondentReport {
   return {
     respondentName: "John CEOExec",
+    respondentEmail: "john@example.com",
     jobTitle: "CEO",
     companyName: "Northwind Logistics",
     assessmentName: "Leadership Vision Alignment",
@@ -43,6 +44,40 @@ function baseReport(overrides: Partial<RespondentReport> = {}): RespondentReport
     ...overrides,
   };
 }
+
+describe("QualitativeReport — respondent identity and next steps", () => {
+  it("shows the taker's email and the shared next-step links", () => {
+    render(
+      <QualitativeReport
+        report={lvaReport()}
+        contactEmail="coach@example.com"
+      />,
+    );
+
+    expect(screen.getByText(/john@example\.com/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /learn more/i })).toHaveAttribute(
+      "href",
+      "https://scalingup.com",
+    );
+    expect(
+      screen.getByRole("link", { name: /talk to a coach/i }),
+    ).toHaveAttribute("href", "mailto:coach%40example.com");
+  });
+
+  it("keeps Learn More but honors an instrument's Coach-action opt-out", () => {
+    render(
+      <QualitativeReport
+        report={lvaReport({ templateAlias: "five-dysfunctions" })}
+        contactEmail="coach@example.com"
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: /learn more/i })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: /talk to a coach/i }),
+    ).not.toBeInTheDocument();
+  });
+});
 
 /**
  * A rich LVA-shaped report covering every presentation kind:
