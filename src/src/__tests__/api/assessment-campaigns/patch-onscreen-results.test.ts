@@ -205,6 +205,42 @@ describe("PATCH showResultsOnScreen — flag ON", () => {
     expect(updateData().showResultsOnScreen).toBe(true);
   });
 
+  /**
+   * The CLIENT half of this contract lives in `handleToggleOnScreenResults`, which
+   * treats a 200 whose echoed row disagrees with what it sent as a failure — that is
+   * the only thing standing between an operator and a silently ignored write.
+   *
+   * That guard depends on this route echoing the FULL row. It does, because both
+   * success paths call `update` with no `select`. Nothing pinned it, though: adding a
+   * `select` here would make the client guard silently inert while its own test
+   * (which mocks `fetch`) stayed green — the same "unguarded guard" shape a review
+   * round already caught once on the client side.
+   */
+  it("asks Prisma for the FULL row and echoes it, so the client guard can read it", async () => {
+    mockCampaign({ status: "ACTIVE", showResultsOnScreen: false });
+    // The real Prisma `update` returns the full row; mirror that.
+    (db.assessmentCampaign.update as jest.Mock).mockResolvedValue({
+      id: "c1",
+      showResultsOnScreen: true,
+    });
+    const res = await PATCH(
+      patchReq({ showResultsOnScreen: true }) as never,
+      detailParams("c1"),
+    );
+    expect(res.status).toBe(200);
+
+    // The load-bearing assertion is the ABSENCE of a `select`. Prisma is mocked
+    // here, so asserting only on the echoed body would be vacuous — the mock returns
+    // the same object whether or not the route narrows the query. Adding a `select`
+    // is the drift that would make the client's echo check silently inert, and this
+    // is the only place it is observable.
+    const updateArg = (db.assessmentCampaign.update as jest.Mock).mock.calls[0][0];
+    expect(updateArg).not.toHaveProperty("select");
+
+    const json = await res.json();
+    expect(json.data).toHaveProperty("showResultsOnScreen", true);
+  });
+
   it("persists false — an explicit opt-OUT is a write, not a skipped falsy value", async () => {
     mockCampaign({ status: "ACTIVE", showResultsOnScreen: true });
     const res = await PATCH(

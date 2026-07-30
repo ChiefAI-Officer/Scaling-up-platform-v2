@@ -410,7 +410,7 @@ describe("an operator-set coach logo is scheme-gated on the respondent path (GH 
   it("documents the LIMIT — an arbitrary https host is NOT blocked", async () => {
     // This is the residual on #229, recorded as a test so the scope of the gate
     // cannot be overstated later: scheme-gating does not stop a third-party
-    // request, it only stops mixed content and non-http(s) schemes.
+    // request, it only stops mixed content (`http:`) and non-http schemes.
     writeOnScreenResult(
       ALIAS,
       {

@@ -191,15 +191,24 @@ describe("CampaignDetail — Results on screen control (Wave OSR #71)", () => {
   });
 
   /**
-   * TIMEOUTS — the async tests in this file pass an explicit per-test budget as
-   * `it`'s third argument, and raise `waitFor`'s own timeout to match.
+   * TIMEOUTS — modest headroom, and NOT because the green path is slow.
    *
-   * BOTH are required, and it is easy to get this wrong: `waitFor` defaults to 1s
-   * while jest's own `testTimeout` defaults to 5s (this repo sets neither in
-   * `jest.config.js`/`jest.setup.js`). Raising only `waitFor` to 15s is
-   * self-defeating — jest aborts the test at 5s and the larger budget is never
-   * reachable. This suite renders the entire CampaignDetail tree in jsdom, which is
-   * slow enough under parallel full-suite load to matter.
+   * Measured on this suite: ~0.5s for the slowest test under real full-suite
+   * parallel load. So the green path needs nothing. What the budgets buy is the
+   * FAILURE mode: an async assertion that will never settle should fail with
+   * `waitFor`'s diagnostic (which prints the DOM), not with a bare jest timeout.
+   *
+   * That requires the two budgets to be ordered, and it is easy to get wrong:
+   * `waitFor` defaults to 1s and jest's `testTimeout` to 5s (this repo sets neither
+   * in `jest.config.js`/`jest.setup.js`). Each `waitFor` must be able to expire
+   * inside the per-test budget, so the budget has to exceed the SUM of the awaits
+   * in the test — otherwise jest aborts mid-way and you get the bare timeout the
+   * ordering was meant to avoid.
+   *
+   * An earlier revision of this file used 15s waits inside a 20s budget, justified
+   * by a 15s measurement. That number came from a deliberately BROKEN run (the
+   * guard removed, so the revert never happened) — it measured the failure, not the
+   * test. Corrected here; do not restore it.
    */
   it(
     "PATCHes the campaign when ticked",
@@ -215,7 +224,7 @@ describe("CampaignDetail — Results on screen control (Wave OSR #71)", () => {
       fireEvent.click(screen.getByTestId(TOGGLE));
 
       await waitFor(() => expect(global.fetch).toHaveBeenCalled(), {
-        timeout: 15000,
+        timeout: 3000,
       });
       const call = (global.fetch as jest.Mock).mock.calls.find((c) =>
         String(c[0]).includes(`/api/assessment-campaigns/${CAMPAIGN_ID}`),
@@ -227,7 +236,7 @@ describe("CampaignDetail — Results on screen control (Wave OSR #71)", () => {
       });
       expect(screen.getByTestId(TOGGLE)).toBeChecked();
     },
-    20000,
+    10000,
   );
 
   it(
@@ -257,18 +266,18 @@ describe("CampaignDetail — Results on screen control (Wave OSR #71)", () => {
 
       // positive control: the request WAS made and reported success…
       await waitFor(() => expect(global.fetch).toHaveBeenCalled(), {
-        timeout: 15000,
+        timeout: 3000,
       });
       // …and the checkbox still goes back, because nothing was actually stored.
       await waitFor(
         () => expect(screen.getByTestId(TOGGLE)).not.toBeChecked(),
-        { timeout: 15000 },
+        { timeout: 3000 },
       );
       expect(toast).toHaveBeenCalledWith(
         expect.objectContaining({ variant: "destructive" }),
       );
     },
-    20000,
+    10000,
   );
 
   it(
@@ -296,16 +305,16 @@ describe("CampaignDetail — Results on screen control (Wave OSR #71)", () => {
       // positive control: the request WAS attempted, so the revert below is a
       // response to a refusal and not just "the click did nothing".
       await waitFor(() => expect(global.fetch).toHaveBeenCalled(), {
-        timeout: 15000,
+        timeout: 3000,
       });
       await waitFor(
         () => expect(screen.getByTestId(TOGGLE)).not.toBeChecked(),
-        { timeout: 15000 },
+        { timeout: 3000 },
       );
       expect(toast).toHaveBeenCalledWith(
         expect.objectContaining({ variant: "destructive" }),
       );
     },
-    20000,
+    10000,
   );
 });

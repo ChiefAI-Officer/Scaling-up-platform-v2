@@ -21,11 +21,14 @@
  *     changed. The in-repo control handles that by comparing the echoed row against
  *     what it sent (`handleToggleOnScreenResults`) and surfacing it as a failure; a
  *     hand-rolled client skipping that comparison would appear to save and change
- *     nothing. That is not a coercion of
- *     stored data (nothing is rewritten) and it is not a security boundary (CREATE
- *     writes the column with no flag check, and disclosure is decided under the
- *     submission lock); it exists for consistency with the route's other
- *     flag-gated fields. The wizard
+ *     nothing.
+ *
+ *     That write-gate is NOT a coercion of stored data (nothing is rewritten) and it
+ *     is NOT a security boundary (CREATE writes the same column with no flag check,
+ *     and disclosure is decided under the submission lock). It exists only for
+ *     consistency with the route's other flag-gated fields.
+ *
+ *     The wizard, separately,
  *     hides the checkbox when the flag is off but NEVER coerces the column,
  *     unlike the `sendResultsToRespondent` force-false precedent in CampaignWizard.
  *     (Cited by symbol, not line: the old `CampaignWizard.tsx:641` citation was
