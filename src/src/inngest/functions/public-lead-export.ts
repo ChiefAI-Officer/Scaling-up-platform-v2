@@ -82,10 +82,15 @@ export const publicLeadExport = inngest.createFunction(
         return { status: job?.status ?? "missing" };
       }
 
-      await db.publicLeadExport.update({
-        where: { id: exportId },
+      const claimed = await db.publicLeadExport.updateMany({
+        where: {
+          id: exportId,
+          status: { in: ["PENDING", "RUNNING"] },
+          authorizationGeneration: job.authorizationGeneration,
+        },
         data: { status: "RUNNING", startedAt: job.startedAt ?? new Date() },
       });
+      if (claimed.count !== 1) return { status: "authorization-revoked" };
 
       try {
         const { key, version } = exportKey();
