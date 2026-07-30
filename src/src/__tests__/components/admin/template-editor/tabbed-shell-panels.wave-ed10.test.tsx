@@ -149,6 +149,31 @@ describe("TabbedShell seam — ed10Active (Preview + Settings)", () => {
     expect(screen.queryByTestId("tab-panel-settings")).toBeNull();
   });
 
+  it("passes the QSP story-group gate into the mounted Preview panel", () => {
+    const props = shellProps(true);
+    render(
+      <TemplateEditorTabbed
+        {...props}
+        qspStoryGroupEnabled
+        template={{ ...props.template, name: "QSP v2", alias: "qsp-v2" }}
+        version={{
+          ...props.version,
+          sections: [{ stableKey: "P1_retrospective", name: "Core values" }],
+          questions: [1, 2, 3].map((index) => ({
+            stableKey: `P1_core_values_story_${index}`,
+            sectionStableKey: "P1_retrospective",
+            label: `Core-values story ${index}`,
+            type: "TEXT" as const,
+            isRequired: false,
+            sortOrder: index,
+          })),
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId("qsp-story-group")).toBeInTheDocument();
+  });
+
   it("?tab=settings mounts SettingsTab", () => {
     mockSearchParams = new URLSearchParams("tab=settings");
     render(<TemplateEditorTabbed {...shellProps(true)} />);

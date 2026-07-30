@@ -6,6 +6,68 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-07-30 — July-10 session closeouts: #59, #67, #70, and #71 <!-- ENTRY_ISO:2026-07-30 ENTRY_SLUG:jeff-jul10-session-closeouts-59-67-70-71 -->
+
+Four July-10 assessment rows were closed from shipped code plus fresh production evidence; none required a new feature implementation in this branch.
+
+- **#71 — Results on screen: Complete.** PR #249 merged through the protected `main` branch as squash `36131fe4`; GitHub Build and Migration Safety passed, the production deployment reached Ready, and `/api/health` returned `200` with healthy database/auth posture and `no-store`. A controlled no-email production campaign with `showResultsOnScreen=true` submitted one scored answer through the public invited flow and rendered the full branded respondent report in place, including the overall result, section breakdown, Print, and Download PDF controls. The exact canary was then closed and soft-deleted; its single submission remains as the audit receipt. This also closes GH #229: PR #249 moved the shared coach-image source through the validated safe-image policy before exposing the report to invited respondents.
+- **#67 — QSP report header: Complete.** A read-only production check removed the prior data caveat: both the original `2026 QSP Q2` campaign and its active replacement have a real `creatorCoach` with a non-empty profile image, and the replacement has completed submissions. The shared report byline code is template-agnostic and its focused cover/footer suites passed 27/27 on current `main`. The auth-gated report itself was not opened with a production account; that is optional pixel-level acceptance, not a code or data blocker.
+- **#70 — Rockefeller Welcome wording: Complete by product decision.** The shipped wording keeps every accurate fact: respondents rate each statement 0–3 and each habit has four items. The omitted “table on page 4” clause remains intentionally omitted because Jeff #24 removed the Rockefeller score table and the report has no page numbering. Restoring that clause would make the Welcome screen promise an artifact that does not exist. GH #223 is closed on this decision.
+- **#59 — false removal error: Complete.** The production audit trail on the report date contains two `AssessmentCampaignParticipant` DELETE events from the affected Spectrum campaign, followed by the campaign deletion; this maps the report to the campaign-detail Respondents table, not to deleting an individual result. The exact UI path is `/portal/assessments/{campaignId}` → Respondents → the row action labelled `Remove {firstName} {lastName}` → confirmation button `Remove` → `DELETE /api/assessment-campaigns/{campaignId}/participants/{participantId}`. Before PR #198, that route committed the invitation/participant transaction and audit row, then threw while constructing an invalid JSON-bodied `204`, so the UI showed “Could not remove respondent” even though removal succeeded. Current code returns `new NextResponse(null, { status: 204 })`; the client treats `204` as success and shows “Respondent removed.” The shipped route regression test uses a faithful `Response` implementation specifically to prevent this production-only failure from returning.
+
+**#48 travels with this closeout PR but remains a launch step, not one of the four completed production rows.** The QSP story-grouping branch is integrated with current `main`, retains the default-off flag/kill switch and three stable-key compatibility boundary, and its runtime whole-branch review passed. Launch-runbook re-review requested fail-closed corrections; those corrections are now recorded, with final runbook verification still pending. The branch remains unmerged and unlaunched and proceeds only after that review clears, followed by a CI-gated PR, merge, and separate flag launch.
+
+---
+
+### 2026-07-30 — Jeff #48: QSP core-values story group built default-OFF <!-- ENTRY_ISO:2026-07-30 ENTRY_SLUG:jeff-48-qsp-story-group-built -->
+
+**Status: BUILT on `codex/issue-48-qsp-story-ui-design`, DEFAULT-OFF, runtime whole-branch review passed; launch-runbook re-review requested fail-closed corrections, now applied with final verification pending; pending PR, merge, and production launch.** This entry records local implementation and verification only. No merge, Vercel environment write, deployment, or launch occurred.
+
+The approved presentation adapter recognizes only the exact consecutive, same-section, optional `TEXT` triplet on template alias `qsp-v2`. When `WAVE_48_QSP_STORY_GROUP_ENABLED` is on, public assessment, invited survey, and editor Preview paths render one prompt with up to three fixed-order story slots and count it as one logical progress item. `WAVE_48_QSP_STORY_GROUP_ENABLED` remains default-OFF; `WAVE_48_QSP_STORY_GROUP_KILL` wins over enablement and restores the ordinary three-question rendering.
+
+**Compatibility boundary.** There is no Prisma schema migration, QSP seed-content or question-count change, Esperto crosswalk/import change, answer-state or submission-payload change, scoring/report/export change, or historical-data rewrite. The stable keys remain exactly `P1_core_values_story_1`, `P1_core_values_story_2`, and `P1_core_values_story_3`; Esperto remains `Q5a/Q5b/Q5c` one-to-one with those slots. Public and invited component tests submit the same three stable-key/value objects, and editor Preview delegates to the same pager in read-only mode.
+
+**Validation receipt.**
+
+- Final complete focused regression command passed **15/15 suites and 224/224 tests** with **0 snapshots**, including QSP seed invariants, Wave-P seed labels, Esperto crosswalk/results planning, ordinary pager/slides/phase-tile behavior, public/invited payloads, ED10 Preview/prop threading, and preservation of a revealed blank story slot across Next → Back navigation:
+
+```bash
+npx jest \
+  src/__tests__/lib/assessments/wave-48-flags.test.ts \
+  src/__tests__/lib/assessments/qsp-story-group.test.ts \
+  src/__tests__/assessments/qsp-story-group.test.tsx \
+  src/__tests__/assessments/section-pager-qsp-stories.test.tsx \
+  src/__tests__/assessments/section-pager.test.tsx \
+  src/__tests__/assessments/section-pager-slides.test.tsx \
+  src/__tests__/assessments/section-pager-phase-tile.test.tsx \
+  src/__tests__/assessments/public-quiz-pager.test.tsx \
+  src/__tests__/assessments/org-survey-pager.test.tsx \
+  src/__tests__/components/admin/template-editor/preview-tab.test.tsx \
+  src/__tests__/components/admin/template-editor/tabbed-shell-panels.wave-ed10.test.tsx \
+  src/__tests__/seed/qsp-v2-content.test.ts \
+  src/__tests__/seed/wave-p-seed-labels.test.ts \
+  src/__tests__/lib/assessments/esperto-import/crosswalk.test.ts \
+  src/__tests__/lib/assessments/esperto-import/results-plan.test.ts \
+  --runInBand
+```
+- Placeholder correction proof: `npx jest src/__tests__/assessments/qsp-story-group.test.tsx src/__tests__/components/assessments/question-input.test.tsx --runInBand` passed **2/2 suites and 27/27 tests**. Scoped ESLint over both components/tests returned no findings.
+- `node scripts/check-migration-safety.mjs` passed: **41 migrations checked**, no unapproved destructive operations.
+- Final `CI=true npx next build --turbopack` passed with exit 0 on Next.js 16.1.6. The local environment emitted the known middleware deprecation and missing `DATABASE_URL` / Inngest-key page-generation warnings; compilation, TypeScript, static generation, and final route output completed.
+
+The first two build attempts usefully caught two TypeScript union-widening defects that Jest could not see: `Math.max(current, restoredCount)` returned `number`, then `visibleCount + 1` returned `number`. They were corrected without behavior changes in isolated commits `830a103e` and `621fae31`; the existing component interaction suite passed **10/10** and scoped ESLint was clean after each correction. The visual pass then found the generic `Type your answer here…` placeholder did not match the approved mockup. Commit `23b35622` added an optional `QuestionInput` text-placeholder override whose default remains unchanged and passed the exact approved QSP copy: **“Name the person, then describe what they did…”**
+
+**Visual review evidence.** A local authenticated editor Preview used the real QSP v2 published v3 at desktop (`1440×783`) and mobile (`390×844`) and compared it with `docs/specs/v7.6/mockups/48-qsp-core-values-progressive.html`. Flag on showed one grouped prompt, one visible story textarea, `1 of 3`, the approved placeholder, and disabled Preview textarea/Add controls; logical progress max was **20**. Flag off showed no group, all **3** ordinary underlying story textareas, and raw progress max **22**. At 390px the document scroll width was **375px**, so the grouped card introduced no horizontal overflow. With the Jeff #48 flag on, a non-QSP Leadership Vision Alignment Preview showed **0** QSP groups, **9** ordinary question cards on the inspected section, and unchanged progress max **51**. Screenshots were written only to the OS temporary directory and were not added to git.
+
+The published-version boundary is explicit: editor Preview hardcodes empty answers and disables Add, while ED1 Test Mode is draft-only. Creating a shared-database draft solely for screenshots was rejected, and no isolated Postgres path was available. The first temporary interaction harness used `wireframe-scope`, which is not a production CSS scope; its field-count/focus/announcement/restore observations remain valid behavior evidence, but its production-styling claim and three PNGs are retracted.
+
+A fresh temporary uncommitted DB-free Next route corrected the harness. It mounted the real production `QspStoryGroup`, canonical three-question fixture, and local React answer state under the relevant `SectionPager` DOM exactly: `main.wf-scope > .su-assessment-brand.survey-section > ul.survey-question-list > li.survey-question.qsp-story-question`. The loaded stylesheet list included the generated `src_styles_wireframes-scoped` chunk. At `1440×900`, computed styles proved `--primary: 269 56% 33%`; a white question card with `rgb(232, 226, 242)` border, `14px` radius, `28px` padding, and purple shadow; a `48px`/`638px` grid prompt row with `16px` gap; a purple `48px` Q mark with `14px` radius; tinted story entries with `rgb(222, 211, 236)` borders, `12px` radius, and `16px` padding; and the production textarea class/border/radius. Initial state showed 1 textarea and 1 Add button. Add once rendered 2 textareas, focused `q-P1_core_values_story_2`, retained 1 Add button, announced slot 2, and activated the production focus-within border `rgb(185, 169, 214)` plus purple shadow. Add twice rendered 3 textareas, focused `q-P1_core_values_story_3`, removed Add, announced slot 3, and retained those styles. A fresh restored-slot-3 load rendered all 3 styled entries, no Add, and `Grace coached the whole team.` at the original slot-3 DOM id.
+
+Corrected accessibility snapshots and the full computed-style JSON receipt were saved as `/tmp/jeff-48-production-context-*`, outside git. The connected Chrome adapter did not support screenshot capture, so no corrected harness PNG is claimed; the published editor Preview PNGs remain the desktop/mobile styling evidence. This is documented as production-context real-component harness evidence, not as editor Preview or Test Mode evidence.
+
+After the corrected route source was removed and the dev server stopped, `CI=true npx next build --turbopack` passed with exit 0 and omitted the validation route from the production route table. Next retained the separate `.next/dev` tree, so the prior “removed completely” cache claim was also retracted. The exact disposable `src/.next/dev` directory was moved recoverably to `/tmp/qsp48-next-dev-cache-add882f5`. Exact `rg` searches for `qsp48-validation` / `qsp48-validation-client`, `find` searches for matching paths, and manifest searches across the remaining `.next` all returned no matches. The worktree contains neither temporary source nor compiled-route residue.
+
+---
+
 ### 2026-07-30 — Jeff #83: verified Coach Referred Results launched <!-- ENTRY_ISO:2026-07-30 ENTRY_SLUG:jeff-83-referred-results-launched -->
 
 **Status: LAUNCHED on production (PR #245, squash `e0e2bc9b`; deployment `dpl_BZtaegoNCrfjpZAoVPpYQu7LxeDX`).** `WAVE_83_REFERRED_RESULTS_ENABLED=1` is an encrypted Production-only Vercel variable; `WAVE_83_REFERRED_RESULTS_KILL` remains the immediate rollback lever. The Ready deployment owns `scaling-up-platform-v2.vercel.app`, `platformtest.scalingup.com`, and the main aliases.

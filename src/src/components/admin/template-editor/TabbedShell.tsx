@@ -319,6 +319,11 @@ export interface TabbedShellProps {
    */
   previewSettingsEnabled?: boolean;
   /**
+   * Wave 48 — QSP core-values stories presentation. Server-computed and
+   * forwarded to the read-only Preview pager; default false preserves ED10.
+   */
+  qspStoryGroupEnabled?: boolean;
+  /**
    * Wave ED10 (spec 19am-plan, Task 5) — the Active PUBLISHED version snapshot
    * for the Preview tab's read-only "Active" mode. Built server-side on the
    * edit page ONLY when `isPreviewSettingsEnabled()` (null when the flag is off
@@ -429,6 +434,7 @@ export function TabbedShell({
   // it feeds `ed10Active` (below), which humanizes the header pills; Task 10
   // mounts the Preview + Settings tabs when `ed10Active`.
   previewSettingsEnabled = false,
+  qspStoryGroupEnabled = false,
   // ED10 (spec 19am-plan, Task 5/10) — Active published-version snapshot for
   // the Preview tab's "Active" side; null when nothing is published (or the
   // flag is off). Threaded into PreviewTab below.
@@ -891,6 +897,7 @@ export function TabbedShell({
                 }}
                 template={{ name: template.name, alias: template.alias }}
                 activePreview={activePreview}
+                qspStoryGroupEnabled={qspStoryGroupEnabled}
               />
             </div>
           </TabsContent>

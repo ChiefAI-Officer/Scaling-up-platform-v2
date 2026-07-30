@@ -397,6 +397,65 @@ describe("PublicQuizClient — SectionPager wiring", () => {
     expect(screen.getByTestId("quiz-email")).toBeInTheDocument();
   });
 
+  it("groups the QSP core-values stories and submits their three stable keys unchanged", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        success: true,
+        data: {
+          submissionId: "sub_qsp_public",
+          scoreResult: {
+            perQuestion: [], perSection: [], overallTotal: 0, overallAverage: 0,
+            countAchieved: 0, tier: null, tierMetricValue: 0, unansweredKeys: [],
+          },
+        },
+      }),
+    });
+    const qspStoryQuestions = [1, 2, 3].map((index) => ({
+      stableKey: `P1_core_values_story_${index}`,
+      sortOrder: index,
+      sectionStableKey: "P1_retrospective",
+      type: "TEXT",
+      label: `Core-values story ${index}`,
+      isRequired: false,
+    }));
+
+    render(
+      <PublicQuizClient
+        {...baseProps}
+        templateAlias="qsp-v2"
+        sections={[{ stableKey: "P1_retrospective", sortOrder: 1, name: "Core values" }]}
+        questions={qspStoryQuestions}
+        qspStoryGroupEnabled
+      />,
+    );
+    reachFormStep();
+    expect(screen.getByTestId("qsp-story-group")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Person and story 1 of 3" }), {
+      target: { value: "Ada led the launch" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /add another person/i }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Person and story 2 of 3" }), {
+      target: { value: "Grace coached the team" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /add another person/i }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Person and story 3 of 3" }), {
+      target: { value: "Lin removed a blocker" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /submit/i }));
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
+    const [, init] = (global.fetch as jest.Mock).mock.calls[0];
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body.answers).toEqual([
+      { stableKey: "P1_core_values_story_1", value: "Ada led the launch" },
+      { stableKey: "P1_core_values_story_2", value: "Grace coached the team" },
+      { stableKey: "P1_core_values_story_3", value: "Lin removed a blocker" },
+    ]);
+  });
+
   it("info step does NOT promise emailed results (D3 policy)", () => {
     render(<PublicQuizClient {...baseProps} />);
     fireEvent.click(screen.getByTestId("quiz-start"));
