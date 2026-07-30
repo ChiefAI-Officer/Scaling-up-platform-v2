@@ -4,6 +4,7 @@ import path from "node:path";
 import { PrismaClient } from "@prisma/client";
 import {
   claimNextOutboxRow,
+  drainLeadOutbox,
   type OutboxDb,
 } from "../src/inngest/functions/quick-assessment-lead-email";
 
@@ -61,6 +62,8 @@ describe("assessment email atomic lease on PostgreSQL", () => {
         "bodyHtml" TEXT NOT NULL,
         "status" TEXT NOT NULL DEFAULT 'PENDING',
         "attempts" INTEGER NOT NULL DEFAULT 0,
+        "lastError" TEXT,
+        "sentAt" TIMESTAMP(3),
         "nextAttemptAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
         "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
         "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -149,5 +152,104 @@ describe("assessment email atomic lease on PostgreSQL", () => {
       persisted[0].leaseToken,
     );
     expect(Number(persisted[0].leaseRemainingMs)).toBeGreaterThan(115_000);
+  });
+
+  it("drains every mixed email type once under four-client database contention", async () => {
+    const workerDbs = Array.from(
+      { length: 4 },
+      () =>
+        new PrismaClient({
+          datasources: { db: { url: scopedDatabaseUrl(testDatabaseUrl!) } },
+        }),
+    );
+    const emailTypes = [
+      "QUICK_ASSESSMENT_LEAD",
+      "ASSESSMENT_RESULTS",
+      "COACH_COMPLETION",
+    ] as const;
+    const rowsPerType = 8;
+
+    try {
+      for (const emailType of emailTypes) {
+        for (let i = 0; i < rowsPerType; i += 1) {
+          const id = `mix-${emailType.toLowerCase()}-${i}`;
+          const submissionId = `mix-submission-${emailType.toLowerCase()}-${i}`;
+          const recipientRole =
+            emailType === "QUICK_ASSESSMENT_LEAD"
+              ? "TAKER_COPY"
+              : emailType === "ASSESSMENT_RESULTS"
+                ? "RESPONDENT"
+                : "OWNING_COACH";
+          await eventDb.$executeRawUnsafe(
+            `
+              INSERT INTO "assessment_email_outbox" (
+                "id", "submissionId", "recipientEmail", "recipientRole",
+                "emailType", "subject", "bodyHtml", "status", "nextAttemptAt"
+              ) VALUES ($1, $2, $3, $4, $5, $6, '<p>Results</p>', 'PENDING',
+                (statement_timestamp() AT TIME ZONE 'UTC') - INTERVAL '1 second')
+            `,
+            id,
+            submissionId,
+            `${id}@example.com`,
+            recipientRole,
+            emailType,
+            id,
+          );
+        }
+      }
+
+      const deliveredSubjects: string[] = [];
+      const sendEmail = async (message: {
+        to: string;
+        subject: string;
+        html: string;
+      }): Promise<void> => {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        deliveredSubjects.push(message.subject);
+      };
+
+      const drain = (workerDb: PrismaClient, submissionId: string | null) =>
+        drainLeadOutbox(
+          {
+            db: workerDb as unknown as OutboxDb,
+            sendEmail,
+            maxRows: 24,
+            invocationBudgetMs: 60_000,
+          },
+          submissionId,
+        );
+      const [eventResult, ...cronResults] = await Promise.all([
+        drain(workerDbs[0], "mix-submission-quick_assessment_lead-0"),
+        ...workerDbs.slice(1).map((workerDb) => drain(workerDb, null)),
+      ]);
+
+      const persisted = await eventDb.$queryRaw<
+        Array<{ emailType: string; status: string; count: bigint }>
+      >`
+        SELECT "emailType", "status", COUNT(*) AS "count"
+        FROM "assessment_email_outbox"
+        WHERE "id" LIKE 'mix-%'
+        GROUP BY "emailType", "status"
+        ORDER BY "emailType", "status"
+      `;
+      const expectedTotal = emailTypes.length * rowsPerType;
+
+      expect(
+        eventResult.sent +
+          cronResults.reduce(
+            (total, result) => total + result.sent,
+            0,
+          ),
+      ).toBe(expectedTotal);
+      expect(deliveredSubjects).toHaveLength(expectedTotal);
+      expect(new Set(deliveredSubjects).size).toBe(expectedTotal);
+      expect(persisted).toEqual([
+        { emailType: "ASSESSMENT_RESULTS", status: "SENT", count: 8n },
+        { emailType: "COACH_COMPLETION", status: "SENT", count: 8n },
+        { emailType: "QUICK_ASSESSMENT_LEAD", status: "SENT", count: 8n },
+      ]);
+    } finally {
+      await Promise.allSettled(workerDbs.map((workerDb) => workerDb.$disconnect()));
+    }
   });
 });

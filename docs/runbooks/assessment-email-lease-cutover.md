@@ -17,10 +17,25 @@ status` subsequently reported the production ledger healthy.
 Before pausing anything:
 
 - confirm the focused PostgreSQL lease-race CI check passed;
-- confirm `ASSESSMENT_SMTP_CONCURRENCY` against the SMTP provider's measured
-  connection capacity (default `4`);
-- run a mixed public/invited backlog exercise and confirm the queue drains
-  without provider throttling or starvation.
+- confirm the Azure Communication Services resource's **account-specific send
+  quota**. Microsoft documents an initial custom-domain quota of 30 messages per
+  minute and 100 per hour unless Azure has approved a higher quota. The
+  documented connection ceiling is 250 authenticated connections, so
+  `ASSESSMENT_SMTP_CONCURRENCY=4` is connection-safe but is not, by itself, a
+  send-rate limit;
+- confirm the focused PostgreSQL mixed-row contention exercise passes. It races four
+  workers over `QUICK_ASSESSMENT_LEAD`, `ASSESSMENT_RESULTS`, and
+  `COACH_COMPLETION` rows and fails on duplicate delivery or an undrained row
+  type. Its SMTP sink is intentionally fake and it invokes the worker seam
+  directly; it does not prove Inngest scheduling, Azure's account-specific rate
+  quota, or the 30-minute pending-age budget;
+- compare the Azure quota with the expected combined assessment-email volume.
+  If the resource is still on the initial quota, stop: Inngest concurrency does
+  not rate-limit messages sent inside one worker run. Obtain a quota increase or
+  add a durable provider-wide rate gate before cutover;
+- run a pre-cutover load exercise at the expected combined volume and measured
+  provider latency. Confirm all three email types remain below the existing
+  30-minute oldest-pending warning threshold with no Azure throttling.
 
 1. Pause both Inngest functions:
    `quick-assessment-lead-email` and `quick-assessment-lead-email-cron`.

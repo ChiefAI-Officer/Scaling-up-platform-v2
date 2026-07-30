@@ -100,7 +100,7 @@ jobs:
           cache-dependency-path: src/package-lock.json
       - run: npm ci
       - run: npx prisma generate
-      - name: Prove one lease under event/cron contention
+      - name: Prove lease safety under mixed-row contention
         env:
           TEST_DATABASE_URL: "postgresql://lease_test:lease_test@localhost:5432/assessment_email_lease_test?schema=public"
           ASSESSMENT_EMAIL_LEASE_TEST_ALLOW: "isolated-schema"

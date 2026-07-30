@@ -17,8 +17,8 @@ the full workshop lifecycle from request through post-event follow-up.
 | **Live URL** | `scaling-up-platform-v2.vercel.app` |
 | **Client** | Jeff Verdun, CIO - Scaling Up |
 | **Operations** | Suzanne (handles manual approvals) |
-| **Last Updated** | <!-- LAST_UPDATED_ISO:2026-07-30 LAST_UPDATED_SLUG:assessment-email-lease-hotfix-implemented --> July 30, 2026 — **Assessment email duplicate-delivery hotfix IMPLEMENTED, NOT LAUNCHED.** Atomic PostgreSQL leases and same-mailbox suppression are on the replacement branch; database-race CI, SMTP capacity validation, and quiesced cutover remain required. Full detail in CHANGELOG `assessment-email-lease-hotfix-implemented`. |
-| **Latest progress** | The assessment-email duplicate-delivery hotfix is implemented on `codex/assessment-email-outbox-lease` but **not launched**. Atomic PostgreSQL leases and same-mailbox suppression are ready for a replacement draft PR; focused PostgreSQL CI, provider-capacity validation, and the quiesced worker cutover remain gates. |
+| **Last Updated** | <!-- LAST_UPDATED_ISO:2026-07-30 LAST_UPDATED_SLUG:assessment-email-lease-hotfix-implemented --> July 30, 2026 — **Assessment email duplicate-delivery hotfix IMPLEMENTED, NOT LAUNCHED.** Atomic PostgreSQL leases and same-mailbox suppression are on the replacement branch; mixed-backlog PostgreSQL CI, the account-specific Azure send quota, and quiesced cutover remain required. Full detail in CHANGELOG `assessment-email-lease-hotfix-implemented`. |
+| **Latest progress** | The assessment-email duplicate-delivery hotfix is implemented on `codex/assessment-email-outbox-lease` but **not launched**. Azure Communication Services permits 250 authenticated connections, so concurrency 4 is connection-safe, but the resource's actual messages-per-minute/hour quota must be confirmed because Inngest concurrency is not a rate limiter. Mixed-row lease contention is covered by focused PostgreSQL CI; provider-rate/backlog-age validation and the quiesced worker cutover remain gates. |
 | **Work Logs** | Session work logs at `~/.claude/worklogs/` — invoke `/log-session` to log or generate reports |
 
 ## Current Status
