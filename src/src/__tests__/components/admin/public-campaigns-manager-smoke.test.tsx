@@ -60,8 +60,29 @@ describe("PublicCampaignsManager — public-quiz submissions (#83)", () => {
       id: "s1",
       takerName: "Jane Smith",
       takerEmail: "jane@x.com",
-      referringCoachEmail: "coach@x.com",
+      referringCoachEmail: "legacy@x.com",
       submittedAt: "2026-07-20T10:00:00.000Z",
+      referringCoach: {
+        name: "Ada Coach",
+        email: "ada@scalingup.com",
+      },
+      template: {
+        id: "t1",
+        name: "Rockefeller Habits",
+        alias: "RockHabits",
+      },
+      summary: {
+        kind: "scored",
+        overallScore: 7.4,
+        tierLabel: "On the way",
+        domains: [
+          { key: "people", label: "People", score: 7.1 },
+          { key: "strategy", label: "Strategy", score: 7.2 },
+          { key: "execution", label: "Execution", score: 7.3 },
+          { key: "cash", label: "Cash", score: 8 },
+        ],
+      },
+      reportHref: "/assessments/public-submissions/s1/report",
     },
     {
       id: "s2",
@@ -69,6 +90,14 @@ describe("PublicCampaignsManager — public-quiz submissions (#83)", () => {
       takerEmail: "bob@x.com",
       referringCoachEmail: null,
       submittedAt: "2026-07-19T10:00:00.000Z",
+      referringCoach: null,
+      template: {
+        id: "t1",
+        name: "Rockefeller Habits",
+        alias: "RockHabits",
+      },
+      summary: { kind: "degraded", label: "Result unavailable" },
+      reportHref: "/assessments/public-submissions/s2/report",
     },
   ];
 
@@ -88,7 +117,7 @@ describe("PublicCampaignsManager — public-quiz submissions (#83)", () => {
     }) as unknown as typeof fetch;
   });
 
-  it("lists submissions (taker name + referring coach) when the row is expanded", async () => {
+  it("renders canonical Coach ownership, frozen summaries, details, and report links", async () => {
     render(<PublicCampaignsManager />);
     await screen.findByText("Quick Scaling Up Check");
 
@@ -97,8 +126,58 @@ describe("PublicCampaignsManager — public-quiz submissions (#83)", () => {
     await waitFor(() =>
       expect(screen.getByText("Jane Smith")).toBeInTheDocument(),
     );
-    // Referring coach shown for the attributed taker; the un-attributed one too.
-    expect(screen.getByText("coach@x.com")).toBeInTheDocument();
+    expect(screen.getByText("Ada Coach")).toBeInTheDocument();
+    expect(screen.getByText("ada@scalingup.com")).toBeInTheDocument();
+    expect(screen.getByText("Scaling Up only")).toBeInTheDocument();
     expect(screen.getByText("bob@x.com")).toBeInTheDocument();
+    expect(screen.getByText("7.4")).toBeInTheDocument();
+    expect(screen.getByText("On the way")).toBeInTheDocument();
+    expect(
+      screen.getByLabelText("Four Decisions result"),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Details" }));
+    expect(screen.getByText("People")).toBeInTheDocument();
+    expect(screen.getByText("7.1")).toBeInTheDocument();
+
+    expect(screen.getAllByRole("link", { name: "View report" })[0]).toHaveAttribute(
+      "href",
+      "/assessments/public-submissions/s1/report",
+    );
+  });
+
+  it("keeps the legacy three-column expander when enrichment is absent", async () => {
+    const legacyRows = [
+      {
+        id: "s1",
+        takerName: "Jane Smith",
+        takerEmail: "jane@x.com",
+        referringCoachEmail: "coach@x.com",
+        submittedAt: "2026-07-20T10:00:00.000Z",
+      },
+    ];
+    (global.fetch as jest.Mock).mockImplementation(
+      async (input: RequestInfo | URL) => {
+        const url = typeof input === "string" ? input : String(input);
+        const json = url.endsWith("/api/assessment-campaigns")
+          ? { success: true, data: [PUBLIC_CAMPAIGN] }
+          : url.endsWith("/api/admin/public-campaigns/pc-1/submissions")
+            ? { success: true, data: legacyRows }
+            : { success: true, data: [] };
+        return {
+          ok: true,
+          status: 200,
+          json: async () => json,
+        } as unknown as Response;
+      },
+    );
+
+    render(<PublicCampaignsManager />);
+    await screen.findByText("Quick Scaling Up Check");
+    fireEvent.click(screen.getByRole("button", { name: /view submissions/i }));
+
+    await screen.findByText("coach@x.com");
+    expect(screen.queryByRole("columnheader", { name: "Result" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "View report" })).not.toBeInTheDocument();
   });
 });

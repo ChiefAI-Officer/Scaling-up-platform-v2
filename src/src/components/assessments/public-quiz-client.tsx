@@ -96,6 +96,7 @@ interface PublicQuizClientProps {
   closeAtIso: string | null;
   sections: unknown;
   questions: unknown;
+  referredResultsEnabled?: boolean;
   /**
    * Wave M (#19): already-sanitized custom slides (SERVER-sanitized into
    * `safeHtml` by the page loader). Empty/omitted ⇒ the mergeCustomSlides
@@ -120,6 +121,7 @@ export function PublicQuizClient({
   sections: rawSections,
   questions: rawQuestions,
   customSlides,
+  referredResultsEnabled = false,
 }: PublicQuizClientProps) {
   const sections = useMemo(() => toSections(rawSections), [rawSections]);
   const questions = useMemo(() => toQuestions(rawQuestions), [rawQuestions]);
@@ -570,9 +572,25 @@ export function PublicQuizClient({
             style={{ fontSize: "0.75rem", textAlign: "center", margin: "0.5rem 0 0" }}
             data-testid="quiz-consent"
           >
-            By submitting, you agree that your results will be shown to you and
-            emailed to you, and shared with the Scaling Up team and the coach who
-            referred you (if any) — who receives the full report.
+            {referredResultsEnabled ? (
+              <>
+                By submitting, you agree that your full report will be shown and
+                emailed to you. It will also be shared with the Scaling Up team
+                and, if you used a coach referral link, made available to that
+                verified coach while their account remains active. Scaling Up
+                retains personal data as described in its{" "}
+                <a href="https://scalingup.com/privacy-policy/">
+                  Privacy Policy
+                </a>
+                .
+              </>
+            ) : (
+              <>
+                By submitting, you agree that your results will be shown to you
+                and emailed to you, and shared with the Scaling Up team and the
+                coach who referred you (if any) — who receives the full report.
+              </>
+            )}
           </p>
 
           {!canSubmit && (

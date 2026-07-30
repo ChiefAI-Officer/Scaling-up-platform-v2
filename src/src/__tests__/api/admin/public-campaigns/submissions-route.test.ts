@@ -37,6 +37,11 @@ jest.mock("@/lib/rate-limit", () => ({
   withRateLimit: jest.fn().mockResolvedValue({ allowed: true, headers: {} }),
 }));
 
+const mockIsReferredResultsEnabled = jest.fn(() => false);
+jest.mock("@/lib/assessments/wave-83-flags", () => ({
+  isReferredResultsEnabled: () => mockIsReferredResultsEnabled(),
+}));
+
 import { GET } from "@/app/api/admin/public-campaigns/[id]/submissions/route";
 import { db } from "@/lib/db";
 import { getApiActor } from "@/lib/auth/authorization";
@@ -52,6 +57,7 @@ const coachActor = { userId: "u2", email: "c@x.com", role: "COACH" as const, coa
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockIsReferredResultsEnabled.mockReturnValue(false);
   (db.assessmentCampaign.findFirst as jest.Mock).mockResolvedValue({
     id: "c1",
     accessMode: "PUBLIC",
@@ -126,5 +132,106 @@ describe("GET /api/admin/public-campaigns/[id]/submissions", () => {
     const args = (db.assessmentSubmission.findMany as jest.Mock).mock.calls[0][0];
     expect(args.where).toMatchObject({ campaignId: "c1" });
     expect(args.orderBy).toMatchObject({ submittedAt: "desc" });
+  });
+
+  it("preserves the legacy response shape while referred results are disabled", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    (db.assessmentSubmission.findMany as jest.Mock).mockResolvedValue([
+      {
+        id: "s1",
+        submittedAt: new Date("2026-07-20T10:00:00Z"),
+        publicTaker: { firstName: "Jane", lastName: "Smith", email: "jane@x.com" },
+        referringCoachEmail: "coach@x.com",
+      },
+    ]);
+
+    const res = await GET(req() as never, paramsFor("c1"));
+    const body = await res.json();
+
+    expect(body.data[0]).toEqual({
+      id: "s1",
+      takerName: "Jane Smith",
+      takerEmail: "jane@x.com",
+      referringCoachEmail: "coach@x.com",
+      submittedAt: "2026-07-20T10:00:00.000Z",
+    });
+    expect(
+      (db.assessmentSubmission.findMany as jest.Mock).mock.calls[0][0].select,
+    ).toEqual({
+      id: true,
+      submittedAt: true,
+      publicTaker: true,
+      referringCoachEmail: true,
+    });
+  });
+
+  it("enriches enabled rows from canonical Coach ownership and frozen results", async () => {
+    mockIsReferredResultsEnabled.mockReturnValue(true);
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    (db.assessmentSubmission.findMany as jest.Mock).mockResolvedValue([
+      {
+        id: "s1",
+        submittedAt: new Date("2026-07-20T10:00:00Z"),
+        publicTaker: { firstName: "Jane", lastName: "Smith", email: "jane@x.com" },
+        referringCoachEmail: "legacy@x.com",
+        result: {
+          perQuestion: [],
+          perSection: [],
+          overallAverage: 7.4,
+          tier: { label: "On the way" },
+          perDomain: [
+            { key: "people", label: "People", averagePoints: 7.1 },
+            { key: "strategy", label: "Strategy", averagePoints: 7.2 },
+            { key: "execution", label: "Execution", averagePoints: 7.3 },
+            { key: "cash", label: "Cash", averagePoints: 8 },
+          ],
+        },
+        campaign: {
+          template: { id: "t1", name: "Rockefeller Habits", alias: "RockHabits" },
+        },
+        referringCoach: {
+          firstName: "Ada",
+          lastName: "Coach",
+          email: "ada@scalingup.com",
+        },
+      },
+      {
+        id: "s2",
+        submittedAt: new Date("2026-07-19T10:00:00Z"),
+        publicTaker: { email: "bob@x.com" },
+        referringCoachEmail: "unverified@x.com",
+        result: { overallAverage: 1 },
+        campaign: {
+          template: { id: "t1", name: "Rockefeller Habits", alias: "RockHabits" },
+        },
+        referringCoach: null,
+      },
+    ]);
+
+    const res = await GET(req() as never, paramsFor("c1"));
+    const body = await res.json();
+
+    expect(body.data[0]).toMatchObject({
+      referringCoach: {
+        name: "Ada Coach",
+        email: "ada@scalingup.com",
+      },
+      template: {
+        id: "t1",
+        name: "Rockefeller Habits",
+        alias: "RockHabits",
+      },
+      summary: {
+        kind: "scored",
+        overallScore: 7.4,
+        tierLabel: "On the way",
+      },
+      reportHref: "/assessments/public-submissions/s1/report",
+    });
+    expect(body.data[1]).toMatchObject({
+      referringCoach: null,
+      summary: { kind: "degraded", label: "Result unavailable" },
+      reportHref: "/assessments/public-submissions/s2/report",
+    });
   });
 });

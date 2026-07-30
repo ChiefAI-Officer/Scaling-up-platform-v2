@@ -20,12 +20,30 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
+import { summarizePublicResult } from "@/lib/assessments/public-referrals";
+import { isReferredResultsEnabled } from "@/lib/assessments/wave-83-flags";
 
 /** Shape of the persisted publicTaker JSON (subset we render). */
 interface PublicTaker {
   firstName?: string;
   lastName?: string;
   email?: string;
+}
+
+interface AdminSubmissionRow {
+  id: string;
+  submittedAt: Date;
+  publicTaker: unknown;
+  referringCoachEmail: string | null;
+  result?: unknown;
+  campaign?: {
+    template: { id: string; name: string; alias: string };
+  };
+  referringCoach?: {
+    firstName: string;
+    lastName: string;
+    email: string;
+  } | null;
 }
 
 export async function GET(
@@ -75,7 +93,8 @@ export async function GET(
       );
     }
 
-    const submissions = await db.assessmentSubmission.findMany({
+    const referredResultsEnabled = isReferredResultsEnabled();
+    const submissions = (await db.assessmentSubmission.findMany({
       where: { campaignId: id },
       orderBy: { submittedAt: "desc" },
       select: {
@@ -83,14 +102,33 @@ export async function GET(
         submittedAt: true,
         publicTaker: true,
         referringCoachEmail: true,
+        ...(referredResultsEnabled
+          ? {
+              result: true,
+              campaign: {
+                select: {
+                  template: {
+                    select: { id: true, name: true, alias: true },
+                  },
+                },
+              },
+              referringCoach: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                },
+              },
+            }
+          : {}),
       },
-    });
+    })) as unknown as AdminSubmissionRow[];
 
     const data = submissions.map((s) => {
       const t = (s.publicTaker ?? {}) as unknown as PublicTaker;
       const name = `${(t.firstName ?? "").trim()} ${(t.lastName ?? "").trim()}`.trim();
       const email = (t.email ?? "").trim();
-      return {
+      const legacyRow = {
         id: s.id,
         // Coach-facing surfaces show the email when the name is blank (Wave P
         // policy); "Anonymous" only when the taker gave neither.
@@ -98,6 +136,31 @@ export async function GET(
         takerEmail: email || null,
         referringCoachEmail: s.referringCoachEmail ?? null,
         submittedAt: s.submittedAt,
+      };
+
+      if (
+        !referredResultsEnabled ||
+        s.result === undefined ||
+        !s.campaign
+      ) {
+        return legacyRow;
+      }
+
+      const coach = s.referringCoach
+        ? {
+            name:
+              `${s.referringCoach.firstName.trim()} ${s.referringCoach.lastName.trim()}`.trim() ||
+              s.referringCoach.email,
+            email: s.referringCoach.email,
+          }
+        : null;
+
+      return {
+        ...legacyRow,
+        referringCoach: coach,
+        template: s.campaign.template,
+        summary: summarizePublicResult(s.campaign.template.alias, s.result),
+        reportHref: `/assessments/public-submissions/${encodeURIComponent(s.id)}/report`,
       };
     });
 
