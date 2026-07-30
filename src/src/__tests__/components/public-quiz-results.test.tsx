@@ -367,5 +367,27 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
     const consent = screen.getByTestId("quiz-consent");
     expect(consent).toHaveTextContent(/emailed to you/i);
     expect(consent).toHaveTextContent(/full report/i);
+    expect(
+      screen.queryByRole("link", { name: "Privacy Policy" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows the feature-matched verified-Coach disclosure and privacy link", () => {
+    render(
+      <PublicQuizClient
+        {...baseProps}
+        referredResultsEnabled
+      />,
+    );
+    reachFormStep();
+
+    const consent = screen.getByTestId("quiz-consent");
+    expect(consent).toHaveTextContent(
+      "available to that verified coach while their account remains active",
+    );
+    expect(screen.getByRole("link", { name: "Privacy Policy" })).toHaveAttribute(
+      "href",
+      "https://scalingup.com/privacy-policy/",
+    );
   });
 });

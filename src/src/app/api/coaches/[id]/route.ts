@@ -3,6 +3,16 @@ import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { updateCoachSchema } from "@/lib/validations";
 import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
+import { isReferringCoachForeignKeyConflict } from "@/lib/assessments/referral-integrity";
+
+class CoachDeletionConflict extends Error {
+  readonly code = "HAS_REFERRED_SUBMISSIONS";
+
+  constructor(readonly referredSubmissionCount: number) {
+    super("HAS_REFERRED_SUBMISSIONS");
+    this.name = "CoachDeletionConflict";
+  }
+}
 
 export async function GET(
   request: NextRequest,
@@ -188,6 +198,13 @@ export async function DELETE(
         throw Object.assign(new Error("OWNS_ORGANIZATIONS"), { ownedOrgCount });
       }
 
+      const referredSubmissionCount = await tx.assessmentSubmission.count({
+        where: { referringCoachId: id },
+      });
+      if (referredSubmissionCount > 0) {
+        throw new CoachDeletionConflict(referredSubmissionCount);
+      }
+
       // Clean up non-cascade Coach FK relations before deleting the coach.
       // AccessGroupCoach has no onDelete; OrganizationOwnershipEvent and
       // AssessmentCampaign use nullable Coach? fields — null them out so
@@ -262,6 +279,25 @@ export async function DELETE(
         : "Coach deleted successfully",
     });
   } catch (error) {
+    if (error instanceof CoachDeletionConflict) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Cannot delete coach with ${error.referredSubmissionCount} referred submission(s). Deactivate the coach instead.`,
+        },
+        { status: 409 }
+      );
+    }
+    if (isReferringCoachForeignKeyConflict(error)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Cannot delete coach with referred submissions. Deactivate the coach instead.",
+        },
+        { status: 409 }
+      );
+    }
     if (error instanceof Error && error.message === "OWNS_ORGANIZATIONS") {
       const count = (error as Error & { ownedOrgCount?: number }).ownedOrgCount ?? 1;
       return NextResponse.json(

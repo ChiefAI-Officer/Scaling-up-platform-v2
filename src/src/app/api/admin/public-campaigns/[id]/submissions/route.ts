@@ -17,15 +17,67 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
+import { summarizePublicResult } from "@/lib/assessments/public-referrals";
+import { isReferredResultsEnabled } from "@/lib/assessments/wave-83-flags";
 
 /** Shape of the persisted publicTaker JSON (subset we render). */
 interface PublicTaker {
   firstName?: string;
   lastName?: string;
   email?: string;
+}
+
+const legacySubmissionSelect =
+  Prisma.validator<Prisma.AssessmentSubmissionSelect>()({
+    id: true,
+    submittedAt: true,
+    publicTaker: true,
+    referringCoachEmail: true,
+  });
+
+const enrichedSubmissionSelect =
+  Prisma.validator<Prisma.AssessmentSubmissionSelect>()({
+    ...legacySubmissionSelect,
+    result: true,
+    campaign: {
+      select: {
+        template: {
+          select: { id: true, name: true, alias: true },
+        },
+      },
+    },
+    referringCoach: {
+      select: {
+        firstName: true,
+        lastName: true,
+        email: true,
+      },
+    },
+  });
+
+type LegacySubmission = Prisma.AssessmentSubmissionGetPayload<{
+  select: typeof legacySubmissionSelect;
+}>;
+
+function legacyAdminRow(submission: LegacySubmission) {
+  const taker = (submission.publicTaker ?? {}) as unknown as PublicTaker;
+  const name =
+    `${(taker.firstName ?? "").trim()} ${(taker.lastName ?? "").trim()}`.trim();
+  const email = (taker.email ?? "").trim();
+
+  return {
+    id: submission.id,
+    // Coach-facing surfaces show the email when the name is blank (Wave P
+    // policy); "Anonymous" only when the taker gave neither.
+    takerName: name || email || "Anonymous",
+    takerEmail: email || null,
+    referringCoachEmail: submission.referringCoachEmail ?? null,
+    submittedAt: submission.submittedAt,
+  };
 }
 
 export async function GET(
@@ -75,29 +127,43 @@ export async function GET(
       );
     }
 
+    const referredResultsEnabled = isReferredResultsEnabled();
+    if (!referredResultsEnabled) {
+      const submissions = await db.assessmentSubmission.findMany({
+        where: { campaignId: id },
+        orderBy: { submittedAt: "desc" },
+        select: legacySubmissionSelect,
+      });
+      return NextResponse.json({
+        success: true,
+        data: submissions.map(legacyAdminRow),
+      });
+    }
+
     const submissions = await db.assessmentSubmission.findMany({
       where: { campaignId: id },
       orderBy: { submittedAt: "desc" },
-      select: {
-        id: true,
-        submittedAt: true,
-        publicTaker: true,
-        referringCoachEmail: true,
-      },
+      select: enrichedSubmissionSelect,
     });
+    const data = submissions.map((submission) => {
+      const coach = submission.referringCoach
+        ? {
+            name:
+              `${submission.referringCoach.firstName.trim()} ${submission.referringCoach.lastName.trim()}`.trim() ||
+              submission.referringCoach.email,
+            email: submission.referringCoach.email,
+          }
+        : null;
 
-    const data = submissions.map((s) => {
-      const t = (s.publicTaker ?? {}) as unknown as PublicTaker;
-      const name = `${(t.firstName ?? "").trim()} ${(t.lastName ?? "").trim()}`.trim();
-      const email = (t.email ?? "").trim();
       return {
-        id: s.id,
-        // Coach-facing surfaces show the email when the name is blank (Wave P
-        // policy); "Anonymous" only when the taker gave neither.
-        takerName: name || email || "Anonymous",
-        takerEmail: email || null,
-        referringCoachEmail: s.referringCoachEmail ?? null,
-        submittedAt: s.submittedAt,
+        ...legacyAdminRow(submission),
+        referringCoach: coach,
+        template: submission.campaign.template,
+        summary: summarizePublicResult(
+          submission.campaign.template.alias,
+          submission.result,
+        ),
+        reportHref: `/assessments/public-submissions/${encodeURIComponent(submission.id)}/report`,
       };
     });
 

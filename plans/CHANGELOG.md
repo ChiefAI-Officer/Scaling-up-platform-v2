@@ -6,6 +6,20 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-07-30 — Jeff #83: verified Coach Referred Results implemented default-OFF <!-- ENTRY_ISO:2026-07-30 ENTRY_SLUG:jeff-83-referred-results-implemented-dark -->
+
+**Status: IMPLEMENTED on `codex/design-83-public-results`, DEFAULT-OFF, NOT LAUNCHED.** This entry records implementation state only. It does not change the `CLAUDE.md` production anchor, provision Vercel variables, apply a historical ownership mapping, approve legal copy, merge, or deploy.
+
+Jeff #83 adds immutable canonical ownership for verified PUBLIC referrals and an authenticated Coach **Referred Results** surface. New valid referrals dual-write `referringCoachId` and the email snapshot independently of the read flag; unknown, inactive, expired, malformed, or absent referrals remain Scaling Up-only. The report loader uses frozen submission data, enforces active canonical Coach ownership with enumeration-safe denial, permits ADMIN/STAFF oversight, and never exposes raw answers through collection APIs.
+
+The default-OFF read wave adds Coach navigation, a server-paginated/searchable/filterable result list, Four Decisions summaries/details, canonical report links, and the relocated Quick Assessment referral-link card. The existing ADMIN/STAFF Public Campaign expander is enriched only while the flag is on; its legacy response and three-column UI remain unchanged while off. The public pre-submit disclosure is also server-flag-matched and links to the Scaling Up Privacy Policy. **Its candidate wording still requires product/legal approval before launch.**
+
+Historical ownership remains human-reviewed. `scripts/review-public-referral-backfill.mjs` emits read-only normalized evidence and explicitly unapproved candidate Coach identities. It does not write or emit an apply-ready mapping. `scripts/apply-public-referral-backfill.mjs --mapping <reviewed.json>` consumes only an explicit array of `{submissionId, coachId}`, validates the entire batch inside one transaction, requires PUBLIC scope plus matching `REFERRING_COACH` outbox evidence, rejects missing/conflicting owners, and writes only null ownership through a compare-and-set. **No historical mapping was applied as part of implementation.**
+
+Rollout controls are documented in `.env.example`: `WAVE_83_REFERRED_RESULTS_ENABLED` and the winning `WAVE_83_REFERRED_RESULTS_KILL`, both default false. Launch remains a separate reviewed operation after the migration, approved disclosure, reviewed backfill, required checks, merge, production deployment, and smoke verification.
+
+---
+
 ### 2026-07-29 — Wave OSR: invited respondents see their own report on screen at submit (Jeff #71) <!-- ENTRY_ISO:2026-07-29 ENTRY_SLUG:jeff-jul10-71-onscreen-respondent-results -->
 
 **Status: MERGED (`26f18701`, squash of PR #236), ships DARK** behind `WAVE_OSR_RESPONDENT_RESULTS_ENABLED` (+ `_KILL`), default-OFF. Four commits: `a89470fe` build · `25eef0f2` review round 1 · `58384040` F4 · `8da65fff` review round 2. Migration additive (`NOT NULL DEFAULT false`). Spec `docs/specs/v7.6/19an`; decision record **ADR-0027**, plus an amendment to **ADR-0008**.

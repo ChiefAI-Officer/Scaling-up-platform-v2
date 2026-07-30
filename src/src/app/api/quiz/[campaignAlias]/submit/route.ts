@@ -45,11 +45,14 @@ import {
   findActiveCoachByEmail,
   buildLeadEmail,
   lowestDecision,
+  type RecipientRole,
 } from "@/lib/assessments/quick-assessment-lead";
 import {
   buildReportEmailHtml,
   buildRespondentReportFromSubmission,
+  type ReportEmailRecipientRole,
 } from "@/lib/assessments/report-email";
+import { isReferringCoachForeignKeyConflict } from "@/lib/assessments/referral-integrity";
 import { logAudit } from "@/lib/audit";
 import { computeScoreResult } from "@/lib/assessments/compute-score-result";
 import type { PagerQuestion } from "@/lib/assessments/section-pages";
@@ -58,6 +61,18 @@ import { inngest } from "@/inngest/client";
 // ---------------------------------------------------------------------------
 // Request body schema
 // ---------------------------------------------------------------------------
+
+const ReferralEmailSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .email()
+  .max(320);
+
+const OptionalReferralEmailSchema = z.preprocess((value) => {
+  const normalized = ReferralEmailSchema.safeParse(value);
+  return normalized.success ? normalized.data : null;
+}, ReferralEmailSchema.nullable());
 
 const PublicSubmitBodySchema = z.object({
   publicTaker: z.object({
@@ -73,7 +88,10 @@ const PublicSubmitBodySchema = z.object({
       }),
     )
     .min(1),
-  referringCoachEmail: z.string().email().max(320).optional().nullable(),
+  // Referral identity is optional and untrusted. A damaged/tampered referral
+  // must not block the taker's submission; only a valid email proceeds to the
+  // canonical active-Coach lookup below.
+  referringCoachEmail: OptionalReferralEmailSchema,
   // Task 6(b): client-supplied idempotency key (optional)
   idempotencyKey: z.string().min(1).max(200).optional(),
 });
@@ -224,6 +242,7 @@ export async function POST(
     // Pre-transaction read: active coach lookup (open-relay guard)
     // -----------------------------------------------------------------------
     const coach = await findActiveCoachByEmail(db, data.referringCoachEmail);
+    const canonicalCoachEmail = coach?.email.trim().toLowerCase() ?? null;
 
     // -----------------------------------------------------------------------
     // Build outbox payloads (pure helpers, no I/O)
@@ -249,27 +268,29 @@ export async function POST(
       averagePoints: d.averagePoints,
     }));
 
-    // Build the per-respondent report ONCE, server-side, from the data we
-    // already hold (no DB round-trip). Shared by both report emails so the
-    // taker and coach copies are byte-identical (Spec 16 §3).
-    const respondentReport = buildRespondentReportFromSubmission({
-      result,
-      publicTaker: data.publicTaker,
-      assessmentName,
-      templateAlias,
-      campaignLabel: null, // campaignLabel is not rendered in the email body
-      sections: version.sections,
-      questions: allQuestions,
-      scoringConfig: version.scoringConfig,
-      rawAnswers: submittedAnswers, // the same answers persisted to submission.answers
-      submittedAt: now,
-      // submissionId is only known after the submission is persisted (below).
-      // The email body does not render provenance for the scored public quiz,
-      // so the placeholder is benign here; the qualitative path only triggers
-      // on the INVITED route, where the real id IS threaded.
-      submissionId: "",
-      referringCoachEmail: data.referringCoachEmail ?? null,
-    });
+    // Build the report from data already held by this request (no DB round-trip).
+    // Keeping referral identity as an argument lets a concurrent Coach deletion
+    // retry produce a genuinely Scaling Up-only taker copy.
+    const buildRespondentReport = (referringCoachEmail: string | null) =>
+      buildRespondentReportFromSubmission({
+        result,
+        publicTaker: data.publicTaker,
+        assessmentName,
+        templateAlias,
+        campaignLabel: null, // campaignLabel is not rendered in the email body
+        sections: version.sections,
+        questions: allQuestions,
+        scoringConfig: version.scoringConfig,
+        rawAnswers: submittedAnswers, // the same answers persisted to submission.answers
+        submittedAt: now,
+        // submissionId is only known after the submission is persisted (below).
+        // The email body does not render provenance for the scored public quiz,
+        // so the placeholder is benign here; the qualitative path only triggers
+        // on the INVITED route, where the real id IS threaded.
+        submissionId: "",
+        referringCoachEmail,
+      });
+    const respondentReport = buildRespondentReport(canonicalCoachEmail);
 
     // Assemble the outbox payloads. Each entry carries the rendered subject +
     // bodyHtml so the worker (role-agnostic) can send it verbatim.
@@ -277,8 +298,14 @@ export async function POST(
     //   - REFERRING_COACH → only when an active coach resolved; full report.
     //   - SU_TEAM         → only when an SU address is configured; lead-alert
     //                       summary (unchanged from before).
+    type PublicQuizOutboxRecipientRole =
+      | RecipientRole
+      | ReportEmailRecipientRole;
     const outboxPayloads: Array<{
-      recipient: { role: string; email: string };
+      recipient: {
+        role: PublicQuizOutboxRecipientRole;
+        email: string;
+      };
       subject: string;
       bodyHtml: string;
     }> = [];
@@ -298,14 +325,13 @@ export async function POST(
 
     // REFERRING_COACH — full report (upgrade from the old lead alert), only
     // when the open-relay guard resolved an active coach.
-    const activeCoachEmail = coach?.email?.trim().toLowerCase() ?? "";
-    if (activeCoachEmail.length > 0) {
+    if (canonicalCoachEmail) {
       const { subject, bodyHtml } = buildReportEmailHtml({
         report: respondentReport,
         recipientRole: "REFERRING_COACH",
       });
       outboxPayloads.push({
-        recipient: { role: "REFERRING_COACH", email: activeCoachEmail },
+        recipient: { role: "REFERRING_COACH", email: canonicalCoachEmail },
         subject,
         bodyHtml,
       });
@@ -331,9 +357,11 @@ export async function POST(
     // -----------------------------------------------------------------------
     // Transactional write: submission + outbox rows in a single DB transaction
     // -----------------------------------------------------------------------
-    let submissionId: string;
-    try {
-      submissionId = await db.$transaction(async (tx) => {
+    const persistSubmission = (
+      referral: { id: string; email: string } | null,
+      payloads: typeof outboxPayloads,
+    ) =>
+      db.$transaction(async (tx) => {
         const sub = await tx.assessmentSubmission.create({
           data: {
             campaignId: campaign.id,
@@ -346,14 +374,14 @@ export async function POST(
               lastName: data.publicTaker.lastName,
               email: data.publicTaker.email,
             } as Prisma.InputJsonValue,
-            referringCoachEmail: data.referringCoachEmail ?? null,
+            referringCoachId: referral?.id ?? null,
+            referringCoachEmail: referral?.email ?? null,
             idempotencyKey: data.idempotencyKey ?? null,
           },
           select: { id: true },
         });
 
-        // Enqueue outbox rows inside the same transaction.
-        for (const payload of outboxPayloads) {
+        for (const payload of payloads) {
           await tx.assessmentEmailOutbox.create({
             data: {
               submissionId: sub.id,
@@ -368,6 +396,47 @@ export async function POST(
 
         return sub.id;
       });
+
+    let submissionId: string;
+    try {
+      try {
+        submissionId = await persistSubmission(
+          coach && canonicalCoachEmail
+            ? { id: coach.id, email: canonicalCoachEmail }
+            : null,
+          outboxPayloads,
+        );
+      } catch (initialError) {
+        if (
+          !coach ||
+          !canonicalCoachEmail ||
+          !isReferringCoachForeignKeyConflict(initialError)
+        ) {
+          throw initialError;
+        }
+
+        const scalingUpOnlyTakerEmail = buildReportEmailHtml({
+          report: buildRespondentReport(null),
+          recipientRole: "TAKER_COPY",
+        });
+        const scalingUpOnlyPayloads = outboxPayloads
+          .filter(
+            (payload) => payload.recipient.role !== "REFERRING_COACH",
+          )
+          .map((payload) =>
+            payload.recipient.role === "TAKER_COPY"
+              ? {
+                  ...payload,
+                  ...scalingUpOnlyTakerEmail,
+                }
+              : payload,
+          );
+
+        submissionId = await persistSubmission(
+          null,
+          scalingUpOnlyPayloads,
+        );
+      }
     } catch (txErr) {
       // Task 6(b): idempotency — duplicate key (P2002 on idempotencyKey partial-unique index)
       if (

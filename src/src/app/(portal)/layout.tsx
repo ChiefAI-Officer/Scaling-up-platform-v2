@@ -5,7 +5,11 @@ import { CoachMobileNav } from "@/components/layout/coach-mobile-nav";
 import { CoachNavLink } from "@/components/layout/coach-nav-link";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { SignOutButton } from "@/components/layout/sign-out-button";
-import { coachAccountNavItem, coachPrimaryNavItems } from "@/lib/coach-nav";
+import {
+    coachAccountNavItem,
+    getCoachPrimaryNavItems,
+} from "@/lib/coach-nav";
+import { isReferredResultsEnabled } from "@/lib/assessments/wave-83-flags";
 
 interface PortalLayoutProps {
     children: React.ReactNode;
@@ -15,6 +19,8 @@ export default async function PortalLayout({ children }: PortalLayoutProps) {
     const { session, coach } = await requireCoach();
 
     const coachName = coach.firstName || session.user.name || "Coach";
+    const referredResultsEnabled = isReferredResultsEnabled();
+    const primaryNavItems = getCoachPrimaryNavItems({ referredResultsEnabled });
     const AccountIcon = coachAccountNavItem.icon;
 
     return (
@@ -26,11 +32,16 @@ export default async function PortalLayout({ children }: PortalLayoutProps) {
                 </div>
 
                 <nav className="flex-1 py-6 px-3 space-y-1">
-                    {coachPrimaryNavItems.map((item) => {
+                    {primaryNavItems.map((item) => {
                         const Icon = item.icon;
 
                         return (
-                            <CoachNavLink key={item.href} href={item.href} icon={<Icon className="w-5 h-5" />}>
+                            <CoachNavLink
+                                key={item.href}
+                                href={item.href}
+                                icon={<Icon className="w-5 h-5" />}
+                                {...(item.exact ? { exact: true } : {})}
+                            >
                                 {item.label}
                             </CoachNavLink>
                         );
@@ -64,7 +75,12 @@ export default async function PortalLayout({ children }: PortalLayoutProps) {
             <div className="md:ml-64 flex-1 flex flex-col min-h-screen">
                 <header className="h-16 bg-card border-b px-4 md:px-8 flex items-center justify-between sticky top-0 z-40 backdrop-blur-sm bg-card/95">
                     {/* Mobile hamburger */}
-                    <CoachMobileNav coachName={coachName} />
+                    <CoachMobileNav
+                        coachName={coachName}
+                        {...(referredResultsEnabled
+                            ? { referredResultsEnabled: true as const }
+                            : {})}
+                    />
 
                     {/* Title on mobile */}
                     <span className="md:hidden text-lg font-bold text-foreground">Scaling Up</span>

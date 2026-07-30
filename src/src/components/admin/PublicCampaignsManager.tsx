@@ -11,6 +11,11 @@
  */
 
 import { Fragment, useEffect, useState } from "react";
+import type { PublicResultSummary } from "@/lib/assessments/public-referrals";
+import {
+  FOUR_DECISION_STYLES,
+  fourDecisionDomains,
+} from "@/lib/assessments/public-result-summary";
 
 interface TemplateSummary {
   id: string;
@@ -43,6 +48,47 @@ interface SubmissionRow {
   takerEmail: string | null;
   referringCoachEmail: string | null;
   submittedAt: string;
+  referringCoach?: { name: string; email: string } | null;
+  template?: { id: string; name: string; alias: string };
+  summary?: PublicResultSummary;
+  reportHref?: string;
+}
+
+function SubmissionResult({ summary }: { summary: PublicResultSummary }) {
+  if (summary.kind !== "scored") {
+    return <span>{summary.label}</span>;
+  }
+
+  const decisions = fourDecisionDomains(summary);
+  return (
+    <div>
+      <strong>{summary.overallScore.toFixed(1)}</strong>
+      {summary.tierLabel && (
+        <div className="wf-muted-text">{summary.tierLabel}</div>
+      )}
+      {decisions && (
+        <div
+          aria-label="Four Decisions result"
+          style={{ display: "flex", gap: "0.25rem", marginTop: "0.25rem" }}
+        >
+          {decisions.map(({ key }) => (
+            <span
+              key={key}
+              aria-hidden="true"
+              data-testid="four-decisions-segment"
+              style={{
+                display: "block",
+                width: "1.25rem",
+                height: "0.25rem",
+                borderRadius: "999px",
+                background: FOUR_DECISION_STYLES[key].color,
+              }}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function PublicCampaignsManager() {
@@ -63,6 +109,9 @@ export function PublicCampaignsManager() {
   >({});
   const [subsLoading, setSubsLoading] = useState<string | null>(null);
   const [subsError, setSubsError] = useState<string | null>(null);
+  const [expandedSubmissionId, setExpandedSubmissionId] = useState<string | null>(
+    null,
+  );
 
   async function toggleSubmissions(id: string) {
     // Collapse if already open.
@@ -236,7 +285,14 @@ export function PublicCampaignsManager() {
               </tr>
             </thead>
             <tbody>
-              {campaigns.map((c) => (
+              {campaigns.map((c) => {
+                const rows = submissionsByCampaign[c.id] ?? [];
+                const enriched = rows.some(
+                  (submission) =>
+                    submission.summary !== undefined &&
+                    submission.reportHref !== undefined,
+                );
+                return (
                 <Fragment key={c.id}>
                   <tr className="wf-tr">
                     <td className="wf-td">{c.name}</td>
@@ -285,20 +341,35 @@ export function PublicCampaignsManager() {
                           <p className="wf-muted-text" role="alert">
                             {subsError}
                           </p>
-                        ) : (submissionsByCampaign[c.id]?.length ?? 0) === 0 ? (
+                        ) : rows.length === 0 ? (
                           <p className="wf-muted-text">No submissions yet.</p>
                         ) : (
                           <table className="wf-table" style={{ width: "100%" }}>
                             <thead>
                               <tr>
                                 <th className="wf-th">Respondent</th>
-                                <th className="wf-th">Referred by coach</th>
+                                <th className="wf-th">
+                                  {enriched
+                                    ? "Referring coach"
+                                    : "Referred by coach"}
+                                </th>
+                                {enriched && (
+                                  <th className="wf-th">Result</th>
+                                )}
                                 <th className="wf-th">Submitted</th>
+                                {enriched && (
+                                  <th className="wf-th">Actions</th>
+                                )}
                               </tr>
                             </thead>
                             <tbody>
-                              {submissionsByCampaign[c.id].map((s) => (
-                                <tr key={s.id} className="wf-tr">
+                              {rows.map((s) => {
+                                const details = fourDecisionDomains(s.summary);
+                                const isExpanded =
+                                  expandedSubmissionId === s.id;
+                                return (
+                                <Fragment key={s.id}>
+                                <tr className="wf-tr">
                                   <td className="wf-td">
                                     {s.takerName}
                                     {s.takerEmail &&
@@ -312,13 +383,96 @@ export function PublicCampaignsManager() {
                                       )}
                                   </td>
                                   <td className="wf-td">
-                                    {s.referringCoachEmail ?? "—"}
+                                    {enriched ? (
+                                      s.referringCoach ? (
+                                        <>
+                                          {s.referringCoach.name}
+                                          <div
+                                            className="wf-muted-text"
+                                            style={{ fontSize: "0.85em" }}
+                                          >
+                                            {s.referringCoach.email}
+                                          </div>
+                                        </>
+                                      ) : (
+                                        "Scaling Up only"
+                                      )
+                                    ) : (
+                                      s.referringCoachEmail ?? "—"
+                                    )}
                                   </td>
+                                  {enriched && (
+                                    <td className="wf-td">
+                                      {s.summary && (
+                                        <SubmissionResult summary={s.summary} />
+                                      )}
+                                    </td>
+                                  )}
                                   <td className="wf-td">
                                     {s.submittedAt.slice(0, 10)}
                                   </td>
+                                  {enriched && (
+                                    <td className="wf-td">
+                                      {details && (
+                                        <button
+                                          type="button"
+                                          className="wf-btn wf-btn-sm"
+                                          aria-expanded={isExpanded}
+                                          onClick={() =>
+                                            setExpandedSubmissionId(
+                                              isExpanded ? null : s.id,
+                                            )
+                                          }
+                                        >
+                                          {isExpanded
+                                            ? "Hide details"
+                                            : "Details"}
+                                        </button>
+                                      )}
+                                      {s.reportHref && (
+                                        <a
+                                          className="wf-btn wf-btn-sm"
+                                          href={s.reportHref}
+                                        >
+                                          View report
+                                        </a>
+                                      )}
+                                    </td>
+                                  )}
                                 </tr>
-                              ))}
+                                {isExpanded && details && (
+                                  <tr className="wf-tr">
+                                    <td
+                                      className="wf-td"
+                                      colSpan={enriched ? 5 : 3}
+                                    >
+                                      <div
+                                        style={{
+                                          display: "grid",
+                                          gridTemplateColumns:
+                                            "repeat(4, minmax(0, 1fr))",
+                                          gap: "0.5rem",
+                                        }}
+                                      >
+                                        {details.map(({ key, domain }) => (
+                                          <div key={key}>
+                                            <span className="wf-muted-text">
+                                              {domain.label}
+                                            </span>
+                                            <strong style={{ display: "block" }}>
+                                              {domain.score === null
+                                                ? "—"
+                                                : domain.score.toFixed(1)}
+                                            </strong>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )}
+                                </Fragment>
+                                );
+                              })}
                             </tbody>
                           </table>
                         )}
@@ -326,7 +480,8 @@ export function PublicCampaignsManager() {
                     </tr>
                   )}
                 </Fragment>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         )}

@@ -117,6 +117,7 @@ model Coach {
   orgOwnershipEventsFromCoach OrganizationOwnershipEvent[]    @relation("OrgOwnershipFromCoach")
   orgOwnershipEventsToCoach   OrganizationOwnershipEvent[]    @relation("OrgOwnershipToCoach")
   campaignWizardDraft         CampaignWizardDraft?
+  referredAssessmentSubmissions AssessmentSubmission[] @relation("AssessmentSubmissionReferringCoach")
 
   @@map("coaches")
 }
@@ -1370,6 +1371,7 @@ model AssessmentSubmission {
   result                Json // frozen ScoreResult cache
   publicTaker           Json? // {email, firstName, lastName, ...} for PUBLIC
   referringCoachEmail   String?
+  referringCoachId      String?
   idempotencyKey        String? // PUBLIC submit idempotency; partial-unique via raw SQL
   resultsTokenHash      String?
   resultsTokenIssuedAt  DateTime?
@@ -1380,11 +1382,13 @@ model AssessmentSubmission {
   campaign   AssessmentCampaign    @relation(fields: [campaignId], references: [id])
   respondent OrgRespondent?        @relation(fields: [respondentId], references: [id])
   invitation AssessmentInvitation? @relation(fields: [invitationId], references: [id])
+  referringCoach Coach?            @relation("AssessmentSubmissionReferringCoach", fields: [referringCoachId], references: [id], onDelete: Restrict)
   outboxEmails AssessmentEmailOutbox[]
 
   @@index([campaignId])
   @@index([respondentId, submittedAt])
   @@index([referringCoachEmail])
+  @@index([referringCoachId, submittedAt])
   // Partial unique indexes added via raw SQL:
   //   - (campaignId, respondentId) WHERE respondentId IS NOT NULL
   //   - (resultsTokenHash) WHERE resultsTokenHash IS NOT NULL
@@ -1398,7 +1402,7 @@ model AssessmentEmailOutbox {
   id             String    @id @default(cuid())
   submissionId   String
   recipientEmail String
-  recipientRole  String // "REFERRING_COACH" | "SU_TEAM"
+  recipientRole  String // "TAKER_COPY" | "REFERRING_COACH" | "SU_TEAM"
   emailType      String // "QUICK_ASSESSMENT_LEAD"
   subject        String
   bodyHtml       String
