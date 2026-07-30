@@ -6,6 +6,24 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-07-30 — Jeff #83: verified Coach Referred Results launched <!-- ENTRY_ISO:2026-07-30 ENTRY_SLUG:jeff-83-referred-results-launched -->
+
+**Status: LAUNCHED on production (PR #245, squash `e0e2bc9b`; deployment `dpl_BZtaegoNCrfjpZAoVPpYQu7LxeDX`).** `WAVE_83_REFERRED_RESULTS_ENABLED=1` is an encrypted Production-only Vercel variable; `WAVE_83_REFERRED_RESULTS_KILL` remains the immediate rollback lever. The Ready deployment owns `scaling-up-platform-v2.vercel.app`, `platformtest.scalingup.com`, and the main aliases.
+
+The launched capability freezes canonical Coach ownership for new verified PUBLIC referrals, gives an active authenticated Coach a paginated/searchable **Referred Results** workspace and canonical report links, and gives ADMIN/STAFF the same referral/result context in the Public Campaign submissions table. Collection responses omit raw answers; report authorization uses frozen ownership, remains enumeration-safe, and writes the report-view audit before returning the report.
+
+**Review and verification receipt.** The repository's Greptile integration was unavailable: an `@greptile review` request produced neither a Greptile check nor bot response, and no Greptile CLI was installed. It is therefore **not recorded as a Greptile pass**. The fallback was the project `check-pr` gate plus independent spec and standards reviews. The standards review found and closed three issues: stale SoT/inventories, duplicate foreign-key conflict classification, and an open-string outbox recipient role/stale schema comment. Both re-reviews returned no findings. Final evidence before merge: **22 Jest suites / 249 tests passed**, changed-file ESLint passed, Prisma schema validation passed, all **41** migrations passed the safety gate, `git diff --check` passed, Turbopack production build passed, and GitHub Build/Migration Safety/Vercel checks were green.
+
+**Approved disclosure, now live before submission:** “By submitting, you agree that your full report will be shown and emailed to you. It will also be shared with the Scaling Up team and, if you used a coach referral link, made available to that verified coach while their account remains active. Scaling Up retains personal data as described in its Privacy Policy.” The live form presents this exact wording and links **Privacy Policy** to `https://scalingup.com/privacy-policy/`.
+
+**Historical backfill was deliberately not applied.** The read-only production review found **4 candidates and 0 exclusions**: two submissions grouped under Gabriel Test and two under Martin Segnitz, all for the Scaling Up 4 Decisions Assessment. Because the evidence does not independently prove the intended canonical Coach identity, the approved launch choice was to leave those historical submissions unassigned. No mapping file was approved and no backfill writes ran.
+
+**Launch walk:** a temporary Preview-only flag was canaried, then removed. In Preview, the seed Coach reached Referred Results and its empty state/Quick Assessment link; the seed STAFF account reached Public Campaigns and verified **Referring coach**, **Result**, and **View report** columns against existing submissions. No submission, campaign, mapping, or other product data was written. Production was then enabled and rebuilt from the merged commit. Vercel reported **Ready**; both production domains returned `200`, healthy database/auth posture, and `Cache-Control: no-store, max-age=0` on health. The protected referred-results API returned an unauthenticated redirect with `Cache-Control: no-store, max-age=0`. The exact disclosure and privacy link were verified on the live quiz without submitting.
+
+**Verification boundary:** no seed Coach owned a canary result, and the production walk intentionally did not create a synthetic assessment submission. Therefore an authenticated live report render and its audit-row write were verified by the passing route/gate tests rather than by mutating production. The Preview role/UI canary and production public/health/cache checks are the live evidence.
+
+---
+
 ### 2026-07-30 — Jeff #83: verified Coach Referred Results implemented default-OFF <!-- ENTRY_ISO:2026-07-30 ENTRY_SLUG:jeff-83-referred-results-implemented-dark -->
 
 **Status: IMPLEMENTED on `codex/design-83-public-results`, DEFAULT-OFF, NOT LAUNCHED.** This entry records implementation state only. It does not change the `CLAUDE.md` production anchor, provision Vercel variables, apply a historical ownership mapping, approve legal copy, merge, or deploy.
