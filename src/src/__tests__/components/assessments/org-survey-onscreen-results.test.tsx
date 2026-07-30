@@ -353,8 +353,14 @@ describe("re-tapping the invitation link after submitting (finding #3)", () => {
  * own "impact is narrow" reasoning (it rests on the Report access gate) no
  * longer holds. Testing the component alone would leave the wave's actual claim
  * unguarded, which is the gap the #230 review caught the hard way.
+ *
+ * SCOPE — the gate is scheme-only, with NO host constraint. The last test below
+ * pins that on purpose: an arbitrary HTTPS host still renders and still causes an
+ * outbound request. Constraining the host is the open part of #229, and a test
+ * asserting otherwise would be the kind of reassuring-but-false guard this repo
+ * has been bitten by.
  */
-describe("an operator-set coach logo cannot make the respondent's browser call out (GH #229)", () => {
+describe("an operator-set coach logo is scheme-gated on the respondent path (GH #229)", () => {
   const REPORT_WITH_HTTP_LOGO = {
     ...(REPORT as unknown as Record<string, unknown>),
     coachLogoUrl: "http://tracker.example.net/pixel.png",
@@ -376,8 +382,8 @@ describe("an operator-set coach logo cannot make the respondent's browser call o
     await waitFor(() =>
       expect(screen.getByTestId("org-survey-results")).toBeInTheDocument(),
     );
-    // negative: no request leaves the respondent's browser for that host.
-    // queryAll, not query — the report renders coach chrome TWICE (cover +
+    // negative: the http image is not rendered, so no mixed-content request is
+    // made. queryAll, not query — the report renders coach chrome TWICE (cover +
     // footer), so a single-element query throws on "multiple found" and would
     // mask the real assertion.
     expect(screen.queryAllByTestId("coach-logo")).toHaveLength(0);
@@ -398,6 +404,32 @@ describe("an operator-set coach logo cannot make the respondent's browser call o
     expect(screen.getAllByTestId("coach-logo")[0]).toHaveAttribute(
       "src",
       "https://cdn.example.com/coach.png",
+    );
+  });
+
+  it("documents the LIMIT — an arbitrary https host is NOT blocked", async () => {
+    // This is the residual on #229, recorded as a test so the scope of the gate
+    // cannot be overstated later: scheme-gating does not stop a third-party
+    // request, it only stops mixed content (`http:`) and non-http schemes.
+    writeOnScreenResult(
+      ALIAS,
+      {
+        ...(REPORT as unknown as Record<string, unknown>),
+        coachLogoUrl: "https://tracker.example.net/pixel.png",
+        coachName: "Dana Coach",
+      } as never,
+      KEY,
+    );
+    installFetch(410);
+
+    render(<OrgSurveyClient campaignAlias={ALIAS} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("org-survey-results")).toBeInTheDocument(),
+    );
+    expect(screen.getAllByTestId("coach-logo")[0]).toHaveAttribute(
+      "src",
+      "https://tracker.example.net/pixel.png",
     );
   });
 });

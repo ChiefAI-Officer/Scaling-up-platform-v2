@@ -84,13 +84,16 @@ export interface CampaignOverview {
     invitationBodyHtml: string | null;
     /**
      * Wave OSR (#71) — whether respondents see their own report on screen at
-     * submit. Surfaced so the screen can both SHOW and CHANGE the setting: it
-     * shipped create-only, which left the production flag surfacing nothing on
-     * any campaign that already existed.
+     * submit. Surfaced so the screen can both SHOW and CHANGE the setting, which
+     * was previously impossible for a campaign that already existed.
      *
-     * Optional, matching `isImported` / `edition` above: older fixtures stay
-     * valid, and absent ⇒ off, which is both fail-closed AND the column default —
-     * so an omission cannot produce a wrong disclosure, only the safe one.
+     * Optional, matching `isImported` / `edition` above, so older fixtures stay
+     * valid. Absent ⇒ off is safe for the RESPONDENT (disclosure is decided from
+     * the DB under the submission lock, never from this projection) but NOT for the
+     * OPERATOR: an omitted value renders the checkbox unticked for a campaign that
+     * IS opted in, and a tick→untick would then write `false` and disable a live
+     * opt-in. `getCampaignOverview` reads with `include`, so every scalar is
+     * present — keep it that way if this ever becomes an explicit `select`.
      */
     showResultsOnScreen?: boolean;
     /**

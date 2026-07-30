@@ -13,21 +13,25 @@
  * PUBLIC campaigns with no creator coach) this renders NOTHING, so the report
  * looks exactly as it did before (SU logo only). No broken image.
  *
- * Security (GH #229): `url` is an OPERATOR-set string with no validation at the
- * write boundary — `createCoachSchema.profileImage` is `z.string().optional()`,
- * so an admin can store any string; the coach portal's own path is upload-only
- * to Vercel Blob and cannot produce an arbitrary host. It is never interpolated
- * into raw HTML/markdown, so this is NOT an XSS concern. The concern is the
- * outbound request: Wave OSR (#71) renders this report to UNAUTHENTICATED
- * respondents, so an unvalidated src makes every respondent's browser fetch a
- * URL of the operator's choosing (IP/UA disclosure to an arbitrary host, plus
- * http: mixed content on an https page). #229's own "impact is narrow" reasoning
- * rested on the Report access gate, which #71 removes.
+ * Security (GH #229): `url` is an OPERATOR-set string. It is never interpolated
+ * into raw HTML/markdown, so this is NOT an XSS concern. Wave OSR (#71) renders
+ * this report to UNAUTHENTICATED respondents, which is what makes the src worth
+ * gating at all — #229's own "impact is narrow" reasoning rested on the Report
+ * access gate that #71 removes.
  *
- * So the url goes through the same https-only `safeImageSrc` gate the invitation
- * email already applies. A REJECTED url degrades to the name-only state rather
- * than rendering nothing: the byline is the half Jeff actually asked for
- * (#63/#67/#73/#78/#81), and a bad image URL must not delete it.
+ * The url goes through the same https-only `safeImageSrc` gate the invitation
+ * email applies. Be precise about what that buys, because it is easy to overstate:
+ *   - BLOCKED: http: (mixed content on an https page), `javascript:`/`data:`,
+ *     protocol-relative, root-relative, and unparseable values.
+ *   - NOT BLOCKED: an arbitrary HTTPS **host**. The gate has no host constraint,
+ *     so a rendered logo can still cause an outbound request from every
+ *     respondent's browser. Constraining the host is the open part of #229; an
+ *     allowlist is not applied here because Circle-synced avatars are
+ *     legitimately third-party hosted.
+ *
+ * A REJECTED url degrades to the name-only state rather than rendering nothing:
+ * the byline is the half Jeff actually asked for (#63/#67/#73/#78/#81), and a bad
+ * image URL must not delete it.
  *
  * `name` is React-escaped text.
  *

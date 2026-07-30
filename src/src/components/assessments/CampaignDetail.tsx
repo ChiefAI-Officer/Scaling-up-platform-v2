@@ -96,8 +96,8 @@ export interface CampaignDetailProps {
    * from the same flag the PATCH route enforces; the client receives ONLY the
    * boolean and never recomputes the gate. Fail-closed: absent/false → no control.
    *
-   * Why this control exists: the toggle shipped create-only, so campaigns that
-   * already existed could never opt in and the production flag surfaced nothing.
+   * Why this control exists: the toggle was writable only at CREATE, so a campaign
+   * that already existed had no way to opt in.
    */
   onScreenResultsEnabled?: boolean;
   /**
@@ -736,6 +736,11 @@ export function CampaignDetail({
   // the checkbox moves immediately and is REVERTED if the server refuses, because
   // a checkbox that disagrees with the stored value would misdescribe what
   // respondents are about to see.
+  //
+  // The revert triggers on a SILENT no-op as well as an error, which matters: the
+  // route ignores this field when the flag is off and still answers
+  // 200 {success:true}, so trusting `res.ok` alone would leave the box ticked
+  // over a column that never changed. Hence the echo check on the returned row.
   async function handleToggleOnScreenResults(next: boolean) {
     if (onScreenSaving) return;
     const previous = onScreenResults;
@@ -754,6 +759,17 @@ export function CampaignDetail({
             ? body.error
             : "The change was not saved.",
         );
+      }
+      // The route echoes the updated row. A 200 whose row does NOT carry the value
+      // we asked for means the field was dropped (flag off), which is a failure
+      // from the operator's point of view even though the request "succeeded".
+      if (
+        body?.data &&
+        typeof body.data === "object" &&
+        "showResultsOnScreen" in body.data &&
+        body.data.showResultsOnScreen !== next
+      ) {
+        throw new Error("This setting is not currently available.");
       }
       toast({
         title: next
