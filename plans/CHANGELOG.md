@@ -6,6 +6,27 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-07-30 — Issue #238: public quiz takers can keep their one-time report <!-- ENTRY_ISO:2026-07-30 ENTRY_SLUG:issue-238-public-quiz-print-download-launched -->
+
+**Status: LAUNCHED on production (PR [#255](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/255), merged 2026-07-30 13:40:41 UTC as `15cfdd5cc5bd0cd38b5c47f35ca7dbb525d9e692`; deployment `dpl_AoW4aC4XL2qZ5LB6pFnm8BztoS12`, `scaling-up-platform-v2-h05onegdc-scaling-up.vercel.app`).** GitHub issue [#238](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/issues/238) is closed. The exact merged-source deployment reached Ready and owns both production aliases, `platformtest.scalingup.com` and `scaling-up-platform-v2.vercel.app`.
+
+The public quiz already rendered the full branded report immediately after submission, but unlike the authenticated report surfaces it omitted the shared `PrintReportButton`. That was a retention defect because the public result is deliberately one-time: a taker who navigated away had no supported way to keep it.
+
+The public result now renders the existing `PrintReportButton` once inside `.su-public-brand.su-report`, immediately before `BrandedReport`. The shared control provides **Print** and **Download PDF** and uses the deterministic document title/filename `${templateName} — ${respondentName}`. Reuse preserves the established print lifecycle, report-only DOM isolation, browser print flow, and title restoration instead of creating a second public-only implementation.
+
+This is a narrow, flagless presentation fix. It changes no assessment answers, scoring, report model, submission contract, persistence, schema, migration, or production environment variable. Rollback is a revert of PR #255; no data cleanup or flag operation is required.
+
+**Validation and review receipt.**
+
+- The focused public-result suite and adjacent shared-button suite passed **18/18 tests**. Scoped ESLint, `git diff --check`, and migration safety all passed; migration safety inspected **42 migrations** with no unapproved destructive operation. `CI=true npx next build --turbopack` passed.
+- The complete local Jest run reported **580 passing suites / 6,859 passing tests** and **8 failing suites / 22 failing tests**. Every failure reproduced on `origin/main`; the branch introduced zero full-suite regressions.
+- Independent task-spec, task-quality, and whole-branch final reviews found no Critical or Important issue. The only optional Minor note concerned restoring a test's `window.print` descriptor; it does not affect production behavior.
+- PR checks passed: **Build**, **Migration Safety Gate**, **Assessment Email Lease (PostgreSQL)**, and **Vercel**.
+
+**Production smoke.** Both aliases returned HTTP `200` from `/api/health` with `database: healthy` and `authPosture: safe`. The existing public campaign route `/quiz/scaling_up_quick_pub_260610041810` also returned HTTP `200` on both aliases. No live assessment was submitted during smoke verification, so production data was not created merely to re-exercise the already-covered post-submit state.
+
+---
+
 ### 2026-07-30 — Jeff #48: QSP core-values story group launched <!-- ENTRY_ISO:2026-07-30 ENTRY_SLUG:jeff-48-qsp-story-group-launched -->
 
 **Status: LAUNCHED on production (PR #251, squash `d676aa77caf328afd113f297d90ca8d41d036caf`; launch deployment `dpl_BK3vSFFQPyo6REpXq74sFmPrX5tJ`, `scaling-up-platform-v2-du38i25fc-scaling-up.vercel.app`).** The exact deployment belongs to the Scaling Up production project/team, targets `main` at the merged SHA, reached Ready, and serves healthy `scaling-up-platform-v2.vercel.app` and `platformtest.scalingup.com` aliases.
