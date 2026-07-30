@@ -1225,7 +1225,7 @@ CI=true npx next build --turbopack
 
 Expected: clean diff check, only intentional branch changes, focused tests PASS, build PASS.
 
-- [ ] **Step 7: Push and open a dark-launch PR**
+- [x] **Step 7: Push and open a dark-launch PR**
 
 ```bash
 git push -u origin codex/issue-48-qsp-story-ui-design
@@ -1238,7 +1238,7 @@ gh pr create \
 
 The PR body must list the approved visual, stable-key/import guarantees, flag-off behavior, focused tests, Turbopack result, and desktop/mobile screenshots.
 
-- [ ] **Step 8: Wait for required checks and merge**
+- [x] **Step 8: Wait for required checks and merge**
 
 Required checks:
 
@@ -1249,9 +1249,11 @@ Migration Safety Gate
 
 Address only actionable findings, rerun the proportional gates, and merge only when both required checks are green. Do not enable the feature flag in this task.
 
-> **Post-review gate:** Task 6 Steps 7–8 are intentionally deferred until the
-> independent whole-branch review is complete. No push, PR, merge, production
-> environment change, deployment, or launch occurred during Steps 1–6.
+> **Completion receipt (2026-07-30):** the independent whole-branch review
+> cleared the runtime and corrected fail-closed launch runbook. PR #251 passed
+> the required Build and Migration Safety gates, then merged dark as squash
+> `d676aa77caf328afd113f297d90ca8d41d036caf`. No #48 production flag was
+> enabled before that merge.
 
 ---
 
@@ -1268,7 +1270,7 @@ Address only actionable findings, rerun the proportional gates, and merge only w
 - Produces: production-enabled QSP grouped presentation with an immediate kill switch.
 - Produces: a consolidated LAUNCHED record in the designated source of truth.
 
-- [ ] **Step 1: Confirm the merged deployment is Ready while the flag is off**
+- [x] **Step 1: Confirm the merged deployment is Ready while the flag is off**
 
 Run the entire block below from `src` as one invocation. It is the
 self-contained, fail-fast runner for Steps 1–3; do not split out or rerun an
@@ -1291,10 +1293,10 @@ case "$QSP48_ACTION" in
   *) echo "QSP48_ACTION must be launch or rollback" >&2; exit 2 ;;
 esac
 
-git fetch origin main
-export QSP48_MERGED_SHA
-QSP48_MERGED_SHA=$(git rev-parse origin/main)
-test -n "$QSP48_MERGED_SHA"
+git fetch origin refs/heads/main:refs/remotes/origin/main
+export QSP48_LAUNCH_SHA="d676aa77caf328afd113f297d90ca8d41d036caf"
+git cat-file -e "${QSP48_LAUNCH_SHA}^{commit}"
+git merge-base --is-ancestor "$QSP48_LAUNCH_SHA" origin/main
 
 export QSP48_VERCEL_DIR
 QSP48_VERCEL_DIR=$(mktemp -d "${TMPDIR:-/tmp}/qsp48-vercel.XXXXXX")
@@ -1348,9 +1350,9 @@ async function api(path, init = {}) {
 
 const teamQuery = `teamId=${encodeURIComponent(TEAM_ID)}`;
 
-async function exactFlagEntries(key) {
+async function listExactFlagEntries(key) {
   const payload = await api(
-    `/v10/projects/${PROJECT_ID}/env?${teamQuery}&decrypt=true`,
+    `/v10/projects/${PROJECT_ID}/env?${teamQuery}`,
   );
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     throw new Error("Malformed environment response: expected an object");
@@ -1368,11 +1370,11 @@ async function exactFlagEntries(key) {
   }
 
   const exact = payload.envs.filter((entry) => entry.key === key);
-  for (const entry of exact) validateExactFlagEntry(entry);
+  for (const entry of exact) validateExactFlagEntry(entry, false);
   return exact;
 }
 
-function validateExactFlagEntry(entry) {
+function validateExactFlagEntry(entry, requireReadableValue = true) {
   if (typeof entry.id !== "string" || entry.id.length === 0) {
     throw new Error(`Malformed exact-key entry for ${entry.key}: missing id`);
   }
@@ -1382,8 +1384,8 @@ function validateExactFlagEntry(entry) {
   if (Object.hasOwn(entry, "value") && typeof entry.value !== "string") {
     throw new Error(`Malformed exact-key entry for ${entry.key}: invalid value shape`);
   }
-  if (entry.type === "encrypted" && !Object.hasOwn(entry, "value")) {
-    throw new Error(`Malformed exact-key entry for ${entry.key}: missing encrypted value`);
+  if (requireReadableValue && !Object.hasOwn(entry, "value")) {
+    throw new Error(`Malformed exact-key entry for ${entry.key}: missing decrypted value`);
   }
   if (
     !Array.isArray(entry.target) ||
@@ -1426,11 +1428,40 @@ function validateExactFlagEntry(entry) {
   }
 }
 
-function flagReceipt(entry) {
+async function readExactFlagEntry(summary) {
+  validateExactFlagEntry(summary, false);
+  const entry = await api(
+    `/v1/projects/${PROJECT_ID}/env/${encodeURIComponent(summary.id)}` +
+      `?${teamQuery}&decrypt=true`,
+  );
+  if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+    throw new Error(`Malformed per-ID environment response for ${summary.key}`);
+  }
+  validateExactFlagEntry(entry, true);
+  if (entry.id !== summary.id || entry.key !== summary.key) {
+    throw new Error(`Per-ID environment response changed identity for ${summary.key}`);
+  }
+  if (
+    entry.type !== summary.type ||
+    JSON.stringify(entry.target) !== JSON.stringify(summary.target) ||
+    JSON.stringify(entry.customEnvironmentIds ?? []) !==
+      JSON.stringify(summary.customEnvironmentIds ?? [])
+  ) {
+    throw new Error(`Per-ID environment response changed scope for ${summary.key}`);
+  }
+  return entry;
+}
+
+async function exactFlagEntries(key) {
+  const summaries = await listExactFlagEntries(key);
+  return Promise.all(summaries.map(readExactFlagEntry));
+}
+
+function redactedFlagReceipt(entry) {
   return {
     id: entry.id,
     key: entry.key,
-    value: Object.hasOwn(entry, "value") ? entry.value : "[unreadable]",
+    value: Object.hasOwn(entry, "value") ? "[redacted]" : "[unavailable]",
     type: entry.type,
     target: entry.target,
     customEnvironmentIds: entry.customEnvironmentIds ?? [],
@@ -1451,14 +1482,28 @@ function partitionExactFlagEntries(entries) {
   return { productionOnly, nonProduction };
 }
 
-function receiptSet(entries) {
+function internalFlagComparison(entry) {
+  return {
+    id: entry.id,
+    key: entry.key,
+    value: entry.value,
+    type: entry.type,
+    target: entry.target,
+    customEnvironmentIds: entry.customEnvironmentIds ?? [],
+  };
+}
+
+function internalComparisonSet(entries) {
   return entries
-    .map((entry) => JSON.stringify(flagReceipt(entry)))
+    .map((entry) => JSON.stringify(internalFlagComparison(entry)))
     .sort();
 }
 
-function sameReceiptSet(left, right) {
-  return JSON.stringify(receiptSet(left)) === JSON.stringify(receiptSet(right));
+function sameInternalComparisonSet(left, right) {
+  return (
+    JSON.stringify(internalComparisonSet(left)) ===
+    JSON.stringify(internalComparisonSet(right))
+  );
 }
 
 async function waitForFlag(key, predicate, description) {
@@ -1477,7 +1522,9 @@ async function replaceFlag(key, value) {
   }
 
   const before = await exactFlagEntries(key);
-  console.error(`Exact entries before ${key}: ${JSON.stringify(before.map(flagReceipt))}`);
+  console.error(
+    `Exact entries before ${key}: ${JSON.stringify(before.map(redactedFlagReceipt))}`,
+  );
   const {
     productionOnly: beforeProduction,
     nonProduction: preservedNonProduction,
@@ -1495,7 +1542,7 @@ async function replaceFlag(key, value) {
       const { productionOnly, nonProduction } = partitionExactFlagEntries(entries);
       return (
         productionOnly.length === 0 &&
-        sameReceiptSet(nonProduction, preservedNonProduction)
+        sameInternalComparisonSet(nonProduction, preservedNonProduction)
       );
     },
     "have no production-targeting entry while preserving non-production entries",
@@ -1519,13 +1566,15 @@ async function replaceFlag(key, value) {
         productionOnly.length === 1 &&
         productionOnly[0].value === value &&
         productionOnly[0].type === "encrypted" &&
-        sameReceiptSet(nonProduction, preservedNonProduction)
+        sameInternalComparisonSet(nonProduction, preservedNonProduction)
       );
     },
-    `be exactly one readable encrypted production entry with value ${value}`,
+    "be exactly one readable encrypted production entry with the requested value",
   );
   const { productionOnly } = partitionExactFlagEntries(after);
-  console.error(`Verified ${key}: ${JSON.stringify(flagReceipt(productionOnly[0]))}`);
+  console.error(
+    `Verified ${key}: ${JSON.stringify(redactedFlagReceipt(productionOnly[0]))}`,
+  );
 }
 
 function deploymentProjectId(deployment) {
@@ -1620,8 +1669,8 @@ async function listProductionDeployments() {
       !deployment ||
       typeof deployment !== "object" ||
       Array.isArray(deployment) ||
-      typeof deployment.id !== "string" ||
-      deployment.id.length === 0
+      typeof deployment.uid !== "string" ||
+      deployment.uid.length === 0
     ) {
       throw new Error("Malformed deployment summary");
     }
@@ -1629,12 +1678,12 @@ async function listProductionDeployments() {
   return payload.deployments;
 }
 
-async function resolveReadyMergedDeployment(sha) {
+async function resolveReadyLaunchDeployment(sha) {
   const summaries = (await listProductionDeployments()).sort(
     (a, b) => Number(b.createdAt) - Number(a.createdAt),
   );
   for (const summary of summaries) {
-    const deployment = await deploymentDetails(summary.id);
+    const deployment = await deploymentDetails(summary.uid);
     try {
       assertExactDeployment(deployment, {
         sha,
@@ -1651,7 +1700,7 @@ async function resolveReadyMergedDeployment(sha) {
       // Keep looking; a Ready deployment for another SHA/ref is not the launch source.
     }
   }
-  throw new Error(`No exact Ready production deployment found for merged main SHA ${sha}`);
+  throw new Error(`No exact Ready production deployment found for pinned launch SHA ${sha}`);
 }
 
 function parseRedeployOutput(output) {
@@ -1707,7 +1756,7 @@ async function main() {
   } else if (command === "resolve-ready") {
     const [sha] = args;
     if (!/^[0-9a-f]{40}$/i.test(sha ?? "")) throw new Error("Expected a full Git SHA");
-    await resolveReadyMergedDeployment(sha);
+    await resolveReadyLaunchDeployment(sha);
   } else if (command === "parse-redeploy-output") {
     process.stdout.write(parseRedeployOutput(await readStdin()));
   } else if (command === "wait-exact-ready") {
@@ -1733,7 +1782,7 @@ NODE
 
 export QSP48_READY_HOST
 QSP48_READY_HOST=$(
-  node "$QSP48_VERCEL_HELPER" resolve-ready "$QSP48_MERGED_SHA"
+  node "$QSP48_VERCEL_HELPER" resolve-ready "$QSP48_LAUNCH_SHA"
 )
 test -n "$QSP48_READY_HOST"
 curl -fsS https://scaling-up-platform-v2.vercel.app/api/health
@@ -1768,7 +1817,7 @@ test -n "$QSP48_NEW_DEPLOYMENT_HOST"
 export QSP48_READY_RECEIPT
 QSP48_READY_RECEIPT=$(
   node "$QSP48_VERCEL_HELPER" \
-    wait-exact-ready "$QSP48_MERGED_SHA" "$QSP48_NEW_DEPLOYMENT_HOST"
+    wait-exact-ready "$QSP48_LAUNCH_SHA" "$QSP48_NEW_DEPLOYMENT_HOST"
 )
 test "$QSP48_READY_RECEIPT" = "$QSP48_NEW_DEPLOYMENT_HOST"
 curl -fsS https://scaling-up-platform-v2.vercel.app/api/health
@@ -1777,39 +1826,66 @@ printf 'QSP48 %s Ready: %s\n' "$QSP48_ACTION" "$QSP48_READY_RECEIPT"
 
 Expected: the helper resolves a Ready production deployment in project
 `prj_xcAWuAmGZAU3DCHgAauRv2WPKneo`, team
-`team_ek3PMuEYCgI0DKZ2EFexMgya`, whose Git metadata matches the merged `main`
-SHA. If there is no exact match, or the API does not expose enough metadata to
-prove the match, the runner stops before any flag mutation. Health must return
-success. `set -euo pipefail` also guarantees that a failed flag write/readback
+`team_ek3PMuEYCgI0DKZ2EFexMgya`, whose Git metadata matches the pinned launch
+SHA `d676aa77caf328afd113f297d90ca8d41d036caf`. The preflight also requires that
+commit to exist locally and remain an ancestor of fetched `origin/main`. If
+there is no exact Ready deployment for that SHA, or the API does not expose
+enough metadata to prove the match, the runner stops before any flag mutation.
+Health must return success. `set -euo pipefail` also guarantees that a failed flag write/readback
 stops before the next flag or redeploy, a failed redeploy stops before parsing
 or polling, and a malformed CLI URL stops before the exact-deployment poll.
 
-- [ ] **Step 2: Confirm rollback posture before enablement**
+> **Completion receipt (2026-07-30):** PR #251 merged dark as
+> `d676aa77caf328afd113f297d90ca8d41d036caf`. The first production attempt,
+> `dpl_8hRSBbEQrGXaKRnQQa56V7sCdSHD`, ended in `ERROR` on unrelated
+> Preview-only migration `20260730050000` (`P3009`, duplicate
+> `referringCoachId`). Read-only diagnosis proved the transaction rolled back
+> with no partial DDL. The active row was marked rolled back through Prisma's
+> supported operation; all 41 main migrations then reported up to date. Clean
+> dark deployment `dpl_2WugBEPrsymdCcTDgxmjnE7fjeow`
+> (`scaling-up-platform-v2-1jt6vahaz-scaling-up.vercel.app`) reached Ready and
+> healthy before enablement.
+
+- [x] **Step 2: Confirm rollback posture before enablement**
 
 In `launch` mode, the Step 1 runner does not infer the kill state from an absent
-or unreadable value. It validates the environment response object, `envs[]`, and
-every exact-key entry before any mutation. It preserves exact-key entries whose
-validated targets are disjoint from production, deletes only entries targeted
-exactly to `["production"]`, and fails before any delete if an entry mixes
-production with Preview/Development, has an ambiguous/custom target shape, or
-has any nonempty `customEnvironmentIds` attachment. Custom-environment entries
-must be resolved manually and are never deleted by this runner.
+or unreadable value. It validates the bulk environment response object, `envs[]`,
+and every exact-key summary before any mutation. Because the bulk list returns
+encrypted ciphertext rather than a trustworthy plaintext value, each exact
+entry is then read by ID through
+`GET /v1/projects/{project}/env/{id}?decrypt=true`; identity and scope must
+match the bulk summary and the per-ID value must be readable. The runner
+preserves exact-key entries whose validated targets are disjoint from
+production, deletes only entries targeted exactly to `["production"]`, and
+fails before any delete if an entry mixes production with
+Preview/Development, has an ambiguous/custom target shape, or has any nonempty
+`customEnvironmentIds` attachment. Custom-environment entries must be resolved
+manually and are never deleted by this runner.
 
 After deletion it proves that no production-targeting entry remains and that
-the non-production receipt is unchanged. It then creates one entry through
+the non-production receipt is unchanged by relisting and repeating the per-ID
+reads. Logged receipts always replace readable values or ciphertext with
+`[redacted]`; raw values exist only in an internal comparison record that is
+never logged or returned. It then creates one entry through
 `POST /v10/projects/prj_xcAWuAmGZAU3DCHgAauRv2WPKneo/env?teamId=team_ek3PMuEYCgI0DKZ2EFexMgya`
 with `type:"encrypted"` and `target:["production"]`, then reads the exact key back
-and requires exactly one readable value `0`, encrypted type, production-only
-target, and the unchanged non-production receipt. Only then may the launch
-branch proceed to enablement.
+by ID, relists, and requires exactly one readable value `0`, encrypted type,
+production-only target, and the unchanged non-production receipt. Only then may
+the launch branch proceed to enablement.
 
 The rollback command is the entire Step 1 block with
 `QSP48_ACTION="rollback"`. That self-contained branch deterministically replaces
 the production-only kill entry with readable encrypted value `1`; any set or
-readback failure stops before redeploy. It then redeploys only the resolved
-merged source and polls only the exact hostname captured from that redeploy.
+readback failure stops before redeploy. It then redeploys only the pinned launch
+source `d676aa77caf328afd113f297d90ca8d41d036caf` and polls only the exact
+hostname captured from that redeploy. A newer `origin/main` cannot silently
+change the rollback source.
 
-- [ ] **Step 3: Enable the production flag and redeploy**
+> **Completion receipt (2026-07-30):** encrypted Production-only entries were
+> verified by per-ID decrypted GET and subsequent relist. Kill was proven `0`
+> before enablement; the same verifier is the current `KILL=1` rollback path.
+
+- [x] **Step 3: Enable the production flag and redeploy**
 
 In `launch` mode, the same fail-fast runner sets and verifies kill `0` before it
 sets enabled `1`. The enabled entry goes through the same
@@ -1828,7 +1904,16 @@ Expected: `QSP48_READY_RECEIPT` is that captured Ready production deployment in 
 testing if any identity, target, readable SHA when supplied, flag-value,
 redeploy, hostname-parse, exact-correlation, or Ready check fails.
 
-- [ ] **Step 4: Perform the production launch walk**
+> **Completion receipt (2026-07-30):**
+> `WAVE_48_QSP_STORY_GROUP_KILL=0` and
+> `WAVE_48_QSP_STORY_GROUP_ENABLED=1` were verified as encrypted
+> Production-only values. Exact deployment
+> `dpl_BK3vSFFQPyo6REpXq74sFmPrX5tJ`
+> (`scaling-up-platform-v2-du38i25fc-scaling-up.vercel.app`) matched the
+> production project/team and `d676aa77` main source, reached Ready, and served
+> healthy production aliases.
+
+- [x] **Step 4: Perform the production launch walk**
 
 Verify:
 
@@ -1847,7 +1932,20 @@ merged deployment with `--scope scaling-up --non-interactive`, capture the
 specific new hostname, and wait for that exact deployment's Ready receipt).
 Then confirm the three-question fallback before investigating.
 
-- [ ] **Step 5: Create the closeout branch and record the launch**
+> **Safe production receipt (2026-07-30):** the invited QSP route
+> `/org-survey/spectrum_qsp_v2_260724133919` returned `200`, and its live RSC
+> payload contained `qspStoryGroupEnabled=true`. No valid invited token was
+> opened because that would write `VIEWED`, and live submission/admin-write
+> verification is prohibited. No PUBLIC QSP campaign exists. The existing
+> non-QSP PUBLIC route `/quiz/scaling_up_quick_pub_260610041810` rendered clean
+> and responsive on desktop/mobile and Start advanced to About You; the Vercel
+> Insights script `404`/MIME console pair is pre-existing and unrelated.
+> Authenticated production editor Preview, production Add/restore, and a live
+> three-key submission are not claimed. Those behaviors remain covered by the
+> pre-launch production-context component/editor Preview evidence and 15/15
+> suites, 224/224 tests.
+
+- [x] **Step 5: Create the closeout branch and record the launch**
 
 Start the documentation closeout from the merged `main` state:
 
@@ -1872,14 +1970,20 @@ Advance `CLAUDE.md`’s freshness anchor to `jeff-48-qsp-story-group-launched`. 
 - current rollback command; and
 - tracker #48 disposition as launched.
 
-- [ ] **Step 6: Commit and ship the launch closeout**
+- [x] **Step 6: Commit the launch closeout**
 
 ```bash
 git add \
   docs/superpowers/specs/2026-07-30-jeff-48-qsp-core-values-stories-design.md \
+  docs/superpowers/plans/2026-07-30-jeff-48-qsp-core-values-stories.md \
   CLAUDE.md \
   plans/CHANGELOG.md
 git commit -m "docs: close out Jeff #48 launch"
+```
+
+- [ ] **Step 7: Ship the launch closeout**
+
+```bash
 git push -u origin codex/issue-48-qsp-story-launch-closeout
 gh pr create \
   --base main \
