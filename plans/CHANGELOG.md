@@ -27,6 +27,39 @@ This is a narrow, flagless presentation fix. It changes no assessment answers, s
 
 ---
 
+### 2026-07-30 — Wave OSR review corrections, and a review loop that outran its own merge <!-- ENTRY_ISO:2026-07-30 ENTRY_SLUG:wave-osr-review-corrections -->
+
+**Status: MERGED + LIVE (PR #252, squash `002e58fd`).** Follow-up to PR #249 (Wave OSR reachability + GH #229). One runtime change; the rest corrects what #249 *said* about itself.
+
+**The process fact worth recording: #249 merged while its review loop was still running.** It merged at 06:52:50Z with head `21f8c3bb` — a single commit — and the first round of review fixes did not exist until 07:44:40Z. A squash-merged PR cannot be updated, so `main` briefly carried working code alongside an overclaimed security note, a **false** code comment, and an untested guard. #252 is where those landed. **Lesson: a PR driven by a review loop is not merge-ready just because its checks are green** — the checks have no opinion about prose.
+
+**Three rounds, ~20 findings, ZERO runtime defects.** Every important finding was an artifact disagreeing with the code — the third consecutive wave (after #241 and #230) where that held. Treat it as the default expectation, not a surprise.
+
+**Round 1 (10 findings, 3 important).**
+- 🔑 **The headline security claim was broader than the fix.** `safeImageSrc` requires `https:` but places **no constraint on the host**, so `https://tracker.example.net/pixel.png` passes and a respondent's browser still calls out. #249's body sold the fix as preventing "IP/UA disclosure to an arbitrary host". It does not. Restated in five places and pinned by a test that asserts the **limit** rather than a guard we do not have. **No host allowlist was applied**, deliberately: `services/circle-sync.ts` writes Circle-hosted avatar URLs, so coach logos are legitimately third-party hosted and an allowlist would silently drop real ones. Residual → **GH #256**.
+- **Prod measurements were baked into four source comments and two test docblocks** — a direct violation of the repo's own rule, and the same finding PR #236 round 2 raised. One of them, "the production flag (already enabled)", is not even knowable: the REST read cannot distinguish `"1"` from `"0"`.
+- 🔑 **"No UI sends this field" was FALSE, and a real 400 sat behind it.** The Bio editor PATCHes `profileImage` **seeded from the stored value**, and `updateCoachSchema = createCoachSchema.partial()` retains the refine — so a coach whose stored image is not https would get a 400 on an unrelated bio save, surfaced as `[object Object]`. Verified against prod before believing either version: **2 coach images, 0 non-https**, so no live 400 path. The comment was the defect, not the code.
+
+**Round 2 reviewed round 1's fixes and found five of them wrong.**
+- 🔑 **The new guard was completely untested** — deleting it left the suite green. Round 1 shipped an unguarded guard, and the comment justifying its mock change was *inverted* (the check is presence-gated, so a bare `data: {}` takes the success path).
+- 🔑 **The timeout fix could not work.** jest's `testTimeout` defaults to 5s and this repo sets none, so a 15s `waitFor` is unreachable — the test dies at 5s first. Fixed with real per-test budgets.
+
+**Round 3 reviewed round 2's fixes and found five more, two of them mine.**
+- 🔑 **A measurement was cited from the failing run.** Round 2 justified a 20s budget with "confirmed by the new test taking 15057ms". That number came from the **mutated run with the guard removed** — it measured the failure, not the test. Real figure under full parallel load: **~0.5s**. Budgets right-sized, and the retracted number is recorded in the docblock so it cannot be restored. **Generalise: a timing taken from a red run is not evidence about a green one.**
+- 🔑 **A guard added to close a test gap was itself vacuous.** With Prisma mocked, asserting on the echoed response body passes whether or not the route narrows the query — so adding a `select` would have made the client guard inert with the test still green. That is the round-2 finding repeating one layer down. The assertion is now the **absence of a `select`**, the only observable form, and it fails under that mutation.
+
+**The one runtime change:** the campaign PATCH route ignores `showResultsOnScreen` when the flag is off and still answers `200 {success:true}`, so the operator's checkbox would stay ticked over a column that never changed. The client now compares the echoed row against what it sent and reverts on a silent no-op. Both PATCH success paths `update()` without a `select`, so the non-nullable column is always echoed, and the toggle can never enter the slides branch.
+
+**Also corrected:** the flag module still listed this column under "deliberately NOT gated" after PATCH began gating writes to it; and the route comment claimed the gate stops "a stale client switching on a respondent-facing disclosure" — it does not, because **CREATE writes the same column with no flag check**. The write-gate is consistency, not a security boundary; disclosure is decided under the submission lock either way.
+
+**Verification.** 5 suites / 88 tests, jest-verified per suite: `coach-logo` 15 · `validations` 38 · `patch-onscreen-results` 9 · `campaign-detail-onscreen-results` 8 · `org-survey-onscreen-results` 18. **Two guards mutation-proved** (removing the client echo check fails exactly one test; adding a `select` fails exactly the route test). Full suite measured **9 failing suites / 16 tests in one run — one sample in an unstable 9-14 band, never a floor.** ESLint clean; `CI=true npx next build --turbopack` green; all five GitHub checks green after a rebase that picked up the new `Assessment Email Lease (PostgreSQL)` job.
+
+⚠️ **NEW OPS GOTCHA — a green CI Build does not mean the Vercel deploy ran at all.** The first production deployment of `002e58fd` reported **ERROR after 200ms**, before any build step, with *"We were unable to fetch required git information required to complete the deployment."* That is a Vercel↔GitHub integration failure, not a code failure — nothing in the repo was wrong and CI's own Build job had passed. An API-triggered redeploy of the **same commit** reached Ready. Two lessons: **always confirm the prod deployment state after a merge** (a failed deploy silently leaves the previous commit serving), and the redeploy call needs the project's real `repoId` from `GET /v9/projects/{id}` — a guessed one returns `incorrect_git_source_info`.
+
+**Not done here, deliberately.** #71's live walk was already performed by another thread and verified against prod (`closeout-71-20260730`, created 07:03, soft-deleted 07:05, one invitation, one submission, `showResultsOnScreen=true`), so repeating it would have been a duplicate production write for no new information. **GH #229 is correctly closed** — its ask was parity with the invite-email path and the fix achieves exactly that; the host question is new scope in **#256**. The org-survey outbox INSERT that silently drops an email with no replay is filed as **#257** (unrelated to #250 / ADR-0030, which govern the send side and presuppose the row exists).
+
+---
+
 ### 2026-07-30 — Jeff #48: QSP core-values story group launched <!-- ENTRY_ISO:2026-07-30 ENTRY_SLUG:jeff-48-qsp-story-group-launched -->
 
 **Status: LAUNCHED on production (PR #251, squash `d676aa77caf328afd113f297d90ca8d41d036caf`; launch deployment `dpl_BK3vSFFQPyo6REpXq74sFmPrX5tJ`, `scaling-up-platform-v2-du38i25fc-scaling-up.vercel.app`).** The exact deployment belongs to the Scaling Up production project/team, targets `main` at the merged SHA, reached Ready, and serves healthy `scaling-up-platform-v2.vercel.app` and `platformtest.scalingup.com` aliases.
