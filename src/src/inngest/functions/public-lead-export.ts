@@ -238,39 +238,49 @@ export const publicLeadExport = inngest.createFunction(
           if (items.length < BATCH_SIZE) break;
         }
 
-        const chunks = await db.publicLeadExportChunk.findMany({
-          where: { exportId },
-          orderBy: { batchIndex: "asc" },
-        });
-        const plaintext =
-          chunks.length === 0
-            ? Buffer.from(
-                `${["Name", "Email", "Submitted at", "Assessment"]
-                  .map(csvCell)
-                  .join(",")}\r\n`,
-                "utf8",
-              )
-            : Buffer.concat(
-                chunks.map((chunk) =>
-                  decryptChunk(
-                    Buffer.from(chunk.ciphertext),
-                    Buffer.from(chunk.nonce),
-                    Buffer.from(chunk.authTag),
-                    key,
-                  ),
-                ),
-              );
-        const digest = createHash("sha256").update(plaintext).digest("hex");
-        const artifact = encryptChunk(plaintext, key);
+        const digestBuilder = createHash("sha256");
+        let emitted = 0;
+        let chunkAfter = -1;
+        let chunkCount = 0;
+        while (true) {
+          const chunks = await db.publicLeadExportChunk.findMany({
+            where: { exportId, batchIndex: { gt: chunkAfter } },
+            orderBy: { batchIndex: "asc" },
+            take: 100,
+          });
+          if (chunks.length === 0) break;
+          for (const chunk of chunks) {
+            digestBuilder.update(
+              decryptChunk(
+                Buffer.from(chunk.ciphertext),
+                Buffer.from(chunk.nonce),
+                Buffer.from(chunk.authTag),
+                key,
+              ),
+            );
+            emitted += chunk.rowCount;
+            chunkAfter = chunk.batchIndex;
+            chunkCount += 1;
+          }
+        }
+        if (chunkCount === 0) {
+          digestBuilder.update(
+            `${["Name", "Email", "Submitted at", "Assessment"]
+              .map(csvCell)
+              .join(",")}\r\n`,
+          );
+        }
+        const digest = digestBuilder.digest("hex");
 
         await db.publicLeadExport.update({
           where: { id: exportId },
           data: {
             status: "COMPLETED",
             emittedDigest: digest,
-            artifactCiphertext: artifact.ciphertext,
-            artifactNonce: artifact.nonce,
-            artifactAuthTag: artifact.authTag,
+            emittedRowCount: emitted,
+            artifactCiphertext: null,
+            artifactNonce: null,
+            artifactAuthTag: null,
             artifactKeyVersion: version,
             completedAt: new Date(),
             expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
@@ -278,7 +288,7 @@ export const publicLeadExport = inngest.createFunction(
         });
         return {
           status: "COMPLETED",
-          emitted: chunks.reduce((sum, chunk) => sum + chunk.rowCount, 0),
+          emitted,
         };
       } catch (error) {
         const message = error instanceof Error ? error.message : "";

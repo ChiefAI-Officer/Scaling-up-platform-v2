@@ -65,6 +65,8 @@ export const publicLeadRetention = inngest.createFunction(
               cancelledAt: now,
               cancelReason: "RETENTION_EXPIRED",
               bodyHtml: "",
+              contentProvenance: Prisma.JsonNull,
+              authorizationProvenance: Prisma.JsonNull,
               leaseToken: null,
               leaseExpiresAt: null,
               sendFenceGeneration: { increment: 1 },

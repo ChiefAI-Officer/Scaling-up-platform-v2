@@ -27,25 +27,27 @@ function envEnabled(value: string | undefined): boolean {
 
 async function syncPublicLeadDeliveryFence(): Promise<void> {
   const blocked = envEnabled(process.env.WAVE_PUBLIC_LEADS_KILL);
+  // Runtime workers may set the monotonic fence, but never clear it. Clearing
+  // is an audited post-quiescence operation, preventing an old KILL=0
+  // deployment from undoing a newer stop decision.
+  if (!blocked) return;
   const now = new Date();
   await db.$executeRaw(Prisma.sql`
     INSERT INTO "public_lead_delivery_fences"
       ("id", "generation", "blocked", "blockedAt", "quiescedAt", "updatedAt")
     VALUES
-      ('global', ${blocked ? 1 : 0}, ${blocked}, ${blocked ? now : null}, NULL, ${now})
+      ('global', 1, true, ${now}, NULL, ${now})
     ON CONFLICT ("id") DO UPDATE SET
       "generation" = CASE
         WHEN "public_lead_delivery_fences"."blocked" <> EXCLUDED."blocked"
           THEN "public_lead_delivery_fences"."generation" + 1
         ELSE "public_lead_delivery_fences"."generation"
       END,
-      "blocked" = EXCLUDED."blocked",
+      "blocked" = true,
       "blockedAt" = CASE
-        WHEN EXCLUDED."blocked"
-          AND NOT "public_lead_delivery_fences"."blocked"
+        WHEN NOT "public_lead_delivery_fences"."blocked"
           THEN EXCLUDED."blockedAt"
-        WHEN EXCLUDED."blocked" THEN "public_lead_delivery_fences"."blockedAt"
-        ELSE NULL
+        ELSE "public_lead_delivery_fences"."blockedAt"
       END,
       "quiescedAt" = CASE
         WHEN "public_lead_delivery_fences"."blocked" <> EXCLUDED."blocked"
@@ -54,6 +56,25 @@ async function syncPublicLeadDeliveryFence(): Promise<void> {
       END,
       "updatedAt" = EXCLUDED."updatedAt"
   `);
+  if (blocked) {
+    await db.$executeRaw(Prisma.sql`
+      UPDATE "assessment_email_outbox"
+      SET
+        "status" = 'CANCELLED',
+        "cancelledAt" = ${now},
+        "cancelReason" = 'PUBLIC_LEADS_KILL',
+        "bodyHtml" = '',
+        "contentProvenance" = NULL,
+        "authorizationProvenance" = NULL,
+        "leaseToken" = NULL,
+        "leaseExpiresAt" = NULL,
+        "sendFenceGeneration" = "sendFenceGeneration" + 1,
+        "updatedAt" = ${now}
+      WHERE "featureKey" = 'PUBLIC_LEADS'
+        AND "recipientRole" = 'REFERRING_COACH'
+        AND "status" IN ('PENDING', 'HELD', 'SENDING')
+    `);
+  }
 }
 
 export interface ClaimedOutboxRow {
@@ -72,6 +93,7 @@ export interface ClaimedOutboxRow {
   contentProvenance?: unknown;
   previousStatus?: string;
   sendFenceGeneration: number;
+  globalFenceGeneration: number;
 }
 
 interface UpdateManyResult {
@@ -119,6 +141,7 @@ export interface DrainDeps {
   leaseMs?: number;
   invocationBudgetMs?: number;
   limiterHealthy?: () => Promise<boolean>;
+  verifyFence?: (row: ClaimedOutboxRow) => Promise<boolean>;
 }
 
 export interface DrainResult {
@@ -140,12 +163,22 @@ export async function claimNextOutboxRow(
     ? Prisma.sql`AND "submissionId" = ${input.submissionId}`
     : Prisma.empty;
   const heldClause = input.releaseHeld
-    ? Prisma.sql`OR "status" = 'HELD'`
+    ? Prisma.sql`OR (
+        outbox."status" = 'HELD'
+        AND outbox."nextAttemptAt" <= ${input.now}
+      )`
     : Prisma.empty;
 
   const rows = await claimDb.$queryRaw<ClaimedOutboxRow[]>(Prisma.sql`
     WITH candidate AS (
-      SELECT outbox."id", outbox."status" AS "previousStatus"
+      SELECT
+        outbox."id",
+        outbox."status" AS "previousStatus",
+        COALESCE((
+          SELECT fence."generation"
+          FROM "public_lead_delivery_fences" AS fence
+          WHERE fence."id" = 'global'
+        ), 0) AS "globalFenceGeneration"
       FROM "assessment_email_outbox" AS outbox
       WHERE (
         (
@@ -196,7 +229,8 @@ export async function claimNextOutboxRow(
       outbox."featureKey",
       outbox."contentProvenance",
       outbox."sendFenceGeneration",
-      candidate."previousStatus"
+      candidate."previousStatus",
+      candidate."globalFenceGeneration"
   `);
 
   return rows[0] ?? null;
@@ -332,6 +366,30 @@ export async function drainLeadOutbox(
   const authorizeBeforeSend =
     deps.authorizeBeforeSend ??
     ((row: ClaimedOutboxRow) => defaultAuthorizeBeforeSend(deps.db, row));
+  const verifyFence =
+    deps.verifyFence ??
+    (async (row: ClaimedOutboxRow) => {
+      const verified = await deps.db.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+        UPDATE "assessment_email_outbox" AS outbox
+        SET "updatedAt" = outbox."updatedAt"
+        WHERE outbox."id" = ${row.id}
+          AND outbox."status" = 'SENDING'
+          AND outbox."leaseToken" = ${row.leaseToken}
+          AND outbox."sendFenceGeneration" = ${row.sendFenceGeneration}
+          AND COALESCE((
+            SELECT fence."generation"
+            FROM "public_lead_delivery_fences" AS fence
+            WHERE fence."id" = 'global'
+          ), 0) = ${row.globalFenceGeneration}
+          AND NOT EXISTS (
+            SELECT 1
+            FROM "public_lead_delivery_fences" AS fence
+            WHERE fence."id" = 'global' AND fence."blocked" = true
+          )
+        RETURNING outbox."id"
+      `);
+      return verified.length === 1;
+    });
   const releaseConfigured =
     (process.env.PUBLIC_LEADS_POLICY_APPROVED === "1" ||
       process.env.PUBLIC_LEADS_POLICY_APPROVED?.toLowerCase() === "true") &&
@@ -391,6 +449,8 @@ export async function drainLeadOutbox(
               cancelReason:
                 authorization.reason ?? "AUTHORIZATION_REVOKED",
               bodyHtml: "",
+              contentProvenance: Prisma.JsonNull,
+              authorizationProvenance: Prisma.JsonNull,
               leaseToken: null,
               leaseExpiresAt: null,
               sendFenceGeneration: { increment: 1 },
@@ -399,16 +459,7 @@ export async function drainLeadOutbox(
         skipped += cancellation.count;
         continue;
       }
-      const fenced = await deps.db.assessmentEmailOutbox.updateMany({
-        where: {
-          id: row.id,
-          status: "SENDING",
-          leaseToken: row.leaseToken,
-          sendFenceGeneration: row.sendFenceGeneration,
-        },
-        data: {},
-      });
-      if (fenced.count !== 1) {
+      if (!(await verifyFence(row))) {
         skipped += 1;
         continue;
       }
@@ -428,6 +479,8 @@ export async function drainLeadOutbox(
           status: "SENT",
           sentAt: currentTime(),
           bodyHtml: "",
+          contentProvenance: Prisma.JsonNull,
+          authorizationProvenance: Prisma.JsonNull,
           leaseToken: null,
           leaseExpiresAt: null,
           lastError: null,
@@ -466,7 +519,7 @@ export async function drainLeadOutbox(
         },
         data: {
           status:
-            row.previousStatus === "HELD"
+            row.previousStatus === "HELD" && !terminal
               ? "HELD"
               : terminal
                 ? "FAILED"
@@ -475,8 +528,12 @@ export async function drainLeadOutbox(
           nextAttemptAt: new Date(failureNow.getTime() + backoffMs),
           leaseToken: null,
           leaseExpiresAt: null,
-          ...(terminal && row.previousStatus !== "HELD"
-            ? { bodyHtml: "" }
+          ...(terminal
+            ? {
+                bodyHtml: "",
+                contentProvenance: Prisma.JsonNull,
+                authorizationProvenance: Prisma.JsonNull,
+              }
             : {}),
         },
       });

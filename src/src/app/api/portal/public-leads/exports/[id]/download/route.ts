@@ -23,13 +23,7 @@ export async function GET(
       expiresAt: { gt: new Date() },
     },
   });
-  if (
-    !job?.artifactCiphertext ||
-    !job.artifactNonce ||
-    !job.artifactAuthTag
-  ) {
-    return new Response("Not found", { status: 404 });
-  }
+  if (!job) return new Response("Not found", { status: 404 });
   const expectedVersion =
     process.env.PUBLIC_LEADS_EXPORT_KEY_VERSION?.trim() || "v1";
   const key = Buffer.from(
@@ -59,17 +53,39 @@ export async function GET(
     },
   });
 
-  const decipher = createDecipheriv(
-    "aes-256-gcm",
-    key,
-    Buffer.from(job.artifactNonce),
-  );
-  decipher.setAuthTag(Buffer.from(job.artifactAuthTag));
-  const plaintext = Buffer.concat([
-    decipher.update(Buffer.from(job.artifactCiphertext)),
-    decipher.final(),
-  ]);
-  return new Response(plaintext, {
+  let after = -1;
+  const stream = new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      const chunk = await db.publicLeadExportChunk.findFirst({
+        where: { exportId: job.id, batchIndex: { gt: after } },
+        orderBy: { batchIndex: "asc" },
+      });
+      if (!chunk) {
+        if (after === -1) {
+          controller.enqueue(
+            new TextEncoder().encode(
+              '"Name","Email","Submitted at","Assessment"\r\n',
+            ),
+          );
+        }
+        controller.close();
+        return;
+      }
+      const decipher = createDecipheriv(
+        "aes-256-gcm",
+        key,
+        Buffer.from(chunk.nonce),
+      );
+      decipher.setAuthTag(Buffer.from(chunk.authTag));
+      const plaintext = Buffer.concat([
+        decipher.update(Buffer.from(chunk.ciphertext)),
+        decipher.final(),
+      ]);
+      after = chunk.batchIndex;
+      controller.enqueue(new Uint8Array(plaintext));
+    },
+  });
+  return new Response(stream, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition":

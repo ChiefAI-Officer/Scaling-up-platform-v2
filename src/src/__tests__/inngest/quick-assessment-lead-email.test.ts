@@ -29,6 +29,7 @@ function makeRow(
     leaseExpiresAt:
       overrides.leaseExpiresAt ?? new Date("2026-07-30T03:02:00.000Z"),
     sendFenceGeneration: overrides.sendFenceGeneration ?? 0,
+    globalFenceGeneration: overrides.globalFenceGeneration ?? 0,
     previousStatus: overrides.previousStatus,
   };
 }
@@ -56,6 +57,7 @@ function makeDeps(rows: ClaimedOutboxRow[] = []): DrainDeps & {
     sendEmail,
     recordDeadLetter,
     limiterHealthy: jest.fn().mockResolvedValue(true),
+    verifyFence: jest.fn().mockResolvedValue(true),
     now: () => new Date("2026-07-30T03:00:00.000Z"),
     makeLeaseToken: (() => {
       let i = 0;
@@ -210,7 +212,7 @@ describe("drainLeadOutbox atomic leases", () => {
     await expect(drainLeadOutbox(deps, "sub-1")).rejects.toThrow(
       "audit unavailable",
     );
-    expect(deps.updateMany).toHaveBeenCalledTimes(1);
+    expect(deps.updateMany).not.toHaveBeenCalled();
     expect(deps.updateMany).not.toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ status: "FAILED", bodyHtml: "" }),

@@ -58,6 +58,9 @@ already in flight as a possible exposure.
 
 Re-enabling never revives cancelled Coach rows. Replay is an audited operation
 that re-renders from the frozen submission and reauthorizes the current owner.
+Workers may set the global fence but never clear it from environment state; an
+operator clears it only after the quiescence audit, preventing a stale
+deployment with `KILL=0` from undoing a newer stop decision.
 
 ## Export incidents
 
@@ -68,7 +71,9 @@ policy, or retention revocation, abort active jobs and deny downloads. Never
 serve an artifact when its key version, expiry, owner, or policy check fails.
 Generation checkpoints each encrypted batch and rechecks actor, Coach, policy,
 and retention before continuing; a transient retry resumes at the durable
-`nextSortOrder` rather than rebuilding from row zero.
+`nextSortOrder` rather than rebuilding from row zero. Finalization hashes
+encrypted chunks in bounded pages, and download decrypts one chunk per stream
+pull rather than materializing the complete CSV in application memory.
 
 ## Historical backfill
 
