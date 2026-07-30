@@ -2,9 +2,10 @@ import { notFound } from "next/navigation";
 
 import { ReferredResultsList } from "@/components/assessments/ReferredResultsList";
 import { FadeUp } from "@/components/ui/animated";
+import { normalizePublicReferralCursorTrail } from "@/lib/assessments/referred-results-page-state";
 import { isReferredResultsEnabled } from "@/lib/assessments/wave-83-flags";
 import { getApiActor } from "@/lib/auth/authorization";
-import { isCertified } from "@/lib/auth/coach-status";
+import { isCoachCurrentlyCertified } from "@/lib/auth/coach-status";
 import { db } from "@/lib/db";
 
 const APP_URL =
@@ -20,13 +21,6 @@ function firstSearchValue(
   value: string | string[] | undefined,
 ): string {
   return typeof value === "string" ? value : "";
-}
-
-function allSearchValues(
-  value: string | string[] | undefined,
-): string[] {
-  if (Array.isArray(value)) return value;
-  return typeof value === "string" ? [value] : [];
 }
 
 async function resolvePublicQuickAlias(): Promise<string | null> {
@@ -67,9 +61,7 @@ export default async function ReferredResultsPage({
   });
   if (
     !coach ||
-    !isCertified(coach) ||
-    (coach.certificationExpiry !== null &&
-      coach.certificationExpiry <= new Date())
+    !isCoachCurrentlyCertified(coach)
   ) {
     notFound();
   }
@@ -104,7 +96,7 @@ export default async function ReferredResultsPage({
           coachLink={coachLink}
           initialQuery={firstSearchValue(params.query)}
           initialTemplateId={firstSearchValue(params.templateId)}
-          initialCursorTrail={allSearchValues(params.cursor)}
+          initialCursorTrail={normalizePublicReferralCursorTrail(params.cursor)}
         />
       </FadeUp>
     </div>

@@ -305,6 +305,7 @@ describe("listPublicReferrals", () => {
     }>,
     matchingIds: string[] = rows.map((row) => row.id),
     totalCount = matchingIds.length,
+    ownedTotalCount = totalCount,
   ) {
     const findUnique = jest.fn().mockResolvedValue(coach);
     const $queryRaw = jest
@@ -325,7 +326,14 @@ describe("listPublicReferrals", () => {
             .map((id) => ({ id }));
         },
       );
-    const count = jest.fn().mockResolvedValue(totalCount);
+    const count = jest.fn().mockImplementation(
+      async (args: { where: Record<string, unknown> }) => {
+        const campaign = args.where.campaign as
+          | Record<string, unknown>
+          | undefined;
+        return campaign?.templateId ? totalCount : ownedTotalCount;
+      },
+    );
     const findMany = jest.fn().mockImplementation(
       async (args: { where: Record<string, unknown> }) => {
         const idFilter = args.where.id as { in?: string[] } | undefined;
@@ -390,6 +398,7 @@ describe("listPublicReferrals", () => {
       listRows,
       undefined,
       47,
+      93,
     );
 
     const outcome = await listPublicReferrals(
@@ -438,6 +447,7 @@ describe("listPublicReferrals", () => {
       ],
       nextCursor: "sub-older",
       totalCount: 47,
+      ownedTotalCount: 93,
     });
 
     expect(db.findUnique).toHaveBeenCalledWith({
@@ -508,6 +518,7 @@ describe("listPublicReferrals", () => {
     expect(searchSql).toBeDefined();
     if (!countSql || !searchSql) return;
     expect(outcome.totalCount).toBe(1);
+    expect(outcome.ownedTotalCount).toBe(1);
     for (const constrainedSql of [countSql, searchSql]) {
       expect(constrainedSql.sql).toMatch(/REGEXP_REPLACE/);
       expect(constrainedSql.sql).toMatch(/LOWER/);

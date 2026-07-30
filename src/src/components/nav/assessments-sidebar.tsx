@@ -7,6 +7,8 @@
  *     with the Aggregate Report row gated by canAccessAggregateReport (admin/staff
  *     in v1, but spec'd as a distinct predicate so future tightening lands
  *     in one place).
+ *   - Coach-lane section (visible to COACH only) with entries pointing at
+ *     the existing /portal/assessments surface.
  *
  * Implementation contract: docs/wireframes-phase2/wave5/24-platform-nav-assessments-entry.md.
  */
@@ -18,6 +20,7 @@ import {
   normalizeRole,
 } from "@/lib/auth/access-control";
 import { canAccessAggregateReport } from "@/lib/assessments/access-control";
+import { isReferredResultsEnabled } from "@/lib/assessments/wave-83-flags";
 
 interface AssessmentsSidebarProps {
   session: Session;
@@ -55,10 +58,29 @@ const ADMIN_ENTRIES: SidebarEntry[] = [
   { href: "/admin/assessments/aggregate", label: "Aggregate Report" },
 ];
 
+const COACH_ENTRIES: SidebarEntry[] = [
+  { href: "/portal/assessments", label: "My Campaigns", exact: true },
+  { href: "/portal/members", label: "Members" },
+];
+
+const REFERRED_RESULTS_ENTRY: SidebarEntry = {
+  href: "/portal/assessments/referred-results",
+  label: "Referred Results",
+};
+
 export function AssessmentsSidebar({ session }: AssessmentsSidebarProps) {
   const rawRole = (session.user as { role?: string } | undefined)?.role ?? "";
   const role = normalizeRole(rawRole);
   const showAdminSection = isPrivilegedRole(role);
+  const showCoachSection = role === "COACH";
+  const coachEntries =
+    showCoachSection && isReferredResultsEnabled()
+      ? [
+          COACH_ENTRIES[0],
+          REFERRED_RESULTS_ENTRY,
+          ...COACH_ENTRIES.slice(1),
+        ]
+      : COACH_ENTRIES;
 
   const adminEntries = ADMIN_ENTRIES.filter((entry) => {
     if (entry.href === "/admin/assessments/aggregate") {
@@ -90,6 +112,22 @@ export function AssessmentsSidebar({ session }: AssessmentsSidebarProps) {
           </div>
         )}
 
+        {showCoachSection && (
+          <div className="space-y-1">
+            <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Coach lane
+            </p>
+            {coachEntries.map((entry) => (
+              <AssessmentsNavLink
+                key={entry.href + entry.label}
+                href={entry.href}
+                label={entry.label}
+                exact={entry.exact}
+                placeholder={entry.placeholder}
+              />
+            ))}
+          </div>
+        )}
       </nav>
     </aside>
   );

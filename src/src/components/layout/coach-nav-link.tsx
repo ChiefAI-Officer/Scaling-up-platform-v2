@@ -9,11 +9,19 @@ interface CoachNavLinkProps {
   href: string;
   icon: React.ReactNode;
   children: React.ReactNode;
+  exact?: boolean;
 }
 
-export function CoachNavLink({ href, icon, children }: CoachNavLinkProps) {
+export function CoachNavLink({
+  href,
+  icon,
+  children,
+  exact = false,
+}: CoachNavLinkProps) {
   const pathname = usePathname();
-  const isActive = isNavLinkActive(pathname, href);
+  const isActive = exact
+    ? pathname === href
+    : isNavLinkActive(pathname, href);
 
   return (
     <Link

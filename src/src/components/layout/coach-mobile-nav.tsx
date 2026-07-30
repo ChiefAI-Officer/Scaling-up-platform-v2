@@ -11,16 +11,18 @@ import { getCoachPrimaryNavItems } from "@/lib/coach-nav";
 
 interface CoachMobileNavProps {
   coachName: string;
-  referredResultsEnabled: boolean;
+  referredResultsEnabled?: true;
 }
 
 export function CoachMobileNav({
   coachName,
-  referredResultsEnabled,
+  referredResultsEnabled = undefined,
 }: CoachMobileNavProps) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
-  const primaryNavItems = getCoachPrimaryNavItems({ referredResultsEnabled });
+  const primaryNavItems = getCoachPrimaryNavItems({
+    referredResultsEnabled: referredResultsEnabled === true,
+  });
 
   return (
     <div className="md:hidden">
@@ -50,7 +52,9 @@ export function CoachMobileNav({
             <nav className="flex-1 py-4 px-3 space-y-1">
               {primaryNavItems.map((link) => {
                 const Icon = link.icon;
-                const isActive = isNavLinkActive(pathname, link.href);
+                const isActive = link.exact
+                  ? pathname === link.href
+                  : isNavLinkActive(pathname, link.href);
                 return (
                   <Link
                     key={link.href}

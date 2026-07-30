@@ -4,7 +4,7 @@ import {
   isPrivilegedRole,
   type ApiActor,
 } from "@/lib/auth/access-control";
-import { isCertified } from "@/lib/auth/coach-status";
+import { isCoachCurrentlyCertified } from "@/lib/auth/coach-status";
 import { reportConfigFor } from "@/lib/assessments/report-config";
 import {
   buildStoredRespondentReport,
@@ -156,6 +156,7 @@ export type PublicReferralListOutcome =
       items: PublicReferralListItem[];
       nextCursor: string | null;
       totalCount: number;
+      ownedTotalCount: number;
     }
   | { status: "forbidden" };
 
@@ -198,18 +199,6 @@ function publicTakerForReport(value: unknown): {
     email: email || "Anonymous",
     jobTitle: stringField(taker, "jobTitle") || null,
   };
-}
-
-function isCurrentlyCertified(
-  coach: RawPublicSubmission["referringCoach"],
-  now: Date,
-): boolean {
-  return Boolean(
-    coach &&
-      isCertified(coach) &&
-      (coach.certificationExpiry === null ||
-        coach.certificationExpiry.getTime() > now.getTime()),
-  );
 }
 
 /**
@@ -362,7 +351,7 @@ export async function listPublicReferrals(
           certificationExpiry: true,
         },
       });
-      if (!isCurrentlyCertified(coach, new Date())) {
+      if (!isCoachCurrentlyCertified(coach)) {
         return { status: "forbidden" } as const;
       }
 
@@ -377,6 +366,13 @@ export async function listPublicReferrals(
       const where: Record<string, unknown> = {
         referringCoachId: coachId,
         campaign: campaignWhere,
+      };
+      const ownedWhere: Record<string, unknown> = {
+        referringCoachId: coachId,
+        campaign: {
+          accessMode: "PUBLIC",
+          deletedAt: null,
+        },
       };
       let totalCount: number;
       if (query) {
@@ -475,6 +471,10 @@ export async function listPublicReferrals(
       });
 
       const page = rows.slice(0, take);
+      const ownedTotalCount =
+        query || templateId
+          ? await tx.assessmentSubmission.count({ where: ownedWhere })
+          : totalCount;
       const items = page.map((row): PublicReferralListItem => {
         const taker = publicTakerForReport(row.publicTaker);
         return {
@@ -500,6 +500,7 @@ export async function listPublicReferrals(
             ? page[page.length - 1].id
             : null,
         totalCount,
+        ownedTotalCount,
       } as const;
     },
     { maxWait: 10_000, timeout: 15_000 },
@@ -587,7 +588,7 @@ export async function getPublicReferralReport(
           !actor.coachId ||
           actor.coachId !== submission.referringCoachId ||
           submission.referringCoach?.id !== actor.coachId ||
-          !isCurrentlyCertified(submission.referringCoach, new Date())
+          !isCoachCurrentlyCertified(submission.referringCoach)
         ) {
           return { status: "forbidden" } as const;
         }

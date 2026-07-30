@@ -15,7 +15,9 @@ function openNavigation(referredResultsEnabled: boolean) {
   render(
     <CoachMobileNav
       coachName="Alex"
-      referredResultsEnabled={referredResultsEnabled}
+      {...(referredResultsEnabled
+        ? { referredResultsEnabled: true as const }
+        : {})}
     />,
   );
   fireEvent.click(screen.getByRole("button", { name: "Open menu" }));
@@ -55,5 +57,17 @@ describe("CoachMobileNav", () => {
       },
       { label: "Members", href: "/portal/members" },
     ]);
+  });
+
+  it("marks only Referred Results current on its route", () => {
+    mockPathname = "/portal/assessments/referred-results";
+    openNavigation(true);
+
+    expect(
+      screen.getByRole("link", { name: "My Campaigns" }),
+    ).not.toHaveAttribute("aria-current");
+    expect(
+      screen.getByRole("link", { name: "Referred Results" }),
+    ).toHaveAttribute("aria-current", "page");
   });
 });

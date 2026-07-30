@@ -44,6 +44,7 @@ jest.mock("next/navigation", () => ({
 import { ReferredResultsList } from "@/components/assessments/ReferredResultsList";
 import CoachAssessmentsPage from "@/app/(portal)/portal/assessments/page";
 import ReferredResultsPage from "@/app/(portal)/portal/assessments/referred-results/page";
+import { MAX_PUBLIC_REFERRAL_CURSOR_TRAIL } from "@/lib/assessments/referred-results-page-state";
 
 const scoredItem = {
   submissionId: "sub-1",
@@ -117,6 +118,7 @@ function apiResponse(
     { id: "tpl-2", name: "Leadership Qualitative Assessment" },
   ],
   totalCount = 18,
+  ownedTotalCount = 18,
 ) {
   return {
     ok: true,
@@ -126,6 +128,7 @@ function apiResponse(
       nextCursor,
       assessmentOptions: options,
       totalCount,
+      ownedTotalCount,
     }),
   } as Response;
 }
@@ -298,6 +301,29 @@ describe("Referred Results page ownership", () => {
       "?query=jordan&templateId=tpl-1&cursor=sub-4&cursor=sub-9",
     );
   });
+
+  it("rejects a forged cursor trail before it can inflate page state", async () => {
+    mockIsReferredResultsEnabled.mockReturnValue(true);
+
+    render(
+      await ReferredResultsPage({
+        searchParams: Promise.resolve({
+          cursor: Array.from(
+            { length: MAX_PUBLIC_REFERRAL_CURSOR_TRAIL + 1 },
+            (_, index) => `sub-${index}`,
+          ),
+        }),
+      }),
+    );
+
+    await waitFor(() =>
+      expect(mockFetch).toHaveBeenCalledWith(
+        "/api/assessments/referred-results?take=25",
+        expect.objectContaining({ cache: "no-store" }),
+      ),
+    );
+    expect(window.location.search).toBe("");
+  });
 });
 
 afterAll(() => {
@@ -336,6 +362,23 @@ describe("ReferredResultsList", () => {
     expect(screen.getByRole("option", {
       name: "Leadership Qualitative Assessment",
     })).toHaveValue("tpl-2");
+  });
+
+  it("keeps the lifetime referral count stable while filters change the matching total", async () => {
+    mockFetch.mockResolvedValue(
+      apiResponse([scoredItem], null, undefined, 1, 18),
+    );
+
+    render(
+      <ReferredResultsList
+        coachLink="https://example.test/quiz/quick?coach=a%40example.com"
+        initialQuery="Jordan"
+      />,
+    );
+
+    expect(await screen.findByText("1 results · newest first")).toBeInTheDocument();
+    expect(screen.getByText("Showing 1–1 of 1")).toBeInTheDocument();
+    expect(screen.getByText("18")).toBeInTheDocument();
   });
 
   it("uses a keyboard-operable disclosure for supported Four Decisions domains only", async () => {

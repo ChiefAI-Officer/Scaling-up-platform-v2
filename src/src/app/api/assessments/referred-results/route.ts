@@ -93,6 +93,7 @@ export async function GET(request: NextRequest) {
         nextCursor: outcome.nextCursor,
         assessmentOptions,
         totalCount: outcome.totalCount,
+        ownedTotalCount: outcome.ownedTotalCount,
       },
       { headers: privateHeaders },
     );

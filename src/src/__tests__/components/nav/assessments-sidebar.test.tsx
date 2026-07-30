@@ -12,10 +12,15 @@ jest.mock("next/navigation", () => ({
 }));
 
 const mockCanAccessAggregateReport = jest.fn<boolean, [{ role: string }]>();
+const mockIsReferredResultsEnabled = jest.fn<boolean, []>();
 
 jest.mock("@/lib/assessments/access-control", () => ({
   canAccessAggregateReport: (actor: { role: string }) =>
     mockCanAccessAggregateReport(actor),
+}));
+
+jest.mock("@/lib/assessments/wave-83-flags", () => ({
+  isReferredResultsEnabled: () => mockIsReferredResultsEnabled(),
 }));
 
 import { render, screen } from "@testing-library/react";
@@ -37,6 +42,7 @@ function makeSession(role: "ADMIN" | "STAFF" | "COACH"): Session {
 beforeEach(() => {
   jest.clearAllMocks();
   mockCanAccessAggregateReport.mockReturnValue(true);
+  mockIsReferredResultsEnabled.mockReturnValue(false);
 });
 
 describe("AssessmentsSidebar", () => {
@@ -82,6 +88,16 @@ describe("AssessmentsSidebar", () => {
     expect(screen.queryByText("Campaigns")).not.toBeInTheDocument();
     expect(screen.queryByText("Public Campaigns")).not.toBeInTheDocument();
     expect(screen.queryByText("Aggregate Report")).not.toBeInTheDocument();
+  });
+
+  it("preserves the existing Coach lane exactly while Referred Results is off", () => {
+    render(<AssessmentsSidebar session={makeSession("COACH")} />);
+
+    expect(
+      screen.getAllByRole("link").map((link) => link.textContent?.trim()),
+    ).toEqual(["My Campaigns", "Members"]);
+    expect(screen.getByText(/coach lane/i)).toBeInTheDocument();
+    expect(screen.queryByText("Referred Results")).not.toBeInTheDocument();
   });
 
   it("does NOT render coach portal entries for ADMIN", () => {

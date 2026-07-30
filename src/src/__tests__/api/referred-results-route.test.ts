@@ -63,6 +63,7 @@ beforeEach(() => {
     items: [],
     nextCursor: null,
     totalCount: 18,
+    ownedTotalCount: 18,
   });
   mockAssessmentTemplateFindMany.mockResolvedValue([
     { id: "tpl-1", name: "Scaling Up 4 Decisions" },
@@ -141,6 +142,7 @@ describe("GET /api/assessments/referred-results", () => {
       ],
       nextCursor: "sub-1",
       totalCount: 7,
+      ownedTotalCount: 18,
     });
 
     const response = await GET(request());
@@ -176,6 +178,7 @@ describe("GET /api/assessments/referred-results", () => {
         { id: "tpl-2", name: "Leadership Qualitative Assessment" },
       ],
       totalCount: 7,
+      ownedTotalCount: 18,
     });
     expect(JSON.stringify(body)).not.toMatch(
       /answers|referringCoachEmail|rawResult/i,
@@ -234,6 +237,7 @@ describe("GET /api/assessments/referred-results", () => {
       items: [],
       nextCursor: null,
       totalCount: 3,
+      ownedTotalCount: 18,
     });
     const response = await GET(
       request("?query=avery&templateId=tpl-1"),
@@ -245,6 +249,7 @@ describe("GET /api/assessments/referred-results", () => {
       { id: "tpl-2", name: "Leadership Qualitative Assessment" },
     ]);
     expect(body.totalCount).toBe(3);
+    expect(body.ownedTotalCount).toBe(18);
     expect(mockAssessmentTemplateFindMany).toHaveBeenCalledWith({
       where: {
         deletedAt: null,

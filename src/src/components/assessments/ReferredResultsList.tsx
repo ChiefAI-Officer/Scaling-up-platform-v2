@@ -6,6 +6,10 @@ import type {
   PublicReferralListItem,
   PublicResultSummary,
 } from "@/lib/assessments/public-referrals";
+import {
+  MAX_PUBLIC_REFERRAL_CURSOR_TRAIL,
+  normalizePublicReferralCursorTrail,
+} from "@/lib/assessments/referred-results-page-state";
 
 interface ReferredResultsListProps {
   coachLink: string | null;
@@ -25,6 +29,7 @@ interface ReferredResultsResponse {
   nextCursor?: string | null;
   assessmentOptions?: Array<{ id: string; name: string }>;
   totalCount?: number;
+  ownedTotalCount?: number;
 }
 
 const FOUR_DECISIONS = ["people", "strategy", "execution", "cash"] as const;
@@ -253,9 +258,7 @@ export function ReferredResultsList({
   const [initialState] = useState(() => ({
     query: initialQuery.trim(),
     templateId: initialTemplateId.trim(),
-    cursorTrail: initialCursorTrail
-      .map((cursor) => cursor.trim())
-      .filter(Boolean),
+    cursorTrail: normalizePublicReferralCursorTrail(initialCursorTrail),
   }));
   const [items, setItems] = useState<DisplayReferral[]>([]);
   const [inputQuery, setInputQuery] = useState(initialState.query);
@@ -263,6 +266,7 @@ export function ReferredResultsList({
   const [templateId, setTemplateId] = useState(initialState.templateId);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState<number | null>(null);
+  const [ownedTotalCount, setOwnedTotalCount] = useState<number | null>(null);
   const [cursorTrail, setCursorTrail] = useState(initialState.cursorTrail);
   const pageIndex = cursorTrail.length;
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
@@ -282,15 +286,16 @@ export function ReferredResultsList({
       filter: string;
       trail: string[];
     }) => {
+      const safeTrail = normalizePublicReferralCursorTrail(trail);
       setLoading(true);
       setError(false);
       setExpandedIds(new Set());
-      setCursorTrail(trail);
+      setCursorTrail(safeTrail);
 
       const params = new URLSearchParams();
       if (query) params.set("query", query);
       if (filter) params.set("templateId", filter);
-      const cursor = trail.at(-1);
+      const cursor = safeTrail.at(-1);
       if (cursor) params.set("cursor", cursor);
       params.set("take", "25");
 
@@ -316,6 +321,13 @@ export function ReferredResultsList({
             ? payload.totalCount
             : null,
         );
+        setOwnedTotalCount(
+          typeof payload.ownedTotalCount === "number" &&
+            Number.isInteger(payload.ownedTotalCount) &&
+            payload.ownedTotalCount >= 0
+            ? payload.ownedTotalCount
+            : null,
+        );
         setTemplates((current) => {
           const updated = new Map(current);
           const options =
@@ -332,7 +344,7 @@ export function ReferredResultsList({
         updateBrowserQuery({
           query,
           templateId: filter,
-          cursorTrail: trail,
+          cursorTrail: safeTrail,
         });
       } catch {
         setItems([]);
@@ -388,7 +400,12 @@ export function ReferredResultsList({
   }
 
   function nextPage() {
-    if (!nextCursor) return;
+    if (
+      !nextCursor ||
+      cursorTrail.length >= MAX_PUBLIC_REFERRAL_CURSOR_TRAIL
+    ) {
+      return;
+    }
     const trail = [...cursorTrail, nextCursor];
     void loadPage({
       query: appliedQuery,
@@ -429,7 +446,7 @@ export function ReferredResultsList({
           </div>
           <div className="border-border text-left md:min-w-32 md:border-l md:pl-5 md:text-center">
             <strong className="block font-serif text-3xl font-normal text-primary">
-              {totalCount ?? "—"}
+              {ownedTotalCount ?? "—"}
             </strong>
             <span className="text-xs text-muted-foreground">
               referred results
@@ -688,7 +705,10 @@ export function ReferredResultsList({
               <button
                 type="button"
                 onClick={nextPage}
-                disabled={!nextCursor}
+                disabled={
+                  !nextCursor ||
+                  cursorTrail.length >= MAX_PUBLIC_REFERRAL_CURSOR_TRAIL
+                }
                 className="rounded-md border border-border px-3 py-1.5 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 Next

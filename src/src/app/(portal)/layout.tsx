@@ -36,7 +36,12 @@ export default async function PortalLayout({ children }: PortalLayoutProps) {
                         const Icon = item.icon;
 
                         return (
-                            <CoachNavLink key={item.href} href={item.href} icon={<Icon className="w-5 h-5" />}>
+                            <CoachNavLink
+                                key={item.href}
+                                href={item.href}
+                                icon={<Icon className="w-5 h-5" />}
+                                exact={item.exact}
+                            >
                                 {item.label}
                             </CoachNavLink>
                         );
@@ -72,7 +77,9 @@ export default async function PortalLayout({ children }: PortalLayoutProps) {
                     {/* Mobile hamburger */}
                     <CoachMobileNav
                         coachName={coachName}
-                        referredResultsEnabled={referredResultsEnabled}
+                        {...(referredResultsEnabled
+                            ? { referredResultsEnabled: true as const }
+                            : {})}
                     />
 
                     {/* Title on mobile */}

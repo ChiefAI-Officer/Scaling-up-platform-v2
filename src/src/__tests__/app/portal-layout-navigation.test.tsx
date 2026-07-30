@@ -1,7 +1,7 @@
 const mockRequireCoach = jest.fn();
 const mockIsReferredResultsEnabled = jest.fn<boolean, []>();
 const mockMobileNav = jest.fn(
-  (props: { coachName: string; referredResultsEnabled: boolean }) => {
+  (props: { coachName: string; referredResultsEnabled?: true }) => {
     void props;
     return null;
   },
@@ -22,7 +22,7 @@ jest.mock("next/navigation", () => ({
 jest.mock("@/components/layout/coach-mobile-nav", () => ({
   CoachMobileNav: (props: {
     coachName: string;
-    referredResultsEnabled: boolean;
+    referredResultsEnabled?: true;
   }) => mockMobileNav(props),
 }));
 
@@ -47,7 +47,7 @@ beforeEach(() => {
 });
 
 describe("(portal)/layout coach navigation", () => {
-  it("keeps the flag-off desktop sidebar unchanged and passes false to mobile", async () => {
+  it("keeps the flag-off desktop sidebar and mobile props unchanged", async () => {
     const { container } = render(
       await PortalLayout({ children: <div>Page</div> }),
     );
@@ -69,7 +69,6 @@ describe("(portal)/layout coach navigation", () => {
     ]);
     expect(mockMobileNav).toHaveBeenCalledWith({
       coachName: "Alex",
-      referredResultsEnabled: false,
     });
   });
 
