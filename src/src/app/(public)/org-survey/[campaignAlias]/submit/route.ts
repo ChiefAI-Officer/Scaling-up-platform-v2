@@ -55,6 +55,7 @@ import {
   buildCoachNotifyEmail,
 } from "@/lib/assessments/results-email";
 import { respondentDisplayName } from "@/lib/assessments/respondent-display-name";
+import { classifyOutboxEnqueueFailure } from "@/lib/assessments/outbox-enqueue-failure";
 
 const NO_STORE_HEADERS = { "Cache-Control": "no-store" } as const;
 
@@ -698,10 +699,26 @@ export async function POST(
 
         // ── Wave D: INSERT the pre-rendered outbox rows IN-TX (transactional
         // outbox). The submission + its outbox rows commit atomically; the
-        // double-submit 409 above guarantees exactly-once. Each INSERT is
-        // guarded so a write failure for one email NEVER rolls back the
-        // submission — it is simply skipped (the unique [submissionId,
-        // recipientRole] keeps it idempotent on replay).
+        // double-submit 409 above guarantees exactly-once.
+        //
+        // ⚠️ GH #257 — this block used to claim that "a write failure for one email
+        // NEVER rolls back the submission — it is simply skipped". That was FALSE
+        // for the case that matters, and it is why the swallow read as safe.
+        // Proven in `integration-tests/tx-swallowed-error.pg.test.ts` against real
+        // PostgreSQL:
+        //   - a failure that REACHED the database aborts this transaction
+        //     (25P02), so every later statement here fails and the submission does
+        //     NOT commit. Prisma adds no per-operation savepoints, so catching the
+        //     error cannot un-abort the transaction.
+        //   - only a failure raised BEFORE the statement was sent (client-side
+        //     validation) leaves the transaction intact and is genuinely skippable.
+        // So we classify instead of blanket-swallowing, defaulting to rethrow.
+        // Rethrowing does not change WHETHER the submission commits — it already
+        // does not — it changes which error you get to debug, surfacing the real
+        // cause instead of a downstream 25P02 raised by the invitation update.
+        //
+        // A mocked Prisma cannot show any of this (mocks have no transaction
+        // state), which is why the PostgreSQL test is the load-bearing guard.
         for (const row of rowsToEnqueue) {
           try {
             await tx.assessmentEmailOutbox.create({
@@ -727,10 +744,36 @@ export async function POST(
               versionId: locked.campaign.version?.id ?? null,
             });
           } catch (err) {
-            console.error(
-              `[assessment-submit] outbox enqueue skipped (${row.recipientRole}):`,
-              err
-            );
+            const { disposition } = classifyOutboxEnqueueFailure(err);
+            if (disposition === "rethrow") {
+              // The transaction is already aborted; the submission is lost either
+              // way. Surface the real cause. No PII — ids and roles only.
+              console.error("[assessment-submit] outbox enqueue FAILED IN-TX", {
+                submissionId: submission.id,
+                campaignId: locked.campaignId,
+                invitationId,
+                recipientRole: row.recipientRole,
+                emailType: row.emailType,
+                consequence:
+                  "transaction aborted — this submission will NOT commit and the respondent must resubmit",
+                err,
+              });
+              throw err;
+            }
+            // Pre-database failure: the transaction is intact, so the submission
+            // still commits and only this email is dropped. Nothing retries it —
+            // the outbox row that a retry would key off was never created — so this
+            // log is the only trace it ever existed.
+            console.error("[assessment-submit] outbox email DROPPED", {
+              submissionId: submission.id,
+              campaignId: locked.campaignId,
+              invitationId,
+              recipientRole: row.recipientRole,
+              emailType: row.emailType,
+              consequence:
+                "submission commits without this email; no retry will occur",
+              err,
+            });
           }
         }
 
