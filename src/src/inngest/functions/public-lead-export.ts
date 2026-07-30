@@ -227,6 +227,8 @@ export const publicLeadExport = inngest.createFunction(
               where: {
                 id: exportId,
                 nextSortOrder: job.nextSortOrder,
+                status: "RUNNING",
+                authorizationGeneration: job.authorizationGeneration,
               },
               data: {
                 nextSortOrder: after + 1,
@@ -273,7 +275,11 @@ export const publicLeadExport = inngest.createFunction(
         const digest = digestBuilder.digest("hex");
 
         await db.publicLeadExport.update({
-          where: { id: exportId },
+          where: {
+            id: exportId,
+            status: "RUNNING",
+            authorizationGeneration: job.authorizationGeneration,
+          },
           data: {
             status: "COMPLETED",
             emittedDigest: digest,

@@ -1,7 +1,10 @@
 import { createDecipheriv } from "node:crypto";
 import { db } from "@/lib/db";
 import { getApiActor } from "@/lib/auth/authorization";
-import { resolvePublicLeadsState } from "@/lib/assessments/public-leads-state";
+import {
+  publicLeadRetentionCutoff,
+  resolvePublicLeadsState,
+} from "@/lib/assessments/public-leads-state";
 
 export async function GET(
   request: Request,
@@ -38,6 +41,43 @@ export async function GET(
     },
   });
   if (!job) return new Response("Not found", { status: 404 });
+  const retentionCutoff = publicLeadRetentionCutoff(state);
+  if (retentionCutoff === null) {
+    return new Response("Not found", { status: 404 });
+  }
+  const staleManifestRows = await db.publicLeadExportItem.count({
+    where: {
+      exportId: job.id,
+      OR: [
+        { exclusion: { isNot: null } },
+        { submission: { publicLeadDeletedAt: { not: null } } },
+        { submission: { submittedAt: { lt: retentionCutoff } } },
+        { submission: { campaign: { deletedAt: { not: null } } } },
+        {
+          submission: {
+            referringCoachId: { not: actor.coachId },
+          },
+        },
+      ],
+    },
+  });
+  if (staleManifestRows > 0) {
+    await db.$transaction([
+      db.publicLeadExport.update({
+        where: { id: job.id },
+        data: {
+          status: "ABORTED",
+          abortedAt: new Date(),
+          errorClass: "DOWNLOAD_AUTHORIZATION_INVALIDATED",
+          authorizationGeneration: { increment: 1 },
+        },
+      }),
+      db.publicLeadExportChunk.deleteMany({
+        where: { exportId: job.id },
+      }),
+    ]);
+    return new Response("Not found", { status: 404 });
+  }
   const expectedVersion =
     process.env.PUBLIC_LEADS_EXPORT_KEY_VERSION?.trim() || "v1";
   const key = Buffer.from(
