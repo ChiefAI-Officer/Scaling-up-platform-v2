@@ -93,8 +93,8 @@ function mockMeFetch() {
 }
 
 /** Render + advance through the intro phase into the pager (ready phase). */
-async function reachPager() {
-  render(<OrgSurveyClient campaignAlias={ALIAS} />);
+async function reachPager(qspStoryGroupEnabled = false) {
+  render(<OrgSurveyClient campaignAlias={ALIAS} qspStoryGroupEnabled={qspStoryGroupEnabled} />);
   // intro phase: "Start the assessment →" (approved participant welcome CTA)
   const start = await screen.findByRole("button", { name: /start the assessment/i });
   fireEvent.click(start);
@@ -462,6 +462,66 @@ describe("OrgSurveyClient — SectionPager wiring + hidden-orphan fix", () => {
     await screen.findByRole("alert");
     expect(screen.getByText("Orphan Q")).toBeInTheDocument();
     expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it("groups the QSP core-values stories and submits their three stable keys unchanged", async () => {
+    const qspSurveyData = {
+      ...surveyData,
+      campaign: { ...surveyData.campaign, templateAlias: "qsp-v2" },
+      sections: [{ stableKey: "P1_retrospective", sortOrder: 1, name: "Core values" }],
+      questions: [1, 2, 3].map((index) => ({
+        stableKey: `P1_core_values_story_${index}`,
+        sortOrder: index,
+        sectionStableKey: "P1_retrospective",
+        type: "TEXT",
+        label: `Core-values story ${index}`,
+        isRequired: false,
+      })),
+    };
+    global.fetch = jest.fn((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/me")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ success: true, data: qspSurveyData }),
+        } as Response);
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({ success: true, data: { submissionId: "sub_qsp_invited" } }),
+      } as Response);
+    }) as unknown as typeof fetch;
+
+    await reachPager(true);
+    expect(await screen.findByTestId("qsp-story-group")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Person and story 1 of 3" }), {
+      target: { value: "Ada led the launch" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /add another person/i }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Person and story 2 of 3" }), {
+      target: { value: "Grace coached the team" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /add another person/i }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Person and story 3 of 3" }), {
+      target: { value: "Lin removed a blocker" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /submit/i }));
+
+    await waitFor(() => {
+      expect((global.fetch as jest.Mock).mock.calls.some(([url]) => String(url).includes("/submit"))).toBe(true);
+    });
+    const [, init] = (global.fetch as jest.Mock).mock.calls.find(([url]) =>
+      String(url).includes("/submit"),
+    );
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body.answers).toEqual([
+      { stableKey: "P1_core_values_story_1", value: "Ada led the launch" },
+      { stableKey: "P1_core_values_story_2", value: "Grace coached the team" },
+      { stableKey: "P1_core_values_story_3", value: "Lin removed a blocker" },
+    ]);
   });
 
   it("keeps the participant ON the pager (inline alert, not terminal) when the pre-submit required/empty gate fires (R2-M1 parity)", async () => {

@@ -97,6 +97,7 @@ interface PublicQuizClientProps {
   sections: unknown;
   questions: unknown;
   referredResultsEnabled?: boolean;
+  qspStoryGroupEnabled?: boolean;
   /**
    * Wave M (#19): already-sanitized custom slides (SERVER-sanitized into
    * `safeHtml` by the page loader). Empty/omitted ⇒ the mergeCustomSlides
@@ -122,6 +123,7 @@ export function PublicQuizClient({
   questions: rawQuestions,
   customSlides,
   referredResultsEnabled = false,
+  qspStoryGroupEnabled = false,
 }: PublicQuizClientProps) {
   const sections = useMemo(() => toSections(rawSections), [rawSections]);
   const questions = useMemo(() => toQuestions(rawQuestions), [rawQuestions]);
@@ -564,6 +566,8 @@ export function PublicQuizClient({
             submitting={submitting}
             onExit={() => setStep("info")}
             assessmentName={campaignName}
+            templateAlias={templateAlias ?? undefined}
+            qspStoryGroupEnabled={qspStoryGroupEnabled}
             requireAtLeastOneAnswer
           />
 
