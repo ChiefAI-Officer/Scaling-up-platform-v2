@@ -41,7 +41,7 @@ export function QspStoryGroup({
 
   function revealNext() {
     if (disabled || visibleCount >= questions.length) return;
-    const nextCount = visibleCount + 1;
+    const nextCount: 2 | 3 = visibleCount === 1 ? 2 : 3;
     const nextQuestion = questions[nextCount - 1];
     setVisibleCount(nextCount);
     setAnnouncement(`Person and story ${nextCount} of 3 added.`);
