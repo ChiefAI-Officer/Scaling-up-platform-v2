@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { updateCoachSchema } from "@/lib/validations";
 import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
+import { isReferringCoachForeignKeyConflict } from "@/lib/assessments/referral-integrity";
 
 class CoachDeletionConflict extends Error {
   readonly code = "HAS_REFERRED_SUBMISSIONS";
@@ -11,21 +12,6 @@ class CoachDeletionConflict extends Error {
     super("HAS_REFERRED_SUBMISSIONS");
     this.name = "CoachDeletionConflict";
   }
-}
-
-function isReferringCoachForeignKeyConflict(error: unknown): boolean {
-  if (
-    !(error instanceof Prisma.PrismaClientKnownRequestError) ||
-    error.code !== "P2003"
-  ) {
-    return false;
-  }
-
-  const fieldName =
-    typeof error.meta?.field_name === "string" ? error.meta.field_name : "";
-  return `${fieldName} ${error.message}`
-    .toLowerCase()
-    .includes("referringcoachid");
 }
 
 export async function GET(

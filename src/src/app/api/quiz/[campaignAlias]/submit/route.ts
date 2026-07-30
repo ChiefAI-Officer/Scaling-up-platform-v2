@@ -45,11 +45,14 @@ import {
   findActiveCoachByEmail,
   buildLeadEmail,
   lowestDecision,
+  type RecipientRole,
 } from "@/lib/assessments/quick-assessment-lead";
 import {
   buildReportEmailHtml,
   buildRespondentReportFromSubmission,
+  type ReportEmailRecipientRole,
 } from "@/lib/assessments/report-email";
+import { isReferringCoachForeignKeyConflict } from "@/lib/assessments/referral-integrity";
 import { logAudit } from "@/lib/audit";
 import { computeScoreResult } from "@/lib/assessments/compute-score-result";
 import type { PagerQuestion } from "@/lib/assessments/section-pages";
@@ -70,21 +73,6 @@ const OptionalReferralEmailSchema = z.preprocess((value) => {
   const normalized = ReferralEmailSchema.safeParse(value);
   return normalized.success ? normalized.data : null;
 }, ReferralEmailSchema.nullable());
-
-function isReferringCoachForeignKeyConflict(error: unknown): boolean {
-  if (
-    !(error instanceof Prisma.PrismaClientKnownRequestError) ||
-    error.code !== "P2003"
-  ) {
-    return false;
-  }
-
-  const fieldName =
-    typeof error.meta?.field_name === "string" ? error.meta.field_name : "";
-  return `${fieldName} ${error.message}`
-    .toLowerCase()
-    .includes("referringcoachid");
-}
 
 const PublicSubmitBodySchema = z.object({
   publicTaker: z.object({
@@ -310,8 +298,14 @@ export async function POST(
     //   - REFERRING_COACH → only when an active coach resolved; full report.
     //   - SU_TEAM         → only when an SU address is configured; lead-alert
     //                       summary (unchanged from before).
+    type PublicQuizOutboxRecipientRole =
+      | RecipientRole
+      | ReportEmailRecipientRole;
     const outboxPayloads: Array<{
-      recipient: { role: string; email: string };
+      recipient: {
+        role: PublicQuizOutboxRecipientRole;
+        email: string;
+      };
       subject: string;
       bodyHtml: string;
     }> = [];

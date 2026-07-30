@@ -1402,7 +1402,7 @@ model AssessmentEmailOutbox {
   id             String    @id @default(cuid())
   submissionId   String
   recipientEmail String
-  recipientRole  String // "REFERRING_COACH" | "SU_TEAM"
+  recipientRole  String // "TAKER_COPY" | "REFERRING_COACH" | "SU_TEAM"
   emailType      String // "QUICK_ASSESSMENT_LEAD"
   subject        String
   bodyHtml       String
