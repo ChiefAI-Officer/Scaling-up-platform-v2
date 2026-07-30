@@ -6,6 +6,27 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-07-31 — Jeff public-survey closure launched; consolidated item #83 is Complete <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:jeff-public-survey-closure-launched -->
+
+**Status: MERGED + LIVE.** PR [#266](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/266) merged as squash `ddc83e8f799cbdac5e2e5eae7cca37f6ce53c629` on 2026-07-31 Manila time. Vercel's Production deployment for that exact SHA completed successfully at `scaling-up-platform-v2-mwymzwu2n-scaling-up.vercel.app`; both production aliases, `scaling-up-platform-v2.vercel.app` and `platformtest.scalingup.com`, returned `200` from `/api/health` with `database: healthy` and `authPosture: safe` on the new process uptime.
+
+**What is now live.**
+
+- Public scored and qualitative reports—and their report emails—show the taker's submitted email separately from the display name.
+- Reports always offer **Learn More** and offer **Talk to a Coach** only from a server-verified, currently eligible referral; referring-Coach mail instead offers **Contact the Taker**.
+- The already-live Coach Referred Results surface now includes filtered CSV export with exactly `Taker Name`, `Taker Email`, `Assessment`, `Result`, and `Submitted At`, bounded to 5,000 rows with strict authorization, distributed fail-closed rate limiting, formula protection, private caching, and strict PII-free audit persistence.
+- Matching lost-response retries use the same show-if-pruned answer identity as the original write, including after campaign close; changed-input and cross-campaign key reuse return `409`.
+
+**Consolidated progress-report classification.** July-10 PDF item **#83 is now Complete**, superseding the earlier Partial classification in `issue-238-jeff-number-mapping-corrected`. PR #245 supplied Coach-facing ownership, list/search/filter, and report access; PR #266 closes the remaining identity/action/export gaps. The screenshot's duplicate-email symptom is also Complete through the separately launched PR #250 atomic outbox lease and same-mailbox suppression. Do not report PR #266 as a new scheduler or delivery cutover: it added no cron, worker, migration, Azure dependency, environment variable, or new feature flag.
+
+**Launch verification.** All protected PR checks passed: Build, Migration Safety Gate, Assessment Email Lease (PostgreSQL), and Vercel. Read-only production QA opened the existing public Scaling Up 4 Decisions campaign, advanced to the non-writing **About you** screen, and confirmed the new export route is deployed and answers an unauthenticated request with `401` plus `Cache-Control: no-store` rather than `404`. No production form was submitted and no real account was used. On the isolated branch preview, the seeded Coach account logged in successfully, but Referred Results correctly remained `404` because the preview environment does not enable the production-only Wave-83 flag; the flag was not changed merely to manufacture a smoke result. The public page still emits the pre-existing missing Vercel Insights script console error; it does not block rendering or this launch.
+
+**Pre-merge evidence retained.** Focused coverage passed **19 suites / 317 tests**; the complete branch run passed **583 suites / 6,905 tests** with the same **8 suites / 22 tests** failing as untouched fixed point `48b68d37` (zero new failures). Changed-file ESLint, changelog freshness, migration safety across 42 migrations, `git diff --check`, and `CI=true npx next build --turbopack` passed. Actual desktop and 390px mobile `BrandedReport` render receipts remain under `docs/specs/v7.6/mockups/`; final independent standards and spec-compliance re-reviews both returned **CLEAN**.
+
+**Rollback:** revert squash `ddc83e8f`. No data cleanup, scheduler change, flag flip, or environment rollback is required. The existing Wave-83 kill switch remains the independent emergency control for the Coach surface.
+
+---
+
 ### 2026-07-30 — Jeff public-survey closure implemented: report identity, verified actions, and Coach CSV <!-- ENTRY_ISO:2026-07-30 ENTRY_SLUG:jeff-public-survey-closure-pr-ready -->
 
 **Status: IMPLEMENTED + LOCALLY VERIFIED; PR-ready, not yet merged or launched.** This closes the remaining product gaps in Jeff Verdun's public-survey screenshot while preserving the already-launched delivery fix from PR #250.
