@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Jeff #48 — Approved QSP core-values story question</title>
+  <style>
+    :root {
+      --purple: #54278b;
+      --ink: #24153b;
+      --muted: #706985;
+      --canvas: #f8f6fb;
+      --line: #dfd3ee;
+      --pale: #f0eafa;
+      --orange: #ffae00;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+      background: #f3f2f5;
+    }
+
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 36px; }
+    .frame {
+      width: min(1160px, 100%);
+      margin: auto;
+      overflow: hidden;
+      border: 4px solid var(--purple);
+      border-radius: 34px;
+      background: white;
+      box-shadow: 0 22px 60px rgba(52, 31, 74, .13);
+    }
+    .approval {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 28px 36px;
+      border-bottom: 1px solid #e9e3ef;
+    }
+    .approval h1 { margin: 0; font-size: clamp(22px, 3vw, 32px); }
+    .chip {
+      padding: 12px 20px;
+      border-radius: 999px;
+      background: #f2f1f4;
+      color: #6c657d;
+      font-weight: 850;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+    }
+    .screen { padding: 28px; background: var(--canvas); }
+    .bar {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 28px;
+      padding: 26px;
+      border-radius: 22px;
+      background: var(--purple);
+      color: white;
+    }
+    .brand { font-size: 29px; font-weight: 900; letter-spacing: .06em; }
+    .place { font-size: 20px; line-height: 1.35; }
+    .steps { display: flex; gap: 7px; }
+    .step { width: 44px; height: 10px; border-radius: 99px; background: rgba(255,255,255,.27); }
+    .step.on { background: var(--orange); }
+    .section-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 36px 10px 22px;
+    }
+    .section-title h2 { margin: 0; font-size: 36px; }
+    .section-title span { color: var(--muted); font-size: 20px; }
+    .question-card {
+      margin: 0;
+      padding: 35px 36px;
+      border: 2px solid var(--line);
+      border-radius: 27px;
+      background: white;
+      box-shadow: 0 7px 20px rgba(74, 43, 102, .06);
+    }
+    .prompt-row { display: grid; grid-template-columns: 60px 1fr; gap: 24px; align-items: start; }
+    .q {
+      display: grid;
+      place-items: center;
+      width: 60px;
+      height: 60px;
+      border-radius: 18px;
+      background: var(--purple);
+      color: white;
+      font: 850 20px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .prompt { font-size: clamp(22px, 3vw, 30px); font-weight: 850; line-height: 1.25; }
+    .help { margin-top: 12px; color: var(--muted); font-size: 21px; }
+    .entry {
+      margin: 34px 0 0;
+      padding: 24px;
+      border: 2px solid var(--line);
+      border-radius: 22px;
+      background: #fdfcfe;
+    }
+    .entry-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+      color: #4d3c62;
+      font-size: 20px;
+      font-weight: 800;
+    }
+    .count {
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: var(--pale);
+      color: var(--purple);
+      font-size: 18px;
+    }
+    textarea {
+      display: block;
+      width: 100%;
+      min-height: 110px;
+      resize: vertical;
+      padding: 20px;
+      border: 2px solid var(--purple);
+      border-radius: 19px;
+      outline: 4px solid rgba(84, 39, 139, .11);
+      background: white;
+      color: var(--ink);
+      font: inherit;
+      font-size: 20px;
+    }
+    textarea::placeholder { color: #9d96aa; }
+    .add {
+      width: 100%;
+      margin-top: 20px;
+      padding: 20px;
+      border: 2px dashed #ad91cf;
+      border-radius: 18px;
+      background: #fbf8fe;
+      color: var(--purple);
+      font: inherit;
+      font-size: 21px;
+      font-weight: 850;
+    }
+    .nav { display: flex; justify-content: space-between; padding: 30px 4px 5px; }
+    .nav button {
+      padding: 17px 30px;
+      border-radius: 16px;
+      font: inherit;
+      font-size: 19px;
+      font-weight: 800;
+    }
+    .back { border: 2px solid #ddd5e4; background: white; color: #554c62; }
+    .next { border: 2px solid var(--purple); background: var(--purple); color: white; }
+    .note {
+      padding: 26px 36px 30px;
+      color: var(--muted);
+      font-size: 18px;
+      line-height: 1.55;
+    }
+    .note strong { color: var(--ink); }
+
+    @media (max-width: 720px) {
+      body { padding: 12px; }
+      .frame { border-width: 3px; border-radius: 24px; }
+      .approval, .screen, .note { padding: 20px; }
+      .approval { align-items: flex-start; }
+      .chip { padding: 8px 11px; font-size: 12px; }
+      .bar { grid-template-columns: 1fr; gap: 8px; padding: 18px; }
+      .brand { font-size: 21px; }
+      .place { font-size: 16px; }
+      .steps { display: none; }
+      .section-title { padding: 24px 4px 15px; }
+      .section-title h2 { font-size: 27px; }
+      .section-title span { font-size: 14px; }
+      .question-card { padding: 23px 20px; }
+      .prompt-row { grid-template-columns: 44px 1fr; gap: 14px; }
+      .q { width: 44px; height: 44px; border-radius: 13px; }
+      .prompt { font-size: 20px; }
+      .help { font-size: 16px; }
+      .entry { margin-top: 24px; padding: 16px; }
+      .entry-head, textarea, .add { font-size: 16px; }
+      .count { font-size: 14px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="frame">
+    <header class="approval">
+      <h1>B · Add another person</h1>
+      <span class="chip">Approved</span>
+    </header>
+
+    <section class="screen" aria-label="Quarterly Session Prep mockup">
+      <header class="bar">
+        <div class="brand">SCALING UP</div>
+        <div class="place"><strong>Quarterly Session Prep</strong><br />Retrospective · Section 1 of 4</div>
+        <div class="steps" aria-hidden="true">
+          <span class="step on"></span><span class="step"></span><span class="step"></span><span class="step"></span>
+        </div>
+      </header>
+
+      <div class="section-title">
+        <h2>Looking back</h2>
+        <span>8 of 16 answered</span>
+      </div>
+
+      <section class="question-card" role="group" aria-labelledby="core-values-prompt">
+        <div class="prompt-row">
+          <span class="q" aria-hidden="true">Q</span>
+          <span>
+            <span class="prompt" id="core-values-prompt">Which employees have demonstrated that they live the core values? Why? Share the stories.</span>
+            <span class="help">Share up to three people and the examples that stood out.</span>
+          </span>
+        </div>
+
+        <div class="entry">
+          <label class="entry-head" for="story-1">
+            <span>Person and story</span>
+            <span class="count" aria-hidden="true">1 of 3</span>
+          </label>
+          <textarea id="story-1" placeholder="Name the person, then describe what they did…"></textarea>
+        </div>
+
+        <button class="add" type="button">＋ Add another person</button>
+      </section>
+
+      <nav class="nav" aria-label="Assessment navigation">
+        <button class="back" type="button">Back</button>
+        <button class="next" type="button">Next</button>
+      </nav>
+    </section>
+
+    <footer class="note">
+      <strong>Behavior:</strong> reveal slots 2 and 3 in fixed order; preserve
+      `P1_core_values_story_1/2/3`; never remove, reorder, or compact answers.
+    </footer>
+  </main>
+</body>
+</html>
