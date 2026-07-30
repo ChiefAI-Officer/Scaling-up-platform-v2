@@ -17,6 +17,11 @@ interface QspStoryGroupProps {
     value: number | string | string[],
   ) => void;
   disabled?: boolean;
+  rememberedVisibleCount?: 1 | 2 | 3;
+  onVisibleCountChange?: (
+    groupKey: string,
+    visibleCount: 1 | 2 | 3,
+  ) => void;
 }
 
 export function QspStoryGroup({
@@ -25,24 +30,34 @@ export function QspStoryGroup({
   answers,
   onAnswerChange,
   disabled = false,
+  rememberedVisibleCount = 1,
+  onVisibleCountChange,
 }: QspStoryGroupProps) {
   const [announcement, setAnnouncement] = React.useState("");
   const promptId = React.useId();
-  const restoredCount = initialVisibleStoryCount(questions, answers);
+  const groupKey = questions[0].stableKey;
+  const restoredAnswerCount = initialVisibleStoryCount(questions, answers);
+  const restoredCount =
+    rememberedVisibleCount >= restoredAnswerCount
+      ? rememberedVisibleCount
+      : restoredAnswerCount;
   const [visibleCount, setVisibleCount] = React.useState(restoredCount);
 
   React.useEffect(() => {
     // Draft hydration may arrive after mount. Visibility grows monotonically
     // for this mount, so clearing a restored field never collapses the UI.
-    setVisibleCount((current) =>
-      current >= restoredCount ? current : restoredCount,
-    );
-  }, [restoredCount]);
+    if (visibleCount < restoredCount) {
+      setVisibleCount(restoredCount);
+      return;
+    }
+    onVisibleCountChange?.(groupKey, visibleCount);
+  }, [groupKey, onVisibleCountChange, restoredCount, visibleCount]);
 
   function revealNext() {
     if (disabled || visibleCount >= questions.length) return;
     const nextCount: 2 | 3 = visibleCount === 1 ? 2 : 3;
     const nextQuestion = questions[nextCount - 1];
+    onVisibleCountChange?.(groupKey, nextCount);
     setVisibleCount(nextCount);
     setAnnouncement(`Person and story ${nextCount} of 3 added.`);
     requestAnimationFrame(() => {

@@ -93,6 +93,49 @@ describe("SectionPager QSP story grouping", () => {
     expect(onAnswerChange).toHaveBeenCalledWith("P1_core_values_story_2", "Ada helped the team");
   });
 
+  test("keeps a revealed blank story slot open after Next then Back in the same pager session", () => {
+    const navigationPages = mergeCustomSlides(
+      buildSectionPages(
+        [
+          ...sections,
+          { stableKey: "P2_next", sortOrder: 2, name: "Next section" },
+        ],
+        [
+          ...questions,
+          {
+            stableKey: "P2_Q1",
+            sortOrder: 1,
+            sectionStableKey: "P2_next",
+            type: "TEXT",
+            label: "What comes next?",
+            isRequired: false,
+          },
+        ],
+      ),
+      [],
+    ).pages;
+
+    render(
+      <SectionPager
+        pages={navigationPages}
+        answers={{ ordinary: "answered" }}
+        onAnswerChange={jest.fn()}
+        onSubmit={jest.fn()}
+        submitting={false}
+        templateAlias="qsp-v2"
+        qspStoryGroupEnabled
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /add another person/i }));
+    expect(screen.getByRole("textbox", { name: "Person and story 2 of 3" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+
+    expect(screen.getByRole("textbox", { name: "Person and story 2 of 3" })).toBeInTheDocument();
+  });
+
   test("keeps story fields and Add read-only in preview mode", () => {
     renderPager({ previewMode: true });
 

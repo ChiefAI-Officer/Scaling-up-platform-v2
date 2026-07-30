@@ -15,13 +15,13 @@ Four July-10 assessment rows were closed from shipped code plus fresh production
 - **#70 — Rockefeller Welcome wording: Complete by product decision.** The shipped wording keeps every accurate fact: respondents rate each statement 0–3 and each habit has four items. The omitted “table on page 4” clause remains intentionally omitted because Jeff #24 removed the Rockefeller score table and the report has no page numbering. Restoring that clause would make the Welcome screen promise an artifact that does not exist. GH #223 is closed on this decision.
 - **#59 — false removal error: Complete.** The production audit trail on the report date contains two `AssessmentCampaignParticipant` DELETE events from the affected Spectrum campaign, followed by the campaign deletion; this maps the report to the campaign-detail Respondents table, not to deleting an individual result. The exact UI path is `/portal/assessments/{campaignId}` → Respondents → the row action labelled `Remove {firstName} {lastName}` → confirmation button `Remove` → `DELETE /api/assessment-campaigns/{campaignId}/participants/{participantId}`. Before PR #198, that route committed the invitation/participant transaction and audit row, then threw while constructing an invalid JSON-bodied `204`, so the UI showed “Could not remove respondent” even though removal succeeded. Current code returns `new NextResponse(null, { status: 204 })`; the client treats `204` as success and shows “Respondent removed.” The shipped route regression test uses a faithful `Response` implementation specifically to prevent this production-only failure from returning.
 
-**#48 travels with this closeout PR but remains a launch step, not one of the four completed production rows.** The QSP story-grouping branch is integrated with current `main`, retains the default-off flag/kill switch and three stable-key compatibility boundary, and proceeds through final whole-branch review, CI-gated PR, merge, then a separate flag launch.
+**#48 travels with this closeout PR but remains a launch step, not one of the four completed production rows.** The QSP story-grouping branch is integrated with current `main`, retains the default-off flag/kill switch and three stable-key compatibility boundary, and passed independent spec and standards review. It proceeds through a CI-gated PR, merge, then a separate flag launch.
 
 ---
 
 ### 2026-07-30 — Jeff #48: QSP core-values story group built default-OFF <!-- ENTRY_ISO:2026-07-30 ENTRY_SLUG:jeff-48-qsp-story-group-built -->
 
-**Status: BUILT on `codex/issue-48-qsp-story-ui-design`, DEFAULT-OFF, pending independent whole-branch review, PR, merge, and production launch.** This entry records local implementation and verification only. No push, PR, merge, Vercel environment write, deployment, or launch occurred.
+**Status: BUILT on `codex/issue-48-qsp-story-ui-design`, DEFAULT-OFF, independent whole-branch spec and standards review passed, pending PR, merge, and production launch.** This entry records local implementation and verification only. No merge, Vercel environment write, deployment, or launch occurred.
 
 The approved presentation adapter recognizes only the exact consecutive, same-section, optional `TEXT` triplet on template alias `qsp-v2`. When `WAVE_48_QSP_STORY_GROUP_ENABLED` is on, public assessment, invited survey, and editor Preview paths render one prompt with up to three fixed-order story slots and count it as one logical progress item. `WAVE_48_QSP_STORY_GROUP_ENABLED` remains default-OFF; `WAVE_48_QSP_STORY_GROUP_KILL` wins over enablement and restores the ordinary three-question rendering.
 
@@ -29,7 +29,7 @@ The approved presentation adapter recognizes only the exact consecutive, same-se
 
 **Validation receipt.**
 
-- Final complete focused regression command passed **15/15 suites and 223/223 tests** with **0 snapshots**, including QSP seed invariants, Wave-P seed labels, Esperto crosswalk/results planning, ordinary pager/slides/phase-tile behavior, public/invited payloads, and ED10 Preview/prop threading:
+- Final complete focused regression command passed **15/15 suites and 224/224 tests** with **0 snapshots**, including QSP seed invariants, Wave-P seed labels, Esperto crosswalk/results planning, ordinary pager/slides/phase-tile behavior, public/invited payloads, ED10 Preview/prop threading, and preservation of a revealed blank story slot across Next → Back navigation:
 
 ```bash
 npx jest \

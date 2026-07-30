@@ -74,6 +74,20 @@ interface SectionPagerProps {
 
 export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitting, onExit, assessmentName, companyName, requireAtLeastOneAnswer, templateAlias, isCEO, previewMode, qspStoryGroupEnabled = false }: SectionPagerProps) {
   const [sectionIndex, setSectionIndex] = React.useState(0);
+  const [qspStoryVisibleCounts, setQspStoryVisibleCounts] = React.useState<
+    Record<string, 1 | 2 | 3>
+  >({});
+  const rememberQspStoryVisibleCount = React.useCallback(
+    (groupKey: string, visibleCount: 1 | 2 | 3) => {
+      setQspStoryVisibleCounts((current) => {
+        const remembered = current[groupKey] ?? 1;
+        return remembered >= visibleCount
+          ? current
+          : { ...current, [groupKey]: visibleCount };
+      });
+    },
+    [],
+  );
   // Wave J-1: when set, the SU-Full growth-phase interstitial is shown in place
   // of the next section. Continue clears it and performs the real advance. It is
   // NOT a counted section (the shell header / progress bar are not rendered on
@@ -335,6 +349,10 @@ export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitt
                     answers={answers}
                     onAnswerChange={handleAnswerChange}
                     disabled={submitting || previewMode}
+                    rememberedVisibleCount={
+                      qspStoryVisibleCounts[unit.questions[0].stableKey]
+                    }
+                    onVisibleCountChange={rememberQspStoryVisibleCount}
                   />
                 </li>
               );
