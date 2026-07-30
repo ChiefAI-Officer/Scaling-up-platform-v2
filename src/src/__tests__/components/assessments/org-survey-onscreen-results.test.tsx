@@ -343,3 +343,61 @@ describe("re-tapping the invitation link after submitting (finding #3)", () => {
     await waitFor(() => expect(window.location.hash).toBe(""));
   });
 });
+
+/**
+ * GH #229, stated on the surface that actually made it a problem.
+ *
+ * `coach-logo.test.tsx` proves the component filters its `src`. This proves the
+ * filter is reached on THIS path — the report rendered to an UNAUTHENTICATED
+ * respondent, which is the audience Wave OSR introduced and the reason #229's
+ * own "impact is narrow" reasoning (it rests on the Report access gate) no
+ * longer holds. Testing the component alone would leave the wave's actual claim
+ * unguarded, which is the gap the #230 review caught the hard way.
+ */
+describe("an operator-set coach logo cannot make the respondent's browser call out (GH #229)", () => {
+  const REPORT_WITH_HTTP_LOGO = {
+    ...(REPORT as unknown as Record<string, unknown>),
+    coachLogoUrl: "http://tracker.example.net/pixel.png",
+    coachName: "Dana Coach",
+  } as never;
+
+  const REPORT_WITH_HTTPS_LOGO = {
+    ...(REPORT as unknown as Record<string, unknown>),
+    coachLogoUrl: "https://cdn.example.com/coach.png",
+    coachName: "Dana Coach",
+  } as never;
+
+  it("drops an http logo on the respondent-facing report, keeping the byline", async () => {
+    writeOnScreenResult(ALIAS, REPORT_WITH_HTTP_LOGO, KEY);
+    installFetch(410);
+
+    render(<OrgSurveyClient campaignAlias={ALIAS} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("org-survey-results")).toBeInTheDocument(),
+    );
+    // negative: no request leaves the respondent's browser for that host.
+    // queryAll, not query — the report renders coach chrome TWICE (cover +
+    // footer), so a single-element query throws on "multiple found" and would
+    // mask the real assertion.
+    expect(screen.queryAllByTestId("coach-logo")).toHaveLength(0);
+    // positive control: the report DID render and the coach is still named, so
+    // this is not passing because the page failed to load.
+    expect(screen.getAllByTestId("coach-name")[0]).toHaveTextContent("Dana Coach");
+  });
+
+  it("positive control — an https logo still renders on the same path", async () => {
+    writeOnScreenResult(ALIAS, REPORT_WITH_HTTPS_LOGO, KEY);
+    installFetch(410);
+
+    render(<OrgSurveyClient campaignAlias={ALIAS} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("org-survey-results")).toBeInTheDocument(),
+    );
+    expect(screen.getAllByTestId("coach-logo")[0]).toHaveAttribute(
+      "src",
+      "https://cdn.example.com/coach.png",
+    );
+  });
+});

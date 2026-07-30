@@ -9,6 +9,7 @@
  *  - Inline links accept only http/https/relative URLs (javascript:/data:/protocol-relative rejected).
  */
 import { escapeHtml } from "@/lib/templates/interpolate-content-html";
+import { safeImageSrc } from "@/lib/assessments/safe-image-src";
 import { SU_LOGO_CID } from "@/lib/assets/invitation-logo";
 import { sanitizeEmailHtml } from "@/lib/assessments/email-html-sanitizer";
 
@@ -164,20 +165,15 @@ function safeHref(raw: string): string | null {
 /**
  * Returns a safe image src or null — STRICTER than `safeHref`: HTTPS only
  * (the email sanitizer already strips http: images — stay consistent).
- * Rejects http:, javascript:, data:, protocol-relative, bare filenames,
- * empty/null, and anything `new URL` cannot parse.
+ *
+ * MOVED to `@/lib/assessments/safe-image-src` (GH #229) so the report chrome can
+ * share it without dragging this email module into a client bundle. Re-exported
+ * here so every existing importer and test keeps working.
+ *
+ * NOTE: imported at the top of this file, not `export … from` — this module calls
+ * `safeImageSrc` itself, and a bare re-export would not bind the name locally.
  */
-export function safeImageSrc(raw: string | null | undefined): string | null {
-  if (typeof raw !== "string") return null;
-  const url = raw.trim();
-  if (!url) return null;
-  try {
-    const parsed = new URL(url);
-    return parsed.protocol === "https:" ? url : null;
-  } catch {
-    return null;
-  }
-}
+export { safeImageSrc };
 
 // ── Markdown-lite (links + bold), escape-first ──────────────────────────────
 function renderInline(escaped: string): string {

@@ -5,6 +5,7 @@
 
 import { z } from "zod";
 import { RESPONDENT_LEVEL_VALUES } from "./assessments/respondent-levels";
+import { safeImageSrc } from "./assessments/safe-image-src";
 
 // ============================================================
 // Common Schemas
@@ -170,7 +171,23 @@ export const createCoachSchema = z.object({
     phone: phoneSchema,
     company: z.string().optional(),
     bio: z.string().optional(),
-    profileImage: z.string().optional(),
+    // GH #229 — defence in depth at the write boundary. This field is rendered as
+    // an <img src> on reports that Wave OSR (#71) now shows to UNAUTHENTICATED
+    // respondents, so a non-https value turns into an outbound request from their
+    // browser. The load-bearing guard is at the render site (`CoachLogo`), which
+    // also covers rows already stored and any future writer; this one stops new
+    // bad values entering through the admin API.
+    //
+    // Deliberately permissive about ABSENCE (undefined / "") because that is what
+    // callers already send, and no UI sends this field at all today — the coach
+    // portal writes `profileImage` via the Blob upload route straight through
+    // Prisma. So this only constrains direct admin API calls.
+    profileImage: z
+        .string()
+        .optional()
+        .refine((v) => v === undefined || v === "" || safeImageSrc(v) !== null, {
+            message: "Profile image must be an https:// URL",
+        }),
     territory: z.string().optional(),
     hubspotId: z.string().optional(),
     circleId: z.string().optional(),
@@ -677,6 +694,15 @@ export const updateAssessmentCampaignSchema = z.object({
     invitationBodyMarkdown: z.string().max(5000).transform(_trim).nullable().optional(),
     // Task 12 (#20) — per-campaign FULL-HTML invitation body (validate-on-save in the route).
     invitationBodyHtml: z.string().max(50_000).nullable().optional(),
+    // Wave OSR (#71) — let an EXISTING campaign opt in to showing each respondent
+    // their own report on screen at submit. Shipped create-only, which made the
+    // already-enabled production flag surface nothing: measured 0 of 76 campaigns
+    // with the toggle on, and every live campaign predates the create control.
+    //
+    // Not flag-gated HERE (mirrors the create schema): the flag decides capability
+    // in the route, and disclosure itself is decided server-side under the Phase-2
+    // submission lock, so a stored value with the flag off is inert.
+    showResultsOnScreen: z.boolean().optional(),
 });
 
 export const assignCampaignParticipantsSchema = z

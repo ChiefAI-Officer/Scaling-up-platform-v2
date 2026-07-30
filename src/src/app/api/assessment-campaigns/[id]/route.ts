@@ -27,6 +27,7 @@ import {
   MAX_INVITATION_HTML_LENGTH,
 } from "@/lib/assessments/email-html-sanitizer";
 import { isCustomSlidesEnabled } from "@/lib/assessments/wave-m-flags";
+import { isOnScreenResultsEnabled } from "@/lib/assessments/wave-osr-flags";
 import {
   prepareCustomSlidesForSave,
   sectionStableKeysOf,
@@ -216,6 +217,7 @@ export async function PATCH(
       invitationSubject?: string | null;
       invitationBodyMarkdown?: string | null;
       invitationBodyHtml?: string | null;
+      showResultsOnScreen?: boolean;
     } = {};
 
     if (data.name !== undefined) updateData.name = data.name;
@@ -254,6 +256,31 @@ export async function PATCH(
         updateData.invitationBodyHtml = rawHtml;
       }
     }
+    // ─────────────────────────────────────────────────────────────────────
+    // Wave OSR (#71) — on-screen respondent results toggle (flag-gated WRITE).
+    //
+    //   - Flag OFF (or `_KILL` set) → the field is IGNORED, not written. Same
+    //     shape as `invitationBodyHtml` (Task 12) and `customSlides` (Wave M
+    //     R1-High-1): a stale or hand-rolled client must not be able to switch on
+    //     a respondent-facing disclosure while the operator's UI hides the
+    //     control. This does NOT contradict `wave-osr-flags.ts`'s "flags gate
+    //     capability, never persisted data" rule — refusing a NEW write is not
+    //     coercing a STORED value, and nothing here rewrites the column.
+    //   - Flag ON → written in both directions (an explicit opt-OUT is a write,
+    //     so the check is `!== undefined`, never truthiness).
+    //
+    // No CAS sentinel, unlike slides: a boolean has no authored content that a
+    // last-write-wins clobber could destroy. The audit trail needs no new code —
+    // the legacy single-update path below logs `changes: updateData`, so the
+    // toggle rides along in it.
+    //
+    // WHY this exists at all: the column shipped create-only, so the production
+    // flag (already enabled) surfaced nothing on any existing campaign.
+    // ─────────────────────────────────────────────────────────────────────
+    if (data.showResultsOnScreen !== undefined && isOnScreenResultsEnabled()) {
+      updateData.showResultsOnScreen = data.showResultsOnScreen;
+    }
+
     if (data.openAt !== undefined) {
       const d = new Date(data.openAt);
       if (Number.isNaN(d.getTime())) {
