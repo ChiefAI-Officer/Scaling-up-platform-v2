@@ -60,7 +60,10 @@ Re-enabling never revives cancelled Coach rows. Replay is an audited operation
 that re-renders from the frozen submission and reauthorizes the current owner.
 Workers may set the global fence but never clear it from environment state; an
 operator clears it only after the quiescence audit, preventing a stale
-deployment with `KILL=0` from undoing a newer stop decision.
+deployment with `KILL=0` from undoing a newer stop decision. After removing the
+environment KILL and verifying the quiescence receipt, an Admin/Staff operator
+calls `POST /api/admin/public-leads/delivery-fence`; the route rechecks active
+leases and atomically increments the generation with an audit record.
 
 ## Export incidents
 

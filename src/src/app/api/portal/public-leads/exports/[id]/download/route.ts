@@ -13,6 +13,20 @@ export async function GET(
   if (!state.presentationEnabled) {
     return new Response("Not found", { status: 404 });
   }
+  const eligibleCoach = await db.coach.count({
+    where: {
+      id: actor.coachId,
+      deletedAt: null,
+      certificationStatus: "ACTIVE",
+      OR: [
+        { certificationExpiry: null },
+        { certificationExpiry: { gt: new Date() } },
+      ],
+    },
+  });
+  if (eligibleCoach !== 1) {
+    return new Response("Not found", { status: 404 });
+  }
   const { id } = await params;
   const job = await db.publicLeadExport.findFirst({
     where: {

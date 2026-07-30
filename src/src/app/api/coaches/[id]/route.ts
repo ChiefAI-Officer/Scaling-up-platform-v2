@@ -229,6 +229,24 @@ export async function DELETE(
               sendFenceGeneration: { increment: 1 },
             },
           }),
+          tx.publicLeadExport.updateMany({
+            where: {
+              ownerCoachId: id,
+              status: { in: ["PENDING", "RUNNING", "COMPLETED"] },
+            },
+            data: {
+              status: "ABORTED",
+              abortedAt: deletedAt,
+              errorClass: "COACH_TOMBSTONED",
+              artifactCiphertext: null,
+              artifactNonce: null,
+              artifactAuthTag: null,
+              authorizationGeneration: { increment: 1 },
+            },
+          }),
+          tx.publicLeadExportChunk.deleteMany({
+            where: { export: { ownerCoachId: id } },
+          }),
           tx.coach.update({
             where: { id },
             data: { deletedAt, publicLeadMailQuiescedAt: null },

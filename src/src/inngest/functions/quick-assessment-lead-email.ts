@@ -369,6 +369,22 @@ export async function drainLeadOutbox(
   const verifyFence =
     deps.verifyFence ??
     (async (row: ClaimedOutboxRow) => {
+      const globalFenceClause =
+        row.featureKey === "PUBLIC_LEADS" &&
+        row.recipientRole === "REFERRING_COACH"
+          ? Prisma.sql`
+              AND COALESCE((
+                SELECT fence."generation"
+                FROM "public_lead_delivery_fences" AS fence
+                WHERE fence."id" = 'global'
+              ), 0) = ${row.globalFenceGeneration}
+              AND NOT EXISTS (
+                SELECT 1
+                FROM "public_lead_delivery_fences" AS fence
+                WHERE fence."id" = 'global' AND fence."blocked" = true
+              )
+            `
+          : Prisma.empty;
       const verified = await deps.db.$queryRaw<Array<{ id: string }>>(Prisma.sql`
         UPDATE "assessment_email_outbox" AS outbox
         SET "updatedAt" = outbox."updatedAt"
@@ -376,16 +392,7 @@ export async function drainLeadOutbox(
           AND outbox."status" = 'SENDING'
           AND outbox."leaseToken" = ${row.leaseToken}
           AND outbox."sendFenceGeneration" = ${row.sendFenceGeneration}
-          AND COALESCE((
-            SELECT fence."generation"
-            FROM "public_lead_delivery_fences" AS fence
-            WHERE fence."id" = 'global'
-          ), 0) = ${row.globalFenceGeneration}
-          AND NOT EXISTS (
-            SELECT 1
-            FROM "public_lead_delivery_fences" AS fence
-            WHERE fence."id" = 'global' AND fence."blocked" = true
-          )
+          ${globalFenceClause}
         RETURNING outbox."id"
       `);
       return verified.length === 1;

@@ -39,13 +39,17 @@ export const publicLeadRetention = inngest.createFunction(
         take: RETENTION_BATCH_SIZE,
         select: {
           id: true,
-          publicLeadExportItems: { select: { id: true } },
+          publicLeadExportItems: {
+            select: { id: true, exportId: true },
+          },
         },
       });
       const now = new Date();
       await db.$transaction(async (tx) => {
+        const invalidatedExportIds = new Set<string>();
         for (const submission of expired) {
           for (const item of submission.publicLeadExportItems) {
+            invalidatedExportIds.add(item.exportId);
             await tx.publicLeadExportExclusion.upsert({
               where: { exportItemId: item.id },
               update: {},
@@ -90,6 +94,24 @@ export const publicLeadRetention = inngest.createFunction(
                   }
                 : {}),
             },
+          });
+        }
+        if (invalidatedExportIds.size > 0) {
+          const exportIds = [...invalidatedExportIds];
+          await tx.publicLeadExport.updateMany({
+            where: { id: { in: exportIds } },
+            data: {
+              status: "ABORTED",
+              abortedAt: now,
+              errorClass: "RETENTION_INVALIDATED",
+              artifactCiphertext: null,
+              artifactNonce: null,
+              artifactAuthTag: null,
+              authorizationGeneration: { increment: 1 },
+            },
+          });
+          await tx.publicLeadExportChunk.deleteMany({
+            where: { exportId: { in: exportIds } },
           });
         }
         if (expired.length > 0) {
