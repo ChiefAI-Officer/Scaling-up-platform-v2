@@ -329,4 +329,43 @@ describe("drainLeadOutbox atomic leases", () => {
     delete process.env.PUBLIC_LEADS_POLICY_APPROVED;
     delete process.env.PUBLIC_LEADS_DISTRIBUTED_LIMITER_READY;
   });
+
+  it("does not release HELD rows when the live limiter health probe fails", async () => {
+    process.env.PUBLIC_LEADS_POLICY_APPROVED = "1";
+    process.env.PUBLIC_LEADS_DISTRIBUTED_LIMITER_READY = "1";
+    const deps = makeDeps();
+    deps.limiterHealthy = jest.fn().mockResolvedValue(false);
+
+    await drainLeadOutbox(deps, null);
+
+    expect(deps.claimNext).toHaveBeenCalledWith(
+      expect.objectContaining({ releaseHeld: false }),
+    );
+    delete process.env.PUBLIC_LEADS_POLICY_APPROVED;
+    delete process.env.PUBLIC_LEADS_DISTRIBUTED_LIMITER_READY;
+  });
+
+  it("returns a released HELD row to HELD after a send failure", async () => {
+    process.env.PUBLIC_LEADS_POLICY_APPROVED = "1";
+    process.env.PUBLIC_LEADS_DISTRIBUTED_LIMITER_READY = "1";
+    const deps = makeDeps([
+      makeRow({
+        featureKey: "PUBLIC_LEADS",
+        previousStatus: "HELD",
+        recipientRole: "TAKER_COPY",
+      }),
+    ]);
+    deps.authorizeBeforeSend = jest.fn().mockResolvedValue({ allowed: true });
+    deps.sendEmail.mockRejectedValue(new Error("SMTP unavailable"));
+
+    await drainLeadOutbox(deps, null);
+
+    expect(deps.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "HELD" }),
+      }),
+    );
+    delete process.env.PUBLIC_LEADS_POLICY_APPROVED;
+    delete process.env.PUBLIC_LEADS_DISTRIBUTED_LIMITER_READY;
+  });
 });
