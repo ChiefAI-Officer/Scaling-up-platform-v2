@@ -1,6 +1,15 @@
 # Jeff #48 — QSP Core-Values Stories Design
 
-**Status:** BUILT behind a default-off flag; visual validation complete via published Preview plus a corrected DB-free production-context component harness; pending PR review and production launch
+**Status:** LAUNCHED on production on 2026-07-30
+
+**Safe live-smoke boundary:** production health and the invited QSP route were
+verified read-only, including the live RSC gate value
+`qspStoryGroupEnabled=true`. No PUBLIC QSP campaign exists. Opening a valid
+invited token would mark the participant `VIEWED`, and submitting would create
+respondent/admin data, so neither action was performed. Authenticated editor
+Preview was not opened in production; its read-only layout plus Add/restore,
+stable-key, and progress behavior remain covered by the pre-launch real-component
+harness and focused regression suite.
 
 **Scope:** Replace three repeated QSP v2 prompts with one progressively revealed “up to three people” question without changing the three stored answers
 

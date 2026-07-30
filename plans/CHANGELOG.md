@@ -6,6 +6,30 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-07-30 — Jeff #48: QSP core-values story group launched <!-- ENTRY_ISO:2026-07-30 ENTRY_SLUG:jeff-48-qsp-story-group-launched -->
+
+**Status: LAUNCHED on production (PR #251, squash `d676aa77caf328afd113f297d90ca8d41d036caf`; launch deployment `dpl_BK3vSFFQPyo6REpXq74sFmPrX5tJ`, `scaling-up-platform-v2-du38i25fc-scaling-up.vercel.app`).** The exact deployment belongs to the Scaling Up production project/team, targets `main` at the merged SHA, reached Ready, and serves healthy `scaling-up-platform-v2.vercel.app` and `platformtest.scalingup.com` aliases.
+
+The rollout was deliberately staged and its interruption is part of the receipt. The first production attempt, `dpl_8hRSBbEQrGXaKRnQQa56V7sCdSHD`, ended in `ERROR` because an unrelated Preview-only migration, `20260730050000`, attempted to add the already-present `referringCoachId` change and failed with Prisma `P3009`. Read-only diagnosis proved the migration transaction rolled back and left no partial DDL. Its active migration row was marked rolled back through Prisma's supported migration-resolution operation; all **41** migrations on merged `main` then reported up to date. A clean dark deployment from the merged source, `dpl_2WugBEPrsymdCcTDgxmjnE7fjeow` (`scaling-up-platform-v2-1jt6vahaz-scaling-up.vercel.app`), reached Ready and healthy before any #48 flag enablement.
+
+**Launch controls.** `WAVE_48_QSP_STORY_GROUP_KILL=0` and `WAVE_48_QSP_STORY_GROUP_ENABLED=1` are encrypted, Production-only Vercel variables. Each value was verified by its environment-variable ID through `GET /v1/projects/{project}/env/{id}` with decryption enabled, followed by a fresh bulk relist to prove the exact production entry and preserve any Preview/Development entries. The corrected runner also treats Vercel deployment-list summaries as `uid` records, not `id` records. It then redeployed the exact `d676aa77` source and waited for the exact launch hostname—not a timestamp-correlated candidate—to reach Ready.
+
+**Production smoke boundary.**
+
+- The invited QSP route `/org-survey/spectrum_qsp_v2_260724133919` returned HTTP `200`, and its live RSC payload contained `qspStoryGroupEnabled=true`.
+- A valid invited token was not opened because doing so would mark the participant `VIEWED`; a live submission was prohibited by the production-test safety boundary. No respondent, answer, submission, admin, template, or campaign write was made.
+- No PUBLIC QSP campaign exists, so that lane could not be exercised live.
+- The existing non-QSP PUBLIC campaign `/quiz/scaling_up_quick_pub_260610041810` rendered cleanly and responsively at desktop and mobile sizes, and **Start** advanced to **About You**. The observed Vercel Insights script `404`/MIME console pair predates and is unrelated to #48.
+- Authenticated editor Preview was not opened in production. This launch does not claim a live editor session, Add/restore interaction, live submission, or admin-visible stable-key inspection.
+
+**Compatibility and pre-launch evidence.** The stable keys remain exactly `P1_core_values_story_1`, `P1_core_values_story_2`, and `P1_core_values_story_3`; Esperto remains `Q5a/Q5b/Q5c` one-to-one. That contract, three-value respondent payloads, logical one-question progress, Add/focus/restore behavior, and read-only editor Preview were proved before launch by the production-context real-component harness and the complete focused regression run: **15/15 suites, 224/224 tests**. No schema, QSP seed content/count, import crosswalk, payload, scoring, report, export, or historical-answer change shipped with #48.
+
+**Rollback.** Run the corrected launch runner with `QSP48_ACTION="rollback"`: verify or replace the Production-only encrypted `WAVE_48_QSP_STORY_GROUP_KILL` entry with `1` through the per-ID decrypted verifier, relist to prove the entry set, redeploy the exact merged `d676aa77` source, and wait for that exact new deployment to reach Ready. The ordinary three-question presentation returns without data cleanup.
+
+Tracker item **#48 is complete and launched** within the explicit no-production-submission/no-authenticated-editor-smoke boundary above.
+
+---
+
 ### 2026-07-30 — July-10 session closeouts: #59, #67, #70, and #71 <!-- ENTRY_ISO:2026-07-30 ENTRY_SLUG:jeff-jul10-session-closeouts-59-67-70-71 -->
 
 Four July-10 assessment rows were closed from shipped code plus fresh production evidence; none required a new feature implementation in this branch.
