@@ -20,6 +20,41 @@ The correct consolidated mapping is:
 
 ---
 
+### 2026-07-30 — Outbox enqueue: a documented guarantee PostgreSQL cannot provide <!-- ENTRY_ISO:2026-07-30 ENTRY_SLUG:outbox-enqueue-transaction-semantics -->
+
+**Status: MERGED + LIVE.** PR **#263** (`4e930535`, the proof) and PR **#264** (`d9cb250b`, the fix); prod deploy READY on `d9cb250b`. Closes the code half of GH **#257**; the issue stays open for the residual.
+
+**The claim that was false, and had been since Wave E / PR #67.** The invited submit route inserts its outbox rows inside `db.$transaction`, wrapping each insert in `try/catch` on this contract:
+
+> a write failure for one email NEVER rolls back the submission — it is simply skipped
+
+**Proven against real PostgreSQL** (`integration-tests/tx-swallowed-error.pg.test.ts`, running on a `postgres:17` service in the existing lease CI job):
+
+| Failure | Reality |
+|---|---|
+| **Reached the database** (unique violation, timeout, reset) | The transaction is **aborted** (`25P02`). Every later statement fails, so the submission **does not commit**. A JavaScript `catch` cannot un-abort it — Prisma adds no per-operation savepoints, so there is nothing to roll back *to*. |
+| **Raised before the statement was sent** (client-side validation) | Transaction intact — genuinely skippable; the submission commits without that email. |
+
+🔑 **So this was a diagnosability defect, not the silent data-loss bug it was filed as.** The database case is loud and retryable (the invitation is never marked `SUBMITTED`, so the respondent can resubmit) — but the swallow **destroyed the real cause**, leaving the operator with a `25P02` raised by the *invitation update*, pointing at the wrong line, beneath a log line reading "skipped" when nothing had been skipped.
+
+**Two corrections to our own issue text, made before writing any code:** #257 claimed the submission commits and the email is lost forever, and that there was no log at all. Both were wrong — there was already a `console.error` (it merely lacked `submissionId`), and for database failures nothing commits. Both retractions are recorded on the issue.
+
+**The fix.** New `classifyOutboxEnqueueFailure`: swallow **only** a positively identified pre-database failure, and **default to rethrow**. The default is the load-bearing part — "we cannot prove the transaction is intact" and "the transaction is intact" are different claims, and only one is safe to act on. It matches Prisma's error `.name` rather than `instanceof`, which breaks across duplicate `@prisma/client` copies and mocked clients. Both branches now log ids only (`submissionId`, `campaignId`, `invitationId`, `recipientRole`, `emailType`) plus an explicit consequence.
+
+**Verified safe to rethrow before changing it:** the 409 "Already submitted" comes from a returned `result.kind === "conflict"`, decided by a status check at lock time — **not** from catching `P2002`, and the file has no `PrismaClientKnownRequestError` handling at all. A rethrown Prisma error therefore lands in the generic 500 path and cannot produce a spurious 409.
+
+🔑 **Why it survived review for months: a mocked Prisma has no transaction state, so a unit test will cheerfully confirm the false comment.** That is why the guard for the *semantics* is an integration test against real PostgreSQL, and the unit suite pins only the *decision*. Generalise it — when a claim is about database behaviour, a mock cannot be the witness.
+
+**Verification.** 12 new unit tests, **mutation-proved in both directions** (forcing always-rethrow fails the skip case; forcing always-skip fails 11 of 12). Existing org-survey submit suites green — 3 suites / 56 tests together. ESLint clean; `CI=true npx next build --turbopack` green; all five GitHub checks green on both PRs.
+
+⚠️ **Two traps hit while running the gates for real.** `CI=true next build --turbopack` fails in a fresh worktree with `TurbopackInternalError — Symlink node_modules is invalid, it points out of the filesystem root` if you symlink `node_modules` from the main checkout; a real `npm ci` is required, so a local build gate is not free in a worktree. And `locked.campaign` carries no `id` in its selected shape — the file's other log lines use `locked.campaignId`.
+
+**Residual, deliberately left open on #257:** the pre-database dropped-email case is now **detectable but not recoverable** — nothing retries a row that was never created. Reconciliation is tractable (the expected-rows rule is derivable from the same `buildWaveDOutboxRows` inputs plus `emailRenderFingerprint`) but was out of scope. Unrelated to #250 / ADR-0030, which govern the send side and presuppose the row exists.
+
+⚠️ **Process note against ourselves:** PR #262 established, hours earlier, that the SoT update belongs in the same PR as the code it describes. #263 and #264 both shipped without one, and this entry is the catch-up. The rule was right; following it needs to be automatic.
+
+---
+
 ### 2026-07-30 — Issue #238: public quiz takers can keep their one-time report <!-- ENTRY_ISO:2026-07-30 ENTRY_SLUG:issue-238-public-quiz-print-download-launched -->
 
 **Status: LAUNCHED on production (PR [#255](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/255), merged 2026-07-30 13:40:41 UTC as `15cfdd5cc5bd0cd38b5c47f35ca7dbb525d9e692`; deployment `dpl_AoW4aC4XL2qZ5LB6pFnm8BztoS12`, `scaling-up-platform-v2-h05onegdc-scaling-up.vercel.app`).** GitHub issue [#238](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/issues/238) is closed. The exact merged-source deployment reached Ready and owns both production aliases, `platformtest.scalingup.com` and `scaling-up-platform-v2.vercel.app`.
