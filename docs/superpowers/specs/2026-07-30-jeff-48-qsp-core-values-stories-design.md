@@ -1,6 +1,6 @@
 # Jeff #48 — QSP Core-Values Stories Design
 
-**Status:** Visual direction and behavior approved by the user on 2026-07-30; ready for implementation planning
+**Status:** BUILT behind a default-off flag; pending PR review and production launch
 
 **Scope:** Replace three repeated QSP v2 prompts with one progressively revealed “up to three people” question without changing the three stored answers
 

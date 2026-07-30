@@ -6,6 +6,29 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-07-30 — Jeff #48: QSP core-values story group built default-OFF <!-- ENTRY_ISO:2026-07-30 ENTRY_SLUG:jeff-48-qsp-story-group-built -->
+
+**Status: BUILT on `codex/issue-48-qsp-story-ui-design`, DEFAULT-OFF, pending independent whole-branch review, PR, merge, and production launch.** This entry records local implementation and verification only. No push, PR, merge, Vercel environment write, deployment, or launch occurred.
+
+The approved presentation adapter recognizes only the exact consecutive, same-section, optional `TEXT` triplet on template alias `qsp-v2`. When `WAVE_48_QSP_STORY_GROUP_ENABLED` is on, public assessment, invited survey, and editor Preview paths render one prompt with up to three fixed-order story slots and count it as one logical progress item. `WAVE_48_QSP_STORY_GROUP_ENABLED` remains default-OFF; `WAVE_48_QSP_STORY_GROUP_KILL` wins over enablement and restores the ordinary three-question rendering.
+
+**Compatibility boundary.** There is no Prisma schema migration, QSP seed-content or question-count change, Esperto crosswalk/import change, answer-state or submission-payload change, scoring/report/export change, or historical-data rewrite. The stable keys remain exactly `P1_core_values_story_1`, `P1_core_values_story_2`, and `P1_core_values_story_3`; Esperto remains `Q5a/Q5b/Q5c` one-to-one with those slots. Public and invited component tests submit the same three stable-key/value objects, and editor Preview delegates to the same pager in read-only mode.
+
+**Validation receipt.**
+
+- Final complete focused regression command: the Task 6 fifteen-file `npx jest ... --runInBand` invocation passed **15/15 suites and 223/223 tests** with **0 snapshots**, including QSP seed invariants, Wave-P seed labels, Esperto crosswalk/results planning, ordinary pager/slides/phase-tile behavior, public/invited payloads, and ED10 Preview/prop threading.
+- Placeholder correction proof: `npx jest src/__tests__/assessments/qsp-story-group.test.tsx src/__tests__/components/assessments/question-input.test.tsx --runInBand` passed **2/2 suites and 27/27 tests**. Scoped ESLint over both components/tests returned no findings.
+- `node scripts/check-migration-safety.mjs` passed: **41 migrations checked**, no unapproved destructive operations.
+- Final `CI=true npx next build --turbopack` passed with exit 0 on Next.js 16.1.6. The local environment emitted the known middleware deprecation and missing `DATABASE_URL` / Inngest-key page-generation warnings; compilation, TypeScript, static generation, and final route output completed.
+
+The first two build attempts usefully caught two TypeScript union-widening defects that Jest could not see: `Math.max(current, restoredCount)` returned `number`, then `visibleCount + 1` returned `number`. They were corrected without behavior changes in isolated commits `830a103e` and `621fae31`; the existing component interaction suite passed **10/10** and scoped ESLint was clean after each correction. The visual pass then found the generic `Type your answer here…` placeholder did not match the approved mockup. Commit `23b35622` added an optional `QuestionInput` text-placeholder override whose default remains unchanged and passed the exact approved QSP copy: **“Name the person, then describe what they did…”**
+
+**Visual review evidence.** A local authenticated editor Preview used the real QSP v2 published v3 at desktop (`1440×783`) and mobile (`390×844`) and compared it with `docs/specs/v7.6/mockups/48-qsp-core-values-progressive.html`. Flag on showed one grouped prompt, one visible story textarea, `1 of 3`, the approved placeholder, and disabled Preview textarea/Add controls; logical progress max was **20**. Flag off showed no group, all **3** ordinary underlying story textareas, and raw progress max **22**. At 390px the document scroll width was **375px**, so the grouped card introduced no horizontal overflow. With the Jeff #48 flag on, a non-QSP Leadership Vision Alignment Preview showed **0** QSP groups, **9** ordinary question cards on the inspected section, and unchanged progress max **51**. Screenshots were written only to the OS temporary directory and were not added to git.
+
+Direct browser interaction evidence stops at the product boundary: this QSP version is published, ED1 Test Mode is deliberately draft-only, and editor Preview hardcodes empty answers and disables Add. Creating a shared-database draft solely for screenshots was rejected. The Add-once/slot-2-focus, Add-twice/slot-3/no-button, restored-slot-3, stable-key write, live-region, and monotonic-visibility cases are therefore automated evidence from the passing `QspStoryGroup` and `SectionPager` suites, not claimed as browser-driven interaction evidence.
+
+---
+
 ### 2026-07-30 — Jeff #83: verified Coach Referred Results launched <!-- ENTRY_ISO:2026-07-30 ENTRY_SLUG:jeff-83-referred-results-launched -->
 
 **Status: LAUNCHED on production (PR #245, squash `e0e2bc9b`; deployment `dpl_BZtaegoNCrfjpZAoVPpYQu7LxeDX`).** `WAVE_83_REFERRED_RESULTS_ENABLED=1` is an encrypted Production-only Vercel variable; `WAVE_83_REFERRED_RESULTS_KILL` remains the immediate rollback lever. The Ready deployment owns `scaling-up-platform-v2.vercel.app`, `platformtest.scalingup.com`, and the main aliases.

@@ -74,7 +74,7 @@
 - Produces: `isQspStoryGroupEnabled(): boolean`.
 - Produces: environment variables `WAVE_48_QSP_STORY_GROUP_ENABLED` and `WAVE_48_QSP_STORY_GROUP_KILL`.
 
-- [ ] **Step 1: Write the failing flag test**
+- [x] **Step 1: Write the failing flag test**
 
 ```ts
 import { isQspStoryGroupEnabled } from "@/lib/assessments/wave-48-flags";
@@ -117,7 +117,7 @@ it("lets the kill switch override enablement", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and verify RED**
+- [x] **Step 2: Run the test and verify RED**
 
 Run:
 
@@ -127,7 +127,7 @@ npx jest src/__tests__/lib/assessments/wave-48-flags.test.ts --runInBand
 
 Expected: FAIL because `wave-48-flags.ts` does not exist.
 
-- [ ] **Step 3: Add the minimal call-time flag helper**
+- [x] **Step 3: Add the minimal call-time flag helper**
 
 ```ts
 function isOn(value: string | undefined): boolean {
@@ -140,7 +140,7 @@ export function isQspStoryGroupEnabled(): boolean {
 }
 ```
 
-- [ ] **Step 4: Document both variables in `.env.example`**
+- [x] **Step 4: Document both variables in `.env.example`**
 
 Add immediately after the Jeff #83 flags:
 
@@ -152,7 +152,7 @@ WAVE_48_QSP_STORY_GROUP_ENABLED="false"
 WAVE_48_QSP_STORY_GROUP_KILL="false"
 ```
 
-- [ ] **Step 5: Verify GREEN and lint**
+- [x] **Step 5: Verify GREEN and lint**
 
 Run:
 
@@ -163,7 +163,7 @@ npx eslint src/lib/assessments/wave-48-flags.ts src/__tests__/lib/assessments/wa
 
 Expected: PASS with no lint errors.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add .env.example src/lib/assessments/wave-48-flags.ts src/__tests__/lib/assessments/wave-48-flags.test.ts
@@ -184,7 +184,7 @@ git commit -m "feat(assessments): gate QSP story grouping"
 - Consumes: `PagerQuestion[]`, `PagerPage[]`, template alias, feature-gate boolean, and answer map.
 - Produces: `QspStoryQuestions`, `QuestionRenderUnit`, `buildQuestionRenderUnits()`, `initialVisibleStoryCount()`, and `questionProgress()`.
 
-- [ ] **Step 1: Write the failing classifier and progress tests**
+- [x] **Step 1: Write the failing classifier and progress tests**
 
 Use this fixture and assertions:
 
@@ -268,7 +268,7 @@ it("counts the group as one logical item answered by any nonblank slot", () => {
 });
 ```
 
-- [ ] **Step 2: Run the pure test and verify RED**
+- [x] **Step 2: Run the pure test and verify RED**
 
 Run:
 
@@ -278,7 +278,7 @@ npx jest src/__tests__/lib/assessments/qsp-story-group.test.ts --runInBand
 
 Expected: FAIL because `qsp-story-group.ts` does not exist.
 
-- [ ] **Step 3: Implement the exact classifier**
+- [x] **Step 3: Implement the exact classifier**
 
 ```ts
 import type { PagerPage } from "@/lib/assessments/custom-slides";
@@ -388,7 +388,7 @@ export function questionProgress(
 }
 ```
 
-- [ ] **Step 4: Run the test and verify GREEN**
+- [x] **Step 4: Run the test and verify GREEN**
 
 Run:
 
@@ -399,7 +399,7 @@ npx eslint src/lib/assessments/qsp-story-group.ts src/__tests__/lib/assessments/
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/assessments/qsp-story-group.ts src/__tests__/lib/assessments/qsp-story-group.test.ts
@@ -421,7 +421,7 @@ git commit -m "feat(assessments): model QSP story render group"
 - Consumes: `QspStoryQuestions`, derived prompt, answer map, `onAnswerChange`, and `disabled`.
 - Produces: `QspStoryGroup` with fixed-order reveal, focus transfer, live announcement, and stable-key writes.
 
-- [ ] **Step 1: Write the failing interaction tests**
+- [x] **Step 1: Write the failing interaction tests**
 
 Create the canonical triplet fixture used in Task 2 and cover these assertions:
 
@@ -467,7 +467,7 @@ Add separate tests proving:
 - the live region announces `Person and story 2 of 3 added.`;
 - prompt and supporting copy render once.
 
-- [ ] **Step 2: Run the component test and verify RED**
+- [x] **Step 2: Run the component test and verify RED**
 
 Run:
 
@@ -477,7 +477,7 @@ npx jest src/__tests__/assessments/qsp-story-group.test.tsx --runInBand
 
 Expected: FAIL because the component does not exist.
 
-- [ ] **Step 3: Implement the progressive component**
+- [x] **Step 3: Implement the progressive component**
 
 ```tsx
 "use client";
@@ -585,7 +585,7 @@ export function QspStoryGroup({
 }
 ```
 
-- [ ] **Step 4: Add the approved scoped styling**
+- [x] **Step 4: Add the approved scoped styling**
 
 Append inside the `.su-assessment-brand` respondent-style region:
 
@@ -686,7 +686,7 @@ Append inside the `.su-assessment-brand` respondent-style region:
 }
 ```
 
-- [ ] **Step 5: Verify GREEN and accessibility behavior**
+- [x] **Step 5: Verify GREEN and accessibility behavior**
 
 Run:
 
@@ -697,7 +697,7 @@ npx eslint src/components/assessments/qsp-story-group.tsx src/__tests__/assessme
 
 Expected: PASS; every visible textarea has a unique accessible name.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/components/assessments/qsp-story-group.tsx src/__tests__/assessments/qsp-story-group.test.tsx src/styles/wireframes-scoped.css
@@ -718,7 +718,7 @@ git commit -m "feat(assessments): add progressive QSP story fields"
 - Consumes: `qspStoryGroupEnabled?: boolean`, `templateAlias`, `buildQuestionRenderUnits()`, `questionProgress()`, and `QspStoryGroup`.
 - Preserves: ordinary `QuestionInput` markup and all existing validation/navigation paths when grouping is inactive.
 
-- [ ] **Step 1: Write the failing shared-pager tests**
+- [x] **Step 1: Write the failing shared-pager tests**
 
 Build one section containing an ordinary answered question followed by the canonical triplet. Assert:
 
@@ -751,7 +751,7 @@ Add tests proving:
 - clicking Add and typing slot 2 reaches `onAnswerChange("P1_core_values_story_2", value)`;
 - `previewMode` disables the story textarea and add button.
 
-- [ ] **Step 2: Run the pager test and verify RED**
+- [x] **Step 2: Run the pager test and verify RED**
 
 Run:
 
@@ -761,7 +761,7 @@ npx jest src/__tests__/assessments/section-pager-qsp-stories.test.tsx --runInBan
 
 Expected: FAIL because `SectionPager` does not accept or render the new gate.
 
-- [ ] **Step 3: Add the prop and shared progress calculation**
+- [x] **Step 3: Add the prop and shared progress calculation**
 
 Extend `SectionPagerProps`:
 
@@ -787,7 +787,7 @@ const { answered: answeredCount, total } = questionProgress(pages, answers, {
 
 Do not replace the existing underlying-question required checks or the assessment-wide at-least-one-answer calculation.
 
-- [ ] **Step 4: Render the same units used by progress**
+- [x] **Step 4: Render the same units used by progress**
 
 For a section page:
 
@@ -852,7 +852,7 @@ Replace only the `sectionPage.questions.map` block:
 
 This ordinary branch intentionally preserves the current markup.
 
-- [ ] **Step 5: Verify focused and frozen regressions**
+- [x] **Step 5: Verify focused and frozen regressions**
 
 Run:
 
@@ -868,7 +868,7 @@ npx eslint src/components/assessments/section-pager.tsx src/__tests__/assessment
 
 Expected: PASS; slides remain uncounted, SU-Full behavior remains unchanged, and Preview mode remains read-only.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/components/assessments/section-pager.tsx src/__tests__/assessments/section-pager-qsp-stories.test.tsx
@@ -900,7 +900,7 @@ git commit -m "feat(assessments): group QSP stories in respondent pager"
 - Produces: `qspStoryGroupEnabled?: boolean` on `PublicQuizClient`, `OrgSurveyClient`, `TabbedShell`, and `PreviewTab`.
 - Guarantees: only server modules read `process.env`; client modules receive a boolean.
 
-- [ ] **Step 1: Write failing public and invited server-seam tests**
+- [x] **Step 1: Write failing public and invited server-seam tests**
 
 Mock `isQspStoryGroupEnabled()` and each client component. For both pages assert:
 
@@ -914,7 +914,7 @@ expect((await renderPageProps())).toHaveProperty("qspStoryGroupEnabled", true);
 
 The public fixture must include a published PUBLIC campaign. The invited page needs only `params`, because its server component performs no database read.
 
-- [ ] **Step 2: Run the page tests and verify RED**
+- [x] **Step 2: Run the page tests and verify RED**
 
 Run:
 
@@ -927,7 +927,7 @@ npx jest \
 
 Expected: FAIL because neither page resolves or passes the flag.
 
-- [ ] **Step 3: Wire public and invited pages**
+- [x] **Step 3: Wire public and invited pages**
 
 In each server page:
 
@@ -958,7 +958,7 @@ Invited already passes `data.campaign.templateAlias`; add:
 qspStoryGroupEnabled={qspStoryGroupEnabled}
 ```
 
-- [ ] **Step 4: Wire editor Preview**
+- [x] **Step 4: Wire editor Preview**
 
 In the admin edit page, resolve:
 
@@ -985,7 +985,7 @@ Add the same optional/defaulted prop to `PreviewTab`, then pass:
 
 Update PreviewTab’s existing comment: `templateAlias` is now passed for the QSP presentation adapter; `isCEO` remains false/omitted, so the SU-Full CEO tile still cannot fire.
 
-- [ ] **Step 5: Add component-seam assertions**
+- [x] **Step 5: Add component-seam assertions**
 
 Public test:
 
@@ -1023,7 +1023,7 @@ Preview test: use `template={{ name: "QSP v2", alias: "qsp-v2" }}`, the canonica
 
 TabbedShell test: set template alias `qsp-v2`, provide the canonical triplet, pass `qspStoryGroupEnabled: true`, enable ED10, and expect `qsp-story-group` in the mounted Preview panel.
 
-- [ ] **Step 6: Verify every entry point**
+- [x] **Step 6: Verify every entry point**
 
 Run:
 
@@ -1040,7 +1040,7 @@ npx jest \
 
 Expected: PASS in public, invited, and read-only Preview paths.
 
-- [ ] **Step 7: Lint all wiring files**
+- [x] **Step 7: Lint all wiring files**
 
 Run:
 
@@ -1057,7 +1057,7 @@ npx eslint \
 
 Expected: no lint errors.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add \
@@ -1093,7 +1093,7 @@ git commit -m "feat(assessments): wire QSP story grouping to respondent flows"
 - Produces: one reviewable PR with the flag default off.
 - Preserves: QSP seed keys/count, Esperto crosswalks, submission payloads, reports, and unrelated templates.
 
-- [ ] **Step 1: Run the complete focused regression suite**
+- [x] **Step 1: Run the complete focused regression suite**
 
 Run:
 
@@ -1119,7 +1119,7 @@ npx jest \
 
 Expected: PASS without changing any seed or crosswalk expectation.
 
-- [ ] **Step 2: Run the required repository gates**
+- [x] **Step 2: Run the required repository gates**
 
 Run:
 
@@ -1130,7 +1130,7 @@ CI=true npx next build --turbopack
 
 Expected: migration safety PASS and Turbopack build PASS.
 
-- [ ] **Step 3: Perform flag-off and flag-on visual review**
+- [x] **Step 3: Perform flag-off and flag-on visual review**
 
 Use the editor Preview tab with the QSP v2 template at desktop width and at a mobile width no larger than 390px:
 
@@ -1144,7 +1144,7 @@ Use the editor Preview tab with the QSP v2 template at desktop width and at a mo
 
 Compare the flag-on screen with `docs/specs/v7.6/mockups/48-qsp-core-values-progressive.html`. Record screenshots in the PR description; do not add temporary screenshots to the repository.
 
-- [ ] **Step 4: Update implementation status**
+- [x] **Step 4: Update implementation status**
 
 In the design, set:
 
@@ -1161,7 +1161,7 @@ Check every completed implementation step in this plan. In `CLAUDE.md`, advance 
 - `WAVE_48_QSP_STORY_GROUP_ENABLED` remains off; and
 - kill switch name.
 
-- [ ] **Step 5: Commit documentation**
+- [x] **Step 5: Commit documentation**
 
 ```bash
 git add \
@@ -1172,7 +1172,7 @@ git add \
 git commit -m "docs: record Jeff #48 build status"
 ```
 
-- [ ] **Step 6: Re-run diff and freshness checks**
+- [x] **Step 6: Re-run diff and freshness checks**
 
 Run from the repository root:
 
@@ -1216,6 +1216,10 @@ Migration Safety Gate
 ```
 
 Address only actionable findings, rerun the proportional gates, and merge only when both required checks are green. Do not enable the feature flag in this task.
+
+> **Post-review gate:** Task 6 Steps 7–8 are intentionally deferred until the
+> independent whole-branch review is complete. No push, PR, merge, production
+> environment change, deployment, or launch occurred during Steps 1–6.
 
 ---
 
