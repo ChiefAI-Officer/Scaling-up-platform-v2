@@ -17,25 +17,20 @@ status` subsequently reported the production ledger healthy.
 Before pausing anything:
 
 - confirm the focused PostgreSQL lease-race CI check passed;
-- confirm the Azure Communication Services resource's **account-specific send
-  quota**. Microsoft documents an initial custom-domain quota of 30 messages per
-  minute and 100 per hour unless Azure has approved a higher quota. The
-  documented connection ceiling is 250 authenticated connections, so
-  `ASSESSMENT_SMTP_CONCURRENCY=4` is connection-safe but is not, by itself, a
-  send-rate limit;
 - confirm the focused PostgreSQL mixed-row contention exercise passes. It races four
   workers over `QUICK_ASSESSMENT_LEAD`, `ASSESSMENT_RESULTS`, and
   `COACH_COMPLETION` rows and fails on duplicate delivery or an undrained row
   type. Its SMTP sink is intentionally fake and it invokes the worker seam
   directly; it does not prove Inngest scheduling, Azure's account-specific rate
   quota, or the 30-minute pending-age budget;
-- compare the Azure quota with the expected combined assessment-email volume.
-  If the resource is still on the initial quota, stop: Inngest concurrency does
-  not rate-limit messages sent inside one worker run. Obtain a quota increase or
-  add a durable provider-wide rate gate before cutover;
-- run a pre-cutover load exercise at the expected combined volume and measured
-  provider latency. Confirm all three email types remain below the existing
-  30-minute oldest-pending warning threshold with no Azure throttling.
+- confirm the cutover does not add an email category or increase intended
+  delivery volume. This release keeps the existing Azure Communication Services
+  provider, caps the two workers behind one environment-scoped concurrency
+  queue, and suppresses a known duplicate path. The account-specific Azure send
+  quota and provider-backed load exercise remain follow-up capacity work, not a
+  launch blocker for this traffic-reducing hotfix. Inngest concurrency limits
+  active steps, not sends per minute, so do not describe it as provider rate
+  limiting.
 
 1. Pause both Inngest functions:
    `quick-assessment-lead-email` and `quick-assessment-lead-email-cron`.
@@ -60,6 +55,10 @@ Before pausing anything:
    - a taker whose verified Referring coach normalizes to the same mailbox
      receives one message, while the coach-role outbox row is `CANCELLED` with
      reason `SAME_MAILBOX_AS_TAKER`.
+   Use only explicitly approved test mailboxes. If none are available during the
+   cutover window, do not invent recipients or submit production forms; instead,
+   verify health plus organic outbox/audit transitions and record the controlled
+   recipient test as an immediate follow-up.
 7. Inspect outbox and audit state for the controlled submissions. Confirm no
    unexpected `SENDING` rows remain and investigate any
    `ASSESSMENT_EMAIL_DELIVERY_UNCERTAIN` audit immediately.

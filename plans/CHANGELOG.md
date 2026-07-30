@@ -36,14 +36,19 @@ is Azure Communication Services over SMTP. Microsoft's documented ceiling of
 250 authenticated connections makes four connection-safe, but the initial
 custom-domain send quota is only 30 messages/minute and 100/hour unless the
 resource has an approved increase; Inngest concurrency is not rate limiting.
-The account-specific Azure quota therefore remains the final capacity gate.
+The account-specific Azure quota and provider-backed load exercise remain
+follow-up capacity work, not launch blockers for this hotfix: it keeps the
+existing provider and email categories, constrains the previously unshared
+event/cron workers, and removes a known duplicate send path rather than adding
+intended volume.
 The PostgreSQL CI exercise now also races four workers over mixed
 `QUICK_ASSESSMENT_LEAD`, `ASSESSMENT_RESULTS`, and `COACH_COMPLETION` rows and
 fails on duplicates or an undrained row type. Because it uses a fake SMTP sink
 and calls the worker seam directly, provider throttling, Inngest scheduling, and
-the 30-minute pending-age budget remain explicit operational gates. The cutover
-runbook requires both old workers to be paused and drained before the lease
-worker starts. Rolling deployment or a flag flip is not sufficient.
+the 30-minute pending-age budget remain explicit follow-up risks. The launch
+gate is the quiesced handoff: the cutover runbook requires both old workers to
+be paused and drained before the lease worker starts. Rolling deployment or a
+flag flip is not sufficient.
 
 The additive migration
 `20260730040000_add_assessment_outbox_leases` was already applied to production
