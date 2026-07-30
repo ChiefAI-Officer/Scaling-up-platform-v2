@@ -45,3 +45,15 @@ export function greetingName(displayName: string | null | undefined): string {
   if (trimmed === "" || trimmed.includes("@")) return "there";
   return trimmed.split(/\s+/)[0];
 }
+
+/** True when a display name is exactly the email fallback, ignoring case. */
+export function respondentNameMatchesEmail(
+  displayName: string | null | undefined,
+  email: string | null | undefined,
+): boolean {
+  const normalizedEmail = (email ?? "").trim().toLowerCase();
+  return (
+    normalizedEmail !== "" &&
+    (displayName ?? "").trim().toLowerCase() === normalizedEmail
+  );
+}

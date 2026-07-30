@@ -166,6 +166,9 @@ export function PublicQuizClient({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [results, setResults] = useState<ScoreResult | null>(null);
   const [submittedId, setSubmittedId] = useState<string>("");
+  const [verifiedCoachEmail, setVerifiedCoachEmail] = useState<string | null>(
+    null,
+  );
   // Stable idempotency key — generated once per component mount and reused on retries.
   const idemRef = useRef<string>("");
 
@@ -397,6 +400,7 @@ export function PublicQuizClient({
   if (step === "results" && results) {
     const report: RespondentReport = {
       respondentName: `${firstName.trim()} ${lastName.trim()}`.trim(),
+      respondentEmail: email.trim() || null,
       jobTitle: null,
       companyName: "",
       assessmentName: templateName,
@@ -449,6 +453,7 @@ export function PublicQuizClient({
             report={report}
             assessmentName={templateName}
             campaignLabel={campaignName}
+            contactEmail={verifiedCoachEmail}
           />
         </div>
       </main>
@@ -513,6 +518,7 @@ export function PublicQuizClient({
       clearDraft();
       setResults(body.data.scoreResult as ScoreResult);
       setSubmittedId(body.data.submissionId ?? "");
+      setVerifiedCoachEmail(body.data.referringCoachEmail ?? null);
       setStep("results");
     } catch (err) {
       setSubmitError(

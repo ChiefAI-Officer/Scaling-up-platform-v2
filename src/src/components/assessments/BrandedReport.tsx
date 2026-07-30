@@ -41,12 +41,16 @@ import {
 import { reportConfigFor } from "@/lib/assessments/report-config";
 import { isFindingsLogicEnabled } from "@/lib/assessments/wave-u-flags";
 import { parseResolvedFindings } from "@/lib/assessments/findings-section-model";
-import { greetingName } from "@/lib/assessments/respondent-display-name";
+import {
+  greetingName,
+  respondentNameMatchesEmail,
+} from "@/lib/assessments/respondent-display-name";
 import { QualitativeReport } from "@/components/assessments/QualitativeReport";
 import { ImportedBadge } from "@/components/assessments/ImportedBadge";
 import type { PeerComparisonSection } from "@/lib/assessments/peer-benchmarks";
 import { CoachLogo } from "@/components/assessments/CoachLogo";
 import { ReportFooter } from "@/components/assessments/ReportFooter";
+import { ReportNextSteps } from "@/components/assessments/ReportNextSteps";
 
 const LOGO_SRC = "/brand/su-logo-white.svg";
 
@@ -175,6 +179,8 @@ export interface BrandedReportProps {
    * story is the SU-Full static benchmark, untouched by Wave S).
    */
   peerComparison?: PeerComparisonSection | null;
+  /** Server-verified current coach email for the contact link. */
+  contactEmail?: string | null;
 }
 
 export function BrandedReport({
@@ -182,12 +188,19 @@ export function BrandedReport({
   assessmentName,
   campaignLabel,
   peerComparison,
+  contactEmail,
 }: BrandedReportProps) {
   // Qualitative templates (LVA / QSP) get a wholly different per-respondent
   // renderer — their answers are mostly free-text/metrics, not scored items.
   // The scored anatomy below is unchanged for default/scored templates.
   if (reportConfigFor(report.templateAlias).reportType === "qualitative") {
-    return <QualitativeReport report={report} peerComparison={peerComparison} />;
+    return (
+      <QualitativeReport
+        report={report}
+        peerComparison={peerComparison}
+        contactEmail={contactEmail}
+      />
+    );
   }
 
   const result: ScoreResult = report.result ?? ({} as ScoreResult);
@@ -205,6 +218,10 @@ export function BrandedReport({
     campaignLabel !== undefined ? campaignLabel : report.campaignLabel ?? null;
   const showCampaignSubtitle =
     !!resolvedCampaignLabel && resolvedCampaignLabel !== title;
+  const respondentNameIsEmail = respondentNameMatchesEmail(
+    report.respondentName,
+    report.respondentEmail,
+  );
 
   const sections = parseSections(report.sections);
   const sectionByKey = new Map<string, ParsedSection>();
@@ -417,10 +434,17 @@ export function BrandedReport({
             </p>
           )}
           <div className="su-report-cover-meta">
-            <div className="su-report-for">
-              Report for: {report.respondentName}
-              {report.jobTitle ? ` · ${report.jobTitle}` : ""}
-            </div>
+            {!respondentNameIsEmail ? (
+              <div className="su-report-for">
+                Report for: {report.respondentName}
+                {report.jobTitle ? ` · ${report.jobTitle}` : ""}
+              </div>
+            ) : null}
+            {report.respondentEmail ? (
+              <div className="su-report-email">
+                Email: {report.respondentEmail}
+              </div>
+            ) : null}
             <div className="su-report-sub">
               {report.companyName
                 ? `${report.companyName} · `
@@ -757,22 +781,12 @@ export function BrandedReport({
           You&apos;ve completed your assessment. Turn these results into a
           90-day plan with your coach.
         </p>
-        {/* CTA: link to the referring coach via mailto, or fall back to the
-            Scaling Up coaches directory. Never crashes when coach is absent.
-            #81: suppressed for templates whose report config sets
-            showCoachCta:false (Five Dysfunctions). */}
-        {reportConfigFor(report.templateAlias).showCoachCta !== false && (
-          <a
-            className="su-report-cta"
-            href={
-              report.referringCoachEmail
-                ? `mailto:${report.referringCoachEmail}`
-                : "https://scalingup.com/coaches"
-            }
-          >
-            Talk to your Scaling Up Certified Coach →
-          </a>
-        )}
+        <ReportNextSteps
+          contactEmail={contactEmail ?? report.referringCoachEmail}
+          showCoachLink={
+            reportConfigFor(report.templateAlias).showCoachCta !== false
+          }
+        />
       </section>
 
       {/* ── 8. Footer ───────────────────────────────────────────────────── */}

@@ -29,6 +29,9 @@ jest.mock("next/server", () => ({
 
 // Transaction mock: tx callback gets txMock; resolve with callback's return value.
 const txMock = {
+  coach: {
+    findFirst: jest.fn(),
+  },
   assessmentSubmission: {
     create: jest.fn(),
   },
@@ -176,6 +179,10 @@ beforeEach(() => {
   (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValue(CAMPAIGN);
   (db.assessmentTemplateVersion.findUnique as jest.Mock).mockResolvedValue(VERSION);
   // Default tx: submission create returns id
+  txMock.coach.findFirst.mockResolvedValue({
+    id: "coach-1",
+    email: "coach@example.com",
+  });
   txMock.assessmentSubmission.create.mockResolvedValue({ id: "sub-1" });
   txMock.assessmentEmailOutbox.create.mockResolvedValue({});
   // Default: no existing submission (idempotency)
@@ -531,12 +538,15 @@ describe("verified referring-coach ownership", () => {
       certificationExpiry: null,
     });
 
-    await POST(
+    const response = await POST(
       makeRequest({
         ...VALID_BODY,
         referringCoachEmail: "  COACH@example.com  ",
       }) as never,
       makeParams() as never,
+    );
+    expect((await response.json()).data.referringCoachEmail).toBe(
+      "coach@example.com",
     );
 
     expect(db.coach.findUnique).toHaveBeenCalledWith(
@@ -559,13 +569,14 @@ describe("verified referring-coach ownership", () => {
   });
 
   it("persists no ownership and sends no coach email when verification fails", async () => {
-    await POST(
+    const response = await POST(
       makeRequest({
         ...VALID_BODY,
         referringCoachEmail: "unknown@example.com",
       }) as never,
       makeParams() as never,
     );
+    expect((await response.json()).data.referringCoachEmail).toBeNull();
 
     expect(txMock.assessmentSubmission.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -579,6 +590,40 @@ describe("verified referring-coach ownership", () => {
       (call: Array<{ data: { recipientRole: string } }>) => call[0].data.recipientRole,
     );
     expect(enqueuedRoles).not.toContain("REFERRING_COACH");
+  });
+
+  it("drops ownership, coach delivery, and response contact when eligibility changes before the write", async () => {
+    (db.coach.findUnique as jest.Mock).mockResolvedValue({
+      id: "coach-1",
+      email: "coach@example.com",
+      certificationStatus: "ACTIVE",
+      certificationExpiry: null,
+    });
+    txMock.coach.findFirst.mockResolvedValueOnce(null);
+
+    const response = await POST(
+      makeRequest({
+        ...VALID_BODY,
+        referringCoachEmail: "coach@example.com",
+      }) as never,
+      makeParams() as never,
+    );
+    const body = await response.json();
+
+    expect(body.data.referringCoachEmail).toBeNull();
+    expect(txMock.assessmentSubmission.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          referringCoachId: null,
+          referringCoachEmail: null,
+        }),
+      }),
+    );
+    expect(
+      txMock.assessmentEmailOutbox.create.mock.calls
+        .map((call) => call[0].data.recipientRole)
+        .filter((role) => role === "REFERRING_COACH"),
+    ).toHaveLength(0);
   });
 
   it.each([
@@ -729,6 +774,10 @@ describe("idempotency — duplicate idempotencyKey (P2002)", () => {
   // Existing submission stored in DB
   const EXISTING_SUB = {
     id: "sub-existing",
+    campaignId: "camp-1",
+    publicTaker: VALID_BODY.publicTaker,
+    answers: VALID_BODY.answers,
+    referringCoach: null,
     result: {
       tier: { label: "Good" },
       overallScore: 7,
@@ -761,6 +810,85 @@ describe("idempotency — duplicate idempotencyKey (P2002)", () => {
     expect(body.data.redirectUrl).toBe("/quiz/quick-assessment/thank-you");
   });
 
+  it("recovers a matching lost response after the campaign closes", async () => {
+    (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValue({
+      ...CAMPAIGN,
+      status: "CLOSED",
+      closeAt: new Date("2026-01-02T00:00:00.000Z"),
+    });
+
+    const res = await POST(
+      makeRequest(IDEMPOTENT_BODY) as never,
+      makeParams() as never,
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      success: true,
+      data: {
+        submissionId: "sub-existing",
+        scoreResult: EXISTING_SUB.result,
+      },
+    });
+    expect(db.$transaction).not.toHaveBeenCalled();
+    expect(db.auditLog.create).not.toHaveBeenCalled();
+    expect(inngest.send).not.toHaveBeenCalled();
+  });
+
+  it("matches a lost-response retry against the originally pruned answers", async () => {
+    const rawAnswers = [
+      { stableKey: "Q_GATE", value: ["cash"] },
+      { stableKey: "Q_DEP", value: "hidden answer from the client" },
+    ];
+    (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValue({
+      ...CAMPAIGN,
+      status: "CLOSED",
+      closeAt: new Date("2026-01-02T00:00:00.000Z"),
+    });
+    (db.assessmentTemplateVersion.findUnique as jest.Mock).mockResolvedValue({
+      ...VERSION,
+      questions: [
+        {
+          stableKey: "Q_GATE",
+          sortOrder: 1,
+          sectionStableKey: "S1",
+          type: "MULTI_CHOICE",
+          label: "Gate",
+          isRequired: false,
+          options: [
+            { key: "sales", label: "Sales" },
+            { key: "cash", label: "Cash" },
+          ],
+        },
+        {
+          stableKey: "Q_DEP",
+          sortOrder: 2,
+          sectionStableKey: "S1",
+          type: "TEXT",
+          label: "Dependent",
+          isRequired: false,
+          showIf: { questionKey: "Q_GATE", optionKey: "sales" },
+        },
+      ],
+    });
+    (db.assessmentSubmission.findFirst as jest.Mock).mockResolvedValue({
+      ...EXISTING_SUB,
+      answers: [{ stableKey: "Q_GATE", value: ["cash"] }],
+    });
+
+    const res = await POST(
+      makeRequest({ ...IDEMPOTENT_BODY, answers: rawAnswers }) as never,
+      makeParams() as never,
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      success: true,
+      data: { submissionId: "sub-existing" },
+    });
+    expect(db.$transaction).not.toHaveBeenCalled();
+  });
+
   it("does NOT call inngest.send on duplicate key path", async () => {
     await POST(makeRequest(IDEMPOTENT_BODY) as never, makeParams() as never);
     expect(inngest.send).not.toHaveBeenCalled();
@@ -778,6 +906,44 @@ describe("idempotency — duplicate idempotencyKey (P2002)", () => {
         where: expect.objectContaining({ idempotencyKey: "client-key-xyz" }),
       }),
     );
+  });
+
+  it("returns 409 when a key is reused for different submission input", async () => {
+    const res = await POST(
+      makeRequest({
+        ...IDEMPOTENT_BODY,
+        publicTaker: {
+          ...IDEMPOTENT_BODY.publicTaker,
+          email: "different@example.com",
+        },
+      }) as never,
+      makeParams() as never,
+    );
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({
+      success: false,
+      error: "IDEMPOTENCY_KEY_REUSED",
+    });
+  });
+
+  it("returns 409 when a key is reused across campaigns", async () => {
+    (db.assessmentSubmission.findFirst as jest.Mock).mockResolvedValue({
+      ...EXISTING_SUB,
+      campaignId: "camp-other",
+    });
+
+    const res = await POST(
+      makeRequest(IDEMPOTENT_BODY) as never,
+      makeParams() as never,
+    );
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({
+      success: false,
+      error: "IDEMPOTENCY_KEY_REUSED",
+    });
+    expect(db.$transaction).not.toHaveBeenCalled();
   });
 
   it("500s if P2002 fires but no existing row found (idempotencyKey race-lost)", async () => {

@@ -104,6 +104,8 @@ export interface ReportProvenance {
 export interface RespondentReport {
   /** Display name: "firstName lastName" */
   respondentName: string;
+  /** Public/invited taker email. Null only for legacy records with no email. */
+  respondentEmail: string | null;
   jobTitle: string | null;
   /** campaign.organization.name */
   companyName: string;
@@ -242,6 +244,7 @@ export function buildStoredRespondentReport(
       input.respondent.lastName,
       input.respondent.email,
     ),
+    respondentEmail: input.respondent.email?.trim() || null,
     jobTitle: input.respondent.jobTitle ?? null,
     companyName: input.campaign.organizationName,
     assessmentName: input.campaign.template.name,

@@ -95,6 +95,49 @@ export async function checkRateLimitAsync(
   return checkRateLimit(identifier, config);
 }
 
+async function checkRateLimitRedisOrThrow(
+  redis: Redis,
+  identifier: string,
+  config: RateLimitConfig,
+): Promise<RateLimitResult> {
+  const now = Date.now();
+  const key = `ratelimit:${identifier}`;
+  const windowMs = config.interval;
+
+  const pipeline = redis.pipeline();
+  pipeline.zadd(key, now.toString(), `${now}-${Math.random()}`);
+  pipeline.zremrangebyscore(key, 0, now - windowMs);
+  pipeline.zcard(key);
+  pipeline.pexpire(key, windowMs);
+
+  const results = await pipeline.exec();
+  if (!results) {
+    throw new Error("Redis pipeline returned null");
+  }
+  for (const result of results) {
+    if (result?.[0]) {
+      throw result[0];
+    }
+  }
+
+  const count = (results[2]?.[1] as number) || 0;
+  const resetAt = now + windowMs;
+  if (count > config.maxRequests) {
+    return {
+      success: false,
+      remaining: 0,
+      resetAt,
+      retryAfter: Math.ceil(windowMs / 1000),
+    };
+  }
+
+  return {
+    success: true,
+    remaining: Math.max(0, config.maxRequests - count),
+    resetAt,
+  };
+}
+
 /**
  * Redis-backed rate limiting using sliding window
  */
@@ -104,48 +147,8 @@ async function checkRateLimitRedis(
   config: RateLimitConfig
 ): Promise<RateLimitResult> {
   const now = Date.now();
-  const key = `ratelimit:${identifier}`;
-  const windowMs = config.interval;
-  
   try {
-    // Use Redis pipeline for atomic operations
-    const pipeline = redis.pipeline();
-    
-    // Add current timestamp to sorted set
-    pipeline.zadd(key, now.toString(), `${now}-${Math.random()}`);
-    
-    // Remove old entries outside the window
-    pipeline.zremrangebyscore(key, 0, now - windowMs);
-    
-    // Count requests in current window
-    pipeline.zcard(key);
-    
-    // Set expiry on the key
-    pipeline.pexpire(key, windowMs);
-    
-    const results = await pipeline.exec();
-    
-    if (!results) {
-      throw new Error("Redis pipeline returned null");
-    }
-    
-    const count = results[2]?.[1] as number || 0;
-    const resetAt = now + windowMs;
-    
-    if (count > config.maxRequests) {
-      return {
-        success: false,
-        remaining: 0,
-        resetAt,
-        retryAfter: Math.ceil(windowMs / 1000),
-      };
-    }
-    
-    return {
-      success: true,
-      remaining: Math.max(0, config.maxRequests - count),
-      resetAt,
-    };
+    return await checkRateLimitRedisOrThrow(redis, identifier, config);
   } catch (error) {
     console.error("Redis rate limit error, falling back to allow:", error);
     // On Redis error, allow the request (fail open) but log
@@ -155,6 +158,25 @@ async function checkRateLimitRedis(
       resetAt: now + config.interval,
     };
   }
+}
+
+/**
+ * Sensitive-operation limiter. Production must have a distributed backend and
+ * backend errors fail closed instead of silently allowing the request.
+ */
+export async function checkRateLimitStrict(
+  identifier: string,
+  config: RateLimitConfig,
+): Promise<RateLimitResult> {
+  const redis = getRedisClient();
+  if (!redis) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("Distributed rate limiter unavailable");
+    }
+    return checkRateLimit(identifier, config);
+  }
+
+  return checkRateLimitRedisOrThrow(redis, identifier, config);
 }
 
 /**

@@ -18,6 +18,7 @@ import type { ScoreResult } from "@/lib/assessments/scoring";
 function baseReport(overrides: Partial<RespondentReport> = {}): RespondentReport {
   return {
     respondentName: "Sarah Chen",
+    respondentEmail: "sarah@example.com",
     jobTitle: "Chief Executive Officer",
     companyName: "Northwind Logistics",
     assessmentName: "Rockefeller Habits Checklist",
@@ -43,6 +44,34 @@ function baseReport(overrides: Partial<RespondentReport> = {}): RespondentReport
     ...overrides,
   };
 }
+
+describe("BrandedReport — respondent identity and next steps", () => {
+  it("shows the taker's email and both next-step links", () => {
+    render(
+      <BrandedReport
+        report={rockefellerReport()}
+        contactEmail="coach@example.com"
+      />,
+    );
+
+    expect(screen.getByText(/sarah@example\.com/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /learn more/i })).toHaveAttribute(
+      "href",
+      "https://scalingup.com",
+    );
+    expect(
+      screen.getByRole("link", { name: /talk to a coach/i }),
+    ).toHaveAttribute("href", "mailto:coach%40example.com");
+  });
+
+  it("falls back to the certified-coach directory when no verified email exists", () => {
+    render(<BrandedReport report={rockefellerReport()} />);
+
+    expect(
+      screen.getByRole("link", { name: /talk to a coach/i }),
+    ).toHaveAttribute("href", "https://scalingup.com/coaches");
+  });
+});
 
 // ── Rockefeller — countAchieved + real tiers + checkmarks, no domains/recs ──
 
@@ -695,7 +724,7 @@ describe("BrandedReport — conclusion + footer", () => {
   it("renders a coach CTA as text and a clean footer (#25): submission date + credit, no provenance", () => {
     render(<BrandedReport report={rockefellerReport()} />);
     expect(screen.getByTestId("report-conclusion").textContent).toMatch(
-      /Scaling Up Certified Coach/i,
+      /Talk to a Coach/i,
     );
     const footer = screen.getByTestId("report-footer");
     // #25 — credit line is exactly the platform name; no provenance metadata.

@@ -41,6 +41,7 @@ function baseReport(overrides: Partial<RespondentReport> = {}): RespondentReport
   };
   return {
     respondentName: "Sarah Chen",
+    respondentEmail: "sarah@example.com",
     jobTitle: "Chief Executive Officer",
     companyName: "Northwind Logistics",
     assessmentName: "Rockefeller Habits Checklist",
@@ -230,7 +231,7 @@ describe("QualitativeReport — coach logo (Wave K)", () => {
 });
 
 describe("BrandedReport — coach CTA gating (#81)", () => {
-  const CTA = /Talk to your Scaling Up Certified Coach/;
+  const CTA = /Talk to a Coach/;
 
   it("hides the 'Talk to your coach' CTA for the five-dysfunctions alias", () => {
     render(<BrandedReport report={baseReport({ templateAlias: "five-dysfunctions" })} />);

@@ -42,6 +42,7 @@ const BADGE_COPY = /Imported from Esperto \(historical\)/;
 function baseReport(overrides: Partial<RespondentReport> = {}): RespondentReport {
   return {
     respondentName: "John CEOExec",
+    respondentEmail: "john@example.com",
     jobTitle: "CEO",
     companyName: "Northwind Logistics",
     assessmentName: "Walk Instrument",

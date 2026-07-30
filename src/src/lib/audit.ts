@@ -12,6 +12,20 @@ interface AuditLogParams {
     userAgent?: string;
 }
 
+async function createAuditLog(params: AuditLogParams): Promise<void> {
+    await db.auditLog.create({
+        data: {
+            entityType: params.entityType,
+            entityId: params.entityId,
+            action: params.action,
+            performedBy: params.performedBy,
+            changes: JSON.stringify(params.changes || {}),
+            ipAddress: params.ipAddress,
+            userAgent: params.userAgent,
+        },
+    });
+}
+
 /**
  * Create an audit log entry
  * This is a "fire and forget" operation that shouldn't block the main thread.
@@ -20,19 +34,17 @@ interface AuditLogParams {
  */
 export async function logAudit(params: AuditLogParams): Promise<void> {
     try {
-        await db.auditLog.create({
-            data: {
-                entityType: params.entityType,
-                entityId: params.entityId,
-                action: params.action,
-                performedBy: params.performedBy,
-                changes: JSON.stringify(params.changes || {}),
-                ipAddress: params.ipAddress,
-                userAgent: params.userAgent,
-            },
-        });
+        await createAuditLog(params);
     } catch (error) {
         // Fail silently to avoiding crashing the app request
         console.error("Failed to create audit log:", error);
     }
+}
+
+/**
+ * Audit variant for sensitive exports: callers must fail the request when the
+ * audit row cannot be persisted.
+ */
+export async function logAuditStrict(params: AuditLogParams): Promise<void> {
+    await createAuditLog(params);
 }

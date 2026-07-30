@@ -100,6 +100,10 @@ describe("the respondent's own result only — the builder ADDS no cohort data",
     const report = build();
     expect(report.rawAnswers).toEqual([{ stableKey: "q1", value: 3 }]);
   });
+
+  it("carries the taker's email as report identity", () => {
+    expect(build().respondentEmail).toBe("resp@example.com");
+  });
 });
 
 // ─── the invited path knows org + coach; the public quiz does not (review #3) ─
@@ -166,6 +170,7 @@ describe("JSON round trip (the server -> client boundary)", () => {
       JSON.stringify(build({ companyName: "Spectrum Health" })),
     );
     expect(round.respondentName).toBe("Resp Ondent");
+    expect(round.respondentEmail).toBe("resp@example.com");
     expect(round.companyName).toBe("Spectrum Health");
     expect(round.templateAlias).toBe("RockHabits");
   });
