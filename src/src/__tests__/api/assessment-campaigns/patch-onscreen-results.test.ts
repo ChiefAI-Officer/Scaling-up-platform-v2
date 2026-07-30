@@ -1,28 +1,29 @@
 /**
  * Wave OSR (#71) — `showResultsOnScreen` on PATCH /api/assessment-campaigns/[id].
  *
- * WHY this exists: the column shipped create-only. `updateAssessmentCampaignSchema`
- * carried none of the campaign toggles, so a campaign that already existed could
- * never opt in — measured in prod as 0 of 76 campaigns with the toggle on. The
- * feature flag was already enabled in production, which means flipping the flag
- * on its own surfaced NOTHING. This route is the reachability fix.
+ * WHY this exists: `updateAssessmentCampaignSchema` carried none of the campaign
+ * toggles, so the column was writable only at CREATE and a campaign that already
+ * existed could never opt in. This route is the reachability fix.
  *
  * Contract (each choice follows this route's own precedent, not a new invention):
  *   - Flag OFF ⇒ the field is IGNORED, never written — the same shape as
- *     `invitationBodyHtml` (Task 12) and `customSlides` (Wave M R1-High-1), so a
- *     stale or hand-rolled client cannot silently switch on a respondent-facing
- *     disclosure while the operator's UI hides the control.
+ *     `invitationBodyHtml` (Task 12) and `customSlides` (Wave M R1-High-1). This is
+ *     consistency, NOT a security boundary: CREATE writes the same column with no
+ *     flag check, and disclosure is decided under the submission lock.
  *   - `_KILL` ⇒ treated as OFF (the flag helper hard-overrides).
  *   - Flag ON ⇒ persisted in BOTH directions, and audited. Auditing needs no new
  *     code: the legacy single-update path already logs `changes: updateData`, so
  *     the assertion here pins that the toggle actually rides along in it.
  *   - No CAS sentinel: unlike slides (authored HTML a clobber would destroy), a
- *     boolean has nothing to lose to last-write-wins.
+ *     boolean has nothing to lose to last-write-wins. Not asserted — the route only
+ *     enters the slides transaction when `customSlides` is present, so any such
+ *     assertion would be tautological for this branch.
  *   - CLOSED ⇒ 409 and non-owner ⇒ 404 are inherited guards; asserted so a future
  *     edit to the toggle branch cannot quietly bypass them.
  *
- * Every "not written" assertion is paired with a positive control in the same
- * test, so none of them can pass merely because the route errored out.
+ * The "not written" assertions carry positive controls (an accompanying field IS
+ * applied), so they cannot pass merely because the route errored out. The 409/404
+ * cases are the exception: their control is the sibling 200 case in this file.
  */
 
 jest.mock("next/server", () => ({
@@ -204,6 +205,42 @@ describe("PATCH showResultsOnScreen — flag ON", () => {
     expect(updateData().showResultsOnScreen).toBe(true);
   });
 
+  /**
+   * The CLIENT half of this contract lives in `handleToggleOnScreenResults`, which
+   * treats a 200 whose echoed row disagrees with what it sent as a failure — that is
+   * the only thing standing between an operator and a silently ignored write.
+   *
+   * That guard depends on this route echoing the FULL row. It does, because both
+   * success paths call `update` with no `select`. Nothing pinned it, though: adding a
+   * `select` here would make the client guard silently inert while its own test
+   * (which mocks `fetch`) stayed green — the same "unguarded guard" shape a review
+   * round already caught once on the client side.
+   */
+  it("asks Prisma for the FULL row and echoes it, so the client guard can read it", async () => {
+    mockCampaign({ status: "ACTIVE", showResultsOnScreen: false });
+    // The real Prisma `update` returns the full row; mirror that.
+    (db.assessmentCampaign.update as jest.Mock).mockResolvedValue({
+      id: "c1",
+      showResultsOnScreen: true,
+    });
+    const res = await PATCH(
+      patchReq({ showResultsOnScreen: true }) as never,
+      detailParams("c1"),
+    );
+    expect(res.status).toBe(200);
+
+    // The load-bearing assertion is the ABSENCE of a `select`. Prisma is mocked
+    // here, so asserting only on the echoed body would be vacuous — the mock returns
+    // the same object whether or not the route narrows the query. Adding a `select`
+    // is the drift that would make the client's echo check silently inert, and this
+    // is the only place it is observable.
+    const updateArg = (db.assessmentCampaign.update as jest.Mock).mock.calls[0][0];
+    expect(updateArg).not.toHaveProperty("select");
+
+    const json = await res.json();
+    expect(json.data).toHaveProperty("showResultsOnScreen", true);
+  });
+
   it("persists false — an explicit opt-OUT is a write, not a skipped falsy value", async () => {
     mockCampaign({ status: "ACTIVE", showResultsOnScreen: true });
     const res = await PATCH(
@@ -251,15 +288,5 @@ describe("PATCH showResultsOnScreen — flag ON", () => {
     );
     expect(res.status).toBe(404);
     expect(db.assessmentCampaign.update).not.toHaveBeenCalled();
-  });
-
-  it("does not require a CAS sentinel (a boolean has nothing to clobber)", async () => {
-    mockCampaign({ status: "ACTIVE" });
-    const res = await PATCH(
-      patchReq({ showResultsOnScreen: true }) as never,
-      detailParams("c1"),
-    );
-    expect(res.status).toBe(200);
-    expect(db.$transaction).not.toHaveBeenCalled();
   });
 });

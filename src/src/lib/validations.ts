@@ -173,15 +173,21 @@ export const createCoachSchema = z.object({
     bio: z.string().optional(),
     // GH #229 — defence in depth at the write boundary. This field is rendered as
     // an <img src> on reports that Wave OSR (#71) now shows to UNAUTHENTICATED
-    // respondents, so a non-https value turns into an outbound request from their
-    // browser. The load-bearing guard is at the render site (`CoachLogo`), which
-    // also covers rows already stored and any future writer; this one stops new
-    // bad values entering through the admin API.
+    // respondents. The load-bearing guard is at the render site (`CoachLogo`),
+    // which also covers rows already stored and every other writer; this one stops
+    // new non-https values entering through the ADMIN/STAFF-only coach API
+    // (`POST /api/coaches`, `PATCH /api/coaches/[id]`).
     //
-    // Deliberately permissive about ABSENCE (undefined / "") because that is what
-    // callers already send, and no UI sends this field at all today — the coach
-    // portal writes `profileImage` via the Blob upload route straight through
-    // Prisma. So this only constrains direct admin API calls.
+    // Permissive about ABSENCE (undefined / "") because callers send both — the
+    // Bio editor clears a photo with "".
+    //
+    // ⚠️ This DOES reach a UI, via `.partial()` on updateCoachSchema: the Bio
+    // editor (`app/(dashboard)/bio/[id]/page.tsx` handleSave) PATCHes
+    // `profileImage` seeded from the STORED value, so a coach whose stored value
+    // is not https would get a 400 on an otherwise unrelated save. Two writers
+    // bypass this schema entirely and could create such a row: the Blob upload
+    // route and `services/circle-sync.ts` (third-party avatar URLs, unvalidated).
+    // Constraining THAT path is the residual on #229.
     profileImage: z
         .string()
         .optional()
@@ -695,9 +701,9 @@ export const updateAssessmentCampaignSchema = z.object({
     // Task 12 (#20) — per-campaign FULL-HTML invitation body (validate-on-save in the route).
     invitationBodyHtml: z.string().max(50_000).nullable().optional(),
     // Wave OSR (#71) — let an EXISTING campaign opt in to showing each respondent
-    // their own report on screen at submit. Shipped create-only, which made the
-    // already-enabled production flag surface nothing: measured 0 of 76 campaigns
-    // with the toggle on, and every live campaign predates the create control.
+    // their own report on screen at submit. This schema previously omitted the
+    // field, so a campaign could only ever be opted in at CREATE time and an
+    // existing one had no way to change it.
     //
     // Not flag-gated HERE (mirrors the create schema): the flag decides capability
     // in the route, and disclosure itself is decided server-side under the Phase-2

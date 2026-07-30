@@ -13,7 +13,22 @@
  *
  * Deliberately NOT gated by this flag (the Wave Q/W durable rule — flags gate
  * capability, never persisted data):
- *   - the stored `AssessmentCampaign.showResultsOnScreen` value. The wizard
+ *   - the stored `AssessmentCampaign.showResultsOnScreen` value.
+ *
+ *     ⚠️ NOTE (added when PATCH learned this field): the campaign PATCH route DOES
+ *     consult this flag before accepting a WRITE to that column, and silently drops
+ *     the field when the flag is off — answering 200 over a column that never
+ *     changed. The in-repo control handles that by comparing the echoed row against
+ *     what it sent (`handleToggleOnScreenResults`) and surfacing it as a failure; a
+ *     hand-rolled client skipping that comparison would appear to save and change
+ *     nothing.
+ *
+ *     That write-gate is NOT a coercion of stored data (nothing is rewritten) and it
+ *     is NOT a security boundary (CREATE writes the same column with no flag check,
+ *     and disclosure is decided under the submission lock). It exists only for
+ *     consistency with the route's other flag-gated fields.
+ *
+ *     The wizard, separately,
  *     hides the checkbox when the flag is off but NEVER coerces the column,
  *     unlike the `sendResultsToRespondent` force-false precedent in CampaignWizard.
  *     (Cited by symbol, not line: the old `CampaignWizard.tsx:641` citation was
