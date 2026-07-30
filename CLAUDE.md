@@ -17,7 +17,7 @@ the full workshop lifecycle from request through post-event follow-up.
 | **Live URL** | `scaling-up-platform-v2.vercel.app` |
 | **Client** | Jeff Verdun, CIO - Scaling Up |
 | **Operations** | Suzanne (handles manual approvals) |
-| **Integrated main history** | **Jeff #48 shipped in PR #251** (squash `d676aa77`) after the protected Build and Migration Safety gates. The presentation-only QSP story grouping preserves the original answer/import contract. The assessment-email duplicate-delivery hotfix from PR #250 (`d4df6db1`) is integrated but its operational cutover remains pending. Wave EV remains shipped from PR #241 (`cc370aa9`), and Wave OSR remains merged dark/default-OFF from PR #249 (`36131fe4`). |
+| **Integrated main history** | **Jeff #48 shipped in PR #251** (squash `d676aa77`) after the protected Build and Migration Safety gates. The presentation-only QSP story grouping preserves the original answer/import contract. The assessment-email duplicate-delivery hotfix from PR #250 (`d4df6db1`) is launched and its controlled Inngest cutover is complete. Wave EV remains shipped from PR #241 (`cc370aa9`), and Wave OSR remains merged dark/default-OFF from PR #249 (`36131fe4`). |
 | **Last Updated** | <!-- LAST_UPDATED_ISO:2026-07-30 LAST_UPDATED_SLUG:jeff-48-qsp-story-group-launched --> July 30, 2026 — **Jeff #48 QSP core-values story grouping launched.** Production-only encrypted flags were verified by per-ID decrypted reads, the exact enabled deployment reached Ready, and both live aliases are healthy. The smoke walk deliberately made no respondent/admin or editor writes. Full detail in CHANGELOG entry `jeff-48-qsp-story-group-launched`. |
 | **Jeff #48 validation** | Pre-launch validation passed 15/15 focused suites and 224/224 tests plus the production-context real-component harness/editor Preview coverage. Live production verification was read-only: the invited QSP route returned `200` with `qspStoryGroupEnabled=true`; no valid token was opened, no assessment was submitted, no authenticated editor session was used, and no PUBLIC QSP campaign exists. |
 | **Latest progress** | Jeff #48 **QSP core-values story grouping is LAUNCHED on production**. Public and invited QSP paths retain `P1_core_values_story_1/2/3` and Esperto `Q5a/Q5b/Q5c` while presenting one progressive question. `WAVE_48_QSP_STORY_GROUP_KILL=1` plus a redeploy pinned to launch commit `d676aa77caf328afd113f297d90ca8d41d036caf` restores the ordinary three-question UI without data cleanup. |
@@ -29,10 +29,11 @@ the full workshop lifecycle from request through post-event follow-up.
 
 - **Jeff #48 QSP core-values stories:** launched from PR #251 (squash `d676aa77`) on Ready production deployment `dpl_BK3vSFFQPyo6REpXq74sFmPrX5tJ`. The approved progressive presentation is enabled by a Production-only encrypted flag and retains the winning kill switch. Live verification stopped at read-only route/RSC evidence because opening a valid invited token or submitting would write production data; no PUBLIC QSP campaign or authenticated production editor smoke was available. Full detail: `plans/CHANGELOG.md` entry `jeff-48-qsp-story-group-launched`.
 - **Jeff #83 Referred Results:** launched from PR #245 on production deployment `dpl_BZtaegoNCrfjpZAoVPpYQu7LxeDX`; enabled by the Production-only encrypted flag with the kill switch retained. Historical candidates remain unassigned by decision. Full detail: `plans/CHANGELOG.md` entry `jeff-83-referred-results-launched`.
-- **Assessment email duplicate-delivery hotfix:** implemented, not launched. The
-  replacement branch uses atomic PostgreSQL leases and suppresses a second send
-  when taker and verified Referring coach share a mailbox. Cutover requires the
-  focused database race check plus the quiescence runbook. Full detail:
+- **Assessment email duplicate-delivery hotfix:** launched from PR #250 on
+  production deployment `dpl_94JiUEjjpDrwpg4ng6a2oEAxef6R`. Atomic PostgreSQL
+  leases prevent overlapping worker claims and same-mailbox suppression removes
+  the known taker/coach duplicate path. The controlled Inngest cutover completed
+  with a clean post-resume cron tick and zero in-flight or failed rows. Full detail:
   `plans/CHANGELOG.md` entry `assessment-email-lease-hotfix-implemented`.
 
 **Open follow-ons (deferred for Beta hardening or external input):**

@@ -30,12 +30,11 @@ Tracker item **#48 is complete and launched** within the explicit no-production-
 
 ---
 
-### 2026-07-30 — Assessment email duplicate-delivery hotfix implemented, cutover pending <!-- ENTRY_ISO:2026-07-30 ENTRY_SLUG:assessment-email-lease-hotfix-implemented -->
+### 2026-07-30 — Assessment email duplicate-delivery hotfix launched <!-- ENTRY_ISO:2026-07-30 ENTRY_SLUG:assessment-email-lease-hotfix-implemented -->
 
-**Status: IMPLEMENTED on `codex/assessment-email-outbox-lease`; NOT LAUNCHED.**
-This is a narrow replacement for broad draft PR #248. It does not rebuild Jeff
-#83 Referred Results, add CSV export, enable a feature flag, merge, deploy, or
-cut over the production workers.
+**Status: LAUNCHED from PR #250 (squash `d4df6db1`; production
+`dpl_94JiUEjjpDrwpg4ng6a2oEAxef6R`).** This is the narrow replacement for broad
+draft PR #248. It does not rebuild Jeff #83 Referred Results or add CSV export.
 
 The reported three-message mailbox had two causes: the taker and verified
 Referring coach normalized to one mailbox, creating two legitimate role rows,
@@ -87,8 +86,33 @@ A focused CI job now races independent Prisma/PostgreSQL connections inside a
 random isolated schema and requires exactly one lease. Local mock-seam coverage
 also pins same-mailbox suppression, token-guarded transitions, no deliberate
 requeue after SMTP success, terminal audit atomicity, and original-error
-preservation. Final validation receipts and the replacement draft PR are added
-only after they actually pass.
+preservation.
+
+**Launch receipt.** The final PR candidate passed GitHub Build, Migration Safety
+Gate, Assessment Email Lease (PostgreSQL), and Vercel checks. Both production
+Inngest functions were paused with the default “pause immediately, then cancel
+after 7 days” behavior. Their run lists showed no active runs; the final old cron
+run ended at 17:12:02 PST, and the five-minute default Vercel function-duration
+window elapsed before the database gate. The outbox then contained 23 `SENT`
+rows and zero `PENDING` or `SENDING` rows, with zero delivery-uncertainty audits.
+
+After PR #250 merged, Vercel deployment
+`dpl_94JiUEjjpDrwpg4ng6a2oEAxef6R` reached Ready and owned
+`scaling-up-platform-v2.vercel.app` plus `platformtest.scalingup.com`. Inngest's
+automatic Vercel sync was not installed or did not fire: its app still showed a
+five-day-old account-scoped plan limit. The production app was therefore
+manually resynced against the canonical `/api/inngest` endpoint at 17:24:43 PST.
+Both paused functions then showed the new shared environment-scoped concurrency
+limit of four. Cron resumed first; its 17:27:00 run completed successfully in one
+second. The event worker then resumed.
+
+Post-cutover verification returned `200` and healthy database/auth posture from
+`/api/health`; the login surface rendered cleanly; Vercel reported zero
+production error logs after the new deployment timestamp; and the outbox still
+contained only the 23 prior `SENT` rows, with zero in-flight, recent failed, or
+delivery-uncertainty rows. No production assessment was submitted because no
+test recipients were explicitly approved. The two-recipient and same-mailbox
+controlled submissions remain immediate follow-up acceptance checks.
 
 ---
 
