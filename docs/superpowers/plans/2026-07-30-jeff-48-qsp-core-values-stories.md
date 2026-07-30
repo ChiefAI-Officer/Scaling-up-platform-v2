@@ -1270,63 +1270,359 @@ Address only actionable findings, rerun the proportional gates, and merge only w
 
 - [ ] **Step 1: Confirm the merged deployment is Ready while the flag is off**
 
-Run from `src`:
+Run from `src`. Do not use the local `.vercel` link: it pairs the production
+project with the wrong team. Fetch `main`, record the exact merged SHA, and create
+an ephemeral helper whose project and team IDs are constants:
 
 ```bash
-npx vercel ls
+git fetch origin main
+QSP48_MERGED_SHA=$(git rev-parse origin/main)
+test -n "$QSP48_MERGED_SHA"
+
+QSP48_VERCEL_HELPER=$(mktemp "${TMPDIR:-/tmp}/qsp48-vercel.XXXXXX.mjs")
+trap 'rm -f "$QSP48_VERCEL_HELPER"' EXIT
+tee "$QSP48_VERCEL_HELPER" >/dev/null <<'NODE'
+import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+
+const PROJECT_ID = "prj_xcAWuAmGZAU3DCHgAauRv2WPKneo";
+const TEAM_ID = "team_ek3PMuEYCgI0DKZ2EFexMgya";
+const API = "https://api.vercel.com";
+const ALLOWED_FLAGS = new Set([
+  "WAVE_48_QSP_STORY_GROUP_ENABLED",
+  "WAVE_48_QSP_STORY_GROUP_KILL",
+]);
+
+function loadToken() {
+  if (process.env.VERCEL_TOKEN) return process.env.VERCEL_TOKEN;
+  const authPath = join(
+    homedir(),
+    "Library",
+    "Application Support",
+    "com.vercel.cli",
+    "auth.json",
+  );
+  const auth = JSON.parse(readFileSync(authPath, "utf8"));
+  const token = auth.token ?? auth[TEAM_ID]?.token;
+  if (!token) throw new Error(`No Vercel CLI token found in ${authPath}`);
+  return token;
+}
+
+const token = loadToken();
+
+async function api(path, init = {}) {
+  const response = await fetch(`${API}${path}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(init.body ? { "Content-Type": "application/json" } : {}),
+      ...init.headers,
+    },
+  });
+  if (!response.ok) {
+    throw new Error(`${init.method ?? "GET"} ${path} failed: HTTP ${response.status}`);
+  }
+  if (response.status === 204) return {};
+  return response.json();
+}
+
+const teamQuery = `teamId=${encodeURIComponent(TEAM_ID)}`;
+
+async function exactFlagEntries(key) {
+  const payload = await api(
+    `/v10/projects/${PROJECT_ID}/env?${teamQuery}&decrypt=true`,
+  );
+  const envs = Array.isArray(payload.envs) ? payload.envs : [];
+  return envs.filter((entry) => entry.key === key);
+}
+
+function flagReceipt(entry) {
+  return {
+    id: entry.id,
+    key: entry.key,
+    value: entry.value,
+    type: entry.type,
+    target: entry.target,
+  };
+}
+
+async function waitForFlag(key, predicate, description) {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const entries = await exactFlagEntries(key);
+    if (predicate(entries)) return entries;
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  throw new Error(`Timed out waiting for ${key} to ${description}`);
+}
+
+async function replaceFlag(key, value) {
+  if (!ALLOWED_FLAGS.has(key)) throw new Error(`Refusing unexpected flag: ${key}`);
+  if (!new Set(["0", "1"]).has(value)) {
+    throw new Error(`Refusing non-binary value for ${key}`);
+  }
+
+  const before = await exactFlagEntries(key);
+  console.error(`Exact entries before ${key}: ${JSON.stringify(before.map(flagReceipt))}`);
+
+  for (const entry of before) {
+    if (!entry.id) throw new Error(`Cannot remove id-less duplicate for ${key}`);
+    await api(
+      `/v9/projects/${PROJECT_ID}/env/${encodeURIComponent(entry.id)}?${teamQuery}`,
+      { method: "DELETE" },
+    );
+  }
+  await waitForFlag(key, (entries) => entries.length === 0, "be absent");
+
+  await api(`/v10/projects/${PROJECT_ID}/env?${teamQuery}`, {
+    method: "POST",
+    body: JSON.stringify({
+      key,
+      value,
+      type: "encrypted",
+      target: ["production"],
+    }),
+  });
+
+  const [verified] = await waitForFlag(
+    key,
+    (entries) =>
+      entries.length === 1 &&
+      entries[0].value === value &&
+      entries[0].type === "encrypted" &&
+      Array.isArray(entries[0].target) &&
+      entries[0].target.length === 1 &&
+      entries[0].target[0] === "production",
+    `be exactly one readable encrypted production entry with value ${value}`,
+  );
+  console.error(`Verified ${key}: ${JSON.stringify(flagReceipt(verified))}`);
+}
+
+function deploymentProjectId(deployment) {
+  return deployment.projectId ?? deployment.project?.id;
+}
+
+function deploymentTeamId(deployment) {
+  return deployment.teamId ?? deployment.team?.id ?? deployment.ownerId;
+}
+
+function deploymentState(deployment) {
+  return deployment.readyState ?? deployment.state;
+}
+
+function deploymentSha(deployment) {
+  return [
+    deployment.gitSource?.sha,
+    deployment.meta?.githubCommitSha,
+    deployment.meta?.gitCommitSha,
+  ].find((value) => typeof value === "string" && value.length > 0);
+}
+
+function deploymentRef(deployment) {
+  return [
+    deployment.gitSource?.ref,
+    deployment.meta?.githubCommitRef,
+    deployment.meta?.gitCommitRef,
+  ].find((value) => typeof value === "string" && value.length > 0);
+}
+
+function deploymentUrl(deployment) {
+  if (!deployment.url) throw new Error(`Deployment ${deployment.id} has no URL`);
+  return deployment.url.startsWith("http")
+    ? deployment.url
+    : `https://${deployment.url}`;
+}
+
+function assertExactDeployment(deployment, { sha, requireReady }) {
+  if (deploymentProjectId(deployment) !== PROJECT_ID) {
+    throw new Error(`Deployment ${deployment.id} belongs to the wrong project`);
+  }
+  const responseTeamId = deploymentTeamId(deployment);
+  if (responseTeamId && responseTeamId !== TEAM_ID) {
+    throw new Error(`Deployment ${deployment.id} belongs to the wrong team`);
+  }
+  if (deployment.target !== "production") {
+    throw new Error(`Deployment ${deployment.id} is not a production deployment`);
+  }
+  const actualSha = deploymentSha(deployment);
+  if (!actualSha || actualSha !== sha) {
+    throw new Error(`Deployment ${deployment.id} does not match merged main SHA`);
+  }
+  const ref = deploymentRef(deployment);
+  if (ref && ref !== "main") {
+    throw new Error(`Deployment ${deployment.id} is from ref ${ref}, not main`);
+  }
+  if (requireReady && deploymentState(deployment) !== "READY") {
+    throw new Error(`Deployment ${deployment.id} is not Ready`);
+  }
+}
+
+async function deploymentDetails(id) {
+  return api(`/v13/deployments/${encodeURIComponent(id)}?${teamQuery}`);
+}
+
+async function listProductionDeployments() {
+  const payload = await api(
+    `/v6/deployments?projectId=${encodeURIComponent(PROJECT_ID)}` +
+      `&target=production&limit=100&${teamQuery}`,
+  );
+  return Array.isArray(payload.deployments) ? payload.deployments : [];
+}
+
+async function resolveReadyMergedDeployment(sha) {
+  const summaries = await listProductionDeployments();
+  for (const summary of summaries) {
+    if (!summary.id) continue;
+    const deployment = await deploymentDetails(summary.id);
+    try {
+      assertExactDeployment(deployment, { sha, requireReady: true });
+      console.error(
+        `Resolved exact Ready deployment: ${deployment.id} ` +
+          `project=${PROJECT_ID} team=${TEAM_ID} target=production sha=${sha}`,
+      );
+      process.stdout.write(deploymentUrl(deployment));
+      return;
+    } catch {
+      // Keep looking; a Ready deployment for another SHA/ref is not the launch source.
+    }
+  }
+  throw new Error(`No exact Ready production deployment found for merged main SHA ${sha}`);
+}
+
+async function waitForNewReadyDeployment(sha, startedAtMs) {
+  const deadline = Date.now() + 15 * 60 * 1000;
+  while (Date.now() < deadline) {
+    const summaries = await listProductionDeployments();
+    const recent = summaries
+      .filter((deployment) => Number(deployment.createdAt) >= startedAtMs)
+      .sort((a, b) => Number(b.createdAt) - Number(a.createdAt));
+    for (const summary of recent) {
+      if (!summary.id) continue;
+      const deployment = await deploymentDetails(summary.id);
+      try {
+        assertExactDeployment(deployment, { sha, requireReady: false });
+      } catch {
+        continue;
+      }
+      const state = deploymentState(deployment);
+      if (state === "READY") {
+        console.error(
+          `Verified new Ready deployment: ${deployment.id} ` +
+            `project=${PROJECT_ID} team=${TEAM_ID} target=production sha=${sha}`,
+        );
+        process.stdout.write(deploymentUrl(deployment));
+        return;
+      }
+      if (["ERROR", "CANCELED"].includes(state)) {
+        throw new Error(`New deployment ${deployment.id} ended in ${state}`);
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+  }
+  throw new Error("Timed out waiting for the exact-project redeployment to become Ready");
+}
+
+const [command, ...args] = process.argv.slice(2);
+if (command === "flag") {
+  const [key, value] = args;
+  await replaceFlag(key, value);
+} else if (command === "resolve-ready") {
+  const [sha] = args;
+  if (!/^[0-9a-f]{40}$/i.test(sha ?? "")) throw new Error("Expected a full Git SHA");
+  await resolveReadyMergedDeployment(sha);
+} else if (command === "wait-new-ready") {
+  const [sha, startedAt] = args;
+  if (!/^[0-9a-f]{40}$/i.test(sha ?? "")) throw new Error("Expected a full Git SHA");
+  if (!/^[0-9]+$/.test(startedAt ?? "")) throw new Error("Expected a millisecond timestamp");
+  await waitForNewReadyDeployment(sha, Number(startedAt));
+} else {
+  throw new Error("Usage: flag <key> <0|1> | resolve-ready <sha> | wait-new-ready <sha> <ms>");
+}
+NODE
+
+QSP48_READY_URL=$(node "$QSP48_VERCEL_HELPER" resolve-ready "$QSP48_MERGED_SHA")
+test -n "$QSP48_READY_URL"
 curl -sS https://scaling-up-platform-v2.vercel.app/api/health
 ```
 
-Expected: newest `main` deployment is Ready and health returns success.
+Expected: the helper resolves a Ready production deployment in project
+`prj_xcAWuAmGZAU3DCHgAauRv2WPKneo`, team
+`team_ek3PMuEYCgI0DKZ2EFexMgya`, whose Git metadata matches the merged `main`
+SHA. If there is no exact match, or the API does not expose enough metadata to
+prove the match, stop. Health must return success.
 
 - [ ] **Step 2: Confirm rollback posture before enablement**
 
-Run:
+Do not infer the kill state from an absent or unreadable value. Replace every
+exact-key duplicate with one readable, encrypted, production-only entry set
+deterministically to `0`:
 
 ```bash
-npx vercel env list production
+node "$QSP48_VERCEL_HELPER" \
+  flag WAVE_48_QSP_STORY_GROUP_KILL 0
 ```
 
-Confirm `WAVE_48_QSP_STORY_GROUP_KILL` is absent or false. Resolve the exact
-newest Ready production deployment URL before any redeploy:
+The helper lists the exact-key entries before replacement, removes all exact-key
+duplicates, creates one entry through
+`POST /v10/projects/prj_xcAWuAmGZAU3DCHgAauRv2WPKneo/env?teamId=team_ek3PMuEYCgI0DKZ2EFexMgya`
+with `type:"encrypted"` and `target:["production"]`, then reads the exact key back
+and requires the readable value, type, target, and single-entry count to match.
+This environment change is not live until Step 3 creates a new deployment.
+
+The rollback action uses the same deterministic helper and the already-proven
+merged deployment as the redeploy source:
 
 ```bash
-QSP48_READY_URL=$(npx vercel ls --environment production --status READY --limit 1 --format json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);const d=j.deployments?.[0];process.stdout.write(d?.url ?? d?.name ?? "")})')
-test -n "$QSP48_READY_URL"
+node "$QSP48_VERCEL_HELPER" \
+  flag WAVE_48_QSP_STORY_GROUP_KILL 1
+QSP48_ROLLBACK_STARTED_AT_MS=$(node -e 'process.stdout.write(String(Date.now()))')
+npx vercel redeploy "$QSP48_READY_URL" \
+  --target production \
+  --scope scaling-up \
+  --yes
+QSP48_ROLLBACK_URL=$(
+  node "$QSP48_VERCEL_HELPER" \
+    wait-new-ready "$QSP48_MERGED_SHA" "$QSP48_ROLLBACK_STARTED_AT_MS"
+)
+test -n "$QSP48_ROLLBACK_URL"
 ```
 
-If the command cannot resolve a Ready URL, stop rather than redeploying an
-unknown deployment. The rollback action is:
-
-```bash
-printf '1\n' | npx vercel env update WAVE_48_QSP_STORY_GROUP_KILL production
-npx vercel redeploy "$QSP48_READY_URL" --target production
-```
-
-If the kill variable does not yet exist, use `vercel env add` in place of `vercel env update`.
+Do not smoke-test the rollback until `QSP48_ROLLBACK_URL` is verified Ready for
+the same project, team, production target, and merged SHA.
 
 - [ ] **Step 3: Enable the production flag and redeploy**
 
-If the enable variable does not exist:
+Reassert kill `0`, then replace the enable flag with one readable, encrypted,
+production-only entry set to `1`. This order is mandatory:
 
 ```bash
-printf '1\n' | npx vercel env add WAVE_48_QSP_STORY_GROUP_ENABLED production
+node "$QSP48_VERCEL_HELPER" \
+  flag WAVE_48_QSP_STORY_GROUP_KILL 0
+node "$QSP48_VERCEL_HELPER" \
+  flag WAVE_48_QSP_STORY_GROUP_ENABLED 1
 ```
 
-If it exists:
+Both environment changes require a new deployment. Redeploy only the exact
+merged deployment resolved in Step 1, with the correct team scope, then capture
+and verify the new deployment through the exact-project REST helper:
 
 ```bash
-printf '1\n' | npx vercel env update WAVE_48_QSP_STORY_GROUP_ENABLED production
+QSP48_LAUNCH_STARTED_AT_MS=$(node -e 'process.stdout.write(String(Date.now()))')
+npx vercel redeploy "$QSP48_READY_URL" \
+  --target production \
+  --scope scaling-up \
+  --yes
+QSP48_LAUNCH_URL=$(
+  node "$QSP48_VERCEL_HELPER" \
+    wait-new-ready "$QSP48_MERGED_SHA" "$QSP48_LAUNCH_STARTED_AT_MS"
+)
+test -n "$QSP48_LAUNCH_URL"
 ```
 
-Redeploy the newest merged production deployment:
-
-```bash
-npx vercel redeploy "$QSP48_READY_URL" --target production
-npx vercel ls
-```
-
-Expected: the new deployment reaches Ready before smoke testing.
+Expected: `QSP48_LAUNCH_URL` is a new Ready production deployment in project
+`prj_xcAWuAmGZAU3DCHgAauRv2WPKneo`, team
+`team_ek3PMuEYCgI0DKZ2EFexMgya`, for the merged `main` SHA. Stop before smoke
+testing if any identity, target, SHA, flag-value, or Ready check fails.
 
 - [ ] **Step 4: Perform the production launch walk**
 
@@ -1341,7 +1637,10 @@ Verify:
 7. Refreshing a draft with slot 3 populated reopens all three fields.
 8. Desktop and mobile layouts match the approved mockup.
 
-If any check fails, set the kill switch to `1`, redeploy, and confirm the three-question fallback before investigating.
+If any check fails, run the Step 2 rollback block (REST-set kill to `1`, redeploy
+the exact merged deployment with `--scope scaling-up`, and wait for its
+exact-project Ready receipt), then confirm the three-question fallback before
+investigating.
 
 - [ ] **Step 5: Create the closeout branch and record the launch**
 
