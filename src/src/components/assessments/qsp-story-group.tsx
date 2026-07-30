@@ -82,6 +82,7 @@ export function QspStoryGroup({
               value={answers[question.stableKey]}
               onChange={onAnswerChange}
               disabled={disabled}
+              textPlaceholder="Name the person, then describe what they did…"
             />
           </div>
         ))}

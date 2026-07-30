@@ -23,6 +23,11 @@ describe("QspStoryGroup", () => {
     expect(screen.getAllByRole("textbox")).toHaveLength(1);
     expect(screen.getByRole("textbox", { name: "Person and story 1 of 3" }))
       .toHaveAttribute("maxlength", String(MAX_TEXT_ANSWER_LENGTH));
+    expect(screen.getByRole("textbox", { name: "Person and story 1 of 3" }))
+      .toHaveAttribute(
+        "placeholder",
+        "Name the person, then describe what they did…",
+      );
 
     fireEvent.click(screen.getByRole("button", { name: /add another person/i }));
     const second = screen.getByRole("textbox", { name: "Person and story 2 of 3" });
