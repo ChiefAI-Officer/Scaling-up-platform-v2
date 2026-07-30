@@ -529,6 +529,34 @@ describe("verified referring-coach ownership", () => {
     expect(enqueuedRoles).not.toContain("REFERRING_COACH");
   });
 
+  it.each(["not-an-email", "   ", "coach@example.com extra"])(
+    "degrades malformed referral %p to Scaling Up-only without blocking submission",
+    async (referringCoachEmail) => {
+      const res = await POST(
+        makeRequest({
+          ...VALID_BODY,
+          referringCoachEmail,
+        }) as never,
+        makeParams() as never,
+      );
+
+      expect(res.status).toBe(200);
+      expect(db.coach.findUnique).not.toHaveBeenCalled();
+      expect(txMock.assessmentSubmission.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            referringCoachId: null,
+            referringCoachEmail: null,
+          }),
+        }),
+      );
+      const enqueuedRoles = txMock.assessmentEmailOutbox.create.mock.calls.map(
+        (call: Array<{ data: { recipientRole: string } }>) => call[0].data.recipientRole,
+      );
+      expect(enqueuedRoles).not.toContain("REFERRING_COACH");
+    },
+  );
+
   it.each([
     {
       label: "inactive",

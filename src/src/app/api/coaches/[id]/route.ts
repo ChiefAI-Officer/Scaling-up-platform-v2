@@ -13,6 +13,21 @@ class CoachDeletionConflict extends Error {
   }
 }
 
+function isReferringCoachForeignKeyConflict(error: unknown): boolean {
+  if (
+    !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+    error.code !== "P2003"
+  ) {
+    return false;
+  }
+
+  const fieldName =
+    typeof error.meta?.field_name === "string" ? error.meta.field_name : "";
+  return `${fieldName} ${error.message}`
+    .toLowerCase()
+    .includes("referringcoachid");
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -283,6 +298,16 @@ export async function DELETE(
         {
           success: false,
           error: `Cannot delete coach with ${error.referredSubmissionCount} referred submission(s). Deactivate the coach instead.`,
+        },
+        { status: 409 }
+      );
+    }
+    if (isReferringCoachForeignKeyConflict(error)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Cannot delete coach with referred submissions. Deactivate the coach instead.",
         },
         { status: 409 }
       );

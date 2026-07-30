@@ -59,6 +59,21 @@ import { inngest } from "@/inngest/client";
 // Request body schema
 // ---------------------------------------------------------------------------
 
+const OptionalReferralEmailSchema = z
+  .string()
+  .transform((value) => {
+    const normalized = z
+      .string()
+      .trim()
+      .toLowerCase()
+      .email()
+      .max(320)
+      .safeParse(value);
+    return normalized.success ? normalized.data : null;
+  })
+  .optional()
+  .nullable();
+
 const PublicSubmitBodySchema = z.object({
   publicTaker: z.object({
     firstName: z.string().min(1).max(100).trim(),
@@ -73,7 +88,10 @@ const PublicSubmitBodySchema = z.object({
       }),
     )
     .min(1),
-  referringCoachEmail: z.string().trim().toLowerCase().email().max(320).optional().nullable(),
+  // Referral identity is optional and untrusted. A damaged/tampered referral
+  // must not block the taker's submission; only a valid email proceeds to the
+  // canonical active-Coach lookup below.
+  referringCoachEmail: OptionalReferralEmailSchema,
   // Task 6(b): client-supplied idempotency key (optional)
   idempotencyKey: z.string().min(1).max(200).optional(),
 });

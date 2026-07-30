@@ -1,6 +1,13 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import type {
   PublicReferralListItem,
@@ -251,6 +258,7 @@ export function ReferredResultsList({
   >(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const latestRequestId = useRef(0);
 
   const loadPage = useCallback(
     async ({
@@ -262,6 +270,7 @@ export function ReferredResultsList({
       filter: string;
       trail: string[];
     }) => {
+      const requestId = ++latestRequestId.current;
       const safeTrail = normalizePublicReferralCursorTrail(trail);
       setLoading(true);
       setError(false);
@@ -284,6 +293,7 @@ export function ReferredResultsList({
           },
         );
         const payload = (await response.json()) as ReferredResultsResponse;
+        if (requestId !== latestRequestId.current) return;
         if (!response.ok || !payload.success || !Array.isArray(payload.items)) {
           throw new Error("Request failed");
         }
@@ -323,11 +333,14 @@ export function ReferredResultsList({
           cursorTrail: safeTrail,
         });
       } catch {
+        if (requestId !== latestRequestId.current) return;
         setItems([]);
         setNextCursor(null);
         setError(true);
       } finally {
-        setLoading(false);
+        if (requestId === latestRequestId.current) {
+          setLoading(false);
+        }
       }
     },
     [],
@@ -339,6 +352,9 @@ export function ReferredResultsList({
       filter: initialState.templateId,
       trail: initialState.cursorTrail,
     });
+    return () => {
+      latestRequestId.current += 1;
+    };
   }, [initialState, loadPage]);
 
   const assessmentOptions = useMemo(

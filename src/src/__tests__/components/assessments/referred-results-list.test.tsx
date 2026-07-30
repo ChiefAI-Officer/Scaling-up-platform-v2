@@ -1,4 +1,5 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -489,6 +490,40 @@ describe("ReferredResultsList", () => {
     expect(
       await screen.findByText("1 results · newest first"),
     ).toBeInTheDocument();
+  });
+
+  it("does not let an older request overwrite a newer search result", async () => {
+    let resolveInitial!: (response: Response) => void;
+    mockFetch
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveInitial = resolve;
+          }),
+      )
+      .mockResolvedValueOnce(
+        apiResponse([qualitativeItem], null, undefined, 1, 18),
+      );
+
+    render(<ReferredResultsList coachLink={null} />);
+
+    const search = screen.getByRole("searchbox", {
+      name: "Search referred results",
+    });
+    fireEvent.change(search, { target: { value: "Sam" } });
+    fireEvent.submit(search.closest("form")!);
+
+    expect(await screen.findAllByText("Sam Rivera")).not.toHaveLength(0);
+    expect(window.location.search).toBe("?query=Sam");
+
+    await act(async () => {
+      resolveInitial(apiResponse([scoredItem], null, undefined, 18, 18));
+      await Promise.resolve();
+    });
+
+    expect(screen.getAllByText("Sam Rivera")).not.toHaveLength(0);
+    expect(screen.queryByText("Jordan Lee")).not.toBeInTheDocument();
+    expect(window.location.search).toBe("?query=Sam");
   });
 
   it("reloads page three from a shareable cursor trail and walks back without skips or duplicate fetches", async () => {

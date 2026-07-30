@@ -54,12 +54,17 @@ interface PublicSubmissionFindMany {
   count: (args: {
     where: Record<string, unknown>;
   }) => Promise<number>;
+  findFirst: (args: {
+    where: Record<string, unknown>;
+    select: {
+      id: true;
+      submittedAt: true;
+    };
+  }) => Promise<{ id: string; submittedAt: Date } | null>;
   findMany: (args: {
     where: Record<string, unknown>;
     select: Record<string, unknown>;
     orderBy: Array<Record<string, "desc">>;
-    cursor?: { id: string };
-    skip?: number;
     take: number;
   }) => Promise<RawPublicReferralListRow[]>;
 }
@@ -94,9 +99,6 @@ interface RawPublicSubmission {
       id: string;
       name: string;
       alias: string;
-    };
-    organization: {
-      name: string;
     };
     creatorCoach: {
       profileImage: string | null;
@@ -374,6 +376,10 @@ export async function listPublicReferrals(
         referringCoachId: coachId,
         campaign: publicCampaignWhere,
       };
+      let unsearchedCursorBoundary:
+        | { id: string; submittedAt: Date }
+        | null
+        | undefined;
       let totalCount: number;
       if (query) {
         // Prisma's PostgreSQL JSON filter has no case-insensitive mode and
@@ -444,31 +450,60 @@ export async function listPublicReferrals(
         where.id = { in: matchingRows.map((row) => row.id) };
       } else {
         totalCount = await tx.assessmentSubmission.count({ where });
+        if (cursor) {
+          unsearchedCursorBoundary =
+            await tx.assessmentSubmission.findFirst({
+              where: {
+                ...where,
+                id: cursor,
+              },
+              select: { id: true, submittedAt: true },
+            });
+        }
       }
 
-      const rows = await tx.assessmentSubmission.findMany({
-        where,
-        select: {
-          id: true,
-          submittedAt: true,
-          publicTaker: true,
-          result: true,
-          campaign: {
-            select: {
-              template: {
-                select: {
-                  id: true,
-                  name: true,
-                  alias: true,
+      const pageWhere: Record<string, unknown> = unsearchedCursorBoundary
+        ? {
+            ...where,
+            OR: [
+              {
+                submittedAt: {
+                  lt: unsearchedCursorBoundary.submittedAt,
                 },
               },
-            },
-          },
-        },
-        orderBy: [{ submittedAt: "desc" }, { id: "desc" }],
-        ...(!query && cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-        take: take + 1,
-      });
+              {
+                submittedAt: unsearchedCursorBoundary.submittedAt,
+                id: { lt: unsearchedCursorBoundary.id },
+              },
+            ],
+          }
+        : where;
+
+      const rows =
+        !query && cursor && !unsearchedCursorBoundary
+          ? []
+          : await tx.assessmentSubmission.findMany({
+              where: pageWhere,
+              select: {
+                id: true,
+                submittedAt: true,
+                publicTaker: true,
+                result: true,
+                campaign: {
+                  select: {
+                    template: {
+                      select: {
+                        id: true,
+                        name: true,
+                        alias: true,
+                      },
+                    },
+                  },
+                },
+              },
+              orderBy: [{ submittedAt: "desc" }, { id: "desc" }],
+              take: take + 1,
+            });
 
       const page = rows.slice(0, take);
       const ownedTotalCount =
@@ -554,9 +589,6 @@ export async function getPublicReferralReport(
                   alias: true,
                 },
               },
-              organization: {
-                select: { name: true },
-              },
               creatorCoach: {
                 select: {
                   profileImage: true,
@@ -604,7 +636,10 @@ export async function getPublicReferralReport(
         respondent: publicTakerForReport(submission.publicTaker),
         campaign: {
           name: submission.campaign.name,
-          organizationName: submission.campaign.organization.name,
+          // Public quiz reports never carried organization metadata at submit
+          // time. Keep the later authenticated view artifact-identical instead
+          // of injecting the campaign's current mutable organization name.
+          organizationName: "",
           template: submission.campaign.template,
           creatorCoach: submission.campaign.creatorCoach,
           version: submission.campaign.version,

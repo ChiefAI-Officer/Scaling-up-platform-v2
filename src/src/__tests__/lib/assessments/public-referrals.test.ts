@@ -124,7 +124,7 @@ describe("getPublicReferralReport", () => {
     if (outcome.status !== "ok") return;
     expect(outcome.report).toMatchObject({
       respondentName: "Avery Leader",
-      companyName: "Scaling Up",
+      companyName: "",
       assessmentName: "Scaling Up Full",
       templateAlias: "scaling-up-full",
       result: FROZEN_RESULT,
@@ -135,6 +135,9 @@ describe("getPublicReferralReport", () => {
         contentHash: "frozen-content-hash",
       },
     });
+    expect(
+      db.findFirst.mock.calls[0][0].select.campaign.select,
+    ).not.toHaveProperty("organization");
     expect(db.$transaction).toHaveBeenCalledTimes(1);
   });
 
@@ -334,6 +337,12 @@ describe("listPublicReferrals", () => {
         return campaign?.templateId ? totalCount : ownedTotalCount;
       },
     );
+    const findFirst = jest.fn().mockImplementation(
+      async (args: { where: Record<string, unknown> }) => ({
+        id: args.where.id as string,
+        submittedAt: new Date("2026-07-29T10:00:00.000Z"),
+      }),
+    );
     const findMany = jest.fn().mockImplementation(
       async (args: { where: Record<string, unknown> }) => {
         const idFilter = args.where.id as { in?: string[] } | undefined;
@@ -345,7 +354,7 @@ describe("listPublicReferrals", () => {
     const tx = {
       $queryRaw,
       coach: { findUnique },
-      assessmentSubmission: { findMany, count },
+      assessmentSubmission: { findFirst, findMany, count },
     };
     const $transaction = jest
       .fn()
@@ -353,7 +362,14 @@ describe("listPublicReferrals", () => {
         async (callback: (value: typeof tx) => Promise<unknown>) =>
           callback(tx),
       );
-    return { $transaction, $queryRaw, findUnique, findMany, count };
+    return {
+      $transaction,
+      $queryRaw,
+      findUnique,
+      findFirst,
+      findMany,
+      count,
+    };
   }
 
   const listRows = [
@@ -467,13 +483,34 @@ describe("listPublicReferrals", () => {
             deletedAt: null,
             templateId: "template-four-decisions",
           }),
+          OR: [
+            {
+              submittedAt: {
+                lt: new Date("2026-07-29T10:00:00.000Z"),
+              },
+            },
+            {
+              submittedAt: new Date("2026-07-29T10:00:00.000Z"),
+              id: { lt: "sub-cursor" },
+            },
+          ],
         }),
         orderBy: [{ submittedAt: "desc" }, { id: "desc" }],
-        cursor: { id: "sub-cursor" },
-        skip: 1,
         take: 3,
       }),
     );
+    expect(db.findFirst).toHaveBeenCalledWith({
+      where: {
+        referringCoachId: "coach-owner",
+        campaign: {
+          accessMode: "PUBLIC",
+          deletedAt: null,
+          templateId: "template-four-decisions",
+        },
+        id: "sub-cursor",
+      },
+      select: { id: true, submittedAt: true },
+    });
     expect(db.count).toHaveBeenCalledWith({
       where: {
         referringCoachId: "coach-owner",
@@ -485,6 +522,54 @@ describe("listPublicReferrals", () => {
       },
     });
   });
+
+  it.each([
+    ["another Coach", ""],
+    ["another assessment filter", "template-four-decisions"],
+  ])(
+    "fails closed when an unsearched cursor belongs to %s",
+    async (_case, templateId) => {
+      const db = makeListDb(
+        PUBLIC_SUBMISSION.referringCoach,
+        listRows,
+        undefined,
+        3,
+        3,
+      );
+      db.findFirst.mockResolvedValueOnce(null);
+
+      const outcome = await listPublicReferrals(
+        db as never,
+        actor(),
+        {
+          cursor: "forged-cursor",
+          templateId,
+          take: 2,
+        },
+      );
+
+      expect(outcome).toMatchObject({
+        status: "ok",
+        items: [],
+        nextCursor: null,
+      });
+      expect(db.findFirst).toHaveBeenCalledWith({
+        where: {
+          referringCoachId: "coach-owner",
+          campaign: {
+            accessMode: "PUBLIC",
+            deletedAt: null,
+            ...(templateId
+              ? { templateId: "template-four-decisions" }
+              : {}),
+          },
+          id: "forged-cursor",
+        },
+        select: { id: true, submittedAt: true },
+      });
+      expect(db.findMany).not.toHaveBeenCalled();
+    },
+  );
 
   it("normalizes mixed-case full-name search in SQL before applying the Prisma list filter", async () => {
     const db = makeListDb(

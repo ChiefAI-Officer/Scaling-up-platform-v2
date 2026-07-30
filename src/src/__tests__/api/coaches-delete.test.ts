@@ -141,6 +141,25 @@ describe("DELETE /api/coaches/[id]", () => {
     expect(db.coach.delete).not.toHaveBeenCalled();
   });
 
+  it("returns 409 when a concurrent referral makes the restrictive delete fail", async () => {
+    const { PrismaClientKnownRequestError } = await import("@prisma/client/runtime/library");
+    (db.coach.delete as jest.Mock).mockRejectedValue(
+      new PrismaClientKnownRequestError("Foreign key constraint failed", {
+        code: "P2003",
+        clientVersion: "6.0",
+        meta: {
+          field_name: "assessment_submissions_referringCoachId_fkey (index)",
+        },
+      }),
+    );
+
+    const res = await DELETE(makeRequest("coach-1") as never, routeParams("coach-1"));
+
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.error).toMatch(/deactivat/i);
+  });
+
   it("deletes accessGroupCoach entries before deleting coach (BUG-MAY25)", async () => {
     const res = await DELETE(makeRequest("coach-1"), routeParams("coach-1"));
     expect(res.status).toBe(200);
