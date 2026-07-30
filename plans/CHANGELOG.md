@@ -6,6 +6,54 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-07-30 — Assessment email duplicate-delivery hotfix implemented, cutover pending <!-- ENTRY_ISO:2026-07-30 ENTRY_SLUG:assessment-email-lease-hotfix-implemented -->
+
+**Status: IMPLEMENTED on `codex/assessment-email-outbox-lease`; NOT LAUNCHED.**
+This is a narrow replacement for broad draft PR #248. It does not rebuild Jeff
+#83 Referred Results, add CSV export, enable a feature flag, merge, deploy, or
+cut over the production workers.
+
+The reported three-message mailbox had two causes: the taker and verified
+Referring coach normalized to one mailbox, creating two legitimate role rows,
+and the event/cron workers could race the same coach row. The approved Spec
+19ao behavior sends the taker copy only for a same-mailbox collision while
+retaining an empty `CANCELLED` coach-role row with reason
+`SAME_MAILBOX_AS_TAKER`.
+
+All assessment-email roles now use one atomic PostgreSQL claim. A
+`FOR UPDATE SKIP LOCKED` CTE selects a due row and, in the same statement,
+moves it to `SENDING`, increments attempts, and installs a unique lease token.
+Eligibility and expiry use PostgreSQL's clock. Completion, requeue, and
+terminal failure require the token; terminal failure and dead-letter audit are
+one transaction. SMTP delivery remains at-least-once: a crash after provider
+acceptance but before `SENT` persistence can still duplicate. The worker retries
+the `SENT` write without resending and emits a structured uncertainty signal
+even when the audit database path is unavailable.
+
+Event and cron share an environment-scoped Inngest concurrency key. The default
+cap is four and can be reduced with `ASSESSMENT_SMTP_CONCURRENCY`; provider
+capacity and a mixed public/invited backlog exercise remain cutover gates. The
+cutover runbook requires both old workers to be paused and drained before the
+lease worker starts. Rolling deployment or a flag flip is not sufficient.
+
+The additive migration
+`20260730040000_add_assessment_outbox_leases` was already applied to production
+by PR #248's Vercel preview because that preview was connected to the shared
+database. Its checksum is therefore frozen. The overlapping later migration
+failed before applying any step, was marked rolled back, and Prisma subsequently
+reported the production ledger healthy. Reserved provenance/generation columns
+remain inert; removing the redundant index is deferred until measured rather
+than rewriting an applied migration.
+
+A focused CI job now races independent Prisma/PostgreSQL connections inside a
+random isolated schema and requires exactly one lease. Local mock-seam coverage
+also pins same-mailbox suppression, token-guarded transitions, no deliberate
+requeue after SMTP success, terminal audit atomicity, and original-error
+preservation. Final validation receipts and the replacement draft PR are added
+only after they actually pass.
+
+---
+
 ### 2026-07-30 — Jeff #83: verified Coach Referred Results launched <!-- ENTRY_ISO:2026-07-30 ENTRY_SLUG:jeff-83-referred-results-launched -->
 
 **Status: LAUNCHED on production (PR #245, squash `e0e2bc9b`; deployment `dpl_BZtaegoNCrfjpZAoVPpYQu7LxeDX`).** `WAVE_83_REFERRED_RESULTS_ENABLED=1` is an encrypted Production-only Vercel variable; `WAVE_83_REFERRED_RESULTS_KILL` remains the immediate rollback lever. The Ready deployment owns `scaling-up-platform-v2.vercel.app`, `platformtest.scalingup.com`, and the main aliases.
