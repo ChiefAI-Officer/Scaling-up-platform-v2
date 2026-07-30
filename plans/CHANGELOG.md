@@ -6,6 +6,19 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-07-30 — July-10 session closeouts: #59, #67, #70, and #71 <!-- ENTRY_ISO:2026-07-30 ENTRY_SLUG:jeff-jul10-session-closeouts-59-67-70-71 -->
+
+Four July-10 assessment rows were closed from shipped code plus fresh production evidence; none required a new feature implementation in this branch.
+
+- **#71 — Results on screen: Complete.** PR #249 merged through the protected `main` branch as squash `36131fe4`; GitHub Build and Migration Safety passed, the production deployment reached Ready, and `/api/health` returned `200` with healthy database/auth posture and `no-store`. A controlled no-email production campaign with `showResultsOnScreen=true` submitted one scored answer through the public invited flow and rendered the full branded respondent report in place, including the overall result, section breakdown, Print, and Download PDF controls. The exact canary was then closed and soft-deleted; its single submission remains as the audit receipt. This also closes GH #229: PR #249 moved the shared coach-image source through the validated safe-image policy before exposing the report to invited respondents.
+- **#67 — QSP report header: Complete.** A read-only production check removed the prior data caveat: both the original `2026 QSP Q2` campaign and its active replacement have a real `creatorCoach` with a non-empty profile image, and the replacement has completed submissions. The shared report byline code is template-agnostic and its focused cover/footer suites passed 27/27 on current `main`. The auth-gated report itself was not opened with a production account; that is optional pixel-level acceptance, not a code or data blocker.
+- **#70 — Rockefeller Welcome wording: Complete by product decision.** The shipped wording keeps every accurate fact: respondents rate each statement 0–3 and each habit has four items. The omitted “table on page 4” clause remains intentionally omitted because Jeff #24 removed the Rockefeller score table and the report has no page numbering. Restoring that clause would make the Welcome screen promise an artifact that does not exist. GH #223 is closed on this decision.
+- **#59 — false removal error: Complete.** The production audit trail on the report date contains two `AssessmentCampaignParticipant` DELETE events from the affected Spectrum campaign, followed by the campaign deletion; this maps the report to the campaign-detail Respondents table, not to deleting an individual result. The exact UI path is `/portal/assessments/{campaignId}` → Respondents → the row action labelled `Remove {firstName} {lastName}` → confirmation button `Remove` → `DELETE /api/assessment-campaigns/{campaignId}/participants/{participantId}`. Before PR #198, that route committed the invitation/participant transaction and audit row, then threw while constructing an invalid JSON-bodied `204`, so the UI showed “Could not remove respondent” even though removal succeeded. Current code returns `new NextResponse(null, { status: 204 })`; the client treats `204` as success and shows “Respondent removed.” The shipped route regression test uses a faithful `Response` implementation specifically to prevent this production-only failure from returning.
+
+**#48 travels with this closeout PR but remains a launch step, not one of the four completed production rows.** The QSP story-grouping branch is integrated with current `main`, retains the default-off flag/kill switch and three stable-key compatibility boundary, and proceeds through final whole-branch review, CI-gated PR, merge, then a separate flag launch.
+
+---
+
 ### 2026-07-30 — Jeff #48: QSP core-values story group built default-OFF <!-- ENTRY_ISO:2026-07-30 ENTRY_SLUG:jeff-48-qsp-story-group-built -->
 
 **Status: BUILT on `codex/issue-48-qsp-story-ui-design`, DEFAULT-OFF, pending independent whole-branch review, PR, merge, and production launch.** This entry records local implementation and verification only. No push, PR, merge, Vercel environment write, deployment, or launch occurred.
@@ -86,6 +99,68 @@ Historical ownership remains human-reviewed. `scripts/review-public-referral-bac
 Rollout controls are documented in `.env.example`: `WAVE_83_REFERRED_RESULTS_ENABLED` and the winning `WAVE_83_REFERRED_RESULTS_KILL`, both default false. Launch remains a separate reviewed operation after the migration, approved disclosure, reviewed backfill, required checks, merge, production deployment, and smoke verification.
 
 ---
+
+### 2026-07-30 — Wave EV: the campaign screen now says which template edition it is serving <!-- ENTRY_ISO:2026-07-30 ENTRY_SLUG:wave-ev-campaign-edition-visibility -->
+
+**PR #241** (squash `cc370aa9`). Read-only, **flagless**, no migration. Rollback is a revert.
+
+#### Why
+
+A campaign pins an `AssessmentTemplateVersion` at creation and **can never move off it** — the PATCH route only ever *reads* `versionId`; there is no write path. That pinning is correct: a live campaign must not have its questions change under the people answering it, and issued reports are stamped with their version's `contentHash` (`ReportProvenance`).
+
+What was wrong is that the pinning was **invisible**. The campaign screen showed the template's name and nothing else, so a tester opening a campaign created before a fix published read the old wording and filed it as broken — correctly, from what was on screen.
+
+This is the most likely mechanism behind Jeff July-10 rows **#40** and **#43** being re-reports of work that shipped eight days before he wrote them. **Precision on that citation:** the CHANGELOG records the re-reports, *not* the mechanism. The inference is ours and rests on both rows being LVA wording asks while Wave P published LVA v3 on 2026-07-02 — so a campaign pinned to LVA v2 would still serve pre-Wave-P wording.
+
+⚠️ **A framing correction worth carrying forward:** this was first written up as something only Jeff could fix by testing differently. That was wrong — he had no way to know. The gap was ours. The customer-facing message is *"you couldn't have known, and here's the fix"*, never *"you tested wrong."*
+
+#### What ships
+
+The Template tile gains the edition it is serving, plus a chip when it has fallen behind:
+
+```
+Quarterly Session Prep v2
+Edition 3 · published Jul 2, 2026
+[ Not the latest edition ]
+```
+
+Quiet when the campaign is on the newest edition. Lands for **admin and coach at once** — `CampaignDetail` is shared.
+
+**Two wording calls, both deliberate:**
+- **"Edition", not "Version".** "Version" is already spent on the instrument's own name in front of coaches — "Quarterly Session Prep v2" is a different *product* from v1, not a newer edition — and reusing it is precisely how this became confusing.
+- **"Not the latest edition", not "Newer edition available."** A campaign cannot move editions, so "available" promised an upgrade button that does not exist. The chip states the frozen fact.
+
+**Exactly one date**, on the edition being served. An earlier draft printed the newer edition's date beside it with nothing disambiguating them; the pinned date is the load-bearing one, because *"this campaign serves content from 2 Jul"* is what lets a tester reason *"the fix shipped later, so of course it isn't here."* A test guards that only one date reaches the screen.
+
+#### The mechanism, and its two traps
+
+A sibling counts as newer only when it is published, **not archived** (Wave ED8), the **same language** (versions are unique per `[templateId, versionNumber, language]`), the **same template**, and strictly higher-numbered. The query spreads **`activePublishedWhere`** from `active-version.ts` — the one place that definition lives — because a sibling only counts if it is what campaign-create would actually offer; a future ED8 predicate would otherwise stop create offering a version while the badge kept advertising it.
+
+🔑 **Trap 1 — fail-quiet must mean `null`, never `false`.** A thrown lookup, a missing version, or an unpublished pin all yield `edition: null`, rendering nothing. The tempting shape — falling back to an empty sibling list — makes the resolver return `newerEditionAvailable: false`, which the tile renders as an **affirmative currency claim**. A transient Neon cold-start would then assert exactly the falsehood the feature prevents. Same defect shape as Wave OSR's round-2 finding.
+
+🔑 **Trap 2 — the duplicated predicates are projection-sensitive, and that direction fails toward the reassuring answer.** `resolveEditionStanding` re-applies every predicate the query filters on (defense-in-depth against a future *loosening*). But a **narrowed `SELECT`** inverts it: drop `versionNumber` and `Number.isFinite(undefined)` is false, so every sibling is rejected and the tile makes the same false currency claim — with the full suite green. Four of the five projected fields fail this way; only `archivedAt` is shielded, because `undefined == null` is true under loose equality. The projection is therefore pinned by a `toEqual` test on **values**, not key names — Prisma reads `select: { f: false }` as an exclusion, so a truthiness flip would slip past a key-presence check.
+
+**The `templateId` re-check is tautological in production** and that is fine — the query filters on the same value. Sourcing it from `campaign.version.templateId` rather than `campaign.template.id` buys the correct comparison *scope* (a mis-pinned campaign's served edition is compared against its own template's lineage), delivered by the query, not the guard. `templateId` and `versionId` are independent FKs with no composite constraint, so mis-pinning is genuinely possible.
+
+**The Prisma bridge cannot be type-checked.** `CampaignDetailDb`'s methods deliberately return narrow row shapes that do not overlap Prisma's generics, so `prisma as CampaignDetailDb` is TS2352 and a double cast is unavoidable — meaning a *required* delegate constrains test mocks only and buys nothing at the four bridge call sites. `Pick<PrismaClient, keyof CampaignDetailDb>` guards the delegate **names** instead (probe-verified: typo → TS2551 + TS2344).
+
+#### Deliberately out of scope
+
+- **Letting a campaign move to a newer edition.** Looks like the obvious next step and isn't: the moment editions can change, every report already issued becomes ambiguous about which questions produced it, and ADR-0016 restricts deltas to a single version. Needs its own design pass.
+- **GH #242** — a campaign pinned to an *archived* edition renders reassuring text with no chip. Arguably more urgent than "not the latest"; needs its own copy decision.
+- **GH #243** — the campaign *list* has no edition signal, so "which campaigns are stale?" is unanswerable at a glance. Detail was fixed first because it is where the mistake was made.
+
+#### Review — five rounds, and the lesson is about prose
+
+**32 new tests / 3 suites** (14 `edition-standing` · 9 `campaign-edition-tile` · 9 in the Wave EV block of `campaign-detail`; 48 in those files), jest-verified per suite. Tile assertions are timezone-independent — `formatTimestamp` renders in the viewer's zone and hardcoded dates failed under `TZ=Pacific/Honolulu`.
+
+⚠️ **After round 1 there were no further runtime defects — every subsequent round found the write-up disagreeing with the code**, and each round's *fix* introduced or left a fresh one. Round 2 caught round 1's corrections going into a commit message instead of the PR body. Round 3 caught round 2's body rewrite adding a false claim (the `templateId` guard "catches mis-pinning"). Round 4 caught round 3 fixing that in the body while leaving **the identical sentence live in `campaign-detail.ts`** — its commit message asserting the overclaim was "confined to the body" — plus a tally of these very defects that was itself unverified and contradicted its own commit.
+
+**Standing lessons, both earned here:**
+1. **When you correct a claim, grep for every copy of it.** Fixing the artifact while leaving the source contradicting it is worse than not fixing it.
+2. **Do not state counts you have not audited** — including counts *of your own errors*. The commit history is the auditable record; the PR body deliberately states no tally.
+
+Also recorded: "matches 10 assessments-local uses" was repeated from a reviewer without checking (actual: four). Reviewers are not oracles either.
 
 ### 2026-07-29 — Wave OSR: invited respondents see their own report on screen at submit (Jeff #71) <!-- ENTRY_ISO:2026-07-29 ENTRY_SLUG:jeff-jul10-71-onscreen-respondent-results -->
 

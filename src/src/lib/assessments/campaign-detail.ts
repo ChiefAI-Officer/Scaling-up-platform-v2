@@ -83,6 +83,17 @@ export interface CampaignOverview {
     invitationBodyMarkdown: string | null;
     invitationBodyHtml: string | null;
     /**
+     * Wave OSR (#71) — whether respondents see their own report on screen at
+     * submit. Surfaced so the screen can both SHOW and CHANGE the setting: it
+     * shipped create-only, which left the production flag surfacing nothing on
+     * any campaign that already existed.
+     *
+     * Optional, matching `isImported` / `edition` above: older fixtures stay
+     * valid, and absent ⇒ off, which is both fail-closed AND the column default —
+     * so an omission cannot produce a wrong disclosure, only the safe one.
+     */
+    showResultsOnScreen?: boolean;
+    /**
      * Wave V (V-3) — true when this campaign is a Wave O historical Esperto
      * import (`importManifest != null`). Boolean ONLY (the manifest payload
      * never leaves the server); optional so older fixtures stay valid —
@@ -176,6 +187,12 @@ interface CampaignWithRels {
   invitationSubject: string | null;
   invitationBodyMarkdown: string | null;
   invitationBodyHtml: string | null;
+  /**
+   * Wave OSR (#71) — whether this campaign shows each respondent their own report
+   * on screen at submit. Optional so older fixtures stay valid; absent ⇒ treated
+   * as off (fail-closed).
+   */
+  showResultsOnScreen?: boolean;
   /** Wave V (V-3): Wave O import-round manifest; non-null ⇒ historical import. */
   importManifest?: unknown;
   template: { id: string; name: string };
@@ -395,6 +412,8 @@ export async function getCampaignOverview(
       invitationSubject: campaign.invitationSubject,
       invitationBodyMarkdown: campaign.invitationBodyMarkdown,
       invitationBodyHtml: campaign.invitationBodyHtml,
+      // Wave OSR (#71) — absent ⇒ off (fail-closed), matching the column default.
+      showResultsOnScreen: campaign.showResultsOnScreen === true,
       // Wave V (V-3): boolean only — the manifest payload stays server-side.
       isImported: campaign.importManifest != null,
       // Wave EV — null ⇒ nothing rendered (unpublished pin, or lookup degraded).

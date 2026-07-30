@@ -179,6 +179,38 @@ describe("Coach Validation Schema", () => {
     });
     expect(result.success).toBe(false);
   });
+
+  /**
+   * GH #229 — `profileImage` is rendered as an <img src> on reports that Wave OSR
+   * (#71) shows to unauthenticated respondents. The render site is the load-bearing
+   * guard; this is the write boundary. No UI sends this field (the coach portal
+   * uploads via Blob straight through Prisma), so the cases below describe direct
+   * admin API calls only.
+   */
+  describe("profileImage — https-only (GH #229)", () => {
+    function parse(profileImage: unknown) {
+      return createCoachSchema.safeParse({ ...validCoach, profileImage });
+    }
+
+    it("accepts an https URL", () => {
+      expect(parse("https://blob.vercel-storage.com/coach-1.png").success).toBe(true);
+    });
+
+    it("still accepts absence — undefined and empty string, as callers already send", () => {
+      expect(parse(undefined).success).toBe(true);
+      expect(parse("").success).toBe(true);
+    });
+
+    it.each([
+      ["http", "http://tracker.example.net/pixel.png"],
+      ["protocol-relative", "//tracker.example.net/pixel.png"],
+      ["javascript:", "javascript:alert(1)"],
+      ["data:", "data:image/png;base64,iVBORw0KGgo="],
+      ["bare filename", "coach.png"],
+    ])("rejects %s", (_label, value) => {
+      expect(parse(value).success).toBe(false);
+    });
+  });
 });
 
 describe("Registration Validation Schema", () => {
