@@ -6,6 +6,7 @@
 import {
   lowestDecision,
   buildLeadEmail,
+  normalizeMailbox,
   resolveLeadRecipients,
 } from "@/lib/assessments/quick-assessment-lead";
 
@@ -374,5 +375,22 @@ describe("resolveLeadRecipients", () => {
     });
     const coach = result.find((r) => r.role === "REFERRING_COACH");
     expect(coach?.email).toBe("coach@example.com");
+  });
+});
+
+describe("normalizeMailbox", () => {
+  it("uses Unicode normalization, trim, and case folding without provider-specific rewriting", () => {
+    expect(normalizeMailbox("  JANE@EXAMPLE.COM  ")).toBe(
+      "jane@example.com",
+    );
+    expect(normalizeMailbox("ｊａｎｅ@example.com")).toBe(
+      "jane@example.com",
+    );
+    expect(normalizeMailbox("jane+results@example.com")).toBe(
+      "jane+results@example.com",
+    );
+    expect(normalizeMailbox("first.last@example.com")).toBe(
+      "first.last@example.com",
+    );
   });
 });

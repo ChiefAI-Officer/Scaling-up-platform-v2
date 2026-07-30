@@ -18,7 +18,7 @@ model User {
   name          String?
   role          String    @default("STAFF")
   image         String?
-  passwordHash  String?   // Sprint 1: Password hashing for credentials auth
+  passwordHash  String? // Sprint 1: Password hashing for credentials auth
   emailVerified DateTime?
   // Wave Q (Jeff July-1 #7) — soft removal (admin offboarding, ADR-0018).
   // Hard delete is impossible (non-nullable createdBy FKs). Enforced at login
@@ -31,14 +31,14 @@ model User {
 
   accounts     Account[]
   sessions     Session[]
-  coachProfile Coach?     // Sprint 1: User↔Coach FK
+  coachProfile Coach? // Sprint 1: User↔Coach FK
 
   // Assessment v7.6 back-relations (compile-time only; no new DB columns on users table)
-  assessmentTemplatesCreated AssessmentTemplate[]          @relation("AssessmentTemplateCreatedBy")
-  assessmentCampaignsCreated AssessmentCampaign[]          @relation("AssessmentCampaignCreatedBy")
-  accessGroupsCreated        AccessGroup[]                 @relation("AccessGroupCreatedBy")
-  accessGroupCoachLinks      AccessGroupCoach[]            @relation("AccessGroupCoachAddedBy")
-  accessGroupTemplateLinks   AccessGroupTemplate[]         @relation("AccessGroupTemplateAddedBy")
+  assessmentTemplatesCreated  AssessmentTemplate[]         @relation("AssessmentTemplateCreatedBy")
+  assessmentCampaignsCreated  AssessmentCampaign[]         @relation("AssessmentCampaignCreatedBy")
+  accessGroupsCreated         AccessGroup[]                @relation("AccessGroupCreatedBy")
+  accessGroupCoachLinks       AccessGroupCoach[]           @relation("AccessGroupCoachAddedBy")
+  accessGroupTemplateLinks    AccessGroupTemplate[]        @relation("AccessGroupTemplateAddedBy")
   organizationOwnershipEvents OrganizationOwnershipEvent[] @relation("OrgOwnershipPerformedBy")
 
   @@map("users")
@@ -81,7 +81,7 @@ model Session {
 
 model Coach {
   id                  String    @id @default(cuid())
-  userId              String?   @unique  // Sprint 1: Link to User for auth
+  userId              String?   @unique // Sprint 1: Link to User for auth
   hubspotId           String?   @unique
   circleId            String?   @unique
   email               String    @unique
@@ -89,7 +89,7 @@ model Coach {
   lastName            String
   phone               String?
   company             String?
-  title               String?   // Professional title/credentials, e.g., "Scaling Up Certified Coach"
+  title               String? // Professional title/credentials, e.g., "Scaling Up Certified Coach"
   bio                 String?
   profileImage        String?
   linkedinUrl         String?
@@ -104,7 +104,7 @@ model Coach {
   updatedAt           DateTime  @updatedAt
   syncedAt            DateTime?
 
-  user            User?            @relation(fields: [userId], references: [id])  // Sprint 1: User relation
+  user            User?                @relation(fields: [userId], references: [id]) // Sprint 1: User relation
   workshops       Workshop[]
   certifications  CoachCertification[]
   approvals       ApprovalQueue[]
@@ -113,9 +113,9 @@ model Coach {
   // Assessment v7.6 back-relations (compile-time only; no new DB columns on coaches table)
   ownedOrganizations          Organization[]
   accessGroupMemberships      AccessGroupCoach[]
-  createdAssessmentCampaigns  AssessmentCampaign[]            @relation("AssessmentCampaignCreatedByCoach")
-  orgOwnershipEventsFromCoach OrganizationOwnershipEvent[]    @relation("OrgOwnershipFromCoach")
-  orgOwnershipEventsToCoach   OrganizationOwnershipEvent[]    @relation("OrgOwnershipToCoach")
+  createdAssessmentCampaigns  AssessmentCampaign[]         @relation("AssessmentCampaignCreatedByCoach")
+  orgOwnershipEventsFromCoach OrganizationOwnershipEvent[] @relation("OrgOwnershipFromCoach")
+  orgOwnershipEventsToCoach   OrganizationOwnershipEvent[] @relation("OrgOwnershipToCoach")
   campaignWizardDraft         CampaignWizardDraft?
 
   @@map("coaches")
@@ -166,11 +166,11 @@ model WorkshopType {
 // ============================================
 
 model Workshop {
-  id             String    @id @default(cuid())
-  workshopCode   String    @unique // JV-03: Human-readable unique ID (e.g., WS-2026-A1B2)
+  id             String           @id @default(cuid())
+  workshopCode   String           @unique // JV-03: Human-readable unique ID (e.g., WS-2026-A1B2)
   coachId        String
-  workshopTypeId String?   // JV-16: Made optional during migration (workshopType being deprecated)
-  categoryId     String?   // JV-16: FK to dynamic Category model (replaces enum)
+  workshopTypeId String? // JV-16: Made optional during migration (workshopType being deprecated)
+  categoryId     String? // JV-16: FK to dynamic Category model (replaces enum)
   category       WorkshopCategory @default(AI) // JV-16: Kept during migration, will be removed
 
   // Event Details
@@ -195,9 +195,9 @@ model Workshop {
   // Pricing
   isFree              Boolean   @default(false)
   priceCents          Int?
-  earlyBirdPriceCents Int?      // Deprecated: kept for historical data
+  earlyBirdPriceCents Int? // Deprecated: kept for historical data
   earlyBirdDeadline   DateTime? // Deprecated: kept for historical data
-  pricingTierId       String?   // JV-17: FK to PricingTier model
+  pricingTierId       String? // JV-17: FK to PricingTier model
 
   // Feb25: Targeting
   geoTargetAreas  String? // Feb25: Comma-separated geographic target areas
@@ -222,9 +222,9 @@ model Workshop {
   maxAttendees Int @default(50)
 
   // Workshop Locking (48h before event)
-  isLocked  Boolean   @default(false)
-  lockedAt  DateTime?
-  lockedBy  String?   // User ID who locked it, or 'SYSTEM'
+  isLocked Boolean   @default(false)
+  lockedAt DateTime?
+  lockedBy String? // User ID who locked it, or 'SYSTEM'
 
   // JV-27: Terms acceptance
   termsAcceptedAt DateTime?
@@ -235,22 +235,22 @@ model Workshop {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  coach           Coach               @relation(fields: [coachId], references: [id], onDelete: Cascade)
-  workshopType    WorkshopType?       @relation(fields: [workshopTypeId], references: [id])
-  workshopCategory Category?          @relation(fields: [categoryId], references: [id])
-  pricingTier     PricingTier?        @relation(fields: [pricingTierId], references: [id])
-  registrations   Registration[]
-  campaigns       MarketingCampaign[]
-  tasks           AutomationTask[]
-  surveys         Survey[]
-  approvals       ApprovalQueue[]
-  landingPages    LandingPage[]
-  followUpReports FollowUpReport[]
-  workshopPages       WorkshopPage[]        // JV-10: Unique pages per workshop
-  workflowAssignments WorkflowAssignment[]  // JV-11: Workflow linkage
-  fileAttachments        FileAttachment[]      // JV-12: File attachments
+  coach                  Coach                   @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  workshopType           WorkshopType?           @relation(fields: [workshopTypeId], references: [id])
+  workshopCategory       Category?               @relation(fields: [categoryId], references: [id])
+  pricingTier            PricingTier?            @relation(fields: [pricingTierId], references: [id])
+  registrations          Registration[]
+  campaigns              MarketingCampaign[]
+  tasks                  AutomationTask[]
+  surveys                Survey[]
+  approvals              ApprovalQueue[]
+  landingPages           LandingPage[]
+  followUpReports        FollowUpReport[]
+  workshopPages          WorkshopPage[] // JV-10: Unique pages per workshop
+  workflowAssignments    WorkflowAssignment[] // JV-11: Workflow linkage
+  fileAttachments        FileAttachment[] // JV-12: File attachments
   workflowStepExecutions WorkflowStepExecution[]
-  adminNote              WorkshopAdminNote?    // ENH-MAY6-2: admin-only side table
+  adminNote              WorkshopAdminNote? // ENH-MAY6-2: admin-only side table
 
   @@index([coachId])
   @@index([status])
@@ -270,7 +270,7 @@ model WorkshopAdminNote {
   id         String   @id @default(cuid())
   workshopId String   @unique
   body       String
-  updatedBy  String   // User.id of the admin/staff who last saved
+  updatedBy  String // User.id of the admin/staff who last saved
   updatedAt  DateTime @updatedAt
   createdAt  DateTime @default(now())
 
@@ -309,8 +309,8 @@ model Registration {
   checkedInAt DateTime?
 
   // Feb25: Attendance tracking (Sprint 3 UI, pre-added here)
-  attended    Boolean   @default(false)
-  attendedAt  DateTime?
+  attended   Boolean   @default(false)
+  attendedAt DateTime?
 
   // Feb25: Marketing opt-in (Sprint 6 UI, pre-added here)
   marketingOptIn Boolean @default(false)
@@ -409,19 +409,19 @@ model AutomationTask {
 // Survey templates — reusable question sets (e.g., "Standard Post-Event Feedback")
 model SurveyTemplate {
   id          String   @id @default(cuid())
-  name        String   // e.g., "Post-Workshop Satisfaction"
+  name        String // e.g., "Post-Workshop Satisfaction"
   description String?
-  surveyType  String   // PRE_WORKSHOP, POST_WORKSHOP, NPS
-  categoryId  String?  // Optional: link to Category for auto-assignment by workshop category
+  surveyType  String // PRE_WORKSHOP, POST_WORKSHOP, NPS
+  categoryId  String? // Optional: link to Category for auto-assignment by workshop category
   isActive    Boolean  @default(true)
-  createdBy   String   // userId
+  createdBy   String // userId
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   category      Category?        @relation(fields: [categoryId], references: [id])
   questions     SurveyQuestion[]
   surveys       Survey[]
-  workflowSteps WorkflowStep[]   // BUG-06: Steps that pin this survey template
+  workflowSteps WorkflowStep[] // BUG-06: Steps that pin this survey template
 
   @@index([categoryId])
   @@index([surveyType])
@@ -432,14 +432,14 @@ model SurveyTemplate {
 model SurveyQuestion {
   id         String @id @default(cuid())
   templateId String
-  sortOrder  Int    // Display order
+  sortOrder  Int // Display order
 
   // Question definition
   // questionType: TEXT, TEXTAREA, RATING, NPS, SINGLE_CHOICE, MULTI_CHOICE, YES_NO
   questionType String
-  label        String   // The question text
-  description  String?  // Optional help text
-  isRequired   Boolean  @default(true)
+  label        String // The question text
+  description  String? // Optional help text
+  isRequired   Boolean @default(true)
 
   // For SINGLE_CHOICE / MULTI_CHOICE: JSON array of option strings
   options String?
@@ -461,7 +461,7 @@ model Survey {
   registrationId String?
   workshopId     String
   workshopCode   String? // Denormalized (JV-04)
-  surveyType     String  // PRE_WORKSHOP, POST_WORKSHOP, NPS
+  surveyType     String // PRE_WORKSHOP, POST_WORKSHOP, NPS
 
   // Legacy Typeform responses (kept for backward compat)
   responses String? // JSON string
@@ -489,7 +489,7 @@ model SurveyAnswer {
 
   // The answer (stored as string; JSON for multi-choice)
   value    String?
-  numValue Int?    // Numeric extraction for RATING/NPS aggregation
+  numValue Int? // Numeric extraction for RATING/NPS aggregation
 
   createdAt DateTime @default(now())
 
@@ -506,17 +506,17 @@ model SurveyAnswer {
 // ============================================
 
 model FileAttachment {
-  id           String   @id @default(cuid())
-  filename     String   // Original filename
-  blobUrl      String   // Vercel Blob URL
-  contentType  String   // MIME type
-  sizeBytes    Int      // File size in bytes
-  workshopId   String?  // Optional: linked to a workshop
-  workshopCode String?  // Denormalized for fast lookup
+  id             String   @id @default(cuid())
+  filename       String // Original filename
+  blobUrl        String // Vercel Blob URL
+  contentType    String // MIME type
+  sizeBytes      Int // File size in bytes
+  workshopId     String? // Optional: linked to a workshop
+  workshopCode   String? // Denormalized for fast lookup
   workflowStepId String? // Optional: linked to a workflow step for email attachment
-  uploadedBy   String   // userId who uploaded
-  category     String?  // e.g., "presentation", "handout", "resource"
-  createdAt    DateTime @default(now())
+  uploadedBy     String // userId who uploaded
+  category       String? // e.g., "presentation", "handout", "resource"
+  createdAt      DateTime @default(now())
 
   workshop     Workshop?     @relation(fields: [workshopId], references: [id], onDelete: SetNull)
   workflowStep WorkflowStep? @relation(fields: [workflowStepId], references: [id], onDelete: SetNull)
@@ -532,26 +532,26 @@ model FileAttachment {
 // ============================================
 
 model ApprovalQueue {
-  id          String         @id @default(cuid())
-  type        ApprovalType
-  workshopId  String?
-  coachId     String
-  requestData String // JSON string
-  status      ApprovalStatus @default(PENDING)
-  requestedAt DateTime       @default(now())
-  requestedBy String?        // Name/email of person who requested
-  respondedAt DateTime?
-  respondedBy String?        // User who responded (email or "SYSTEM")
-  decision    String?
-  notes       String?
-  responseReason String?     // Reason for approval/denial
-  escalatedAt DateTime?      // When escalated to higher authority
-  coachResponse  String?     // MR-33: Coach's response to INFO_REQUESTED questions
+  id                String         @id @default(cuid())
+  type              ApprovalType
+  workshopId        String?
+  coachId           String
+  requestData       String // JSON string
+  status            ApprovalStatus @default(PENDING)
+  requestedAt       DateTime       @default(now())
+  requestedBy       String? // Name/email of person who requested
+  respondedAt       DateTime?
+  respondedBy       String? // User who responded (email or "SYSTEM")
+  decision          String?
+  notes             String?
+  responseReason    String? // Reason for approval/denial
+  escalatedAt       DateTime? // When escalated to higher authority
+  coachResponse     String? // MR-33: Coach's response to INFO_REQUESTED questions
   counterOfferCents Int?
   counterOfferNote  String?
 
   workshop Workshop?         @relation(fields: [workshopId], references: [id], onDelete: Cascade)
-  coach    Coach              @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  coach    Coach             @relation(fields: [coachId], references: [id], onDelete: Cascade)
   messages ApprovalMessage[]
 
   @@index([status])
@@ -563,7 +563,7 @@ model ApprovalMessage {
   id         String        @id @default(cuid())
   approvalId String
   approval   ApprovalQueue @relation(fields: [approvalId], references: [id], onDelete: Cascade)
-  from       String        // "ADMIN" | "COACH"
+  from       String // "ADMIN" | "COACH"
   text       String
   // BUG-06–08 (May 4 2026): true for rows created by the one-time backfill
   // script (scripts/backfill-approval-messages.ts). Live writers leave the
@@ -627,11 +627,11 @@ model LandingPage {
   workshopId       String
   template         LandingPageTemplate
   slug             String              @unique
-  content          String              // JSON with all dynamic variables
+  content          String // JSON with all dynamic variables
   status           PageStatus          @default(DRAFT)
   isActiveTemplate Boolean             @default(false) // Feb25 Sprint 5: marks this page as the active template for auto-build
-  categoryId       String?             // FIG-005: FK to Category — null = global template (applies to all)
-  sourceTemplateId String?             // Tracks which PageTemplate this page was cloned from (informational, no FK)
+  categoryId       String? // FIG-005: FK to Category — null = global template (applies to all)
+  sourceTemplateId String? // Tracks which PageTemplate this page was cloned from (informational, no FK)
   // CHG-03 (May 4 2026): customCode rendered on THANK_YOU pages for iDev
   // affiliate tracking. Copied at build time from the source PageTemplate;
   // never accepted from request bodies on coach-accessible routes.
@@ -658,12 +658,12 @@ model LandingPage {
 
 model PageTemplate {
   id           String              @id @default(cuid())
-  name         String              // e.g., "AI Workshop Solo Landing"
+  name         String // e.g., "AI Workshop Solo Landing"
   templateType LandingPageTemplate // BIO_PAGE, SOLO_LANDING, DUO_LANDING, REGISTRATION, THANK_YOU
-  categoryId   String?             // null = global template (applies to all categories)
-  content      String              // JSON string with {{variable}} placeholders (TEXT column)
-  customCode   String?             // ENH-06: affiliate / tracking code (stored only, not rendered)
-  customHtml   String?             // TEMPLATE-02 (Jun 3 2026): sanitized raw HTML override. When non-empty, replaces React template at render. SOLO_LANDING + DUO_LANDING only.
+  categoryId   String? // null = global template (applies to all categories)
+  content      String // JSON string with {{variable}} placeholders (TEXT column)
+  customCode   String? // ENH-06: affiliate / tracking code (stored only, not rendered)
+  customHtml   String? // TEMPLATE-02 (Jun 3 2026): sanitized raw HTML override. When non-empty, replaces React template at render. SOLO_LANDING + DUO_LANDING only.
   isActive     Boolean             @default(false)
   createdAt    DateTime            @default(now())
   updatedAt    DateTime            @updatedAt
@@ -681,10 +681,10 @@ model PageTemplate {
 
 model WorkshopDraft {
   id          String   @id @default(cuid())
-  userId      String   // User who started the draft
+  userId      String // User who started the draft
   workshopId  String?  @unique // Null if not yet saved, linked to Workshop if resumed
   currentStep Int      @default(1) // 1=Details, 2=Schedule, 3=Pricing
-  stepsData   String   // JSON containing all form data across steps
+  stepsData   String // JSON containing all form data across steps
   lastSavedAt DateTime @default(now())
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -699,15 +699,15 @@ model WorkshopDraft {
 // ============================================
 
 model CampaignWizardDraft {
-  id           String   @id @default(cuid())
-  coachId      String   @unique
-  currentStep  Int      @default(1)
-  stepsData    String   // JSON-stringified wizard state
-  lastSavedAt  DateTime @default(now())
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id          String   @id @default(cuid())
+  coachId     String   @unique
+  currentStep Int      @default(1)
+  stepsData   String // JSON-stringified wizard state
+  lastSavedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  coach        Coach    @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  coach Coach @relation(fields: [coachId], references: [id], onDelete: Cascade)
 
   @@index([coachId])
   @@map("assessment_campaign_wizard_drafts")
@@ -745,8 +745,8 @@ model Category {
   name               String   @unique // e.g., "AI Workshop", "Exit Workshop"
   slug               String   @unique // e.g., "ai", "exit-and-valuation"
   description        String?
-  defaultTitle       String?  // Feb25: Auto-title template (e.g., "Scaling Up AI Workshop")
-  defaultDescription String?  // Feb25: Auto-description populated on category select
+  defaultTitle       String? // Feb25: Auto-title template (e.g., "Scaling Up AI Workshop")
+  defaultDescription String? // Feb25: Auto-description populated on category select
   isActive           Boolean  @default(true)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
@@ -755,7 +755,7 @@ model Category {
   pricingTiers    PricingTier[]
   surveyTemplates SurveyTemplate[]
   workflows       Workflow[]
-  landingPages    LandingPage[]    // FIG-005: Templates scoped to this category
+  landingPages    LandingPage[] // FIG-005: Templates scoped to this category
   pageTemplates   PageTemplate[]
 
   @@map("categories")
@@ -768,8 +768,8 @@ model Category {
 model PricingTier {
   id          String   @id @default(cuid())
   categoryId  String
-  name        String   // e.g., "Standard", "Early Bird", "Group Rate"
-  amountCents Int      // Price in cents
+  name        String // e.g., "Standard", "Early Bird", "Group Rate"
+  amountCents Int // Price in cents
   description String?
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
@@ -787,17 +787,17 @@ model PricingTier {
 // ============================================
 
 model WorkshopPage {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   workshopId   String
-  workshopCode String   // Denormalized for easy lookup
-  pageType     String   // LANDING, PAYMENT, THANK_YOU
-  templateId   String?  // Reference to template used
-  content      String?  // JSON with page content
-  slug         String?  @unique // Public URL slug
-  published    Boolean  @default(false)
+  workshopCode String // Denormalized for easy lookup
+  pageType     String // LANDING, PAYMENT, THANK_YOU
+  templateId   String? // Reference to template used
+  content      String? // JSON with page content
+  slug         String?   @unique // Public URL slug
+  published    Boolean   @default(false)
   publishedAt  DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   workshop Workshop @relation(fields: [workshopId], references: [id], onDelete: Cascade)
 
@@ -871,19 +871,19 @@ enum LandingPageTemplate {
 // ============================================
 
 model Workflow {
-  id              String   @id @default(cuid())
-  name            String   // e.g., "Standard Pre-Event Sequence"
-  description     String?
-  isActive        Boolean  @default(true)
-  isTemplate      Boolean  @default(false) // Admin-created templates coaches can clone
-  categoryId      String?  // Feb25 Sprint 5: FK to Category for auto-assignment on approval
-  workshopFormat  String?  // Feb25 Sprint 5: "IN_PERSON" or "VIRTUAL" — null = any format
-  workflowPhase   String?  // Feb25 Sprint 5: "PRE_EVENT" or "POST_EVENT" — for auto-assign matching
-  createdBy       String   // userId who created the workflow
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id             String   @id @default(cuid())
+  name           String // e.g., "Standard Pre-Event Sequence"
+  description    String?
+  isActive       Boolean  @default(true)
+  isTemplate     Boolean  @default(false) // Admin-created templates coaches can clone
+  categoryId     String? // Feb25 Sprint 5: FK to Category for auto-assignment on approval
+  workshopFormat String? // Feb25 Sprint 5: "IN_PERSON" or "VIRTUAL" — null = any format
+  workflowPhase  String? // Feb25 Sprint 5: "PRE_EVENT" or "POST_EVENT" — for auto-assign matching
+  createdBy      String // userId who created the workflow
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  category    Category?    @relation(fields: [categoryId], references: [id])
+  category    Category?            @relation(fields: [categoryId], references: [id])
   steps       WorkflowStep[]
   assignments WorkflowAssignment[]
 
@@ -893,16 +893,16 @@ model Workflow {
 model WorkflowStep {
   id         String @id @default(cuid())
   workflowId String
-  sortOrder  Int    // Execution order within the workflow
+  sortOrder  Int // Execution order within the workflow
 
   // What to do
   // Allowed values: EMAIL_ATTENDEES, EMAIL_COACH, EMAIL_STAFF, EMAIL_CUSTOM, NOTIFICATION
   stepType String
 
   // Email content (inline or from template)
-  emailTemplateId String?   // Optional FK to reusable EmailTemplate
-  subject         String?   // Override or inline subject
-  body            String?   // Override or inline HTML body (supports {{ variables }})
+  emailTemplateId String? // Optional FK to reusable EmailTemplate
+  subject         String? // Override or inline subject
+  body            String? // Override or inline HTML body (supports {{ variables }})
 
   // For EMAIL_CUSTOM: JSON array of email addresses
   customRecipients String?
@@ -910,9 +910,9 @@ model WorkflowStep {
   // JV-22: Date-relative scheduling
   // triggerType values: RELATIVE_TO_EVENT, ON_REGISTRATION, ON_APPROVAL
   triggerType   String
-  offsetDays    Int?       // Days relative to event (negative = before, positive = after)
-  offsetHours   Int?       // Hours offset for fine-grained timing
-  sendTimeOfDay String?    // "09:00" — preferred send time (defaults to event time if null)
+  offsetDays    Int? // Days relative to event (negative = before, positive = after)
+  offsetHours   Int? // Hours offset for fine-grained timing
+  sendTimeOfDay String? // "09:00" — preferred send time (defaults to event time if null)
 
   // JV-12: File attachments placeholder (future Track B)
   attachments String? // JSON array of { filename, storageKey, contentType }
@@ -924,9 +924,9 @@ model WorkflowStep {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  workflow        Workflow         @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-  emailTemplate   EmailTemplate?   @relation(fields: [emailTemplateId], references: [id])
-  surveyTemplate  SurveyTemplate?  @relation(fields: [surveyTemplateId], references: [id], onDelete: SetNull)
+  workflow        Workflow                @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  emailTemplate   EmailTemplate?          @relation(fields: [emailTemplateId], references: [id])
+  surveyTemplate  SurveyTemplate?         @relation(fields: [surveyTemplateId], references: [id], onDelete: SetNull)
   executions      WorkflowStepExecution[]
   fileAttachments FileAttachment[] // JV-12: Files attached to this step
 
@@ -938,9 +938,9 @@ model WorkflowAssignment {
   id           String   @id @default(cuid())
   workflowId   String
   workshopId   String
-  workshopCode String   // Denormalized for easy lookup (JV-04)
+  workshopCode String // Denormalized for easy lookup (JV-04)
   isActive     Boolean  @default(true)
-  assignedBy   String   // userId who assigned the workflow
+  assignedBy   String // userId who assigned the workflow
   assignedAt   DateTime @default(now())
 
   workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
@@ -953,23 +953,23 @@ model WorkflowAssignment {
 }
 
 model WorkflowStepExecution {
-  id             String    @id @default(cuid())
+  id             String   @id @default(cuid())
   stepId         String
-  workshopId     String    // Which workshop this execution is for
+  workshopId     String // Which workshop this execution is for
   // Both cascades (step + workshop) are intentional and independent:
   // - step cascade: handles workflow template edits/deletions
   // - workshop cascade: handles workshop permanent deletion
-  workshop       Workshop  @relation(fields: [workshopId], references: [id], onDelete: Cascade)
-  registrationId String?   // Which registrant (for attendee-targeted emails)
+  workshop       Workshop @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+  registrationId String? // Which registrant (for attendee-targeted emails)
 
   // ENH-MAY6-10: parent/child rollup model. Top-level rows have parentId=null
   // (existing rows + parent rollups). Per-recipient child rows have parentId
   // set + non-null registrationId + non-null recipientEmail. Composite unique
   // (parentId, registrationId) makes child upserts idempotent across replays.
   // Coach surfaces filter parentId=null to avoid leaking recipient PII.
-  parentId       String?
-  parent         WorkflowStepExecution?  @relation("ParentChildren", fields: [parentId], references: [id], onDelete: Cascade)
-  children       WorkflowStepExecution[] @relation("ParentChildren")
+  parentId String?
+  parent   WorkflowStepExecution?  @relation("ParentChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children WorkflowStepExecution[] @relation("ParentChildren")
 
   // ENH-MAY6-10: snapshot of the recipient email at row-write time. Set on
   // child rows; null on parent/legacy rows.
@@ -1009,24 +1009,24 @@ model WorkflowStepExecution {
 // ============================================
 
 model Contact {
-  id             String   @id @default(cuid())
-  kajabiId       String?  @unique // "Member ID" from CSV
+  id             String    @id @default(cuid())
+  kajabiId       String?   @unique // "Member ID" from CSV
   name           String
   firstName      String?
   lastName       String?
-  email          String   @unique
-  emailMarketing String   @default("Never subscribed")
-  lifetimeValue  Float    @default(0.0)
-  addedAt        DateTime @default(now()) // "Created At" from CSV
+  email          String    @unique
+  emailMarketing String    @default("Never subscribed")
+  lifetimeValue  Float     @default(0.0)
+  addedAt        DateTime  @default(now()) // "Created At" from CSV
   lastActivityAt DateTime? // "Last Activity" from CSV
-  
+
   // Additional fields from CSV
-  tags           String?
-  products       String?
-  avatar         String?
-  
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  tags     String?
+  products String?
+  avatar   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("contacts")
 }
@@ -1035,7 +1035,7 @@ model AdminInvite {
   id         String    @id @default(cuid())
   email      String    @unique
   name       String?
-  invitedBy  String    // userId of admin who sent the invite
+  invitedBy  String // userId of admin who sent the invite
   token      String    @unique
   expiresAt  DateTime
   acceptedAt DateTime?
@@ -1057,7 +1057,7 @@ model TransactionalEmailTemplate {
   id              String   @id @default(cuid())
   emailType       String   @unique // "REGISTRATION_CONFIRMATION"
   subject         String
-  body            String   // HTML, supports {{token}} interpolation
+  body            String // HTML, supports {{token}} interpolation
   version         Int      @default(1)
   updatedBy       String?
   updatedAt       DateTime @updatedAt
@@ -1097,20 +1097,20 @@ model TransactionalEmailTemplate {
 //     same name)
 
 model Organization {
-  id            String    @id @default(cuid())
-  name          String
-  externalId    String?   @unique // Prisma full-unique dropped; replaced with partial WHERE NOT NULL via raw SQL
+  id               String    @id @default(cuid())
+  name             String
+  externalId       String?   @unique // Prisma full-unique dropped; replaced with partial WHERE NOT NULL via raw SQL
   espertoSuFullCid String? // Wave O — pinned lazily on the org's first successful SU-Full historical import; a later import batch whose file `cid` differs is a wrong-org signal. null = no SU-Full import yet. Additive, default-OFF behind WAVE_O_ESPERTO_SUFULL_IMPORT.
-  ownerCoachId  String    // v7.6: single owning coach (replaces v7.5 createdBy + OrganizationMembership)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  deletedAt     DateTime?
+  ownerCoachId     String // v7.6: single owning coach (replaces v7.5 createdBy + OrganizationMembership)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  deletedAt        DateTime?
 
-  owner            Coach                          @relation(fields: [ownerCoachId], references: [id])
-  teams            OrgTeam[]
-  respondents      OrgRespondent[]
-  campaigns        AssessmentCampaign[]
-  ownershipEvents  OrganizationOwnershipEvent[]
+  owner           Coach                        @relation(fields: [ownerCoachId], references: [id])
+  teams           OrgTeam[]
+  respondents     OrgRespondent[]
+  campaigns       AssessmentCampaign[]
+  ownershipEvents OrganizationOwnershipEvent[]
 
   @@index([ownerCoachId])
   @@map("organizations")
@@ -1141,13 +1141,13 @@ model OrgRespondent {
   organizationId  String
   teamId          String?
   email           String
-  normalizedEmail String?   // lowercased + trimmed; for future per-org uniqueness rule
+  normalizedEmail String? // lowercased + trimmed; for future per-org uniqueness rule
   firstName       String
   lastName        String
   jobTitle        String?
   externalId      String?
-  dedupeSource    String    // "external" | "email"
-  dedupeValue     String    // externalId value OR normalizedEmail value
+  dedupeSource    String // "external" | "email"
+  dedupeValue     String // externalId value OR normalizedEmail value
   roleType        String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -1167,20 +1167,20 @@ model OrgRespondent {
 }
 
 model AssessmentTemplate {
-  id                            String                              @id @default(cuid())
-  name                          String
-  alias                         String                              @unique
-  description                   String?
-  invitationSubject             String
-  invitationBodyMarkdown        String
+  id                              String                            @id @default(cuid())
+  name                            String
+  alias                           String                            @unique
+  description                     String?
+  invitationSubject               String
+  invitationBodyMarkdown          String
   // Results Email — Phase F0 (Checkpoint 1b). Nullable subject/body so a
   // template can opt-in to a results email; gated behind
   // `resultsEmailContentApproved` until the operator flips it true. Per
   // anonymity constraint, the rendered email contains only the
   // respondent's own individual result (never team aggregate).
-  resultsEmailSubject           String?
-  resultsEmailBodyMarkdown      String?
-  resultsEmailContentApproved   Boolean                             @default(false)
+  resultsEmailSubject             String?
+  resultsEmailBodyMarkdown        String?
+  resultsEmailContentApproved     Boolean                           @default(false)
   // Wave D (Spec 17) — approval binding for the results email. The approval
   // is bound to a content HASH so editing the subject/body after approval
   // invalidates the prior sign-off (the app compares the live content hash
@@ -1192,24 +1192,24 @@ model AssessmentTemplate {
   // sendResultsToRespondent toggle. Seeds the wizard checkbox ONLY while the
   // results-email content is approved (approval always wins); the coach's
   // per-campaign flip is the override. Inert data otherwise.
-  sendResultsDefault            Boolean                             @default(false)
+  sendResultsDefault              Boolean                           @default(false)
   // Wave Q (Jeff July-1 #6) — "disabled" third lifecycle state, distinct from
   // soft-delete: hidden from NEW-campaign template pickers + rejected at
   // campaign create, but existing campaigns/reports/trends/re-seeds are
   // untouched and the admin list keeps showing it (re-enablable). Enforcement
   // is deliberately NOT flag-gated (spec 19q durable rule).
-  disabledAt                    DateTime?
-  aggregationMode               AssessmentTemplateAggregationMode   @default(FULL_VISIBILITY)
-  createdBy                     String
-  createdAt                     DateTime                            @default(now())
-  updatedAt                     DateTime                            @updatedAt
-  deletedAt                     DateTime?
+  disabledAt                      DateTime?
+  aggregationMode                 AssessmentTemplateAggregationMode @default(FULL_VISIBILITY)
+  createdBy                       String
+  createdAt                       DateTime                          @default(now())
+  updatedAt                       DateTime                          @updatedAt
+  deletedAt                       DateTime?
 
-  creator       User                        @relation("AssessmentTemplateCreatedBy", fields: [createdBy], references: [id])
-  versions      AssessmentTemplateVersion[]
-  campaigns     AssessmentCampaign[]
-  accessGroups  AccessGroupTemplate[]
-  benchmarks    AssessmentBenchmark[]
+  creator      User                        @relation("AssessmentTemplateCreatedBy", fields: [createdBy], references: [id])
+  versions     AssessmentTemplateVersion[]
+  campaigns    AssessmentCampaign[]
+  accessGroups AccessGroupTemplate[]
+  benchmarks   AssessmentBenchmark[]
 
   @@map("assessment_templates")
 }
@@ -1249,7 +1249,7 @@ model AssessmentTemplateVersion {
   sections      Json
   scoringConfig Json
   reportConfig  Json?
-  contentHash   String    // sha256 of canonical JSON serialization of {questions, sections, scoringConfig, reportConfig, invitationSubject, invitationBodyMarkdown}
+  contentHash   String // sha256 of canonical JSON serialization of {questions, sections, scoringConfig, reportConfig, invitationSubject, invitationBodyMarkdown}
   publishedAt   DateTime?
   publishedBy   String?
   archivedAt    DateTime? // Wave ED8 (spec 19ak): retire/unretire mark on PUBLISHED rows — the ONLY column mutable post-publish (DB-trigger-enforced). No index; grouping is client-side.
@@ -1267,50 +1267,50 @@ model AssessmentTemplateVersion {
 }
 
 model AssessmentCampaign {
-  id                  String                       @id @default(cuid())
-  templateId          String
-  versionId           String
-  organizationId      String
-  language            String
-  alias               String                       @unique
-  externalId          String?                      @unique // Esperto historical-import provenance + idempotency; stored namespaced "esperto:<campaignid>". Prisma full-unique replaced with partial WHERE NOT NULL via raw SQL (see migration add_external_id_to_campaign), mirroring Organization.externalId.
-  name                String
-  description         String?
-  status              AssessmentCampaignStatus     @default(DRAFT)
-  accessMode          AssessmentCampaignAccessMode @default(INVITED)
-  publicConfig        Json?
-  openAt              DateTime
-  endMode             AssessmentCampaignEndMode
-  closeAt             DateTime?
-  notifyAdminOnSubmit Boolean                      @default(true)
+  id                      String                       @id @default(cuid())
+  templateId              String
+  versionId               String
+  organizationId          String
+  language                String
+  alias                   String                       @unique
+  externalId              String?                      @unique // Esperto historical-import provenance + idempotency; stored namespaced "esperto:<campaignid>". Prisma full-unique replaced with partial WHERE NOT NULL via raw SQL (see migration add_external_id_to_campaign), mirroring Organization.externalId.
+  name                    String
+  description             String?
+  status                  AssessmentCampaignStatus     @default(DRAFT)
+  accessMode              AssessmentCampaignAccessMode @default(INVITED)
+  publicConfig            Json?
+  openAt                  DateTime
+  endMode                 AssessmentCampaignEndMode
+  closeAt                 DateTime?
+  notifyAdminOnSubmit     Boolean                      @default(true)
   // Task O — per-campaign invitation email overrides (null = fall back to template defaults)
   invitationSubject       String?
   invitationBodyMarkdown  String?
   // Wave D (Spec 17) — additive campaign-setup columns.
-  deletedAt               DateTime?                // soft-delete tombstone
-  inviteTiming            AssessmentInviteTiming   @default(IMMEDIATELY)
-  inviteSendStartedAt     DateTime?                // CAS claim — when a send run grabbed this campaign (distinct from completion)
-  inviteSendHeartbeatAt   DateTime?                // lease heartbeat — last liveness tick of the active send run
-  invitesSentAt           DateTime?                // completion marker — set once invites finished sending
-  sendResultsToRespondent Boolean                  @default(false)
-  notifyCoachOnCompletion Boolean                  @default(false)
-  showResultsOnScreen     Boolean                  @default(false) // Wave OSR (Jeff #71) — render the respondent's own Results report in place at submit. Additive, default-OFF behind WAVE_OSR_RESPONDENT_RESULTS_ENABLED. Independent of sendResultsToRespondent (email) and of the results-email approval hash.
-  invitationBodyHtml      String?                  // optional rich-HTML invitation body
-  customSlides            Json?                    // Wave M — coach-authored branded interstitial slides (CustomSlide[]); null = none. Additive, default-OFF behind WAVE_M_CUSTOM_SLIDES_ENABLED.
-  importManifest          Json?                    // Wave O — historical Esperto SU-Full import round manifest (cid provenance, canonical roundLabel, batch content fingerprint, per-respondent {saltedMidHash, saltedReportIdHash, answerHash} for exact/superset/divergent reuse reconciliation, versionId, crosswalkId, skip reasons); null = not an imported round. Additive, default-OFF behind WAVE_O_ESPERTO_SUFULL_IMPORT.
-  createdBy           String
-  createdByCoachId    String?                      // v7.6: role-specific coach ownership pointer (nullable so admin PUBLIC campaigns can omit)
-  createdAt           DateTime                     @default(now())
-  updatedAt           DateTime                     @updatedAt
+  deletedAt               DateTime? // soft-delete tombstone
+  inviteTiming            AssessmentInviteTiming       @default(IMMEDIATELY)
+  inviteSendStartedAt     DateTime? // CAS claim — when a send run grabbed this campaign (distinct from completion)
+  inviteSendHeartbeatAt   DateTime? // lease heartbeat — last liveness tick of the active send run
+  invitesSentAt           DateTime? // completion marker — set once invites finished sending
+  sendResultsToRespondent Boolean                      @default(false)
+  notifyCoachOnCompletion Boolean                      @default(false)
+  showResultsOnScreen     Boolean                      @default(false) // Wave OSR (Jeff #71) — render the respondent's own Results report in place at submit. Additive, default-OFF behind WAVE_OSR_RESPONDENT_RESULTS_ENABLED. Independent of sendResultsToRespondent (email) and of the results-email approval hash.
+  invitationBodyHtml      String? // optional rich-HTML invitation body
+  customSlides            Json? // Wave M — coach-authored branded interstitial slides (CustomSlide[]); null = none. Additive, default-OFF behind WAVE_M_CUSTOM_SLIDES_ENABLED.
+  importManifest          Json? // Wave O — historical Esperto SU-Full import round manifest (cid provenance, canonical roundLabel, batch content fingerprint, per-respondent {saltedMidHash, saltedReportIdHash, answerHash} for exact/superset/divergent reuse reconciliation, versionId, crosswalkId, skip reasons); null = not an imported round. Additive, default-OFF behind WAVE_O_ESPERTO_SUFULL_IMPORT.
+  createdBy               String
+  createdByCoachId        String? // v7.6: role-specific coach ownership pointer (nullable so admin PUBLIC campaigns can omit)
+  createdAt               DateTime                     @default(now())
+  updatedAt               DateTime                     @updatedAt
 
-  template       AssessmentTemplate              @relation(fields: [templateId], references: [id])
-  version        AssessmentTemplateVersion       @relation(fields: [versionId], references: [id])
-  organization   Organization                    @relation(fields: [organizationId], references: [id])
-  creator        User                            @relation("AssessmentCampaignCreatedBy", fields: [createdBy], references: [id])
-  creatorCoach   Coach?                          @relation("AssessmentCampaignCreatedByCoach", fields: [createdByCoachId], references: [id])
-  participants   AssessmentCampaignParticipant[]
-  invitations    AssessmentInvitation[]
-  submissions    AssessmentSubmission[]
+  template        AssessmentTemplate              @relation(fields: [templateId], references: [id])
+  version         AssessmentTemplateVersion       @relation(fields: [versionId], references: [id])
+  organization    Organization                    @relation(fields: [organizationId], references: [id])
+  creator         User                            @relation("AssessmentCampaignCreatedBy", fields: [createdBy], references: [id])
+  creatorCoach    Coach?                          @relation("AssessmentCampaignCreatedByCoach", fields: [createdByCoachId], references: [id])
+  participants    AssessmentCampaignParticipant[]
+  invitations     AssessmentInvitation[]
+  submissions     AssessmentSubmission[]
   ownershipEvents OrganizationOwnershipEvent[]
 
   @@index([organizationId])
@@ -1377,9 +1377,9 @@ model AssessmentSubmission {
   resultsTokenRevokedAt DateTime?
   resultsTokenViewedAt  DateTime?
 
-  campaign   AssessmentCampaign    @relation(fields: [campaignId], references: [id])
-  respondent OrgRespondent?        @relation(fields: [respondentId], references: [id])
-  invitation AssessmentInvitation? @relation(fields: [invitationId], references: [id])
+  campaign     AssessmentCampaign      @relation(fields: [campaignId], references: [id])
+  respondent   OrgRespondent?          @relation(fields: [respondentId], references: [id])
+  invitation   AssessmentInvitation?   @relation(fields: [invitationId], references: [id])
   outboxEmails AssessmentEmailOutbox[]
 
   @@index([campaignId])
@@ -1395,25 +1395,35 @@ model AssessmentSubmission {
 /// Durable outbox for Quick Assessment lead/result emails (claudex R2 hardening).
 /// Enqueued in the submit transaction; drained by an Inngest worker with retries.
 model AssessmentEmailOutbox {
-  id             String    @id @default(cuid())
-  submissionId   String
-  recipientEmail String
-  recipientRole  String // "REFERRING_COACH" | "SU_TEAM"
-  emailType      String // "QUICK_ASSESSMENT_LEAD"
-  subject        String
-  bodyHtml       String
-  status         String    @default("PENDING") // PENDING | SENT | FAILED
-  attempts       Int       @default(0)
-  lastError      String?
-  sentAt         DateTime?
-  nextAttemptAt  DateTime  @default(now())
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id                      String    @id @default(cuid())
+  submissionId            String
+  recipientEmail          String
+  recipientRole           String // "REFERRING_COACH" | "SU_TEAM"
+  emailType               String // "QUICK_ASSESSMENT_LEAD"
+  subject                 String
+  bodyHtml                String
+  status                  String    @default("PENDING") // PENDING | SENT | FAILED
+  attempts                Int       @default(0)
+  lastError               String?
+  sentAt                  DateTime?
+  nextAttemptAt           DateTime  @default(now())
+  leaseToken              String?
+  leaseExpiresAt          DateTime?
+  cancelledAt             DateTime?
+  cancelReason            String?
+  featureKey              String?
+  authorizationProvenance Json?
+  contentProvenance       Json?
+  sendFenceGeneration     Int       @default(0)
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
 
   submission AssessmentSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
 
   @@unique([submissionId, recipientRole]) // idempotent enqueue per role
   @@index([status, nextAttemptAt])
+  @@index([status, nextAttemptAt, createdAt])
+  @@index([status, leaseExpiresAt])
   @@index([submissionId])
   @@map("assessment_email_outbox")
 }
@@ -1428,18 +1438,18 @@ model AssessmentEmailOutbox {
 //   - Partial unique index on access_groups.name WHERE deletedAt IS NULL.
 
 model AccessGroup {
-  id                   String    @id @default(cuid())
-  name                 String    // Partial unique enforced via raw SQL (WHERE deletedAt IS NULL)
-  description          String?
-  accessPolicyVersion  String    @default("v1.intersection")
-  createdBy            String
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
-  deletedAt            DateTime?
+  id                  String    @id @default(cuid())
+  name                String // Partial unique enforced via raw SQL (WHERE deletedAt IS NULL)
+  description         String?
+  accessPolicyVersion String    @default("v1.intersection")
+  createdBy           String
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  deletedAt           DateTime?
 
-  creator         User                   @relation("AccessGroupCreatedBy", fields: [createdBy], references: [id])
-  coachMembers    AccessGroupCoach[]
-  templateAccess  AccessGroupTemplate[]
+  creator        User                  @relation("AccessGroupCreatedBy", fields: [createdBy], references: [id])
+  coachMembers   AccessGroupCoach[]
+  templateAccess AccessGroupTemplate[]
 
   @@index([deletedAt])
   @@map("access_groups")
@@ -1486,7 +1496,7 @@ model AccessGroupTemplate {
 model OrganizationOwnershipEvent {
   id              String   @id @default(cuid())
   organizationId  String
-  kind            String   // CREATED | TRANSFERRED | RETAINED_CLOSED_CAMPAIGN (free-text to allow future kinds)
+  kind            String // CREATED | TRANSFERRED | RETAINED_CLOSED_CAMPAIGN (free-text to allow future kinds)
   oldOwnerCoachId String?
   newOwnerCoachId String?
   campaignId      String?
@@ -1496,7 +1506,7 @@ model OrganizationOwnershipEvent {
 
   organization Organization        @relation(fields: [organizationId], references: [id])
   oldOwner     Coach?              @relation("OrgOwnershipFromCoach", fields: [oldOwnerCoachId], references: [id])
-  newOwner     Coach?              @relation("OrgOwnershipToCoach",   fields: [newOwnerCoachId], references: [id])
+  newOwner     Coach?              @relation("OrgOwnershipToCoach", fields: [newOwnerCoachId], references: [id])
   campaign     AssessmentCampaign? @relation(fields: [campaignId], references: [id])
   performer    User                @relation("OrgOwnershipPerformedBy", fields: [performedBy], references: [id])
 

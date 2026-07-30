@@ -45,6 +45,7 @@ import {
   findActiveCoachByEmail,
   buildLeadEmail,
   lowestDecision,
+  normalizeMailbox,
 } from "@/lib/assessments/quick-assessment-lead";
 import {
   buildReportEmailHtml,
@@ -298,8 +299,17 @@ export async function POST(
 
     // REFERRING_COACH — full report (upgrade from the old lead alert), only
     // when the open-relay guard resolved an active coach.
-    const activeCoachEmail = coach?.email?.trim().toLowerCase() ?? "";
-    if (activeCoachEmail.length > 0) {
+    const activeCoachEmail = normalizeMailbox(coach?.email);
+    const takerEmail = normalizeMailbox(data.publicTaker.email);
+    const suppressCoachSelfNotification =
+      activeCoachEmail.length > 0 && activeCoachEmail === takerEmail;
+    if (suppressCoachSelfNotification) {
+      console.info("[assessment-email] coach self-notification suppressed", {
+        submissionScope: "public-quiz",
+        coachId: coach?.id ?? null,
+      });
+    }
+    if (activeCoachEmail.length > 0 && !suppressCoachSelfNotification) {
       const { subject, bodyHtml } = buildReportEmailHtml({
         report: respondentReport,
         recipientRole: "REFERRING_COACH",

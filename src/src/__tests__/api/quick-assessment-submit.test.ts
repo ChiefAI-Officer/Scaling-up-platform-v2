@@ -127,6 +127,7 @@ const CAMPAIGN = {
   closeAt: null as Date | null,
   templateId: "tmpl-1",
   versionId: "ver-1",
+  deletedAt: null,
   template: { name: "Scaling Up Quick Assessment" },
 };
 
@@ -434,6 +435,37 @@ describe("outbox enqueue", () => {
     expect(roles).toContain("TAKER_COPY");
     expect(roles).toContain("SU_TEAM");
     expect(roles).not.toContain("REFERRING_COACH");
+  });
+
+  it("suppresses the coach row when taker and coach normalize to the same mailbox", async () => {
+    process.env.QUICK_ASSESSMENT_TEAM_EMAIL = "team@scalingup.com";
+    (db.coach.findUnique as jest.Mock).mockResolvedValue({
+      id: "coach-1",
+      email: " JANE@EXAMPLE.COM ",
+      firstName: "Jane",
+      lastName: "Coach",
+      certificationStatus: "ACTIVE",
+      certificationExpiry: null,
+    });
+    const info = jest.spyOn(console, "info").mockImplementation(() => undefined);
+
+    await POST(
+      makeRequest({
+        ...VALID_BODY,
+        referringCoachEmail: "jane@example.com",
+      }) as never,
+      makeParams() as never,
+    );
+
+    expect(enqueuedRoles()).toEqual(["TAKER_COPY", "SU_TEAM"]);
+    expect(info).toHaveBeenCalledWith(
+      "[assessment-email] coach self-notification suppressed",
+      expect.objectContaining({
+        submissionScope: "public-quiz",
+        coachId: "coach-1",
+      }),
+    );
+    info.mockRestore();
   });
 
   it("outbox rows are created inside the transaction (via txMock)", async () => {

@@ -434,6 +434,24 @@ describe("Wave D — outbox enqueue", () => {
     expect(roles).toHaveLength(2);
   });
 
+  it.each(["RESPONDENT", "OWNING_COACH"])(
+    "rolls back the submission contract when the %s outbox insert fails",
+    async (failingRole) => {
+      mockHappyInvitation();
+      txMock.assessmentEmailOutbox.create.mockImplementation(
+        ({ data }: { data: { recipientRole: string } }) =>
+          data.recipientRole === failingRole
+            ? Promise.reject(new Error(`insert failed: ${failingRole}`))
+            : Promise.resolve({}),
+      );
+
+      const res = await submit();
+
+      expect(res.status).toBe(500);
+      expect(txMock.assessmentInvitation.update).not.toHaveBeenCalled();
+    },
+  );
+
   it("#15 RESPONDENT row carries the respondent email + ASSESSMENT_RESULTS type + submission id", async () => {
     mockHappyInvitation();
     await submit();

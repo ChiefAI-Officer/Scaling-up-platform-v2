@@ -696,42 +696,29 @@ export async function POST(
           return true;
         });
 
-        // ── Wave D: INSERT the pre-rendered outbox rows IN-TX (transactional
-        // outbox). The submission + its outbox rows commit atomically; the
-        // double-submit 409 above guarantees exactly-once. Each INSERT is
-        // guarded so a write failure for one email NEVER rolls back the
-        // submission — it is simply skipped (the unique [submissionId,
-        // recipientRole] keeps it idempotent on replay).
+        // ── Wave D / Spec 19ao: INSERT every policy-required row IN-TX.
+        // Submission + outbox are one durability contract: an insert failure
+        // throws and rolls the transaction back rather than silently losing a
+        // result or coach notification.
         for (const row of rowsToEnqueue) {
-          try {
-            await tx.assessmentEmailOutbox.create({
-              data: {
-                submissionId: submission.id,
-                recipientEmail: row.recipientEmail,
-                recipientRole: row.recipientRole,
-                emailType: row.emailType,
-                subject: row.subject,
-                bodyHtml: row.bodyHtml,
-              },
-            });
-            // R2-L8: the outbox row has no metadata column (no migration), so
-            // record which renderer produced the (frozen) bodyHtml as a
-            // structured log line — keeps send-side provenance after #25
-            // removed the visible footer stamp. No PII (no answer text).
-            const alias = locked.campaign.template?.alias ?? null;
-            console.info("[assessment-report] enqueued", {
-              templateAlias: alias,
-              reportType: reportConfigFor(alias).reportType,
-              emailType: row.emailType,
+          await tx.assessmentEmailOutbox.create({
+            data: {
+              submissionId: submission.id,
+              recipientEmail: row.recipientEmail,
               recipientRole: row.recipientRole,
-              versionId: locked.campaign.version?.id ?? null,
-            });
-          } catch (err) {
-            console.error(
-              `[assessment-submit] outbox enqueue skipped (${row.recipientRole}):`,
-              err
-            );
-          }
+              emailType: row.emailType,
+              subject: row.subject,
+              bodyHtml: row.bodyHtml,
+            },
+          });
+          const alias = locked.campaign.template?.alias ?? null;
+          console.info("[assessment-report] enqueued", {
+            templateAlias: alias,
+            reportType: reportConfigFor(alias).reportType,
+            emailType: row.emailType,
+            recipientRole: row.recipientRole,
+            versionId: locked.campaign.version?.id ?? null,
+          });
         }
 
         await tx.assessmentInvitation.update({

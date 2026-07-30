@@ -1,378 +1,249 @@
 /**
- * Tests for drainLeadOutbox — the pure, injected-dep drain function
- * used by the quickAssessmentLeadEmail Inngest function.
+ * Atomic-lease regression tests for the shared assessment email outbox.
  *
- * All tests mock db + sendEmail; no real DB or SMTP used.
+ * These tests exercise the pre-agreed worker seam without a real database or
+ * SMTP server. The claim function models the database CAS/skip-locked boundary;
+ * only a claimed row is ever handed to sendEmail.
  */
-
-/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import {
   drainLeadOutbox,
-  listSubmissionsWithDueOutbox,
+  type ClaimedOutboxRow,
   type DrainDeps,
-  type DueScanDb,
 } from "@/inngest/functions/quick-assessment-lead-email";
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function makeRow(overrides: Partial<{
-  id: string;
-  recipientEmail: string;
-  recipientRole: string;
-  subject: string;
-  bodyHtml: string;
-  status: string;
-  attempts: number;
-}> = {}) {
+function makeRow(
+  overrides: Partial<ClaimedOutboxRow> = {},
+): ClaimedOutboxRow {
   return {
     id: overrides.id ?? "row-1",
+    submissionId: overrides.submissionId ?? "sub-1",
     recipientEmail: overrides.recipientEmail ?? "coach@example.com",
     recipientRole: overrides.recipientRole ?? "REFERRING_COACH",
-    subject: overrides.subject ?? "Your lead is ready",
+    emailType: overrides.emailType ?? "QUICK_ASSESSMENT_LEAD",
+    subject: overrides.subject ?? "Assessment complete",
     bodyHtml: overrides.bodyHtml ?? "<p>Results</p>",
-    status: overrides.status ?? "PENDING",
-    attempts: overrides.attempts ?? 0,
+    status: "SENDING",
+    attempts: overrides.attempts ?? 1,
+    leaseToken: overrides.leaseToken ?? "lease-1",
+    leaseExpiresAt:
+      overrides.leaseExpiresAt ?? new Date("2026-07-30T03:02:00.000Z"),
   };
 }
 
-function makeDeps(overrides: Partial<DrainDeps> = {}): DrainDeps & {
-  dbFindMany: jest.Mock;
-  dbUpdate: jest.Mock;
+function makeDeps(rows: ClaimedOutboxRow[] = []): DrainDeps & {
+  claimNext: jest.Mock;
+  updateMany: jest.Mock;
   sendEmail: jest.Mock;
+  recordDeadLetter: jest.Mock;
 } {
-  const dbFindMany = jest.fn();
-  const dbUpdate = jest.fn().mockResolvedValue({});
+  const queue = [...rows];
+  const claimNext = jest.fn(async () => queue.shift() ?? null);
+  const updateMany = jest.fn().mockResolvedValue({ count: 1 });
   const sendEmail = jest.fn().mockResolvedValue(undefined);
+  const recordDeadLetter = jest.fn().mockResolvedValue(undefined);
 
   return {
     db: {
-      assessmentEmailOutbox: {
-        findMany: dbFindMany,
-        update: dbUpdate,
-      },
+      assessmentEmailOutbox: { updateMany },
+      auditLog: { create: jest.fn().mockResolvedValue({}) },
+      $queryRaw: jest.fn(),
     },
+    claimNext,
+    updateMany,
     sendEmail,
-    dbFindMany,
-    dbUpdate,
-    ...overrides,
-  } as any;
+    recordDeadLetter,
+    now: () => new Date("2026-07-30T03:00:00.000Z"),
+    makeLeaseToken: (() => {
+      let i = 0;
+      return () => `lease-${++i}`;
+    })(),
+  };
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
+describe("drainLeadOutbox atomic leases", () => {
+  it("sends a claimed row once and token-guards terminal completion", async () => {
+    const row = makeRow();
+    const deps = makeDeps([row]);
 
-describe("drainLeadOutbox", () => {
-  const SUBMISSION_ID = "sub-abc-123";
+    await expect(drainLeadOutbox(deps, "sub-1")).resolves.toEqual({
+      sent: 1,
+      failed: 0,
+      skipped: 0,
+    });
 
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
-  // -------------------------------------------------------------------------
-  // Happy path: 2 PENDING rows both send OK
-  // -------------------------------------------------------------------------
-  it("sends all PENDING rows and marks them SENT, returning {sent:2,failed:0,skipped:0}", async () => {
-    const row1 = makeRow({ id: "row-1", recipientEmail: "coach@example.com" });
-    const row2 = makeRow({ id: "row-2", recipientEmail: "team@scalingup.com", recipientRole: "SU_TEAM" });
-
-    const deps = makeDeps();
-    deps.dbFindMany.mockResolvedValue([row1, row2]);
-
-    const result = await drainLeadOutbox(deps, SUBMISSION_ID);
-
-    expect(result).toEqual({ sent: 2, failed: 0, skipped: 0 });
-
-    // sendEmail called twice, once per recipient
-    expect(deps.sendEmail).toHaveBeenCalledTimes(2);
+    expect(deps.sendEmail).toHaveBeenCalledTimes(1);
     expect(deps.sendEmail).toHaveBeenCalledWith({
-      to: "coach@example.com",
-      subject: row1.subject,
-      html: row1.bodyHtml,
+      to: row.recipientEmail,
+      subject: row.subject,
+      html: row.bodyHtml,
     });
-    expect(deps.sendEmail).toHaveBeenCalledWith({
-      to: "team@scalingup.com",
-      subject: row2.subject,
-      html: row2.bodyHtml,
-    });
-
-    // Both rows updated to SENT with sentAt set
-    expect(deps.dbUpdate).toHaveBeenCalledTimes(2);
-    const call1 = deps.dbUpdate.mock.calls[0][0];
-    expect(call1.where.id).toBe("row-1");
-    expect(call1.data.status).toBe("SENT");
-    expect(call1.data.sentAt).toBeInstanceOf(Date);
-
-    const call2 = deps.dbUpdate.mock.calls[1][0];
-    expect(call2.where.id).toBe("row-2");
-    expect(call2.data.status).toBe("SENT");
-    expect(call2.data.sentAt).toBeInstanceOf(Date);
-  });
-
-  // -------------------------------------------------------------------------
-  // Send throws: row stays PENDING with attempts+1 and nextAttemptAt in future
-  // -------------------------------------------------------------------------
-  it("on send throw increments attempts, records lastError, keeps status PENDING, sets nextAttemptAt in future", async () => {
-    const row = makeRow({ id: "row-fail", attempts: 0 });
-    const deps = makeDeps();
-    deps.dbFindMany.mockResolvedValue([row]);
-    deps.sendEmail.mockRejectedValue(new Error("SMTP connection refused"));
-
-    const fixedNow = new Date("2026-01-01T12:00:00Z");
-    deps.now = () => fixedNow;
-
-    const result = await drainLeadOutbox(deps, SUBMISSION_ID);
-
-    expect(result).toEqual({ sent: 0, failed: 1, skipped: 0 });
-
-    expect(deps.dbUpdate).toHaveBeenCalledTimes(1);
-    const call = deps.dbUpdate.mock.calls[0][0];
-    expect(call.where.id).toBe("row-fail");
-    expect(call.data.attempts).toBe(1);
-    expect(call.data.lastError).toBe("SMTP connection refused");
-    expect(call.data.status).toBe("PENDING");
-    // nextAttemptAt should be in the future relative to fixedNow
-    expect(call.data.nextAttemptAt.getTime()).toBeGreaterThan(fixedNow.getTime());
-  });
-
-  // -------------------------------------------------------------------------
-  // Exhausted retries: attempts:4 + throw = status FAILED (maxAttempts default 5)
-  // -------------------------------------------------------------------------
-  it("marks row as FAILED when attempts+1 reaches maxAttempts (default 5)", async () => {
-    const row = makeRow({ id: "row-exhausted", attempts: 4 });
-    const deps = makeDeps();
-    deps.dbFindMany.mockResolvedValue([row]);
-    deps.sendEmail.mockRejectedValue(new Error("Permanent failure"));
-
-    const result = await drainLeadOutbox(deps, SUBMISSION_ID);
-
-    expect(result).toEqual({ sent: 0, failed: 1, skipped: 0 });
-
-    const call = deps.dbUpdate.mock.calls[0][0];
-    expect(call.where.id).toBe("row-exhausted");
-    expect(call.data.attempts).toBe(5);
-    expect(call.data.status).toBe("FAILED");
-    expect(call.data.lastError).toBe("Permanent failure");
-  });
-
-  // -------------------------------------------------------------------------
-  // Idempotent re-run: findMany returns [] (all already SENT)
-  // -------------------------------------------------------------------------
-  it("is idempotent when no PENDING rows remain — no sends, returns {sent:0,failed:0,skipped:0}", async () => {
-    const deps = makeDeps();
-    deps.dbFindMany.mockResolvedValue([]);
-
-    const result = await drainLeadOutbox(deps, SUBMISSION_ID);
-
-    expect(result).toEqual({ sent: 0, failed: 0, skipped: 0 });
-    expect(deps.sendEmail).not.toHaveBeenCalled();
-    expect(deps.dbUpdate).not.toHaveBeenCalled();
-  });
-
-  // -------------------------------------------------------------------------
-  // sendEmail is called with row's recipientEmail / subject / bodyHtml
-  // -------------------------------------------------------------------------
-  it("passes recipientEmail, subject, bodyHtml exactly to sendEmail", async () => {
-    const row = makeRow({
-      id: "row-content",
-      recipientEmail: "specific@test.com",
-      subject: "Exact Subject Line",
-      bodyHtml: "<h1>Exact Body</h1>",
-    });
-    const deps = makeDeps();
-    deps.dbFindMany.mockResolvedValue([row]);
-
-    await drainLeadOutbox(deps, SUBMISSION_ID);
-
-    expect(deps.sendEmail).toHaveBeenCalledWith({
-      to: "specific@test.com",
-      subject: "Exact Subject Line",
-      html: "<h1>Exact Body</h1>",
+    expect(deps.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: row.id,
+        status: "SENDING",
+        leaseToken: row.leaseToken,
+      },
+      data: expect.objectContaining({
+        status: "SENT",
+        bodyHtml: "",
+        leaseToken: null,
+        leaseExpiresAt: null,
+      }),
     });
   });
 
-  // -------------------------------------------------------------------------
-  // findMany query filters correctly: submissionId + PENDING + nextAttemptAt <= now
-  // -------------------------------------------------------------------------
-  it("queries findMany with the correct submissionId, PENDING status, and nextAttemptAt filter", async () => {
+  it("allows only one sender when event and cron drains race", async () => {
+    const row = makeRow();
+    let available = true;
+    const claimNext = jest.fn(async () => {
+      if (!available) return null;
+      available = false;
+      return row;
+    });
     const deps = makeDeps();
-    deps.dbFindMany.mockResolvedValue([]);
-    const fixedNow = new Date("2026-06-09T10:00:00Z");
-    deps.now = () => fixedNow;
+    deps.claimNext = claimNext;
 
-    await drainLeadOutbox(deps, SUBMISSION_ID);
+    const [eventResult, cronResult] = await Promise.all([
+      drainLeadOutbox(deps, "sub-1"),
+      drainLeadOutbox(deps, null),
+    ]);
 
-    expect(deps.dbFindMany).toHaveBeenCalledTimes(1);
-    const query = deps.dbFindMany.mock.calls[0][0];
-    expect(query.where.submissionId).toBe(SUBMISSION_ID);
-    expect(query.where.status).toBe("PENDING");
-    // nextAttemptAt filter: lte now
-    expect(query.where.nextAttemptAt).toEqual({ lte: fixedNow });
+    expect(deps.sendEmail).toHaveBeenCalledTimes(1);
+    expect(eventResult.sent + cronResult.sent).toBe(1);
   });
 
-  // -------------------------------------------------------------------------
-  // Custom maxAttempts respected
-  // -------------------------------------------------------------------------
-  it("respects a custom maxAttempts of 3 — marks FAILED when attempts+1 = 3", async () => {
-    const row = makeRow({ id: "row-custom", attempts: 2 });
-    const deps = makeDeps({ maxAttempts: 3 });
-    deps.dbFindMany.mockResolvedValue([row]);
-    deps.sendEmail.mockRejectedValue(new Error("fail"));
-
-    const result = await drainLeadOutbox(deps, SUBMISSION_ID);
-
-    expect(result.failed).toBe(1);
-    const call = deps.dbUpdate.mock.calls[0][0];
-    expect(call.data.status).toBe("FAILED");
-    expect(call.data.attempts).toBe(3);
-  });
-
-  // -------------------------------------------------------------------------
-  // Exponential backoff: row with attempts:0 gets ~2min; attempts:2 gets ~4min backoff
-  // -------------------------------------------------------------------------
-  it("applies exponential backoff: nextAttemptAt grows with attempts", async () => {
-    const rowA = makeRow({ id: "row-a", attempts: 0 });
-    const rowB = makeRow({ id: "row-b", attempts: 2 });
-
-    const depsA = makeDeps();
-    const fixedNow = new Date("2026-01-01T12:00:00Z");
-    depsA.now = () => fixedNow;
-    depsA.dbFindMany.mockResolvedValue([rowA]);
-    depsA.sendEmail.mockRejectedValue(new Error("fail"));
-
-    const depsB = makeDeps();
-    depsB.now = () => fixedNow;
-    depsB.dbFindMany.mockResolvedValue([rowB]);
-    depsB.sendEmail.mockRejectedValue(new Error("fail"));
-
-    await drainLeadOutbox(depsA, "sub-a");
-    await drainLeadOutbox(depsB, "sub-b");
-
-    const callA = depsA.dbUpdate.mock.calls[0][0];
-    const callB = depsB.dbUpdate.mock.calls[0][0];
-
-    const delayA = callA.data.nextAttemptAt.getTime() - fixedNow.getTime();
-    const delayB = callB.data.nextAttemptAt.getTime() - fixedNow.getTime();
-
-    // Delay B (attempts=2) should be strictly greater than delay A (attempts=0)
-    expect(delayB).toBeGreaterThan(delayA);
-    // Both should be positive (future)
-    expect(delayA).toBeGreaterThan(0);
-    expect(delayB).toBeGreaterThan(0);
-  });
-
-  // -------------------------------------------------------------------------
-  // Mixed: one success, one failure
-  // -------------------------------------------------------------------------
-  it("handles a mix of success and failure across multiple rows", async () => {
-    const rowOk = makeRow({ id: "row-ok", recipientEmail: "ok@example.com" });
-    const rowFail = makeRow({ id: "row-bad", recipientEmail: "bad@example.com" });
-
-    const deps = makeDeps();
-    deps.dbFindMany.mockResolvedValue([rowOk, rowFail]);
-    deps.sendEmail
-      .mockResolvedValueOnce(undefined)
-      .mockRejectedValueOnce(new Error("network error"));
-
-    const result = await drainLeadOutbox(deps, SUBMISSION_ID);
-
-    expect(result).toEqual({ sent: 1, failed: 1, skipped: 0 });
-
-    // row-ok → SENT
-    const okCall = deps.dbUpdate.mock.calls.find(
-      (c: any) => c[0].where.id === "row-ok"
+  it("passes submission scope to event claims and null to the global cron", async () => {
+    const eventDeps = makeDeps();
+    await drainLeadOutbox(eventDeps, "sub-1");
+    expect(eventDeps.claimNext).toHaveBeenCalledWith(
+      expect.objectContaining({ submissionId: "sub-1" }),
     );
-    expect(okCall[0].data.status).toBe("SENT");
 
-    // row-bad → still PENDING (attempts < maxAttempts)
-    const failCall = deps.dbUpdate.mock.calls.find(
-      (c: any) => c[0].where.id === "row-bad"
+    const cronDeps = makeDeps();
+    await drainLeadOutbox(cronDeps, null);
+    expect(cronDeps.claimNext).toHaveBeenCalledWith(
+      expect.objectContaining({ submissionId: null }),
     );
-    expect(failCall[0].data.status).toBe("PENDING");
-    expect(failCall[0].data.attempts).toBe(1);
   });
 
-  // -------------------------------------------------------------------------
-  // SEC-M4: PII purge — bodyHtml cleared on SENT + on terminal FAILED, kept on PENDING
-  // -------------------------------------------------------------------------
-  it("SEC-M4: clears bodyHtml to \"\" when a row is marked SENT", async () => {
-    const row = makeRow({ id: "row-sent", bodyHtml: "<table>PII REPORT</table>" });
+  it("claims just in time with a lease longer than the transport maximum", async () => {
     const deps = makeDeps();
-    deps.dbFindMany.mockResolvedValue([row]);
+    deps.leaseMs = 120_000;
 
-    await drainLeadOutbox(deps, SUBMISSION_ID);
+    await drainLeadOutbox(deps, null);
 
-    const call = deps.dbUpdate.mock.calls[0][0];
-    expect(call.data.status).toBe("SENT");
-    expect(call.data.bodyHtml).toBe("");
+    const claim = deps.claimNext.mock.calls[0][0];
+    expect(claim.leaseExpiresAt.getTime() - claim.now.getTime()).toBe(120_000);
   });
 
-  it("SEC-M4: clears bodyHtml to \"\" on a TERMINAL FAILED row", async () => {
-    const row = makeRow({ id: "row-dead", attempts: 4, bodyHtml: "<table>PII</table>" });
-    const deps = makeDeps();
-    deps.dbFindMany.mockResolvedValue([row]);
-    deps.sendEmail.mockRejectedValue(new Error("Permanent failure"));
+  it("requeues a transient failure using the attempt consumed at claim time", async () => {
+    const row = makeRow({ attempts: 2, leaseToken: "lease-fail" });
+    const deps = makeDeps([row]);
+    deps.sendEmail.mockRejectedValue(new Error("SMTP unavailable"));
 
-    await drainLeadOutbox(deps, SUBMISSION_ID);
+    await expect(drainLeadOutbox(deps, "sub-1")).resolves.toEqual({
+      sent: 0,
+      failed: 1,
+      skipped: 0,
+    });
 
-    const call = deps.dbUpdate.mock.calls[0][0];
-    expect(call.data.status).toBe("FAILED");
-    expect(call.data.bodyHtml).toBe("");
+    expect(deps.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: row.id,
+        status: "SENDING",
+        leaseToken: row.leaseToken,
+      },
+      data: expect.objectContaining({
+        status: "PENDING",
+        lastError: "SMTP unavailable",
+        leaseToken: null,
+        leaseExpiresAt: null,
+        nextAttemptAt: new Date("2026-07-30T03:04:00.000Z"),
+      }),
+    });
+    expect(deps.updateMany.mock.calls[0][0].data).not.toHaveProperty("attempts");
   });
 
-  it("SEC-M4: does NOT clear bodyHtml while a row stays PENDING (still needed for retry)", async () => {
-    const row = makeRow({ id: "row-retry", attempts: 0, bodyHtml: "<table>PII</table>" });
-    const deps = makeDeps();
-    deps.dbFindMany.mockResolvedValue([row]);
-    deps.sendEmail.mockRejectedValue(new Error("Transient"));
+  it("records a durable dead letter before purging terminal PII", async () => {
+    const row = makeRow({ attempts: 5, bodyHtml: "<p>PII</p>" });
+    const deps = makeDeps([row]);
+    deps.sendEmail.mockRejectedValue(new Error("permanent"));
 
-    await drainLeadOutbox(deps, SUBMISSION_ID);
+    await drainLeadOutbox(deps, "sub-1");
 
-    const call = deps.dbUpdate.mock.calls[0][0];
-    expect(call.data.status).toBe("PENDING");
-    expect(call.data.bodyHtml).toBeUndefined();
+    expect(deps.recordDeadLetter).toHaveBeenCalledWith(
+      expect.objectContaining({
+        submissionId: row.submissionId,
+        outboxId: row.id,
+        recipientRole: row.recipientRole,
+        attempts: 5,
+        errorClass: "Error",
+      }),
+    );
+    expect(deps.recordDeadLetter.mock.invocationCallOrder[0]).toBeLessThan(
+      deps.updateMany.mock.invocationCallOrder[0],
+    );
+    expect(deps.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: "FAILED",
+          bodyHtml: "",
+        }),
+      }),
+    );
   });
-});
 
-// ---------------------------------------------------------------------------
-// listSubmissionsWithDueOutbox — the cron drain's due-scan
-// ---------------------------------------------------------------------------
+  it("does not purge or terminally update when dead-letter audit fails", async () => {
+    const row = makeRow({ attempts: 5, bodyHtml: "<p>PII</p>" });
+    const deps = makeDeps([row]);
+    deps.sendEmail.mockRejectedValue(new Error("permanent"));
+    deps.recordDeadLetter.mockRejectedValue(new Error("audit unavailable"));
 
-describe("listSubmissionsWithDueOutbox", () => {
-  const now = new Date("2026-06-09T12:00:00Z");
+    await expect(drainLeadOutbox(deps, "sub-1")).rejects.toThrow(
+      "audit unavailable",
+    );
+    expect(deps.updateMany).not.toHaveBeenCalled();
+  });
 
-  it("queries PENDING rows due now, distinct by submissionId, bounded by limit", async () => {
-    const findMany = jest
-      .fn()
-      .mockResolvedValue([{ submissionId: "sub-a" }, { submissionId: "sub-b" }]);
-    const db: DueScanDb = { assessmentEmailOutbox: { findMany } } as any;
+  it("treats a lost lease-token completion as skipped", async () => {
+    const deps = makeDeps([makeRow()]);
+    deps.updateMany.mockResolvedValue({ count: 0 });
 
-    const ids = await listSubmissionsWithDueOutbox(db, now, 50);
-
-    expect(ids).toEqual(["sub-a", "sub-b"]);
-    expect(findMany).toHaveBeenCalledWith({
-      where: { status: "PENDING", nextAttemptAt: { lte: now } },
-      select: { submissionId: true },
-      distinct: ["submissionId"],
-      take: 50,
+    await expect(drainLeadOutbox(deps, "sub-1")).resolves.toEqual({
+      sent: 0,
+      failed: 0,
+      skipped: 1,
     });
   });
 
-  it("returns [] when nothing is due", async () => {
-    const findMany = jest.fn().mockResolvedValue([]);
-    const db: DueScanDb = { assessmentEmailOutbox: { findMany } } as any;
-    expect(await listSubmissionsWithDueOutbox(db, now)).toEqual([]);
+  it("stops before claiming when invocation budget is exhausted", async () => {
+    const times = [
+      new Date("2026-07-30T03:00:00.000Z"),
+      new Date("2026-07-30T03:00:45.000Z"),
+    ];
+    const deps = makeDeps([makeRow()]);
+    deps.now = () => times.shift() ?? times[0];
+    deps.invocationBudgetMs = 40_000;
+
+    await expect(drainLeadOutbox(deps, null)).resolves.toEqual({
+      sent: 0,
+      failed: 0,
+      skipped: 0,
+    });
+    expect(deps.claimNext).not.toHaveBeenCalled();
   });
 
-  it("defaults the limit to 200", async () => {
-    const findMany = jest.fn().mockResolvedValue([]);
-    const db: DueScanDb = { assessmentEmailOutbox: { findMany } } as any;
-    await listSubmissionsWithDueOutbox(db, now);
-    expect(findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ take: 200 }),
-    );
+  it("bounds the number of claims per invocation", async () => {
+    const deps = makeDeps([
+      makeRow({ id: "row-1", leaseToken: "lease-1" }),
+      makeRow({ id: "row-2", leaseToken: "lease-2" }),
+    ]);
+    deps.maxRows = 1;
+
+    await drainLeadOutbox(deps, null);
+
+    expect(deps.sendEmail).toHaveBeenCalledTimes(1);
+    expect(deps.claimNext).toHaveBeenCalledTimes(1);
   });
 });
