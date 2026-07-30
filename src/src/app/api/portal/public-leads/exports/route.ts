@@ -1,6 +1,5 @@
 import { createHash } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import { db } from "@/lib/db";
 import { getApiActor } from "@/lib/auth/authorization";
 import {
@@ -9,20 +8,10 @@ import {
 } from "@/lib/assessments/public-leads-state";
 import { inngest } from "@/inngest/client";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
-
-const ExportFilterSchema = z.object({
-  search: z.string().trim().max(320).optional().default(""),
-  assessment: z.string().trim().max(200).optional().default(""),
-  from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-});
-
-function boundary(value: string | undefined, end: boolean) {
-  if (!value) return undefined;
-  const date = new Date(`${value}T00:00:00.000Z`);
-  if (end) date.setUTCDate(date.getUTCDate() + 1);
-  return date;
-}
+import {
+  buildPublicLeadSubmissionWhere,
+  PublicLeadFilterSchema,
+} from "@/lib/assessments/public-lead-filters";
 
 export async function POST(request: NextRequest) {
   const rate = await withRateLimit(request, RateLimits.search);
@@ -39,7 +28,7 @@ export async function POST(request: NextRequest) {
       { status: 404 },
     );
   }
-  const parsed = ExportFilterSchema.safeParse(
+  const parsed = PublicLeadFilterSchema.safeParse(
     await request.json().catch(() => ({})),
   );
   if (!parsed.success) {
@@ -59,9 +48,6 @@ export async function POST(request: NextRequest) {
   }
 
   const filter = parsed.data;
-  const search = filter.search.toLowerCase();
-  const from = boundary(filter.from, false);
-  const to = boundary(filter.to, true);
   const retentionCutoff = publicLeadRetentionCutoff(state);
   if (retentionCutoff === null) {
     return NextResponse.json(
@@ -69,34 +55,15 @@ export async function POST(request: NextRequest) {
       { status: 404 },
     );
   }
-  const effectiveFrom =
-    from && from > retentionCutoff ? from : retentionCutoff;
+  const where = buildPublicLeadSubmissionWhere({
+    coachId: actor.coachId,
+    filter,
+    retentionCutoff,
+  });
 
   const exportId = await db.$transaction(async (tx) => {
     const submissions = await tx.assessmentSubmission.findMany({
-      where: {
-        referringCoachId: actor.coachId,
-        publicLeadDeletedAt: null,
-        respondentId: null,
-        campaign: {
-          deletedAt: null,
-          ...(filter.assessment
-            ? { templateId: filter.assessment }
-            : {}),
-        },
-        submittedAt: {
-          gte: effectiveFrom,
-          ...(to ? { lt: to } : {}),
-        },
-        ...(search
-          ? {
-              OR: [
-                { publicTakerNameNormalized: { startsWith: search } },
-                { publicTakerEmailNormalized: { startsWith: search } },
-              ],
-            }
-          : {}),
-      },
+      where,
       orderBy: [{ submittedAt: "desc" }, { id: "desc" }],
       select: { id: true },
     });

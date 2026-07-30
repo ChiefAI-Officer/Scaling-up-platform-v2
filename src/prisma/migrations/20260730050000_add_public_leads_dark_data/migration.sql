@@ -242,3 +242,13 @@ CREATE UNIQUE INDEX "public_lead_export_chunks_exportId_batchIndex_key"
   ON "public_lead_export_chunks" ("exportId", "batchIndex");
 CREATE INDEX "public_lead_export_chunks_exportId_batchIndex_idx"
   ON "public_lead_export_chunks" ("exportId", "batchIndex");
+
+CREATE TABLE "public_lead_delivery_fences" (
+  "id" TEXT NOT NULL,
+  "generation" INTEGER NOT NULL DEFAULT 0,
+  "blocked" BOOLEAN NOT NULL DEFAULT false,
+  "blockedAt" TIMESTAMP(3),
+  "quiescedAt" TIMESTAMP(3),
+  "updatedAt" TIMESTAMP(3) NOT NULL,
+  CONSTRAINT "public_lead_delivery_fences_pkey" PRIMARY KEY ("id")
+);

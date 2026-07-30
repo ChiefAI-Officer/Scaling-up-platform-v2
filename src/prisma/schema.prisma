@@ -1524,6 +1524,17 @@ model PublicLeadExportChunk {
   @@map("public_lead_export_chunks")
 }
 
+model PublicLeadDeliveryFence {
+  id         String    @id
+  generation Int       @default(0)
+  blocked    Boolean   @default(false)
+  blockedAt  DateTime?
+  quiescedAt DateTime?
+  updatedAt  DateTime  @updatedAt
+
+  @@map("public_lead_delivery_fences")
+}
+
 model PublicLeadExportItem {
   id           String @id @default(cuid())
   exportId     String

@@ -13,12 +13,48 @@ import { db } from "@/lib/db";
 import { sendEmailViaSMTP } from "@/lib/smtp-transport";
 import { resolvePublicLeadsState } from "@/lib/assessments/public-leads-state";
 import { normalizeMailbox } from "@/lib/assessments/quick-assessment-lead";
+import { isDistributedRateLimiterHealthy } from "@/lib/rate-limit";
 
 const DEFAULT_LEASE_MS = 120_000;
 const DEFAULT_INVOCATION_BUDGET_MS = 45_000;
 const DEFAULT_EVENT_ROWS = 10;
 const DEFAULT_CRON_ROWS = 50;
 const DEFAULT_MAX_ATTEMPTS = 5;
+
+function envEnabled(value: string | undefined): boolean {
+  return value === "1" || value?.toLowerCase() === "true";
+}
+
+async function syncPublicLeadDeliveryFence(): Promise<void> {
+  const blocked = envEnabled(process.env.WAVE_PUBLIC_LEADS_KILL);
+  const now = new Date();
+  await db.$executeRaw(Prisma.sql`
+    INSERT INTO "public_lead_delivery_fences"
+      ("id", "generation", "blocked", "blockedAt", "quiescedAt", "updatedAt")
+    VALUES
+      ('global', ${blocked ? 1 : 0}, ${blocked}, ${blocked ? now : null}, NULL, ${now})
+    ON CONFLICT ("id") DO UPDATE SET
+      "generation" = CASE
+        WHEN "public_lead_delivery_fences"."blocked" <> EXCLUDED."blocked"
+          THEN "public_lead_delivery_fences"."generation" + 1
+        ELSE "public_lead_delivery_fences"."generation"
+      END,
+      "blocked" = EXCLUDED."blocked",
+      "blockedAt" = CASE
+        WHEN EXCLUDED."blocked"
+          AND NOT "public_lead_delivery_fences"."blocked"
+          THEN EXCLUDED."blockedAt"
+        WHEN EXCLUDED."blocked" THEN "public_lead_delivery_fences"."blockedAt"
+        ELSE NULL
+      END,
+      "quiescedAt" = CASE
+        WHEN "public_lead_delivery_fences"."blocked" <> EXCLUDED."blocked"
+          THEN NULL
+        ELSE "public_lead_delivery_fences"."quiescedAt"
+      END,
+      "updatedAt" = EXCLUDED."updatedAt"
+  `);
+}
 
 export interface ClaimedOutboxRow {
   id: string;
@@ -33,6 +69,7 @@ export interface ClaimedOutboxRow {
   leaseToken: string;
   leaseExpiresAt: Date;
   featureKey?: string | null;
+  contentProvenance?: unknown;
   previousStatus?: string;
   sendFenceGeneration: number;
 }
@@ -81,6 +118,7 @@ export interface DrainDeps {
   maxRows?: number;
   leaseMs?: number;
   invocationBudgetMs?: number;
+  limiterHealthy?: () => Promise<boolean>;
 }
 
 export interface DrainResult {
@@ -107,18 +145,27 @@ export async function claimNextOutboxRow(
 
   const rows = await claimDb.$queryRaw<ClaimedOutboxRow[]>(Prisma.sql`
     WITH candidate AS (
-      SELECT "id", "status" AS "previousStatus"
-      FROM "assessment_email_outbox"
+      SELECT outbox."id", outbox."status" AS "previousStatus"
+      FROM "assessment_email_outbox" AS outbox
       WHERE (
         (
-          "status" = 'PENDING'
-          AND "nextAttemptAt" <= ${input.now}
+          outbox."status" = 'PENDING'
+          AND outbox."nextAttemptAt" <= ${input.now}
         )
         OR (
-          "status" = 'SENDING'
-          AND "leaseExpiresAt" <= ${input.now}
+          outbox."status" = 'SENDING'
+          AND outbox."leaseExpiresAt" <= ${input.now}
         )
         ${heldClause}
+      )
+      AND NOT (
+        outbox."featureKey" = 'PUBLIC_LEADS'
+        AND outbox."recipientRole" = 'REFERRING_COACH'
+        AND EXISTS (
+          SELECT 1
+          FROM "public_lead_delivery_fences" AS fence
+          WHERE fence."id" = 'global' AND fence."blocked" = true
+        )
       )
       ${submissionClause}
       ORDER BY "nextAttemptAt" ASC, "createdAt" ASC, "id" ASC
@@ -147,6 +194,7 @@ export async function claimNextOutboxRow(
       outbox."leaseToken",
       outbox."leaseExpiresAt",
       outbox."featureKey",
+      outbox."contentProvenance",
       outbox."sendFenceGeneration",
       candidate."previousStatus"
   `);
@@ -191,7 +239,7 @@ async function defaultAuthorizeBeforeSend(
   if (row.featureKey !== "PUBLIC_LEADS") {
     return { allowed: true };
   }
-  const candidates = await authorizationDb.$queryRaw<
+  const candidates = (await authorizationDb.$queryRaw<
     Array<{
       coachId: string;
       email: string;
@@ -213,34 +261,44 @@ async function defaultAuthorizeBeforeSend(
       ON coach."id" = submission."referringCoachId"
     WHERE submission."id" = ${row.submissionId}
     LIMIT 1
-  `);
+  `)) ?? [];
   const candidate = candidates[0];
   const state = resolvePublicLeadsState(process.env, {
     coachId: candidate?.coachId ?? null,
   });
-  const eligible =
+  const eligibleCoach =
     candidate !== undefined &&
     candidate.deletedAt === null &&
     candidate.publicLeadDeletedAt === null &&
     candidate.certificationStatus === "ACTIVE" &&
     (candidate.certificationExpiry === null ||
-      candidate.certificationExpiry > new Date()) &&
-    normalizeMailbox(candidate.email) ===
-      normalizeMailbox(row.recipientEmail);
+      candidate.certificationExpiry > new Date());
   if (row.recipientRole === "REFERRING_COACH") {
-    return state.sendCoachNotification && eligible
+    const recipientMatches =
+      candidate !== undefined &&
+      normalizeMailbox(candidate.email) ===
+        normalizeMailbox(row.recipientEmail);
+    return state.sendCoachNotification && eligibleCoach && recipientMatches
       ? { allowed: true }
       : { allowed: false, reason: "PUBLIC_LEAD_AUTHORIZATION_REVOKED" };
   }
-  if (row.recipientRole === "TAKER_COPY" && !state.presentationEnabled) {
+  if (
+    row.recipientRole === "TAKER_COPY" &&
+    (!state.presentationEnabled || !eligibleCoach)
+  ) {
+    const provenance =
+      row.contentProvenance &&
+      typeof row.contentProvenance === "object" &&
+      !Array.isArray(row.contentProvenance)
+        ? (row.contentProvenance as Record<string, unknown>)
+        : {};
+    const genericBodyHtml = provenance.genericBodyHtml;
+    if (typeof genericBodyHtml !== "string" || genericBodyHtml.length === 0) {
+      return { allowed: false, reason: "GENERIC_TAKER_RENDER_MISSING" };
+    }
     return {
       allowed: true,
-      bodyHtml: row.bodyHtml
-        .replace(
-          /href="mailto:[^"]*"/g,
-          'href="https://scalingup.com/coaches"',
-        )
-        .replaceAll("Talk to your coach →", "Find a coach →"),
+      bodyHtml: genericBodyHtml,
     };
   }
   return { allowed: true };
@@ -255,6 +313,7 @@ export async function drainLeadOutbox(
   deps: DrainDeps,
   submissionId: string | null,
 ): Promise<DrainResult> {
+  if (!deps.claimNext) await syncPublicLeadDeliveryFence();
   const currentTime = deps.now ?? (() => new Date());
   const makeLeaseToken = deps.makeLeaseToken ?? randomUUID;
   const maxAttempts = deps.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
@@ -273,12 +332,15 @@ export async function drainLeadOutbox(
   const authorizeBeforeSend =
     deps.authorizeBeforeSend ??
     ((row: ClaimedOutboxRow) => defaultAuthorizeBeforeSend(deps.db, row));
-  const releaseHeld =
+  const releaseConfigured =
     (process.env.PUBLIC_LEADS_POLICY_APPROVED === "1" ||
       process.env.PUBLIC_LEADS_POLICY_APPROVED?.toLowerCase() === "true") &&
     (process.env.PUBLIC_LEADS_DISTRIBUTED_LIMITER_READY === "1" ||
       process.env.PUBLIC_LEADS_DISTRIBUTED_LIMITER_READY?.toLowerCase() ===
         "true");
+  const releaseHeld =
+    releaseConfigured &&
+    (await (deps.limiterHealthy ?? isDistributedRateLimiterHealthy)());
 
   const startedAt = currentTime().getTime();
   let sent = 0;
@@ -403,12 +465,19 @@ export async function drainLeadOutbox(
           leaseToken: row.leaseToken,
         },
         data: {
-          status: terminal ? "FAILED" : "PENDING",
+          status:
+            row.previousStatus === "HELD"
+              ? "HELD"
+              : terminal
+                ? "FAILED"
+                : "PENDING",
           lastError: errorMessageOf(error),
           nextAttemptAt: new Date(failureNow.getTime() + backoffMs),
           leaseToken: null,
           leaseExpiresAt: null,
-          ...(terminal ? { bodyHtml: "" } : {}),
+          ...(terminal && row.previousStatus !== "HELD"
+            ? { bodyHtml: "" }
+            : {}),
         },
       });
 
@@ -513,6 +582,48 @@ export const publicLeadMailFenceReconciler = inngest.createFunction(
           });
         });
       }
-      return { reconciled: coaches.length };
+      const globalFence = await db.publicLeadDeliveryFence.findFirst({
+        where: {
+          id: "global",
+          blocked: true,
+          blockedAt: { lte: transportBound },
+          quiescedAt: null,
+        },
+      });
+      if (globalFence) {
+        const activeLeases = await db.assessmentEmailOutbox.count({
+          where: {
+            featureKey: "PUBLIC_LEADS",
+            recipientRole: "REFERRING_COACH",
+            status: "SENDING",
+            leaseExpiresAt: { gt: now },
+          },
+        });
+        if (activeLeases === 0) {
+          await db.$transaction([
+            db.publicLeadDeliveryFence.update({
+              where: { id: globalFence.id },
+              data: { quiescedAt: now },
+            }),
+            db.auditLog.create({
+              data: {
+                entityType: "PublicLeadDeliveryFence",
+                entityId: globalFence.id,
+                action: "PUBLIC_LEAD_MAIL_QUIESCED",
+                performedBy: "assessment-email-worker",
+                changes: JSON.stringify({
+                  generation: globalFence.generation,
+                  blockedAt: globalFence.blockedAt,
+                  quiescedAt: now,
+                  possibleInFlightExposure: true,
+                }),
+              },
+            }),
+          ]);
+        }
+      }
+      return {
+        reconciled: coaches.length + (globalFence ? 1 : 0),
+      };
     }),
 );

@@ -428,6 +428,10 @@ export async function POST(
         report: respondentReport,
         recipientRole: "TAKER_COPY",
       });
+      const genericTakerCopy = buildReportEmailHtml({
+        report: { ...respondentReport, referringCoachEmail: null },
+        recipientRole: "TAKER_COPY",
+      });
       const featureMetadata = input.state.legacyDelivery
         ? {}
         : {
@@ -439,6 +443,7 @@ export async function POST(
             contentProvenance: {
               kind: "PUBLIC_TAKER_REPORT",
               version: 1,
+              genericBodyHtml: genericTakerCopy.bodyHtml,
             } as Prisma.InputJsonValue,
           };
       const heldStatus = input.state.holdTakerAndTeamMail

@@ -30,6 +30,8 @@ floor.
 2. Configure the Redis limiter and load-test the campaign/IP and
    campaign/email budgets. Set the HMAC secrets and encrypted-export key.
 3. Set conservative global/per-campaign HELD caps and exercise a Redis outage.
+   HELD release requires a live Redis `PING`; the readiness flag alone never
+   releases mail, and a failed release attempt returns the row to `HELD`.
 4. Issue opaque keys only for the approved Coach-ID cohort, record the issuance
    audit, then set `PUBLIC_LEADS_REFERRAL_KEYS_ISSUED=1`.
 5. Set `WAVE_PUBLIC_LEADS_CANARY_COACH_IDS` without enabling the global flag.
@@ -49,7 +51,8 @@ while waiting for the worker.
 Set `WAVE_PUBLIC_LEADS_KILL=1` and redeploy. Post-issuance parsing remains on,
 but coach presentation and notification stop. Cancel feature-provenance Coach
 rows, invalidate their lease tokens, purge their rendered bodies, and record
-the send-fence generation. Do not report mail quiesced until every active lease
+the database-backed global send-fence generation. The worker synchronizes that
+fence before claiming and refuses new Coach claims while blocked. Do not report mail quiesced until every active lease
 has terminated or the transport-bound timeout has elapsed; record any SMTP call
 already in flight as a possible exposure.
 

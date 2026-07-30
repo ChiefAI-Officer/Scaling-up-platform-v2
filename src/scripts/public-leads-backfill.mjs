@@ -39,6 +39,10 @@ if (!Array.isArray(mappings)) throw new Error("Mapping file must be an array");
 const runId = approvedManifest?.runId ?? randomUUID();
 const prisma = new PrismaClient();
 
+function enabled(value) {
+  return value === "1" || value?.toLowerCase() === "true";
+}
+
 try {
   const assessed = [];
   for (const mapping of mappings) {
@@ -136,6 +140,19 @@ try {
       await writeFile(manifestOut, `${JSON.stringify(frozenManifest, null, 2)}\n`);
     }
   } else {
+    const policyVersion = process.env.PUBLIC_LEADS_POLICY_VERSION?.trim();
+    const retentionDays = Number(process.env.PUBLIC_LEADS_RETENTION_DAYS);
+    const deletionMode = process.env.PUBLIC_LEADS_DELETION_MODE;
+    if (
+      !enabled(process.env.PUBLIC_LEADS_POLICY_APPROVED) ||
+      !enabled(process.env.PUBLIC_LEADS_DISTRIBUTED_LIMITER_READY) ||
+      !policyVersion ||
+      !Number.isSafeInteger(retentionDays) ||
+      retentionDays <= 0 ||
+      !["ANONYMIZE", "DELETE"].includes(deletionMode)
+    ) {
+      throw new Error("Approved Public-leads policy boundary is unavailable");
+    }
     if (
       !approvedManifest ||
       !approvedDigest ||
@@ -187,8 +204,7 @@ try {
             referringCoachId: coach.id,
             referringCoachEmailSnapshot: coach.email.trim().toLowerCase(),
             attributionSource: "APPROVED_BACKFILL",
-            publicLeadPolicyVersion:
-              process.env.PUBLIC_LEADS_POLICY_VERSION ?? null,
+            publicLeadPolicyVersion: policyVersion,
           },
         });
         if (updated.count !== 1) {

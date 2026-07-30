@@ -55,6 +55,7 @@ function makeDeps(rows: ClaimedOutboxRow[] = []): DrainDeps & {
     updateMany,
     sendEmail,
     recordDeadLetter,
+    limiterHealthy: jest.fn().mockResolvedValue(true),
     now: () => new Date("2026-07-30T03:00:00.000Z"),
     makeLeaseToken: (() => {
       let i = 0;

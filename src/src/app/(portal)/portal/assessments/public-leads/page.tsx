@@ -8,19 +8,15 @@ import {
   resolvePublicLeadsState,
 } from "@/lib/assessments/public-leads-state";
 import { PublicLeadExportButton } from "@/components/assessments/PublicLeadExportButton";
+import {
+  buildPublicLeadSubmissionWhere,
+  PublicLeadFilterSchema,
+} from "@/lib/assessments/public-lead-filters";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 const PAGE_SIZE = 25;
-
-function dateBoundary(value: string | undefined, endExclusive: boolean) {
-  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined;
-  const date = new Date(`${value}T00:00:00.000Z`);
-  if (Number.isNaN(date.getTime())) return undefined;
-  if (endExclusive) date.setUTCDate(date.getUTCDate() + 1);
-  return date;
-}
 
 function resultHeadline(value: unknown): string {
   if (!value || typeof value !== "object") return "Completed";
@@ -54,44 +50,23 @@ export default async function PublicLeadsPage({
   }
 
   const raw = await searchParams;
-  const search =
-    typeof raw.search === "string" ? raw.search.trim().toLowerCase() : "";
-  const assessment =
-    typeof raw.assessment === "string" ? raw.assessment.trim() : "";
   const cursor = typeof raw.cursor === "string" ? raw.cursor : null;
-  const from = dateBoundary(
-    typeof raw.from === "string" ? raw.from : undefined,
-    false,
-  );
-  const to = dateBoundary(
-    typeof raw.to === "string" ? raw.to : undefined,
-    true,
-  );
+  const parsed = PublicLeadFilterSchema.safeParse({
+    search: typeof raw.search === "string" ? raw.search : undefined,
+    assessment:
+      typeof raw.assessment === "string" ? raw.assessment : undefined,
+    from: typeof raw.from === "string" ? raw.from : undefined,
+    to: typeof raw.to === "string" ? raw.to : undefined,
+  });
+  if (!parsed.success) notFound();
+  const { search, assessment, from, to } = parsed.data;
   const retentionCutoff = publicLeadRetentionCutoff(state);
   if (retentionCutoff === null) notFound();
-  const effectiveFrom =
-    from && from > retentionCutoff ? from : retentionCutoff;
-
-  const where = {
-    referringCoachId: coach.id,
-    publicLeadDeletedAt: null,
-    respondentId: null,
-    ...(assessment
-      ? { campaign: { templateId: assessment, deletedAt: null } }
-      : { campaign: { deletedAt: null } }),
-    submittedAt: {
-      gte: effectiveFrom,
-      ...(to ? { lt: to } : {}),
-    },
-    ...(search
-      ? {
-          OR: [
-            { publicTakerNameNormalized: { startsWith: search } },
-            { publicTakerEmailNormalized: { startsWith: search } },
-          ],
-        }
-      : {}),
-  };
+  const where = buildPublicLeadSubmissionWhere({
+    coachId: coach.id,
+    filter: parsed.data,
+    retentionCutoff,
+  });
 
   const leads = await db.assessmentSubmission.findMany({
     where,

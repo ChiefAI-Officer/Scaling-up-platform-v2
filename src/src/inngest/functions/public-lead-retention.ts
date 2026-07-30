@@ -6,7 +6,7 @@ import {
   resolvePublicLeadsState,
 } from "@/lib/assessments/public-leads-state";
 
-const RETENTION_BATCH_SIZE = 500;
+const RETENTION_BATCH_SIZE = 5_000;
 
 export const publicLeadRetention = inngest.createFunction(
   {
@@ -14,7 +14,7 @@ export const publicLeadRetention = inngest.createFunction(
     retries: 3,
     concurrency: { limit: 1 },
   },
-  { cron: "17 3 * * *" },
+  { cron: "* * * * *" },
   async ({ step }) =>
     step.run("apply-public-lead-retention", async () => {
       const state = resolvePublicLeadsState(process.env, { coachId: null });
@@ -81,6 +81,12 @@ export const publicLeadRetention = inngest.createFunction(
               referringCoachEmailSnapshot: null,
               answers: [],
               result: { retained: false },
+              ...(state.deletionMode === "DELETE"
+                ? {
+                    referringCoachId: null,
+                    attributionSource: null,
+                  }
+                : {}),
             },
           });
         }
@@ -96,6 +102,7 @@ export const publicLeadRetention = inngest.createFunction(
                 deletionMode: state.deletionMode,
                 cutoff: cutoff.toISOString(),
                 processed: expired.length,
+                mailQuiescence: "PENDING_TRANSPORT_BOUND",
               }),
             },
           });

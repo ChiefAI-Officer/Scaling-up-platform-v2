@@ -134,6 +134,16 @@ export async function checkDistributedDualRateLimit(
   };
 }
 
+export async function isDistributedRateLimiterHealthy(): Promise<boolean> {
+  const redis = getRedisClient();
+  if (!redis) return false;
+  try {
+    return (await redis.ping()) === "PONG";
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Check rate limit using Redis (production) or in-memory (development)
  */

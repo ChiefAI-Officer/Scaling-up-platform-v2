@@ -95,9 +95,22 @@ export const publicLeadExport = inngest.createFunction(
           // durable batch checkpoint. A retry resumes at nextSortOrder.
           const actor = await db.user.findFirst({
             where: { id: job.requestedByUserId, deletedAt: null },
-            select: { id: true, role: true },
+            select: {
+              id: true,
+              role: true,
+              coachProfile: {
+                select: { id: true, deletedAt: true },
+              },
+            },
           });
-          if (!actor) throw new Error("EXPORT_ACTOR_INELIGIBLE");
+          if (
+            !actor ||
+            (job.ownerCoachId !== null &&
+              (actor.coachProfile?.id !== job.ownerCoachId ||
+                actor.coachProfile.deletedAt !== null))
+          ) {
+            throw new Error("EXPORT_ACTOR_INELIGIBLE");
+          }
           const state = resolvePublicLeadsState(process.env, {
             coachId: job.ownerCoachId,
           });
@@ -286,4 +299,48 @@ export const publicLeadExport = inngest.createFunction(
       }
     });
   },
+);
+
+export const publicLeadExportWatchdog = inngest.createFunction(
+  {
+    id: "assessment-public-lead-export-watchdog",
+    retries: 2,
+    concurrency: { limit: 1 },
+  },
+  { cron: "*/5 * * * *" },
+  async ({ step }) =>
+    step.run("resume-or-abort-public-lead-exports", async () => {
+      const now = new Date();
+      const stale = await db.publicLeadExport.findMany({
+        where: {
+          status: { in: ["PENDING", "RUNNING"] },
+          updatedAt: { lt: new Date(now.getTime() - 5 * 60 * 1_000) },
+        },
+        orderBy: { updatedAt: "asc" },
+        take: 25,
+        select: { id: true, createdAt: true },
+      });
+      let resumed = 0;
+      let aborted = 0;
+      for (const job of stale) {
+        if (job.createdAt < new Date(now.getTime() - 24 * 60 * 60 * 1_000)) {
+          await db.publicLeadExport.update({
+            where: { id: job.id },
+            data: {
+              status: "ABORTED",
+              abortedAt: now,
+              errorClass: "EXPORT_WATCHDOG_TIMEOUT",
+            },
+          });
+          aborted += 1;
+        } else {
+          await inngest.send({
+            name: "assessment/public-lead-export.requested",
+            data: { exportId: job.id },
+          });
+          resumed += 1;
+        }
+      }
+      return { resumed, aborted };
+    }),
 );

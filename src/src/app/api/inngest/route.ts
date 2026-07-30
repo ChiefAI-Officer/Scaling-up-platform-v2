@@ -17,7 +17,10 @@ import {
 import { assessmentInviteFanout } from "@/inngest/functions/assessment-invite-fanout";
 import { assessmentScheduledSendCron } from "@/inngest/functions/assessment-scheduled-send-cron";
 import { espertoImportAlertCron } from "@/inngest/functions/esperto-import-alert-cron";
-import { publicLeadExport } from "@/inngest/functions/public-lead-export";
+import {
+  publicLeadExport,
+  publicLeadExportWatchdog,
+} from "@/inngest/functions/public-lead-export";
 import { publicLeadRetention } from "@/inngest/functions/public-lead-retention";
 
 export const { GET, POST, PUT } = serve({
@@ -39,6 +42,7 @@ export const { GET, POST, PUT } = serve({
         assessmentScheduledSendCron,
         espertoImportAlertCron,
         publicLeadExport,
+        publicLeadExportWatchdog,
         publicLeadRetention,
     ],
 });
