@@ -259,13 +259,18 @@ export async function PATCH(
     // ─────────────────────────────────────────────────────────────────────
     // Wave OSR (#71) — on-screen respondent results toggle (flag-gated WRITE).
     //
-    //   - Flag OFF (or `_KILL` set) → the field is IGNORED, not written. Same
-    //     shape as `invitationBodyHtml` (Task 12) and `customSlides` (Wave M
-    //     R1-High-1): a stale or hand-rolled client must not be able to switch on
-    //     a respondent-facing disclosure while the operator's UI hides the
-    //     control. This does NOT contradict `wave-osr-flags.ts`'s "flags gate
-    //     capability, never persisted data" rule — refusing a NEW write is not
-    //     coercing a STORED value, and nothing here rewrites the column.
+    //   - Flag OFF (or `_KILL` set) → the field is IGNORED, not written, for
+    //     CONSISTENCY with the other two flag-gated fields on this route
+    //     (`invitationBodyHtml` Task 12, `customSlides` Wave M R1-High-1): a
+    //     hidden control should not be drivable from this route. This does NOT
+    //     contradict `wave-osr-flags.ts`'s "flags gate capability, never persisted
+    //     data" rule — refusing a NEW write is not coercing a STORED value, and
+    //     nothing here rewrites the column.
+    //
+    //     ⚠️ It is NOT a security boundary, so do not describe it as one: the
+    //     CREATE route writes this same column with no flag check, and disclosure
+    //     is decided server-side under the Phase-2 submission lock regardless of
+    //     what is stored. The gate is tidiness, and the lock is the control.
     //   - Flag ON → written in both directions (an explicit opt-OUT is a write,
     //     so the check is `!== undefined`, never truthiness).
     //
@@ -274,8 +279,8 @@ export async function PATCH(
     // the legacy single-update path below logs `changes: updateData`, so the
     // toggle rides along in it.
     //
-    // WHY this exists at all: the column shipped create-only, so the production
-    // flag (already enabled) surfaced nothing on any existing campaign.
+    // WHY this exists at all: the column was writable only at CREATE, so a
+    // campaign that already existed had no way to opt in.
     // ─────────────────────────────────────────────────────────────────────
     if (data.showResultsOnScreen !== undefined && isOnScreenResultsEnabled()) {
       updateData.showResultsOnScreen = data.showResultsOnScreen;

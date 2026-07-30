@@ -183,9 +183,13 @@ describe("Coach Validation Schema", () => {
   /**
    * GH #229 — `profileImage` is rendered as an <img src> on reports that Wave OSR
    * (#71) shows to unauthenticated respondents. The render site is the load-bearing
-   * guard; this is the write boundary. No UI sends this field (the coach portal
-   * uploads via Blob straight through Prisma), so the cases below describe direct
-   * admin API calls only.
+   * guard; this is the write boundary.
+   *
+   * This DOES reach a UI: `updateCoachSchema` is `createCoachSchema.partial()`, and
+   * the Bio editor PATCHes `profileImage` seeded from the stored value. So a stored
+   * non-https value would 400 an unrelated save. Two writers bypass this schema and
+   * could create one — the Blob upload route and `services/circle-sync.ts`. Scheme
+   * gating here is deliberate; the HOST is not constrained (see #229).
    */
   describe("profileImage — https-only (GH #229)", () => {
     function parse(profileImage: unknown) {

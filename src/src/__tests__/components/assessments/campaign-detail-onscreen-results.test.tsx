@@ -2,10 +2,10 @@
  * CampaignDetail — "Results on screen" control (Wave OSR, #71).
  *
  * This control is the reachability fix, and therefore the load-bearing piece of
- * the launch: the column shipped create-only, so every campaign that already
- * existed was stuck opted-out and the production flag surfaced nothing. Closing
- * the API gap without a control would move the dead end rather than remove it,
- * which is why this file guards the control itself and not only the route.
+ * the launch: the column was writable only at CREATE, so every campaign that
+ * already existed was stuck opted-out. Closing the API gap without a control would
+ * move the dead end rather than remove it, which is why this file guards the
+ * control itself and not only the route.
  *
  * Gate shape copied from the group-report entry point (Wave F #22, T10): the
  * server computes the boolean, the client never recomputes it, absent ⇒ hidden.
@@ -113,11 +113,19 @@ const ROW: CampaignRespondentRow = {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  global.fetch = jest.fn(async () => ({
-    ok: true,
-    status: 200,
-    json: async () => ({ success: true, data: {} }),
-  })) as unknown as typeof fetch;
+  // The handler verifies the echoed row, so the mock must return the field. A bare
+  // `data: {}` would exercise the silent-no-op path, not the success path.
+  global.fetch = jest.fn(async (_url: unknown, init?: { body?: string }) => {
+    const sent = init?.body ? JSON.parse(init.body) : {};
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        success: true,
+        data: { showResultsOnScreen: sent.showResultsOnScreen },
+      }),
+    };
+  }) as unknown as typeof fetch;
 });
 
 describe("CampaignDetail — Results on screen control (Wave OSR #71)", () => {
@@ -187,7 +195,11 @@ describe("CampaignDetail — Results on screen control (Wave OSR #71)", () => {
 
     fireEvent.click(screen.getByTestId(TOGGLE));
 
-    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+    // Generous timeout: this suite renders the whole CampaignDetail tree in jsdom,
+    // which under parallel full-suite load has exceeded the default 5s budget.
+    await waitFor(() => expect(global.fetch).toHaveBeenCalled(), {
+      timeout: 15000,
+    });
     const call = (global.fetch as jest.Mock).mock.calls.find((c) =>
       String(c[0]).includes(`/api/assessment-campaigns/${CAMPAIGN_ID}`),
     );
@@ -218,8 +230,12 @@ describe("CampaignDetail — Results on screen control (Wave OSR #71)", () => {
 
     // positive control: the request WAS attempted, so the revert below is a
     // response to a refusal and not just "the click did nothing".
-    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
-    await waitFor(() => expect(screen.getByTestId(TOGGLE)).not.toBeChecked());
+    await waitFor(() => expect(global.fetch).toHaveBeenCalled(), {
+      timeout: 15000,
+    });
+    await waitFor(() => expect(screen.getByTestId(TOGGLE)).not.toBeChecked(), {
+      timeout: 15000,
+    });
     expect(toast).toHaveBeenCalledWith(
       expect.objectContaining({ variant: "destructive" }),
     );

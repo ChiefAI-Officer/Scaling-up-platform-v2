@@ -15,6 +15,16 @@
  * only (the email sanitizer already strips http: images — stay consistent).
  * Rejects http:, javascript:, data:, protocol-relative, root-relative, bare
  * filenames, empty/null, and anything `new URL` cannot parse.
+ *
+ * SCOPE — what this does NOT do: it places **no constraint on the host**.
+ * `https://anywhere.example/pixel.png` passes. So it stops mixed content and
+ * non-http(s) schemes, but it does NOT stop a rendered image from causing an
+ * outbound request to a third-party host. Do not describe it as preventing that.
+ *
+ * A host allowlist is deliberately NOT used here: coach logos are legitimately
+ * third-party hosted (`services/circle-sync.ts` writes Circle avatar URLs), so
+ * an allowlist would drop real logos. Whether the host should be constrained is
+ * the open question on GH #229.
  */
 export function safeImageSrc(raw: string | null | undefined): string | null {
   if (typeof raw !== "string") return null;

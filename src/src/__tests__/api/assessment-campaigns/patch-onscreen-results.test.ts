@@ -1,28 +1,29 @@
 /**
  * Wave OSR (#71) — `showResultsOnScreen` on PATCH /api/assessment-campaigns/[id].
  *
- * WHY this exists: the column shipped create-only. `updateAssessmentCampaignSchema`
- * carried none of the campaign toggles, so a campaign that already existed could
- * never opt in — measured in prod as 0 of 76 campaigns with the toggle on. The
- * feature flag was already enabled in production, which means flipping the flag
- * on its own surfaced NOTHING. This route is the reachability fix.
+ * WHY this exists: `updateAssessmentCampaignSchema` carried none of the campaign
+ * toggles, so the column was writable only at CREATE and a campaign that already
+ * existed could never opt in. This route is the reachability fix.
  *
  * Contract (each choice follows this route's own precedent, not a new invention):
  *   - Flag OFF ⇒ the field is IGNORED, never written — the same shape as
- *     `invitationBodyHtml` (Task 12) and `customSlides` (Wave M R1-High-1), so a
- *     stale or hand-rolled client cannot silently switch on a respondent-facing
- *     disclosure while the operator's UI hides the control.
+ *     `invitationBodyHtml` (Task 12) and `customSlides` (Wave M R1-High-1). This is
+ *     consistency, NOT a security boundary: CREATE writes the same column with no
+ *     flag check, and disclosure is decided under the submission lock.
  *   - `_KILL` ⇒ treated as OFF (the flag helper hard-overrides).
  *   - Flag ON ⇒ persisted in BOTH directions, and audited. Auditing needs no new
  *     code: the legacy single-update path already logs `changes: updateData`, so
  *     the assertion here pins that the toggle actually rides along in it.
  *   - No CAS sentinel: unlike slides (authored HTML a clobber would destroy), a
- *     boolean has nothing to lose to last-write-wins.
+ *     boolean has nothing to lose to last-write-wins. Not asserted — the route only
+ *     enters the slides transaction when `customSlides` is present, so any such
+ *     assertion would be tautological for this branch.
  *   - CLOSED ⇒ 409 and non-owner ⇒ 404 are inherited guards; asserted so a future
  *     edit to the toggle branch cannot quietly bypass them.
  *
- * Every "not written" assertion is paired with a positive control in the same
- * test, so none of them can pass merely because the route errored out.
+ * The "not written" assertions carry positive controls (an accompanying field IS
+ * applied), so they cannot pass merely because the route errored out. The 409/404
+ * cases are the exception: their control is the sibling 200 case in this file.
  */
 
 jest.mock("next/server", () => ({
@@ -251,15 +252,5 @@ describe("PATCH showResultsOnScreen — flag ON", () => {
     );
     expect(res.status).toBe(404);
     expect(db.assessmentCampaign.update).not.toHaveBeenCalled();
-  });
-
-  it("does not require a CAS sentinel (a boolean has nothing to clobber)", async () => {
-    mockCampaign({ status: "ACTIVE" });
-    const res = await PATCH(
-      patchReq({ showResultsOnScreen: true }) as never,
-      detailParams("c1"),
-    );
-    expect(res.status).toBe(200);
-    expect(db.$transaction).not.toHaveBeenCalled();
   });
 });
