@@ -236,6 +236,7 @@ export async function viewPublicLeadReport(
     surface: "respondent",
     actor,
     noActorPolicy: "redirect-login",
+    flagGate: undefined,
     ip,
     userAgent,
     rateLimitKey: `public-lead-report:${actorKey}:${args.submissionId}:${ip}`,

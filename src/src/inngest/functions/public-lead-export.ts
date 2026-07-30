@@ -1,6 +1,5 @@
 import {
   createCipheriv,
-  createDecipheriv,
   createHash,
   randomBytes,
 } from "node:crypto";
@@ -36,17 +35,6 @@ function encryptChunk(plaintext: Buffer, key: Buffer) {
     nonce,
     authTag: cipher.getAuthTag(),
   };
-}
-
-function decryptChunk(
-  ciphertext: Buffer,
-  nonce: Buffer,
-  authTag: Buffer,
-  key: Buffer,
-) {
-  const decipher = createDecipheriv("aes-256-gcm", key, nonce);
-  decipher.setAuthTag(authTag);
-  return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
 }
 
 function takerOf(value: unknown): {
@@ -94,6 +82,9 @@ export const publicLeadExport = inngest.createFunction(
 
       try {
         const { key, version } = exportKey();
+        const digestBuilder = createHash("sha256");
+        let emittedTotal = 0;
+        let chunkCount = 0;
         let after = job.nextSortOrder - 1;
         while (true) {
           // Actor, owner, policy, and retention are re-evaluated for every
@@ -211,7 +202,15 @@ export const publicLeadExport = inngest.createFunction(
             emittedInBatch += 1;
           }
           const plaintext = Buffer.from(`${lines.join("\r\n")}\r\n`, "utf8");
+          digestBuilder.update(plaintext);
+          emittedTotal += emittedInBatch;
+          chunkCount += 1;
           const encrypted = encryptChunk(plaintext, key);
+          // batchIndex stores the sort-order cursor at which this chunk was
+          // emitted (sparse, not sequential). The unique constraint on
+          // (exportId, batchIndex) makes the upsert idempotent on retry;
+          // the download route iterates with `batchIndex > cursor` which
+          // works correctly with sparse values.
           await db.$transaction([
             db.publicLeadExportChunk.upsert({
               where: {
@@ -245,31 +244,6 @@ export const publicLeadExport = inngest.createFunction(
           if (items.length < BATCH_SIZE) break;
         }
 
-        const digestBuilder = createHash("sha256");
-        let emitted = 0;
-        let chunkAfter = -1;
-        let chunkCount = 0;
-        while (true) {
-          const chunks = await db.publicLeadExportChunk.findMany({
-            where: { exportId, batchIndex: { gt: chunkAfter } },
-            orderBy: { batchIndex: "asc" },
-            take: 100,
-          });
-          if (chunks.length === 0) break;
-          for (const chunk of chunks) {
-            digestBuilder.update(
-              decryptChunk(
-                Buffer.from(chunk.ciphertext),
-                Buffer.from(chunk.nonce),
-                Buffer.from(chunk.authTag),
-                key,
-              ),
-            );
-            emitted += chunk.rowCount;
-            chunkAfter = chunk.batchIndex;
-            chunkCount += 1;
-          }
-        }
         if (chunkCount === 0) {
           digestBuilder.update(
             `${["Name", "Email", "Submitted at", "Assessment"]
@@ -288,7 +262,7 @@ export const publicLeadExport = inngest.createFunction(
           data: {
             status: "COMPLETED",
             emittedDigest: digest,
-            emittedRowCount: emitted,
+            emittedRowCount: emittedTotal,
             artifactCiphertext: null,
             artifactNonce: null,
             artifactAuthTag: null,
@@ -299,7 +273,7 @@ export const publicLeadExport = inngest.createFunction(
         });
         return {
           status: "COMPLETED",
-          emitted,
+          emitted: emittedTotal,
         };
       } catch (error) {
         const message = error instanceof Error ? error.message : "";

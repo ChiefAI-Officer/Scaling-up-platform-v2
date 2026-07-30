@@ -540,14 +540,14 @@ export async function POST(
             Array<{ globalCount: bigint; campaignCount: bigint }>
           >(Prisma.sql`
             SELECT
-              COUNT(*) FILTER (WHERE outbox."status" = 'HELD') AS "globalCount",
+              COUNT(*) AS "globalCount",
               COUNT(*) FILTER (
-                WHERE outbox."status" = 'HELD'
-                  AND submission."campaignId" = ${campaign.id}
+                WHERE submission."campaignId" = ${campaign.id}
               ) AS "campaignCount"
             FROM "assessment_email_outbox" AS outbox
             INNER JOIN "assessment_submissions" AS submission
               ON submission."id" = outbox."submissionId"
+            WHERE outbox."status" = 'HELD'
           `);
           const counts = heldCounts[0];
           if (

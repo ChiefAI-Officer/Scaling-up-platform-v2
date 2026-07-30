@@ -1520,7 +1520,6 @@ model PublicLeadExportChunk {
   export PublicLeadExport @relation(fields: [exportId], references: [id], onDelete: Cascade)
 
   @@unique([exportId, batchIndex])
-  @@index([exportId, batchIndex])
   @@map("public_lead_export_chunks")
 }
 

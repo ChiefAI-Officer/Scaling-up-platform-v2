@@ -240,8 +240,6 @@ CREATE TABLE "public_lead_export_chunks" (
 
 CREATE UNIQUE INDEX "public_lead_export_chunks_exportId_batchIndex_key"
   ON "public_lead_export_chunks" ("exportId", "batchIndex");
-CREATE INDEX "public_lead_export_chunks_exportId_batchIndex_idx"
-  ON "public_lead_export_chunks" ("exportId", "batchIndex");
 
 CREATE TABLE "public_lead_delivery_fences" (
   "id" TEXT NOT NULL,
