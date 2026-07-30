@@ -529,7 +529,14 @@ describe("verified referring-coach ownership", () => {
     expect(enqueuedRoles).not.toContain("REFERRING_COACH");
   });
 
-  it.each(["not-an-email", "   ", "coach@example.com extra"])(
+  it.each([
+    "not-an-email",
+    "   ",
+    "coach@example.com extra",
+    42,
+    [],
+    { email: "coach@example.com" },
+  ])(
     "degrades malformed referral %p to Scaling Up-only without blocking submission",
     async (referringCoachEmail) => {
       const res = await POST(
@@ -556,6 +563,66 @@ describe("verified referring-coach ownership", () => {
       expect(enqueuedRoles).not.toContain("REFERRING_COACH");
     },
   );
+
+  it("retries as Scaling Up-only when the verified Coach is deleted before the write", async () => {
+    (db.coach.findUnique as jest.Mock).mockResolvedValue({
+      id: "coach-1",
+      email: "coach@example.com",
+      firstName: "Bob",
+      lastName: "Coach",
+      certificationStatus: "ACTIVE",
+      certificationExpiry: null,
+    });
+    txMock.assessmentSubmission.create
+      .mockRejectedValueOnce(
+        new Prisma.PrismaClientKnownRequestError(
+          "Foreign key constraint failed",
+          {
+            code: "P2003",
+            clientVersion: "6.0",
+            meta: {
+              field_name:
+                "assessment_submissions_referringCoachId_fkey (index)",
+            },
+          },
+        ),
+      )
+      .mockResolvedValueOnce({ id: "sub-1" });
+
+    const res = await POST(
+      makeRequest({
+        ...VALID_BODY,
+        referringCoachEmail: "coach@example.com",
+      }) as never,
+      makeParams() as never,
+    );
+
+    expect(res.status).toBe(200);
+    expect(db.$transaction).toHaveBeenCalledTimes(2);
+    expect(txMock.assessmentSubmission.create).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        data: expect.objectContaining({
+          referringCoachId: null,
+          referringCoachEmail: null,
+        }),
+      }),
+    );
+    const outboxRows = txMock.assessmentEmailOutbox.create.mock.calls.map(
+      (call: Array<{
+        data: {
+          recipientRole: string;
+          bodyHtml: string;
+        };
+      }>) => call[0].data,
+    );
+    expect(outboxRows.map((row) => row.recipientRole)).not.toContain(
+      "REFERRING_COACH",
+    );
+    expect(
+      outboxRows.find((row) => row.recipientRole === "TAKER_COPY")?.bodyHtml,
+    ).not.toContain("mailto:coach@example.com");
+  });
 
   it.each([
     {
