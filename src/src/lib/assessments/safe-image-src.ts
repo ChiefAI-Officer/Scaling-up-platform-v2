@@ -17,8 +17,8 @@
  * filenames, empty/null, and anything `new URL` cannot parse.
  *
  * SCOPE — what this does NOT do: it places **no constraint on the host**.
- * `https://anywhere.example/pixel.png` passes. So it stops mixed content and
- * non-http(s) schemes, but it does NOT stop a rendered image from causing an
+ * `https://anywhere.example/pixel.png` passes. So it stops mixed content (`http:`)
+ * and non-http schemes, but it does NOT stop a rendered image from causing an
  * outbound request to a third-party host. Do not describe it as preventing that.
  *
  * A host allowlist is deliberately NOT used here: coach logos are legitimately

@@ -57,17 +57,21 @@ describe("CoachLogo — coach name as visible text (#63/67/73/78/81)", () => {
 });
 
 /**
- * GH #229 — the logo `src` is an operator-set string with NO validation at the
- * write boundary (`createCoachSchema.profileImage` is `z.string().optional()`),
- * and Wave OSR (#71) puts this component in front of UNAUTHENTICATED
- * respondents for the first time. An unvalidated src turns that string into an
- * outbound request from every respondent's browser (IP/UA disclosure to an
- * arbitrary host, plus http: mixed content on an https page).
+ * GH #229 — the logo `src` is an operator-set string, and Wave OSR (#71) puts this
+ * component in front of UNAUTHENTICATED respondents for the first time.
  *
- * Contract: the URL is filtered through the same https-only `safeImageSrc` gate
- * the invitation email already applies, and a REJECTED url degrades to the
- * name-only state — it must NOT erase the coach byline that #63/#67/#73/#78/#81
- * shipped, because the byline is the part Jeff actually asked for.
+ * Contract: the URL is filtered through the same https-only `safeImageSrc` gate the
+ * invitation email applies, and a REJECTED url degrades to the name-only state — it
+ * must NOT erase the coach byline that #63/#67/#73/#78/#81 shipped, because the
+ * byline is the part Jeff actually asked for.
+ *
+ * SCOPE — the gate is scheme-only. It blocks `http:` (mixed content),
+ * `javascript:`/`data:`, protocol-relative, root-relative and unparseable values. It
+ * does NOT constrain the HOST, so an arbitrary https host still renders and still
+ * causes an outbound request; that half of #229 is open. The write boundary
+ * (`createCoachSchema.profileImage`) now applies the same scheme gate, but two
+ * writers bypass the schema entirely — the Blob upload route and
+ * `services/circle-sync.ts`.
  *
  * Every "the image is absent" assertion below is paired with a positive control
  * (the name is still there / an https url still renders), so the block cannot

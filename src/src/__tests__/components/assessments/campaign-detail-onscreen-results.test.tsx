@@ -19,6 +19,9 @@
  *   5. ticking it PATCHes `{ showResultsOnScreen: true }` to this campaign.
  *   6. a REFUSED PATCH reverts the checkbox — it must never sit in a state the
  *      server rejected, or it misdescribes what respondents are about to see.
+ *   7. a SILENTLY IGNORED PATCH also reverts. The route drops this field when the
+ *      flag is off and still answers 200 {success:true}, so `res.ok` alone would
+ *      leave the box ticked over a column that never changed.
  */
 
 import React from "react";
@@ -113,8 +116,11 @@ const ROW: CampaignRespondentRow = {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  // The handler verifies the echoed row, so the mock must return the field. A bare
-  // `data: {}` would exercise the silent-no-op path, not the success path.
+  // The handler verifies the echoed row, so this mock echoes the value back — the
+  // realistic shape, since the route returns the updated row. Note the guard is
+  // PRESENCE-gated (`"showResultsOnScreen" in body.data`), so a bare `data: {}`
+  // also passes; the silent-no-op branch is exercised by its own test below, which
+  // echoes a value that DISAGREES with what was sent.
   global.fetch = jest.fn(async (_url: unknown, init?: { body?: string }) => {
     const sent = init?.body ? JSON.parse(init.body) : {};
     return {
@@ -184,60 +190,122 @@ describe("CampaignDetail — Results on screen control (Wave OSR #71)", () => {
     expect(screen.queryByTestId(CARD)).toBeNull();
   });
 
-  it("PATCHes the campaign when ticked", async () => {
-    render(
-      <CampaignDetail
-        initialOverview={makeOverview({ showResultsOnScreen: false })}
-        initialRespondents={[ROW]}
-        onScreenResultsEnabled
-      />,
-    );
+  /**
+   * TIMEOUTS — the async tests in this file pass an explicit per-test budget as
+   * `it`'s third argument, and raise `waitFor`'s own timeout to match.
+   *
+   * BOTH are required, and it is easy to get this wrong: `waitFor` defaults to 1s
+   * while jest's own `testTimeout` defaults to 5s (this repo sets neither in
+   * `jest.config.js`/`jest.setup.js`). Raising only `waitFor` to 15s is
+   * self-defeating — jest aborts the test at 5s and the larger budget is never
+   * reachable. This suite renders the entire CampaignDetail tree in jsdom, which is
+   * slow enough under parallel full-suite load to matter.
+   */
+  it(
+    "PATCHes the campaign when ticked",
+    async () => {
+      render(
+        <CampaignDetail
+          initialOverview={makeOverview({ showResultsOnScreen: false })}
+          initialRespondents={[ROW]}
+          onScreenResultsEnabled
+        />,
+      );
 
-    fireEvent.click(screen.getByTestId(TOGGLE));
+      fireEvent.click(screen.getByTestId(TOGGLE));
 
-    // Generous timeout: this suite renders the whole CampaignDetail tree in jsdom,
-    // which under parallel full-suite load has exceeded the default 5s budget.
-    await waitFor(() => expect(global.fetch).toHaveBeenCalled(), {
-      timeout: 15000,
-    });
-    const call = (global.fetch as jest.Mock).mock.calls.find((c) =>
-      String(c[0]).includes(`/api/assessment-campaigns/${CAMPAIGN_ID}`),
-    );
-    expect(call).toBeDefined();
-    expect(call![1].method).toBe("PATCH");
-    expect(JSON.parse(call![1].body as string)).toEqual({
-      showResultsOnScreen: true,
-    });
-    expect(screen.getByTestId(TOGGLE)).toBeChecked();
-  });
+      await waitFor(() => expect(global.fetch).toHaveBeenCalled(), {
+        timeout: 15000,
+      });
+      const call = (global.fetch as jest.Mock).mock.calls.find((c) =>
+        String(c[0]).includes(`/api/assessment-campaigns/${CAMPAIGN_ID}`),
+      );
+      expect(call).toBeDefined();
+      expect(call![1].method).toBe("PATCH");
+      expect(JSON.parse(call![1].body as string)).toEqual({
+        showResultsOnScreen: true,
+      });
+      expect(screen.getByTestId(TOGGLE)).toBeChecked();
+    },
+    20000,
+  );
 
-  it("reverts the checkbox when the server refuses the change", async () => {
-    global.fetch = jest.fn(async () => ({
-      ok: false,
-      status: 409,
-      json: async () => ({ success: false, error: "Closed campaigns cannot be edited" }),
-    })) as unknown as typeof fetch;
+  it(
+    "reverts the checkbox when the server SILENTLY ignores the field",
+    async () => {
+      // The flag-off branch of the route drops the field and still returns
+      // 200 {success:true} with the unchanged row. From the operator's point of view
+      // that is a failure, so the echoed value — not the status — decides.
+      global.fetch = jest.fn(async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          success: true,
+          data: { showResultsOnScreen: false },
+        }),
+      })) as unknown as typeof fetch;
 
-    render(
-      <CampaignDetail
-        initialOverview={makeOverview({ showResultsOnScreen: false })}
-        initialRespondents={[ROW]}
-        onScreenResultsEnabled
-      />,
-    );
+      render(
+        <CampaignDetail
+          initialOverview={makeOverview({ showResultsOnScreen: false })}
+          initialRespondents={[ROW]}
+          onScreenResultsEnabled
+        />,
+      );
 
-    fireEvent.click(screen.getByTestId(TOGGLE));
+      fireEvent.click(screen.getByTestId(TOGGLE));
 
-    // positive control: the request WAS attempted, so the revert below is a
-    // response to a refusal and not just "the click did nothing".
-    await waitFor(() => expect(global.fetch).toHaveBeenCalled(), {
-      timeout: 15000,
-    });
-    await waitFor(() => expect(screen.getByTestId(TOGGLE)).not.toBeChecked(), {
-      timeout: 15000,
-    });
-    expect(toast).toHaveBeenCalledWith(
-      expect.objectContaining({ variant: "destructive" }),
-    );
-  });
+      // positive control: the request WAS made and reported success…
+      await waitFor(() => expect(global.fetch).toHaveBeenCalled(), {
+        timeout: 15000,
+      });
+      // …and the checkbox still goes back, because nothing was actually stored.
+      await waitFor(
+        () => expect(screen.getByTestId(TOGGLE)).not.toBeChecked(),
+        { timeout: 15000 },
+      );
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "destructive" }),
+      );
+    },
+    20000,
+  );
+
+  it(
+    "reverts the checkbox when the server refuses the change",
+    async () => {
+      global.fetch = jest.fn(async () => ({
+        ok: false,
+        status: 409,
+        json: async () => ({
+          success: false,
+          error: "Closed campaigns cannot be edited",
+        }),
+      })) as unknown as typeof fetch;
+
+      render(
+        <CampaignDetail
+          initialOverview={makeOverview({ showResultsOnScreen: false })}
+          initialRespondents={[ROW]}
+          onScreenResultsEnabled
+        />,
+      );
+
+      fireEvent.click(screen.getByTestId(TOGGLE));
+
+      // positive control: the request WAS attempted, so the revert below is a
+      // response to a refusal and not just "the click did nothing".
+      await waitFor(() => expect(global.fetch).toHaveBeenCalled(), {
+        timeout: 15000,
+      });
+      await waitFor(
+        () => expect(screen.getByTestId(TOGGLE)).not.toBeChecked(),
+        { timeout: 15000 },
+      );
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "destructive" }),
+      );
+    },
+    20000,
+  );
 });

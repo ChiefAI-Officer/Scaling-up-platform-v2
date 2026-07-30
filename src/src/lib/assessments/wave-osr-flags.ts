@@ -17,8 +17,11 @@
  *
  *     ⚠️ NOTE (added when PATCH learned this field): the campaign PATCH route DOES
  *     consult this flag before accepting a WRITE to that column, and silently drops
- *     the field when the flag is off — so a client that shows the control while the
- *     flag is off will appear to save and change nothing. That is not a coercion of
+ *     the field when the flag is off — answering 200 over a column that never
+ *     changed. The in-repo control handles that by comparing the echoed row against
+ *     what it sent (`handleToggleOnScreenResults`) and surfacing it as a failure; a
+ *     hand-rolled client skipping that comparison would appear to save and change
+ *     nothing. That is not a coercion of
  *     stored data (nothing is rewritten) and it is not a security boundary (CREATE
  *     writes the column with no flag check, and disclosure is decided under the
  *     submission lock); it exists for consistency with the route's other

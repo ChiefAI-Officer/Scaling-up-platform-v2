@@ -175,7 +175,8 @@ export const createCoachSchema = z.object({
     // an <img src> on reports that Wave OSR (#71) now shows to UNAUTHENTICATED
     // respondents. The load-bearing guard is at the render site (`CoachLogo`),
     // which also covers rows already stored and every other writer; this one stops
-    // new non-https values entering through the coach API.
+    // new non-https values entering through the ADMIN/STAFF-only coach API
+    // (`POST /api/coaches`, `PATCH /api/coaches/[id]`).
     //
     // Permissive about ABSENCE (undefined / "") because callers send both — the
     // Bio editor clears a photo with "".
