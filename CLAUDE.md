@@ -18,9 +18,9 @@ the full workshop lifecycle from request through post-event follow-up.
 | **Client** | Jeff Verdun, CIO - Scaling Up |
 | **Operations** | Suzanne (handles manual approvals) |
 | **Integrated main history** | **Wave EV shipped** the flagless campaign-edition visibility work from PR #241 (`cc370aa9`), and **Wave OSR remains merged dark/default-OFF** with the `origin/main` reachability and report-logo source validation changes from PR #249 (`36131fe4`). Neither mainline wave changes Jeff #48's default-off status. Full detail remains newest-first in `plans/CHANGELOG.md`. |
-| **Last Updated** | <!-- LAST_UPDATED_ISO:2026-07-30 LAST_UPDATED_SLUG:assessment-email-lease-hotfix-implemented --> July 30, 2026 — **Assessment email duplicate-delivery hotfix IMPLEMENTED, NOT LAUNCHED.** Atomic PostgreSQL leases and same-mailbox suppression are on the replacement branch; mixed-backlog PostgreSQL CI is green and the quiesced Inngest cutover remains the launch gate. Azure quota/load validation is follow-up capacity work because this hotfix bounds existing traffic and removes a duplicate path. Full detail in CHANGELOG `assessment-email-lease-hotfix-implemented`. |
+| **Last Updated** | <!-- LAST_UPDATED_ISO:2026-07-30 LAST_UPDATED_SLUG:assessment-email-lease-hotfix-implemented --> July 30, 2026 — **Assessment email duplicate-delivery hotfix LAUNCHED.** PR #250 squash-merged as `d4df6db1`; production deployment `dpl_94JiUEjjpDrwpg4ng6a2oEAxef6R` is Ready. The controlled Inngest pause/drain/sync/resume completed with both workers sharing environment concurrency 4, a clean first cron tick, healthy production, and no pending/sending/failed/uncertain email state. Full detail in CHANGELOG `assessment-email-lease-hotfix-implemented`. |
 | **Jeff #48 validation** | Desktop/mobile editor Preview and a corrected production-context component harness are complete. Detailed visual, interaction, cleanup, and build receipts live in CHANGELOG entry `jeff-48-qsp-story-group-built`. |
-| **Latest progress** | The assessment-email duplicate-delivery hotfix is implemented on `codex/assessment-email-outbox-lease` but **not launched**. Event and cron delivery share an environment-scoped concurrency cap of four, and same-mailbox suppression reduces intended sends. Mixed-row lease contention is covered by focused PostgreSQL CI; the remaining launch-critical step is the pause/drain/deploy/resume cutover. Account-specific Azure quota and provider-backed load validation remain explicit follow-up capacity checks, not launch blockers for this traffic-reducing hotfix. |
+| **Latest progress** | The assessment-email duplicate-delivery hotfix is live on production. Event and cron delivery share an Inngest environment-scoped concurrency cap of four, atomic PostgreSQL leases prevent overlapping workers from claiming the same row, and same-mailbox suppression removes the known taker/coach duplicate path. Account-specific Azure quota, provider-backed load validation, and an approved-recipient production submission remain follow-up checks. |
 | **Work Logs** | Session work logs at `~/.claude/worklogs/` — invoke `/log-session` to log or generate reports |
 
 ## Current Status
@@ -29,10 +29,11 @@ the full workshop lifecycle from request through post-event follow-up.
 
 - **Jeff #48 QSP core-values stories:** built on `codex/issue-48-qsp-story-ui-design`, default-OFF, unmerged, and not launched. The approved progressive presentation is covered in public, invited, and read-only Preview paths without schema, seed-content, Esperto-import, payload, scoring, report, or historical-data changes. Published Preview plus a corrected DB-free production-context component harness completed the visual and interactive states without creating a shared-data draft. Runtime whole-branch review passed; requested launch-runbook fail-closed corrections are applied and await final reviewer verification before push/PR/merge. Full detail: `plans/CHANGELOG.md` entry `jeff-48-qsp-story-group-built`.
 - **Jeff #83 Referred Results:** launched from PR #245 on production deployment `dpl_BZtaegoNCrfjpZAoVPpYQu7LxeDX`; enabled by the Production-only encrypted flag with the kill switch retained. Historical candidates remain unassigned by decision. Full detail: `plans/CHANGELOG.md` entry `jeff-83-referred-results-launched`.
-- **Assessment email duplicate-delivery hotfix:** implemented, not launched. The
-  replacement branch uses atomic PostgreSQL leases and suppresses a second send
-  when taker and verified Referring coach share a mailbox. Cutover requires the
-  focused database race check plus the quiescence runbook. Full detail:
+- **Assessment email duplicate-delivery hotfix:** launched from PR #250 on
+  production deployment `dpl_94JiUEjjpDrwpg4ng6a2oEAxef6R`. Atomic PostgreSQL
+  leases prevent overlapping worker claims and same-mailbox suppression removes
+  the known taker/coach duplicate path. The controlled Inngest cutover completed
+  with a clean post-resume cron tick and zero in-flight or failed rows. Full detail:
   `plans/CHANGELOG.md` entry `assessment-email-lease-hotfix-implemented`.
 
 **Open follow-ons (deferred for Beta hardening or external input):**

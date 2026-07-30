@@ -12,6 +12,32 @@ The later overlapping migration `20260730050000_add_public_leads_dark_data`
 failed before applying a step, was marked rolled back, and `prisma migrate
 status` subsequently reported the production ledger healthy.
 
+## Cutover receipt
+
+Completed on 2026-07-30:
+
+- PR #250 squash-merged as `d4df6db1`; Vercel production deployment
+  `dpl_94JiUEjjpDrwpg4ng6a2oEAxef6R` reached Ready and owned both production
+  aliases.
+- Both functions were paused and showed no active runs. The final old cron run
+  ended at 17:12:02 PST; the five-minute default Vercel execution window elapsed
+  before the database gate.
+- Before deploy/resume, the outbox had 23 `SENT` rows, zero `PENDING`, zero
+  `SENDING`, and no recent delivery-uncertainty audit.
+- The Vercel integration did not automatically update the five-day-old Inngest
+  app configuration, so the canonical production `/api/inngest` endpoint was
+  manually resynced at 17:24:43 PST while both functions remained paused.
+- Both functions then showed the shared environment-scoped concurrency key with
+  limit four. Cron resumed first and its 17:27:00 run completed in one second;
+  the event function resumed afterward.
+- Post-cutover health was `200` with healthy database/auth posture. The outbox
+  remained 23 `SENT`, zero in-flight, zero recent failures, and zero recent
+  delivery-uncertainty audits. Vercel had no error-level production logs after
+  the new deployment timestamp.
+- Controlled submissions were not run because no test recipients were
+  explicitly approved. The different-mailbox and same-mailbox acceptance cases
+  remain immediate follow-up checks.
+
 ## Cut over to the lease worker
 
 Before pausing anything:
