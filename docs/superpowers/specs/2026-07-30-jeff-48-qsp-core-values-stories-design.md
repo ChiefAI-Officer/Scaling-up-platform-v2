@@ -1,6 +1,6 @@
 # Jeff #48 — QSP Core-Values Stories Design
 
-**Status:** BUILT behind a default-off flag; pending PR review and production launch
+**Status:** BUILT behind a default-off flag; visual validation complete via published Preview plus a temporary DB-free real-component harness; pending PR review and production launch
 
 **Scope:** Replace three repeated QSP v2 prompts with one progressively revealed “up to three people” question without changing the three stored answers
 

@@ -16,7 +16,27 @@ The approved presentation adapter recognizes only the exact consecutive, same-se
 
 **Validation receipt.**
 
-- Final complete focused regression command: the Task 6 fifteen-file `npx jest ... --runInBand` invocation passed **15/15 suites and 223/223 tests** with **0 snapshots**, including QSP seed invariants, Wave-P seed labels, Esperto crosswalk/results planning, ordinary pager/slides/phase-tile behavior, public/invited payloads, and ED10 Preview/prop threading.
+- Final complete focused regression command passed **15/15 suites and 223/223 tests** with **0 snapshots**, including QSP seed invariants, Wave-P seed labels, Esperto crosswalk/results planning, ordinary pager/slides/phase-tile behavior, public/invited payloads, and ED10 Preview/prop threading:
+
+```bash
+npx jest \
+  src/__tests__/lib/assessments/wave-48-flags.test.ts \
+  src/__tests__/lib/assessments/qsp-story-group.test.ts \
+  src/__tests__/assessments/qsp-story-group.test.tsx \
+  src/__tests__/assessments/section-pager-qsp-stories.test.tsx \
+  src/__tests__/assessments/section-pager.test.tsx \
+  src/__tests__/assessments/section-pager-slides.test.tsx \
+  src/__tests__/assessments/section-pager-phase-tile.test.tsx \
+  src/__tests__/assessments/public-quiz-pager.test.tsx \
+  src/__tests__/assessments/org-survey-pager.test.tsx \
+  src/__tests__/components/admin/template-editor/preview-tab.test.tsx \
+  src/__tests__/components/admin/template-editor/tabbed-shell-panels.wave-ed10.test.tsx \
+  src/__tests__/seed/qsp-v2-content.test.ts \
+  src/__tests__/seed/wave-p-seed-labels.test.ts \
+  src/__tests__/lib/assessments/esperto-import/crosswalk.test.ts \
+  src/__tests__/lib/assessments/esperto-import/results-plan.test.ts \
+  --runInBand
+```
 - Placeholder correction proof: `npx jest src/__tests__/assessments/qsp-story-group.test.tsx src/__tests__/components/assessments/question-input.test.tsx --runInBand` passed **2/2 suites and 27/27 tests**. Scoped ESLint over both components/tests returned no findings.
 - `node scripts/check-migration-safety.mjs` passed: **41 migrations checked**, no unapproved destructive operations.
 - Final `CI=true npx next build --turbopack` passed with exit 0 on Next.js 16.1.6. The local environment emitted the known middleware deprecation and missing `DATABASE_URL` / Inngest-key page-generation warnings; compilation, TypeScript, static generation, and final route output completed.
@@ -25,7 +45,7 @@ The first two build attempts usefully caught two TypeScript union-widening defec
 
 **Visual review evidence.** A local authenticated editor Preview used the real QSP v2 published v3 at desktop (`1440×783`) and mobile (`390×844`) and compared it with `docs/specs/v7.6/mockups/48-qsp-core-values-progressive.html`. Flag on showed one grouped prompt, one visible story textarea, `1 of 3`, the approved placeholder, and disabled Preview textarea/Add controls; logical progress max was **20**. Flag off showed no group, all **3** ordinary underlying story textareas, and raw progress max **22**. At 390px the document scroll width was **375px**, so the grouped card introduced no horizontal overflow. With the Jeff #48 flag on, a non-QSP Leadership Vision Alignment Preview showed **0** QSP groups, **9** ordinary question cards on the inspected section, and unchanged progress max **51**. Screenshots were written only to the OS temporary directory and were not added to git.
 
-Direct browser interaction evidence stops at the product boundary: this QSP version is published, ED1 Test Mode is deliberately draft-only, and editor Preview hardcodes empty answers and disables Add. Creating a shared-database draft solely for screenshots was rejected. The Add-once/slot-2-focus, Add-twice/slot-3/no-button, restored-slot-3, stable-key write, live-region, and monotonic-visibility cases are therefore automated evidence from the passing `QspStoryGroup` and `SectionPager` suites, not claimed as browser-driven interaction evidence.
+The published-version boundary is explicit: editor Preview hardcodes empty answers and disables Add, while ED1 Test Mode is draft-only. Creating a shared-database draft solely for screenshots was rejected, and no isolated Postgres path was available. A temporary uncommitted DB-free Next route therefore mounted the real production `QspStoryGroup`, canonical three-question fixture, local React answer state, and `wireframes-scoped.css`. Direct browser review at `1440×900` proved Add once rendered 2 textareas, focused `q-P1_core_values_story_2`, retained one Add button, and announced slot 2; Add twice rendered 3 textareas, focused `q-P1_core_values_story_3`, removed Add, and announced slot 3; a fresh restored-slot-3 initial state rendered all 3 textareas, no Add button, and the slot-3 value under its original stable-key-derived DOM id. Screenshots `jeff-48-local-harness-add-once-focus.png`, `jeff-48-local-harness-add-twice-no-button.png`, and `jeff-48-local-harness-restored-slot-3.png` were saved outside git. The temporary route was removed completely. This is documented as real-component harness evidence, not as editor Preview or Test Mode evidence.
 
 ---
 

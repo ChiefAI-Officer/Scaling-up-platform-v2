@@ -1144,12 +1144,29 @@ Use the editor Preview tab with the QSP v2 template at desktop width and at a mo
 
 Compare the flag-on screen with `docs/specs/v7.6/mockups/48-qsp-core-values-progressive.html`. Record screenshots in the PR description; do not add temporary screenshots to the repository.
 
+> **Justified validation deviation (2026-07-30):** The published QSP v2 editor
+> Preview supplied the real editor evidence for desktop/mobile, flag-off,
+> flag-on, Preview-disabled controls, and non-QSP isolation. It could not
+> exercise Add/focus/restore because Preview is read-only and ED1 Test Mode is
+> draft-only. The canonical local environment may target shared production
+> data, and this workspace had no isolated Postgres path, so no shared-data
+> draft was created. Instead, a temporary uncommitted DB-free Next route
+> mounted the real production `QspStoryGroup`, canonical three-question
+> fixture, local React answer state, and `wireframes-scoped.css`. Direct browser
+> review proved Add once reveals slot 2 and focuses
+> `q-P1_core_values_story_2`; Add twice reveals slot 3, focuses
+> `q-P1_core_values_story_3`, and removes Add; and a fresh restored-slot-3
+> initial state renders all three fields with the slot-3 value. Three
+> screenshots were saved outside git, and the temporary route was removed
+> completely. This harness evidence is not represented as editor Preview or
+> Test Mode evidence.
+
 - [x] **Step 4: Update implementation status**
 
 In the design, set:
 
 ```md
-**Status:** BUILT behind a default-off flag; pending PR review and production launch
+**Status:** BUILT behind a default-off flag; visual validation complete via published Preview plus a temporary DB-free real-component harness; pending PR review and production launch
 ```
 
 Check every completed implementation step in this plan. In `CLAUDE.md`, advance `LAST_UPDATED_ISO` and `LAST_UPDATED_SLUG` to a `jeff-48-qsp-story-group-built` entry. Prepend a detailed `plans/CHANGELOG.md` entry recording:
