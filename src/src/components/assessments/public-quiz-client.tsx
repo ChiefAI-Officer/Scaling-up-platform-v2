@@ -28,6 +28,7 @@ import {
   deriveTimeEstimate,
 } from "@/components/assessments/assessment-welcome";
 import { BrandedReport } from "@/components/assessments/BrandedReport";
+import { PrintReportButton } from "@/components/assessments/PrintReportButton";
 // The detailed report styling lives in su-report.css (scoped to .su-public-brand
 // .su-report). The invited (report) route loads it via its layout; the public
 // in-place results must load it here too, else the report renders unstyled.
@@ -441,6 +442,9 @@ export function PublicQuizClient({
         {/* Scope wrapper so su-report.css applies (ADR-0005) — same wrapper the
             invited (report) route layout provides. */}
         <div className="su-public-brand su-report">
+          <PrintReportButton
+            fileName={`${templateName} — ${report.respondentName}`}
+          />
           <BrandedReport
             report={report}
             assessmentName={templateName}
