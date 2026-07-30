@@ -202,6 +202,19 @@ function candidateExclusion(submissionId, reason) {
   return { submissionId, reason };
 }
 
+function writeCommittedReceipt(writeSync, receipt, reportError) {
+  try {
+    writeSync(`${JSON.stringify({ success: true, ...receipt }, null, 2)}\n`);
+    return true;
+  } catch (error) {
+    reportError(
+      "Public referral backfill COMMITTED, but writing the success receipt failed:",
+      error,
+    );
+    return false;
+  }
+}
+
 function buildReviewCandidates(submissions, coaches) {
   const coachesByEmail = new Map();
   for (const coach of coaches) {
@@ -287,4 +300,5 @@ module.exports = {
   normalizedEmail,
   parseReviewedMappings,
   validateReviewedMappings,
+  writeCommittedReceipt,
 };

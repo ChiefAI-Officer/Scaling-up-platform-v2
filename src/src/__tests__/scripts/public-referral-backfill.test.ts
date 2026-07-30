@@ -8,6 +8,7 @@ const {
   buildReviewCandidates,
   parseReviewedMappings,
   validateReviewedMappings,
+  writeCommittedReceipt,
 } = require("../../../scripts/public-referral-backfill-core.cjs") as {
   applyReviewedMappings: (
     db: unknown,
@@ -37,6 +38,11 @@ const {
     coachId: string;
     action: "update" | "already-applied";
   }>;
+  writeCommittedReceipt: (
+    writeSync: (output: string) => void,
+    receipt: Record<string, unknown>,
+    reportError: (...args: unknown[]) => void,
+  ) => boolean;
 };
 
 function publicSubmission(
@@ -425,5 +431,24 @@ describe("apply CLI failure behavior", () => {
     expect(result.status).toBe(1);
     expect(result.stderr).toMatch(/no batch writes applied/i);
     expect(result.stderr).toMatch(/--mapping/i);
+  });
+
+  it("reports synchronous stdout failure as post-commit, never as rollback", () => {
+    const reportError = jest.fn();
+
+    expect(
+      writeCommittedReceipt(
+        () => {
+          throw Object.assign(new Error("broken pipe"), { code: "EPIPE" });
+        },
+        { reviewed: 2, updated: 2, alreadyApplied: 0 },
+        reportError,
+      ),
+    ).toBe(false);
+    expect(reportError).toHaveBeenCalledWith(
+      expect.stringMatching(/COMMITTED.*receipt failed/i),
+      expect.objectContaining({ code: "EPIPE" }),
+    );
+    expect(reportError.mock.calls[0][0]).not.toMatch(/no batch writes/i);
   });
 });

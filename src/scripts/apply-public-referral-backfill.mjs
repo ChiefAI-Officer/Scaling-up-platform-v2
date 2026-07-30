@@ -12,12 +12,12 @@
  *     --mapping /private/tmp/jeff-83-reviewed-mapping.json
  */
 
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { Prisma, PrismaClient } from "@prisma/client";
 import core from "./public-referral-backfill-core.cjs";
 
-const { applyReviewedMappings } = core;
+const { applyReviewedMappings, writeCommittedReceipt } = core;
 const db = new PrismaClient();
 
 function mappingPathFrom(argv) {
@@ -63,15 +63,12 @@ let committed = false;
 try {
   const result = await main();
   committed = true;
-  try {
-    process.stdout.write(
-      `${JSON.stringify({ success: true, ...result }, null, 2)}\n`,
-    );
-  } catch (error) {
-    console.error(
-      "Public referral backfill COMMITTED, but writing the success receipt failed:",
-      error,
-    );
+  const receiptWritten = writeCommittedReceipt(
+    (output) => writeFileSync(1, output, "utf8"),
+    result,
+    (...args) => console.error(...args),
+  );
+  if (!receiptWritten) {
     process.exitCode = 1;
   }
 } catch (error) {
