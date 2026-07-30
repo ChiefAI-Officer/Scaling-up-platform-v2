@@ -8,6 +8,8 @@ import { AssessmentShellHeader } from "@/components/assessments/AssessmentShellH
 import { domainColor } from "@/lib/assessments/report-presentation";
 import { PhaseTile } from "@/components/assessments/phase-tile";
 import { computeGrowthPhase } from "@/lib/assessments/su-full-phase";
+import { QspStoryGroup } from "@/components/assessments/qsp-story-group";
+import { buildQuestionRenderUnits, questionProgress } from "@/lib/assessments/qsp-story-group";
 
 type AnswersMap = Record<string, number | string | string[]>;
 
@@ -66,10 +68,26 @@ interface SectionPagerProps {
    * survey passes nothing here ⇒ byte-identical when off.
    */
   previewMode?: boolean;
+  /** Jeff #48 — server-resolved, default-OFF QSP story presentation gate. */
+  qspStoryGroupEnabled?: boolean;
 }
 
-export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitting, onExit, assessmentName, companyName, requireAtLeastOneAnswer, templateAlias, isCEO, previewMode }: SectionPagerProps) {
+export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitting, onExit, assessmentName, companyName, requireAtLeastOneAnswer, templateAlias, isCEO, previewMode, qspStoryGroupEnabled = false }: SectionPagerProps) {
   const [sectionIndex, setSectionIndex] = React.useState(0);
+  const [qspStoryVisibleCounts, setQspStoryVisibleCounts] = React.useState<
+    Record<string, 1 | 2 | 3>
+  >({});
+  const rememberQspStoryVisibleCount = React.useCallback(
+    (groupKey: string, visibleCount: 1 | 2 | 3) => {
+      setQspStoryVisibleCounts((current) => {
+        const remembered = current[groupKey] ?? 1;
+        return remembered >= visibleCount
+          ? current
+          : { ...current, [groupKey]: visibleCount };
+      });
+    },
+    [],
+  );
   // Wave J-1: when set, the SU-Full growth-phase interstitial is shown in place
   // of the next section. Continue clears it and performs the real advance. It is
   // NOT a counted section (the shell header / progress bar are not rendered on
@@ -121,9 +139,15 @@ export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitt
   // slide, so every question-counting / gating path below is a no-op on a
   // slide (R3-Low-2 exhaustive kind handling).
   const pageQuestions = page.kind === "section" ? page.questions : [];
-  // answered/total count questions across SECTION pages only (slides have none).
-  const answeredCount = sectionQuestions(pages).filter((q) => isAnswered(answers[q.stableKey])).length;
-  const total = sectionQuestions(pages).length;
+  const pageRenderUnits = page.kind === "section"
+    ? buildQuestionRenderUnits(pageQuestions, { enabled: qspStoryGroupEnabled, templateAlias })
+    : [];
+  // Render units are also the progress units, so the QSP story triplet counts
+  // once only while its server-resolved gate is enabled.
+  const { answered: answeredCount, total } = questionProgress(pages, answers, {
+    enabled: qspStoryGroupEnabled,
+    templateAlias,
+  });
   // "Section N of M": denominator + active index count `kind==="section"` pages
   // ONLY (slides are rendered-but-uncounted, like the existing phase tile / the
   // "Other" page). active = the 1-based ordinal of the current page among the
@@ -313,17 +337,38 @@ export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitt
         ) : null}
       </section>
 
-      {sectionPage.questions.length > 0 ? (
+      {pageRenderUnits.length > 0 ? (
         <ul className="survey-question-list">
-          {sectionPage.questions.map((q) => (
-            <li key={q.stableKey} className="survey-question">
-              <label htmlFor={`q-${q.stableKey}`} className="survey-question-label">
-                {q.label}{q.isRequired ? <span className="survey-required" aria-hidden="true"> *</span> : null}
-              </label>
-              {q.helpText ? <p className="survey-question-help">{q.helpText}</p> : null}
-              <QuestionInput question={q} value={answers[q.stableKey]} onChange={handleAnswerChange} disabled={submitting || previewMode} invalid={invalidKeys.has(q.stableKey)} />
-            </li>
-          ))}
+          {pageRenderUnits.map((unit) => {
+            if (unit.kind === "qsp-story-group") {
+              return (
+                <li key={unit.questions[0].stableKey} className="survey-question qsp-story-question">
+                  <QspStoryGroup
+                    questions={unit.questions}
+                    prompt={unit.prompt}
+                    answers={answers}
+                    onAnswerChange={handleAnswerChange}
+                    disabled={submitting || previewMode}
+                    rememberedVisibleCount={
+                      qspStoryVisibleCounts[unit.questions[0].stableKey]
+                    }
+                    onVisibleCountChange={rememberQspStoryVisibleCount}
+                  />
+                </li>
+              );
+            }
+
+            const q = unit.question;
+            return (
+              <li key={q.stableKey} className="survey-question">
+                <label htmlFor={`q-${q.stableKey}`} className="survey-question-label">
+                  {q.label}{q.isRequired ? <span className="survey-required" aria-hidden="true"> *</span> : null}
+                </label>
+                {q.helpText ? <p className="survey-question-help">{q.helpText}</p> : null}
+                <QuestionInput question={q} value={answers[q.stableKey]} onChange={handleAnswerChange} disabled={submitting || previewMode} invalid={invalidKeys.has(q.stableKey)} />
+              </li>
+            );
+          })}
         </ul>
       ) : null}
 

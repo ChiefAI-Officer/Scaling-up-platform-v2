@@ -29,6 +29,7 @@ import { isSingleColumnEnabled } from "@/lib/assessments/wave-ed6-flags";
 import { isVersionLifecycleEnabled } from "@/lib/assessments/wave-ed8-flags";
 import { isFormsBuildEnabled } from "@/lib/assessments/wave-ed9-flags";
 import { isPreviewSettingsEnabled } from "@/lib/assessments/wave-ed10-flags";
+import { isQspStoryGroupEnabled } from "@/lib/assessments/wave-48-flags";
 import { computePublishedQuestionUnions } from "@/lib/assessments/published-question-unions";
 import {
   activePublishedWhere,
@@ -294,6 +295,7 @@ export default async function AdminAssessmentVersionEditPage({
         // yet. Default false ⇒ byte-identical ED9 shell. Presentation-only,
         // kill = flag off + redeploy.
         previewSettingsEnabled={isPreviewSettingsEnabled()}
+        qspStoryGroupEnabled={isQspStoryGroupEnabled()}
         // Wave ED10 (spec 19am-plan, Task 5) — the Active published version
         // snapshot for the Preview tab's read-only "Active" mode. Null when
         // the flag is off or nothing is published. TabbedShell holds it;

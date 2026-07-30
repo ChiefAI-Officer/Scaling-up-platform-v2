@@ -148,7 +148,13 @@ type Phase =
   | { kind: "results"; report: RespondentReport }
   | { kind: "error"; message: string };
 
-export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
+export function OrgSurveyClient({
+  campaignAlias,
+  qspStoryGroupEnabled = false,
+}: {
+  campaignAlias: string;
+  qspStoryGroupEnabled?: boolean;
+}) {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>({ kind: "exchanging" });
   const [answers, setAnswers] = useState<Record<string, number | string | string[]>>({});
@@ -695,6 +701,7 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
             assessmentName={data.campaign.name}
             companyName={data.campaign.organizationName ?? undefined}
             templateAlias={data.campaign.templateAlias ?? undefined}
+            qspStoryGroupEnabled={qspStoryGroupEnabled}
             isCEO={data.isCEO === true}
             requireAtLeastOneAnswer
           />

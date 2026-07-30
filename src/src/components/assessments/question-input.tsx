@@ -43,6 +43,7 @@ interface QuestionInputProps {
   onChange: (stableKey: string, value: number | string | string[]) => void;
   disabled?: boolean;
   invalid?: boolean;
+  textPlaceholder?: string;
   /**
    * ED4 (spec 19af §3.3, co-validate C5) — namespace for the element `id`.
    * Defaults to `"q-"`, byte-identical to the historical `q-${stableKey}` id,
@@ -60,6 +61,7 @@ export function QuestionInput({
   onChange,
   disabled,
   invalid,
+  textPlaceholder = "Type your answer here…",
   idPrefix = "q-",
 }: QuestionInputProps) {
   if (q.type === "SLIDER_LIKERT" && q.scale) {
@@ -143,7 +145,7 @@ export function QuestionInput({
           className={`survey-textarea${invalid ? " is-invalid" : ""}`}
           rows={3}
           value={textValue}
-          placeholder="Type your answer here…"
+          placeholder={textPlaceholder}
           maxLength={MAX_TEXT_ANSWER_LENGTH}
           aria-invalid={invalid || undefined}
           onChange={(e) => onChange(q.stableKey, e.target.value)}

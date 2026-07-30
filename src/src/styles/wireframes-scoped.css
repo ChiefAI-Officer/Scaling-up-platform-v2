@@ -1392,6 +1392,102 @@
 }
 .su-assessment-brand .survey-question-help { margin: -0.5rem 0 0.75rem; font-size: 0.875rem; color: #6b6480; }
 
+/* QSP core-values stories: progressive respondent group. */
+.su-assessment-brand .survey-question.qsp-story-question {
+  padding: 1.75rem;
+}
+.su-assessment-brand .qsp-story-prompt-row {
+  display: grid;
+  grid-template-columns: 3rem minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+.su-assessment-brand .qsp-story-prompt-mark {
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.875rem;
+  background: hsl(var(--primary));
+  color: #fff;
+  font-weight: 800;
+}
+.su-assessment-brand .qsp-story-prompt {
+  color: #231535;
+  font-size: 1.125rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+.su-assessment-brand .qsp-story-help {
+  margin: 0.35rem 0 0;
+  color: #6b6480;
+  font-size: 0.9375rem;
+}
+.su-assessment-brand .qsp-story-entries {
+  display: grid;
+  gap: 0.875rem;
+  margin-top: 1.25rem;
+}
+.su-assessment-brand .qsp-story-entry {
+  padding: 1rem;
+  border: 1px solid #ded3ec;
+  border-radius: 12px;
+  background: #fcfbfd;
+}
+.su-assessment-brand .qsp-story-entry-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+  color: #49375d;
+  font-size: 0.875rem;
+  font-weight: 800;
+}
+.su-assessment-brand .qsp-story-count {
+  flex: 0 0 auto;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  background: #eee8f6;
+  color: #522583;
+  font-size: 0.75rem;
+}
+.su-assessment-brand .qsp-story-add {
+  width: 100%;
+  margin-top: 0.875rem;
+  padding: 0.8rem 1rem;
+  border: 1px dashed #a88ec7;
+  border-radius: 10px;
+  background: #faf7fd;
+  color: #522583;
+  font-weight: 800;
+}
+.su-assessment-brand .qsp-story-add:focus-visible {
+  outline: 2px solid #522583;
+  outline-offset: 2px;
+}
+.su-assessment-brand .qsp-story-add:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+@media (max-width: 640px) {
+  .su-assessment-brand .survey-question.qsp-story-question {
+    padding: 1.25rem;
+  }
+  .su-assessment-brand .qsp-story-prompt-row {
+    grid-template-columns: 2.5rem minmax(0, 1fr);
+    gap: 0.75rem;
+  }
+  .su-assessment-brand .qsp-story-prompt-mark {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 0.75rem;
+  }
+  .su-assessment-brand .qsp-story-entry {
+    padding: 0.875rem;
+  }
+}
+
 /* ---- Brand-styled text inputs (#11) ---- */
 .su-assessment-brand .survey-textarea,
 .su-assessment-brand .survey-input-number {

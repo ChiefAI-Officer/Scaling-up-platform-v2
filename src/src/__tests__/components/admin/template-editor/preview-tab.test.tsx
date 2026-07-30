@@ -243,6 +243,29 @@ describe("PreviewTab — read-only", () => {
     expect(screen.getByText(/read-only/i)).toBeInTheDocument();
     expect(screen.getByText(/test mode/i)).toBeInTheDocument();
   });
+
+  it("renders the QSP story group read-only when its server gate is enabled", () => {
+    render(
+      <PreviewTab
+        sections={[sectionDraft({ stableKey: "P1_retrospective", name: "Core values" })]}
+        questions={[1, 2, 3].map((index) => questionDraft({
+          stableKey: `P1_core_values_story_${index}`,
+          type: "TEXT",
+          label: `Core-values story ${index}`,
+          sortOrder: index,
+          sectionStableKey: "P1_retrospective",
+        }))}
+        version={DRAFT_VERSION}
+        template={{ name: "QSP v2", alias: "qsp-v2" }}
+        activePreview={null}
+        qspStoryGroupEnabled
+      />,
+    );
+
+    expect(screen.getByTestId("qsp-story-group")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Person and story 1 of 3" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /add another person/i })).toBeDisabled();
+  });
 });
 
 // ── 5. Empty template ⇒ graceful empty preview ────────────────────────────────

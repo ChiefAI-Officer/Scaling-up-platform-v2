@@ -99,6 +99,7 @@ describe("QuestionInput", () => {
     const textarea = screen.getByRole("textbox");
     expect(textarea.tagName).toBe("TEXTAREA");
     expect(textarea).toHaveValue("hello");
+    expect(textarea).toHaveAttribute("placeholder", "Type your answer here…");
   });
 
   test("3. renders NUMBER with number input", () => {
