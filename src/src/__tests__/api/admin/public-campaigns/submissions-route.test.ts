@@ -233,5 +233,8 @@ describe("GET /api/admin/public-campaigns/[id]/submissions", () => {
       summary: { kind: "degraded", label: "Result unavailable" },
       reportHref: "/assessments/public-submissions/s2/report",
     });
+    expect(
+      (db.assessmentSubmission.findMany as jest.Mock).mock.calls[0][0].select,
+    ).not.toHaveProperty("answers");
   });
 });

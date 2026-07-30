@@ -12,6 +12,10 @@
 
 import { Fragment, useEffect, useState } from "react";
 import type { PublicResultSummary } from "@/lib/assessments/public-referrals";
+import {
+  FOUR_DECISION_STYLES,
+  fourDecisionDomains,
+} from "@/lib/assessments/public-result-summary";
 
 interface TemplateSummary {
   id: string;
@@ -50,17 +54,6 @@ interface SubmissionRow {
   reportHref?: string;
 }
 
-const FOUR_DECISIONS = ["people", "strategy", "execution", "cash"] as const;
-
-function fourDecisionDomains(summary: PublicResultSummary | undefined) {
-  if (!summary || summary.kind !== "scored") return null;
-  const byKey = new Map(
-    summary.domains.map((domain) => [domain.key.toLowerCase(), domain]),
-  );
-  if (!FOUR_DECISIONS.every((key) => byKey.has(key))) return null;
-  return FOUR_DECISIONS.map((key) => byKey.get(key)!);
-}
-
 function SubmissionResult({ summary }: { summary: PublicResultSummary }) {
   if (summary.kind !== "scored") {
     return <span>{summary.label}</span>;
@@ -78,16 +71,17 @@ function SubmissionResult({ summary }: { summary: PublicResultSummary }) {
           aria-label="Four Decisions result"
           style={{ display: "flex", gap: "0.25rem", marginTop: "0.25rem" }}
         >
-          {decisions.map((domain) => (
+          {decisions.map(({ key }) => (
             <span
-              key={domain.key}
+              key={key}
               aria-hidden="true"
+              data-testid="four-decisions-segment"
               style={{
                 display: "block",
                 width: "1.25rem",
                 height: "0.25rem",
                 borderRadius: "999px",
-                background: "currentColor",
+                background: FOUR_DECISION_STYLES[key].color,
               }}
             />
           ))}
@@ -354,7 +348,11 @@ export function PublicCampaignsManager() {
                             <thead>
                               <tr>
                                 <th className="wf-th">Respondent</th>
-                                <th className="wf-th">Referred by coach</th>
+                                <th className="wf-th">
+                                  {enriched
+                                    ? "Referring coach"
+                                    : "Referred by coach"}
+                                </th>
                                 {enriched && (
                                   <th className="wf-th">Result</th>
                                 )}
@@ -456,8 +454,8 @@ export function PublicCampaignsManager() {
                                           gap: "0.5rem",
                                         }}
                                       >
-                                        {details.map((domain) => (
-                                          <div key={domain.key}>
+                                        {details.map(({ key, domain }) => (
+                                          <div key={key}>
                                             <span className="wf-muted-text">
                                               {domain.label}
                                             </span>

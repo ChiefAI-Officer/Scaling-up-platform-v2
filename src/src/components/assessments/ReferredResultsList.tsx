@@ -10,6 +10,10 @@ import {
   MAX_PUBLIC_REFERRAL_CURSOR_TRAIL,
   normalizePublicReferralCursorTrail,
 } from "@/lib/assessments/referred-results-page-state";
+import {
+  FOUR_DECISION_STYLES,
+  fourDecisionDomains,
+} from "@/lib/assessments/public-result-summary";
 
 interface ReferredResultsListProps {
   coachLink: string | null;
@@ -30,34 +34,6 @@ interface ReferredResultsResponse {
   assessmentOptions?: Array<{ id: string; name: string }>;
   totalCount?: number;
   ownedTotalCount?: number;
-}
-
-const FOUR_DECISIONS = ["people", "strategy", "execution", "cash"] as const;
-
-const domainStyles: Record<(typeof FOUR_DECISIONS)[number], string> = {
-  people: "border-[#f7a600]",
-  strategy: "border-[#008bd2]",
-  execution: "border-[#946b36]",
-  cash: "border-[#95c11f]",
-};
-
-const stripStyles: Record<(typeof FOUR_DECISIONS)[number], string> = {
-  people: "bg-[#f7a600]",
-  strategy: "bg-[#008bd2]",
-  execution: "bg-[#946b36]",
-  cash: "bg-[#95c11f]",
-};
-
-function fourDecisionDomains(summary: PublicResultSummary) {
-  if (summary.kind !== "scored") return null;
-  const byKey = new Map(
-    summary.domains.map((domain) => [domain.key.toLowerCase(), domain]),
-  );
-  if (!FOUR_DECISIONS.every((key) => byKey.has(key))) return null;
-  return FOUR_DECISIONS.map((key) => ({
-    key,
-    domain: byKey.get(key)!,
-  }));
 }
 
 function formatScore(score: number | null): string {
@@ -147,7 +123,7 @@ function DecisionStrip({
       {domains.map(({ key }) => (
         <span
           key={key}
-          className={`h-1 w-5 rounded-full ${stripStyles[key]}`}
+          className={`h-1 w-5 rounded-full ${FOUR_DECISION_STYLES[key].stripClass}`}
         />
       ))}
     </div>
@@ -198,7 +174,7 @@ function DomainBreakdown({
       {domains.map(({ key, domain }) => (
         <div
           key={key}
-          className={`border-l-4 bg-card px-3 py-1 ${domainStyles[key]}`}
+          className={`border-l-4 bg-card px-3 py-1 ${FOUR_DECISION_STYLES[key].borderClass}`}
         >
           <span className="block text-[11px] text-muted-foreground">
             {domain.label}

@@ -17,6 +17,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
@@ -30,20 +31,53 @@ interface PublicTaker {
   email?: string;
 }
 
-interface AdminSubmissionRow {
-  id: string;
-  submittedAt: Date;
-  publicTaker: unknown;
-  referringCoachEmail: string | null;
-  result?: unknown;
-  campaign?: {
-    template: { id: string; name: string; alias: string };
+const legacySubmissionSelect =
+  Prisma.validator<Prisma.AssessmentSubmissionSelect>()({
+    id: true,
+    submittedAt: true,
+    publicTaker: true,
+    referringCoachEmail: true,
+  });
+
+const enrichedSubmissionSelect =
+  Prisma.validator<Prisma.AssessmentSubmissionSelect>()({
+    ...legacySubmissionSelect,
+    result: true,
+    campaign: {
+      select: {
+        template: {
+          select: { id: true, name: true, alias: true },
+        },
+      },
+    },
+    referringCoach: {
+      select: {
+        firstName: true,
+        lastName: true,
+        email: true,
+      },
+    },
+  });
+
+type LegacySubmission = Prisma.AssessmentSubmissionGetPayload<{
+  select: typeof legacySubmissionSelect;
+}>;
+
+function legacyAdminRow(submission: LegacySubmission) {
+  const taker = (submission.publicTaker ?? {}) as unknown as PublicTaker;
+  const name =
+    `${(taker.firstName ?? "").trim()} ${(taker.lastName ?? "").trim()}`.trim();
+  const email = (taker.email ?? "").trim();
+
+  return {
+    id: submission.id,
+    // Coach-facing surfaces show the email when the name is blank (Wave P
+    // policy); "Anonymous" only when the taker gave neither.
+    takerName: name || email || "Anonymous",
+    takerEmail: email || null,
+    referringCoachEmail: submission.referringCoachEmail ?? null,
+    submittedAt: submission.submittedAt,
   };
-  referringCoach?: {
-    firstName: string;
-    lastName: string;
-    email: string;
-  } | null;
 }
 
 export async function GET(
@@ -94,73 +128,42 @@ export async function GET(
     }
 
     const referredResultsEnabled = isReferredResultsEnabled();
-    const submissions = (await db.assessmentSubmission.findMany({
+    if (!referredResultsEnabled) {
+      const submissions = await db.assessmentSubmission.findMany({
+        where: { campaignId: id },
+        orderBy: { submittedAt: "desc" },
+        select: legacySubmissionSelect,
+      });
+      return NextResponse.json({
+        success: true,
+        data: submissions.map(legacyAdminRow),
+      });
+    }
+
+    const submissions = await db.assessmentSubmission.findMany({
       where: { campaignId: id },
       orderBy: { submittedAt: "desc" },
-      select: {
-        id: true,
-        submittedAt: true,
-        publicTaker: true,
-        referringCoachEmail: true,
-        ...(referredResultsEnabled
-          ? {
-              result: true,
-              campaign: {
-                select: {
-                  template: {
-                    select: { id: true, name: true, alias: true },
-                  },
-                },
-              },
-              referringCoach: {
-                select: {
-                  firstName: true,
-                  lastName: true,
-                  email: true,
-                },
-              },
-            }
-          : {}),
-      },
-    })) as unknown as AdminSubmissionRow[];
-
-    const data = submissions.map((s) => {
-      const t = (s.publicTaker ?? {}) as unknown as PublicTaker;
-      const name = `${(t.firstName ?? "").trim()} ${(t.lastName ?? "").trim()}`.trim();
-      const email = (t.email ?? "").trim();
-      const legacyRow = {
-        id: s.id,
-        // Coach-facing surfaces show the email when the name is blank (Wave P
-        // policy); "Anonymous" only when the taker gave neither.
-        takerName: name || email || "Anonymous",
-        takerEmail: email || null,
-        referringCoachEmail: s.referringCoachEmail ?? null,
-        submittedAt: s.submittedAt,
-      };
-
-      if (
-        !referredResultsEnabled ||
-        s.result === undefined ||
-        !s.campaign
-      ) {
-        return legacyRow;
-      }
-
-      const coach = s.referringCoach
+      select: enrichedSubmissionSelect,
+    });
+    const data = submissions.map((submission) => {
+      const coach = submission.referringCoach
         ? {
             name:
-              `${s.referringCoach.firstName.trim()} ${s.referringCoach.lastName.trim()}`.trim() ||
-              s.referringCoach.email,
-            email: s.referringCoach.email,
+              `${submission.referringCoach.firstName.trim()} ${submission.referringCoach.lastName.trim()}`.trim() ||
+              submission.referringCoach.email,
+            email: submission.referringCoach.email,
           }
         : null;
 
       return {
-        ...legacyRow,
+        ...legacyAdminRow(submission),
         referringCoach: coach,
-        template: s.campaign.template,
-        summary: summarizePublicResult(s.campaign.template.alias, s.result),
-        reportHref: `/assessments/public-submissions/${encodeURIComponent(s.id)}/report`,
+        template: submission.campaign.template,
+        summary: summarizePublicResult(
+          submission.campaign.template.alias,
+          submission.result,
+        ),
+        reportHref: `/assessments/public-submissions/${encodeURIComponent(submission.id)}/report`,
       };
     });
 

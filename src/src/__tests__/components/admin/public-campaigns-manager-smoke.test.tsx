@@ -6,7 +6,13 @@
  */
 
 import React from "react";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import {
+  render,
+  screen,
+  waitFor,
+  fireEvent,
+  within,
+} from "@testing-library/react";
 import { PublicCampaignsManager } from "@/components/admin/PublicCampaignsManager";
 
 const PUBLIC_CAMPAIGN = {
@@ -133,8 +139,18 @@ describe("PublicCampaignsManager — public-quiz submissions (#83)", () => {
     expect(screen.getByText("7.4")).toBeInTheDocument();
     expect(screen.getByText("On the way")).toBeInTheDocument();
     expect(
-      screen.getByLabelText("Four Decisions result"),
+      screen.getByRole("columnheader", { name: "Referring coach" }),
     ).toBeInTheDocument();
+    const decisionStrip = screen.getByLabelText("Four Decisions result");
+    const segments = within(decisionStrip).getAllByTestId(
+      "four-decisions-segment",
+    );
+    expect(segments.map((segment) => segment.style.backgroundColor)).toEqual([
+      "rgb(247, 166, 0)",
+      "rgb(0, 139, 210)",
+      "rgb(148, 107, 54)",
+      "rgb(149, 193, 31)",
+    ]);
 
     fireEvent.click(screen.getByRole("button", { name: "Details" }));
     expect(screen.getByText("People")).toBeInTheDocument();
@@ -177,6 +193,9 @@ describe("PublicCampaignsManager — public-quiz submissions (#83)", () => {
     fireEvent.click(screen.getByRole("button", { name: /view submissions/i }));
 
     await screen.findByText("coach@x.com");
+    expect(
+      screen.getByRole("columnheader", { name: "Referred by coach" }),
+    ).toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: "Result" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "View report" })).not.toBeInTheDocument();
   });
