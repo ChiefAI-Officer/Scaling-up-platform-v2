@@ -31,6 +31,10 @@ import {
   getRespondentReport,
   type RespondentReportOutcome,
 } from "@/lib/assessments/respondent-report";
+import {
+  getPublicLeadReport,
+  type PublicLeadReportOutcome,
+} from "@/lib/assessments/public-lead-report";
 import { reportConfigFor } from "@/lib/assessments/report-config";
 import {
   REPORT_FILTERS,
@@ -207,6 +211,60 @@ export async function viewRespondentReport(
           ...(o.report.templateAlias && REPORT_FILTERS[o.report.templateAlias]
             ? { reportFilterId: REPORT_FILTER_VERSION }
             : {}),
+        },
+      };
+    },
+    metricRole,
+  });
+
+  return { outcome, metricRole };
+}
+
+/** Public-submission report adapter: exact Referring-coach or privileged actor. */
+export async function viewPublicLeadReport(
+  deps: ReportGateDeps,
+  args: { submissionId: string },
+): Promise<{ outcome: PublicLeadReportOutcome; metricRole: string | null }> {
+  const actor = await getApiActor();
+  const h = await headers();
+  const ip = ipFromHeaders(h);
+  const userAgent = h.get("user-agent");
+  const actorKey = actor?.coachId ?? actor?.userId ?? "anon";
+  const metricRole = actor?.role ?? null;
+
+  const outcome = await viewReport<PublicLeadReportOutcome>(deps, {
+    surface: "respondent",
+    actor,
+    noActorPolicy: "redirect-login",
+    ip,
+    userAgent,
+    rateLimitKey: `public-lead-report:${actorKey}:${args.submissionId}:${ip}`,
+    rateLimitConfig: RateLimits.standard,
+    load: () =>
+      getPublicLeadReport(
+        db,
+        actor!,
+        args.submissionId,
+      ),
+    classify: (result) =>
+      result.status === "ok"
+        ? "ok"
+        : result.status === "forbidden"
+          ? "forbidden"
+          : "not-found",
+    auditOf: (result) => {
+      if (result.status !== "ok") {
+        throw new Error("unreachable: auditOf on non-ok public lead outcome");
+      }
+      return {
+        entityType: "AssessmentSubmission",
+        entityId: result.report.provenance.submissionId,
+        action: "VIEW_REPORT",
+        changes: {
+          kind: "public-lead-report",
+          versionId: result.report.provenance.versionId,
+          contentHash: result.report.provenance.contentHash,
+          ownerCoachId: result.ownerCoachId,
         },
       };
     },

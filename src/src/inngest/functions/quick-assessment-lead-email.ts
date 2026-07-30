@@ -11,6 +11,8 @@ import { Prisma } from "@prisma/client";
 import { inngest } from "@/inngest/client";
 import { db } from "@/lib/db";
 import { sendEmailViaSMTP } from "@/lib/smtp-transport";
+import { resolvePublicLeadsState } from "@/lib/assessments/public-leads-state";
+import { normalizeMailbox } from "@/lib/assessments/quick-assessment-lead";
 
 const DEFAULT_LEASE_MS = 120_000;
 const DEFAULT_INVOCATION_BUDGET_MS = 45_000;
@@ -30,6 +32,7 @@ export interface ClaimedOutboxRow {
   attempts: number;
   leaseToken: string;
   leaseExpiresAt: Date;
+  featureKey?: string | null;
 }
 
 interface UpdateManyResult {
@@ -66,6 +69,9 @@ export interface DrainDeps {
   sendEmail: (o: { to: string; subject: string; html: string }) => Promise<void>;
   claimNext?: (input: ClaimInput) => Promise<ClaimedOutboxRow | null>;
   recordDeadLetter?: (input: DeadLetterInput) => Promise<void>;
+  authorizeBeforeSend?: (
+    row: ClaimedOutboxRow,
+  ) => Promise<{ allowed: boolean; reason?: string }>;
   now?: () => Date;
   makeLeaseToken?: () => string;
   maxAttempts?: number;
@@ -132,7 +138,8 @@ export async function claimNextOutboxRow(
       outbox."status",
       outbox."attempts",
       outbox."leaseToken",
-      outbox."leaseExpiresAt"
+      outbox."leaseExpiresAt",
+      outbox."featureKey"
   `);
 
   return rows[0] ?? null;
@@ -168,6 +175,57 @@ async function defaultRecordDeadLetter(
   });
 }
 
+async function defaultAuthorizeBeforeSend(
+  authorizationDb: Pick<OutboxDb, "$queryRaw">,
+  row: ClaimedOutboxRow,
+): Promise<{ allowed: boolean; reason?: string }> {
+  if (
+    row.featureKey !== "PUBLIC_LEADS" ||
+    row.recipientRole !== "REFERRING_COACH"
+  ) {
+    return { allowed: true };
+  }
+  const candidates = await authorizationDb.$queryRaw<
+    Array<{
+      coachId: string;
+      email: string;
+      deletedAt: Date | null;
+      certificationStatus: string;
+      certificationExpiry: Date | null;
+      publicLeadDeletedAt: Date | null;
+    }>
+  >(Prisma.sql`
+    SELECT
+      coach."id" AS "coachId",
+      coach."email",
+      coach."deletedAt",
+      coach."certificationStatus",
+      coach."certificationExpiry",
+      submission."publicLeadDeletedAt"
+    FROM "assessment_submissions" AS submission
+    INNER JOIN "coaches" AS coach
+      ON coach."id" = submission."referringCoachId"
+    WHERE submission."id" = ${row.submissionId}
+    LIMIT 1
+  `);
+  const candidate = candidates[0];
+  const state = resolvePublicLeadsState(process.env, {
+    coachId: candidate?.coachId ?? null,
+  });
+  const eligible =
+    candidate !== undefined &&
+    candidate.deletedAt === null &&
+    candidate.publicLeadDeletedAt === null &&
+    candidate.certificationStatus === "ACTIVE" &&
+    (candidate.certificationExpiry === null ||
+      candidate.certificationExpiry > new Date()) &&
+    normalizeMailbox(candidate.email) ===
+      normalizeMailbox(row.recipientEmail);
+  return state.sendCoachNotification && eligible
+    ? { allowed: true }
+    : { allowed: false, reason: "PUBLIC_LEAD_AUTHORIZATION_REVOKED" };
+}
+
 /**
  * Drains either one submission (event path) or the global oldest-due queue
  * (cron path). Claims happen only inside the sequential send slot and before
@@ -192,6 +250,9 @@ export async function drainLeadOutbox(
   const recordDeadLetter =
     deps.recordDeadLetter ??
     ((input: DeadLetterInput) => defaultRecordDeadLetter(deps.db, input));
+  const authorizeBeforeSend =
+    deps.authorizeBeforeSend ??
+    ((row: ClaimedOutboxRow) => defaultAuthorizeBeforeSend(deps.db, row));
 
   const startedAt = currentTime().getTime();
   let sent = 0;
@@ -212,6 +273,29 @@ export async function drainLeadOutbox(
     if (!row) break;
 
     try {
+      const authorization = await authorizeBeforeSend(row);
+      if (!authorization.allowed) {
+        const cancellation =
+          await deps.db.assessmentEmailOutbox.updateMany({
+            where: {
+              id: row.id,
+              status: "SENDING",
+              leaseToken: row.leaseToken,
+            },
+            data: {
+              status: "CANCELLED",
+              cancelledAt: currentTime(),
+              cancelReason:
+                authorization.reason ?? "AUTHORIZATION_REVOKED",
+              bodyHtml: "",
+              leaseToken: null,
+              leaseExpiresAt: null,
+              sendFenceGeneration: { increment: 1 },
+            },
+          });
+        skipped += cancellation.count;
+        continue;
+      }
       await deps.sendEmail({
         to: row.recipientEmail,
         subject: row.subject,

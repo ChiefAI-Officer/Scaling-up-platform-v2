@@ -762,16 +762,30 @@ export function BrandedReport({
             #81: suppressed for templates whose report config sets
             showCoachCta:false (Five Dysfunctions). */}
         {reportConfigFor(report.templateAlias).showCoachCta !== false && (
-          <a
-            className="su-report-cta"
-            href={
-              report.referringCoachEmail
-                ? `mailto:${report.referringCoachEmail}`
-                : "https://scalingup.com/coaches"
-            }
-          >
-            Talk to your Scaling Up Certified Coach →
-          </a>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            {report.publicLeadActions && (
+              <a
+                className="su-report-cta"
+                href="https://scalingup.com"
+              >
+                Learn more →
+              </a>
+            )}
+            <a
+              className="su-report-cta"
+              href={
+                report.referringCoachEmail
+                  ? `mailto:${report.referringCoachEmail}`
+                  : "https://scalingup.com/coaches"
+              }
+            >
+              {report.referringCoachEmail
+                ? "Talk to your coach →"
+                : report.publicLeadActions
+                  ? "Find a coach →"
+                  : "Talk to your Scaling Up Certified Coach →"}
+            </a>
+          </div>
         )}
       </section>
 

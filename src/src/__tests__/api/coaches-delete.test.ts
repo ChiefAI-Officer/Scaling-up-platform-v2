@@ -14,6 +14,7 @@ jest.mock("@/lib/db", () => ({
     coach: {
       findUnique: jest.fn(),
       delete: jest.fn(),
+      update: jest.fn(),
     },
     user: {
       delete: jest.fn(),
@@ -39,6 +40,11 @@ jest.mock("@/lib/db", () => ({
     auditLog: {
       create: jest.fn(),
     },
+    assessmentSubmission: { count: jest.fn() },
+    coachReferralKey: { count: jest.fn(), updateMany: jest.fn() },
+    coachEmailIdentity: { count: jest.fn(), updateMany: jest.fn() },
+    assessmentEmailOutbox: { updateMany: jest.fn() },
+    session: { deleteMany: jest.fn() },
     $transaction: jest.fn(),
   },
 }));
@@ -75,6 +81,9 @@ describe("DELETE /api/coaches/[id]", () => {
       async (fn: (...args: unknown[]) => unknown) => fn(db)
     );
     (db.organization.count as jest.Mock).mockResolvedValue(0);
+    (db.assessmentSubmission.count as jest.Mock).mockResolvedValue(0);
+    (db.coachReferralKey.count as jest.Mock).mockResolvedValue(0);
+    (db.coachEmailIdentity.count as jest.Mock).mockResolvedValue(0);
     (db.accessGroupCoach.deleteMany as jest.Mock).mockResolvedValue({ count: 0 });
     (db.organizationOwnershipEvent.updateMany as jest.Mock).mockResolvedValue({ count: 0 });
     (db.assessmentCampaign.updateMany as jest.Mock).mockResolvedValue({ count: 0 });

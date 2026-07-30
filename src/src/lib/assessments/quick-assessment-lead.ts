@@ -123,6 +123,36 @@ export interface LeadEmailOutput {
   bodyHtml: string;
 }
 
+export function buildPublicLeadCoachNotification(input: {
+  taker: { firstName: string; lastName: string; email: string };
+  assessmentName: string;
+  reportUrl: string;
+}): LeadEmailOutput {
+  const name = `${stripControlChars(input.taker.firstName)} ${stripControlChars(input.taker.lastName)}`.trim();
+  const assessmentName = stripControlChars(input.assessmentName);
+  const subject = `${name} completed ${assessmentName}`;
+  const escapedName = escapeHtml(
+    `${input.taker.firstName} ${input.taker.lastName}`.trim(),
+  );
+  const escapedEmail = escapeHtml(input.taker.email);
+  const escapedAssessment = escapeHtml(input.assessmentName);
+  const escapedReportUrl = escapeHtml(input.reportUrl);
+
+  return {
+    subject,
+    bodyHtml: `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8" /><title>${escapedAssessment} completed</title></head>
+<body style="font-family:Arial,Helvetica,sans-serif;color:#222;max-width:600px;margin:0 auto;padding:24px;">
+  <h2 style="color:#522583;margin-bottom:12px;">A contact completed ${escapedAssessment}</h2>
+  <p style="margin:0 0 16px;"><strong>${escapedName}</strong><br />${escapedEmail}</p>
+  <a href="${escapedReportUrl}" style="display:inline-block;background:#522583;color:#fff;text-decoration:none;border-radius:8px;padding:12px 18px;font-weight:700;">View report</a>
+  <p style="font-size:12px;color:#666;margin-top:28px;">Sign in to the Scaling Up Platform to view the frozen result.</p>
+</body>
+</html>`,
+  };
+}
+
 /**
  * Builds a lead-notification email for a quick-assessment submission.
  *

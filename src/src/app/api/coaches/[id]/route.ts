@@ -180,12 +180,89 @@ export async function DELETE(
     }
 
     let userAccountRetained = false;
+    let coachTombstoned = false;
 
     await db.$transaction(async (tx) => {
       // Block if coach owns organizations — ownerCoachId is non-nullable, can't be auto-nullified.
       const ownedOrgCount = await tx.organization.count({ where: { ownerCoachId: id } });
       if (ownedOrgCount > 0) {
         throw Object.assign(new Error("OWNS_ORGANIZATIONS"), { ownedOrgCount });
+      }
+
+      const [ownedPublicLeads, issuedReferralKeys, legacyAliases] =
+        await Promise.all([
+          tx.assessmentSubmission.count({
+            where: { referringCoachId: id },
+          }),
+          tx.coachReferralKey.count({ where: { coachId: id } }),
+          tx.coachEmailIdentity.count({
+            where: { coachId: id, kind: "LEGACY" },
+          }),
+        ]);
+      if (ownedPublicLeads > 0 || issuedReferralKeys > 0 || legacyAliases > 0) {
+        coachTombstoned = true;
+        const deletedAt = new Date();
+        await Promise.all([
+          tx.accessGroupCoach.deleteMany({ where: { coachId: id } }),
+          tx.coachReferralKey.updateMany({
+            where: { coachId: id, revokedAt: null },
+            data: { revokedAt: deletedAt },
+          }),
+          tx.coachEmailIdentity.updateMany({
+            where: { coachId: id, revokedAt: null },
+            data: { revokedAt: deletedAt },
+          }),
+          tx.assessmentEmailOutbox.updateMany({
+            where: {
+              featureKey: "PUBLIC_LEADS",
+              recipientRole: "REFERRING_COACH",
+              status: { in: ["PENDING", "HELD", "SENDING"] },
+              submission: { referringCoachId: id },
+            },
+            data: {
+              status: "CANCELLED",
+              cancelledAt: deletedAt,
+              cancelReason: "COACH_TOMBSTONED",
+              bodyHtml: "",
+              leaseToken: null,
+              leaseExpiresAt: null,
+              sendFenceGeneration: { increment: 1 },
+            },
+          }),
+          tx.coach.update({
+            where: { id },
+            data: { deletedAt },
+          }),
+          ...(existing.userId
+            ? [
+                tx.session.deleteMany({
+                  where: { userId: existing.userId },
+                }),
+                tx.user.update({
+                  where: { id: existing.userId },
+                  data: { deletedAt },
+                }),
+              ]
+            : []),
+        ]);
+        await tx.auditLog.create({
+          data: {
+            entityType: "Coach",
+            entityId: id,
+            action: "DELETE",
+            performedBy: actor.email,
+            changes: JSON.stringify({
+              mode: "TOMBSTONE",
+              coachName: `${existing.firstName} ${existing.lastName}`,
+              coachEmail: existing.email,
+              ownedPublicLeads,
+              issuedReferralKeys,
+              legacyAliases,
+              mailQuiescence: "PENDING_RECONCILIATION",
+            }),
+          },
+        });
+        return;
       }
 
       // Clean up non-cascade Coach FK relations before deleting the coach.
@@ -257,7 +334,9 @@ export async function DELETE(
 
     return NextResponse.json({
       success: true,
-      message: userAccountRetained
+      message: coachTombstoned
+        ? "Coach access revoked and historical Public-lead ownership retained."
+        : userAccountRetained
         ? "Coach deleted. User account retained (linked to assessment data)."
         : "Coach deleted successfully",
     });

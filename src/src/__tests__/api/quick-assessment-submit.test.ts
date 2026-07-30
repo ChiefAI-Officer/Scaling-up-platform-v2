@@ -29,6 +29,7 @@ jest.mock("next/server", () => ({
 
 // Transaction mock: tx callback gets txMock; resolve with callback's return value.
 const txMock = {
+  $queryRaw: jest.fn(),
   assessmentSubmission: {
     create: jest.fn(),
   },
@@ -62,6 +63,12 @@ jest.mock("@/lib/db", () => ({
 jest.mock("@/lib/rate-limit", () => ({
   RateLimits: { standard: {} },
   withRateLimit: jest.fn().mockResolvedValue({ allowed: true, headers: {} }),
+  getClientIdentifier: jest.fn().mockReturnValue("127.0.0.1"),
+  checkDistributedDualRateLimit: jest.fn().mockResolvedValue({
+    success: true,
+    remaining: 9,
+    resetAt: Date.now() + 60_000,
+  }),
 }));
 
 jest.mock("@/inngest/client", () => ({
@@ -178,6 +185,7 @@ beforeEach(() => {
   // Default tx: submission create returns id
   txMock.assessmentSubmission.create.mockResolvedValue({ id: "sub-1" });
   txMock.assessmentEmailOutbox.create.mockResolvedValue({});
+  txMock.$queryRaw.mockResolvedValue([]);
   // Default: no existing submission (idempotency)
   (db.assessmentSubmission.findFirst as jest.Mock).mockResolvedValue(null);
   // Default: audit log succeeds
@@ -190,6 +198,17 @@ beforeEach(() => {
   delete process.env.QUICK_ASSESSMENT_TEAM_EMAIL;
   delete process.env.ESCALATION_EMAIL;
   delete process.env.ADMIN_EMAIL;
+  delete process.env.WAVE_PUBLIC_LEADS_ENABLED;
+  delete process.env.WAVE_PUBLIC_LEADS_KILL;
+  delete process.env.WAVE_PUBLIC_LEADS_CANARY_COACH_IDS;
+  delete process.env.PUBLIC_LEADS_POLICY_APPROVED;
+  delete process.env.PUBLIC_LEADS_POLICY_VERSION;
+  delete process.env.PUBLIC_LEADS_RETENTION_DAYS;
+  delete process.env.PUBLIC_LEADS_DELETION_MODE;
+  delete process.env.PUBLIC_LEADS_DISTRIBUTED_LIMITER_READY;
+  delete process.env.PUBLIC_LEADS_REFERRAL_KEYS_ISSUED;
+  delete process.env.PUBLIC_LEADS_LIMITER_SECRET;
+  delete process.env.PUBLIC_LEADS_IDEMPOTENCY_SECRET;
 });
 
 /* -------------------------------------------------------------------------- */
@@ -223,6 +242,21 @@ describe("preserved behavior", () => {
       makeParams() as never,
     );
     expect(res.status).toBe(400);
+  });
+
+  it("413s an oversized streamed request before campaign or scoring work", async () => {
+    const res = await POST(
+      makeRequest({
+        ...VALID_BODY,
+        publicTaker: {
+          ...VALID_BODY.publicTaker,
+          firstName: "x".repeat(270_000),
+        },
+      }) as never,
+      makeParams() as never,
+    );
+    expect(res.status).toBe(413);
+    expect(db.assessmentCampaign.findUnique).not.toHaveBeenCalled();
   });
 
   it("404 when campaign not found", async () => {
@@ -493,6 +527,119 @@ describe("outbox enqueue", () => {
     const roles = enqueuedRoles();
     expect(roles).not.toContain("RESPONDENT");
     expect(roles).not.toContain("OWNING_COACH");
+  });
+});
+
+describe("Public leads dark data contract", () => {
+  function enablePublicLeads() {
+    process.env.WAVE_PUBLIC_LEADS_ENABLED = "1";
+    process.env.PUBLIC_LEADS_POLICY_APPROVED = "1";
+    process.env.PUBLIC_LEADS_POLICY_VERSION = "2026-07";
+    process.env.PUBLIC_LEADS_RETENTION_DAYS = "365";
+    process.env.PUBLIC_LEADS_DELETION_MODE = "ANONYMIZE";
+    process.env.PUBLIC_LEADS_DISTRIBUTED_LIMITER_READY = "1";
+    process.env.PUBLIC_LEADS_LIMITER_SECRET = "test-limiter-secret";
+    process.env.PUBLIC_LEADS_IDEMPOTENCY_SECRET = "test-idempotency-secret";
+  }
+
+  function attributionRow(email = "coach@example.com") {
+    return {
+      coachId: "coach-1",
+      email,
+      firstName: "Casey",
+      lastName: "Coach",
+      source: "REFERRAL_KEY",
+    };
+  }
+
+  function roles(): string[] {
+    return txMock.assessmentEmailOutbox.create.mock.calls.map(
+      (call: Array<{ data: { recipientRole: string } }>) =>
+        call[0].data.recipientRole,
+    );
+  }
+
+  it("snapshots validated stable ownership and sends a concise coach notification", async () => {
+    enablePublicLeads();
+    process.env.QUICK_ASSESSMENT_TEAM_EMAIL = "team@scalingup.com";
+    txMock.$queryRaw.mockResolvedValue([attributionRow()]);
+
+    const res = await POST(
+      makeRequest({
+        ...VALID_BODY,
+        referralKey: "opaque-ref",
+      }) as never,
+      makeParams() as never,
+    );
+
+    expect(res.status).toBe(200);
+    expect(txMock.assessmentSubmission.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          referringCoachId: "coach-1",
+          referringCoachEmailSnapshot: "coach@example.com",
+          attributionSource: "REFERRAL_KEY",
+          publicLeadPolicyVersion: "2026-07",
+          publicTakerEmailNormalized: "jane@example.com",
+          publicTakerNameNormalized: "jane doe",
+        }),
+      }),
+    );
+    expect(roles()).toEqual([
+      "TAKER_COPY",
+      "SU_TEAM",
+      "REFERRING_COACH",
+    ]);
+    const coach = txMock.assessmentEmailOutbox.create.mock.calls
+      .map((call: Array<{ data: Record<string, unknown> }>) => call[0].data)
+      .find((row) => row.recipientRole === "REFERRING_COACH");
+    expect(coach?.recipientEmail).toBe("coach@example.com");
+    expect(coach?.bodyHtml).toContain("View report");
+    expect(coach?.bodyHtml).not.toContain("<table");
+    expect(coach?.featureKey).toBe("PUBLIC_LEADS");
+  });
+
+  it("fails closed to Scaling Up-owned when policy is unavailable", async () => {
+    process.env.WAVE_PUBLIC_LEADS_ENABLED = "1";
+    process.env.PUBLIC_LEADS_DISTRIBUTED_LIMITER_READY = "1";
+    process.env.PUBLIC_LEADS_IDEMPOTENCY_SECRET = "test-idempotency-secret";
+    process.env.QUICK_ASSESSMENT_TEAM_EMAIL = "team@scalingup.com";
+
+    const res = await POST(
+      makeRequest({
+        ...VALID_BODY,
+        referralKey: "opaque-ref",
+      }) as never,
+      makeParams() as never,
+    );
+
+    expect(res.status).toBe(200);
+    expect(txMock.$queryRaw).not.toHaveBeenCalled();
+    expect(roles()).toEqual(["TAKER_COPY", "SU_TEAM"]);
+    expect(txMock.assessmentSubmission.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          referringCoachId: null,
+          publicLeadPolicyVersion: null,
+        }),
+      }),
+    );
+  });
+
+  it("suppresses the new coach notification for a same-mailbox owner", async () => {
+    enablePublicLeads();
+    process.env.QUICK_ASSESSMENT_TEAM_EMAIL = "team@scalingup.com";
+    txMock.$queryRaw.mockResolvedValue([attributionRow("JANE@EXAMPLE.COM")]);
+
+    await POST(
+      makeRequest({
+        ...VALID_BODY,
+        referralKey: "opaque-ref",
+      }) as never,
+      makeParams() as never,
+    );
+
+    expect(roles()).toEqual(["TAKER_COPY", "SU_TEAM"]);
   });
 });
 

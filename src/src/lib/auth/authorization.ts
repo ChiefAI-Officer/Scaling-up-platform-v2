@@ -71,7 +71,10 @@ export async function getCoachForSession() {
             where: { email: session.user.email },
             include: { coachProfile: true },
         });
-        if (user?.coachProfile) {
+        if (
+            user?.coachProfile &&
+            (user.coachProfile.deletedAt ?? null) === null
+        ) {
             return user.coachProfile;
         }
     } catch (err) {
@@ -84,7 +87,9 @@ export async function getCoachForSession() {
         const coachByEmail = await db.coach.findUnique({
             where: { email: session.user.email },
         });
-        return coachByEmail;
+        return coachByEmail && (coachByEmail.deletedAt ?? null) === null
+            ? coachByEmail
+            : null;
     } catch (err) {
         console.error("[getCoachForSession] db.coach.findUnique failed:", err);
         return null;
@@ -319,4 +324,3 @@ export async function getApiActor(): Promise<ApiActor | null> {
 
 export type { ApiActor, ApiUserRole } from "@/lib/auth/access-control";
 export { canManageCoachData, isPrivilegedRole };
-

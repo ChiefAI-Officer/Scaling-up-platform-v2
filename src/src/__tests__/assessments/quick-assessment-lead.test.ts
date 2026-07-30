@@ -6,6 +6,7 @@
 import {
   lowestDecision,
   buildLeadEmail,
+  buildPublicLeadCoachNotification,
   normalizeMailbox,
   resolveLeadRecipients,
 } from "@/lib/assessments/quick-assessment-lead";
@@ -392,5 +393,44 @@ describe("normalizeMailbox", () => {
     expect(normalizeMailbox("first.last@example.com")).toBe(
       "first.last@example.com",
     );
+  });
+});
+
+describe("buildPublicLeadCoachNotification", () => {
+  it("contains lead identity and an authenticated report action but no score table", () => {
+    const output = buildPublicLeadCoachNotification({
+      taker: {
+        firstName: "Jane",
+        lastName: "Doe",
+        email: "jane@example.com",
+      },
+      assessmentName: "Scaling Up 4 Decisions",
+      reportUrl: "https://app.example.com/assessments/public-leads/sub-1/report",
+    });
+
+    expect(output.subject).toBe(
+      "Jane Doe completed Scaling Up 4 Decisions",
+    );
+    expect(output.bodyHtml).toContain("jane@example.com");
+    expect(output.bodyHtml).toContain("View report");
+    expect(output.bodyHtml).toContain(
+      "https://app.example.com/assessments/public-leads/sub-1/report",
+    );
+    expect(output.bodyHtml).not.toContain("<table");
+  });
+
+  it("escapes identity and URL values", () => {
+    const output = buildPublicLeadCoachNotification({
+      taker: {
+        firstName: "<Jane>",
+        lastName: '"Doe"',
+        email: "jane&doe@example.com",
+      },
+      assessmentName: "<Assessment>",
+      reportUrl: 'https://app.example.com/?next="bad"&x=1',
+    });
+    expect(output.bodyHtml).not.toContain("<Jane>");
+    expect(output.bodyHtml).toContain("&lt;Jane&gt;");
+    expect(output.bodyHtml).toContain("&amp;x=1");
   });
 });

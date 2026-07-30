@@ -21,15 +21,23 @@ jest.mock("next/server", () => ({
 
 jest.mock("@/lib/db", () => ({
   db: {
+    $transaction: jest.fn(),
     assessmentCampaign: { findUnique: jest.fn() },
     assessmentTemplateVersion: { findUnique: jest.fn() },
-    assessmentSubmission: { create: jest.fn() },
+    assessmentSubmission: { create: jest.fn(), findFirst: jest.fn() },
+    assessmentEmailOutbox: { create: jest.fn() },
+    coach: { findUnique: jest.fn() },
+    auditLog: { create: jest.fn() },
   },
 }));
 
 jest.mock("@/lib/rate-limit", () => ({
   RateLimits: { standard: {} },
   withRateLimit: jest.fn().mockResolvedValue({ allowed: true, headers: {} }),
+}));
+
+jest.mock("@/inngest/client", () => ({
+  inngest: { send: jest.fn().mockResolvedValue(undefined) },
 }));
 
 // Scoring helper is real — feed it a valid template version + valid answers
@@ -103,6 +111,12 @@ const aliasParams = { params: Promise.resolve({ campaignAlias: "demo" }) };
 
 beforeEach(() => {
   jest.clearAllMocks();
+  (db.$transaction as jest.Mock).mockImplementation(
+    (callback: (tx: unknown) => Promise<unknown>) => callback(db),
+  );
+  (db.coach.findUnique as jest.Mock).mockResolvedValue(null);
+  (db.assessmentEmailOutbox.create as jest.Mock).mockResolvedValue({});
+  (db.auditLog.create as jest.Mock).mockResolvedValue({});
 });
 
 describe("POST /api/quiz/[campaignAlias]/submit", () => {

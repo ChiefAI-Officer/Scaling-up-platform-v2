@@ -42,6 +42,9 @@ interface SubmissionRow {
   takerName: string;
   takerEmail: string | null;
   referringCoachEmail: string | null;
+  referringCoachName?: string | null;
+  ownership?: "REFERRING_COACH" | "SCALING_UP";
+  reportUrl?: string;
   submittedAt: string;
 }
 
@@ -294,6 +297,9 @@ export function PublicCampaignsManager() {
                                 <th className="wf-th">Respondent</th>
                                 <th className="wf-th">Referred by coach</th>
                                 <th className="wf-th">Submitted</th>
+                                {submissionsByCampaign[c.id]?.some(
+                                  (row) => row.reportUrl,
+                                ) && <th className="wf-th">Result</th>}
                               </tr>
                             </thead>
                             <tbody>
@@ -312,11 +318,31 @@ export function PublicCampaignsManager() {
                                       )}
                                   </td>
                                   <td className="wf-td">
-                                    {s.referringCoachEmail ?? "—"}
+                                    {s.ownership === "SCALING_UP"
+                                      ? "Scaling Up-owned"
+                                      : s.referringCoachName ??
+                                        s.referringCoachEmail ??
+                                        "—"}
                                   </td>
                                   <td className="wf-td">
                                     {s.submittedAt.slice(0, 10)}
                                   </td>
+                                  {submissionsByCampaign[c.id]?.some(
+                                    (row) => row.reportUrl,
+                                  ) && (
+                                    <td className="wf-td">
+                                      {s.reportUrl ? (
+                                        <a
+                                          className="wf-link"
+                                          href={s.reportUrl}
+                                        >
+                                          View report
+                                        </a>
+                                      ) : (
+                                        "—"
+                                      )}
+                                    </td>
+                                  )}
                                 </tr>
                               ))}
                             </tbody>

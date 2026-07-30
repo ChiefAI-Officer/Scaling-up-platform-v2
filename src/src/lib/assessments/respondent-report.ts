@@ -153,6 +153,8 @@ export interface RespondentReport {
    * from context) and on submissions with no ?coach= param.
    */
   referringCoachEmail?: string | null;
+  /** Public-taker conclusion renders Learn more plus coach/finder actions. */
+  publicLeadActions?: boolean;
   /**
    * Wave K — the creator coach's logo URL (Coach.profileImage), shown on the
    * report cover + footer-left alongside the Scaling Up mark. Null when there

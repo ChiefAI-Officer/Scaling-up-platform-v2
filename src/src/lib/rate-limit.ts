@@ -78,6 +78,62 @@ export interface RateLimitResult {
   retryAfter?: number;
 }
 
+export interface DualRateLimitInput {
+  campaignKey: string;
+  emailKey: string;
+  intervalMs: number;
+  campaignMax: number;
+  emailMax: number;
+}
+
+/**
+ * Atomically admits a public submission against both campaign+IP and
+ * campaign+email budgets. Callers pass only HMAC-derived identifiers.
+ * Unlike the general limiter, unavailability is surfaced so Public leads can
+ * enter its explicitly bounded HELD fallback instead of failing open.
+ */
+export async function checkDistributedDualRateLimit(
+  input: DualRateLimitInput,
+): Promise<RateLimitResult> {
+  const redis = getRedisClient();
+  if (!redis) throw new Error("DISTRIBUTED_LIMITER_UNAVAILABLE");
+  const now = Date.now();
+  const script = `
+    local campaign = redis.call("INCR", KEYS[1])
+    if campaign == 1 then redis.call("PEXPIRE", KEYS[1], ARGV[1]) end
+    local email = redis.call("INCR", KEYS[2])
+    if email == 1 then redis.call("PEXPIRE", KEYS[2], ARGV[1]) end
+    if campaign > tonumber(ARGV[2]) or email > tonumber(ARGV[3]) then
+      return {0, campaign, email}
+    end
+    return {1, campaign, email}
+  `;
+  const result = (await redis.eval(
+    script,
+    2,
+    `public-submit:campaign:${input.campaignKey}`,
+    `public-submit:email:${input.emailKey}`,
+    input.intervalMs,
+    input.campaignMax,
+    input.emailMax,
+  )) as [number, number, number];
+  const allowed = result[0] === 1;
+  return {
+    success: allowed,
+    remaining: Math.max(
+      0,
+      Math.min(
+        input.campaignMax - result[1],
+        input.emailMax - result[2],
+      ),
+    ),
+    resetAt: now + input.intervalMs,
+    ...(allowed
+      ? {}
+      : { retryAfter: Math.ceil(input.intervalMs / 1000) }),
+  };
+}
+
 /**
  * Check rate limit using Redis (production) or in-memory (development)
  */

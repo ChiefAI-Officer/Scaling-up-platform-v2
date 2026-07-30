@@ -19,6 +19,7 @@ import {
   type CampaignListItem,
 } from "@/components/assessments/CampaignsListWithFilter";
 import { toCampaignListItems } from "@/lib/assessments/campaign-list-items";
+import { resolvePublicLeadsState } from "@/lib/assessments/public-leads-state";
 
 const APP_URL =
   process.env.APP_URL || "https://scaling-up-platform-v2.vercel.app";
@@ -46,13 +47,37 @@ async function resolvePublicQuickAlias(): Promise<string | null> {
 
 export default async function CoachAssessmentsPage() {
   const { coach } = await requireCoach();
+  const publicLeadsState = resolvePublicLeadsState(process.env, {
+    coachId: coach.id,
+  });
 
   // §4 — per-coach attributed share link for the public Quick Assessment.
   const publicQuickAlias = await resolvePublicQuickAlias();
-  const coachLink =
-    publicQuickAlias && coach.email
-      ? `${APP_URL}/quiz/${publicQuickAlias}?coach=${encodeURIComponent(coach.email)}`
-      : null;
+  const referralKey = publicLeadsState.presentationEnabled
+    ? await db.coachReferralKey.findFirst({
+        where: { coachId: coach.id, revokedAt: null },
+        select: { key: true },
+        orderBy: { createdAt: "desc" },
+      })
+    : null;
+  const coachLink = publicQuickAlias
+    ? publicLeadsState.presentationEnabled
+      ? referralKey
+        ? `${APP_URL}/quiz/${publicQuickAlias}?ref=${encodeURIComponent(referralKey.key)}`
+        : null
+      : coach.email
+        ? `${APP_URL}/quiz/${publicQuickAlias}?coach=${encodeURIComponent(coach.email)}`
+        : null
+    : null;
+  const publicLeadCount = publicLeadsState.presentationEnabled
+    ? await db.assessmentSubmission.count({
+        where: {
+          referringCoachId: coach.id,
+          publicLeadDeletedAt: null,
+          respondentId: null,
+        },
+      })
+    : 0;
 
   // Single round-trip: include participants (for respondentId → invitation join)
   // and invitations (for staged-progress metrics).
@@ -99,10 +124,10 @@ export default async function CoachAssessmentsPage() {
         </div>
       </FadeUp>
 
-      {coachLink && (
+      {(coachLink || publicLeadsState.presentationEnabled) && (
         <FadeUp delay={0.05}>
           <div className="rounded-xl border border-border bg-card p-4">
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex flex-col items-start justify-between gap-4 sm:flex-row">
               <div className="min-w-0">
                 <h2 className="text-sm font-semibold text-foreground">
                   Your Quick Assessment link
@@ -110,18 +135,34 @@ export default async function CoachAssessmentsPage() {
                 <p className="text-xs text-muted-foreground mt-0.5">
                   Share this link to attribute new Quick Assessment leads to you.
                   Takers see their results on screen and by email; you receive the
-                  full report.
+                  {publicLeadsState.presentationEnabled
+                    ? " contact notification."
+                    : " full report."}
                 </p>
-                <code
-                  className="mt-2 block truncate text-xs text-muted-foreground"
-                  data-testid="coach-quick-link"
-                  title={coachLink}
-                >
-                  {coachLink}
-                </code>
+                {coachLink ? (
+                  <code
+                    className="mt-2 block truncate text-xs text-muted-foreground"
+                    data-testid="coach-quick-link"
+                    title={coachLink}
+                  >
+                    {coachLink}
+                  </code>
+                ) : (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Your share link is being prepared.
+                  </p>
+                )}
               </div>
-              <div className="flex-shrink-0 pt-1">
-                <CopyUrlButton url={coachLink} />
+              <div className="flex flex-shrink-0 items-center gap-2 pt-1">
+                {publicLeadsState.presentationEnabled && (
+                  <Link
+                    href="/portal/assessments/public-leads"
+                    className="rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-muted"
+                  >
+                    View Public leads ({publicLeadCount})
+                  </Link>
+                )}
+                {coachLink && <CopyUrlButton url={coachLink} />}
               </div>
             </div>
           </div>

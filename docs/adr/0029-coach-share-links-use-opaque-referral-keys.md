@@ -1,0 +1,7 @@
+---
+status: accepted
+---
+
+# Coach share links use opaque stable referral keys
+
+New Coach share links identify the Referring coach with a non-secret opaque referral key tied to the stable coach account, rather than exposing a mutable email address in the URL. Existing email-attributed links remain supported so already-shared links do not break, but the platform stops generating them immediately; compatibility may be retired only after 90 consecutive days with zero legacy-link submissions and explicit owner approval, never on an arbitrary date. Current Coach emails and revocable Legacy referral aliases live in one database-enforced normalized identity namespace. An email change atomically converts the prior CURRENT identity to a LEGACY identity bound to the same Coach; concurrent signup, sync, reactivation, or reassignment cannot claim it for another account. Successful legacy resolution snapshots the same stable coach ID as a referral key. The key provides attribution only and grants no access to leads or reports. An unknown, malformed, revoked, or inactive reference never blocks completion or reveals coach-account state: the submission remains Scaling Up-owned, coach delivery and coach-specific contact are suppressed, and only a restricted admin diagnostic records the failed attribution. Because the key is shareable, launch also requires server-side per-IP/per-campaign and per-email throttles, duplicate-attempt suppression, and abuse metrics; CAPTCHA is deferred until measured abuse justifies its completion cost.

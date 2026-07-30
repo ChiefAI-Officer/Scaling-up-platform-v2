@@ -20,6 +20,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
+import { resolvePublicLeadsState } from "@/lib/assessments/public-leads-state";
 
 /** Shape of the persisted publicTaker JSON (subset we render). */
 interface PublicTaker {
@@ -83,6 +84,14 @@ export async function GET(
         submittedAt: true,
         publicTaker: true,
         referringCoachEmail: true,
+        referringCoachId: true,
+        referringCoachEmailSnapshot: true,
+        referringCoach: {
+          select: {
+            firstName: true,
+            lastName: true,
+          },
+        },
       },
     });
 
@@ -90,6 +99,9 @@ export async function GET(
       const t = (s.publicTaker ?? {}) as unknown as PublicTaker;
       const name = `${(t.firstName ?? "").trim()} ${(t.lastName ?? "").trim()}`.trim();
       const email = (t.email ?? "").trim();
+      const featureState = resolvePublicLeadsState(process.env, {
+        coachId: s.referringCoachId,
+      });
       return {
         id: s.id,
         // Coach-facing surfaces show the email when the name is blank (Wave P
@@ -98,6 +110,21 @@ export async function GET(
         takerEmail: email || null,
         referringCoachEmail: s.referringCoachEmail ?? null,
         submittedAt: s.submittedAt,
+        ...(featureState.presentationEnabled
+          ? {
+              referringCoachName: s.referringCoach
+                ? `${s.referringCoach.firstName} ${s.referringCoach.lastName}`.trim()
+                : null,
+              referringCoachEmail:
+                s.referringCoachEmailSnapshot ??
+                s.referringCoachEmail ??
+                null,
+              ownership: s.referringCoachId
+                ? "REFERRING_COACH"
+                : "SCALING_UP",
+              reportUrl: `/assessments/public-leads/${s.id}/report`,
+            }
+          : {}),
       };
     });
 

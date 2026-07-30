@@ -246,4 +246,34 @@ describe("drainLeadOutbox atomic leases", () => {
     expect(deps.sendEmail).toHaveBeenCalledTimes(1);
     expect(deps.claimNext).toHaveBeenCalledTimes(1);
   });
+
+  it("cancels and purges a feature Coach row when send-time authorization is revoked", async () => {
+    const deps = makeDeps([
+      makeRow({ featureKey: "PUBLIC_LEADS", leaseToken: "lease-auth" }),
+    ]);
+    deps.authorizeBeforeSend = jest.fn().mockResolvedValue({
+      allowed: false,
+      reason: "PUBLIC_LEAD_AUTHORIZATION_REVOKED",
+    });
+
+    await expect(drainLeadOutbox(deps, "sub-1")).resolves.toEqual({
+      sent: 0,
+      failed: 0,
+      skipped: 1,
+    });
+    expect(deps.sendEmail).not.toHaveBeenCalled();
+    expect(deps.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: "row-1",
+        status: "SENDING",
+        leaseToken: "lease-auth",
+      },
+      data: expect.objectContaining({
+        status: "CANCELLED",
+        cancelReason: "PUBLIC_LEAD_AUTHORIZATION_REVOKED",
+        bodyHtml: "",
+        leaseToken: null,
+      }),
+    });
+  });
 });

@@ -27,6 +27,7 @@ import {
   deriveScaleLabel,
   deriveTimeEstimate,
 } from "@/components/assessments/assessment-welcome";
+import { formatEventDateUTC } from "@/lib/utils";
 import { BrandedReport } from "@/components/assessments/BrandedReport";
 // The detailed report styling lives in su-report.css (scoped to .su-public-brand
 // .su-report). The invited (report) route loads it via its layout; the public
@@ -124,16 +125,24 @@ export function PublicQuizClient({
   const sections = useMemo(() => toSections(rawSections), [rawSections]);
   const questions = useMemo(() => toQuestions(rawQuestions), [rawQuestions]);
 
-  // §4 — Per-coach attribution. A `?coach=<ref>` query param (the coach's email
-  // for v1) is forwarded to the submit route as `referringCoachEmail`. The
-  // server's active-coach guard validates it; a blank/missing/inactive ref
-  // silently falls back to SU-team-only. We omit the field entirely when blank.
+  // Capture attribution once, then remove it from the browser URL so opaque
+  // keys and legacy email aliases do not linger in screenshots/history.
   const searchParams = useSearchParams();
-  const referringCoachEmail = useMemo(() => {
-    const raw = searchParams?.get("coach") ?? "";
-    const trimmed = raw.trim();
-    return trimmed.length > 0 ? trimmed : null;
-  }, [searchParams]);
+  const [attribution] = useState(() => {
+    const referralKey = (searchParams?.get("ref") ?? "").trim();
+    const referringCoachEmail = (searchParams?.get("coach") ?? "").trim();
+    return {
+      referralKey: referralKey || null,
+      referringCoachEmail: referringCoachEmail || null,
+    };
+  });
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has("ref") && !url.searchParams.has("coach")) return;
+    url.searchParams.delete("ref");
+    url.searchParams.delete("coach");
+    window.history.replaceState(window.history.state, "", url);
+  }, []);
 
   const sortedQuestions = useMemo(
     () => [...questions].sort((a, b) => a.sortOrder - b.sortOrder),
@@ -160,6 +169,10 @@ export function PublicQuizClient({
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [results, setResults] = useState<ScoreResult | null>(null);
+  const [coachContactEmail, setCoachContactEmail] = useState<string | null>(
+    null,
+  );
+  const [publicLeadActions, setPublicLeadActions] = useState(false);
   const [submittedId, setSubmittedId] = useState<string>("");
   // Stable idempotency key — generated once per component mount and reused on retries.
   const idemRef = useRef<string>("");
@@ -217,9 +230,9 @@ export function PublicQuizClient({
                 : status === "CLOSED"
                   ? "This assessment is closed."
                   : new Date(openAtIso) > new Date()
-                    ? `This assessment opens ${new Date(openAtIso).toLocaleDateString()}.`
+                    ? `This assessment opens ${formatEventDateUTC(openAtIso)}.`
                     : closeAtIso
-                      ? `This assessment closed on ${new Date(closeAtIso).toLocaleDateString()}.`
+                      ? `This assessment closed on ${formatEventDateUTC(closeAtIso)}.`
                       : "This assessment is not currently accepting submissions."}
             </p>
           </section>
@@ -431,6 +444,8 @@ export function PublicQuizClient({
         templateName,
       },
       degraded: false,
+      referringCoachEmail: coachContactEmail,
+      publicLeadActions,
     };
     return (
       <main className="survey-body" data-testid="quiz-results">
@@ -494,8 +509,12 @@ export function PublicQuizClient({
             value,
           })),
           idempotencyKey: idemRef.current,
-          // §4 — include only when a non-blank ?coach= param was present.
-          ...(referringCoachEmail ? { referringCoachEmail } : {}),
+          ...(attribution.referralKey
+            ? { referralKey: attribution.referralKey }
+            : {}),
+          ...(attribution.referringCoachEmail
+            ? { referringCoachEmail: attribution.referringCoachEmail }
+            : {}),
         }),
       });
       const body = await res.json().catch(() => ({}));
@@ -504,6 +523,8 @@ export function PublicQuizClient({
       }
       clearDraft();
       setResults(body.data.scoreResult as ScoreResult);
+      setCoachContactEmail(body.data.coachContactEmail ?? null);
+      setPublicLeadActions(body.data.publicLeadActions === true);
       setSubmittedId(body.data.submissionId ?? "");
       setStep("results");
     } catch (err) {

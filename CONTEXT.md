@@ -62,6 +62,34 @@ _Avoid_: assessment instance, test, run.
 A **Campaign** with `accessMode = PUBLIC` — anyone with the link self-enrolls and answers via `/quiz/[alias]` (no invitation, no roster membership required). Admin/STAFF-only to create; it still belongs to a chosen **Organization** (`organizationId` is non-nullable). The admin nav entry and its management page are labelled **"Public Campaigns"** and live at `/admin/assessments/public-campaigns`.
 _Avoid_: "Public Quiz" / "Public Quizzes" as a label (the glossary avoids "quiz" — the `/quiz/...` URL is not the domain term); conflating it with the INVITED flow (roster + emailed invitations).
 
+**Public taker**:
+A person who self-enrolls in a **Public Campaign**. Their contact identity belongs to that completed public submission; they are not a roster **Respondent** or campaign **Participant**.
+_Avoid_: "Respondent" or "Participant" for a public taker; "test taker" (there is no test).
+
+**Referring coach**:
+The stable coach account verified from the attributed link a **Public taker** used. The Referring coach owns the resulting **Public lead** even if their email later changes; they are not the Public Campaign's creator.
+_Avoid_: "campaign coach" or "creator coach" — a shared Public Campaign may be admin-created and serve many Referring coaches.
+
+**Coach share link**:
+The shareable **Public Campaign** URL that carries a **Coach referral key**, allowing a completed submission to become that coach's **Public lead**. It identifies attribution but grants no access to lead or report data.
+_Avoid_: "private link" or "secure link" — anyone may take the assessment through it; "email link" — new links do not expose the coach's email.
+
+**Coach referral key**:
+A non-secret, opaque, stable identifier in a **Coach share link** that resolves to one coach account. It is an attribution identifier, never an authentication credential.
+_Avoid_: coach email, access token, invitation token.
+
+**Legacy referral alias**:
+A normalized coach email retained only to resolve Coach share links created before **Coach referral keys**. It remains bound to its original coach account across email changes, can be explicitly revoked by an admin, and never becomes a login or contact-email alias.
+_Avoid_: current coach email, login alias, transferable email ownership.
+
+**Public lead**:
+A completed **Public Campaign** submission attributed to exactly one verified **Referring coach**. It is a durable coach-owned lead whose submitted contact identity and full frozen **Results report** remain available to that coach through the **Report access gate**, with admin/STAFF oversight; an intentional retake creates another Public lead rather than overwriting or merging the earlier result. Contact permission is limited to follow-up about that assessment and its results.
+_Avoid_: treating every public submission as a coach-owned lead — an unattributed or invalidly attributed submission remains Scaling Up-owned; treating a Public lead as a CRM opportunity with pipeline stages, assignment, notes, or outreach tracking; treating submission as newsletter or unrelated marketing consent.
+
+**Public leads page**:
+The read-only coach-facing area within **Assessments** for searching and filtering Public leads, seeing each lead's instrument-aware result headline, opening the full **Results report**, contacting the taker, and exporting the complete filtered contact set. Scored assessments show their tier or overall headline; qualitative assessments show completion rather than a fabricated score. It is distinct from the Campaign list because a shared Public Campaign can produce leads for many Referring coaches.
+_Avoid_: placing Public leads under a coach-owned Campaign; adding a separate primary-navigation product area.
+
 **Respondent**:
 A person in a company's roster (`OrgRespondent`) who can be invited to answer. Distinct from a **Participant** — the record of a respondent's inclusion in a *specific* campaign (`AssessmentCampaignParticipant`).
 _Avoid_: using "participant" and "respondent" interchangeably — a respondent exists in the roster independent of any campaign.
@@ -131,7 +159,7 @@ An instrument with no real scoring — Quarterly Session Prep v1 and v2. Respons
 
 **Results report** (a.k.a. "the report", "the PDF"):
 The branded, printable **per-respondent** document for *one* completed submission — cover, overall result, per-section breakdown, scores table, recommendations (when present), conclusion. It is the human-readable view that **replaces the raw answer (`stableKey`) view**. It is per individual.
-Its **audience is a property of where it is reached, not of the document**: a coach/admin views it through the **Report access gate**; when a **Campaign** opts in, the **Respondent** sees the *same* artifact rendered in place immediately after submitting (ADR-0027); and a public quiz taker sees it in place too (ADR-0008). One document, three readers — no reduced "respondent edition" exists. (Precision: the same *component*, minus cohort sections a given reader is not entitled to — the coach/admin route can pass a Wave S `peerComparison` section that the respondent's copy structurally cannot receive. See ADR-0027.)
+Its **audience is a property of where it is reached, not of the document**: a coach/admin views it through the **Report access gate**; when a **Campaign** opts in, the **Respondent** sees the *same* artifact rendered in place immediately after submitting (ADR-0027); and a **Public taker** sees it in place too (ADR-0008). One document, three readers — no reduced "respondent edition" exists. The frozen result content stays canonical, while the final contact action follows the reader: a Public taker can learn more and contact their verified **Referring coach** (or find a coach), whereas a Referring coach sees and can contact the Public taker. (Precision: the same *component*, minus cohort sections a given reader is not entitled to — the coach/admin route can pass a Wave S `peerComparison` section that the respondent's copy structurally cannot receive. See ADR-0027.)
 _Avoid_: calling it "the coach's view" — that was true only while the gated route was the only door.
 _Avoid_: conflating the per-respondent **Results report** with a cohort **Aggregate report** (Esperto's "group" / "self-comparison" report — the facilitator's all-responses dashboard; shipped for LVA in Wave F).
 

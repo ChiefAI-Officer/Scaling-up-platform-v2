@@ -102,6 +102,12 @@ type AssessmentCampaignSendInvites = {
     };
 };
 
+type AssessmentPublicLeadExportRequested = {
+    data: {
+        exportId: string;
+    };
+};
+
 type Events = {
     "workshop/created": WorkshopCreated;
     "workshop/approved": WorkshopApproved;
@@ -115,6 +121,7 @@ type Events = {
     "workflow/step.trigger": WorkflowStepTrigger;
     "assessment/quick-lead.enqueued": AssessmentQuickLeadEnqueued;
     "assessment/campaign.send-invites": AssessmentCampaignSendInvites;
+    "assessment/public-lead-export.requested": AssessmentPublicLeadExportRequested;
 };
 
 export const schemas = new EventSchemas().fromRecord<Events>();

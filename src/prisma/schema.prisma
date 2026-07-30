@@ -103,6 +103,7 @@ model Coach {
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
   syncedAt            DateTime?
+  deletedAt           DateTime?
 
   user            User?                @relation(fields: [userId], references: [id]) // Sprint 1: User relation
   workshops       Workshop[]
@@ -117,8 +118,40 @@ model Coach {
   orgOwnershipEventsFromCoach OrganizationOwnershipEvent[] @relation("OrgOwnershipFromCoach")
   orgOwnershipEventsToCoach   OrganizationOwnershipEvent[] @relation("OrgOwnershipToCoach")
   campaignWizardDraft         CampaignWizardDraft?
+  referralKeys                CoachReferralKey[]
+  emailIdentities             CoachEmailIdentity[]
+  publicLeads                 AssessmentSubmission[] @relation("PublicLeadOwner")
 
+  @@index([deletedAt])
   @@map("coaches")
+}
+
+model CoachReferralKey {
+  id        String    @id @default(cuid())
+  coachId   String
+  key       String    @unique
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  coach Coach @relation(fields: [coachId], references: [id], onDelete: Restrict)
+
+  @@index([coachId, revokedAt])
+  @@map("coach_referral_keys")
+}
+
+model CoachEmailIdentity {
+  normalizedEmail String   @id
+  coachId         String
+  kind            String // CURRENT | LEGACY
+  revokedAt       DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  coach Coach @relation(fields: [coachId], references: [id], onDelete: Restrict)
+
+  @@index([coachId, kind, revokedAt])
+  @@map("coach_email_identities")
 }
 
 model CoachCertification {
@@ -1370,7 +1403,16 @@ model AssessmentSubmission {
   result                Json // frozen ScoreResult cache
   publicTaker           Json? // {email, firstName, lastName, ...} for PUBLIC
   referringCoachEmail   String?
+  referringCoachId      String?
+  referringCoachEmailSnapshot String?
+  attributionSource     String?
+  publicLeadPolicyVersion String?
+  publicLeadDeletedAt   DateTime?
+  publicTakerNameNormalized String?
+  publicTakerEmailNormalized String?
   idempotencyKey        String? // PUBLIC submit idempotency; partial-unique via raw SQL
+  requestFingerprint    String?
+  requestFingerprintVersion Int?
   resultsTokenHash      String?
   resultsTokenIssuedAt  DateTime?
   resultsTokenExpiresAt DateTime?
@@ -1381,10 +1423,14 @@ model AssessmentSubmission {
   respondent   OrgRespondent?          @relation(fields: [respondentId], references: [id])
   invitation   AssessmentInvitation?   @relation(fields: [invitationId], references: [id])
   outboxEmails AssessmentEmailOutbox[]
+  referringCoach Coach? @relation("PublicLeadOwner", fields: [referringCoachId], references: [id], onDelete: Restrict)
+  publicLeadExportItems PublicLeadExportItem[]
 
   @@index([campaignId])
   @@index([respondentId, submittedAt])
   @@index([referringCoachEmail])
+  @@index([referringCoachId, submittedAt, id])
+  @@index([publicLeadDeletedAt])
   // Partial unique indexes added via raw SQL:
   //   - (campaignId, respondentId) WHERE respondentId IS NOT NULL
   //   - (resultsTokenHash) WHERE resultsTokenHash IS NOT NULL
@@ -1426,6 +1472,63 @@ model AssessmentEmailOutbox {
   @@index([status, leaseExpiresAt])
   @@index([submissionId])
   @@map("assessment_email_outbox")
+}
+
+model PublicLeadExport {
+  id                   String    @id @default(cuid())
+  requestedByUserId    String
+  ownerCoachId         String?
+  status               String    @default("PENDING") // PENDING | RUNNING | COMPLETED | ABORTED
+  filter               Json
+  authorizationGeneration Int   @default(0)
+  manifestDigest       String?
+  manifestRowCount     Int?
+  emittedDigest        String?
+  emittedRowCount      Int?
+  artifactCiphertext   Bytes?
+  artifactNonce        Bytes?
+  artifactAuthTag      Bytes?
+  artifactKeyVersion   String?
+  expiresAt            DateTime?
+  startedAt            DateTime?
+  completedAt          DateTime?
+  abortedAt            DateTime?
+  errorClass           String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  items PublicLeadExportItem[]
+
+  @@index([requestedByUserId, createdAt])
+  @@index([status, createdAt])
+  @@map("public_lead_exports")
+}
+
+model PublicLeadExportItem {
+  id           String @id @default(cuid())
+  exportId     String
+  submissionId String
+  sortOrder    Int
+
+  export      PublicLeadExport           @relation(fields: [exportId], references: [id], onDelete: Cascade)
+  submission  AssessmentSubmission       @relation(fields: [submissionId], references: [id], onDelete: Restrict)
+  exclusion   PublicLeadExportExclusion?
+
+  @@unique([exportId, submissionId])
+  @@unique([exportId, sortOrder])
+  @@index([submissionId])
+  @@map("public_lead_export_items")
+}
+
+model PublicLeadExportExclusion {
+  id           String   @id @default(cuid())
+  exportItemId String   @unique
+  reason       String
+  createdAt    DateTime @default(now())
+
+  exportItem PublicLeadExportItem @relation(fields: [exportItemId], references: [id], onDelete: Cascade)
+
+  @@map("public_lead_export_exclusions")
 }
 
 // v7.6: AccessGroup replaces TemplateAccessGrant. Groups grant template
