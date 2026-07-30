@@ -49,7 +49,7 @@ jest.mock("@/inngest/client", () => ({
 }));
 
 jest.mock("@/lib/audit", () => ({
-  createAuditLog: jest.fn().mockResolvedValue(undefined),
+  logAudit: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock("@/lib/rate-limit", () => ({

@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { PrismaClient } from "@prisma/client";
 import {
   claimNextOutboxRow,
@@ -9,6 +11,10 @@ const destructiveOptIn =
   process.env.ASSESSMENT_EMAIL_LEASE_TEST_ALLOW === "isolated-schema";
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 const schemaName = `assessment_email_lease_${randomUUID().replaceAll("-", "")}`;
+const leaseMigrationPath = path.resolve(
+  process.cwd(),
+  "prisma/migrations/20260730040000_add_assessment_outbox_leases/migration.sql",
+);
 
 function scopedDatabaseUrl(baseUrl: string): string {
   const url = new URL(baseUrl);
@@ -42,6 +48,8 @@ describe("assessment email atomic lease on PostgreSQL", () => {
     });
 
     await admin.$executeRawUnsafe(`CREATE SCHEMA "${schemaName}"`);
+    // Reproduce the pre-expand table, then apply the exact frozen migration.
+    // The test therefore fails if the migration and worker query drift apart.
     await eventDb.$executeRawUnsafe(`
       CREATE TABLE "assessment_email_outbox" (
         "id" TEXT PRIMARY KEY,
@@ -53,14 +61,18 @@ describe("assessment email atomic lease on PostgreSQL", () => {
         "bodyHtml" TEXT NOT NULL,
         "status" TEXT NOT NULL DEFAULT 'PENDING',
         "attempts" INTEGER NOT NULL DEFAULT 0,
-        "leaseToken" TEXT,
-        "leaseExpiresAt" TIMESTAMP(3),
-        "cancelledAt" TIMESTAMP(3),
         "nextAttemptAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
         "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
         "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
       )
     `);
+    const migrationStatements = readFileSync(leaseMigrationPath, "utf8")
+      .split(";")
+      .map((statement) => statement.trim())
+      .filter(Boolean);
+    for (const statement of migrationStatements) {
+      await eventDb.$executeRawUnsafe(statement);
+    }
   });
 
   afterAll(async () => {
