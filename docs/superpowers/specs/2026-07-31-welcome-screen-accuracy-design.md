@@ -69,19 +69,19 @@ For a wholly uniform slider bank:
 
 - preserve the existing sentence:
   `{count} short statements, rated {minimum}–{maximum}.`;
-- preserve all three stat chips: question count, estimated time, and scale.
+- preserve all three stat chips: question count, section count, and scale.
 
 For a non-empty mixed-format bank:
 
 - render:
   `{count} questions using a mix of response formats.`;
-- render only the question-count and estimated-time chips;
+- render only the question-count and section-count chips;
 - do not add a replacement “Mixed formats” chip.
 
 For an empty or unrecognized bank:
 
 - use the neutral fallback `{count} questions.`;
-- render only the question-count and estimated-time chips.
+- render only the question-count and section-count chips.
 
 The two-chip row uses the existing flexible layout. No replacement chip or CSS
 redesign is required.
@@ -105,10 +105,10 @@ aliases. New templates therefore receive correct behavior without new branches.
 
 | Bank shape | Expectations sentence | Stat chips |
 | --- | --- | --- |
-| All sliders, identical valid range | Existing “short statements, rated …” copy | Questions, time, scale |
-| Contains text, number, or multiple choice | “questions using a mix of response formats” | Questions, time |
-| Sliders use different ranges | “questions using a mix of response formats” | Questions, time |
-| Empty, invalid, or unrecognized | Neutral “questions” fallback | Questions, time |
+| All sliders, identical valid range | Existing “short statements, rated …” copy | Questions, sections, scale |
+| Contains text, number, or multiple choice | “questions using a mix of response formats” | Questions, sections |
+| Sliders use different ranges | “questions using a mix of response formats” | Questions, sections |
+| Empty, invalid, or unrecognized | Neutral “questions” fallback | Questions, sections |
 
 Known examples:
 
@@ -188,7 +188,7 @@ risks. The strict all-questions rule addresses the third.
    numeric range.
 2. Mixed-format banks render
    `{count} questions using a mix of response formats.`.
-3. Mixed-format banks show exactly the question-count and estimated-time chips.
+3. Mixed-format banks show exactly the question-count and section-count chips.
 4. Uniform slider banks preserve their existing copy and three-chip layout.
 5. Invited and public Welcome screens use the same derivation.
 6. `deriveTimeEstimate` remains unchanged.
