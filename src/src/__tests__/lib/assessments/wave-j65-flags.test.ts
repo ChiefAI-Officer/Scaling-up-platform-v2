@@ -36,11 +36,39 @@ describe("isStableInvitationLinksEnabled", () => {
       "alpha",
       false,
     ],
+    [
+      {
+        WAVE_J65_STABLE_LINKS_CANARY: "alpha,beta",
+        WAVE_J65_STABLE_LINKS_KILL: "1",
+      },
+      "beta",
+      false,
+    ],
   ])(
     "applies kill, global, and exact-alias precedence",
     (env, alias, expected) => {
       Object.assign(process.env, env);
       expect(isStableInvitationLinksEnabled(alias)).toBe(expected);
+    },
+  );
+
+  it.each(["1", "true", "TRUE", "yes"])(
+    "accepts %p as an explicit truthy global value",
+    (value) => {
+      process.env.WAVE_J65_STABLE_LINKS_ENABLED = value;
+      expect(isStableInvitationLinksEnabled()).toBe(true);
+    },
+  );
+
+  it.each([undefined, "", "0", "false"])(
+    "treats %p as a falsey global value",
+    (value) => {
+      if (value === undefined) {
+        delete process.env.WAVE_J65_STABLE_LINKS_ENABLED;
+      } else {
+        process.env.WAVE_J65_STABLE_LINKS_ENABLED = value;
+      }
+      expect(isStableInvitationLinksEnabled()).toBe(false);
     },
   );
 });
