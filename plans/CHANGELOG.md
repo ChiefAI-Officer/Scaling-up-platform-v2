@@ -6,6 +6,21 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="gh-224-truthful-welcome-sharing-copy-launched"></a>
+### 2026-07-31 — Truthful Welcome sharing disclosure launched (GH #224) <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:gh-224-truthful-welcome-sharing-copy-launched -->
+
+**Status: MERGED + LIVE.** Implementation PR [#278](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/278) was promoted from draft only after **Build**, **Migration Safety Gate**, **Assessment Email Lease (PostgreSQL)**, **Vercel**, and **Vercel Preview Comments** passed. GitHub reported the PR `CLEAN` and `MERGEABLE`; it squash-merged at `2026-07-31T11:48:33Z` as `e66c85ee87b45adceaecab3b2dd9e391bed3d183`, and issue [#224](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/issues/224) auto-closed at `2026-07-31T11:48:34Z`.
+
+**Exact deployment and health evidence.** Production deployment `dpl_51NbhFeR1oPKdFXXo9K4dhRx88Gj` (`scaling-up-platform-v2-gh3g4cikz-scaling-up.vercel.app`), target `production`, was created at `2026-07-31T11:48:36.051Z` and reached **READY** at `2026-07-31T11:49:37.883Z`, with Vercel metadata bound to `main` at the exact merge SHA. It owns both `scaling-up-platform-v2.vercel.app` and `platformtest.scalingup.com`. Health calls to both aliases returned HTTP `200` with `status: healthy`, `database: healthy`, and `authPosture: safe` at `2026-07-31T11:49:47.991Z` and `2026-07-31T11:49:47.379Z`.
+
+**Read-only production smoke.** `https://platformtest.scalingup.com/quiz/scaling_up_quick_pub_260610041810` returned HTTP `200`, rendered **How your results are shared** and the authorized-Scaling-Up-staff disclosure, and contained no **Honest & confidential**, `anonymous`, or `private` claim. No assessment was started or submitted, no lead data was entered, and no production write occurred. The invited disclosure remains covered by the focused flow suite because opening it live would require a participant invitation.
+
+**Tracking and reporting closeout.** The stale `needs-triage` label was removed from the closed issue. The shared claim on issue [#261](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/issues/261#issuecomment-5142563965) was released after production verification. GH #224 is the fourth reportable product outcome after the already-sent July 27–31 report, following GH #222, GH #242, and GH #243. This launch record is operational evidence, not a fifth outcome.
+
+**Rollback.** Revert merge squash `e66c85ee87b45adceaecab3b2dd9e391bed3d183`. No migration rollback, data cleanup, feature-flag operation, environment change, or scheduler action is required.
+
+---
+
 <a id="gh-224-truthful-welcome-sharing-copy-pr-ready"></a>
 ### 2026-07-31 — Truthful Welcome sharing disclosure implemented (GH #224) <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:gh-224-truthful-welcome-sharing-copy-pr-ready -->
 
