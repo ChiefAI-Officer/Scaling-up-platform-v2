@@ -6,6 +6,20 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-07-31 — Welcome-screen question-bank accuracy implemented (GH #222) <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:gh-222-welcome-screen-accuracy-implemented -->
+
+**Status: IMPLEMENTED + LOCALLY VERIFIED; not yet merged or launched.** The shared participant Welcome screen no longer takes the first slider's range and presents it as a property of the entire question bank.
+
+**Behavior.** A bank shows its existing `short statements, rated …` sentence and scale chip only when every question is `SLIDER_LIKERT`, every range is finite and increasing, and every range matches. LVA, QSP v1, QSP v2, and Scaling Up Full instead use `questions using a mix of response formats` and retain only the existing question-count and section-count chips. Rockefeller Habits, Five Dysfunctions, and Scaling Up Quick retain their existing rated copy and three-chip layout. Invited and public flows use one shared derivation.
+
+**Scope.** `deriveTimeEstimate` is unchanged. No template-specific rule, percentage threshold, CSS change, API change, migration, seed edit, feature flag, or unrelated Welcome copy is included.
+
+**Verification.** The focused shared-component, invited-pager, and public-pager suites passed. Changed-file ESLint, migration safety, changelog freshness, `git diff --check`, and `CI=true npx next build --turbopack` passed.
+
+**Rollout and rollback.** This is a flagless presentation fix with no stored-data change. It is not live until its PR merges and deploys; rollback is a normal revert.
+
+---
+
 ### 2026-07-31 — Jeff public-survey closure launched; consolidated item #83 is Complete <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:jeff-public-survey-closure-launched -->
 
 **Status: MERGED + LIVE.** PR [#266](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/266) merged as squash `ddc83e8f799cbdac5e2e5eae7cca37f6ce53c629` on 2026-07-31 Manila time. Vercel's Production deployment for that exact SHA completed successfully at `scaling-up-platform-v2-mwymzwu2n-scaling-up.vercel.app`; both production aliases, `scaling-up-platform-v2.vercel.app` and `platformtest.scalingup.com`, returned `200` from `/api/health` with `database: healthy` and `authPosture: safe` on the new process uptime.
