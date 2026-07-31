@@ -64,6 +64,7 @@ function makeCampaign(
         ? overrides.invitationBodyMarkdown
         : null,
     template: {
+      alias: "five-dysfunctions",
       name: "Five Dysfunctions",
       invitationSubject: "You're invited",
       invitationBodyMarkdown: "Hello {{first_name}}",
@@ -108,6 +109,17 @@ function makeDeps(
     .fn()
     .mockResolvedValue({ sent: [], skipped: [], failed: [], results: [] });
   const sendEmail = jest.fn().mockResolvedValue(undefined);
+  const prepareEmail = jest.fn();
+  const stableTokens = {
+    stageExistingOriginal: jest.fn(),
+    registerOriginal: jest.fn(),
+    confirm: jest.fn(),
+    uncertain: jest.fn(),
+    removeRegistered: jest.fn(),
+    rollbackRejected: jest.fn(),
+  };
+  const persistRejectedCleanupAudit = jest.fn().mockResolvedValue(undefined);
+  const isStableLinksEnabled = jest.fn().mockReturnValue(false);
   const isPaused = jest.fn().mockReturnValue(false);
   const isAutoSendEnabled = jest.fn().mockReturnValue(true);
   // Mirror REAL Inngest: every step.run return is JSON-serialized + parsed back,
@@ -128,6 +140,10 @@ function makeDeps(
       },
     },
     sendEmail,
+    prepareEmail,
+    stableTokens,
+    persistRejectedCleanupAudit,
+    isStableLinksEnabled,
     sendInvitesBatch,
     isPaused,
     isAutoSendEnabled,
@@ -302,6 +318,70 @@ describe("runInviteFanout", () => {
     expect(batchDeps.db).toBe(deps.db);
     expect(batchDeps.sendEmail).toBe(deps.sendEmail);
     expect(typeof batchDeps.now).toBe("function");
+  });
+
+  it("passes enabled stable-link context and adapters using the exact campaign alias", async () => {
+    const deps = makeDeps();
+    const isStableLinksEnabled = jest.fn().mockReturnValue(true);
+    const prepareEmail = jest.fn();
+    const stableTokens = {
+      stageExistingOriginal: jest.fn(),
+      registerOriginal: jest.fn(),
+      confirm: jest.fn(),
+      uncertain: jest.fn(),
+      removeRegistered: jest.fn(),
+      rollbackRejected: jest.fn(),
+    };
+    const persistRejectedCleanupAudit = jest.fn();
+    Object.assign(deps, {
+      isStableLinksEnabled,
+      prepareEmail,
+      stableTokens,
+      persistRejectedCleanupAudit,
+    });
+
+    await runInviteFanout(deps, { campaignId: CAMPAIGN_ID });
+
+    expect(isStableLinksEnabled).toHaveBeenCalledWith("q3-team");
+    const [batchDeps, batchInput] = deps.sendInvitesBatch.mock.calls[0];
+    expect(batchInput.stableLinksEnabled).toBe(true);
+    expect(batchDeps.prepareEmail).toBe(prepareEmail);
+    expect(batchDeps.stableTokens).toBe(stableTokens);
+    expect(batchDeps.persistRejectedCleanupAudit).toBe(
+      persistRejectedCleanupAudit,
+    );
+  });
+
+  it("passes disabled stable-link context without adapters or changing fanout steps", async () => {
+    const deps = makeDeps();
+    const isStableLinksEnabled = jest.fn().mockReturnValue(false);
+    const prepareEmail = jest.fn();
+    const stableTokens = {
+      stageExistingOriginal: jest.fn(),
+      registerOriginal: jest.fn(),
+      confirm: jest.fn(),
+      uncertain: jest.fn(),
+      removeRegistered: jest.fn(),
+      rollbackRejected: jest.fn(),
+    };
+    Object.assign(deps, {
+      isStableLinksEnabled,
+      prepareEmail,
+      stableTokens,
+    });
+
+    await runInviteFanout(deps, { campaignId: CAMPAIGN_ID });
+
+    expect(isStableLinksEnabled).toHaveBeenCalledWith("q3-team");
+    const [batchDeps, batchInput] = deps.sendInvitesBatch.mock.calls[0];
+    expect(batchInput.stableLinksEnabled).toBe(false);
+    expect(batchDeps.prepareEmail).toBeUndefined();
+    expect(batchDeps.stableTokens).toBeUndefined();
+    expect(batchDeps.persistRejectedCleanupAudit).toBeUndefined();
+    expect(deps.sendInvitesBatch).toHaveBeenCalledTimes(1);
+    expect(deps.runStep.mock.calls.map(([name]) => name)).toContain(
+      "heartbeat-1",
+    );
   });
 
   it("flips ON_OPEN DRAFT campaign to ACTIVE on completion", async () => {
