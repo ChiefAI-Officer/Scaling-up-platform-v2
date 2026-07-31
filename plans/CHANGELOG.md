@@ -6,6 +6,21 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="gh-242-retired-edition-warning-launched"></a>
+### 2026-07-31 — GH #242 retired pinned-edition warning launched <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:gh-242-retired-edition-warning-launched -->
+
+**Status: MERGED + LIVE.** PR [#273](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/273) squash-merged through the normal protected path as `54d0c215983f2d27d84056fbb7e1ca99a5e36b55`. Vercel production deployment `dpl_Do162d5YEbpUjDyUTNXEo2HEQYzi` (`scaling-up-platform-v2-f9t8c463p-scaling-up.vercel.app`) reached Ready with metadata bound to that exact `main` SHA and owns both production aliases.
+
+**Live behavior.** The shared admin/Coach campaign detail now preserves the exact pinned-edition provenance and shows the destructive **This edition has been retired** warning when that `AssessmentTemplateVersion.archivedAt` is non-null. Retirement suppresses the amber **Not the latest edition** warning; non-retired current, behind, unpublished, and fail-quiet states remain unchanged. The change is read-only and flagless, with no migration, backfill, environment change, campaign-list change, lifecycle write, scoring/report change, or production-data operation. GH #243 owns the now-unblocked campaign-list presentation.
+
+**Protected release and production verification.** Before merge, PR checks **Build**, **Migration Safety Gate**, **Assessment Email Lease (PostgreSQL)**, **Vercel**, and **Vercel Preview Comments** all passed; GitHub reported the PR `CLEAN` and `MERGEABLE`, and no admin override was used. Both `https://scaling-up-platform-v2.vercel.app/api/health` and `https://platformtest.scalingup.com/api/health` returned HTTP `200` with `status: healthy`, `database: healthy`, and `authPosture: safe` on the new process. A read-only authenticated smoke opened the existing **QSP v2 for Spectrum 2026** admin campaign detail and confirmed the page rendered its title, `ACTIVE` status, Quarterly Session Prep v2 template, **Edition 3 · published Jul 2, 2026** provenance, and organization. No button, form, export, archive/unarchive, submission, invitation, or other mutation was exercised.
+
+**Fixture limitation and reporting.** The 2026-07-31 production audit found zero non-deleted campaigns pinned to archived editions, so launch verification deliberately did not manufacture a retired campaign. The warning itself is proven by the focused 55-test suite and local real-component visual review recorded in the implementation entry below. GH #242 is the second reportable product outcome after the sent July 27–31 report, following GH #222; this launch-record follow-up is operational evidence, not a third outcome.
+
+**Rollback:** revert squash `54d0c215983f2d27d84056fbb7e1ca99a5e36b55`. No migration rollback, data cleanup, flag operation, environment change, or scheduler action is required.
+
+---
+
 <a id="gh-242-retired-edition-warning-pr-ready"></a>
 ### 2026-07-31 — GH #242 retired pinned-edition warning implemented <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:gh-242-retired-edition-warning-pr-ready -->
 
