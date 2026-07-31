@@ -46,6 +46,15 @@ import {
   resolveCoachLogo,
 } from "@/lib/assessments/invitation-email";
 import { isInviteEmailChromeEnabled } from "@/lib/assessments/wave-p-flags";
+import { isStableInvitationLinksEnabled } from "@/lib/assessments/wave-j65-flags";
+import {
+  classifyInvitationSendError,
+  confirmStableInvitationToken,
+  markStableInvitationTokenUncertain,
+  rollbackRejectedStableInvitationToken,
+  stageStableInvitationToken,
+  type StagedStableToken,
+} from "@/lib/assessments/stable-invitation-tokens";
 import { sendAssessmentInvitationEmail } from "@/services/notifications";
 
 const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
@@ -280,6 +289,7 @@ export async function POST(
     // beyond the cap are reported via `remaining` so the caller can chunk.
     const capped = targets.slice(0, MAX_REMINDER_BATCH);
     const remaining = Math.max(0, targets.length - capped.length);
+    const stableLinksEnabled = isStableInvitationLinksEnabled(campaign.alias);
 
     let sent = 0;
     let skipped = 0;
@@ -312,6 +322,126 @@ export async function POST(
 
       const rawToken = generateRawToken();
       const tokenHash = hashToken(rawToken);
+
+      if (stableLinksEnabled) {
+        let staged: StagedStableToken;
+        try {
+          staged = await stageStableInvitationToken(db, {
+            invitationId: prior.id,
+            newTokenHash: tokenHash,
+            expiresAt,
+            source: "REMINDER",
+          });
+        } catch (stageErr) {
+          console.error(
+            "[assessment-reminders] stable token staging failed",
+            {
+              respondentId: participant.respondentId,
+              invitationId: prior.id,
+              errorName:
+                stageErr instanceof Error ? stageErr.name : "UnknownError",
+            }
+          );
+          failed.push({
+            participantId: participant.respondentId,
+            reason: "token-stage-failed",
+          });
+          continue;
+        }
+
+        try {
+          await sendAssessmentInvitationEmail({
+            invitation: { id: prior.id, expiresAt },
+            respondent: {
+              id: respondent.id,
+              firstName: respondent.firstName,
+              lastName: respondent.lastName,
+              email: respondent.email,
+            },
+            campaign: {
+              id: campaign.id,
+              name: campaign.name,
+              alias: campaign.alias,
+              closeAt: campaign.closeAt,
+            },
+            template: {
+              alias: campaign.template.alias,
+              invitationSubject:
+                campaign.invitationSubject ??
+                campaign.template.invitationSubject,
+              invitationBodyMarkdown:
+                campaign.invitationBodyMarkdown ??
+                campaign.template.invitationBodyMarkdown,
+            },
+            invitationBodyHtml: campaign.invitationBodyHtml,
+            organizationName,
+            coachName,
+            templateName,
+            rawToken,
+            baseUrl: appUrl,
+            chrome,
+            coachLogoUrl,
+          });
+        } catch (sendErr) {
+          const disposition = classifyInvitationSendError(sendErr);
+          try {
+            if (disposition === "UNCERTAIN") {
+              await markStableInvitationTokenUncertain(db, staged.tokenId);
+            } else {
+              await rollbackRejectedStableInvitationToken(db, staged);
+            }
+          } catch (transitionErr) {
+            console.error(
+              "[assessment-reminders] post-send failure transition failed",
+              {
+                respondentId: participant.respondentId,
+                invitationId: prior.id,
+                disposition,
+                errorName:
+                  transitionErr instanceof Error
+                    ? transitionErr.name
+                    : "UnknownError",
+              }
+            );
+          }
+          console.error(
+            "[assessment-reminders] SMTP send failed",
+            {
+              respondentId: participant.respondentId,
+              invitationId: prior.id,
+              disposition,
+              errorName:
+                sendErr instanceof Error ? sendErr.name : "UnknownError",
+            }
+          );
+          failed.push({
+            participantId: participant.respondentId,
+            reason: "smtp-failed",
+          });
+          continue;
+        }
+
+        try {
+          await confirmStableInvitationToken(db, {
+            tokenId: staged.tokenId,
+            invitationId: staged.invitationId,
+            confirmedAt: new Date(),
+            reminder: true,
+          });
+        } catch (confirmErr) {
+          console.error(
+            "[assessment-reminders] post-send stable token confirm failed",
+            {
+              respondentId: participant.respondentId,
+              invitationId: prior.id,
+              errorName:
+                confirmErr instanceof Error ? confirmErr.name : "UnknownError",
+            }
+          );
+        }
+        sent += 1;
+        continue;
+      }
 
       // Reorder: send FIRST with the freshly-minted token, and only persist
       // the rotated tokenHash AFTER the send resolves. On send failure we

@@ -52,10 +52,50 @@ jest.mock("@/services/notifications", () => ({
   sendAssessmentInvitationEmail: jest.fn(),
 }));
 
+jest.mock("@/lib/assessments/wave-j65-flags", () => ({
+  isStableInvitationLinksEnabled: jest.fn().mockReturnValue(false),
+}));
+
+jest.mock("@/lib/assessments/stable-invitation-tokens", () => ({
+  stageStableInvitationToken: jest.fn(),
+  confirmStableInvitationToken: jest.fn(),
+  markStableInvitationTokenUncertain: jest.fn(),
+  rollbackRejectedStableInvitationToken: jest.fn(),
+  classifyInvitationSendError: jest.fn().mockReturnValue("UNCERTAIN"),
+}));
+
 import { POST } from "@/app/api/assessment-campaigns/[id]/reminders/route";
 import { db } from "@/lib/db";
 import { getApiActor } from "@/lib/auth/authorization";
+import {
+  classifyInvitationSendError,
+  confirmStableInvitationToken,
+  markStableInvitationTokenUncertain,
+  rollbackRejectedStableInvitationToken,
+  stageStableInvitationToken,
+} from "@/lib/assessments/stable-invitation-tokens";
+import { isStableInvitationLinksEnabled } from "@/lib/assessments/wave-j65-flags";
+import { hashToken } from "@/lib/assessments/invitation-tokens";
 import { sendAssessmentInvitationEmail } from "@/services/notifications";
+
+const mockIsStableInvitationLinksEnabled = jest.mocked(
+  isStableInvitationLinksEnabled
+);
+const mockClassifyInvitationSendError = jest.mocked(
+  classifyInvitationSendError
+);
+const mockStageStableInvitationToken = jest.mocked(
+  stageStableInvitationToken
+);
+const mockConfirmStableInvitationToken = jest.mocked(
+  confirmStableInvitationToken
+);
+const mockMarkStableInvitationTokenUncertain = jest.mocked(
+  markStableInvitationTokenUncertain
+);
+const mockRollbackRejectedStableInvitationToken = jest.mocked(
+  rollbackRejectedStableInvitationToken
+);
 
 const coachActor = {
   userId: "u1",
@@ -133,6 +173,15 @@ function emptyReq(): Request {
   );
 }
 
+function capturedLogText(calls: unknown[][]): string {
+  return calls
+    .flat()
+    .map((value) =>
+      value instanceof Error ? value.message : JSON.stringify(value)
+    )
+    .join("\n");
+}
+
 function pendingInvitation(respondentId: string) {
   return {
     id: `inv-${respondentId}`,
@@ -186,6 +235,20 @@ beforeEach(() => {
         expiresAt: new Date(Date.now() + 86400_000),
       })
   );
+  mockIsStableInvitationLinksEnabled.mockReturnValue(false);
+  mockClassifyInvitationSendError.mockReturnValue("UNCERTAIN");
+  mockStageStableInvitationToken.mockImplementation(
+    async (_database, input) => ({
+      tokenId: `stable-${input.invitationId}`,
+      invitationId: input.invitationId,
+      newTokenHash: input.newTokenHash,
+      previousTokenHash: "a".repeat(64),
+      previousExpiresAt: new Date("2026-08-01T00:00:00.000Z"),
+    })
+  );
+  mockConfirmStableInvitationToken.mockResolvedValue(undefined);
+  mockMarkStableInvitationTokenUncertain.mockResolvedValue(undefined);
+  mockRollbackRejectedStableInvitationToken.mockResolvedValue(undefined);
   (sendAssessmentInvitationEmail as jest.Mock).mockResolvedValue(undefined);
 });
 
@@ -498,38 +561,465 @@ describe("POST /api/assessment-campaigns/[id]/reminders", () => {
     );
   });
 
-  it("caps the batch at MAX_REMINDER_BATCH and reports remaining", async () => {
-    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
-    const COUNT = 205;
-    const many = Array.from({ length: COUNT }, (_, i) => ({
-      respondentId: `r${i}`,
-      respondent: {
-        id: `r${i}`,
-        firstName: "F",
-        lastName: "L",
-        email: `r${i}@example.com`,
-        deletedAt: null,
-      },
-    }));
-    (db.assessmentCampaign.findUnique as jest.Mock).mockImplementation(
-      (args) => {
-        if (args?.include) {
-          return Promise.resolve({ ...baseCampaign, participants: many });
+  it.each([false, true])(
+    "caps the batch at 200 and reports remaining (stable links: %s)",
+    async (stableLinksEnabled) => {
+      (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+      mockIsStableInvitationLinksEnabled.mockReturnValue(stableLinksEnabled);
+      const COUNT = 205;
+      const many = Array.from({ length: COUNT }, (_, i) => ({
+        respondentId: `r${i}`,
+        respondent: {
+          id: `r${i}`,
+          firstName: "F",
+          lastName: "L",
+          email: `r${i}@example.com`,
+          deletedAt: null,
+        },
+      }));
+      (db.assessmentCampaign.findUnique as jest.Mock).mockImplementation(
+        (args) => {
+          if (args?.include) {
+            return Promise.resolve({ ...baseCampaign, participants: many });
+          }
+          return Promise.resolve(baseCampaign);
         }
-        return Promise.resolve(baseCampaign);
+      );
+      (db.assessmentInvitation.findMany as jest.Mock).mockResolvedValue(
+        many.map((p) => pendingInvitation(p.respondentId))
+      );
+      const res = await POST(emptyReq() as never, detailParams("c1"));
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        data: { sent: number; remaining: number };
+      };
+      expect(body.data.sent).toBeLessThanOrEqual(200);
+      expect(body.data.remaining).toBe(COUNT - 200);
+      expect(sendAssessmentInvitationEmail).toHaveBeenCalledTimes(200);
+      if (stableLinksEnabled) {
+        expect(mockStageStableInvitationToken).toHaveBeenCalledTimes(200);
+        expect(mockConfirmStableInvitationToken).toHaveBeenCalledTimes(200);
+        expect(db.assessmentInvitation.update).not.toHaveBeenCalled();
+      }
+    }
+  );
+
+  it("stages, sends, and confirms one stable reminder by token identity when enabled", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    mockIsStableInvitationLinksEnabled.mockReturnValue(true);
+    const consoleLog = jest
+      .spyOn(console, "log")
+      .mockImplementation(() => undefined);
+    const consoleError = jest
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
+    const res = await POST(
+      jsonReq({ participantIds: ["r1"] }) as never,
+      detailParams("c1")
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockIsStableInvitationLinksEnabled).toHaveBeenCalledTimes(1);
+    expect(mockIsStableInvitationLinksEnabled).toHaveBeenCalledWith("demo");
+    expect(mockStageStableInvitationToken).toHaveBeenCalledWith(
+      db,
+      expect.objectContaining({
+        invitationId: "inv-r1",
+        source: "REMINDER",
+      })
+    );
+    const stagedHash =
+      mockStageStableInvitationToken.mock.calls[0][1].newTokenHash;
+    const emailedRawToken = (sendAssessmentInvitationEmail as jest.Mock).mock
+      .calls[0][0].rawToken as string;
+    expect(stagedHash).toBe(hashToken(emailedRawToken));
+    expect(mockConfirmStableInvitationToken).toHaveBeenCalledWith(
+      db,
+      expect.objectContaining({
+        tokenId: "stable-inv-r1",
+        invitationId: "inv-r1",
+        reminder: true,
+      })
+    );
+    expect(mockConfirmStableInvitationToken).toHaveBeenCalledTimes(1);
+    expect(
+      mockStageStableInvitationToken.mock.invocationCallOrder[0]
+    ).toBeLessThan(
+      (sendAssessmentInvitationEmail as jest.Mock).mock.invocationCallOrder[0]
+    );
+    expect(
+      (sendAssessmentInvitationEmail as jest.Mock).mock.invocationCallOrder[0]
+    ).toBeLessThan(
+      mockConfirmStableInvitationToken.mock.invocationCallOrder[0]
+    );
+    expect(db.assessmentInvitation.update).not.toHaveBeenCalled();
+    const body = (await res.json()) as {
+      data: { sent: number; skipped: number; failed: unknown[] };
+    };
+    expect(body.data).toEqual({
+      sent: 1,
+      skipped: 0,
+      failed: [],
+      remaining: 0,
+    });
+    const observableText = JSON.stringify({
+      response: body,
+      logs: [...consoleLog.mock.calls, ...consoleError.mock.calls],
+      audits: (db.auditLog.create as jest.Mock).mock.calls,
+    });
+    expect(observableText).not.toContain(emailedRawToken);
+    expect(observableText).not.toContain(stagedHash);
+    consoleLog.mockRestore();
+    consoleError.mockRestore();
+  });
+
+  it("marks an unclassified send failure uncertain without leaking token material", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    mockIsStableInvitationLinksEnabled.mockReturnValue(true);
+    const consoleError = jest
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    (sendAssessmentInvitationEmail as jest.Mock).mockImplementationOnce(
+      async (payload) => {
+        throw new Error(`smtp transport echoed ${payload.rawToken}`);
       }
     );
-    (db.assessmentInvitation.findMany as jest.Mock).mockResolvedValue(
-      many.map((p) => pendingInvitation(p.respondentId))
+
+    const res = await POST(
+      jsonReq({ participantIds: ["r1"] }) as never,
+      detailParams("c1")
     );
-    const res = await POST(emptyReq() as never, detailParams("c1"));
+
     expect(res.status).toBe(200);
+    expect(mockMarkStableInvitationTokenUncertain).toHaveBeenCalledWith(
+      db,
+      "stable-inv-r1"
+    );
+    expect(mockRollbackRejectedStableInvitationToken).not.toHaveBeenCalled();
+    expect(mockConfirmStableInvitationToken).not.toHaveBeenCalled();
     const body = (await res.json()) as {
-      data: { sent: number; remaining: number };
+      data: {
+        sent: number;
+        skipped: number;
+        failed: Array<{ participantId: string; reason: string }>;
+        remaining: number;
+      };
     };
-    expect(body.data.sent).toBeLessThanOrEqual(200);
-    expect(body.data.remaining).toBe(COUNT - 200);
-    expect(sendAssessmentInvitationEmail).toHaveBeenCalledTimes(200);
+    expect(body.data).toEqual({
+      sent: 0,
+      skipped: 0,
+      failed: [{ participantId: "r1", reason: "smtp-failed" }],
+      remaining: 0,
+    });
+    const emailedRawToken = (sendAssessmentInvitationEmail as jest.Mock).mock
+      .calls[0][0].rawToken as string;
+    const stagedHash =
+      mockStageStableInvitationToken.mock.calls[0][1].newTokenHash;
+    const observableText = JSON.stringify({
+      response: body,
+      logs: capturedLogText(consoleError.mock.calls),
+      audits: (db.auditLog.create as jest.Mock).mock.calls,
+    });
+    expect(observableText).not.toContain(emailedRawToken);
+    expect(observableText).not.toContain(stagedHash);
+    consoleError.mockRestore();
+  });
+
+  it("rolls back a numeric SMTP 5xx rejection through the chain-safe service", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    mockIsStableInvitationLinksEnabled.mockReturnValue(true);
+    mockClassifyInvitationSendError.mockReturnValueOnce(
+      "DEFINITE_REJECTION"
+    );
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+    (sendAssessmentInvitationEmail as jest.Mock).mockRejectedValueOnce({
+      responseCode: 550,
+      message: "mailbox unavailable",
+    });
+
+    const res = await POST(
+      jsonReq({ participantIds: ["r1"] }) as never,
+      detailParams("c1")
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockClassifyInvitationSendError).toHaveBeenCalledWith(
+      expect.objectContaining({ responseCode: 550 })
+    );
+    expect(mockRollbackRejectedStableInvitationToken).toHaveBeenCalledWith(
+      db,
+      expect.objectContaining({
+        tokenId: "stable-inv-r1",
+        invitationId: "inv-r1",
+        previousTokenHash: "a".repeat(64),
+      })
+    );
+    expect(mockMarkStableInvitationTokenUncertain).not.toHaveBeenCalled();
+    expect(mockConfirmStableInvitationToken).not.toHaveBeenCalled();
+    expect(db.assessmentInvitation.update).not.toHaveBeenCalled();
+    const body = (await res.json()) as {
+      data: { sent: number; failed: unknown[] };
+    };
+    expect(body.data.sent).toBe(0);
+    expect(body.data.failed).toEqual([
+      { participantId: "r1", reason: "smtp-failed" },
+    ]);
+    jest.restoreAllMocks();
+  });
+
+  it("reports a staging failure per recipient and sends no email", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    mockIsStableInvitationLinksEnabled.mockReturnValue(true);
+    const consoleError = jest
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    mockStageStableInvitationToken.mockImplementationOnce(
+      async (_database, input) => {
+        throw new Error(`database rejected ${input.newTokenHash}`);
+      }
+    );
+
+    const res = await POST(
+      jsonReq({ participantIds: ["r1"] }) as never,
+      detailParams("c1")
+    );
+
+    expect(res.status).toBe(200);
+    expect(sendAssessmentInvitationEmail).not.toHaveBeenCalled();
+    expect(mockConfirmStableInvitationToken).not.toHaveBeenCalled();
+    expect(mockMarkStableInvitationTokenUncertain).not.toHaveBeenCalled();
+    expect(mockRollbackRejectedStableInvitationToken).not.toHaveBeenCalled();
+    const body = (await res.json()) as {
+      data: { sent: number; skipped: number; failed: unknown[]; remaining: number };
+    };
+    expect(body.data).toEqual({
+      sent: 0,
+      skipped: 0,
+      failed: [{ participantId: "r1", reason: "token-stage-failed" }],
+      remaining: 0,
+    });
+    expect(capturedLogText(consoleError.mock.calls)).not.toContain(
+      mockStageStableInvitationToken.mock.calls[0][1].newTokenHash
+    );
+    consoleError.mockRestore();
+  });
+
+  it("counts an accepted email as sent when token confirmation persistence fails", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    mockIsStableInvitationLinksEnabled.mockReturnValue(true);
+    const consoleError = jest
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    mockConfirmStableInvitationToken.mockRejectedValueOnce(
+      new Error("telemetry write failed")
+    );
+
+    const res = await POST(
+      jsonReq({ participantIds: ["r1"] }) as never,
+      detailParams("c1")
+    );
+
+    expect(res.status).toBe(200);
+    expect(sendAssessmentInvitationEmail).toHaveBeenCalledTimes(1);
+    expect(mockConfirmStableInvitationToken).toHaveBeenCalledTimes(1);
+    expect(mockMarkStableInvitationTokenUncertain).not.toHaveBeenCalled();
+    expect(mockRollbackRejectedStableInvitationToken).not.toHaveBeenCalled();
+    const body = (await res.json()) as {
+      data: { sent: number; failed: unknown[] };
+    };
+    expect(body.data.sent).toBe(1);
+    expect(body.data.failed).toEqual([]);
+    const emailedRawToken = (sendAssessmentInvitationEmail as jest.Mock).mock
+      .calls[0][0].rawToken as string;
+    expect(JSON.stringify(consoleError.mock.calls)).not.toContain(
+      emailedRawToken
+    );
+    expect(JSON.stringify(consoleError.mock.calls)).not.toContain(
+      hashToken(emailedRawToken)
+    );
+    consoleError.mockRestore();
+  });
+
+  it("keeps the exact parent-only send-first flow when the gate is off or killed", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    mockIsStableInvitationLinksEnabled.mockReturnValue(false);
+
+    const res = await POST(
+      jsonReq({ participantIds: ["r1"] }) as never,
+      detailParams("c1")
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockIsStableInvitationLinksEnabled).toHaveBeenCalledTimes(1);
+    expect(mockIsStableInvitationLinksEnabled).toHaveBeenCalledWith("demo");
+    expect(mockStageStableInvitationToken).not.toHaveBeenCalled();
+    expect(mockConfirmStableInvitationToken).not.toHaveBeenCalled();
+    expect(mockMarkStableInvitationTokenUncertain).not.toHaveBeenCalled();
+    expect(mockRollbackRejectedStableInvitationToken).not.toHaveBeenCalled();
+    const emailedRawToken = (sendAssessmentInvitationEmail as jest.Mock).mock
+      .calls[0][0].rawToken as string;
+    expect(db.assessmentInvitation.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "inv-r1" },
+        data: expect.objectContaining({
+          tokenHash: hashToken(emailedRawToken),
+          resentCount: { increment: 1 },
+          lastResentAt: expect.any(Date),
+        }),
+      })
+    );
+    expect(
+      (sendAssessmentInvitationEmail as jest.Mock).mock.invocationCallOrder[0]
+    ).toBeLessThan(
+      (db.assessmentInvitation.update as jest.Mock).mock.invocationCallOrder[0]
+    );
+  });
+
+  it("stages distinct token hashes for two targeted participants", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    mockIsStableInvitationLinksEnabled.mockReturnValue(true);
+
+    const res = await POST(
+      jsonReq({ participantIds: ["r1", "r2"] }) as never,
+      detailParams("c1")
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockStageStableInvitationToken).toHaveBeenCalledTimes(2);
+    expect(mockConfirmStableInvitationToken).toHaveBeenCalledTimes(2);
+    const stagedHashes = mockStageStableInvitationToken.mock.calls.map(
+      ([, input]) => input.newTokenHash
+    );
+    const rawTokens = (sendAssessmentInvitationEmail as jest.Mock).mock.calls.map(
+      ([payload]) => payload.rawToken as string
+    );
+    expect(new Set(stagedHashes).size).toBe(2);
+    expect(stagedHashes).toEqual(rawTokens.map(hashToken));
+    const body = (await res.json()) as {
+      data: { sent: number; skipped: number; failed: unknown[] };
+    };
+    expect(body.data.sent).toBe(2);
+    expect(body.data.skipped).toBe(0);
+    expect(body.data.failed).toEqual([]);
+  });
+
+  it("continues a mixed stable batch after one uncertain recipient failure", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    mockIsStableInvitationLinksEnabled.mockReturnValue(true);
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+    (sendAssessmentInvitationEmail as jest.Mock)
+      .mockRejectedValueOnce(new Error("connection reset"))
+      .mockResolvedValueOnce(undefined);
+
+    const res = await POST(emptyReq() as never, detailParams("c1"));
+
+    expect(res.status).toBe(200);
+    expect(mockStageStableInvitationToken).toHaveBeenCalledTimes(2);
+    expect(mockMarkStableInvitationTokenUncertain).toHaveBeenCalledWith(
+      db,
+      "stable-inv-r1"
+    );
+    expect(mockConfirmStableInvitationToken).toHaveBeenCalledWith(
+      db,
+      expect.objectContaining({
+        tokenId: "stable-inv-r2",
+        invitationId: "inv-r2",
+        reminder: true,
+      })
+    );
+    const body = (await res.json()) as {
+      data: {
+        sent: number;
+        skipped: number;
+        failed: unknown[];
+        remaining: number;
+      };
+    };
+    expect(body.data).toEqual({
+      sent: 1,
+      skipped: 0,
+      failed: [{ participantId: "r1", reason: "smtp-failed" }],
+      remaining: 0,
+    });
+    jest.restoreAllMocks();
+  });
+
+  it("continues the batch when uncertain-state persistence fails without leaking the hash", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    mockIsStableInvitationLinksEnabled.mockReturnValue(true);
+    const consoleError = jest
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    (sendAssessmentInvitationEmail as jest.Mock)
+      .mockRejectedValueOnce(new Error("connection reset"))
+      .mockResolvedValueOnce(undefined);
+    mockMarkStableInvitationTokenUncertain.mockImplementationOnce(async () => {
+      const stagedHash =
+        mockStageStableInvitationToken.mock.calls[0][1].newTokenHash;
+      throw new Error(`persistence echoed ${stagedHash}`);
+    });
+
+    const res = await POST(emptyReq() as never, detailParams("c1"));
+
+    expect(res.status).toBe(200);
+    expect(sendAssessmentInvitationEmail).toHaveBeenCalledTimes(2);
+    expect(mockConfirmStableInvitationToken).toHaveBeenCalledTimes(1);
+    const body = (await res.json()) as {
+      data: { sent: number; failed: unknown[] };
+    };
+    expect(body.data.sent).toBe(1);
+    expect(body.data.failed).toEqual([
+      { participantId: "r1", reason: "smtp-failed" },
+    ]);
+    const stagedHash =
+      mockStageStableInvitationToken.mock.calls[0][1].newTokenHash;
+    expect(capturedLogText(consoleError.mock.calls)).not.toContain(stagedHash);
+    consoleError.mockRestore();
+  });
+
+  it("delegates overlapping reminder attempts for one invitation to the stateful service", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    mockIsStableInvitationLinksEnabled.mockReturnValue(true);
+    let attempt = 0;
+    mockStageStableInvitationToken.mockImplementation(
+      async (_database, input) => ({
+        tokenId: `overlap-${++attempt}`,
+        invitationId: input.invitationId,
+        newTokenHash: input.newTokenHash,
+        previousTokenHash: "b".repeat(64),
+        previousExpiresAt: new Date("2026-08-01T00:00:00.000Z"),
+      })
+    );
+
+    const [first, second] = await Promise.all([
+      POST(
+        jsonReq({ participantIds: ["r1"] }) as never,
+        detailParams("c1")
+      ),
+      POST(
+        jsonReq({ participantIds: ["r1"] }) as never,
+        detailParams("c1")
+      ),
+    ]);
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(mockStageStableInvitationToken).toHaveBeenCalledTimes(2);
+    expect(
+      mockStageStableInvitationToken.mock.calls.map(
+        ([, input]) => input.invitationId
+      )
+    ).toEqual(["inv-r1", "inv-r1"]);
+    expect(
+      new Set(
+        mockStageStableInvitationToken.mock.calls.map(
+          ([, input]) => input.newTokenHash
+        )
+      ).size
+    ).toBe(2);
+    expect(mockConfirmStableInvitationToken).toHaveBeenCalledTimes(2);
+    expect(db.assessmentInvitation.update).not.toHaveBeenCalled();
   });
 });
 
