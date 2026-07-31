@@ -1151,6 +1151,7 @@ export async function sendAssessmentInvitationEmail(data: {
             campaign: data.campaign,
             organizationName: data.organizationName ?? null,
             templateName: data.templateName ?? null,
+            coachName: data.coachName ?? null,
             invitationUrl,
             effectiveSubject,
             effectiveBodyMarkdown,
@@ -1250,6 +1251,7 @@ async function sendLegacyInvitationEmail(data: {
     campaign: { id: string; name: string; alias: string; closeAt: Date | null };
     organizationName: string | null;
     templateName: string | null;
+    coachName: string | null;
     invitationUrl: string;
     effectiveSubject: string;
     effectiveBodyMarkdown: string;
@@ -1268,7 +1270,7 @@ async function sendLegacyInvitationEmail(data: {
         organizationName: data.organizationName,
         campaignName: data.campaign.name,
         templateName: data.templateName,
-        coachName: null,
+        coachName: data.coachName,
         invitationUrl: data.invitationUrl,
         closeAt: data.campaign.closeAt,
     };
@@ -1287,13 +1289,26 @@ async function sendLegacyInvitationEmail(data: {
         .split(/\n\s*\n/)
         .map((p) => `<p style="margin:0 0 12px;color:#374151;">${p.replace(/\n/g, "<br/>")}</p>`)
         .join("");
-    const html = `<div style="font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;max-width:560px;margin:0 auto;">${paragraphs}<br/><div style="text-align:center;"><a href="${data.invitationUrl}" style="display:inline-block;background-color:#1D4ED8;color:#ffffff;padding:14px 28px;text-decoration:none;border-radius:8px;font-weight:600;font-size:15px;">Start the assessment</a></div></div>`;
+    const escapedInvitationUrl = escapeHtml(data.invitationUrl);
+    const html =
+        `<div style="font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;max-width:560px;margin:0 auto;">` +
+        `${paragraphs}<br/>` +
+        `<div style="text-align:center;">` +
+        `<a href="${escapedInvitationUrl}" style="display:inline-block;background-color:#1D4ED8;color:#ffffff;padding:14px 28px;text-decoration:none;border-radius:8px;font-weight:600;font-size:15px;">Start the assessment</a>` +
+        `</div>` +
+        `<p style="color:#9ca3af;font-size:12px;margin-top:20px;">` +
+        `If the button doesn't work, paste this into your browser:<br/>` +
+        `<span style="word-break:break-all;color:#6b7280;">${escapedInvitationUrl}</span>` +
+        `</p>` +
+        `</div>`;
+    const text = renderTextBody(data.effectiveBodyMarkdown, vars);
 
     const usedDefault = data.subjectSource === "default" || data.bodySource === "default";
     await sendEmailViaSMTP({
         to: data.respondent.email,
         subject,
         html,
+        text,
         telemetry: {
             recipientRole: "CUSTOM",
             metadata: {

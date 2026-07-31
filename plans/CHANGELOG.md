@@ -6,6 +6,19 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="gh-217-legacy-invite-fallback-pr-ready"></a>
+### 2026-07-31 — Legacy invitation fallback hardened (GH #217) <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:gh-217-legacy-invite-fallback-pr-ready -->
+
+**Status: IMPLEMENTED + LOCALLY VERIFIED; not yet merged or launched.** The dormant `ASSESSMENT_INVITE_BRANDED=0` renderer now threads the supplied Coach name into its existing token variables (retaining the established neutral `your coach` fallback), sends a plain-text twin through the shared text renderer, and adds one visible copy/paste URL beneath its existing blue CTA. The generated invitation URL is HTML-escaped in both the button `href` and visible fallback.
+
+**Preserved contracts and scope.** The branded and campaign full-HTML renderers are byte-unmodified, custom-HTML precedence and existing template/campaign invitation copy are unchanged, and the legacy path remains attachment-free. Telemetry type, renderer, source fields, and default version are unchanged; SMTP errors still propagate to the caller. There is no schema, migration, API, route, scoring, report, scheduler, environment, production-data, or new-feature-flag change. Production continues to leave `ASSESSMENT_INVITE_BRANDED` unset, and this work did not mutate it, so the live branded renderer remains active.
+
+**Local verification.** The complete focused regression command passed **8/8 suites, 112/112 tests, and 1/1 snapshot**, covering the notification service, shared invitation renderer, all five seeded invitation-copy contracts, and changelog freshness. Scoped ESLint exited `0` with **0 errors and 2 existing `@typescript-eslint/no-unused-vars` warnings** in the notification test. Migration safety checked **42 migrations** with no unapproved destructive operations. `git diff --check` and the final standalone changelog-freshness run passed. `CI=true npx next build --turbopack` exited `0`, compiled successfully, and generated **92/92** static pages; it retained the known middleware deprecation notice, seven missing-`INNGEST_EVENT_KEY` notices, seven missing-`INNGEST_SIGNING_KEY` notices, and three non-fatal missing-`DATABASE_URL` Prisma validation messages during static collection.
+
+**Rollout, reporting, and rollback.** This is implemented and locally verified only. It becomes the next eligible reliability outcome after protected merge, verification of the exact production deployment and unchanged/unset production flag, issue closeout, claim release, and launch SoT. Rollback is a normal code revert; no migration rollback, data cleanup, flag operation, environment rollback, or scheduler action is required.
+
+---
+
 <a id="gh-224-truthful-welcome-sharing-copy-launched"></a>
 ### 2026-07-31 — Truthful Welcome sharing disclosure launched (GH #224) <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:gh-224-truthful-welcome-sharing-copy-launched -->
 

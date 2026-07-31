@@ -486,4 +486,103 @@ describe("sendAssessmentInvitationEmail — default body/subject + telemetry (Wa
       defaultVersion: DEFAULT_VERSION,
     });
   });
+
+  it("legacy threads coachName into HTML and plain text", async () => {
+    process.env.ASSESSMENT_INVITE_BRANDED = "0";
+    await sendAssessmentInvitationEmail({
+      ...blankData(),
+      template: {
+        invitationSubject: "Assessment from {{coachName}}",
+        invitationBodyMarkdown: "{{coachName}} has invited you.",
+      },
+    });
+
+    const args = mockSendEmailViaSMTP.mock.calls[0][0];
+    expect(args.subject).toBe("Assessment from Pat Coach");
+    expect(args.html).toContain("Pat Coach has invited you.");
+    expect(args.text).toContain("Pat Coach has invited you.");
+  });
+
+  it("legacy uses the established neutral Coach fallback", async () => {
+    process.env.ASSESSMENT_INVITE_BRANDED = "0";
+    await sendAssessmentInvitationEmail({
+      ...blankData(),
+      coachName: null,
+      template: {
+        invitationSubject: "Your assessment",
+        invitationBodyMarkdown: "{{coachName}} has invited you.",
+      },
+    });
+
+    const args = mockSendEmailViaSMTP.mock.calls[0][0];
+    expect(args.html).toContain("your coach has invited you.");
+    expect(args.text).toContain("your coach has invited you.");
+  });
+
+  it("legacy sends multipart text and one canonical visible fallback", async () => {
+    process.env.ASSESSMENT_INVITE_BRANDED = "0";
+    await sendAssessmentInvitationEmail({
+      ...blankData(),
+      template: {
+        invitationSubject: "Your assessment",
+        invitationBodyMarkdown:
+          "Hi {{respondentFirstName}}\n\n[Start now]({{invitationUrl}})",
+      },
+    });
+
+    const args = mockSendEmailViaSMTP.mock.calls[0][0];
+    const invitationUrl = "https://app.test/org-survey/abc#t=SECRET";
+
+    expect(args.html).toContain("background-color:#1D4ED8");
+    expect(args.html).toContain("If the button doesn't work, paste this into your browser:");
+    expect(args.html).toContain(`<span style="word-break:break-all;color:#6b7280;">${invitationUrl}</span>`);
+    expect(args.text).toBe(`Hi Jane\n\nStart the assessment: ${invitationUrl}`);
+    expect(args.text.match(/#t=SECRET/g)).toHaveLength(1);
+    expect(args.attachments ?? []).toHaveLength(0);
+    expect(args.telemetry.metadata).toMatchObject({
+      type: "assessment_invitation_legacy",
+      renderer: "legacy",
+      subjectSource: "authored",
+      bodySource: "authored",
+      defaultVersion: null,
+    });
+  });
+
+  it("legacy escapes the generated URL in its href and visible fallback", async () => {
+    process.env.ASSESSMENT_INVITE_BRANDED = "0";
+    await sendAssessmentInvitationEmail({
+      ...blankData(),
+      baseUrl: 'https://app.test/\"><script>alert(1)</script>',
+    });
+
+    const args = mockSendEmailViaSMTP.mock.calls[0][0];
+    const escapedInvitationUrl =
+      "https://app.test/&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;/org-survey/abc#t=SECRET";
+
+    expect({
+      href: args.html.includes(`<a href="${escapedInvitationUrl}"`),
+      visibleFallback: args.html.includes(
+        `<span style="word-break:break-all;color:#6b7280;">${escapedInvitationUrl}</span>`,
+      ),
+    }).toEqual({
+      href: true,
+      visibleFallback: true,
+    });
+    expect(args.html).not.toContain("<script>");
+    expect(args.html).not.toContain('\"><script');
+  });
+
+  it("branded rendering remains multipart with its CID attachment", async () => {
+    await sendAssessmentInvitationEmail(blankData());
+
+    const args = mockSendEmailViaSMTP.mock.calls[0][0];
+    expect(args.html).toContain("cid:sulogo");
+    expect(args.text).toContain("Start the assessment:");
+    expect(args.attachments).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ cid: "sulogo", filename: "su-logo.png" }),
+      ]),
+    );
+    expect(args.telemetry.metadata.renderer).toBe("branded");
+  });
 });
