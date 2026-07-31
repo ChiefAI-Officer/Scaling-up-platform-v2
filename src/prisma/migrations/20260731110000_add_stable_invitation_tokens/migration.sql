@@ -17,7 +17,7 @@ CREATE TABLE "assessment_invitation_tokens" (
 
     CONSTRAINT "assessment_invitation_tokens_pkey" PRIMARY KEY ("id"),
     CONSTRAINT "assessment_invitation_tokens_invitationId_fkey"
-      FOREIGN KEY ("invitationId") REFERENCES "assessment_invitations"("id") ON DELETE CASCADE
+      FOREIGN KEY ("invitationId") REFERENCES "assessment_invitations"("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 CREATE UNIQUE INDEX "assessment_invitation_tokens_tokenHash_key"
