@@ -6,6 +6,18 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-07-31 — Jeff #65 stable reminder-link contract locked <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:jeff-65-reminder-link-contract-locked -->
+
+**Status: CLAIMED + PRODUCT CONTRACT LOCKED; design only, no runtime change.** A fresh audit of `origin/main` at `aed1342934e6ab80160aa9aef658306e0c4ca0af`, merged and open pull requests, remote branches, the shared claim board, production flags, and the deployed production SHA found no implementation of Jeff's July-10 item #65. Reminder sending is built and live, but a successful reminder still overwrites the invitation row's only `tokenHash`; the original link and every earlier successful reminder link therefore stop matching at exchange. The shipped Wave A safety repair covers failed sends only. No flag can flip multi-link validity on. Jeff #65 was claimed on [issue #261](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/issues/261#issuecomment-5140577904) only after that audit.
+
+**Locked contract.** Every original invitation link and every successfully sent reminder link remains valid until the underlying invitation becomes unusable through submission, explicit revocation, expiry, or campaign closure. All sibling links resolve to the same invitation and assessment state. A failed reminder creates no newly usable link and invalidates none of the existing links. Raw token storage remains prohibited.
+
+**Boundary.** Manual **Resend**, invitation/reminder copy or visuals, public-assessment access, expiry-duration changes, and recovery of already-overwritten historical tokens are excluded unless separately approved. The product behavior is locked in `docs/specs/v7.6/20-jeff-65-stable-reminder-links-contract.md`; storage, migration, exchange, concurrency, rollout, and rollback choices remain for the next technical-design gate. No implementation, migration, feature flag, PR launch, or production write is represented by this entry.
+
+**Reporting classification.** This resolves a product decision and starts work; it is not a shipped outcome. The fresh consolidated-report window remains at one product outcome, GH #222, until #65 is implemented, merged, deployed, verified, claim-released, and closed out in the SoT.
+
+---
+
 ### 2026-07-31 — Consolidated progress-report window reset after PR #267 <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:consolidated-report-window-reset-after-pr-267 -->
 
 **Status: REPORTING BASELINE LOCKED; no runtime change.** The consolidated report at `output/pdf/Scaling-Up-Progress-Report-2026-07-27-to-2026-07-31.pdf` has already been sent. It explicitly covers **33 merged pull requests through PR #267** and groups them into **ten product and reliability outcomes**. Invitation emails, per-assessment Welcome wording, the report Coach byline, on-screen respondent results, QSP story grouping, public-result Print/Download, Coach Referred Results and the remaining #83 gaps, campaign-edition visibility, respondent-removal messaging, and email/outbox reliability are therefore prior-window work. Do not present any of them, their launch-record PRs, or their retained screenshots as new progress.
