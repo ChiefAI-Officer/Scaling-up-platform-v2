@@ -48,7 +48,7 @@ describe("smtp-transport — a failed verify() must not latch _verified (audit P
     expect(prepared).toEqual({ send: expect.any(Function) });
   });
 
-  it("re-verifies on the next send after a failed verify (not permanently suppressed)", async () => {
+  it("shares one failed cold-start verify and clears the latch for a later retry", async () => {
     const rawToken = "verify-raw-token";
     const tokenHash = "b".repeat(64);
     const verifyError = new Error(`verify echoed ${rawToken}`);
@@ -56,17 +56,37 @@ describe("smtp-transport — a failed verify() must not latch _verified (audit P
     const consoleError = jest
       .spyOn(console, "error")
       .mockImplementation(() => undefined);
+
+    let rejectColdVerify!: (reason: Error) => void;
+    const coldVerify = new Promise<void>((_resolve, reject) => {
+      rejectColdVerify = reject;
+    });
     mockVerify
-      .mockRejectedValueOnce(verifyError)
-      .mockResolvedValueOnce(undefined);
+      .mockReturnValueOnce(coldVerify)
+      .mockRejectedValue(new Error("retry still unavailable"));
 
-    await sendEmailViaSMTP({ to: "a@x.com", subject: "s", html: "<p>h</p>" });
-    await sendEmailViaSMTP({ to: "b@x.com", subject: "s", html: "<p>h</p>" });
+    const first = sendEmailViaSMTP({
+      to: "a@x.com",
+      subject: "s",
+      html: "<p>h</p>",
+    });
+    const second = sendEmailViaSMTP({
+      to: "b@x.com",
+      subject: "s",
+      html: "<p>h</p>",
+    });
+    rejectColdVerify(verifyError);
+    await Promise.all([first, second]);
 
-    // Buggy code latched _verified=true after the first (failed) verify, so the
-    // 2nd send skipped verify (1 call). Correct behavior re-verifies (2 calls).
+    await sendEmailViaSMTP({
+      to: "retry@x.com",
+      subject: "s",
+      html: "<p>h</p>",
+    });
+
+    // The concurrent pair shares call 1. The later send retries with call 2.
     expect(mockVerify).toHaveBeenCalledTimes(2);
-    expect(mockSendMail).toHaveBeenCalledTimes(2);
+    expect(mockSendMail).toHaveBeenCalledTimes(3);
     const captured = consoleError.mock.calls
       .flat()
       .map((value) =>
@@ -78,6 +98,35 @@ describe("smtp-transport — a failed verify() must not latch _verified (audit P
     expect(captured).not.toContain(rawToken);
     expect(captured).not.toContain(tokenHash);
     consoleError.mockRestore();
+  });
+
+  it("shares one successful cold-start verify and keeps the verified fast path", async () => {
+    let resolveColdVerify!: () => void;
+    const coldVerify = new Promise<void>((resolve) => {
+      resolveColdVerify = resolve;
+    });
+    mockVerify.mockReturnValueOnce(coldVerify);
+
+    const first = sendEmailViaSMTP({
+      to: "a@x.com",
+      subject: "s",
+      html: "<p>h</p>",
+    });
+    const second = sendEmailViaSMTP({
+      to: "b@x.com",
+      subject: "s",
+      html: "<p>h</p>",
+    });
+    resolveColdVerify();
+    await Promise.all([first, second]);
+    await sendEmailViaSMTP({
+      to: "fast-path@x.com",
+      subject: "s",
+      html: "<p>h</p>",
+    });
+
+    expect(mockVerify).toHaveBeenCalledTimes(1);
+    expect(mockSendMail).toHaveBeenCalledTimes(3);
   });
 
   it("redacts untrusted provider error fields for sensitive email telemetry", async () => {

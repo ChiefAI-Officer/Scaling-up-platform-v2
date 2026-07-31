@@ -32,6 +32,7 @@ export interface PreparedEmail {
 
 let _transporter: nodemailer.Transporter | null = null;
 let _verified = false;
+let _verificationInFlight: Promise<void> | null = null;
 
 function getTransporter(): nodemailer.Transporter {
   if (!_transporter) {
@@ -54,6 +55,38 @@ function getTransporter(): nodemailer.Transporter {
     });
   }
   return _transporter;
+}
+
+async function verifyTransporter(
+  transporter: nodemailer.Transporter
+): Promise<void> {
+  if (_verified) return;
+
+  if (!_verificationInFlight) {
+    _verificationInFlight = (async () => {
+      try {
+        await transporter.verify();
+        console.log(
+          "[smtp-transport] SMTP verify() succeeded: host=" +
+            process.env.SMTP_HOST
+        );
+        _verified = true;
+      } catch {
+        console.error("[smtp-transport] SMTP verify() FAILED");
+      }
+    })();
+  }
+
+  const verification = _verificationInFlight;
+  try {
+    await verification;
+  } finally {
+    // Clear outside the verification closure so even a synchronous throw from
+    // verify() cannot be overwritten by the initial promise assignment.
+    if (_verificationInFlight === verification) {
+      _verificationInFlight = null;
+    }
+  }
 }
 
 /**
@@ -120,20 +153,7 @@ export function prepareEmailViaSMTP(options: SendEmailOptions): PreparedEmail {
       }
 
       try {
-        if (!_verified) {
-          try {
-            await transporter.verify();
-            console.log(
-              "[smtp-transport] SMTP verify() succeeded: host=" +
-                process.env.SMTP_HOST
-            );
-            // Only latch on success — a failed verify must not permanently
-            // suppress re-verification for the rest of the process lifetime.
-            _verified = true;
-          } catch {
-            console.error("[smtp-transport] SMTP verify() FAILED");
-          }
-        }
+        await verifyTransporter(transporter);
         await transporter.sendMail(mailOptions);
 
         if (options.telemetry) {

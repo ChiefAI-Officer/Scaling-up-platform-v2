@@ -35,7 +35,7 @@ import {
   asAccessDb,
   canManageCampaign,
 } from "@/lib/assessments/access-control";
-import { logAudit } from "@/lib/audit";
+import { logAudit, logAuditStrict } from "@/lib/audit";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
 import {
   generateRawToken,
@@ -63,6 +63,7 @@ import {
 const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
 const MAX_REMINDER_BATCH = 200; // serverless/SMTP budget guard
 const MAX_REJECTED_ROLLBACK_ATTEMPTS = 3;
+const MAX_CRITICAL_AUDIT_ATTEMPTS = 3;
 
 const ReminderBodySchema = z.object({
   participantIds: z.array(z.string().min(1)).optional(),
@@ -80,6 +81,39 @@ async function rollbackRejectedWithRetry(
     } catch {
       // Bounded, synchronous retry. The service owns all identity checks,
       // locking, predecessor rewiring, and compare-and-swap mechanics.
+    }
+  }
+  return false;
+}
+
+async function persistRollbackExhaustionAuditWithRetry(input: {
+  campaignId: string;
+  participantId: string;
+  invitationId: string;
+  tokenId: string;
+  performedBy: string;
+}): Promise<boolean> {
+  for (let attempt = 0; attempt < MAX_CRITICAL_AUDIT_ATTEMPTS; attempt += 1) {
+    try {
+      await logAuditStrict({
+        entityType: "AssessmentInvitationToken",
+        entityId: input.tokenId,
+        action: "UPDATE",
+        performedBy: input.performedBy,
+        changes: {
+          campaignId: input.campaignId,
+          participantId: input.participantId,
+          invitationId: input.invitationId,
+          tokenId: input.tokenId,
+          action: "reminder-rejected-rollback-exhausted",
+          disposition: "DEFINITE_REJECTION_ROLLBACK_EXHAUSTED",
+        },
+      });
+      return true;
+    } catch {
+      // This audit is the durable operator signal for a token state that
+      // could not be repaired. Retry synchronously before allowing the batch
+      // to continue.
     }
   }
   return false;
@@ -437,6 +471,32 @@ export async function POST(
             }
           } else if (!(await rollbackRejectedWithRetry(staged))) {
             failureReason = "smtp-rejected-rollback-failed";
+            const auditPersisted =
+              await persistRollbackExhaustionAuditWithRetry({
+                campaignId,
+                participantId: participant.respondentId,
+                invitationId: prior.id,
+                tokenId: staged.tokenId,
+                performedBy: actor.email,
+              });
+            if (!auditPersisted) {
+              console.error(
+                "[assessment-reminders] rollback-exhaustion audit persistence failed",
+                {
+                  respondentId: participant.respondentId,
+                  invitationId: prior.id,
+                  disposition: "CRITICAL_AUDIT_PERSIST_FAILED",
+                  attempts: MAX_CRITICAL_AUDIT_ATTEMPTS,
+                }
+              );
+              return NextResponse.json(
+                {
+                  success: false,
+                  error: "Failed to persist reminder rollback audit",
+                },
+                { status: 503 }
+              );
+            }
             console.error(
               "[assessment-reminders] rejected-token rollback exhausted",
               {
@@ -576,7 +636,7 @@ export async function POST(
         sent,
         skipped,
         failed: failed.length,
-        failureReasons,
+        ...(stableLinksEnabled ? { failureReasons } : {}),
         targets: targets.length,
         remaining,
         requestedIds: requestedIds ?? null,
