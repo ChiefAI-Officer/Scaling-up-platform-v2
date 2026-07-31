@@ -29,6 +29,7 @@ const fixture: CampaignListItem[] = [
     organizationId: "org-acme",
     organizationName: "Acme",
     metrics: zeroMetrics,
+    edition: null,
     openAt: "2026-05-01T00:00:00Z",
   },
   {
@@ -40,6 +41,7 @@ const fixture: CampaignListItem[] = [
     organizationId: "org-acme",
     organizationName: "Acme",
     metrics: zeroMetrics,
+    edition: null,
     openAt: "2026-06-01T00:00:00Z",
   },
   {
@@ -51,6 +53,7 @@ const fixture: CampaignListItem[] = [
     organizationId: "org-beta",
     organizationName: "Beta",
     metrics: zeroMetrics,
+    edition: null,
     openAt: "2026-07-01T00:00:00Z",
   },
   {
@@ -62,6 +65,7 @@ const fixture: CampaignListItem[] = [
     organizationId: "org-beta",
     organizationName: "Beta",
     metrics: zeroMetrics,
+    edition: null,
     openAt: "2026-01-01T00:00:00Z",
   },
 ];
@@ -131,6 +135,7 @@ describe("CampaignsListWithFilter", () => {
         organizationId: "org-acme",
         organizationName: "Acme",
         metrics: zeroMetrics,
+        edition: null,
         openAt: "2026-05-01T00:00:00Z",
       },
     ];

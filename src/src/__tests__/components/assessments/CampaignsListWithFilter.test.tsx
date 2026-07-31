@@ -44,6 +44,7 @@ function makeCampaign(
     templateName: "QSP v2",
     openAt: "2026-06-01T00:00:00.000Z",
     metrics: nonZeroMetrics,
+    edition: null,
     ...overrides,
   };
 }
@@ -228,5 +229,149 @@ describe("CampaignsListWithFilter — detailBasePath", () => {
       "href",
       "/admin/assessments/campaigns/c1",
     );
+  });
+});
+
+describe("CampaignsListWithFilter — edition standing", () => {
+  function editionCampaign(
+    status: CampaignListItem["status"],
+    edition: CampaignListItem["edition"],
+  ): CampaignListItem {
+    return makeCampaign({
+      id: `${String(status).toLowerCase()}-edition`,
+      organizationId: "org-edition",
+      organizationName: "Edition Org",
+      status,
+      edition,
+    });
+  }
+
+  const currentEdition = {
+    versionNumber: 3,
+    newerEditionAvailable: false,
+    pinnedRetired: false,
+  };
+
+  it("shows persistent edition identity without a positive current badge", () => {
+    render(
+      <CampaignsListWithFilter
+        campaigns={[editionCampaign("ACTIVE", currentEdition)]}
+      />,
+    );
+    const identity = screen.getByTestId(
+      "campaign-edition-identity-active-edition",
+    );
+    expect(identity).toHaveTextContent("QSP v2 · Edition 3");
+    expect(identity).not.toHaveClass("hidden");
+    expect(identity.className).not.toContain("sm:inline");
+    expect(screen.queryByText("Current")).not.toBeInTheDocument();
+  });
+
+  it("uses a full-width campaign identity block before the sm breakpoint", () => {
+    render(
+      <CampaignsListWithFilter
+        campaigns={[editionCampaign("ACTIVE", currentEdition)]}
+      />,
+    );
+    const campaignLink = screen.getByRole("link", {
+      name: "Campaign active-edition",
+    });
+    expect(campaignLink.parentElement).toHaveClass("basis-full", "sm:flex-1");
+  });
+
+  it("shows Not latest for actionable stale pins", () => {
+    render(
+      <CampaignsListWithFilter
+        campaigns={[
+          editionCampaign("DRAFT", {
+            ...currentEdition,
+            newerEditionAvailable: true,
+          }),
+        ]}
+      />,
+    );
+    const marker = screen.getByTestId("campaign-edition-stale-draft-edition");
+    expect(marker).toHaveTextContent("Not latest");
+    expect(marker).toHaveClass(
+      "border-warning/30",
+      "bg-warning/10",
+      "text-warning",
+    );
+  });
+
+  it("gives Retired precedence over Not latest", () => {
+    render(
+      <CampaignsListWithFilter
+        campaigns={[
+          editionCampaign("ACTIVE", {
+            versionNumber: 2,
+            newerEditionAvailable: true,
+            pinnedRetired: true,
+          }),
+        ]}
+      />,
+    );
+    const marker = screen.getByTestId(
+      "campaign-edition-retired-active-edition",
+    );
+    expect(marker).toHaveTextContent("Retired");
+    expect(marker).toHaveClass(
+      "border-destructive",
+      "bg-destructive/10",
+      "text-destructive",
+    );
+    expect(
+      screen.queryByTestId("campaign-edition-stale-active-edition"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps closed identity but suppresses both warnings", () => {
+    render(
+      <CampaignsListWithFilter
+        campaigns={[
+          editionCampaign("CLOSED", {
+            versionNumber: 1,
+            newerEditionAvailable: true,
+            pinnedRetired: true,
+          }),
+        ]}
+      />,
+    );
+    expect(
+      screen.getByTestId("campaign-edition-identity-closed-edition"),
+    ).toHaveTextContent("Edition 1");
+    expect(screen.queryByText("Retired")).not.toBeInTheDocument();
+    expect(screen.queryByText("Not latest")).not.toBeInTheDocument();
+  });
+
+  it("suppresses actionable warnings for an unrecognized lifecycle state", () => {
+    render(
+      <CampaignsListWithFilter
+        campaigns={[
+          editionCampaign("PAUSED", {
+            versionNumber: 2,
+            newerEditionAvailable: true,
+            pinnedRetired: true,
+          }),
+        ]}
+      />,
+    );
+    expect(screen.getByText("Edition 2")).toBeInTheDocument();
+    expect(screen.queryByText("Retired")).not.toBeInTheDocument();
+    expect(screen.queryByText("Not latest")).not.toBeInTheDocument();
+  });
+
+  it("preserves template-only presentation for unknown standing", () => {
+    render(
+      <CampaignsListWithFilter
+        campaigns={[editionCampaign("ACTIVE", null)]}
+      />,
+    );
+    expect(
+      screen.getByTestId("campaign-edition-identity-active-edition"),
+    ).toHaveTextContent("QSP v2");
+    expect(
+      screen.getByTestId("campaign-edition-identity-active-edition"),
+    ).not.toHaveTextContent("Edition");
   });
 });
