@@ -6,6 +6,18 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-07-31 — Campaign-list edition visibility launched (GH #243) <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:gh-243-campaign-list-edition-visibility-launched -->
+
+**Status: LAUNCHED + PRODUCTION-VERIFIED.** Implementation PR [#275](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/275) squash-merged through the protected path at `2026-07-31T10:30:05Z` as `bdda554c8f0bb765bc78e7854eaa8a203b0ec6db`; GitHub auto-closed issue #243 at `2026-07-31T10:30:06Z`. Required **Build**, **Migration Safety Gate**, **Assessment Email Lease**, and **Vercel** checks all passed. This records the completed release of the existing implementation; it is not new feature work.
+
+**Exact deployment and health evidence.** Production deployment `dpl_3y6aVniQT9KkKJ9fFvfCy2y3Y3ct`, target `production`, bound to `main` at merge SHA `bdda554c8f0bb765bc78e7854eaa8a203b0ec6db`, was created at `2026-07-31T10:30:08.719Z` and reached **READY** at `2026-07-31T10:31:19.660Z` (epoch `1785493879660`). It owns `scaling-up-platform-v2.vercel.app` and `platformtest.scalingup.com`. Both health calls returned `status: healthy`, `database: healthy`, and `authPosture: safe` at `2026-07-31T10:32:33.906Z` and `2026-07-31T10:32:36.971Z`.
+
+**Read-only production smoke.** `/admin/assessments/campaigns` rendered five existing Spectrum campaigns with factual edition identities: LVA Edition 3, QSP v2 Edition 3, Rockefeller Edition 2, Scaling Up Full Edition 3, and Five Dysfunctions Edition 1. No campaign was created or changed. An authorized test coach opened `/portal/assessments`; the page rendered one Assessments heading and its existing no-template/no-campaign empty state. That account has no campaign or published-template access, so no coach row was manufactured. Neither smoke performed a production write.
+
+**Rollback.** Normal revert of the implementation is sufficient. No migration rollback, data cleanup, flag or environment action is required.
+
+---
+
 ### 2026-07-31 — Campaign-list edition visibility implemented (GH #243) <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:gh-243-campaign-list-edition-visibility-pr-ready -->
 
 **Status: IMPLEMENTED + LOCALLY VERIFIED; not yet merged or launched.** The shared admin and coach campaign lists now show the pinned assessment identity as `Template · Edition N`. DRAFT and ACTIVE rows show a compact `Not latest` marker when a newer active edition exists and a stronger `Retired` marker when the pin itself is retired; retirement has precedence. CLOSED rows, including imported historical campaigns, keep factual edition identity but suppress both actionable markers. Current rows have no positive badge.
