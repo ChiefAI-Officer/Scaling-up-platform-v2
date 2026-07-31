@@ -13,6 +13,8 @@ import {
   type CampaignStatusMetricsInput,
 } from "@/lib/assessments/campaign-status-metrics";
 import type { CampaignListItem } from "@/components/assessments/CampaignsListWithFilter";
+import type { PinnedVersion } from "@/lib/assessments/edition-standing";
+import type { CampaignEditionStandingMap } from "@/lib/assessments/campaign-list-editions";
 
 /** The campaign row shape this mapper needs (a subset of the Prisma include). */
 export interface CampaignListRow {
@@ -22,6 +24,7 @@ export interface CampaignListRow {
   status: CampaignListItem["status"];
   openAt: Date;
   template: { name: string };
+  version: PinnedVersion;
   organization: { id: string; name: string };
   participants: { id: string; respondentId: string }[];
   invitations: {
@@ -34,6 +37,7 @@ export interface CampaignListRow {
 
 export function toCampaignListItems(
   campaigns: CampaignListRow[],
+  editionsByCampaignId: CampaignEditionStandingMap,
 ): CampaignListItem[] {
   return campaigns.map((c) => {
     // respondentId → invitation (1-to-1 per campaign).
@@ -57,6 +61,14 @@ export function toCampaignListItems(
           : null,
       };
     });
+    const standing = editionsByCampaignId.get(c.id) ?? null;
+    const edition = standing
+      ? {
+          versionNumber: standing.versionNumber,
+          newerEditionAvailable: standing.newerEditionAvailable,
+          pinnedRetired: standing.pinnedRetired,
+        }
+      : null;
 
     return {
       id: c.id,
@@ -68,6 +80,7 @@ export function toCampaignListItems(
       organizationName: c.organization.name,
       openAt: c.openAt.toISOString(),
       metrics: computeCampaignStatusMetrics(metricsInput),
+      edition,
     };
   });
 }

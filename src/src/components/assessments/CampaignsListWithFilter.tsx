@@ -20,6 +20,12 @@ import type { CampaignStatusMetrics as CampaignStatusMetricsType } from "@/lib/a
 
 export type CampaignStatus = "DRAFT" | "ACTIVE" | "CLOSED";
 
+export interface CampaignListEdition {
+  versionNumber: number;
+  newerEditionAvailable: boolean;
+  pinnedRetired: boolean;
+}
+
 export interface CampaignListItem {
   id: string;
   name: string;
@@ -30,6 +36,7 @@ export interface CampaignListItem {
   organizationName: string;
   openAt: string; // ISO date so server -> client serializes safely
   metrics: CampaignStatusMetricsType;
+  edition: CampaignListEdition | null;
 }
 
 type FilterValue = "ALL" | CampaignStatus;
