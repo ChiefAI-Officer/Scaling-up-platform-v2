@@ -1,5 +1,9 @@
+import React from "react";
+import { render, screen, within } from "@testing-library/react";
 import {
   deriveWelcomePresentation,
+  WelcomeExpectations,
+  WelcomeStats,
   type WelcomeQuestion,
 } from "@/components/assessments/assessment-welcome";
 import { buildLvaContent } from "../../../prisma/seed-lva-assessment";
@@ -84,5 +88,53 @@ describe("deriveWelcomePresentation", () => {
       expectationText,
       scaleLabel: null,
     });
+  });
+});
+
+describe("Welcome presentation rendering", () => {
+  it("renders mixed copy and only question/section chips without a scale", () => {
+    render(
+      <>
+        <WelcomeExpectations
+          timeLabel="About 35 minutes"
+          expectationText="67 questions using a mix of response formats."
+          confidentialSub="Confidential detail."
+          scoresSub="Scores detail."
+        />
+        <WelcomeStats questionCount={67} sectionCount={8} scaleLabel={null} />
+      </>,
+    );
+
+    expect(
+      within(screen.getByTestId("welcome-expectations")).getByText(
+        "67 questions using a mix of response formats.",
+      ),
+    ).toBeInTheDocument();
+    const stats = screen.getByTestId("welcome-stats");
+    expect(stats.querySelectorAll(".su-welcome-chip")).toHaveLength(2);
+    expect(within(stats).queryByText("scale")).not.toBeInTheDocument();
+  });
+
+  it("preserves uniform copy and the scale chip", () => {
+    render(
+      <>
+        <WelcomeExpectations
+          timeLabel="About 15 minutes"
+          expectationText="40 short statements, rated 0–3."
+          confidentialSub="Confidential detail."
+          scoresSub="Scores detail."
+        />
+        <WelcomeStats questionCount={40} sectionCount={10} scaleLabel="0–3" />
+      </>,
+    );
+
+    expect(
+      within(screen.getByTestId("welcome-expectations")).getByText(
+        "40 short statements, rated 0–3.",
+      ),
+    ).toBeInTheDocument();
+    const stats = screen.getByTestId("welcome-stats");
+    expect(stats.querySelectorAll(".su-welcome-chip")).toHaveLength(3);
+    expect(within(stats).getByText("0–3")).toBeInTheDocument();
   });
 });

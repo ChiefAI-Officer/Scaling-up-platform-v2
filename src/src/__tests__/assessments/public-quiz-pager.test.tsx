@@ -476,11 +476,12 @@ describe("PublicQuizClient — SectionPager wiring", () => {
     expect(expectations).toBeInTheDocument();
     expect(within(expectations).getByText(/honest & confidential/i)).toBeInTheDocument();
     // ...and the stat chips reflect the real counts (2 questions, 2 sections)
-    // and the derived 0–3 scale — NOT hardcoded 38/5/1–5.
+    // and the uniform 0–3 scale — NOT hardcoded 38/5/1–5.
     const stats = screen.getByTestId("welcome-stats");
     // 2 questions + 2 sections → both chips read "2"; the scale chip reads "0–3".
     expect(within(stats).getAllByText("2")).toHaveLength(2);
     expect(within(stats).getByText("0–3")).toBeInTheDocument(); // derived from the slider scale
+    expect(stats.querySelectorAll(".su-welcome-chip")).toHaveLength(3);
     expect(within(stats).queryByText("38")).not.toBeInTheDocument();
     // The expectation row also states the real count + scale.
     expect(within(expectations).getByText(/2 short statements, rated 0–3\./i)).toBeInTheDocument();

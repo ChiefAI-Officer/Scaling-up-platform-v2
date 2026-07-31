@@ -589,11 +589,20 @@ describe("OrgSurveyClient — SectionPager wiring + hidden-orphan fix", () => {
     // INVITED team framing — "feed the team picture", NOT the public lead-magnet copy.
     expect(within(expectations).getByText(/feed the team picture/i)).toBeInTheDocument();
 
-    // Stat chips reflect the real counts (2 questions; 1 defined section) and the
-    // derived 0–3 scale (from the slider question).
+    expect(
+      within(expectations).getByText(
+        "2 questions using a mix of response formats.",
+      ),
+    ).toBeInTheDocument();
+
+    // Stat chips reflect the real counts (2 questions; 1 defined section). The
+    // mixed response bank does not make a scale claim.
     const stats = screen.getByTestId("welcome-stats");
+    expect(stats.querySelectorAll(".su-welcome-chip")).toHaveLength(2);
     expect(within(stats).getByText("2")).toBeInTheDocument();
-    expect(within(stats).getByText("0–3")).toBeInTheDocument();
+    expect(within(stats).getByText("1")).toBeInTheDocument();
+    expect(within(stats).queryByText("0–3")).not.toBeInTheDocument();
+    expect(within(stats).queryByText("scale")).not.toBeInTheDocument();
 
     // Invited fine print mentions the facilitator/coach (team framing kept).
     expect(screen.getByText(/facilitator or coach/i)).toBeInTheDocument();
