@@ -45,6 +45,7 @@ the full workshop lifecycle from request through post-event follow-up.
   `plans/CHANGELOG.md` entry `assessment-email-lease-hotfix-implemented`.
 
 **Open follow-ons (deferred for Beta hardening or external input):**
+- Jeff July-10 #33 — all-reports fidelity umbrella (needs Jeff's exact report-by-report side-by-side differences; do not claim the broad item)
 - Wave O: wire a log drain + the `18o-ops-runbook.md` §7 alert queries (launch observability = human-read `vercel logs` + kill switch)
 - Wave O: align the report READ-path transaction budget with the #117 commit-path fix (5s Prisma default; fine same-region, trips on high-latency clients)
 - Wave O: "Imported from Esperto (historical)" badge on rendered reports (campaign name carries "imported" today)
