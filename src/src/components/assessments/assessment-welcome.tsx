@@ -123,6 +123,89 @@ export function WelcomeStats({
   );
 }
 
+export interface WelcomeQuestion {
+  type: string;
+  scale?: { min: number; max: number };
+}
+
+export interface WelcomePresentation {
+  expectationText: string;
+  scaleLabel: string | null;
+}
+
+const SUPPORTED_QUESTION_TYPES = new Set([
+  "SLIDER_LIKERT",
+  "TEXT",
+  "NUMBER",
+  "MULTI_CHOICE",
+]);
+
+function questionCountLabel(questionCount: number): string {
+  return `${questionCount} ${questionCount === 1 ? "question" : "questions"}`;
+}
+
+export function deriveWelcomePresentation(
+  questions: WelcomeQuestion[],
+): WelcomePresentation {
+  const countLabel = questionCountLabel(questions.length);
+  const neutral = {
+    expectationText: `${countLabel}.`,
+    scaleLabel: null,
+  };
+
+  if (
+    questions.length === 0 ||
+    questions.some((question) => !SUPPORTED_QUESTION_TYPES.has(question.type))
+  ) {
+    return neutral;
+  }
+
+  const responseTypes = new Set(questions.map((question) => question.type));
+  if (responseTypes.size > 1) {
+    return {
+      expectationText: `${countLabel} using a mix of response formats.`,
+      scaleLabel: null,
+    };
+  }
+
+  if (!responseTypes.has("SLIDER_LIKERT")) {
+    return neutral;
+  }
+
+  const firstScale = questions[0].scale;
+  const allScalesValid = questions.every(({ scale }) =>
+    Boolean(
+      scale &&
+        Number.isFinite(scale.min) &&
+        Number.isFinite(scale.max) &&
+        scale.max > scale.min,
+    ),
+  );
+  if (!firstScale || !allScalesValid) {
+    return neutral;
+  }
+
+  const sameScale = questions.every(
+    ({ scale }) =>
+      scale?.min === firstScale.min && scale?.max === firstScale.max,
+  );
+
+  if (!sameScale) {
+    return {
+      expectationText: `${countLabel} using a mix of response formats.`,
+      scaleLabel: null,
+    };
+  }
+
+  const scaleLabel = `${firstScale.min}–${firstScale.max}`;
+  return {
+    expectationText:
+      `${questions.length} short ` +
+      `${questions.length === 1 ? "statement" : "statements"}, rated ${scaleLabel}.`,
+    scaleLabel,
+  };
+}
+
 /**
  * Derive a human scale label ("1–5", "0–3") from the first SLIDER_LIKERT
  * question's scale. Falls back to "rating" when no slider scale is present
