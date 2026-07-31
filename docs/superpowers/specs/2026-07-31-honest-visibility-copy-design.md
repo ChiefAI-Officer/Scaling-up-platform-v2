@@ -54,7 +54,7 @@ Replace the lock row with a people icon and flow-owned disclosure copy.
 
 Icon: `👥` (decorative)
 
-> **How your answers are shared**  
+> **How your answers are shared**
 > Your coach or facilitator and authorized Scaling Up staff can review your
 > named individual answers.
 
@@ -62,7 +62,7 @@ Icon: `👥` (decorative)
 
 Icon: `👥` (decorative)
 
-> **How your results are shared**  
+> **How your results are shared**
 > You receive your results immediately. Authorized Scaling Up staff can review
 > your full report; your referring coach can too, if you used their link.
 
