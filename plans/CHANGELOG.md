@@ -6,6 +6,7 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="gh-242-retired-edition-warning-pr-ready"></a>
 ### 2026-07-31 — GH #242 retired pinned-edition warning implemented <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:gh-242-retired-edition-warning-pr-ready -->
 
 **Status: IMPLEMENTED + LOCALLY VERIFIED; PR-ready, not merged or launched.** Campaign detail now preserves its pinned-edition provenance and shows the destructive **This edition has been retired** warning when that exact `AssessmentTemplateVersion` has a non-null `archivedAt`. Retirement has presentation precedence over the existing amber **Not the latest edition** warning.

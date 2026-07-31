@@ -1,7 +1,7 @@
 # GH #242 — Retired Pinned-Edition Warning Design
 
-**Status:** Approved in brainstorming on 2026-07-31  
-**Issue:** [GH #242](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/issues/242)  
+**Status:** Approved in brainstorming on 2026-07-31<br />
+**Issue:** [GH #242](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/issues/242)<br />
 **Branch:** `codex/242-retired-edition-warning`
 
 ## 1. Problem
