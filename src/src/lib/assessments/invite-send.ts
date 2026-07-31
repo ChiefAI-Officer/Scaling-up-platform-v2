@@ -121,13 +121,8 @@ export interface StableOriginalTokenAdapter {
 }
 
 export interface RejectedCleanupAuditInput {
-  campaignId: string;
-  respondentId: string;
   invitationId: string;
   tokenId: string;
-  disposition:
-    | "DEFINITE_REJECTION_QUARANTINE_EXHAUSTED"
-    | "DEFINITE_REJECTION_RECONCILIATION_EXHAUSTED";
 }
 
 export class StableInvitationCleanupAuditError extends Error {
@@ -458,36 +453,27 @@ export async function sendInvitesBatch(
               attempts: 3,
             });
             const auditInput: RejectedCleanupAuditInput = {
-              campaignId: campaign.id,
-              respondentId: recipient.respondentId,
               invitationId: invitationRow.id,
               tokenId: stableToken.tokenId,
-              disposition: "DEFINITE_REJECTION_QUARANTINE_EXHAUSTED",
             };
-            try {
-              if (!deps.enqueueRejectedQuarantineRetry) {
-                throw new Error("durable quarantine retry is not configured");
-              }
-              await deps.enqueueRejectedQuarantineRetry({
-                invitationId: invitationRow.id,
-                tokenId: stableToken.tokenId,
-              });
-            } catch {
-              console.error(
-                "[invite-send] durable rejected-token quarantine dispatch failed",
-                {
-                  respondentId: recipient.respondentId,
-                  invitationId: invitationRow.id,
-                  disposition: "DURABLE_QUARANTINE_DISPATCH_FAILED",
-                },
-              );
-            }
             const persistAudit = deps.persistRejectedCleanupAudit;
             const auditPersisted =
               persistAudit !== undefined &&
               (await retryStableInvitationOperation(() => persistAudit(auditInput)));
             if (!auditPersisted) {
               throw new StableInvitationCleanupAuditError();
+            }
+            try {
+              await deps.enqueueRejectedQuarantineRetry?.(auditInput);
+            } catch {
+              console.error(
+                "[invite-send] rejected-token fast-path event submission failed",
+                {
+                  respondentId: recipient.respondentId,
+                  invitationId: invitationRow.id,
+                  disposition: "REPAIR_FAST_PATH_EVENT_SUBMISSION_FAILED",
+                },
+              );
             }
             throw new StableInvitationQuarantineError();
           }
@@ -507,12 +493,8 @@ export async function sendInvitesBatch(
               },
             );
             const auditInput: RejectedCleanupAuditInput = {
-              campaignId: campaign.id,
-              respondentId: recipient.respondentId,
               invitationId: invitationRow.id,
               tokenId: stableToken.tokenId,
-              disposition:
-                "DEFINITE_REJECTION_RECONCILIATION_EXHAUSTED",
             };
             const persistAudit = deps.persistRejectedCleanupAudit;
             const auditPersisted =
@@ -522,6 +504,18 @@ export async function sendInvitesBatch(
               ));
             if (!auditPersisted) {
               throw new StableInvitationCleanupAuditError();
+            }
+            try {
+              await deps.enqueueRejectedQuarantineRetry?.(auditInput);
+            } catch {
+              console.error(
+                "[invite-send] rejected-token fast-path event submission failed",
+                {
+                  respondentId: recipient.respondentId,
+                  invitationId: invitationRow.id,
+                  disposition: "REPAIR_FAST_PATH_EVENT_SUBMISSION_FAILED",
+                },
+              );
             }
           }
         }

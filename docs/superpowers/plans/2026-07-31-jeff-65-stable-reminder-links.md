@@ -697,8 +697,9 @@ Before email:
 - on an unclassified send exception mark it uncertain;
 - on a classified 5xx rejection durably quarantine the exact child as
   `REJECTED`, compare-and-swap the parent mirror to its persisted safe fallback,
-  and enqueue an ID-only durable Inngest retry if synchronous quarantine retries
-  exhaust; and
+  and, if synchronous repair retries exhaust, strictly persist the ID-only
+  repair intent before attempting an ID-only Inngest fast-path event; a bounded
+  scheduled drain owns durable recovery; and
 - leave the existing disabled code path and result shape unchanged.
 
 The raw token never reaches logs, event payloads, or audits. Success and uncertain

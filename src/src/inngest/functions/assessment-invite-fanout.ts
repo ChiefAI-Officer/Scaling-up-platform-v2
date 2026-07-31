@@ -46,7 +46,6 @@
 
 import { inngest } from "@/inngest/client";
 import { db } from "@/lib/db";
-import { logAuditStrict } from "@/lib/audit";
 import {
   prepareAssessmentInvitationEmail,
   sendAssessmentInvitationEmail,
@@ -75,6 +74,10 @@ import {
 import { isStableInvitationLinksEnabled } from "@/lib/assessments/wave-j65-flags";
 import { ASSESSMENT_SEND_INVITES_EVENT } from "./assessment-invite-fanout-event";
 import { STABLE_INVITATION_REJECTION_RETRY_EVENT } from "./stable-invitation-rejection-retry-event";
+import {
+  persistStableInvitationRejectionRepairPending,
+  type StableInvitationRejectionOutboxDb,
+} from "@/lib/assessments/stable-invitation-rejection-outbox";
 
 // ---------------------------------------------------------------------------
 // Event
@@ -575,20 +578,14 @@ export const assessmentInviteFanout = inngest.createFunction(
           });
         },
         persistRejectedCleanupAudit: (input) =>
-          logAuditStrict({
-            entityType: "AssessmentInvitationToken",
-            entityId: input.tokenId,
-            action: "UPDATE",
-            performedBy: "system:assessment-invite-fanout",
-            changes: {
-              campaignId: input.campaignId,
-              respondentId: input.respondentId,
+          persistStableInvitationRejectionRepairPending(
+            db as unknown as StableInvitationRejectionOutboxDb,
+            {
               invitationId: input.invitationId,
               tokenId: input.tokenId,
-              action: "original-invite-rejected-cleanup-exhausted",
-              disposition: input.disposition,
+              performedBy: "system:assessment-invite-fanout",
             },
-          }),
+          ),
         isStableLinksEnabled: isStableInvitationLinksEnabled,
         isPaused: assessmentSendsPaused,
         isAutoSendEnabled: waveDAutoSendEnabled,

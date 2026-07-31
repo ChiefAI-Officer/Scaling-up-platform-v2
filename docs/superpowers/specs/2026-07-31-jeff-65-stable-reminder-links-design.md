@@ -184,10 +184,12 @@ enabled exchange fallback.
     - compare-and-swap the parent mirror from the failed hash to the persisted
       fallback hash and expiry without predecessor traversal; and
     - separately rewire direct successor rollback metadata. If synchronous
-      quarantine retries exhaust, enqueue an ID-only durable Inngest job keyed by
-      invitation and token IDs; the replay performs quarantine before
-      reconciliation and is convergent. Reconciliation failure cannot undo the
-      tombstone or parent restoration.
+      repair retries exhaust, strictly persist a pending AuditLog outbox intent
+      keyed by token-row ID with only `invitationId` metadata, then attempt an
+      ID-only Inngest fast-path event. A bounded scheduled drain replays pending
+      intents even when event submission or worker retries exhaust. Every replay
+      performs quarantine before reconciliation and is convergent.
+      Reconciliation failure cannot undo the tombstone or parent restoration.
 
 The conditional restore prevents a failed send from clobbering a newer concurrent
 reminder. If post-send telemetry or counter persistence fails, the already-staged
@@ -485,10 +487,17 @@ durable invariant is now a parent-owned last-known-deliverable fallback:
   persisted fallback in one transaction, without walking predecessors;
 - successor reconciliation may still simplify historical rollback metadata, but
   it cannot change the parent restore point or roll back the tombstone; and
-- exhausted synchronous quarantine retries dispatch
-  `assessment/invitation.rejection-retry`, keyed by invitation/token IDs and
-  carrying no token or hash. The durable handler quarantines before reconciling,
-  throws on infrastructure failure for Inngest retry, and converges on replay.
+- exhausted synchronous repair first persists
+  `STABLE_INVITATION_REJECTION_REPAIR_PENDING` on entity type
+  `AssessmentInvitationToken`, keyed by token-row ID with exactly
+  `{invitationId}` metadata;
+- `assessment/invitation.rejection-retry` carries only invitation/token IDs and
+  remains the immediate fast path; and
+- a five-minute, concurrency-one drain selects at most 50 pending intents
+  oldest-first, quarantines before reconciling, and upserts the same deterministic
+  resolved marker as the direct event. Completion transitions duplicate pending
+  rows out of future selection, while concurrent event/cron execution remains
+  safe through service idempotency plus the resolved check.
 
 The outcome-order matrix covers B-confirm-then-A-confirm, A-confirm-while-B-current
 then-B-reject, and the equivalent uncertain transitions. A delayed confirmation
@@ -522,7 +531,7 @@ Jeff #65 is implemented only when:
 - changing reminder selection, batch caps, counters, copy, HTML, or visual chrome;
 - changing public-assessment access;
 - adding token-management UI;
-- adding a cleanup scheduler;
+- adding a token-retention or deletion scheduler;
 - replacing SHA-256 token hashing;
 - removing the parent `tokenHash` in this wave; or
 - implementing a general assessment-email outbox redesign.

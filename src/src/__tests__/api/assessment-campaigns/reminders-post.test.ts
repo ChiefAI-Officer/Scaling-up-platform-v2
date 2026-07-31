@@ -859,7 +859,7 @@ describe("POST /api/assessment-campaigns/[id]/reminders", () => {
     jest.restoreAllMocks();
   });
 
-  it("dispatches identifier-only durable repair when quarantine retries exhaust", async () => {
+  it("persists the repair outbox before an identifier-only fast-path event that may fail", async () => {
     (getApiActor as jest.Mock).mockResolvedValue(coachActor);
     mockIsStableInvitationLinksEnabled.mockReturnValue(true);
     mockClassifyInvitationSendError.mockReturnValueOnce(
@@ -872,6 +872,9 @@ describe("POST /api/assessment-campaigns/[id]/reminders", () => {
     mockQuarantineRejectedStableInvitationToken.mockRejectedValue(
       new Error("database unavailable"),
     );
+    jest
+      .mocked(inngest.send)
+      .mockRejectedValueOnce(new Error("event submission unavailable"));
 
     const res = await POST(
       jsonReq({ participantIds: ["r1"] }) as never,
@@ -888,6 +891,17 @@ describe("POST /api/assessment-campaigns/[id]/reminders", () => {
         tokenId: "stable-inv-r1",
       },
     });
+    const pendingAudit = (db.auditLog.create as jest.Mock).mock.calls[0][0].data;
+    expect(pendingAudit).toEqual({
+      entityType: "AssessmentInvitationToken",
+      entityId: "stable-inv-r1",
+      action: "STABLE_INVITATION_REJECTION_REPAIR_PENDING",
+      performedBy: coachActor.email,
+      changes: JSON.stringify({ invitationId: "inv-r1" }),
+    });
+    expect(
+      (db.auditLog.create as jest.Mock).mock.invocationCallOrder[0],
+    ).toBeLessThan(jest.mocked(inngest.send).mock.invocationCallOrder[0]);
     const dispatched = JSON.stringify(jest.mocked(inngest.send).mock.calls);
     expect(dispatched).not.toContain("rawToken");
     expect(dispatched).not.toContain("tokenHash");
@@ -932,17 +946,12 @@ describe("POST /api/assessment-campaigns/[id]/reminders", () => {
     expect(criticalAudit).toEqual({
       entityType: "AssessmentInvitationToken",
       entityId: "stable-inv-r1",
-      action: "UPDATE",
+      action: "STABLE_INVITATION_REJECTION_REPAIR_PENDING",
       performedBy: coachActor.email,
       changes: expect.any(String),
     });
     expect(JSON.parse(criticalAudit.changes)).toEqual({
-      campaignId: "c1",
-      participantId: "r1",
       invitationId: "inv-r1",
-      tokenId: "stable-inv-r1",
-      action: "reminder-rejected-reconciliation-unresolved",
-      disposition: "DEFINITE_REJECTION_RECONCILIATION_EXHAUSTED",
     });
     expect(
       (db.auditLog.create as jest.Mock).mock.invocationCallOrder[0]

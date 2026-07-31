@@ -499,8 +499,13 @@ describe("sendInvitesBatch", () => {
     errorSpy.mockRestore();
   });
 
-  it("enabled: quarantine exhaustion schedules identifier-only durable repair before failing", async () => {
-    const enqueueRejectedQuarantineRetry = jest.fn().mockResolvedValue(undefined);
+  it("enabled: quarantine exhaustion persists the outbox before an identifier-only fast-path event", async () => {
+    const persistRejectedCleanupAudit = jest
+      .fn()
+      .mockResolvedValue(undefined);
+    const enqueueRejectedQuarantineRetry = jest
+      .fn()
+      .mockRejectedValue(new Error("event submission unavailable"));
     const stableTokens = {
       stageExistingOriginal: jest
         .fn()
@@ -519,7 +524,7 @@ describe("sendInvitesBatch", () => {
         send: jest.fn().mockRejectedValue({ responseCode: 550 }),
       }),
       stableTokens,
-      persistRejectedCleanupAudit: jest.fn().mockResolvedValue(undefined),
+      persistRejectedCleanupAudit,
       enqueueRejectedQuarantineRetry,
     });
     const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
@@ -538,6 +543,13 @@ describe("sendInvitesBatch", () => {
       invitationId: "inv-r1",
       tokenId: "token-r1",
     });
+    expect(persistRejectedCleanupAudit).toHaveBeenCalledWith({
+      invitationId: "inv-r1",
+      tokenId: "token-r1",
+    });
+    expect(persistRejectedCleanupAudit.mock.invocationCallOrder[0]).toBeLessThan(
+      enqueueRejectedQuarantineRetry.mock.invocationCallOrder[0],
+    );
     expect(stableTokens.reconcileRejected).not.toHaveBeenCalled();
     const dispatched = JSON.stringify(
       enqueueRejectedQuarantineRetry.mock.calls,
@@ -572,6 +584,7 @@ describe("sendInvitesBatch", () => {
       }),
       stableTokens,
       persistRejectedCleanupAudit,
+      enqueueRejectedQuarantineRetry: jest.fn().mockResolvedValue(undefined),
     });
     const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
 
@@ -585,11 +598,8 @@ describe("sendInvitesBatch", () => {
     expect(stableTokens.reconcileRejected).toHaveBeenCalledTimes(3);
     expect(persistRejectedCleanupAudit).toHaveBeenCalledTimes(3);
     expect(persistRejectedCleanupAudit).toHaveBeenCalledWith({
-      campaignId: "c1",
-      respondentId: "r1",
       invitationId: "inv-r1",
       tokenId: "token-r1",
-      disposition: "DEFINITE_REJECTION_RECONCILIATION_EXHAUSTED",
     });
     expect(result.failed).toEqual(["r1"]);
     errorSpy.mockRestore();

@@ -33,7 +33,7 @@ import {
   asAccessDb,
   canManageCampaign,
 } from "@/lib/assessments/access-control";
-import { logAudit, logAuditStrict } from "@/lib/audit";
+import { logAudit } from "@/lib/audit";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
 import {
   resolveCoachName,
@@ -55,6 +55,10 @@ import { waveDAutoSendEnabled } from "@/lib/assessments/wave-d-feature-flags";
 import { isStableInvitationLinksEnabled } from "@/lib/assessments/wave-j65-flags";
 import { inngest } from "@/inngest/client";
 import { STABLE_INVITATION_REJECTION_RETRY_EVENT } from "@/inngest/functions/stable-invitation-rejection-retry-event";
+import {
+  persistStableInvitationRejectionRepairPending,
+  type StableInvitationRejectionOutboxDb,
+} from "@/lib/assessments/stable-invitation-rejection-outbox";
 
 const InviteBodySchema = z.object({
   respondentIds: z.array(z.string().min(1)).optional(),
@@ -271,24 +275,14 @@ export async function POST(
                   });
                 },
                 persistRejectedCleanupAudit: (input) =>
-                  logAuditStrict({
-                    entityType: "AssessmentInvitationToken",
-                    entityId: input.tokenId,
-                    action: "UPDATE",
-                    performedBy: actor.email,
-                    changes: {
-                      campaignId: input.campaignId,
-                      respondentId: input.respondentId,
+                  persistStableInvitationRejectionRepairPending(
+                    db as unknown as StableInvitationRejectionOutboxDb,
+                    {
                       invitationId: input.invitationId,
                       tokenId: input.tokenId,
-                      action:
-                        input.disposition ===
-                        "DEFINITE_REJECTION_QUARANTINE_EXHAUSTED"
-                          ? "original-invite-rejected-quarantine-unresolved"
-                          : "original-invite-rejected-reconciliation-unresolved",
-                      disposition: input.disposition,
+                      performedBy: actor.email,
                     },
-                  }),
+                  ),
               }
             : {}),
         },

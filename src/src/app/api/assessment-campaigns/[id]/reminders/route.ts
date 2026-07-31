@@ -33,7 +33,7 @@ import {
   asAccessDb,
   canManageCampaign,
 } from "@/lib/assessments/access-control";
-import { logAudit, logAuditStrict } from "@/lib/audit";
+import { logAudit } from "@/lib/audit";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
 import {
   generateRawToken,
@@ -61,6 +61,10 @@ import {
 } from "@/services/notifications";
 import { inngest } from "@/inngest/client";
 import { STABLE_INVITATION_REJECTION_RETRY_EVENT } from "@/inngest/functions/stable-invitation-rejection-retry-event";
+import {
+  persistStableInvitationRejectionRepairPending,
+  type StableInvitationRejectionOutboxDb,
+} from "@/lib/assessments/stable-invitation-rejection-outbox";
 
 const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
 const MAX_REMINDER_BATCH = 200; // serverless/SMTP budget guard
@@ -120,35 +124,20 @@ async function enqueueRejectedQuarantineRetry(
 }
 
 async function persistRollbackExhaustionAuditWithRetry(input: {
-  campaignId: string;
-  participantId: string;
   invitationId: string;
   tokenId: string;
   performedBy: string;
-  disposition:
-    | "DEFINITE_REJECTION_QUARANTINE_EXHAUSTED"
-    | "DEFINITE_REJECTION_RECONCILIATION_EXHAUSTED";
 }): Promise<boolean> {
   return retryStableInvitationOperation(
     async () => {
-      await logAuditStrict({
-        entityType: "AssessmentInvitationToken",
-        entityId: input.tokenId,
-        action: "UPDATE",
-        performedBy: input.performedBy,
-        changes: {
-          campaignId: input.campaignId,
-          participantId: input.participantId,
+      await persistStableInvitationRejectionRepairPending(
+        db as unknown as StableInvitationRejectionOutboxDb,
+        {
           invitationId: input.invitationId,
           tokenId: input.tokenId,
-          action:
-            input.disposition ===
-            "DEFINITE_REJECTION_QUARANTINE_EXHAUSTED"
-              ? "reminder-rejected-quarantine-unresolved"
-              : "reminder-rejected-reconciliation-unresolved",
-          disposition: input.disposition,
+          performedBy: input.performedBy,
         },
-      });
+      );
     },
     MAX_CRITICAL_AUDIT_ATTEMPTS,
   );
@@ -534,27 +523,11 @@ export async function POST(
             }
           } else if (!(await quarantineRejectedWithRetry(staged))) {
             failureReason = "smtp-rejected-quarantine-failed";
-            try {
-              await enqueueRejectedQuarantineRetry(staged);
-            } catch {
-              console.error(
-                "[assessment-reminders] durable quarantine dispatch failed",
-                {
-                  respondentId: participant.respondentId,
-                  invitationId: prior.id,
-                  disposition: "DURABLE_QUARANTINE_DISPATCH_FAILED",
-                },
-              );
-            }
             const auditPersisted =
               await persistRollbackExhaustionAuditWithRetry({
-                campaignId,
-                participantId: participant.respondentId,
                 invitationId: prior.id,
                 tokenId: staged.tokenId,
                 performedBy: actor.email,
-                disposition:
-                  "DEFINITE_REJECTION_QUARANTINE_EXHAUSTED",
               });
             if (!auditPersisted) {
               console.error(
@@ -609,6 +582,18 @@ export async function POST(
                 { status: 503 }
               );
             }
+            try {
+              await enqueueRejectedQuarantineRetry(staged);
+            } catch {
+              console.error(
+                "[assessment-reminders] repair fast-path event submission failed",
+                {
+                  respondentId: participant.respondentId,
+                  invitationId: prior.id,
+                  disposition: "REPAIR_FAST_PATH_EVENT_SUBMISSION_FAILED",
+                },
+              );
+            }
             const rejectedFailure = {
               participantId: participant.respondentId,
               reason: failureReason,
@@ -656,13 +641,9 @@ export async function POST(
             failureReason = "smtp-rejected-reconciliation-failed";
             const auditPersisted =
               await persistRollbackExhaustionAuditWithRetry({
-                campaignId,
-                participantId: participant.respondentId,
                 invitationId: prior.id,
                 tokenId: staged.tokenId,
                 performedBy: actor.email,
-                disposition:
-                  "DEFINITE_REJECTION_RECONCILIATION_EXHAUSTED",
               });
             if (!auditPersisted) {
               console.error(
@@ -716,6 +697,18 @@ export async function POST(
                     "PARTIAL_BATCH_DO_NOT_RETRY_WHOLE_REQUEST",
                 },
                 { status: 503 }
+              );
+            }
+            try {
+              await enqueueRejectedQuarantineRetry(staged);
+            } catch {
+              console.error(
+                "[assessment-reminders] repair fast-path event submission failed",
+                {
+                  respondentId: participant.respondentId,
+                  invitationId: prior.id,
+                  disposition: "REPAIR_FAST_PATH_EVENT_SUBMISSION_FAILED",
+                },
               );
             }
             console.error(
