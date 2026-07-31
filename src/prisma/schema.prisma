@@ -1356,9 +1356,26 @@ model AssessmentInvitation {
   campaign   AssessmentCampaign    @relation(fields: [campaignId], references: [id])
   respondent OrgRespondent         @relation(fields: [respondentId], references: [id])
   submission AssessmentSubmission?
+  tokens     AssessmentInvitationToken[]
 
   @@unique([campaignId, respondentId])
   @@map("assessment_invitations")
+}
+
+model AssessmentInvitationToken {
+  id                  String                                 @id @default(cuid())
+  invitationId        String
+  tokenHash           String                                 @unique
+  source              AssessmentInvitationTokenSource
+  deliveryState       AssessmentInvitationTokenDeliveryState
+  deliveryConfirmedAt DateTime?
+  createdAt           DateTime                               @default(now())
+  updatedAt           DateTime                               @updatedAt
+
+  invitation AssessmentInvitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+
+  @@index([invitationId])
+  @@map("assessment_invitation_tokens")
 }
 
 model AssessmentSubmission {
@@ -1549,6 +1566,18 @@ enum AssessmentInvitationStatus {
   SENT
   VIEWED
   SUBMITTED
+}
+
+enum AssessmentInvitationTokenSource {
+  LEGACY_CURRENT
+  ORIGINAL
+  REMINDER
+}
+
+enum AssessmentInvitationTokenDeliveryState {
+  STAGED
+  SENT
+  UNCERTAIN
 }
 
 enum AssessmentQuestionType {
