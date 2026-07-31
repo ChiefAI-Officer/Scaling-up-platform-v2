@@ -24,7 +24,7 @@ import {
   WelcomeShellHeader,
   WelcomeExpectations,
   WelcomeStats,
-  deriveScaleLabel,
+  deriveWelcomePresentation,
   deriveTimeEstimate,
 } from "@/components/assessments/assessment-welcome";
 import { BrandedReport } from "@/components/assessments/BrandedReport";
@@ -149,9 +149,12 @@ export function PublicQuizClient({
     [sections],
   );
 
-  // Welcome stat chips + expectation copy derive from the ACTUAL data (never
-  // hardcoded counts/scale).
-  const scaleLabel = useMemo(() => deriveScaleLabel(sortedQuestions), [sortedQuestions]);
+  // Welcome stat chips + expectation copy derive from the complete ACTUAL
+  // question bank (never hardcoded counts/scale).
+  const welcomePresentation = useMemo(
+    () => deriveWelcomePresentation(sortedQuestions),
+    [sortedQuestions],
+  );
   const timeEstimate = useMemo(
     () => deriveTimeEstimate(sortedQuestions.length),
     [sortedQuestions.length],
@@ -263,15 +266,14 @@ export function PublicQuizClient({
             )}
             <WelcomeExpectations
               timeLabel={timeEstimate}
-              questionCount={sortedQuestions.length}
-              scaleLabel={scaleLabel}
+              expectationText={welcomePresentation.expectationText}
               confidentialSub="Your results are shown to you the moment you submit."
               scoresSub="See where you stand across each category."
             />
             <WelcomeStats
               questionCount={sortedQuestions.length}
               sectionCount={sortedSections.length}
-              scaleLabel={scaleLabel}
+              scaleLabel={welcomePresentation.scaleLabel}
             />
             <div className="su-welcome-cta-row">
               <button

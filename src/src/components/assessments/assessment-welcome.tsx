@@ -10,8 +10,8 @@
  * Both the PUBLIC quiz (PublicQuizClient) and the INVITED survey
  * (OrgSurveyClient) render the same value-prop "what to expect" list + stat
  * chips, but with FLOW-SPECIFIC copy (public lead-magnet vs invited team
- * framing). These presentational pieces take the copy as props so the wording
- * stays owned by each flow.
+ * framing). The complete question bank derives the truthful expectation and
+ * optional scale; each flow owns its specific supporting copy.
  *
  * Scope (ADR-0005): every class lives under `.su-welcome-*`, styled ONLY inside
  * the `.su-assessment-brand` scope (the participant lane wrapper). No global
@@ -38,10 +38,8 @@ export function WelcomeShellHeader({ caption }: { caption?: string }) {
 export interface WelcomeExpectationsProps {
   /** e.g. "About 10 minutes" — derived from the question count. */
   timeLabel: string;
-  /** Actual number of questions (NOT hardcoded). */
-  questionCount: number;
-  /** e.g. "1–5" — derived from the slider scale. */
-  scaleLabel: string;
+  /** Complete-bank expectation copy (NOT hardcoded). */
+  expectationText: string;
   /** Flow-specific sub for the "honest & confidential" row. */
   confidentialSub: string;
   /** Flow-specific sub for the "category scores" row. */
@@ -50,13 +48,12 @@ export interface WelcomeExpectationsProps {
 
 /**
  * The "what to expect" value-prop list (3 rows: icon + bold label + muted sub).
- * Time + question count + scale are derived from real data; the confidential /
- * scores subs differ per flow (public vs invited).
+ * Time + complete-bank expectation text are derived from real data; the
+ * confidential / scores subs differ per flow (public vs invited).
  */
 export function WelcomeExpectations({
   timeLabel,
-  questionCount,
-  scaleLabel,
+  expectationText,
   confidentialSub,
   scoresSub,
 }: WelcomeExpectationsProps) {
@@ -68,9 +65,7 @@ export function WelcomeExpectations({
         </span>
         <span className="su-welcome-expect-text">
           <b>{timeLabel}</b>
-          <span>
-            {questionCount} short {questionCount === 1 ? "statement" : "statements"}, rated {scaleLabel}.
-          </span>
+          <span>{expectationText}</span>
         </span>
       </li>
       <li className="su-welcome-expect-item">
@@ -95,7 +90,7 @@ export function WelcomeExpectations({
   );
 }
 
-/** The three stat chips (questions / sections / scale) — all from real data. */
+/** Stat chips for questions and sections, plus an optional complete-bank scale. */
 export function WelcomeStats({
   questionCount,
   sectionCount,
@@ -103,8 +98,8 @@ export function WelcomeStats({
 }: {
   questionCount: number;
   sectionCount: number;
-  scaleLabel: string;
-}) {
+  scaleLabel: string | null;
+}): React.ReactElement {
   return (
     <div className="su-welcome-meta" aria-label="Assessment details" data-testid="welcome-stats">
       <div className="su-welcome-chip">
@@ -115,29 +110,97 @@ export function WelcomeStats({
         <b>{sectionCount}</b>
         <span>{sectionCount === 1 ? "section" : "sections"}</span>
       </div>
-      <div className="su-welcome-chip">
-        <b>{scaleLabel}</b>
-        <span>scale</span>
-      </div>
+      {scaleLabel ? (
+        <div className="su-welcome-chip">
+          <b>{scaleLabel}</b>
+          <span>scale</span>
+        </div>
+      ) : null}
     </div>
   );
 }
 
-/**
- * Derive a human scale label ("1–5", "0–3") from the first SLIDER_LIKERT
- * question's scale. Falls back to "rating" when no slider scale is present
- * (e.g. an all-qualitative survey).
- */
-export function deriveScaleLabel(
-  questions: Array<{ type: string; scale?: { min: number; max: number } }>,
-): string {
-  const slider = questions.find(
-    (q) => q.type === "SLIDER_LIKERT" && q.scale && typeof q.scale.min === "number" && typeof q.scale.max === "number",
-  );
-  if (slider?.scale) {
-    return `${slider.scale.min}–${slider.scale.max}`;
+export interface WelcomeQuestion {
+  type: string;
+  scale?: { min: number; max: number };
+}
+
+export interface WelcomePresentation {
+  expectationText: string;
+  scaleLabel: string | null;
+}
+
+const SUPPORTED_QUESTION_TYPES = new Set([
+  "SLIDER_LIKERT",
+  "TEXT",
+  "NUMBER",
+  "MULTI_CHOICE",
+]);
+
+function questionCountLabel(questionCount: number): string {
+  return `${questionCount} ${questionCount === 1 ? "question" : "questions"}`;
+}
+
+export function deriveWelcomePresentation(
+  questions: WelcomeQuestion[],
+): WelcomePresentation {
+  const countLabel = questionCountLabel(questions.length);
+  const neutral = {
+    expectationText: `${countLabel}.`,
+    scaleLabel: null,
+  };
+
+  if (
+    questions.length === 0 ||
+    questions.some((question) => !SUPPORTED_QUESTION_TYPES.has(question.type))
+  ) {
+    return neutral;
   }
-  return "rating";
+
+  const responseTypes = new Set(questions.map((question) => question.type));
+  if (responseTypes.size > 1) {
+    return {
+      expectationText: `${countLabel} using a mix of response formats.`,
+      scaleLabel: null,
+    };
+  }
+
+  if (!responseTypes.has("SLIDER_LIKERT")) {
+    return neutral;
+  }
+
+  const firstScale = questions[0].scale;
+  const allScalesValid = questions.every(({ scale }) =>
+    Boolean(
+      scale &&
+        Number.isFinite(scale.min) &&
+        Number.isFinite(scale.max) &&
+        scale.max > scale.min,
+    ),
+  );
+  if (!firstScale || !allScalesValid) {
+    return neutral;
+  }
+
+  const sameScale = questions.every(
+    ({ scale }) =>
+      scale?.min === firstScale.min && scale?.max === firstScale.max,
+  );
+
+  if (!sameScale) {
+    return {
+      expectationText: `${countLabel} using a mix of response formats.`,
+      scaleLabel: null,
+    };
+  }
+
+  const scaleLabel = `${firstScale.min}–${firstScale.max}`;
+  return {
+    expectationText:
+      `${questions.length} short ` +
+      `${questions.length === 1 ? "statement" : "statements"}, rated ${scaleLabel}.`,
+    scaleLabel,
+  };
 }
 
 /**

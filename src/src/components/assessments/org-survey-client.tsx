@@ -50,7 +50,7 @@ import {
   WelcomeShellHeader,
   WelcomeExpectations,
   WelcomeStats,
-  deriveScaleLabel,
+  deriveWelcomePresentation,
   deriveTimeEstimate,
 } from "@/components/assessments/assessment-welcome";
 import { formatTimestampDateTime } from "@/lib/utils";
@@ -360,8 +360,12 @@ export function OrgSurveyClient({
       .sort((a, b) => a.sortOrder - b.sortOrder);
   }, [phase, dropBackground]);
 
-  // Welcome stat chips + expectation copy derive from the ACTUAL data.
-  const scaleLabel = useMemo(() => deriveScaleLabel(sortedQuestions), [sortedQuestions]);
+  // Welcome stat chips + expectation copy derive from the complete ACTUAL
+  // question bank.
+  const welcomePresentation = useMemo(
+    () => deriveWelcomePresentation(sortedQuestions),
+    [sortedQuestions],
+  );
   const timeEstimate = useMemo(
     () => deriveTimeEstimate(sortedQuestions.length),
     [sortedQuestions.length],
@@ -608,15 +612,14 @@ export function OrgSurveyClient({
             ))}
             <WelcomeExpectations
               timeLabel={timeEstimate}
-              questionCount={sortedQuestions.length}
-              scaleLabel={scaleLabel}
+              expectationText={welcomePresentation.expectationText}
               confidentialSub="Your individual answers feed the team picture."
               scoresSub="See where the team stands across each category."
             />
             <WelcomeStats
               questionCount={sortedQuestions.length}
               sectionCount={sortedSections.length}
-              scaleLabel={scaleLabel}
+              scaleLabel={welcomePresentation.scaleLabel}
             />
             <div className="su-welcome-cta-row">
               <button

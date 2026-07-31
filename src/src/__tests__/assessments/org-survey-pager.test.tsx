@@ -72,15 +72,48 @@ const surveyData = {
   ],
 };
 
+const scalingUpFullSurveyData = {
+  campaign: {
+    name: "Scaling Up Full",
+    alias: "scaling-up-full-invited",
+    templateAlias: "scaling-up-full",
+  },
+  version: { language: "en" },
+  respondentKey: RESPONDENT_KEY,
+  sections: [
+    { stableKey: "S1", sortOrder: 1, name: "Strategy" },
+    { stableKey: "S_BACKGROUND", sortOrder: 2, name: "Background" },
+  ],
+  questions: [
+    {
+      stableKey: "q1",
+      sortOrder: 1,
+      sectionStableKey: "S1",
+      type: "SLIDER_LIKERT",
+      label: "Strategy question",
+      isRequired: true,
+      scale: { min: 0, max: 10, step: 1, anchorMin: "lo", anchorMax: "hi" },
+    },
+    {
+      stableKey: "q_fte",
+      sortOrder: 2,
+      sectionStableKey: "S_BACKGROUND",
+      type: "NUMBER",
+      label: "Number of employees",
+      isRequired: true,
+    },
+  ],
+};
+
 /** Mock GET /me → { success, data }. No window hash ⇒ exchange step is skipped. */
-function mockMeFetch() {
+function mockMeFetch(data: object = surveyData) {
   global.fetch = jest.fn((input: RequestInfo | URL) => {
     const url = typeof input === "string" ? input : input.toString();
     if (url.includes("/me")) {
       return Promise.resolve({
         ok: true,
         status: 200,
-        json: async () => ({ success: true, data: surveyData }),
+        json: async () => ({ success: true, data }),
       } as Response);
     }
     // /submit (and anything else) — default 200 OK
@@ -589,13 +622,57 @@ describe("OrgSurveyClient — SectionPager wiring + hidden-orphan fix", () => {
     // INVITED team framing — "feed the team picture", NOT the public lead-magnet copy.
     expect(within(expectations).getByText(/feed the team picture/i)).toBeInTheDocument();
 
-    // Stat chips reflect the real counts (2 questions; 1 defined section) and the
-    // derived 0–3 scale (from the slider question).
+    expect(
+      within(expectations).getByText(
+        "2 questions using a mix of response formats.",
+      ),
+    ).toBeInTheDocument();
+
+    // Stat chips reflect the real counts (2 questions; 1 defined section). The
+    // mixed response bank does not make a scale claim.
     const stats = screen.getByTestId("welcome-stats");
+    expect(stats.querySelectorAll(".su-welcome-chip")).toHaveLength(2);
     expect(within(stats).getByText("2")).toBeInTheDocument();
-    expect(within(stats).getByText("0–3")).toBeInTheDocument();
+    expect(within(stats).getByText("1")).toBeInTheDocument();
+    expect(within(stats).queryByText("0–3")).not.toBeInTheDocument();
+    expect(within(stats).queryByText("scale")).not.toBeInTheDocument();
 
     // Invited fine print mentions the facilitator/coach (team framing kept).
     expect(screen.getByText(/facilitator or coach/i)).toBeInTheDocument();
+  });
+
+  it("derives Scaling Up Full Welcome claims from the non-CEO respondent-visible bank", async () => {
+    mockMeFetch({ ...scalingUpFullSurveyData, isCEO: false });
+
+    render(<OrgSurveyClient campaignAlias={ALIAS} />);
+    await screen.findByRole("button", { name: /start the assessment/i });
+
+    const expectations = screen.getByTestId("welcome-expectations");
+    expect(
+      within(expectations).getByText("1 short statement, rated 0–10."),
+    ).toBeInTheDocument();
+
+    const stats = screen.getByTestId("welcome-stats");
+    expect(stats.querySelectorAll(".su-welcome-chip")).toHaveLength(3);
+    expect(within(stats).getByText("0–10")).toBeInTheDocument();
+  });
+
+  it("derives Scaling Up Full Welcome claims from the CEO respondent-visible bank", async () => {
+    mockMeFetch({ ...scalingUpFullSurveyData, isCEO: true });
+
+    render(<OrgSurveyClient campaignAlias={ALIAS} />);
+    await screen.findByRole("button", { name: /start the assessment/i });
+
+    const expectations = screen.getByTestId("welcome-expectations");
+    expect(
+      within(expectations).getByText(
+        "2 questions using a mix of response formats.",
+      ),
+    ).toBeInTheDocument();
+
+    const stats = screen.getByTestId("welcome-stats");
+    expect(stats.querySelectorAll(".su-welcome-chip")).toHaveLength(2);
+    expect(within(stats).queryByText("0–10")).not.toBeInTheDocument();
+    expect(within(stats).queryByText("scale")).not.toBeInTheDocument();
   });
 });

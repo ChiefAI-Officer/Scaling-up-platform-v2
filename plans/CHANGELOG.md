@@ -6,6 +6,20 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-07-31 — Welcome-screen question-bank accuracy implemented (GH #222) <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:gh-222-welcome-screen-accuracy-implemented -->
+
+**Status: IMPLEMENTED + LOCALLY VERIFIED; not yet merged or launched.** The shared participant Welcome screen no longer takes the first slider's range and presents it as a property of the entire respondent-visible question bank.
+
+**Behavior.** A respondent-visible bank shows its existing `short statements, rated …` sentence and scale chip only when every question is `SLIDER_LIKERT`, every range is finite and increasing, and every range matches. LVA, QSP v1, and QSP v2 use `questions using a mix of response formats` and retain only the existing question-count and section-count chips. Scaling Up Full is role-dependent: non-CEOs do not receive the `S_BACKGROUND` number questions, so their uniform visible slider bank retains rated copy and the scale chip; CEOs receive the slider and background-number questions, so their mixed visible bank uses mixed-format copy and two chips. Rockefeller Habits, Five Dysfunctions, and Scaling Up Quick retain their existing rated copy and three-chip layout. Invited and public flows use one shared derivation.
+
+**Scope.** `deriveTimeEstimate` is unchanged. No template-specific rule, percentage threshold, CSS change, API change, migration, seed edit, feature flag, or unrelated Welcome copy is included.
+
+**Verification.** The focused shared-component, invited-pager, and public-pager suites passed. Changed-file ESLint, migration safety, changelog freshness, `git diff --check`, and `CI=true npx next build --turbopack` passed.
+
+**Rollout and rollback.** This is a flagless presentation fix with no stored-data change. It is not live until its PR merges and deploys; rollback is a normal revert.
+
+---
+
 ### 2026-07-31 — Jeff July-10 #33 deferred pending report-by-report fidelity notes <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:jeff-33-report-fidelity-deferred -->
 
 **Status: DEFERRED / NEEDS INPUT — reporting disposition only.** Jeff's July-10 feedback describes #33 as an all-reports fidelity review: the reports are close to, but not exactly aligned with, the originals, and Jeff will perform the full side-by-side review and provide detailed follow-up. The latest status overlay likewise marks the item **NEEDS INPUT**, waiting for the report-by-report comparison notes. This records the decision to take #33 out of the selectable work queue; it does not mark the item Complete.
