@@ -120,6 +120,9 @@ function makeDeps(
     rollbackRejected: jest.fn(),
   };
   const persistRejectedCleanupAudit = jest.fn().mockResolvedValue(undefined);
+  const enqueueRejectedQuarantineRetry = jest
+    .fn()
+    .mockResolvedValue(undefined);
   const isStableLinksEnabled = jest.fn().mockReturnValue(false);
   const isPaused = jest.fn().mockReturnValue(false);
   const isAutoSendEnabled = jest.fn().mockReturnValue(true);
@@ -144,6 +147,7 @@ function makeDeps(
     prepareEmail,
     stableTokens,
     persistRejectedCleanupAudit,
+    enqueueRejectedQuarantineRetry,
     isStableLinksEnabled,
     sendInvitesBatch,
     isPaused,

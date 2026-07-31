@@ -64,6 +64,8 @@ Add an `AssessmentInvitationToken` model with:
 - `id String @id @default(cuid())`;
 - `invitationId String`;
 - `tokenHash String @unique`;
+- `sequence Int` — invitation-local, monotonically increasing attempt order;
+- `expiresAtSnapshot DateTime` — expiry paired with this token hash;
 - `source AssessmentInvitationTokenSource`;
 - `deliveryState AssessmentInvitationTokenDeliveryState`;
 - `createdAt DateTime @default(now())`;
@@ -92,11 +94,17 @@ child is never exchangeable and never falls through to the parent mirror.
 Validity for every other state comes from possession of the raw token plus the
 parent lifecycle gates.
 
-Index `invitationId` for sibling lookup and retain the unique `tokenHash` index for
-constant-time exchange. Do not add per-token expiry or terminal-state columns.
+Index `invitationId` for sibling lookup, uniquely constrain
+`(invitationId, sequence)`, and retain the unique `tokenHash` index for
+constant-time exchange. The expiry snapshot is rollback metadata only; the parent
+remains the lifecycle authority.
 
 Keep `AssessmentInvitation.tokenHash` during this wave as the newest-token
-compatibility mirror. It remains unique and is not made nullable.
+compatibility mirror. It remains unique and is not made nullable. Add parent
+`stableTokenSequence`, `stableFallbackTokenHash`,
+`stableFallbackExpiresAt`, and `stableFallbackTokenSequence`. The fallback pair
+is the durable last-known-deliverable restore point; it is independent of the
+child predecessor chain.
 
 ## Component boundaries
 
@@ -108,8 +116,9 @@ A focused service owns:
 - staging a new child token;
 - maintaining the parent compatibility mirror;
 - marking a staged token `SENT` or `UNCERTAIN`;
-- quarantining a definitively rejected staged token, restoring a viable parent
-  mirror, and separately reconciling successor rollback metadata;
+- quarantining a definitively rejected staged token and restoring the persisted
+  safe fallback in the same transaction, plus separately reconciling successor
+  rollback metadata;
   and
 - resolving a token hash through child-first, parent-fallback lookup.
 
@@ -157,24 +166,28 @@ enabled exchange fallback.
      the transaction;
    - promote that locked parent hash to `LEGACY_CURRENT` if no child row contains
      it;
-   - create the new `REMINDER` child in `STAGED`;
+   - allocate the next monotonic sequence and create the new `REMINDER` child in
+     `STAGED` with its expiry snapshot;
    - refresh the parent expiry; and
    - set the parent compatibility mirror to the new hash.
 7. Send the email with the raw token.
 8. On confirmed provider acceptance, atomically mark the child `SENT`, set
-   `deliveryConfirmedAt`, increment `resentCount`, and set `lastResentAt`.
+   `deliveryConfirmedAt`, increment `resentCount`, set `lastResentAt`, and advance
+   the parent fallback only when the child sequence is newer than the persisted
+   fallback sequence.
 9. On an unclassified or ambiguous provider exception, mark the child
    `UNCERTAIN`, retain the refreshed expiry and parent mirror, report the send as
-   uncertain/failed to the operator without logging the token, and leave the link
-   exchangeable.
+   uncertain/failed to the operator without logging the token, leave the link
+   exchangeable, and advance the fallback under the same monotonic rule.
 10. Only when a typed provider result proves no acceptance occurred:
-    - atomically retain the child as `REJECTED`;
-    - traverse any rejected predecessor tombstones to the first viable hash;
-    - restore that viable hash and expiry only when the parent mirror still
-      equals this failed token hash; and
-    - separately rewire direct successor rollback metadata. If this reconciliation
-      exhausts its bounded retries, strict audit records the unresolved work;
-      the rejected child and parent mirror are already fail closed.
+    - atomically retain the exact child as `REJECTED`;
+    - compare-and-swap the parent mirror from the failed hash to the persisted
+      fallback hash and expiry without predecessor traversal; and
+    - separately rewire direct successor rollback metadata. If synchronous
+      quarantine retries exhaust, enqueue an ID-only durable Inngest job keyed by
+      invitation and token IDs; the replay performs quarantine before
+      reconciliation and is convergent. Reconciliation failure cannot undo the
+      tombstone or parent restoration.
 
 The conditional restore prevents a failed send from clobbering a newer concurrent
 reminder. If post-send telemetry or counter persistence fails, the already-staged
@@ -230,7 +243,11 @@ Manual **Resend** remains outside Jeff #65:
   preservation does not grant all future manual-Resend links a stable-link
   guarantee.
 
-No email copy, route response shape, UI, or resend counter semantics are changed.
+No email copy, UI component, or resend counter semantics are changed. A partial
+batch 503 extends its JSON body and human-readable `error` with sent/skipped/failed
+counts, completed and remaining identifiers, `retrySafe: false`, and an explicit
+warning not to retry the whole request. The existing caller already displays that
+error string.
 
 ## Migration and backfill
 
@@ -268,11 +285,12 @@ compatibility mirror is last-writer-wins by design because only one newest token
 can serve the legacy lookup. Child rows remain authoritative for stable-link
 behavior.
 
-A definite-rejection quarantine restores the first non-`REJECTED` predecessor
-only with a compare-and-swap predicate on the failed new hash. If a newer
-reminder owns the mirror, quarantine leaves it untouched. A later rejection of
-that newer reminder traverses the retained tombstone chain, so it cannot restore
-an older rejected hash even if successor reconciliation previously exhausted.
+A definite-rejection quarantine restores the persisted last-known-deliverable
+fallback only with a compare-and-swap predicate on the failed new hash. If a
+newer reminder owns the mirror, quarantine leaves it untouched. Confirmed and
+uncertain transitions advance the fallback only when their child sequence is
+newer, so delayed A/B outcomes cannot regress the restore point. Parent
+restoration never depends on predecessor traversal or successor reconciliation.
 
 The available stateful Prisma-shaped tests prove these state-machine transitions
 and serialized transaction callbacks. They do not schedule independent
@@ -341,7 +359,8 @@ future migration after the rollout is proven.
 - unclassified failure marks `UNCERTAIN` and stays resolvable;
 - definite rejection retains an exact `REJECTED` tombstone;
 - compare-and-swap rollback cannot clobber a newer mirror;
-- serialized state-machine attempts capture and traverse viable predecessors;
+- serialized state-machine attempts preserve a monotonic safe fallback across
+  overlapping confirmation, uncertainty, and rejection orderings;
 - independently staged reminders create distinct valid rows;
 - shared expiry and counters update atomically; and
 - child-first lookup falls back to the parent.
@@ -354,7 +373,8 @@ future migration after the rollout is proven.
   email-chrome behavior remains;
 - flag off preserves the existing parent-only write;
 - no raw token is logged on any error; and
-- response fields remain compatible.
+- partial-failure response fields remain backward compatible while adding
+  explicit retry-safety guidance and progress identifiers.
 
 ### Exchange route
 
@@ -450,6 +470,30 @@ The composed acceptance coverage uses production invite-send, token service,
 resolver, and lifecycle-classification functions over a stateful Prisma-shaped
 fake. It proves state transitions and shared parent behavior, not PostgreSQL lock
 scheduling.
+
+## Durable quarantine correction addendum (Fix Round 2)
+
+Fix Round 1's predecessor traversal is superseded for parent restoration. The
+durable invariant is now a parent-owned last-known-deliverable fallback:
+
+- every child has an invitation-local monotonic `sequence` and paired
+  `expiresAtSnapshot`;
+- the parent persists the current sequence and its newest known-deliverable
+  hash/expiry/sequence;
+- `SENT` and `UNCERTAIN` advance that fallback only when their sequence is newer;
+- quarantine marks the exact child `REJECTED` and compare-and-swap restores the
+  persisted fallback in one transaction, without walking predecessors;
+- successor reconciliation may still simplify historical rollback metadata, but
+  it cannot change the parent restore point or roll back the tombstone; and
+- exhausted synchronous quarantine retries dispatch
+  `assessment/invitation.rejection-retry`, keyed by invitation/token IDs and
+  carrying no token or hash. The durable handler quarantines before reconciling,
+  throws on infrastructure failure for Inngest retry, and converges on replay.
+
+The outcome-order matrix covers B-confirm-then-A-confirm, A-confirm-while-B-current
+then-B-reject, and the equivalent uncertain transitions. A delayed confirmation
+after rejection is a no-op. The kill/default exchange shape remains the exact
+legacy parent-only lookup.
 
 ## Acceptance criteria
 

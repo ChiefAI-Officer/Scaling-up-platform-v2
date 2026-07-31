@@ -53,6 +53,8 @@ import {
 } from "@/lib/assessments/invite-send";
 import { waveDAutoSendEnabled } from "@/lib/assessments/wave-d-feature-flags";
 import { isStableInvitationLinksEnabled } from "@/lib/assessments/wave-j65-flags";
+import { inngest } from "@/inngest/client";
+import { STABLE_INVITATION_REJECTION_RETRY_EVENT } from "@/inngest/functions/stable-invitation-rejection-retry-event";
 
 const InviteBodySchema = z.object({
   respondentIds: z.array(z.string().min(1)).optional(),
@@ -261,6 +263,13 @@ export async function POST(
                     coalesceVerification: true,
                   }),
                 stableTokens: createStableOriginalTokenAdapter(db),
+                enqueueRejectedQuarantineRetry: async (input) => {
+                  await inngest.send({
+                    id: `stable-invitation-rejection-${input.tokenId}`,
+                    name: STABLE_INVITATION_REJECTION_RETRY_EVENT,
+                    data: input,
+                  });
+                },
                 persistRejectedCleanupAudit: (input) =>
                   logAuditStrict({
                     entityType: "AssessmentInvitationToken",

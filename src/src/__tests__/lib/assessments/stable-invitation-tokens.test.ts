@@ -3,7 +3,9 @@ import {
   confirmStableInvitationToken,
   markStableInvitationTokenUncertain,
   quarantineRejectedStableInvitationToken,
+  quarantineRejectedStableInvitationTokenById,
   reconcileRejectedStableInvitationToken,
+  reconcileRejectedStableInvitationTokenById,
   registerNewOriginalToken,
   removeRegisteredStableInvitationToken,
   resolveInvitationByStableTokenHash,
@@ -22,6 +24,7 @@ const LEGACY_HASH = "f".repeat(64);
 const ATTEMPT_A_HASH = "1".repeat(64);
 const ATTEMPT_B_HASH = "2".repeat(64);
 const ATTEMPT_C_HASH = "3".repeat(64);
+const SAFE_FALLBACK_HASH = "4".repeat(64);
 
 const INVITATION_WITH_CAMPAIGN = {
   id: "inv-1",
@@ -53,6 +56,8 @@ interface HarnessToken {
   id: string;
   invitationId: string;
   tokenHash: string;
+  sequence: number;
+  expiresAtSnapshot: Date;
   source: HarnessTokenSource;
   deliveryState: HarnessDeliveryState;
   deliveryConfirmedAt: Date | null;
@@ -65,6 +70,10 @@ function buildStatefulTokenDb() {
     id: "inv-1",
     tokenHash: OLD_HASH,
     expiresAt: new Date("2026-10-01T00:00:00Z"),
+    stableTokenSequence: 0,
+    stableFallbackTokenHash: OLD_HASH,
+    stableFallbackExpiresAt: new Date("2026-10-01T00:00:00Z"),
+    stableFallbackTokenSequence: 0,
     status: "SENT" as const,
     sentAt: new Date("2026-09-01T00:00:00Z"),
     resentCount: 0,
@@ -134,6 +143,10 @@ function buildStatefulTokenDb() {
       findUniqueOrThrow: jest.fn().mockImplementation(async () => ({
         tokenHash: parent.tokenHash,
         expiresAt: parent.expiresAt,
+        stableTokenSequence: parent.stableTokenSequence,
+        stableFallbackTokenHash: parent.stableFallbackTokenHash,
+        stableFallbackExpiresAt: parent.stableFallbackExpiresAt,
+        stableFallbackTokenSequence: parent.stableFallbackTokenSequence,
         status: parent.status,
         sentAt: parent.sentAt,
       })),
@@ -142,6 +155,10 @@ function buildStatefulTokenDb() {
           data: {
             tokenHash?: string;
             expiresAt?: Date;
+            stableTokenSequence?: number;
+            stableFallbackTokenHash?: string;
+            stableFallbackExpiresAt?: Date;
+            stableFallbackTokenSequence?: number;
             resentCount?: { increment: number };
             lastResentAt?: Date;
           };
@@ -151,6 +168,21 @@ function buildStatefulTokenDb() {
           }
           if (args.data.expiresAt !== undefined) {
             parent.expiresAt = args.data.expiresAt;
+          }
+          if (args.data.stableTokenSequence !== undefined) {
+            parent.stableTokenSequence = args.data.stableTokenSequence;
+          }
+          if (args.data.stableFallbackTokenHash !== undefined) {
+            parent.stableFallbackTokenHash =
+              args.data.stableFallbackTokenHash;
+          }
+          if (args.data.stableFallbackExpiresAt !== undefined) {
+            parent.stableFallbackExpiresAt =
+              args.data.stableFallbackExpiresAt;
+          }
+          if (args.data.stableFallbackTokenSequence !== undefined) {
+            parent.stableFallbackTokenSequence =
+              args.data.stableFallbackTokenSequence;
           }
           if (args.data.resentCount !== undefined) {
             parent.resentCount += args.data.resentCount.increment;
@@ -163,17 +195,41 @@ function buildStatefulTokenDb() {
       ),
       updateMany: jest.fn().mockImplementation(
         async (args: {
-          where: { id: string; tokenHash: string };
-          data: { tokenHash: string; expiresAt: Date };
+          where: {
+            id: string;
+            tokenHash?: string;
+            stableFallbackTokenSequence?: { lt: number };
+            OR?: Array<
+              | { stableFallbackTokenHash: null }
+              | { stableFallbackTokenSequence: { lt: number } }
+            >;
+          };
+          data: {
+            tokenHash?: string;
+            expiresAt?: Date;
+            stableFallbackTokenHash?: string;
+            stableFallbackExpiresAt?: Date;
+            stableFallbackTokenSequence?: number;
+          };
         }) => {
           if (
             args.where.id !== parent.id ||
-            args.where.tokenHash !== parent.tokenHash
+            (args.where.tokenHash !== undefined &&
+              args.where.tokenHash !== parent.tokenHash) ||
+            (args.where.stableFallbackTokenSequence !== undefined &&
+              parent.stableFallbackTokenSequence >=
+                args.where.stableFallbackTokenSequence.lt) ||
+            (args.where.OR !== undefined &&
+              !args.where.OR.some((condition) =>
+                "stableFallbackTokenHash" in condition
+                  ? parent.stableFallbackTokenHash === null
+                  : parent.stableFallbackTokenSequence <
+                    condition.stableFallbackTokenSequence.lt,
+              ))
           ) {
             return { count: 0 };
           }
-          parent.tokenHash = args.data.tokenHash;
-          parent.expiresAt = args.data.expiresAt;
+          Object.assign(parent, args.data);
           return { count: 1 };
         },
       ),
@@ -188,10 +244,12 @@ function buildStatefulTokenDb() {
       upsert: jest.fn().mockImplementation(
         async (args: {
           where: { tokenHash: string };
-          create: Omit<HarnessToken, "id" | "deliveryConfirmedAt" | "previousTokenHash" | "previousExpiresAt"> & {
+          create: Omit<HarnessToken, "id" | "deliveryConfirmedAt" | "previousTokenHash" | "previousExpiresAt" | "sequence" | "expiresAtSnapshot"> & {
             deliveryConfirmedAt?: Date | null;
             previousTokenHash?: string | null;
             previousExpiresAt?: Date | null;
+            sequence?: number;
+            expiresAtSnapshot?: Date;
           };
         }) => {
           const existing = findToken(args.where);
@@ -201,6 +259,8 @@ function buildStatefulTokenDb() {
             deliveryConfirmedAt: null,
             previousTokenHash: null,
             previousExpiresAt: null,
+            sequence: 0,
+            expiresAtSnapshot: parent.expiresAt,
             ...args.create,
           };
           tokens.push(created);
@@ -209,10 +269,12 @@ function buildStatefulTokenDb() {
       ),
       create: jest.fn().mockImplementation(
         async (args: {
-          data: Omit<HarnessToken, "id" | "deliveryConfirmedAt" | "previousTokenHash" | "previousExpiresAt"> & {
+          data: Omit<HarnessToken, "id" | "deliveryConfirmedAt" | "previousTokenHash" | "previousExpiresAt" | "sequence" | "expiresAtSnapshot"> & {
             deliveryConfirmedAt?: Date | null;
             previousTokenHash?: string | null;
             previousExpiresAt?: Date | null;
+            sequence?: number;
+            expiresAtSnapshot?: Date;
           };
         }) => {
           const created: HarnessToken = {
@@ -220,6 +282,8 @@ function buildStatefulTokenDb() {
             deliveryConfirmedAt: null,
             previousTokenHash: null,
             previousExpiresAt: null,
+            sequence: 0,
+            expiresAtSnapshot: parent.expiresAt,
             ...args.data,
           };
           tokens.push(created);
@@ -308,6 +372,7 @@ describe("stable invitation tokens", () => {
       registerNewOriginalToken(db, {
         invitationId: "inv-1",
         tokenHash: "not-a-sha-256-hash",
+        expiresAt: new Date("2026-12-01T00:00:00Z"),
       }),
     ).rejects.toThrow("SHA-256");
     await expect(
@@ -341,13 +406,23 @@ describe("stable invitation tokens", () => {
         findUniqueOrThrow: jest.fn().mockResolvedValue({
           tokenHash: OLD_HASH,
           expiresAt: previousExpiresAt,
+          stableTokenSequence: 0,
+          stableFallbackTokenHash: OLD_HASH,
+          stableFallbackExpiresAt: previousExpiresAt,
+          stableFallbackTokenSequence: 0,
           status: "SENT",
           sentAt: new Date("2026-09-01T00:00:00Z"),
         }),
         update: jest.fn().mockResolvedValue({ id: "inv-1" }),
       },
       assessmentInvitationToken: {
-        upsert: jest.fn().mockResolvedValue({ id: "legacy-token" }),
+        upsert: jest.fn().mockResolvedValue({
+          invitationId: "inv-1",
+          tokenHash: OLD_HASH,
+          sequence: 0,
+          expiresAtSnapshot: previousExpiresAt,
+          deliveryState: "SENT",
+        }),
         create: jest.fn().mockResolvedValue({ id: "new-token" }),
       },
     };
@@ -381,6 +456,10 @@ describe("stable invitation tokens", () => {
       select: {
         tokenHash: true,
         expiresAt: true,
+        stableTokenSequence: true,
+        stableFallbackTokenHash: true,
+        stableFallbackExpiresAt: true,
+        stableFallbackTokenSequence: true,
         status: true,
         sentAt: true,
       },
@@ -394,6 +473,8 @@ describe("stable invitation tokens", () => {
         create: expect.objectContaining({
           invitationId: "inv-1",
           tokenHash: OLD_HASH,
+          sequence: 0,
+          expiresAtSnapshot: previousExpiresAt,
           source: "LEGACY_CURRENT",
           deliveryState: "SENT",
         }),
@@ -403,6 +484,8 @@ describe("stable invitation tokens", () => {
       data: {
         invitationId: "inv-1",
         tokenHash: NEW_HASH,
+        sequence: 1,
+        expiresAtSnapshot: expiresAt,
         source: "REMINDER",
         deliveryState: "STAGED",
         previousTokenHash: OLD_HASH,
@@ -412,7 +495,14 @@ describe("stable invitation tokens", () => {
     });
     expect(tx.assessmentInvitation.update).toHaveBeenCalledWith({
       where: { id: "inv-1" },
-      data: { tokenHash: NEW_HASH, expiresAt },
+      data: {
+        tokenHash: NEW_HASH,
+        expiresAt,
+        stableTokenSequence: 1,
+        stableFallbackTokenHash: OLD_HASH,
+        stableFallbackExpiresAt: previousExpiresAt,
+        stableFallbackTokenSequence: 0,
+      },
       select: { id: true },
     });
     expect(staged).toEqual({
@@ -432,6 +522,9 @@ describe("stable invitation tokens", () => {
         findUnique: jest.fn().mockResolvedValue({
           id: "token-1",
           invitationId: "inv-1",
+          tokenHash: NEW_HASH,
+          sequence: 1,
+          expiresAtSnapshot: new Date("2026-12-01T00:00:00Z"),
           source: "REMINDER",
           deliveryState: "STAGED",
         }),
@@ -439,6 +532,7 @@ describe("stable invitation tokens", () => {
       },
       assessmentInvitation: {
         update: jest.fn().mockResolvedValue({ id: "inv-1" }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
     };
     const db = {
@@ -487,6 +581,9 @@ describe("stable invitation tokens", () => {
         findUnique: jest.fn().mockResolvedValue({
           id: "token-1",
           invitationId: "inv-1",
+          tokenHash: NEW_HASH,
+          sequence: 1,
+          expiresAtSnapshot: new Date("2026-12-01T00:00:00Z"),
           source: "ORIGINAL",
           deliveryState: "STAGED",
         }),
@@ -494,6 +591,7 @@ describe("stable invitation tokens", () => {
       },
       assessmentInvitation: {
         update: jest.fn().mockResolvedValue({ id: "inv-1" }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
     };
     const db = {
@@ -517,17 +615,20 @@ describe("stable invitation tokens", () => {
   });
 
   test("an ambiguous send outcome marks the staged child uncertain", async () => {
-    const updateMany = jest.fn().mockResolvedValue({ count: 1 });
-    const db = {
-      assessmentInvitationToken: { updateMany },
-    } as unknown as StableTokenDb;
-
-    await markStableInvitationTokenUncertain(db, "token-1");
-
-    expect(updateMany).toHaveBeenCalledWith({
-      where: { id: "token-1", deliveryState: "STAGED" },
-      data: { deliveryState: "UNCERTAIN" },
+    const harness = buildStatefulTokenDb();
+    const staged = await stageStableInvitationToken(harness.db, {
+      invitationId: "inv-1",
+      newTokenHash: NEW_HASH,
+      expiresAt: new Date("2026-12-01T00:00:00Z"),
+      source: "ORIGINAL",
     });
+
+    await markStableInvitationTokenUncertain(harness.db, staged.tokenId);
+
+    expect(
+      harness.tokens.find((token) => token.id === staged.tokenId),
+    ).toMatchObject({ deliveryState: "UNCERTAIN" });
+    expect(harness.parent.stableFallbackTokenHash).toBe(NEW_HASH);
   });
 
   test("an unclassified send error is uncertain", () => {
@@ -647,28 +748,31 @@ describe("stable invitation tokens", () => {
     },
   );
 
-  test("rejecting a staged token retains a tombstone and restores the parent with compare-and-swap", async () => {
+  test("quarantine commits the tombstone and restores the safe parent without predecessor traversal", async () => {
+    const safeFallbackExpiresAt = new Date("2026-09-15T00:00:00Z");
     const tx = {
       $executeRaw: jest.fn().mockResolvedValue(1),
       assessmentInvitationToken: {
-        findUnique: jest
-          .fn()
-          .mockResolvedValueOnce({
-            id: "token-1",
-            invitationId: "inv-1",
-            tokenHash: NEW_HASH,
-            source: "REMINDER",
-            deliveryState: "STAGED",
-            previousTokenHash: OLD_HASH,
-            previousExpiresAt: new Date("2026-10-01T00:00:00Z"),
-          })
-          .mockResolvedValueOnce(null),
+        findUnique: jest.fn().mockResolvedValue({
+          id: "token-1",
+          invitationId: "inv-1",
+          tokenHash: NEW_HASH,
+          source: "REMINDER",
+          deliveryState: "STAGED",
+          previousTokenHash: OLD_HASH,
+          previousExpiresAt: new Date("2026-10-01T00:00:00Z"),
+        }),
         updateMany: jest
           .fn()
           .mockResolvedValueOnce({ count: 1 })
           .mockResolvedValueOnce({ count: 0 }),
       },
       assessmentInvitation: {
+        findUniqueOrThrow: jest.fn().mockResolvedValue({
+          tokenHash: NEW_HASH,
+          stableFallbackTokenHash: SAFE_FALLBACK_HASH,
+          stableFallbackExpiresAt: safeFallbackExpiresAt,
+        }),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
     };
@@ -706,8 +810,12 @@ describe("stable invitation tokens", () => {
     expect(tx.assessmentInvitationToken.updateMany).toHaveBeenCalledTimes(1);
     expect(tx.assessmentInvitation.updateMany).toHaveBeenCalledWith({
       where: { id: "inv-1", tokenHash: NEW_HASH },
-      data: { tokenHash: OLD_HASH, expiresAt: previousExpiresAt },
+      data: {
+        tokenHash: SAFE_FALLBACK_HASH,
+        expiresAt: safeFallbackExpiresAt,
+      },
     });
+    expect(tx.assessmentInvitationToken.findUnique).toHaveBeenCalledTimes(1);
     expect(db.$transaction).toHaveBeenCalledTimes(1);
   });
 
@@ -731,6 +839,10 @@ describe("stable invitation tokens", () => {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       assessmentInvitation: {
+        findUniqueOrThrow: jest.fn().mockResolvedValue({
+          stableFallbackTokenHash: OLD_HASH,
+          stableFallbackExpiresAt: previousExpiresAt,
+        }),
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
     };
@@ -785,6 +897,10 @@ describe("stable invitation tokens", () => {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       assessmentInvitation: {
+        findUniqueOrThrow: jest.fn().mockResolvedValue({
+          stableFallbackTokenHash: OLD_HASH,
+          stableFallbackExpiresAt: previousExpiresAt,
+        }),
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),
         update: overwriteNewerMirror,
       },
@@ -987,6 +1103,175 @@ describe("stable invitation tokens", () => {
     ).toHaveLength(2);
   });
 
+  test("out-of-order B then A confirmations retain newer B as the safe fallback", async () => {
+    const harness = buildStatefulTokenDb();
+    const a = await stageStableInvitationToken(harness.db, {
+      invitationId: "inv-1",
+      newTokenHash: ATTEMPT_A_HASH,
+      expiresAt: new Date("2026-11-01T00:00:00Z"),
+      source: "REMINDER",
+    });
+    const b = await stageStableInvitationToken(harness.db, {
+      invitationId: "inv-1",
+      newTokenHash: ATTEMPT_B_HASH,
+      expiresAt: new Date("2026-12-01T00:00:00Z"),
+      source: "REMINDER",
+    });
+
+    await confirmStableInvitationToken(harness.db, {
+      tokenId: b.tokenId,
+      invitationId: "inv-1",
+      confirmedAt: new Date("2026-10-16T00:00:00Z"),
+      reminder: true,
+    });
+    await confirmStableInvitationToken(harness.db, {
+      tokenId: a.tokenId,
+      invitationId: "inv-1",
+      confirmedAt: new Date("2026-10-17T00:00:00Z"),
+      reminder: true,
+    });
+
+    expect(harness.parent.stableFallbackTokenHash).toBe(ATTEMPT_B_HASH);
+    expect(harness.parent.stableFallbackExpiresAt).toEqual(
+      new Date("2026-12-01T00:00:00Z"),
+    );
+    expect(harness.parent.stableFallbackTokenSequence).toBe(2);
+  });
+
+  test("A confirmation followed by B rejection restores confirmed A from the safe fallback", async () => {
+    const harness = buildStatefulTokenDb();
+    const a = await stageStableInvitationToken(harness.db, {
+      invitationId: "inv-1",
+      newTokenHash: ATTEMPT_A_HASH,
+      expiresAt: new Date("2026-11-01T00:00:00Z"),
+      source: "REMINDER",
+    });
+    const b = await stageStableInvitationToken(harness.db, {
+      invitationId: "inv-1",
+      newTokenHash: ATTEMPT_B_HASH,
+      expiresAt: new Date("2026-12-01T00:00:00Z"),
+      source: "REMINDER",
+    });
+
+    await confirmStableInvitationToken(harness.db, {
+      tokenId: a.tokenId,
+      invitationId: "inv-1",
+      confirmedAt: new Date("2026-10-16T00:00:00Z"),
+      reminder: true,
+    });
+    await quarantineRejectedStableInvitationToken(harness.db, b);
+
+    expect(harness.parent.tokenHash).toBe(ATTEMPT_A_HASH);
+    expect(harness.parent.expiresAt).toEqual(
+      new Date("2026-11-01T00:00:00Z"),
+    );
+  });
+
+  test("out-of-order B then A uncertain transitions retain newer B as the safe fallback", async () => {
+    const harness = buildStatefulTokenDb();
+    const a = await stageStableInvitationToken(harness.db, {
+      invitationId: "inv-1",
+      newTokenHash: ATTEMPT_A_HASH,
+      expiresAt: new Date("2026-11-01T00:00:00Z"),
+      source: "ORIGINAL",
+    });
+    const b = await stageStableInvitationToken(harness.db, {
+      invitationId: "inv-1",
+      newTokenHash: ATTEMPT_B_HASH,
+      expiresAt: new Date("2026-12-01T00:00:00Z"),
+      source: "ORIGINAL",
+    });
+
+    await markStableInvitationTokenUncertain(harness.db, b.tokenId);
+    await markStableInvitationTokenUncertain(harness.db, a.tokenId);
+
+    expect(harness.parent.stableFallbackTokenHash).toBe(ATTEMPT_B_HASH);
+    expect(harness.parent.stableFallbackTokenSequence).toBe(2);
+  });
+
+  test("A uncertain transition followed by B rejection restores uncertain A", async () => {
+    const harness = buildStatefulTokenDb();
+    const a = await stageStableInvitationToken(harness.db, {
+      invitationId: "inv-1",
+      newTokenHash: ATTEMPT_A_HASH,
+      expiresAt: new Date("2026-11-01T00:00:00Z"),
+      source: "ORIGINAL",
+    });
+    const b = await stageStableInvitationToken(harness.db, {
+      invitationId: "inv-1",
+      newTokenHash: ATTEMPT_B_HASH,
+      expiresAt: new Date("2026-12-01T00:00:00Z"),
+      source: "ORIGINAL",
+    });
+
+    await markStableInvitationTokenUncertain(harness.db, a.tokenId);
+    await quarantineRejectedStableInvitationToken(harness.db, b);
+
+    expect(harness.parent.tokenHash).toBe(ATTEMPT_A_HASH);
+    expect(harness.parent.expiresAt).toEqual(
+      new Date("2026-11-01T00:00:00Z"),
+    );
+  });
+
+  test("durable identifier-only retry converges after the initial quarantine transaction fails", async () => {
+    const harness = buildStatefulTokenDb();
+    const staged = await stageStableInvitationToken(harness.db, {
+      invitationId: "inv-1",
+      newTokenHash: ATTEMPT_A_HASH,
+      expiresAt: new Date("2026-11-01T00:00:00Z"),
+      source: "REMINDER",
+    });
+    jest
+      .mocked(harness.db.$transaction)
+      .mockRejectedValueOnce(new Error("database unavailable"));
+
+    await expect(
+      quarantineRejectedStableInvitationToken(harness.db, staged),
+    ).rejects.toThrow("database unavailable");
+    expect(
+      harness.tokens.find((token) => token.id === staged.tokenId),
+    ).toMatchObject({ deliveryState: "STAGED" });
+
+    await quarantineRejectedStableInvitationTokenById(harness.db, {
+      invitationId: staged.invitationId,
+      tokenId: staged.tokenId,
+    });
+    await reconcileRejectedStableInvitationTokenById(harness.db, {
+      invitationId: staged.invitationId,
+      tokenId: staged.tokenId,
+    });
+
+    expect(
+      harness.tokens.find((token) => token.id === staged.tokenId),
+    ).toMatchObject({ deliveryState: "REJECTED" });
+    expect(harness.parent.tokenHash).toBe(OLD_HASH);
+    expect(harness.parent.tokenHash).not.toBe(ATTEMPT_A_HASH);
+  });
+
+  test("a delayed confirmation cannot revive a quarantined credential or advance fallback", async () => {
+    const harness = buildStatefulTokenDb();
+    const staged = await stageStableInvitationToken(harness.db, {
+      invitationId: "inv-1",
+      newTokenHash: ATTEMPT_A_HASH,
+      expiresAt: new Date("2026-11-01T00:00:00Z"),
+      source: "REMINDER",
+    });
+
+    await quarantineRejectedStableInvitationToken(harness.db, staged);
+    await confirmStableInvitationToken(harness.db, {
+      tokenId: staged.tokenId,
+      invitationId: staged.invitationId,
+      confirmedAt: new Date("2026-10-20T00:00:00Z"),
+      reminder: true,
+    });
+
+    expect(
+      harness.tokens.find((token) => token.id === staged.tokenId),
+    ).toMatchObject({ deliveryState: "REJECTED" });
+    expect(harness.parent.stableFallbackTokenHash).toBe(OLD_HASH);
+    expect(harness.parent.resentCount).toBe(0);
+  });
+
   test("out-of-order A/B/C state-machine rejection never restores a tombstoned predecessor hash", async () => {
     const harness = buildStatefulTokenDb();
     const attempts = [
@@ -1101,7 +1386,7 @@ describe("stable invitation tokens", () => {
 
       const survivingAttempt = attempts[secondRejected];
       expect(harness.parent.tokenHash).toBe(
-        survivingAttempt.newTokenHash,
+        firstRejected === 0 ? ATTEMPT_B_HASH : OLD_HASH,
       );
       expect(
         harness.tokens.find(
@@ -1258,10 +1543,13 @@ describe("stable invitation tokens", () => {
   });
 
   test("registering a new original token creates an idempotent staged child", async () => {
+    const expiresAt = new Date("2026-12-01T00:00:00Z");
     const upsert = jest.fn().mockResolvedValue({
       id: "token-1",
       invitationId: "inv-1",
       tokenHash: ORIGINAL_HASH,
+      sequence: 0,
+      expiresAtSnapshot: expiresAt,
       source: "ORIGINAL",
       deliveryState: "STAGED",
     });
@@ -1272,6 +1560,7 @@ describe("stable invitation tokens", () => {
     const registered = await registerNewOriginalToken(db, {
       invitationId: "inv-1",
       tokenHash: ORIGINAL_HASH,
+      expiresAt,
     });
 
     expect(upsert).toHaveBeenCalledWith({
@@ -1279,6 +1568,8 @@ describe("stable invitation tokens", () => {
       create: {
         invitationId: "inv-1",
         tokenHash: ORIGINAL_HASH,
+        sequence: 0,
+        expiresAtSnapshot: expiresAt,
         source: "ORIGINAL",
         deliveryState: "STAGED",
       },
@@ -1287,6 +1578,8 @@ describe("stable invitation tokens", () => {
         id: true,
         invitationId: true,
         tokenHash: true,
+        sequence: true,
+        expiresAtSnapshot: true,
         source: true,
         deliveryState: true,
       },
@@ -1304,6 +1597,8 @@ describe("stable invitation tokens", () => {
         id: "conflicting-token",
         invitationId,
         tokenHash: ORIGINAL_HASH,
+        sequence: 0,
+        expiresAtSnapshot: new Date("2026-12-01T00:00:00Z"),
         source,
         deliveryState: "STAGED",
       });
@@ -1315,6 +1610,7 @@ describe("stable invitation tokens", () => {
         registerNewOriginalToken(db, {
           invitationId: "inv-1",
           tokenHash: ORIGINAL_HASH,
+          expiresAt: new Date("2026-12-01T00:00:00Z"),
         }),
       ).rejects.toThrow("registration conflict");
     },

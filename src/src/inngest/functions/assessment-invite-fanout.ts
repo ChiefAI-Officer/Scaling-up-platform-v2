@@ -74,6 +74,7 @@ import {
 } from "@/lib/assessments/wave-d-feature-flags";
 import { isStableInvitationLinksEnabled } from "@/lib/assessments/wave-j65-flags";
 import { ASSESSMENT_SEND_INVITES_EVENT } from "./assessment-invite-fanout-event";
+import { STABLE_INVITATION_REJECTION_RETRY_EVENT } from "./stable-invitation-rejection-retry-event";
 
 // ---------------------------------------------------------------------------
 // Event
@@ -158,6 +159,9 @@ export interface InviteFanoutDeps {
   stableTokens: StableOriginalTokenAdapter;
   persistRejectedCleanupAudit: (
     input: RejectedCleanupAuditInput,
+  ) => Promise<void>;
+  enqueueRejectedQuarantineRetry: (
+    input: { invitationId: string; tokenId: string },
   ) => Promise<void>;
   isStableLinksEnabled: (campaignAlias?: string) => boolean;
   /** Shared per-recipient create+send (injected so tests can stub it). */
@@ -419,6 +423,8 @@ export async function runInviteFanout(
                 stableTokens: deps.stableTokens,
                 persistRejectedCleanupAudit:
                   deps.persistRejectedCleanupAudit,
+                enqueueRejectedQuarantineRetry:
+                  deps.enqueueRejectedQuarantineRetry,
               }
             : {}),
         },
@@ -561,6 +567,13 @@ export const assessmentInviteFanout = inngest.createFunction(
             coalesceVerification: true,
           }),
         stableTokens: createStableOriginalTokenAdapter(db),
+        enqueueRejectedQuarantineRetry: async (input) => {
+          await inngest.send({
+            id: `stable-invitation-rejection-${input.tokenId}`,
+            name: STABLE_INVITATION_REJECTION_RETRY_EVENT,
+            data: input,
+          });
+        },
         persistRejectedCleanupAudit: (input) =>
           logAuditStrict({
             entityType: "AssessmentInvitationToken",

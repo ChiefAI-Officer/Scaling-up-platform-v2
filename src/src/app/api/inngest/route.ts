@@ -16,6 +16,7 @@ import {
 import { assessmentInviteFanout } from "@/inngest/functions/assessment-invite-fanout";
 import { assessmentScheduledSendCron } from "@/inngest/functions/assessment-scheduled-send-cron";
 import { espertoImportAlertCron } from "@/inngest/functions/esperto-import-alert-cron";
+import { stableInvitationRejectionRetry } from "@/inngest/functions/stable-invitation-rejection-retry";
 
 export const { GET, POST, PUT } = serve({
     client: inngest,
@@ -34,5 +35,6 @@ export const { GET, POST, PUT } = serve({
         assessmentInviteFanout,
         assessmentScheduledSendCron,
         espertoImportAlertCron,
+        stableInvitationRejectionRetry,
     ],
 });

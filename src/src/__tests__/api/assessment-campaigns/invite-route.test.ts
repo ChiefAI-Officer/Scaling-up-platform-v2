@@ -44,6 +44,10 @@ jest.mock("@/lib/rate-limit", () => ({
   withRateLimit: jest.fn().mockResolvedValue({ allowed: true, headers: {} }),
 }));
 
+jest.mock("@/inngest/client", () => ({
+  inngest: { send: jest.fn().mockResolvedValue(undefined) },
+}));
+
 jest.mock("@/services/notifications", () => {
   const sendAssessmentInvitationEmail = jest.fn();
   return {
@@ -100,6 +104,7 @@ import {
   sendAssessmentInvitationEmail,
 } from "@/services/notifications";
 import { isStableInvitationLinksEnabled } from "@/lib/assessments/wave-j65-flags";
+import { inngest } from "@/inngest/client";
 import {
   confirmStableInvitationToken,
   quarantineRejectedStableInvitationToken,
@@ -274,6 +279,7 @@ beforeEach(() => {
   (removeRegisteredStableInvitationToken as jest.Mock).mockResolvedValue(
     undefined,
   );
+  jest.mocked(inngest.send).mockResolvedValue({ ids: ["retry-event"] });
 });
 
 describe("POST /api/assessment-campaigns/[id]/invite", () => {

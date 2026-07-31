@@ -4,7 +4,7 @@
 
 **Goal:** Preserve every original invitation and bulk-reminder link until the shared invitation reaches an existing terminal lifecycle gate.
 
-**Architecture:** Add an additive `AssessmentInvitationToken` child table while retaining `AssessmentInvitation.tokenHash` as the newest-token rollback mirror. A focused token service owns row locking, promotion, staging, delivery state, rollback, and child-first resolution; the existing invitation, reminder, and exchange paths call it only when the Jeff #65 flag is enabled.
+**Architecture:** Add an additive `AssessmentInvitationToken` child table while retaining `AssessmentInvitation.tokenHash` as the newest-token compatibility mirror. The parent also persists the last-known-deliverable hash, expiry, and monotonic sequence independently of predecessor traversal. A focused token service owns row locking, promotion, staging, delivery state, quarantine, and child-first resolution; the existing invitation, reminder, and exchange paths call it only when the Jeff #65 flag is enabled.
 
 **Tech Stack:** Next.js 16 App Router, TypeScript 5, Prisma 5/PostgreSQL, Jest 30, Nodemailer SMTP, existing assessment feature-flag conventions.
 
@@ -17,6 +17,9 @@
 - Flag off and kill must retain the current parent-only runtime path.
 - Manual **Resend** remains parent-only and works through enabled exchange fallback.
 - No UI, email copy, email chrome, public-assessment, expiry-policy, or batch-cap changes.
+- Partial reminder failures extend the existing 503 JSON error with a visible
+  do-not-retry warning, completed/remaining identifiers, and `retrySafe: false`;
+  the existing caller surfaces `body.error`, so no UI component change is needed.
 - Every implementation slice follows red → green TDD at the approved public seams.
 
 ## File map
@@ -163,7 +166,8 @@ type AssessmentInvitationTokenSource =
 type AssessmentInvitationTokenDeliveryState =
   | "STAGED"
   | "SENT"
-  | "UNCERTAIN";
+  | "UNCERTAIN"
+  | "REJECTED";
 ```
 
 - [ ] **Step 1: Write the failing migration contract**
@@ -199,6 +203,8 @@ model AssessmentInvitationToken {
   id                  String                                 @id @default(cuid())
   invitationId        String
   tokenHash           String                                 @unique
+  sequence            Int
+  expiresAtSnapshot   DateTime
   source              AssessmentInvitationTokenSource
   deliveryState       AssessmentInvitationTokenDeliveryState
   deliveryConfirmedAt DateTime?
@@ -208,6 +214,7 @@ model AssessmentInvitationToken {
   invitation AssessmentInvitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
 
   @@index([invitationId])
+  @@unique([invitationId, sequence])
   @@map("assessment_invitation_tokens")
 }
 
@@ -221,8 +228,14 @@ enum AssessmentInvitationTokenDeliveryState {
   STAGED
   SENT
   UNCERTAIN
+  REJECTED
 }
 ```
+
+Add `stableTokenSequence`, `stableFallbackTokenHash`,
+`stableFallbackExpiresAt`, and `stableFallbackTokenSequence` to the parent.
+The migration initializes the safe fallback from the existing parent hash and
+expiry and initializes the backfilled child at sequence zero.
 
 - [ ] **Step 4: Write the additive SQL and truthful backfill**
 
@@ -328,7 +341,7 @@ export async function stageStableInvitationToken(
 
 export async function registerNewOriginalToken(
   db: StableTokenDb,
-  input: { invitationId: string; tokenHash: string },
+  input: { invitationId: string; tokenHash: string; expiresAt: Date },
 ): Promise<{ tokenId: string }>;
 
 export async function confirmStableInvitationToken(
@@ -633,6 +646,7 @@ stableTokens?: {
   registerOriginal(input: {
     invitationId: string;
     tokenHash: string;
+    expiresAt: Date;
   }): Promise<{ tokenId: string }>;
   confirm(input: {
     tokenId: string;
@@ -674,20 +688,23 @@ npx jest src/__tests__/lib/invite-send.test.ts --runInBand
 Before email:
 
 - require the adapter when `stableLinksEnabled` is true;
-- for a new parent row, register its current hash as `ORIGINAL/STAGED`;
+- for a new parent row, initialize a never-delivered parent fallback, then stage
+  its deliverable hash as `ORIGINAL/STAGED`;
 - for an existing `PENDING` row, call `stageExistingOriginal` instead of the
   legacy direct re-key so the locked previous hash is promoted before the parent
   mirror changes;
 - on success confirm it;
 - on an unclassified send exception mark it uncertain;
-- on a classified 5xx rejection roll back the staged existing token, or remove
-  the newly registered child through `removeRegistered` when there was no
-  predecessor; and
+- on a classified 5xx rejection durably quarantine the exact child as
+  `REJECTED`, compare-and-swap the parent mirror to its persisted safe fallback,
+  and enqueue an ID-only durable Inngest retry if synchronous quarantine retries
+  exhaust; and
 - leave the existing disabled code path and result shape unchanged.
 
-The raw token never reaches logs. A rejected new-parent hash may remain in the
-legacy parent mirror, but no recipient possesses its raw token; enabled exchange
-has no child for it and the next retry replaces it.
+The raw token never reaches logs, event payloads, or audits. Success and uncertain
+delivery advance the parent fallback only when their child sequence is newer, so
+delayed confirmations cannot regress the safe restore point. Exact rejected
+children fail closed.
 
 - [ ] **Step 4: Verify invite-send GREEN**
 

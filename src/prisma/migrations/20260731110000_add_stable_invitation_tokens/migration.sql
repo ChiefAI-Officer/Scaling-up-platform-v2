@@ -5,10 +5,23 @@ CREATE TYPE "AssessmentInvitationTokenSource" AS ENUM ('LEGACY_CURRENT', 'ORIGIN
 
 CREATE TYPE "AssessmentInvitationTokenDeliveryState" AS ENUM ('STAGED', 'SENT', 'UNCERTAIN', 'REJECTED');
 
+ALTER TABLE "assessment_invitations"
+  ADD COLUMN "stableTokenSequence" INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN "stableFallbackTokenHash" TEXT,
+  ADD COLUMN "stableFallbackExpiresAt" TIMESTAMP(3),
+  ADD COLUMN "stableFallbackTokenSequence" INTEGER NOT NULL DEFAULT 0;
+
+UPDATE "assessment_invitations"
+SET
+  "stableFallbackTokenHash" = "tokenHash",
+  "stableFallbackExpiresAt" = "expiresAt";
+
 CREATE TABLE "assessment_invitation_tokens" (
     "id" TEXT NOT NULL,
     "invitationId" TEXT NOT NULL,
     "tokenHash" TEXT NOT NULL,
+    "sequence" INTEGER NOT NULL,
+    "expiresAtSnapshot" TIMESTAMP(3) NOT NULL,
     "source" "AssessmentInvitationTokenSource" NOT NULL,
     "deliveryState" "AssessmentInvitationTokenDeliveryState" NOT NULL,
     "deliveryConfirmedAt" TIMESTAMP(3),
@@ -31,10 +44,15 @@ CREATE INDEX "assessment_invitation_tokens_invitationId_idx"
 CREATE INDEX "assessment_invitation_tokens_invitationId_previousTokenHash_idx"
   ON "assessment_invitation_tokens"("invitationId", "previousTokenHash");
 
+CREATE UNIQUE INDEX "assessment_invitation_tokens_invitationId_sequence_key"
+  ON "assessment_invitation_tokens"("invitationId", "sequence");
+
 INSERT INTO "assessment_invitation_tokens" (
     "id",
     "invitationId",
     "tokenHash",
+    "sequence",
+    "expiresAtSnapshot",
     "source",
     "deliveryState",
     "deliveryConfirmedAt",
@@ -45,6 +63,8 @@ SELECT
     'legacy_' || "id",
     "id",
     "tokenHash",
+    0,
+    "expiresAt",
     'LEGACY_CURRENT'::"AssessmentInvitationTokenSource",
     CASE
       WHEN "status" IN ('SENT', 'VIEWED', 'SUBMITTED')

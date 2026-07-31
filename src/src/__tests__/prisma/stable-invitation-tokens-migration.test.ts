@@ -24,6 +24,15 @@ describe("stable invitation tokens migration", () => {
         expect(sql).toMatch(
             /"previousTokenHash" TEXT,\s+"previousExpiresAt" TIMESTAMP\(3\),/,
         );
+        expect(sql).toMatch(
+            /ADD COLUMN "stableTokenSequence" INTEGER NOT NULL DEFAULT 0,[\s\S]*ADD COLUMN "stableFallbackTokenHash" TEXT,[\s\S]*ADD COLUMN "stableFallbackExpiresAt" TIMESTAMP\(3\),[\s\S]*ADD COLUMN "stableFallbackTokenSequence" INTEGER NOT NULL DEFAULT 0/,
+        );
+        expect(sql).toMatch(
+            /SET\s+"stableFallbackTokenHash" = "tokenHash",\s+"stableFallbackExpiresAt" = "expiresAt"/,
+        );
+        expect(sql).toMatch(
+            /"sequence" INTEGER NOT NULL,\s+"expiresAtSnapshot" TIMESTAMP\(3\) NOT NULL,/,
+        );
         expect(sql).toContain("CREATE UNIQUE INDEX");
         expect(sql).toContain('"invitationId"');
         expect(sql).toMatch(/ON DELETE CASCADE\s+ON UPDATE CASCADE/);
@@ -49,6 +58,12 @@ describe("stable invitation tokens migration", () => {
         );
         expect(sql).toMatch(
             /CREATE INDEX "assessment_invitation_tokens_invitationId_previousTokenHash_idx"\s+ON "assessment_invitation_tokens"\("invitationId", "previousTokenHash"\)/,
+        );
+        expect(sql).toMatch(
+            /CREATE UNIQUE INDEX "assessment_invitation_tokens_invitationId_sequence_key"\s+ON "assessment_invitation_tokens"\("invitationId", "sequence"\)/,
+        );
+        expect(sql).toMatch(
+            /'legacy_' \|\| "id",\s+"id",\s+"tokenHash",\s+0,\s+"expiresAt"/,
         );
     });
 });

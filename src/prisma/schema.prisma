@@ -1352,6 +1352,10 @@ model AssessmentInvitation {
   resentCount  Int                        @default(0)
   lastResentAt DateTime?
   createdAt    DateTime                   @default(now())
+  stableTokenSequence         Int       @default(0)
+  stableFallbackTokenHash     String?
+  stableFallbackExpiresAt     DateTime?
+  stableFallbackTokenSequence Int       @default(0)
 
   campaign   AssessmentCampaign    @relation(fields: [campaignId], references: [id])
   respondent OrgRespondent         @relation(fields: [respondentId], references: [id])
@@ -1366,6 +1370,8 @@ model AssessmentInvitationToken {
   id                  String                                 @id @default(cuid())
   invitationId        String
   tokenHash           String                                 @unique
+  sequence            Int
+  expiresAtSnapshot   DateTime
   source              AssessmentInvitationTokenSource
   deliveryState       AssessmentInvitationTokenDeliveryState
   deliveryConfirmedAt DateTime?
@@ -1378,6 +1384,7 @@ model AssessmentInvitationToken {
 
   @@index([invitationId])
   @@index([invitationId, previousTokenHash])
+  @@unique([invitationId, sequence])
   @@map("assessment_invitation_tokens")
 }
 

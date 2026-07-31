@@ -59,6 +59,8 @@ import {
   prepareAssessmentInvitationEmail,
   sendAssessmentInvitationEmail,
 } from "@/services/notifications";
+import { inngest } from "@/inngest/client";
+import { STABLE_INVITATION_REJECTION_RETRY_EVENT } from "@/inngest/functions/stable-invitation-rejection-retry-event";
 
 const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
 const MAX_REMINDER_BATCH = 200; // serverless/SMTP budget guard
@@ -70,6 +72,21 @@ const ReminderBodySchema = z.object({
 });
 
 type FailedEntry = { participantId: string; reason: string };
+type ReminderProgressEntry = {
+  participantId: string;
+  invitationId: string | null;
+  outcome: "sent" | "skipped" | "failed";
+};
+
+function partialBatchFailureMessage(input: {
+  sent: number;
+  skipped: number;
+  failed: number;
+  remaining: number;
+  detail: string;
+}): string {
+  return `Some reminders were already sent (${input.sent} sent, ${input.skipped} skipped, ${input.failed} failed; ${input.remaining} remaining). Do not retry the whole request. ${input.detail}.`;
+}
 
 async function quarantineRejectedWithRetry(
   staged: StagedStableToken
@@ -87,6 +104,19 @@ async function reconcileRejectedWithRetry(
     () => reconcileRejectedStableInvitationToken(db, staged),
     MAX_REJECTED_ROLLBACK_ATTEMPTS,
   );
+}
+
+async function enqueueRejectedQuarantineRetry(
+  staged: StagedStableToken,
+): Promise<void> {
+  await inngest.send({
+    id: `stable-invitation-rejection-${staged.tokenId}`,
+    name: STABLE_INVITATION_REJECTION_RETRY_EVENT,
+    data: {
+      invitationId: staged.invitationId,
+      tokenId: staged.tokenId,
+    },
+  });
 }
 
 async function persistRollbackExhaustionAuditWithRetry(input: {
@@ -352,6 +382,7 @@ export async function POST(
     let sent = 0;
     let skipped = 0;
     const failed: FailedEntry[] = [];
+    const completed: ReminderProgressEntry[] = [];
 
     for (const [cappedIndex, participant] of capped.entries()) {
       const respondent = participant.respondent!;
@@ -364,17 +395,32 @@ export async function POST(
         (prior && prior.submittedAt !== null)
       ) {
         skipped += 1;
+        completed.push({
+          participantId: participant.respondentId,
+          invitationId: prior?.id ?? null,
+          outcome: "skipped",
+        });
         continue;
       }
       // Skip: revoked invitation.
       if (prior && prior.revokedAt !== null) {
         skipped += 1;
+        completed.push({
+          participantId: participant.respondentId,
+          invitationId: prior.id,
+          outcome: "skipped",
+        });
         continue;
       }
       // Skip: no invitation row yet — reminders only nudge people who
       // were already invited (use /invite to first-send).
       if (!prior) {
         skipped += 1;
+        completed.push({
+          participantId: participant.respondentId,
+          invitationId: null,
+          outcome: "skipped",
+        });
         continue;
       }
 
@@ -431,6 +477,11 @@ export async function POST(
             participantId: participant.respondentId,
             reason: "email-prepare-failed",
           });
+          completed.push({
+            participantId: participant.respondentId,
+            invitationId: prior.id,
+            outcome: "failed",
+          });
           continue;
         }
 
@@ -455,6 +506,11 @@ export async function POST(
             participantId: participant.respondentId,
             reason: "token-stage-failed",
           });
+          completed.push({
+            participantId: participant.respondentId,
+            invitationId: prior.id,
+            outcome: "failed",
+          });
           continue;
         }
 
@@ -478,6 +534,18 @@ export async function POST(
             }
           } else if (!(await quarantineRejectedWithRetry(staged))) {
             failureReason = "smtp-rejected-quarantine-failed";
+            try {
+              await enqueueRejectedQuarantineRetry(staged);
+            } catch {
+              console.error(
+                "[assessment-reminders] durable quarantine dispatch failed",
+                {
+                  respondentId: participant.respondentId,
+                  invitationId: prior.id,
+                  disposition: "DURABLE_QUARANTINE_DISPATCH_FAILED",
+                },
+              );
+            }
             const auditPersisted =
               await persistRollbackExhaustionAuditWithRetry({
                 campaignId,
@@ -502,15 +570,37 @@ export async function POST(
                 participantId: participant.respondentId,
                 reason: failureReason,
               });
+              completed.push({
+                participantId: participant.respondentId,
+                invitationId: prior.id,
+                outcome: "failed",
+              });
+              const partialRemaining = targets
+                .slice(cappedIndex + 1)
+                .map((target) => ({
+                  participantId: target.respondentId,
+                  invitationId:
+                    existingByRespondentId.get(target.respondentId)?.id ?? null,
+                }));
               return NextResponse.json(
                 {
                   success: false,
-                  error: "Failed to persist reminder quarantine audit",
+                  error: partialBatchFailureMessage({
+                    sent,
+                    skipped,
+                    failed: failed.length,
+                    remaining: partialRemaining.length,
+                    detail: "Failed to persist reminder quarantine audit",
+                  }),
                   data: {
                     sent,
                     skipped,
                     failed,
-                    remaining: targets.length - cappedIndex - 1,
+                    remaining: partialRemaining.length,
+                    progress: {
+                      completed,
+                      remaining: partialRemaining,
+                    },
                   },
                   retrySafe: false,
                   retrySafety:
@@ -519,21 +609,42 @@ export async function POST(
                 { status: 503 }
               );
             }
+            const rejectedFailure = {
+              participantId: participant.respondentId,
+              reason: failureReason,
+            };
+            failed.push(rejectedFailure);
+            completed.push({
+              participantId: participant.respondentId,
+              invitationId: prior.id,
+              outcome: "failed",
+            });
+            const partialRemaining = targets
+              .slice(cappedIndex + 1)
+              .map((target) => ({
+                participantId: target.respondentId,
+                invitationId:
+                  existingByRespondentId.get(target.respondentId)?.id ?? null,
+              }));
             return NextResponse.json(
               {
                 success: false,
-                error: "Failed to quarantine a rejected reminder token",
+                error: partialBatchFailureMessage({
+                  sent,
+                  skipped,
+                  failed: failed.length,
+                  remaining: partialRemaining.length,
+                  detail: "Failed to quarantine a rejected reminder token",
+                }),
                 data: {
                   sent,
                   skipped,
-                  failed: [
-                    ...failed,
-                    {
-                      participantId: participant.respondentId,
-                      reason: failureReason,
-                    },
-                  ],
-                  remaining: targets.length - cappedIndex - 1,
+                  failed,
+                  remaining: partialRemaining.length,
+                  progress: {
+                    completed,
+                    remaining: partialRemaining,
+                  },
                 },
                 retrySafe: false,
                 retrySafety:
@@ -567,15 +678,38 @@ export async function POST(
                 participantId: participant.respondentId,
                 reason: failureReason,
               });
+              completed.push({
+                participantId: participant.respondentId,
+                invitationId: prior.id,
+                outcome: "failed",
+              });
+              const partialRemaining = targets
+                .slice(cappedIndex + 1)
+                .map((target) => ({
+                  participantId: target.respondentId,
+                  invitationId:
+                    existingByRespondentId.get(target.respondentId)?.id ?? null,
+                }));
               return NextResponse.json(
                 {
                   success: false,
-                  error: "Failed to persist reminder reconciliation audit",
+                  error: partialBatchFailureMessage({
+                    sent,
+                    skipped,
+                    failed: failed.length,
+                    remaining: partialRemaining.length,
+                    detail:
+                      "Failed to persist reminder reconciliation audit",
+                  }),
                   data: {
                     sent,
                     skipped,
                     failed,
-                    remaining: targets.length - cappedIndex - 1,
+                    remaining: partialRemaining.length,
+                    progress: {
+                      completed,
+                      remaining: partialRemaining,
+                    },
                   },
                   retrySafe: false,
                   retrySafety:
@@ -607,6 +741,11 @@ export async function POST(
             participantId: participant.respondentId,
             reason: failureReason,
           });
+          completed.push({
+            participantId: participant.respondentId,
+            invitationId: prior.id,
+            outcome: "failed",
+          });
           continue;
         }
 
@@ -628,6 +767,11 @@ export async function POST(
           );
         }
         sent += 1;
+        completed.push({
+          participantId: participant.respondentId,
+          invitationId: prior.id,
+          outcome: "sent",
+        });
         continue;
       }
 
@@ -676,6 +820,11 @@ export async function POST(
           participantId: participant.respondentId,
           reason: "smtp-failed",
         });
+        completed.push({
+          participantId: participant.respondentId,
+          invitationId: prior.id,
+          outcome: "failed",
+        });
         continue; // prior token NOT rotated — recipient's existing link stays valid
       }
 
@@ -703,6 +852,11 @@ export async function POST(
         // in 17a; closing it fully needs a deferred token-version column).
       }
       sent += 1;
+      completed.push({
+        participantId: participant.respondentId,
+        invitationId: prior.id,
+        outcome: "sent",
+      });
     }
 
     const failureReasons = failed.reduce<Record<string, number>>(

@@ -13,6 +13,7 @@
 
 import {
   sendInvitesBatch,
+  StableInvitationQuarantineError,
   INVITE_BATCH_CAP,
   type SendInvitesDeps,
 } from "@/lib/assessments/invite-send";
@@ -495,6 +496,54 @@ describe("sendInvitesBatch", () => {
     expect(create).toHaveBeenCalledTimes(1);
     expect(update).not.toHaveBeenCalled();
     expect(result.failed).toEqual(["r1"]);
+    errorSpy.mockRestore();
+  });
+
+  it("enabled: quarantine exhaustion schedules identifier-only durable repair before failing", async () => {
+    const enqueueRejectedQuarantineRetry = jest.fn().mockResolvedValue(undefined);
+    const stableTokens = {
+      stageExistingOriginal: jest
+        .fn()
+        .mockResolvedValue(stagedOriginal("token-r1")),
+      registerOriginal: jest.fn(),
+      confirm: jest.fn(),
+      uncertain: jest.fn(),
+      removeRegistered: jest.fn(),
+      rollbackRejected: jest
+        .fn()
+        .mockRejectedValue(new Error("database unavailable")),
+      reconcileRejected: jest.fn(),
+    };
+    const { deps } = makeDeps({
+      prepareEmail: jest.fn().mockReturnValue({
+        send: jest.fn().mockRejectedValue({ responseCode: 550 }),
+      }),
+      stableTokens,
+      persistRejectedCleanupAudit: jest.fn().mockResolvedValue(undefined),
+      enqueueRejectedQuarantineRetry,
+    });
+    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+
+    await expect(
+      sendInvitesBatch(deps, {
+        campaign: CAMPAIGN,
+        recipients: [participant("r1")],
+        baseUrl: "https://app.example.com",
+        stableLinksEnabled: true,
+      }),
+    ).rejects.toBeInstanceOf(StableInvitationQuarantineError);
+
+    expect(stableTokens.rollbackRejected).toHaveBeenCalledTimes(3);
+    expect(enqueueRejectedQuarantineRetry).toHaveBeenCalledWith({
+      invitationId: "inv-r1",
+      tokenId: "token-r1",
+    });
+    expect(stableTokens.reconcileRejected).not.toHaveBeenCalled();
+    const dispatched = JSON.stringify(
+      enqueueRejectedQuarantineRetry.mock.calls,
+    );
+    expect(dispatched).not.toContain("rawToken");
+    expect(dispatched).not.toContain("tokenHash");
     errorSpy.mockRestore();
   });
 

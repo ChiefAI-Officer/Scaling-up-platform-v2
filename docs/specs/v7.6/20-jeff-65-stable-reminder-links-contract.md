@@ -2,7 +2,7 @@
 
 **Status at approval (historical):** PRODUCT CONTRACT LOCKED; design only; not implemented, merged, shipped, or flag-enabled.
 
-**Current status:** Jeff #65 is implemented on the branch and locally verified only; it is not merged, deployed, canaried, globally enabled, or closed. The final whole-branch correction fails closed for definitely rejected tokens, including rejected brand-new originals and exhausted successor reconciliation, without changing the locked product contract below.
+**Current status:** Jeff #65 is implemented on the branch and locally verified only; it is not merged, deployed, canaried, globally enabled, or closed. The final correction persists an exact `REJECTED` tombstone and restores a monotonic last-known-deliverable parent fallback without predecessor traversal. Exhausted synchronous quarantine retries dispatch an ID-only durable job. Partial reminder failures visibly warn operators not to retry the whole request. These mechanics do not change the locked product contract below.
 
 **Decision date:** 2026-07-31
 

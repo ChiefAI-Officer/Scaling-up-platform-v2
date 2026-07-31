@@ -20,6 +20,8 @@ interface StoredToken {
   id: string;
   invitationId: string;
   tokenHash: string;
+  sequence: number;
+  expiresAtSnapshot: Date;
   source: TokenSource;
   deliveryState: TokenState;
   deliveryConfirmedAt: Date | null;
@@ -53,6 +55,10 @@ function createStatefulPrismaFake() {
         campaignId: string;
         respondentId: string;
         tokenHash: string;
+        stableTokenSequence: number;
+        stableFallbackTokenHash: string;
+        stableFallbackExpiresAt: Date;
+        stableFallbackTokenSequence: number;
         status: "PENDING" | "SENT" | "VIEWED" | "SUBMITTED";
         expiresAt: Date;
         sentAt: Date | null;
@@ -151,6 +157,13 @@ function createStatefulPrismaFake() {
           campaignId: args.data.campaignId,
           respondentId: args.data.respondentId,
           tokenHash: args.data.tokenHash,
+          stableTokenSequence: args.data.stableTokenSequence ?? 0,
+          stableFallbackTokenHash:
+            args.data.stableFallbackTokenHash ?? args.data.tokenHash,
+          stableFallbackExpiresAt:
+            args.data.stableFallbackExpiresAt ?? args.data.expiresAt,
+          stableFallbackTokenSequence:
+            args.data.stableFallbackTokenSequence ?? 0,
           status: args.data.status,
           expiresAt: args.data.expiresAt,
           sentAt: null,
@@ -167,6 +180,10 @@ function createStatefulPrismaFake() {
         return {
           tokenHash: parent.tokenHash,
           expiresAt: parent.expiresAt,
+          stableTokenSequence: parent.stableTokenSequence,
+          stableFallbackTokenHash: parent.stableFallbackTokenHash,
+          stableFallbackExpiresAt: parent.stableFallbackExpiresAt,
+          stableFallbackTokenSequence: parent.stableFallbackTokenSequence,
           status: parent.status,
           sentAt: parent.sentAt,
         };
@@ -186,6 +203,21 @@ function createStatefulPrismaFake() {
         if (args.data.expiresAt !== undefined) {
           parent.expiresAt = args.data.expiresAt;
         }
+        if (args.data.stableTokenSequence !== undefined) {
+          parent.stableTokenSequence = args.data.stableTokenSequence;
+        }
+        if (args.data.stableFallbackTokenHash !== undefined) {
+          parent.stableFallbackTokenHash =
+            args.data.stableFallbackTokenHash;
+        }
+        if (args.data.stableFallbackExpiresAt !== undefined) {
+          parent.stableFallbackExpiresAt =
+            args.data.stableFallbackExpiresAt;
+        }
+        if (args.data.stableFallbackTokenSequence !== undefined) {
+          parent.stableFallbackTokenSequence =
+            args.data.stableFallbackTokenSequence;
+        }
         if (args.data.status !== undefined) {
           parent.status = args.data.status;
         }
@@ -204,12 +236,24 @@ function createStatefulPrismaFake() {
         if (
           !parent ||
           parent.id !== args.where.id ||
-          parent.tokenHash !== args.where.tokenHash
+          (args.where.tokenHash !== undefined &&
+            parent.tokenHash !== args.where.tokenHash) ||
+          (Array.isArray(args.where.OR) &&
+            !args.where.OR.some(
+              (
+                condition:
+                  | { stableFallbackTokenHash: null }
+                  | { stableFallbackTokenSequence: { lt: number } },
+              ) =>
+                "stableFallbackTokenHash" in condition
+                  ? parent!.stableFallbackTokenHash === null
+                  : parent!.stableFallbackTokenSequence <
+                    condition.stableFallbackTokenSequence.lt,
+            ))
         ) {
           return { count: 0 };
         }
-        parent.tokenHash = args.data.tokenHash;
-        parent.expiresAt = args.data.expiresAt;
+        Object.assign(parent, args.data);
         return { count: 1 };
       }),
     },
@@ -230,6 +274,8 @@ function createStatefulPrismaFake() {
         if (existing) return { ...existing };
         const created: StoredToken = {
           id: `token-${++tokenSequence}`,
+          sequence: 0,
+          expiresAtSnapshot: parent?.expiresAt ?? new Date(0),
           deliveryConfirmedAt: null,
           previousTokenHash: null,
           previousExpiresAt: null,
@@ -241,6 +287,8 @@ function createStatefulPrismaFake() {
       create: jest.fn().mockImplementation(async (args) => {
         const created: StoredToken = {
           id: `token-${++tokenSequence}`,
+          sequence: 0,
+          expiresAtSnapshot: parent?.expiresAt ?? new Date(0),
           deliveryConfirmedAt: null,
           previousTokenHash: null,
           previousExpiresAt: null,

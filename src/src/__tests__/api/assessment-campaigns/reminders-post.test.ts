@@ -48,6 +48,10 @@ jest.mock("@/lib/rate-limit", () => ({
     .mockResolvedValue({ allowed: true, headers: {} }),
 }));
 
+jest.mock("@/inngest/client", () => ({
+  inngest: { send: jest.fn().mockResolvedValue(undefined) },
+}));
+
 jest.mock("@/services/notifications", () => {
   const sendAssessmentInvitationEmail = jest.fn();
   return {
@@ -91,6 +95,7 @@ import {
   stageStableInvitationToken,
 } from "@/lib/assessments/stable-invitation-tokens";
 import { isStableInvitationLinksEnabled } from "@/lib/assessments/wave-j65-flags";
+import { inngest } from "@/inngest/client";
 import { hashToken } from "@/lib/assessments/invitation-tokens";
 import {
   prepareAssessmentInvitationEmail,
@@ -278,6 +283,7 @@ beforeEach(() => {
   mockMarkStableInvitationTokenUncertain.mockResolvedValue(undefined);
   mockQuarantineRejectedStableInvitationToken.mockResolvedValue(undefined);
   mockRollbackRejectedStableInvitationToken.mockResolvedValue(undefined);
+  jest.mocked(inngest.send).mockResolvedValue({ ids: ["retry-event"] });
   mockPrepareAssessmentInvitationEmail.mockImplementation(
     (payload) =>
       ({
@@ -853,6 +859,41 @@ describe("POST /api/assessment-campaigns/[id]/reminders", () => {
     jest.restoreAllMocks();
   });
 
+  it("dispatches identifier-only durable repair when quarantine retries exhaust", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    mockIsStableInvitationLinksEnabled.mockReturnValue(true);
+    mockClassifyInvitationSendError.mockReturnValueOnce(
+      "DEFINITE_REJECTION",
+    );
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+    (sendAssessmentInvitationEmail as jest.Mock).mockRejectedValueOnce({
+      responseCode: 550,
+    });
+    mockQuarantineRejectedStableInvitationToken.mockRejectedValue(
+      new Error("database unavailable"),
+    );
+
+    const res = await POST(
+      jsonReq({ participantIds: ["r1"] }) as never,
+      detailParams("c1"),
+    );
+
+    expect(res.status).toBe(503);
+    expect(mockQuarantineRejectedStableInvitationToken).toHaveBeenCalledTimes(3);
+    expect(inngest.send).toHaveBeenCalledWith({
+      id: "stable-invitation-rejection-stable-inv-r1",
+      name: "assessment/invitation.rejection-retry",
+      data: {
+        invitationId: "inv-r1",
+        tokenId: "stable-inv-r1",
+      },
+    });
+    const dispatched = JSON.stringify(jest.mocked(inngest.send).mock.calls);
+    expect(dispatched).not.toContain("rawToken");
+    expect(dispatched).not.toContain("tokenHash");
+    jest.restoreAllMocks();
+  });
+
   it("durably audits exhausted state-machine reconciliation before continuing a mixed batch", async () => {
     (getApiActor as jest.Mock).mockResolvedValue(coachActor);
     mockIsStableInvitationLinksEnabled.mockReturnValue(true);
@@ -991,7 +1032,8 @@ describe("POST /api/assessment-campaigns/[id]/reminders", () => {
     };
     expect(body).toEqual({
       success: false,
-      error: "Failed to persist reminder reconciliation audit",
+      error:
+        "Some reminders were already sent (1 sent, 0 skipped, 1 failed; 0 remaining). Do not retry the whole request. Failed to persist reminder reconciliation audit.",
       data: {
         sent: 1,
         skipped: 0,
@@ -1002,6 +1044,21 @@ describe("POST /api/assessment-campaigns/[id]/reminders", () => {
           },
         ],
         remaining: 0,
+        progress: {
+          completed: [
+            {
+              participantId: "r1",
+              invitationId: "inv-r1",
+              outcome: "sent",
+            },
+            {
+              participantId: "r2",
+              invitationId: "inv-r2",
+              outcome: "failed",
+            },
+          ],
+          remaining: [],
+        },
       },
       retrySafe: false,
       retrySafety: "PARTIAL_BATCH_DO_NOT_RETRY_WHOLE_REQUEST",

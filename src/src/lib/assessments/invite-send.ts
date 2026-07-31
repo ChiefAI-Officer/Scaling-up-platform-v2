@@ -107,6 +107,7 @@ export interface StableOriginalTokenAdapter {
   registerOriginal(input: {
     invitationId: string;
     tokenHash: string;
+    expiresAt: Date;
   }): Promise<{ tokenId: string }>;
   confirm(input: {
     tokenId: string;
@@ -178,6 +179,9 @@ export interface SendInvitesDeps {
   stableTokens?: StableOriginalTokenAdapter;
   persistRejectedCleanupAudit?: (
     input: RejectedCleanupAuditInput,
+  ) => Promise<void>;
+  enqueueRejectedQuarantineRetry?: (
+    input: { invitationId: string; tokenId: string },
   ) => Promise<void>;
   /** Injectable clock (defaults to real now) — used for the fallback expiresAt. */
   now?: () => Date;
@@ -342,6 +346,14 @@ export async function sendInvitesBatch(
             tokenHash: parentTokenHash,
             status: "PENDING",
             expiresAt,
+            ...(input.stableLinksEnabled
+              ? {
+                  stableFallbackTokenHash: parentTokenHash,
+                  stableFallbackExpiresAt: expiresAt,
+                  stableTokenSequence: 0,
+                  stableFallbackTokenSequence: 0,
+                }
+              : {}),
           },
           select: { id: true, expiresAt: true },
         });
@@ -452,6 +464,24 @@ export async function sendInvitesBatch(
               tokenId: stableToken.tokenId,
               disposition: "DEFINITE_REJECTION_QUARANTINE_EXHAUSTED",
             };
+            try {
+              if (!deps.enqueueRejectedQuarantineRetry) {
+                throw new Error("durable quarantine retry is not configured");
+              }
+              await deps.enqueueRejectedQuarantineRetry({
+                invitationId: invitationRow.id,
+                tokenId: stableToken.tokenId,
+              });
+            } catch {
+              console.error(
+                "[invite-send] durable rejected-token quarantine dispatch failed",
+                {
+                  respondentId: recipient.respondentId,
+                  invitationId: invitationRow.id,
+                  disposition: "DURABLE_QUARANTINE_DISPATCH_FAILED",
+                },
+              );
+            }
             const persistAudit = deps.persistRejectedCleanupAudit;
             const auditPersisted =
               persistAudit !== undefined &&

@@ -102,6 +102,13 @@ type AssessmentCampaignSendInvites = {
     };
 };
 
+type AssessmentInvitationRejectionRetry = {
+    data: {
+        invitationId: string;
+        tokenId: string;
+    };
+};
+
 type Events = {
     "workshop/created": WorkshopCreated;
     "workshop/approved": WorkshopApproved;
@@ -115,6 +122,7 @@ type Events = {
     "workflow/step.trigger": WorkflowStepTrigger;
     "assessment/quick-lead.enqueued": AssessmentQuickLeadEnqueued;
     "assessment/campaign.send-invites": AssessmentCampaignSendInvites;
+    "assessment/invitation.rejection-retry": AssessmentInvitationRejectionRetry;
 };
 
 export const schemas = new EventSchemas().fromRecord<Events>();
