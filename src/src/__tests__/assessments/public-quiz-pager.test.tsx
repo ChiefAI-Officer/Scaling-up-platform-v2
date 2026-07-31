@@ -483,7 +483,7 @@ describe("PublicQuizClient — SectionPager wiring", () => {
       ),
     ).toBeInTheDocument();
     expect(
-      within(expectations).queryByText(/honest & confidential/i),
+      screen.queryByText(/\b(?:confidential|anonymous|private)\b/i),
     ).not.toBeInTheDocument();
     expect(container.querySelector(".su-welcome-fine")).toHaveTextContent(
       "Free to take — you'll get your results on screen and a copy by email.",

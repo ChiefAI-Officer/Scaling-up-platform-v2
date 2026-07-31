@@ -627,7 +627,9 @@ describe("OrgSurveyClient — SectionPager wiring + hidden-orphan fix", () => {
         "Your coach or facilitator and authorized Scaling Up staff can review your named individual answers.",
       ),
     ).toBeInTheDocument();
-    expect(screen.queryByText(/confidential/i)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/\b(?:confidential|anonymous|private)\b/i),
+    ).not.toBeInTheDocument();
 
     expect(
       within(expectations).getByText(
