@@ -267,7 +267,8 @@ export function PublicQuizClient({
             <WelcomeExpectations
               timeLabel={timeEstimate}
               expectationText={welcomePresentation.expectationText}
-              confidentialSub="Your results are shown to you the moment you submit."
+              sharingLabel="How your results are shared"
+              sharingSub="You receive your results immediately. Authorized Scaling Up staff can review your full report; your referring coach can too, if you used their link."
               scoresSub="See where you stand across each category."
             />
             <WelcomeStats
@@ -287,9 +288,7 @@ export function PublicQuizClient({
             </div>
             <p className="su-welcome-fine">
               Free to take — you&apos;ll get your results on screen and a copy
-              by email. Your responses are also shared with the Scaling Up team
-              and the coach who referred you (if any), who receives the full
-              report.
+              by email.
             </p>
           </section>
         </main>

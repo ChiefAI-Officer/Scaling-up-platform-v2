@@ -98,7 +98,8 @@ describe("Welcome presentation rendering", () => {
         <WelcomeExpectations
           timeLabel="About 35 minutes"
           expectationText="67 questions using a mix of response formats."
-          confidentialSub="Confidential detail."
+          sharingLabel="How your answers are shared"
+          sharingSub="Authorized people can review your answers."
           scoresSub="Scores detail."
         />
         <WelcomeStats questionCount={67} sectionCount={8} scaleLabel={null} />
@@ -110,6 +111,22 @@ describe("Welcome presentation rendering", () => {
         "67 questions using a mix of response formats.",
       ),
     ).toBeInTheDocument();
+    const expectations = screen.getByTestId("welcome-expectations");
+    expect(
+      within(expectations).getByText("How your answers are shared"),
+    ).toBeInTheDocument();
+    expect(
+      within(expectations).getByText(
+        "Authorized people can review your answers.",
+      ),
+    ).toBeInTheDocument();
+    expect(within(expectations).getByText("👥")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
+    expect(
+      within(expectations).queryByText(/honest & confidential/i),
+    ).not.toBeInTheDocument();
     const stats = screen.getByTestId("welcome-stats");
     expect(stats.querySelectorAll(".su-welcome-chip")).toHaveLength(2);
     expect(within(stats).queryByText("scale")).not.toBeInTheDocument();
@@ -121,7 +138,8 @@ describe("Welcome presentation rendering", () => {
         <WelcomeExpectations
           timeLabel="About 15 minutes"
           expectationText="40 short statements, rated 0–3."
-          confidentialSub="Confidential detail."
+          sharingLabel="How your results are shared"
+          sharingSub="Authorized people can review your report."
           scoresSub="Scores detail."
         />
         <WelcomeStats questionCount={40} sectionCount={10} scaleLabel="0–3" />

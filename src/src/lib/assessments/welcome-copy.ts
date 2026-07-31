@@ -36,11 +36,11 @@
 
 /**
  * The copy every template showed before per-template copy existed, and the copy
- * every un-keyed template still shows. Byte-identical to the JSX it replaced.
- * Templates Jeff did not ask about MUST keep rendering exactly this.
+ * every un-keyed template still shows. GH #224 removes the unsupported
+ * "confidential" adjective while preserving the truthful resume promise.
  */
 export const DEFAULT_WELCOME_LEDE: readonly string[] = Object.freeze([
-  "A quick, confidential check on how your team works together. You can answer in one sitting or come back later — your link stays active.",
+  "A quick check on how your team works together. You can answer in one sitting or come back later — your link stays active.",
 ]);
 
 /**

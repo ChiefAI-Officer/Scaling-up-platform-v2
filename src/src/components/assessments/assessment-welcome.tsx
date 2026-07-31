@@ -40,8 +40,10 @@ export interface WelcomeExpectationsProps {
   timeLabel: string;
   /** Complete-bank expectation copy (NOT hardcoded). */
   expectationText: string;
-  /** Flow-specific sub for the "honest & confidential" row. */
-  confidentialSub: string;
+  /** Flow-specific label that states how answers or results are shared. */
+  sharingLabel: string;
+  /** Flow-specific recipient disclosure. */
+  sharingSub: string;
   /** Flow-specific sub for the "category scores" row. */
   scoresSub: string;
 }
@@ -49,12 +51,13 @@ export interface WelcomeExpectationsProps {
 /**
  * The "what to expect" value-prop list (3 rows: icon + bold label + muted sub).
  * Time + complete-bank expectation text are derived from real data; the
- * confidential / scores subs differ per flow (public vs invited).
+ * sharing label/sub and scores sub differ per flow (public vs invited).
  */
 export function WelcomeExpectations({
   timeLabel,
   expectationText,
-  confidentialSub,
+  sharingLabel,
+  sharingSub,
   scoresSub,
 }: WelcomeExpectationsProps) {
   return (
@@ -70,11 +73,11 @@ export function WelcomeExpectations({
       </li>
       <li className="su-welcome-expect-item">
         <span className="su-welcome-expect-ic" aria-hidden="true">
-          {"🔒"}
+          {"👥"}
         </span>
         <span className="su-welcome-expect-text">
-          <b>Honest &amp; confidential</b>
-          <span>{confidentialSub}</span>
+          <b>{sharingLabel}</b>
+          <span>{sharingSub}</span>
         </span>
       </li>
       <li className="su-welcome-expect-item">

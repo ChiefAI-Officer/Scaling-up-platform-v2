@@ -470,11 +470,27 @@ describe("PublicQuizClient — SectionPager wiring", () => {
   });
 
   it("Screen 1 (welcome) renders the value-prop 'what to expect' list and stat chips from ACTUAL data", () => {
-    render(<PublicQuizClient {...baseProps} />);
+    const { container } = render(<PublicQuizClient {...baseProps} />);
     // The de-bared welcome renders the value-prop expectation list...
     const expectations = screen.getByTestId("welcome-expectations");
     expect(expectations).toBeInTheDocument();
-    expect(within(expectations).getByText(/honest & confidential/i)).toBeInTheDocument();
+    expect(
+      within(expectations).getByText("How your results are shared"),
+    ).toBeInTheDocument();
+    expect(
+      within(expectations).getByText(
+        "You receive your results immediately. Authorized Scaling Up staff can review your full report; your referring coach can too, if you used their link.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/\b(?:confidential|anonymous|private)\b/i),
+    ).not.toBeInTheDocument();
+    expect(container.querySelector(".su-welcome-fine")).toHaveTextContent(
+      "Free to take — you'll get your results on screen and a copy by email.",
+    );
+    expect(container.querySelector(".su-welcome-fine")).not.toHaveTextContent(
+      /responses are also shared/i,
+    );
     // ...and the stat chips reflect the real counts (2 questions, 2 sections)
     // and the uniform 0–3 scale — NOT hardcoded 38/5/1–5.
     const stats = screen.getByTestId("welcome-stats");

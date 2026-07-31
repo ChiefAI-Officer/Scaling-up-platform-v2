@@ -6,6 +6,19 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="gh-224-truthful-welcome-sharing-copy-pr-ready"></a>
+### 2026-07-31 — Truthful Welcome sharing disclosure implemented (GH #224) <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:gh-224-truthful-welcome-sharing-copy-pr-ready -->
+
+**Status: IMPLEMENTED + LOCALLY VERIFIED; not yet merged or launched.** Both respondent Welcome flows now use a shared people icon and exact disclosure copy instead of the unconditional **Honest & confidential** lock claim. Invited assessments state that the coach or facilitator and authorized Scaling Up staff can review named individual answers. Public assessments state that the participant receives results immediately, authorized Scaling Up staff can review the full report, and a referring coach can too when the participant used that coach's link.
+
+**Copy and boundary.** The shared Welcome component accepts explicit `sharingLabel` and `sharingSub` inputs; each owning flow supplies its approved wording. The default invited lede is now factual and no longer claims confidentiality. Invited fine print retains only the resume note for a bespoke lede and otherwise omits the empty paragraph; public fine print retains only the on-screen-and-email delivery note. This is a flagless presentation correction. It does not infer or expose `aggregationMode`, and it changes no API, schema, authorization, report, scoring, invitation, submission, or result-sharing behavior.
+
+**Verification.** The five focused Welcome/copy suites passed **78 tests**; migration safety across **42 migrations**, changelog freshness, `git diff --check`, and the Turbopack production build passed, producing **92/92** static pages. Changed-file ESLint reported zero errors and one pre-existing `@next/next/no-img-element` warning. A fresh non-incremental repository-wide type-check reported the same **433 errors across 58 files** on this branch and exact current `origin/main`, with zero GH #224-scoped errors. The full Jest run passed **587 suites / 6,952 tests** and failed seven suites outside GH #224: six non-database failures were reproduced unchanged at the fixed pre-implementation commit, while the migration-verification suite lacked `DATABASE_URL`; every GH #224 test passed. Real-CSS visual review at 1440px and 390px confirmed both disclosures fit without horizontal overflow and the default invited flow leaves no empty fine-print gap.
+
+**Rollout and rollback.** The change is not live until its protected PR merges and the exact merge deployment reaches Ready. Rollback is a normal code revert with no migration, data cleanup, flag operation, or environment change.
+
+---
+
 ### 2026-07-31 — Consolidated progress ledger current through GH #243; GH #217 primed <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:consolidated-progress-through-gh-243 -->
 
 **Status: REPORTING LEDGER UPDATED; no runtime change.** The hard cutoff remains the already-sent `output/pdf/Scaling-Up-Progress-Report-2026-07-27-to-2026-07-31.pdf`, which covers work through PR #267. The next consolidated report currently has exactly **three** eligible product outcomes:
