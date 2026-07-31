@@ -613,7 +613,8 @@ export function OrgSurveyClient({
             <WelcomeExpectations
               timeLabel={timeEstimate}
               expectationText={welcomePresentation.expectationText}
-              confidentialSub="Your individual answers feed the team picture."
+              sharingLabel="How your answers are shared"
+              sharingSub="Your coach or facilitator and authorized Scaling Up staff can review your named individual answers."
               scoresSub="See where the team stands across each category."
             />
             <WelcomeStats
@@ -630,17 +631,9 @@ export function OrgSurveyClient({
                 Start the assessment →
               </button>
             </div>
-            <p className="su-welcome-fine">
-              {/* `{" "}` is structural: a trailing space inside a template
-                  literal is invisible and silently deletable, and both
-                  sentence-level assertions would still pass if it vanished. */}
-              {showResumeNote && (
-                <>
-                  {RESUME_NOTE}{" "}
-                </>
-              )}
-              Shared with your facilitator or coach to discuss as a team.
-            </p>
+            {showResumeNote ? (
+              <p className="su-welcome-fine">{RESUME_NOTE}</p>
+            ) : null}
           </section>
         </main>
         <footer className="su-welcome-foot">Powered by Scaling Up</footer>

@@ -614,13 +614,20 @@ describe("OrgSurveyClient — SectionPager wiring + hidden-orphan fix", () => {
   });
 
   it("Screen 1 (welcome) renders the value-prop list with INVITED team framing + stat chips from real data", async () => {
-    render(<OrgSurveyClient campaignAlias={ALIAS} />);
+    const { container } = render(<OrgSurveyClient campaignAlias={ALIAS} />);
     // Wait for the intro (welcome) phase to render after /me resolves.
     await screen.findByRole("button", { name: /start the assessment/i });
 
     const expectations = screen.getByTestId("welcome-expectations");
-    // INVITED team framing — "feed the team picture", NOT the public lead-magnet copy.
-    expect(within(expectations).getByText(/feed the team picture/i)).toBeInTheDocument();
+    expect(
+      within(expectations).getByText("How your answers are shared"),
+    ).toBeInTheDocument();
+    expect(
+      within(expectations).getByText(
+        "Your coach or facilitator and authorized Scaling Up staff can review your named individual answers.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/confidential/i)).not.toBeInTheDocument();
 
     expect(
       within(expectations).getByText(
@@ -637,8 +644,10 @@ describe("OrgSurveyClient — SectionPager wiring + hidden-orphan fix", () => {
     expect(within(stats).queryByText("0–3")).not.toBeInTheDocument();
     expect(within(stats).queryByText("scale")).not.toBeInTheDocument();
 
-    // Invited fine print mentions the facilitator/coach (team framing kept).
-    expect(screen.getByText(/facilitator or coach/i)).toBeInTheDocument();
+    // This fixture uses the default lede, which already carries the resume
+    // promise. With sharing moved into the expectation row, no fine print
+    // remains and the component must not leave an empty paragraph behind.
+    expect(container.querySelector(".su-welcome-fine")).not.toBeInTheDocument();
   });
 
   it("derives Scaling Up Full Welcome claims from the non-CEO respondent-visible bank", async () => {

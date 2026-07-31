@@ -23,7 +23,7 @@ const CAMPAIGN_ALIAS = "spectrum-welcome-lede-test";
 
 /* The byte-exact pin lives in welcome-copy.test.ts; transcribing it a second
    time here would just be a second thing to keep in sync. */
-const LEGACY_LEDE = DEFAULT_WELCOME_LEDE[0];
+const APPROVED_DEFAULT_LEDE = DEFAULT_WELCOME_LEDE[0];
 
 function surveyData(campaign: { alias: string; templateAlias: string | null }) {
   return {
@@ -102,10 +102,13 @@ describe("Welcome screen lede — DOM wiring", () => {
     expect(paragraphs[0]).toContain("Leadership Vision Alignment Assessment");
   });
 
-  it("leaves an out-of-scope template on the copy that shipped before this change", async () => {
+  it("renders the truthful default for an unkeyed template", async () => {
     const { container } = await renderWelcome("qsp-v1");
 
-    expect(ledeParagraphs(container)).toEqual([LEGACY_LEDE]);
+    expect(ledeParagraphs(container)).toEqual([APPROVED_DEFAULT_LEDE]);
+    expect(ledeParagraphs(container).join(" ")).not.toMatch(
+      /\b(?:confidential|anonymous|private)\b/i,
+    );
   });
 
   it("keys off templateAlias — NOT the campaign alias or the route param", async () => {
@@ -118,7 +121,7 @@ describe("Welcome screen lede — DOM wiring", () => {
     );
     await screen.findByRole("button", { name: /start the assessment/i });
 
-    expect(ledeParagraphs(container)).toEqual([LEGACY_LEDE]);
+    expect(ledeParagraphs(container)).toEqual([APPROVED_DEFAULT_LEDE]);
   });
 });
 
@@ -171,14 +174,18 @@ describe("Welcome screen — the resume affordance survives the copy change", ()
     }
   });
 
-  it("keeps the coach-sharing note alongside it", async () => {
+  it("keeps only the resume note in fine print and moves sharing into the expectation row", async () => {
     const { container } = await renderWelcome("scaling-up-full");
 
-    expect(fineText(container)).toMatch(/facilitator or coach/i);
-    // Pin the junction: the space between the two sentences is structural, and
-    // both sentence-level assertions above would still pass without it.
-    expect(fineText(container)).toMatch(
-      /stays active\. Shared with your facilitator/,
+    expect(fineText(container)).toBe(
+      "Answer in one sitting or come back later — your link stays active.",
+    );
+    const expectations = screen.getByTestId("welcome-expectations");
+    expect(
+      expectations,
+    ).toHaveTextContent("How your answers are shared");
+    expect(expectations).toHaveTextContent(
+      "Your coach or facilitator and authorized Scaling Up staff can review your named individual answers.",
     );
   });
 });
