@@ -6,6 +6,19 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="gh-217-legacy-invite-fallback-launched"></a>
+### 2026-07-31 — Legacy invitation fallback hardening launched (GH #217) <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:gh-217-legacy-invite-fallback-launched -->
+
+**Status: MERGED + LIVE, dormant unless the existing kill switch is activated.** Implementation PR [#280](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/280) passed the protected **Build**, **Migration Safety Gate**, **Assessment Email Lease (PostgreSQL)**, **Vercel**, and **Vercel Preview Comments** checks and squash-merged at `2026-07-31T16:28:23Z` as `a683e55dfb84eb8606b7d79c9701637fac86ca2b`. Issue [#217](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/issues/217) closed at `2026-07-31T16:28:24Z`.
+
+**Exact deployment and health evidence.** Production deployment `dpl_uM3anRWbD3Nmzuqi3dStdEGyVfLW`, target `production`, was created at `2026-07-31T16:28:26.146Z` (`2026-08-01 00:28:26` Asia/Manila) and reached **READY** at `2026-07-31T16:29:47.434Z` (`2026-08-01 00:29:47` Asia/Manila), with Vercel metadata bound to `main` at the exact merge SHA. It owns both `scaling-up-platform-v2.vercel.app` and `platformtest.scalingup.com`. Read-only health calls returned HTTP `200` with `status: healthy`, `database: healthy`, and `authPosture: safe` at `2026-07-31T16:36:59.367Z` and `2026-07-31T16:37:00.075Z`, respectively.
+
+**Flag state, live limitation, and scope.** A key/type-only Production environment query found zero `ASSESSMENT_INVITE_BRANDED` entries; no environment values were requested or printed, and no flag was created or changed. The live branded renderer therefore remains active and the hardened legacy renderer stays dormant unless the existing off-switch is deliberately activated. Production verification sent no invitation and mutated no production data; the focused implementation tests are the acceptance evidence for the dormant path. The implementation changes no schema, migration, API, route, scoring, report, scheduler, invitation copy, custom-HTML precedence, telemetry contract, attachment behavior, or SMTP error propagation.
+
+**Reporting classification and rollback.** GH #217 is the fifth reportable product or reliability outcome after the already-sent July 27–31 report, following GH #222, GH #242, GH #243, and GH #224. This launch record is operational evidence, not a sixth outcome. Roll back by reverting implementation squash `a683e55dfb84eb8606b7d79c9701637fac86ca2b`; no migration rollback, data cleanup, environment rollback, scheduler action, or new flag operation is required.
+
+---
+
 <a id="gh-217-legacy-invite-fallback-pr-ready"></a>
 ### 2026-07-31 — Legacy invitation fallback hardened (GH #217) <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:gh-217-legacy-invite-fallback-pr-ready -->
 
