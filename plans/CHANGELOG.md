@@ -7,7 +7,7 @@ Future entries should be appended at the TOP of the entries section below (newes
 ---
 
 <a id="gh-217-legacy-invite-fallback-launched"></a>
-### 2026-08-01 — Legacy invitation fallback hardening launched (GH #217) <!-- ENTRY_ISO:2026-08-01 ENTRY_SLUG:gh-217-legacy-invite-fallback-launched -->
+### 2026-07-31 — Legacy invitation fallback hardening launched (GH #217) <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:gh-217-legacy-invite-fallback-launched -->
 
 **Status: MERGED + LIVE, dormant unless the existing kill switch is activated.** Implementation PR [#280](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/280) passed the protected **Build**, **Migration Safety Gate**, **Assessment Email Lease (PostgreSQL)**, **Vercel**, and **Vercel Preview Comments** checks and squash-merged at `2026-07-31T16:28:23Z` as `a683e55dfb84eb8606b7d79c9701637fac86ca2b`. Issue [#217](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/issues/217) closed at `2026-07-31T16:28:24Z`.
 
