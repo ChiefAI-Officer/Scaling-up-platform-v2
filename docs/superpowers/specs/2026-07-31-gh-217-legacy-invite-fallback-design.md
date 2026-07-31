@@ -1,8 +1,8 @@
 # GH #217 — Legacy Invitation Fallback Hardening Design
 
-Date: 2026-07-31  
-Status: Approved for implementation planning  
-Issue: [GH #217](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/issues/217)  
+Date: 2026-07-31
+Status: Approved for implementation planning
+Issue: [GH #217](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/issues/217)
 Branch: `codex/217-legacy-invite-fallback-hardening`
 
 ## Context
