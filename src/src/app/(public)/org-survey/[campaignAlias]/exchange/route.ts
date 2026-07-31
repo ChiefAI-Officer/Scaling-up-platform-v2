@@ -21,6 +21,8 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { hashToken } from "@/lib/assessments/invitation-tokens";
 import { getInvitationSession } from "@/lib/assessments/invitation-cookie";
+import { resolveInvitationByStableTokenHash } from "@/lib/assessments/stable-invitation-tokens";
+import { isStableInvitationLinksEnabled } from "@/lib/assessments/wave-j65-flags";
 import { formatTimestampDateTime } from "@/lib/utils";
 
 const ExchangeBodySchema = z.object({
@@ -73,21 +75,23 @@ export async function POST(
     }
 
     const tokenHash = hashToken(parsed.data.token);
-    const invitation = await db.assessmentInvitation.findUnique({
-      where: { tokenHash },
-      include: {
-        campaign: {
-          select: {
-            id: true,
-            alias: true,
-            status: true,
-            openAt: true,
-            closeAt: true,
-            deletedAt: true,
+    const invitation = isStableInvitationLinksEnabled(campaignAlias)
+      ? await resolveInvitationByStableTokenHash(db, tokenHash)
+      : await db.assessmentInvitation.findUnique({
+          where: { tokenHash },
+          include: {
+            campaign: {
+              select: {
+                id: true,
+                alias: true,
+                status: true,
+                openAt: true,
+                closeAt: true,
+                deletedAt: true,
+              },
+            },
           },
-        },
-      },
-    });
+        });
 
     // Either no row, or row belongs to a DIFFERENT campaign (alias guard).
     if (!invitation || invitation.campaign.alias !== campaignAlias) {
