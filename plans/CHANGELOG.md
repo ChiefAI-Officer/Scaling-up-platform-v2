@@ -6,6 +6,22 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-07-31 — Consolidated progress ledger current through GH #243; GH #217 primed <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:consolidated-progress-through-gh-243 -->
+
+**Status: REPORTING LEDGER UPDATED; no runtime change.** The hard cutoff remains the already-sent `output/pdf/Scaling-Up-Progress-Report-2026-07-27-to-2026-07-31.pdf`, which covers work through PR #267. The next consolidated report currently has exactly **three** eligible product outcomes:
+
+1. **GH #222 — Welcome-screen question-bank accuracy**, launched in PR #269.
+2. **GH #242 — retired pinned-edition warning**, launched in PR #273.
+3. **GH #243 — campaign-list edition visibility**, launched in PR #275 and production-verified before its claim was released.
+
+The corresponding launch-record PRs #270, #274, and #276 are operational evidence, not additional outcomes. PR #268's Jeff #33 deferral and PR #272's Jeff #65 contract lock are dispositions/design work, not shipped product. Active unmerged work, including Jeff #65 and GH #224, remains excluded until it is merged, deployed, verified, claim-released, and recorded in the SoT.
+
+**Next-item coordination.** The shared claim board and current branches were re-read after GH #243 closed. Jeff #65 and GH #224 already have active claims and unmerged implementation work, so neither is available for a new owner. GH #217 was confirmed open, unclaimed, absent from all PR history and remote/local branch names, and still reproducible on `origin/main`: the dormant `ASSESSMENT_INVITE_BRANDED=0` renderer hardcodes `coachName: null`, sends no plain-text twin, and supplies no bottom fallback URL. It is now primed on claim-board issue #261 for `codex/217-legacy-invite-fallback-hardening`.
+
+**Primed scope and gate.** GH #217 owns only those three fallback-path corrections plus characterization coverage for both invite-renderer flag states. It does not change the live branded renderer, invitation copy, campaign overrides, SMTP delivery semantics, or production flag state. The next session must fetch `origin/main`, re-read issue #261, and complete the design/verification gate before writing feature code.
+
+---
+
 ### 2026-07-31 — Campaign-list edition visibility launched (GH #243) <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:gh-243-campaign-list-edition-visibility-launched -->
 
 **Status: LAUNCHED + PRODUCTION-VERIFIED.** Implementation PR [#275](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/275) squash-merged through the protected path at `2026-07-31T10:30:05Z` as `bdda554c8f0bb765bc78e7854eaa8a203b0ec6db`; GitHub auto-closed issue #243 at `2026-07-31T10:30:06Z`. Required **Build**, **Migration Safety Gate**, **Assessment Email Lease**, and **Vercel** checks all passed. This records the completed release of the existing implementation; it is not new feature work.
