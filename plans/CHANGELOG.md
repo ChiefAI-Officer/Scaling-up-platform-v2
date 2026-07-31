@@ -6,6 +6,18 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-07-31 — Jeff July-10 #33 deferred pending report-by-report fidelity notes <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:jeff-33-report-fidelity-deferred -->
+
+**Status: DEFERRED / NEEDS INPUT — reporting disposition only.** Jeff's July-10 feedback describes #33 as an all-reports fidelity review: the reports are close to, but not exactly aligned with, the originals, and Jeff will perform the full side-by-side review and provide detailed follow-up. The latest status overlay likewise marks the item **NEEDS INPUT**, waiting for the report-by-report comparison notes. This records the decision to take #33 out of the selectable work queue; it does not mark the item Complete.
+
+**Boundary.** Report work already shipped—including Wave E's shared report polish and subsequent report-specific improvements—does not close this umbrella acceptance item. There is no dedicated #33 implementation claim, feature flag, merge, launch, or production write to record. The earlier Wave E entry and design artifacts already preserve the same dependency on Jeff's side-by-side differences.
+
+**Resume gate.** Wait for Jeff (or Suzanne relaying Jeff's review) to identify the exact report, surface, expected original, and observable mismatch for each comparison. Convert those notes into narrow, independently claimable items, then re-check the current claim board and `main` before selecting one. Do not claim #33 broadly or infer acceptance from adjacent shipped work.
+
+**Reporting cutoff.** This is a docs-only disposition created after the prior consolidated report was sent. It is not implementation progress and must not be used to re-report prior-cycle shipped work as new.
+
+---
+
 ### 2026-07-31 — Jeff public-survey closure launched; consolidated item #83 is Complete <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:jeff-public-survey-closure-launched -->
 
 **Status: MERGED + LIVE.** PR [#266](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/266) merged as squash `ddc83e8f799cbdac5e2e5eae7cca37f6ce53c629` on 2026-07-31 Manila time. Vercel's Production deployment for that exact SHA completed successfully at `scaling-up-platform-v2-mwymzwu2n-scaling-up.vercel.app`; both production aliases, `scaling-up-platform-v2.vercel.app` and `platformtest.scalingup.com`, returned `200` from `/api/health` with `database: healthy` and `authPosture: safe` on the new process uptime.
