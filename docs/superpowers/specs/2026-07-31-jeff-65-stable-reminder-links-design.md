@@ -499,6 +499,32 @@ durable invariant is now a parent-owned last-known-deliverable fallback:
   rows out of future selection, while concurrent event/cron execution remains
   safe through service idempotency plus the resolved check.
 
+## Outbox fairness correction addendum (Fix Round 4)
+
+Every row selected by the bounded oldest-ready-first drain must leave `PENDING`
+before that drain completes:
+
+- an existing deterministic resolved marker transitions duplicate pending rows
+  to `STABLE_INVITATION_REJECTION_REPAIR_RESOLVED`;
+- a missing token row, including invitation cascade deletion, writes the
+  deterministic `STABLE_INVITATION_REJECTION_REPAIR_TERMINAL` outcome with
+  allowlisted reason `TARGET_DELETED` and consumes all pending duplicates;
+- malformed metadata writes a deterministic terminal marker keyed by pending-row
+  ID with allowlisted reason `MALFORMED_METADATA`, then consumes that row; and
+- a transient repair failure transitions the selected row to
+  `STABLE_INVITATION_REJECTION_REPAIR_FAILED_ATTEMPT`, records only
+  `invitationId`, monotonic `attemptCount`, and allowlisted reason
+  `TRANSIENT_REPAIR_FAILURE`, then deterministically enqueues one strict
+  `{invitationId}` pending intent at the tail.
+
+No audit row is deleted. Deterministic marker/retry IDs, conditional pending-state
+updates, service idempotency, and marker rechecks keep duplicate or concurrent
+event/cron work convergent. Fifty transient head rows therefore rotate behind row
+51, which becomes ready on the next bounded drain, while each failed repair
+retains an indefinite retry chain. The additive migration also indexes
+`AuditLog(action, timestamp)` for the action-filtered oldest-first query. Terminal
+and failed-attempt metadata contain no token, hash, or serialized error.
+
 The outcome-order matrix covers B-confirm-then-A-confirm, A-confirm-while-B-current
 then-B-reject, and the equivalent uncertain transitions. A delayed confirmation
 after rejection is a no-op. The kill/default exchange shape remains the exact

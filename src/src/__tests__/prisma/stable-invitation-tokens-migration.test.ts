@@ -66,4 +66,18 @@ describe("stable invitation tokens migration", () => {
             /'legacy_' \|\| "id",\s+"id",\s+"tokenHash",\s+0,\s+"expiresAt"/,
         );
     });
+
+    it("indexes the bounded rejection-repair drain by action and age", () => {
+        const sql = readFileSync(MIGRATION_PATH, "utf8");
+        const schema = readFileSync(
+            path.join(process.cwd(), "prisma", "schema.prisma"),
+            "utf8",
+        );
+
+        expect(sql).toMatch(
+            /CREATE INDEX "audit_logs_action_timestamp_idx"\s+ON "audit_logs"\("action", "timestamp"\)/,
+        );
+        expect(schema).toContain("@@index([action, timestamp])");
+        expect(sql).not.toMatch(/\b(?:DROP|TRUNCATE|DELETE\s+FROM)\b/i);
+    });
 });

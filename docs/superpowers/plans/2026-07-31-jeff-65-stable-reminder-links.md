@@ -838,3 +838,22 @@ actionable findings.
 At minimum rerun focused tests, changed-file ESLint, typecheck, migration safety,
 changelog freshness, `git diff --check`, and the Turbopack build. If a review fix
 touches broadly shared behavior, rerun the full Jest suite.
+
+---
+
+### Fix Round 4: Prevent bounded outbox head-of-line starvation
+
+- [x] Capture RED regressions for resolved duplicates, deleted targets, malformed
+  metadata, transient retry rotation, and 50 head rows starving row 51.
+- [x] Make every selected pending audit transition to resolved, terminal, or
+  failed-attempt state; never delete audit history.
+- [x] Enqueue a deterministic ID-only retry intent at the tail after each
+  transient failure, with the monotonic attempt count retained only on the
+  failed-attempt audit.
+- [x] Share deterministic missing-target terminalization between the direct event
+  and scheduled drain.
+- [x] Add the `AuditLog(action, timestamp)` Prisma/schema index to the existing
+  additive migration and pin its non-destructive SQL in the migration contract.
+- [x] Rerun affected and focused matrices, Prisma gates, migration safety,
+  changed-file lint/type/privacy/diff/freshness, and Turbopack; record exact
+  evidence without rerunning the full Jest suite.

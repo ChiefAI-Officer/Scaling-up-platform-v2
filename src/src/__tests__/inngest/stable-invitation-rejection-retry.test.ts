@@ -14,11 +14,20 @@ describe("stable invitation rejection durable retry", () => {
     const quarantine = jest.fn().mockResolvedValue(undefined);
     const reconcile = jest.fn().mockResolvedValue(undefined);
     const isResolved = jest.fn().mockResolvedValue(false);
+    const targetExists = jest.fn().mockResolvedValue(true);
     const markResolved = jest.fn().mockResolvedValue(undefined);
+    const markTerminal = jest.fn();
 
     await expect(
       runStableInvitationRejectionRetry(
-        { quarantine, reconcile, isResolved, markResolved },
+        {
+          quarantine,
+          reconcile,
+          isResolved,
+          targetExists,
+          markResolved,
+          markTerminal,
+        },
         { invitationId: "inv-1", tokenId: "token-1" },
       ),
     ).resolves.toEqual({
@@ -51,11 +60,20 @@ describe("stable invitation rejection durable retry", () => {
       .mockRejectedValue(new Error("database unavailable"));
     const reconcile = jest.fn();
     const isResolved = jest.fn().mockResolvedValue(false);
+    const targetExists = jest.fn().mockResolvedValue(true);
     const markResolved = jest.fn();
+    const markTerminal = jest.fn();
 
     await expect(
       runStableInvitationRejectionRetry(
-        { quarantine, reconcile, isResolved, markResolved },
+        {
+          quarantine,
+          reconcile,
+          isResolved,
+          targetExists,
+          markResolved,
+          markTerminal,
+        },
         { invitationId: "inv-1", tokenId: "token-1" },
       ),
     ).rejects.toThrow("database unavailable");
@@ -70,18 +88,34 @@ describe("stable invitation rejection durable retry", () => {
       .mockRejectedValueOnce(new Error("transient successor rewrite"))
       .mockResolvedValueOnce(undefined);
     const isResolved = jest.fn().mockResolvedValue(false);
+    const targetExists = jest.fn().mockResolvedValue(true);
     const markResolved = jest.fn().mockResolvedValue(undefined);
+    const markTerminal = jest.fn();
     const input = { invitationId: "inv-1", tokenId: "token-1" };
 
     await expect(
       runStableInvitationRejectionRetry(
-        { quarantine, reconcile, isResolved, markResolved },
+        {
+          quarantine,
+          reconcile,
+          isResolved,
+          targetExists,
+          markResolved,
+          markTerminal,
+        },
         input,
       ),
     ).rejects.toThrow("transient successor rewrite");
     await expect(
       runStableInvitationRejectionRetry(
-        { quarantine, reconcile, isResolved, markResolved },
+        {
+          quarantine,
+          reconcile,
+          isResolved,
+          targetExists,
+          markResolved,
+          markTerminal,
+        },
         input,
       ),
     ).resolves.toMatchObject({ quarantined: true, reconciled: true });
@@ -95,6 +129,7 @@ describe("stable invitation rejection durable retry", () => {
     const quarantine = jest.fn();
     const reconcile = jest.fn();
     const markResolved = jest.fn();
+    const markTerminal = jest.fn();
 
     await expect(
       runStableInvitationRejectionRetry(
@@ -102,11 +137,41 @@ describe("stable invitation rejection durable retry", () => {
           quarantine,
           reconcile,
           isResolved: jest.fn().mockResolvedValue(true),
+          targetExists: jest.fn(),
           markResolved,
+          markTerminal,
         },
         { invitationId: "inv-1", tokenId: "token-1" },
       ),
     ).resolves.toMatchObject({ skipped: true });
+    expect(quarantine).not.toHaveBeenCalled();
+    expect(reconcile).not.toHaveBeenCalled();
+    expect(markResolved).not.toHaveBeenCalled();
+  });
+
+  it("terminalizes a deleted target instead of retrying an impossible repair", async () => {
+    const quarantine = jest.fn();
+    const reconcile = jest.fn();
+    const markResolved = jest.fn();
+    const markTerminal = jest.fn().mockResolvedValue(undefined);
+    const deps = {
+      quarantine,
+      reconcile,
+      isResolved: jest.fn().mockResolvedValue(false),
+      markResolved,
+      targetExists: jest.fn().mockResolvedValue(false),
+      markTerminal,
+    };
+    const input = { invitationId: "inv-deleted", tokenId: "token-deleted" };
+
+    await expect(
+      runStableInvitationRejectionRetry(deps, input),
+    ).resolves.toEqual({
+      invitationId: input.invitationId,
+      tokenId: input.tokenId,
+      terminal: true,
+    });
+    expect(markTerminal).toHaveBeenCalledWith(input);
     expect(quarantine).not.toHaveBeenCalled();
     expect(reconcile).not.toHaveBeenCalled();
     expect(markResolved).not.toHaveBeenCalled();

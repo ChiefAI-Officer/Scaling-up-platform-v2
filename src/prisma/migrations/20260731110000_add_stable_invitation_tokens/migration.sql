@@ -47,6 +47,10 @@ CREATE INDEX "assessment_invitation_tokens_invitationId_previousTokenHash_idx"
 CREATE UNIQUE INDEX "assessment_invitation_tokens_invitationId_sequence_key"
   ON "assessment_invitation_tokens"("invitationId", "sequence");
 
+-- Support the bounded oldest-ready-first rejection-repair AuditLog drain.
+CREATE INDEX "audit_logs_action_timestamp_idx"
+  ON "audit_logs"("action", "timestamp");
+
 INSERT INTO "assessment_invitation_tokens" (
     "id",
     "invitationId",

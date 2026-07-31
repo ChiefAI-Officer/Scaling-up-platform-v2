@@ -6,6 +6,21 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="jeff-65-outbox-fairness-correction-local-only"></a>
+### 2026-08-01 — Jeff #65 outbox fairness correction locally verified (not launched) <!-- ENTRY_ISO:2026-08-01 ENTRY_SLUG:jeff-65-outbox-fairness-correction-local-only -->
+
+**Status: IMPLEMENTED + LOCALLY VERIFIED ONLY; not merged, deployed, canaried, globally enabled, or closed.** This is a correctness correction to the existing unlaunched Jeff #65 branch. It does not increase the consolidated shipped-outcome count or release the shared claim.
+
+**Forward-progress state machine.** The five-minute concurrency-one drain still selects at most 50 `STABLE_INVITATION_REJECTION_REPAIR_PENDING` AuditLog rows oldest-first, but every selected row now leaves `PENDING`. An existing resolved marker consumes late duplicates. A deleted token row—including invitation cascade deletion—cannot authenticate and therefore receives the deterministic `TARGET_DELETED` terminal outcome. Malformed metadata receives a deterministic row-keyed `MALFORMED_METADATA` dead letter. A transient repair failure becomes `STABLE_INVITATION_REJECTION_REPAIR_FAILED_ATTEMPT` with monotonic attempt count and an allowlisted reason, while one deterministic strict `{invitationId}` pending row is enqueued at the tail. No audit history is deleted, and the next scheduled drain continues recovery indefinitely without allowing poison head rows to starve newer work.
+
+**Concurrency, privacy, and migration.** Conditional pending-state transitions, deterministic marker/retry IDs, marker rechecks, and the existing identity-guarded token service keep duplicate and concurrent event/cron work convergent. The direct ID-only event also terminalizes a missing target. Audit state contains only invitation/token-row IDs, allowlisted reasons, and attempt count—never raw tokens, hashes, or serialized error objects. The existing additive migration now adds `audit_logs_action_timestamp_idx` over `(action, timestamp)`, matching the bounded action-filtered oldest-first query. Default-off flags, kill behavior, partial-503 contract, UI, and invitation copy are unchanged.
+
+**TDD and verification.** RED evidence reproduced all five starvation modes: resolved duplicates stayed pending, deleted work retried impossibly, malformed rows were filtered before consumption, transient rows remained at the head, and row 51 was not reached; the migration index was absent. GREEN coverage proves resolved sweeping, deleted-target terminalization, malformed dead-lettering, transient attempt rotation, privacy, concurrent event resolution, target identity checks, and 50 transient rows moving behind a valid row 51 within the next bounded drain. The affected outbox/event/service/migration slice passed **4 suites / 68 tests** and the complete Jeff #65 focused matrix passed **15 suites / 252 tests**. Prisma validate/generate passed with inert local PostgreSQL URLs; migration safety checked all **43 migrations**. Changed-file ESLint and the zero-diagnostic scoped TypeScript scan passed, as did privacy, UI no-change, changelog freshness, and `git diff --check`. `CI=true npx next build --turbopack` exited `0`, compiled in **38.8s**, completed TypeScript, and generated **92/92** static pages. Expected missing local Inngest and unreachable inert-database warnings appeared during static generation. The full Jest suite was deliberately not rerun and is not claimed.
+
+**Rollout boundary.** Nothing was pushed or deployed. Normal protected-branch review, merge, migration deployment, explicit canary, exact-SHA production verification, global enablement, claim release, and launch closeout remain outstanding.
+
+---
+
 <a id="jeff-65-stable-reminder-links-implemented-local-only"></a>
 ### 2026-07-31 — Jeff #65 stable reminder links implemented locally (not launched) <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:jeff-65-stable-reminder-links-implemented-local-only -->
 

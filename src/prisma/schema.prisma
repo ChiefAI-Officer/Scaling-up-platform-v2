@@ -594,6 +594,7 @@ model AuditLog {
   timestamp   DateTime @default(now())
 
   @@index([entityType, entityId])
+  @@index([action, timestamp])
   @@index([timestamp])
   @@map("audit_logs")
 }
