@@ -30,6 +30,30 @@ export const invitationForExchangeArgs = Prisma.validator<
 export type InvitationWithCampaign =
   Prisma.AssessmentInvitationGetPayload<typeof invitationForExchangeArgs>;
 
+export type InvitationExchangeAvailability =
+  | "USABLE"
+  | "NOT_YET_OPEN"
+  | "UNAVAILABLE";
+
+export function classifyInvitationExchangeAvailability(
+  invitation: InvitationWithCampaign,
+  now: Date,
+): InvitationExchangeAvailability {
+  if (invitation.campaign.deletedAt !== null) return "UNAVAILABLE";
+  if (invitation.revokedAt !== null) return "UNAVAILABLE";
+  if (now >= invitation.expiresAt) return "UNAVAILABLE";
+  if (invitation.status === "SUBMITTED") return "UNAVAILABLE";
+  if (invitation.campaign.status !== "ACTIVE") return "UNAVAILABLE";
+  if (now < invitation.campaign.openAt) return "NOT_YET_OPEN";
+  if (
+    invitation.campaign.closeAt !== null &&
+    now >= invitation.campaign.closeAt
+  ) {
+    return "UNAVAILABLE";
+  }
+  return "USABLE";
+}
+
 export interface StagedStableToken {
   tokenId: string;
   invitationId: string;
@@ -304,7 +328,47 @@ export async function removeRegisteredStableInvitationToken(
   }
 }
 
-export async function rollbackRejectedStableInvitationToken(
+async function findViableRejectedTokenPredecessor(
+  tx: Prisma.TransactionClient,
+  input: { tokenHash: string; expiresAt: Date },
+): Promise<{ tokenHash: string; expiresAt: Date }> {
+  let current = input;
+  const visited = new Set<string>();
+
+  while (true) {
+    if (visited.has(current.tokenHash)) {
+      throw stableTokenInvariant("rejected predecessor chain contains a cycle");
+    }
+    visited.add(current.tokenHash);
+
+    const predecessor = await tx.assessmentInvitationToken.findUnique({
+      where: { tokenHash: current.tokenHash },
+      select: {
+        deliveryState: true,
+        previousTokenHash: true,
+        previousExpiresAt: true,
+      },
+    });
+    if (!predecessor || predecessor.deliveryState !== "REJECTED") {
+      return current;
+    }
+    if (
+      predecessor.previousTokenHash === null ||
+      predecessor.previousExpiresAt === null
+    ) {
+      throw stableTokenInvariant(
+        "rejected predecessor has no viable rollback metadata",
+      );
+    }
+    assertSha256Hash(predecessor.previousTokenHash);
+    current = {
+      tokenHash: predecessor.previousTokenHash,
+      expiresAt: predecessor.previousExpiresAt,
+    };
+  }
+}
+
+export async function quarantineRejectedStableInvitationToken(
   db: StableTokenDb,
   staged: StagedStableToken,
 ): Promise<void> {
@@ -337,7 +401,8 @@ export async function rollbackRejectedStableInvitationToken(
       failed.invitationId !== staged.invitationId ||
       failed.tokenHash !== staged.newTokenHash ||
       (failed.source !== "ORIGINAL" && failed.source !== "REMINDER") ||
-      failed.deliveryState !== "STAGED" ||
+      (failed.deliveryState !== "STAGED" &&
+        failed.deliveryState !== "REJECTED") ||
       failed.previousTokenHash === null ||
       failed.previousExpiresAt === null
     ) {
@@ -349,7 +414,7 @@ export async function rollbackRejectedStableInvitationToken(
     assertSha256Hash(failed.tokenHash);
     assertSha256Hash(failed.previousTokenHash);
 
-    const deleted = await tx.assessmentInvitationToken.deleteMany({
+    const rejected = await tx.assessmentInvitationToken.updateMany({
       where: {
         id: failed.id,
         invitationId: failed.invitationId,
@@ -357,12 +422,80 @@ export async function rollbackRejectedStableInvitationToken(
         source: failed.source,
         deliveryState: "STAGED",
       },
+      data: {
+        deliveryState: "REJECTED",
+        deliveryConfirmedAt: null,
+      },
     });
-    if (deleted.count !== 1) {
+    if (rejected.count !== 1 && failed.deliveryState !== "REJECTED") {
       throw stableTokenInvariant(
-        "rejected rotating token changed before deletion",
+        "rejected rotating token changed before quarantine",
       );
     }
+
+    const viablePredecessor = await findViableRejectedTokenPredecessor(tx, {
+      tokenHash: failed.previousTokenHash,
+      expiresAt: failed.previousExpiresAt,
+    });
+
+    await tx.assessmentInvitation.updateMany({
+      where: {
+        id: failed.invitationId,
+        tokenHash: failed.tokenHash,
+      },
+      data: {
+        tokenHash: viablePredecessor.tokenHash,
+        expiresAt: viablePredecessor.expiresAt,
+      },
+    });
+  });
+}
+
+export async function reconcileRejectedStableInvitationToken(
+  db: StableTokenDb,
+  staged: StagedStableToken,
+): Promise<void> {
+  assertSha256Hash(staged.newTokenHash);
+  assertSha256Hash(staged.previousTokenHash);
+
+  await db.$transaction(async (tx) => {
+    await tx.$executeRaw`
+      SELECT "id"
+      FROM "assessment_invitations"
+      WHERE "id" = ${staged.invitationId}
+      FOR UPDATE
+    `;
+
+    const failed = await tx.assessmentInvitationToken.findUnique({
+      where: { id: staged.tokenId },
+      select: {
+        id: true,
+        invitationId: true,
+        tokenHash: true,
+        source: true,
+        deliveryState: true,
+        previousTokenHash: true,
+        previousExpiresAt: true,
+      },
+    });
+    if (
+      !failed ||
+      failed.invitationId !== staged.invitationId ||
+      failed.tokenHash !== staged.newTokenHash ||
+      (failed.source !== "ORIGINAL" && failed.source !== "REMINDER") ||
+      failed.deliveryState !== "REJECTED" ||
+      failed.previousTokenHash === null ||
+      failed.previousExpiresAt === null
+    ) {
+      throw stableTokenInvariant(
+        "rejected rotating token reconciliation identity or state mismatch",
+      );
+    }
+
+    const viablePredecessor = await findViableRejectedTokenPredecessor(tx, {
+      tokenHash: failed.previousTokenHash,
+      expiresAt: failed.previousExpiresAt,
+    });
 
     await tx.assessmentInvitationToken.updateMany({
       where: {
@@ -371,8 +504,8 @@ export async function rollbackRejectedStableInvitationToken(
         previousTokenHash: failed.tokenHash,
       },
       data: {
-        previousTokenHash: failed.previousTokenHash,
-        previousExpiresAt: failed.previousExpiresAt,
+        previousTokenHash: viablePredecessor.tokenHash,
+        previousExpiresAt: viablePredecessor.expiresAt,
       },
     });
 
@@ -382,11 +515,20 @@ export async function rollbackRejectedStableInvitationToken(
         tokenHash: failed.tokenHash,
       },
       data: {
-        tokenHash: failed.previousTokenHash,
-        expiresAt: failed.previousExpiresAt,
+        tokenHash: viablePredecessor.tokenHash,
+        expiresAt: viablePredecessor.expiresAt,
       },
     });
   });
+}
+
+/** @deprecated Call quarantine then reconciliation so fail-closed state persists first. */
+export async function rollbackRejectedStableInvitationToken(
+  db: StableTokenDb,
+  staged: StagedStableToken,
+): Promise<void> {
+  await quarantineRejectedStableInvitationToken(db, staged);
+  await reconcileRejectedStableInvitationToken(db, staged);
 }
 
 export async function resolveInvitationByStableTokenHash(
@@ -398,9 +540,14 @@ export async function resolveInvitationByStableTokenHash(
   const token = await db.assessmentInvitationToken.findUnique({
     where: { tokenHash },
     select: {
+      deliveryState: true,
       invitation: invitationForExchangeArgs,
     },
   });
+
+  if (token?.deliveryState === "REJECTED") {
+    return null;
+  }
 
   if (token) {
     return token.invitation;

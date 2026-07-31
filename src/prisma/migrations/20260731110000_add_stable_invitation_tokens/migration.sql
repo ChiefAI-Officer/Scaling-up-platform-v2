@@ -3,7 +3,7 @@
 
 CREATE TYPE "AssessmentInvitationTokenSource" AS ENUM ('LEGACY_CURRENT', 'ORIGINAL', 'REMINDER');
 
-CREATE TYPE "AssessmentInvitationTokenDeliveryState" AS ENUM ('STAGED', 'SENT', 'UNCERTAIN');
+CREATE TYPE "AssessmentInvitationTokenDeliveryState" AS ENUM ('STAGED', 'SENT', 'UNCERTAIN', 'REJECTED');
 
 CREATE TABLE "assessment_invitation_tokens" (
     "id" TEXT NOT NULL,

@@ -3,13 +3,11 @@
  *
  * Bulk-friendly reminder send. Defaults to "all pending participants" when
  * no IDs are passed; otherwise restricts to the supplied subset. Reuses the
- * existing invitation row when one is present (status PENDING/SENT/VIEWED)
- * and rotates the cryptographic token on that row — the row id, expiresAt,
- * and status are preserved. Mirrors the security trade-off documented in
- * `/api/assessment-campaigns/[id]/invitations/[invitationId]/resend`:
- * tokenHash is one-way, so the raw token cannot be recovered for an
- * existing row; a fresh raw token is minted and any prior link is
- * invalidated. From the coach's perspective the row is the same row.
+ * existing invitation row when one is present (status PENDING/SENT/VIEWED).
+ * With Jeff #65 enabled, each delivered reminder adds a sibling token while
+ * retaining older links; flag-off or kill preserves the legacy parent-only
+ * rotation. The invitation row id, lifecycle, and assessment state remain
+ * shared in both modes.
  *
  * Body:
  *   { participantIds?: string[] }
@@ -51,8 +49,9 @@ import {
   classifyInvitationSendError,
   confirmStableInvitationToken,
   markStableInvitationTokenUncertain,
+  quarantineRejectedStableInvitationToken,
+  reconcileRejectedStableInvitationToken,
   retryStableInvitationOperation,
-  rollbackRejectedStableInvitationToken,
   stageStableInvitationToken,
   type StagedStableToken,
 } from "@/lib/assessments/stable-invitation-tokens";
@@ -72,11 +71,20 @@ const ReminderBodySchema = z.object({
 
 type FailedEntry = { participantId: string; reason: string };
 
-async function rollbackRejectedWithRetry(
+async function quarantineRejectedWithRetry(
   staged: StagedStableToken
 ): Promise<boolean> {
   return retryStableInvitationOperation(
-    () => rollbackRejectedStableInvitationToken(db, staged),
+    () => quarantineRejectedStableInvitationToken(db, staged),
+    MAX_REJECTED_ROLLBACK_ATTEMPTS,
+  );
+}
+
+async function reconcileRejectedWithRetry(
+  staged: StagedStableToken
+): Promise<boolean> {
+  return retryStableInvitationOperation(
+    () => reconcileRejectedStableInvitationToken(db, staged),
     MAX_REJECTED_ROLLBACK_ATTEMPTS,
   );
 }
@@ -87,6 +95,9 @@ async function persistRollbackExhaustionAuditWithRetry(input: {
   invitationId: string;
   tokenId: string;
   performedBy: string;
+  disposition:
+    | "DEFINITE_REJECTION_QUARANTINE_EXHAUSTED"
+    | "DEFINITE_REJECTION_RECONCILIATION_EXHAUSTED";
 }): Promise<boolean> {
   return retryStableInvitationOperation(
     async () => {
@@ -100,8 +111,12 @@ async function persistRollbackExhaustionAuditWithRetry(input: {
           participantId: input.participantId,
           invitationId: input.invitationId,
           tokenId: input.tokenId,
-          action: "reminder-rejected-rollback-exhausted",
-          disposition: "DEFINITE_REJECTION_ROLLBACK_EXHAUSTED",
+          action:
+            input.disposition ===
+            "DEFINITE_REJECTION_QUARANTINE_EXHAUSTED"
+              ? "reminder-rejected-quarantine-unresolved"
+              : "reminder-rejected-reconciliation-unresolved",
+          disposition: input.disposition,
         },
       });
     },
@@ -338,7 +353,7 @@ export async function POST(
     let skipped = 0;
     const failed: FailedEntry[] = [];
 
-    for (const participant of capped) {
+    for (const [cappedIndex, participant] of capped.entries()) {
       const respondent = participant.respondent!;
       const prior = existingByRespondentId.get(participant.respondentId);
 
@@ -461,8 +476,8 @@ export async function POST(
                 }
               );
             }
-          } else if (!(await rollbackRejectedWithRetry(staged))) {
-            failureReason = "smtp-rejected-rollback-failed";
+          } else if (!(await quarantineRejectedWithRetry(staged))) {
+            failureReason = "smtp-rejected-quarantine-failed";
             const auditPersisted =
               await persistRollbackExhaustionAuditWithRetry({
                 campaignId,
@@ -470,6 +485,8 @@ export async function POST(
                 invitationId: prior.id,
                 tokenId: staged.tokenId,
                 performedBy: actor.email,
+                disposition:
+                  "DEFINITE_REJECTION_QUARANTINE_EXHAUSTED",
               });
             if (!auditPersisted) {
               console.error(
@@ -481,20 +498,99 @@ export async function POST(
                   attempts: MAX_CRITICAL_AUDIT_ATTEMPTS,
                 }
               );
+              failed.push({
+                participantId: participant.respondentId,
+                reason: failureReason,
+              });
               return NextResponse.json(
                 {
                   success: false,
-                  error: "Failed to persist reminder rollback audit",
+                  error: "Failed to persist reminder quarantine audit",
+                  data: {
+                    sent,
+                    skipped,
+                    failed,
+                    remaining: targets.length - cappedIndex - 1,
+                  },
+                  retrySafe: false,
+                  retrySafety:
+                    "PARTIAL_BATCH_DO_NOT_RETRY_WHOLE_REQUEST",
+                },
+                { status: 503 }
+              );
+            }
+            return NextResponse.json(
+              {
+                success: false,
+                error: "Failed to quarantine a rejected reminder token",
+                data: {
+                  sent,
+                  skipped,
+                  failed: [
+                    ...failed,
+                    {
+                      participantId: participant.respondentId,
+                      reason: failureReason,
+                    },
+                  ],
+                  remaining: targets.length - cappedIndex - 1,
+                },
+                retrySafe: false,
+                retrySafety:
+                  "PARTIAL_BATCH_DO_NOT_RETRY_WHOLE_REQUEST",
+              },
+              { status: 503 },
+            );
+          } else if (!(await reconcileRejectedWithRetry(staged))) {
+            failureReason = "smtp-rejected-reconciliation-failed";
+            const auditPersisted =
+              await persistRollbackExhaustionAuditWithRetry({
+                campaignId,
+                participantId: participant.respondentId,
+                invitationId: prior.id,
+                tokenId: staged.tokenId,
+                performedBy: actor.email,
+                disposition:
+                  "DEFINITE_REJECTION_RECONCILIATION_EXHAUSTED",
+              });
+            if (!auditPersisted) {
+              console.error(
+                "[assessment-reminders] reconciliation-exhaustion audit persistence failed",
+                {
+                  respondentId: participant.respondentId,
+                  invitationId: prior.id,
+                  disposition: "CRITICAL_AUDIT_PERSIST_FAILED",
+                  attempts: MAX_CRITICAL_AUDIT_ATTEMPTS,
+                }
+              );
+              failed.push({
+                participantId: participant.respondentId,
+                reason: failureReason,
+              });
+              return NextResponse.json(
+                {
+                  success: false,
+                  error: "Failed to persist reminder reconciliation audit",
+                  data: {
+                    sent,
+                    skipped,
+                    failed,
+                    remaining: targets.length - cappedIndex - 1,
+                  },
+                  retrySafe: false,
+                  retrySafety:
+                    "PARTIAL_BATCH_DO_NOT_RETRY_WHOLE_REQUEST",
                 },
                 { status: 503 }
               );
             }
             console.error(
-              "[assessment-reminders] rejected-token rollback exhausted",
+              "[assessment-reminders] rejected-token reconciliation exhausted",
               {
                 respondentId: participant.respondentId,
                 invitationId: prior.id,
-                disposition: "DEFINITE_REJECTION_ROLLBACK_EXHAUSTED",
+                disposition:
+                  "DEFINITE_REJECTION_RECONCILIATION_EXHAUSTED",
                 attempts: MAX_REJECTED_ROLLBACK_ATTEMPTS,
               }
             );

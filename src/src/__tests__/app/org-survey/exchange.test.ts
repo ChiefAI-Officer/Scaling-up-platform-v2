@@ -56,9 +56,15 @@ jest.mock("@/lib/assessments/wave-j65-flags", () => ({
   isStableInvitationLinksEnabled: jest.fn().mockReturnValue(false),
 }));
 
-jest.mock("@/lib/assessments/stable-invitation-tokens", () => ({
-  resolveInvitationByStableTokenHash: jest.fn(),
-}));
+jest.mock("@/lib/assessments/stable-invitation-tokens", () => {
+  const actual = jest.requireActual<
+    typeof import("@/lib/assessments/stable-invitation-tokens")
+  >("@/lib/assessments/stable-invitation-tokens");
+  return {
+    ...actual,
+    resolveInvitationByStableTokenHash: jest.fn(),
+  };
+});
 
 import { POST } from "@/app/(public)/org-survey/[campaignAlias]/exchange/route";
 import { db } from "@/lib/db";

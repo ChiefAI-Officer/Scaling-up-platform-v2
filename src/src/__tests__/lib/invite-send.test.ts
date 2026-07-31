@@ -80,6 +80,16 @@ function participant(id: string) {
   };
 }
 
+function stagedOriginal(tokenId: string, invitationId: string = "inv-r1") {
+  return {
+    tokenId,
+    invitationId,
+    newTokenHash: "a".repeat(64),
+    previousTokenHash: "b".repeat(64),
+    previousExpiresAt: new Date("2026-06-30T00:00:00.000Z"),
+  };
+}
+
 function expectSecretNotLogged(errorSpy: jest.SpyInstance, secret: string) {
   for (const value of errorSpy.mock.calls.flat()) {
     if (value instanceof Error) {
@@ -145,12 +155,15 @@ describe("sendInvitesBatch", () => {
   it("enabled: invitation write failures expose only an allowlisted disposition", async () => {
     const secret = "database-error-containing-token-or-hash";
     const stableTokens = {
-      stageExistingOriginal: jest.fn(),
+      stageExistingOriginal: jest
+        .fn()
+        .mockResolvedValue(stagedOriginal("token-r1")),
       registerOriginal: jest.fn(),
       confirm: jest.fn(),
       uncertain: jest.fn(),
       removeRegistered: jest.fn(),
       rollbackRejected: jest.fn(),
+      reconcileRejected: jest.fn(),
     };
     const { deps, create } = makeDeps({
       prepareEmail: jest.fn(),
@@ -178,18 +191,25 @@ describe("sendInvitesBatch", () => {
     errorSpy.mockRestore();
   });
 
-  it("enabled: prepares, registers, sends, and confirms a new original token", async () => {
+  it("enabled: stages a new original over a never-delivered rollback root before sending", async () => {
     const providerSend = jest.fn().mockResolvedValue(undefined);
     const prepareEmail = jest.fn().mockReturnValue({ send: providerSend });
     const stableTokens = {
-      stageExistingOriginal: jest.fn(),
+      stageExistingOriginal: jest.fn().mockResolvedValue({
+        tokenId: "token-r1",
+        invitationId: "inv-r1",
+        newTokenHash: "a".repeat(64),
+        previousTokenHash: "b".repeat(64),
+        previousExpiresAt: new Date("2026-06-30T00:00:00.000Z"),
+      }),
       registerOriginal: jest.fn().mockResolvedValue({ tokenId: "token-r1" }),
       confirm: jest.fn().mockResolvedValue(undefined),
       uncertain: jest.fn(),
       removeRegistered: jest.fn(),
       rollbackRejected: jest.fn(),
+      reconcileRejected: jest.fn(),
     };
-    const { deps, sendEmail } = makeDeps({ prepareEmail, stableTokens });
+    const { deps, create, sendEmail } = makeDeps({ prepareEmail, stableTokens });
 
     const result = await sendInvitesBatch(deps, {
       campaign: CAMPAIGN,
@@ -202,19 +222,24 @@ describe("sendInvitesBatch", () => {
     const expectedHash = createHash("sha256")
       .update(preparedPayload.rawToken)
       .digest("hex");
-    expect(stableTokens.registerOriginal).toHaveBeenCalledWith({
+    expect(stableTokens.registerOriginal).not.toHaveBeenCalled();
+    expect(stableTokens.stageExistingOriginal).toHaveBeenCalledWith({
       invitationId: "inv-r1",
       tokenHash: expectedHash,
+      expiresAt: expect.any(Date),
     });
+    const parentRootHash = create.mock.calls[0][0].data.tokenHash;
+    expect(parentRootHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(parentRootHash).not.toBe(expectedHash);
     expect(stableTokens.confirm).toHaveBeenCalledWith({
       tokenId: "token-r1",
       invitationId: "inv-r1",
       confirmedAt: expect.any(Date),
     });
     expect(prepareEmail.mock.invocationCallOrder[0]).toBeLessThan(
-      stableTokens.registerOriginal.mock.invocationCallOrder[0],
+      stableTokens.stageExistingOriginal.mock.invocationCallOrder[0],
     );
-    expect(stableTokens.registerOriginal.mock.invocationCallOrder[0]).toBeLessThan(
+    expect(stableTokens.stageExistingOriginal.mock.invocationCallOrder[0]).toBeLessThan(
       providerSend.mock.invocationCallOrder[0],
     );
     expect(providerSend.mock.invocationCallOrder[0]).toBeLessThan(
@@ -241,6 +266,7 @@ describe("sendInvitesBatch", () => {
       uncertain: jest.fn(),
       removeRegistered: jest.fn(),
       rollbackRejected: jest.fn(),
+      reconcileRejected: jest.fn(),
     };
     const { deps, findMany, update } = makeDeps({ prepareEmail, stableTokens });
     findMany.mockResolvedValue([
@@ -319,6 +345,7 @@ describe("sendInvitesBatch", () => {
       uncertain: jest.fn(),
       removeRegistered: jest.fn(),
       rollbackRejected: jest.fn(),
+      reconcileRejected: jest.fn(),
     };
     const { deps, findMany, update, sendEmail } = makeDeps({
       prepareEmail,
@@ -359,6 +386,7 @@ describe("sendInvitesBatch", () => {
       uncertain: jest.fn(),
       removeRegistered: jest.fn(),
       rollbackRejected: jest.fn(),
+      reconcileRejected: jest.fn(),
     };
     const { deps, findMany, update } = makeDeps({
       prepareEmail: jest.fn().mockReturnValue({ send: providerSend }),
@@ -392,12 +420,15 @@ describe("sendInvitesBatch", () => {
     const secret = "raw-token-or-hash-from-provider";
     const providerSend = jest.fn().mockRejectedValue(new Error(secret));
     const stableTokens = {
-      stageExistingOriginal: jest.fn(),
+      stageExistingOriginal: jest
+        .fn()
+        .mockResolvedValue(stagedOriginal("token-r1")),
       registerOriginal: jest.fn().mockResolvedValue({ tokenId: "token-r1" }),
       confirm: jest.fn(),
       uncertain: jest.fn().mockResolvedValue(undefined),
       removeRegistered: jest.fn(),
       rollbackRejected: jest.fn(),
+      reconcileRejected: jest.fn(),
     };
     const { deps, update } = makeDeps({
       prepareEmail: jest.fn().mockReturnValue({ send: providerSend }),
@@ -422,19 +453,22 @@ describe("sendInvitesBatch", () => {
     errorSpy.mockRestore();
   });
 
-  it("enabled: definite rejection retries guarded cleanup of only a new registered child", async () => {
+  it("enabled: definite rejection retries quarantine before reconciling a new original", async () => {
     const providerSend = jest.fn().mockRejectedValue({ responseCode: 550 });
     const stableTokens = {
-      stageExistingOriginal: jest.fn(),
+      stageExistingOriginal: jest
+        .fn()
+        .mockResolvedValue(stagedOriginal("token-r1")),
       registerOriginal: jest.fn().mockResolvedValue({ tokenId: "token-r1" }),
       confirm: jest.fn(),
       uncertain: jest.fn(),
-      removeRegistered: jest
+      removeRegistered: jest.fn(),
+      rollbackRejected: jest
         .fn()
-        .mockRejectedValueOnce(new Error("transient cleanup failure"))
-        .mockRejectedValueOnce(new Error("transient cleanup failure"))
+        .mockRejectedValueOnce(new Error("transient quarantine failure"))
+        .mockRejectedValueOnce(new Error("transient quarantine failure"))
         .mockResolvedValueOnce(undefined),
-      rollbackRejected: jest.fn(),
+      reconcileRejected: jest.fn().mockResolvedValue(undefined),
     };
     const { deps, create, update } = makeDeps({
       prepareEmail: jest.fn().mockReturnValue({ send: providerSend }),
@@ -449,9 +483,14 @@ describe("sendInvitesBatch", () => {
       stableLinksEnabled: true,
     });
 
-    expect(stableTokens.removeRegistered).toHaveBeenCalledTimes(3);
-    expect(stableTokens.removeRegistered).toHaveBeenCalledWith("token-r1");
-    expect(stableTokens.rollbackRejected).not.toHaveBeenCalled();
+    expect(stableTokens.rollbackRejected).toHaveBeenCalledTimes(3);
+    expect(stableTokens.rollbackRejected).toHaveBeenCalledWith(
+      stagedOriginal("token-r1"),
+    );
+    expect(stableTokens.reconcileRejected).toHaveBeenCalledWith(
+      stagedOriginal("token-r1"),
+    );
+    expect(stableTokens.removeRegistered).not.toHaveBeenCalled();
     expect(stableTokens.uncertain).not.toHaveBeenCalled();
     expect(create).toHaveBeenCalledTimes(1);
     expect(update).not.toHaveBeenCalled();
@@ -459,19 +498,24 @@ describe("sendInvitesBatch", () => {
     errorSpy.mockRestore();
   });
 
-  it("enabled: cleanup exhaustion persists a strict token-id audit with bounded retries", async () => {
+  it("enabled: reconciliation exhaustion persists a strict token-id audit with bounded retries", async () => {
     const persistRejectedCleanupAudit = jest
       .fn()
       .mockRejectedValueOnce(new Error("audit unavailable"))
       .mockRejectedValueOnce(new Error("audit unavailable"))
       .mockResolvedValueOnce(undefined);
     const stableTokens = {
-      stageExistingOriginal: jest.fn(),
+      stageExistingOriginal: jest
+        .fn()
+        .mockResolvedValue(stagedOriginal("token-r1")),
       registerOriginal: jest.fn().mockResolvedValue({ tokenId: "token-r1" }),
       confirm: jest.fn(),
       uncertain: jest.fn(),
-      removeRegistered: jest.fn().mockRejectedValue(new Error("cleanup unavailable")),
-      rollbackRejected: jest.fn(),
+      removeRegistered: jest.fn(),
+      rollbackRejected: jest.fn().mockResolvedValue(undefined),
+      reconcileRejected: jest
+        .fn()
+        .mockRejectedValue(new Error("reconciliation unavailable")),
     };
     const { deps } = makeDeps({
       prepareEmail: jest.fn().mockReturnValue({
@@ -489,14 +533,14 @@ describe("sendInvitesBatch", () => {
       stableLinksEnabled: true,
     });
 
-    expect(stableTokens.removeRegistered).toHaveBeenCalledTimes(3);
+    expect(stableTokens.reconcileRejected).toHaveBeenCalledTimes(3);
     expect(persistRejectedCleanupAudit).toHaveBeenCalledTimes(3);
     expect(persistRejectedCleanupAudit).toHaveBeenCalledWith({
       campaignId: "c1",
       respondentId: "r1",
       invitationId: "inv-r1",
       tokenId: "token-r1",
-      disposition: "DEFINITE_REJECTION_CLEANUP_EXHAUSTED",
+      disposition: "DEFINITE_REJECTION_RECONCILIATION_EXHAUSTED",
     });
     expect(result.failed).toEqual(["r1"]);
     errorSpy.mockRestore();
@@ -517,6 +561,7 @@ describe("sendInvitesBatch", () => {
       uncertain: jest.fn(),
       removeRegistered: jest.fn(),
       rollbackRejected: jest.fn().mockResolvedValue(undefined),
+      reconcileRejected: jest.fn().mockResolvedValue(undefined),
     };
     const { deps, findMany, update } = makeDeps({
       prepareEmail: jest.fn().mockReturnValue({
@@ -542,6 +587,7 @@ describe("sendInvitesBatch", () => {
     });
 
     expect(stableTokens.rollbackRejected).toHaveBeenCalledWith(staged);
+    expect(stableTokens.reconcileRejected).toHaveBeenCalledWith(staged);
     expect(stableTokens.removeRegistered).not.toHaveBeenCalled();
     expect(stableTokens.uncertain).not.toHaveBeenCalled();
     expect(update).not.toHaveBeenCalled();
@@ -552,12 +598,15 @@ describe("sendInvitesBatch", () => {
   it("enabled: provider acceptance still counts as sent when child confirmation persistence fails", async () => {
     const secret = "confirmation-error-with-secret";
     const stableTokens = {
-      stageExistingOriginal: jest.fn(),
+      stageExistingOriginal: jest
+        .fn()
+        .mockResolvedValue(stagedOriginal("token-r1")),
       registerOriginal: jest.fn().mockResolvedValue({ tokenId: "token-r1" }),
       confirm: jest.fn().mockRejectedValue(new Error(secret)),
       uncertain: jest.fn(),
       removeRegistered: jest.fn(),
       rollbackRejected: jest.fn(),
+      reconcileRejected: jest.fn(),
     };
     const { deps, update } = makeDeps({
       prepareEmail: jest.fn().mockReturnValue({
@@ -589,7 +638,10 @@ describe("sendInvitesBatch", () => {
   it("enabled: provider acceptance preserves legacy retry signaling when the parent status write fails", async () => {
     const secret = "parent-write-error-with-secret";
     const stableTokens = {
-      stageExistingOriginal: jest.fn(),
+      stageExistingOriginal: jest
+        .fn()
+        .mockResolvedValueOnce(stagedOriginal("token-r1"))
+        .mockResolvedValueOnce(stagedOriginal("token-r2", "inv-r2")),
       registerOriginal: jest
         .fn()
         .mockResolvedValueOnce({ tokenId: "token-r1" })
@@ -598,6 +650,7 @@ describe("sendInvitesBatch", () => {
       uncertain: jest.fn(),
       removeRegistered: jest.fn(),
       rollbackRejected: jest.fn(),
+      reconcileRejected: jest.fn(),
     };
     const { deps, update } = makeDeps({
       prepareEmail: jest.fn().mockReturnValue({

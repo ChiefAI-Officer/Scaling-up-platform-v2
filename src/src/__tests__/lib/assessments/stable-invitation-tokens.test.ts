@@ -2,6 +2,8 @@ import {
   classifyInvitationSendError,
   confirmStableInvitationToken,
   markStableInvitationTokenUncertain,
+  quarantineRejectedStableInvitationToken,
+  reconcileRejectedStableInvitationToken,
   registerNewOriginalToken,
   removeRegisteredStableInvitationToken,
   resolveInvitationByStableTokenHash,
@@ -45,7 +47,7 @@ const INVITATION_WITH_CAMPAIGN = {
 };
 
 type HarnessTokenSource = "LEGACY_CURRENT" | "ORIGINAL" | "REMINDER";
-type HarnessDeliveryState = "STAGED" | "SENT" | "UNCERTAIN";
+type HarnessDeliveryState = "STAGED" | "SENT" | "UNCERTAIN" | "REJECTED";
 
 interface HarnessToken {
   id: string;
@@ -317,7 +319,7 @@ describe("stable invitation tokens", () => {
       }),
     ).rejects.toThrow("SHA-256");
     await expect(
-      rollbackRejectedStableInvitationToken(db, {
+      quarantineRejectedStableInvitationToken(db, {
         tokenId: "token-1",
         invitationId: "inv-1",
         newTokenHash: NEW_HASH,
@@ -645,21 +647,26 @@ describe("stable invitation tokens", () => {
     },
   );
 
-  test("rolling back a rejected staged token deletes its child and restores the parent with compare-and-swap", async () => {
+  test("rejecting a staged token retains a tombstone and restores the parent with compare-and-swap", async () => {
     const tx = {
       $executeRaw: jest.fn().mockResolvedValue(1),
       assessmentInvitationToken: {
-        findUnique: jest.fn().mockResolvedValue({
-          id: "token-1",
-          invitationId: "inv-1",
-          tokenHash: NEW_HASH,
-          source: "REMINDER",
-          deliveryState: "STAGED",
-          previousTokenHash: OLD_HASH,
-          previousExpiresAt: new Date("2026-10-01T00:00:00Z"),
-        }),
-        deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
-        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+        findUnique: jest
+          .fn()
+          .mockResolvedValueOnce({
+            id: "token-1",
+            invitationId: "inv-1",
+            tokenHash: NEW_HASH,
+            source: "REMINDER",
+            deliveryState: "STAGED",
+            previousTokenHash: OLD_HASH,
+            previousExpiresAt: new Date("2026-10-01T00:00:00Z"),
+          })
+          .mockResolvedValueOnce(null),
+        updateMany: jest
+          .fn()
+          .mockResolvedValueOnce({ count: 1 })
+          .mockResolvedValueOnce({ count: 0 }),
       },
       assessmentInvitation: {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
@@ -675,7 +682,7 @@ describe("stable invitation tokens", () => {
     } as unknown as StableTokenDb;
     const previousExpiresAt = new Date("2026-10-01T00:00:00Z");
 
-    await rollbackRejectedStableInvitationToken(db, {
+    await quarantineRejectedStableInvitationToken(db, {
       tokenId: "token-1",
       invitationId: "inv-1",
       newTokenHash: NEW_HASH,
@@ -683,7 +690,7 @@ describe("stable invitation tokens", () => {
       previousExpiresAt,
     });
 
-    expect(tx.assessmentInvitationToken.deleteMany).toHaveBeenCalledWith({
+    expect(tx.assessmentInvitationToken.updateMany).toHaveBeenNthCalledWith(1, {
       where: {
         id: "token-1",
         invitationId: "inv-1",
@@ -691,7 +698,59 @@ describe("stable invitation tokens", () => {
         source: "REMINDER",
         deliveryState: "STAGED",
       },
+      data: {
+        deliveryState: "REJECTED",
+        deliveryConfirmedAt: null,
+      },
     });
+    expect(tx.assessmentInvitationToken.updateMany).toHaveBeenCalledTimes(1);
+    expect(tx.assessmentInvitation.updateMany).toHaveBeenCalledWith({
+      where: { id: "inv-1", tokenHash: NEW_HASH },
+      data: { tokenHash: OLD_HASH, expiresAt: previousExpiresAt },
+    });
+    expect(db.$transaction).toHaveBeenCalledTimes(1);
+  });
+
+  test("reconciling a rejected tombstone rewires direct successors without changing its state", async () => {
+    const previousExpiresAt = new Date("2026-10-01T00:00:00Z");
+    const tx = {
+      $executeRaw: jest.fn().mockResolvedValue(1),
+      assessmentInvitationToken: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValueOnce({
+            id: "token-1",
+            invitationId: "inv-1",
+            tokenHash: NEW_HASH,
+            source: "REMINDER",
+            deliveryState: "REJECTED",
+            previousTokenHash: OLD_HASH,
+            previousExpiresAt,
+          })
+          .mockResolvedValueOnce(null),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      assessmentInvitation: {
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+    };
+    const db = {
+      $transaction: jest.fn(
+        async (callback: (client: typeof tx) => Promise<unknown>) =>
+          callback(tx),
+      ),
+      assessmentInvitation: {},
+      assessmentInvitationToken: {},
+    } as unknown as StableTokenDb;
+
+    await reconcileRejectedStableInvitationToken(db, {
+      tokenId: "token-1",
+      invitationId: "inv-1",
+      newTokenHash: NEW_HASH,
+      previousTokenHash: OLD_HASH,
+      previousExpiresAt,
+    });
+
     expect(tx.assessmentInvitationToken.updateMany).toHaveBeenCalledWith({
       where: {
         invitationId: "inv-1",
@@ -703,30 +762,27 @@ describe("stable invitation tokens", () => {
         previousExpiresAt,
       },
     });
-    expect(tx.assessmentInvitation.updateMany).toHaveBeenCalledWith({
-      where: { id: "inv-1", tokenHash: NEW_HASH },
-      data: { tokenHash: OLD_HASH, expiresAt: previousExpiresAt },
-    });
-    expect(db.$transaction).toHaveBeenCalledTimes(1);
   });
 
-  test("a zero-count rollback leaves a newer parent mirror untouched", async () => {
+  test("quarantine leaves a newer parent mirror untouched when compare-and-swap loses", async () => {
     const overwriteNewerMirror = jest.fn();
     const previousExpiresAt = new Date("2026-10-01T00:00:00Z");
     const tx = {
       $executeRaw: jest.fn().mockResolvedValue(1),
       assessmentInvitationToken: {
-        findUnique: jest.fn().mockResolvedValue({
-          id: "token-1",
-          invitationId: "inv-1",
-          tokenHash: FAILED_HASH,
-          source: "REMINDER",
-          deliveryState: "STAGED",
-          previousTokenHash: OLD_HASH,
-          previousExpiresAt,
-        }),
-        deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
-        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+        findUnique: jest
+          .fn()
+          .mockResolvedValueOnce({
+            id: "token-1",
+            invitationId: "inv-1",
+            tokenHash: FAILED_HASH,
+            source: "REMINDER",
+            deliveryState: "STAGED",
+            previousTokenHash: OLD_HASH,
+            previousExpiresAt,
+          })
+          .mockResolvedValueOnce(null),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       assessmentInvitation: {
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),
@@ -742,7 +798,7 @@ describe("stable invitation tokens", () => {
       assessmentInvitationToken: {},
     } as unknown as StableTokenDb;
 
-    await rollbackRejectedStableInvitationToken(db, {
+    await quarantineRejectedStableInvitationToken(db, {
       tokenId: "token-1",
       invitationId: "inv-1",
       newTokenHash: FAILED_HASH,
@@ -752,7 +808,14 @@ describe("stable invitation tokens", () => {
 
     expect(tx.assessmentInvitation.updateMany).toHaveBeenCalledTimes(1);
     expect(overwriteNewerMirror).not.toHaveBeenCalled();
-    expect(tx.assessmentInvitationToken.deleteMany).toHaveBeenCalledTimes(1);
+    expect(tx.assessmentInvitationToken.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: {
+          deliveryState: "REJECTED",
+          deliveryConfirmedAt: null,
+        },
+      }),
+    );
   });
 
   test.each([
@@ -830,8 +893,8 @@ describe("stable invitation tokens", () => {
 
     expect(harness.parent.tokenHash).toBe(OLD_HASH);
     expect(
-      harness.tokens.some((token) => token.tokenHash === ATTEMPT_A_HASH),
-    ).toBe(false);
+      harness.tokens.find((token) => token.tokenHash === ATTEMPT_A_HASH),
+    ).toMatchObject({ deliveryState: "REJECTED" });
     expect(
       harness.tokens.some(
         (token) => token.tokenHash === harness.parent.tokenHash,
@@ -878,8 +941,8 @@ describe("stable invitation tokens", () => {
         ),
       ).toBe(true);
       expect(
-        harness.tokens.some((token) => token.source !== "LEGACY_CURRENT"),
-      ).toBe(false);
+        harness.tokens.filter((token) => token.deliveryState === "REJECTED"),
+      ).toHaveLength(2);
       expect(harness.parent.resentCount).toBe(0);
     },
   );
@@ -924,7 +987,7 @@ describe("stable invitation tokens", () => {
     ).toHaveLength(2);
   });
 
-  test("out-of-order A/B/C rejection never resurrects a deleted predecessor hash", async () => {
+  test("out-of-order A/B/C state-machine rejection never restores a tombstoned predecessor hash", async () => {
     const harness = buildStatefulTokenDb();
     const attempts = [
       await stageStableInvitationToken(harness.db, {
@@ -963,8 +1026,49 @@ describe("stable invitation tokens", () => {
       ),
     ).toBe(true);
     expect(
-      harness.tokens.some((token) => token.source === "REMINDER"),
-    ).toBe(false);
+      harness.tokens.filter(
+        (token) =>
+          token.source === "REMINDER" &&
+          token.deliveryState === "REJECTED",
+      ),
+    ).toHaveLength(3);
+  });
+
+  test("a newer rejection traverses an unreconciled rejected predecessor before restoring the parent mirror", async () => {
+    const harness = buildStatefulTokenDb();
+    const older = await stageStableInvitationToken(harness.db, {
+      invitationId: "inv-1",
+      newTokenHash: ATTEMPT_A_HASH,
+      expiresAt: new Date("2026-11-01T00:00:00Z"),
+      source: "REMINDER",
+    });
+    const newer = await stageStableInvitationToken(harness.db, {
+      invitationId: "inv-1",
+      newTokenHash: ATTEMPT_B_HASH,
+      expiresAt: new Date("2026-12-01T00:00:00Z"),
+      source: "REMINDER",
+    });
+
+    // Simulate successor-rewrite reconciliation exhaustion for the older
+    // rejection: quarantine is durable, but B still points at rejected A.
+    await quarantineRejectedStableInvitationToken(harness.db, older);
+    expect(harness.parent.tokenHash).toBe(ATTEMPT_B_HASH);
+    expect(
+      harness.tokens.find((token) => token.tokenHash === ATTEMPT_B_HASH),
+    ).toMatchObject({ previousTokenHash: ATTEMPT_A_HASH });
+
+    await quarantineRejectedStableInvitationToken(harness.db, newer);
+
+    expect(harness.parent.tokenHash).toBe(OLD_HASH);
+    expect(harness.parent.tokenHash).not.toBe(ATTEMPT_A_HASH);
+    expect(
+      harness.tokens.filter(
+        (token) =>
+          (token.tokenHash === ATTEMPT_A_HASH ||
+            token.tokenHash === ATTEMPT_B_HASH) &&
+          token.deliveryState === "REJECTED",
+      ),
+    ).toHaveLength(2);
   });
 
   test.each([
@@ -1017,15 +1121,13 @@ describe("stable invitation tokens", () => {
         ),
       ).toBe(true);
       expect(
-        harness.tokens.some(
+        harness.tokens.filter(
           (token) =>
-            token.tokenHash === ATTEMPT_A_HASH ||
-            token.tokenHash === ATTEMPT_B_HASH,
+            (token.tokenHash === ATTEMPT_A_HASH ||
+              token.tokenHash === ATTEMPT_B_HASH) &&
+            token.deliveryState === "REJECTED",
         ),
-      ).toBe(false);
-      expect(
-        harness.tokens.some((token) => token.source === "ORIGINAL"),
-      ).toBe(false);
+      ).toHaveLength(2);
       expect(harness.parent.resentCount).toBe(0);
     },
   );
@@ -1220,6 +1322,7 @@ describe("stable invitation tokens", () => {
 
   test("stable-token lookup resolves the invitation through the child first", async () => {
     const childFindUnique = jest.fn().mockResolvedValue({
+      deliveryState: "SENT",
       invitation: INVITATION_WITH_CAMPAIGN,
     });
     const parentFindUnique = jest.fn();
@@ -1233,6 +1336,7 @@ describe("stable invitation tokens", () => {
     expect(childFindUnique).toHaveBeenCalledWith({
       where: { tokenHash: HASH },
       select: {
+        deliveryState: true,
         invitation: {
           include: {
             campaign: {
@@ -1251,6 +1355,42 @@ describe("stable invitation tokens", () => {
     });
     expect(parentFindUnique).not.toHaveBeenCalled();
     expect(invitation?.id).toBe("inv-1");
+  });
+
+  test("an exact REJECTED child is denied without parent fallback", async () => {
+      const childFindUnique = jest.fn().mockResolvedValue({
+        deliveryState: "REJECTED",
+        invitation: INVITATION_WITH_CAMPAIGN,
+      });
+      const parentFindUnique = jest
+        .fn()
+        .mockResolvedValue(INVITATION_WITH_CAMPAIGN);
+      const db = {
+        assessmentInvitationToken: { findUnique: childFindUnique },
+        assessmentInvitation: { findUnique: parentFindUnique },
+      } as unknown as StableTokenLookupDb;
+
+      await expect(
+        resolveInvitationByStableTokenHash(db, HASH),
+      ).resolves.toBeNull();
+      expect(parentFindUnique).not.toHaveBeenCalled();
+  });
+
+  test("an exact STAGED child stays usable when provider acceptance may have occurred", async () => {
+    const childFindUnique = jest.fn().mockResolvedValue({
+      deliveryState: "STAGED",
+      invitation: INVITATION_WITH_CAMPAIGN,
+    });
+    const parentFindUnique = jest.fn();
+    const db = {
+      assessmentInvitationToken: { findUnique: childFindUnique },
+      assessmentInvitation: { findUnique: parentFindUnique },
+    } as unknown as StableTokenLookupDb;
+
+    await expect(
+      resolveInvitationByStableTokenHash(db, HASH),
+    ).resolves.toEqual(INVITATION_WITH_CAMPAIGN);
+    expect(parentFindUnique).not.toHaveBeenCalled();
   });
 
   test("stable-token lookup falls back to the parent compatibility mirror", async () => {

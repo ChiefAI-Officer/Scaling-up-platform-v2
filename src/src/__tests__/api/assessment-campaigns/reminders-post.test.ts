@@ -72,6 +72,8 @@ jest.mock("@/lib/assessments/stable-invitation-tokens", () => {
     stageStableInvitationToken: jest.fn(),
     confirmStableInvitationToken: jest.fn(),
     markStableInvitationTokenUncertain: jest.fn(),
+    quarantineRejectedStableInvitationToken: jest.fn(),
+    reconcileRejectedStableInvitationToken: jest.fn(),
     rollbackRejectedStableInvitationToken: jest.fn(),
     classifyInvitationSendError: jest.fn().mockReturnValue("UNCERTAIN"),
   };
@@ -84,7 +86,8 @@ import {
   classifyInvitationSendError,
   confirmStableInvitationToken,
   markStableInvitationTokenUncertain,
-  rollbackRejectedStableInvitationToken,
+  quarantineRejectedStableInvitationToken,
+  reconcileRejectedStableInvitationToken,
   stageStableInvitationToken,
 } from "@/lib/assessments/stable-invitation-tokens";
 import { isStableInvitationLinksEnabled } from "@/lib/assessments/wave-j65-flags";
@@ -110,7 +113,10 @@ const mockMarkStableInvitationTokenUncertain = jest.mocked(
   markStableInvitationTokenUncertain
 );
 const mockRollbackRejectedStableInvitationToken = jest.mocked(
-  rollbackRejectedStableInvitationToken
+  reconcileRejectedStableInvitationToken
+);
+const mockQuarantineRejectedStableInvitationToken = jest.mocked(
+  quarantineRejectedStableInvitationToken
 );
 const mockPrepareAssessmentInvitationEmail = jest.mocked(
   prepareAssessmentInvitationEmail
@@ -270,6 +276,7 @@ beforeEach(() => {
   );
   mockConfirmStableInvitationToken.mockResolvedValue(undefined);
   mockMarkStableInvitationTokenUncertain.mockResolvedValue(undefined);
+  mockQuarantineRejectedStableInvitationToken.mockResolvedValue(undefined);
   mockRollbackRejectedStableInvitationToken.mockResolvedValue(undefined);
   mockPrepareAssessmentInvitationEmail.mockImplementation(
     (payload) =>
@@ -846,7 +853,7 @@ describe("POST /api/assessment-campaigns/[id]/reminders", () => {
     jest.restoreAllMocks();
   });
 
-  it("durably audits exhausted rollback before continuing a mixed batch", async () => {
+  it("durably audits exhausted state-machine reconciliation before continuing a mixed batch", async () => {
     (getApiActor as jest.Mock).mockResolvedValue(coachActor);
     mockIsStableInvitationLinksEnabled.mockReturnValue(true);
     mockClassifyInvitationSendError.mockReturnValueOnce(
@@ -873,7 +880,7 @@ describe("POST /api/assessment-campaigns/[id]/reminders", () => {
         failed: [
           {
             participantId: "r1",
-            reason: "smtp-rejected-rollback-failed",
+            reason: "smtp-rejected-reconciliation-failed",
           },
         ],
       })
@@ -893,8 +900,8 @@ describe("POST /api/assessment-campaigns/[id]/reminders", () => {
       participantId: "r1",
       invitationId: "inv-r1",
       tokenId: "stable-inv-r1",
-      action: "reminder-rejected-rollback-exhausted",
-      disposition: "DEFINITE_REJECTION_ROLLBACK_EXHAUSTED",
+      action: "reminder-rejected-reconciliation-unresolved",
+      disposition: "DEFINITE_REJECTION_RECONCILIATION_EXHAUSTED",
     });
     expect(
       (db.auditLog.create as jest.Mock).mock.invocationCallOrder[0]
@@ -907,7 +914,7 @@ describe("POST /api/assessment-campaigns/[id]/reminders", () => {
     jest.restoreAllMocks();
   });
 
-  it("retries the strict rollback-exhaustion audit before continuing", async () => {
+  it("retries the strict reconciliation-exhaustion audit before continuing", async () => {
     (getApiActor as jest.Mock).mockResolvedValue(coachActor);
     mockIsStableInvitationLinksEnabled.mockReturnValue(true);
     mockClassifyInvitationSendError.mockReturnValueOnce(
@@ -940,22 +947,22 @@ describe("POST /api/assessment-campaigns/[id]/reminders", () => {
     expect(body.data.failed).toEqual([
       {
         participantId: "r1",
-        reason: "smtp-rejected-rollback-failed",
+        reason: "smtp-rejected-reconciliation-failed",
       },
     ]);
     jest.restoreAllMocks();
   });
 
-  it("returns non-2xx when the strict rollback-exhaustion audit cannot persist", async () => {
+  it("returns the partial ledger and unsafe-retry signal when strict audit persistence fails after a prior success", async () => {
     (getApiActor as jest.Mock).mockResolvedValue(coachActor);
     mockIsStableInvitationLinksEnabled.mockReturnValue(true);
     mockClassifyInvitationSendError.mockReturnValueOnce(
       "DEFINITE_REJECTION"
     );
     jest.spyOn(console, "error").mockImplementation(() => undefined);
-    (sendAssessmentInvitationEmail as jest.Mock).mockRejectedValueOnce({
-      responseCode: 550,
-    });
+    (sendAssessmentInvitationEmail as jest.Mock)
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce({ responseCode: 550 });
     mockRollbackRejectedStableInvitationToken.mockRejectedValue(
       new Error("database unavailable")
     );
@@ -964,7 +971,7 @@ describe("POST /api/assessment-campaigns/[id]/reminders", () => {
     );
 
     const res = await POST(
-      jsonReq({ participantIds: ["r1"] }) as never,
+      emptyReq() as never,
       detailParams("c1")
     );
 
@@ -973,10 +980,31 @@ describe("POST /api/assessment-campaigns/[id]/reminders", () => {
     const body = (await res.json()) as {
       success: boolean;
       error: string;
+      data: {
+        sent: number;
+        skipped: number;
+        failed: Array<{ participantId: string; reason: string }>;
+        remaining: number;
+      };
+      retrySafe: boolean;
+      retrySafety: string;
     };
     expect(body).toEqual({
       success: false,
-      error: "Failed to persist reminder rollback audit",
+      error: "Failed to persist reminder reconciliation audit",
+      data: {
+        sent: 1,
+        skipped: 0,
+        failed: [
+          {
+            participantId: "r2",
+            reason: "smtp-rejected-reconciliation-failed",
+          },
+        ],
+        remaining: 0,
+      },
+      retrySafe: false,
+      retrySafety: "PARTIAL_BATCH_DO_NOT_RETRY_WHOLE_REQUEST",
     });
     jest.restoreAllMocks();
   });

@@ -69,6 +69,8 @@ jest.mock("@/lib/assessments/stable-invitation-tokens", () => {
     registerNewOriginalToken: jest.fn(),
     confirmStableInvitationToken: jest.fn(),
     markStableInvitationTokenUncertain: jest.fn(),
+    quarantineRejectedStableInvitationToken: jest.fn(),
+    reconcileRejectedStableInvitationToken: jest.fn(),
     removeRegisteredStableInvitationToken: jest.fn(),
     rollbackRejectedStableInvitationToken: jest.fn(),
     classifyInvitationSendError: jest.fn((error) => {
@@ -100,6 +102,8 @@ import {
 import { isStableInvitationLinksEnabled } from "@/lib/assessments/wave-j65-flags";
 import {
   confirmStableInvitationToken,
+  quarantineRejectedStableInvitationToken,
+  reconcileRejectedStableInvitationToken,
   registerNewOriginalToken,
   removeRegisteredStableInvitationToken,
   stageStableInvitationToken,
@@ -251,7 +255,22 @@ beforeEach(() => {
   (registerNewOriginalToken as jest.Mock).mockResolvedValue({
     tokenId: "stable-original-r1",
   });
+  (stageStableInvitationToken as jest.Mock).mockImplementation(
+    async (_database, input) => ({
+      tokenId: "stable-original-r1",
+      invitationId: input.invitationId,
+      newTokenHash: input.newTokenHash,
+      previousTokenHash: "b".repeat(64),
+      previousExpiresAt: new Date("2026-08-01T00:00:00.000Z"),
+    }),
+  );
   (confirmStableInvitationToken as jest.Mock).mockResolvedValue(undefined);
+  (quarantineRejectedStableInvitationToken as jest.Mock).mockResolvedValue(
+    undefined,
+  );
+  (reconcileRejectedStableInvitationToken as jest.Mock).mockResolvedValue(
+    undefined,
+  );
   (removeRegisteredStableInvitationToken as jest.Mock).mockResolvedValue(
     undefined,
   );
@@ -328,9 +347,12 @@ describe("POST /api/assessment-campaigns/[id]/invite", () => {
     expect(res.status).toBe(200);
     expect(isStableInvitationLinksEnabled).toHaveBeenCalledWith("demo");
     expect(prepareAssessmentInvitationEmail).toHaveBeenCalledTimes(1);
-    expect(registerNewOriginalToken).toHaveBeenCalledWith(db, {
+    expect(registerNewOriginalToken).not.toHaveBeenCalled();
+    expect(stageStableInvitationToken).toHaveBeenCalledWith(db, {
       invitationId: "inv-r1",
-      tokenHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+      newTokenHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+      expiresAt: expect.any(Date),
+      source: "ORIGINAL",
     });
     expect(confirmStableInvitationToken).toHaveBeenCalledWith(
       db,
@@ -344,8 +366,11 @@ describe("POST /api/assessment-campaigns/[id]/invite", () => {
     const body = await res.json();
     const rawToken = (sendAssessmentInvitationEmail as jest.Mock).mock.calls[0][0]
       .rawToken;
-    const tokenHash = (registerNewOriginalToken as jest.Mock).mock.calls[0][1]
-      .tokenHash;
+    const tokenHash = (stageStableInvitationToken as jest.Mock).mock.calls[0][1]
+      .newTokenHash;
+    const parentRootHash = (db.assessmentInvitation.create as jest.Mock).mock
+      .calls[0][0].data.tokenHash;
+    expect(parentRootHash).not.toBe(tokenHash);
     const observableOutput = JSON.stringify({
       body,
       auditWrites: (db.auditLog.create as jest.Mock).mock.calls,
@@ -356,14 +381,14 @@ describe("POST /api/assessment-campaigns/[id]/invite", () => {
     expect(observableOutput).not.toContain("tokenHash");
   });
 
-  it("stable links enabled: returns 503 when rejected-child cleanup and strict audit both exhaust", async () => {
+  it("stable links enabled: returns 503 when rejected-child reconciliation and strict audit both exhaust", async () => {
     (getApiActor as jest.Mock).mockResolvedValue(coachActor);
     (isStableInvitationLinksEnabled as jest.Mock).mockReturnValue(true);
     (sendAssessmentInvitationEmail as jest.Mock).mockRejectedValue({
       responseCode: 550,
     });
-    (removeRegisteredStableInvitationToken as jest.Mock).mockRejectedValue(
-      new Error("cleanup failure with secret"),
+    (reconcileRejectedStableInvitationToken as jest.Mock).mockRejectedValue(
+      new Error("reconciliation failure with secret"),
     );
     (db.auditLog.create as jest.Mock).mockRejectedValue(
       new Error("audit failure with secret"),
@@ -376,7 +401,8 @@ describe("POST /api/assessment-campaigns/[id]/invite", () => {
     );
 
     expect(res.status).toBe(503);
-    expect(removeRegisteredStableInvitationToken).toHaveBeenCalledTimes(3);
+    expect(quarantineRejectedStableInvitationToken).toHaveBeenCalledTimes(1);
+    expect(reconcileRejectedStableInvitationToken).toHaveBeenCalledTimes(3);
     expect(db.auditLog.create).toHaveBeenCalledTimes(3);
     const body = await res.json();
     expect(body).toEqual({

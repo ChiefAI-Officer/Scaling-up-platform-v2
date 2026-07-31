@@ -82,12 +82,15 @@ Add an `AssessmentInvitationToken` model with:
 
 - `STAGED` — persisted before provider handoff;
 - `SENT` — provider acceptance was confirmed; and
-- `UNCERTAIN` — provider acceptance could not be proven either way.
+- `UNCERTAIN` — provider acceptance could not be proven either way; and
+- `REJECTED` — the provider definitely rejected the handoff; this retained row
+  is a fail-closed tombstone.
 
-All three states are exchangeable. Validity comes from possession of the raw
-token plus the parent lifecycle gates, not from delivery telemetry. A token that
-the provider definitively did not accept is removed rather than given a fourth
-state.
+`STAGED`, `SENT`, and `UNCERTAIN` remain exchangeable because provider acceptance
+may have occurred before confirmation telemetry persisted. An exact `REJECTED`
+child is never exchangeable and never falls through to the parent mirror.
+Validity for every other state comes from possession of the raw token plus the
+parent lifecycle gates.
 
 Index `invitationId` for sibling lookup and retain the unique `tokenHash` index for
 constant-time exchange. Do not add per-token expiry or terminal-state columns.
@@ -105,7 +108,8 @@ A focused service owns:
 - staging a new child token;
 - maintaining the parent compatibility mirror;
 - marking a staged token `SENT` or `UNCERTAIN`;
-- rolling back a definitively rejected staged token with compare-and-swap safety;
+- quarantining a definitively rejected staged token, restoring a viable parent
+  mirror, and separately reconciling successor rollback metadata;
   and
 - resolving a token hash through child-first, parent-fallback lookup.
 
@@ -134,9 +138,10 @@ The exchange route keeps parsing, alias protection, lifecycle gates, `VIEWED`
 monotonicity, cookie minting, response codes, and no-store headers. Only token
 resolution changes under the flag.
 
-The original-invite path dual-writes parent and child tokens while enabled so new
-invitations are immediately compatible. Manual **Resend** continues writing only
-the parent mirror and is found through the enabled exchange fallback.
+The original-invite path creates a random, never-delivered parent rollback root,
+then uses the same locked `ORIGINAL` staging transition as a retry. Manual
+**Resend** continues writing only the parent mirror and is found through the
+enabled exchange fallback.
 
 ## Reminder data flow
 
@@ -163,9 +168,13 @@ the parent mirror and is found through the enabled exchange fallback.
    uncertain/failed to the operator without logging the token, and leave the link
    exchangeable.
 10. Only when a typed provider result proves no acceptance occurred:
-    - delete the staged child; and
-    - restore the prior parent hash and prior expiry only when the parent mirror
-      still equals this failed token hash.
+    - atomically retain the child as `REJECTED`;
+    - traverse any rejected predecessor tombstones to the first viable hash;
+    - restore that viable hash and expiry only when the parent mirror still
+      equals this failed token hash; and
+    - separately rewire direct successor rollback metadata. If this reconciliation
+      exhausts its bounded retries, strict audit records the unresolved work;
+      the rejected child and parent mirror are already fail closed.
 
 The conditional restore prevents a failed send from clobbering a newer concurrent
 reminder. If post-send telemetry or counter persistence fails, the already-staged
@@ -186,7 +195,8 @@ Flag on or matching the campaign-alias canary:
 1. Hash the submitted raw token.
 2. Look up an `AssessmentInvitationToken` by unique hash and include its parent
    invitation and campaign.
-3. If no child matches, fall back to the parent unique-hash lookup. This keeps
+3. If the exact child is `REJECTED`, deny it without parent fallback. If no child
+   matches, fall back to the parent unique-hash lookup. This keeps
    manual Resend and flag-transition invitations working.
 4. Enforce the existing campaign-alias guard.
 5. Apply the existing soft-delete, revocation, shared-expiry, submission,
@@ -199,9 +209,11 @@ not-yet-open `425`.
 
 ## Original invite and manual Resend compatibility
 
-When the feature is enabled, original invitation creation writes its hash to both
-the parent and an `ORIGINAL` child. A retry that reaches provider handoff follows
-the same `STAGED`/`SENT`/`UNCERTAIN` rules.
+When the feature is enabled, original invitation creation writes a random
+never-delivered SHA-256 rollback root to the parent, then stage-rotates the
+delivered hash into an `ORIGINAL` child. Definite rejection therefore restores an
+unpossessed root; a retry that reaches provider handoff follows the same
+`STAGED`/`SENT`/`UNCERTAIN`/`REJECTED` rules.
 
 An invitation created while disabled may not have a child row. Its first enabled
 reminder promotes the current parent hash before changing the mirror, so its
@@ -256,9 +268,15 @@ compatibility mirror is last-writer-wins by design because only one newest token
 can serve the legacy lookup. Child rows remain authoritative for stable-link
 behavior.
 
-A definite-rejection rollback restores the prior parent values only with a
-compare-and-swap predicate on the failed new hash. If a newer reminder owns the
-mirror, the rollback leaves it untouched.
+A definite-rejection quarantine restores the first non-`REJECTED` predecessor
+only with a compare-and-swap predicate on the failed new hash. If a newer
+reminder owns the mirror, quarantine leaves it untouched. A later rejection of
+that newer reminder traverses the retained tombstone chain, so it cannot restore
+an older rejected hash even if successor reconciliation previously exhausted.
+
+The available stateful Prisma-shaped tests prove these state-machine transitions
+and serialized transaction callbacks. They do not schedule independent
+PostgreSQL connections and are not evidence of real database lock interleaving.
 
 ## Flags, rollout, and rollback
 
@@ -321,11 +339,10 @@ future migration after the rollout is proven.
 - original and reminder staging dual-write correctly;
 - success marks `SENT`;
 - unclassified failure marks `UNCERTAIN` and stays resolvable;
-- definite rejection removes only its staged child;
+- definite rejection retains an exact `REJECTED` tombstone;
 - compare-and-swap rollback cannot clobber a newer mirror;
-- interleaved reminders capture the prior mirror under the parent-row lock, so a
-  failed newer send restores the last successfully staged predecessor;
-- concurrent reminders create distinct valid rows;
+- serialized state-machine attempts capture and traverse viable predecessors;
+- independently staged reminders create distinct valid rows;
 - shared expiry and counters update atomically; and
 - child-first lookup falls back to the parent.
 
@@ -355,7 +372,8 @@ future migration after the rollout is proven.
 
 - existing reminder, invite-send, exchange, submit, session, and manual-resend
   suites;
-- focused Jest for the new service, flags, routes, migration, and concurrency;
+- focused Jest for the new service, flags, routes, migration, and state-machine
+  serialization;
 - changed-file ESLint;
 - changelog freshness;
 - migration safety;
@@ -376,19 +394,19 @@ shape above.
 
 The original caller-held rollback snapshot was insufficient for overlapping
 reminders. If A staged, B staged from A, A rejected after losing its parent CAS,
-and B later rejected, B could restore A's already-deleted hash. To keep every
+and B later rejected, B could restore A's rejected hash. To keep every
 rollback predecessor viable:
 
 - every stage-based rotating child (`ORIGINAL` or `REMINDER`) persists nullable
   `previousTokenHash` and `previousExpiresAt` rollback metadata;
 - staging captures those values from the locked parent in the same transaction
   that creates the rotating child and advances the parent mirror;
-- definite-rejection rollback locks the parent, re-reads and verifies the child
-  by id/invitation/hash plus `(ORIGINAL|REMINDER)/STAGED`, and uses the
+- definite-rejection quarantine locks the parent, re-reads and verifies the child
+  by id/invitation/hash plus `(ORIGINAL|REMINDER)/(STAGED|REJECTED)`, and uses the
   persisted predecessor rather than caller-held values;
-- rollback conditionally deletes that exact child, rewires every direct rotating
-  successor from the failed hash to the failed row's viable predecessor, and
-  restores the parent only when its mirror still equals the failed hash; and
+- quarantine retains that exact child as `REJECTED`, traverses older rejected
+  tombstones, and restores the parent only when its mirror still equals the
+  failed hash; successor rewiring is a separate retryable reconciliation; and
 - staging, confirmation, and rollback share the parent-row lock convention, so
   their identity/state decisions serialize without a child/parent lock-order
   inversion.
@@ -403,11 +421,35 @@ Delivery transitions are also conditional and identity-derived:
   identity/source/state predicates so an id/hash collision or stale cleanup
   request cannot mutate another child.
 
-The new predecessor fields are rollback snapshots only. They do not add
+The predecessor fields are rollback snapshots only. They do not add
 per-token expiry, do not determine exchange validity, and remain null on legacy
-rows and parent-neutral originals created by `registerNewOriginalToken`. Every
+rows. Every
 service hash boundary accepts only 64-character lowercase SHA-256 hex; no raw
 token or hash is logged.
+
+## Final review correction addendum
+
+Whole-branch review found two fail-open paths in the earlier implementation:
+brand-new enabled originals placed the delivered hash directly on the parent, and
+rollback exhaustion could leave a definitely rejected `STAGED` child
+exchangeable. The corrected internal contract is:
+
+- every enabled original uses a never-delivered parent root plus the same
+  stage-based `ORIGINAL` rotation as a pending retry;
+- definite rejection first commits `REJECTED` plus viable-parent restoration;
+- exact `REJECTED` lookup never falls through to the parent;
+- successor reconciliation happens only after quarantine is durable, with strict
+  audit on bounded exhaustion;
+- the default-off/kill exchange path remains the exact legacy parent-only query,
+  made safe because quarantine restores the parent before reconciliation; and
+- a 503 caused by strict-audit infrastructure failure includes the completed
+  reminder ledger, the number remaining, and an explicit
+  `retrySafe: false` / whole-batch retry warning.
+
+The composed acceptance coverage uses production invite-send, token service,
+resolver, and lifecycle-classification functions over a stateful Prisma-shaped
+fake. It proves state transitions and shared parent behavior, not PostgreSQL lock
+scheduling.
 
 ## Acceptance criteria
 

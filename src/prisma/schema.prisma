@@ -1581,6 +1581,7 @@ enum AssessmentInvitationTokenDeliveryState {
   STAGED
   SENT
   UNCERTAIN
+  REJECTED
 }
 
 enum AssessmentQuestionType {

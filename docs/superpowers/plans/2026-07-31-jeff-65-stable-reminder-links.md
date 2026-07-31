@@ -26,7 +26,7 @@
 - `src/src/lib/assessments/wave-j65-flags.ts` — pure kill/global/campaign-alias flag decision.
 - `src/src/lib/assessments/stable-invitation-tokens.ts` — all multi-token persistence and lookup behavior.
 - `src/src/__tests__/lib/assessments/wave-j65-flags.test.ts` — flag seam.
-- `src/src/__tests__/lib/assessments/stable-invitation-tokens.test.ts` — service seam and concurrency receipts.
+- `src/src/__tests__/lib/assessments/stable-invitation-tokens.test.ts` — service seam and serialized state-machine receipts (not PostgreSQL lock scheduling).
 - `src/prisma/migrations/20260731110000_add_stable_invitation_tokens/migration.sql` — enums, table, indexes, foreign key, and backfill.
 - `src/src/__tests__/prisma/stable-invitation-tokens-migration.test.ts` — migration contract.
 

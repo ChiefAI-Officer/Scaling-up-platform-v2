@@ -21,7 +21,10 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { hashToken } from "@/lib/assessments/invitation-tokens";
 import { getInvitationSession } from "@/lib/assessments/invitation-cookie";
-import { resolveInvitationByStableTokenHash } from "@/lib/assessments/stable-invitation-tokens";
+import {
+  classifyInvitationExchangeAvailability,
+  resolveInvitationByStableTokenHash,
+} from "@/lib/assessments/stable-invitation-tokens";
 import { isStableInvitationLinksEnabled } from "@/lib/assessments/wave-j65-flags";
 import { formatTimestampDateTime } from "@/lib/utils";
 
@@ -103,20 +106,13 @@ export async function POST(
 
     const now = new Date();
 
-    // SEC-M6: a soft-deleted campaign is no longer available.
-    if (invitation.campaign.deletedAt !== null) return gateFailed();
-    if (invitation.revokedAt !== null) return gateFailed();
-    if (now >= invitation.expiresAt) return gateFailed();
-    if (invitation.status === "SUBMITTED") return gateFailed();
-    if (invitation.campaign.status !== "ACTIVE") return gateFailed();
-    if (now < invitation.campaign.openAt)
+    const availability = classifyInvitationExchangeAvailability(
+      invitation,
+      now,
+    );
+    if (availability === "UNAVAILABLE") return gateFailed();
+    if (availability === "NOT_YET_OPEN")
       return gateNotYetOpen(invitation.campaign.openAt);
-    if (
-      invitation.campaign.closeAt !== null &&
-      now >= invitation.campaign.closeAt
-    ) {
-      return gateFailed();
-    }
 
     // VIEWED monotonicity: only flip from PENDING/SENT. Never regress from
     // VIEWED back to anything else; never flip SUBMITTED (already gated above).

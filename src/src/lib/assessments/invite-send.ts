@@ -30,10 +30,11 @@ import {
   classifyInvitationSendError,
   confirmStableInvitationToken,
   markStableInvitationTokenUncertain,
+  quarantineRejectedStableInvitationToken,
+  reconcileRejectedStableInvitationToken,
   registerNewOriginalToken,
   removeRegisteredStableInvitationToken,
   retryStableInvitationOperation,
-  rollbackRejectedStableInvitationToken,
   stageStableInvitationToken,
   type StableTokenDb,
   type StagedStableToken,
@@ -115,6 +116,7 @@ export interface StableOriginalTokenAdapter {
   uncertain(tokenId: string): Promise<void>;
   removeRegistered(tokenId: string): Promise<void>;
   rollbackRejected(staged: StagedStableToken): Promise<void>;
+  reconcileRejected(staged: StagedStableToken): Promise<void>;
 }
 
 export interface RejectedCleanupAuditInput {
@@ -122,13 +124,22 @@ export interface RejectedCleanupAuditInput {
   respondentId: string;
   invitationId: string;
   tokenId: string;
-  disposition: "DEFINITE_REJECTION_CLEANUP_EXHAUSTED";
+  disposition:
+    | "DEFINITE_REJECTION_QUARANTINE_EXHAUSTED"
+    | "DEFINITE_REJECTION_RECONCILIATION_EXHAUSTED";
 }
 
 export class StableInvitationCleanupAuditError extends Error {
   constructor() {
     super("Failed to persist stable invitation cleanup audit.");
     this.name = "StableInvitationCleanupAuditError";
+  }
+}
+
+export class StableInvitationQuarantineError extends Error {
+  constructor() {
+    super("Failed to quarantine a definitely rejected invitation token.");
+    this.name = "StableInvitationQuarantineError";
   }
 }
 
@@ -154,7 +165,9 @@ export function createStableOriginalTokenAdapter(
     removeRegistered: (tokenId) =>
       removeRegisteredStableInvitationToken(stableDb, tokenId),
     rollbackRejected: (staged) =>
-      rollbackRejectedStableInvitationToken(stableDb, staged),
+      quarantineRejectedStableInvitationToken(stableDb, staged),
+    reconcileRejected: (staged) =>
+      reconcileRejectedStableInvitationToken(stableDb, staged),
   };
 }
 
@@ -303,6 +316,10 @@ export async function sendInvitesBatch(
 
     const rawToken = generateRawToken();
     const tokenHash = hashToken(rawToken);
+    const parentTokenHash =
+      input.stableLinksEnabled && !prior
+        ? hashToken(generateRawToken())
+        : tokenHash;
 
     let invitationRow: InvitationRow;
     try {
@@ -322,7 +339,7 @@ export async function sendInvitesBatch(
           data: {
             campaignId: campaign.id,
             respondentId: recipient.respondentId,
-            tokenHash,
+            tokenHash: parentTokenHash,
             status: "PENDING",
             expiresAt,
           },
@@ -388,16 +405,11 @@ export async function sendInvitesBatch(
       }
       let stableToken: StagedStableToken | { tokenId: string };
       try {
-        stableToken = prior
-          ? await deps.stableTokens!.stageExistingOriginal({
-              invitationId: invitationRow.id,
-              tokenHash,
-              expiresAt,
-            })
-          : await deps.stableTokens!.registerOriginal({
-              invitationId: invitationRow.id,
-              tokenHash,
-            });
+        stableToken = await deps.stableTokens!.stageExistingOriginal({
+          invitationId: invitationRow.id,
+          tokenHash,
+          expiresAt,
+        });
       } catch {
         console.error("[invite-send] stable token staging failed", {
           respondentId: recipient.respondentId,
@@ -422,18 +434,15 @@ export async function sendInvitesBatch(
             });
           }
         } else {
-          const cleaned = await retryStableInvitationOperation(() =>
-            prior
-              ? deps.stableTokens!.rollbackRejected(
-                  stableToken as StagedStableToken,
-                )
-              : deps.stableTokens!.removeRegistered(stableToken.tokenId),
+          const stagedRejectedToken = stableToken as StagedStableToken;
+          const quarantined = await retryStableInvitationOperation(() =>
+            deps.stableTokens!.rollbackRejected(stagedRejectedToken),
           );
-          if (!cleaned) {
-            console.error("[invite-send] rejected-token cleanup exhausted", {
+          if (!quarantined) {
+            console.error("[invite-send] rejected-token quarantine exhausted", {
               respondentId: recipient.respondentId,
               invitationId: invitationRow.id,
-              disposition: "DEFINITE_REJECTION_CLEANUP_EXHAUSTED",
+              disposition: "DEFINITE_REJECTION_QUARANTINE_EXHAUSTED",
               attempts: 3,
             });
             const auditInput: RejectedCleanupAuditInput = {
@@ -441,12 +450,46 @@ export async function sendInvitesBatch(
               respondentId: recipient.respondentId,
               invitationId: invitationRow.id,
               tokenId: stableToken.tokenId,
-              disposition: "DEFINITE_REJECTION_CLEANUP_EXHAUSTED",
+              disposition: "DEFINITE_REJECTION_QUARANTINE_EXHAUSTED",
             };
             const persistAudit = deps.persistRejectedCleanupAudit;
             const auditPersisted =
               persistAudit !== undefined &&
               (await retryStableInvitationOperation(() => persistAudit(auditInput)));
+            if (!auditPersisted) {
+              throw new StableInvitationCleanupAuditError();
+            }
+            throw new StableInvitationQuarantineError();
+          }
+
+          const reconciled = await retryStableInvitationOperation(() =>
+            deps.stableTokens!.reconcileRejected(stagedRejectedToken),
+          );
+          if (!reconciled) {
+            console.error(
+              "[invite-send] rejected-token reconciliation exhausted",
+              {
+                respondentId: recipient.respondentId,
+                invitationId: invitationRow.id,
+                disposition:
+                  "DEFINITE_REJECTION_RECONCILIATION_EXHAUSTED",
+                attempts: 3,
+              },
+            );
+            const auditInput: RejectedCleanupAuditInput = {
+              campaignId: campaign.id,
+              respondentId: recipient.respondentId,
+              invitationId: invitationRow.id,
+              tokenId: stableToken.tokenId,
+              disposition:
+                "DEFINITE_REJECTION_RECONCILIATION_EXHAUSTED",
+            };
+            const persistAudit = deps.persistRejectedCleanupAudit;
+            const auditPersisted =
+              persistAudit !== undefined &&
+              (await retryStableInvitationOperation(() =>
+                persistAudit(auditInput),
+              ));
             if (!auditPersisted) {
               throw new StableInvitationCleanupAuditError();
             }

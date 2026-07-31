@@ -48,6 +48,7 @@ import {
   createStableOriginalTokenAdapter,
   sendInvitesBatch,
   StableInvitationCleanupAuditError,
+  StableInvitationQuarantineError,
   INVITE_BATCH_CAP,
 } from "@/lib/assessments/invite-send";
 import { waveDAutoSendEnabled } from "@/lib/assessments/wave-d-feature-flags";
@@ -271,7 +272,11 @@ export async function POST(
                       respondentId: input.respondentId,
                       invitationId: input.invitationId,
                       tokenId: input.tokenId,
-                      action: "original-invite-rejected-cleanup-exhausted",
+                      action:
+                        input.disposition ===
+                        "DEFINITE_REJECTION_QUARANTINE_EXHAUSTED"
+                          ? "original-invite-rejected-quarantine-unresolved"
+                          : "original-invite-rejected-reconciliation-unresolved",
                       disposition: input.disposition,
                     },
                   }),
@@ -321,6 +326,19 @@ export async function POST(
           {
             success: false,
             error: "Failed to persist invitation cleanup audit",
+          },
+          { status: 503 },
+        );
+      }
+      if (error instanceof StableInvitationQuarantineError) {
+        console.error("[assessment-invite] rejected token quarantine failed", {
+          campaignId,
+          disposition: "DEFINITE_REJECTION_QUARANTINE_EXHAUSTED",
+        });
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Failed to quarantine rejected invitation token",
           },
           { status: 503 },
         );

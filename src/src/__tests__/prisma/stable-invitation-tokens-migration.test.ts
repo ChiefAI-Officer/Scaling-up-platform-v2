@@ -17,6 +17,9 @@ describe("stable invitation tokens migration", () => {
         expect(sql).toContain(
             'CREATE TYPE "AssessmentInvitationTokenDeliveryState"',
         );
+        expect(sql).toMatch(
+            /AssessmentInvitationTokenDeliveryState" AS ENUM \('STAGED', 'SENT', 'UNCERTAIN', 'REJECTED'\)/,
+        );
         expect(sql).toContain('CREATE TABLE "assessment_invitation_tokens"');
         expect(sql).toMatch(
             /"previousTokenHash" TEXT,\s+"previousExpiresAt" TIMESTAMP\(3\),/,
