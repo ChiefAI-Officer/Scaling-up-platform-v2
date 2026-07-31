@@ -23,6 +23,7 @@ const pinned = {
   templateId: TPL,
   versionNumber: 3,
   publishedAt: new Date("2026-07-02T09:00:00.000Z"),
+  archivedAt: null,
   // Real data is "enUS" on every seeded published row (see active-version.ts's
   // C4 note) — using "en" in fixtures teaches a string the repo warns about.
   language: "enUS",
@@ -46,6 +47,7 @@ describe("on the newest edition", () => {
     expect(resolveEditionStanding(pinned, [])).toEqual({
       versionNumber: 3,
       publishedAt: pinned.publishedAt,
+      pinnedRetired: false,
       newerEditionAvailable: false,
     });
   });
@@ -76,6 +78,29 @@ describe("behind a newer edition", () => {
     const st = resolveEditionStanding(pinned, [published(9)]);
     expect(st?.versionNumber).toBe(3);
     expect(st?.publishedAt).toEqual(pinned.publishedAt);
+  });
+});
+
+describe("retired pinned edition", () => {
+  const retiredPinned = {
+    ...pinned,
+    archivedAt: new Date("2026-07-30T12:00:00.000Z"),
+  };
+
+  it("reports that the pinned edition itself has been retired", () => {
+    expect(resolveEditionStanding(retiredPinned, [])).toEqual({
+      versionNumber: 3,
+      publishedAt: pinned.publishedAt,
+      pinnedRetired: true,
+      newerEditionAvailable: false,
+    });
+  });
+
+  it("can represent retirement and a newer active edition as separate facts", () => {
+    expect(resolveEditionStanding(retiredPinned, [published(4)])).toMatchObject({
+      pinnedRetired: true,
+      newerEditionAvailable: true,
+    });
   });
 });
 
@@ -136,6 +161,7 @@ describe("degrades rather than lying when the pinned edition is unknowable", () 
       templateId: TPL,
       versionNumber: 3,
       publishedAt: null,
+      archivedAt: null,
       language: "enUS",
     };
     expect(resolveEditionStanding(unpublished, [published(4)])).toBeNull();

@@ -81,6 +81,7 @@ describe("on the newest edition", () => {
   const current = {
     versionNumber: 4,
     publishedAt: CURRENT_PUBLISHED,
+    pinnedRetired: false,
     newerEditionAvailable: false,
   };
 
@@ -96,6 +97,9 @@ describe("on the newest edition", () => {
     expect(
       screen.queryByTestId("campaign-edition-stale"),
     ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("campaign-edition-retired"),
+    ).not.toBeInTheDocument();
   });
 });
 
@@ -103,6 +107,7 @@ describe("behind a newer edition", () => {
   const behind = {
     versionNumber: 3,
     publishedAt: BEHIND_PUBLISHED,
+    pinnedRetired: false,
     newerEditionAvailable: true,
   };
 
@@ -143,6 +148,57 @@ describe("behind a newer edition", () => {
   });
 });
 
+describe("retired pinned edition", () => {
+  const retired = {
+    versionNumber: 3,
+    publishedAt: BEHIND_PUBLISHED,
+    pinnedRetired: true,
+    newerEditionAvailable: false,
+  };
+
+  it("preserves provenance and names retirement explicitly", () => {
+    renderDetail(retired);
+
+    expect(screen.getByTestId("campaign-edition-line")).toHaveTextContent(
+      "Edition 3",
+    );
+    expect(screen.getByTestId("campaign-edition-line")).toHaveTextContent(
+      formatTimestamp(BEHIND_PUBLISHED),
+    );
+    expect(screen.getByTestId("campaign-edition-retired")).toHaveTextContent(
+      "This edition has been retired",
+    );
+  });
+
+  it("uses the semantic destructive treatment", () => {
+    renderDetail(retired);
+
+    const warning = screen.getByTestId("campaign-edition-retired");
+    expect(warning).toHaveStyle({
+      borderColor: "hsl(var(--destructive))",
+    });
+    expect(warning).toHaveClass(
+      "border",
+      "bg-destructive/10",
+      "text-destructive",
+    );
+  });
+
+  it("shows retirement instead of the stale badge when both facts are true", () => {
+    renderDetail({
+      ...retired,
+      newerEditionAvailable: true,
+    });
+
+    expect(
+      screen.getByTestId("campaign-edition-retired"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("campaign-edition-stale"),
+    ).not.toBeInTheDocument();
+  });
+});
+
 describe("unknowable / degraded", () => {
   it("renders nothing when there is no edition info (pinned to a draft, or lookup failed)", () => {
     renderDetail(null);
@@ -151,6 +207,9 @@ describe("unknowable / degraded", () => {
     ).not.toBeInTheDocument();
     expect(
       screen.queryByTestId("campaign-edition-stale"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("campaign-edition-retired"),
     ).not.toBeInTheDocument();
   });
 
@@ -164,6 +223,9 @@ describe("unknowable / degraded", () => {
     expect(
       screen.queryByTestId("campaign-edition-line"),
     ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("campaign-edition-retired"),
+    ).not.toBeInTheDocument();
   });
 });
 
@@ -172,6 +234,7 @@ describe("wording", () => {
     renderDetail({
       versionNumber: 3,
       publishedAt: BEHIND_PUBLISHED,
+      pinnedRetired: false,
       newerEditionAvailable: true,
     });
     const line = screen.getByTestId("campaign-edition-line");

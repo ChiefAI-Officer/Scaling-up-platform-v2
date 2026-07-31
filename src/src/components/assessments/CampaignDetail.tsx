@@ -1193,10 +1193,11 @@ export function CampaignDetail({
             <div className="mt-1 font-medium text-foreground">
               {campaign.templateName}
             </div>
-            {/* Wave EV — which EDITION this campaign serves, and whether it has
-                fallen behind. A campaign pins a version at creation and can
-                never move off it, so without this the screen silently shows
-                frozen content — the cause of Jeff's #40/#43 being re-reports of
+            {/* Wave EV — which EDITION this campaign serves, and whether its
+                pinned edition has been retired or fallen behind. A campaign
+                pins a version at creation and has no edition-changing write
+                path, so without these warnings the screen silently shows frozen
+                content — the cause of Jeff's #40/#43 being re-reports of
                 already-shipped work. Absent `edition` (unpublished pin, or a
                 degraded lookup) renders nothing, exactly as before.
 
@@ -1206,9 +1207,8 @@ export function CampaignDetail({
                 from v1, not a newer edition), and reusing it is precisely how
                 this got confusing.
 
-                The chip deliberately does NOT say "Newer edition available":
-                a campaign cannot move editions (there is no write path for
-                versionId), so "available" would promise an upgrade button that
+                The stale warning deliberately does NOT say "Newer edition
+                available": "available" would promise an upgrade button that
                 does not exist. It states the frozen fact instead, which is what
                 a tester actually needs. */}
             {campaign.edition && (
@@ -1220,14 +1220,22 @@ export function CampaignDetail({
                   Edition {campaign.edition.versionNumber} &middot; published{" "}
                   {formatTimestamp(campaign.edition.publishedAt)}
                 </div>
-                {campaign.edition.newerEditionAvailable && (
+                {campaign.edition.pinnedRetired ? (
+                  <span
+                    className="mt-1.5 inline-flex items-center gap-1 rounded-md border bg-destructive/10 px-1.5 py-0.5 text-xs font-semibold text-destructive"
+                    data-testid="campaign-edition-retired"
+                    style={{ borderColor: "hsl(var(--destructive))" }}
+                  >
+                    This edition has been retired
+                  </span>
+                ) : campaign.edition.newerEditionAvailable ? (
                   <span
                     className="mt-1.5 inline-flex items-center gap-1 rounded-md border border-warning/30 bg-warning/10 px-1.5 py-0.5 text-xs font-semibold text-warning"
                     data-testid="campaign-edition-stale"
                   >
                     Not the latest edition
                   </span>
-                )}
+                ) : null}
               </>
             )}
           </div>

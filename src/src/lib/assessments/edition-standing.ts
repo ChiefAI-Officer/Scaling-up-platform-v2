@@ -38,6 +38,8 @@ export interface PinnedVersion {
   versionNumber: number;
   /** Null ⇒ the campaign is pinned to a draft (an anomaly — see below). */
   publishedAt: Date | null;
+  /** Non-null ⇒ an administrator retired the pinned published edition. */
+  archivedAt: Date | null;
   language: string;
 }
 
@@ -57,7 +59,9 @@ export interface EditionStanding {
   /** The edition this campaign is ACTUALLY serving — never the newest one. */
   versionNumber: number;
   publishedAt: Date;
-  /** True ⇒ show the "Not the latest edition" chip. */
+  /** True ⇒ the pinned edition itself has been retired. */
+  pinnedRetired: boolean;
+  /** True ⇒ show the "Not the latest edition" chip unless retirement wins. */
   newerEditionAvailable: boolean;
 }
 
@@ -97,12 +101,9 @@ export interface EditionStanding {
  * Pure and never-throwing: a malformed or null sibling is skipped rather than
  * crashing the campaign screen, which must keep rendering whatever else it knows.
  *
- * KNOWN ASYMMETRY, deliberate and scoped out: a sibling is disqualified when it
- * is archived, but the PINNED version's own `archivedAt` is never consulted. So a
- * campaign serving an ED8-retired edition, with no newer published sibling,
- * renders an unqualified "Edition 3 · published …" and no chip — reassuring-
- * looking text about content an admin explicitly retired. Arguably more urgent
- * than "not the latest"; it needs its own copy and is tracked separately.
+ * The pinned edition's `archivedAt` is a separate fact from whether a newer
+ * active sibling exists. The resolver preserves both; callers decide which
+ * warning has presentation precedence.
  */
 export function resolveEditionStanding(
   pinned: PinnedVersion,
@@ -127,6 +128,7 @@ export function resolveEditionStanding(
   return {
     versionNumber: pinned.versionNumber,
     publishedAt: pinned.publishedAt,
+    pinnedRetired: pinned.archivedAt != null,
     newerEditionAvailable,
   };
 }
