@@ -556,9 +556,20 @@ describe("sendAssessmentInvitationEmail — default body/subject + telemetry (Wa
     });
 
     const args = mockSendEmailViaSMTP.mock.calls[0][0];
+    const escapedInvitationUrl =
+      "https://app.test/&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;/org-survey/abc#t=SECRET";
+
+    expect({
+      href: args.html.includes(`<a href="${escapedInvitationUrl}"`),
+      visibleFallback: args.html.includes(
+        `<span style="word-break:break-all;color:#6b7280;">${escapedInvitationUrl}</span>`,
+      ),
+    }).toEqual({
+      href: true,
+      visibleFallback: true,
+    });
     expect(args.html).not.toContain("<script>");
     expect(args.html).not.toContain('\"><script');
-    expect(args.html).toContain("&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;");
   });
 
   it("branded rendering remains multipart with its CID attachment", async () => {
