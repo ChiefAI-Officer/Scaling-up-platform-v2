@@ -55,16 +55,35 @@ import {
   stageStableInvitationToken,
   type StagedStableToken,
 } from "@/lib/assessments/stable-invitation-tokens";
-import { sendAssessmentInvitationEmail } from "@/services/notifications";
+import {
+  prepareAssessmentInvitationEmail,
+  sendAssessmentInvitationEmail,
+} from "@/services/notifications";
 
 const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
 const MAX_REMINDER_BATCH = 200; // serverless/SMTP budget guard
+const MAX_REJECTED_ROLLBACK_ATTEMPTS = 3;
 
 const ReminderBodySchema = z.object({
   participantIds: z.array(z.string().min(1)).optional(),
 });
 
 type FailedEntry = { participantId: string; reason: string };
+
+async function rollbackRejectedWithRetry(
+  staged: StagedStableToken
+): Promise<boolean> {
+  for (let attempt = 0; attempt < MAX_REJECTED_ROLLBACK_ATTEMPTS; attempt += 1) {
+    try {
+      await rollbackRejectedStableInvitationToken(db, staged);
+      return true;
+    } catch {
+      // Bounded, synchronous retry. The service owns all identity checks,
+      // locking, predecessor rewiring, and compare-and-swap mechanics.
+    }
+  }
+  return false;
+}
 
 export async function POST(
   request: NextRequest,
@@ -324,33 +343,9 @@ export async function POST(
       const tokenHash = hashToken(rawToken);
 
       if (stableLinksEnabled) {
-        let staged: StagedStableToken;
+        let prepared: ReturnType<typeof prepareAssessmentInvitationEmail>;
         try {
-          staged = await stageStableInvitationToken(db, {
-            invitationId: prior.id,
-            newTokenHash: tokenHash,
-            expiresAt,
-            source: "REMINDER",
-          });
-        } catch (stageErr) {
-          console.error(
-            "[assessment-reminders] stable token staging failed",
-            {
-              respondentId: participant.respondentId,
-              invitationId: prior.id,
-              errorName:
-                stageErr instanceof Error ? stageErr.name : "UnknownError",
-            }
-          );
-          failed.push({
-            participantId: participant.respondentId,
-            reason: "token-stage-failed",
-          });
-          continue;
-        }
-
-        try {
-          await sendAssessmentInvitationEmail({
+          prepared = prepareAssessmentInvitationEmail({
             invitation: { id: prior.id, expiresAt },
             respondent: {
               id: respondent.id,
@@ -382,25 +377,73 @@ export async function POST(
             chrome,
             coachLogoUrl,
           });
+        } catch {
+          console.error(
+            "[assessment-reminders] email preparation failed",
+            {
+              respondentId: participant.respondentId,
+              invitationId: prior.id,
+              disposition: "PREPARATION_FAILED",
+            }
+          );
+          failed.push({
+            participantId: participant.respondentId,
+            reason: "email-prepare-failed",
+          });
+          continue;
+        }
+
+        let staged: StagedStableToken;
+        try {
+          staged = await stageStableInvitationToken(db, {
+            invitationId: prior.id,
+            newTokenHash: tokenHash,
+            expiresAt,
+            source: "REMINDER",
+          });
+        } catch {
+          console.error(
+            "[assessment-reminders] stable token staging failed",
+            {
+              respondentId: participant.respondentId,
+              invitationId: prior.id,
+              disposition: "STAGING_FAILED",
+            }
+          );
+          failed.push({
+            participantId: participant.respondentId,
+            reason: "token-stage-failed",
+          });
+          continue;
+        }
+
+        try {
+          await prepared.send();
         } catch (sendErr) {
           const disposition = classifyInvitationSendError(sendErr);
-          try {
-            if (disposition === "UNCERTAIN") {
+          let failureReason = "smtp-failed";
+          if (disposition === "UNCERTAIN") {
+            try {
               await markStableInvitationTokenUncertain(db, staged.tokenId);
-            } else {
-              await rollbackRejectedStableInvitationToken(db, staged);
+            } catch {
+              console.error(
+                "[assessment-reminders] post-send failure transition failed",
+                {
+                  respondentId: participant.respondentId,
+                  invitationId: prior.id,
+                  disposition: "UNCERTAIN_STATE_PERSIST_FAILED",
+                }
+              );
             }
-          } catch (transitionErr) {
+          } else if (!(await rollbackRejectedWithRetry(staged))) {
+            failureReason = "smtp-rejected-rollback-failed";
             console.error(
-              "[assessment-reminders] post-send failure transition failed",
+              "[assessment-reminders] rejected-token rollback exhausted",
               {
                 respondentId: participant.respondentId,
                 invitationId: prior.id,
-                disposition,
-                errorName:
-                  transitionErr instanceof Error
-                    ? transitionErr.name
-                    : "UnknownError",
+                disposition: "DEFINITE_REJECTION_ROLLBACK_EXHAUSTED",
+                attempts: MAX_REJECTED_ROLLBACK_ATTEMPTS,
               }
             );
           }
@@ -410,13 +453,11 @@ export async function POST(
               respondentId: participant.respondentId,
               invitationId: prior.id,
               disposition,
-              errorName:
-                sendErr instanceof Error ? sendErr.name : "UnknownError",
             }
           );
           failed.push({
             participantId: participant.respondentId,
-            reason: "smtp-failed",
+            reason: failureReason,
           });
           continue;
         }
@@ -428,14 +469,13 @@ export async function POST(
             confirmedAt: new Date(),
             reminder: true,
           });
-        } catch (confirmErr) {
+        } catch {
           console.error(
             "[assessment-reminders] post-send stable token confirm failed",
             {
               respondentId: participant.respondentId,
               invitationId: prior.id,
-              errorName:
-                confirmErr instanceof Error ? confirmErr.name : "UnknownError",
+              disposition: "CONFIRM_PERSIST_FAILED",
             }
           );
         }
@@ -517,6 +557,14 @@ export async function POST(
       sent += 1;
     }
 
+    const failureReasons = failed.reduce<Record<string, number>>(
+      (counts, entry) => {
+        counts[entry.reason] = (counts[entry.reason] ?? 0) + 1;
+        return counts;
+      },
+      {}
+    );
+
     await logAudit({
       entityType: "AssessmentInvitation",
       entityId: campaignId,
@@ -528,6 +576,7 @@ export async function POST(
         sent,
         skipped,
         failed: failed.length,
+        failureReasons,
         targets: targets.length,
         remaining,
         requestedIds: requestedIds ?? null,
