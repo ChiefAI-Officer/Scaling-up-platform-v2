@@ -2,15 +2,15 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make invited and public assessment Welcome screens claim a rating scale only when every question uses the same valid slider scale.
+**Goal:** Make invited and public assessment Welcome screens claim a rating scale only when every respondent-visible question uses the same valid slider scale.
 
-**Architecture:** Replace the first-slider-only helper with one pure derivation over the complete question bank. The derivation returns the exact expectations sentence and an optional scale label; both participant clients compute it once and pass its fields into the shared Welcome components, which omit the scale chip when the label is absent.
+**Architecture:** Replace the first-slider-only helper with one pure derivation over the respondent-visible question bank. The derivation returns the exact expectations sentence and an optional scale label; both participant clients compute it once from their filtered question arrays and pass its fields into the shared Welcome components, which omit the scale chip when the label is absent.
 
 **Tech Stack:** TypeScript 5, React, Next.js 16 App Router, Jest, React Testing Library
 
 ## Global Constraints
 
-- A scale may render only when every question is `SLIDER_LIKERT`, every scale has finite numeric `min` and `max` values with `max > min`, and every slider uses the same range.
+- A scale may render only when every respondent-visible question is `SLIDER_LIKERT`, every scale has finite numeric `min` and `max` values with `max > min`, and every slider uses the same range.
 - Uniform banks keep the exact existing copy: `{count} short statement(s), rated {minimum}–{maximum}.`
 - Banks with more than one supported response type, or multiple valid slider
   ranges, render exactly
@@ -20,6 +20,9 @@
 - A missing scale label removes only the scale chip; the existing question-count and section-count chips remain.
 - `deriveTimeEstimate` and all time-estimate behavior remain byte-unchanged.
 - Invited and public Welcome flows must use the same derivation.
+- Scaling Up Full is role-dependent: non-CEOs have a uniform visible slider bank,
+  while CEOs have a mixed visible bank containing the `S_BACKGROUND` number
+  questions. The complete raw seed remains mixed.
 - Do not add template aliases, percentage thresholds, CSS changes, API changes, migrations, seed edits, feature flags, or unrelated Welcome copy.
 - Update `CLAUDE.md` and prepend `plans/CHANGELOG.md` in the implementation branch before push.
 - Before push, run changed-file ESLint, focused Jest, migration safety, and `CI=true npx next build --turbopack` from the app root.
@@ -43,6 +46,7 @@
   - Pins the unchanged uniform-bank public behavior.
 - Modify `src/src/__tests__/assessments/org-survey-pager.test.tsx`
   - Pins mixed-bank wording and two-chip behavior in the invited flow.
+  - Pins Scaling Up Full's non-CEO uniform and CEO mixed visible-bank behavior.
 - Modify `CLAUDE.md`
   - Advances the SoT freshness anchor and records the PR-ready state briefly.
 - Modify `plans/CHANGELOG.md`
@@ -52,7 +56,7 @@ No stylesheet should change: `.su-welcome-chip { flex: 1 }` already balances a t
 
 ---
 
-### Task 1: Derive one truthful Welcome presentation from the complete bank
+### Task 1: Derive one truthful Welcome presentation from the supplied visible bank
 
 **Files:**
 
@@ -107,7 +111,7 @@ describe("deriveWelcomePresentation", () => {
     ["QSP v1", buildQspV1Content().questions, "28 questions using a mix of response formats."],
     ["QSP v2", buildQspV2Content().questions, "22 questions using a mix of response formats."],
     [
-      "Scaling Up Full",
+      "Scaling Up Full complete raw seed",
       buildScalingUpFullContent().questions,
       "63 questions using a mix of response formats.",
     ],
@@ -174,6 +178,11 @@ describe("deriveWelcomePresentation", () => {
   });
 });
 ```
+
+The Scaling Up Full seed-builder case intentionally exercises the complete raw
+seed, which includes the two `S_BACKGROUND` number questions and is therefore
+mixed. The invited-flow tests in Task 2 separately exercise each role's
+respondent-visible bank after filtering.
 
 - [ ] **Step 2: Run the new suite and verify the missing export fails**
 
@@ -312,7 +321,8 @@ git commit -m "test(assessments): define truthful welcome presentation (#222)"
 
 **Interfaces:**
 
-- Consumes: `WelcomePresentation` returned once per sorted question bank.
+- Consumes: `WelcomePresentation` returned once per respondent-visible
+  `sortedQuestions` bank.
 - Produces:
 
 ```ts
@@ -415,6 +425,15 @@ expect(within(stats).getByText("1")).toBeInTheDocument();
 expect(within(stats).queryByText("0–3")).not.toBeInTheDocument();
 expect(within(stats).queryByText("scale")).not.toBeInTheDocument();
 ```
+
+Also make `mockMeFetch` accept an optional survey-data argument and add a minimal
+Scaling Up Full fixture containing one ordinary 0–10 slider and one
+`S_BACKGROUND` number question. Add two invited-flow regressions:
+
+- non-CEO: exact `1 short statement, rated 0–10.` sentence, three chips, and the
+  `0–10` scale;
+- CEO: exact `2 questions using a mix of response formats.` sentence, two chips,
+  and no scale.
 
 In the public Welcome test, retain the existing exact copy and scale assertions, then add:
 
@@ -546,7 +565,9 @@ npx jest \
   --runInBand
 ```
 
-Expected: PASS. The invited mixed fixture has two chips and no scale claim; the public uniform fixture retains its exact sentence and three chips.
+Expected: PASS. The invited mixed fixture has two chips and no scale claim; the
+public uniform fixture retains its exact sentence and three chips; Scaling Up
+Full is uniform for the non-CEO visible bank and mixed for the CEO visible bank.
 
 - [ ] **Step 8: Run changed-file ESLint**
 
@@ -641,9 +662,9 @@ Insert immediately after the `---` near the top of `plans/CHANGELOG.md`:
 ```md
 ### 2026-07-31 — Welcome-screen question-bank accuracy implemented (GH #222) <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:gh-222-welcome-screen-accuracy-implemented -->
 
-**Status: IMPLEMENTED + LOCALLY VERIFIED; not yet merged or launched.** The shared participant Welcome screen no longer takes the first slider's range and presents it as a property of the entire question bank.
+**Status: IMPLEMENTED + LOCALLY VERIFIED; not yet merged or launched.** The shared participant Welcome screen no longer takes the first slider's range and presents it as a property of the entire respondent-visible question bank.
 
-**Behavior.** A bank shows its existing `short statements, rated …` sentence and scale chip only when every question is `SLIDER_LIKERT`, every range is finite and increasing, and every range matches. LVA, QSP v1, QSP v2, and Scaling Up Full instead use `questions using a mix of response formats` and retain only the existing question-count and section-count chips. Rockefeller Habits, Five Dysfunctions, and Scaling Up Quick retain their existing rated copy and three-chip layout. Invited and public flows use one shared derivation.
+**Behavior.** A respondent-visible bank shows its existing `short statements, rated …` sentence and scale chip only when every question is `SLIDER_LIKERT`, every range is finite and increasing, and every range matches. LVA, QSP v1, and QSP v2 use `questions using a mix of response formats` and retain only the existing question-count and section-count chips. Scaling Up Full is role-dependent: non-CEOs see a uniform slider bank with rated copy and the scale chip, while CEOs see the mixed slider/background-number bank with mixed-format copy and two chips. Rockefeller Habits, Five Dysfunctions, and Scaling Up Quick retain their existing rated copy and three-chip layout. Invited and public flows use one shared derivation.
 
 **Scope.** `deriveTimeEstimate` is unchanged. No template-specific rule, percentage threshold, CSS change, API change, migration, seed edit, feature flag, or unrelated Welcome copy is included.
 

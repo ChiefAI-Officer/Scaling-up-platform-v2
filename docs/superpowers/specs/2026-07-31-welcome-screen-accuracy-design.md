@@ -12,10 +12,11 @@
 
 ## Goal
 
-Make the shared assessment Welcome screen describe the complete question bank
-truthfully. Today it takes the first `SLIDER_LIKERT` question's scale and presents
-that scale as if it applies to every question. That produces false summaries for
-mixed-format banks such as Leadership Vision Alignment (LVA), QSP v1, and QSP v2.
+Make the shared assessment Welcome screen describe the respondent-visible
+question bank truthfully. Today it takes the first `SLIDER_LIKERT` question's
+scale and presents that scale as if it applies to every visible question. That
+produces false summaries for mixed-format banks such as Leadership Vision
+Alignment (LVA), QSP v1, and QSP v2.
 
 The fix must remain deliberately small:
 
@@ -48,7 +49,11 @@ This makes the copy inaccurate for the following known banks:
 
 ### One strict composition rule
 
-A question bank may claim a rating scale only when:
+In this design, “question bank” means the questions visible to the current
+respondent after role-based filtering. In the invited flow, that is
+`sortedQuestions`; it is not necessarily the template's complete seed bank.
+
+A respondent-visible question bank may claim a rating scale only when:
 
 1. every question is `SLIDER_LIKERT`;
 2. every slider has finite numeric minimum and maximum values, with maximum
@@ -59,9 +64,11 @@ There are no percentage thresholds or template exceptions. A single non-slider
 question makes the bank mixed. Sliders with different ranges also make the bank
 mixed.
 
-This strict rule intentionally treats Scaling Up Full as mixed because it
-contains 61 slider questions and 2 number questions. Although the existing scale
-claim is close to representative, it is not true for the whole bank.
+Scaling Up Full is role-dependent under this rule. Non-CEO respondents do not
+receive the `S_BACKGROUND` number questions, so their visible bank is uniform
+sliders and retains rated copy plus the scale chip. CEOs receive the slider
+questions and the two background number questions, so their visible bank is
+mixed and omits the scale claim. The complete raw seed remains mixed.
 
 ### Welcome copy and stat chips
 
@@ -90,7 +97,7 @@ redesign is required.
 ## Presentation derivation
 
 Replace the first-slider-only decision with one shared presentation derivation
-over the complete question bank. Its output contains:
+over the respondent-visible question bank. Its output contains:
 
 - the expectations sentence; and
 - an optional scale label.
@@ -122,7 +129,8 @@ Known examples:
 | LVA | Mixed |
 | QSP v1 | Mixed |
 | QSP v2 | Mixed |
-| Scaling Up Full | Mixed |
+| Scaling Up Full — non-CEO | Uniform scale |
+| Scaling Up Full — CEO | Mixed |
 
 ## Scope boundaries
 
@@ -165,9 +173,11 @@ Rendering coverage:
 - mixed and fallback cases contain no scale chip or `rated` claim;
 - invited and public Welcome flows both consume the shared result.
 
-Regression examples should include LVA, QSP v1, QSP v2, Scaling Up Full,
-Rockefeller Habits, and Five Dysfunctions where their seed builders are practical
-to exercise without database access.
+Regression examples should include LVA, QSP v1, QSP v2, the complete raw Scaling
+Up Full seed, Rockefeller Habits, and Five Dysfunctions where their seed builders
+are practical to exercise without database access. Invited-flow coverage should
+also pin Scaling Up Full's non-CEO uniform result and CEO mixed result after
+role-based filtering.
 
 ## Rollout and risk
 
@@ -186,8 +196,8 @@ risks. The strict all-questions rule addresses the third.
 
 ## Acceptance criteria
 
-1. A scale is shown only when every question is a slider with the same valid
-   numeric range.
+1. A scale is shown only when every respondent-visible question is a slider with
+   the same valid numeric range.
 2. Mixed-format banks render
    `{count} questions using a mix of response formats.`.
 3. Mixed-format banks show exactly the question-count and section-count chips.
