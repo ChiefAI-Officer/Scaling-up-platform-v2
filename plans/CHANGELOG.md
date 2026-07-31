@@ -6,6 +6,22 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-07-31 — Consolidated progress-report window reset after PR #267 <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:consolidated-report-window-reset-after-pr-267 -->
+
+**Status: REPORTING BASELINE LOCKED; no runtime change.** The consolidated report at `output/pdf/Scaling-Up-Progress-Report-2026-07-27-to-2026-07-31.pdf` has already been sent. It explicitly covers **33 merged pull requests through PR #267** and groups them into **ten product and reliability outcomes**. Invitation emails, per-assessment Welcome wording, the report Coach byline, on-screen respondent results, QSP story grouping, public-result Print/Download, Coach Referred Results and the remaining #83 gaps, campaign-edition visibility, respondent-removal messaging, and email/outbox reliability are therefore prior-window work. Do not present any of them, their launch-record PRs, or their retained screenshots as new progress.
+
+**Current fresh-window count: one reportable product outcome.** GH **#222 Welcome-screen question-bank accuracy** shipped after the sent-report cutoff in PR [#269](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/269), squash `b350ff2267fc690568f5aa75e00cb90a414e2d8c`. Mixed respondent-visible question banks now use truthful format-aware wording and omit the scale chip; uniform valid slider banks retain their rated copy. The exact merge SHA deployed successfully, the production health check was green, issue #222 is closed, and its shared-board claim is released. This is the only product outcome currently eligible for the next consolidated progress report.
+
+**Post-cutoff work that does not increase the progress count.**
+
+- PR #268 records Jeff's July-10 item #33 as **DEFERRED / NEEDS INPUT** pending report-by-report side-by-side notes. It is a disposition, not implementation or completion.
+- PR #270 corrects the #222 source-of-truth status from pre-merge wording to **MERGED + LIVE**. It is documentation closeout, not a second product outcome.
+- Claim-board and Notion closeout keep ownership and payment records accurate. They are operational receipts, not user-facing product changes.
+
+**Rule for the next consolidated report.** Add an outcome only after its implementation is merged, its exact production deployment is verified, its claim is released, and the SoT records what shipped and what remains. Work already present in the sent July 27-31 PDF may appear only as a clearly labelled **Before** comparison for a new change. Documentation corrections, deferrals, research, plans, and coordination updates may be listed in an internal ledger when useful, but must not inflate the product-outcome headline.
+
+---
+
 ### 2026-07-31 — Welcome-screen question-bank accuracy launched (GH #222) <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:gh-222-welcome-screen-accuracy-launched -->
 
 **Status: MERGED + LIVE.** PR [#269](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/269) merged as squash `b350ff2267fc690568f5aa75e00cb90a414e2d8c` on 2026-07-31. Vercel completed the production deployment for that exact SHA. The canonical production health endpoint returned `healthy`, with `database: healthy` and `authPosture: safe` on the new process.
