@@ -398,12 +398,22 @@ describe("getCampaignRespondents", () => {
 // failure. Precisely the falsehood this feature exists to prevent.
 // ────────────────────────────────────────────────────────────────────────
 
-function campaignOnVersion(versionNumber: number, publishedAt: Date | null) {
+function campaignOnVersion(
+  versionNumber: number,
+  publishedAt: Date | null,
+  archivedAt: Date | null = null,
+) {
   return {
     ...baseCampaign(),
     // templateId is sourced from the VERSION in prod (the two FKs are
     // independent), so the fixture must carry it here too.
-    version: { templateId: "tpl-1", versionNumber, publishedAt, language: "enUS" },
+    version: {
+      templateId: "tpl-1",
+      versionNumber,
+      publishedAt,
+      archivedAt,
+      language: "enUS",
+    },
   };
 }
 
@@ -425,6 +435,7 @@ describe("getCampaignOverview — Wave EV edition standing", () => {
     expect(campaign.edition).toEqual({
       versionNumber: 3,
       publishedAt: new Date("2026-07-02T09:00:00Z"),
+      pinnedRetired: false,
       newerEditionAvailable: false,
     });
   });
@@ -438,6 +449,44 @@ describe("getCampaignOverview — Wave EV edition standing", () => {
     expect(campaign.edition?.newerEditionAvailable).toBe(true);
     // Still the edition actually being served — never the newer one.
     expect(campaign.edition?.versionNumber).toBe(3);
+  });
+
+  it("projects archivedAt from the pinned version", async () => {
+    const db = buildDb({
+      campaign: campaignOnVersion(3, new Date("2026-07-02T09:00:00Z")),
+    });
+    await getCampaignOverview(db, "c1");
+    const { select } = (
+      db.assessmentCampaign.findUnique as jest.Mock
+    ).mock.calls[0][0].include.version;
+    expect(select).toEqual({
+      templateId: true,
+      versionNumber: true,
+      publishedAt: true,
+      language: true,
+      archivedAt: true,
+    });
+  });
+
+  it("reports a retired pin without querying sibling versions", async () => {
+    const db = buildDb({
+      campaign: campaignOnVersion(
+        3,
+        new Date("2026-07-02T09:00:00Z"),
+        new Date("2026-07-30T12:00:00Z"),
+      ),
+      versionsThrow: true,
+    });
+
+    const { campaign } = await getCampaignOverview(db, "c1");
+
+    expect(campaign.edition).toEqual({
+      versionNumber: 3,
+      publishedAt: new Date("2026-07-02T09:00:00Z"),
+      pinnedRetired: true,
+      newerEditionAvailable: false,
+    });
+    expect(db.assessmentTemplateVersion.findMany).not.toHaveBeenCalled();
   });
 
   it("scopes the lookup to this template, this language, and strictly newer rows", async () => {

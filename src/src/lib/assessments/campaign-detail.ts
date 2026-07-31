@@ -104,13 +104,14 @@ export interface CampaignOverview {
      */
     isImported?: boolean;
     /**
-     * Wave EV — which EDITION of the template this campaign is serving, and
-     * whether a newer one has since been published. A campaign pins a version at
-     * creation and can never move off it, so without this the screen silently
-     * shows frozen content (the cause of Jeff's #40/#43 re-reports).
+     * Wave EV / GH #242 — which EDITION of the template this campaign is serving,
+     * whether its pinned edition is retired, and whether a newer active sibling
+     * exists. A campaign pins a version at creation and can never move off it, so
+     * without this the screen silently shows frozen content (the cause of Jeff's
+     * #40/#43 re-reports).
      *
-     * Optional, and null when the pinned version is unpublished — older fixtures
-     * stay valid and the tile renders as it does today (fail-quiet).
+     * Optional, and null when the pin is missing or unpublished, or the sibling
+     * lookup fails — older fixtures stay valid and the tile renders fail-quiet.
      */
     edition?: EditionStanding | null;
   };
@@ -200,11 +201,13 @@ interface CampaignWithRels {
   importManifest?: unknown;
   template: { id: string; name: string };
   organization: { id: string; name: string };
-  /** Wave EV — the pinned version. Optional so older fixtures stay valid. */
+  /** Wave EV / GH #242 — the pinned version, including retirement state and the
+   * sibling-currency inputs. Optional so older fixtures stay valid. */
   version?: {
     templateId: string;
     versionNumber: number;
     publishedAt: Date | null;
+    archivedAt: Date | null;
     language: string;
   } | null;
 }
@@ -323,6 +326,7 @@ export async function getCampaignOverview(
           versionNumber: true,
           publishedAt: true,
           language: true,
+          archivedAt: true,
         },
       },
     },
@@ -351,51 +355,56 @@ export async function getCampaignOverview(
 
   const stats = computeStats(participants, invitations);
 
-  // Wave EV — resolve the pinned edition + whether a newer one exists. Fully
-  // fail-quiet: no version on the row, no sibling query available, or a query
-  // failure all yield `null`, which renders the tile exactly as it did before.
-  // A campaign screen must never fail to load over a decorative badge.
+  // Wave EV / GH #242 — resolve the pinned edition. Retirement is known from
+  // the pinned row and needs no sibling query. Non-retired currency remains
+  // fail-quiet: a missing version, unpublished pin, or sibling-query failure
+  // yields `null`, so a decorative badge never blocks the campaign screen.
   let edition: EditionStanding | null = null;
   if (campaign.version != null) {
     const pinned = {
       templateId: campaign.version.templateId,
       versionNumber: campaign.version.versionNumber,
       publishedAt: campaign.version.publishedAt,
+      archivedAt: campaign.version.archivedAt,
       language: campaign.version.language,
     };
-    try {
-      const siblings: TemplateVersionRow[] =
-        await db.assessmentTemplateVersion.findMany({
-          where: {
-            templateId: pinned.templateId,
-            language: pinned.language,
-            versionNumber: { gt: pinned.versionNumber },
-            // The ONE definition of published-and-not-retired lives in
-            // active-version.ts. A sibling counts as newer only if it is what
-            // campaign-create would actually offer, so this filter has to be the
-            // same object create resolves through — otherwise a future ED8
-            // predicate would stop create offering a version while this badge
-            // kept pointing a coach at an edition they cannot get.
-            ...activePublishedWhere,
-          },
-          select: {
-            templateId: true,
-            versionNumber: true,
-            language: true,
-            publishedAt: true,
-            archivedAt: true,
-          },
-        });
-      edition = resolveEditionStanding(pinned, siblings);
-    } catch (err) {
-      // Leave `edition` NULL — never claim currency we did not verify.
-      //
-      // The tempting shape here is `siblings = []` on failure, but that makes
-      // resolveEditionStanding return `newerEditionAvailable: false`, which the
-      // tile renders as an affirmative "you are on the newest edition". A
-      // transient read failure would then tell a tester exactly the falsehood
-      // this feature exists to prevent. Null renders no edition info at all.
-      console.error("[campaign-detail] edition sibling lookup failed:", err);
+    if (pinned.archivedAt != null) {
+      edition = resolveEditionStanding(pinned, []);
+    } else {
+      try {
+        const siblings: TemplateVersionRow[] =
+          await db.assessmentTemplateVersion.findMany({
+            where: {
+              templateId: pinned.templateId,
+              language: pinned.language,
+              versionNumber: { gt: pinned.versionNumber },
+              // The ONE definition of published-and-not-retired lives in
+              // active-version.ts. A sibling counts as newer only if it is what
+              // campaign-create would actually offer, so this filter has to be the
+              // same object create resolves through — otherwise a future ED8
+              // predicate would stop create offering a version while this badge
+              // kept pointing a coach at an edition they cannot get.
+              ...activePublishedWhere,
+            },
+            select: {
+              templateId: true,
+              versionNumber: true,
+              language: true,
+              publishedAt: true,
+              archivedAt: true,
+            },
+          });
+        edition = resolveEditionStanding(pinned, siblings);
+      } catch (err) {
+        // Leave `edition` NULL — never claim currency we did not verify.
+        //
+        // The tempting shape here is `siblings = []` on failure, but that makes
+        // resolveEditionStanding return `newerEditionAvailable: false`, which the
+        // tile renders as an affirmative "you are on the newest edition". A
+        // transient read failure would then tell a tester exactly the falsehood
+        // this feature exists to prevent. Null renders no edition info at all.
+        console.error("[campaign-detail] edition sibling lookup failed:", err);
+      }
     }
   }
 
