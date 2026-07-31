@@ -1,6 +1,8 @@
 # Jeff #65 — stable reminder-link contract
 
-**Status:** PRODUCT CONTRACT LOCKED; design only; not implemented, merged, shipped, or flag-enabled
+**Status at approval (historical):** PRODUCT CONTRACT LOCKED; design only; not implemented, merged, shipped, or flag-enabled.
+
+**Current status:** Jeff #65 is implemented on the branch and locally verified only; it is not merged, deployed, canaried, globally enabled, or closed. This status update does not alter the locked product contract below.
 
 **Decision date:** 2026-07-31
 

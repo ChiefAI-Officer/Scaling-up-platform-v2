@@ -62,26 +62,20 @@ jest.mock("@/lib/assessments/wave-j65-flags", () => ({
   isStableInvitationLinksEnabled: jest.fn().mockReturnValue(false),
 }));
 
-jest.mock("@/lib/assessments/stable-invitation-tokens", () => ({
-  stageStableInvitationToken: jest.fn(),
-  confirmStableInvitationToken: jest.fn(),
-  markStableInvitationTokenUncertain: jest.fn(),
-  rollbackRejectedStableInvitationToken: jest.fn(),
-  retryStableInvitationOperation: jest.fn(
-    async (operation: () => Promise<void>, attempts: number = 3) => {
-      for (let attempt = 0; attempt < attempts; attempt += 1) {
-        try {
-          await operation();
-          return true;
-        } catch {
-          // Match the domain helper's bounded, caller-owned retry semantics.
-        }
-      }
-      return false;
-    }
-  ),
-  classifyInvitationSendError: jest.fn().mockReturnValue("UNCERTAIN"),
-}));
+jest.mock("@/lib/assessments/stable-invitation-tokens", () => {
+  const actual = jest.requireActual<
+    typeof import("@/lib/assessments/stable-invitation-tokens")
+  >("@/lib/assessments/stable-invitation-tokens");
+
+  return {
+    ...actual,
+    stageStableInvitationToken: jest.fn(),
+    confirmStableInvitationToken: jest.fn(),
+    markStableInvitationTokenUncertain: jest.fn(),
+    rollbackRejectedStableInvitationToken: jest.fn(),
+    classifyInvitationSendError: jest.fn().mockReturnValue("UNCERTAIN"),
+  };
+});
 
 import { POST } from "@/app/api/assessment-campaigns/[id]/reminders/route";
 import { db } from "@/lib/db";

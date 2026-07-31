@@ -1,6 +1,8 @@
 # Jeff #65 stable reminder links — technical design
 
-**Status:** Approved in brainstorming; implementation not started
+**Status at approval (historical):** Approved in brainstorming; implementation not started.
+
+**Current status:** Jeff #65 is implemented on the branch and locally verified only; it is not merged, deployed, canaried, globally enabled, or closed.
 
 **Date:** 2026-07-31
 

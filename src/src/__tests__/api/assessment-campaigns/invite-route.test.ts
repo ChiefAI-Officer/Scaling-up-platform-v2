@@ -58,35 +58,29 @@ jest.mock("@/lib/assessments/wave-j65-flags", () => ({
   isStableInvitationLinksEnabled: jest.fn().mockReturnValue(false),
 }));
 
-jest.mock("@/lib/assessments/stable-invitation-tokens", () => ({
-  stageStableInvitationToken: jest.fn(),
-  registerNewOriginalToken: jest.fn(),
-  confirmStableInvitationToken: jest.fn(),
-  markStableInvitationTokenUncertain: jest.fn(),
-  removeRegisteredStableInvitationToken: jest.fn(),
-  rollbackRejectedStableInvitationToken: jest.fn(),
-  retryStableInvitationOperation: jest.fn(
-    async (operation: () => Promise<void>, attempts: number = 3) => {
-      for (let attempt = 0; attempt < attempts; attempt += 1) {
-        try {
-          await operation();
-          return true;
-        } catch {
-          // Match the domain helper's bounded, caller-owned retry semantics.
-        }
-      }
-      return false;
-    }
-  ),
-  classifyInvitationSendError: jest.fn((error) => {
-    const responseCode = error?.responseCode;
-    return typeof responseCode === "number" &&
-      responseCode >= 500 &&
-      responseCode <= 599
-      ? "DEFINITE_REJECTION"
-      : "UNCERTAIN";
-  }),
-}));
+jest.mock("@/lib/assessments/stable-invitation-tokens", () => {
+  const actual = jest.requireActual<
+    typeof import("@/lib/assessments/stable-invitation-tokens")
+  >("@/lib/assessments/stable-invitation-tokens");
+
+  return {
+    ...actual,
+    stageStableInvitationToken: jest.fn(),
+    registerNewOriginalToken: jest.fn(),
+    confirmStableInvitationToken: jest.fn(),
+    markStableInvitationTokenUncertain: jest.fn(),
+    removeRegisteredStableInvitationToken: jest.fn(),
+    rollbackRejectedStableInvitationToken: jest.fn(),
+    classifyInvitationSendError: jest.fn((error) => {
+      const responseCode = error?.responseCode;
+      return typeof responseCode === "number" &&
+        responseCode >= 500 &&
+        responseCode <= 599
+        ? "DEFINITE_REJECTION"
+        : "UNCERTAIN";
+    }),
+  };
+});
 
 // Wave-D auto-send flag. The early-send 409 gate must ONLY apply when auto-send
 // is ON; default ON in this suite so the existing gate tests pass unchanged.
