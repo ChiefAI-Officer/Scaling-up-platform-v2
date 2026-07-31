@@ -6,6 +6,20 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-07-31 — Campaign-list edition visibility implemented (GH #243) <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:gh-243-campaign-list-edition-visibility-pr-ready -->
+
+**Status: IMPLEMENTED + LOCALLY VERIFIED; not yet merged or launched.** The shared admin and coach campaign lists now show the pinned assessment identity as `Template · Edition N`. DRAFT and ACTIVE rows show a compact `Not latest` marker when a newer active edition exists and a stronger `Retired` marker when the pin itself is retired; retirement has precedence. CLOSED rows, including imported historical campaigns, keep factual edition identity but suppress both actionable markers. Current rows have no positive badge.
+
+**Architecture and safety.** Both page queries project the same pinned-version fields. One server-only resolver deduplicates exact `(templateId, language)` pairs, performs one additional `findMany` using `activePublishedWhere`, groups the complete candidate set in memory, and delegates decisions to the GH #242 `resolveEditionStanding` contract. A failed query, invalid pin, or incomplete nonretired group yields null edition metadata and preserves the prior template-only row; it never asserts currency. The client DTO contains only edition number and the two standing booleans.
+
+**Presentation and scope.** Desktop and 390px mobile receipts were approved before feature code and retained under `docs/specs/v7.6/mockups/`. Existing grouping, filtering, metrics, ordering, links, actions, and the Coach Quick-link path remain unchanged. There is no edition filter, sort, date, repinning action, migration, API route, feature flag, report change, scoring change, or write-path change.
+
+**Verification.** The focused resolver, mapper, shared-list, filter, admin-page, coach-page, referred-results, and edition-standing suites passed. Changed-file ESLint, migration safety, changelog freshness, `git diff --check`, and `CI=true npx next build --turbopack` passed.
+
+**Rollout and rollback.** This is a flagless read-only presentation change. It is not live until its PR merges and the exact merge deployment reaches Ready. Rollback is a normal revert with no data cleanup, flag operation, or environment change.
+
+---
+
 <a id="gh-242-retired-edition-warning-launched"></a>
 ### 2026-07-31 — GH #242 retired pinned-edition warning launched <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:gh-242-retired-edition-warning-launched -->
 

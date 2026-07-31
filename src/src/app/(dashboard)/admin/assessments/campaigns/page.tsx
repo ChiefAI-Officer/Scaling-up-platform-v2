@@ -22,6 +22,10 @@ import {
   type CampaignListItem,
 } from "@/components/assessments/CampaignsListWithFilter";
 import { toCampaignListItems } from "@/lib/assessments/campaign-list-items";
+import {
+  asCampaignListEditionDb,
+  resolveCampaignListEditions,
+} from "@/lib/assessments/campaign-list-editions";
 
 export default async function AdminAssessmentCampaignsPage() {
   const session = await getServerSession(authOptions);
@@ -40,6 +44,15 @@ export default async function AdminAssessmentCampaignsPage() {
     include: {
       organization: { select: { id: true, name: true } },
       template: { select: { id: true, name: true } },
+      version: {
+        select: {
+          templateId: true,
+          versionNumber: true,
+          language: true,
+          publishedAt: true,
+          archivedAt: true,
+        },
+      },
       participants: { select: { id: true, respondentId: true } },
       invitations: {
         select: {
@@ -53,7 +66,14 @@ export default async function AdminAssessmentCampaignsPage() {
     orderBy: { createdAt: "desc" },
   });
 
-  const items: CampaignListItem[] = toCampaignListItems(campaigns);
+  const editionsByCampaignId = await resolveCampaignListEditions(
+    asCampaignListEditionDb(db),
+    campaigns,
+  );
+  const items: CampaignListItem[] = toCampaignListItems(
+    campaigns,
+    editionsByCampaignId,
+  );
 
   return (
     <div>
