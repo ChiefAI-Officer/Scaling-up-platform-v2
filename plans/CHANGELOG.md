@@ -6,17 +6,17 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
-### 2026-07-31 — Welcome-screen question-bank accuracy implemented (GH #222) <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:gh-222-welcome-screen-accuracy-implemented -->
+### 2026-07-31 — Welcome-screen question-bank accuracy launched (GH #222) <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:gh-222-welcome-screen-accuracy-launched -->
 
-**Status: IMPLEMENTED + LOCALLY VERIFIED; not yet merged or launched.** The shared participant Welcome screen no longer takes the first slider's range and presents it as a property of the entire respondent-visible question bank.
+**Status: MERGED + LIVE.** PR [#269](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/269) merged as squash `b350ff2267fc690568f5aa75e00cb90a414e2d8c` on 2026-07-31. Vercel completed the production deployment for that exact SHA. The canonical production health endpoint returned `healthy`, with `database: healthy` and `authPosture: safe` on the new process.
 
 **Behavior.** A respondent-visible bank shows its existing `short statements, rated …` sentence and scale chip only when every question is `SLIDER_LIKERT`, every range is finite and increasing, and every range matches. LVA, QSP v1, and QSP v2 use `questions using a mix of response formats` and retain only the existing question-count and section-count chips. Scaling Up Full is role-dependent: non-CEOs do not receive the `S_BACKGROUND` number questions, so their uniform visible slider bank retains rated copy and the scale chip; CEOs receive the slider and background-number questions, so their mixed visible bank uses mixed-format copy and two chips. Rockefeller Habits, Five Dysfunctions, and Scaling Up Quick retain their existing rated copy and three-chip layout. Invited and public flows use one shared derivation.
 
 **Scope.** `deriveTimeEstimate` is unchanged. No template-specific rule, percentage threshold, CSS change, API change, migration, seed edit, feature flag, or unrelated Welcome copy is included.
 
-**Verification.** The focused shared-component, invited-pager, and public-pager suites passed. Changed-file ESLint, migration safety, changelog freshness, `git diff --check`, and `CI=true npx next build --turbopack` passed.
+**Verification.** Before merge, the focused shared-component, invited-pager, public-pager, and changelog-freshness suites passed 43/43 tests. Changed-file ESLint had zero errors, migration safety checked 42 migrations, `git diff --check` passed, and `CI=true npx next build --turbopack` generated 92/92 pages. After merge, GitHub Build, Migration Safety Gate, and Assessment Email Lease checks passed; the production deployment and health check then passed.
 
-**Rollout and rollback.** This is a flagless presentation fix with no stored-data change. It is not live until its PR merges and deploys; rollback is a normal revert.
+**Rollout and rollback.** This is a live, flagless presentation fix with no stored-data change. Rollback is a normal revert of PR #269.
 
 ---
 
