@@ -569,6 +569,8 @@ describe("stable invitation tokens", () => {
           tokenHash: ORIGINAL_HASH,
           source: "ORIGINAL",
           deliveryState: "STAGED",
+          previousTokenHash: null,
+          previousExpiresAt: null,
         }),
         deleteMany,
       },
@@ -584,9 +586,34 @@ describe("stable invitation tokens", () => {
         tokenHash: ORIGINAL_HASH,
         source: "ORIGINAL",
         deliveryState: "STAGED",
+        previousTokenHash: null,
+        previousExpiresAt: null,
       },
     });
     expect(parentUpdate).not.toHaveBeenCalled();
+  });
+
+  test("original cleanup rejects a rotating original without deleting it", async () => {
+    const deleteMany = jest.fn();
+    const db = {
+      assessmentInvitationToken: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "token-1",
+          invitationId: "inv-1",
+          tokenHash: ORIGINAL_HASH,
+          source: "ORIGINAL",
+          deliveryState: "STAGED",
+          previousTokenHash: OLD_HASH,
+          previousExpiresAt: new Date("2026-10-01T00:00:00Z"),
+        }),
+        deleteMany,
+      },
+    } as unknown as StableTokenDb;
+
+    await expect(
+      removeRegisteredStableInvitationToken(db, "token-1"),
+    ).rejects.toThrow("cleanup identity or state mismatch");
+    expect(deleteMany).not.toHaveBeenCalled();
   });
 
   test.each([
@@ -604,6 +631,8 @@ describe("stable invitation tokens", () => {
             tokenHash: ORIGINAL_HASH,
             source,
             deliveryState,
+            previousTokenHash: null,
+            previousExpiresAt: null,
           }),
           deleteMany,
         },
@@ -937,6 +966,69 @@ describe("stable invitation tokens", () => {
       harness.tokens.some((token) => token.source === "REMINDER"),
     ).toBe(false);
   });
+
+  test.each([
+    ["earlier-first", [0, 1]],
+    ["later-first", [1, 0]],
+  ] as const)(
+    "two overlapping original rotations reject safely in %s order",
+    async (_label, rejectionOrder) => {
+      const harness = buildStatefulTokenDb();
+      const attempts = [
+        await stageStableInvitationToken(harness.db, {
+          invitationId: "inv-1",
+          newTokenHash: ATTEMPT_A_HASH,
+          expiresAt: new Date("2026-11-01T00:00:00Z"),
+          source: "ORIGINAL",
+        }),
+        await stageStableInvitationToken(harness.db, {
+          invitationId: "inv-1",
+          newTokenHash: ATTEMPT_B_HASH,
+          expiresAt: new Date("2026-12-01T00:00:00Z"),
+          source: "ORIGINAL",
+        }),
+      ];
+
+      const [firstRejected, secondRejected] = rejectionOrder;
+      await rollbackRejectedStableInvitationToken(
+        harness.db,
+        attempts[firstRejected],
+      );
+
+      const survivingAttempt = attempts[secondRejected];
+      expect(harness.parent.tokenHash).toBe(
+        survivingAttempt.newTokenHash,
+      );
+      expect(
+        harness.tokens.find(
+          (token) => token.tokenHash === survivingAttempt.newTokenHash,
+        )?.previousTokenHash,
+      ).toBe(OLD_HASH);
+
+      await rollbackRejectedStableInvitationToken(
+        harness.db,
+        attempts[secondRejected],
+      );
+
+      expect(harness.parent.tokenHash).toBe(OLD_HASH);
+      expect(
+        harness.tokens.some(
+          (token) => token.tokenHash === harness.parent.tokenHash,
+        ),
+      ).toBe(true);
+      expect(
+        harness.tokens.some(
+          (token) =>
+            token.tokenHash === ATTEMPT_A_HASH ||
+            token.tokenHash === ATTEMPT_B_HASH,
+        ),
+      ).toBe(false);
+      expect(
+        harness.tokens.some((token) => token.source === "ORIGINAL"),
+      ).toBe(false);
+      expect(harness.parent.resentCount).toBe(0);
+    },
+  );
 
   test.each([
     ["earlier-first", [0, 1]],

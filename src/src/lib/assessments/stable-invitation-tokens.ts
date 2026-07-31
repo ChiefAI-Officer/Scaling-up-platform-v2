@@ -256,13 +256,17 @@ export async function removeRegisteredStableInvitationToken(
       tokenHash: true,
       source: true,
       deliveryState: true,
+      previousTokenHash: true,
+      previousExpiresAt: true,
     },
   });
 
   if (
     !token ||
     token.source !== "ORIGINAL" ||
-    token.deliveryState !== "STAGED"
+    token.deliveryState !== "STAGED" ||
+    token.previousTokenHash !== null ||
+    token.previousExpiresAt !== null
   ) {
     throw stableTokenInvariant("original cleanup identity or state mismatch");
   }
@@ -275,6 +279,8 @@ export async function removeRegisteredStableInvitationToken(
       tokenHash: token.tokenHash,
       source: "ORIGINAL",
       deliveryState: "STAGED",
+      previousTokenHash: null,
+      previousExpiresAt: null,
     },
   });
   if (deleted.count !== 1) {
