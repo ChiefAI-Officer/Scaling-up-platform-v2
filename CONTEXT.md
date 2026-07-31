@@ -124,6 +124,10 @@ _Avoid_: recommendation = tier; "findings" = survey branching (that is condition
 A campaign-progress label for a respondent — new / invited / started / completed (revoked excluded). Purely workflow state; carries no scoring meaning.
 _Avoid_: confusing this with a scoring tier.
 
+**Invitation link**:
+A secret, emailed entry URL for one Respondent's invitation to an invited Campaign. The original invitation and every successfully sent reminder may carry different tokens, but Jeff #65's locked lifecycle contract treats them as sibling doors to the same Invitation: every one remains valid until submission, explicit revocation, expiry, or Campaign closure. A failed reminder creates no usable new door and invalidates none of the existing ones. Manual **Resend** is outside that contract unless separately approved.
+_Avoid_: calling the newest link a replacement link, assuming a successful reminder may invalidate earlier links, or treating multiple links as multiple Invitations.
+
 **ScaleUp Score**:
 Scaling Up Full's overall weighted 0–100 score (can exceed 100 via bonus). Its exact weighting formula is owned by Esperto and not in our source export.
 
@@ -171,6 +175,7 @@ _Avoid_: "delete admin" implying a hard row delete (FKs forbid it); assuming a k
 - An **Assessment Template** has one or more **Template Versions**; only published versions are selectable by a campaign.
 - A **Campaign** pins exactly one **Template Version** and targets many **Respondents** (each via a **Participant** record).
 - The **Invitation email copy** (subject + body) lives on the **Template** itself — read live at send time by every send path, so editing it immediately affects future sends of in-flight campaigns. It is *not* pinned by a Template Version; only a per-campaign override shields a campaign from template-level copy edits.
+- An invited Respondent has one **Invitation**, which may be reached through its original **Invitation link** or any successfully sent reminder link; those sibling links share one lifecycle and never create extra Invitations.
 - A scored **Template Version** defines **Scoring Tiers**; a Scaling Up Full version additionally defines **Domains** and per-question **Recommendations**.
 - A **Respondent**'s progress in a campaign is an **Invitation status band**; their answers, once submitted, may produce a **Scoring tier** result.
 - A **Results report** (per-respondent) and an **Aggregate report** (cohort) are both viewed through the **Report access gate**, which wraps each one's **loader**.
