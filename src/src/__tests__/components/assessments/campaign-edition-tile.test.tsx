@@ -173,8 +173,12 @@ describe("retired pinned edition", () => {
   it("uses the semantic destructive treatment", () => {
     renderDetail(retired);
 
-    expect(screen.getByTestId("campaign-edition-retired")).toHaveClass(
-      "border-destructive",
+    const warning = screen.getByTestId("campaign-edition-retired");
+    expect(warning).toHaveStyle({
+      borderColor: "hsl(var(--destructive))",
+    });
+    expect(warning).toHaveClass(
+      "border",
       "bg-destructive/10",
       "text-destructive",
     );
