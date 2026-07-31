@@ -71,14 +71,15 @@ For a wholly uniform slider bank:
   `{count} short statements, rated {minimum}–{maximum}.`;
 - preserve all three stat chips: question count, section count, and scale.
 
-For a non-empty mixed-format bank:
+For a non-empty bank with more than one supported response type, or with
+multiple valid slider ranges:
 
 - render:
   `{count} questions using a mix of response formats.`;
 - render only the question-count and section-count chips;
 - do not add a replacement “Mixed formats” chip.
 
-For an empty or unrecognized bank:
+For a homogeneous non-slider bank, or an empty, invalid, or unrecognized bank:
 
 - use the neutral fallback `{count} questions.`;
 - render only the question-count and section-count chips.
@@ -106,7 +107,8 @@ aliases. New templates therefore receive correct behavior without new branches.
 | Bank shape | Expectations sentence | Stat chips |
 | --- | --- | --- |
 | All sliders, identical valid range | Existing “short statements, rated …” copy | Questions, sections, scale |
-| Contains text, number, or multiple choice | “questions using a mix of response formats” | Questions, sections |
+| Contains more than one supported response type | “questions using a mix of response formats” | Questions, sections |
+| Homogeneous non-slider bank | Neutral “questions” fallback | Questions, sections |
 | Sliders use different ranges | “questions using a mix of response formats” | Questions, sections |
 | Empty, invalid, or unrecognized | Neutral “questions” fallback | Questions, sections |
 

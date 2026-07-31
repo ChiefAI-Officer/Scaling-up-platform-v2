@@ -12,8 +12,11 @@
 
 - A scale may render only when every question is `SLIDER_LIKERT`, every scale has finite numeric `min` and `max` values with `max > min`, and every slider uses the same range.
 - Uniform banks keep the exact existing copy: `{count} short statement(s), rated {minimum}–{maximum}.`
-- Supported non-uniform banks render exactly `{count} question(s) using a mix of response formats.`
-- Empty, invalid, or unrecognized banks render only the neutral `{count} question(s).` fallback.
+- Banks with more than one supported response type, or multiple valid slider
+  ranges, render exactly
+  `{count} question(s) using a mix of response formats.`
+- Homogeneous non-slider, empty, invalid, or unrecognized banks render only
+  the neutral `{count} question(s).` fallback.
 - A missing scale label removes only the scale chip; the existing question-count and section-count chips remain.
 - `deriveTimeEstimate` and all time-estimate behavior remain byte-unchanged.
 - Invited and public Welcome flows must use the same derivation.
@@ -143,6 +146,7 @@ describe("deriveWelcomePresentation", () => {
 
   it.each([
     ["empty bank", [], "0 questions."],
+    ["homogeneous text bank", [{ type: "TEXT" }], "1 question."],
     ["unknown type", [{ type: "RANKING" }], "1 question."],
     [
       "invalid scale",
@@ -153,6 +157,14 @@ describe("deriveWelcomePresentation", () => {
       "non-finite scale",
       [{ type: "SLIDER_LIKERT", scale: { min: 0, max: Number.NaN } }],
       "1 question.",
+    ],
+    [
+      "later invalid scale",
+      [
+        { type: "SLIDER_LIKERT", scale: { min: 0, max: 3 } },
+        { type: "SLIDER_LIKERT", scale: { min: 3, max: 3 } },
+      ],
+      "2 questions.",
     ],
   ])("uses neutral copy for %s", (_name, questions, expectationText) => {
     expect(deriveWelcomePresentation(questions as WelcomeQuestion[])).toEqual({
@@ -216,35 +228,37 @@ export function deriveWelcomePresentation(
     return neutral;
   }
 
-  if (questions.some((question) => question.type !== "SLIDER_LIKERT")) {
+  const responseTypes = new Set(questions.map((question) => question.type));
+  if (responseTypes.size > 1) {
     return {
       expectationText: `${countLabel} using a mix of response formats.`,
       scaleLabel: null,
     };
   }
 
-  const firstScale = questions[0].scale;
-  if (
-    !firstScale ||
-    !Number.isFinite(firstScale.min) ||
-    !Number.isFinite(firstScale.max) ||
-    firstScale.max <= firstScale.min
-  ) {
+  if (!responseTypes.has("SLIDER_LIKERT")) {
     return neutral;
   }
 
-  const sameValidScale = questions.every(({ scale }) =>
+  const firstScale = questions[0].scale;
+  const allScalesValid = questions.every(({ scale }) =>
     Boolean(
       scale &&
         Number.isFinite(scale.min) &&
         Number.isFinite(scale.max) &&
-        scale.max > scale.min &&
-        scale.min === firstScale.min &&
-        scale.max === firstScale.max,
+        scale.max > scale.min,
     ),
   );
+  if (!firstScale || !allScalesValid) {
+    return neutral;
+  }
 
-  if (!sameValidScale) {
+  const sameScale = questions.every(
+    ({ scale }) =>
+      scale?.min === firstScale.min && scale?.max === firstScale.max,
+  );
+
+  if (!sameScale) {
     return {
       expectationText: `${countLabel} using a mix of response formats.`,
       scaleLabel: null,
