@@ -144,12 +144,8 @@ export async function stageStableInvitationToken(
         tokenHash: input.newTokenHash,
         source: input.source,
         deliveryState: "STAGED",
-        ...(input.source === "REMINDER"
-          ? {
-              previousTokenHash: current.tokenHash,
-              previousExpiresAt: current.expiresAt,
-            }
-          : {}),
+        previousTokenHash: current.tokenHash,
+        previousExpiresAt: current.expiresAt,
       },
       select: { id: true },
     });
@@ -318,12 +314,14 @@ export async function rollbackRejectedStableInvitationToken(
       !failed ||
       failed.invitationId !== staged.invitationId ||
       failed.tokenHash !== staged.newTokenHash ||
-      failed.source !== "REMINDER" ||
+      (failed.source !== "ORIGINAL" && failed.source !== "REMINDER") ||
       failed.deliveryState !== "STAGED" ||
       failed.previousTokenHash === null ||
       failed.previousExpiresAt === null
     ) {
-      throw stableTokenInvariant("rejected reminder identity or state mismatch");
+      throw stableTokenInvariant(
+        "rejected rotating token identity or state mismatch",
+      );
     }
 
     assertSha256Hash(failed.tokenHash);
@@ -334,18 +332,20 @@ export async function rollbackRejectedStableInvitationToken(
         id: failed.id,
         invitationId: failed.invitationId,
         tokenHash: failed.tokenHash,
-        source: "REMINDER",
+        source: failed.source,
         deliveryState: "STAGED",
       },
     });
     if (deleted.count !== 1) {
-      throw stableTokenInvariant("rejected reminder changed before deletion");
+      throw stableTokenInvariant(
+        "rejected rotating token changed before deletion",
+      );
     }
 
     await tx.assessmentInvitationToken.updateMany({
       where: {
         invitationId: failed.invitationId,
-        source: "REMINDER",
+        source: { in: ["ORIGINAL", "REMINDER"] },
         previousTokenHash: failed.tokenHash,
       },
       data: {

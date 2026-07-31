@@ -87,7 +87,7 @@ function buildStatefulTokenDb() {
       id?: string;
       invitationId?: string;
       tokenHash?: string;
-      source?: HarnessTokenSource;
+      source?: HarnessTokenSource | { in: HarnessTokenSource[] };
       deliveryState?:
         | HarnessDeliveryState
         | { in: HarnessDeliveryState[] };
@@ -104,7 +104,12 @@ function buildStatefulTokenDb() {
     if (where.tokenHash !== undefined && token.tokenHash !== where.tokenHash) {
       return false;
     }
-    if (where.source !== undefined && token.source !== where.source) {
+    if (typeof where.source === "string") {
+      if (token.source !== where.source) return false;
+    } else if (
+      where.source !== undefined &&
+      !where.source.in.includes(token.source)
+    ) {
       return false;
     }
     if (where.previousTokenHash !== undefined) {
@@ -661,7 +666,7 @@ describe("stable invitation tokens", () => {
     expect(tx.assessmentInvitationToken.updateMany).toHaveBeenCalledWith({
       where: {
         invitationId: "inv-1",
-        source: "REMINDER",
+        source: { in: ["ORIGINAL", "REMINDER"] },
         previousTokenHash: NEW_HASH,
       },
       data: {
@@ -730,10 +735,10 @@ describe("stable invitation tokens", () => {
       "STAGED",
     ],
     ["hash", "inv-1", ATTEMPT_A_HASH, "REMINDER", "STAGED"],
-    ["source", "inv-1", NEW_HASH, "ORIGINAL", "STAGED"],
+    ["source", "inv-1", NEW_HASH, "LEGACY_CURRENT", "STAGED"],
     ["state", "inv-1", NEW_HASH, "REMINDER", "UNCERTAIN"],
   ] as const)(
-    "rejected reminder rollback refuses a mismatched %s without deletion",
+    "rejected rotating-token rollback refuses a mismatched %s without deletion",
     async (
       _label,
       rowInvitationId,
@@ -782,6 +787,113 @@ describe("stable invitation tokens", () => {
       expect(deleteMany).not.toHaveBeenCalled();
     },
   );
+
+  test("a rejected stage-based ORIGINAL rotation restores its viable predecessor", async () => {
+    const harness = buildStatefulTokenDb();
+    const staged = await stageStableInvitationToken(harness.db, {
+      invitationId: "inv-1",
+      newTokenHash: ATTEMPT_A_HASH,
+      expiresAt: new Date("2026-11-01T00:00:00Z"),
+      source: "ORIGINAL",
+    });
+
+    await rollbackRejectedStableInvitationToken(harness.db, staged);
+
+    expect(harness.parent.tokenHash).toBe(OLD_HASH);
+    expect(
+      harness.tokens.some((token) => token.tokenHash === ATTEMPT_A_HASH),
+    ).toBe(false);
+    expect(
+      harness.tokens.some(
+        (token) => token.tokenHash === harness.parent.tokenHash,
+      ),
+    ).toBe(true);
+    expect(harness.parent.resentCount).toBe(0);
+  });
+
+  test.each([
+    ["ORIGINAL→REMINDER, earlier-first", "ORIGINAL", "REMINDER", [0, 1]],
+    ["ORIGINAL→REMINDER, later-first", "ORIGINAL", "REMINDER", [1, 0]],
+    ["REMINDER→ORIGINAL, earlier-first", "REMINDER", "ORIGINAL", [0, 1]],
+    ["REMINDER→ORIGINAL, later-first", "REMINDER", "ORIGINAL", [1, 0]],
+  ] as const)(
+    "mixed rotating sources reject safely in %s order",
+    async (_label, firstSource, secondSource, rejectionOrder) => {
+      const harness = buildStatefulTokenDb();
+      const attempts = [
+        await stageStableInvitationToken(harness.db, {
+          invitationId: "inv-1",
+          newTokenHash: ATTEMPT_A_HASH,
+          expiresAt: new Date("2026-11-01T00:00:00Z"),
+          source: firstSource,
+        }),
+        await stageStableInvitationToken(harness.db, {
+          invitationId: "inv-1",
+          newTokenHash: ATTEMPT_B_HASH,
+          expiresAt: new Date("2026-12-01T00:00:00Z"),
+          source: secondSource,
+        }),
+      ];
+
+      for (const index of rejectionOrder) {
+        await rollbackRejectedStableInvitationToken(
+          harness.db,
+          attempts[index],
+        );
+      }
+
+      expect(harness.parent.tokenHash).toBe(OLD_HASH);
+      expect(
+        harness.tokens.some(
+          (token) => token.tokenHash === harness.parent.tokenHash,
+        ),
+      ).toBe(true);
+      expect(
+        harness.tokens.some((token) => token.source !== "LEGACY_CURRENT"),
+      ).toBe(false);
+      expect(harness.parent.resentCount).toBe(0);
+    },
+  );
+
+  test("mixed ORIGINAL and REMINDER confirmation increments counters only for the reminder", async () => {
+    const harness = buildStatefulTokenDb();
+    const original = await stageStableInvitationToken(harness.db, {
+      invitationId: "inv-1",
+      newTokenHash: ATTEMPT_A_HASH,
+      expiresAt: new Date("2026-11-01T00:00:00Z"),
+      source: "ORIGINAL",
+    });
+    const reminder = await stageStableInvitationToken(harness.db, {
+      invitationId: "inv-1",
+      newTokenHash: ATTEMPT_B_HASH,
+      expiresAt: new Date("2026-12-01T00:00:00Z"),
+      source: "REMINDER",
+    });
+    const confirmedAt = new Date("2026-10-15T00:00:00Z");
+
+    for (const input of [
+      { staged: original, reminder: false },
+      { staged: reminder, reminder: true },
+      { staged: original, reminder: false },
+      { staged: reminder, reminder: true },
+    ]) {
+      await confirmStableInvitationToken(harness.db, {
+        tokenId: input.staged.tokenId,
+        invitationId: "inv-1",
+        confirmedAt,
+        reminder: input.reminder,
+      });
+    }
+
+    expect(harness.parent.resentCount).toBe(1);
+    expect(
+      harness.tokens.filter(
+        (token) =>
+          token.source !== "LEGACY_CURRENT" &&
+          token.deliveryState === "SENT",
+      ),
+    ).toHaveLength(2);
+  });
 
   test("out-of-order A/B/C rejection never resurrects a deleted predecessor hash", async () => {
     const harness = buildStatefulTokenDb();
