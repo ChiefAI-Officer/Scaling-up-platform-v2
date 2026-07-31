@@ -174,7 +174,7 @@ describe("retired pinned edition", () => {
     renderDetail(retired);
 
     expect(screen.getByTestId("campaign-edition-retired")).toHaveClass(
-      "border-destructive/30",
+      "border-destructive",
       "bg-destructive/10",
       "text-destructive",
     );

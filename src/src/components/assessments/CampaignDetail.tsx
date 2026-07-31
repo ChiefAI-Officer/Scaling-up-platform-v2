@@ -1222,7 +1222,7 @@ export function CampaignDetail({
                 </div>
                 {campaign.edition.pinnedRetired ? (
                   <span
-                    className="mt-1.5 inline-flex items-center gap-1 rounded-md border border-destructive/30 bg-destructive/10 px-1.5 py-0.5 text-xs font-semibold text-destructive"
+                    className="mt-1.5 inline-flex items-center gap-1 rounded-md border border-destructive bg-destructive/10 px-1.5 py-0.5 text-xs font-semibold text-destructive"
                     data-testid="campaign-edition-retired"
                   >
                     This edition has been retired
