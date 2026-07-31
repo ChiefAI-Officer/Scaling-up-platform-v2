@@ -48,6 +48,18 @@ describe("smtp-transport — a failed verify() must not latch _verified (audit P
     expect(prepared).toEqual({ send: expect.any(Function) });
   });
 
+  it("keeps legacy sends on their independent verification path", async () => {
+    mockVerify.mockRejectedValue(new Error("legacy verify unavailable"));
+
+    await Promise.all([
+      sendEmailViaSMTP({ to: "legacy-a@x.com", subject: "s", html: "<p>h</p>" }),
+      sendEmailViaSMTP({ to: "legacy-b@x.com", subject: "s", html: "<p>h</p>" }),
+    ]);
+
+    expect(mockVerify).toHaveBeenCalledTimes(2);
+    expect(mockSendMail).toHaveBeenCalledTimes(2);
+  });
+
   it("shares one failed cold-start verify and clears the latch for a later retry", async () => {
     const rawToken = "verify-raw-token";
     const tokenHash = "b".repeat(64);
@@ -69,11 +81,13 @@ describe("smtp-transport — a failed verify() must not latch _verified (audit P
       to: "a@x.com",
       subject: "s",
       html: "<p>h</p>",
+      coalesceVerification: true,
     });
     const second = sendEmailViaSMTP({
       to: "b@x.com",
       subject: "s",
       html: "<p>h</p>",
+      coalesceVerification: true,
     });
     rejectColdVerify(verifyError);
     await Promise.all([first, second]);
@@ -82,6 +96,7 @@ describe("smtp-transport — a failed verify() must not latch _verified (audit P
       to: "retry@x.com",
       subject: "s",
       html: "<p>h</p>",
+      coalesceVerification: true,
     });
 
     // The concurrent pair shares call 1. The later send retries with call 2.
@@ -111,11 +126,13 @@ describe("smtp-transport — a failed verify() must not latch _verified (audit P
       to: "a@x.com",
       subject: "s",
       html: "<p>h</p>",
+      coalesceVerification: true,
     });
     const second = sendEmailViaSMTP({
       to: "b@x.com",
       subject: "s",
       html: "<p>h</p>",
+      coalesceVerification: true,
     });
     resolveColdVerify();
     await Promise.all([first, second]);
@@ -123,6 +140,7 @@ describe("smtp-transport — a failed verify() must not latch _verified (audit P
       to: "fast-path@x.com",
       subject: "s",
       html: "<p>h</p>",
+      coalesceVerification: true,
     });
 
     expect(mockVerify).toHaveBeenCalledTimes(1);

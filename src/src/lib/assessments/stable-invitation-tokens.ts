@@ -38,6 +38,22 @@ export interface StagedStableToken {
   previousExpiresAt: Date;
 }
 
+/** Retry bounded stable-token side effects without moving identity rules to callers. */
+export async function retryStableInvitationOperation(
+  operation: () => Promise<void>,
+  attempts: number = 3,
+): Promise<boolean> {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      await operation();
+      return true;
+    } catch {
+      // The injected operation owns its transaction and identity safeguards.
+    }
+  }
+  return false;
+}
+
 function assertSha256Hash(value: string): void {
   if (!/^[a-f0-9]{64}$/.test(value)) {
     throw new Error(

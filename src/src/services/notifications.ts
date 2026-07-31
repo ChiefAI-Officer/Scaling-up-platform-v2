@@ -1130,6 +1130,10 @@ export interface AssessmentInvitationEmailInput {
     chrome?: "legacy" | "waveP";
     /** Wave P — coach logo (creator coach ?? org owner profileImage; https-gated at render). */
     coachLogoUrl?: string | null;
+    /** Jeff #65 enabled delivery keeps provider errors out of persistence. */
+    redactErrors?: boolean;
+    /** Jeff #65 enabled delivery shares concurrent SMTP verification. */
+    coalesceVerification?: boolean;
 }
 
 export async function sendAssessmentInvitationEmail(
@@ -1174,6 +1178,8 @@ export function prepareAssessmentInvitationEmail(
             effectiveBodyMarkdown,
             subjectSource,
             bodySource,
+            redactErrors: data.redactErrors,
+            coalesceVerification: data.coalesceVerification,
         }));
     }
 
@@ -1244,7 +1250,12 @@ export function prepareAssessmentInvitationEmail(
         html,
         text,
         attachments,
-        redactErrors: true,
+        ...(data.redactErrors
+            ? {
+                redactErrors: true,
+                coalesceVerification: data.coalesceVerification === true,
+              }
+            : {}),
         telemetry: {
             recipientRole: "CUSTOM",
             metadata: {
@@ -1274,6 +1285,8 @@ function buildLegacyInvitationEmailOptions(data: {
     effectiveBodyMarkdown: string;
     subjectSource: "authored" | "default";
     bodySource: "authored" | "default";
+    redactErrors?: boolean;
+    coalesceVerification?: boolean;
 }): SendEmailOptions {
     // Build the SAME InvitationVars the branded path uses so {{organizationName}}
     // / {{templateName}} (and every other token) resolve here too. The old legacy
@@ -1326,7 +1339,12 @@ function buildLegacyInvitationEmailOptions(data: {
         subject,
         html,
         text,
-        redactErrors: true,
+        ...(data.redactErrors
+            ? {
+                redactErrors: true,
+                coalesceVerification: data.coalesceVerification === true,
+              }
+            : {}),
         telemetry: {
             recipientRole: "CUSTOM",
             metadata: {

@@ -65,6 +65,19 @@ jest.mock("@/lib/assessments/stable-invitation-tokens", () => ({
   markStableInvitationTokenUncertain: jest.fn(),
   removeRegisteredStableInvitationToken: jest.fn(),
   rollbackRejectedStableInvitationToken: jest.fn(),
+  retryStableInvitationOperation: jest.fn(
+    async (operation: () => Promise<void>, attempts: number = 3) => {
+      for (let attempt = 0; attempt < attempts; attempt += 1) {
+        try {
+          await operation();
+          return true;
+        } catch {
+          // Match the domain helper's bounded, caller-owned retry semantics.
+        }
+      }
+      return false;
+    }
+  ),
   classifyInvitationSendError: jest.fn((error) => {
     const responseCode = error?.responseCode;
     return typeof responseCode === "number" &&

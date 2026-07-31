@@ -287,7 +287,11 @@ describe("sendAssessmentInvitationEmail — full-HTML override (#20)", () => {
   });
 
   it("prepares the complete rendered email before exposing the provider handoff", async () => {
-    const prepared = prepareAssessmentInvitationEmail(baseData());
+    const prepared = prepareAssessmentInvitationEmail({
+      ...baseData(),
+      redactErrors: true,
+      coalesceVerification: true,
+    });
 
     expect(mockPrepareEmailViaSMTP).toHaveBeenCalledTimes(1);
     const preparedOptions = mockPrepareEmailViaSMTP.mock.calls[0][0];
@@ -306,6 +310,17 @@ describe("sendAssessmentInvitationEmail — full-HTML override (#20)", () => {
     await prepared.send();
 
     expect(mockSendEmailViaSMTP).toHaveBeenCalledWith(preparedOptions);
+  });
+
+  it("leaves delivery-error telemetry unchanged without the J65 handoff opt-in", () => {
+    prepareAssessmentInvitationEmail(baseData());
+
+    expect(mockPrepareEmailViaSMTP).toHaveBeenLastCalledWith(
+      expect.not.objectContaining({
+        redactErrors: expect.anything(),
+        coalesceVerification: expect.anything(),
+      })
+    );
   });
 
   afterAll(() => {

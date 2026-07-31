@@ -554,7 +554,12 @@ export const assessmentInviteFanout = inngest.createFunction(
       {
         db: db as unknown as FanoutCampaignDb,
         sendEmail: sendAssessmentInvitationEmail,
-        prepareEmail: prepareAssessmentInvitationEmail,
+        prepareEmail: (data) =>
+          prepareAssessmentInvitationEmail({
+            ...data,
+            redactErrors: true,
+            coalesceVerification: true,
+          }),
         stableTokens: createStableOriginalTokenAdapter(db),
         persistRejectedCleanupAudit: (input) =>
           logAuditStrict({

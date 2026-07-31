@@ -253,7 +253,12 @@ export async function POST(
           sendEmail: sendAssessmentInvitationEmail,
           ...(stableLinksEnabled
             ? {
-                prepareEmail: prepareAssessmentInvitationEmail,
+                prepareEmail: (data) =>
+                  prepareAssessmentInvitationEmail({
+                    ...data,
+                    redactErrors: true,
+                    coalesceVerification: true,
+                  }),
                 stableTokens: createStableOriginalTokenAdapter(db),
                 persistRejectedCleanupAudit: (input) =>
                   logAuditStrict({

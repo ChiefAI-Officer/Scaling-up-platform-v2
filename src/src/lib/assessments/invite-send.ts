@@ -32,6 +32,7 @@ import {
   markStableInvitationTokenUncertain,
   registerNewOriginalToken,
   removeRegisteredStableInvitationToken,
+  retryStableInvitationOperation,
   rollbackRejectedStableInvitationToken,
   stageStableInvitationToken,
   type StableTokenDb,
@@ -39,7 +40,6 @@ import {
 } from "@/lib/assessments/stable-invitation-tokens";
 
 const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
-const MAX_STABLE_FAILURE_ATTEMPTS = 3;
 
 /** Max recipients per call. Callers (the fan-out) chunk larger sets into ≤25. */
 export const INVITE_BATCH_CAP = 25;
@@ -223,20 +223,6 @@ export interface SendInvitesResult {
   failed: string[];
   /** Full per-recipient ledger, preserving the route's response shape. */
   results: Array<{ respondentId: string; status: InviteSendStatus }>;
-}
-
-async function retryBounded(
-  operation: () => Promise<void>,
-): Promise<boolean> {
-  for (let attempt = 0; attempt < MAX_STABLE_FAILURE_ATTEMPTS; attempt += 1) {
-    try {
-      await operation();
-      return true;
-    } catch {
-      // Bounded synchronous retry; the injected operation owns its safeguards.
-    }
-  }
-  return false;
 }
 
 /**
@@ -436,7 +422,7 @@ export async function sendInvitesBatch(
             });
           }
         } else {
-          const cleaned = await retryBounded(() =>
+          const cleaned = await retryStableInvitationOperation(() =>
             prior
               ? deps.stableTokens!.rollbackRejected(
                   stableToken as StagedStableToken,
@@ -448,7 +434,7 @@ export async function sendInvitesBatch(
               respondentId: recipient.respondentId,
               invitationId: invitationRow.id,
               disposition: "DEFINITE_REJECTION_CLEANUP_EXHAUSTED",
-              attempts: MAX_STABLE_FAILURE_ATTEMPTS,
+              attempts: 3,
             });
             const auditInput: RejectedCleanupAuditInput = {
               campaignId: campaign.id,
@@ -460,7 +446,7 @@ export async function sendInvitesBatch(
             const persistAudit = deps.persistRejectedCleanupAudit;
             const auditPersisted =
               persistAudit !== undefined &&
-              (await retryBounded(() => persistAudit(auditInput)));
+              (await retryStableInvitationOperation(() => persistAudit(auditInput)));
             if (!auditPersisted) {
               throw new StableInvitationCleanupAuditError();
             }

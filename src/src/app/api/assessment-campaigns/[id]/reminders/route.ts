@@ -51,6 +51,7 @@ import {
   classifyInvitationSendError,
   confirmStableInvitationToken,
   markStableInvitationTokenUncertain,
+  retryStableInvitationOperation,
   rollbackRejectedStableInvitationToken,
   stageStableInvitationToken,
   type StagedStableToken,
@@ -74,16 +75,10 @@ type FailedEntry = { participantId: string; reason: string };
 async function rollbackRejectedWithRetry(
   staged: StagedStableToken
 ): Promise<boolean> {
-  for (let attempt = 0; attempt < MAX_REJECTED_ROLLBACK_ATTEMPTS; attempt += 1) {
-    try {
-      await rollbackRejectedStableInvitationToken(db, staged);
-      return true;
-    } catch {
-      // Bounded, synchronous retry. The service owns all identity checks,
-      // locking, predecessor rewiring, and compare-and-swap mechanics.
-    }
-  }
-  return false;
+  return retryStableInvitationOperation(
+    () => rollbackRejectedStableInvitationToken(db, staged),
+    MAX_REJECTED_ROLLBACK_ATTEMPTS,
+  );
 }
 
 async function persistRollbackExhaustionAuditWithRetry(input: {
@@ -93,8 +88,8 @@ async function persistRollbackExhaustionAuditWithRetry(input: {
   tokenId: string;
   performedBy: string;
 }): Promise<boolean> {
-  for (let attempt = 0; attempt < MAX_CRITICAL_AUDIT_ATTEMPTS; attempt += 1) {
-    try {
+  return retryStableInvitationOperation(
+    async () => {
       await logAuditStrict({
         entityType: "AssessmentInvitationToken",
         entityId: input.tokenId,
@@ -109,14 +104,9 @@ async function persistRollbackExhaustionAuditWithRetry(input: {
           disposition: "DEFINITE_REJECTION_ROLLBACK_EXHAUSTED",
         },
       });
-      return true;
-    } catch {
-      // This audit is the durable operator signal for a token state that
-      // could not be repaired. Retry synchronously before allowing the batch
-      // to continue.
-    }
-  }
-  return false;
+    },
+    MAX_CRITICAL_AUDIT_ATTEMPTS,
+  );
 }
 
 export async function POST(
@@ -410,6 +400,8 @@ export async function POST(
             baseUrl: appUrl,
             chrome,
             coachLogoUrl,
+            redactErrors: true,
+            coalesceVerification: true,
           });
         } catch {
           console.error(

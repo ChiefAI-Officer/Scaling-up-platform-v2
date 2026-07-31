@@ -24,6 +24,8 @@ export interface SendEmailOptions {
   telemetry?: Omit<DeliveryTelemetryEvent, "recipient" | "subject" | "status" | "provider">;
   /** Persist only an allowlisted error classification for credential-bearing emails. */
   redactErrors?: boolean;
+  /** Share concurrent SMTP verification only for the stable invitation handoff. */
+  coalesceVerification?: boolean;
 }
 
 export interface PreparedEmail {
@@ -58,9 +60,24 @@ function getTransporter(): nodemailer.Transporter {
 }
 
 async function verifyTransporter(
-  transporter: nodemailer.Transporter
+  transporter: nodemailer.Transporter,
+  coalesceVerification: boolean,
 ): Promise<void> {
   if (_verified) return;
+
+  if (!coalesceVerification) {
+    try {
+      await transporter.verify();
+      console.log(
+        "[smtp-transport] SMTP verify() succeeded: host=" +
+          process.env.SMTP_HOST
+      );
+      _verified = true;
+    } catch (verifyErr) {
+      console.error("[smtp-transport] SMTP verify() FAILED:", verifyErr);
+    }
+    return;
+  }
 
   if (!_verificationInFlight) {
     _verificationInFlight = (async () => {
@@ -153,7 +170,10 @@ export function prepareEmailViaSMTP(options: SendEmailOptions): PreparedEmail {
       }
 
       try {
-        await verifyTransporter(transporter);
+        await verifyTransporter(
+          transporter,
+          options.coalesceVerification === true,
+        );
         await transporter.sendMail(mailOptions);
 
         if (options.telemetry) {
