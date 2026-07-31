@@ -12,6 +12,8 @@ CREATE TABLE "assessment_invitation_tokens" (
     "source" "AssessmentInvitationTokenSource" NOT NULL,
     "deliveryState" "AssessmentInvitationTokenDeliveryState" NOT NULL,
     "deliveryConfirmedAt" TIMESTAMP(3),
+    "previousTokenHash" TEXT,
+    "previousExpiresAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -25,6 +27,9 @@ CREATE UNIQUE INDEX "assessment_invitation_tokens_tokenHash_key"
 
 CREATE INDEX "assessment_invitation_tokens_invitationId_idx"
   ON "assessment_invitation_tokens"("invitationId");
+
+CREATE INDEX "assessment_invitation_tokens_invitationId_previousTokenHash_idx"
+  ON "assessment_invitation_tokens"("invitationId", "previousTokenHash");
 
 INSERT INTO "assessment_invitation_tokens" (
     "id",

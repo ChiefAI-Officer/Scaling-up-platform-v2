@@ -38,10 +38,24 @@ export interface StagedStableToken {
   previousExpiresAt: Date;
 }
 
+function assertSha256Hash(value: string): void {
+  if (!/^[a-f0-9]{64}$/.test(value)) {
+    throw new Error(
+      "Stable invitation token hashes must be lowercase SHA-256 hex.",
+    );
+  }
+}
+
+function stableTokenInvariant(message: string): Error {
+  return new Error(`Stable invitation token invariant failed: ${message}`);
+}
+
 export async function registerNewOriginalToken(
   db: StableTokenDb,
   input: { invitationId: string; tokenHash: string },
 ): Promise<{ tokenId: string }> {
+  assertSha256Hash(input.tokenHash);
+
   const token = await db.assessmentInvitationToken.upsert({
     where: { tokenHash: input.tokenHash },
     create: {
@@ -51,8 +65,27 @@ export async function registerNewOriginalToken(
       deliveryState: "STAGED",
     },
     update: {},
-    select: { id: true },
+    select: {
+      id: true,
+      invitationId: true,
+      tokenHash: true,
+      source: true,
+      deliveryState: true,
+    },
   });
+
+  if (
+    token.invitationId !== input.invitationId ||
+    token.tokenHash !== input.tokenHash ||
+    token.source !== "ORIGINAL" ||
+    !(
+      token.deliveryState === "STAGED" ||
+      token.deliveryState === "SENT" ||
+      token.deliveryState === "UNCERTAIN"
+    )
+  ) {
+    throw stableTokenInvariant("original token registration conflict");
+  }
 
   return { tokenId: token.id };
 }
@@ -66,6 +99,8 @@ export async function stageStableInvitationToken(
     source: "ORIGINAL" | "REMINDER";
   },
 ): Promise<StagedStableToken> {
+  assertSha256Hash(input.newTokenHash);
+
   return db.$transaction(async (tx) => {
     await tx.$executeRaw`
       SELECT "id"
@@ -89,6 +124,8 @@ export async function stageStableInvitationToken(
       current.status === "VIEWED" ||
       current.status === "SUBMITTED";
 
+    assertSha256Hash(current.tokenHash);
+
     await tx.assessmentInvitationToken.upsert({
       where: { tokenHash: current.tokenHash },
       create: {
@@ -107,6 +144,12 @@ export async function stageStableInvitationToken(
         tokenHash: input.newTokenHash,
         source: input.source,
         deliveryState: "STAGED",
+        ...(input.source === "REMINDER"
+          ? {
+              previousTokenHash: current.tokenHash,
+              previousExpiresAt: current.expiresAt,
+            }
+          : {}),
       },
       select: { id: true },
     });
@@ -140,18 +183,48 @@ export async function confirmStableInvitationToken(
   },
 ): Promise<void> {
   await db.$transaction(async (tx) => {
-    await tx.assessmentInvitationToken.update({
+    await tx.$executeRaw`
+      SELECT "id"
+      FROM "assessment_invitations"
+      WHERE "id" = ${input.invitationId}
+      FOR UPDATE
+    `;
+
+    const token = await tx.assessmentInvitationToken.findUnique({
       where: { id: input.tokenId },
+      select: {
+        id: true,
+        invitationId: true,
+        source: true,
+        deliveryState: true,
+      },
+    });
+    const isReminder = token?.source === "REMINDER";
+    if (
+      !token ||
+      token.invitationId !== input.invitationId ||
+      (token.source !== "ORIGINAL" && token.source !== "REMINDER") ||
+      input.reminder !== isReminder
+    ) {
+      throw stableTokenInvariant("delivery confirmation identity mismatch");
+    }
+
+    const transitioned = await tx.assessmentInvitationToken.updateMany({
+      where: {
+        id: token.id,
+        invitationId: token.invitationId,
+        source: token.source,
+        deliveryState: { in: ["STAGED", "UNCERTAIN"] },
+      },
       data: {
         deliveryState: "SENT",
         deliveryConfirmedAt: input.confirmedAt,
       },
-      select: { id: true },
     });
 
-    if (input.reminder) {
+    if (transitioned.count === 1 && isReminder) {
       await tx.assessmentInvitation.update({
-        where: { id: input.invitationId },
+        where: { id: token.invitationId },
         data: {
           resentCount: { increment: 1 },
           lastResentAt: input.confirmedAt,
@@ -166,10 +239,12 @@ export async function markStableInvitationTokenUncertain(
   db: StableTokenDb,
   tokenId: string,
 ): Promise<void> {
-  await db.assessmentInvitationToken.update({
-    where: { id: tokenId },
+  await db.assessmentInvitationToken.updateMany({
+    where: {
+      id: tokenId,
+      deliveryState: "STAGED",
+    },
     data: { deliveryState: "UNCERTAIN" },
-    select: { id: true },
   });
 }
 
@@ -177,30 +252,116 @@ export async function removeRegisteredStableInvitationToken(
   db: StableTokenDb,
   tokenId: string,
 ): Promise<void> {
-  await db.assessmentInvitationToken.delete({
+  const token = await db.assessmentInvitationToken.findUnique({
     where: { id: tokenId },
-    select: { id: true },
+    select: {
+      id: true,
+      invitationId: true,
+      tokenHash: true,
+      source: true,
+      deliveryState: true,
+    },
   });
+
+  if (
+    !token ||
+    token.source !== "ORIGINAL" ||
+    token.deliveryState !== "STAGED"
+  ) {
+    throw stableTokenInvariant("original cleanup identity or state mismatch");
+  }
+  assertSha256Hash(token.tokenHash);
+
+  const deleted = await db.assessmentInvitationToken.deleteMany({
+    where: {
+      id: token.id,
+      invitationId: token.invitationId,
+      tokenHash: token.tokenHash,
+      source: "ORIGINAL",
+      deliveryState: "STAGED",
+    },
+  });
+  if (deleted.count !== 1) {
+    throw stableTokenInvariant("original token changed before cleanup");
+  }
 }
 
 export async function rollbackRejectedStableInvitationToken(
   db: StableTokenDb,
   staged: StagedStableToken,
 ): Promise<void> {
+  assertSha256Hash(staged.newTokenHash);
+  assertSha256Hash(staged.previousTokenHash);
+
   await db.$transaction(async (tx) => {
-    await tx.assessmentInvitationToken.delete({
+    await tx.$executeRaw`
+      SELECT "id"
+      FROM "assessment_invitations"
+      WHERE "id" = ${staged.invitationId}
+      FOR UPDATE
+    `;
+
+    const failed = await tx.assessmentInvitationToken.findUnique({
       where: { id: staged.tokenId },
-      select: { id: true },
+      select: {
+        id: true,
+        invitationId: true,
+        tokenHash: true,
+        source: true,
+        deliveryState: true,
+        previousTokenHash: true,
+        previousExpiresAt: true,
+      },
+    });
+
+    if (
+      !failed ||
+      failed.invitationId !== staged.invitationId ||
+      failed.tokenHash !== staged.newTokenHash ||
+      failed.source !== "REMINDER" ||
+      failed.deliveryState !== "STAGED" ||
+      failed.previousTokenHash === null ||
+      failed.previousExpiresAt === null
+    ) {
+      throw stableTokenInvariant("rejected reminder identity or state mismatch");
+    }
+
+    assertSha256Hash(failed.tokenHash);
+    assertSha256Hash(failed.previousTokenHash);
+
+    const deleted = await tx.assessmentInvitationToken.deleteMany({
+      where: {
+        id: failed.id,
+        invitationId: failed.invitationId,
+        tokenHash: failed.tokenHash,
+        source: "REMINDER",
+        deliveryState: "STAGED",
+      },
+    });
+    if (deleted.count !== 1) {
+      throw stableTokenInvariant("rejected reminder changed before deletion");
+    }
+
+    await tx.assessmentInvitationToken.updateMany({
+      where: {
+        invitationId: failed.invitationId,
+        source: "REMINDER",
+        previousTokenHash: failed.tokenHash,
+      },
+      data: {
+        previousTokenHash: failed.previousTokenHash,
+        previousExpiresAt: failed.previousExpiresAt,
+      },
     });
 
     await tx.assessmentInvitation.updateMany({
       where: {
-        id: staged.invitationId,
-        tokenHash: staged.newTokenHash,
+        id: failed.invitationId,
+        tokenHash: failed.tokenHash,
       },
       data: {
-        tokenHash: staged.previousTokenHash,
-        expiresAt: staged.previousExpiresAt,
+        tokenHash: failed.previousTokenHash,
+        expiresAt: failed.previousExpiresAt,
       },
     });
   });
@@ -210,6 +371,8 @@ export async function resolveInvitationByStableTokenHash(
   db: StableTokenLookupDb,
   tokenHash: string,
 ): Promise<InvitationWithCampaign | null> {
+  assertSha256Hash(tokenHash);
+
   const token = await db.assessmentInvitationToken.findUnique({
     where: { tokenHash },
     select: {

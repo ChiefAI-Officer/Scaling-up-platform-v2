@@ -18,6 +18,9 @@ describe("stable invitation tokens migration", () => {
             'CREATE TYPE "AssessmentInvitationTokenDeliveryState"',
         );
         expect(sql).toContain('CREATE TABLE "assessment_invitation_tokens"');
+        expect(sql).toMatch(
+            /"previousTokenHash" TEXT,\s+"previousExpiresAt" TIMESTAMP\(3\),/,
+        );
         expect(sql).toContain("CREATE UNIQUE INDEX");
         expect(sql).toContain('"invitationId"');
         expect(sql).toMatch(/ON DELETE CASCADE\s+ON UPDATE CASCADE/);
@@ -40,6 +43,9 @@ describe("stable invitation tokens migration", () => {
         );
         expect(sql).toMatch(
             /CREATE UNIQUE INDEX "assessment_invitation_tokens_tokenHash_key"\s+ON "assessment_invitation_tokens"\("tokenHash"\)/,
+        );
+        expect(sql).toMatch(
+            /CREATE INDEX "assessment_invitation_tokens_invitationId_previousTokenHash_idx"\s+ON "assessment_invitation_tokens"\("invitationId", "previousTokenHash"\)/,
         );
     });
 });

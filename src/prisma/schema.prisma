@@ -1369,12 +1369,15 @@ model AssessmentInvitationToken {
   source              AssessmentInvitationTokenSource
   deliveryState       AssessmentInvitationTokenDeliveryState
   deliveryConfirmedAt DateTime?
+  previousTokenHash   String?
+  previousExpiresAt   DateTime?
   createdAt           DateTime                               @default(now())
   updatedAt           DateTime                               @updatedAt
 
   invitation AssessmentInvitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
 
   @@index([invitationId])
+  @@index([invitationId, previousTokenHash])
   @@map("assessment_invitation_tokens")
 }
 

@@ -366,6 +366,46 @@ future migration after the rollout is proven.
 
 No visual review is required because the design changes no UI or email appearance.
 
+## Concurrency-correction addendum (Fix Round 1)
+
+This addendum corrects the internal rollback algorithm without changing the
+recipient-facing contract, lifecycle authority, email behavior, or rollout
+shape above.
+
+The original caller-held rollback snapshot was insufficient for overlapping
+reminders. If A staged, B staged from A, A rejected after losing its parent CAS,
+and B later rejected, B could restore A's already-deleted hash. To keep every
+rollback predecessor viable:
+
+- reminder child rows persist nullable `previousTokenHash` and
+  `previousExpiresAt` rollback metadata;
+- staging captures those values from the locked parent in the same transaction
+  that creates the reminder child and advances the parent mirror;
+- definite-rejection rollback locks the parent, re-reads and verifies the child
+  by id/invitation/hash plus `REMINDER/STAGED`, and uses the persisted
+  predecessor rather than caller-held values;
+- rollback conditionally deletes that exact child, rewires every direct reminder
+  successor from the failed hash to the failed row's viable predecessor, and
+  restores the parent only when its mirror still equals the failed hash; and
+- staging, confirmation, and rollback share the parent-row lock convention, so
+  their identity/state decisions serialize without a child/parent lock-order
+  inversion.
+
+Delivery transitions are also conditional and identity-derived:
+
+- confirmation verifies the stored invitation/source, transitions only
+  `STAGED|UNCERTAIN → SENT`, and increments reminder counters only when that
+  transition wins, making retries no-ops;
+- ambiguous delivery changes only `STAGED → UNCERTAIN`, never `SENT`; and
+- original registration/removal and reminder rollback use full
+  identity/source/state predicates so an id/hash collision or stale cleanup
+  request cannot mutate another child.
+
+The new predecessor fields are rollback snapshots only. They do not add
+per-token expiry, do not determine exchange validity, and remain null on legacy
+and newly registered original rows. Every service hash boundary accepts only
+64-character lowercase SHA-256 hex; no raw token or hash is logged.
+
 ## Acceptance criteria
 
 Jeff #65 is implemented only when:
