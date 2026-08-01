@@ -20,9 +20,15 @@ jest.mock("@/lib/db", () => ({
   },
 }));
 
-jest.mock("@/lib/smtp-transport", () => ({
-  sendEmailViaSMTP: jest.fn().mockResolvedValue(undefined),
-}));
+jest.mock("@/lib/smtp-transport", () => {
+  const sendEmailViaSMTP = jest.fn().mockResolvedValue(undefined);
+  return {
+    sendEmailViaSMTP,
+    prepareEmailViaSMTP: jest.fn((options) => ({
+      send: () => sendEmailViaSMTP(options),
+    })),
+  };
+});
 
 jest.mock("@/lib/ics-generator", () => ({
   generateIcsContent: jest.fn().mockReturnValue("BEGIN:VCALENDAR\nEND:VCALENDAR"),
@@ -47,14 +53,21 @@ jest.mock("@/lib/utils", () => {
 // Imports (after mocks — Jest hoists mock() calls above these)
 // ---------------------------------------------------------------------------
 
-import { sendWorkshopDateChangeEmail } from "@/services/notifications";
+import {
+  prepareAssessmentInvitationEmail,
+  sendWorkshopDateChangeEmail,
+} from "@/services/notifications";
 import { db } from "@/lib/db";
-import { sendEmailViaSMTP } from "@/lib/smtp-transport";
+import {
+  prepareEmailViaSMTP,
+  sendEmailViaSMTP,
+} from "@/lib/smtp-transport";
 import { generateIcsContent, buildLocationString } from "@/lib/ics-generator";
 
 // Typed mock aliases for easy use in tests
 const mockFindMany = db.registration.findMany as jest.Mock;
 const mockSendEmailViaSMTP = sendEmailViaSMTP as jest.Mock;
+const mockPrepareEmailViaSMTP = prepareEmailViaSMTP as jest.Mock;
 const mockGenerateIcsContent = generateIcsContent as jest.Mock;
 const mockBuildLocationString = buildLocationString as jest.Mock;
 
@@ -209,6 +222,7 @@ describe("sendWorkshopDateChangeEmail", () => {
     ]);
 
     const { durationHours: _unused, ...paramsWithoutDuration } = baseParams;
+    void _unused;
     await sendWorkshopDateChangeEmail(paramsWithoutDuration);
 
     expect(mockGenerateIcsContent).toHaveBeenCalledWith(
@@ -222,6 +236,7 @@ describe("sendWorkshopDateChangeEmail", () => {
     ]);
 
     const { landingPageUrl: _unused, ...paramsWithoutUrl } = baseParams;
+    void _unused;
     await sendWorkshopDateChangeEmail(paramsWithoutUrl);
 
     const callArgs = mockSendEmailViaSMTP.mock.calls[0][0];
@@ -255,6 +270,7 @@ describe("sendAssessmentInvitationEmail — full-HTML override (#20)", () => {
     respondent: { id: "r1", firstName: "Jane", lastName: "Doe", email: "jane@example.com" },
     campaign: { id: "c1", name: "Q1 Alignment", alias: "abc", closeAt: null as Date | null },
     template: {
+      alias: "five-dysfunctions",
       invitationSubject: "Take {{campaignName}}",
       invitationBodyMarkdown: "Hi {{respondentFirstName}}",
     },
@@ -268,6 +284,43 @@ describe("sendAssessmentInvitationEmail — full-HTML override (#20)", () => {
   beforeEach(() => {
     mockSendEmailViaSMTP.mockClear();
     delete process.env.ASSESSMENT_INVITE_BRANDED; // branded path on
+  });
+
+  it("prepares the complete rendered email before exposing the provider handoff", async () => {
+    const prepared = prepareAssessmentInvitationEmail({
+      ...baseData(),
+      redactErrors: true,
+      coalesceVerification: true,
+    });
+
+    expect(mockPrepareEmailViaSMTP).toHaveBeenCalledTimes(1);
+    const preparedOptions = mockPrepareEmailViaSMTP.mock.calls[0][0];
+    expect(preparedOptions).toEqual(
+      expect.objectContaining({
+        to: "jane@example.com",
+        subject: "Take Q1 Alignment",
+        redactErrors: true,
+        html: expect.stringContaining(
+          "https://app.test/org-survey/abc#t=SECRET"
+        ),
+      })
+    );
+    expect(mockSendEmailViaSMTP).not.toHaveBeenCalled();
+
+    await prepared.send();
+
+    expect(mockSendEmailViaSMTP).toHaveBeenCalledWith(preparedOptions);
+  });
+
+  it("leaves delivery-error telemetry unchanged without the J65 handoff opt-in", () => {
+    prepareAssessmentInvitationEmail(baseData());
+
+    expect(mockPrepareEmailViaSMTP).toHaveBeenLastCalledWith(
+      expect.not.objectContaining({
+        redactErrors: expect.anything(),
+        coalesceVerification: expect.anything(),
+      })
+    );
   });
 
   afterAll(() => {
@@ -373,6 +426,7 @@ describe("sendAssessmentInvitationEmail — default body/subject + telemetry (Wa
     respondent: { id: "r1", firstName: "Jane", lastName: "Doe", email: "jane@example.com" },
     campaign: { id: "c1", name: "Q1 Alignment", alias: "abc", closeAt: null as Date | null },
     template: {
+      alias: "five-dysfunctions",
       invitationSubject: "",
       invitationBodyMarkdown: "   ", // whitespace-only — must be treated as blank
     },
@@ -415,6 +469,7 @@ describe("sendAssessmentInvitationEmail — default body/subject + telemetry (Wa
     await sendAssessmentInvitationEmail({
       ...blankData(),
       template: {
+        alias: "five-dysfunctions",
         invitationSubject: "Take {{campaignName}}",
         invitationBodyMarkdown: "Hello {{respondentFirstName}}, please begin.",
       },
@@ -456,6 +511,7 @@ describe("sendAssessmentInvitationEmail — default body/subject + telemetry (Wa
     await sendAssessmentInvitationEmail({
       ...blankData(),
       template: {
+        alias: "five-dysfunctions",
         invitationSubject: "Hi {{invitationUrl}}\r\ninjected",
         invitationBodyMarkdown: "body",
       },

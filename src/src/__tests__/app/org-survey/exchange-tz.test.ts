@@ -47,6 +47,14 @@ jest.mock("@/lib/db", () => ({
 import { POST } from "@/app/(public)/org-survey/[campaignAlias]/exchange/route";
 import { db } from "@/lib/db";
 
+const J65_ENV_KEYS = [
+  "WAVE_J65_STABLE_LINKS_ENABLED",
+  "WAVE_J65_STABLE_LINKS_CANARY",
+  "WAVE_J65_STABLE_LINKS_KILL",
+] as const;
+
+const originalJ65Env = new Map<string, string | undefined>();
+
 function reqWithToken(token: string): Request {
   return new Request("http://localhost/org-survey/demo/exchange", {
     method: "POST",
@@ -59,8 +67,28 @@ const aliasParams = (alias: string) => ({
   params: Promise.resolve({ campaignAlias: alias }),
 });
 
+beforeAll(() => {
+  for (const key of J65_ENV_KEYS) {
+    originalJ65Env.set(key, process.env[key]);
+  }
+});
+
 beforeEach(() => {
   jest.clearAllMocks();
+  for (const key of J65_ENV_KEYS) {
+    delete process.env[key];
+  }
+});
+
+afterAll(() => {
+  for (const key of J65_ENV_KEYS) {
+    const value = originalJ65Env.get(key);
+    if (value === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = value;
+    }
+  }
 });
 
 describe("exchange route — gateNotYetOpen TZ fix", () => {

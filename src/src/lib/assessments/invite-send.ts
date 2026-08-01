@@ -26,6 +26,19 @@ import {
   generateRawToken,
   hashToken,
 } from "@/lib/assessments/invitation-tokens";
+import {
+  classifyInvitationSendError,
+  confirmStableInvitationToken,
+  markStableInvitationTokenUncertain,
+  quarantineRejectedStableInvitationToken,
+  reconcileRejectedStableInvitationToken,
+  registerNewOriginalToken,
+  removeRegisteredStableInvitationToken,
+  retryStableInvitationOperation,
+  stageStableInvitationToken,
+  type StableTokenDb,
+  type StagedStableToken,
+} from "@/lib/assessments/stable-invitation-tokens";
 
 const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
 
@@ -55,8 +68,8 @@ export interface InviteSendDb {
   };
 }
 
-/** Mailer call — exactly the payload `sendAssessmentInvitationEmail` accepts. */
-export type InviteMailer = (data: {
+/** Mailer payload — exactly the payload `sendAssessmentInvitationEmail` accepts. */
+export interface InviteEmailInput {
   invitation: { id: string; expiresAt: Date };
   respondent: { id: string; firstName: string; lastName: string; email: string };
   campaign: { id: string; name: string; alias: string; closeAt: Date | null };
@@ -76,11 +89,95 @@ export type InviteMailer = (data: {
   chrome?: "legacy" | "waveP";
   /** Wave P — coach logo (creator coach ?? org owner profileImage). Only rendered under chrome:"waveP" + https gate. */
   coachLogoUrl?: string | null;
-}) => Promise<void>;
+}
+
+/** Mailer call — exactly the payload `sendAssessmentInvitationEmail` accepts. */
+export type InviteMailer = (data: InviteEmailInput) => Promise<void>;
+
+export interface PreparedInviteEmail {
+  send(): Promise<void>;
+}
+
+export interface StableOriginalTokenAdapter {
+  stageExistingOriginal(input: {
+    invitationId: string;
+    tokenHash: string;
+    expiresAt: Date;
+  }): Promise<StagedStableToken>;
+  registerOriginal(input: {
+    invitationId: string;
+    tokenHash: string;
+    expiresAt: Date;
+  }): Promise<{ tokenId: string }>;
+  confirm(input: {
+    tokenId: string;
+    invitationId: string;
+    confirmedAt: Date;
+  }): Promise<void>;
+  uncertain(tokenId: string): Promise<void>;
+  removeRegistered(tokenId: string): Promise<void>;
+  rollbackRejected(staged: StagedStableToken): Promise<void>;
+  reconcileRejected(staged: StagedStableToken): Promise<void>;
+}
+
+export interface RejectedCleanupAuditInput {
+  invitationId: string;
+  tokenId: string;
+}
+
+export class StableInvitationCleanupAuditError extends Error {
+  constructor() {
+    super("Failed to persist stable invitation cleanup audit.");
+    this.name = "StableInvitationCleanupAuditError";
+  }
+}
+
+export class StableInvitationQuarantineError extends Error {
+  constructor() {
+    super("Failed to quarantine a definitely rejected invitation token.");
+    this.name = "StableInvitationQuarantineError";
+  }
+}
+
+export function createStableOriginalTokenAdapter(
+  stableDb: StableTokenDb,
+): StableOriginalTokenAdapter {
+  return {
+    stageExistingOriginal: (input) =>
+      stageStableInvitationToken(stableDb, {
+        invitationId: input.invitationId,
+        newTokenHash: input.tokenHash,
+        expiresAt: input.expiresAt,
+        source: "ORIGINAL",
+      }),
+    registerOriginal: (input) => registerNewOriginalToken(stableDb, input),
+    confirm: (input) =>
+      confirmStableInvitationToken(stableDb, {
+        ...input,
+        reminder: false,
+      }),
+    uncertain: (tokenId) =>
+      markStableInvitationTokenUncertain(stableDb, tokenId),
+    removeRegistered: (tokenId) =>
+      removeRegisteredStableInvitationToken(stableDb, tokenId),
+    rollbackRejected: (staged) =>
+      quarantineRejectedStableInvitationToken(stableDb, staged),
+    reconcileRejected: (staged) =>
+      reconcileRejectedStableInvitationToken(stableDb, staged),
+  };
+}
 
 export interface SendInvitesDeps {
   db: InviteSendDb;
   sendEmail: InviteMailer;
+  prepareEmail?: (data: InviteEmailInput) => PreparedInviteEmail;
+  stableTokens?: StableOriginalTokenAdapter;
+  persistRejectedCleanupAudit?: (
+    input: RejectedCleanupAuditInput,
+  ) => Promise<void>;
+  enqueueRejectedQuarantineRetry?: (
+    input: { invitationId: string; tokenId: string },
+  ) => Promise<void>;
   /** Injectable clock (defaults to real now) — used for the fallback expiresAt. */
   now?: () => Date;
 }
@@ -126,6 +223,7 @@ export interface SendInvitesInput {
   chrome?: "legacy" | "waveP";
   /** Wave P — coach logo (creator coach ?? org owner profileImage; mirrors resolveCoachName). */
   coachLogoUrl?: string | null;
+  stableLinksEnabled?: boolean;
 }
 
 export interface SendInvitesResult {
@@ -159,6 +257,12 @@ export async function sendInvitesBatch(
   const chrome = input.chrome ?? "legacy";
   const coachLogoUrl = input.coachLogoUrl ?? null;
 
+  if (input.stableLinksEnabled && (!deps.stableTokens || !deps.prepareEmail)) {
+    throw new Error(
+      "Stable invitation dependencies are required when stable links are enabled.",
+    );
+  }
+
   if (recipients.length > INVITE_BATCH_CAP) {
     throw new Error(
       `Invite batch of ${recipients.length} exceeds INVITE_BATCH_CAP (${INVITE_BATCH_CAP}); caller must chunk.`
@@ -169,6 +273,10 @@ export async function sendInvitesBatch(
   const skipped: string[] = [];
   const failed: string[] = [];
   const results: Array<{ respondentId: string; status: InviteSendStatus }> = [];
+  const recordFailure = (respondentId: string) => {
+    failed.push(respondentId);
+    results.push({ respondentId, status: "send-failed" });
+  };
 
   if (recipients.length === 0) {
     return { sent, skipped, failed, results };
@@ -207,66 +315,252 @@ export async function sendInvitesBatch(
 
     const rawToken = generateRawToken();
     const tokenHash = hashToken(rawToken);
+    const parentTokenHash =
+      input.stableLinksEnabled && !prior
+        ? hashToken(generateRawToken())
+        : tokenHash;
 
     let invitationRow: InvitationRow;
     try {
       if (prior) {
-        // Re-key the PENDING row with a fresh token + refreshed expiresAt.
-        invitationRow = await db.assessmentInvitation.update({
-          where: { id: prior.id },
-          data: { tokenHash, expiresAt, status: "PENDING" },
-          select: { id: true, expiresAt: true },
-        });
+        if (input.stableLinksEnabled) {
+          invitationRow = { id: prior.id, expiresAt };
+        } else {
+          // Re-key the PENDING row with a fresh token + refreshed expiresAt.
+          invitationRow = await db.assessmentInvitation.update({
+            where: { id: prior.id },
+            data: { tokenHash, expiresAt, status: "PENDING" },
+            select: { id: true, expiresAt: true },
+          });
+        }
       } else {
         invitationRow = await db.assessmentInvitation.create({
           data: {
             campaignId: campaign.id,
             respondentId: recipient.respondentId,
-            tokenHash,
+            tokenHash: parentTokenHash,
             status: "PENDING",
             expiresAt,
+            ...(input.stableLinksEnabled
+              ? {
+                  stableFallbackTokenHash: parentTokenHash,
+                  stableFallbackExpiresAt: expiresAt,
+                  stableTokenSequence: 0,
+                  stableFallbackTokenSequence: 0,
+                }
+              : {}),
           },
           select: { id: true, expiresAt: true },
         });
       }
     } catch (writeErr) {
-      console.error("[invite-send] failed to write invitation row", writeErr);
-      failed.push(recipient.respondentId);
-      results.push({ respondentId: recipient.respondentId, status: "send-failed" });
+      if (input.stableLinksEnabled) {
+        console.error("[invite-send] failed to write invitation row", {
+          respondentId: recipient.respondentId,
+          disposition: "INVITATION_WRITE_FAILED",
+        });
+      } else {
+        console.error("[invite-send] failed to write invitation row", writeErr);
+      }
+      recordFailure(recipient.respondentId);
+      continue;
+    }
+
+    const emailInput: InviteEmailInput = {
+      invitation: invitationRow,
+      respondent: {
+        id: respondent.id,
+        firstName: respondent.firstName,
+        lastName: respondent.lastName,
+        email: respondent.email,
+      },
+      campaign: {
+        id: campaign.id,
+        name: campaign.name,
+        alias: campaign.alias,
+        closeAt: campaign.closeAt,
+      },
+      template: {
+        alias: campaign.template.alias,
+        invitationSubject:
+          campaign.invitationSubject ?? campaign.template.invitationSubject,
+        invitationBodyMarkdown:
+          campaign.invitationBodyMarkdown ?? campaign.template.invitationBodyMarkdown,
+      },
+      invitationBodyHtml: campaign.invitationBodyHtml ?? null,
+      organizationName,
+      coachName,
+      templateName,
+      rawToken,
+      baseUrl,
+      chrome,
+      coachLogoUrl,
+    };
+
+    if (input.stableLinksEnabled) {
+      let prepared: PreparedInviteEmail;
+      try {
+        prepared = deps.prepareEmail!(emailInput);
+      } catch {
+        console.error("[invite-send] email preparation failed", {
+          respondentId: recipient.respondentId,
+          invitationId: invitationRow.id,
+          disposition: "PREPARATION_FAILED",
+        });
+        recordFailure(recipient.respondentId);
+        continue;
+      }
+      let stableToken: StagedStableToken | { tokenId: string };
+      try {
+        stableToken = await deps.stableTokens!.stageExistingOriginal({
+          invitationId: invitationRow.id,
+          tokenHash,
+          expiresAt,
+        });
+      } catch {
+        console.error("[invite-send] stable token staging failed", {
+          respondentId: recipient.respondentId,
+          invitationId: invitationRow.id,
+          disposition: "STAGING_FAILED",
+        });
+        recordFailure(recipient.respondentId);
+        continue;
+      }
+      try {
+        await prepared.send();
+      } catch (sendError) {
+        const disposition = classifyInvitationSendError(sendError);
+        if (disposition === "UNCERTAIN") {
+          try {
+            await deps.stableTokens!.uncertain(stableToken.tokenId);
+          } catch {
+            console.error("[invite-send] post-send failure transition failed", {
+              respondentId: recipient.respondentId,
+              invitationId: invitationRow.id,
+              disposition: "UNCERTAIN_STATE_PERSIST_FAILED",
+            });
+          }
+        } else {
+          const stagedRejectedToken = stableToken as StagedStableToken;
+          const quarantined = await retryStableInvitationOperation(() =>
+            deps.stableTokens!.rollbackRejected(stagedRejectedToken),
+          );
+          if (!quarantined) {
+            console.error("[invite-send] rejected-token quarantine exhausted", {
+              respondentId: recipient.respondentId,
+              invitationId: invitationRow.id,
+              disposition: "DEFINITE_REJECTION_QUARANTINE_EXHAUSTED",
+              attempts: 3,
+            });
+            const auditInput: RejectedCleanupAuditInput = {
+              invitationId: invitationRow.id,
+              tokenId: stableToken.tokenId,
+            };
+            const persistAudit = deps.persistRejectedCleanupAudit;
+            const auditPersisted =
+              persistAudit !== undefined &&
+              (await retryStableInvitationOperation(() => persistAudit(auditInput)));
+            if (!auditPersisted) {
+              throw new StableInvitationCleanupAuditError();
+            }
+            try {
+              await deps.enqueueRejectedQuarantineRetry?.(auditInput);
+            } catch {
+              console.error(
+                "[invite-send] rejected-token fast-path event submission failed",
+                {
+                  respondentId: recipient.respondentId,
+                  invitationId: invitationRow.id,
+                  disposition: "REPAIR_FAST_PATH_EVENT_SUBMISSION_FAILED",
+                },
+              );
+            }
+            throw new StableInvitationQuarantineError();
+          }
+
+          const reconciled = await retryStableInvitationOperation(() =>
+            deps.stableTokens!.reconcileRejected(stagedRejectedToken),
+          );
+          if (!reconciled) {
+            console.error(
+              "[invite-send] rejected-token reconciliation exhausted",
+              {
+                respondentId: recipient.respondentId,
+                invitationId: invitationRow.id,
+                disposition:
+                  "DEFINITE_REJECTION_RECONCILIATION_EXHAUSTED",
+                attempts: 3,
+              },
+            );
+            const auditInput: RejectedCleanupAuditInput = {
+              invitationId: invitationRow.id,
+              tokenId: stableToken.tokenId,
+            };
+            const persistAudit = deps.persistRejectedCleanupAudit;
+            const auditPersisted =
+              persistAudit !== undefined &&
+              (await retryStableInvitationOperation(() =>
+                persistAudit(auditInput),
+              ));
+            if (!auditPersisted) {
+              throw new StableInvitationCleanupAuditError();
+            }
+            try {
+              await deps.enqueueRejectedQuarantineRetry?.(auditInput);
+            } catch {
+              console.error(
+                "[invite-send] rejected-token fast-path event submission failed",
+                {
+                  respondentId: recipient.respondentId,
+                  invitationId: invitationRow.id,
+                  disposition: "REPAIR_FAST_PATH_EVENT_SUBMISSION_FAILED",
+                },
+              );
+            }
+          }
+        }
+        console.error("[invite-send] provider handoff failed", {
+          respondentId: recipient.respondentId,
+          invitationId: invitationRow.id,
+          disposition,
+        });
+        recordFailure(recipient.respondentId);
+        continue;
+      }
+      try {
+        await deps.stableTokens!.confirm({
+          tokenId: stableToken.tokenId,
+          invitationId: invitationRow.id,
+          confirmedAt: now(),
+        });
+      } catch {
+        console.error("[invite-send] stable token confirmation failed", {
+          respondentId: recipient.respondentId,
+          invitationId: invitationRow.id,
+          disposition: "CONFIRM_PERSIST_FAILED",
+        });
+      }
+      try {
+        await db.assessmentInvitation.update({
+          where: { id: invitationRow.id },
+          data: { status: "SENT", sentAt: now() },
+        });
+      } catch {
+        console.error("[invite-send] parent status update failed", {
+          respondentId: recipient.respondentId,
+          invitationId: invitationRow.id,
+          disposition: "PARENT_STATUS_WRITE_FAILED",
+        });
+        recordFailure(recipient.respondentId);
+        continue;
+      }
+      sent.push(recipient.respondentId);
+      results.push({ respondentId: recipient.respondentId, status: "sent" });
       continue;
     }
 
     try {
-      await sendEmail({
-        invitation: invitationRow,
-        respondent: {
-          id: respondent.id,
-          firstName: respondent.firstName,
-          lastName: respondent.lastName,
-          email: respondent.email,
-        },
-        campaign: {
-          id: campaign.id,
-          name: campaign.name,
-          alias: campaign.alias,
-          closeAt: campaign.closeAt,
-        },
-        template: {
-          alias: campaign.template.alias,
-          invitationSubject:
-            campaign.invitationSubject ?? campaign.template.invitationSubject,
-          invitationBodyMarkdown:
-            campaign.invitationBodyMarkdown ?? campaign.template.invitationBodyMarkdown,
-        },
-        invitationBodyHtml: campaign.invitationBodyHtml ?? null,
-        organizationName,
-        coachName,
-        templateName,
-        rawToken,
-        baseUrl,
-        chrome,
-        coachLogoUrl,
-      });
+      await sendEmail(emailInput);
 
       await db.assessmentInvitation.update({
         where: { id: invitationRow.id },
@@ -281,8 +575,7 @@ export async function sendInvitesBatch(
         sendErr
       );
       // Leave the row PENDING — caller can retry via /resend or re-invite.
-      failed.push(recipient.respondentId);
-      results.push({ respondentId: recipient.respondentId, status: "send-failed" });
+      recordFailure(recipient.respondentId);
     }
   }
 

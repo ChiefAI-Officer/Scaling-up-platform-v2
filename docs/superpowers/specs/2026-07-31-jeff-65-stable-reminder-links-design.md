@@ -1,0 +1,563 @@
+# Jeff #65 stable reminder links — technical design
+
+**Status at approval (historical):** Approved in brainstorming; implementation not started.
+
+**Current status:** Jeff #65 is implemented on the branch and locally verified only; it is not merged, deployed, canaried, globally enabled, or closed.
+
+**Date:** 2026-07-31
+
+**Product contract:** `docs/specs/v7.6/20-jeff-65-stable-reminder-links-contract.md`
+
+**Claim:** [Jeff #65 on the shared claim board](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/issues/261#issuecomment-5140577904)
+
+## Goal
+
+Make the original invitation link and every successfully sent bulk-reminder link
+remain valid together until their shared invitation becomes unusable through
+submission, explicit revocation, expiry, campaign closure, or the existing
+soft-delete gate.
+
+The implementation must preserve one Invitation and one assessment state per
+respondent. Multiple links are sibling entry doors, not multiple invitations.
+
+## Current behavior
+
+`AssessmentInvitation` stores one unique `tokenHash`. The bulk-reminder route
+generates a new token, sends it, then overwrites that column. Exchange hashes the
+presented token and looks up the invitation by the same column. A successful
+reminder therefore invalidates the original and every earlier reminder link.
+
+Wave A already fixed a narrower problem by moving that overwrite after the email
+call. A failed call no longer destroys the prior link, but successful sends still
+replace it. Manual **Resend** also rotates the parent hash because the raw token is
+not recoverable.
+
+## Approved product decisions
+
+1. Every original and successfully delivered bulk-reminder link shares one
+   invitation lifecycle.
+2. A successful reminder refreshes the invitation's one shared expiry using the
+   existing formula. Every sibling link inherits that deadline.
+3. If the email provider reports an uncertain outcome, retain the new token so any
+   email that arrives contains a working link.
+4. Rollout preserves every currently working parent hash. Previously overwritten
+   hashes cannot be reconstructed and are not recoverable.
+5. Manual **Resend** is compatible with the feature but is not granted stable-link
+   semantics by Jeff #65.
+6. No UI, email-copy, or email-appearance change is included.
+
+## Chosen approach
+
+Add an `AssessmentInvitationToken` child table. The parent Invitation remains the
+only lifecycle authority; child rows contain independently hashed sibling tokens.
+
+This approach was selected over:
+
+- storing encrypted raw token material and resending one identical link, which
+  expands the secret-recovery boundary; and
+- current/previous hash columns, which cannot satisfy the all-reminders contract.
+
+## Data model
+
+Add an `AssessmentInvitationToken` model with:
+
+- `id String @id @default(cuid())`;
+- `invitationId String`;
+- `tokenHash String @unique`;
+- `sequence Int` — invitation-local, monotonically increasing attempt order;
+- `expiresAtSnapshot DateTime` — expiry paired with this token hash;
+- `source AssessmentInvitationTokenSource`;
+- `deliveryState AssessmentInvitationTokenDeliveryState`;
+- `createdAt DateTime @default(now())`;
+- `updatedAt DateTime @updatedAt`;
+- `deliveryConfirmedAt DateTime?`; and
+- an `AssessmentInvitation` relation with cascade-on-delete.
+
+`AssessmentInvitationTokenSource` has:
+
+- `LEGACY_CURRENT` — the parent hash copied during migration or promoted when a
+  flag-off invitation first enters the enabled flow;
+- `ORIGINAL` — an original invitation issued while the feature is enabled; and
+- `REMINDER` — a bulk-reminder token.
+
+`AssessmentInvitationTokenDeliveryState` has:
+
+- `STAGED` — persisted before provider handoff;
+- `SENT` — provider acceptance was confirmed; and
+- `UNCERTAIN` — provider acceptance could not be proven either way; and
+- `REJECTED` — the provider definitely rejected the handoff; this retained row
+  is a fail-closed tombstone.
+
+`STAGED`, `SENT`, and `UNCERTAIN` remain exchangeable because provider acceptance
+may have occurred before confirmation telemetry persisted. An exact `REJECTED`
+child is never exchangeable and never falls through to the parent mirror.
+Validity for every other state comes from possession of the raw token plus the
+parent lifecycle gates.
+
+Index `invitationId` for sibling lookup, uniquely constrain
+`(invitationId, sequence)`, and retain the unique `tokenHash` index for
+constant-time exchange. The expiry snapshot is rollback metadata only; the parent
+remains the lifecycle authority.
+
+Keep `AssessmentInvitation.tokenHash` during this wave as the newest-token
+compatibility mirror. It remains unique and is not made nullable. Add parent
+`stableTokenSequence`, `stableFallbackTokenHash`,
+`stableFallbackExpiresAt`, and `stableFallbackTokenSequence`. The fallback pair
+is the durable last-known-deliverable restore point; it is independent of the
+child predecessor chain.
+
+## Component boundaries
+
+### `stable-invitation-tokens` service
+
+A focused service owns:
+
+- promoting a parent hash to `LEGACY_CURRENT` when missing;
+- staging a new child token;
+- maintaining the parent compatibility mirror;
+- marking a staged token `SENT` or `UNCERTAIN`;
+- quarantining a definitively rejected staged token and restoring the persisted
+  safe fallback in the same transaction, plus separately reconciling successor
+  rollback metadata;
+  and
+- resolving a token hash through child-first, parent-fallback lookup.
+
+The service accepts a narrow database interface so token behavior can be tested
+without exercising route authorization or email rendering.
+
+### Feature-flag helper
+
+A pure `wave-j65-flags` helper owns this precedence:
+
+1. `WAVE_J65_STABLE_LINKS_KILL` forces legacy behavior;
+2. `WAVE_J65_STABLE_LINKS_ENABLED` enables globally; otherwise
+3. `WAVE_J65_STABLE_LINKS_CANARY` matches an exact campaign alias.
+
+Unset values are off. Truthiness follows the existing assessment-wave convention.
+Campaign-alias canarying allows exchange to choose its path before any new database
+lookup because the alias is already a route parameter.
+
+### Routes
+
+The bulk-reminder route keeps actor authorization, campaign/recipient selection,
+email composition, counters, and audit logging. It delegates token persistence and
+delivery-state transitions to the service.
+
+The exchange route keeps parsing, alias protection, lifecycle gates, `VIEWED`
+monotonicity, cookie minting, response codes, and no-store headers. Only token
+resolution changes under the flag.
+
+The original-invite path creates a random, never-delivered parent rollback root,
+then uses the same locked `ORIGINAL` staging transition as a retry. Manual
+**Resend** continues writing only the parent mirror and is found through the
+enabled exchange fallback.
+
+## Reminder data flow
+
+1. Authenticate and authorize the actor.
+2. Load the campaign, target invitation, respondent, and email inputs.
+3. Apply the existing skip rules for submission, revocation, and missing
+   invitations.
+4. Compute the existing shared expiry:
+   `campaign.closeAt ?? now + 90 days`.
+5. Generate the raw token in memory and hash it.
+6. In one transaction:
+   - lock the parent Invitation row and read its current hash and expiry inside
+     the transaction;
+   - promote that locked parent hash to `LEGACY_CURRENT` if no child row contains
+     it;
+   - allocate the next monotonic sequence and create the new `REMINDER` child in
+     `STAGED` with its expiry snapshot;
+   - refresh the parent expiry; and
+   - set the parent compatibility mirror to the new hash.
+7. Send the email with the raw token.
+8. On confirmed provider acceptance, atomically mark the child `SENT`, set
+   `deliveryConfirmedAt`, increment `resentCount`, set `lastResentAt`, and advance
+   the parent fallback only when the child sequence is newer than the persisted
+   fallback sequence.
+9. On an unclassified or ambiguous provider exception, mark the child
+   `UNCERTAIN`, retain the refreshed expiry and parent mirror, report the send as
+   uncertain/failed to the operator without logging the token, leave the link
+   exchangeable, and advance the fallback under the same monotonic rule.
+10. Only when a typed provider result proves no acceptance occurred:
+    - atomically retain the exact child as `REJECTED`;
+    - compare-and-swap the parent mirror from the failed hash to the persisted
+      fallback hash and expiry without predecessor traversal; and
+    - separately rewire direct successor rollback metadata. If synchronous
+      repair retries exhaust, strictly persist a pending AuditLog outbox intent
+      keyed by token-row ID with only `invitationId` metadata, then attempt an
+      ID-only Inngest fast-path event. A bounded scheduled drain replays pending
+      intents even when event submission or worker retries exhaust. Every replay
+      performs quarantine before reconciliation and is convergent.
+      Reconciliation failure cannot undo the tombstone or parent restoration.
+
+The conditional restore prevents a failed send from clobbering a newer concurrent
+reminder. If post-send telemetry or counter persistence fails, the already-staged
+token remains exchangeable; the route logs identifiers and state only.
+
+All validation that can fail deterministically occurs before staging. Once
+provider handoff begins, an unclassified error is always treated as uncertain,
+favoring a working recipient link.
+
+## Exchange data flow
+
+Flag off or killed:
+
+- execute the current parent `tokenHash` lookup and writes byte-for-byte.
+
+Flag on or matching the campaign-alias canary:
+
+1. Hash the submitted raw token.
+2. Look up an `AssessmentInvitationToken` by unique hash and include its parent
+   invitation and campaign.
+3. If the exact child is `REJECTED`, deny it without parent fallback. If no child
+   matches, fall back to the parent unique-hash lookup. This keeps
+   manual Resend and flag-transition invitations working.
+4. Enforce the existing campaign-alias guard.
+5. Apply the existing soft-delete, revocation, shared-expiry, submission,
+   campaign-status, open-date, and close-date gates.
+6. Preserve the existing `VIEWED` transition and invitation-scoped session.
+
+A missing token or alias mismatch remains an enumeration-safe `404`. A known
+invitation that fails a lifecycle gate remains `410`, except for the existing
+not-yet-open `425`.
+
+## Original invite and manual Resend compatibility
+
+When the feature is enabled, original invitation creation writes a random
+never-delivered SHA-256 rollback root to the parent, then stage-rotates the
+delivered hash into an `ORIGINAL` child. Definite rejection therefore restores an
+unpossessed root; a retry that reaches provider handoff follows the same
+`STAGED`/`SENT`/`UNCERTAIN`/`REJECTED` rules.
+
+An invitation created while disabled may not have a child row. Its first enabled
+reminder promotes the current parent hash before changing the mirror, so its
+working original link survives.
+
+Manual **Resend** remains outside Jeff #65:
+
+- its new token is stored only in the parent mirror;
+- enabled exchange accepts it through the parent fallback;
+- original and bulk-reminder child links remain valid as required; and
+- a later manual Resend may replace that manual-Resend link. If a bulk reminder
+  runs first, the generic promotion step preserves the current parent hash as
+  `LEGACY_CURRENT`, regardless of which send path produced it. That incidental
+  preservation does not grant all future manual-Resend links a stable-link
+  guarantee.
+
+No email copy, UI component, or resend counter semantics are changed. A partial
+batch 503 extends its JSON body and human-readable `error` with sent/skipped/failed
+counts, completed and remaining identifiers, `retrySafe: false`, and an explicit
+warning not to retry the whole request. The existing caller already displays that
+error string.
+
+## Migration and backfill
+
+The migration is additive:
+
+1. create the two enums;
+2. create `assessment_invitation_tokens`;
+3. add its primary key, unique hash index, invitation index, and cascade foreign
+   key; and
+4. insert one child for every existing `assessment_invitations.tokenHash`.
+
+Backfilled rows use:
+
+- `source = LEGACY_CURRENT`;
+- `deliveryState = SENT` when the parent status is `SENT`, `VIEWED`, or
+  `SUBMITTED`, otherwise `UNCERTAIN`;
+- `createdAt = assessment_invitations.createdAt`;
+- `updatedAt = COALESCE(assessment_invitations.sentAt,
+  assessment_invitations.createdAt)`; and
+- `deliveryConfirmedAt = assessment_invitations.sentAt`.
+
+The existing unique parent hash guarantees a conflict-free backfill. The migration
+does not alter, null, or drop the parent column and stores no raw token.
+
+## Concurrency
+
+Each reminder generates an independent random token and unique child row. Sibling
+creation does not overwrite another child's hash.
+
+Staging locks the parent Invitation row before capturing the prior mirror and
+expiry. This serializes compatibility-mirror changes, so a later failed reminder
+restores the actual preceding mirror rather than a stale value read before another
+send. Parent expiry and reminder counters then use atomic updates. The
+compatibility mirror is last-writer-wins by design because only one newest token
+can serve the legacy lookup. Child rows remain authoritative for stable-link
+behavior.
+
+A definite-rejection quarantine restores the persisted last-known-deliverable
+fallback only with a compare-and-swap predicate on the failed new hash. If a
+newer reminder owns the mirror, quarantine leaves it untouched. Confirmed and
+uncertain transitions advance the fallback only when their child sequence is
+newer, so delayed A/B outcomes cannot regress the restore point. Parent
+restoration never depends on predecessor traversal or successor reconciliation.
+
+The available stateful Prisma-shaped tests prove these state-machine transitions
+and serialized transaction callbacks. They do not schedule independent
+PostgreSQL connections and are not evidence of real database lock interleaving.
+
+## Flags, rollout, and rollback
+
+1. Deploy the additive migration and code with all flags off.
+2. Verify migration counts: one backfilled child per parent invitation and no
+   duplicate hashes.
+3. Enable one controlled campaign alias through
+   `WAVE_J65_STABLE_LINKS_CANARY`.
+4. Send an original invitation and at least two reminders to controlled addresses.
+5. Confirm every link exchanges to the same invitation before a terminal state.
+6. Exercise the shared expiry and one controlled terminal gate without customer
+   data.
+7. Confirm the kill switch returns the canary to newest-parent-only behavior and
+   reenabling restores child links.
+8. Enable `WAVE_J65_STABLE_LINKS_ENABLED` globally, then clear the canary.
+
+Emergency kill performs a code-path rollback only. It temporarily makes only the
+newest parent-mirror link usable, matching legacy behavior. Child rows are retained
+and become usable again when the feature is reenabled.
+
+Do not run a destructive down-migration. A normal code revert leaves the additive
+table dormant. Removal of the legacy parent column, if ever desired, is a separate
+future migration after the rollout is proven.
+
+## Security and observability
+
+- Raw tokens exist only in process memory and the recipient's URL fragment.
+- Persist, compare, and index SHA-256 hashes only.
+- Never include raw tokens or hashes in application logs, audit details, responses,
+  analytics, or error-monitoring metadata.
+- Logs may include invitation ID, token-row ID, source, delivery state, campaign
+  ID, and a non-secret error classification.
+- Keep the current generic lookup failures and no-store responses.
+- Record confirmed, uncertain, and definite-rejection outcomes without adding a
+  customer-facing surface.
+- Token rows share the parent's retention and cascade-delete lifecycle; no separate
+  cleanup job is introduced.
+
+## Test design
+
+### Flags
+
+- default off;
+- global enable;
+- exact campaign-alias canary match and mismatch;
+- kill precedence over global and canary; and
+- existing truthy/falsey string conventions.
+
+### Migration
+
+- enums, columns, indexes, foreign key, and cascade exist;
+- one current hash is backfilled per invitation;
+- status-to-delivery-state mapping is correct;
+- migration safety accepts the additive SQL; and
+- no raw-token column exists.
+
+### Token service
+
+- promotion is idempotent;
+- original and reminder staging dual-write correctly;
+- success marks `SENT`;
+- unclassified failure marks `UNCERTAIN` and stays resolvable;
+- definite rejection retains an exact `REJECTED` tombstone;
+- compare-and-swap rollback cannot clobber a newer mirror;
+- serialized state-machine attempts preserve a monotonic safe fallback across
+  overlapping confirmation, uncertainty, and rejection orderings;
+- independently staged reminders create distinct valid rows;
+- shared expiry and counters update atomically; and
+- child-first lookup falls back to the parent.
+
+### Reminder route
+
+- original plus two confirmed reminders produces three exchangeable child hashes;
+- all three resolve to one Invitation;
+- existing submitted, revoked, missing-invitation, closed-campaign, cap, audit, and
+  email-chrome behavior remains;
+- flag off preserves the existing parent-only write;
+- no raw token is logged on any error; and
+- partial-failure response fields remain backward compatible while adding
+  explicit retry-safety guidance and progress identifiers.
+
+### Exchange route
+
+- every sibling hash succeeds under the enabled path;
+- parent fallback supports manual Resend;
+- alias mismatch remains `404`;
+- revoked, expired, submitted, closed, close-date-passed, and soft-deleted parents
+  reject every sibling;
+- not-yet-open remains `425`;
+- `VIEWED` remains monotonic;
+- flag off and kill use legacy parent-only lookup; and
+- reenabling restores sibling lookup without data repair.
+
+### Regression and release gates
+
+- existing reminder, invite-send, exchange, submit, session, and manual-resend
+  suites;
+- focused Jest for the new service, flags, routes, migration, and state-machine
+  serialization;
+- changed-file ESLint;
+- changelog freshness;
+- migration safety;
+- `git diff --check`;
+- `CI=true npx next build --turbopack`;
+- protected GitHub checks;
+- controlled production canary;
+- exact-merge-SHA deployment verification; and
+- production health with healthy database and safe auth posture.
+
+No visual review is required because the design changes no UI or email appearance.
+
+## Concurrency-correction addendum (Fix Round 1)
+
+This addendum corrects the internal rollback algorithm without changing the
+recipient-facing contract, lifecycle authority, email behavior, or rollout
+shape above.
+
+The original caller-held rollback snapshot was insufficient for overlapping
+reminders. If A staged, B staged from A, A rejected after losing its parent CAS,
+and B later rejected, B could restore A's rejected hash. To keep every
+rollback predecessor viable:
+
+- every stage-based rotating child (`ORIGINAL` or `REMINDER`) persists nullable
+  `previousTokenHash` and `previousExpiresAt` rollback metadata;
+- staging captures those values from the locked parent in the same transaction
+  that creates the rotating child and advances the parent mirror;
+- definite-rejection quarantine locks the parent, re-reads and verifies the child
+  by id/invitation/hash plus `(ORIGINAL|REMINDER)/(STAGED|REJECTED)`, and uses the
+  persisted predecessor rather than caller-held values;
+- quarantine retains that exact child as `REJECTED`, traverses older rejected
+  tombstones, and restores the parent only when its mirror still equals the
+  failed hash; successor rewiring is a separate retryable reconciliation; and
+- staging, confirmation, and rollback share the parent-row lock convention, so
+  their identity/state decisions serialize without a child/parent lock-order
+  inversion.
+
+Delivery transitions are also conditional and identity-derived:
+
+- confirmation verifies the stored invitation/source, transitions only
+  `STAGED|UNCERTAIN → SENT`, and increments reminder counters only when that
+  transition wins, making retries no-ops;
+- ambiguous delivery changes only `STAGED → UNCERTAIN`, never `SENT`; and
+- original registration/removal and rotating rollback use full
+  identity/source/state predicates so an id/hash collision or stale cleanup
+  request cannot mutate another child.
+
+The predecessor fields are rollback snapshots only. They do not add
+per-token expiry, do not determine exchange validity, and remain null on legacy
+rows. Every
+service hash boundary accepts only 64-character lowercase SHA-256 hex; no raw
+token or hash is logged.
+
+## Final review correction addendum
+
+Whole-branch review found two fail-open paths in the earlier implementation:
+brand-new enabled originals placed the delivered hash directly on the parent, and
+rollback exhaustion could leave a definitely rejected `STAGED` child
+exchangeable. The corrected internal contract is:
+
+- every enabled original uses a never-delivered parent root plus the same
+  stage-based `ORIGINAL` rotation as a pending retry;
+- definite rejection first commits `REJECTED` plus viable-parent restoration;
+- exact `REJECTED` lookup never falls through to the parent;
+- successor reconciliation happens only after quarantine is durable, with strict
+  audit on bounded exhaustion;
+- the default-off/kill exchange path remains the exact legacy parent-only query,
+  made safe because quarantine restores the parent before reconciliation; and
+- a 503 caused by strict-audit infrastructure failure includes the completed
+  reminder ledger, the number remaining, and an explicit
+  `retrySafe: false` / whole-batch retry warning.
+
+The composed acceptance coverage uses production invite-send, token service,
+resolver, and lifecycle-classification functions over a stateful Prisma-shaped
+fake. It proves state transitions and shared parent behavior, not PostgreSQL lock
+scheduling.
+
+## Durable quarantine correction addendum (Fix Round 2)
+
+Fix Round 1's predecessor traversal is superseded for parent restoration. The
+durable invariant is now a parent-owned last-known-deliverable fallback:
+
+- every child has an invitation-local monotonic `sequence` and paired
+  `expiresAtSnapshot`;
+- the parent persists the current sequence and its newest known-deliverable
+  hash/expiry/sequence;
+- `SENT` and `UNCERTAIN` advance that fallback only when their sequence is newer;
+- quarantine marks the exact child `REJECTED` and compare-and-swap restores the
+  persisted fallback in one transaction, without walking predecessors;
+- successor reconciliation may still simplify historical rollback metadata, but
+  it cannot change the parent restore point or roll back the tombstone; and
+- exhausted synchronous repair first persists
+  `STABLE_INVITATION_REJECTION_REPAIR_PENDING` on entity type
+  `AssessmentInvitationToken`, keyed by token-row ID with exactly
+  `{invitationId}` metadata;
+- `assessment/invitation.rejection-retry` carries only invitation/token IDs and
+  remains the immediate fast path; and
+- a five-minute, concurrency-one drain selects at most 50 pending intents
+  oldest-first, quarantines before reconciling, and upserts the same deterministic
+  resolved marker as the direct event. Completion transitions duplicate pending
+  rows out of future selection, while concurrent event/cron execution remains
+  safe through service idempotency plus the resolved check.
+
+## Outbox fairness correction addendum (Fix Round 4)
+
+Every row selected by the bounded oldest-ready-first drain must leave `PENDING`
+before that drain completes:
+
+- an existing deterministic resolved marker transitions duplicate pending rows
+  to `STABLE_INVITATION_REJECTION_REPAIR_RESOLVED`;
+- a missing token row, including invitation cascade deletion, writes the
+  deterministic `STABLE_INVITATION_REJECTION_REPAIR_TERMINAL` outcome with
+  allowlisted reason `TARGET_DELETED` and consumes all pending duplicates;
+- malformed metadata writes a deterministic terminal marker keyed by pending-row
+  ID with allowlisted reason `MALFORMED_METADATA`, then consumes that row; and
+- a transient repair failure transitions the selected row to
+  `STABLE_INVITATION_REJECTION_REPAIR_FAILED_ATTEMPT`, records only
+  `invitationId`, monotonic `attemptCount`, and allowlisted reason
+  `TRANSIENT_REPAIR_FAILURE`, then deterministically enqueues one strict
+  `{invitationId}` pending intent at the tail.
+
+No audit row is deleted. Deterministic marker/retry IDs, conditional pending-state
+updates, service idempotency, and marker rechecks keep duplicate or concurrent
+event/cron work convergent. Fifty transient head rows therefore rotate behind row
+51, which becomes ready on the next bounded drain, while each failed repair
+retains an indefinite retry chain. The additive migration also indexes
+`AuditLog(action, timestamp)` for the action-filtered oldest-first query. Terminal
+and failed-attempt metadata contain no token, hash, or serialized error.
+
+The outcome-order matrix covers B-confirm-then-A-confirm, A-confirm-while-B-current
+then-B-reject, and the equivalent uncertain transitions. A delayed confirmation
+after rejection is a no-op. The kill/default exchange shape remains the exact
+legacy parent-only lookup.
+
+## Acceptance criteria
+
+Jeff #65 is implemented only when:
+
+1. an original link and at least two successful bulk-reminder links all exchange
+   into the same active invitation;
+2. all sibling links share the refreshed invitation expiry;
+3. submission, revocation, expiry, campaign closure, close-date passage, and
+   soft deletion reject every sibling through existing lifecycle gates;
+4. an uncertain delivery retains a working link;
+5. flag-off and kill behavior match the legacy newest-token-only path;
+6. existing active links survive migration and flag enablement;
+7. manual Resend remains functional through the parent fallback;
+8. no raw token is persisted or logged;
+9. the feature is merged, canary-verified, globally enabled, and verified on the
+   exact production SHA; and
+10. the claim, Notion task, and project source of truth are closed out without
+    counting design work as a shipped product outcome.
+
+## Non-goals
+
+- stable semantics for manual **Resend** links;
+- recovering historically overwritten tokens;
+- changing invitation lifetime policy;
+- changing reminder selection, batch caps, counters, copy, HTML, or visual chrome;
+- changing public-assessment access;
+- adding token-management UI;
+- adding a token-retention or deletion scheduler;
+- replacing SHA-256 token hashing;
+- removing the parent `tokenHash` in this wave; or
+- implementing a general assessment-email outbox redesign.

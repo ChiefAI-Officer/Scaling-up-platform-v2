@@ -4,7 +4,13 @@
  * Uses shared SMTP transport from lib/smtp-transport.ts.
  */
 
-import { sendEmailViaSMTP, type SmtpAttachment } from "@/lib/smtp-transport";
+import {
+    prepareEmailViaSMTP,
+    sendEmailViaSMTP,
+    type PreparedEmail,
+    type SendEmailOptions,
+    type SmtpAttachment,
+} from "@/lib/smtp-transport";
 import { db } from "@/lib/db";
 import { generateIcsContent, buildLocationString } from "@/lib/ics-generator";
 import { formatEventDateUTC, formatTimeWithZone } from "@/lib/utils";
@@ -1098,7 +1104,7 @@ export async function sendCoachDeclinedCounterEmail(data: {
  * Throws on SMTP failure so the caller (the invite route) can mark the
  * invitation row as send-failed instead of optimistically flipping to SENT.
  */
-export async function sendAssessmentInvitationEmail(data: {
+export interface AssessmentInvitationEmailInput {
     invitation: { id: string; expiresAt: Date };
     respondent: { id: string; firstName: string; lastName: string; email: string };
     campaign: { id: string; name: string; alias: string; closeAt: Date | null };
@@ -1124,7 +1130,22 @@ export async function sendAssessmentInvitationEmail(data: {
     chrome?: "legacy" | "waveP";
     /** Wave P — coach logo (creator coach ?? org owner profileImage; https-gated at render). */
     coachLogoUrl?: string | null;
-}): Promise<void> {
+    /** Jeff #65 enabled delivery keeps provider errors out of persistence. */
+    redactErrors?: boolean;
+    /** Jeff #65 enabled delivery shares concurrent SMTP verification. */
+    coalesceVerification?: boolean;
+}
+
+export async function sendAssessmentInvitationEmail(
+    data: AssessmentInvitationEmailInput,
+): Promise<void> {
+    const prepared = prepareAssessmentInvitationEmail(data);
+    await prepared.send();
+}
+
+export function prepareAssessmentInvitationEmail(
+    data: AssessmentInvitationEmailInput,
+): PreparedEmail {
     const trimmedBase = data.baseUrl.replace(/\/+$/, "");
     const invitationUrl = `${trimmedBase}/org-survey/${data.campaign.alias}#t=${data.rawToken}`;
 
@@ -1145,7 +1166,7 @@ export async function sendAssessmentInvitationEmail(data: {
     const branded = process.env.ASSESSMENT_INVITE_BRANDED !== "0";
 
     if (!branded) {
-        await sendLegacyInvitationEmail({
+        return prepareEmailViaSMTP(buildLegacyInvitationEmailOptions({
             invitation: data.invitation,
             respondent: data.respondent,
             campaign: data.campaign,
@@ -1157,8 +1178,9 @@ export async function sendAssessmentInvitationEmail(data: {
             effectiveBodyMarkdown,
             subjectSource,
             bodySource,
-        });
-        return;
+            redactErrors: data.redactErrors,
+            coalesceVerification: data.coalesceVerification,
+        }));
     }
 
     const vars: InvitationVars = {
@@ -1222,12 +1244,18 @@ export async function sendAssessmentInvitationEmail(data: {
 
     // STRICT: failures propagate. The invite route catches and marks the
     // invitation row as send-failed instead of optimistically flipping SENT.
-    await sendEmailViaSMTP({
+    return prepareEmailViaSMTP({
         to: data.respondent.email,
         subject,
         html,
         text,
         attachments,
+        ...(data.redactErrors
+            ? {
+                redactErrors: true,
+                coalesceVerification: data.coalesceVerification === true,
+              }
+            : {}),
         telemetry: {
             recipientRole: "CUSTOM",
             metadata: {
@@ -1245,7 +1273,7 @@ export async function sendAssessmentInvitationEmail(data: {
 }
 
 /** Legacy plain invitation renderer — retained as the ASSESSMENT_INVITE_BRANDED=0 off-switch. */
-async function sendLegacyInvitationEmail(data: {
+function buildLegacyInvitationEmailOptions(data: {
     invitation: { id: string; expiresAt: Date };
     respondent: { id: string; firstName: string; lastName: string; email: string };
     campaign: { id: string; name: string; alias: string; closeAt: Date | null };
@@ -1257,7 +1285,9 @@ async function sendLegacyInvitationEmail(data: {
     effectiveBodyMarkdown: string;
     subjectSource: "authored" | "default";
     bodySource: "authored" | "default";
-}): Promise<void> {
+    redactErrors?: boolean;
+    coalesceVerification?: boolean;
+}): SendEmailOptions {
     // Build the SAME InvitationVars the branded path uses so {{organizationName}}
     // / {{templateName}} (and every other token) resolve here too. The old legacy
     // substitute() didn't know those tokens.
@@ -1304,11 +1334,17 @@ async function sendLegacyInvitationEmail(data: {
     const text = renderTextBody(data.effectiveBodyMarkdown, vars);
 
     const usedDefault = data.subjectSource === "default" || data.bodySource === "default";
-    await sendEmailViaSMTP({
+    return {
         to: data.respondent.email,
         subject,
         html,
         text,
+        ...(data.redactErrors
+            ? {
+                redactErrors: true,
+                coalesceVerification: data.coalesceVerification === true,
+              }
+            : {}),
         telemetry: {
             recipientRole: "CUSTOM",
             metadata: {
@@ -1322,7 +1358,7 @@ async function sendLegacyInvitationEmail(data: {
                 defaultVersion: usedDefault ? DEFAULT_INVITATION_VERSION : null,
             },
         },
-    });
+    };
 }
 
 // ============================================

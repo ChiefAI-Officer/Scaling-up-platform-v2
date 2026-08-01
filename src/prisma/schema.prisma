@@ -594,6 +594,7 @@ model AuditLog {
   timestamp   DateTime @default(now())
 
   @@index([entityType, entityId])
+  @@index([action, timestamp])
   @@index([timestamp])
   @@map("audit_logs")
 }
@@ -1352,13 +1353,40 @@ model AssessmentInvitation {
   resentCount  Int                        @default(0)
   lastResentAt DateTime?
   createdAt    DateTime                   @default(now())
+  stableTokenSequence         Int       @default(0)
+  stableFallbackTokenHash     String?
+  stableFallbackExpiresAt     DateTime?
+  stableFallbackTokenSequence Int       @default(0)
 
   campaign   AssessmentCampaign    @relation(fields: [campaignId], references: [id])
   respondent OrgRespondent         @relation(fields: [respondentId], references: [id])
   submission AssessmentSubmission?
+  tokens     AssessmentInvitationToken[]
 
   @@unique([campaignId, respondentId])
   @@map("assessment_invitations")
+}
+
+model AssessmentInvitationToken {
+  id                  String                                 @id @default(cuid())
+  invitationId        String
+  tokenHash           String                                 @unique
+  sequence            Int
+  expiresAtSnapshot   DateTime
+  source              AssessmentInvitationTokenSource
+  deliveryState       AssessmentInvitationTokenDeliveryState
+  deliveryConfirmedAt DateTime?
+  previousTokenHash   String?
+  previousExpiresAt   DateTime?
+  createdAt           DateTime                               @default(now())
+  updatedAt           DateTime                               @updatedAt
+
+  invitation AssessmentInvitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+
+  @@index([invitationId])
+  @@index([invitationId, previousTokenHash])
+  @@unique([invitationId, sequence])
+  @@map("assessment_invitation_tokens")
 }
 
 model AssessmentSubmission {
@@ -1549,6 +1577,19 @@ enum AssessmentInvitationStatus {
   SENT
   VIEWED
   SUBMITTED
+}
+
+enum AssessmentInvitationTokenSource {
+  LEGACY_CURRENT
+  ORIGINAL
+  REMINDER
+}
+
+enum AssessmentInvitationTokenDeliveryState {
+  STAGED
+  SENT
+  UNCERTAIN
+  REJECTED
 }
 
 enum AssessmentQuestionType {
