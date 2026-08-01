@@ -6,6 +6,19 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="gh-217-accepted-gh-257-primed"></a>
+### 2026-08-01 — GH #217 accepted; GH #257 reconciliation primed <!-- ENTRY_ISO:2026-08-01 ENTRY_SLUG:gh-217-accepted-gh-257-primed -->
+
+**GH #217 owner acceptance and final closeout.** The owner accepted the completed legacy invitation fallback hardening after the launch and Manila-date receipt corrections. Implementation PR [#280](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/280) remains merged as `a683e55dfb84eb8606b7d79c9701637fac86ca2b`; receipt PRs [#283](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/283) and [#284](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/284) landed as `aae96d44cc117739e8bc48762871967d8b91fe5a` and `2a858e0737c4dfa73c3c03b78e83e5217f2a5cdf`. Final production deployment `dpl_HD6UVhYtVYhmmXVi8ifLJBsKj1Md` is **Ready**, owns both required aliases, and both aliases returned HTTP `200` with healthy database and safe auth posture on the final verification. The dormant path remains off because Production leaves `ASSESSMENT_INVITE_BRANDED` unset. Issue #217 is closed, its [shared claim is released](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/issues/261#issuecomment-5145377446), and its Notion task is Done.
+
+**Verification accounting.** The focused GH #217 matrix passed **3 suites / 82 tests / 1 snapshot**. The complete repository run on the final GH #217 tree reported **586 passing suites / 6,956 passing tests** and **8 failing suites / 17 failing tests**; the failures were outside the GH #217 diff and were not represented as GH #217 regressions. The production walk remained read-only and sent no invitation. Audit worktrees were preserved rather than removed as part of this non-destructive closeout.
+
+**Next item: GH #257 residual outbox reconciliation.** The open issue is now [claimed](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/issues/261#issuecomment-5148844996) on clean branch `codex/257-outbox-reconciliation`, and a dedicated [Notion design task](https://app.notion.com/p/3af8c45dd82981ec9820d35bc4890970) is In progress. This was selected over GH #233, which already has an active claim; GH #220 and #256, which still need product-policy decisions; and GH #228, which is net-new scope. The completed GH #257 transaction-semantics correction remains closed; this residual owns only recovery when a positively identified pre-database enqueue failure leaves a committed submission without an expected outbox row.
+
+**Design gate and exclusions.** Before code, the next session must agree how expected rows are reconstructed from the existing `buildWaveDOutboxRows` inputs and `emailRenderFingerprint`, how historical campaign/template drift and terminal invitation/submission states affect eligibility, and how the existing `(submissionId, recipientRole)` uniqueness contract prevents duplicates. Send-lease behavior, provider delivery, email copy/chrome, production backfill, and unrelated outbox types are excluded until that contract is approved. No GH #257 implementation code was written while priming.
+
+---
+
 <a id="jeff-65-stable-reminder-links-launched"></a>
 ### 2026-08-01 — Jeff #65 stable reminder links launched <!-- ENTRY_ISO:2026-08-01 ENTRY_SLUG:jeff-65-stable-reminder-links-launched -->
 
