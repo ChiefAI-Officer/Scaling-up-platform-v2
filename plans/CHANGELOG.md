@@ -6,6 +6,21 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="jeff-65-stable-reminder-links-launched"></a>
+### 2026-08-01 — Jeff #65 stable reminder links launched <!-- ENTRY_ISO:2026-08-01 ENTRY_SLUG:jeff-65-stable-reminder-links-launched -->
+
+**Status: MERGED + GLOBALLY ENABLED + PRODUCTION-VERIFIED + CLAIM-RELEASED.** Implementation PR [#282](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/282) passed the protected **Build**, **Migration Safety Gate**, **Assessment Email Lease (PostgreSQL)**, **Vercel**, and **Vercel Preview Comments** checks, then squash-merged at `2026-08-01T01:16:55Z` as `050573fa09a6d8587ad7026aabe4021e35c26c35`. The shared Jeff #65 claim was [released](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/issues/261#issuecomment-5148842955) after production verification.
+
+**Dark migration deployment.** Exact production deployment `dpl_A6DPitCUbVt1Wpqz1GcJNZa1gpj2` (`scaling-up-platform-v2-iuk2oo1ko-scaling-up.vercel.app`) was created at `2026-08-01T01:16:58.142Z` and reached **READY** at `2026-08-01T01:18:08.902Z`, with Vercel metadata bound to `main` at the merge SHA. Its build ran Prisma generation, the 43-migration safety gate, `prisma migrate deploy`, and the Turbopack build while all Jeff #65 rollout controls remained dark. Read-only production SQL then found **103 invitations / 103 token-history rows**, zero invitations without a history row, zero duplicate token-hash groups, and zero duplicate invitation/sequence groups.
+
+**Global activation.** Production had no Jeff #65 environment variables: global enabled false, kill false, and no canary. `WAVE_J65_STABLE_LINKS_ENABLED=1` was added only to Production; the kill switch remained off and no canary override was introduced. Vercel then rebuilt the exact merged artifact as production deployment `dpl_HAF1FS2BpUXQxjVLXz4Tu1h3YoJB` (`scaling-up-platform-v2-5p61fw6su-scaling-up.vercel.app`), created at `2026-08-01T01:21:03.090Z` and **READY** at `2026-08-01T01:22:10.083Z`. Metadata remained bound to `main` at `050573fa`, and the deployment owns both production aliases.
+
+**Post-activation evidence and scope boundary.** The immutable deployment, `scaling-up-platform-v2.vercel.app`, and `platformtest.scalingup.com` each returned HTTP `200` with `status: healthy`, `database: healthy`, and `authPosture: safe`. A second read-only SQL audit remained 103/103 with zero missing parents or duplicate hash/sequence groups. The public root redirected to the production login page and rendered the expected sign-in form. No production invitation, reminder, token exchange, assessment submission, authenticated admin action, or customer-data mutation was manufactured; end-to-end multi-link behavior is therefore supported by the pre-merge 15-suite / 257-test matrix rather than a live email walk. Manual **Resend** remains outside the locked guarantee, and there is no invitation-copy or UI change.
+
+**Behavior and rollback.** Original invitation links and every successfully delivered bulk-reminder link now authenticate the same invitation until submission, explicit revocation, expiry, or campaign closure. Failed sends create no newly usable link and invalidate none of the existing links; exact rejected-token tombstones fail closed. Immediate rollback is setting `WAVE_J65_STABLE_LINKS_KILL=1` and redeploying, which restores the exact legacy parent-only lookup. Full rollback is disabling the global flag or reverting PR #282; the additive hashed history may remain in place and requires no destructive migration.
+
+---
+
 <a id="jeff-65-outbox-fairness-correction-local-only"></a>
 ### 2026-08-01 — Jeff #65 outbox fairness correction locally verified (not launched) <!-- ENTRY_ISO:2026-08-01 ENTRY_SLUG:jeff-65-outbox-fairness-correction-local-only -->
 
