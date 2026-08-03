@@ -24,7 +24,7 @@ design adds no schema or migration.
 
 This document is design only. No product implementation is included.
 
-## Current State
+## Pre-implementation Baseline
 
 `buildReportEmailHtml` already renders a purple, four-color-striped report shell
 for both scored and qualitative reports. Its cover uses the text `SCALING UP`,
