@@ -111,7 +111,7 @@ WAVE_D_CUSTOM_HTML_EMAIL_ENABLED=1
 
 **What it enables:** The `invitationBodyHtml` field (campaign wizard Step 4) becomes
 available to the invitation renderer; the subject remains the separate token-allowlisted
-field. The HTML is sanitized on write and again after escaped interpolation at render.
+field. The HTML is validated on write and sanitized after escaped interpolation at render.
 With `ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED` on, non-empty HTML is the body
 inside the shared branded shell. With that behavior flag off, token-bearing legacy HTML
 uses complete replacement and tokenless HTML uses the branded markdown/template
