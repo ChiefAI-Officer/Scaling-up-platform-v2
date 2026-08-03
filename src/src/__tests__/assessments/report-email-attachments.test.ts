@@ -26,6 +26,8 @@ describe("reportEmailAttachments", () => {
   it.each([
     "plain text cid:su-report-logo-v1",
     "src=&quot;cid:su-report-logo-v1&quot;",
+    '<img data-src="cid:su-report-logo-v1" />',
+    '&lt;img src="cid:su-report-logo-v1" /&gt;',
     '<img src="cid:sulogo" />',
     '<img src="cid:su-report-logo-v10" />',
     "<p>legacy report</p>",

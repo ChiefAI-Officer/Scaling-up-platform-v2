@@ -5,10 +5,10 @@ import {
 import { SU_LOGO_PNG } from "@/lib/assets/invitation-logo";
 import type { SmtpAttachment } from "@/lib/smtp-transport";
 
-const REPORT_EMAIL_LOGO_SRC_TOKEN = `src="${REPORT_EMAIL_LOGO_SRC}"`;
+const REPORT_EMAIL_LOGO_IMG_TOKEN = `<img src="${REPORT_EMAIL_LOGO_SRC}"`;
 
 export function reportEmailAttachments(bodyHtml: string): SmtpAttachment[] {
-  if (!bodyHtml.includes(REPORT_EMAIL_LOGO_SRC_TOKEN)) return [];
+  if (!bodyHtml.includes(REPORT_EMAIL_LOGO_IMG_TOKEN)) return [];
 
   return [
     {
