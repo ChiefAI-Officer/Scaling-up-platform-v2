@@ -34,6 +34,11 @@ export function waveDCustomHtmlEmailEnabled(): boolean {
   return isTruthy(process.env.WAVE_D_CUSTOM_HTML_EMAIL_ENABLED);
 }
 
+/** Enables durable assessment email delivery intents. Default OFF. */
+export function assessmentEmailDeliveryIntentsEnabled(): boolean {
+  return isTruthy(process.env.ASSESSMENT_EMAIL_DELIVERY_INTENTS_ENABLED);
+}
+
 /**
  * Global assessment kill switch.
  *

@@ -1412,6 +1412,7 @@ model AssessmentSubmission {
   invitation AssessmentInvitation? @relation(fields: [invitationId], references: [id])
   referringCoach Coach?            @relation("AssessmentSubmissionReferringCoach", fields: [referringCoachId], references: [id], onDelete: Restrict)
   outboxEmails AssessmentEmailOutbox[]
+  deliveryIntents AssessmentEmailDeliveryIntent[]
 
   @@index([campaignId])
   @@index([respondentId, submittedAt])
@@ -1458,6 +1459,48 @@ model AssessmentEmailOutbox {
   @@index([status, leaseExpiresAt])
   @@index([submissionId])
   @@map("assessment_email_outbox")
+}
+
+model AssessmentEmailDeliveryIntent {
+  id                       String   @id @default(cuid())
+  submissionId             String
+  campaignId               String
+  invitationId             String
+  respondentId             String
+  recipientRole            String
+  emailType                String
+  recipientEmail           String?
+  subject                  String?
+  bodyHtml                 String?
+  payloadHash              String
+  snapshotSchemaVersion    Int      @default(1)
+  rendererContractVersion  Int      @default(1)
+  authorizationSnapshot    Json?
+  contentProvenance        Json?
+  status                   String   @default("PENDING")
+  version                  Int      @default(0)
+  holdReason               String?
+  holdReasons              Json?
+  attempts                 Int      @default(0)
+  lastErrorClass           String?
+  nextAttemptAt            DateTime @default(now())
+  heldAt                   DateTime?
+  expiresAt                DateTime
+  handedOffOutboxId        String?
+  resolvedAt               DateTime?
+  resolvedBy               String?
+  resolutionReasonCode     String?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  submission AssessmentSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@unique([submissionId, recipientRole])
+  @@index([status, nextAttemptAt, createdAt, id])
+  @@index([status, expiresAt, id])
+  @@index([status, heldAt, id])
+  @@index([submissionId])
+  @@map("assessment_email_delivery_intents")
 }
 
 // v7.6: AccessGroup replaces TemplateAccessGrant. Groups grant template
