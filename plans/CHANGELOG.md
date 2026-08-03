@@ -6,6 +6,15 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="gh-256-circle-sync-image-validation-launched"></a>
+### 2026-08-03 — GH #256 Circle-sync Coach image validation launched <!-- ENTRY_ISO:2026-08-03 ENTRY_SLUG:gh-256-circle-sync-image-validation-launched -->
+
+**Protected merge and exact production receipt.** Implementation PR [#287](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/287) was independently approved, all refreshed hosted Build, Migration Safety Gate, Assessment Email Lease (PostgreSQL), Vercel, and Vercel Preview Comments checks passed, and it squash-merged as `cc38dd501271747438dde8562954ead0f193f4ac`. Exact Production deployment `dpl_4yDfLC92HEPVinAVxsVSEXQnhu7o` is **Ready**, carries that merge SHA, and owns `scaling-up-platform-v2.vercel.app`, `platformtest.scalingup.com`, the Scaling Up alias, and the `git-main` alias. Both required public `/api/health` aliases returned HTTP `200` with healthy database and safe auth posture.
+
+**Shipped narrow behavior.** Circle-supplied Coach avatars now pass through the existing HTTPS-only `safeImageSrc` policy immediately before persistence. Rejected values preserve the stored image in both normal and force modes, do not prevent unrelated profile updates or `syncedAt` advancement, surface field-level operator warnings, and emit PII-safe post-persistence telemetry without a raw URL or email. No schema, migration, feature flag, proxy, rehosting job, backfill, production repair, invalid Circle profile, Coach-image mutation, or manual sync was used to obtain this receipt.
+
+**Residual policy remains explicit.** The narrow #261 claim is [released](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/issues/261#issuecomment-5162188735) and GH #256's `circle-sync.ts` validation checkbox is checked. GH #256 remains **open**: arbitrary parseable HTTPS hosts are still accepted, and its host allowlist/proxy/rehosting decision checkbox remains unchecked. This launch receipt does not claim or introduce any broader host policy.
+
 <a id="consolidated-progress-through-gh-228"></a>
 ### 2026-08-03 — Consolidated progress ledger current through GH #228 <!-- ENTRY_ISO:2026-08-03 ENTRY_SLUG:consolidated-progress-through-gh-228 -->
 
