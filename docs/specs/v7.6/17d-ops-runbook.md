@@ -32,7 +32,7 @@ Wave D introduces 8 features across 4 operational areas:
 | #2/#3 timing radio + auto-send | `WAVE_D_AUTO_SEND_ENABLED` | `inviteTiming`, cron + fan-out |
 | #15 results email to respondent | `WAVE_D_RESULTS_EMAIL_ENABLED` | approval-gated per template |
 | #16 coach-notify on completion | `WAVE_D_COACH_NOTIFY_ENABLED` | per-completion, opt-in |
-| #20 full-HTML invitation email | `WAVE_D_CUSTOM_HTML_EMAIL_ENABLED` | body replace only; subject separate |
+| #20 custom-HTML invitation email | `WAVE_D_CUSTOM_HTML_EMAIL_ENABLED` | capability gate; GH #220 branded-body behavior is separately default-off |
 
 **Global kill switch:** `ASSESSMENT_SENDS_PAUSED` — stops ALL assessment sends regardless
 of the per-feature flags (auto-send fan-out aborts + releases its claim; cron short-circuits).
@@ -116,6 +116,38 @@ the sanitized stored value at render time. When the field is empty, the existing
 markdown body path is used as the fallback — so enabling this flag has no effect on
 campaigns that don't supply `invitationBodyHtml`.
 
+GH #220 separates the existing capability gate from the new composition behavior:
+
+```text
+WAVE_D_CUSTOM_HTML_EMAIL_ENABLED
+  Capability: read and render campaign invitationBodyHtml.
+
+ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED
+  Behavior: compose non-empty custom HTML as the sanitized body inside the
+  shared branded shell. Default off.
+```
+
+#### GH #220 dark rollout
+
+1. Deploy with `ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED` unset.
+2. Read the current Production values for both HTML flags. Set
+   `GH220_READONLY_DATABASE_URL` to the operator-provided read-only connection,
+   then run the audit with those exact flag values. Before first activation the
+   expected command is:
+
+   ```bash
+   WAVE_D_CUSTOM_HTML_EMAIL_ENABLED=1 ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED=0 AUDIT_READONLY_URL="$GH220_READONLY_DATABASE_URL" npm run audit:invitation-html-overrides
+   ```
+
+3. Stop if live overrides are nonzero until each live campaign is reviewed.
+4. Separately authorize and set
+   `ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED` in Production.
+5. Redeploy, then verify the exact deployment, aliases, health, and flag state.
+6. Observe organic PII-free telemetry without manufacturing a customer send.
+
+Production activation is outside the implementation PR. Do not infer activation
+authorization from a successful deployment or audit.
+
 ### Recommended enabling order
 
 ```
@@ -127,6 +159,14 @@ campaigns that don't supply `invitationBodyHtml`.
 ```
 
 Each step is independently reversible by flipping the flag back to `0` + redeploying.
+
+### GH #220 behavior rollback
+
+Unset `ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED` and redeploy. Token-bearing
+legacy HTML becomes complete replacement, tokenless HTML uses the branded
+markdown/template fallback, and stored HTML bytes remain unchanged. Unsetting
+`WAVE_D_CUSTOM_HTML_EMAIL_ENABLED` remains the broader capability rollback and
+causes stored custom HTML to be ignored.
 
 ---
 

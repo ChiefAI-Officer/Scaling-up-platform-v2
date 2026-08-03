@@ -6,6 +6,17 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="gh-220-branded-invitation-html-dark"></a>
+### 2026-08-03 — GH #220 branded invitation HTML implemented dark <!-- ENTRY_ISO:2026-08-03 ENTRY_SLUG:gh-220-branded-invitation-html-dark -->
+
+**Status: IMPLEMENTED + LOCALLY VERIFIED + DEFAULT-OFF; not production-activated.** Campaign-authored `invitationBodyHtml` now has a flag-controlled branded-body mode. `WAVE_D_CUSTOM_HTML_EMAIL_ENABLED` remains the capability gate, while new default-off `ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED` composes escaped/interpolated/sanitized authored content inside the existing Scaling Up/Coach invitation shell. The platform owns the CID logo, Coach-logo behavior, CTA, visible fallback URL, footer, and canonical plain-text URL. Subjects and SMTP failure propagation are unchanged.
+
+**Rollback and stored data.** Existing HTML bytes are neither rewritten nor migrated. With the new behavior flag off, recognized-token legacy HTML retains complete replacement and tokenless HTML uses the branded markdown/template fallback, preventing a linkless rollback. Create/update validation permits tokenless bodies only while branded mode is active and continues to reject unsafe token placement.
+
+**Authoring and observability.** Campaign Wizard and Campaign Detail receive the server-derived mode and disclose branded-body, complete-replacement, or retained-fallback state. Campaign Detail omits unchanged retained tokenless HTML from unrelated rollback edits. Existing `renderer:"custom_html"` and `bodySource:"custom_html"` telemetry remain stable; PII-free metadata adds the custom-HTML mode or safe-fallback reason.
+
+**Activation boundary.** `npm run audit:invitation-html-overrides` requires a dedicated `AUDIT_READONLY_URL`, enforces a read-only transaction, and prints only counts, campaign IDs, template aliases, token presence, and current/post-activation/rollback modes. Production activation is separate: re-run the audit, manually review every live override, then explicitly authorize the flag and redeploy. No production data, flag, invitation, migration, GH #228 report branding, GH #256 image policy, or GH #257 outbox behavior changed in this implementation.
+
 <a id="gh-217-accepted-gh-257-primed"></a>
 ### 2026-08-01 — GH #217 accepted; GH #257 reconciliation primed <!-- ENTRY_ISO:2026-08-01 ENTRY_SLUG:gh-217-accepted-gh-257-primed -->
 
