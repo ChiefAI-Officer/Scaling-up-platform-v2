@@ -159,6 +159,8 @@ function canonicalJsonValue(value: unknown, seen: Set<object>): string {
         seen.delete(value);
       }
   }
+
+  throw new TypeError("stableCanonicalJson encountered an unsupported value.");
 }
 
 export function stableCanonicalJson(value: unknown): string {
