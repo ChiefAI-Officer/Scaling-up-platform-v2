@@ -198,6 +198,58 @@ const DETAIL_B = {
   reviewToken: "second-review-token",
 };
 
+const COACH_DETAIL = {
+  ...DETAIL,
+  recipientRole: "OWNING_COACH",
+  emailType: "COACH_COMPLETION",
+  recipientEmail: "frozen-coach@example.com",
+  authorizationSnapshot: {
+    schemaVersion: 1,
+    common: {
+      ...DETAIL.authorizationSnapshot.common,
+      recipientRole: "OWNING_COACH",
+      emailType: "COACH_COMPLETION",
+    },
+    coachCompletion: {
+      canonicalRecipientMailbox: "frozen-coach@example.com",
+      notifyCoachOnCompletion: true,
+      featureKey: "WAVE_D_COACH_NOTIFY_ENABLED",
+      featureEnabled: true,
+      coachId: "coach-frozen",
+    },
+  },
+  contentProvenance: {
+    ...DETAIL.contentProvenance,
+    approvalHash: null,
+  },
+  current: {
+    ...DETAIL.current,
+    campaign: {
+      ...DETAIL.current.campaign,
+      createdByCoachId: "coach-current",
+      notifyCoachOnCompletion: false,
+    },
+    coach: {
+      exists: true,
+      id: "coach-current",
+      canonicalMailbox: "current-coach@example.com",
+    },
+    features: {
+      resultsEmailEnabled: true,
+      coachNotifyEnabled: false,
+    },
+  },
+  drift: {
+    kind: "HELD",
+    primaryReason: "COACH_OWNER_CHANGED",
+    reasons: [
+      "COACH_OWNER_CHANGED",
+      "COACH_EMAIL_CHANGED",
+      "FEATURE_DISABLED",
+    ],
+  },
+};
+
 type MockResponse = {
   ok: boolean;
   status: number;
@@ -540,6 +592,54 @@ describe("AssessmentEmailDeliveryHolds", () => {
         },
       },
     ],
+    [
+      "a top-level snapshot contract version that differs from the frozen snapshot",
+      { ...DETAIL, snapshotSchemaVersion: 2 },
+    ],
+    [
+      "a top-level renderer contract version that differs from provenance",
+      { ...DETAIL, rendererContractVersion: 2 },
+    ],
+    [
+      "a respondent approval hash that differs from frozen approval evidence",
+      {
+        ...DETAIL,
+        contentProvenance: {
+          ...DETAIL.contentProvenance,
+          approvalHash: "9".repeat(64),
+        },
+      },
+    ],
+    [
+      "a respondent approval hash outside the 64-hex contract",
+      {
+        ...DETAIL,
+        contentProvenance: {
+          ...DETAIL.contentProvenance,
+          approvalHash: "not-a-64-hex-hash",
+        },
+      },
+    ],
+    [
+      "missing respondent approval provenance",
+      {
+        ...DETAIL,
+        contentProvenance: {
+          ...DETAIL.contentProvenance,
+          approvalHash: null,
+        },
+      },
+    ],
+    [
+      "non-null owning-coach approval provenance",
+      {
+        ...COACH_DETAIL,
+        contentProvenance: {
+          ...COACH_DETAIL.contentProvenance,
+          approvalHash: "f".repeat(64),
+        },
+      },
+    ],
     ["an empty review token", { ...DETAIL, reviewToken: "" }],
   ])("fails closed for detail evidence with %s", async (_label, unsafeDetail) => {
     mockedFetch()
@@ -837,65 +937,11 @@ describe("AssessmentEmailDeliveryHolds", () => {
   });
 
   it("shows owning-coach drift reasons with frozen/current ownership evidence", async () => {
-    const coachDetail = {
-      ...DETAIL,
-      recipientRole: "OWNING_COACH",
-      emailType: "COACH_COMPLETION",
-      recipientEmail: "frozen-coach@example.com",
-      authorizationSnapshot: {
-        schemaVersion: 1,
-        common: {
-          ...(DETAIL.authorizationSnapshot.common as Record<string, unknown>),
-          campaignId: "campaign-1",
-          invitationId: "invitation-1",
-          respondentId: "respondent-1",
-          templateId: "template-1",
-          accessMode: "INVITED",
-          campaignDeleted: false,
-          invitationRevoked: false,
-          recipientRole: "OWNING_COACH",
-          emailType: "COACH_COMPLETION",
-        },
-        coachCompletion: {
-          canonicalRecipientMailbox: "frozen-coach@example.com",
-          notifyCoachOnCompletion: true,
-          featureKey: "WAVE_D_COACH_NOTIFY_ENABLED",
-          featureEnabled: true,
-          coachId: "coach-frozen",
-        },
-      },
-      current: {
-        ...DETAIL.current,
-        campaign: {
-          ...DETAIL.current.campaign,
-          createdByCoachId: "coach-current",
-          notifyCoachOnCompletion: false,
-        },
-        coach: {
-          exists: true,
-          id: "coach-current",
-          canonicalMailbox: "current-coach@example.com",
-        },
-        features: {
-          resultsEmailEnabled: true,
-          coachNotifyEnabled: false,
-        },
-      },
-      drift: {
-        kind: "HELD",
-        primaryReason: "COACH_OWNER_CHANGED",
-        reasons: [
-          "COACH_OWNER_CHANGED",
-          "COACH_EMAIL_CHANGED",
-          "FEATURE_DISABLED",
-        ],
-      },
-    };
     mockedFetch()
       .mockResolvedValueOnce(
         response({ data: [LIST_ROW], nextCursor: null }) as Response,
       )
-      .mockResolvedValueOnce(response({ data: coachDetail }) as Response);
+      .mockResolvedValueOnce(response({ data: COACH_DETAIL }) as Response);
 
     render(<AssessmentEmailDeliveryHolds />);
     expect(await screen.findByText("p***@example.com")).toBeInTheDocument();
@@ -924,6 +970,12 @@ describe("AssessmentEmailDeliveryHolds", () => {
     });
     expect(within(featureRow).getByText("Yes")).toBeInTheDocument();
     expect(within(featureRow).getByText("No")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Release frozen payload" }),
+    ).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: "Cancel permanently" }),
+    ).toBeEnabled();
   });
 
   it("keeps a stored retry-exhausted hold reason visible when current facts reauthorize", async () => {

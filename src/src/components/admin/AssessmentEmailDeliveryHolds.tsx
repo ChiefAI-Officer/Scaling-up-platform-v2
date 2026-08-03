@@ -140,7 +140,7 @@ const contentProvenanceSchema = z
     versionId: requiredStringSchema,
     templateAlias: requiredStringSchema,
     reportType: requiredStringSchema,
-    approvalHash: nullableStringSchema,
+    approvalHash: sha256Schema.nullable(),
     rendererContractVersion: z.literal(1),
     sourceCommit: requiredStringSchema,
     renderInputHash: sha256Schema,
@@ -274,6 +274,11 @@ const heldDetailSchema = z
       "respondentResults" in snapshot
         ? snapshot.respondentResults.canonicalRecipientMailbox
         : snapshot.coachCompletion.canonicalRecipientMailbox;
+    const approvalProvenanceMatches =
+      "respondentResults" in snapshot
+        ? detail.contentProvenance.approvalHash ===
+          snapshot.respondentResults.approvedContentHash
+        : detail.contentProvenance.approvalHash === null;
     const bindingsMatch =
       detail.campaignId === common.campaignId &&
       detail.invitationId === common.invitationId &&
@@ -283,7 +288,12 @@ const heldDetailSchema = z
       detail.recipientEmail === expectedMailbox &&
       detail.contentProvenance.templateId === common.templateId &&
       detail.contentProvenance.versionId === common.versionId &&
-      detail.contentProvenance.templateAlias === common.templateAlias;
+      detail.contentProvenance.templateAlias === common.templateAlias &&
+      detail.snapshotSchemaVersion === snapshot.schemaVersion &&
+      detail.contentProvenance.schemaVersion === snapshot.schemaVersion &&
+      detail.rendererContractVersion ===
+        detail.contentProvenance.rendererContractVersion &&
+      approvalProvenanceMatches;
     if (!bindingsMatch) {
       context.addIssue({
         code: "custom",
