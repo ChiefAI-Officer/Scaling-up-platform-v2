@@ -101,11 +101,14 @@ jobs:
           cache-dependency-path: src/package-lock.json
       - run: npm ci
       - run: npx prisma generate
-      - name: Apply migrations to isolated PostgreSQL test database
+      # The legacy migration chain cannot construct a fresh database. Build the
+      # disposable schema from schema.prisma, then source the v7.6 raw indexes
+      # and trigger from their checked-in migration (no duplicated SQL fixture).
+      - name: Bootstrap isolated PostgreSQL integration database
         env:
-          DATABASE_URL: "postgresql://lease_test:lease_test@localhost:5432/assessment_email_lease_test?schema=public"
-          DIRECT_URL: "postgresql://lease_test:lease_test@localhost:5432/assessment_email_lease_test?schema=public"
-        run: npx prisma migrate deploy
+          TEST_DATABASE_URL: "postgresql://lease_test:lease_test@localhost:5432/assessment_email_lease_test?schema=public"
+          ASSESSMENT_EMAIL_LEASE_TEST_ALLOW: "isolated-schema"
+        run: npm run bootstrap:postgres-integration
       - name: Run isolated PostgreSQL integration suites
         env:
           TEST_DATABASE_URL: "postgresql://lease_test:lease_test@localhost:5432/assessment_email_lease_test?schema=public"

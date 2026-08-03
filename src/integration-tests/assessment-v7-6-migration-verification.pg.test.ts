@@ -2,8 +2,9 @@
  * Assessment Tool v1 (v7.6) — PostgreSQL migration verification.
  *
  * Queries pg_indexes and pg_trigger against the explicitly isolated PostgreSQL
- * integration database. CI applies the complete Prisma migration history to
- * that ephemeral database before this suite runs.
+ * integration database. CI synchronizes the current Prisma schema to that
+ * ephemeral database, then applies the marked v7.6 raw index/trigger section
+ * directly from its checked-in migration before this suite runs.
  *
  * The shared opt-in and TEST_DATABASE_URL/DATABASE_URL separation mirror the
  * assessment-email lease suite. This is deliberately not a default Jest test:
