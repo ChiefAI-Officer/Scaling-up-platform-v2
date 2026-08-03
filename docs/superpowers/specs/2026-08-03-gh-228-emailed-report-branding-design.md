@@ -92,7 +92,10 @@ URI, or a newly designed asset.
 The dedicated GH #228 kill switch is prospective: it returns newly rendered
 Results report emails to the legacy variant. It does not recall, rewrite,
 cancel, or strip branding from rows already queued. The existing global
-`ASSESSMENT_SENDS_PAUSED` control contains queued delivery when necessary.
+`ASSESSMENT_SENDS_PAUSED` control stops applicable new enqueue activity.
+Containing queued delivery requires pausing both Inngest functions
+`quick-assessment-lead-email` and `quick-assessment-lead-email-cron` before
+quarantine or rollback.
 
 ### Approval boundary
 
@@ -149,16 +152,15 @@ The branded HTML references a new exact CID such as
 `SU_LOGO_PNG`.
 
 A small pure helper maps frozen HTML to SMTP attachments by matching the exact
-platform-owned attribute token (for example,
-`src="cid:su-report-logo-v1"`):
+platform-owned image prefix `<img src="cid:su-report-logo-v1"`:
 
-- exact report-logo `src` token present: return the one inline PNG attachment;
-- exact token absent: return no attachment.
+- exact report-logo image prefix present: return the one inline PNG attachment;
+- exact image prefix absent: return no attachment.
 
-That exact versioned `src` token is the complete attachment manifest for GH
-#228. A bare CID string in visible or escaped copy does not match. The worker
-does not infer from recipient role or email type, and no attachment metadata is
-added to the outbox row.
+That exact versioned image prefix is the complete attachment manifest for GH
+#228. Bare CID, `data-src`, escaped, non-image, and unrelated text do not match.
+The worker does not infer from recipient role or email type, and no attachment
+metadata is added to the outbox row.
 
 The assessment outbox worker passes that result to the existing SMTP transport.
 It does not change the outbox schema or persist duplicate static image bytes.
@@ -268,10 +270,12 @@ Existing outbox rows are never rewritten:
   body.
 
 The dedicated kill returns newly rendered reports to legacy immediately.
-`ASSESSMENT_SENDS_PAUSED` remains the immediate containment control for branded
-rows already enqueued. This avoids mutating frozen bodies or changing lease and
-retry semantics. Disabling GH #228 alone therefore does not recall, cancel, or
-restyle an already-queued email.
+`ASSESSMENT_SENDS_PAUSED` stops applicable new enqueue activity, but it does not
+stop the outbox drain. To contain branded rows already enqueued, pause both
+Inngest functions `quick-assessment-lead-email` and
+`quick-assessment-lead-email-cron` before quarantine or rollback. This preserves
+the unchanged frozen-body, lease, and retry semantics. Disabling GH #228 alone
+therefore does not recall, cancel, or restyle an already-queued email.
 
 ## Failure, Security, and Privacy
 
@@ -288,7 +292,8 @@ restyle an already-queued email.
   `renderError` signal.
 - Observability may record only the chrome variant and a PII-free state such as
   `none`, `name-only`, or `image-and-name`.
-- Logs must not contain coach names, coach email addresses, or raw image URLs.
+- Logs introduced by GH #228 must not contain coach names, coach email
+  addresses, or raw image URLs.
 - `safeImageSrc` remains HTTPS-only but does not constrain hosts. Enabling coach
   images can therefore cause an email client to request an arbitrary HTTPS
   host. GH #228 does not add a proxy, allowlist, download, or embedding policy;
@@ -306,7 +311,9 @@ restyle an already-queued email.
 - Global enable.
 - Kill precedence over global and canary.
 - Dedicated-kill changes affect new renders only; queued rows remain unchanged.
-- Global send pause contains queued branded rows.
+- Global send pause stops applicable new enqueue activity; pausing both
+  `quick-assessment-lead-email` and `quick-assessment-lead-email-cron` contains
+  queued branded rows.
 
 ### Renderer
 
@@ -339,10 +346,11 @@ restyle an already-queued email.
 - Legacy mode ignores irrelevant coach-profile drift.
 - Queued branded rows retain their rendered coach name and image URL after
   subsequent profile edits.
-- Exact report-logo `src` token adds exactly one inline attachment.
+- Exact `<img src="cid:su-report-logo-v1"` prefix adds exactly one inline
+  attachment.
 - Recipient role, email type, and similar unrelated HTML do not trigger the
-  attachment without the exact token.
-- A bare CID string in escaped report or introduction copy does not trigger an
+  attachment without the exact image prefix.
+- Bare CID, `data-src`, escaped, non-image, and unrelated text do not trigger an
   attachment.
 - Legacy and unrelated HTML add no attachment.
 - Attachment or SMTP failure uses existing retry and terminal-state behavior.
@@ -382,8 +390,10 @@ behavior-changing work can begin until this separate visual gate is approved.
    recipients, scoring, approval hashes, outbox schema, leases, retries, and
    provider semantics remain unchanged.
 6. The new variant can be canaried, globally enabled, stopped for new renders
-   with its dedicated kill, and contained for queued sends with the existing
-   global send pause.
+   with its dedicated kill, and stopped from applicable new enqueue activity
+   with the existing global send pause. Containing queued sends requires pausing
+   both `quick-assessment-lead-email` and
+   `quick-assessment-lead-email-cron` before quarantine or rollback.
 7. Automated tests and the pre-implementation visual review gate pass before
    implementation proceeds.
 

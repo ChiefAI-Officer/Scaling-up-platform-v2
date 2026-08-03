@@ -19,7 +19,10 @@
 - `ReportEmailChrome` defaults to `"legacy"`; all disabled output must remain byte-identical and attach nothing.
 - `WAVE_228_REPORT_EMAIL_CHROME_KILL` overrides global and canary enablement; it changes only newly rendered rows.
 - Existing queued rows, recipients, approval hashes, send leases, retries, dead-letter behavior, and provider handoff remain unchanged.
-- `ASSESSMENT_SENDS_PAUSED` remains the containment control for rows already queued.
+- `ASSESSMENT_SENDS_PAUSED` stops applicable new enqueue activity; containing
+  rows already queued requires pausing both Inngest functions
+  `quick-assessment-lead-email` and `quick-assessment-lead-email-cron` before
+  quarantine or rollback.
 - Add no Prisma schema change or migration.
 - Keep GH #220, GH #233, GH #256, and GH #257 out of scope.
 - Do not change short `COACH_COMPLETION` notifications or `SU_TEAM` lead summaries.
@@ -43,8 +46,8 @@
 - Modify `src/src/__tests__/assessments/active-coach-lookup.test.ts`: pin the widened verified-coach return shape.
 - Modify `src/src/app/api/quiz/[campaignAlias]/submit/route.ts`: supply frozen Referring coach branding to taker and coach report copies.
 - Modify `src/src/__tests__/api/quick-assessment-submit.test.ts`: public provenance, fallbacks, gate, deletion recovery, and same-mailbox coverage.
-- Create `src/src/lib/assessments/report-email-attachments.ts`: exact-token-to-static-attachment resolver.
-- Create `src/src/__tests__/assessments/report-email-attachments.test.ts`: exact token, escaped-copy, unrelated-CID, and single-attachment coverage.
+- Create `src/src/lib/assessments/report-email-attachments.ts`: exact-image-prefix-to-static-attachment resolver.
+- Create `src/src/__tests__/assessments/report-email-attachments.test.ts`: exact image prefix, bare-CID, `data-src`, escaped, non-image, unrelated-text, and single-attachment coverage.
 - Modify `src/src/inngest/functions/quick-assessment-lead-email.ts`: pass derived attachments through the existing SMTP handoff.
 - Modify `src/src/__tests__/inngest/quick-assessment-lead-email.test.ts`: frozen-body attachment and existing retry/lease behavior coverage.
 - Modify `src/.env.example`: document the three default-off GH #228 controls.
@@ -1172,7 +1175,9 @@ git commit -m "feat(assessments): brand public results emails"
 
 **Interfaces:**
 - Consumes: `REPORT_EMAIL_LOGO_CID`, `SU_LOGO_PNG`, `SmtpAttachment`, and frozen `bodyHtml`.
-- Produces: `reportEmailAttachments(bodyHtml): SmtpAttachment[]`; worker `sendEmail` accepts optional `attachments`.
+- Produces: `reportEmailAttachments(bodyHtml): SmtpAttachment[]` from the exact
+  `<img src="cid:su-report-logo-v1"` prefix; worker `sendEmail` accepts optional
+  `attachments`.
 
 - [ ] **Step 1: Write failing resolver tests**
 
@@ -1186,7 +1191,7 @@ import {
 } from "@/lib/assessments/report-email-chrome";
 import { SU_LOGO_PNG } from "@/lib/assets/invitation-logo";
 
-it("returns one static inline PNG for the exact src token", () => {
+it("returns one static inline PNG for the exact image prefix", () => {
   expect(
     reportEmailAttachments(`<img src="${REPORT_EMAIL_LOGO_SRC}" alt="Scaling Up" />`),
   ).toEqual([
@@ -1202,6 +1207,8 @@ it("returns one static inline PNG for the exact src token", () => {
 it.each([
   "plain text cid:su-report-logo-v1",
   "src=&quot;cid:su-report-logo-v1&quot;",
+  '<img data-src="cid:su-report-logo-v1" />',
+  '&lt;img src="cid:su-report-logo-v1" /&gt;',
   '<img src="cid:sulogo" />',
   '<img src="cid:su-report-logo-v10" />',
   "<p>legacy report</p>",
@@ -1223,7 +1230,7 @@ npx jest src/__tests__/assessments/report-email-attachments.test.ts --runInBand
 
 Expected: FAIL because the resolver module does not exist.
 
-- [ ] **Step 3: Implement the exact-token resolver**
+- [ ] **Step 3: Implement the exact-image-prefix resolver**
 
 ```ts
 import { SU_LOGO_PNG } from "@/lib/assets/invitation-logo";
@@ -1233,10 +1240,10 @@ import {
   REPORT_EMAIL_LOGO_SRC,
 } from "@/lib/assessments/report-email-chrome";
 
-const REPORT_EMAIL_LOGO_SRC_TOKEN = `src="${REPORT_EMAIL_LOGO_SRC}"`;
+const REPORT_EMAIL_LOGO_IMG_TOKEN = `<img src="${REPORT_EMAIL_LOGO_SRC}"`;
 
 export function reportEmailAttachments(bodyHtml: string): SmtpAttachment[] {
-  if (!bodyHtml.includes(REPORT_EMAIL_LOGO_SRC_TOKEN)) return [];
+  if (!bodyHtml.includes(REPORT_EMAIL_LOGO_IMG_TOKEN)) return [];
   return [
     {
       filename: "su-report-logo-v1.png",
@@ -1367,7 +1374,7 @@ npx eslint src/lib/assessments/report-email-attachments.ts \
 git diff --check
 ```
 
-Expected: exact-token tests pass; legacy worker assertion remains object-identical; branded rows pass one attachment; all atomic-lease tests remain green.
+Expected: exact-image-prefix tests pass; legacy worker assertion remains object-identical; branded rows pass one attachment; all atomic-lease tests remain green.
 
 - [ ] **Step 7: Commit**
 
@@ -1509,5 +1516,9 @@ Invoke `superpowers:requesting-code-review`. Resolve confirmed findings with `su
 3. Trusted creator/Referring coach provenance with no Organization-owner fallback: Tasks 4-5.
 4. Name-required and invalid-image degradation: Task 3 pure tests plus Task 5 route tests.
 5. Unchanged copy, recipients, approval, schema, leases, retries, and provider semantics: Tasks 4-7.
-6. Canary/global/kill and queued-row containment: Task 2 flag matrix, Task 4 variant drift, Task 6 frozen worker handoff.
+6. Canary/global/kill plus containment boundaries: Task 2 flag matrix and Task 4
+   variant drift prove new-render/new-enqueue controls; Task 6 frozen worker
+   handoff proves queued rows continue to drain unless both
+   `quick-assessment-lead-email` and `quick-assessment-lead-email-cron` are
+   paused before quarantine or rollback.
 7. Visual and automated gates before implementation completion: Task 1 and Task 7.
