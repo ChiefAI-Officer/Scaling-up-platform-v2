@@ -106,7 +106,7 @@ export function assessmentInviteBrandedCustomHtmlEnabled(): boolean;
 
 - `invitation-html-policy.ts` must not import React, Prisma, `sanitize-html`, `htmlparser2`, Node built-ins, or environment readers.
 
-- [ ] **Step 1: Write the failing policy tests**
+- [x] **Step 1: Write the failing policy tests**
 
 Create the test with this matrix:
 
@@ -165,7 +165,7 @@ describe("resolveInvitationHtmlMode", () => {
 });
 ```
 
-- [ ] **Step 2: Run the policy test and verify RED**
+- [x] **Step 2: Run the policy test and verify RED**
 
 Run from `src/`:
 
@@ -175,7 +175,7 @@ npx jest src/__tests__/lib/assessments/invitation-html-policy.test.ts --runInBan
 
 Expected: FAIL because `invitation-html-policy.ts` does not exist.
 
-- [ ] **Step 3: Implement the pure policy**
+- [x] **Step 3: Implement the pure policy**
 
 Use one regex and one normalized-name predicate:
 
@@ -232,7 +232,7 @@ export function resolveInvitationHtmlMode(input: {
 }
 ```
 
-- [ ] **Step 4: Add the default-off behavior-flag test**
+- [x] **Step 4: Add the default-off behavior-flag test**
 
 Import `assessmentInviteBrandedCustomHtmlEnabled` in the existing flag test and add:
 
@@ -242,7 +242,7 @@ Import `assessmentInviteBrandedCustomHtmlEnabled` in the existing flag test and 
 
 to `ENABLE_FLAGS`. This reuses the existing `OFF_VALUES` and `ON_VALUES` exact matrix.
 
-- [ ] **Step 5: Run the flag test and verify RED**
+- [x] **Step 5: Run the flag test and verify RED**
 
 Run:
 
@@ -252,7 +252,7 @@ npx jest src/__tests__/lib/assessments/wave-d-feature-flags.test.ts --runInBand
 
 Expected: FAIL because the reader is not exported.
 
-- [ ] **Step 6: Implement the flag reader**
+- [x] **Step 6: Implement the flag reader**
 
 Add to `wave-d-feature-flags.ts`:
 
@@ -263,7 +263,7 @@ export function assessmentInviteBrandedCustomHtmlEnabled(): boolean {
 }
 ```
 
-- [ ] **Step 7: Run both focused suites and verify GREEN**
+- [x] **Step 7: Run both focused suites and verify GREEN**
 
 Run:
 
@@ -276,7 +276,7 @@ npx jest \
 
 Expected: both suites PASS.
 
-- [ ] **Step 8: Commit the policy boundary**
+- [x] **Step 8: Commit the policy boundary**
 
 ```bash
 git add \
@@ -322,7 +322,7 @@ export function validateInvitationHtml(
 
 - Default behavior remains `requireUrlToken: true`.
 
-- [ ] **Step 1: Add validator policy tests**
+- [x] **Step 1: Add validator policy tests**
 
 Move the `INVITATION_URL_TOKENS` test import to `invitation-html-policy.ts`, keep every existing placement test, and add:
 
@@ -349,7 +349,7 @@ it("keeps URL tokens required by default", () => {
 });
 ```
 
-- [ ] **Step 2: Run the sanitizer test and verify RED**
+- [x] **Step 2: Run the sanitizer test and verify RED**
 
 Run:
 
@@ -359,7 +359,7 @@ npx jest src/__tests__/lib/email-html-sanitizer.test.ts --runInBand
 
 Expected: the tokenless opt-in case FAILS under the current required-token contract.
 
-- [ ] **Step 3: Refactor the validator onto the shared policy**
+- [x] **Step 3: Refactor the validator onto the shared policy**
 
 Delete the local token aliases, regex, count, name, and whole-value helpers from `email-html-sanitizer.ts`. Import:
 
@@ -394,7 +394,7 @@ export function validateInvitationHtml(
 
 The parser must still inspect all occurrences when a token exists; `requireUrlToken: false` only changes the zero-token outcome.
 
-- [ ] **Step 4: Run the sanitizer suite and verify GREEN**
+- [x] **Step 4: Run the sanitizer suite and verify GREEN**
 
 Run:
 
@@ -404,7 +404,7 @@ npx jest src/__tests__/lib/email-html-sanitizer.test.ts --runInBand
 
 Expected: all existing sanitizer/placement tests plus the new policy cases PASS.
 
-- [ ] **Step 5: Add the create and update route tests**
+- [x] **Step 5: Add the create and update route tests**
 
 In both API suites, save and restore both flag env vars. Add these concrete
 create-route cases:
@@ -497,7 +497,7 @@ it("both flags ON still rejects a URL token in img src", async () => {
 });
 ```
 
-- [ ] **Step 6: Run both API suites and verify RED**
+- [x] **Step 6: Run both API suites and verify RED**
 
 Run:
 
@@ -510,7 +510,7 @@ npx jest \
 
 Expected: branded-mode tokenless create and update return 400.
 
-- [ ] **Step 7: Pass the validation policy from both routes**
+- [x] **Step 7: Pass the validation policy from both routes**
 
 Import `assessmentInviteBrandedCustomHtmlEnabled` alongside the existing Wave-D reader and replace both validator calls with:
 
@@ -522,7 +522,7 @@ const placement = validateInvitationHtml(rawHtml, {
 
 Do not change the capability-off ignore behavior, length limit, raw-byte storage, or 400/no-write path.
 
-- [ ] **Step 8: Run the validator and API suites and verify GREEN**
+- [x] **Step 8: Run the validator and API suites and verify GREEN**
 
 Run:
 
@@ -536,7 +536,7 @@ npx jest \
 
 Expected: all three suites PASS.
 
-- [ ] **Step 9: Commit validation and API behavior**
+- [x] **Step 9: Commit validation and API behavior**
 
 ```bash
 git add \
@@ -589,7 +589,7 @@ export function renderBrandedCustomHtmlText(
 - `renderFullHtmlBody` remains an exported compatibility wrapper over `renderCustomHtmlFragment`.
 - `buildInvitationEmailHtml` remains public and delegates to `buildInvitationEmailShell`.
 
-- [ ] **Step 1: Add shared-shell and text tests**
+- [x] **Step 1: Add shared-shell and text tests**
 
 Extend the renderer suite:
 
@@ -673,7 +673,7 @@ it("omits the Coach line and still emits the canonical URL for empty fragments",
 
 Also retain the legacy full-replacement tests, including escaped PII, inert encoded braces, href-only URL recovery, sanitizer behavior, and subject credential exclusion.
 
-- [ ] **Step 2: Run the renderer suite and verify RED**
+- [x] **Step 2: Run the renderer suite and verify RED**
 
 Run:
 
@@ -683,7 +683,7 @@ npx jest src/__tests__/lib/assessments/invitation-email.test.ts --runInBand
 
 Expected: FAIL because the three new exports do not exist.
 
-- [ ] **Step 3: Expose the sanitized-fragment semantic**
+- [x] **Step 3: Expose the sanitized-fragment semantic**
 
 Replace the old implementation body with:
 
@@ -706,7 +706,7 @@ export function renderFullHtmlBody(
 
 Keep `renderFullTextBody` for the rollback complete-replacement path.
 
-- [ ] **Step 4: Extract the shared shell without changing its markup**
+- [x] **Step 4: Extract the shared shell without changing its markup**
 
 Move the current shell body into:
 
@@ -741,7 +741,7 @@ export function buildInvitationEmailHtml(input: {
 
 Do not sanitize the trusted shell and do not pass unsanitized authored bytes to it.
 
-- [ ] **Step 5: Add branded custom-HTML plain text**
+- [x] **Step 5: Add branded custom-HTML plain text**
 
 Extract the existing sanitized-HTML-to-text transformations into a private `htmlFragmentToText(sanitizedFragment: string)` helper. Keep `renderFullTextBody` behavior intact, then add:
 
@@ -762,7 +762,7 @@ export function renderBrandedCustomHtmlText(
 
 Always append the platform URL, even if the fragment text already contains it.
 
-- [ ] **Step 6: Run the renderer suite and verify GREEN**
+- [x] **Step 6: Run the renderer suite and verify GREEN**
 
 Run:
 
@@ -772,7 +772,7 @@ npx jest src/__tests__/lib/assessments/invitation-email.test.ts --runInBand
 
 Expected: all shell, custom HTML, plain text, subject, and security cases PASS.
 
-- [ ] **Step 7: Commit the renderer boundary**
+- [x] **Step 7: Commit the renderer boundary**
 
 ```bash
 git add \
@@ -809,7 +809,7 @@ customHtmlMode?: "full_replace" | "branded_body";
 customHtmlFallbackReason?: "branded_mode_disabled_missing_url_token";
 ```
 
-- [ ] **Step 1: Replace the custom-HTML tests with the complete mode matrix**
+- [x] **Step 1: Replace the custom-HTML tests with the complete mode matrix**
 
 Save and restore both env vars. Add focused cases:
 
@@ -883,7 +883,7 @@ expect(JSON.stringify(fallback.telemetry.metadata)).not.toContain("Coach body");
 
 Add branded-body cases for an empty sanitized fragment, legacy duplicate authored URL plus platform CTA, Wave-P valid/invalid Coach image, href-only custom URL in plain text, optional Coach text line, script/iframe/event/unsafe-style stripping, PII markup injection, and unchanged subject credential exclusion.
 
-- [ ] **Step 2: Run the notification suite and verify RED**
+- [x] **Step 2: Run the notification suite and verify RED**
 
 Run:
 
@@ -893,7 +893,7 @@ npx jest src/__tests__/services/notifications.test.ts --runInBand
 
 Expected: branded-body and tokenless rollback cases fail under complete replacement.
 
-- [ ] **Step 3: Resolve one render mode at the send chokepoint**
+- [x] **Step 3: Resolve one render mode at the send chokepoint**
 
 Update imports and replace the `fullHtml` branch with:
 
@@ -941,7 +941,7 @@ if (customHtmlMode === "full_replace" && rawCustomHtml !== null) {
 }
 ```
 
-- [ ] **Step 4: Emit compatible PII-free metadata**
+- [x] **Step 4: Emit compatible PII-free metadata**
 
 Use:
 
@@ -966,7 +966,7 @@ const customHtmlMetadata =
 
 Spread `customHtmlMetadata` inside the existing telemetry metadata. Do not add raw HTML, rendered HTML, invitation URL, campaign name, email address, or Coach image URL.
 
-- [ ] **Step 5: Run renderer and notification suites and verify GREEN**
+- [x] **Step 5: Run renderer and notification suites and verify GREEN**
 
 Run:
 
@@ -979,7 +979,7 @@ npx jest \
 
 Expected: both suites PASS and the SMTP failure propagation tests remain unchanged.
 
-- [ ] **Step 6: Commit send orchestration**
+- [x] **Step 6: Commit send orchestration**
 
 ```bash
 git add \
@@ -1042,7 +1042,7 @@ brandedCustomHtmlEnabled?: boolean;
 
 - The prop defaults to `false`; client components never read `process.env`.
 
-- [ ] **Step 1: Write the shared editor-copy tests**
+- [x] **Step 1: Write the shared editor-copy tests**
 
 Create:
 
@@ -1135,7 +1135,7 @@ describe("invitationSaveConfirmation", () => {
 });
 ```
 
-- [ ] **Step 2: Run the editor-copy test and verify RED**
+- [x] **Step 2: Run the editor-copy test and verify RED**
 
 Run:
 
@@ -1147,7 +1147,7 @@ npx jest \
 
 Expected: FAIL because the shared copy module does not exist.
 
-- [ ] **Step 3: Implement the shared editor copy**
+- [x] **Step 3: Implement the shared editor copy**
 
 Use the exact strings asserted above and this summary function:
 
@@ -1209,7 +1209,7 @@ export function invitationSaveConfirmation(input: {
 }
 ```
 
-- [ ] **Step 4: Create the Wizard UI tests**
+- [x] **Step 4: Create the Wizard UI tests**
 
 Copy `installFetch` and the existing Wizard fixtures, then define this
 flag-aware navigation helper in the new test:
@@ -1281,7 +1281,7 @@ visible and both create buttons are disabled. Clear the field and assert the
 buttons become enabled and the next submission payload omits
 `invitationBodyHtml`.
 
-- [ ] **Step 5: Run the Wizard UI test and verify RED**
+- [x] **Step 5: Run the Wizard UI test and verify RED**
 
 Run:
 
@@ -1293,7 +1293,7 @@ npx jest \
 
 Expected: FAIL because the behavior prop and branded-body copy do not exist.
 
-- [ ] **Step 6: Implement Wizard mode copy and summary**
+- [x] **Step 6: Implement Wizard mode copy and summary**
 
 Add `brandedCustomHtmlEnabled` to `CampaignWizard` and `ReviewStep`, pass it through at the existing `ReviewStep` call, and compute:
 
@@ -1325,7 +1325,7 @@ Retain upload, paste, clear, 50,000-character length, and save-error behavior.
 Update the placeholder to describe a custom body fragment only in branded
 mode.
 
-- [ ] **Step 7: Run the copy and Wizard UI tests and verify GREEN**
+- [x] **Step 7: Run the copy and Wizard UI tests and verify GREEN**
 
 Run:
 
@@ -1339,7 +1339,7 @@ npx jest \
 
 Expected: all three suites PASS.
 
-- [ ] **Step 8: Pass the behavior flag from the new-campaign server page**
+- [x] **Step 8: Pass the behavior flag from the new-campaign server page**
 
 Import and evaluate `assessmentInviteBrandedCustomHtmlEnabled()` next to
 `waveDCustomHtmlEmailEnabled()` and pass:
@@ -1348,7 +1348,7 @@ Import and evaluate `assessmentInviteBrandedCustomHtmlEnabled()` next to
 brandedCustomHtmlEnabled={assessmentInviteBrandedCustomHtmlEnabled()}
 ```
 
-- [ ] **Step 9: Commit the shared copy and Wizard authoring experience**
+- [x] **Step 9: Commit the shared copy and Wizard authoring experience**
 
 ```bash
 git add \
@@ -1396,7 +1396,7 @@ brandedCustomHtmlEnabled?: boolean;
 
 - The prop defaults to `false`; the client component never reads `process.env`.
 
-- [ ] **Step 1: Create the Campaign Detail UI tests**
+- [x] **Step 1: Create the Campaign Detail UI tests**
 
 Copy the lightweight `CampaignOverview`, respondent row, router, toast, and
 child-component mocks from `campaign-detail-onscreen-results.test.tsx`. Extend
@@ -1468,7 +1468,7 @@ Mock successful saves and assert exact descriptions:
 
 The template-default message must appear only when subject, markdown, and HTML are all empty.
 
-- [ ] **Step 2: Run the Detail UI test and verify RED**
+- [x] **Step 2: Run the Detail UI test and verify RED**
 
 Run:
 
@@ -1480,7 +1480,7 @@ npx jest \
 
 Expected: FAIL because HTML-only summary, rollback PATCH omission, and mode-specific toast copy do not exist.
 
-- [ ] **Step 3: Implement Campaign Detail mode state**
+- [x] **Step 3: Implement Campaign Detail mode state**
 
 Add the prop and compute:
 
@@ -1523,7 +1523,7 @@ the post-edit HTML mode and
 `emailSubject.trim() !== "" || emailBody.trim() !== ""` into
 `invitationSaveConfirmation`; do not classify using only subject and markdown.
 
-- [ ] **Step 4: Pass the behavior flag from both detail server pages**
+- [x] **Step 4: Pass the behavior flag from both detail server pages**
 
 Import and evaluate `assessmentInviteBrandedCustomHtmlEnabled()` next to `waveDCustomHtmlEmailEnabled()` and pass:
 
@@ -1539,7 +1539,7 @@ assessmentInviteBrandedCustomHtmlEnabled: jest.fn(() => true),
 
 and assert the mocked Campaign Detail receives both booleans.
 
-- [ ] **Step 5: Run the Detail and host-page regression suites**
+- [x] **Step 5: Run the Detail and host-page regression suites**
 
 Run:
 
@@ -1553,7 +1553,7 @@ npx jest \
 
 Expected: all three suites PASS.
 
-- [ ] **Step 6: Commit the Campaign Detail authoring experience**
+- [x] **Step 6: Commit the Campaign Detail authoring experience**
 
 ```bash
 git add \
@@ -1653,7 +1653,7 @@ export function loadInvitationHtmlOverrideRows(
 ): Promise<InvitationHtmlOverrideAuditRow[]>;
 ```
 
-- [ ] **Step 1: Write the pure audit tests**
+- [x] **Step 1: Write the pure audit tests**
 
 Import the full audit surface:
 
@@ -1776,7 +1776,7 @@ it("starts a read-only transaction before the allowlisted select", async () => {
 });
 ```
 
-- [ ] **Step 2: Run the audit test and verify RED**
+- [x] **Step 2: Run the audit test and verify RED**
 
 Run:
 
@@ -1788,7 +1788,7 @@ npx jest \
 
 Expected: FAIL because the audit module does not exist.
 
-- [ ] **Step 3: Implement pure classification and safe formatting**
+- [x] **Step 3: Implement pure classification and safe formatting**
 
 For each non-empty row:
 
@@ -1833,7 +1833,7 @@ export async function loadInvitationHtmlOverrideRows(
 }
 ```
 
-- [ ] **Step 4: Run the pure audit suite and verify GREEN**
+- [x] **Step 4: Run the pure audit suite and verify GREEN**
 
 Run:
 
@@ -1845,7 +1845,7 @@ npx jest \
 
 Expected: PASS.
 
-- [ ] **Step 5: Implement the read-only runner**
+- [x] **Step 5: Implement the read-only runner**
 
 The runner must create Prisma with only the dedicated URL:
 
@@ -1884,6 +1884,10 @@ Do not run this command during implementation unless an operator provides an exp
 
 - [ ] **Step 6: Type-check the runner without connecting**
 
+> Closeout note (2026-08-03): a fresh `npx tsc --noEmit` still exits nonzero
+> on the inherited repository-wide TypeScript baseline. The audit runner is
+> covered by the separately green production build and focused verification.
+
 Run:
 
 ```bash
@@ -1892,7 +1896,7 @@ npx tsc --noEmit
 
 Expected: PASS. No audit query runs during type-checking.
 
-- [ ] **Step 7: Commit the activation audit**
+- [x] **Step 7: Commit the activation audit**
 
 ```bash
 git add \
@@ -1921,7 +1925,7 @@ git commit -m "feat(assessments): add read-only invitation HTML audit"
 - Consumes: the implemented flag name, render modes, audit command, rollback behavior, and validation receipts.
 - Produces: one current source-of-truth contract and a branch ready for review; it does not activate production.
 
-- [ ] **Step 1: Update the Wave-D design without rewriting history**
+- [x] **Step 1: Update the Wave-D design without rewriting history**
 
 At the existing #20 full-replacement section, retain the original contract and append:
 
@@ -1929,7 +1933,7 @@ At the existing #20 full-replacement section, retain the original contract and a
 
 Apply the same qualification to the grill-outcome line that says “custom HTML = body/render only.”
 
-- [ ] **Step 2: Update the Wave-D operations runbook**
+- [x] **Step 2: Update the Wave-D operations runbook**
 
 Document these exact controls:
 
@@ -1953,7 +1957,7 @@ Add the rollout sequence:
 
 Add rollback: unset the new flag and redeploy; token-bearing legacy HTML becomes complete replacement, tokenless HTML uses branded fallback, and stored bytes remain unchanged.
 
-- [ ] **Step 3: Update the durable project context**
+- [x] **Step 3: Update the durable project context**
 
 Replace the unconditional full-replacement sentence in `CLAUDE.md` with a flag-aware statement:
 
@@ -1968,7 +1972,7 @@ LAST_UPDATED_SLUG:gh-220-branded-invitation-html-dark
 
 Do not overwrite a newer entry introduced by rebasing active GH #257/#228/#256 work. If one exists, prepend the GH #220 changelog detail but keep the newest valid project-context anchor.
 
-- [ ] **Step 4: Prepend the changelog entry**
+- [x] **Step 4: Prepend the changelog entry**
 
 Use:
 
@@ -1985,7 +1989,7 @@ Use:
 **Activation boundary.** `npm run audit:invitation-html-overrides` requires a dedicated `AUDIT_READONLY_URL`, enforces a read-only transaction, and prints only counts, campaign IDs, template aliases, token presence, and current/post-activation/rollback modes. Production activation is separate: re-run the audit, manually review every live override, then explicitly authorize the flag and redeploy. No production data, flag, invitation, migration, GH #228 report branding, GH #256 image policy, or GH #257 outbox behavior changed in this implementation.
 ```
 
-- [ ] **Step 5: Run the complete focused Jest matrix**
+- [x] **Step 5: Run the complete focused Jest matrix**
 
 Run from `src/`:
 
@@ -2011,7 +2015,7 @@ npx jest \
 
 Expected: all listed suites PASS. Record the suite/test totals in the PR body; do not invent totals in source-of-truth docs.
 
-- [ ] **Step 6: Run scoped ESLint**
+- [x] **Step 6: Run scoped ESLint**
 
 Run:
 
@@ -2050,6 +2054,10 @@ Expected: exit 0.
 
 - [ ] **Step 7: Run type, migration, whitespace, and source-of-truth checks**
 
+> Closeout note (2026-08-03): migration safety, changelog freshness, and
+> whitespace checks pass, but the compound step remains open because the fresh
+> repository-wide `npx tsc --noEmit` check still fails on inherited diagnostics.
+
 Run:
 
 ```bash
@@ -2061,7 +2069,7 @@ git diff --check origin/main...HEAD
 
 Expected: all commands exit 0; migration safety reports no new migration requirement.
 
-- [ ] **Step 8: Run the required production-equivalent build**
+- [x] **Step 8: Run the required production-equivalent build**
 
 Run:
 
@@ -2071,7 +2079,7 @@ CI=true npx next build --turbopack
 
 Expected: exit 0. Do not represent unrelated pre-existing failures as passing; diagnose any failure before proceeding.
 
-- [ ] **Step 9: Commit documentation and verification state**
+- [x] **Step 9: Commit documentation and verification state**
 
 From the repository root:
 
@@ -2085,7 +2093,7 @@ git add \
 git commit -m "docs: record GH 220 dark rollout contract"
 ```
 
-- [ ] **Step 10: Review the final branch and re-run push gates**
+- [x] **Step 10: Review the final branch and re-run push gates**
 
 Run:
 
