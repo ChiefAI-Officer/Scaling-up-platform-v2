@@ -1,6 +1,7 @@
 # GH #228 — Results Report Email Branding Design
 
-- **Status:** Written design approved on 2026-08-03; visual mockup gate pending
+- **Status:** Written design and visual mockups approved; implementation pending
+- **Approved visual:** [`docs/specs/v7.6/mockups/228-report-email-branding.html`](../../specs/v7.6/mockups/228-report-email-branding.html)
 - **Issue:** [GH #228](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/issues/228)
 - **Claim:** [Tracker #261 claim](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/issues/261#issuecomment-5162184752)
 - **Notion:** [Design Scaling Up / Coach chrome for emailed assessment results](https://app.notion.com/p/3b18c45dd82981dc80caf51e78c91808)
