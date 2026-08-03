@@ -109,12 +109,13 @@ authz-gated route). No approval gate — this is an internal coach notification.
 WAVE_D_CUSTOM_HTML_EMAIL_ENABLED=1
 ```
 
-**What it enables:** The `invitationBodyHtml` field (campaign wizard Step 4) is respected
-as a full-replace HTML body in the invitation email (subject remains the separate
-token-allowlisted field). The HTML is DOMPurify-sanitized on write; the fan-out uses
-the sanitized stored value at render time. When the field is empty, the existing
-markdown body path is used as the fallback — so enabling this flag has no effect on
-campaigns that don't supply `invitationBodyHtml`.
+**What it enables:** The `invitationBodyHtml` field (campaign wizard Step 4) becomes
+available to the invitation renderer; the subject remains the separate token-allowlisted
+field. The HTML is sanitized on write and again after escaped interpolation at render.
+With `ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED` on, non-empty HTML is the body
+inside the shared branded shell. With that behavior flag off, token-bearing legacy HTML
+uses complete replacement and tokenless HTML uses the branded markdown/template
+fallback. Empty HTML also uses the branded markdown/template path.
 
 GH #220 separates the existing capability gate from the new composition behavior:
 
