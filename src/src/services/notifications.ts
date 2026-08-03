@@ -23,6 +23,9 @@ import {
     renderTextBody,
     renderFullHtmlBody,
     renderFullTextBody,
+    renderCustomHtmlFragment,
+    buildInvitationEmailShell,
+    renderBrandedCustomHtmlText,
     shouldShowOrgLine,
     type InvitationVars,
 } from "@/lib/assessments/invitation-email";
@@ -31,8 +34,12 @@ import {
     DEFAULT_INVITATION_SUBJECT,
     DEFAULT_INVITATION_VERSION,
 } from "@/lib/assessments/invitation-defaults";
-import { waveDCustomHtmlEmailEnabled } from "@/lib/assessments/wave-d-feature-flags";
+import {
+    assessmentInviteBrandedCustomHtmlEnabled,
+    waveDCustomHtmlEmailEnabled,
+} from "@/lib/assessments/wave-d-feature-flags";
 import { SU_LOGO_PNG, SU_LOGO_CID } from "@/lib/assets/invitation-logo";
+import { resolveInvitationHtmlMode } from "@/lib/assessments/invitation-html-policy";
 
 // ============================================
 // Types
@@ -1206,18 +1213,16 @@ export function prepareAssessmentInvitationEmail(
     // NEVER derived from the full-HTML body. This holds on every render path.
     const subject = renderSubject(effectiveSubject, vars);
 
-    // Render precedence (#20):
-    //   invitationBodyHtml (full HTML, flag on) > invitationBodyMarkdown (shell) > template default.
-    // The full-HTML body REPLACES the branded shell entirely (no wrap, no CID
-    // logo attachment). buildTokenValues already neutralizes markdown in PII;
-    // renderFullHtmlBody additionally HTML-escapes every token value BEFORE
-    // substitution and strict-sanitizes the result (the second gate).
-    const fullHtml =
-        waveDCustomHtmlEmailEnabled() &&
+    const rawCustomHtml =
         typeof data.invitationBodyHtml === "string" &&
         data.invitationBodyHtml.trim().length > 0
             ? data.invitationBodyHtml
             : null;
+    const customHtmlMode = resolveInvitationHtmlMode({
+        waveDCustomHtmlEnabled: waveDCustomHtmlEmailEnabled(),
+        brandedCustomHtmlEnabled: assessmentInviteBrandedCustomHtmlEnabled(),
+        rawHtml: rawCustomHtml,
+    });
 
     let html: string;
     let text: string;
@@ -1225,21 +1230,38 @@ export function prepareAssessmentInvitationEmail(
         { filename: "su-logo.png", content: SU_LOGO_PNG, contentType: "image/png", cid: SU_LOGO_CID },
     ];
 
-    if (fullHtml) {
-        // Full-HTML override: the rendered body IS the whole email — no shell,
-        // and no CID logo attachment (the coach controls all imagery). The
-        // default body never applies here (the full HTML replaces the body).
-        html = renderFullHtmlBody(fullHtml, vars);
-        text = renderFullTextBody(fullHtml, vars);
+    if (customHtmlMode === "full_replace" && rawCustomHtml !== null) {
+        html = renderFullHtmlBody(rawCustomHtml, vars);
+        text = renderFullTextBody(rawCustomHtml, vars);
         attachments = [];
+    } else if (customHtmlMode === "branded_body" && rawCustomHtml !== null) {
+        const fragment = renderCustomHtmlFragment(rawCustomHtml, vars);
+        html = buildInvitationEmailShell({
+            bodyHtml: fragment,
+            vars,
+            chrome: data.chrome ?? "legacy",
+        });
+        text = renderBrandedCustomHtmlText(fragment, vars);
     } else {
         html = buildInvitationEmailHtml({ bodyMarkdown: effectiveBodyMarkdown, vars, chrome: data.chrome ?? "legacy" });
         text = renderTextBody(effectiveBodyMarkdown, vars);
     }
 
     // Telemetry (PII-FREE): which renderer + whether defaults filled a blank.
-    const renderer: "branded" | "custom_html" = fullHtml ? "custom_html" : "branded";
-    const effectiveBodySource: "authored" | "default" | "custom_html" = fullHtml ? "custom_html" : bodySource;
+    const customHtmlRendered =
+        customHtmlMode === "full_replace" || customHtmlMode === "branded_body";
+    const renderer: "branded" | "custom_html" = customHtmlRendered ? "custom_html" : "branded";
+    const effectiveBodySource: "authored" | "default" | "custom_html" =
+        customHtmlRendered ? "custom_html" : bodySource;
+    const customHtmlMetadata =
+        customHtmlMode === "full_replace" || customHtmlMode === "branded_body"
+            ? { customHtmlMode }
+            : customHtmlMode === "branded_fallback"
+                ? {
+                    customHtmlFallbackReason:
+                        "branded_mode_disabled_missing_url_token" as const,
+                }
+                : {};
     const usedDefault = subjectSource === "default" || effectiveBodySource === "default";
 
     // STRICT: failures propagate. The invite route catches and marks the
@@ -1267,6 +1289,7 @@ export function prepareAssessmentInvitationEmail(
                 subjectSource,
                 bodySource: effectiveBodySource,
                 defaultVersion: usedDefault ? DEFAULT_INVITATION_VERSION : null,
+                ...customHtmlMetadata,
             },
         },
     });
