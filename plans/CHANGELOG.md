@@ -6,6 +6,17 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="gh-256-circle-sync-image-validation-pr-ready"></a>
+### 2026-08-03 — Circle-sync Coach image validation implemented (GH #256 slice) <!-- ENTRY_ISO:2026-08-03 ENTRY_SLUG:gh-256-circle-sync-image-validation-pr-ready -->
+
+**Status: IMPLEMENTED + LOCALLY VERIFIED; not yet merged or launched.** Circle sync now applies the existing HTTPS-only `safeImageSrc` policy immediately before an eligible Circle avatar would be written to the stored Coach image. A rejected avatar preserves existing image state in both fill-empty and forced modes, does not block unrelated field updates, and still advances `syncedAt`.
+
+**Operator and telemetry behavior.** Manual import remains successful and reports every nonfatal warning separately from truthful changed / warned-without-changes / already-current base copy. PII-safe field-skipped telemetry emits only after persistence and contains Coach ID, sync mode, field, and reason without the raw URL or email. Repeated eligible attempts emit repeated events; failed persistence emits no field-skipped event.
+
+**Scope and tracking boundary.** This slice changes no host policy: arbitrary parseable HTTPS hosts remain accepted. There is no proxy, rehosting, migration, schema, feature flag, backfill, repair, or production-data write. GH #256 remains open for the allowlist/proxy/accept-arbitrary-HTTPS product decision; only its Circle-sync validation checkbox and the narrow issue #261 claim become eligible for closeout after merge and production verification. GH #257 remains separately owned.
+
+**Local verification.** The complete focused regression matrix passed **7 suites / 131 tests / 1 snapshot**. Changed-file ESLint exited `0`; migration safety exited `0` after reporting **43 migrations** with no unapproved destructive operations; `git diff --check` exited `0` with no output; and `CI=true npx next build --turbopack` exited `0`, compiled successfully, and generated **92/92** static pages. The build reported the expected local warnings for unset Inngest keys and missing `DATABASE_URL` during static generation; neither prevented its zero exit.
+
 <a id="gh-217-accepted-gh-257-primed"></a>
 ### 2026-08-01 — GH #217 accepted; GH #257 reconciliation primed <!-- ENTRY_ISO:2026-08-01 ENTRY_SLUG:gh-217-accepted-gh-257-primed -->
 
