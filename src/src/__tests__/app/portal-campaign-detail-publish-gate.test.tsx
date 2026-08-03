@@ -53,6 +53,7 @@ jest.mock("@/lib/assessments/longitudinal-eligibility", () => ({
 
 jest.mock("@/lib/assessments/wave-d-feature-flags", () => ({
   waveDCustomHtmlEmailEnabled: () => false,
+  assessmentInviteBrandedCustomHtmlEnabled: jest.fn(() => true),
 }));
 
 // NOTE: @/lib/assessments/wave-f-flags is intentionally NOT mocked — the page
