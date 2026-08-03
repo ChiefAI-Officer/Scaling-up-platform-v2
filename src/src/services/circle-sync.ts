@@ -1,14 +1,22 @@
 import { db } from "@/lib/db";
+import { safeImageSrc } from "@/lib/assessments/safe-image-src";
 import { getCircleProfileByEmail } from "@/services/circle";
 
 export interface SyncOptions {
     forceOverwrite?: boolean;
 }
 
+export interface SyncWarning {
+    code: "invalid-image-url";
+    field: "profileImage";
+    message: string;
+}
+
 export interface SyncResult {
     success: boolean;
     updated: boolean;
     fieldsUpdated: string[];
+    warnings: SyncWarning[];
     error?: string;
 }
 
@@ -26,7 +34,7 @@ export async function syncCoachFromCircle(
     const forceOverwrite = options?.forceOverwrite ?? false;
 
     if (!process.env.CIRCLE_API_KEY) {
-        return { success: false, updated: false, fieldsUpdated: [], error: "Circle not configured" };
+        return { success: false, updated: false, fieldsUpdated: [], warnings: [], error: "Circle not configured" };
     }
 
     try {
@@ -43,21 +51,32 @@ export async function syncCoachFromCircle(
         });
 
         if (!coach) {
-            return { success: false, updated: false, fieldsUpdated: [], error: "Coach not found" };
+            return { success: false, updated: false, fieldsUpdated: [], warnings: [], error: "Coach not found" };
         }
 
         const profile = await getCircleProfileByEmail(coach.email);
         if (!profile) {
-            return { success: false, updated: false, fieldsUpdated: [], error: "No Circle profile found for this email" };
+            return { success: false, updated: false, fieldsUpdated: [], warnings: [], error: "No Circle profile found for this email" };
         }
 
         // Build update payload — only fill empty fields unless forceOverwrite
         const updateData: Record<string, unknown> = {};
         const fieldsUpdated: string[] = [];
+        const warnings: SyncWarning[] = [];
+        const syncMode = forceOverwrite ? "force-overwrite" : "fill-empty";
 
         if (profile.avatarUrl && (forceOverwrite || !coach.profileImage)) {
-            updateData.profileImage = profile.avatarUrl;
-            fieldsUpdated.push("profileImage");
+            const safeAvatarUrl = safeImageSrc(profile.avatarUrl);
+            if (safeAvatarUrl) {
+                updateData.profileImage = safeAvatarUrl;
+                fieldsUpdated.push("profileImage");
+            } else {
+                warnings.push({
+                    code: "invalid-image-url",
+                    field: "profileImage",
+                    message: "Profile image skipped because Circle supplied an invalid URL.",
+                });
+            }
         }
 
         if (profile.bio && (forceOverwrite || !coach.bio)) {
@@ -83,13 +102,23 @@ export async function syncCoachFromCircle(
             data: updateData,
         });
 
-        return { success: true, updated: fieldsUpdated.length > 0, fieldsUpdated };
+        for (const warning of warnings) {
+            console.warn("[Circle Sync] Field skipped", {
+                coachId,
+                syncMode,
+                field: warning.field,
+                reason: warning.code,
+            });
+        }
+
+        return { success: true, updated: fieldsUpdated.length > 0, fieldsUpdated, warnings };
     } catch (error) {
         console.error("[Circle Sync] Failed to sync coach:", error);
         return {
             success: false,
             updated: false,
             fieldsUpdated: [],
+            warnings: [],
             error: error instanceof Error ? error.message : "Unknown error during sync",
         };
     }
