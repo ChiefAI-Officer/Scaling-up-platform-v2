@@ -202,6 +202,49 @@ describe("CampaignDetail — invitation HTML branding", () => {
     );
   });
 
+  it("normalizes controlled drafts to the successful PATCH row before reopening", async () => {
+    global.fetch = jest.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        success: true,
+        data: {
+          invitationSubject: "Saved subject",
+          invitationBodyMarkdown: "Saved markdown",
+          invitationBodyHtml: null,
+        },
+      }),
+    })) as unknown as typeof fetch;
+    renderDetail({
+      brandedCustomHtmlEnabled: true,
+      invitationBodyHtml: "<p>Initial body</p>",
+      invitationSubject: "Initial subject",
+      invitationBodyMarkdown: "Initial markdown",
+    });
+
+    fireEvent.click(screen.getByTestId("email-overrides-toggle"));
+    fireEvent.change(screen.getByTestId("email-overrides-subject"), {
+      target: { value: "  Saved subject  " },
+    });
+    fireEvent.change(screen.getByTestId("email-overrides-body"), {
+      target: { value: "\n Saved markdown \n" },
+    });
+    fireEvent.change(screen.getByTestId("email-overrides-html"), {
+      target: { value: "  \n  " },
+    });
+    await saveAndGetPayload();
+
+    fireEvent.click(screen.getByTestId("email-overrides-toggle"));
+    expect(screen.getByTestId("email-overrides-subject")).toHaveValue(
+      "Saved subject",
+    );
+    expect(screen.getByTestId("email-overrides-body")).toHaveValue(
+      "Saved markdown",
+    );
+    expect(screen.getByTestId("email-overrides-html")).toHaveValue("");
+    expect(screen.getByTestId("email-overrides-save")).toBeDisabled();
+  });
+
   it("updates the collapsed summary from a successful subject-only save", async () => {
     renderDetail({
       brandedCustomHtmlEnabled: true,

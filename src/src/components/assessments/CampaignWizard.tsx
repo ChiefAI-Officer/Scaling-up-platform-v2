@@ -163,7 +163,8 @@ interface WizardState {
   invitationSubject: string;
   invitationBodyMarkdown: string;
   // Task 12 (#20) — per-campaign FULL-HTML invitation body. Empty = fall back to the
-  // markdown/template default. When set + flag on, REPLACES the entire branded email.
+  // markdown/template default. When set, branded mode composes it as the shell body;
+  // legacy mode keeps full replacement only for a recognized invitation URL token.
   invitationBodyHtml: string;
   // Task 6b — #15/#16 result/notify toggles.
   /** Whether the selected template has an approved results email (server-computed).

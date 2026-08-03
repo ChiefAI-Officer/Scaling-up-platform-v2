@@ -858,22 +858,46 @@ export function CampaignDetail({
         }
         throw new Error(reason);
       }
-      setPersistedEmailSubject(
-        typeof payload.invitationSubject === "string"
-          ? payload.invitationSubject
-          : "",
-      );
-      setPersistedEmailBody(
-        typeof payload.invitationBodyMarkdown === "string"
-          ? payload.invitationBodyMarkdown
-          : "",
-      );
+      // The route returns its updated row. Keep the controlled values aligned
+      // with those canonical values too, otherwise a trimmed successful save
+      // reopens as a false dirty draft against its normalized baseline.
+      const savedSubject =
+        body?.data &&
+        typeof body.data === "object" &&
+        "invitationSubject" in body.data
+          ? typeof body.data.invitationSubject === "string"
+            ? body.data.invitationSubject
+            : ""
+          : typeof payload.invitationSubject === "string"
+            ? payload.invitationSubject
+            : "";
+      const savedBody =
+        body?.data &&
+        typeof body.data === "object" &&
+        "invitationBodyMarkdown" in body.data
+          ? typeof body.data.invitationBodyMarkdown === "string"
+            ? body.data.invitationBodyMarkdown
+            : ""
+          : typeof payload.invitationBodyMarkdown === "string"
+            ? payload.invitationBodyMarkdown
+            : "";
+      setEmailSubject(savedSubject);
+      setPersistedEmailSubject(savedSubject);
+      setEmailBody(savedBody);
+      setPersistedEmailBody(savedBody);
       if ("invitationBodyHtml" in payload) {
-        setPersistedHtml(
-          typeof payload.invitationBodyHtml === "string"
-            ? payload.invitationBodyHtml
-            : "",
-        );
+        const savedHtml =
+          body?.data &&
+          typeof body.data === "object" &&
+          "invitationBodyHtml" in body.data
+            ? typeof body.data.invitationBodyHtml === "string"
+              ? body.data.invitationBodyHtml
+              : ""
+            : typeof payload.invitationBodyHtml === "string"
+              ? payload.invitationBodyHtml
+              : "";
+        setEmailHtml(savedHtml);
+        setPersistedHtml(savedHtml);
       }
       toast({
         title: "Invitation email saved",
