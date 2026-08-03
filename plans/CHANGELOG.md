@@ -6,6 +6,19 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="gh-228-report-email-branding-pr-ready"></a>
+### 2026-08-03 — GH #228 Results report email branding implemented and locally verified <!-- ENTRY_ISO:2026-08-03 ENTRY_SLUG:gh-228-report-email-branding-pr-ready -->
+
+**Status: IMPLEMENTED + LOCALLY VERIFIED + DEFAULT-OFF.** GH #228 adds approved Scaling Up-first report-email chrome to exactly the three Results report roles: invited `ASSESSMENT_RESULTS`, public `TAKER_COPY`, and public `REFERRING_COACH`. The Scaling Up mark remains primary in the cover and footer. Invited reports use the campaign creator Coach; attributed public reports use the submission-time frozen verified Referring coach; neither path substitutes the Organization owner. A usable Coach name is required, with a valid HTTPS image shown only alongside that name; missing or rejected images degrade to name-only, and absent names render Scaling Up-only.
+
+**Frozen rendering, exact attachment, and rollout boundary.** The shared pure renderer remains legacy by default and disabled output is byte-identical. `WAVE_228_REPORT_EMAIL_CHROME_ENABLED` enables globally, `WAVE_228_REPORT_EMAIL_CHROME_CANARY` matches exact campaign IDs, and `WAVE_228_REPORT_EMAIL_CHROME_KILL` overrides both for newly rendered rows; unset or unrecognized values are off. Existing outbox rows, their frozen HTML and Coach presentation snapshot, recipients, approval hashes, send leases, retries, dead-letter behavior, and provider handoff remain unchanged. The worker derives one static inline attachment only when frozen HTML contains the exact platform-owned `<img src="cid:su-report-logo-v1"` prefix; bare CID, `data-src`, escaped, non-image, or unrelated text attaches nothing. The dedicated kill does not rewrite already-queued branded rows. `ASSESSMENT_SENDS_PAUSED` stops applicable new enqueue activity; containing queued rows requires pausing both Inngest functions `quick-assessment-lead-email` and `quick-assessment-lead-email-cron` before quarantine or rollback.
+
+**Approved visual review artifacts.** The approved email-safe mockups are [`228-report-email-branding.html`](../docs/specs/v7.6/mockups/228-report-email-branding.html), [`desktop receipt`](../docs/specs/v7.6/mockups/228-report-email-branding-desktop.png), and [`mobile receipt`](../docs/specs/v7.6/mockups/228-report-email-branding-mobile.png). They cover scored and qualitative report anatomy plus image-and-name, blocked-image/name-visible, name-only, and Scaling Up-only fallbacks.
+
+**Verification.** The complete prescribed focused Jest matrix exited `0`: **14 suites passed / 269 tests passed / 2 snapshots passed**. The prescribed changed-file ESLint command exited `0` with no output (no warnings). `node scripts/check-migration-safety.mjs` exited `0`: `✓ Checked 43 migration(s) — no unapproved destructive ops.` `CI=true npx next build --turbopack` exited `0`, compiled in **28.3s**, completed TypeScript, and generated **92/92** static pages; expected local missing-Inngest and `DATABASE_URL` messages occurred during static generation without failing the build. `git diff --check` exited `0` with no output before documentation update. No full-repository Jest baseline is claimed; its known unrelated failures were not part of this task.
+
+**Scope and rollout limitation.** No production flag was enabled, no deployment was made, and no live customer email was sent or checked. GH #220 (campaign full-HTML precedence), GH #233 (flag visibility/production-state investigation), GH #256 (coach-logo host policy), and GH #257 (outbox reconciliation/backfill) were untouched.
+
 <a id="gh-217-accepted-gh-257-primed"></a>
 ### 2026-08-01 — GH #217 accepted; GH #257 reconciliation primed <!-- ENTRY_ISO:2026-08-01 ENTRY_SLUG:gh-217-accepted-gh-257-primed -->
 
