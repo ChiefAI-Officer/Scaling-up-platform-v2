@@ -25,12 +25,31 @@ import {
   type AuthorizationSnapshotV1,
   type ContentProvenanceV1,
 } from "../src/lib/assessments/assessment-email-delivery-intents";
-import {
-  productionAssessmentEmailIntentReconcilerDeps,
-  reconcileAssessmentEmailIntents,
-  type ReconcilerDeps,
-} from "../src/lib/assessments/assessment-email-intent-reconciler";
+import type { ReconcilerDeps } from "../src/lib/assessments/assessment-email-intent-reconciler";
 import { resultsEmailContentHash } from "../src/lib/assessments/results-email-approval";
+
+// The real reconciler imports @/lib/db for its production dependency factory.
+// This suite injects both real schema-scoped clients itself, so that singleton
+// is intentionally unused. The lazy factory also makes an import-before-safety-
+// validation regression fail with a test-specific error before lib/db can
+// construct a client from DATABASE_URL.
+jest.mock("@/lib/db", () => {
+  if (
+    !process.env.TEST_DATABASE_URL ||
+    process.env.ASSESSMENT_EMAIL_LEASE_TEST_ALLOW !== "isolated-schema" ||
+    process.env.TEST_DATABASE_URL === process.env.DATABASE_URL
+  ) {
+    throw new Error(
+      "Unsafe reconciler import before PostgreSQL test validation",
+    );
+  }
+  return { db: {} };
+});
+
+type ReconcilerModule =
+  typeof import("../src/lib/assessments/assessment-email-intent-reconciler");
+let reconcileAssessmentEmailIntents: ReconcilerModule["reconcileAssessmentEmailIntents"];
+let productionAssessmentEmailIntentReconcilerDeps: ReconcilerModule["productionAssessmentEmailIntentReconcilerDeps"];
 
 const destructiveOptIn =
   process.env.ASSESSMENT_EMAIL_LEASE_TEST_ALLOW === "isolated-schema";
@@ -89,13 +108,21 @@ function deferred<T>(): Deferred<T> {
   };
 }
 
-function oneShotBarrier(parties: number): () => Promise<void> {
+type ExternalBarrier = {
+  wait(): Promise<void>;
+  release(): void;
+};
+
+function oneShotBarrier(parties: number): ExternalBarrier {
   const opened = deferred<void>();
   let arrivals = 0;
-  return async () => {
-    arrivals += 1;
-    if (arrivals >= parties) opened.resolve();
-    await opened.promise;
+  return {
+    wait: async () => {
+      arrivals += 1;
+      if (arrivals >= parties) opened.resolve();
+      await opened.promise;
+    },
+    release: () => opened.resolve(),
   };
 }
 
@@ -492,6 +519,16 @@ describe("assessment email intent reconciliation on PostgreSQL", () => {
       throw new Error("TEST_DATABASE_URL must not equal DATABASE_URL");
     }
 
+    // Import only after every destructive-safety precondition has passed.
+    // @/lib/db is stubbed above because this suite supplies the two real,
+    // isolated-schema clients through the reconciler's public dependency seam.
+    const reconcilerModule =
+      await import("../src/lib/assessments/assessment-email-intent-reconciler");
+    reconcileAssessmentEmailIntents =
+      reconcilerModule.reconcileAssessmentEmailIntents;
+    productionAssessmentEmailIntentReconcilerDeps =
+      reconcilerModule.productionAssessmentEmailIntentReconcilerDeps;
+
     originalResultsFlag = process.env.WAVE_D_RESULTS_EMAIL_ENABLED;
     originalCoachFlag = process.env.WAVE_D_COACH_NOTIFY_ENABLED;
     process.env.WAVE_D_RESULTS_EMAIL_ENABLED = "true";
@@ -684,6 +721,7 @@ describe("assessment email intent reconciliation on PostgreSQL", () => {
     });
     const respondentPayload = frozenPayload("RESPONDENT");
     const coachPayload = frozenPayload("OWNING_COACH");
+    let transitionObservedInsideTransaction = false;
 
     const submission = eventDb.$transaction(async (tx) => {
       await tx.assessmentSubmission.create({
@@ -713,9 +751,24 @@ describe("assessment email intent reconciliation on PostgreSQL", () => {
         },
         select: { id: true },
       });
+      // This proof deliberately moves the invitation transition ahead of the
+      // injected second-write failure. The production route transitions after
+      // all intent writes; the reordered fixture exists specifically to prove
+      // that an already-executed transition rolls back with both earlier rows.
+      const transitionedInvitation = await tx.assessmentInvitation.update({
+        where: { id: "invitation-1" },
+        data: { status: "SUBMITTED", submittedAt: reconcileNow },
+        select: { status: true, submittedAt: true },
+      });
+      expect(transitionedInvitation).toEqual({
+        status: "SUBMITTED",
+        submittedAt: reconcileNow,
+      });
+      transitionObservedInsideTransaction = true;
+
       // A distinct required recipient role reaches PostgreSQL but fails on the
-      // duplicated primary-key identity. The first intent and submission must
-      // not survive the aborted transaction.
+      // duplicated primary-key identity. The executed invitation transition,
+      // first intent, and submission must not survive the aborted transaction.
       await tx.assessmentEmailDeliveryIntent.create({
         data: {
           id: "required-intent",
@@ -732,14 +785,10 @@ describe("assessment email intent reconciliation on PostgreSQL", () => {
         },
         select: { id: true },
       });
-      await tx.assessmentInvitation.update({
-        where: { id: "invitation-1" },
-        data: { status: "SUBMITTED", submittedAt: reconcileNow },
-        select: { id: true },
-      });
     });
 
     await expect(submission).rejects.toMatchObject({ code: "P2002" });
+    expect(transitionObservedInsideTransaction).toBe(true);
 
     const counts = await eventDb.$queryRaw<
       Array<{ submissions: number; intents: number }>
@@ -768,23 +817,29 @@ describe("assessment email intent reconciliation on PostgreSQL", () => {
     await seedIntent(eventDb);
     const startTogether = oneShotBarrier(2);
 
-    const [eventResult, cronResult] = await bounded(
-      Promise.all([
-        reconcileAssessmentEmailIntents(
-          reconcilerDeps(eventDb, {
-            beforeTransactionWork: startTogether,
-          }),
-          { kind: "submission", submissionId: "submission-1", maxRows: 10 },
-        ),
-        reconcileAssessmentEmailIntents(
-          reconcilerDeps(cronDb, {
-            beforeTransactionWork: startTogether,
-          }),
-          { kind: "scheduled", maxRows: 50 },
-        ),
-      ]),
-      "event/cron reconciliation race",
+    const eventOperation = reconcileAssessmentEmailIntents(
+      reconcilerDeps(eventDb, {
+        beforeTransactionWork: () => startTogether.wait(),
+      }),
+      { kind: "submission", submissionId: "submission-1", maxRows: 10 },
     );
+    const cronOperation = reconcileAssessmentEmailIntents(
+      reconcilerDeps(cronDb, {
+        beforeTransactionWork: () => startTogether.wait(),
+      }),
+      { kind: "scheduled", maxRows: 50 },
+    );
+    const [eventResult, cronResult] = await (async () => {
+      try {
+        return await bounded(
+          Promise.all([eventOperation, cronOperation]),
+          "event/cron reconciliation race",
+        );
+      } finally {
+        startTogether.release();
+        await Promise.allSettled([eventOperation, cronOperation]);
+      }
+    })();
 
     expect(eventResult.handedOff + cronResult.handedOff).toBe(1);
     expect(
@@ -881,29 +936,43 @@ describe("assessment email intent reconciliation on PostgreSQL", () => {
       mutationLocked.resolve(pid);
       await releaseMutation.promise;
     });
-    await bounded(mutationLocked.promise, "mutation to hold campaign lock");
-
     const reconcilePid = deferred<number>();
-    const reconciliation = reconcileAssessmentEmailIntents(
-      reconcilerDeps(eventDb, {
-        onTransactionStarted: (pid) => reconcilePid.resolve(pid),
-      }),
-      { kind: "submission", submissionId: "submission-1", maxRows: 10 },
-    );
-    let result;
-    try {
-      await waitForBackendLock(
-        admin,
-        await bounded(reconcilePid.promise, "reconciler backend PID"),
-      );
-      releaseMutation.resolve();
-      [result] = await bounded(
-        Promise.all([reconciliation, mutation]),
-        "drift mutation and reconciliation",
-      );
-    } finally {
-      releaseMutation.resolve();
-    }
+    let reconciliation:
+      | ReturnType<typeof reconcileAssessmentEmailIntents>
+      | undefined;
+    const [result] = await (async () => {
+      try {
+        await bounded(
+          mutationLocked.promise,
+          "mutation to hold campaign lock",
+        );
+        reconciliation = reconcileAssessmentEmailIntents(
+          reconcilerDeps(eventDb, {
+            onTransactionStarted: (pid) => reconcilePid.resolve(pid),
+          }),
+          {
+            kind: "submission",
+            submissionId: "submission-1",
+            maxRows: 10,
+          },
+        );
+        await waitForBackendLock(
+          admin,
+          await bounded(reconcilePid.promise, "reconciler backend PID"),
+        );
+        releaseMutation.resolve();
+        return await bounded(
+          Promise.all([reconciliation, mutation]),
+          "drift mutation and reconciliation",
+        );
+      } finally {
+        releaseMutation.resolve();
+        await Promise.allSettled([
+          mutation,
+          ...(reconciliation ? [reconciliation] : []),
+        ]);
+      }
+    })();
 
     expect(result).toEqual(
       expect.objectContaining({ handedOff: 0, held: 1 }),
@@ -934,31 +1003,39 @@ describe("assessment email intent reconciliation on PostgreSQL", () => {
       }),
       { kind: "submission", submissionId: "submission-1", maxRows: 10 },
     );
-    await bounded(handoffHasLocks.promise, "handoff authoritative locks");
-
     const mutationPid = deferred<number>();
-    const mutation = cronDb.$transaction(async (tx) => {
-      mutationPid.resolve(await backendPid(tx));
-      await tx.$executeRaw(Prisma.sql`
-        UPDATE "assessment_campaigns"
-        SET "sendResultsToRespondent" = false
-        WHERE "id" = 'campaign-1'
-      `);
-    });
-    let result;
-    try {
-      await waitForBackendLock(
-        admin,
-        await bounded(mutationPid.promise, "mutation backend PID"),
-      );
-      releaseHandoff.resolve();
-      [result] = await bounded(
-        Promise.all([reconciliation, mutation]),
-        "handoff-first mutation ordering",
-      );
-    } finally {
-      releaseHandoff.resolve();
-    }
+    let mutation: Promise<void> | undefined;
+    const [result] = await (async () => {
+      try {
+        await bounded(
+          handoffHasLocks.promise,
+          "handoff authoritative locks",
+        );
+        mutation = cronDb.$transaction(async (tx) => {
+          mutationPid.resolve(await backendPid(tx));
+          await tx.$executeRaw(Prisma.sql`
+            UPDATE "assessment_campaigns"
+            SET "sendResultsToRespondent" = false
+            WHERE "id" = 'campaign-1'
+          `);
+        });
+        await waitForBackendLock(
+          admin,
+          await bounded(mutationPid.promise, "mutation backend PID"),
+        );
+        releaseHandoff.resolve();
+        return await bounded(
+          Promise.all([reconciliation, mutation]),
+          "handoff-first mutation ordering",
+        );
+      } finally {
+        releaseHandoff.resolve();
+        await Promise.allSettled([
+          reconciliation,
+          ...(mutation ? [mutation] : []),
+        ]);
+      }
+    })();
     const campaign = await eventDb.$queryRaw<
       Array<{ sendResultsToRespondent: boolean }>
     >(Prisma.sql`
@@ -1212,21 +1289,32 @@ describe("assessment email intent reconciliation on PostgreSQL", () => {
       submissionLocked.resolve();
       await releaseSubmission.promise;
     });
-    await bounded(submissionLocked.promise, "submission lock");
-
-    let result;
-    try {
-      result = await bounded(
-        reconcileAssessmentEmailIntents(
+    let reconciliation:
+      | ReturnType<typeof reconcileAssessmentEmailIntents>
+      | undefined;
+    const result = await (async () => {
+      try {
+        await bounded(submissionLocked.promise, "submission lock");
+        reconciliation = reconcileAssessmentEmailIntents(
           reconcilerDeps(eventDb),
-          { kind: "submission", submissionId: "submission-1", maxRows: 10 },
-        ),
-        "PostgreSQL lock_timeout classification",
-      );
-    } finally {
-      releaseSubmission.resolve();
-      await locker;
-    }
+          {
+            kind: "submission",
+            submissionId: "submission-1",
+            maxRows: 10,
+          },
+        );
+        return await bounded(
+          reconciliation,
+          "PostgreSQL lock_timeout classification",
+        );
+      } finally {
+        releaseSubmission.resolve();
+        await Promise.allSettled([
+          locker,
+          ...(reconciliation ? [reconciliation] : []),
+        ]);
+      }
+    })();
 
     expect(result).toEqual(
       expect.objectContaining({
@@ -1278,33 +1366,43 @@ describe("assessment email intent reconciliation on PostgreSQL", () => {
       }),
       { kind: "submission", submissionId: "submission-1", maxRows: 10 },
     );
-    await bounded(reconcilerRead.promise, "Serializable reconciler read");
-
-    try {
-      await cronDb.$transaction(
-        async (tx) => {
-          await tx.$queryRaw(Prisma.sql`
-            SELECT COUNT(*)
-            FROM "assessment_email_outbox"
-            WHERE "submissionId" = 'submission-1'
-              AND "recipientRole" = 'RESPONDENT'
-          `);
-          await tx.$executeRaw(Prisma.sql`
-            UPDATE "serialization_probe"
-            SET "value" = "value" + 1
-            WHERE "id" = 'probe-1'
-          `);
-        },
-        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-      );
-    } finally {
-      conflictingCommit.resolve();
-    }
-
-    const result = await bounded(
-      reconciliation,
-      "Serializable read/write dependency cycle",
-    );
+    let conflictingOperation: Promise<void> | undefined;
+    const result = await (async () => {
+      try {
+        await bounded(
+          reconcilerRead.promise,
+          "Serializable reconciler read",
+        );
+        conflictingOperation = cronDb.$transaction(
+          async (tx) => {
+            await tx.$queryRaw(Prisma.sql`
+              SELECT COUNT(*)
+              FROM "assessment_email_outbox"
+              WHERE "submissionId" = 'submission-1'
+                AND "recipientRole" = 'RESPONDENT'
+            `);
+            await tx.$executeRaw(Prisma.sql`
+              UPDATE "serialization_probe"
+              SET "value" = "value" + 1
+              WHERE "id" = 'probe-1'
+            `);
+          },
+          { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+        );
+        await conflictingOperation;
+        conflictingCommit.resolve();
+        return await bounded(
+          reconciliation,
+          "Serializable read/write dependency cycle",
+        );
+      } finally {
+        conflictingCommit.resolve();
+        await Promise.allSettled([
+          reconciliation,
+          ...(conflictingOperation ? [conflictingOperation] : []),
+        ]);
+      }
+    })();
     const intent = await readIntent(eventDb);
 
     expect(result).toEqual(
