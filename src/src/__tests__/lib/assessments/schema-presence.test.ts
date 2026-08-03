@@ -13,8 +13,9 @@
  *   - Column presence assertions added for Organization.ownerCoachId and
  *     AssessmentCampaign.createdByCoachId via Prisma's runtime DMMF.
  *
- * Companion: ./migration-verification.test.ts asserts the actual database
- * objects (partial indexes, GIN index, immutability trigger) exist.
+ * Companion: integration-tests/assessment-v7-6-migration-verification.pg.test.ts
+ * asserts the actual database objects (partial indexes, GIN index, immutability
+ * trigger) exist in the isolated PostgreSQL integration lane.
  */
 
 import { PrismaClient, Prisma } from "@prisma/client";
