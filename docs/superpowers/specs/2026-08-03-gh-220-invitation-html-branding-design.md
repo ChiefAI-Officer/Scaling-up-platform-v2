@@ -1,7 +1,7 @@
 # GH #220 — Branded Campaign Invitation HTML Design
 
 Date: 2026-08-03
-Status: User-approved design; awaiting written-spec review
+Status: User-approved design; implementation planning authorized
 Issue: [GH #220](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/issues/220)
 Branch: `codex/220-invitation-html-branding-design`
 Base: `origin/main` at `6983c1f1050be06e95a736be8f228d30ad13f200`
