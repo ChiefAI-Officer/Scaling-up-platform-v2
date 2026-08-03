@@ -6,6 +6,23 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="gh-257-outbox-reconciliation-implemented"></a>
+### 2026-08-03 — GH #257 residual outbox reconciliation implemented locally <!-- ENTRY_ISO:2026-08-03 ENTRY_SLUG:gh-257-outbox-reconciliation-implemented -->
+
+**Status: IMPLEMENTED + FOCUSED-VERIFIED LOCALLY; default off; not pushed, merged, launched, or deployed.** Invited submissions on the gated path now atomically commit zero to two durable `AssessmentEmailDeliveryIntent` obligations with the submission. Each stores the exact recipient, subject, HTML, authorization snapshot, and content provenance at submission time. The existing `AssessmentEmailOutbox` remains the only SMTP queue and retains its ADR-0030 lease, retry, uncertainty, and terminal-state semantics.
+
+**Reconciliation and recovery contract.** After commit, an ID-only Inngest event attempts immediate reconciliation; a concurrency-one three-minute scan repairs missed events and transient failures in bounded batches. Reauthorization uses current authoritative campaign, invitation, respondent, Coach-owner, template, version, approval, feature, schema, provenance, hash, pause, and existing-outbox facts without rerendering or replacing frozen bytes. Drift moves the intent to `HELD`; an already-authoritative outbox row wins; an authorized handoff creates at most one outbox row. `ASSESSMENT_SENDS_PAUSED` blocks handoff and release but not durable intent creation or absolute expiry, while disabling the default-off route flag sends new submissions back to the legacy path without stranding existing intents.
+
+**Operator and retention controls.** The narrow delivery-holds surface is ADMIN/STAFF-only; Coaches have no retroactive-delivery capability. It masks list identity, audits full-detail access, renders preview content in an inert sandbox document, forbids editing, and offers only exact frozen release after a fresh review-token and state recheck or permanent allowlisted cancellation. Handoff, cancellation, and absolute `createdAt + 30 days` expiry clear payload-bearing intent fields; the existing worker separately purges outbox HTML after `SENT` or terminal `FAILED`. Required audit records are transactional and contain IDs, roles, allowlisted reasons, versions, and provenance hashes rather than addresses, subject text, HTML, answers, or raw errors.
+
+**Forward-only legacy boundary and operations.** The new legacy auditor requires an explicit closed-open `--until=<ISO>` rollout boundary, accepts an optional `--since=<ISO>`, performs one parameterized SELECT-only query, and emits only IDs, missing `RESPONDENT`/`OWNING_COACH` roles, allowlisted current-evidence codes, counts, and the classification `UNVERIFIABLE_CANDIDATE`. It has no render, reconstruction, apply, replay, backfill, or write mode and was not run against any database. The runbook records flag-off schema deployment, read-only queue and age/expiry/hold/handoff monitoring, exact alert thresholds, pause and operator response, route-flag rollback, and the requirement to keep the reconciler deployed while unresolved intents exist.
+
+**Verification and outstanding gates.** Task-scoped Jest matrices, privacy/forbidden-output checks, migration safety, scoped ESLint and TypeScript filters, and diff checks have exercised the ledger, flag, atomic submit path, deterministic reauthorization, bounded reconciler, event/cron wiring, operator service and routes, held-queue UI, and read-only auditor. The PostgreSQL behavioral suite was authored but **not run** because no isolated `TEST_DATABASE_URL`, `DATABASE_URL`, Docker, or local PostgreSQL service was available. A production Turbopack build did **not** reach a passing terminal result in the restricted environment because external font fetches were unavailable; the final complete Jest/build acceptance gate remains Task 12 work and is not claimed here.
+
+**No-production-operation boundary.** No production database connection, read-only legacy audit, replay, backfill, payload reconstruction, manual data write, environment or flag change, deployment, or customer email send occurred. This local implementation does not close the issue or release its claim; protected review, final gates, push, PR, merge, additive schema deployment, deliberate activation, monitoring, and production verification remain separate authorized steps.
+
+---
+
 <a id="gh-217-accepted-gh-257-primed"></a>
 ### 2026-08-01 — GH #217 accepted; GH #257 reconciliation primed <!-- ENTRY_ISO:2026-08-01 ENTRY_SLUG:gh-217-accepted-gh-257-primed -->
 
