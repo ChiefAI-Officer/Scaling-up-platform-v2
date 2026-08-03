@@ -1,0 +1,766 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; img-src 'self' data:; style-src 'unsafe-inline';">
+  <title>GH #228 report email branding proof</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --canvas: #efedf2;
+      --paper: #fbfafc;
+      --ink: #2b2440;
+      --muted: #6b6480;
+      --purple: #522583;
+      --line: #d9d1e2;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      min-width: 0;
+      background: var(--canvas);
+    }
+
+    body {
+      margin: 0;
+      min-width: 0;
+      overflow-x: hidden;
+      background:
+        linear-gradient(90deg, rgba(82, 37, 131, .035) 1px, transparent 1px) 0 0 / 24px 24px,
+        var(--canvas);
+      color: var(--ink);
+      font-family: "Avenir Next", "Helvetica Neue", Arial, sans-serif;
+    }
+
+    .proof {
+      width: min(880px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 44px 0 72px;
+    }
+
+    .proof-header {
+      position: relative;
+      margin: 0 0 34px;
+      padding: 0 0 24px 28px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .proof-header::before {
+      position: absolute;
+      top: 3px;
+      bottom: 24px;
+      left: 0;
+      width: 5px;
+      background: var(--purple);
+      content: "";
+    }
+
+    .eyebrow {
+      margin: 0 0 9px;
+      color: var(--purple);
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      max-width: 700px;
+      margin: 0;
+      font-family: "Iowan Old Style", Georgia, serif;
+      font-size: clamp(30px, 5vw, 48px);
+      font-weight: 600;
+      letter-spacing: -.035em;
+      line-height: .98;
+    }
+
+    .intro {
+      max-width: 650px;
+      margin: 16px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.65;
+    }
+
+    .proof-key {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 18px;
+      margin: 20px 0 0;
+      padding: 0;
+      color: var(--muted);
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 10px;
+      letter-spacing: .04em;
+      list-style: none;
+      text-transform: uppercase;
+    }
+
+    .proof-key li::before {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      margin: 0 7px 1px 0;
+      border-radius: 50%;
+      background: var(--purple);
+      content: "";
+    }
+
+    .cases {
+      position: relative;
+      margin-right: 32px;
+      padding-left: 32px;
+    }
+
+    .cases::before {
+      position: absolute;
+      top: 20px;
+      bottom: 20px;
+      left: 9px;
+      width: 1px;
+      background: var(--line);
+      content: "";
+    }
+
+    .case {
+      position: relative;
+      margin: 0 0 48px;
+      scroll-margin-top: 14px;
+    }
+
+    .case:last-child {
+      margin-bottom: 0;
+    }
+
+    .case::before {
+      position: absolute;
+      top: 3px;
+      left: -32px;
+      width: 19px;
+      height: 19px;
+      border: 4px solid var(--canvas);
+      border-radius: 50%;
+      background: var(--purple);
+      box-shadow: 0 0 0 1px var(--purple);
+      content: "";
+    }
+
+    .case-header {
+      margin: 0 auto 12px;
+      max-width: 640px;
+    }
+
+    .case-number {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--purple);
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    h2 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 650;
+      letter-spacing: -.01em;
+    }
+
+    .case-note {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .email-stage {
+      width: 100%;
+      padding: 18px;
+      overflow: hidden;
+      border: 1px solid rgba(82, 37, 131, .12);
+      border-radius: 4px;
+      background: var(--paper);
+      box-shadow: 0 16px 45px rgba(43, 36, 64, .08);
+    }
+
+    @media (max-width: 560px) {
+      .proof {
+        width: calc(100% - 20px);
+        padding: 22px 0 44px;
+      }
+
+      .proof-header {
+        margin-bottom: 24px;
+        padding: 0 0 18px 18px;
+      }
+
+      .proof-header::before {
+        bottom: 18px;
+        width: 4px;
+      }
+
+      h1 {
+        max-width: 330px;
+        font-size: 31px;
+      }
+
+      .intro {
+        margin-top: 12px;
+        font-size: 13px;
+      }
+
+      .proof-key {
+        gap: 6px 12px;
+        margin-top: 14px;
+        font-size: 9px;
+      }
+
+      .cases {
+        margin-right: 0;
+        padding-left: 14px;
+      }
+
+      .cases::before {
+        left: 2px;
+      }
+
+      .case {
+        margin-bottom: 34px;
+      }
+
+      .case::before {
+        left: -18px;
+        width: 13px;
+        height: 13px;
+        border-width: 3px;
+      }
+
+      .email-stage {
+        padding: 0;
+        border-radius: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="proof">
+    <header class="proof-header">
+      <p class="eyebrow">Email proof / GH #228</p>
+      <h1>Scaling Up first.<br>Coach provenance second.</h1>
+      <p class="intro">
+        Six fixed cases review one cover and footer contract. The email frames use
+        presentation tables and inline styles; only Coach provenance changes.
+      </p>
+      <ul class="proof-key" aria-label="Review constraints">
+        <li>640px email</li>
+        <li>Logo before byline</li>
+        <li>Name survives image failure</li>
+      </ul>
+    </header>
+
+    <section class="cases" aria-label="Email branding cases">
+      <article class="case" id="case-scored">
+        <header class="case-header">
+          <span class="case-number">Case 01 / scored</span>
+          <h2>Scored report with coach image and name</h2>
+          <p class="case-note">Primary Scaling Up mark, then a complete Coach byline.</p>
+        </header>
+        <div class="email-stage">
+          <table data-email-case="scored" role="presentation" width="640" cellpadding="0" cellspacing="0" border="0"
+                 style="max-width:640px;width:100%;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;font-family:'Helvetica Neue',Roboto,Arial,sans-serif;color:#2b2440;">
+            <tr>
+              <td style="height:6px;padding:0;font-size:0;line-height:0;background:#f7a600;">&nbsp;</td>
+            </tr>
+            <tr>
+              <td style="padding:0;font-size:0;line-height:0;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td width="25%" style="height:4px;background:#f7a600;font-size:0;line-height:0;">&nbsp;</td>
+                    <td width="25%" style="height:4px;background:#008bd2;font-size:0;line-height:0;">&nbsp;</td>
+                    <td width="25%" style="height:4px;background:#946b36;font-size:0;line-height:0;">&nbsp;</td>
+                    <td width="25%" style="height:4px;background:#95c11f;font-size:0;line-height:0;">&nbsp;</td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="background:#522583;padding:28px 32px 26px;color:#ffffff;">
+                <img src="../../../../src/public/brand/su-logo-white.png"
+                     alt="Scaling Up" width="180"
+                     style="display:block;border:0;outline:none;max-width:180px;height:auto;" />
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0"
+                       style="margin-top:12px;">
+                  <tr>
+                    <td style="vertical-align:middle;padding-right:10px;">
+                      <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4OCIgaGVpZ2h0PSI4OCIgdmlld0JveD0iMCAwIDg4IDg4Ij48cmVjdCB3aWR0aD0iODgiIGhlaWdodD0iODgiIHJ4PSIxMiIgZmlsbD0iI2ZmZmZmZiIvPjx0ZXh0IHg9IjQ0IiB5PSI1NCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjI4IiBmb250LXdlaWdodD0iNzAwIiBmaWxsPSIjNTIyNTgzIj5BQzwvdGV4dD48L3N2Zz4="
+                           alt="" width="44"
+                           style="display:block;border:0;outline:none;max-height:44px;max-width:200px;height:auto;width:auto;" />
+                    </td>
+                    <td style="vertical-align:middle;color:#ffffff;font-size:13px;">
+                      Coached by Alex Coach
+                    </td>
+                  </tr>
+                </table>
+                <div style="margin-top:20px;font-size:21px;font-weight:800;color:#ffffff;line-height:1.2;">
+                  Scaling Up 4 Decisions Assessment
+                </div>
+                <div style="margin-top:4px;font-size:13px;color:#ffffff;opacity:.85;">
+                  Report for Jordan Lee &middot; August 3, 2026
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:24px 32px;background:#ffffff;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td width="86" style="vertical-align:middle;padding-right:18px;">
+                      <div style="width:76px;height:76px;border:6px solid #f0e9fa;border-radius:50%;text-align:center;line-height:64px;color:#522583;font-size:23px;font-weight:800;">78</div>
+                    </td>
+                    <td style="vertical-align:middle;">
+                      <div style="color:#522583;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;">Strong foundation</div>
+                      <div style="margin-top:6px;color:#2b2440;font-size:17px;font-weight:800;">Your overall score</div>
+                      <div style="margin-top:4px;color:#6b6480;font-size:12px;line-height:1.5;">People 19 &middot; Strategy 21 &middot; Execution 20 &middot; Cash 18</div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="background:#522583;padding:18px 32px 20px;color:#ffffff;">
+                <img src="../../../../src/public/brand/su-logo-white.png"
+                     alt="Scaling Up" width="120"
+                     style="display:block;border:0;outline:none;max-width:120px;height:auto;" />
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0"
+                       style="margin-top:10px;">
+                  <tr>
+                    <td style="vertical-align:middle;padding-right:8px;">
+                      <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4OCIgaGVpZ2h0PSI4OCIgdmlld0JveD0iMCAwIDg4IDg4Ij48cmVjdCB3aWR0aD0iODgiIGhlaWdodD0iODgiIHJ4PSIxMiIgZmlsbD0iI2ZmZmZmZiIvPjx0ZXh0IHg9IjQ0IiB5PSI1NCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjI4IiBmb250LXdlaWdodD0iNzAwIiBmaWxsPSIjNTIyNTgzIj5BQzwvdGV4dD48L3N2Zz4="
+                           alt="" width="28"
+                           style="display:block;border:0;outline:none;max-height:28px;max-width:120px;height:auto;width:auto;" />
+                    </td>
+                    <td style="vertical-align:middle;color:#ffffff;font-size:12px;">
+                      Coached by Alex Coach
+                    </td>
+                  </tr>
+                </table>
+                <div style="margin-top:10px;font-size:11px;opacity:.82;">
+                  August 3, 2026 &middot; Generated by Scaling Up Platform
+                </div>
+              </td>
+            </tr>
+          </table>
+        </div>
+      </article>
+
+      <article class="case" id="case-qualitative">
+        <header class="case-header">
+          <span class="case-number">Case 02 / qualitative</span>
+          <h2>Qualitative report with coach image and name</h2>
+          <p class="case-note">The same chrome surrounds the qualitative report anatomy.</p>
+        </header>
+        <div class="email-stage">
+          <table data-email-case="qualitative" role="presentation" width="640" cellpadding="0" cellspacing="0" border="0"
+                 style="max-width:640px;width:100%;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;font-family:'Helvetica Neue',Roboto,Arial,sans-serif;color:#2b2440;">
+            <tr>
+              <td style="height:6px;padding:0;font-size:0;line-height:0;background:#f7a600;">&nbsp;</td>
+            </tr>
+            <tr>
+              <td style="padding:0;font-size:0;line-height:0;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td width="25%" style="height:4px;background:#f7a600;font-size:0;line-height:0;">&nbsp;</td>
+                    <td width="25%" style="height:4px;background:#008bd2;font-size:0;line-height:0;">&nbsp;</td>
+                    <td width="25%" style="height:4px;background:#946b36;font-size:0;line-height:0;">&nbsp;</td>
+                    <td width="25%" style="height:4px;background:#95c11f;font-size:0;line-height:0;">&nbsp;</td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="background:#522583;padding:28px 32px 26px;color:#ffffff;">
+                <img src="../../../../src/public/brand/su-logo-white.png"
+                     alt="Scaling Up" width="180"
+                     style="display:block;border:0;outline:none;max-width:180px;height:auto;" />
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0"
+                       style="margin-top:12px;">
+                  <tr>
+                    <td style="vertical-align:middle;padding-right:10px;">
+                      <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4OCIgaGVpZ2h0PSI4OCIgdmlld0JveD0iMCAwIDg4IDg4Ij48cmVjdCB3aWR0aD0iODgiIGhlaWdodD0iODgiIHJ4PSIxMiIgZmlsbD0iI2ZmZmZmZiIvPjx0ZXh0IHg9IjQ0IiB5PSI1NCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjI4IiBmb250LXdlaWdodD0iNzAwIiBmaWxsPSIjNTIyNTgzIj5BQzwvdGV4dD48L3N2Zz4="
+                           alt="" width="44"
+                           style="display:block;border:0;outline:none;max-height:44px;max-width:200px;height:auto;width:auto;" />
+                    </td>
+                    <td style="vertical-align:middle;color:#ffffff;font-size:13px;">
+                      Coached by Alex Coach
+                    </td>
+                  </tr>
+                </table>
+                <div style="margin-top:20px;font-size:21px;font-weight:800;color:#ffffff;line-height:1.2;">
+                  Leadership Vision Alignment
+                </div>
+                <div style="margin-top:4px;font-size:13px;color:#ffffff;opacity:.85;">
+                  Report for Jordan Lee &middot; August 3, 2026
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:22px 32px 24px;background:#ffffff;">
+                <div style="color:#6b6480;font-size:13px;line-height:1.5;">Dear Jordan, here is your report &mdash; your own answers, organized by theme.</div>
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+                       style="margin-top:16px;border:1px solid #ece8f2;border-radius:10px;">
+                  <tr>
+                    <td style="padding:14px 16px;">
+                      <div style="color:#522583;font-size:12px;font-weight:800;">Vision and priorities</div>
+                      <div style="margin-top:5px;color:#2b2440;font-size:13px;line-height:1.5;">The team understands our priorities and can connect daily work to them.</div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="background:#522583;padding:18px 32px 20px;color:#ffffff;">
+                <img src="../../../../src/public/brand/su-logo-white.png"
+                     alt="Scaling Up" width="120"
+                     style="display:block;border:0;outline:none;max-width:120px;height:auto;" />
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0"
+                       style="margin-top:10px;">
+                  <tr>
+                    <td style="vertical-align:middle;padding-right:8px;">
+                      <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4OCIgaGVpZ2h0PSI4OCIgdmlld0JveD0iMCAwIDg4IDg4Ij48cmVjdCB3aWR0aD0iODgiIGhlaWdodD0iODgiIHJ4PSIxMiIgZmlsbD0iI2ZmZmZmZiIvPjx0ZXh0IHg9IjQ0IiB5PSI1NCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjI4IiBmb250LXdlaWdodD0iNzAwIiBmaWxsPSIjNTIyNTgzIj5BQzwvdGV4dD48L3N2Zz4="
+                           alt="" width="28"
+                           style="display:block;border:0;outline:none;max-height:28px;max-width:120px;height:auto;width:auto;" />
+                    </td>
+                    <td style="vertical-align:middle;color:#ffffff;font-size:12px;">
+                      Coached by Alex Coach
+                    </td>
+                  </tr>
+                </table>
+                <div style="margin-top:10px;font-size:11px;opacity:.82;">
+                  August 3, 2026 &middot; Generated by Scaling Up Platform
+                </div>
+              </td>
+            </tr>
+          </table>
+        </div>
+      </article>
+
+      <article class="case" id="case-blocked-image">
+        <header class="case-header">
+          <span class="case-number">Case 03 / rejected image</span>
+          <h2>Blocked remote image with the name still visible</h2>
+          <p class="case-note">The proof page blocks the remote fixture; adjacent text remains authoritative.</p>
+        </header>
+        <div class="email-stage">
+          <table data-email-case="blocked-image" role="presentation" width="640" cellpadding="0" cellspacing="0" border="0"
+                 style="max-width:640px;width:100%;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;font-family:'Helvetica Neue',Roboto,Arial,sans-serif;color:#2b2440;">
+            <tr>
+              <td style="height:6px;padding:0;font-size:0;line-height:0;background:#f7a600;">&nbsp;</td>
+            </tr>
+            <tr>
+              <td style="padding:0;font-size:0;line-height:0;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td width="25%" style="height:4px;background:#f7a600;font-size:0;line-height:0;">&nbsp;</td>
+                    <td width="25%" style="height:4px;background:#008bd2;font-size:0;line-height:0;">&nbsp;</td>
+                    <td width="25%" style="height:4px;background:#946b36;font-size:0;line-height:0;">&nbsp;</td>
+                    <td width="25%" style="height:4px;background:#95c11f;font-size:0;line-height:0;">&nbsp;</td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="background:#522583;padding:28px 32px 26px;color:#ffffff;">
+                <img src="../../../../src/public/brand/su-logo-white.png"
+                     alt="Scaling Up" width="180"
+                     style="display:block;border:0;outline:none;max-width:180px;height:auto;" />
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0"
+                       style="margin-top:12px;">
+                  <tr>
+                    <td style="vertical-align:middle;padding-right:10px;">
+                      <img src="https://coach-image.invalid/alex-coach.png"
+                           alt="" width="44"
+                           style="display:block;border:0;outline:none;max-height:44px;max-width:200px;height:auto;width:auto;" />
+                    </td>
+                    <td style="vertical-align:middle;color:#ffffff;font-size:13px;">
+                      Coached by Alex Coach
+                    </td>
+                  </tr>
+                </table>
+                <div style="margin-top:20px;font-size:21px;font-weight:800;color:#ffffff;line-height:1.2;">
+                  Scaling Up 4 Decisions Assessment
+                </div>
+                <div style="margin-top:4px;font-size:13px;color:#ffffff;opacity:.85;">
+                  Report for Jordan Lee &middot; August 3, 2026
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:24px 32px;background:#ffffff;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td width="86" style="vertical-align:middle;padding-right:18px;">
+                      <div style="width:76px;height:76px;border:6px solid #f0e9fa;border-radius:50%;text-align:center;line-height:64px;color:#522583;font-size:23px;font-weight:800;">78</div>
+                    </td>
+                    <td style="vertical-align:middle;">
+                      <div style="color:#522583;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;">Strong foundation</div>
+                      <div style="margin-top:6px;color:#2b2440;font-size:17px;font-weight:800;">Your overall score</div>
+                      <div style="margin-top:4px;color:#6b6480;font-size:12px;line-height:1.5;">People 19 &middot; Strategy 21 &middot; Execution 20 &middot; Cash 18</div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="background:#522583;padding:18px 32px 20px;color:#ffffff;">
+                <img src="../../../../src/public/brand/su-logo-white.png"
+                     alt="Scaling Up" width="120"
+                     style="display:block;border:0;outline:none;max-width:120px;height:auto;" />
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0"
+                       style="margin-top:10px;">
+                  <tr>
+                    <td style="vertical-align:middle;padding-right:8px;">
+                      <img src="https://coach-image.invalid/alex-coach.png"
+                           alt="" width="28"
+                           style="display:block;border:0;outline:none;max-height:28px;max-width:120px;height:auto;width:auto;" />
+                    </td>
+                    <td style="vertical-align:middle;color:#ffffff;font-size:12px;">
+                      Coached by Alex Coach
+                    </td>
+                  </tr>
+                </table>
+                <div style="margin-top:10px;font-size:11px;opacity:.82;">
+                  August 3, 2026 &middot; Generated by Scaling Up Platform
+                </div>
+              </td>
+            </tr>
+          </table>
+        </div>
+      </article>
+
+      <article class="case" id="case-name-only">
+        <header class="case-header">
+          <span class="case-number">Case 04 / no image</span>
+          <h2>Name-only provenance</h2>
+          <p class="case-note">The Coach byline keeps its place without reserving an empty image cell.</p>
+        </header>
+        <div class="email-stage">
+          <table data-email-case="name-only" role="presentation" width="640" cellpadding="0" cellspacing="0" border="0"
+                 style="max-width:640px;width:100%;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;font-family:'Helvetica Neue',Roboto,Arial,sans-serif;color:#2b2440;">
+            <tr>
+              <td style="height:6px;padding:0;font-size:0;line-height:0;background:#f7a600;">&nbsp;</td>
+            </tr>
+            <tr>
+              <td style="padding:0;font-size:0;line-height:0;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td width="25%" style="height:4px;background:#f7a600;font-size:0;line-height:0;">&nbsp;</td>
+                    <td width="25%" style="height:4px;background:#008bd2;font-size:0;line-height:0;">&nbsp;</td>
+                    <td width="25%" style="height:4px;background:#946b36;font-size:0;line-height:0;">&nbsp;</td>
+                    <td width="25%" style="height:4px;background:#95c11f;font-size:0;line-height:0;">&nbsp;</td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="background:#522583;padding:28px 32px 26px;color:#ffffff;">
+                <img src="../../../../src/public/brand/su-logo-white.png"
+                     alt="Scaling Up" width="180"
+                     style="display:block;border:0;outline:none;max-width:180px;height:auto;" />
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0"
+                       style="margin-top:12px;">
+                  <tr>
+                    <td style="vertical-align:middle;color:#ffffff;font-size:13px;">
+                      Coached by Alex Coach
+                    </td>
+                  </tr>
+                </table>
+                <div style="margin-top:20px;font-size:21px;font-weight:800;color:#ffffff;line-height:1.2;">
+                  Scaling Up 4 Decisions Assessment
+                </div>
+                <div style="margin-top:4px;font-size:13px;color:#ffffff;opacity:.85;">
+                  Report for Jordan Lee &middot; August 3, 2026
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:24px 32px;background:#ffffff;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td width="86" style="vertical-align:middle;padding-right:18px;">
+                      <div style="width:76px;height:76px;border:6px solid #f0e9fa;border-radius:50%;text-align:center;line-height:64px;color:#522583;font-size:23px;font-weight:800;">78</div>
+                    </td>
+                    <td style="vertical-align:middle;">
+                      <div style="color:#522583;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;">Strong foundation</div>
+                      <div style="margin-top:6px;color:#2b2440;font-size:17px;font-weight:800;">Your overall score</div>
+                      <div style="margin-top:4px;color:#6b6480;font-size:12px;line-height:1.5;">People 19 &middot; Strategy 21 &middot; Execution 20 &middot; Cash 18</div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="background:#522583;padding:18px 32px 20px;color:#ffffff;">
+                <img src="../../../../src/public/brand/su-logo-white.png"
+                     alt="Scaling Up" width="120"
+                     style="display:block;border:0;outline:none;max-width:120px;height:auto;" />
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0"
+                       style="margin-top:10px;">
+                  <tr>
+                    <td style="vertical-align:middle;color:#ffffff;font-size:12px;">
+                      Coached by Alex Coach
+                    </td>
+                  </tr>
+                </table>
+                <div style="margin-top:10px;font-size:11px;opacity:.82;">
+                  August 3, 2026 &middot; Generated by Scaling Up Platform
+                </div>
+              </td>
+            </tr>
+          </table>
+        </div>
+      </article>
+
+      <article class="case" id="case-blank-name">
+        <header class="case-header">
+          <span class="case-number">Case 05 / blank name</span>
+          <h2>Blank coach name with Scaling Up only</h2>
+          <p class="case-note">An image never renders on its own when the Coach name is unusable.</p>
+        </header>
+        <div class="email-stage">
+          <table data-email-case="blank-name" role="presentation" width="640" cellpadding="0" cellspacing="0" border="0"
+                 style="max-width:640px;width:100%;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;font-family:'Helvetica Neue',Roboto,Arial,sans-serif;color:#2b2440;">
+            <tr>
+              <td style="height:6px;padding:0;font-size:0;line-height:0;background:#f7a600;">&nbsp;</td>
+            </tr>
+            <tr>
+              <td style="padding:0;font-size:0;line-height:0;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td width="25%" style="height:4px;background:#f7a600;font-size:0;line-height:0;">&nbsp;</td>
+                    <td width="25%" style="height:4px;background:#008bd2;font-size:0;line-height:0;">&nbsp;</td>
+                    <td width="25%" style="height:4px;background:#946b36;font-size:0;line-height:0;">&nbsp;</td>
+                    <td width="25%" style="height:4px;background:#95c11f;font-size:0;line-height:0;">&nbsp;</td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="background:#522583;padding:28px 32px 26px;color:#ffffff;">
+                <img src="../../../../src/public/brand/su-logo-white.png"
+                     alt="Scaling Up" width="180"
+                     style="display:block;border:0;outline:none;max-width:180px;height:auto;" />
+                <div style="margin-top:20px;font-size:21px;font-weight:800;color:#ffffff;line-height:1.2;">
+                  Scaling Up 4 Decisions Assessment
+                </div>
+                <div style="margin-top:4px;font-size:13px;color:#ffffff;opacity:.85;">
+                  Report for Jordan Lee &middot; August 3, 2026
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:24px 32px;background:#ffffff;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td width="86" style="vertical-align:middle;padding-right:18px;">
+                      <div style="width:76px;height:76px;border:6px solid #f0e9fa;border-radius:50%;text-align:center;line-height:64px;color:#522583;font-size:23px;font-weight:800;">78</div>
+                    </td>
+                    <td style="vertical-align:middle;">
+                      <div style="color:#522583;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;">Strong foundation</div>
+                      <div style="margin-top:6px;color:#2b2440;font-size:17px;font-weight:800;">Your overall score</div>
+                      <div style="margin-top:4px;color:#6b6480;font-size:12px;line-height:1.5;">People 19 &middot; Strategy 21 &middot; Execution 20 &middot; Cash 18</div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="background:#522583;padding:18px 32px 20px;color:#ffffff;">
+                <img src="../../../../src/public/brand/su-logo-white.png"
+                     alt="Scaling Up" width="120"
+                     style="display:block;border:0;outline:none;max-width:120px;height:auto;" />
+                <div style="margin-top:10px;font-size:11px;opacity:.82;">
+                  August 3, 2026 &middot; Generated by Scaling Up Platform
+                </div>
+              </td>
+            </tr>
+          </table>
+        </div>
+      </article>
+
+      <article class="case" id="case-no-coach">
+        <header class="case-header">
+          <span class="case-number">Case 06 / no coach</span>
+          <h2>No coach with Scaling Up only</h2>
+          <p class="case-note">The trusted provenance unit is absent; platform branding remains complete.</p>
+        </header>
+        <div class="email-stage">
+          <table data-email-case="no-coach" role="presentation" width="640" cellpadding="0" cellspacing="0" border="0"
+                 style="max-width:640px;width:100%;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;font-family:'Helvetica Neue',Roboto,Arial,sans-serif;color:#2b2440;">
+            <tr>
+              <td style="height:6px;padding:0;font-size:0;line-height:0;background:#f7a600;">&nbsp;</td>
+            </tr>
+            <tr>
+              <td style="padding:0;font-size:0;line-height:0;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td width="25%" style="height:4px;background:#f7a600;font-size:0;line-height:0;">&nbsp;</td>
+                    <td width="25%" style="height:4px;background:#008bd2;font-size:0;line-height:0;">&nbsp;</td>
+                    <td width="25%" style="height:4px;background:#946b36;font-size:0;line-height:0;">&nbsp;</td>
+                    <td width="25%" style="height:4px;background:#95c11f;font-size:0;line-height:0;">&nbsp;</td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="background:#522583;padding:28px 32px 26px;color:#ffffff;">
+                <img src="../../../../src/public/brand/su-logo-white.png"
+                     alt="Scaling Up" width="180"
+                     style="display:block;border:0;outline:none;max-width:180px;height:auto;" />
+                <div style="margin-top:20px;font-size:21px;font-weight:800;color:#ffffff;line-height:1.2;">
+                  Scaling Up 4 Decisions Assessment
+                </div>
+                <div style="margin-top:4px;font-size:13px;color:#ffffff;opacity:.85;">
+                  Report for Jordan Lee &middot; August 3, 2026
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:24px 32px;background:#ffffff;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td width="86" style="vertical-align:middle;padding-right:18px;">
+                      <div style="width:76px;height:76px;border:6px solid #f0e9fa;border-radius:50%;text-align:center;line-height:64px;color:#522583;font-size:23px;font-weight:800;">78</div>
+                    </td>
+                    <td style="vertical-align:middle;">
+                      <div style="color:#522583;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;">Strong foundation</div>
+                      <div style="margin-top:6px;color:#2b2440;font-size:17px;font-weight:800;">Your overall score</div>
+                      <div style="margin-top:4px;color:#6b6480;font-size:12px;line-height:1.5;">People 19 &middot; Strategy 21 &middot; Execution 20 &middot; Cash 18</div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="background:#522583;padding:18px 32px 20px;color:#ffffff;">
+                <img src="../../../../src/public/brand/su-logo-white.png"
+                     alt="Scaling Up" width="120"
+                     style="display:block;border:0;outline:none;max-width:120px;height:auto;" />
+                <div style="margin-top:10px;font-size:11px;opacity:.82;">
+                  August 3, 2026 &middot; Generated by Scaling Up Platform
+                </div>
+              </td>
+            </tr>
+          </table>
+        </div>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

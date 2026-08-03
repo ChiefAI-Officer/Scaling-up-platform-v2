@@ -91,23 +91,27 @@ jest.mock("@/lib/assessments/results-email-approval", () => ({
   isResultsEmailApproved: jest.fn(() => approvedState.approved),
 }));
 
-// Report-email + results-email builders — deterministic strings.
-jest.mock("@/lib/assessments/report-email", () => ({
-  buildRespondentReportFromSubmission: jest.fn(() => ({ result: {} })),
-  buildReportEmailHtml: jest.fn(() => ({
-    subject: "report-subject",
-    bodyHtml: "<table>REPORT</table>",
-  })),
-}));
-jest.mock("@/lib/assessments/results-email", () => ({
-  buildResultsEmailHtml: jest.fn(
-    () => "<p>BODY</p><table>REPORT</table>",
-  ),
-  buildCoachNotifyEmail: jest.fn(() => ({
-    subject: "coach-notify-subject",
-    bodyHtml: "<a>report link</a>",
-  })),
-}));
+// Keep the report/results builders real so consumer tests observe the frozen
+// HTML that is actually enqueued. Wrap them as spies so the render-failure test
+// can still replace one call without replacing production behavior globally.
+jest.mock("@/lib/assessments/report-email", () => {
+  const actual = jest.requireActual("@/lib/assessments/report-email");
+  return {
+    ...actual,
+    buildRespondentReportFromSubmission: jest.fn(
+      actual.buildRespondentReportFromSubmission,
+    ),
+    buildReportEmailHtml: jest.fn(actual.buildReportEmailHtml),
+  };
+});
+jest.mock("@/lib/assessments/results-email", () => {
+  const actual = jest.requireActual("@/lib/assessments/results-email");
+  return {
+    ...actual,
+    buildResultsEmailHtml: jest.fn(actual.buildResultsEmailHtml),
+    buildCoachNotifyEmail: jest.fn(actual.buildCoachNotifyEmail),
+  };
+});
 
 import { POST } from "@/app/(public)/org-survey/[campaignAlias]/submit/route";
 
@@ -142,6 +146,9 @@ function mockHappyInvitation(
     notifyCoachOnCompletion: boolean;
     createdByCoachId: string | null;
     creatorCoachEmail: string | null;
+    creatorCoachFirstName: string;
+    creatorCoachLastName: string;
+    creatorCoachProfileImage: string | null;
   }>
 ) {
   const invitation = {
@@ -173,7 +180,12 @@ function mockHappyInvitation(
       creatorCoach:
         overrides?.creatorCoachEmail === null
           ? null
-          : { email: overrides?.creatorCoachEmail ?? "coach@example.com" },
+          : {
+              email: overrides?.creatorCoachEmail ?? "coach@example.com",
+              firstName: overrides?.creatorCoachFirstName ?? "Casey",
+              lastName: overrides?.creatorCoachLastName ?? "Coach",
+              profileImage: overrides?.creatorCoachProfileImage ?? null,
+            },
       version: {
         id: "v1",
         questions: goodVersion.questions,
@@ -193,6 +205,7 @@ function mockHappyInvitation(
   // Phase 1 (lock-free read, full include) + Phase 2 (locked re-read) agree.
   dbMock.assessmentInvitation.findUnique.mockResolvedValue(invitation);
   txMock.assessmentInvitation.findUnique.mockResolvedValue(invitation);
+  return invitation;
 }
 
 function jsonReq(body: unknown): Request {
@@ -206,6 +219,12 @@ const aliasParams = (alias: string) => ({
   params: Promise.resolve({ campaignAlias: alias }),
 });
 
+const originalWave228Env = {
+  enabled: process.env.WAVE_228_REPORT_EMAIL_CHROME_ENABLED,
+  kill: process.env.WAVE_228_REPORT_EMAIL_CHROME_KILL,
+  canary: process.env.WAVE_228_REPORT_EMAIL_CHROME_CANARY,
+};
+
 beforeEach(() => {
   jest.clearAllMocks();
   sessionState.invitationId = "inv-1";
@@ -215,8 +234,24 @@ beforeEach(() => {
   flagState.paused = false;
   approvedState.approved = true;
   process.env.APP_URL = "https://app.example.com";
+  delete process.env.WAVE_228_REPORT_EMAIL_CHROME_ENABLED;
+  delete process.env.WAVE_228_REPORT_EMAIL_CHROME_KILL;
+  delete process.env.WAVE_228_REPORT_EMAIL_CHROME_CANARY;
   txMock.assessmentSubmission.create.mockResolvedValue({ id: "sub-1" });
   txMock.assessmentEmailOutbox.create.mockResolvedValue({});
+});
+
+afterEach(() => {
+  const restore = (key: string, value: string | undefined) => {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  };
+  restore(
+    "WAVE_228_REPORT_EMAIL_CHROME_ENABLED",
+    originalWave228Env.enabled,
+  );
+  restore("WAVE_228_REPORT_EMAIL_CHROME_KILL", originalWave228Env.kill);
+  restore("WAVE_228_REPORT_EMAIL_CHROME_CANARY", originalWave228Env.canary);
 });
 
 describe("POST submit — strict v6.6 validation", () => {
@@ -423,6 +458,112 @@ describe("Wave D — outbox enqueue", () => {
       (c: Array<{ data: { recipientRole: string } }>) => c[0].data.recipientRole
     );
   }
+  function resultRow(): { bodyHtml: string } {
+    const row = txMock.assessmentEmailOutbox.create.mock.calls
+      .map(
+        (call: Array<{ data: { emailType: string; bodyHtml: string } }>) =>
+          call[0].data,
+      )
+      .find((candidate) => candidate.emailType === "ASSESSMENT_RESULTS");
+    if (!row) throw new Error("ASSESSMENT_RESULTS row was not enqueued");
+    return row;
+  }
+
+  function enqueuedTypes(): string[] {
+    return txMock.assessmentEmailOutbox.create.mock.calls.map(
+      (call: Array<{ data: { emailType: string } }>) => call[0].data.emailType,
+    );
+  }
+
+  it("keeps invited report HTML legacy when GH #228 is off", async () => {
+    mockHappyInvitation();
+    const res = await submit();
+    expect(res.status).toBe(200);
+    const row = resultRow();
+    expect(row.bodyHtml).toContain(">SCALING UP<");
+    expect(row.bodyHtml).not.toContain("cid:su-report-logo-v1");
+  });
+
+  it("brands invited results with creator coach only", async () => {
+    process.env.WAVE_228_REPORT_EMAIL_CHROME_ENABLED = "1";
+    mockHappyInvitation({
+      creatorCoachEmail: "creator@example.com",
+      creatorCoachFirstName: "Casey",
+      creatorCoachLastName: "Coach",
+      creatorCoachProfileImage: "https://images.example/casey.png",
+    });
+
+    const res = await submit();
+    expect(res.status).toBe(200);
+    const row = resultRow();
+    expect(row.bodyHtml).toContain("cid:su-report-logo-v1");
+    expect(row.bodyHtml).toContain("Coached by Casey Coach");
+    expect(row.bodyHtml).toContain("https://images.example/casey.png");
+  });
+
+  it("drops only a branded stale results row when creator presentation changes under lock", async () => {
+    process.env.WAVE_228_REPORT_EMAIL_CHROME_ENABLED = "1";
+    const phase1 = mockHappyInvitation({
+      creatorCoachFirstName: "Casey",
+      creatorCoachLastName: "Coach",
+      creatorCoachProfileImage: "https://images.example/old.png",
+    });
+    const phase2 = {
+      ...phase1,
+      campaign: {
+        ...phase1.campaign,
+        creatorCoach: {
+          ...phase1.campaign.creatorCoach!,
+          lastName: "Updated",
+          profileImage: "https://images.example/new.png",
+        },
+      },
+    };
+    txMock.assessmentInvitation.findUnique.mockResolvedValue(phase2);
+
+    const res = await submit();
+    expect(res.status).toBe(200);
+    expect(enqueuedTypes()).not.toContain("ASSESSMENT_RESULTS");
+    expect(txMock.assessmentSubmission.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores creator presentation drift in legacy mode", async () => {
+    const phase1 = mockHappyInvitation({
+      creatorCoachFirstName: "Casey",
+      creatorCoachLastName: "Coach",
+      creatorCoachProfileImage: "https://images.example/old.png",
+    });
+    const phase2 = {
+      ...phase1,
+      campaign: {
+        ...phase1.campaign,
+        creatorCoach: {
+          ...phase1.campaign.creatorCoach!,
+          lastName: "Updated",
+          profileImage: "https://images.example/new.png",
+        },
+      },
+    };
+    txMock.assessmentInvitation.findUnique.mockResolvedValue(phase2);
+
+    const res = await submit();
+    expect(res.status).toBe(200);
+    expect(enqueuedTypes()).toContain("ASSESSMENT_RESULTS");
+  });
+
+  it("drops only the stale results row when the chrome variant changes under lock", async () => {
+    process.env.WAVE_228_REPORT_EMAIL_CHROME_ENABLED = "1";
+    const invitation = mockHappyInvitation();
+    txMock.assessmentInvitation.findUnique.mockImplementation(async () => {
+      process.env.WAVE_228_REPORT_EMAIL_CHROME_KILL = "1";
+      return invitation;
+    });
+
+    const res = await submit();
+    expect(res.status).toBe(200);
+    expect(enqueuedTypes()).not.toContain("ASSESSMENT_RESULTS");
+    expect(txMock.assessmentSubmission.create).toHaveBeenCalledTimes(1);
+  });
 
   it("enqueues exactly ONE RESPONDENT row (#15) + ONE OWNING_COACH row (#16) on the happy path", async () => {
     mockHappyInvitation();
