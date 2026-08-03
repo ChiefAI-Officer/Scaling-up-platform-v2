@@ -71,6 +71,8 @@ Current `AssessmentCampaign` fields: `id, templateId, versionId, organizationId,
 - **Boundaries (grill Q4):** custom HTML covers the **body/email render only**. The SMTP **subject keeps coming from the existing token-allowlisted `invitationSubject` field** (folding subject into HTML would reopen the `#t=`-credential-leak hole closed in Wave A). **No footer/unsubscribe is force-injected** — these are transactional invites and the current shell injects none (full-replace loses only a cosmetic "— Scaling Up Platform" line).
 - **Upload-or-paste:** a textarea (paste) + an optional file-picker that loads an `.html` file's text into the same textarea → one sanitize-on-write path. Editor lives in the wizard email panel (Step 4/Review) + CampaignDetail's email-override panel (both already exist for markdown).
 
+> **GH #220 supersession (2026-08-03):** Full replacement remains only the rollback behavior for token-bearing legacy HTML while `ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED` is off. When that default-off behavior flag is on, validated campaign HTML is a sanitized body fragment inside the shared Scaling Up/Coach shell; the platform owns the CTA, fallback URL, CID logo, and footer. Tokenless stored HTML safely falls back to branded markdown/template content when the behavior flag is off. Stored bytes are not rewritten.
+
 ## Recommended defaults (user-approved 2026-06-15; "looks right")
 
 | # | Decision |
@@ -122,7 +124,7 @@ Per-task: fresh implementer (TDD, build gate `CI=true npx next build --turbopack
 1. **Auto-send blast radius (Q1)** → **consequence-labeled final button** on the Review step ("Create & send N invitations now" / "Schedule for &lt;date&gt;"); no modal, no DRAFT pre-state.
 2. **Cron cadence (Q2)** → **3 min (`*/3 * * * *`)**, matching the existing outbox cron.
 3. **`openAt` coupling + edits (Q3)** → **UNIFIED**: invites send when the campaign opens; "Immediately" sets `openAt = now`. Editing `openAt` on a SCHEDULED campaign reschedules; **lock the editor once `invitesSentAt` is set**.
-4. **#20 boundaries (Q4)** → subject stays the separate token-allowlisted field; **no forced footer**; custom HTML = body/render only; upload = file-load-into-textarea.
+4. **#20 boundaries (Q4)** → subject stays the separate token-allowlisted field; **no forced footer under the original full-replacement contract**; custom HTML = body/render only; upload = file-load-into-textarea. **GH #220 qualification (2026-08-03):** when `ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED` is on, the custom HTML is a sanitized body fragment in the shared branded shell and the platform owns the CTA, fallback URL, CID logo, and footer; when it is off, token-bearing legacy HTML uses complete replacement and tokenless stored HTML uses the branded markdown/template fallback without rewriting stored bytes.
 5. **Delete scope (Q5)** → **deletable in any state** + blast-radius confirm; soft-delete preserves data; no restore UI v1; links die; cron skips deleted.
 6. **#15/#16 idempotency** → enqueue **inside the SUBMITTED-transition transaction** (exactly-once); auto-send via atomic `updateMany` CAS on `invitesSentAt IS NULL`. Report/link built at drain time.
 7. **Legacy campaigns** → VERIFIED safe (default `IMMEDIATELY` + already ACTIVE/sent → never swept).

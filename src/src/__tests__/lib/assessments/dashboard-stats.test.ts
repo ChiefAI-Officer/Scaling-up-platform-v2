@@ -44,11 +44,11 @@ describe("getAssessmentsDashboardStats", () => {
     });
   });
 
-  it("activeCampaigns filters by status === ACTIVE", async () => {
+  it("activeCampaigns filters by status === ACTIVE and excludes soft-deleted campaigns", async () => {
     await getAssessmentsDashboardStats();
     expect(mockCampaign).toHaveBeenCalledTimes(1);
     expect(mockCampaign).toHaveBeenCalledWith({
-      where: { status: "ACTIVE" },
+      where: { status: "ACTIVE", deletedAt: null },
     });
   });
 

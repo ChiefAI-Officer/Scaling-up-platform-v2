@@ -10,8 +10,9 @@ name: CI
 # `prisma migrate deploy` against whatever DATABASE_URL is set). Giving CI the
 # prod DB URL would let CI mutate / migrate production on every run and
 # reintroduce exactly the wipe risk this repo is hardening against. The dummy
-# URLs below only satisfy `prisma generate` + Prisma client instantiation; they
-# never connect.
+# The global URLs below only satisfy `prisma generate` + Prisma client
+# instantiation; they never connect. The isolated PostgreSQL integration job
+# overrides them only for its GitHub-hosted Postgres service.
 #
 # SCOPE (see docs/runbooks/branch-protection-setup.md):
 # When CI was first activated, the standalone `eslint` + `jest` runs surfaced a
@@ -100,8 +101,16 @@ jobs:
           cache-dependency-path: src/package-lock.json
       - run: npm ci
       - run: npx prisma generate
-      - name: Prove lease safety under mixed-row contention
+      # The legacy migration chain cannot construct a fresh database. Build the
+      # disposable schema from schema.prisma, then source the v7.6 raw indexes
+      # and trigger from their checked-in migration (no duplicated SQL fixture).
+      - name: Bootstrap isolated PostgreSQL integration database
         env:
           TEST_DATABASE_URL: "postgresql://lease_test:lease_test@localhost:5432/assessment_email_lease_test?schema=public"
           ASSESSMENT_EMAIL_LEASE_TEST_ALLOW: "isolated-schema"
-        run: npm run test:assessment-email-lease-pg
+        run: npm run bootstrap:postgres-integration
+      - name: Run isolated PostgreSQL integration suites
+        env:
+          TEST_DATABASE_URL: "postgresql://lease_test:lease_test@localhost:5432/assessment_email_lease_test?schema=public"
+          ASSESSMENT_EMAIL_LEASE_TEST_ALLOW: "isolated-schema"
+        run: npm run test:postgres-integration

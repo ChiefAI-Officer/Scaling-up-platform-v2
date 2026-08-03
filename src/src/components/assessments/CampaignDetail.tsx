@@ -58,6 +58,12 @@ import {
   computeCampaignStatusMetrics,
   getInvitationBand,
 } from "@/lib/assessments/campaign-status-metrics";
+import { resolveInvitationHtmlMode } from "@/lib/assessments/invitation-html-policy";
+import {
+  invitationHtmlEditorCopy,
+  invitationOverrideSummary,
+  invitationSaveConfirmation,
+} from "@/lib/assessments/invitation-html-editor-copy";
 
 const REASON_MAX_LENGTH = 500;
 
@@ -75,6 +81,8 @@ export interface CampaignDetailProps {
   initialRespondents: CampaignRespondentRow[];
   /** Wave D #20 — gate the full-HTML invitation editor (mirrors the server flag). */
   customHtmlEmailEnabled?: boolean;
+  /** GH #220 — server-computed branded HTML-body mode; defaults fail-closed. */
+  brandedCustomHtmlEnabled?: boolean;
   /**
    * Wave F #22 (T10) — gates the campaign-level "View group report" entry
    * point. Computed SERVER-side (accessMode==="INVITED" && flag/canary &&
@@ -219,6 +227,7 @@ export function CampaignDetail({
   initialOverview,
   initialRespondents,
   customHtmlEmailEnabled = false,
+  brandedCustomHtmlEnabled = false,
   canViewGroupReport = false,
   groupReportHref,
   customSlidesEnabled = false,
@@ -296,8 +305,33 @@ export function CampaignDetail({
   const [emailHtml, setEmailHtml] = useState<string>(
     overview.campaign.invitationBodyHtml ?? "",
   );
+  const [persistedEmailSubject, setPersistedEmailSubject] = useState<string>(
+    overview.campaign.invitationSubject ?? "",
+  );
+  const [persistedEmailBody, setPersistedEmailBody] = useState<string>(
+    overview.campaign.invitationBodyMarkdown ?? "",
+  );
+  const [persistedHtml, setPersistedHtml] = useState<string>(
+    overview.campaign.invitationBodyHtml ?? "",
+  );
   const [emailHtmlError, setEmailHtmlError] = useState<string | null>(null);
   const [emailSaving, setEmailSaving] = useState(false);
+
+  const invitationHtmlMode = resolveInvitationHtmlMode({
+    waveDCustomHtmlEnabled: customHtmlEmailEnabled,
+    brandedCustomHtmlEnabled,
+    rawHtml: emailHtml,
+  });
+  const persistedInvitationHtmlMode = resolveInvitationHtmlMode({
+    waveDCustomHtmlEnabled: customHtmlEmailEnabled,
+    brandedCustomHtmlEnabled,
+    rawHtml: persistedHtml,
+  });
+  const emailHtmlChanged = emailHtml !== persistedHtml;
+  const htmlEditorCopy = invitationHtmlEditorCopy({
+    brandedCustomHtmlEnabled,
+    htmlMode: invitationHtmlMode,
+  });
 
   // Wave M (#19) — custom-slides editor state. `slidesValue` is the controlled
   // editor list; `slidesLoaded` is the CAS sentinel (the exact stored value the
@@ -311,10 +345,9 @@ export function CampaignDetail({
   const [slidesWarning, setSlidesWarning] = useState<string | null>(null);
 
   const emailDirty =
-    emailSubject !== (overview.campaign.invitationSubject ?? "") ||
-    emailBody !== (overview.campaign.invitationBodyMarkdown ?? "") ||
-    (customHtmlEmailEnabled &&
-      emailHtml !== (overview.campaign.invitationBodyHtml ?? ""));
+    emailSubject !== persistedEmailSubject ||
+    emailBody !== persistedEmailBody ||
+    (customHtmlEmailEnabled && emailHtmlChanged);
 
   // Follow-on (May 21) — coach edit start-date affordance.
   // openAt is set in the wizard and locked post-creation in earlier UI;
@@ -801,9 +834,13 @@ export function CampaignDetail({
         invitationBodyMarkdown:
           emailBody.trim() === "" ? null : emailBody.trim(),
       };
-      // Task 12 (#20) — only send the full-HTML field when the flag is on.
-      // The server validates token placement + length and rejects with a reason.
-      if (customHtmlEmailEnabled) {
+      // A retained tokenless override becomes inactive when the branded mode is
+      // rolled back. Omit it from unrelated edits so the server does not reject
+      // a value the operator did not change; changed or cleared HTML is always sent.
+      if (
+        customHtmlEmailEnabled &&
+        (persistedInvitationHtmlMode !== "branded_fallback" || emailHtmlChanged)
+      ) {
         payload.invitationBodyHtml = emailHtml.trim() === "" ? null : emailHtml;
       }
       const res = await fetch(`/api/assessment-campaigns/${campaign.id}`, {
@@ -821,12 +858,54 @@ export function CampaignDetail({
         }
         throw new Error(reason);
       }
+      // The route returns its updated row. Keep the controlled values aligned
+      // with those canonical values too, otherwise a trimmed successful save
+      // reopens as a false dirty draft against its normalized baseline.
+      const savedSubject =
+        body?.data &&
+        typeof body.data === "object" &&
+        "invitationSubject" in body.data
+          ? typeof body.data.invitationSubject === "string"
+            ? body.data.invitationSubject
+            : ""
+          : typeof payload.invitationSubject === "string"
+            ? payload.invitationSubject
+            : "";
+      const savedBody =
+        body?.data &&
+        typeof body.data === "object" &&
+        "invitationBodyMarkdown" in body.data
+          ? typeof body.data.invitationBodyMarkdown === "string"
+            ? body.data.invitationBodyMarkdown
+            : ""
+          : typeof payload.invitationBodyMarkdown === "string"
+            ? payload.invitationBodyMarkdown
+            : "";
+      setEmailSubject(savedSubject);
+      setPersistedEmailSubject(savedSubject);
+      setEmailBody(savedBody);
+      setPersistedEmailBody(savedBody);
+      if ("invitationBodyHtml" in payload) {
+        const savedHtml =
+          body?.data &&
+          typeof body.data === "object" &&
+          "invitationBodyHtml" in body.data
+            ? typeof body.data.invitationBodyHtml === "string"
+              ? body.data.invitationBodyHtml
+              : ""
+            : typeof payload.invitationBodyHtml === "string"
+              ? payload.invitationBodyHtml
+              : "";
+        setEmailHtml(savedHtml);
+        setPersistedHtml(savedHtml);
+      }
       toast({
         title: "Invitation email saved",
-        description:
-          emailSubject.trim() === "" && emailBody.trim() === ""
-            ? "Using template default."
-            : "New campaign overrides applied.",
+        description: invitationSaveConfirmation({
+          htmlMode: invitationHtmlMode,
+          hasSubjectOrMarkdown:
+            emailSubject.trim() !== "" || emailBody.trim() !== "",
+        }),
       });
       setEmailOpen(false);
       router.refresh();
@@ -1397,10 +1476,13 @@ export function CampaignDetail({
                 Invitation email
               </h2>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {overview.campaign.invitationSubject ||
-                overview.campaign.invitationBodyMarkdown
-                  ? "Custom subject/body set for this campaign"
-                  : "Using template default — click to customize"}
+                {invitationOverrideSummary({
+                  htmlMode: persistedInvitationHtmlMode,
+                  hasSubjectOrMarkdown:
+                    persistedEmailSubject.trim() !== "" ||
+                    persistedEmailBody.trim() !== "",
+                  emptySummary: "Using template default — click to customize",
+                })}
               </p>
             </div>
             <span className="text-xs font-medium text-muted-foreground">
@@ -1465,17 +1547,14 @@ export function CampaignDetail({
               </div>
               {customHtmlEmailEnabled && (
                 <div className="space-y-1 border-t border-border pt-3">
-                  <label className="text-xs font-medium text-foreground">
-                    Full custom HTML (advanced)
+                  <label
+                    htmlFor="email-overrides-html"
+                    className="text-xs font-medium text-foreground"
+                  >
+                    {htmlEditorCopy.label}
                   </label>
                   <p className="text-[11px] text-muted-foreground">
-                    When set, this HTML <strong>replaces the entire branded
-                    email</strong> (no template wrap). It must include{" "}
-                    <code className="px-1 py-0.5 bg-muted rounded text-[10px]">
-                      {"{{invitationUrl}}"}
-                    </code>{" "}
-                    as a link <code className="text-[10px]">href</code> or as
-                    plain text.
+                    {htmlEditorCopy.description}
                   </p>
                   <div className="flex items-center gap-3">
                     <input
@@ -1514,6 +1593,7 @@ export function CampaignDetail({
                     )}
                   </div>
                   <textarea
+                    id="email-overrides-html"
                     value={emailHtml}
                     onChange={(e) => {
                       setEmailHtml(e.target.value);
@@ -1521,13 +1601,22 @@ export function CampaignDetail({
                     }}
                     maxLength={50000}
                     rows={10}
-                    placeholder="Paste your full HTML email here, or upload an .html file above. Leave blank to use the body above."
+                    placeholder={
+                      brandedCustomHtmlEnabled
+                        ? "Paste a custom HTML body fragment here, or upload an .html file above. Leave blank to use the markdown body above."
+                        : "Paste your full HTML email here, or upload an .html file above. Leave blank to use the body above."
+                    }
                     className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-primary/30"
                     data-testid="email-overrides-html"
                   />
                   <p className="text-[11px] text-muted-foreground">
                     {emailHtml.length} / 50000 characters
                   </p>
+                  {emailHtmlChanged && htmlEditorCopy.validationError && (
+                    <p className="text-[11px] text-destructive">
+                      {htmlEditorCopy.validationError}
+                    </p>
+                  )}
                   {emailHtmlError && (
                     <p
                       className="text-[11px] text-destructive"
@@ -1542,11 +1631,9 @@ export function CampaignDetail({
                 <button
                   type="button"
                   onClick={() => {
-                    setEmailSubject(overview.campaign.invitationSubject ?? "");
-                    setEmailBody(
-                      overview.campaign.invitationBodyMarkdown ?? "",
-                    );
-                    setEmailHtml(overview.campaign.invitationBodyHtml ?? "");
+                    setEmailSubject(persistedEmailSubject);
+                    setEmailBody(persistedEmailBody);
+                    setEmailHtml(persistedHtml);
                     setEmailHtmlError(null);
                     setEmailOpen(false);
                   }}

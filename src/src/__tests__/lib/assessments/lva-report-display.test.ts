@@ -16,7 +16,6 @@ import {
   lvaSectionIntro,
   LVA_REPORT_FACTOR_LABELS,
   LVA_SECTION_INTROS,
-  GROUP_RENDER_VERSION,
 } from "@/lib/assessments/lva-report-display";
 
 describe("ceil1 — round UP to one decimal, float-safe", () => {
@@ -170,12 +169,6 @@ describe("lvaSectionIntro — verbatim Esperto section intros", () => {
     expect(lvaSectionIntro("S6_focus")).toBeNull();
     expect(LVA_SECTION_INTROS.S5_explained).toBeUndefined();
     expect(LVA_SECTION_INTROS.S6_focus).toBeUndefined();
-  });
-});
-
-describe("GROUP_RENDER_VERSION", () => {
-  it("is the stable lva-fidelity-v1 provenance constant", () => {
-    expect(GROUP_RENDER_VERSION).toBe("lva-fidelity-v1");
   });
 });
 

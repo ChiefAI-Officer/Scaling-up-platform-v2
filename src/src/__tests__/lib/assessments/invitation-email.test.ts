@@ -140,7 +140,92 @@ describe("renderTextBody — plain text twin", () => {
   });
 });
 
-import { buildInvitationEmailHtml, resolveCoachName, shouldShowOrgLine } from "@/lib/assessments/invitation-email";
+import {
+  buildInvitationEmailHtml,
+  buildInvitationEmailShell,
+  renderBrandedCustomHtmlText,
+  renderCustomHtmlFragment,
+  resolveCoachName,
+  shouldShowOrgLine,
+} from "@/lib/assessments/invitation-email";
+
+describe("branded custom-HTML invitation rendering", () => {
+  it("wraps one sanitized custom fragment in the same branded shell", () => {
+    const fragment = renderCustomHtmlFragment(
+      '<p onclick="bad()">Coach body {{respondentFirstName}}</p><script>bad()</script>',
+      baseVars,
+    );
+    const custom = buildInvitationEmailShell({
+      bodyHtml: fragment,
+      vars: baseVars,
+      chrome: "legacy",
+    });
+    const markdown = buildInvitationEmailHtml({
+      bodyMarkdown: "Coach body {{respondentFirstName}}",
+      vars: baseVars,
+      chrome: "legacy",
+    });
+
+    for (const marker of [
+      "cid:sulogo",
+      "Start the assessment",
+      "If the button doesn't work",
+      "&mdash; Scaling Up Platform",
+    ]) {
+      expect(custom).toContain(marker);
+      expect(markdown).toContain(marker);
+    }
+    expect(custom).toContain("Coach body Jane");
+    expect(custom).not.toContain("onclick");
+    expect(custom).not.toContain("<script");
+  });
+
+  it("keeps Wave-P Coach-logo ordering and invalid-image degradation", () => {
+    const fragment = renderCustomHtmlFragment("<p>Body</p>", baseVars);
+    const withLogo = buildInvitationEmailShell({
+      bodyHtml: fragment,
+      vars: { ...baseVars, coachLogoUrl: "https://cdn.test/coach.png" },
+      chrome: "waveP",
+    });
+    expect(withLogo.indexOf("cid:sulogo")).toBeLessThan(
+      withLogo.indexOf("https://cdn.test/coach.png"),
+    );
+
+    const rejected = buildInvitationEmailShell({
+      bodyHtml: fragment,
+      vars: { ...baseVars, coachLogoUrl: "javascript:bad()" },
+      chrome: "waveP",
+    });
+    expect(rejected).not.toContain("javascript:");
+    expect(rejected).toContain("Start the assessment");
+  });
+
+  it("builds a branded text twin from the same sanitized fragment", () => {
+    const fragment = renderCustomHtmlFragment(
+      '<h1>Hello {{respondentFirstName}}</h1><a href="{{invitationUrl}}">Open</a>',
+      baseVars,
+    );
+    expect(renderBrandedCustomHtmlText(fragment, baseVars)).toBe(
+      [
+        "Scaling Up Platform",
+        "Coach: Pat Coach",
+        "",
+        "Hello Jane",
+        "Open",
+        "",
+        `Start the assessment: ${baseVars.invitationUrl}`,
+      ].join("\n"),
+    );
+  });
+
+  it("omits the Coach line and still emits the canonical URL for empty fragments", () => {
+    const vars = { ...baseVars, coachName: null };
+    const text = renderBrandedCustomHtmlText("", vars);
+    expect(text).toContain("Scaling Up Platform");
+    expect(text).not.toContain("Coach:");
+    expect(text).toContain(`Start the assessment: ${vars.invitationUrl}`);
+  });
+});
 
 describe("buildInvitationEmailHtml — branded shell", () => {
   it("wraps the body in the purple branded shell with CID logo + CTA", () => {

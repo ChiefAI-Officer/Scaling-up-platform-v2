@@ -34,6 +34,11 @@ export function waveDCustomHtmlEmailEnabled(): boolean {
   return isTruthy(process.env.WAVE_D_CUSTOM_HTML_EMAIL_ENABLED);
 }
 
+/** GH #220: composes campaign custom HTML inside the branded shell. Default OFF. */
+export function assessmentInviteBrandedCustomHtmlEnabled(): boolean {
+  return isTruthy(process.env.ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED);
+}
+
 /**
  * Global assessment kill switch.
  *
