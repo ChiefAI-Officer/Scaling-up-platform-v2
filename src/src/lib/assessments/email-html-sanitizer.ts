@@ -16,13 +16,12 @@
  */
 import sanitizeHtml from "sanitize-html";
 import { Parser } from "htmlparser2";
+import {
+  countInvitationUrlTokens,
+  hasInvitationUrlToken,
+  isWholeInvitationUrlToken,
+} from "@/lib/assessments/invitation-html-policy";
 
-// ──────────────────────────────────────────────────────────────────────────
-// Token names (Wave A invitation-email.ts). normKey() there lowercases +
-// strips underscores, so all four of these resolve to the single-use survey
-// URL `/org-survey/{alias}#t=<token>`. The validator must recognize every
-// spelling a coach might paste.
-// ──────────────────────────────────────────────────────────────────────────
 /**
  * Max RAW invitation-HTML length accepted on save (#20). Reuses the Wave-B
  * "cap the stored bytes" concept (post-interpolation the body grows when the
@@ -30,44 +29,6 @@ import { Parser } from "htmlparser2";
  * rich email while bounding sanitize/DB cost). Save rejects over this.
  */
 export const MAX_INVITATION_HTML_LENGTH = 50_000;
-
-export const INVITATION_URL_TOKENS = [
-  "invitationUrl",
-  "invitation_url",
-  "assessmentUrl",
-  "assessment_url",
-] as const;
-
-// Normalized stems (lowercase, underscores stripped) — matches Wave A normKey().
-const URL_TOKEN_STEMS = new Set(["invitationurl", "assessmenturl"]);
-
-// Matches a single {{token}} occurrence (lax inner whitespace), capturing the
-// inner name. Used PRE-interpolation to find every token in the coach's raw HTML.
-const TOKEN_GLOBAL_RE = /\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g;
-
-function isUrlTokenName(raw: string): boolean {
-  return URL_TOKEN_STEMS.has(raw.toLowerCase().replace(/_/g, ""));
-}
-
-/** Count of URL-token occurrences anywhere in `s`. */
-function countUrlTokens(s: string): number {
-  let count = 0;
-  for (const m of s.matchAll(TOKEN_GLOBAL_RE)) {
-    if (isUrlTokenName(m[1])) count += 1;
-  }
-  return count;
-}
-
-/** True if `s` contains at least one URL token. */
-function containsUrlToken(s: string): boolean {
-  return countUrlTokens(s) > 0;
-}
-
-/** True if `s` is EXACTLY a single URL token (after trim), nothing around it. */
-function isWholeUrlToken(s: string): boolean {
-  const m = /^\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}$/.exec(s.trim());
-  return m !== null && isUrlTokenName(m[1]);
-}
 
 // ──────────────────────────────────────────────────────────────────────────
 // sanitizeEmailHtml — STRICT post-interpolation sanitizer.
@@ -204,25 +165,30 @@ export function sanitizeEmailHtml(raw: string): string {
 //   (a) a text node, or
 //   (b) the ENTIRE value of an <a href> (e.g. href="{{invitationUrl}}").
 // Anywhere else (other attrs, src/srcset, css/style, comments, query strings,
-// concatenated with other chars) is rejected. Requires ≥1 URL token (R1-M8).
+// concatenated with other chars) is rejected. The caller can opt out of the
+// ≥1-token requirement for branded-body mode, but placement is always strict.
 // ──────────────────────────────────────────────────────────────────────────
 
 type ValidationResult = { ok: true } | { ok: false; reason: string };
 
-export function validateInvitationHtml(raw: string): ValidationResult {
+export function validateInvitationHtml(
+  raw: string,
+  options: { requireUrlToken?: boolean } = {},
+): ValidationResult {
   if (typeof raw !== "string") {
     return { ok: false, reason: "Invitation HTML must be a string." };
   }
 
-  // Total URL-token occurrences in the raw source (ground truth).
-  const totalUrlTokens = countUrlTokens(raw);
-  if (totalUrlTokens === 0) {
+  const requireUrlToken = options.requireUrlToken ?? true;
+  if (requireUrlToken && !hasInvitationUrlToken(raw)) {
     return {
       ok: false,
-      reason:
-        "The invitation HTML must include the survey link token (e.g. {{invitationUrl}}) — either as a link href or as plain text.",
+      reason: "Invitation HTML must include the survey link token {{invitationUrl}}.",
     };
   }
+
+  // Total URL-token occurrences in the raw source (ground truth).
+  const totalUrlTokens = countInvitationUrlTokens(raw);
 
   let validHrefTokens = 0;
   let textTokens = 0;
@@ -236,12 +202,12 @@ export function validateInvitationHtml(raw: string): ValidationResult {
     {
       onopentag(name, attribs) {
         for (const [attrName, attrValue] of Object.entries(attribs)) {
-          if (!containsUrlToken(attrValue)) continue;
+          if (!hasInvitationUrlToken(attrValue)) continue;
           const lower = attrName.toLowerCase();
           if (name === "a" && lower === "href") {
             // Allowed ONLY if the whole attr value is exactly the token.
-            if (isWholeUrlToken(attrValue)) {
-              validHrefTokens += countUrlTokens(attrValue);
+            if (isWholeInvitationUrlToken(attrValue)) {
+              validHrefTokens += countInvitationUrlTokens(attrValue);
             } else {
               fail(
                 `The survey link token must be the entire href value (href="{{invitationUrl}}"), not combined with other text in "${attrName}".`,
@@ -256,12 +222,12 @@ export function validateInvitationHtml(raw: string): ValidationResult {
         }
       },
       ontext(text) {
-        if (containsUrlToken(text)) {
-          textTokens += countUrlTokens(text);
+        if (hasInvitationUrlToken(text)) {
+          textTokens += countInvitationUrlTokens(text);
         }
       },
       oncomment(data) {
-        if (containsUrlToken(data)) {
+        if (hasInvitationUrlToken(data)) {
           fail("The survey link token may not appear inside an HTML comment.");
         }
       },

@@ -21,7 +21,10 @@ import {
 import { loadLiveCampaign } from "@/lib/assessments/campaign-live";
 import { logAudit } from "@/lib/audit";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
-import { waveDCustomHtmlEmailEnabled } from "@/lib/assessments/wave-d-feature-flags";
+import {
+  assessmentInviteBrandedCustomHtmlEnabled,
+  waveDCustomHtmlEmailEnabled,
+} from "@/lib/assessments/wave-d-feature-flags";
 import {
   validateInvitationHtml,
   MAX_INVITATION_HTML_LENGTH,
@@ -246,7 +249,9 @@ export async function PATCH(
             { status: 400 }
           );
         }
-        const placement = validateInvitationHtml(rawHtml);
+        const placement = validateInvitationHtml(rawHtml, {
+          requireUrlToken: !assessmentInviteBrandedCustomHtmlEnabled(),
+        });
         if (!placement.ok) {
           return NextResponse.json(
             { success: false, error: placement.reason },

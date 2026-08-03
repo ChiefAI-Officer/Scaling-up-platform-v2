@@ -1,8 +1,8 @@
 import {
   sanitizeEmailHtml,
   validateInvitationHtml,
-  INVITATION_URL_TOKENS,
 } from "@/lib/assessments/email-html-sanitizer";
+import { INVITATION_URL_TOKENS } from "@/lib/assessments/invitation-html-policy";
 
 // ──────────────────────────────────────────────────────────────────────────
 // sanitizeEmailHtml — STRICT post-interpolation sanitizer (coach-pasted HTML).
@@ -287,6 +287,27 @@ describe("validateInvitationHtml — rejects bad token placement", () => {
   test("rejects snake_case token misplaced in src", () => {
     const r = validateInvitationHtml('<img src="{{assessment_url}}">');
     expect(r.ok).toBe(false);
+  });
+
+  it("allows zero URL tokens when requireUrlToken is false", () => {
+    expect(
+      validateInvitationHtml("<h1>Coach-authored body</h1>", {
+        requireUrlToken: false,
+      }),
+    ).toEqual({ ok: true });
+  });
+
+  it("still rejects unsafe placement when requireUrlToken is false", () => {
+    const result = validateInvitationHtml(
+      '<img src="{{invitationUrl}}" alt="unsafe">',
+      { requireUrlToken: false },
+    );
+    expect(result.ok).toBe(false);
+  });
+
+  it("keeps URL tokens required by default", () => {
+    const result = validateInvitationHtml("<p>No URL token</p>");
+    expect(result.ok).toBe(false);
   });
 });
 
