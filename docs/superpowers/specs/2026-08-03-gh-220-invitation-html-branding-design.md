@@ -449,10 +449,15 @@ campaign create/update API, feature-flag, and two editor suites; scoped ESLint;
 5. Let organic sends populate PII-free mode telemetry. Do not manufacture a
    customer invitation solely for rollout verification.
 
-For value verification, an empty or `[SENSITIVE]` read for a
-`sensitive`-typed flag means **unknown**, not off. Such a value requires a live
-in-app check or a separately authorized REST rewrite as `type:"encrypted"`;
-REST-written `encrypted` flags are readable. Never paste returned values.
+For exact value verification, use
+`vercel env pull --environment=production` from a correctly linked/scoped
+Vercel CLI context. REST GET may confirm set/type/target metadata, but its
+`decrypt=true` response is ciphertext on this plan and cannot distinguish
+`"1"` from `"0"`; it is never exact value evidence. An empty or `[SENSITIVE]`
+read for a `sensitive`-typed flag means **unknown**, not off. Such a value
+requires a live in-app check or a separately authorized REST rewrite as
+`type:"encrypted"`, followed by exact verification through the correctly
+linked/scoped Vercel CLI. Never paste returned values.
 
 The verified 2026-08-03 inventory—zero live and two soft-deleted overrides—is
 evidence for planning, not permission to skip the activation-time audit.

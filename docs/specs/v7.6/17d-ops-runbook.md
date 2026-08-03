@@ -159,13 +159,16 @@ ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED
 5. Redeploy, then verify the exact deployment, aliases, health, and flag state.
 6. Observe organic PII-free telemetry without manufacturing a customer send.
 
-For value verification, follow `CLAUDE.md`'s Production flag guidance: read the
-correctly scoped Production environment via the Vercel CLI and/or authenticated
-`GET /v10/projects/{id}/env?teamId=…&decrypt=true`, and never paste returned
-values. REST-written `encrypted` flags are readable. A `sensitive`-typed flag's
-value cannot be verified from an empty read or `[SENSITIVE]`; that state is
+For exact value verification, follow `CLAUDE.md`'s Production flag guidance and
+use `vercel env pull --environment=production` from a correctly linked/scoped
+Vercel CLI context; never paste returned values. An authenticated
+`GET /v10/projects/{id}/env?teamId=…&decrypt=true` may confirm set/type/target
+metadata, but this plan returns ciphertext and cannot distinguish `"1"` from
+`"0"`, so it is never exact value evidence. A `sensitive`-typed flag's value
+cannot be verified from an empty read or `[SENSITIVE]`; that state is
 **unknown**, not off. Resolve a sensitive kill-switch value with a live in-app
-check or a separately authorized REST rewrite as `type:"encrypted"` before
+check or a separately authorized REST rewrite as `type:"encrypted"`, followed
+by exact verification through the correctly linked/scoped Vercel CLI, before
 activation. Do not infer flag values from the mis-paired local project link.
 
 Production activation is outside the implementation PR. Do not infer activation
