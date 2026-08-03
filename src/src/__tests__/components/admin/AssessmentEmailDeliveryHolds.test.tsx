@@ -48,25 +48,42 @@ const DETAIL = {
   authorizationSnapshot: {
     schemaVersion: 1,
     common: {
-      campaignStatus: "ACTIVE",
-      closeAt: "2026-08-30T00:00:00.000Z",
-      invitationStatus: "SUBMITTED",
-      invitationExpiresAt: "2026-08-20T00:00:00.000Z",
+      campaignId: "campaign-1",
+      invitationId: "invitation-1",
+      respondentId: "respondent-1",
+      templateId: "template-1",
       templateAlias: "qsp-v2",
       versionId: "version-1",
+      accessMode: "INVITED",
+      campaignStatus: "ACTIVE",
+      campaignDeleted: false,
+      closeAt: "2026-08-30T00:00:00.000Z",
+      invitationStatus: "SUBMITTED",
+      invitationRevoked: false,
+      invitationExpiresAt: "2026-08-20T00:00:00.000Z",
+      recipientRole: "RESPONDENT",
+      emailType: "ASSESSMENT_RESULTS",
+      phase2Fingerprint: "e".repeat(64),
     },
     respondentResults: {
       canonicalRecipientMailbox: "person@example.com",
       sendResultsToRespondent: true,
+      featureKey: "WAVE_D_RESULTS_EMAIL_ENABLED",
+      featureEnabled: true,
       approved: true,
+      approvedContentHash: "f".repeat(64),
     },
   },
   contentProvenance: {
+    schemaVersion: 1,
     templateId: "template-1",
     versionId: "version-1",
     templateAlias: "qsp-v2",
     reportType: "ASSESSMENT_RESULTS",
+    approvalHash: "f".repeat(64),
     rendererContractVersion: 1,
+    sourceCommit: "c".repeat(40),
+    renderInputHash: "d".repeat(64),
   },
   status: "HELD",
   version: 7,
@@ -75,16 +92,30 @@ const DETAIL = {
   heldAt: "2026-08-03T04:00:00.000Z",
   expiresAt: "2026-09-02T10:00:00.000Z",
   current: {
+    submission: {
+      exists: true,
+      campaignId: "campaign-1",
+      invitationId: "invitation-1",
+      respondentId: "respondent-1",
+    },
     campaign: {
       exists: true,
       status: "CLOSED",
+      accessMode: "INVITED",
+      deleted: false,
       closeAt: "2026-08-30T00:00:00.000Z",
       templateId: "template-1",
       versionId: "version-1",
+      sendResultsToRespondent: true,
+      notifyCoachOnCompletion: true,
+      createdByCoachId: "coach-1",
     },
     invitation: {
       exists: true,
+      campaignId: "campaign-1",
+      respondentId: "respondent-1",
       status: "SUBMITTED",
+      revoked: false,
       expiresAt: "2026-08-20T00:00:00.000Z",
     },
     respondent: {
@@ -95,7 +126,11 @@ const DETAIL = {
       exists: true,
       alias: "qsp-v2",
       resultsEmailApproved: true,
+      storedApprovedContentHash: "f".repeat(64),
+      liveContentHash: "f".repeat(64),
     },
+    version: { exists: true, templateId: "template-1" },
+    coach: null,
     features: {
       resultsEmailEnabled: true,
       coachNotifyEnabled: true,
@@ -128,6 +163,37 @@ const DETAIL_B = {
   respondentId: "respondent-2",
   recipientEmail: "second@example.net",
   subject: "Second frozen subject",
+  authorizationSnapshot: {
+    ...DETAIL.authorizationSnapshot,
+    common: {
+      ...DETAIL.authorizationSnapshot.common,
+      campaignId: "campaign-2",
+      invitationId: "invitation-2",
+      respondentId: "respondent-2",
+    },
+    respondentResults: {
+      ...DETAIL.authorizationSnapshot.respondentResults,
+      canonicalRecipientMailbox: "second@example.net",
+    },
+  },
+  current: {
+    ...DETAIL.current,
+    submission: {
+      ...DETAIL.current.submission,
+      campaignId: "campaign-2",
+      invitationId: "invitation-2",
+      respondentId: "respondent-2",
+    },
+    invitation: {
+      ...DETAIL.current.invitation,
+      campaignId: "campaign-2",
+      respondentId: "respondent-2",
+    },
+    respondent: {
+      ...DETAIL.current.respondent,
+      canonicalMailbox: "second@example.net",
+    },
+  },
   version: 11,
   reviewToken: "second-review-token",
 };
@@ -156,6 +222,15 @@ function deferred<T>() {
     resolve = resolver;
   });
   return { promise, resolve };
+}
+
+function withoutField(
+  value: Record<string, unknown>,
+  field: string,
+): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(value).filter(([key]) => key !== field),
+  );
 }
 
 async function renderQueueAndOpenDetail() {
@@ -350,6 +425,146 @@ describe("AssessmentEmailDeliveryHolds", () => {
     expect(screen.queryByTitle("Frozen email preview")).not.toBeInTheDocument();
     expect(
       screen.queryByText("raw payload must not cross the boundary"),
+    ).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["an empty authorization snapshot", { ...DETAIL, authorizationSnapshot: {} }],
+    ["empty content provenance", { ...DETAIL, contentProvenance: {} }],
+    ["empty current authorization facts", { ...DETAIL, current: {} }],
+    ["an empty drift decision", { ...DETAIL, drift: {} }],
+    [
+      "a missing required intent identity",
+      withoutField(DETAIL, "submissionId"),
+    ],
+    ["a non-string campaign identity", { ...DETAIL, campaignId: 42 }],
+    ["an empty respondent identity", { ...DETAIL, respondentId: "" }],
+    ["a missing primary hold reason", withoutField(DETAIL, "holdReason")],
+    ["malformed hold reasons", { ...DETAIL, holdReasons: {} }],
+    ["a missing review context hash", withoutField(DETAIL, "reviewContextHash")],
+    ["a malformed review context hash", { ...DETAIL, reviewContextHash: 12 }],
+    [
+      "an incomplete respondent role block",
+      {
+        ...DETAIL,
+        authorizationSnapshot: withoutField(
+          DETAIL.authorizationSnapshot,
+          "respondentResults",
+        ),
+      },
+    ],
+    [
+      "a respondent snapshot with the owning-coach discriminant",
+      {
+        ...DETAIL,
+        authorizationSnapshot: {
+          ...withoutField(
+            DETAIL.authorizationSnapshot,
+            "respondentResults",
+          ),
+          coachCompletion: {
+            canonicalRecipientMailbox: "coach@example.com",
+            notifyCoachOnCompletion: true,
+            featureKey: "WAVE_D_COACH_NOTIFY_ENABLED",
+            featureEnabled: true,
+            coachId: "coach-1",
+          },
+        },
+      },
+    ],
+    [
+      "a mismatched nested recipient role",
+      {
+        ...DETAIL,
+        authorizationSnapshot: {
+          ...DETAIL.authorizationSnapshot,
+          common: {
+            ...DETAIL.authorizationSnapshot.common,
+            recipientRole: "OWNING_COACH",
+            emailType: "COACH_COMPLETION",
+          },
+        },
+      },
+    ],
+    [
+      "an invalid held drift reason",
+      {
+        ...DETAIL,
+        drift: {
+          kind: "HELD",
+          primaryReason: "NOT_A_HOLD_REASON",
+          reasons: ["NOT_A_HOLD_REASON"],
+        },
+      },
+    ],
+    [
+      "a malformed held drift reason array",
+      {
+        ...DETAIL,
+        drift: {
+          kind: "HELD",
+          primaryReason: "CAMPAIGN_STATUS_CHANGED",
+          reasons: "CAMPAIGN_STATUS_CHANGED",
+        },
+      },
+    ],
+    [
+      "an authorized decision carrying held-only fields",
+      {
+        ...DETAIL,
+        drift: {
+          kind: "AUTHORIZED",
+          reasons: ["CAMPAIGN_STATUS_CHANGED"],
+        },
+      },
+    ],
+    ["a malformed held date", { ...DETAIL, heldAt: "not-a-date" }],
+    ["a malformed expiry date", { ...DETAIL, expiresAt: null }],
+    [
+      "a malformed nullable campaign date",
+      {
+        ...DETAIL,
+        current: {
+          ...DETAIL.current,
+          campaign: { ...DETAIL.current.campaign, closeAt: [] },
+        },
+      },
+    ],
+    [
+      "a malformed nullable approval hash",
+      {
+        ...DETAIL,
+        contentProvenance: {
+          ...DETAIL.contentProvenance,
+          approvalHash: 123,
+        },
+      },
+    ],
+    ["an empty review token", { ...DETAIL, reviewToken: "" }],
+  ])("fails closed for detail evidence with %s", async (_label, unsafeDetail) => {
+    mockedFetch()
+      .mockResolvedValueOnce(
+        response({ data: [LIST_ROW], nextCursor: null }) as Response,
+      )
+      .mockResolvedValueOnce(response({ data: unsafeDetail }) as Response);
+
+    render(<AssessmentEmailDeliveryHolds />);
+    expect(await screen.findByText("p***@example.com")).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Review p***@example.com" }),
+    );
+
+    expect(
+      await screen.findByText(
+        "The audited held-intent detail could not be loaded. Try again.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByTitle("Frozen email preview")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Release frozen payload" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Cancel permanently" }),
     ).not.toBeInTheDocument();
   });
 
@@ -585,16 +800,40 @@ describe("AssessmentEmailDeliveryHolds", () => {
       liveApprovalHash,
     );
     expectFact("Results email feature", "Yes", "No");
-    expectFact(
-      "Phase 2 fingerprint",
-      "a".repeat(64),
-      "Frozen provenance only",
-    );
-    expectFact(
-      "Feature key",
-      "WAVE_D_RESULTS_EMAIL_ENABLED",
-      "resultsEmailEnabled",
-    );
+    expect(
+      within(
+        screen.getByRole("row", { name: /Phase 2 fingerprint/i }),
+      ).getByText("a".repeat(64)),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("row", { name: /Feature key/i })).getByText(
+        "WAVE_D_RESULTS_EMAIL_ENABLED",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("highlights only genuinely changed comparison facts, not evidence-only contract rows", async () => {
+    await renderQueueAndOpenDetail();
+
+    const changedStatus = screen.getByRole("row", {
+      name: /Campaign status/i,
+    });
+    expect(changedStatus).toHaveClass("bg-warning/5");
+
+    for (const label of [
+      /Feature key/i,
+      /Frozen payload integrity/i,
+      /Phase 2 fingerprint/i,
+    ]) {
+      const evidenceRow = screen.getByRole("row", { name: label });
+      expect(evidenceRow).not.toHaveClass("bg-warning/5");
+      expect(within(evidenceRow).getByText("Evidence only")).toBeInTheDocument();
+    }
+
+    const unchangedDeadline = screen.getByRole("row", {
+      name: /Campaign deadline/i,
+    });
+    expect(unchangedDeadline).not.toHaveClass("bg-warning/5");
   });
 
   it("shows owning-coach drift reasons with frozen/current ownership evidence", async () => {
@@ -602,6 +841,7 @@ describe("AssessmentEmailDeliveryHolds", () => {
       ...DETAIL,
       recipientRole: "OWNING_COACH",
       emailType: "COACH_COMPLETION",
+      recipientEmail: "frozen-coach@example.com",
       authorizationSnapshot: {
         schemaVersion: 1,
         common: {

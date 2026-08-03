@@ -9,6 +9,7 @@ import {
   ShieldAlert,
   XCircle,
 } from "lucide-react";
+import { z } from "zod";
 
 const RELEASE_REASON = "DRIFT_REVIEWED_SEND_FROZEN";
 const CANCELLATION_REASONS = [
@@ -27,34 +28,6 @@ const STALE_REVIEW_ERRORS = new Set([
   "REVIEW_TOKEN_INTENT_MISMATCH",
   "REVIEW_TOKEN_VERSION_MISMATCH",
   "REVIEW_CONTEXT_CHANGED",
-]);
-
-const HELD_DETAIL_FIELDS = new Set([
-  "id",
-  "submissionId",
-  "campaignId",
-  "invitationId",
-  "respondentId",
-  "recipientRole",
-  "emailType",
-  "recipientEmail",
-  "subject",
-  "previewDocument",
-  "payloadHash",
-  "snapshotSchemaVersion",
-  "rendererContractVersion",
-  "authorizationSnapshot",
-  "contentProvenance",
-  "status",
-  "version",
-  "holdReason",
-  "holdReasons",
-  "heldAt",
-  "expiresAt",
-  "current",
-  "drift",
-  "reviewContextHash",
-  "reviewToken",
 ]);
 
 const DRIFT_REASON_LABELS: Record<string, string> = {
@@ -77,6 +50,250 @@ const DRIFT_REASON_LABELS: Record<string, string> = {
   RETRY_EXHAUSTED: "Automatic retry budget exhausted",
 };
 
+const holdReasonSchema = z.enum([
+  "CAMPAIGN_DELETED",
+  "CAMPAIGN_STATUS_CHANGED",
+  "CAMPAIGN_DEADLINE_CHANGED",
+  "INVITATION_REVOKED",
+  "INVITATION_EXPIRY_CHANGED",
+  "IDENTITY_LINK_CHANGED",
+  "RESPONDENT_EMAIL_CHANGED",
+  "COACH_OWNER_CHANGED",
+  "COACH_EMAIL_CHANGED",
+  "TEMPLATE_CHANGED",
+  "VERSION_CHANGED",
+  "APPROVAL_REVOKED",
+  "APPROVAL_HASH_CHANGED",
+  "FEATURE_DISABLED",
+  "PAYLOAD_INTEGRITY_FAILED",
+  "SCHEMA_UNSUPPORTED",
+  "RETRY_EXHAUSTED",
+]);
+const requiredStringSchema = z.string().min(1);
+const nullableStringSchema = requiredStringSchema.nullable();
+const dateTimeSchema = z.string().datetime();
+const sha256Schema = z.string().regex(/^[a-f0-9]{64}$/);
+
+const frozenCommonBaseSchema = z
+  .object({
+    campaignId: requiredStringSchema,
+    invitationId: requiredStringSchema,
+    respondentId: requiredStringSchema,
+    templateId: requiredStringSchema,
+    templateAlias: requiredStringSchema,
+    versionId: requiredStringSchema,
+    accessMode: z.literal("INVITED"),
+    campaignStatus: requiredStringSchema,
+    campaignDeleted: z.boolean(),
+    invitationStatus: z.literal("SUBMITTED"),
+    invitationRevoked: z.boolean(),
+    closeAt: dateTimeSchema.nullable(),
+    invitationExpiresAt: dateTimeSchema,
+    phase2Fingerprint: sha256Schema,
+  })
+  .strict();
+
+const authorizationSnapshotSchema = z.union([
+  z
+    .object({
+      schemaVersion: z.literal(1),
+      common: frozenCommonBaseSchema.extend({
+        recipientRole: z.literal("RESPONDENT"),
+        emailType: z.literal("ASSESSMENT_RESULTS"),
+      }),
+      respondentResults: z
+        .object({
+          canonicalRecipientMailbox: requiredStringSchema,
+          sendResultsToRespondent: z.literal(true),
+          featureKey: z.literal("WAVE_D_RESULTS_EMAIL_ENABLED"),
+          featureEnabled: z.literal(true),
+          approved: z.literal(true),
+          approvedContentHash: sha256Schema,
+        })
+        .strict(),
+    })
+    .strict(),
+  z
+    .object({
+      schemaVersion: z.literal(1),
+      common: frozenCommonBaseSchema.extend({
+        recipientRole: z.literal("OWNING_COACH"),
+        emailType: z.literal("COACH_COMPLETION"),
+      }),
+      coachCompletion: z
+        .object({
+          canonicalRecipientMailbox: requiredStringSchema,
+          notifyCoachOnCompletion: z.literal(true),
+          featureKey: z.literal("WAVE_D_COACH_NOTIFY_ENABLED"),
+          featureEnabled: z.literal(true),
+          coachId: requiredStringSchema,
+        })
+        .strict(),
+    })
+    .strict(),
+]);
+
+const contentProvenanceSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    templateId: requiredStringSchema,
+    versionId: requiredStringSchema,
+    templateAlias: requiredStringSchema,
+    reportType: requiredStringSchema,
+    approvalHash: nullableStringSchema,
+    rendererContractVersion: z.literal(1),
+    sourceCommit: requiredStringSchema,
+    renderInputHash: sha256Schema,
+  })
+  .strict();
+
+const currentAuthorizationFactsSchema = z
+  .object({
+    submission: z
+      .object({
+        exists: z.boolean(),
+        campaignId: nullableStringSchema,
+        invitationId: nullableStringSchema,
+        respondentId: nullableStringSchema,
+      })
+      .strict(),
+    campaign: z
+      .object({
+        exists: z.boolean(),
+        templateId: nullableStringSchema,
+        versionId: nullableStringSchema,
+        accessMode: nullableStringSchema,
+        status: nullableStringSchema,
+        deleted: z.boolean().nullable(),
+        closeAt: dateTimeSchema.nullable(),
+        sendResultsToRespondent: z.boolean().nullable(),
+        notifyCoachOnCompletion: z.boolean().nullable(),
+        createdByCoachId: nullableStringSchema,
+      })
+      .strict(),
+    invitation: z
+      .object({
+        exists: z.boolean(),
+        campaignId: nullableStringSchema,
+        respondentId: nullableStringSchema,
+        status: nullableStringSchema,
+        revoked: z.boolean().nullable(),
+        expiresAt: dateTimeSchema.nullable(),
+      })
+      .strict(),
+    respondent: z
+      .object({
+        exists: z.boolean(),
+        canonicalMailbox: nullableStringSchema,
+      })
+      .strict(),
+    template: z
+      .object({
+        exists: z.boolean(),
+        alias: nullableStringSchema,
+        resultsEmailApproved: z.boolean().nullable(),
+        storedApprovedContentHash: nullableStringSchema,
+        liveContentHash: nullableStringSchema,
+      })
+      .strict(),
+    version: z
+      .object({
+        exists: z.boolean(),
+        templateId: nullableStringSchema,
+      })
+      .strict(),
+    coach: z
+      .object({
+        exists: z.boolean(),
+        id: nullableStringSchema,
+        canonicalMailbox: nullableStringSchema,
+      })
+      .strict()
+      .nullable(),
+    features: z
+      .object({
+        resultsEmailEnabled: z.boolean(),
+        coachNotifyEnabled: z.boolean(),
+      })
+      .strict(),
+  })
+  .strict();
+
+const driftDecisionSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("AUTHORIZED") }).strict(),
+  z
+    .object({
+      kind: z.literal("HELD"),
+      primaryReason: holdReasonSchema,
+      reasons: z.array(holdReasonSchema).min(1),
+    })
+    .strict()
+    .superRefine((decision, context) => {
+      if (!decision.reasons.includes(decision.primaryReason)) {
+        context.addIssue({
+          code: "custom",
+          message: "The primary drift reason must appear in the reason list.",
+        });
+      }
+    }),
+]);
+
+const heldDetailSchema = z
+  .object({
+    id: requiredStringSchema,
+    submissionId: requiredStringSchema,
+    campaignId: requiredStringSchema,
+    invitationId: requiredStringSchema,
+    respondentId: requiredStringSchema,
+    recipientRole: z.enum(["RESPONDENT", "OWNING_COACH"]),
+    emailType: z.enum(["ASSESSMENT_RESULTS", "COACH_COMPLETION"]),
+    recipientEmail: requiredStringSchema,
+    subject: z.string(),
+    previewDocument: requiredStringSchema,
+    payloadHash: sha256Schema,
+    snapshotSchemaVersion: z.number().int().nonnegative(),
+    rendererContractVersion: z.number().int().nonnegative(),
+    authorizationSnapshot: authorizationSnapshotSchema,
+    contentProvenance: contentProvenanceSchema,
+    status: z.literal("HELD"),
+    version: z.number().int().nonnegative(),
+    holdReason: holdReasonSchema.nullable(),
+    holdReasons: z.array(holdReasonSchema),
+    heldAt: dateTimeSchema.nullable(),
+    expiresAt: dateTimeSchema,
+    current: currentAuthorizationFactsSchema,
+    drift: driftDecisionSchema,
+    reviewContextHash: sha256Schema,
+    reviewToken: requiredStringSchema,
+  })
+  .strict()
+  .superRefine((detail, context) => {
+    const snapshot = detail.authorizationSnapshot;
+    const common = snapshot.common;
+    const expectedMailbox =
+      "respondentResults" in snapshot
+        ? snapshot.respondentResults.canonicalRecipientMailbox
+        : snapshot.coachCompletion.canonicalRecipientMailbox;
+    const bindingsMatch =
+      detail.campaignId === common.campaignId &&
+      detail.invitationId === common.invitationId &&
+      detail.respondentId === common.respondentId &&
+      detail.recipientRole === common.recipientRole &&
+      detail.emailType === common.emailType &&
+      detail.recipientEmail === expectedMailbox &&
+      detail.contentProvenance.templateId === common.templateId &&
+      detail.contentProvenance.versionId === common.versionId &&
+      detail.contentProvenance.templateAlias === common.templateAlias;
+    if (!bindingsMatch) {
+      context.addIssue({
+        code: "custom",
+        message: "Held detail identity and role evidence must stay bound.",
+      });
+    }
+  });
+
+const heldDetailResponseSchema = z.object({ data: heldDetailSchema }).strict();
+
 type HeldListRow = {
   id: string;
   version: number;
@@ -98,27 +315,7 @@ type HeldListRow = {
   };
 };
 
-type HeldDetail = {
-  id: string;
-  recipientRole: string;
-  emailType: string;
-  recipientEmail: string;
-  subject: string;
-  previewDocument: string;
-  payloadHash: string;
-  snapshotSchemaVersion: number;
-  rendererContractVersion: number;
-  version: number;
-  holdReason: string | null;
-  holdReasons: unknown;
-  heldAt: string | null;
-  expiresAt: string;
-  authorizationSnapshot: unknown;
-  contentProvenance: unknown;
-  current: unknown;
-  drift: unknown;
-  reviewToken: string;
-};
+type HeldDetail = z.infer<typeof heldDetailSchema>;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -184,31 +381,9 @@ function parseDetailResponse(
   value: unknown,
   requestedIntentId: string,
 ): HeldDetail | null {
-  if (!isRecord(value) || !isRecord(value.data)) return null;
-  const data = value.data;
-  if (
-    Object.keys(data).some((key) => !HELD_DETAIL_FIELDS.has(key)) ||
-    data.id !== requestedIntentId ||
-    data.status !== "HELD" ||
-    typeof data.recipientRole !== "string" ||
-    typeof data.emailType !== "string" ||
-    typeof data.recipientEmail !== "string" ||
-    typeof data.subject !== "string" ||
-    typeof data.previewDocument !== "string" ||
-    typeof data.payloadHash !== "string" ||
-    typeof data.snapshotSchemaVersion !== "number" ||
-    typeof data.rendererContractVersion !== "number" ||
-    typeof data.version !== "number" ||
-    typeof data.expiresAt !== "string" ||
-    typeof data.reviewToken !== "string" ||
-    !isRecord(data.authorizationSnapshot) ||
-    !isRecord(data.contentProvenance) ||
-    !isRecord(data.current) ||
-    !isRecord(data.drift)
-  ) {
-    return null;
-  }
-  return data as HeldDetail;
+  const parsed = heldDetailResponseSchema.safeParse(value);
+  if (!parsed.success || parsed.data.data.id !== requestedIntentId) return null;
+  return parsed.data.data;
 }
 
 function isResolutionResponse(
@@ -745,17 +920,9 @@ function DriftComparison({ detail }: { detail: HeldDetail }) {
     frozenCommon.recipientRole === "OWNING_COACH"
       ? currentCoach.canonicalMailbox
       : currentRespondent.canonicalMailbox;
-  const rawDriftReasons = valueAt(detail.drift, "reasons");
-  const driftReasons = Array.isArray(rawDriftReasons)
-    ? rawDriftReasons.filter(
-        (reason): reason is string => typeof reason === "string",
-      )
-    : [];
-  const storedHoldReasons = Array.isArray(detail.holdReasons)
-    ? detail.holdReasons.filter(
-        (reason): reason is string => typeof reason === "string",
-      )
-    : [];
+  const driftReasons =
+    detail.drift.kind === "HELD" ? detail.drift.reasons : [];
+  const storedHoldReasons = detail.holdReasons;
   const reviewReasons = Array.from(
     new Set([
       ...(detail.holdReason ? [detail.holdReason] : []),
@@ -770,7 +937,8 @@ function DriftComparison({ detail }: { detail: HeldDetail }) {
     group: string;
     label: string;
     frozen: unknown;
-    current: unknown;
+    current?: unknown;
+    evidenceOnly?: boolean;
   }> = [
     {
       group: "Identity links",
@@ -1010,9 +1178,7 @@ function DriftComparison({ detail }: { detail: HeldDetail }) {
       frozen: isRespondent
         ? frozenRespondent.featureKey
         : frozenCoach.featureKey,
-      current: isRespondent
-        ? "resultsEmailEnabled"
-        : "coachNotifyEnabled",
+      evidenceOnly: true,
     },
     {
       group: "Contract",
@@ -1032,8 +1198,8 @@ function DriftComparison({ detail }: { detail: HeldDetail }) {
     {
       group: "Contract",
       label: "Frozen payload integrity",
-      frozen: detail.payloadHash ? "Hash stored" : "Missing",
-      current: "Verified before review",
+      frozen: `Verified before review · ${detail.payloadHash}`,
+      evidenceOnly: true,
     },
     {
       group: "Contract",
@@ -1051,7 +1217,7 @@ function DriftComparison({ detail }: { detail: HeldDetail }) {
       group: "Contract",
       label: "Phase 2 fingerprint",
       frozen: frozenCommon.phase2Fingerprint,
-      current: "Frozen provenance only",
+      evidenceOnly: true,
     },
     {
       group: "Version",
@@ -1118,8 +1284,11 @@ function DriftComparison({ detail }: { detail: HeldDetail }) {
           <tbody className="divide-y divide-border">
             {facts.map((fact) => {
               const frozen = displayValue(fact.frozen);
-              const current = displayValue(fact.current);
-              const changed = frozen !== current;
+              const current = fact.evidenceOnly
+                ? null
+                : displayValue(fact.current);
+              const changed =
+                fact.evidenceOnly !== true && frozen !== current;
               return (
                 <tr key={fact.label} className={changed ? "bg-warning/5" : ""}>
                   <td className="px-3 py-2.5 text-[0.6875rem] font-bold uppercase tracking-wider text-muted-foreground">
@@ -1128,16 +1297,32 @@ function DriftComparison({ detail }: { detail: HeldDetail }) {
                   <th className="px-3 py-2.5 text-left text-xs font-semibold text-foreground">
                     {fact.label}
                   </th>
-                  <td className="px-3 py-2.5 text-xs text-muted-foreground">
-                    {frozen}
-                  </td>
-                  <td
-                    className={`px-3 py-2.5 text-xs font-semibold ${
-                      changed ? "text-warning-foreground" : "text-foreground"
-                    }`}
-                  >
-                    {current}
-                  </td>
+                  {fact.evidenceOnly ? (
+                    <td
+                      colSpan={2}
+                      className="px-3 py-2.5 text-xs text-foreground"
+                    >
+                      <span className="break-all font-semibold">{frozen}</span>
+                      <span className="ml-2 whitespace-nowrap rounded-full bg-muted px-2 py-0.5 text-[0.6875rem] font-bold uppercase tracking-wide text-muted-foreground">
+                        Evidence only
+                      </span>
+                    </td>
+                  ) : (
+                    <>
+                      <td className="px-3 py-2.5 text-xs text-muted-foreground">
+                        {frozen}
+                      </td>
+                      <td
+                        className={`px-3 py-2.5 text-xs font-semibold ${
+                          changed
+                            ? "text-warning-foreground"
+                            : "text-foreground"
+                        }`}
+                      >
+                        {current}
+                      </td>
+                    </>
+                  )}
                 </tr>
               );
             })}
