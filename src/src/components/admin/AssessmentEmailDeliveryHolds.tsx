@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -29,6 +29,54 @@ const STALE_REVIEW_ERRORS = new Set([
   "REVIEW_CONTEXT_CHANGED",
 ]);
 
+const HELD_DETAIL_FIELDS = new Set([
+  "id",
+  "submissionId",
+  "campaignId",
+  "invitationId",
+  "respondentId",
+  "recipientRole",
+  "emailType",
+  "recipientEmail",
+  "subject",
+  "previewDocument",
+  "payloadHash",
+  "snapshotSchemaVersion",
+  "rendererContractVersion",
+  "authorizationSnapshot",
+  "contentProvenance",
+  "status",
+  "version",
+  "holdReason",
+  "holdReasons",
+  "heldAt",
+  "expiresAt",
+  "current",
+  "drift",
+  "reviewContextHash",
+  "reviewToken",
+]);
+
+const DRIFT_REASON_LABELS: Record<string, string> = {
+  CAMPAIGN_DELETED: "Campaign deleted or missing",
+  CAMPAIGN_STATUS_CHANGED: "Campaign status or access changed",
+  CAMPAIGN_DEADLINE_CHANGED: "Campaign deadline changed",
+  INVITATION_REVOKED: "Invitation revoked or status changed",
+  INVITATION_EXPIRY_CHANGED: "Invitation expiry changed",
+  IDENTITY_LINK_CHANGED: "Identity link changed",
+  RESPONDENT_EMAIL_CHANGED: "Respondent email changed",
+  COACH_OWNER_CHANGED: "Owning coach changed",
+  COACH_EMAIL_CHANGED: "Owning coach email changed",
+  TEMPLATE_CHANGED: "Assessment template changed",
+  VERSION_CHANGED: "Assessment template version changed",
+  APPROVAL_REVOKED: "Template email approval revoked",
+  APPROVAL_HASH_CHANGED: "Approved content hash changed",
+  FEATURE_DISABLED: "Feature gate disabled",
+  PAYLOAD_INTEGRITY_FAILED: "Frozen payload integrity failed",
+  SCHEMA_UNSUPPORTED: "Snapshot or renderer contract unsupported",
+  RETRY_EXHAUSTED: "Automatic retry budget exhausted",
+};
+
 type HeldListRow = {
   id: string;
   version: number;
@@ -52,9 +100,14 @@ type HeldListRow = {
 
 type HeldDetail = {
   id: string;
+  recipientRole: string;
+  emailType: string;
   recipientEmail: string;
   subject: string;
   previewDocument: string;
+  payloadHash: string;
+  snapshotSchemaVersion: number;
+  rendererContractVersion: number;
   version: number;
   holdReason: string | null;
   holdReasons: unknown;
@@ -127,20 +180,31 @@ function parseListResponse(value: unknown): {
   return { data: value.data, nextCursor: value.nextCursor };
 }
 
-function parseDetailResponse(value: unknown): HeldDetail | null {
+function parseDetailResponse(
+  value: unknown,
+  requestedIntentId: string,
+): HeldDetail | null {
   if (!isRecord(value) || !isRecord(value.data)) return null;
   const data = value.data;
   if (
-    typeof data.id !== "string" ||
+    Object.keys(data).some((key) => !HELD_DETAIL_FIELDS.has(key)) ||
+    data.id !== requestedIntentId ||
+    data.status !== "HELD" ||
+    typeof data.recipientRole !== "string" ||
+    typeof data.emailType !== "string" ||
     typeof data.recipientEmail !== "string" ||
     typeof data.subject !== "string" ||
     typeof data.previewDocument !== "string" ||
+    typeof data.payloadHash !== "string" ||
+    typeof data.snapshotSchemaVersion !== "number" ||
+    typeof data.rendererContractVersion !== "number" ||
     typeof data.version !== "number" ||
     typeof data.expiresAt !== "string" ||
     typeof data.reviewToken !== "string" ||
-    !Object.prototype.hasOwnProperty.call(data, "authorizationSnapshot") ||
-    !Object.prototype.hasOwnProperty.call(data, "current") ||
-    !Object.prototype.hasOwnProperty.call(data, "drift")
+    !isRecord(data.authorizationSnapshot) ||
+    !isRecord(data.contentProvenance) ||
+    !isRecord(data.current) ||
+    !isRecord(data.drift)
   ) {
     return null;
   }
@@ -202,10 +266,11 @@ export function AssessmentEmailDeliveryHolds() {
   const [detailError, setDetailError] = useState<string | null>(null);
   const [staleReview, setStaleReview] = useState(false);
   const [resolving, setResolving] = useState(false);
-  const [cancellationReason, setCancellationReason] = useState(
+  const [cancellationReason, setCancellationReason] = useState<string>(
     CANCELLATION_REASONS[0][0],
   );
   const [resolutionNotice, setResolutionNotice] = useState<string | null>(null);
+  const detailRequestGeneration = useRef(0);
 
   const loadList = useCallback(async (cursor?: string) => {
     setListLoading(true);
@@ -230,6 +295,8 @@ export function AssessmentEmailDeliveryHolds() {
   }, []);
 
   const loadDetail = useCallback(async (intentId: string) => {
+    const generation = detailRequestGeneration.current + 1;
+    detailRequestGeneration.current = generation;
     setSelectedId(intentId);
     setDetail(null);
     setDetailLoading(true);
@@ -241,15 +308,19 @@ export function AssessmentEmailDeliveryHolds() {
         `/api/admin/assessment-email-delivery-intents/${encodeURIComponent(intentId)}`,
       );
       const body = await responseBody(response);
-      const parsed = response.ok ? parseDetailResponse(body) : null;
+      const parsed = response.ok ? parseDetailResponse(body, intentId) : null;
       if (!parsed) throw new Error("DETAIL_UNAVAILABLE");
+      if (generation !== detailRequestGeneration.current) return;
       setDetail(parsed);
     } catch {
+      if (generation !== detailRequestGeneration.current) return;
       setDetailError(
         "The audited held-intent detail could not be loaded. Try again.",
       );
     } finally {
-      setDetailLoading(false);
+      if (generation === detailRequestGeneration.current) {
+        setDetailLoading(false);
+      }
     }
   }, []);
 
@@ -659,11 +730,14 @@ function DriftComparison({ detail }: { detail: HeldDetail }) {
     detail.authorizationSnapshot,
     "coachCompletion",
   );
+  const currentSubmission = recordAt(detail.current, "submission");
   const currentCampaign = recordAt(detail.current, "campaign");
   const currentInvitation = recordAt(detail.current, "invitation");
   const currentRespondent = recordAt(detail.current, "respondent");
   const currentCoach = recordAt(detail.current, "coach");
   const currentTemplate = recordAt(detail.current, "template");
+  const currentVersion = recordAt(detail.current, "version");
+  const currentFeatures = recordAt(detail.current, "features");
   const frozenMailbox =
     frozenRespondent.canonicalRecipientMailbox ??
     frozenCoach.canonicalRecipientMailbox;
@@ -671,40 +745,316 @@ function DriftComparison({ detail }: { detail: HeldDetail }) {
     frozenCommon.recipientRole === "OWNING_COACH"
       ? currentCoach.canonicalMailbox
       : currentRespondent.canonicalMailbox;
-  const driftReasons = valueAt(detail.drift, "reasons");
+  const rawDriftReasons = valueAt(detail.drift, "reasons");
+  const driftReasons = Array.isArray(rawDriftReasons)
+    ? rawDriftReasons.filter(
+        (reason): reason is string => typeof reason === "string",
+      )
+    : [];
+  const storedHoldReasons = Array.isArray(detail.holdReasons)
+    ? detail.holdReasons.filter(
+        (reason): reason is string => typeof reason === "string",
+      )
+    : [];
+  const reviewReasons = Array.from(
+    new Set([
+      ...(detail.holdReason ? [detail.holdReason] : []),
+      ...storedHoldReasons,
+      ...driftReasons,
+    ]),
+  );
+  const isRespondent = frozenCommon.recipientRole === "RESPONDENT";
+  const isCoach = frozenCommon.recipientRole === "OWNING_COACH";
 
-  const facts = [
+  const facts: Array<{
+    group: string;
+    label: string;
+    frozen: unknown;
+    current: unknown;
+  }> = [
     {
+      group: "Identity links",
+      label: "Submission exists",
+      frozen: true,
+      current: currentSubmission.exists,
+    },
+    {
+      group: "Identity links",
+      label: "Submission campaign ID",
+      frozen: frozenCommon.campaignId,
+      current: currentSubmission.campaignId,
+    },
+    {
+      group: "Identity links",
+      label: "Submission invitation ID",
+      frozen: frozenCommon.invitationId,
+      current: currentSubmission.invitationId,
+    },
+    {
+      group: "Identity links",
+      label: "Submission respondent ID",
+      frozen: frozenCommon.respondentId,
+      current: currentSubmission.respondentId,
+    },
+    {
+      group: "Campaign",
+      label: "Campaign exists",
+      frozen: true,
+      current: currentCampaign.exists,
+    },
+    {
+      group: "Campaign",
+      label: "Campaign access mode",
+      frozen: frozenCommon.accessMode,
+      current: currentCampaign.accessMode,
+    },
+    {
+      group: "Campaign",
       label: "Campaign status",
       frozen: frozenCommon.campaignStatus,
       current: currentCampaign.status,
     },
     {
+      group: "Campaign",
+      label: "Campaign deleted",
+      frozen: frozenCommon.campaignDeleted,
+      current: currentCampaign.deleted,
+    },
+    {
+      group: "Campaign",
       label: "Campaign deadline",
       frozen: frozenCommon.closeAt,
       current: currentCampaign.closeAt,
     },
     {
+      group: "Campaign",
+      label: "Campaign template ID",
+      frozen: frozenCommon.templateId,
+      current: currentCampaign.templateId,
+    },
+    {
+      group: "Campaign",
+      label: "Campaign version ID",
+      frozen: frozenCommon.versionId,
+      current: currentCampaign.versionId,
+    },
+    {
+      group: "Campaign",
+      label: "Send results to respondent",
+      frozen: isRespondent
+        ? frozenRespondent.sendResultsToRespondent
+        : "Not applicable",
+      current: isRespondent
+        ? currentCampaign.sendResultsToRespondent
+        : "Not applicable",
+    },
+    {
+      group: "Campaign",
+      label: "Notify owning coach",
+      frozen: isCoach
+        ? frozenCoach.notifyCoachOnCompletion
+        : "Not applicable",
+      current: isCoach
+        ? currentCampaign.notifyCoachOnCompletion
+        : "Not applicable",
+    },
+    {
+      group: "Campaign",
+      label: "Campaign owner coach ID",
+      frozen: isCoach ? frozenCoach.coachId : "Not applicable",
+      current: isCoach
+        ? currentCampaign.createdByCoachId
+        : "Not applicable",
+    },
+    {
+      group: "Invitation",
+      label: "Invitation exists",
+      frozen: true,
+      current: currentInvitation.exists,
+    },
+    {
+      group: "Invitation",
+      label: "Invitation campaign ID",
+      frozen: frozenCommon.campaignId,
+      current: currentInvitation.campaignId,
+    },
+    {
+      group: "Invitation",
+      label: "Invitation respondent ID",
+      frozen: frozenCommon.respondentId,
+      current: currentInvitation.respondentId,
+    },
+    {
+      group: "Invitation",
       label: "Invitation status",
       frozen: frozenCommon.invitationStatus,
       current: currentInvitation.status,
     },
     {
+      group: "Invitation",
+      label: "Invitation revoked",
+      frozen: frozenCommon.invitationRevoked,
+      current: currentInvitation.revoked,
+    },
+    {
+      group: "Invitation",
       label: "Invitation expiry",
       frozen: frozenCommon.invitationExpiresAt,
       current: currentInvitation.expiresAt,
     },
     {
+      group: "Recipient",
+      label: "Respondent exists",
+      frozen: true,
+      current: currentRespondent.exists,
+    },
+    {
+      group: "Recipient",
       label: "Recipient mailbox",
       frozen: frozenMailbox,
       current: currentMailbox,
     },
     {
+      group: "Template",
+      label: "Template exists",
+      frozen: true,
+      current: currentTemplate.exists,
+    },
+    {
+      group: "Template",
       label: "Template alias",
       frozen: frozenCommon.templateAlias,
       current: currentTemplate.alias,
     },
     {
+      group: "Template",
+      label: "Template approved",
+      frozen: isRespondent ? frozenRespondent.approved : "Not applicable",
+      current: isRespondent
+        ? currentTemplate.resultsEmailApproved
+        : "Not applicable",
+    },
+    {
+      group: "Template",
+      label: "Stored approved content hash",
+      frozen: isRespondent
+        ? frozenRespondent.approvedContentHash
+        : "Not applicable",
+      current: isRespondent
+        ? currentTemplate.storedApprovedContentHash
+        : "Not applicable",
+    },
+    {
+      group: "Template",
+      label: "Live approved content hash",
+      frozen: isRespondent
+        ? frozenRespondent.approvedContentHash
+        : "Not applicable",
+      current: isRespondent
+        ? currentTemplate.liveContentHash
+        : "Not applicable",
+    },
+    {
+      group: "Version",
+      label: "Version exists",
+      frozen: true,
+      current: currentVersion.exists,
+    },
+    {
+      group: "Version",
+      label: "Version template ID",
+      frozen: frozenCommon.templateId,
+      current: currentVersion.templateId,
+    },
+    {
+      group: "Owning coach",
+      label: "Owning coach exists",
+      frozen: isCoach ? true : "Not applicable",
+      current: isCoach ? currentCoach.exists : "Not applicable",
+    },
+    {
+      group: "Owning coach",
+      label: "Owning coach ID",
+      frozen: isCoach ? frozenCoach.coachId : "Not applicable",
+      current: isCoach ? currentCoach.id : "Not applicable",
+    },
+    {
+      group: "Owning coach",
+      label: "Owning coach mailbox",
+      frozen: isCoach
+        ? frozenCoach.canonicalRecipientMailbox
+        : "Not applicable",
+      current: isCoach ? currentCoach.canonicalMailbox : "Not applicable",
+    },
+    {
+      group: "Feature gates",
+      label: "Results email feature",
+      frozen: isRespondent
+        ? frozenRespondent.featureEnabled
+        : "Not applicable",
+      current: isRespondent
+        ? currentFeatures.resultsEmailEnabled
+        : "Not applicable",
+    },
+    {
+      group: "Feature gates",
+      label: "Coach notification feature",
+      frozen: isCoach ? frozenCoach.featureEnabled : "Not applicable",
+      current: isCoach
+        ? currentFeatures.coachNotifyEnabled
+        : "Not applicable",
+    },
+    {
+      group: "Feature gates",
+      label: "Feature key",
+      frozen: isRespondent
+        ? frozenRespondent.featureKey
+        : frozenCoach.featureKey,
+      current: isRespondent
+        ? "resultsEmailEnabled"
+        : "coachNotifyEnabled",
+    },
+    {
+      group: "Contract",
+      label: "Snapshot schema version",
+      frozen: valueAt(detail.authorizationSnapshot, "schemaVersion"),
+      current: detail.snapshotSchemaVersion,
+    },
+    {
+      group: "Contract",
+      label: "Renderer contract version",
+      frozen: valueAt(
+        detail.contentProvenance,
+        "rendererContractVersion",
+      ),
+      current: detail.rendererContractVersion,
+    },
+    {
+      group: "Contract",
+      label: "Frozen payload integrity",
+      frozen: detail.payloadHash ? "Hash stored" : "Missing",
+      current: "Verified before review",
+    },
+    {
+      group: "Contract",
+      label: "Recipient role",
+      frozen: frozenCommon.recipientRole,
+      current: detail.recipientEmail ? detail.recipientRole : "—",
+    },
+    {
+      group: "Contract",
+      label: "Email type",
+      frozen: frozenCommon.emailType,
+      current: detail.emailType,
+    },
+    {
+      group: "Contract",
+      label: "Phase 2 fingerprint",
+      frozen: frozenCommon.phase2Fingerprint,
+      current: "Frozen provenance only",
+    },
+    {
+      group: "Version",
       label: "Template version",
       frozen: frozenCommon.versionId,
       current: currentCampaign.versionId,
@@ -720,17 +1070,40 @@ function DriftComparison({ detail }: { detail: HeldDetail }) {
         >
           Submission snapshot vs current facts
         </h3>
-        {Array.isArray(driftReasons) && (
+        {reviewReasons.length > 0 && (
           <span className="text-xs font-semibold text-warning-foreground">
-            {driftReasons.length} drift{" "}
-            {driftReasons.length === 1 ? "reason" : "reasons"}
+            {reviewReasons.length} review{" "}
+            {reviewReasons.length === 1 ? "reason" : "reasons"}
           </span>
         )}
       </div>
+      {reviewReasons.length > 0 && (
+        <ul
+          aria-label="Hold and drift reasons"
+          className="mt-3 grid gap-2 sm:grid-cols-2"
+        >
+          {reviewReasons.map((reason) => (
+            <li
+              key={reason}
+              className="rounded-md border border-warning/30 bg-warning/5 px-3 py-2"
+            >
+              <code className="block break-all text-[0.6875rem] font-bold text-warning-foreground">
+                {reason}
+              </code>
+              <span className="mt-0.5 block text-xs text-foreground">
+                {DRIFT_REASON_LABELS[reason] ?? reasonLabel(reason)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
       <div className="mt-3 overflow-x-auto rounded-lg border border-border">
         <table className="w-full min-w-[34rem] border-collapse text-sm">
           <thead className="bg-muted/60">
             <tr>
+              <th className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Scope
+              </th>
               <th className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 Fact
               </th>
@@ -749,6 +1122,9 @@ function DriftComparison({ detail }: { detail: HeldDetail }) {
               const changed = frozen !== current;
               return (
                 <tr key={fact.label} className={changed ? "bg-warning/5" : ""}>
+                  <td className="px-3 py-2.5 text-[0.6875rem] font-bold uppercase tracking-wider text-muted-foreground">
+                    {fact.group}
+                  </td>
                   <th className="px-3 py-2.5 text-left text-xs font-semibold text-foreground">
                     {fact.label}
                   </th>

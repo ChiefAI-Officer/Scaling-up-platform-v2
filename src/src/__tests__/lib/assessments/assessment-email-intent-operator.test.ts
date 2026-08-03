@@ -498,6 +498,12 @@ describe("held assessment email intent operator services", () => {
           <audio src="https://tracker.example/audio"></audio>
           <video src="https://tracker.example/video"></video>
           <p style="color: #123; background: url(https://tracker.example/css)">Safe copy</p>
+          <p style="border: u\\72l(https://escaped-tracker.example/a)">Escaped short</p>
+          <p style="border: u/**/rl(https://comment-tracker.example/b)">Comment split</p>
+          <p style="font-family: u\\000072l(https://long-escape-tracker.example/c)">Escaped long</p>
+          <p style="border: URL(https://case-tracker.example/d)">Upper case</p>
+          <p style="border: uRl   ( https://space-tracker.example/e )">Whitespace</p>
+          <p style="color: #123; padding: 4px">Safe inline style</p>
         </body>
       </html>
     `);
@@ -511,7 +517,15 @@ describe("held assessment email intent operator services", () => {
     expect(preview).toContain("data:image/jpeg;base64,/9j/");
     expect(preview).toContain("data:image/gif;base64,R0lGODlh");
     expect(preview).toContain("data:image/webp;base64,UklGRg==");
+    expect(preview).toMatch(
+      /<p style="(?:color:#123;padding:4px|padding:4px;color:#123)">Safe inline style<\/p>/,
+    );
     expect(preview).not.toContain("tracker.example");
+    expect(preview).not.toContain("escaped-tracker.example");
+    expect(preview).not.toContain("comment-tracker.example");
+    expect(preview).not.toContain("long-escape-tracker.example");
+    expect(preview).not.toContain("case-tracker.example");
+    expect(preview).not.toContain("space-tracker.example");
     expect(preview).not.toMatch(
       /<script|<form|<input|<iframe|<object|<embed|<svg|<audio|<video|onload=|onclick=|href=|srcset=|image\/svg|url\s*\(/i,
     );

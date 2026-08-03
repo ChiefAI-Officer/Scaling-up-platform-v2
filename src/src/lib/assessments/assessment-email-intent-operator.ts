@@ -235,9 +235,26 @@ const INERT_PREVIEW_CSP =
 const SAFE_DATA_IMAGE =
   /^data:image\/(?:png|jpeg|gif|webp);base64,[a-z0-9+/=\s]+$/i;
 
+function inertInlineStyle(style: string): string | undefined {
+  const declarations = style
+    .split(";")
+    .map((declaration) => declaration.trim())
+    .filter((declaration) => {
+      if (declaration.length === 0) return false;
+      if (
+        /\\|\/\*|\*\//.test(declaration) ||
+        /url\s*\(/i.test(declaration) ||
+        /(?:https?|ftp)\s*:/i.test(declaration)
+      ) {
+        return false;
+      }
+      return true;
+    });
+  return declarations.length > 0 ? declarations.join(";") : undefined;
+}
+
 export function buildInertIntentPreviewDocument(bodyHtml: string): string {
-  const withoutCssUrls = bodyHtml.replace(/url\s*\([^)]*\)/gi, "");
-  const sanitized = sanitizeHtml(withoutCssUrls, {
+  const sanitized = sanitizeHtml(bodyHtml, {
     allowedTags: [
       "a",
       "abbr",
@@ -367,7 +384,9 @@ export function buildInertIntentPreviewDocument(bodyHtml: string): string {
       "*": (tagName, attribs) => {
         const next = { ...attribs };
         if (next.style) {
-          next.style = next.style.replace(/url\s*\([^)]*\)/gi, "");
+          const style = inertInlineStyle(next.style);
+          if (style) next.style = style;
+          else delete next.style;
         }
         return { tagName, attribs: next };
       },
@@ -378,7 +397,9 @@ export function buildInertIntentPreviewDocument(bodyHtml: string): string {
         }
         delete next.srcset;
         if (next.style) {
-          next.style = next.style.replace(/url\s*\([^)]*\)/gi, "");
+          const style = inertInlineStyle(next.style);
+          if (style) next.style = style;
+          else delete next.style;
         }
         return { tagName, attribs: next };
       },
