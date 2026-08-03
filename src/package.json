@@ -21,6 +21,7 @@
     "test:security": "node scripts/security-audit.js",
     "test:phase7": "npm run test && npm run test:e2e -- --project=chromium && npm run test:security",
     "eval:hitl-baseline": "tsx scripts/hitl-baseline-report.ts",
+    "audit:invitation-html-overrides": "npx tsx scripts/audit-invitation-html-overrides.ts",
     "audit": "npm audit --audit-level=high",
     "validate:redis:local": "npx tsx scripts/validate-local-redis.ts",
     "validate:inngest:local": "npx tsx scripts/validate-local-inngest.ts",
