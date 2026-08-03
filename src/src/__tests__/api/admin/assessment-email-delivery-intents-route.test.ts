@@ -43,6 +43,8 @@ jest.mock("@/lib/assessments/assessment-email-intent-operator", () => {
   };
 });
 
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { GET as listHeldIntents } from "@/app/api/admin/assessment-email-delivery-intents/route";
 import { GET as getHeldIntent } from "@/app/api/admin/assessment-email-delivery-intents/[id]/route";
 import { POST as releaseHeldIntentRoute } from "@/app/api/admin/assessment-email-delivery-intents/[id]/release/route";
@@ -229,6 +231,32 @@ beforeEach(() => {
   (loadHeldIntentDetail as jest.Mock).mockResolvedValue(detailResult);
   (releaseHeldIntent as jest.Mock).mockResolvedValue(releaseResult);
   (cancelHeldIntent as jest.Mock).mockResolvedValue(cancelResult);
+});
+
+it("centralizes the security-sensitive route boundary in one non-route helper", () => {
+  const routeRoot = resolve(
+    process.cwd(),
+    "src/app/api/admin/assessment-email-delivery-intents",
+  );
+  const support = readFileSync(resolve(routeRoot, "route-support.ts"), "utf8");
+  expect(support).toContain("export function privateJson");
+  expect(support).toContain("export async function requirePrivilegedActor");
+  expect(support).toContain("export function operatorErrorResponse");
+
+  for (const relativePath of [
+    "route.ts",
+    "[id]/route.ts",
+    "[id]/release/route.ts",
+    "[id]/cancel/route.ts",
+  ]) {
+    const source = readFileSync(resolve(routeRoot, relativePath), "utf8");
+    expect(source).toContain(
+      'from "@/app/api/admin/assessment-email-delivery-intents/route-support"',
+    );
+    expect(source).not.toMatch(
+      /function (?:privateJson|requirePrivilegedActor|operatorErrorStatus|operatorErrorResponse)\b/,
+    );
+  }
 });
 
 it("keeps every App Router module export surface supported", () => {
