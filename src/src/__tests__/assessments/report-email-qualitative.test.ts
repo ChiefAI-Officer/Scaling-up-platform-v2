@@ -72,6 +72,20 @@ function qualReport(args: QualFixtureArgs): RespondentReport {
 // ── Dispatch ─────────────────────────────────────────────────────────────────
 
 describe("buildReportEmailHtml — qualitative dispatch", () => {
+  it("freezes the exact legacy qualitative report email bytes", () => {
+    expect(
+      buildReportEmailHtml({
+        report: qualReport({
+          templateAlias: "qsp-v2",
+          sections: [],
+          questionsByKey: {},
+          rawAnswers: [],
+        }),
+        recipientRole: "TAKER_COPY",
+      }).bodyHtml,
+    ).toMatchSnapshot("legacy-qualitative-report-email");
+  });
+
   it("includes the taker's email and next-step links", () => {
     const report = qualReport({
       templateAlias: "qsp-v2",

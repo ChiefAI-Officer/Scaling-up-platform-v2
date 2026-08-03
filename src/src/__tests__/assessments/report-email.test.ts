@@ -202,6 +202,15 @@ function neutralReport(): RespondentReport {
 // ── Tests ──────────────────────────────────────────────────────────────────
 
 describe("buildReportEmailHtml — overall score", () => {
+  it("freezes the exact legacy scored report email bytes", () => {
+    expect(
+      buildReportEmailHtml({
+        report: fourDecisionsReport(),
+        recipientRole: "TAKER_COPY",
+      }).bodyHtml,
+    ).toMatchSnapshot("legacy-scored-report-email");
+  });
+
   it("renders the overall headline metric (ScaleUp score)", () => {
     const { bodyHtml } = buildReportEmailHtml({
       report: fourDecisionsReport(),
