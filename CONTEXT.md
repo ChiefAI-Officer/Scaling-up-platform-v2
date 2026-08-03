@@ -55,8 +55,24 @@ The participant UI tints each section by its **Domain** using the Scaling Up bra
 ### Sending & answering
 
 **Campaign**:
-One send of a template version to a chosen subset of a company's members.
+One send of a template version to a chosen subset of a company's members. Its unchanged `closeAt` is a clock-based intake cutoff, while stored `status = CLOSED` is an explicit lifecycle transition. For an Email Delivery Intent created by a valid submission, merely passing `closeAt` does not revoke the obligation; changing the deadline or stored status triggers review.
 _Avoid_: assessment instance, test, run.
+
+**Email Delivery Intent**:
+The frozen submission-time expectation that one invited assessment email should be delivered for one recipient role. It exists before an outbox row and remains authoritative until reconciliation hands it off or resolves it. Handoff reauthorizes under row locks on every authoritative record used by the decision, so a concurrent policy edit cannot slip between the check and outbox creation. Its payload has one absolute 30-day retention deadline from creation; pause and hold transitions never extend that deadline.
+_Avoid_: recovery intent (the intent exists before any failure), outbox row, delivery attempt.
+
+**Delivery Hold**:
+An Email Delivery Intent withheld from automatic handoff because current authorization, ownership, campaign lifecycle, recipient identity, payload integrity, or retry safety no longer matches its frozen contract. ADMIN and STAFF may inspect the exact frozen payload through an audited detail view, then release that exact payload or cancel it; they cannot edit or rerender it. Release is bound to the current facts shown during that review and requires a fresh review if those facts change again.
+_Avoid_: failed email (no outbox send may have occurred), retry queue, editable draft.
+
+**Global assessment-send pause**:
+An operational delivery defer that blocks Email Delivery Intent handoff and operator release, but not the atomic capture of a valid submission-time intent. It never erases an obligation, increments retry attempts, or extends the intent's 30-day payload deadline.
+_Avoid_: authorization revocation, feature disablement, permanent cancellation.
+
+**Completed invited submission**:
+An invited assessment submission whose answers and every Email Delivery Intent required by its locked submission-time gates committed atomically. A failed intent write leaves the invitation retryable and the client-held answer draft intact; it is not a completed submission.
+_Avoid_: treating an answers-only commit as complete when an expected email has no durable intent or outbox row.
 
 **Public Campaign**:
 A **Campaign** with `accessMode = PUBLIC` — anyone with the link self-enrolls and answers via `/quiz/[alias]` (no invitation, no roster membership required). Admin/STAFF-only to create; it still belongs to a chosen **Organization** (`organizationId` is non-nullable). The admin nav entry and its management page are labelled **"Public Campaigns"** and live at `/admin/assessments/public-campaigns`.
@@ -174,6 +190,7 @@ _Avoid_: "delete admin" implying a hard row delete (FKs forbid it); assuming a k
 
 - An **Assessment Template** has one or more **Template Versions**; only published versions are selectable by a campaign.
 - A **Campaign** pins exactly one **Template Version** and targets many **Respondents** (each via a **Participant** record).
+- A **Completed invited submission** owns one **Email Delivery Intent** per expected recipient role; reconciliation hands each intent to at most one outbox row.
 - The **Invitation email copy** (subject + body) lives on the **Template** itself — read live at send time by every send path, so editing it immediately affects future sends of in-flight campaigns. It is *not* pinned by a Template Version; only a per-campaign override shields a campaign from template-level copy edits.
 - An invited Respondent has one **Invitation**, which may be reached through its original **Invitation link** or any successfully sent reminder link; those sibling links share one lifecycle and never create extra Invitations.
 - A scored **Template Version** defines **Scoring Tiers**; a Scaling Up Full version additionally defines **Domains** and per-question **Recommendations**.

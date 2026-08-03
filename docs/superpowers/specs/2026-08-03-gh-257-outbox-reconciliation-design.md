@@ -9,7 +9,8 @@
 [#264](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/264),
 [#265](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/265),
 [#286](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/286),
-and [ADR-0030](../../adr/0030-assessment-email-delivery-is-at-least-once-with-an-atomic-lease.md)
+[ADR-0030](../../adr/0030-assessment-email-delivery-is-at-least-once-with-an-atomic-lease.md),
+and [ADR-0031](../../adr/0031-assessment-email-obligations-use-a-dedicated-intent-ledger.md).
 
 ## 1. Problem statement
 
@@ -46,8 +47,7 @@ send different content to a different recipient under a different approval.
    that was valid and successfully rendered at submission time.
 2. Preserve the exact submission-time recipient, subject, rendered HTML, and
    provenance until the existing outbox owns the single retained copy.
-3. Reauthorize against current authoritative state before automatic
-   materialization.
+3. Reauthorize against current authoritative state before automatic handoff.
 4. Hold, rather than rerender or silently discard, an intent when relevant
    authorization state has drifted.
 5. Make event and scheduled reconciliation converge safely under concurrency.
@@ -55,7 +55,7 @@ send different content to a different recipient under a different approval.
    ledger and the existing outbox.
 7. Give ADMIN and STAFF operators only two audited held-intent actions:
    release the exact frozen payload or cancel it permanently.
-8. Bound held-payload retention to 30 days.
+8. Bound every unresolved intent payload to 30 days.
 9. Keep ADR-0030's lease, SMTP, retry, and terminal-delivery contract
    unchanged.
 10. Treat pre-deployment submissions as read-only audit candidates, never as
@@ -67,12 +67,12 @@ send different content to a different recipient under a different approval.
 - Changes to ADR-0030 lease claiming, completion, requeue, uncertainty, or
   terminal-failure semantics.
 - Invitation, results-email, coach-notification, or branded-report copy.
-- Rerendering a frozen recovery intent from current data.
+- Rerendering a frozen Email Delivery Intent from current data.
 - Broad production replay or backfill.
 - Automatic repair of pre-deployment submissions.
 - Recovery for public-quiz or unrelated outbox roles.
 - Repair of a submission-time render failure. If no valid frozen payload was
-  produced, no recovery intent exists.
+  produced, no Email Delivery Intent exists.
 - Production writes during design, implementation, or verification unless a
   later operating plan receives separate explicit approval.
 
@@ -81,7 +81,7 @@ send different content to a different recipient under a different approval.
 ### 4.1 Freeze, then reauthorize
 
 The system preserves the original payload and provenance. Before automatic
-materialization, it compares the submission-time authorization snapshot with
+handoff, it compares the submission-time authorization snapshot with
 current authoritative records. Drift moves the intent to `HELD`. The system
 never silently rerenders from current state.
 
@@ -113,17 +113,19 @@ The intent owns the frozen recipient, subject, and body only until:
 
 - an outbox row durably owns them;
 - an operator cancels the intent; or
-- a held intent expires.
+- an unresolved intent expires.
 
-The intent payload is purged in the same transaction as that transition.
-Existing outbox behavior then purges `bodyHtml` after `SENT` or terminal
-`FAILED`. A held intent expires 30 days after `heldAt`.
+The intent payload and every PII-bearing authorization-snapshot field are
+purged in the same transaction as that transition. Existing outbox behavior
+then purges `bodyHtml` after `SENT` or terminal `FAILED`. Every intent receives
+an absolute `expiresAt` of `createdAt + 30 days`; moving between `PENDING` and
+`HELD` never extends that deadline.
 
 ## 5. Architecture
 
-### 5.1 Dedicated recovery-intent ledger
+### 5.1 Dedicated delivery-intent ledger
 
-Add an `AssessmentEmailRecoveryIntent` model with one row per expected
+Add an `AssessmentEmailDeliveryIntent` model with one row per expected
 `(submissionId, recipientRole)`.
 
 The logical fields are:
@@ -135,14 +137,15 @@ The logical fields are:
 | Integrity | `payloadHash`, `snapshotSchemaVersion`, `rendererContractVersion` |
 | Provenance | structured `authorizationSnapshot` and `contentProvenance` |
 | State | `status`, integer `version`, `holdReason`, `attempts`, `nextAttemptAt`, `heldAt`, `expiresAt` |
-| Resolution | optional `materializedOutboxId`, `resolvedAt`, `resolvedBy`, and `resolutionReasonCode` |
+| Resolution | optional `handedOffOutboxId`, `resolvedAt`, `resolvedBy`, and `resolutionReasonCode` |
 | Timestamps | `createdAt`, `updatedAt` |
 
 Required constraints and indexes:
 
 - unique `(submissionId, recipientRole)`;
 - index `(status, nextAttemptAt, createdAt, id)` for bounded pending scans;
-- index `(status, heldAt, id)` for held expiry; and
+- index `(status, expiresAt, id)` for unresolved expiry;
+- index `(status, heldAt, id)` for the held-work queue; and
 - foreign key from the intent to `AssessmentSubmission` with the same lifecycle
   expectations as the existing outbox relation.
 
@@ -150,37 +153,48 @@ Statuses are application-allowlisted strings:
 
 - `PENDING`
 - `HELD`
-- `MATERIALIZED`
+- `HANDED_OFF`
 - `CANCELLED`
 - `EXPIRED`
 
 No long-lived `PROCESSING` or lease state is required. Reconciliation performs
 no network I/O and holds a PostgreSQL row lock only for the short
-reauthorize-and-materialize transaction.
+reauthorize-and-hand-off transaction.
 
 ### 5.2 Durability boundary
 
-The intent becomes part of the definition of a successful submission.
+The intent becomes part of the definition of a completed invited submission.
+Answers and every intent required by the locked submission-time gates form one
+durability boundary; an answers-only commit is not success.
 
 After the existing Phase-2 invitation lock:
 
 1. Recompute the existing per-role fingerprint from locked state.
 2. Drop any prepared row whose Phase-1 and Phase-2 fingerprints differ, exactly
    as the route does today.
-3. Create the submission and its 0–2 remaining intents atomically.
+3. Create the submission and its 0–2 remaining intents atomically, with each
+   intent's `expiresAt` fixed at 30 days after creation.
 
 If the submission-plus-intent write fails, including a pre-database validation
 failure, the submission does not commit and remains retryable. This is
 intentional. Once an email is expected, committing without either a delivery
-row or its durable intent would recreate GH #257.
+row or its durable intent would recreate GH #257. The invited survey client
+returns to its ready state on a failed submit, shows an inline retry message,
+retains its autosaved answer draft, and clears that draft only after a
+successful response. This makes the atomic failure retryable without silently
+discarding the respondent's work.
 
-Outbox materialization happens after the submission commits. A failure in that
+This durability rule supersedes the earlier preference to commit answers after
+a positively identified pre-database outbox failure. That preference predates
+the durable intent ledger; retaining it would knowingly preserve the residual
+gap this design exists to close.
+
+Outbox handoff happens after the submission commits. A failure in that
 second stage cannot roll back or erase the submission because the intent
 remains.
 
 An intent is not created when:
 
-- the global assessment-send pause prevented preparation;
 - the role's Wave-D feature flag or campaign toggle was off;
 - the results-email approval gate failed;
 - a recipient was unavailable;
@@ -188,6 +202,12 @@ An intent is not created when:
 - Phase-2 fingerprint revalidation rejected the prepared row.
 
 Those cases were never expected rows under the locked submission-time contract.
+
+On the new intent-first path, `ASSESSMENT_SENDS_PAUSED` is deliberately absent
+from that list. The route evaluates the other gates, renders, and atomically
+captures every valid intent while paused. The pause governs handoff, not
+whether the obligation exists. The legacy direct-outbox path retains its
+current early-return behavior while the route-selection flag is off.
 
 ### 5.3 Payload integrity and provenance
 
@@ -219,8 +239,9 @@ Snapshot version `1` contains these exact authorization facts:
 
 - common: campaign, invitation, respondent, template, and version IDs;
   campaign access mode, stored status, and soft-delete state; expected
-  post-commit invitation status; invitation revocation state; recipient role;
-  email type; and the accepted Phase-2 fingerprint;
+  post-commit invitation status; campaign `closeAt`; invitation `expiresAt`
+  and revocation state; recipient role; email type; and the accepted Phase-2
+  fingerprint;
 - respondent results: canonical recipient mailbox derived from the exact
   frozen recipient with the existing `normalizeMailbox` helper,
   `sendResultsToRespondent`, the Wave-D results feature key and enabled state,
@@ -230,17 +251,24 @@ Snapshot version `1` contains these exact authorization facts:
   `notifyCoachOnCompletion`, the Wave-D coach-notify feature key and enabled
   state, owning Coach ID, and owning Coach email.
 
+The full authorization snapshot is required only while an intent is unresolved.
+At handoff, cancellation, or expiry, the same transaction replaces it with a
+sanitized terminal summary containing only schema versions, IDs, booleans,
+stable hashes, and reason codes. Canonical mailboxes and any other PII-bearing
+snapshot values are removed. The outbox receives the unresolved provenance
+before that scrub when handoff succeeds, so the intent never retains a second
+PII copy.
+
 Provenance also retains a canonical `renderInputHash` over the exact
 submission-time report-model inputs. The hash function uses stable key
 ordering; raw answers, result content, names, and other render inputs are not
 copied into provenance.
 
-When an intent materializes, its provenance populates the existing outbox
+When an intent is handed off, its provenance populates the existing outbox
 `authorizationProvenance` and `contentProvenance` fields. The ADR-0030 worker
-does not interpret those fields as a send fence; they are evidence only. The
-implementation updates ADR-0030's descriptive provenance paragraph to record
-that these fields are populated while explicitly leaving its lease and
-delivery semantics unchanged.
+does not interpret those fields as a send fence; they are evidence only.
+ADR-0030 now records that provenance use while explicitly leaving its lease
+and delivery semantics unchanged.
 
 ## 6. Reconciliation flow
 
@@ -269,18 +297,38 @@ The fixed invocation budgets are:
 For each due `PENDING` intent:
 
 1. Select and lock it with `FOR UPDATE SKIP LOCKED`.
-2. Check for any existing `AssessmentEmailOutbox` row with the same
+2. In one documented order, acquire `FOR SHARE` locks on every surviving
+   authoritative row used by the common and role-specific checks: submission,
+   campaign, invitation, respondent, template, pinned version, and the owning
+   Coach when applicable. A missing row is evaluated as drift after the
+   conflicting delete commits. All reconciliation and release paths use this
+   same lock order.
+3. Check for any existing `AssessmentEmailOutbox` row with the same
    `(submissionId, recipientRole)`.
-3. If any row exists, regardless of status, mark the intent `MATERIALIZED`,
-   record that outbox ID, and purge the intent payload. Do not alter the
-   existing outbox row.
-4. If no row exists, evaluate the reauthorization contract.
-5. If reauthorization passes, create one `PENDING` outbox row from the exact
-   frozen fields, copy provenance, then mark the intent `MATERIALIZED` and
-   purge its payload in the same transaction.
-6. If reauthorization detects deterministic drift or an integrity problem,
-   move the intent to `HELD`, set `heldAt`, set `expiresAt` to 30 days later,
-   and persist one stable hold code.
+4. If any row exists, regardless of status, mark the intent `HANDED_OFF`,
+   record that outbox ID, write the ID-only handoff audit, and purge the intent
+   payload and PII-bearing snapshot fields in the same transaction. Do not
+   alter the existing outbox row.
+5. If no row exists and the intent's absolute `expiresAt` has passed, mark it
+   `EXPIRED`, write the ID-only expiry audit, and purge its payload and
+   PII-bearing snapshot fields.
+6. Otherwise, re-read and evaluate the reauthorization contract under those
+   locks.
+7. If reauthorization passes, create one `PENDING` outbox row from the exact
+   frozen fields, copy provenance, write the ID-only handoff audit, then mark
+   the intent `HANDED_OFF` and purge its payload and PII-bearing snapshot
+   fields in the same transaction.
+8. If reauthorization detects deterministic drift or an integrity problem,
+   move the intent to `HELD`, set `heldAt`, preserve the original `expiresAt`,
+   persist one stable hold code, and write the ID-only hold audit in the same
+   transaction.
+
+This short transaction is the authorization linearization point and performs
+no network I/O. If a relevant mutation owns a row lock first, reconciliation
+waits and evaluates the new state. If reconciliation owns the locks first, it
+hands off before that mutation proceeds. Bounded lock waits, deadlocks, and
+serialization failures use the transient retry policy. Once the outbox row
+exists, later mutations do not reopen the intent; ADR-0030 governs delivery.
 
 An existing outbox row always wins, including:
 
@@ -295,7 +343,7 @@ Reconciliation never reopens, replaces, resets, or duplicates those rows.
 ### 6.3 Transient errors
 
 An unexpected transient database or infrastructure failure rolls back the
-materialization attempt. A separate guarded update:
+handoff attempt. A separate guarded update:
 
 - increments `attempts`;
 - records only a stable, non-PII error class;
@@ -311,6 +359,8 @@ exception bodies because driver and query errors can contain sensitive values.
 `ASSESSMENT_SENDS_PAUSED` is an operational defer, not authorization drift.
 While it is active:
 
+- new submissions on the intent-first path still freeze and persist otherwise
+  valid intents;
 - automatic reconciliation leaves intents `PENDING`;
 - attempts do not increment; and
 - operator release is rejected.
@@ -318,6 +368,9 @@ While it is active:
 Once the pause clears, the next event or cron scan resumes normal work. The
 role-specific feature flag becoming disabled is different: that is
 authorization drift and produces `FEATURE_DISABLED`.
+
+The pause does not suspend or extend the absolute 30-day retention deadline.
+The scheduled expiry pass remains active while sends are paused.
 
 ## 7. Reauthorization contract
 
@@ -335,6 +388,8 @@ All roles require:
 - the invitation still belongs to the same campaign and respondent;
 - the invitation was not revoked after submission;
 - campaign soft-delete and stored status match the snapshot;
+- campaign `closeAt` and invitation `expiresAt` still equal their frozen
+  values;
 - template ID, template alias, and pinned version ID match the snapshot;
 - recipient role and email type match the intent;
 - the intent schema and renderer contract versions are supported;
@@ -343,8 +398,10 @@ All roles require:
 
 Natural time passage is not drift. Reconciliation does not fail merely because
 the unchanged campaign `closeAt` or invitation `expiresAt` is now in the past.
-It detects mutation of stored lifecycle state, not the movement of the clock
-after a valid submission.
+Those clock values govern whether a submission may begin or complete; they do
+not retroactively revoke an obligation created by a valid completed
+submission. An explicit stored-status transition or mutation of either frozen
+deadline is drift and moves the intent to `HELD`.
 
 ### 7.2 Respondent results
 
@@ -377,7 +434,9 @@ The initial allowlist is:
 
 - `CAMPAIGN_DELETED`
 - `CAMPAIGN_STATUS_CHANGED`
+- `CAMPAIGN_DEADLINE_CHANGED`
 - `INVITATION_REVOKED`
+- `INVITATION_EXPIRY_CHANGED`
 - `IDENTITY_LINK_CHANGED`
 - `RESPONDENT_EMAIL_CHANGED`
 - `COACH_OWNER_CHANGED`
@@ -399,11 +458,11 @@ Tests pin the ordering so dashboards and operator decisions remain stable.
 
 ### 8.1 Surface
 
-Add a narrow recovery queue under the existing admin assessment area.
+Add a narrow **Delivery Holds** queue under the existing admin assessment area.
 
 The list is paginated and shows:
 
-- age and held-expiry time;
+- age and absolute payload-expiry time;
 - role and email type;
 - masked recipient;
 - stable hold reason;
@@ -421,7 +480,39 @@ The detail view shows:
 
 Responses containing payload or recipient data use private, no-store caching
 and no-referrer policy. The preview must not inject the frozen HTML into the
-admin document; it uses a sandboxed, scriptless boundary.
+admin document; it uses a sandboxed, opaque-origin, scriptless boundary with a
+preview-specific Content Security Policy. That policy blocks network-loaded
+images and other subresources, fonts, forms, scripts, popups, downloads,
+top-level navigation, and link activation. It permits only the minimum inline
+styling and safe embedded raster data required for legible inspection.
+External destinations may be displayed separately as non-clickable text
+metadata, but the preview never requests or follows them. These restrictions
+may make the preview less pixel-perfect than the delivered email; they never
+rewrite the stored or released bytes. There is no bulk detail, export,
+download, or payload-copy API.
+
+Opening a detail view writes an
+`ASSESSMENT_EMAIL_INTENT_DETAIL_VIEWED` audit containing only the actor and
+intent identifiers plus non-PII provenance. The detail response is returned
+only after that audit persists; an audit failure fails the read closed. List
+views remain masked and do not retrieve full payload fields.
+
+The detail loader reads the intent and current authoritative facts and writes
+that audit within one repeatable-read transaction. The returned comparison and
+its hash therefore describe the same reviewed snapshot. After the transaction
+succeeds, the server returns a short-lived, opaque `reviewToken` bound to:
+
+- the operator's user ID;
+- intent ID and integer `version`;
+- a versioned `reviewContextHash` over every current authorization fact shown
+  in the comparison;
+- issue and expiry times; and
+- the review-token schema version.
+
+The token is server-authenticated, contains no raw PII, expires after 15
+minutes, and cannot be used by a different actor. Signing-key rotation may
+invalidate outstanding review tokens; the operator then opens a fresh audited
+detail view.
 
 There is no Coach-facing recovery UI.
 
@@ -434,6 +525,7 @@ cancel. Mutations require:
 - a validated, allowlisted operator reason code;
 - an `expectedVersion` concurrency sentinel that must equal the intent's
   integer `version`;
+- a valid actor-bound `reviewToken` for release;
 - mandatory audit persistence in the same transaction; and
 - private, no-store responses.
 
@@ -448,26 +540,35 @@ If the audit write fails, the release or cancellation rolls back.
 ### 8.3 Release
 
 Release is an explicit acceptance of the reviewed drift. It does not rerun the
-normal reauthorization comparison, but it must recheck:
+normal reauthorization comparison as a deny gate. Inside the release
+transaction it acquires the same authoritative-row locks in the same order as
+automatic reconciliation, re-reads the current authorization facts,
+recomputes the versioned `reviewContextHash`, and requires it to match the
+valid actor-and-intent-bound `reviewToken`. A mismatch or expired token rejects
+the release and requires a fresh audited detail view.
+
+Release also rechecks:
 
 - status is still `HELD`;
+- `expectedVersion` still matches;
 - the intent has not expired;
 - `ASSESSMENT_SENDS_PAUSED` is off;
 - schema version and renderer contract remain supported;
 - payload hash still validates; and
-- no outbox row exists for `(submissionId, recipientRole)`.
+- outbox ownership for `(submissionId, recipientRole)` is checked under the
+  same lock.
 
 If no outbox row exists, release atomically:
 
 1. creates a `PENDING` outbox row from the exact frozen fields;
 2. copies provenance;
 3. writes the release audit;
-4. marks the intent `MATERIALIZED`; and
-5. purges the intent recipient, subject, and body.
+4. marks the intent `HANDED_OFF`; and
+5. purges the intent recipient, subject, body, and PII-bearing snapshot fields.
 
 If a competing outbox row exists, release sends nothing. It records the
 existing row as the winner, audits that resolution, marks the intent
-`MATERIALIZED`, and purges the duplicate payload.
+`HANDED_OFF`, and purges the duplicate payload and PII-bearing snapshot fields.
 
 ### 8.4 Cancellation
 
@@ -476,22 +577,26 @@ Cancellation atomically:
 1. verifies the held status and concurrency sentinel;
 2. writes the cancellation audit with the operator's reason;
 3. marks the intent `CANCELLED`; and
-4. purges recipient, subject, and body.
+4. purges recipient, subject, body, and PII-bearing snapshot fields.
 
 Cancellation never creates or changes an outbox row.
 
 ### 8.5 Expiry
 
-The scheduled function expires held intents whose `expiresAt` has passed. It
-atomically marks them `EXPIRED`, writes an ID-only expiry audit, and purges the
-payload. Expiry has no release path.
+The scheduled function expires every unresolved `PENDING` or `HELD` intent
+whose absolute `expiresAt` has passed and for which no outbox row exists. It
+atomically marks the intent `EXPIRED`, writes an ID-only expiry audit, and
+purges the payload and PII-bearing snapshot fields. Expiry remains active
+during the global send pause and has no release path. If the expiry pass finds
+an existing outbox row instead, that row wins: the transaction records the
+handoff and purges the intent copy rather than expiring it.
 
 After any terminal resolution, the intent retains only:
 
 - IDs;
 - role and email type;
 - payload hash;
-- versioned provenance;
+- schema and renderer versions plus sanitized, non-PII provenance;
 - reason codes;
 - timestamps; and
 - operator identity and non-PII resolution reason.
@@ -503,11 +608,12 @@ answers, raw exception bodies, or other payload content.
 
 Suggested audit actions:
 
-- `ASSESSMENT_EMAIL_RECOVERY_HELD`
-- `ASSESSMENT_EMAIL_RECOVERY_MATERIALIZED`
-- `ASSESSMENT_EMAIL_RECOVERY_RELEASED`
-- `ASSESSMENT_EMAIL_RECOVERY_CANCELLED`
-- `ASSESSMENT_EMAIL_RECOVERY_EXPIRED`
+- `ASSESSMENT_EMAIL_INTENT_DETAIL_VIEWED`
+- `ASSESSMENT_EMAIL_INTENT_HELD`
+- `ASSESSMENT_EMAIL_INTENT_HANDED_OFF`
+- `ASSESSMENT_EMAIL_INTENT_RELEASED`
+- `ASSESSMENT_EMAIL_INTENT_CANCELLED`
+- `ASSESSMENT_EMAIL_INTENT_EXPIRED`
 
 The audit metadata is limited to intent, submission, campaign, invitation, and
 outbox IDs; role; email type; stable reason codes; payload hash; attempts;
@@ -515,14 +621,14 @@ schema and renderer versions; and operator identity.
 
 Required operational signals:
 
-- `PENDING` count and oldest age;
-- `HELD` count and oldest age;
+- `PENDING` count, oldest age, and approaching-expiry count;
+- `HELD` count, oldest age, and approaching-expiry count;
 - holds grouped by reason and role;
 - retry-exhausted count;
 - expiry count;
 - post-commit event-dispatch failures;
 - reconciliation latency;
-- successful materializations; and
+- successful handoffs; and
 - existing-outbox-won resolutions.
 
 The project has no metrics backend for this path. Initial observability
@@ -535,7 +641,7 @@ response for each required signal.
 ### 10.1 Route-selection flag
 
 Add a default-off route-selection flag,
-`ASSESSMENT_EMAIL_RECOVERY_INTENTS_ENABLED`.
+`ASSESSMENT_EMAIL_DELIVERY_INTENTS_ENABLED`.
 
 - Off: new submissions retain the current direct-outbox path.
 - On: new invited submissions use the intent-first path.
@@ -545,7 +651,7 @@ authorization fact and is not part of per-intent reauthorization.
 
 The scheduled reconciler continues processing already-created intents
 regardless of the route-selection flag. Only `ASSESSMENT_SENDS_PAUSED` pauses
-materialization. This prevents rollback from stranding intents created while
+handoff. This prevents rollback from stranding intents created while
 the new path was enabled.
 
 ### 10.2 Deployment sequence
@@ -594,12 +700,14 @@ operator controls. It also requires a separate production operating plan.
 - Deterministic ordering when multiple drift reasons apply.
 - Global-pause defer versus feature-disabled hold.
 - State transition and payload-purge invariants.
-- Thirty-day held expiry.
+- Absolute 30-day unresolved-intent expiry.
 
 ### 12.2 Submit-route and service tests
 
 - Zero, one, or two intents follow the existing locked fingerprint decision.
 - No intent is created for a gate-off or render-failure case.
+- The global pause still permits atomic intent creation on the intent-first
+  path, but blocks automatic handoff and operator release.
 - Submission and expected intents commit atomically.
 - Intent persistence failure leaves the invitation retryable and creates no
   submission.
@@ -613,10 +721,16 @@ operator controls. It also requires a separate production operating plan.
 - Rate limiting, private no-store responses, and no-referrer policy.
 - Masked list data versus authorized detail data.
 - Required reason and optimistic-concurrency enforcement.
+- Detail view is fail-closed on audit failure and issues an actor-, intent-,
+  version-, and current-facts-bound review token.
+- Release rejects expired, cross-actor, wrong-intent, stale-version, and
+  changed-current-facts review tokens.
+- Cancellation does not require a review token because it sends nothing.
 - No edit, rerender, or recipient-substitution input.
 - Payload hash, schema, pause, expiry, and duplicate guards on release.
 - Audit failure rolls back release, cancellation, and expiry.
-- Sandboxed preview isolation.
+- Sandboxed preview isolation blocks scripts, network subresources, forms,
+  downloads, and navigation without mutating the frozen payload.
 
 ### 12.4 Real PostgreSQL integration tests
 
@@ -624,6 +738,10 @@ operator controls. It also requires a separate production operating plan.
 - Concurrent event and cron reconciliation yields one outbox row.
 - Concurrent operator release and automatic reconciliation yield one outbox
   row.
+- A concurrent relevant mutation that locks first is visible to
+  reauthorization; a handoff that locks first completes before the mutation.
+- Automatic and operator paths acquire authoritative row locks in the same
+  order and retry bounded lock/serialization failures.
 - `FOR UPDATE SKIP LOCKED` prevents duplicate ownership.
 - Every existing outbox status wins without mutation.
 - Outbox creation, intent resolution, audit, and payload purge commit or roll
@@ -645,17 +763,18 @@ operator controls. It also requires a separate production operating plan.
 The design is correctly implemented when:
 
 1. Every successfully committed, expected invited-results email has either an
-   outbox row or one durable recovery intent.
+   outbox row or one durable Email Delivery Intent.
 2. Automatic reconciliation never rerenders or substitutes current content.
 3. Relevant drift always holds with an allowlisted reason.
 4. Event loss and cron overlap cannot duplicate an outbox row.
 5. Existing outbox rows in every status remain unchanged and authoritative.
-6. Materialization, resolution, audit, and intent-payload purge are atomic.
+6. Handoff, resolution, audit, and intent-payload purge are atomic.
 7. Only ADMIN and STAFF can release or cancel held work.
 8. Operator release sends the exact frozen bytes and respects pause,
    integrity, expiry, and duplicate guards.
-9. Held payload is purged after materialization, cancellation, or 30-day
-   expiry.
+9. Every unresolved intent payload is purged after handoff, cancellation, or
+   its absolute 30-day expiry; global pause and hold transitions do not extend
+   retention.
 10. Pre-deployment gaps remain read-only, unverifiable candidates unless a
     separate repair is explicitly approved.
 11. ADR-0030 delivery behavior is unchanged.
