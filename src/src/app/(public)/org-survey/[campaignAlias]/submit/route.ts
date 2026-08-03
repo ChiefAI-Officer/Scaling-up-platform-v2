@@ -19,6 +19,7 @@
  * 409 — double-submit (status === SUBMITTED at lock time)
  * 410 — lifecycle gate failed
  */
+import { createHash } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
@@ -38,6 +39,7 @@ import {
   waveDResultsEmailEnabled,
   waveDCoachNotifyEnabled,
   assessmentSendsPaused,
+  assessmentEmailDeliveryIntentsEnabled,
 } from "@/lib/assessments/wave-d-feature-flags";
 import { isResultsEmailApproved } from "@/lib/assessments/results-email-approval";
 import { isOnScreenResultsEnabled } from "@/lib/assessments/wave-osr-flags";
@@ -56,6 +58,18 @@ import {
 } from "@/lib/assessments/results-email";
 import { respondentDisplayName } from "@/lib/assessments/respondent-display-name";
 import { classifyOutboxEnqueueFailure } from "@/lib/assessments/outbox-enqueue-failure";
+import { normalizeMailbox } from "@/lib/assessments/quick-assessment-lead";
+import {
+  INTENT_RENDERER_CONTRACT_VERSION,
+  INTENT_SNAPSHOT_SCHEMA_VERSION,
+  assessmentEmailIntentPayloadHash,
+  intentExpiresAt,
+  sourceCommitIdentifier,
+  stableCanonicalJson,
+  type AuthorizationSnapshotV1,
+  type ContentProvenanceV1,
+} from "@/lib/assessments/assessment-email-delivery-intents";
+import { inngest } from "@/inngest/client";
 
 const NO_STORE_HEADERS = { "Cache-Control": "no-store" } as const;
 
@@ -107,9 +121,16 @@ interface PreparedOutboxRow {
   bodyHtml: string;
 }
 
+type PreparedDeliveryRow = PreparedOutboxRow & {
+  canonicalRecipientMailbox: string;
+  renderInputHash: string;
+  contentProvenance: ContentProvenanceV1;
+};
+
 interface EnqueueArgs {
   campaign: {
     id: string;
+    templateId: string;
     accessMode: string;
     sendResultsToRespondent: boolean;
     notifyCoachOnCompletion: boolean;
@@ -117,8 +138,9 @@ interface EnqueueArgs {
     creatorCoach: { email: string } | null;
     // Wave OSR: version CONTENT is no longer read here — the report model that
     // needed it is built by the caller. Only the id remains (fingerprinting).
-    version: { id: string };
+    version: { id: string; templateId: string };
     template: {
+      id: string;
       name: string;
       alias: string;
       resultsEmailSubject: string | null;
@@ -129,6 +151,9 @@ interface EnqueueArgs {
   };
   respondent: { email: string; firstName: string; lastName: string } | null;
   respondentId: string;
+  reportRenderInputHash: string;
+  respectGlobalPause: boolean;
+  prepareIntentMetadata: boolean;
   /**
    * Wave OSR: the respondent report model, built ONCE by the caller (Phase 1,
    * lock-free) and shared by the #15 results email and the on-screen payload.
@@ -154,11 +179,14 @@ function buildWaveDOutboxRows({
   respondent,
   respondentId,
   report,
-}: EnqueueArgs): PreparedOutboxRow[] {
-  const rows: PreparedOutboxRow[] = [];
+  reportRenderInputHash,
+  respectGlobalPause,
+  prepareIntentMetadata,
+}: EnqueueArgs): PreparedDeliveryRow[] {
+  const rows: PreparedDeliveryRow[] = [];
 
   // Global kill switch — nothing is enqueued while sends are paused.
-  if (assessmentSendsPaused()) return rows;
+  if (respectGlobalPause && assessmentSendsPaused()) return rows;
 
   const isInvited = campaign.accessMode === "INVITED";
 
@@ -206,12 +234,40 @@ function buildWaveDOutboxRows({
         bodyMarkdown: template.resultsEmailBodyMarkdown ?? "",
         reportHtml,
       });
+      const contentProvenance: ContentProvenanceV1 = prepareIntentMetadata
+        ? {
+            schemaVersion: INTENT_SNAPSHOT_SCHEMA_VERSION,
+            templateId: template.id,
+            versionId: campaign.version.id,
+            templateAlias: template.alias,
+            reportType: reportConfigFor(template.alias).reportType,
+            approvalHash: template.resultsEmailContentApprovedHash,
+            rendererContractVersion: INTENT_RENDERER_CONTRACT_VERSION,
+            sourceCommit: sourceCommitIdentifier(),
+            renderInputHash: reportRenderInputHash,
+          }
+        : {
+            schemaVersion: INTENT_SNAPSHOT_SCHEMA_VERSION,
+            templateId: template.id,
+            versionId: campaign.version.id,
+            templateAlias: template.alias,
+            reportType: "unused-in-legacy-mode",
+            approvalHash: template.resultsEmailContentApprovedHash,
+            rendererContractVersion: INTENT_RENDERER_CONTRACT_VERSION,
+            sourceCommit: "unused-in-legacy-mode",
+            renderInputHash: "",
+          };
       rows.push({
         recipientEmail: respondentEmail,
+        canonicalRecipientMailbox: prepareIntentMetadata
+          ? normalizeMailbox(respondentEmail)
+          : "",
         recipientRole: "RESPONDENT",
         emailType: "ASSESSMENT_RESULTS",
         subject: template.resultsEmailSubject ?? "Your assessment results",
         bodyHtml,
+        renderInputHash: prepareIntentMetadata ? reportRenderInputHash : "",
+        contentProvenance,
       });
     } catch (err) {
       // Do NOT abort the submission — drop this email only.
@@ -228,7 +284,7 @@ function buildWaveDOutboxRows({
     coachEmail
   ) {
     try {
-      const { subject, bodyHtml } = buildCoachNotifyEmail({
+      const coachRenderInput = {
         appUrl: process.env.APP_URL ?? "",
         campaignId: campaign.id,
         respondentId,
@@ -240,13 +296,47 @@ function buildWaveDOutboxRows({
           respondent?.lastName,
           respondent?.email,
         ),
-      });
+      };
+      const { subject, bodyHtml } = buildCoachNotifyEmail(coachRenderInput);
+      const renderInputHash = prepareIntentMetadata
+        ? stableInputHash(coachRenderInput)
+        : "";
+      const contentProvenance: ContentProvenanceV1 = prepareIntentMetadata
+        ? {
+            schemaVersion: INTENT_SNAPSHOT_SCHEMA_VERSION,
+            templateId: campaign.template?.id ?? campaign.templateId,
+            versionId: campaign.version.id,
+            templateAlias: campaign.template?.alias ?? "unknown",
+            reportType: reportConfigFor(
+              campaign.template?.alias ?? null,
+            ).reportType,
+            approvalHash: null,
+            rendererContractVersion: INTENT_RENDERER_CONTRACT_VERSION,
+            sourceCommit: sourceCommitIdentifier(),
+            renderInputHash,
+          }
+        : {
+            schemaVersion: INTENT_SNAPSHOT_SCHEMA_VERSION,
+            templateId: campaign.template?.id ?? campaign.templateId,
+            versionId: campaign.version.id,
+            templateAlias: campaign.template?.alias ?? "unknown",
+            reportType: "unused-in-legacy-mode",
+            approvalHash: null,
+            rendererContractVersion: INTENT_RENDERER_CONTRACT_VERSION,
+            sourceCommit: "unused-in-legacy-mode",
+            renderInputHash,
+          };
       rows.push({
         recipientEmail: coachEmail,
+        canonicalRecipientMailbox: prepareIntentMetadata
+          ? normalizeMailbox(coachEmail)
+          : "",
         recipientRole: "OWNING_COACH",
         emailType: "COACH_COMPLETION",
         subject,
         bodyHtml,
+        renderInputHash,
+        contentProvenance,
       });
     } catch (err) {
       console.error("[assessment-submit] #16 coach-notify render skipped:", err);
@@ -254,6 +344,13 @@ function buildWaveDOutboxRows({
   }
 
   return rows;
+}
+
+function stableInputHash(value: unknown): string {
+  const jsonCompatible = JSON.parse(JSON.stringify(value)) as unknown;
+  return createHash("sha256")
+    .update(stableCanonicalJson(jsonCompatible), "utf8")
+    .digest("hex");
 }
 
 /**
@@ -314,10 +411,153 @@ function emailRenderFingerprint(campaign: {
   };
 }
 
+interface LockedInvitationForIntent {
+  status: string;
+  revokedAt: Date | null;
+  expiresAt: Date;
+  campaignId: string;
+  respondentId: string;
+  respondent: { email: string } | null;
+  campaign: {
+    templateId: string;
+    accessMode: string;
+    deletedAt: Date | null;
+    status: string;
+    closeAt: Date | null;
+    sendResultsToRespondent: boolean;
+    notifyCoachOnCompletion: boolean;
+    createdByCoachId: string | null;
+    creatorCoach: { id: string; email: string } | null;
+    version: { id: string; templateId: string };
+    template: {
+      id: string;
+      alias: string;
+      resultsEmailSubject: string | null;
+      resultsEmailBodyMarkdown: string | null;
+      resultsEmailContentApproved: boolean;
+      resultsEmailContentApprovedHash: string | null;
+    };
+  };
+}
+
+function intentRowAuthorizedUnderLock(
+  locked: LockedInvitationForIntent,
+  row: PreparedDeliveryRow,
+): boolean {
+  const template = locked.campaign.template;
+  const identityMatches =
+    locked.campaign.accessMode === "INVITED" &&
+    locked.campaign.templateId === template.id &&
+    locked.campaign.version.templateId === template.id &&
+    row.contentProvenance.templateId === template.id &&
+    row.contentProvenance.versionId === locked.campaign.version.id &&
+    row.contentProvenance.templateAlias === template.alias;
+
+  if (!identityMatches) return false;
+
+  if (row.emailType === "ASSESSMENT_RESULTS") {
+    return (
+      locked.campaign.sendResultsToRespondent &&
+      isResultsEmailApproved(template) &&
+      template.resultsEmailContentApprovedHash !== null &&
+      row.contentProvenance.approvalHash ===
+        template.resultsEmailContentApprovedHash &&
+      normalizeMailbox(locked.respondent?.email) ===
+        row.canonicalRecipientMailbox
+    );
+  }
+
+  return (
+    locked.campaign.notifyCoachOnCompletion &&
+    locked.campaign.createdByCoachId !== null &&
+    locked.campaign.creatorCoach?.id === locked.campaign.createdByCoachId &&
+    normalizeMailbox(locked.campaign.creatorCoach?.email) ===
+      row.canonicalRecipientMailbox
+  );
+}
+
+function buildAuthorizationSnapshotV1(input: {
+  locked: LockedInvitationForIntent;
+  row: PreparedDeliveryRow;
+  phase2Fingerprint: EmailRenderFingerprint;
+  invitationId: string;
+}): AuthorizationSnapshotV1 {
+  const { locked, row, phase2Fingerprint } = input;
+  const template = locked.campaign.template;
+  const commonFacts = {
+    campaignId: locked.campaignId,
+    invitationId: input.invitationId,
+    respondentId: locked.respondentId,
+    templateId: template.id,
+    templateAlias: template.alias,
+    versionId: locked.campaign.version.id,
+    accessMode: "INVITED" as const,
+    campaignStatus: locked.campaign.status,
+    campaignDeleted: locked.campaign.deletedAt !== null,
+    invitationStatus: "SUBMITTED" as const,
+    invitationRevoked: locked.revokedAt !== null,
+    closeAt: locked.campaign.closeAt?.toISOString() ?? null,
+    invitationExpiresAt: locked.expiresAt.toISOString(),
+    recipientRole: row.recipientRole,
+    emailType: row.emailType,
+  };
+  const acceptedRenderFingerprint =
+    row.emailType === "ASSESSMENT_RESULTS"
+      ? phase2Fingerprint.results
+      : phase2Fingerprint.coach;
+
+  if (row.emailType === "ASSESSMENT_RESULTS") {
+    const respondentResults = {
+      canonicalRecipientMailbox: normalizeMailbox(locked.respondent?.email),
+      sendResultsToRespondent: true as const,
+      featureKey: "WAVE_D_RESULTS_EMAIL_ENABLED" as const,
+      featureEnabled: true as const,
+      approved: true as const,
+      approvedContentHash:
+        template.resultsEmailContentApprovedHash as string,
+    };
+    return {
+      schemaVersion: INTENT_SNAPSHOT_SCHEMA_VERSION,
+      common: {
+        ...commonFacts,
+        phase2Fingerprint: stableInputHash({
+          common: commonFacts,
+          respondentResults,
+          acceptedRenderFingerprint,
+        }),
+      },
+      respondentResults,
+    };
+  }
+
+  const coachCompletion = {
+    canonicalRecipientMailbox: normalizeMailbox(
+      locked.campaign.creatorCoach?.email,
+    ),
+    notifyCoachOnCompletion: true as const,
+    featureKey: "WAVE_D_COACH_NOTIFY_ENABLED" as const,
+    featureEnabled: true as const,
+    coachId: locked.campaign.createdByCoachId as string,
+  };
+  return {
+    schemaVersion: INTENT_SNAPSHOT_SCHEMA_VERSION,
+    common: {
+      ...commonFacts,
+      phase2Fingerprint: stableInputHash({
+        common: commonFacts,
+        coachCompletion,
+        acceptedRenderFingerprint,
+      }),
+    },
+    coachCompletion,
+  };
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ campaignAlias: string }> }
 ) {
+  const intentMode = assessmentEmailDeliveryIntentsEnabled?.() ?? false;
   try {
     const { campaignAlias } = await params;
     const session = await getInvitationSession(campaignAlias);
@@ -387,6 +627,7 @@ export async function POST(
               // — without them the respondent's copy is NOT the same artifact.
               creatorCoach: {
                 select: {
+                  id: true,
                   email: true,
                   profileImage: true,
                   firstName: true,
@@ -396,6 +637,7 @@ export async function POST(
               version: {
                 select: {
                   id: true,
+                  templateId: true,
                   questions: true,
                   sections: true,
                   scoringConfig: true,
@@ -404,6 +646,7 @@ export async function POST(
               // Wave D #15: admin-authored results email + approval gate.
               template: {
                 select: {
+                  id: true,
                   name: true,
                   alias: true,
                   resultsEmailSubject: true,
@@ -542,37 +785,38 @@ export async function POST(
         invitation.campaign.sendResultsToRespondent === true;
 
       let respondentReport: RespondentReport | null = null;
+      let reportRenderInputHash = "";
       if (mayNeedReport) {
+        const reportModelInput = {
+          result: scoreResult as never,
+          publicTaker: {
+            firstName: invitation.respondent?.firstName ?? "",
+            lastName: invitation.respondent?.lastName ?? "",
+            email: invitation.respondent?.email ?? "",
+          },
+          assessmentName:
+            invitation.campaign.template?.name ?? "an assessment",
+          templateAlias: invitation.campaign.template?.alias ?? "",
+          campaignLabel: null,
+          sections: invitation.campaign.version.sections,
+          questions: invitation.campaign.version.questions,
+          scoringConfig: invitation.campaign.version.scoringConfig,
+          rawAnswers,
+          submittedAt,
+          submissionId: "",
+          referringCoachEmail: null,
+          companyName: invitation.campaign.organization?.name ?? "",
+          jobTitle: invitation.respondent?.jobTitle ?? null,
+          coachLogoUrl: invitation.campaign.creatorCoach?.profileImage ?? null,
+          coachName: coachBylineName(invitation.campaign.creatorCoach),
+          degraded: !isScoreResult(scoreResult),
+        };
+        if (intentMode) {
+          reportRenderInputHash = stableInputHash(reportModelInput);
+        }
         try {
-          respondentReport = buildRespondentReportFromSubmission({
-            result: scoreResult as never,
-            publicTaker: {
-              firstName: invitation.respondent?.firstName ?? "",
-              lastName: invitation.respondent?.lastName ?? "",
-              email: invitation.respondent?.email ?? "",
-            },
-            assessmentName: invitation.campaign.template?.name ?? "an assessment",
-            // Load-bearing: BrandedReport dispatches scored-vs-qualitative on
-            // reportConfigFor(report.templateAlias). Because the SERVER builds
-            // the model, this can never be silently omitted by a caller.
-            templateAlias: invitation.campaign.template?.alias ?? "",
-            campaignLabel: null,
-            sections: invitation.campaign.version.sections,
-            questions: invitation.campaign.version.questions,
-            scoringConfig: invitation.campaign.version.scoringConfig,
-            rawAnswers,
-            submittedAt,
-            submissionId: "", // not interpolated into the body; FK set at INSERT
-            referringCoachEmail: null,
-            // Wave OSR (#71) — the invited path knows these; the public quiz does not.
-            companyName: invitation.campaign.organization?.name ?? "",
-            jobTitle: invitation.respondent?.jobTitle ?? null,
-            coachLogoUrl: invitation.campaign.creatorCoach?.profileImage ?? null,
-            coachName: coachBylineName(invitation.campaign.creatorCoach),
-            // #6: surface a malformed frozen result as the degraded notice rather
-            // than silently rendering an incomplete report.
-            degraded: !isScoreResult(scoreResult),
-          });
+          respondentReport =
+            buildRespondentReportFromSubmission(reportModelInput);
         } catch (err) {
           console.error(
             "[assessment-submit] respondent report model build failed — submission unaffected:",
@@ -587,6 +831,9 @@ export async function POST(
         respondent: invitation.respondent,
         respondentId: invitation.respondentId,
         report: respondentReport,
+        reportRenderInputHash,
+        respectGlobalPause: !intentMode,
+        prepareIntentMetadata: intentMode,
       });
 
       // C-M2: capture the render-input fingerprints these rows were prepared
@@ -613,9 +860,12 @@ export async function POST(
             expiresAt: true,
             campaignId: true,
             respondentId: true,
+            respondent: { select: { email: true } },
             campaign: {
               select: {
                 alias: true,
+                templateId: true,
+                accessMode: true,
                 deletedAt: true,
                 status: true,
                 openAt: true,
@@ -628,11 +878,15 @@ export async function POST(
                 // from THIS locked read, never from the Phase-1 read.
                 showResultsOnScreen: true,
                 createdByCoachId: true,
-                creatorCoach: { select: { email: true } },
-                version: { select: { id: true } },
+                creatorCoach: { select: { id: true, email: true } },
+                version: { select: { id: true, templateId: true } },
                 template: {
                   select: {
+                    id: true,
                     alias: true,
+                    resultsEmailSubject: true,
+                    resultsEmailBodyMarkdown: true,
+                    resultsEmailContentApproved: true,
                     resultsEmailContentApprovedHash: true,
                   },
                 },
@@ -678,7 +932,7 @@ export async function POST(
         // the per-email skip-on-failure handling used in the INSERT loop below —
         // the submission itself is unaffected.
         const phase2Fingerprint = emailRenderFingerprint(locked.campaign);
-        const rowsToEnqueue = preparedRows.filter((row) => {
+        const rowsToPersist = preparedRows.filter((row) => {
           if (row.emailType === "ASSESSMENT_RESULTS") {
             if (phase2Fingerprint.results !== phase1Fingerprint.results) {
               console.warn(
@@ -694,86 +948,116 @@ export async function POST(
               return false;
             }
           }
+          if (
+            intentMode &&
+            !intentRowAuthorizedUnderLock(
+              locked as LockedInvitationForIntent,
+              row,
+            )
+          ) {
+            console.warn(
+              `[assessment-submit] delivery intent row dropped — authorization inputs changed under lock (campaignId=${locked.campaignId}, recipientRole=${row.recipientRole})`,
+            );
+            return false;
+          }
           return true;
         });
 
-        // ── Wave D: INSERT the pre-rendered outbox rows IN-TX (transactional
-        // outbox). The submission + its outbox rows commit atomically; the
-        // double-submit 409 above guarantees exactly-once.
-        //
-        // ⚠️ GH #257 — this block used to claim that "a write failure for one email
-        // NEVER rolls back the submission — it is simply skipped". That was FALSE
-        // for the case that matters, and it is why the swallow read as safe.
-        // Proven in `integration-tests/tx-swallowed-error.pg.test.ts` against real
-        // PostgreSQL:
-        //   - a failure that REACHED the database aborts this transaction
-        //     (25P02), so every later statement here fails and the submission does
-        //     NOT commit. Prisma adds no per-operation savepoints, so catching the
-        //     error cannot un-abort the transaction.
-        //   - only a failure raised BEFORE the statement was sent (client-side
-        //     validation) leaves the transaction intact and is genuinely skippable.
-        // So we classify instead of blanket-swallowing, defaulting to rethrow.
-        // Rethrowing does not change WHETHER the submission commits — it already
-        // does not — it changes which error you get to debug, surfacing the real
-        // cause instead of a downstream 25P02 raised by the invitation update.
-        //
-        // A mocked Prisma cannot show any of this (mocks have no transaction
-        // state), which is why the PostgreSQL test is the load-bearing guard.
-        for (const row of rowsToEnqueue) {
-          try {
-            await tx.assessmentEmailOutbox.create({
+        if (intentMode) {
+          for (const row of rowsToPersist) {
+            const snapshot = buildAuthorizationSnapshotV1({
+              locked: locked as LockedInvitationForIntent,
+              row,
+              phase2Fingerprint,
+              invitationId,
+            });
+            await tx.assessmentEmailDeliveryIntent.create({
               data: {
                 submissionId: submission.id,
+                campaignId: locked.campaignId,
+                invitationId,
+                respondentId: locked.respondentId,
                 recipientEmail: row.recipientEmail,
                 recipientRole: row.recipientRole,
                 emailType: row.emailType,
                 subject: row.subject,
                 bodyHtml: row.bodyHtml,
+                payloadHash: assessmentEmailIntentPayloadHash({
+                  snapshotSchemaVersion: INTENT_SNAPSHOT_SCHEMA_VERSION,
+                  recipientRole: row.recipientRole,
+                  emailType: row.emailType,
+                  recipientEmail: row.recipientEmail,
+                  subject: row.subject,
+                  bodyHtml: row.bodyHtml,
+                }),
+                snapshotSchemaVersion: INTENT_SNAPSHOT_SCHEMA_VERSION,
+                rendererContractVersion: INTENT_RENDERER_CONTRACT_VERSION,
+                authorizationSnapshot: snapshot,
+                contentProvenance: row.contentProvenance,
+                expiresAt: intentExpiresAt(submittedAt),
               },
             });
-            // R2-L8: the outbox row has no metadata column (no migration), so
-            // record which renderer produced the (frozen) bodyHtml as a
-            // structured log line — keeps send-side provenance after #25
-            // removed the visible footer stamp. No PII (no answer text).
-            const alias = locked.campaign.template?.alias ?? null;
-            console.info("[assessment-report] enqueued", {
-              templateAlias: alias,
-              reportType: reportConfigFor(alias).reportType,
-              emailType: row.emailType,
-              recipientRole: row.recipientRole,
-              versionId: locked.campaign.version?.id ?? null,
-            });
-          } catch (err) {
-            const { disposition } = classifyOutboxEnqueueFailure(err);
-            if (disposition === "rethrow") {
-              // The transaction is already aborted; the submission is lost either
-              // way. Surface the real cause. No PII — ids and roles only.
-              console.error("[assessment-submit] outbox enqueue FAILED IN-TX", {
+          }
+        } else {
+          // ── Legacy Wave D: INSERT the pre-rendered direct-outbox rows IN-TX.
+          // This branch intentionally preserves the pre-GH #257 behavior,
+          // including its classified client-side skip and database-error rethrow.
+          for (const row of rowsToPersist) {
+            try {
+              await tx.assessmentEmailOutbox.create({
+                data: {
+                  submissionId: submission.id,
+                  recipientEmail: row.recipientEmail,
+                  recipientRole: row.recipientRole,
+                  emailType: row.emailType,
+                  subject: row.subject,
+                  bodyHtml: row.bodyHtml,
+                },
+              });
+              // R2-L8: the outbox row has no metadata column (no migration), so
+              // record which renderer produced the (frozen) bodyHtml as a
+              // structured log line — keeps send-side provenance after #25
+              // removed the visible footer stamp. No PII (no answer text).
+              const alias = locked.campaign.template?.alias ?? null;
+              console.info("[assessment-report] enqueued", {
+                templateAlias: alias,
+                reportType: reportConfigFor(alias).reportType,
+                emailType: row.emailType,
+                recipientRole: row.recipientRole,
+                versionId: locked.campaign.version?.id ?? null,
+              });
+            } catch (err) {
+              const { disposition } = classifyOutboxEnqueueFailure(err);
+              if (disposition === "rethrow") {
+                // The transaction is already aborted; the submission is lost either
+                // way. Surface the real cause. No PII — ids and roles only.
+                console.error("[assessment-submit] outbox enqueue FAILED IN-TX", {
+                  submissionId: submission.id,
+                  campaignId: locked.campaignId,
+                  invitationId,
+                  recipientRole: row.recipientRole,
+                  emailType: row.emailType,
+                  consequence:
+                    "transaction aborted — this submission will NOT commit and the respondent must resubmit",
+                  err,
+                });
+                throw err;
+              }
+              // Pre-database failure: the transaction is intact, so the submission
+              // still commits and only this email is dropped. Nothing retries it —
+              // the outbox row that a retry would key off was never created — so this
+              // log is the only trace it ever existed.
+              console.error("[assessment-submit] outbox email DROPPED", {
                 submissionId: submission.id,
                 campaignId: locked.campaignId,
                 invitationId,
                 recipientRole: row.recipientRole,
                 emailType: row.emailType,
                 consequence:
-                  "transaction aborted — this submission will NOT commit and the respondent must resubmit",
+                  "submission commits without this email; no retry will occur",
                 err,
               });
-              throw err;
             }
-            // Pre-database failure: the transaction is intact, so the submission
-            // still commits and only this email is dropped. Nothing retries it —
-            // the outbox row that a retry would key off was never created — so this
-            // log is the only trace it ever existed.
-            console.error("[assessment-submit] outbox email DROPPED", {
-              submissionId: submission.id,
-              campaignId: locked.campaignId,
-              invitationId,
-              recipientRole: row.recipientRole,
-              emailType: row.emailType,
-              consequence:
-                "submission commits without this email; no retry will occur",
-              err,
-            });
           }
         }
 
@@ -810,6 +1094,7 @@ export async function POST(
           submissionId: submission.id,
           invitationId,
           campaignId: locked.campaignId,
+          createdIntentCount: intentMode ? rowsToPersist.length : 0,
           discloseOnScreen,
         };
       });
@@ -838,6 +1123,26 @@ export async function POST(
           invitationId: result.invitationId,
         },
       });
+
+      if (intentMode && result.createdIntentCount > 0) {
+        try {
+          await inngest.send({
+            name: "assessment/email-delivery-intent.created",
+            data: { submissionId: result.submissionId },
+          });
+        } catch (error) {
+          console.error(
+            "[assessment-submit] delivery-intent event dispatch failed",
+            {
+              submissionId: result.submissionId,
+              campaignId: result.campaignId,
+              invitationId: result.invitationId,
+              errorName:
+                error instanceof Error ? error.name : "UnknownDispatchError",
+            },
+          );
+        }
+      }
 
       // Wave OSR (#71): attach the respondent's OWN report for in-place
       // rendering when the locked decision permitted it and the model built.

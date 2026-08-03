@@ -109,6 +109,12 @@ type AssessmentInvitationRejectionRetry = {
     };
 };
 
+type AssessmentEmailDeliveryIntentCreated = {
+    data: {
+        submissionId: string;
+    };
+};
+
 type Events = {
     "workshop/created": WorkshopCreated;
     "workshop/approved": WorkshopApproved;
@@ -123,6 +129,7 @@ type Events = {
     "assessment/quick-lead.enqueued": AssessmentQuickLeadEnqueued;
     "assessment/campaign.send-invites": AssessmentCampaignSendInvites;
     "assessment/invitation.rejection-retry": AssessmentInvitationRejectionRetry;
+    "assessment/email-delivery-intent.created": AssessmentEmailDeliveryIntentCreated;
 };
 
 export const schemas = new EventSchemas().fromRecord<Events>();
