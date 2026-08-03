@@ -147,6 +147,10 @@ Its **audience is a property of where it is reached, not of the document**: a co
 _Avoid_: calling it "the coach's view" — that was true only while the gated route was the only door.
 _Avoid_: conflating the per-respondent **Results report** with a cohort **Aggregate report** (Esperto's "group" / "self-comparison" report — the facilitator's all-responses dashboard; shipped for LVA in Wave F).
 
+**Coach image**:
+The single image associated with a Coach, whether it is a headshot or a company mark. It may appear alone or as the image within a **Coach byline**.
+_Avoid_: "coach logo" and "coach photo" as general terms; "Circle avatar" for the stored concept (a Circle avatar is only one possible upstream source).
+
 **Results report email**:
 An email that carries the complete **Results report** inline. It includes invited-respondent delivery and public taker/referring-coach copies; it is distinct from the invited **Results Email** template setting and its authored copy, and from short completion or lead notifications.
 _Avoid_: "Results Email" for the delivered artifact, and the less precise "full-report email" or "complete-report email."

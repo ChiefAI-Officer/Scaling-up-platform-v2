@@ -6,6 +6,15 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="gh-256-circle-sync-image-validation-launched"></a>
+### 2026-08-03 — GH #256 Circle-sync Coach image validation launched <!-- ENTRY_ISO:2026-08-03 ENTRY_SLUG:gh-256-circle-sync-image-validation-launched -->
+
+**Protected merge and exact production receipt.** Implementation PR [#287](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/287) was independently approved, all refreshed hosted Build, Migration Safety Gate, Assessment Email Lease (PostgreSQL), Vercel, and Vercel Preview Comments checks passed, and it squash-merged as `cc38dd501271747438dde8562954ead0f193f4ac`. Exact Production deployment `dpl_4yDfLC92HEPVinAVxsVSEXQnhu7o` is **Ready**, carries that merge SHA, and owns `scaling-up-platform-v2.vercel.app`, `platformtest.scalingup.com`, the Scaling Up alias, and the `git-main` alias. Both required public `/api/health` aliases returned HTTP `200` with healthy database and safe auth posture.
+
+**Shipped narrow behavior.** Circle-supplied Coach avatars now pass through the existing HTTPS-only `safeImageSrc` policy immediately before persistence. Rejected values preserve the stored image in both normal and force modes, do not prevent unrelated profile updates or `syncedAt` advancement, surface field-level operator warnings, and emit PII-safe post-persistence telemetry without a raw URL or email. No schema, migration, feature flag, proxy, rehosting job, backfill, production repair, invalid Circle profile, Coach-image mutation, or manual sync was used to obtain this receipt.
+
+**Residual policy remains explicit.** The narrow #261 claim is [released](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/issues/261#issuecomment-5162188735) and GH #256's `circle-sync.ts` validation checkbox is checked. GH #256 remains **open**: arbitrary parseable HTTPS hosts are still accepted, and its host allowlist/proxy/rehosting decision checkbox remains unchecked. This launch receipt does not claim or introduce any broader host policy.
+
 <a id="consolidated-progress-through-gh-228"></a>
 ### 2026-08-03 — Consolidated progress ledger current through GH #228 <!-- ENTRY_ISO:2026-08-03 ENTRY_SLUG:consolidated-progress-through-gh-228 -->
 
@@ -55,6 +64,16 @@ Future entries should be appended at the TOP of the entries section below (newes
 **Verification.** The complete prescribed focused Jest matrix exited `0`: **14 suites passed / 269 tests passed / 2 snapshots passed**. The prescribed changed-file ESLint command exited `0` with no output (no warnings). `node scripts/check-migration-safety.mjs` exited `0`: `✓ Checked 43 migration(s) — no unapproved destructive ops.` `CI=true npx next build --turbopack` exited `0`, compiled in **28.3s**, completed TypeScript, and generated **92/92** static pages; expected local missing-Inngest and `DATABASE_URL` messages occurred during static generation without failing the build. `git diff --check` exited `0` with no output before documentation update. No full-repository Jest baseline is claimed; its known unrelated failures were not part of this task.
 
 **Scope and rollout limitation.** No production flag was enabled, no deployment was made, and no live customer email was sent or checked. GH #220 (campaign full-HTML precedence), GH #233 (flag visibility/production-state investigation), GH #256 (coach-logo host policy), and GH #257 (outbox reconciliation/backfill) were untouched.
+<a id="gh-256-circle-sync-image-validation-pr-ready"></a>
+### 2026-08-03 — Circle-sync Coach image validation implemented (GH #256 slice) <!-- ENTRY_ISO:2026-08-03 ENTRY_SLUG:gh-256-circle-sync-image-validation-pr-ready -->
+
+**Status: IMPLEMENTED + LOCALLY VERIFIED; not yet merged or launched.** Circle sync now applies the existing HTTPS-only `safeImageSrc` policy immediately before an eligible Circle avatar would be written to the stored Coach image. A rejected avatar preserves existing image state in both fill-empty and forced modes, does not block unrelated field updates, and still advances `syncedAt`.
+
+**Operator and telemetry behavior.** Manual import remains successful and reports every nonfatal warning separately from truthful changed / warned-without-changes / already-current base copy. PII-safe field-skipped telemetry emits only after persistence and contains Coach ID, sync mode, field, and reason without the raw URL or email. Repeated eligible attempts emit repeated events; failed persistence emits no field-skipped event.
+
+**Scope and tracking boundary.** This slice changes no host policy: arbitrary parseable HTTPS hosts remain accepted. There is no proxy, rehosting, migration, schema, feature flag, backfill, repair, or production-data write. GH #256 remains open for the allowlist/proxy/accept-arbitrary-HTTPS product decision; only its Circle-sync validation checkbox and the narrow issue #261 claim become eligible for closeout after protected merge and production verification. GH #257 remains separately owned.
+
+**Local verification.** The complete focused regression matrix passed **7 suites / 131 tests / 1 snapshot**. Changed-file ESLint exited `0`; migration safety exited `0` after reporting **43 migrations** with no unapproved destructive operations; `git diff --check` exited `0` with no output; and `CI=true npx next build --turbopack` exited `0`, compiled successfully, and generated **92/92** static pages. The build reported the expected local warnings for unset Inngest keys and missing `DATABASE_URL` during static generation; neither prevented its zero exit.
 
 <a id="gh-217-accepted-gh-257-primed"></a>
 ### 2026-08-01 — GH #217 accepted; GH #257 reconciliation primed <!-- ENTRY_ISO:2026-08-01 ENTRY_SLUG:gh-217-accepted-gh-257-primed -->

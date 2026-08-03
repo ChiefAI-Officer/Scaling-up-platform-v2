@@ -95,13 +95,18 @@ export async function POST(
         }
       : null;
 
+    const message = result.updated
+      ? `Synced ${result.fieldsUpdated.length} field(s) from Circle.`
+      : result.warnings.length > 0
+        ? "Sync completed; no profile fields were updated."
+        : "Coach profile already up to date.";
+
     return NextResponse.json({
       success: true,
       data: responseData,
       fieldsUpdated: result.fieldsUpdated,
-      message: result.updated
-        ? `Synced ${result.fieldsUpdated.length} field(s) from Circle.`
-        : "Coach profile already up to date.",
+      warnings: result.warnings,
+      message,
     });
   } catch (error) {
     console.error("Error importing Circle coach profile:", error);
