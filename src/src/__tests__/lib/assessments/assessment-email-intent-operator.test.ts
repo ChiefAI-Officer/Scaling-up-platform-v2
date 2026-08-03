@@ -3,7 +3,10 @@ import {
   assessmentEmailIntentPayloadHash,
   type AuthorizationSnapshotV1,
 } from "@/lib/assessments/assessment-email-delivery-intents";
-import type { CurrentAuthorizationFactsV1 } from "@/lib/assessments/assessment-email-intent-reauthorization";
+import {
+  reviewContextHash,
+  type CurrentAuthorizationFactsV1,
+} from "@/lib/assessments/assessment-email-intent-reauthorization";
 import {
   issueIntentReviewToken,
   verifyIntentReviewToken,
@@ -241,6 +244,8 @@ function makeHarness(options: {
   lockedOutboxOverride?: Outbox | null;
   paused?: boolean;
   now?: Date;
+  nowAfterIntentLock?: Date;
+  nowAfterFactsLoad?: Date;
 } = {}) {
   let committed: HarnessState = deepClone({
     intent:
@@ -252,8 +257,11 @@ function makeHarness(options: {
   let failNextAudit = false;
   const events: string[] = [];
   const queries: unknown[] = [];
+  const lockedIntentRows: Intent[] = [];
+  const outboxCreateInputs: Array<Record<string, unknown>> = [];
+  const intentUpdates: Array<Record<string, unknown>> = [];
   const transactionOptions: Array<Record<string, unknown>> = [];
-  const now = options.now ?? NOW;
+  let currentNow = new Date(options.now ?? NOW);
 
   function transactionFor(state: HarnessState) {
     return {
@@ -268,10 +276,15 @@ function makeHarness(options: {
         events.push(`sql:${sql}`);
         if (sql.includes('"assessment_email_delivery_intents"')) {
           const requestedId = queryValues(query)[0];
-          return state.intent !== null &&
-            state.intent.id === requestedId
-            ? [deepClone(state.intent)]
-            : [];
+          const rows =
+            state.intent !== null && state.intent.id === requestedId
+              ? [deepClone(state.intent)]
+              : [];
+          lockedIntentRows.push(...rows);
+          if (options.nowAfterIntentLock) {
+            currentNow = new Date(options.nowAfterIntentLock);
+          }
+          return rows;
         }
         if (sql.includes('"assessment_email_outbox"')) {
           if (options.lockedOutboxOverride !== undefined) {
@@ -293,6 +306,7 @@ function makeHarness(options: {
       assessmentEmailOutbox: {
         create: jest.fn(async (args: { data: Record<string, unknown> }) => {
           events.push("outbox.create");
+          outboxCreateInputs.push(args.data);
           const row = {
             id: `outbox-created-${state.outboxes.length + 1}`,
             ...deepClone(args.data),
@@ -308,8 +322,22 @@ function makeHarness(options: {
             data: Record<string, unknown>;
           }) => {
             events.push("intent.update");
+            intentUpdates.push(args.data);
             if (state.intent === null || state.intent.id !== args.where.id) {
               throw new Error("missing test intent");
+            }
+            for (const jsonField of [
+              "authorizationSnapshot",
+              "contentProvenance",
+            ]) {
+              if (
+                Object.prototype.hasOwnProperty.call(args.data, jsonField) &&
+                args.data[jsonField] === null
+              ) {
+                throw new Error(
+                  `Prisma Json? update requires a SQL-null sentinel for ${jsonField}`,
+                );
+              }
             }
             applyData(
               state.intent as unknown as Record<string, unknown>,
@@ -336,7 +364,10 @@ function makeHarness(options: {
   }
 
   const deps = {
-    now: () => new Date(now),
+    now: () => {
+      events.push("clock.now");
+      return new Date(currentNow);
+    },
     isPaused: () => options.paused ?? false,
     runTransaction: async <T>(
       work: (tx: ReturnType<typeof transactionFor>) => Promise<T>,
@@ -354,6 +385,9 @@ function makeHarness(options: {
     },
     loadCurrentAuthorizationFacts: async () => {
       events.push("facts.load");
+      if (options.nowAfterFactsLoad) {
+        currentNow = new Date(options.nowAfterFactsLoad);
+      }
       return deepClone(committed.facts);
     },
     reviewTokens: {
@@ -385,6 +419,9 @@ function makeHarness(options: {
     deps,
     events,
     queries,
+    lockedIntentRows,
+    outboxCreateInputs,
+    intentUpdates,
     transactionOptions,
     getState: () => deepClone(committed),
     setFacts: (facts: CurrentAuthorizationFactsV1) => {
@@ -542,6 +579,18 @@ describe("held assessment email intent operator services", () => {
         contentProvenance: contentProvenance(),
       }),
     ]);
+    expect(harness.outboxCreateInputs[0]).toEqual(
+      expect.objectContaining({
+        authorizationProvenance: authorizationSnapshot(),
+        contentProvenance: contentProvenance(),
+      }),
+    );
+    expect(
+      harness.outboxCreateInputs[0].authorizationProvenance,
+    ).not.toBe(harness.lockedIntentRows.at(-1)?.authorizationSnapshot);
+    expect(harness.outboxCreateInputs[0].contentProvenance).not.toBe(
+      harness.lockedIntentRows.at(-1)?.contentProvenance,
+    );
     expect(state.intent).toEqual(
       expect.objectContaining({
         status: "HANDED_OFF",
@@ -783,6 +832,30 @@ describe("held assessment email intent operator services", () => {
       code: "PROVENANCE_INVALID",
     },
     {
+      label: "provenance with an extra PII/content key",
+      options: {},
+      mutate: (harness: ReturnType<typeof makeHarness>) =>
+        harness.setIntent({
+          contentProvenance: {
+            ...contentProvenance(),
+            recipientEmail: RECIPIENT,
+          },
+        }),
+      code: "PROVENANCE_INVALID",
+    },
+    {
+      label: "provenance with malformed render-input hash",
+      options: {},
+      mutate: (harness: ReturnType<typeof makeHarness>) =>
+        harness.setIntent({
+          contentProvenance: {
+            ...contentProvenance(),
+            renderInputHash: "D".repeat(64),
+          },
+        }),
+      code: "PROVENANCE_INVALID",
+    },
+    {
       label: "payload hash mismatch",
       options: {},
       mutate: (harness: ReturnType<typeof makeHarness>) =>
@@ -923,6 +996,109 @@ describe("held assessment email intent operator services", () => {
           reviewToken: expiredToken,
         }),
       "REVIEW_TOKEN_EXPIRED",
+    );
+  });
+
+  it("rejects at exact intent expiry when the deadline passes during authoritative lock waits", async () => {
+    const expiresAt = new Date("2026-08-03T05:00:01.000Z");
+    const intent = frozenIntent({ expiresAt });
+    const facts = currentFacts();
+    const token = issueIntentReviewToken(
+      {
+        actorUserId: "operator-1",
+        intentId: intent.id,
+        intentVersion: intent.version,
+        reviewContextHash: reviewContextHash({
+          intentId: intent.id,
+          intentVersion: intent.version,
+          current: facts,
+        }),
+      },
+      { now: NOW, secret: TOKEN_SECRET },
+    );
+    const existingOutbox = {
+      id: "outbox-existing-at-expiry",
+      submissionId: intent.submissionId,
+      recipientRole: intent.recipientRole,
+      status: "SENT",
+    };
+    const harness = makeHarness({
+      intent,
+      facts,
+      outboxes: [existingOutbox],
+      now: NOW,
+      nowAfterIntentLock: NOW,
+      nowAfterFactsLoad: expiresAt,
+    });
+
+    await expectOperatorError(
+      () =>
+        releaseHeldIntent(harness.deps, {
+          intentId: intent.id,
+          actor: { userId: "operator-1" },
+          expectedVersion: intent.version,
+          reasonCode: RELEASE_REASON,
+          reviewToken: token,
+        }),
+      "INTENT_EXPIRED",
+    );
+
+    expect(harness.getState()).toEqual(
+      expect.objectContaining({
+        outboxes: [existingOutbox],
+        intent: expect.objectContaining({
+          status: "HELD",
+          handedOffOutboxId: null,
+          version: 7,
+        }),
+      }),
+    );
+    expect(harness.events.lastIndexOf("clock.now")).toBeGreaterThan(
+      harness.events.indexOf("facts.load"),
+    );
+  });
+
+  it("rejects at exact token expiry when the token expires during authoritative lock waits", async () => {
+    const tokenIssuedAt = new Date("2026-08-03T04:45:00.000Z");
+    const tokenExpiresAt = new Date("2026-08-03T05:00:00.000Z");
+    const intent = frozenIntent();
+    const facts = currentFacts();
+    const token = issueIntentReviewToken(
+      {
+        actorUserId: "operator-1",
+        intentId: intent.id,
+        intentVersion: intent.version,
+        reviewContextHash: reviewContextHash({
+          intentId: intent.id,
+          intentVersion: intent.version,
+          current: facts,
+        }),
+      },
+      { now: tokenIssuedAt, secret: TOKEN_SECRET },
+    );
+    const harness = makeHarness({
+      intent,
+      facts,
+      now: new Date(tokenExpiresAt.getTime() - 1),
+      nowAfterIntentLock: new Date(tokenExpiresAt.getTime() - 1),
+      nowAfterFactsLoad: tokenExpiresAt,
+    });
+
+    await expectOperatorError(
+      () =>
+        releaseHeldIntent(harness.deps, {
+          intentId: intent.id,
+          actor: { userId: "operator-1" },
+          expectedVersion: intent.version,
+          reasonCode: RELEASE_REASON,
+          reviewToken: token,
+        }),
+      "REVIEW_TOKEN_EXPIRED",
+    );
+
+    expect(harness.getState().outboxes).toEqual([]);
+    expect(harness.events.lastIndexOf("clock.now")).toBeGreaterThan(
+      harness.events.indexOf("facts.load"),
     );
   });
 
@@ -1077,6 +1253,38 @@ describe("held assessment email intent operator services", () => {
     );
   });
 
+  it("uses Prisma SQL-null sentinels to purge unsupported JSON metadata during cancellation", async () => {
+    const harness = makeHarness({
+      intent: frozenIntent({
+        snapshotSchemaVersion: 99,
+        authorizationSnapshot: { schemaVersion: 99 },
+        contentProvenance: { corrupt: "private unsupported metadata" },
+      }),
+    });
+
+    await cancelHeldIntent(harness.deps, {
+      intentId: "intent-1",
+      actor: { userId: "operator-1" },
+      expectedVersion: 7,
+      reasonCode: "POLICY_DECISION",
+    });
+
+    const terminalUpdate = harness.intentUpdates.at(-1);
+    expect(terminalUpdate).toEqual(
+      expect.objectContaining({
+        authorizationSnapshot: Prisma.DbNull,
+        contentProvenance: Prisma.DbNull,
+      }),
+    );
+    expect(harness.getState().intent).toEqual(
+      expect.objectContaining({
+        status: "CANCELLED",
+        authorizationSnapshot: null,
+        contentProvenance: null,
+      }),
+    );
+  });
+
   it.each([
     {
       label: "not held",
@@ -1128,6 +1336,39 @@ describe("held assessment email intent operator services", () => {
     expect(harness.getState().outboxes).toEqual([]);
   });
 
+  it("rejects cancellation at exact expiry when the deadline passes while acquiring the intent lock", async () => {
+    const expiresAt = new Date("2026-08-03T05:00:01.000Z");
+    const harness = makeHarness({
+      intent: frozenIntent({ expiresAt }),
+      now: NOW,
+      nowAfterIntentLock: expiresAt,
+    });
+
+    await expectOperatorError(
+      () =>
+        cancelHeldIntent(harness.deps, {
+          intentId: "intent-1",
+          actor: { userId: "operator-1" },
+          expectedVersion: 7,
+          reasonCode: "POLICY_DECISION",
+        }),
+      "INTENT_EXPIRED",
+    );
+
+    expect(harness.events.indexOf("clock.now")).toBeGreaterThan(
+      harness.events.findIndex((event) =>
+        event.includes('"assessment_email_delivery_intents"'),
+      ),
+    );
+    expect(harness.getState()).toEqual(
+      expect.objectContaining({
+        outboxes: [],
+        audits: [],
+        intent: expect.objectContaining({ status: "HELD", version: 7 }),
+      }),
+    );
+  });
+
   it("rolls back cancellation and exposes only a stable audit failure when cancellation audit persistence fails", async () => {
     const harness = makeHarness();
     harness.failNextAudit();
@@ -1158,15 +1399,35 @@ describe("held assessment email intent operator services", () => {
     );
   });
 
-  it("keeps audit metadata free of addresses, subjects, HTML, current facts, and raw errors", async () => {
+  it("keeps detail, release, and cancel audits on the non-PII allowlist", async () => {
     const releaseHarness = makeHarness();
     await reviewedRelease(releaseHarness);
-    const serialized = JSON.stringify(releaseHarness.getState().audits);
+    const cancelHarness = makeHarness();
+    await cancelHeldIntent(cancelHarness.deps, {
+      intentId: "intent-1",
+      actor: { userId: "operator-1" },
+      expectedVersion: 7,
+      reasonCode: "POLICY_DECISION",
+    });
+    const audits = [
+      ...releaseHarness.getState().audits,
+      ...cancelHarness.getState().audits,
+    ];
+    const serialized = JSON.stringify(audits);
 
     expect(serialized).not.toContain(RECIPIENT);
     expect(serialized).not.toContain(SUBJECT);
     expect(serialized).not.toContain(HTML);
+    expect(serialized).not.toContain("respondent-1");
+    expect(serialized).not.toContain("respondentId");
     expect(serialized).not.toContain("canonicalMailbox");
     expect(serialized).not.toContain("CLOSED");
+    expect(serialized).toContain("operator-1");
+    expect(serialized).toContain("intent-1");
+    expect(audits.map((audit) => audit.action)).toEqual([
+      "ASSESSMENT_EMAIL_INTENT_DETAIL_VIEWED",
+      "ASSESSMENT_EMAIL_INTENT_RELEASED",
+      "ASSESSMENT_EMAIL_INTENT_CANCELLED",
+    ]);
   });
 });

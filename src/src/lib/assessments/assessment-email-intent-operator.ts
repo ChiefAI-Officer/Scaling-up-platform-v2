@@ -236,21 +236,37 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function parseContentProvenance(value: unknown): ContentProvenanceV1 | null {
   if (!isRecord(value)) return null;
+  const exactKeys = [
+    "schemaVersion",
+    "templateId",
+    "versionId",
+    "templateAlias",
+    "reportType",
+    "approvalHash",
+    "rendererContractVersion",
+    "sourceCommit",
+    "renderInputHash",
+  ] as const;
   const stringFields = [
     "templateId",
     "versionId",
     "templateAlias",
     "reportType",
     "sourceCommit",
-    "renderInputHash",
   ] as const;
   if (
+    Object.keys(value).length !== exactKeys.length ||
+    exactKeys.some(
+      (field) => !Object.prototype.hasOwnProperty.call(value, field),
+    ) ||
     value.schemaVersion !== INTENT_SNAPSHOT_SCHEMA_VERSION ||
     value.rendererContractVersion !== INTENT_RENDERER_CONTRACT_VERSION ||
     stringFields.some(
       (field) =>
         typeof value[field] !== "string" || value[field].length === 0,
     ) ||
+    typeof value.renderInputHash !== "string" ||
+    !/^[a-f0-9]{64}$/.test(value.renderInputHash) ||
     !(
       value.approvalHash === null ||
       typeof value.approvalHash === "string"
@@ -258,7 +274,17 @@ function parseContentProvenance(value: unknown): ContentProvenanceV1 | null {
   ) {
     return null;
   }
-  return value as ContentProvenanceV1;
+  return {
+    schemaVersion: INTENT_SNAPSHOT_SCHEMA_VERSION,
+    templateId: value.templateId as string,
+    versionId: value.versionId as string,
+    templateAlias: value.templateAlias as string,
+    reportType: value.reportType as string,
+    approvalHash: value.approvalHash as string | null,
+    rendererContractVersion: INTENT_RENDERER_CONTRACT_VERSION,
+    sourceCommit: value.sourceCommit as string,
+    renderInputHash: value.renderInputHash,
+  };
 }
 
 function snapshotMatchesIntent(
@@ -493,7 +519,6 @@ function auditChanges(
     submissionId: intent.submissionId,
     campaignId: intent.campaignId,
     invitationId: intent.invitationId,
-    respondentId: intent.respondentId,
     recipientRole: intent.recipientRole,
     emailType: intent.emailType,
     payloadHash: intent.payloadHash,
@@ -669,8 +694,8 @@ function terminalData(
           recipientEmail: null,
           subject: null,
           bodyHtml: null,
-          authorizationSnapshot: null,
-          contentProvenance: null,
+          authorizationSnapshot: Prisma.DbNull,
+          contentProvenance: Prisma.DbNull,
         };
   return {
     ...terminal,
@@ -774,15 +799,15 @@ export async function releaseHeldIntent(
   return runOperatorTransaction(
     deps,
     async (tx) => {
-      const now = deps.now();
       await tx.$executeRaw(Prisma.sql`SET LOCAL lock_timeout = '2s'`);
       await tx.$executeRaw(
         Prisma.sql`SET LOCAL statement_timeout = '10s'`,
       );
       const intent = await readIntent(tx, input.intentId, "UPDATE");
+      const initialNow = deps.now();
       assertHeld(intent);
       assertVersion(intent, input.expectedVersion);
-      assertNotExpired(intent, now);
+      assertNotExpired(intent, initialNow);
       if (deps.isPaused()) {
         throw new OperatorServiceError("SENDS_PAUSED");
       }
@@ -806,6 +831,8 @@ export async function releaseHeldIntent(
         intentVersion: intent.version,
         current,
       });
+      const now = deps.now();
+      assertNotExpired(intent, now);
       verifyReviewToken(
         deps,
         input.reviewToken,
@@ -837,8 +864,8 @@ export async function releaseHeldIntent(
               subject: payload.subject,
               bodyHtml: payload.bodyHtml,
               status: "PENDING",
-              authorizationProvenance: intent.authorizationSnapshot,
-              contentProvenance: intent.contentProvenance,
+              authorizationProvenance: snapshot,
+              contentProvenance: provenance,
             },
             select: { id: true },
           })
@@ -889,12 +916,12 @@ export async function cancelHeldIntent(
   return runOperatorTransaction(
     deps,
     async (tx) => {
-      const now = deps.now();
       await tx.$executeRaw(Prisma.sql`SET LOCAL lock_timeout = '2s'`);
       await tx.$executeRaw(
         Prisma.sql`SET LOCAL statement_timeout = '10s'`,
       );
       const intent = await readIntent(tx, input.intentId, "UPDATE");
+      const now = deps.now();
       assertHeld(intent);
       assertVersion(intent, input.expectedVersion);
       assertNotExpired(intent, now);
