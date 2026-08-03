@@ -6,6 +6,17 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="gh-220-branded-invitation-html-launched-default-off"></a>
+### 2026-08-04 — GH #220 branded invitation HTML launched default-off <!-- ENTRY_ISO:2026-08-04 ENTRY_SLUG:gh-220-branded-invitation-html-launched-default-off -->
+
+**Protected merge and exact deployment receipt.** Implementation PR [#292](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/292) was independently approved and squash-merged as `fe3deeba2384aaf504c40b758aad7399880899af`. Exact Production deployment `dpl_AJ2gQhRtmuYYP6dU8bhT2a4mQfx4` is **READY**, and GitHub deployment `5729526511` ties it to that exact SHA. It owns `platformtest.scalingup.com`, `scaling-up-platform-v2.vercel.app`, `scaling-up-platform-v2-scaling-up.vercel.app`, and `scaling-up-platform-v2-git-main-scaling-up.vercel.app`. Both public health aliases returned HTTP `200` with healthy database and safe auth posture. Refreshed hosted **Build**, **Migration Safety Gate**, **Assessment Email Lease (PostgreSQL)**, **Vercel**, and **Vercel Preview Comments** checks passed.
+
+**Production rollout state by variable name only.** A name-only Production inventory found pre-existing capability variable `WAVE_D_CUSTOM_HTML_EMAIL_ENABLED` present. New branded-body variable `ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED` is absent, and renderer kill variable `ASSESSMENT_INVITE_BRANDED` is absent. Therefore the new branded-body composition remains default-off and existing `full_replace` semantics remain active. No flag value was read, no flag was changed, no live email was sent, and no override audit, activation, or production-data write ran.
+
+**Verification and scope boundaries.** The final local full Jest run passed **609 suites / 7,259 tests / 14 snapshots**. Changed-file ESLint, migration safety across **43 migrations**, whitespace/diff checks, and the Turbopack production build passed; the build generated **92/92** static pages. The shipped implementation composes safe campaign-authored content inside the existing branded invitation shell only when separately activated, while retaining stored bytes, platform-owned logo/CTA/fallback/footer behavior, canonical plain text, SMTP failure propagation, and fail-safe rollback behavior. GH #228 report branding, GH #256 image-host policy, and GH #257 outbox reconciliation remain separate and unchanged.
+
+**Tracking and reporting state.** Issue [#220](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/issues/220) auto-closed with the implementation merge. Claim release and the matching Notion closeout remain pending until this receipt lands, so the next consolidated report remains at its existing **seven** eligible outcomes through GH #228 under the established complete-closeout rule. This launch becomes eligible for the next outcome slot only after those tracking steps complete; this receipt itself is operational evidence and does not add a second outcome.
+
 <a id="gh-256-circle-sync-image-validation-launched"></a>
 ### 2026-08-03 — GH #256 Circle-sync Coach image validation launched <!-- ENTRY_ISO:2026-08-03 ENTRY_SLUG:gh-256-circle-sync-image-validation-launched -->
 
