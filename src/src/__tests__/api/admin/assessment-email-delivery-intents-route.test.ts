@@ -127,7 +127,8 @@ const detailResult = {
   emailType: "ASSESSMENT_RESULTS",
   recipientEmail: "person@example.com",
   subject: "Private subject",
-  bodyHtml: "<p>Private body</p>",
+  previewDocument:
+    '<!doctype html><meta http-equiv="Content-Security-Policy" content="default-src \'none\'"><p>Private preview copy</p>',
   payloadHash: "c".repeat(64),
   snapshotSchemaVersion: 1,
   rendererContractVersion: 1,
@@ -488,7 +489,7 @@ describe("GET /api/admin/assessment-email-delivery-intents", () => {
 });
 
 describe("GET /api/admin/assessment-email-delivery-intents/:id", () => {
-  it.each([ADMIN, STAFF])("allows privileged role $role, passes only userId, and strips bodyHtml", async (actor) => {
+  it.each([ADMIN, STAFF])("allows privileged role $role, passes only userId, and returns previewDocument without bodyHtml", async (actor) => {
     (getApiActor as jest.Mock).mockResolvedValueOnce(actor);
 
     const response = await getHeldIntent(detailRequest() as never, params);
@@ -504,7 +505,8 @@ describe("GET /api/admin/assessment-email-delivery-intents/:id", () => {
       reviewTokenSecret: process.env.ASSESSMENT_EMAIL_INTENT_REVIEW_TOKEN_SECRET,
     });
     expect(body.data).not.toHaveProperty("bodyHtml");
-    expect(JSON.stringify(body)).not.toContain("<p>Private body</p>");
+    expect(body.data.previewDocument).toBe(detailResult.previewDocument);
+    expect(JSON.stringify(body)).not.toContain("bodyHtml");
   });
 });
 

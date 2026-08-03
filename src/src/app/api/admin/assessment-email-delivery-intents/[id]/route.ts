@@ -48,6 +48,7 @@ export async function GET(
         emailType: detail.emailType,
         recipientEmail: detail.recipientEmail,
         subject: detail.subject,
+        previewDocument: detail.previewDocument,
         payloadHash: detail.payloadHash,
         snapshotSchemaVersion: detail.snapshotSchemaVersion,
         rendererContractVersion: detail.rendererContractVersion,

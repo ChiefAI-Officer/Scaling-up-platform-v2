@@ -63,9 +63,30 @@ describe("AssessmentsSidebar", () => {
     expect(link).toHaveAttribute("href", "/admin/assessments/observability");
   });
 
+  it.each(["ADMIN", "STAFF"] as const)(
+    "renders Delivery Holds beside Observability for %s",
+    (role) => {
+      render(<AssessmentsSidebar session={makeSession(role)} />);
+      const deliveryHolds = screen.getByText("Delivery Holds").closest("a");
+      expect(deliveryHolds).toHaveAttribute(
+        "href",
+        "/admin/assessments/delivery-holds",
+      );
+      const links = screen.getAllByRole("link");
+      expect(
+        links.indexOf(screen.getByText("Delivery Holds").closest("a")!),
+      ).toBe(links.indexOf(screen.getByText("Observability").closest("a")!) + 1);
+    },
+  );
+
   it("does NOT render Observability for COACH (admin-only surface)", () => {
     render(<AssessmentsSidebar session={makeSession("COACH")} />);
     expect(screen.queryByText("Observability")).not.toBeInTheDocument();
+  });
+
+  it("does NOT render Delivery Holds for COACH", () => {
+    render(<AssessmentsSidebar session={makeSession("COACH")} />);
+    expect(screen.queryByText("Delivery Holds")).not.toBeInTheDocument();
   });
 
   it("hides Aggregate Report when canAccessAggregateReport returns false", () => {

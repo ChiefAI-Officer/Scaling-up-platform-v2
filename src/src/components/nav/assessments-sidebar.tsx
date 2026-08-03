@@ -55,6 +55,10 @@ const ADMIN_ENTRIES: SidebarEntry[] = [
   // built but never linked — operators had to know the URL. Sits next to Import
   // since it surfaces import-health signals. ADMIN/STAFF-only, like this section.
   { href: "/admin/assessments/observability", label: "Observability" },
+  {
+    href: "/admin/assessments/delivery-holds",
+    label: "Delivery Holds",
+  },
   { href: "/admin/assessments/aggregate", label: "Aggregate Report" },
 ];
 

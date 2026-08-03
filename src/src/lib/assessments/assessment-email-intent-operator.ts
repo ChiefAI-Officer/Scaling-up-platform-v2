@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import sanitizeHtml from "sanitize-html";
 import {
   INTENT_RENDERER_CONTRACT_VERSION,
   INTENT_SNAPSHOT_SCHEMA_VERSION,
@@ -202,7 +203,7 @@ export type HeldIntentDetail = {
   emailType: string;
   recipientEmail: string;
   subject: string;
-  bodyHtml: string;
+  previewDocument: string;
   payloadHash: string;
   snapshotSchemaVersion: number;
   rendererContractVersion: number;
@@ -229,6 +230,168 @@ export type OperatorResolution = {
 };
 
 const TRANSACTION_TIMEOUT_MS = 15_000;
+const INERT_PREVIEW_CSP =
+  "default-src 'none'; base-uri 'none'; connect-src 'none'; font-src 'none'; form-action 'none'; frame-src 'none'; img-src data:; media-src 'none'; object-src 'none'; script-src 'none'; style-src 'unsafe-inline'; navigate-to 'none';";
+const SAFE_DATA_IMAGE =
+  /^data:image\/(?:png|jpeg|gif|webp);base64,[a-z0-9+/=\s]+$/i;
+
+export function buildInertIntentPreviewDocument(bodyHtml: string): string {
+  const withoutCssUrls = bodyHtml.replace(/url\s*\([^)]*\)/gi, "");
+  const sanitized = sanitizeHtml(withoutCssUrls, {
+    allowedTags: [
+      "a",
+      "abbr",
+      "address",
+      "article",
+      "aside",
+      "b",
+      "blockquote",
+      "br",
+      "caption",
+      "center",
+      "code",
+      "col",
+      "colgroup",
+      "dd",
+      "del",
+      "details",
+      "div",
+      "dl",
+      "dt",
+      "em",
+      "figcaption",
+      "figure",
+      "footer",
+      "h1",
+      "h2",
+      "h3",
+      "h4",
+      "h5",
+      "h6",
+      "header",
+      "hr",
+      "i",
+      "img",
+      "ins",
+      "li",
+      "main",
+      "mark",
+      "nav",
+      "ol",
+      "p",
+      "pre",
+      "s",
+      "section",
+      "small",
+      "span",
+      "strong",
+      "sub",
+      "summary",
+      "sup",
+      "table",
+      "tbody",
+      "td",
+      "tfoot",
+      "th",
+      "thead",
+      "tr",
+      "u",
+      "ul",
+    ],
+    allowedAttributes: {
+      "*": [
+        "align",
+        "bgcolor",
+        "border",
+        "cellpadding",
+        "cellspacing",
+        "class",
+        "color",
+        "dir",
+        "height",
+        "id",
+        "lang",
+        "role",
+        "style",
+        "title",
+        "valign",
+        "width",
+      ],
+      img: ["alt", "height", "src", "style", "title", "width"],
+    },
+    allowedSchemes: ["data"],
+    allowProtocolRelative: false,
+    allowedStyles: {
+      "*": {
+        "background-color": [/^(?!.*url\s*\().+$/i],
+        border: [/^(?!.*url\s*\().+$/i],
+        "border-bottom": [/^(?!.*url\s*\().+$/i],
+        "border-collapse": [/^(?!.*url\s*\().+$/i],
+        "border-color": [/^(?!.*url\s*\().+$/i],
+        "border-left": [/^(?!.*url\s*\().+$/i],
+        "border-radius": [/^(?!.*url\s*\().+$/i],
+        "border-right": [/^(?!.*url\s*\().+$/i],
+        "border-spacing": [/^(?!.*url\s*\().+$/i],
+        "border-style": [/^(?!.*url\s*\().+$/i],
+        "border-top": [/^(?!.*url\s*\().+$/i],
+        "border-width": [/^(?!.*url\s*\().+$/i],
+        color: [/^(?!.*url\s*\().+$/i],
+        display: [/^(?!.*url\s*\().+$/i],
+        "font-family": [/^(?!.*url\s*\().+$/i],
+        "font-size": [/^(?!.*url\s*\().+$/i],
+        "font-style": [/^(?!.*url\s*\().+$/i],
+        "font-weight": [/^(?!.*url\s*\().+$/i],
+        height: [/^(?!.*url\s*\().+$/i],
+        "letter-spacing": [/^(?!.*url\s*\().+$/i],
+        "line-height": [/^(?!.*url\s*\().+$/i],
+        margin: [/^(?!.*url\s*\().+$/i],
+        "margin-bottom": [/^(?!.*url\s*\().+$/i],
+        "margin-left": [/^(?!.*url\s*\().+$/i],
+        "margin-right": [/^(?!.*url\s*\().+$/i],
+        "margin-top": [/^(?!.*url\s*\().+$/i],
+        "max-width": [/^(?!.*url\s*\().+$/i],
+        "min-width": [/^(?!.*url\s*\().+$/i],
+        padding: [/^(?!.*url\s*\().+$/i],
+        "padding-bottom": [/^(?!.*url\s*\().+$/i],
+        "padding-left": [/^(?!.*url\s*\().+$/i],
+        "padding-right": [/^(?!.*url\s*\().+$/i],
+        "padding-top": [/^(?!.*url\s*\().+$/i],
+        "text-align": [/^(?!.*url\s*\().+$/i],
+        "text-decoration": [/^(?!.*url\s*\().+$/i],
+        "vertical-align": [/^(?!.*url\s*\().+$/i],
+        "white-space": [/^(?!.*url\s*\().+$/i],
+        width: [/^(?!.*url\s*\().+$/i],
+      },
+    },
+    transformTags: {
+      "*": (tagName, attribs) => {
+        const next = { ...attribs };
+        if (next.style) {
+          next.style = next.style.replace(/url\s*\([^)]*\)/gi, "");
+        }
+        return { tagName, attribs: next };
+      },
+      img: (tagName, attribs) => {
+        const next = { ...attribs };
+        if (!next.src || !SAFE_DATA_IMAGE.test(next.src)) {
+          delete next.src;
+        }
+        delete next.srcset;
+        if (next.style) {
+          next.style = next.style.replace(/url\s*\([^)]*\)/gi, "");
+        }
+        return { tagName, attribs: next };
+      },
+    },
+  });
+
+  return (
+    '<!doctype html><html><head><meta charset="utf-8">' +
+    `<meta http-equiv="Content-Security-Policy" content="${INERT_PREVIEW_CSP}">` +
+    '<meta name="referrer" content="no-referrer"></head>' +
+    `<body>${sanitized}</body></html>`
+  );
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -643,7 +806,9 @@ function toHeldIntentDetail(
     respondentId: intent.respondentId,
     recipientRole: intent.recipientRole,
     emailType: intent.emailType,
-    ...payload,
+    recipientEmail: payload.recipientEmail,
+    subject: payload.subject,
+    previewDocument: buildInertIntentPreviewDocument(payload.bodyHtml),
     payloadHash: intent.payloadHash,
     snapshotSchemaVersion: intent.snapshotSchemaVersion,
     rendererContractVersion: intent.rendererContractVersion,

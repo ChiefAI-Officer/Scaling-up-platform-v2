@@ -13,6 +13,7 @@ import {
 } from "@/lib/assessments/assessment-email-intent-review-token";
 import {
   OperatorServiceError,
+  buildInertIntentPreviewDocument,
   cancelHeldIntent,
   loadHeldIntentDetail,
   releaseHeldIntent,
@@ -471,6 +472,51 @@ async function expectOperatorError(
 }
 
 describe("held assessment email intent operator services", () => {
+  it("builds a CSP-locked preview copy without active or navigable email content", () => {
+    const preview = buildInertIntentPreviewDocument(`
+      <!doctype html>
+      <html>
+        <head>
+          <style>
+            .tracked { background-image: url("https://tracker.example/pixel"); }
+          </style>
+        </head>
+        <body onload="steal()" onclick="steal()">
+          <script>steal()</script>
+          <form action="https://tracker.example/form"><input name="secret"></form>
+          <a href="https://tracker.example/click">Open</a>
+          <img src="https://tracker.example/pixel" srcset="https://tracker.example/2x 2x">
+          <img src="data:image/svg+xml;base64,PHN2Zz4=">
+          <img src="data:image/png;base64,iVBORw0KGgo=" alt="Allowed logo">
+          <img src="data:image/jpeg;base64,/9j/" alt="Allowed jpeg">
+          <img src="data:image/gif;base64,R0lGODlh" alt="Allowed gif">
+          <img src="data:image/webp;base64,UklGRg==" alt="Allowed webp">
+          <svg><script>steal()</script></svg>
+          <iframe srcdoc="<script>steal()</script>"></iframe>
+          <object data="https://tracker.example/object"></object>
+          <embed src="https://tracker.example/embed">
+          <audio src="https://tracker.example/audio"></audio>
+          <video src="https://tracker.example/video"></video>
+          <p style="color: #123; background: url(https://tracker.example/css)">Safe copy</p>
+        </body>
+      </html>
+    `);
+
+    expect(preview).toContain(
+      "default-src 'none'; base-uri 'none'; connect-src 'none'; font-src 'none'; form-action 'none'; frame-src 'none'; img-src data:; media-src 'none'; object-src 'none'; script-src 'none'; style-src 'unsafe-inline'; navigate-to 'none';",
+    );
+    expect(preview).toContain('<meta name="referrer" content="no-referrer">');
+    expect(preview).toContain("Safe copy");
+    expect(preview).toContain("data:image/png;base64,iVBORw0KGgo=");
+    expect(preview).toContain("data:image/jpeg;base64,/9j/");
+    expect(preview).toContain("data:image/gif;base64,R0lGODlh");
+    expect(preview).toContain("data:image/webp;base64,UklGRg==");
+    expect(preview).not.toContain("tracker.example");
+    expect(preview).not.toMatch(
+      /<script|<form|<input|<iframe|<object|<embed|<svg|<audio|<video|onload=|onclick=|href=|srcset=|image\/svg|url\s*\(/i,
+    );
+  });
+
   it("loads one consistent HELD detail in RepeatableRead, audits before issuing its actor-bound token, and returns all reviewed current facts", async () => {
     const harness = makeHarness();
 
@@ -491,12 +537,13 @@ describe("held assessment email intent operator services", () => {
         status: "HELD",
         recipientEmail: RECIPIENT,
         subject: SUBJECT,
-        bodyHtml: HTML,
+        previewDocument: expect.stringContaining("default-src 'none'"),
         current: currentFacts(),
         reviewContextHash: expect.stringMatching(/^[a-f0-9]{64}$/),
         reviewToken: expect.stringMatching(/^v1\./),
       }),
     );
+    expect(detail).not.toHaveProperty("bodyHtml");
     expect(harness.events.indexOf("facts.load")).toBeGreaterThanOrEqual(0);
     expect(harness.events.indexOf("audit.create")).toBeGreaterThan(
       harness.events.indexOf("facts.load"),
