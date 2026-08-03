@@ -1,7 +1,7 @@
 # GH #256 — Circle-Sync Coach Image Validation Design
 
 Date: 2026-08-03
-Status: Design approved; awaiting written-spec review
+Status: Design and written spec approved; implementation planning complete
 Issue: [GH #256](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/issues/256)
 Claim: [Issue #261 comment](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/issues/261#issuecomment-5162188735)
 Branch: `codex/256-circle-sync-image-validation`
