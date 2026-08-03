@@ -354,6 +354,35 @@ function parseContentProvenance(value: unknown): ContentProvenanceV1 | null {
   return value as ContentProvenanceV1;
 }
 
+function contentProvenanceMatchesFrozenContract(
+  intent: IntentRow,
+  snapshot: AuthorizationSnapshotV1,
+  provenance: ContentProvenanceV1,
+): boolean {
+  if (
+    provenance.schemaVersion !== intent.snapshotSchemaVersion ||
+    provenance.templateId !== snapshot.common.templateId ||
+    provenance.versionId !== snapshot.common.versionId ||
+    provenance.templateAlias !== snapshot.common.templateAlias ||
+    provenance.rendererContractVersion !== intent.rendererContractVersion
+  ) {
+    return false;
+  }
+
+  if (snapshot.common.recipientRole === "RESPONDENT") {
+    return (
+      snapshot.respondentResults !== undefined &&
+      provenance.approvalHash ===
+        snapshot.respondentResults.approvedContentHash
+    );
+  }
+
+  return (
+    snapshot.coachCompletion !== undefined &&
+    provenance.approvalHash === null
+  );
+}
+
 function terminalDataFor(
   intent: IntentRow,
   input: {
@@ -545,6 +574,15 @@ async function reconcileCandidate(
     return { kind: "HELD" };
   }
 
+  if (!contentProvenanceMatchesFrozenContract(intent, snapshot, provenance)) {
+    await holdIntent(tx, intent, {
+      now,
+      primaryReason: "PAYLOAD_INTEGRITY_FAILED",
+      reasons: ["PAYLOAD_INTEGRITY_FAILED"],
+    });
+    return { kind: "HELD" };
+  }
+
   const current = await deps.loadCurrentAuthorizationFacts(
     tx,
     intent,
@@ -642,6 +680,7 @@ async function recordTransientFailure(
   intent: IntentRow,
   error: unknown,
   now: Date,
+  deadlineAt: number,
 ): Promise<BookkeepingOutcome> {
   const nextAttempts = intent.attempts + 1;
   const errorClass = stableErrorClass(error);
@@ -651,6 +690,7 @@ async function recordTransientFailure(
 
   try {
     if (nextAttempts >= 5) {
+      if (deps.now().getTime() >= deadlineAt) return "UNCHANGED";
       const changed = await deps.runOneTransaction(async (tx) => {
         const updated = await tx.assessmentEmailDeliveryIntent.updateMany({
           where: {
@@ -713,12 +753,32 @@ export async function reconcileAssessmentEmailIntents(
   assertFixedScope(scope);
   const result = emptyResult();
   const startedAt = deps.now().getTime();
+  const deadlineAt = startedAt + RECONCILER_BUDGET_MS;
+  const paused = deps.isPaused();
+
+  if (paused) {
+    try {
+      result.deferredByPause = await deps.runOneTransaction(async (tx) => {
+        await tx.$executeRaw(
+          Prisma.sql`SET LOCAL lock_timeout = '2s'`,
+        );
+        await tx.$executeRaw(
+          Prisma.sql`SET LOCAL statement_timeout = '10s'`,
+        );
+        return countDeferredByPause(tx, scope);
+      });
+    } catch (error) {
+      deps.logger.error(
+        "[assessment-email-intent] pause deferral count failed",
+        { errorClass: stableErrorClass(error), scopeKind: scope.kind },
+      );
+    }
+  }
 
   for (let processed = 0; processed < scope.maxRows; processed += 1) {
     const now = deps.now();
-    if (now.getTime() - startedAt >= RECONCILER_BUDGET_MS) break;
+    if (now.getTime() >= deadlineAt) break;
 
-    const paused = deps.isPaused();
     const selection = { current: null as IntentRow | null };
     try {
       const outcome = await deps.runOneTransaction(async (tx) => {
@@ -732,9 +792,7 @@ export async function reconcileAssessmentEmailIntents(
         if (selection.current === null) {
           return {
             kind: "EMPTY" as const,
-            deferredByPause: paused
-              ? await countDeferredByPause(tx, scope)
-              : 0,
+            deferredByPause: 0,
           };
         }
         return reconcileCandidate(deps, tx, selection.current, now);
@@ -768,6 +826,7 @@ export async function reconcileAssessmentEmailIntents(
         selected,
         error,
         now,
+        deadlineAt,
       );
       if (bookkeeping === "RETRIED") result.retried += 1;
       if (bookkeeping === "HELD") result.held += 1;

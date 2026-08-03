@@ -486,6 +486,71 @@ describe("reconcileAssessmentEmailIntents", () => {
     });
   });
 
+  it("counts paused due work even when expired rows consume the full scope", async () => {
+    const harness = makeHarness({
+      candidates: Array.from({ length: 10 }, (_, index) =>
+        frozenIntent({
+          id: `expired-intent-${index}`,
+          expiresAt: new Date("2026-08-02T00:00:00.000Z"),
+        }),
+      ),
+      deferredCount: 4,
+      paused: true,
+    });
+
+    const result = await reconcileAssessmentEmailIntents(
+      harness.deps,
+      SUBMISSION_SCOPE,
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        deferredByPause: 4,
+        expired: 10,
+        handedOff: 0,
+        retried: 0,
+      }),
+    );
+    const deferredQueries = harness.tx.$queryRaw.mock.calls
+      .map(([query]) => query)
+      .filter((query) => queryText(query).includes("deferredByPause"));
+    expect(deferredQueries).toHaveLength(1);
+    expect(queryText(deferredQueries[0])).not.toContain("FOR UPDATE");
+    expect(queryValues(deferredQueries[0])).toEqual(
+      expect.arrayContaining(["submission-1", 10]),
+    );
+  });
+
+  it("counts paused due work before expiry processing reaches the 45-second budget", async () => {
+    const times = [new Date(0), new Date(44_999), new Date(45_000)];
+    const harness = makeHarness({
+      candidates: [
+        frozenIntent({
+          expiresAt: new Date("1969-12-31T00:00:00.000Z"),
+        }),
+      ],
+      deferredCount: 2,
+      now: () => times.shift() ?? new Date(45_000),
+      paused: true,
+    });
+
+    const result = await reconcileAssessmentEmailIntents(
+      harness.deps,
+      SUBMISSION_SCOPE,
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        deferredByPause: 2,
+        expired: 1,
+      }),
+    );
+    const deferredQueries = harness.tx.$queryRaw.mock.calls
+      .map(([query]) => query)
+      .filter((query) => queryText(query).includes("deferredByPause"));
+    expect(deferredQueries).toHaveLength(1);
+  });
+
   it.each(["PENDING", "SENDING", "SENT", "FAILED", "CANCELLED"])(
     "adopts an existing %s outbox unchanged before expiry or reauthorization",
     async (status) => {
@@ -670,6 +735,122 @@ describe("reconcileAssessmentEmailIntents", () => {
     });
   });
 
+  it.each([
+    {
+      label: "template identity",
+      contentOverride: { templateId: "template-other" },
+    },
+    {
+      label: "version identity",
+      contentOverride: { versionId: "version-other" },
+    },
+    {
+      label: "template alias",
+      contentOverride: { templateAlias: "other-alias" },
+    },
+    {
+      label: "respondent approval hash",
+      contentOverride: { approvalHash: "e".repeat(64) },
+    },
+  ])("holds contradictory $label provenance without rewriting or handing it off", async ({
+    contentOverride,
+  }) => {
+    const provenance = {
+      ...contentProvenance(),
+      ...contentOverride,
+    };
+    const harness = makeHarness({
+      candidates: [
+        frozenIntent({
+          contentProvenance: provenance,
+        }),
+      ],
+    });
+
+    const result = await reconcileAssessmentEmailIntents(
+      harness.deps,
+      SUBMISSION_SCOPE,
+    );
+
+    expect(result.held).toBe(1);
+    expect(harness.loadCurrentAuthorizationFacts).not.toHaveBeenCalled();
+    expect(harness.tx.assessmentEmailOutbox.create).not.toHaveBeenCalled();
+    expect(harness.tx.assessmentEmailDeliveryIntent.update).toHaveBeenCalledWith({
+      where: { id: "intent-1" },
+      data: expect.objectContaining({
+        status: "HELD",
+        holdReason: "PAYLOAD_INTEGRITY_FAILED",
+        holdReasons: ["PAYLOAD_INTEGRITY_FAILED"],
+      }),
+    });
+    const updateData =
+      harness.tx.assessmentEmailDeliveryIntent.update.mock.calls[0][0].data;
+    expect(updateData.contentProvenance).toBeUndefined();
+  });
+
+  it("requires owning-Coach provenance to retain a null approval hash", async () => {
+    const snapshot = {
+      ...authorizationSnapshot(),
+      common: {
+        ...authorizationSnapshot().common,
+        recipientRole: "OWNING_COACH" as const,
+        emailType: "COACH_COMPLETION" as const,
+      },
+      respondentResults: undefined,
+      coachCompletion: {
+        canonicalRecipientMailbox: "coach@example.com",
+        notifyCoachOnCompletion: true as const,
+        featureKey: "WAVE_D_COACH_NOTIFY_ENABLED" as const,
+        featureEnabled: true as const,
+        coachId: "coach-1",
+      },
+    };
+    const harness = makeHarness({
+      candidates: [
+        frozenIntent({
+          recipientRole: "OWNING_COACH",
+          emailType: "COACH_COMPLETION",
+          recipientEmail: "coach@example.com",
+          authorizationSnapshot: snapshot,
+          contentProvenance: {
+            ...contentProvenance(),
+            approvalHash: "e".repeat(64),
+          },
+          payloadHash: assessmentEmailIntentPayloadHash({
+            snapshotSchemaVersion: 1,
+            recipientRole: "OWNING_COACH",
+            emailType: "COACH_COMPLETION",
+            recipientEmail: "coach@example.com",
+            subject: SUBJECT,
+            bodyHtml: HTML,
+          }),
+        }),
+      ],
+      facts: currentFacts({
+        coach: {
+          exists: true,
+          id: "coach-1",
+          canonicalMailbox: "coach@example.com",
+        },
+      }),
+    });
+
+    const result = await reconcileAssessmentEmailIntents(
+      harness.deps,
+      SUBMISSION_SCOPE,
+    );
+
+    expect(result.held).toBe(1);
+    expect(harness.loadCurrentAuthorizationFacts).not.toHaveBeenCalled();
+    expect(harness.tx.assessmentEmailOutbox.create).not.toHaveBeenCalled();
+    expect(harness.tx.assessmentEmailDeliveryIntent.update).toHaveBeenCalledWith({
+      where: { id: "intent-1" },
+      data: expect.objectContaining({
+        holdReason: "PAYLOAD_INTEGRITY_FAILED",
+      }),
+    });
+  });
+
   it("does not coerce an unknown intent role into an authorized role", async () => {
     const invalidRole = "UNKNOWN_ROLE";
     const harness = makeHarness({
@@ -810,6 +991,32 @@ describe("reconcileAssessmentEmailIntents", () => {
     expect(JSON.stringify(harness.tx.auditLog.create.mock.calls)).not.toMatch(
       /private-recipient|Private frozen|Private frozen body|database rejected/,
     );
+  });
+
+  it("does not start fifth-failure bookkeeping at the 45-second deadline", async () => {
+    const times = [new Date(0), new Date(44_999), new Date(45_000)];
+    const intent = frozenIntent({ attempts: 4 });
+    const harness = makeHarness({
+      candidates: [intent],
+      now: () => times.shift() ?? new Date(45_000),
+    });
+    harness.loadCurrentAuthorizationFacts.mockRejectedValueOnce(
+      Object.assign(new Error(RAW_ERROR), { name: "TimeoutError" }),
+    );
+
+    const result = await reconcileAssessmentEmailIntents(
+      harness.deps,
+      SUBMISSION_SCOPE,
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({ held: 0, retried: 0 }),
+    );
+    expect(harness.runOneTransaction).toHaveBeenCalledTimes(1);
+    expect(
+      harness.tx.assessmentEmailDeliveryIntent.updateMany,
+    ).not.toHaveBeenCalled();
+    expect(harness.tx.auditLog.create).not.toHaveBeenCalled();
   });
 
   it.each([
