@@ -1885,8 +1885,9 @@ Do not run this command during implementation unless an operator provides an exp
 - [ ] **Step 6: Type-check the runner without connecting**
 
 > Closeout note (2026-08-03): a fresh `npx tsc --noEmit` still exits nonzero
-> on the inherited repository-wide TypeScript baseline. The audit runner is
-> covered by the separately green production build and focused verification.
+> on the inherited repository-wide TypeScript baseline. The runner passed
+> scoped ESLint and its imported audit module passed focused tests; a direct
+> runner type-check remains outstanding.
 
 Run:
 
