@@ -33,7 +33,10 @@ import {
   getCampaignRespondents,
 } from "@/lib/assessments/campaign-detail";
 import { CampaignDetail } from "@/components/assessments/CampaignDetail";
-import { waveDCustomHtmlEmailEnabled } from "@/lib/assessments/wave-d-feature-flags";
+import {
+  assessmentInviteBrandedCustomHtmlEnabled,
+  waveDCustomHtmlEmailEnabled,
+} from "@/lib/assessments/wave-d-feature-flags";
 import { isOnScreenResultsEnabled } from "@/lib/assessments/wave-osr-flags";
 import {
   isGroupReportEnabled,
@@ -115,6 +118,7 @@ export default async function AdminCampaignDetailPage({ params }: PageProps) {
         initialOverview={overview}
         initialRespondents={respondents}
         customHtmlEmailEnabled={waveDCustomHtmlEmailEnabled()}
+        brandedCustomHtmlEnabled={assessmentInviteBrandedCustomHtmlEnabled()}
         canViewGroupReport={canShowGroupReport}
         groupReportHref={`/assessments/${id}/report`}
         // Wave OSR (#71) — gate computed here, server-side, from the same flag the

@@ -45,6 +45,7 @@ jest.mock("@/lib/db", () => ({
 
 jest.mock("@/lib/assessments/wave-d-feature-flags", () => ({
   waveDCustomHtmlEmailEnabled: () => false,
+  assessmentInviteBrandedCustomHtmlEnabled: jest.fn(() => true),
 }));
 jest.mock("@/lib/assessments/wave-f-flags", () => ({
   isGroupReportEnabled: () => false,
@@ -122,6 +123,8 @@ describe("Admin campaign detail — reduced-nav host props", () => {
     expect(detailProps).toMatchObject({
       basePath: "/admin/assessments/campaigns",
       hidePortalOnlyLinks: true,
+      customHtmlEmailEnabled: false,
+      brandedCustomHtmlEnabled: true,
     });
     // Longitudinal is intentionally NOT passed → CampaignDetail's own [] default.
     expect(detailProps).not.toHaveProperty("longitudinalRespondentIds");
