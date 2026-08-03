@@ -315,6 +315,12 @@ The audit must not print raw HTML, invitation credentials, respondent data, or
 email addresses. It performs no writes. Activation pauses when live overrides
 are nonzero until each live row has been manually reviewed.
 
+The audit's current, post-activation, and rollback mode classifications assume
+the branded renderer is active. `ASSESSMENT_INVITE_BRANDED=0` selects the legacy
+renderer before custom-HTML render selection, so activation must also verify
+that kill switch is inactive; the audit classifications do not describe actual
+send behavior while the legacy renderer is selected.
+
 ## Telemetry
 
 Preserve existing values for continuity:
@@ -425,13 +431,28 @@ campaign create/update API, feature-flag, and two editor suites; scoped ESLint;
 
 1. Merge and deploy with
    `ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED` unset/default-off.
-2. Run the read-only override audit and retain its receipt.
+2. Read the current Production values of `WAVE_D_CUSTOM_HTML_EMAIL_ENABLED`,
+   `ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED`, and
+   `ASSESSMENT_INVITE_BRANDED`. Stop unless the branded-renderer kill switch is
+   verified inactive (`ASSESSMENT_INVITE_BRANDED` is not exactly `"0"`), then
+   run the read-only override audit with the exact two custom-HTML flag values
+   and retain its receipt.
 3. If live overrides are zero, or every live override has been manually
-   reviewed, set the new flag for Production and redeploy.
+   reviewed, separately authorize the new Production flag. Use the repository's
+   established Vercel REST write path—`POST /v10/projects/{id}/env` with
+   `type:"encrypted"` and `target:["production"]`, passing the correct
+   Production `teamId` explicitly—then redeploy. Do not use piped
+   `vercel env add`, the mis-paired local `.vercel` link, or
+   `scripts/push-env-to-vercel.mjs`.
 4. Confirm the exact deployment is ready, owns the production aliases, reports
    healthy database/auth posture, and has the expected flag state.
 5. Let organic sends populate PII-free mode telemetry. Do not manufacture a
    customer invitation solely for rollout verification.
+
+For value verification, an empty or `[SENSITIVE]` read for a
+`sensitive`-typed flag means **unknown**, not off. Such a value requires a live
+in-app check or a separately authorized REST rewrite as `type:"encrypted"`;
+REST-written `encrypted` flags are readable. Never paste returned values.
 
 The verified 2026-08-03 inventory—zero live and two soft-deleted overrides—is
 evidence for planning, not permission to skip the activation-time audit.

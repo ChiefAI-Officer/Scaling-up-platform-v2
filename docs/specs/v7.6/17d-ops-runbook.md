@@ -131,20 +131,42 @@ ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED
 #### GH #220 dark rollout
 
 1. Deploy with `ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED` unset.
-2. Read the current Production values for both HTML flags. Set
-   `GH220_READONLY_DATABASE_URL` to the operator-provided read-only connection,
-   then run the audit with those exact flag values. Before first activation the
-   expected command is:
+2. Read the current Production values for both HTML flags and the branded-renderer
+   kill switch `ASSESSMENT_INVITE_BRANDED`. Verify the kill switch is inactive:
+   the branded renderer is active only when `ASSESSMENT_INVITE_BRANDED` is not
+   exactly `"0"`. If it is `"0"`, stop; the legacy renderer is selected before
+   custom-HTML render selection. Set `GH220_READONLY_DATABASE_URL` to the
+   operator-provided read-only connection, then run the audit with the exact
+   custom-HTML flag values. Before first activation the expected command is:
 
    ```bash
    WAVE_D_CUSTOM_HTML_EMAIL_ENABLED=1 ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED=0 AUDIT_READONLY_URL="$GH220_READONLY_DATABASE_URL" npm run audit:invitation-html-overrides
    ```
 
+   The audit's current, post-activation, and rollback mode classifications apply
+   only while the branded renderer is active. They do not describe actual send
+   behavior while `ASSESSMENT_INVITE_BRANDED=0`.
 3. Stop if live overrides are nonzero until each live campaign is reviewed.
-4. Separately authorize and set
-   `ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED` in Production.
+4. Separately authorize the Production flag change, then use the repository's
+   safe write path. Target the Production project
+   `prj_xcAWuAmGZAU3DCHgAauRv2WPKneo` under
+   `team_ek3PMuEYCgI0DKZ2EFexMgya`, passing that `teamId` explicitly, and write
+   `ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED` with the Vercel REST API:
+   `POST /v10/projects/{id}/env`, `type:"encrypted"`,
+   `target:["production"]`. Do not use piped `vercel env add`; do not use the
+   repository's currently mis-paired local `.vercel` link or
+   `scripts/push-env-to-vercel.mjs`.
 5. Redeploy, then verify the exact deployment, aliases, health, and flag state.
 6. Observe organic PII-free telemetry without manufacturing a customer send.
+
+For value verification, follow `CLAUDE.md`'s Production flag guidance: read the
+correctly scoped Production environment via the Vercel CLI and/or authenticated
+`GET /v10/projects/{id}/env?teamId=…&decrypt=true`, and never paste returned
+values. REST-written `encrypted` flags are readable. A `sensitive`-typed flag's
+value cannot be verified from an empty read or `[SENSITIVE]`; that state is
+**unknown**, not off. Resolve a sensitive kill-switch value with a live in-app
+check or a separately authorized REST rewrite as `type:"encrypted"` before
+activation. Do not infer flag values from the mis-paired local project link.
 
 Production activation is outside the implementation PR. Do not infer activation
 authorization from a successful deployment or audit.
