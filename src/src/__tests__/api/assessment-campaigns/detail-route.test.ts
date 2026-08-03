@@ -61,6 +61,8 @@ function detailParams(id: string) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  delete process.env.WAVE_D_CUSTOM_HTML_EMAIL_ENABLED;
+  delete process.env.ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED;
   (db.accessGroupCoach.findMany as jest.Mock).mockResolvedValue([
     {
       accessGroupId: "g1",

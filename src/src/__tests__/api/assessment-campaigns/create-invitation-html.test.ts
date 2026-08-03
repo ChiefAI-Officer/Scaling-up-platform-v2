@@ -76,6 +76,8 @@ const ORIGINAL_BRANDED_FLAG = process.env.ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_
 
 beforeEach(() => {
   jest.clearAllMocks();
+  delete process.env.WAVE_D_CUSTOM_HTML_EMAIL_ENABLED;
+  delete process.env.ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED;
   (getApiActor as jest.Mock).mockResolvedValue(coachActor);
   (db.accessGroupCoach.findMany as jest.Mock).mockResolvedValue([
     { accessGroupId: "g1", coachId: "coach-1", accessGroup: { id: "g1", deletedAt: null } },
