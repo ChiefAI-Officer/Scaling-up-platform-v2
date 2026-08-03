@@ -26,6 +26,11 @@ import {
   type ContentProvenanceV1,
 } from "../src/lib/assessments/assessment-email-delivery-intents";
 import type { ReconcilerDeps } from "../src/lib/assessments/assessment-email-intent-reconciler";
+import {
+  issueIntentReviewToken,
+  verifyIntentReviewToken,
+} from "../src/lib/assessments/assessment-email-intent-review-token";
+import type { OperatorDeps } from "../src/lib/assessments/assessment-email-intent-operator";
 import { resultsEmailContentHash } from "../src/lib/assessments/results-email-approval";
 
 // The real reconciler imports @/lib/db for its production dependency factory.
@@ -50,6 +55,10 @@ type ReconcilerModule =
   typeof import("../src/lib/assessments/assessment-email-intent-reconciler");
 let reconcileAssessmentEmailIntents: ReconcilerModule["reconcileAssessmentEmailIntents"];
 let productionAssessmentEmailIntentReconcilerDeps: ReconcilerModule["productionAssessmentEmailIntentReconcilerDeps"];
+type OperatorModule =
+  typeof import("../src/lib/assessments/assessment-email-intent-operator");
+let loadHeldIntentDetail: OperatorModule["loadHeldIntentDetail"];
+let releaseHeldIntent: OperatorModule["releaseHeldIntent"];
 
 const destructiveOptIn =
   process.env.ASSESSMENT_EMAIL_LEASE_TEST_ALLOW === "isolated-schema";
@@ -72,6 +81,8 @@ const approvedContentHash = resultsEmailContentHash(
   resultsMarkdown,
 );
 const phase2Fingerprint = "a".repeat(64);
+const operatorReviewTokenSecret =
+  "postgres-operator-review-token-secret-at-least-32-characters";
 
 function scopedDatabaseUrl(baseUrl: string): string {
   const url = new URL(baseUrl);
@@ -151,7 +162,27 @@ type ReconcilerTestOptions = {
   beforeTransactionWork?: (tx: Prisma.TransactionClient) => Promise<void>;
   beforeAuthorizationLoad?: () => Promise<void>;
   onTransactionStarted?: (pid: number) => void;
+  observeQuery?: (query: Prisma.Sql) => void;
 };
+
+function observedTransaction(
+  tx: Prisma.TransactionClient,
+  observeQuery: ((query: Prisma.Sql) => void) | undefined,
+): Prisma.TransactionClient {
+  if (!observeQuery) return tx;
+  return new Proxy(tx, {
+    get(target, property) {
+      if (property === "$queryRaw") {
+        return (query: Prisma.Sql) => {
+          observeQuery(query);
+          return target.$queryRaw(query);
+        };
+      }
+      const value = Reflect.get(target, property, target);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+}
 
 function reconcilerDeps(
   client: PrismaClient,
@@ -179,7 +210,9 @@ function reconcilerDeps(
           );
           options.onTransactionStarted?.(pidRows[0].pid);
           await options.beforeTransactionWork?.(tx);
-          return work(tx as never);
+          return work(
+            observedTransaction(tx, options.observeQuery) as never,
+          );
         },
         {
           timeout: 15_000,
@@ -189,6 +222,65 @@ function reconcilerDeps(
         },
       ),
   };
+}
+
+type OperatorTestOptions = {
+  paused?: boolean;
+  beforeTransactionWork?: (tx: Prisma.TransactionClient) => Promise<void>;
+  beforeAuthorizationLoad?: () => Promise<void>;
+  onTransactionStarted?: (pid: number) => void;
+  observeQuery?: (query: Prisma.Sql) => void;
+};
+
+function operatorDeps(
+  client: PrismaClient,
+  options: OperatorTestOptions = {},
+): OperatorDeps {
+  const production = productionAssessmentEmailIntentReconcilerDeps();
+  return {
+    now: () => reconcileNow,
+    isPaused: () => options.paused ?? false,
+    runTransaction: (work, transactionOptions) =>
+      client.$transaction(
+        async (tx) => {
+          options.onTransactionStarted?.(await backendPid(tx));
+          await options.beforeTransactionWork?.(tx);
+          return work(
+            observedTransaction(tx, options.observeQuery) as never,
+          );
+        },
+        {
+          timeout: transactionOptions.timeout,
+          ...(transactionOptions.isolationLevel
+            ? { isolationLevel: transactionOptions.isolationLevel }
+            : {}),
+        },
+      ),
+    loadCurrentAuthorizationFacts: async (tx, intent, snapshot) => {
+      await options.beforeAuthorizationLoad?.();
+      return production.loadCurrentAuthorizationFacts(
+        tx as never,
+        intent as never,
+        snapshot,
+      );
+    },
+    reviewTokens: {
+      issue: (claims, now) =>
+        issueIntentReviewToken(claims, {
+          now,
+          secret: operatorReviewTokenSecret,
+        }),
+      verify: (token, expected, now) =>
+        verifyIntentReviewToken(token, expected, {
+          now,
+          secret: operatorReviewTokenSecret,
+        }),
+    },
+  };
+}
+
+function sqlText(query: Prisma.Sql): string {
+  return query.strings.join(" ");
 }
 
 type IntentRole = "RESPONDENT" | "OWNING_COACH";
@@ -528,6 +620,10 @@ describe("assessment email intent reconciliation on PostgreSQL", () => {
       reconcilerModule.reconcileAssessmentEmailIntents;
     productionAssessmentEmailIntentReconcilerDeps =
       reconcilerModule.productionAssessmentEmailIntentReconcilerDeps;
+    const operatorModule =
+      await import("../src/lib/assessments/assessment-email-intent-operator");
+    loadHeldIntentDetail = operatorModule.loadHeldIntentDetail;
+    releaseHeldIntent = operatorModule.releaseHeldIntent;
 
     originalResultsFlag = process.env.WAVE_D_RESULTS_EMAIL_ENABLED;
     originalCoachFlag = process.env.WAVE_D_COACH_NOTIFY_ENABLED;
@@ -651,7 +747,12 @@ describe("assessment email intent reconciliation on PostgreSQL", () => {
           "userAgent" TEXT,
           "timestamp" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
           CONSTRAINT "audit_logs_test_failure"
-            CHECK ("entityId" NOT LIKE 'audit-fail-%')
+            CHECK ("entityId" NOT LIKE 'audit-fail-%'),
+          CONSTRAINT "audit_logs_operator_release_test_failure"
+            CHECK (
+              "entityId" NOT LIKE 'operator-audit-fail-%'
+              OR "action" <> 'ASSESSMENT_EMAIL_INTENT_RELEASED'
+            )
         )
       `,
       `
@@ -861,6 +962,434 @@ describe("assessment email intent reconciliation on PostgreSQL", () => {
         eventDb,
         "intent-1",
         "ASSESSMENT_EMAIL_INTENT_HANDED_OFF",
+      ),
+    ).toBe(1);
+  });
+
+  it("partitions concurrent automatic reconciliation from valid HELD release and creates one outbox", async () => {
+    await seedAuthorizationGraph(eventDb);
+    await seedIntent(eventDb, { status: "HELD" });
+    const detail = await loadHeldIntentDetail(operatorDeps(eventDb), {
+      intentId: "intent-1",
+      actor: { userId: "operator-1" },
+    });
+    const startTogether = oneShotBarrier(2);
+
+    const automatic = reconcileAssessmentEmailIntents(
+      reconcilerDeps(cronDb, {
+        beforeTransactionWork: () => startTogether.wait(),
+      }),
+      { kind: "scheduled", maxRows: 50 },
+    );
+    const release = releaseHeldIntent(
+      operatorDeps(eventDb, {
+        beforeTransactionWork: () => startTogether.wait(),
+      }),
+      {
+        intentId: "intent-1",
+        actor: { userId: "operator-1" },
+        expectedVersion: 0,
+        reasonCode: "DRIFT_REVIEWED_SEND_FROZEN",
+        reviewToken: detail.reviewToken,
+      },
+    );
+    const [automaticResult, releaseResult] = await (async () => {
+      try {
+        return await bounded(
+          Promise.all([automatic, release]),
+          "automatic reconciliation and HELD release partition",
+        );
+      } finally {
+        startTogether.release();
+        await Promise.allSettled([automatic, release]);
+      }
+    })();
+
+    expect(automaticResult).toEqual(
+      expect.objectContaining({
+        handedOff: 0,
+        held: 0,
+        expired: 0,
+        existingOutboxWon: 0,
+      }),
+    );
+    expect(releaseResult).toEqual({
+      intentId: "intent-1",
+      status: "HANDED_OFF",
+      version: 1,
+      outboxId: expect.any(String),
+      existingOutboxWon: false,
+    });
+    expect(await countOutboxRows(eventDb, "submission-1", "RESPONDENT")).toBe(
+      1,
+    );
+    expect(await readIntent(eventDb)).toEqual(
+      expect.objectContaining({
+        status: "HANDED_OFF",
+        version: 1,
+        recipientEmail: null,
+        subject: null,
+        bodyHtml: null,
+      }),
+    );
+    expect(
+      await countIntentAudits(
+        eventDb,
+        "intent-1",
+        "ASSESSMENT_EMAIL_INTENT_HANDED_OFF",
+      ),
+    ).toBe(0);
+    expect(
+      await countIntentAudits(
+        eventDb,
+        "intent-1",
+        "ASSESSMENT_EMAIL_INTENT_RELEASED",
+      ),
+    ).toBe(1);
+    expect(
+      await countIntentAudits(
+        eventDb,
+        "intent-1",
+        "ASSESSMENT_EMAIL_INTENT_DETAIL_VIEWED",
+      ),
+    ).toBe(1);
+  });
+
+  it("holds every operator authoritative lock before a relevant mutation proceeds", async () => {
+    await seedAuthorizationGraph(eventDb);
+    await seedIntent(eventDb, { status: "HELD" });
+    const detail = await loadHeldIntentDetail(operatorDeps(eventDb), {
+      intentId: "intent-1",
+      actor: { userId: "operator-1" },
+    });
+    const releaseHasLocks = deferred<void>();
+    const continueRelease = deferred<void>();
+    const release = releaseHeldIntent(
+      operatorDeps(eventDb, {
+        beforeAuthorizationLoad: async () => {
+          releaseHasLocks.resolve();
+          await continueRelease.promise;
+        },
+      }),
+      {
+        intentId: "intent-1",
+        actor: { userId: "operator-1" },
+        expectedVersion: 0,
+        reasonCode: "DRIFT_REVIEWED_SEND_FROZEN",
+        reviewToken: detail.reviewToken,
+      },
+    );
+    const mutationPid = deferred<number>();
+    let mutation: Promise<void> | undefined;
+    const [releaseResult] = await (async () => {
+      try {
+        await bounded(
+          releaseHasLocks.promise,
+          "operator authoritative locks",
+        );
+        mutation = cronDb.$transaction(async (tx) => {
+          mutationPid.resolve(await backendPid(tx));
+          await tx.$executeRaw(Prisma.sql`
+            UPDATE "assessment_campaigns"
+            SET "sendResultsToRespondent" = false
+            WHERE "id" = 'campaign-1'
+          `);
+        });
+        await waitForBackendLock(
+          admin,
+          await bounded(mutationPid.promise, "operator mutation backend PID"),
+        );
+        continueRelease.resolve();
+        return await bounded(
+          Promise.all([release, mutation]),
+          "operator-first mutation ordering",
+        );
+      } finally {
+        continueRelease.resolve();
+        await Promise.allSettled([
+          release,
+          ...(mutation ? [mutation] : []),
+        ]);
+      }
+    })();
+    const campaign = await eventDb.$queryRaw<
+      Array<{ sendResultsToRespondent: boolean }>
+    >(Prisma.sql`
+      SELECT "sendResultsToRespondent"
+      FROM "assessment_campaigns"
+      WHERE "id" = 'campaign-1'
+    `);
+
+    expect(releaseResult).toEqual(
+      expect.objectContaining({
+        status: "HANDED_OFF",
+        existingOutboxWon: false,
+      }),
+    );
+    expect(campaign).toEqual([{ sendResultsToRespondent: false }]);
+    expect(await countOutboxRows(eventDb, "submission-1", "RESPONDENT")).toBe(
+      1,
+    );
+  });
+
+  it("executes automatic and operator PostgreSQL locks in the same complete physical-table order", async () => {
+    await seedAuthorizationGraph(eventDb);
+    await seedIntent(eventDb, { role: "OWNING_COACH" });
+    const automaticQueries: Prisma.Sql[] = [];
+
+    const automaticResult = await reconcileAssessmentEmailIntents(
+      reconcilerDeps(eventDb, {
+        observeQuery: (query) => automaticQueries.push(query),
+      }),
+      { kind: "submission", submissionId: "submission-1", maxRows: 10 },
+    );
+    expect(automaticResult.handedOff).toBe(1);
+
+    await eventDb.$executeRaw(Prisma.sql`
+      DELETE FROM "assessment_email_outbox"
+      WHERE "submissionId" = 'submission-1'
+    `);
+    await eventDb.$executeRaw(Prisma.sql`
+      DELETE FROM "audit_logs"
+      WHERE "entityId" = 'intent-1'
+    `);
+    await eventDb.$executeRaw(Prisma.sql`
+      DELETE FROM "assessment_email_delivery_intents"
+      WHERE "id" = 'intent-1'
+    `);
+    await seedIntent(eventDb, {
+      role: "OWNING_COACH",
+      status: "HELD",
+    });
+    const detail = await loadHeldIntentDetail(operatorDeps(eventDb), {
+      intentId: "intent-1",
+      actor: { userId: "operator-1" },
+    });
+    const operatorQueries: Prisma.Sql[] = [];
+
+    const releaseResult = await releaseHeldIntent(
+      operatorDeps(eventDb, {
+        observeQuery: (query) => operatorQueries.push(query),
+      }),
+      {
+        intentId: "intent-1",
+        actor: { userId: "operator-1" },
+        expectedVersion: 0,
+        reasonCode: "DRIFT_REVIEWED_SEND_FROZEN",
+        reviewToken: detail.reviewToken,
+      },
+    );
+    expect(releaseResult.status).toBe("HANDED_OFF");
+
+    const expectedTables = [
+      '"assessment_email_delivery_intents"',
+      '"assessment_submissions"',
+      '"assessment_campaigns"',
+      '"assessment_invitations"',
+      '"org_respondents"',
+      '"assessment_templates"',
+      '"assessment_template_versions"',
+      '"coaches"',
+      '"assessment_email_outbox"',
+    ];
+    const lockIndexes = (queries: Prisma.Sql[]) => {
+      const texts = queries.map(sqlText);
+      return expectedTables.map((table) =>
+        texts.findIndex(
+          (text) =>
+            text.includes(table) &&
+            (text.includes("FOR UPDATE") || text.includes("FOR SHARE")),
+        ),
+      );
+    };
+    const automaticOrder = lockIndexes(automaticQueries);
+    const operatorOrder = lockIndexes(operatorQueries);
+
+    expect(automaticOrder.every((index) => index >= 0)).toBe(true);
+    expect(operatorOrder.every((index) => index >= 0)).toBe(true);
+    expect(automaticOrder).toEqual(
+      [...automaticOrder].sort((left, right) => left - right),
+    );
+    expect(operatorOrder).toEqual(
+      [...operatorOrder].sort((left, right) => left - right),
+    );
+  });
+
+  it("rejects release after a reviewed authoritative fact changes", async () => {
+    await seedAuthorizationGraph(eventDb);
+    await seedIntent(eventDb, { status: "HELD" });
+    const detail = await loadHeldIntentDetail(operatorDeps(eventDb), {
+      intentId: "intent-1",
+      actor: { userId: "operator-1" },
+    });
+    const mutationLocked = deferred<void>();
+    const continueMutation = deferred<void>();
+    const mutation = cronDb.$transaction(async (tx) => {
+      await tx.$queryRaw(Prisma.sql`
+        SELECT "id"
+        FROM "assessment_campaigns"
+        WHERE "id" = 'campaign-1'
+        FOR UPDATE
+      `);
+      await tx.$executeRaw(Prisma.sql`
+        UPDATE "assessment_campaigns"
+        SET "sendResultsToRespondent" = false
+        WHERE "id" = 'campaign-1'
+      `);
+      mutationLocked.resolve();
+      await continueMutation.promise;
+    });
+    const releasePid = deferred<number>();
+    let release: ReturnType<typeof releaseHeldIntent> | undefined;
+
+    try {
+      await bounded(
+        mutationLocked.promise,
+        "reviewed-fact mutation lock",
+      );
+      release = releaseHeldIntent(
+        operatorDeps(eventDb, {
+          onTransactionStarted: (pid) => releasePid.resolve(pid),
+        }),
+        {
+          intentId: "intent-1",
+          actor: { userId: "operator-1" },
+          expectedVersion: 0,
+          reasonCode: "DRIFT_REVIEWED_SEND_FROZEN",
+          reviewToken: detail.reviewToken,
+        },
+      );
+      await waitForBackendLock(
+        admin,
+        await bounded(releasePid.promise, "stale-review release backend PID"),
+      );
+      continueMutation.resolve();
+      await expect(
+        bounded(release, "stale reviewed-fact rejection"),
+      ).rejects.toMatchObject({
+        code: "REVIEW_CONTEXT_CHANGED",
+      });
+      await bounded(mutation, "reviewed-fact mutation commit");
+    } finally {
+      continueMutation.resolve();
+      await Promise.allSettled([
+        mutation,
+        ...(release ? [release] : []),
+      ]);
+    }
+    expect(await countOutboxRows(eventDb, "submission-1", "RESPONDENT")).toBe(
+      0,
+    );
+    expect(await readIntent(eventDb)).toEqual(
+      expect.objectContaining({
+        status: "HELD",
+        version: 0,
+        recipientEmail: "respondent@example.com",
+        subject: "Frozen respondent result",
+        bodyHtml: "<p>Exact respondent bytes</p>",
+      }),
+    );
+    expect(
+      await countIntentAudits(
+        eventDb,
+        "intent-1",
+        "ASSESSMENT_EMAIL_INTENT_RELEASED",
+      ),
+    ).toBe(0);
+  });
+
+  it("adopts an existing outbox during release without mutating the winner", async () => {
+    await seedAuthorizationGraph(eventDb);
+    await seedIntent(eventDb, { status: "HELD" });
+    const outboxId = await seedOutbox(eventDb, "SENT");
+    const before = await eventDb.$queryRaw<
+      Array<Record<string, unknown>>
+    >(Prisma.sql`
+      SELECT *
+      FROM "assessment_email_outbox"
+      WHERE "id" = ${outboxId}
+    `);
+    const detail = await loadHeldIntentDetail(operatorDeps(eventDb), {
+      intentId: "intent-1",
+      actor: { userId: "operator-1" },
+    });
+
+    const result = await releaseHeldIntent(operatorDeps(eventDb), {
+      intentId: "intent-1",
+      actor: { userId: "operator-1" },
+      expectedVersion: 0,
+      reasonCode: "DRIFT_REVIEWED_SEND_FROZEN",
+      reviewToken: detail.reviewToken,
+    });
+    const after = await eventDb.$queryRaw<
+      Array<Record<string, unknown>>
+    >(Prisma.sql`
+      SELECT *
+      FROM "assessment_email_outbox"
+      WHERE "id" = ${outboxId}
+    `);
+
+    expect(result).toEqual({
+      intentId: "intent-1",
+      status: "HANDED_OFF",
+      version: 1,
+      outboxId,
+      existingOutboxWon: true,
+    });
+    expect(after).toEqual(before);
+    expect(await readIntent(eventDb)).toEqual(
+      expect.objectContaining({
+        status: "HANDED_OFF",
+        handedOffOutboxId: outboxId,
+        recipientEmail: null,
+        subject: null,
+        bodyHtml: null,
+      }),
+    );
+  });
+
+  it("rolls back operator outbox creation, release resolution, and purge when release audit fails", async () => {
+    await seedAuthorizationGraph(eventDb);
+    await seedIntent(eventDb, {
+      id: "operator-audit-fail-release",
+      status: "HELD",
+    });
+    const detail = await loadHeldIntentDetail(operatorDeps(eventDb), {
+      intentId: "operator-audit-fail-release",
+      actor: { userId: "operator-1" },
+    });
+    const before = await readIntent(
+      eventDb,
+      "operator-audit-fail-release",
+    );
+
+    const release = releaseHeldIntent(operatorDeps(eventDb), {
+      intentId: "operator-audit-fail-release",
+      actor: { userId: "operator-1" },
+      expectedVersion: 0,
+      reasonCode: "DRIFT_REVIEWED_SEND_FROZEN",
+      reviewToken: detail.reviewToken,
+    });
+
+    await expect(release).rejects.toMatchObject({ code: "AUDIT_FAILED" });
+    expect(await countOutboxRows(eventDb, "submission-1", "RESPONDENT")).toBe(
+      0,
+    );
+    expect(
+      await readIntent(eventDb, "operator-audit-fail-release"),
+    ).toEqual(before);
+    expect(
+      await countIntentAudits(
+        eventDb,
+        "operator-audit-fail-release",
+        "ASSESSMENT_EMAIL_INTENT_RELEASED",
+      ),
+    ).toBe(0);
+    expect(
+      await countIntentAudits(
+        eventDb,
+        "operator-audit-fail-release",
+        "ASSESSMENT_EMAIL_INTENT_DETAIL_VIEWED",
       ),
     ).toBe(1);
   });
