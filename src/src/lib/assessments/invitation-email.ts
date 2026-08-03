@@ -224,8 +224,9 @@ export function renderTextBody(template: string, vars: InvitationVars): string {
 
 // ── Full-HTML override (#20) ────────────────────────────────────────────────
 //
-// When a campaign sets `invitationBodyHtml`, that HTML REPLACES the entire
-// branded shell (no wrap). Render = interpolate → sanitize:
+// When a campaign sets `invitationBodyHtml`, the selected flag mode either
+// REPLACES the entire email (legacy full_replace) or composes the fragment
+// inside the branded shell (branded_body). Both render interpolate → sanitize:
 //   1. Interpolate the RAW stored bytes with Wave A's `interpolateTokens`
 //      (SAME `TOKEN_RE` the placement validator counts with — PIN #1) so the
 //      bytes that reach the sanitizer match the bytes the validator vetted.

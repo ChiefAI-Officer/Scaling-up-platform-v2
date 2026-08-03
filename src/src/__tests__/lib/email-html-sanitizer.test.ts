@@ -264,6 +264,27 @@ describe("validateInvitationHtml — rejects bad token placement", () => {
     expect(r.ok).toBe(false);
   });
 
+  it.each([
+    ["style", "<style>{{invitationUrl}}</style>"],
+    ["script", "<script>{{invitation_url}}</script>"],
+    ["textarea", "<textarea>{{assessmentUrl}}</textarea>"],
+    ["noscript", "<noscript>{{assessment_url}}</noscript>"],
+  ])("rejects a URL token inside non-visible <%s> content", (_tag, html) => {
+    expect(validateInvitationHtml(html).ok).toBe(false);
+  });
+
+  it.each([
+    ["style", "<style>{{invitationUrl}}</style>"],
+    ["script", "<script>{{invitation_url}}</script>"],
+    ["textarea", "<textarea>{{assessmentUrl}}</textarea>"],
+    ["noscript", "<noscript>{{assessment_url}}</noscript>"],
+  ])(
+    "rejects a URL token inside non-visible <%s> content when the token is optional",
+    (_tag, html) => {
+      expect(validateInvitationHtml(html, { requireUrlToken: false }).ok).toBe(false);
+    },
+  );
+
   test("rejects token inside HTML comment", () => {
     const r = validateInvitationHtml('<!-- {{invitationUrl}} --><a href="https://x">t</a>');
     expect(r.ok).toBe(false);

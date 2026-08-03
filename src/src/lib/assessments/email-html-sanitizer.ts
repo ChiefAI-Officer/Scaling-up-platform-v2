@@ -171,6 +171,8 @@ export function sanitizeEmailHtml(raw: string): string {
 
 type ValidationResult = { ok: true } | { ok: false; reason: string };
 
+const NON_VISIBLE_TOKEN_CONTAINERS = new Set(["script", "style", "textarea", "noscript"]);
+
 export function validateInvitationHtml(
   raw: string,
   options: { requireUrlToken?: boolean } = {},
@@ -192,6 +194,7 @@ export function validateInvitationHtml(
 
   let validHrefTokens = 0;
   let textTokens = 0;
+  let nonVisibleTokenContainerDepth = 0;
   let rejection: string | null = null;
 
   const fail = (reason: string) => {
@@ -201,6 +204,10 @@ export function validateInvitationHtml(
   const parser = new Parser(
     {
       onopentag(name, attribs) {
+        if (NON_VISIBLE_TOKEN_CONTAINERS.has(name)) {
+          nonVisibleTokenContainerDepth += 1;
+        }
+
         for (const [attrName, attrValue] of Object.entries(attribs)) {
           if (!hasInvitationUrlToken(attrValue)) continue;
           const lower = attrName.toLowerCase();
@@ -223,7 +230,18 @@ export function validateInvitationHtml(
       },
       ontext(text) {
         if (hasInvitationUrlToken(text)) {
-          textTokens += countInvitationUrlTokens(text);
+          if (nonVisibleTokenContainerDepth > 0) {
+            fail(
+              "The survey link token may not appear inside non-visible HTML content. Use it as a link href or as visible plain text.",
+            );
+          } else {
+            textTokens += countInvitationUrlTokens(text);
+          }
+        }
+      },
+      onclosetag(name) {
+        if (NON_VISIBLE_TOKEN_CONTAINERS.has(name)) {
+          nonVisibleTokenContainerDepth -= 1;
         }
       },
       oncomment(data) {
