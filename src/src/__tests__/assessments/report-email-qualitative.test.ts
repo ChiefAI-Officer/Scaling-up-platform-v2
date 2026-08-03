@@ -73,17 +73,26 @@ function qualReport(args: QualFixtureArgs): RespondentReport {
 
 describe("buildReportEmailHtml — qualitative dispatch", () => {
   it("freezes the exact legacy qualitative report email bytes", () => {
-    expect(
-      buildReportEmailHtml({
-        report: qualReport({
-          templateAlias: "qsp-v2",
-          sections: [],
-          questionsByKey: {},
-          rawAnswers: [],
-        }),
-        recipientRole: "TAKER_COPY",
-      }).bodyHtml,
-    ).toMatchSnapshot("legacy-qualitative-report-email");
+    const report = qualReport({
+      templateAlias: "qsp-v2",
+      sections: [],
+      questionsByKey: {},
+      rawAnswers: [],
+    });
+    const legacyDefault = buildReportEmailHtml({
+      report,
+      recipientRole: "TAKER_COPY",
+    });
+    const legacyExplicit = buildReportEmailHtml({
+      report,
+      recipientRole: "TAKER_COPY",
+      chrome: "legacy",
+    });
+
+    expect(legacyExplicit).toEqual(legacyDefault);
+    expect(legacyExplicit.bodyHtml).toMatchSnapshot(
+      "legacy-qualitative-report-email",
+    );
   });
 
   it("includes the taker's email and next-step links", () => {
@@ -230,6 +239,42 @@ describe("buildReportEmailHtml — qualitative dispatch", () => {
     });
     expect(bodyHtml).toContain("CHECKED_SALES_TEXT");
     expect(bodyHtml).not.toContain("UNCHECKED_CASH_TEXT");
+  });
+});
+
+describe("buildReportEmailHtml — qualitative GH 228 branded chrome", () => {
+  it("renders the shared email-safe logo and coach byline chrome", () => {
+    const report = qualReport({
+      templateAlias: "qsp-v2",
+      sections: [{ stableKey: "s1", name: "Priorities" }],
+      questionsByKey: {
+        q1: {
+          type: "TEXT",
+          label: "What changed?",
+          sectionStableKey: "s1",
+        },
+      },
+      rawAnswers: [
+        { stableKey: "q1", value: "We clarified priorities." },
+      ],
+    });
+    report.coachName = "Alex Coach";
+    report.coachLogoUrl = "https://images.example/coach.png";
+
+    const branded = buildReportEmailHtml({
+      report,
+      recipientRole: "TAKER_COPY",
+      chrome: "gh228",
+    });
+
+    expect(branded.bodyHtml.match(/cid:su-report-logo-v1/g)).toHaveLength(2);
+    expect(branded.bodyHtml.indexOf("cid:su-report-logo-v1")).toBeLessThan(
+      branded.bodyHtml.indexOf("Coached by Alex Coach"),
+    );
+    expect(branded.bodyHtml).not.toMatch(/display:(?:flex|grid)/);
+    expect(branded.bodyHtml).not.toContain("<style");
+    expect(branded.bodyHtml).not.toContain("<link");
+    expect(branded.bodyHtml).toContain("We clarified priorities.");
   });
 });
 
