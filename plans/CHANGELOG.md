@@ -6,6 +6,23 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="consolidated-progress-through-gh-228"></a>
+### 2026-08-03 — Consolidated progress ledger current through GH #228 <!-- ENTRY_ISO:2026-08-03 ENTRY_SLUG:consolidated-progress-through-gh-228 -->
+
+**Status: REPORTING LEDGER UPDATED; no runtime change.** The hard cutoff remains the already-sent `output/pdf/Scaling-Up-Progress-Report-2026-07-27-to-2026-07-31.pdf`, which covers 33 merged pull requests through PR #267. The next consolidated report now has exactly **seven** eligible product or reliability outcomes:
+
+1. **GH #222 — Welcome-screen question-bank accuracy** (PR #269): mixed respondent-visible banks use truthful format-aware wording while valid uniform slider banks retain their scale copy.
+2. **GH #242 — retired pinned-edition warning** (PR #273): shared campaign detail shows the exact pinned edition and warns when it has been retired.
+3. **GH #243 — campaign-list edition visibility** (PR #275): admin and Coach campaign lists show factual edition identity plus lifecycle-aware `Not latest` or `Retired` markers.
+4. **GH #224 — truthful Welcome sharing disclosure** (PR #278): invited and public Welcome screens describe who can review named answers instead of promising unconditional confidentiality.
+5. **GH #217 — legacy invitation fallback hardening** (PR #280): the dormant fallback renderer now carries Coach identity, a plain-text twin, and a bottom fallback URL without changing the active branded path.
+6. **Jeff #65 — stable reminder links** (PR #282): original invitation links and successfully delivered bulk-reminder links remain valid for the same invitation lifecycle; the Production global flag is enabled and the kill switch remains off.
+7. **GH #228 — Results report email branding** (PR #288): all three full-report email roles have Scaling Up-first chrome and trusted frozen Coach provenance, shipped behind absent default-off rollout variables.
+
+**Counting and rollout discipline.** Each implementation counts once. PRs #270, #274, #276, #279, #281, #283–#286, and #289 are source-of-truth, receipt, acceptance, or coordination evidence and do not add outcomes. GH #217's fallback remains dormant under the active branded renderer, while GH #228 remains deployed but default-off; the consolidated report must not describe either as active customer-visible behavior. Documentation, design, deferral, claim management, and unmerged work remain excluded from the headline count.
+
+**Closeout evidence.** All seven implementation PRs are merged, their exact production deployments were verified healthy, their issues or source claims were closed or released, and their canonical launch records remain in this changelog. GH #257 residual outbox reconciliation is not part of this seven-outcome window because its separate implementation and production closeout are not present on `main`.
+
 <a id="gh-228-report-email-branding-launched"></a>
 ### 2026-08-03 — GH #228 Results report email branding launched default-off <!-- ENTRY_ISO:2026-08-03 ENTRY_SLUG:gh-228-report-email-branding-launched -->
 
