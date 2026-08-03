@@ -305,7 +305,7 @@ describe("reconcileAssessmentEmailIntents", () => {
     ).toContain("FOR UPDATE");
   });
 
-  it("locks the owning Coach after version and before the matching outbox", async () => {
+  it("locks the mapped coaches table after version and before the matching outbox", async () => {
     const snapshot = {
       ...authorizationSnapshot(),
       common: {
@@ -355,13 +355,20 @@ describe("reconcileAssessmentEmailIntents", () => {
     const versionIndex = sqlCalls.findIndex((sql) =>
       sql.includes('"assessment_template_versions"'),
     );
-    const coachIndex = sqlCalls.findIndex((sql) => sql.includes('"Coach"'));
+    const coachIndex = sqlCalls.findIndex((sql) =>
+      /FROM "(?:coaches|Coach)"/.test(sql),
+    );
     const outboxIndex = sqlCalls.findIndex((sql) =>
       sql.includes('"assessment_email_outbox"'),
     );
     expect(versionIndex).toBeGreaterThanOrEqual(0);
     expect(coachIndex).toBeGreaterThan(versionIndex);
     expect(outboxIndex).toBeGreaterThan(coachIndex);
+    const coachQuery = harness.tx.$queryRaw.mock.calls[coachIndex][0];
+    expect(queryText(coachQuery)).toContain('FROM "coaches"');
+    expect(queryText(coachQuery)).not.toContain('FROM "Coach"');
+    expect(queryText(coachQuery)).toContain("FOR SHARE");
+    expect(queryValues(coachQuery)).toContain("coach-1");
   });
 
   it.each([

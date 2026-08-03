@@ -304,7 +304,7 @@ async function lockAuthoritativeRows(
     ) {
       await tx.$queryRaw(Prisma.sql`
         SELECT "id"
-        FROM "Coach"
+        FROM "coaches"
         WHERE "id" = ${snapshot.coachCompletion.coachId}
         FOR SHARE
       `);
