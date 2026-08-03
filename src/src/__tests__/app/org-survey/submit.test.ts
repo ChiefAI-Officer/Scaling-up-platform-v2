@@ -126,6 +126,7 @@ jest.mock("@/lib/assessments/results-email", () => ({
 
 import { POST } from "@/app/(public)/org-survey/[campaignAlias]/submit/route";
 import { parseAuthorizationSnapshot } from "@/lib/assessments/assessment-email-delivery-intents";
+import { assessmentEmailDeliveryIntentsEnabled } from "@/lib/assessments/wave-d-feature-flags";
 import { inngest } from "@/inngest/client";
 
 // Template version with a single required SLIDER_LIKERT q1 scale 0..3.
@@ -868,6 +869,16 @@ describe("GH #257 — assessment email delivery intents", () => {
     );
   });
 
+  it("evaluates the required intent-mode flag exactly once per request", async () => {
+    mockHappyInvitation();
+    flagState.intents = true;
+
+    const res = await submit();
+
+    expect(res.status).toBe(200);
+    expect(assessmentEmailDeliveryIntentsEnabled).toHaveBeenCalledTimes(1);
+  });
+
   it("flag on still creates valid intents while sends are globally paused", async () => {
     mockHappyInvitation();
     flagState.intents = true;
@@ -916,20 +927,91 @@ describe("GH #257 — assessment email delivery intents", () => {
     expect(intentRoles()).toEqual(["OWNING_COACH"]);
   });
 
-  it("creates no respondent intent when its render fails", async () => {
+  it("creates no respondent intent when the report renderer signals renderError", async () => {
     mockHappyInvitation();
     flagState.intents = true;
-    const { buildResultsEmailHtml } = jest.requireMock(
-      "@/lib/assessments/results-email",
+    const { buildReportEmailHtml } = jest.requireMock(
+      "@/lib/assessments/report-email",
     );
-    (buildResultsEmailHtml as jest.Mock).mockImplementationOnce(() => {
-      throw new Error("render failed before persistence");
+    (buildReportEmailHtml as jest.Mock).mockReturnValueOnce({
+      subject: "unused-report-subject",
+      bodyHtml: "<p>degraded fallback</p>",
+      renderError:
+        "private respondent@example.com subject and HTML must not be logged",
     });
+    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
 
     const res = await submit();
 
     expect(res.status).toBe(200);
     expect(intentRoles()).toEqual(["OWNING_COACH"]);
+    const logJson = JSON.stringify(errorSpy.mock.calls);
+    expect(logJson).toContain("ReportRenderError");
+    expect(logJson).not.toContain("respondent@example.com");
+    expect(logJson).not.toContain("subject and HTML");
+    errorSpy.mockRestore();
+  });
+
+  it("keeps the legacy fallback row when the intent flag is off and the renderer signals renderError", async () => {
+    mockHappyInvitation();
+    flagState.intents = false;
+    const { buildReportEmailHtml } = jest.requireMock(
+      "@/lib/assessments/report-email",
+    );
+    (buildReportEmailHtml as jest.Mock).mockReturnValueOnce({
+      subject: "unused-report-subject",
+      bodyHtml: "<p>degraded fallback</p>",
+      renderError: "qualitative render failed",
+    });
+    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+
+    const res = await submit();
+
+    expect(res.status).toBe(200);
+    expect(
+      txMock.assessmentEmailOutbox.create.mock.calls.map(
+        (call: Array<{ data: { recipientRole: string } }>) =>
+          call[0].data.recipientRole,
+      ),
+    ).toEqual(["RESPONDENT", "OWNING_COACH"]);
+    errorSpy.mockRestore();
+  });
+
+  it("creates no respondent intent and sanitizes the log when rendering throws", async () => {
+    mockHappyInvitation();
+    flagState.intents = true;
+    const { buildResultsEmailHtml } = jest.requireMock(
+      "@/lib/assessments/results-email",
+    );
+    const renderFailure = Object.assign(
+      new Error(
+        "private respondent@example.com subject and HTML must not be logged",
+      ),
+      {
+        recipientEmail: "respondent@example.com",
+        subject: "private subject",
+        bodyHtml: "<p>private HTML</p>",
+        answers: [{ stableKey: "q1", value: 2 }],
+      },
+    );
+    renderFailure.name = "ResultsRenderError";
+    (buildResultsEmailHtml as jest.Mock).mockImplementationOnce(() => {
+      throw renderFailure;
+    });
+    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+
+    const res = await submit();
+
+    expect(res.status).toBe(200);
+    expect(intentRoles()).toEqual(["OWNING_COACH"]);
+    const logJson = JSON.stringify(errorSpy.mock.calls);
+    expect(logJson).toContain("ResultsRenderError");
+    expect(logJson).not.toContain("respondent@example.com");
+    expect(logJson).not.toContain("private subject");
+    expect(logJson).not.toContain("private HTML");
+    expect(logJson).not.toContain("stableKey");
+    expect(errorSpy.mock.calls.flat()).not.toContain(renderFailure);
+    errorSpy.mockRestore();
   });
 
   it("creates no respondent intent when its Phase-2 fingerprint is stale", async () => {
@@ -956,8 +1038,20 @@ describe("GH #257 — assessment email delivery intents", () => {
     mockHappyInvitation();
     flagState.intents = true;
     const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+    const persistenceFailure = Object.assign(
+      new Error(
+        "private respondent@example.com subject and HTML must not be logged",
+      ),
+      {
+        recipientEmail: "respondent@example.com",
+        subject: "private subject",
+        bodyHtml: "<p>private HTML</p>",
+        answers: [{ stableKey: "q1", value: 2 }],
+      },
+    );
+    persistenceFailure.name = "PrismaClientKnownRequestError";
     txMock.assessmentEmailDeliveryIntent.create
-      .mockRejectedValueOnce(new Error("intent write failed"))
+      .mockRejectedValueOnce(persistenceFailure)
       .mockResolvedValue({});
 
     const first = await submit();
@@ -965,6 +1059,13 @@ describe("GH #257 — assessment email delivery intents", () => {
     expect(first.status).toBe(500);
     expect(txMock.assessmentInvitation.update).not.toHaveBeenCalled();
     expect(inngestMock.send).not.toHaveBeenCalled();
+    const failureLogJson = JSON.stringify(errorSpy.mock.calls);
+    expect(failureLogJson).toContain("PrismaClientKnownRequestError");
+    expect(failureLogJson).not.toContain("respondent@example.com");
+    expect(failureLogJson).not.toContain("private subject");
+    expect(failureLogJson).not.toContain("private HTML");
+    expect(failureLogJson).not.toContain("stableKey");
+    expect(errorSpy.mock.calls.flat()).not.toContain(persistenceFailure);
 
     const retry = await submit();
 

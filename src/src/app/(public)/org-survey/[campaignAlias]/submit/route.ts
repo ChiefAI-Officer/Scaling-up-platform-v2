@@ -73,6 +73,10 @@ import { inngest } from "@/inngest/client";
 
 const NO_STORE_HEADERS = { "Cache-Control": "no-store" } as const;
 
+function errorNameOnly(error: unknown, fallback = "UnknownError"): string {
+  return error instanceof Error && error.name ? error.name : fallback;
+}
+
 const AnswerInputSchema = z.object({
   stableKey: z.string().min(1),
   value: z.unknown(),
@@ -227,51 +231,58 @@ function buildWaveDOutboxRows({
           recipientRole: "RESPONDENT",
           emailType: "ASSESSMENT_RESULTS",
           campaignId: campaign.id,
-          error: renderError,
+          errorName: "ReportRenderError",
         });
       }
-      const bodyHtml = buildResultsEmailHtml({
-        bodyMarkdown: template.resultsEmailBodyMarkdown ?? "",
-        reportHtml,
-      });
-      const contentProvenance: ContentProvenanceV1 = prepareIntentMetadata
-        ? {
-            schemaVersion: INTENT_SNAPSHOT_SCHEMA_VERSION,
-            templateId: template.id,
-            versionId: campaign.version.id,
-            templateAlias: template.alias,
-            reportType: reportConfigFor(template.alias).reportType,
-            approvalHash: template.resultsEmailContentApprovedHash,
-            rendererContractVersion: INTENT_RENDERER_CONTRACT_VERSION,
-            sourceCommit: sourceCommitIdentifier(),
-            renderInputHash: reportRenderInputHash,
-          }
-        : {
-            schemaVersion: INTENT_SNAPSHOT_SCHEMA_VERSION,
-            templateId: template.id,
-            versionId: campaign.version.id,
-            templateAlias: template.alias,
-            reportType: "unused-in-legacy-mode",
-            approvalHash: template.resultsEmailContentApprovedHash,
-            rendererContractVersion: INTENT_RENDERER_CONTRACT_VERSION,
-            sourceCommit: "unused-in-legacy-mode",
-            renderInputHash: "",
-          };
-      rows.push({
-        recipientEmail: respondentEmail,
-        canonicalRecipientMailbox: prepareIntentMetadata
-          ? normalizeMailbox(respondentEmail)
-          : "",
-        recipientRole: "RESPONDENT",
-        emailType: "ASSESSMENT_RESULTS",
-        subject: template.resultsEmailSubject ?? "Your assessment results",
-        bodyHtml,
-        renderInputHash: prepareIntentMetadata ? reportRenderInputHash : "",
-        contentProvenance,
-      });
+      if (!renderError || !prepareIntentMetadata) {
+        const bodyHtml = buildResultsEmailHtml({
+          bodyMarkdown: template.resultsEmailBodyMarkdown ?? "",
+          reportHtml,
+        });
+        const contentProvenance: ContentProvenanceV1 = prepareIntentMetadata
+          ? {
+              schemaVersion: INTENT_SNAPSHOT_SCHEMA_VERSION,
+              templateId: template.id,
+              versionId: campaign.version.id,
+              templateAlias: template.alias,
+              reportType: reportConfigFor(template.alias).reportType,
+              approvalHash: template.resultsEmailContentApprovedHash,
+              rendererContractVersion: INTENT_RENDERER_CONTRACT_VERSION,
+              sourceCommit: sourceCommitIdentifier(),
+              renderInputHash: reportRenderInputHash,
+            }
+          : {
+              schemaVersion: INTENT_SNAPSHOT_SCHEMA_VERSION,
+              templateId: template.id,
+              versionId: campaign.version.id,
+              templateAlias: template.alias,
+              reportType: "unused-in-legacy-mode",
+              approvalHash: template.resultsEmailContentApprovedHash,
+              rendererContractVersion: INTENT_RENDERER_CONTRACT_VERSION,
+              sourceCommit: "unused-in-legacy-mode",
+              renderInputHash: "",
+            };
+        rows.push({
+          recipientEmail: respondentEmail,
+          canonicalRecipientMailbox: prepareIntentMetadata
+            ? normalizeMailbox(respondentEmail)
+            : "",
+          recipientRole: "RESPONDENT",
+          emailType: "ASSESSMENT_RESULTS",
+          subject: template.resultsEmailSubject ?? "Your assessment results",
+          bodyHtml,
+          renderInputHash: prepareIntentMetadata ? reportRenderInputHash : "",
+          contentProvenance,
+        });
+      }
     } catch (err) {
       // Do NOT abort the submission — drop this email only.
-      console.error("[assessment-submit] #15 results render skipped:", err);
+      console.error("[assessment-submit] #15 results render skipped", {
+        campaignId: campaign.id,
+        recipientRole: "RESPONDENT",
+        emailType: "ASSESSMENT_RESULTS",
+        errorName: errorNameOnly(err),
+      });
     }
   }
 
@@ -339,7 +350,12 @@ function buildWaveDOutboxRows({
         contentProvenance,
       });
     } catch (err) {
-      console.error("[assessment-submit] #16 coach-notify render skipped:", err);
+      console.error("[assessment-submit] #16 coach-notify render skipped", {
+        campaignId: campaign.id,
+        recipientRole: "OWNING_COACH",
+        emailType: "COACH_COMPLETION",
+        errorName: errorNameOnly(err),
+      });
     }
   }
 
@@ -557,7 +573,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ campaignAlias: string }> }
 ) {
-  const intentMode = assessmentEmailDeliveryIntentsEnabled?.() ?? false;
+  const intentMode = assessmentEmailDeliveryIntentsEnabled();
   try {
     const { campaignAlias } = await params;
     const session = await getInvitationSession(campaignAlias);
@@ -819,8 +835,12 @@ export async function POST(
             buildRespondentReportFromSubmission(reportModelInput);
         } catch (err) {
           console.error(
-            "[assessment-submit] respondent report model build failed — submission unaffected:",
-            err
+            "[assessment-submit] respondent report model build failed — submission unaffected",
+            {
+              campaignId: invitation.campaign.id,
+              versionId: invitation.campaign.version.id,
+              errorName: errorNameOnly(err),
+            },
           );
         }
       }
@@ -1039,7 +1059,7 @@ export async function POST(
                   emailType: row.emailType,
                   consequence:
                     "transaction aborted — this submission will NOT commit and the respondent must resubmit",
-                  err,
+                  errorName: errorNameOnly(err),
                 });
                 throw err;
               }
@@ -1055,7 +1075,7 @@ export async function POST(
                 emailType: row.emailType,
                 consequence:
                   "submission commits without this email; no retry will occur",
-                err,
+                errorName: errorNameOnly(err),
               });
             }
           }
@@ -1137,8 +1157,7 @@ export async function POST(
               submissionId: result.submissionId,
               campaignId: result.campaignId,
               invitationId: result.invitationId,
-              errorName:
-                error instanceof Error ? error.name : "UnknownDispatchError",
+              errorName: errorNameOnly(error, "UnknownDispatchError"),
             },
           );
         }
@@ -1190,7 +1209,9 @@ export async function POST(
       throw err;
     }
   } catch (error) {
-    console.error("[assessment-submit] error:", error);
+    console.error("[assessment-submit] error", {
+      errorName: errorNameOnly(error),
+    });
     return NextResponse.json(
       { success: false, error: "Failed to submit answers" },
       { status: 500, headers: NO_STORE_HEADERS }

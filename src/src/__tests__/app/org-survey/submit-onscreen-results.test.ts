@@ -71,11 +71,12 @@ jest.mock("@/lib/db", () => {
 });
 
 // eslint-disable-next-line no-var
-var flagState = { results: true, coach: true, paused: false };
+var flagState = { results: true, coach: true, paused: false, intents: false };
 jest.mock("@/lib/assessments/wave-d-feature-flags", () => ({
   waveDResultsEmailEnabled: jest.fn(() => flagState.results),
   waveDCoachNotifyEnabled: jest.fn(() => flagState.coach),
   assessmentSendsPaused: jest.fn(() => flagState.paused),
+  assessmentEmailDeliveryIntentsEnabled: jest.fn(() => flagState.intents),
 }));
 
 // Wave OSR flag — the server-side lever. Default ON here; tests flip it.
@@ -238,6 +239,7 @@ beforeEach(() => {
   flagState.results = true;
   flagState.coach = true;
   flagState.paused = false;
+  flagState.intents = false;
   osrState.enabled = true;
   approvedState.approved = true;
   buildState.throws = false;
