@@ -270,7 +270,7 @@ export function CampaignWizard({
   waveQDefaultsEnabled = false,
   onScreenResultsEnabled = false,
 }: {
-  /** Wave D #20 — gate the full-HTML invitation editor (mirrors the server flag). */
+  /** Wave D #20 — gate the custom-HTML invitation editor (mirrors the server flag). */
   customHtmlEmailEnabled?: boolean;
   /** GH #220 — composes custom HTML inside the branded invitation shell. */
   brandedCustomHtmlEnabled?: boolean;
@@ -656,9 +656,11 @@ export function CampaignWizard({
             state.invitationBodyMarkdown.trim() !== ""
               ? state.invitationBodyMarkdown.trim()
               : undefined,
-          // Task 12 (#20) — full-HTML body. Sent RAW (the server validates +
-          // stores raw, then sanitizes at render). Only sent when the flag is
-          // on AND non-empty; the server ignores it when its flag is off.
+          // Task 12 (#20) — custom HTML. Sent RAW (the server validates +
+          // stores raw, then sanitizes at render). With the GH #220 behavior
+          // flag on it is a branded body fragment; otherwise legacy full
+          // replacement rules apply. Only sent when the capability flag is on
+          // AND non-empty; the server ignores it when its flag is off.
           invitationBodyHtml:
             customHtmlEmailEnabled && state.invitationBodyHtml.trim() !== ""
               ? state.invitationBodyHtml
@@ -2264,7 +2266,10 @@ function ReviewStep({
             </div>
             {customHtmlEmailEnabled && (
               <div className="space-y-1 border-t border-border pt-3">
-                <label className="text-xs font-medium text-foreground">
+                <label
+                  htmlFor="invitation-html-input"
+                  className="text-xs font-medium text-foreground"
+                >
                   {htmlEditorCopy.label}
                 </label>
                 <p className="text-[11px] text-muted-foreground">
@@ -2302,6 +2307,7 @@ function ReviewStep({
                   )}
                 </div>
                 <textarea
+                  id="invitation-html-input"
                   value={state.invitationBodyHtml}
                   onChange={(e) =>
                     onChange({ invitationBodyHtml: e.target.value })

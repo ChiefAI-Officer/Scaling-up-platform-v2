@@ -45,6 +45,7 @@ interface FetchCall {
 }
 
 let fetchCalls: FetchCall[] = [];
+const originalFetch = global.fetch;
 
 function jsonResponse(payload: unknown, ok = true) {
   return {
@@ -100,6 +101,7 @@ function installFetch() {
 
 afterEach(() => {
   jest.restoreAllMocks();
+  global.fetch = originalFetch;
 });
 
 async function advanceToReviewPanel(props: {
@@ -141,6 +143,9 @@ describe("CampaignWizard — invitation HTML branding", () => {
     ).toBeInTheDocument();
     expect(screen.getByText(/replaces only the markdown body/i)).toBeInTheDocument();
     expect(screen.getByText(/invitationUrl.*optional/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("textbox", { name: "Custom HTML body (advanced)" }),
+    ).toBeInTheDocument();
 
     fireEvent.change(screen.getByTestId("invitation-html-input"), {
       target: { value: "<p>Coach body</p>" },

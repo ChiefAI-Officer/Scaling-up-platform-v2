@@ -6,7 +6,7 @@
 
 **Architecture:** A small browser-safe policy layer owns URL-token recognition and render-mode selection. The existing strict sanitizer continues to render authored bytes, the current invitation renderer exposes one shared shell composer, and `prepareAssessmentInvitationEmail` remains the only send-time decision point. Server-derived flags drive both API validation and editor copy; a separately invoked read-only audit classifies stored overrides without changing them.
 
-**Tech Stack:** Next.js 15 App Router, React 19, TypeScript, Prisma/PostgreSQL, Jest and Testing Library, Nodemailer SMTP composition, `sanitize-html`, `htmlparser2`, `tsx`, ESLint, Turbopack.
+**Tech Stack:** Next.js 16.1.6 App Router, React 19, TypeScript, Prisma/PostgreSQL, Jest and Testing Library, Nodemailer SMTP composition, `sanitize-html`, `htmlparser2`, `tsx`, ESLint, Turbopack.
 
 ## Global Constraints
 

@@ -305,10 +305,18 @@ export function CampaignDetail({
   const [emailHtml, setEmailHtml] = useState<string>(
     overview.campaign.invitationBodyHtml ?? "",
   );
+  const [persistedEmailSubject, setPersistedEmailSubject] = useState<string>(
+    overview.campaign.invitationSubject ?? "",
+  );
+  const [persistedEmailBody, setPersistedEmailBody] = useState<string>(
+    overview.campaign.invitationBodyMarkdown ?? "",
+  );
+  const [persistedHtml, setPersistedHtml] = useState<string>(
+    overview.campaign.invitationBodyHtml ?? "",
+  );
   const [emailHtmlError, setEmailHtmlError] = useState<string | null>(null);
   const [emailSaving, setEmailSaving] = useState(false);
 
-  const persistedHtml = overview.campaign.invitationBodyHtml ?? "";
   const invitationHtmlMode = resolveInvitationHtmlMode({
     waveDCustomHtmlEnabled: customHtmlEmailEnabled,
     brandedCustomHtmlEnabled,
@@ -337,8 +345,8 @@ export function CampaignDetail({
   const [slidesWarning, setSlidesWarning] = useState<string | null>(null);
 
   const emailDirty =
-    emailSubject !== (overview.campaign.invitationSubject ?? "") ||
-    emailBody !== (overview.campaign.invitationBodyMarkdown ?? "") ||
+    emailSubject !== persistedEmailSubject ||
+    emailBody !== persistedEmailBody ||
     (customHtmlEmailEnabled && emailHtmlChanged);
 
   // Follow-on (May 21) — coach edit start-date affordance.
@@ -849,6 +857,23 @@ export function CampaignDetail({
           setEmailHtmlError(reason);
         }
         throw new Error(reason);
+      }
+      setPersistedEmailSubject(
+        typeof payload.invitationSubject === "string"
+          ? payload.invitationSubject
+          : "",
+      );
+      setPersistedEmailBody(
+        typeof payload.invitationBodyMarkdown === "string"
+          ? payload.invitationBodyMarkdown
+          : "",
+      );
+      if ("invitationBodyHtml" in payload) {
+        setPersistedHtml(
+          typeof payload.invitationBodyHtml === "string"
+            ? payload.invitationBodyHtml
+            : "",
+        );
       }
       toast({
         title: "Invitation email saved",
@@ -1430,8 +1455,8 @@ export function CampaignDetail({
                 {invitationOverrideSummary({
                   htmlMode: persistedInvitationHtmlMode,
                   hasSubjectOrMarkdown:
-                    (overview.campaign.invitationSubject ?? "").trim() !== "" ||
-                    (overview.campaign.invitationBodyMarkdown ?? "").trim() !== "",
+                    persistedEmailSubject.trim() !== "" ||
+                    persistedEmailBody.trim() !== "",
                   emptySummary: "Using template default — click to customize",
                 })}
               </p>
@@ -1498,7 +1523,10 @@ export function CampaignDetail({
               </div>
               {customHtmlEmailEnabled && (
                 <div className="space-y-1 border-t border-border pt-3">
-                  <label className="text-xs font-medium text-foreground">
+                  <label
+                    htmlFor="email-overrides-html"
+                    className="text-xs font-medium text-foreground"
+                  >
                     {htmlEditorCopy.label}
                   </label>
                   <p className="text-[11px] text-muted-foreground">
@@ -1541,6 +1569,7 @@ export function CampaignDetail({
                     )}
                   </div>
                   <textarea
+                    id="email-overrides-html"
                     value={emailHtml}
                     onChange={(e) => {
                       setEmailHtml(e.target.value);
@@ -1548,7 +1577,11 @@ export function CampaignDetail({
                     }}
                     maxLength={50000}
                     rows={10}
-                    placeholder="Paste your full HTML email here, or upload an .html file above. Leave blank to use the body above."
+                    placeholder={
+                      brandedCustomHtmlEnabled
+                        ? "Paste a custom HTML body fragment here, or upload an .html file above. Leave blank to use the markdown body above."
+                        : "Paste your full HTML email here, or upload an .html file above. Leave blank to use the body above."
+                    }
                     className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-primary/30"
                     data-testid="email-overrides-html"
                   />
@@ -1574,11 +1607,9 @@ export function CampaignDetail({
                 <button
                   type="button"
                   onClick={() => {
-                    setEmailSubject(overview.campaign.invitationSubject ?? "");
-                    setEmailBody(
-                      overview.campaign.invitationBodyMarkdown ?? "",
-                    );
-                    setEmailHtml(overview.campaign.invitationBodyHtml ?? "");
+                    setEmailSubject(persistedEmailSubject);
+                    setEmailBody(persistedEmailBody);
+                    setEmailHtml(persistedHtml);
                     setEmailHtmlError(null);
                     setEmailOpen(false);
                   }}

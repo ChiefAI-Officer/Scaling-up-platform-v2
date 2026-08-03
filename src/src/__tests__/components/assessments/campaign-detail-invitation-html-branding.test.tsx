@@ -28,6 +28,7 @@ import type {
 } from "@/lib/assessments/campaign-detail";
 
 const CAMPAIGN_ID = "camp-html-branding-1";
+const originalFetch = global.fetch;
 
 function makeOverview(opts: {
   invitationBodyHtml?: string | null;
@@ -122,6 +123,10 @@ beforeEach(() => {
   mockSuccessfulSave();
 });
 
+afterEach(() => {
+  global.fetch = originalFetch;
+});
+
 describe("CampaignDetail — invitation HTML branding", () => {
   it("summarizes branded custom HTML without requiring another override", () => {
     renderDetail({
@@ -131,6 +136,86 @@ describe("CampaignDetail — invitation HTML branding", () => {
 
     expect(
       screen.getByText("Branded custom HTML body set for this campaign"),
+    ).toBeInTheDocument();
+  });
+
+  it("labels branded custom HTML as a body fragment", () => {
+    renderDetail({
+      brandedCustomHtmlEnabled: true,
+      invitationBodyHtml: null,
+    });
+
+    fireEvent.click(screen.getByTestId("email-overrides-toggle"));
+
+    expect(
+      screen.getByRole("textbox", { name: "Custom HTML body (advanced)" }),
+    ).toHaveAttribute(
+      "placeholder",
+      "Paste a custom HTML body fragment here, or upload an .html file above. Leave blank to use the markdown body above.",
+    );
+  });
+
+  it("uses the successful HTML save as the next editor baseline", async () => {
+    renderDetail({
+      brandedCustomHtmlEnabled: true,
+      invitationBodyHtml: "<p>Initial body</p>",
+      invitationSubject: "Initial subject",
+    });
+
+    fireEvent.click(screen.getByTestId("email-overrides-toggle"));
+    fireEvent.change(screen.getByTestId("email-overrides-subject"), {
+      target: { value: "Saved subject" },
+    });
+    fireEvent.change(screen.getByTestId("email-overrides-html"), {
+      target: { value: "<p>Saved body</p>" },
+    });
+    await saveAndGetPayload();
+
+    expect(
+      screen.getByText("Branded custom HTML body set for this campaign"),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("email-overrides-toggle"));
+    expect(screen.getByTestId("email-overrides-html")).toHaveValue(
+      "<p>Saved body</p>",
+    );
+    expect(screen.getByTestId("email-overrides-subject")).toHaveValue(
+      "Saved subject",
+    );
+    expect(screen.getByTestId("email-overrides-save")).toBeDisabled();
+
+    fireEvent.change(screen.getByTestId("email-overrides-html"), {
+      target: { value: "<p>Discarded body</p>" },
+    });
+    fireEvent.change(screen.getByTestId("email-overrides-subject"), {
+      target: { value: "Discarded subject" },
+    });
+    expect(screen.getByTestId("email-overrides-save")).not.toBeDisabled();
+    fireEvent.click(screen.getByTestId("email-overrides-cancel"));
+
+    fireEvent.click(screen.getByTestId("email-overrides-toggle"));
+    expect(screen.getByTestId("email-overrides-html")).toHaveValue(
+      "<p>Saved body</p>",
+    );
+    expect(screen.getByTestId("email-overrides-subject")).toHaveValue(
+      "Saved subject",
+    );
+  });
+
+  it("updates the collapsed summary from a successful subject-only save", async () => {
+    renderDetail({
+      brandedCustomHtmlEnabled: true,
+      invitationBodyHtml: null,
+    });
+
+    fireEvent.click(screen.getByTestId("email-overrides-toggle"));
+    fireEvent.change(screen.getByTestId("email-overrides-subject"), {
+      target: { value: "Saved subject" },
+    });
+    await saveAndGetPayload();
+
+    expect(
+      screen.getByText("Custom subject/body set for this campaign"),
     ).toBeInTheDocument();
   });
 

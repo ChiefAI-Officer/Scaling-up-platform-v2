@@ -1117,9 +1117,10 @@ export interface AssessmentInvitationEmailInput {
     campaign: { id: string; name: string; alias: string; closeAt: Date | null };
     template: { alias: string; invitationSubject: string; invitationBodyMarkdown: string };
     /**
-     * Per-campaign full-HTML invitation override (#20). When non-empty AND
-     * waveDCustomHtmlEmailEnabled(), this REPLACES the entire branded shell
-     * (the subject still comes from invitationSubject — never the HTML).
+     * Per-campaign custom-HTML invitation override (#20). When non-empty and
+     * Wave D is enabled, the GH #220 behavior flag composes it as a branded
+     * body fragment; otherwise only token-bearing legacy HTML replaces the
+     * shell. The subject still comes from invitationSubject — never the HTML.
      */
     invitationBodyHtml?: string | null;
     organizationName?: string | null;
@@ -1131,8 +1132,8 @@ export interface AssessmentInvitationEmailInput {
      * Wave P — invitation-email chrome (coach logo + larger CTA). Callers
      * evaluate `isInviteEmailChromeEnabled` once per send and pass the
      * variant; this chokepoint never reads the flag. Defaults to "legacy"
-     * (byte-identical branded shell). The full-HTML override path is
-     * EXCLUDED: chrome/logo never alter a custom-HTML invitation.
+     * (byte-identical branded shell). Branded custom HTML receives this chrome;
+     * only the legacy full-replacement path is excluded.
      */
     chrome?: "legacy" | "waveP";
     /** Wave P — coach logo (creator coach ?? org owner profileImage; https-gated at render). */
