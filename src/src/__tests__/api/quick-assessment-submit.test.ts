@@ -727,6 +727,12 @@ describe("verified referring-coach ownership", () => {
       .map((call: Array<{ data: { recipientRole: string; recipientEmail: string } }>) => call[0].data)
       .find((row: { recipientRole: string }) => row.recipientRole === "REFERRING_COACH");
     expect(coachOutboxRow?.recipientEmail).toBe("coach@example.com");
+    expect(rowFor("TAKER_COPY").bodyHtml).toContain(
+      "mailto:coach%40example.com",
+    );
+    expect(rowFor("TAKER_COPY").bodyHtml).not.toContain(
+      "mailto:Coach%40Example.COM",
+    );
   });
 
   it("persists no ownership and sends no coach email when verification fails", async () => {
