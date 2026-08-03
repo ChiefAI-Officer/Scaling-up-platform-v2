@@ -215,7 +215,7 @@ describe("buildReportEmailHtml — overall score", () => {
     });
 
     expect(legacyExplicit).toEqual(legacyDefault);
-    expect(legacyExplicit.bodyHtml).toMatchSnapshot(
+    expect(JSON.stringify(legacyExplicit.bodyHtml)).toMatchSnapshot(
       "legacy-scored-report-email",
     );
   });
@@ -330,6 +330,18 @@ describe("buildReportEmailHtml — email safety", () => {
 });
 
 describe("buildReportEmailHtml — GH 228 branded chrome", () => {
+  it("adds the approved 20px separation before the scored report title", () => {
+    const branded = buildReportEmailHtml({
+      report: fourDecisionsReport(),
+      recipientRole: "TAKER_COPY",
+      chrome: "gh228",
+    });
+
+    expect(branded.bodyHtml).toContain(
+      '<div style="margin-top:20px;font-size:21px;font-weight:800;color:#ffffff;line-height:1.2;margin-bottom:4px;">Scaling Up 4 Decisions Assessment</div>',
+    );
+  });
+
   it.each(["TAKER_COPY", "REFERRING_COACH"] as const)(
     "renders both Scaling Up logo placements before the coach byline for %s",
     (recipientRole) => {

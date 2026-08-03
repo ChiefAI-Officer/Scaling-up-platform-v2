@@ -90,7 +90,7 @@ describe("buildReportEmailHtml — qualitative dispatch", () => {
     });
 
     expect(legacyExplicit).toEqual(legacyDefault);
-    expect(legacyExplicit.bodyHtml).toMatchSnapshot(
+    expect(JSON.stringify(legacyExplicit.bodyHtml)).toMatchSnapshot(
       "legacy-qualitative-report-email",
     );
   });
@@ -243,6 +243,23 @@ describe("buildReportEmailHtml — qualitative dispatch", () => {
 });
 
 describe("buildReportEmailHtml — qualitative GH 228 branded chrome", () => {
+  it("adds the approved 20px separation before the qualitative report title", () => {
+    const branded = buildReportEmailHtml({
+      report: qualReport({
+        templateAlias: "qsp-v2",
+        sections: [],
+        questionsByKey: {},
+        rawAnswers: [],
+      }),
+      recipientRole: "TAKER_COPY",
+      chrome: "gh228",
+    });
+
+    expect(branded.bodyHtml).toContain(
+      '<div style="margin-top:20px;font-size:21px;font-weight:800;color:#ffffff;line-height:1.2;margin-bottom:4px;">Leadership Vision Alignment</div>',
+    );
+  });
+
   it("renders the shared email-safe logo and coach byline chrome", () => {
     const report = qualReport({
       templateAlias: "qsp-v2",

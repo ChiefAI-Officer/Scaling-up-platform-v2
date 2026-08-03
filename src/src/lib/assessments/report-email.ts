@@ -748,6 +748,8 @@ export function buildReportEmailHtml({
     coachLogoUrl: report.coachLogoUrl,
     escapedDate: escDate,
   });
+  const reportTitleTopMargin =
+    chrome === "gh228" ? "margin-top:20px;" : "";
   const escEmail = report.respondentEmail
     ? escapeHtml(report.respondentEmail)
     : "";
@@ -791,7 +793,7 @@ export function buildReportEmailHtml({
   <tr>
     <td style="background:${PURPLE};background-image:linear-gradient(135deg,${PURPLE},${PURPLE_DEEP});padding:28px 32px 26px;color:#ffffff;">
       ${emailChrome.coverBrandHtml}
-      <div style="font-size:21px;font-weight:800;color:#ffffff;line-height:1.2;margin-bottom:4px;">${escTitle}</div>
+      <div style="${reportTitleTopMargin}font-size:21px;font-weight:800;color:#ffffff;line-height:1.2;margin-bottom:4px;">${escTitle}</div>
       <div style="font-size:13px;color:#ffffff;opacity:0.85;">${respondentNameIsEmail ? escDate : `Report for ${escName} &middot; ${escDate}`}</div>
       ${escEmail ? `<div style="font-size:13px;color:#ffffff;opacity:0.85;margin-top:4px;">Email: ${escEmail}</div>` : ""}
     </td>
