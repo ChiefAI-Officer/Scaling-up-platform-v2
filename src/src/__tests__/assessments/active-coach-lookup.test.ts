@@ -19,6 +19,7 @@ function makeDb(
     email: string;
     firstName: string;
     lastName: string;
+    profileImage: string | null;
     certificationStatus: string;
     certificationExpiry: Date | null;
   } | null = null
@@ -33,6 +34,7 @@ const ACTIVE_COACH = {
   email: "coach@example.com",
   firstName: "Alice",
   lastName: "Smith",
+  profileImage: "https://images.example/alice.png",
   certificationStatus: "ACTIVE",
   certificationExpiry: null,
 };
@@ -98,18 +100,24 @@ describe("findActiveCoachByEmail — email normalization", () => {
 });
 
 // ---------------------------------------------------------------------------
-// ACTIVE coach + null expiry → returns coach (id/email/firstName/lastName only)
+// ACTIVE coach + null expiry → returns frozen presentation provenance
 // ---------------------------------------------------------------------------
 
 describe("findActiveCoachByEmail — ACTIVE coach, null expiry", () => {
-  it("returns id/email/firstName/lastName when status is ACTIVE and expiry is null", async () => {
-    const { db } = makeDb(ACTIVE_COACH);
+  it("selects and returns the verified coach profile image with their identity", async () => {
+    const { db, findUnique } = makeDb(ACTIVE_COACH);
     const result = await findActiveCoachByEmail(db, "coach@example.com");
+    expect(findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({ profileImage: true }),
+      }),
+    );
     expect(result).toEqual({
       id: "coach-1",
       email: "coach@example.com",
       firstName: "Alice",
       lastName: "Smith",
+      profileImage: "https://images.example/alice.png",
     });
   });
 

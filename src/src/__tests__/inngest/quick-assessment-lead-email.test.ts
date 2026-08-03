@@ -123,6 +123,63 @@ describe("drainLeadOutbox atomic leases", () => {
     });
   });
 
+  it("adds the report-logo attachment for frozen branded HTML", async () => {
+    const row = makeRow({
+      bodyHtml: '<img src="cid:su-report-logo-v1" alt="Scaling Up" />',
+    });
+    const deps = makeDeps([row]);
+
+    await drainLeadOutbox(deps, "sub-1");
+
+    expect(deps.sendEmail).toHaveBeenCalledWith({
+      to: row.recipientEmail,
+      subject: row.subject,
+      html: row.bodyHtml,
+      attachments: [
+        expect.objectContaining({
+          cid: "su-report-logo-v1",
+          filename: "su-report-logo-v1.png",
+          contentType: "image/png",
+        }),
+      ],
+    });
+  });
+
+  it("keeps legacy and short-notification handoffs attachment-free", async () => {
+    const row = makeRow({ bodyHtml: "<p>Results</p>" });
+    const deps = makeDeps([row]);
+
+    await drainLeadOutbox(deps, "sub-1");
+
+    expect(deps.sendEmail).toHaveBeenCalledWith({
+      to: row.recipientEmail,
+      subject: row.subject,
+      html: row.bodyHtml,
+    });
+  });
+
+  it("treats attachment preparation failure as the existing send failure", async () => {
+    const row = makeRow({ attempts: 2 });
+    const deps = makeDeps([row]);
+    deps.resolveAttachments = jest.fn(() => {
+      throw new Error("attachment preparation failed");
+    });
+
+    await expect(drainLeadOutbox(deps, "sub-1")).resolves.toEqual({
+      sent: 0,
+      failed: 1,
+      skipped: 0,
+    });
+    expect(deps.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: "PENDING",
+          lastError: "attachment preparation failed",
+        }),
+      }),
+    );
+  });
+
   it("allows only one sender when event and cron drains race", async () => {
     const row = makeRow();
     let available = true;
