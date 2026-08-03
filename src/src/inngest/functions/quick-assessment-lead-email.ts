@@ -9,8 +9,12 @@
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { inngest } from "@/inngest/client";
+import { reportEmailAttachments } from "@/lib/assessments/report-email-attachments";
 import { db } from "@/lib/db";
-import { sendEmailViaSMTP } from "@/lib/smtp-transport";
+import {
+  sendEmailViaSMTP,
+  type SmtpAttachment,
+} from "@/lib/smtp-transport";
 
 const DEFAULT_LEASE_MS = 600_000;
 const DEFAULT_INVOCATION_BUDGET_MS = 45_000;
@@ -100,7 +104,13 @@ export interface DeliveryUncertainInput extends DeadLetterInput {
 
 export interface DrainDeps {
   db: OutboxDb;
-  sendEmail: (o: { to: string; subject: string; html: string }) => Promise<void>;
+  sendEmail: (input: {
+    to: string;
+    subject: string;
+    html: string;
+    attachments?: SmtpAttachment[];
+  }) => Promise<void>;
+  resolveAttachments?: (bodyHtml: string) => SmtpAttachment[];
   claimNext?: (input: ClaimInput) => Promise<ClaimedOutboxRow | null>;
   finalizeTerminalFailure?: (
     input: TerminalFailureInput,
@@ -348,6 +358,8 @@ export async function drainLeadOutbox(
     deps.recordDeliveryUncertain ??
     ((input: DeliveryUncertainInput) =>
       defaultRecordDeliveryUncertain(deps.db, input));
+  const resolveAttachments =
+    deps.resolveAttachments ?? reportEmailAttachments;
 
   const startedAt = currentTime().getTime();
   let sent = 0;
@@ -381,10 +393,12 @@ export async function drainLeadOutbox(
 
     let sendError: unknown;
     try {
+      const attachments = resolveAttachments(row.bodyHtml);
       await deps.sendEmail({
         to: row.recipientEmail,
         subject: row.subject,
         html: row.bodyHtml,
+        ...(attachments.length > 0 ? { attachments } : {}),
       });
     } catch (error) {
       sendError = error;
@@ -501,8 +515,13 @@ export const quickAssessmentLeadEmail = inngest.createFunction(
       drainLeadOutbox(
         {
           db: db as unknown as OutboxDb,
-          sendEmail: ({ to, subject, html }) =>
-            sendEmailViaSMTP({ to, subject, html }),
+          sendEmail: ({ to, subject, html, attachments }) =>
+            sendEmailViaSMTP({
+              to,
+              subject,
+              html,
+              ...(attachments ? { attachments } : {}),
+            }),
         },
         event.data.submissionId,
       ),
@@ -520,8 +539,13 @@ export const quickAssessmentLeadEmailCron = inngest.createFunction(
       drainLeadOutbox(
         {
           db: db as unknown as OutboxDb,
-          sendEmail: ({ to, subject, html }) =>
-            sendEmailViaSMTP({ to, subject, html }),
+          sendEmail: ({ to, subject, html, attachments }) =>
+            sendEmailViaSMTP({
+              to,
+              subject,
+              html,
+              ...(attachments ? { attachments } : {}),
+            }),
         },
         null,
       ),
