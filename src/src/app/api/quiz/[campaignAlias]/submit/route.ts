@@ -59,6 +59,7 @@ import { computeScoreResult } from "@/lib/assessments/compute-score-result";
 import type { PagerQuestion } from "@/lib/assessments/section-pages";
 import { inngest } from "@/inngest/client";
 import { isCoachCurrentlyCertified } from "@/lib/auth/coach-status";
+import { reportEmailChromeForCampaign } from "@/lib/assessments/wave-228-flags";
 
 // ---------------------------------------------------------------------------
 // Request body schema
@@ -378,6 +379,7 @@ export async function POST(
     // path. alias is a non-null column on AssessmentTemplate; empty-string
     // fallback yields the scored default if the relation is somehow absent.
     const templateAlias = campaign.template?.alias ?? "";
+    const chrome = reportEmailChromeForCampaign(campaign.id);
 
     // SU team address: prefer QUICK_ASSESSMENT_TEAM_EMAIL, fall back to
     // ESCALATION_EMAIL, then ADMIN_EMAIL. Empty string → no SU_TEAM row enqueued.
@@ -396,7 +398,7 @@ export async function POST(
     // Build the report from data already held by this request (no DB round-trip).
     // Keeping referral identity as an argument lets a concurrent Coach deletion
     // retry produce a genuinely Scaling Up-only taker copy.
-    const buildRespondentReport = (referringCoachEmail: string | null) =>
+    const buildRespondentReport = (verifiedCoach: typeof coach | null) =>
       buildRespondentReportFromSubmission({
         result,
         publicTaker: data.publicTaker,
@@ -413,9 +415,13 @@ export async function POST(
         // so the placeholder is benign here; the qualitative path only triggers
         // on the INVITED route, where the real id IS threaded.
         submissionId: "",
-        referringCoachEmail,
+        referringCoachEmail: verifiedCoach?.email ?? null,
+        coachName: verifiedCoach
+          ? `${verifiedCoach.firstName} ${verifiedCoach.lastName}`.trim() || null
+          : null,
+        coachLogoUrl: verifiedCoach?.profileImage ?? null,
       });
-    const respondentReport = buildRespondentReport(canonicalCoachEmail);
+    const respondentReport = buildRespondentReport(coach);
 
     // Assemble the outbox payloads. Each entry carries the rendered subject +
     // bodyHtml so the worker (role-agnostic) can send it verbatim.
@@ -443,6 +449,7 @@ export async function POST(
       const { subject, bodyHtml } = buildReportEmailHtml({
         report: respondentReport,
         recipientRole: "TAKER_COPY",
+        chrome,
       });
       outboxPayloads.push({
         recipient: { role: "TAKER_COPY", email: data.publicTaker.email },
@@ -482,6 +489,7 @@ export async function POST(
         const { subject, bodyHtml } = buildReportEmailHtml({
           report: respondentReport,
           recipientRole: "REFERRING_COACH",
+          chrome,
         });
         outboxPayloads.push({
           recipient: { role: "REFERRING_COACH", email: activeCoachEmail },
@@ -515,6 +523,7 @@ export async function POST(
       const takerCopyContent = buildReportEmailHtml({
         report: buildRespondentReport(null),
         recipientRole: "TAKER_COPY",
+        chrome,
       });
       return outboxPayloads
         .filter((payload) => payload.recipient.role !== "REFERRING_COACH")
