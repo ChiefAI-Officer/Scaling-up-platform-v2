@@ -147,9 +147,13 @@ Its **audience is a property of where it is reached, not of the document**: a co
 _Avoid_: calling it "the coach's view" — that was true only while the gated route was the only door.
 _Avoid_: conflating the per-respondent **Results report** with a cohort **Aggregate report** (Esperto's "group" / "self-comparison" report — the facilitator's all-responses dashboard; shipped for LVA in Wave F).
 
+**Coach image**:
+The single image associated with a Coach, whether it is a headshot or a company mark. It may appear alone or as the image within a **Coach byline**.
+_Avoid_: "coach logo" and "coach photo" as general terms; "Circle avatar" for the stored concept (a Circle avatar is only one possible upstream source).
+
 **Coach byline**:
-The creator coach's identity as it appears on a **Results report** / **Aggregate report** — an image plus "Coached by {name}", in the cover masthead and the page footer. It is an *acknowledgement*, deliberately subordinate to the Scaling Up mark, never a co-brand of equal weight: the report is a Scaling Up product artifact that names the coach who ran it.
-_Avoid_: "coach logo" as though it were always a firm's logo, and "coach photo" as though it were always a headshot — the same single image (`Coach.profileImage`) serves both, so neither word is safe as the general term; say **coach byline** for the whole unit (image + name) and "the coach's image" for the picture alone. Also avoid treating it as co-branding — that framing invites peer-weight sizing, which this deliberately is not.
+The creator coach's identity as it appears on a **Results report** / **Aggregate report** — a **Coach image** plus "Coached by {name}", in the cover masthead and the page footer. It is an *acknowledgement*, deliberately subordinate to the Scaling Up mark, never a co-brand of equal weight: the report is a Scaling Up product artifact that names the coach who ran it.
+_Avoid_: "coach logo" or "coach photo" for the whole unit; treating it as co-branding, which invites peer-weight sizing that this deliberately does not use.
 
 **Cohort trend** (a.k.a. longitudinal trend):
 The coach-facing view that charts an **Organization**'s *aggregate* results for one scored **Template** across its successive **Campaigns** over time (per-campaign means + per-question sparklines). It answers "is this whole team improving each quarter?" — every person is invisible inside the average. (Already shipped at `/portal/assessments/trends`.)

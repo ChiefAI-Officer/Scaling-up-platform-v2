@@ -1,4 +1,4 @@
-# GH #256 — Circle-Sync Coach-Image Validation Design
+# GH #256 — Circle-Sync Coach Image Validation Design
 
 Date: 2026-08-03
 Status: Design approved; awaiting written-spec review
@@ -11,7 +11,7 @@ Baseline: `origin/main` at `6983c1f1050be06e95a736be8f228d30ad13f200`
 
 `src/src/services/circle-sync.ts` copies Circle's `profile.avatarUrl` directly
 into `Coach.profileImage`. This bypasses the HTTPS-only validation already used
-by the ADMIN/STAFF Coach APIs and respondent-facing Coach-logo renderers.
+by the ADMIN/STAFF Coach APIs and respondent-facing Coach image renderers.
 
 The shared authority is
 `src/src/lib/assessments/safe-image-src.ts`. It accepts parseable `https:` URLs
@@ -71,7 +71,7 @@ path.
 
 ## Warning Contract
 
-Every `SyncResult` carries a `warnings` array. The Circle-image rejection uses
+Every `SyncResult` carries a `warnings` array. The Circle avatar rejection uses
 one stable warning:
 
 - `code`: `invalid-image-url`
@@ -84,6 +84,26 @@ an empty array.
 
 The API response exposes the same warning objects. A warning does not change the
 HTTP status, set `success` to false, or suppress successfully updated fields.
+
+### Operator outcome messages
+
+The manual import route uses three mutually exclusive base messages:
+
+- when `updated` is true: `Synced N field(s) from Circle.`;
+- when `updated` is false and warnings are present:
+  `Sync completed; no profile fields were updated.`; and
+- when `updated` is false and warnings are empty:
+  `Coach profile already up to date.`
+
+`CircleSyncButton` displays the base success message and each warning
+separately. It must never pair `Coach profile already up to date.` with a
+rejection warning.
+
+The base message keeps the component's existing success treatment. Warnings
+render beneath it in a separate amber, non-destructive `role="status"` block,
+following the repository's existing nonblocking-warning convention. The
+component renders every returned warning and never gives a successful partial
+sync destructive error styling.
 
 ## Data Flow
 
@@ -98,13 +118,15 @@ HTTP status, set `success` to false, or suppress successfully updated fields.
 4. If eligible, pass it through `safeImageSrc`.
 5. If accepted, write the returned HTTPS value and add `profileImage` to
    `fieldsUpdated`.
-6. If rejected, omit `profileImage`, append the structured warning, and emit the
-   approved PII-safe warning event.
+6. If rejected, omit `profileImage` and append the structured warning. Retain
+   its telemetry metadata until persistence succeeds.
 7. Independently evaluate and write bio, company, and Circle ID under the
    existing rules.
 8. Always include a new `syncedAt` after a successful Circle lookup.
 9. Perform the existing single Coach update.
-10. Return `success: true`. Derive `updated` exclusively from whether
+10. After the update commits, emit the approved PII-safe event for each
+    accumulated warning.
+11. Return `success: true`. Derive `updated` exclusively from whether
     `fieldsUpdated` is nonempty; `syncedAt` does not count as a user-profile
     field update.
 
@@ -124,7 +146,8 @@ If an invalid avatar is the only candidate, the database still records
 
 ## Observability and Privacy
 
-A rejected eligible avatar emits one structured `console.warn` with:
+After a successful Coach update, a rejected eligible avatar emits one structured
+`console.warn` with:
 
 - `coachId`;
 - sync mode (`fill-empty` or `force-overwrite`);
@@ -135,6 +158,16 @@ The log must not contain the Coach email, raw rejected URL, Circle profile
 payload, query string, or user-facing warning message. Excluding the raw URL
 also avoids leaking signed parameters or other credentials that an upstream URL
 could contain.
+
+If the database update fails, no field-skipped event is emitted because no
+successful sync committed. The existing full-sync error log remains the sole
+event for that failed attempt.
+
+Each rejected eligible sync attempt emits its own event after persistence,
+including repeated lazy or manual syncs for the same unchanged Circle avatar.
+This slice adds no deduplication window or per-Coach warning state. Repeated
+events indicate that the upstream condition persists; they do not imply that
+the rejected image was ever written.
 
 ## Error Handling
 
@@ -164,7 +197,7 @@ loses the write-mode context needed for useful operator feedback.
 
 ### 3. Introduce a generic Coach image persistence layer
 
-Route every Coach-image writer through a new shared database helper.
+Route every Coach image writer through a new shared database helper.
 
 Rejected as disproportionate. The Blob upload route is safe by construction,
 the ADMIN/STAFF APIs already apply the shared scheme policy, and a broad
@@ -186,17 +219,27 @@ Extend `src/src/__tests__/unit/circle-sync.test.ts` to prove:
    `fieldsUpdated: []`, and the exact structured warning while still persisting
    `syncedAt`.
 6. Warning telemetry contains the approved Coach ID, mode, field, and reason,
-   and contains neither the raw URL nor the Coach email.
-7. Existing configuration, not-found, valid-image, default-mode, forced-mode,
+   contains neither the raw URL nor the Coach email, and is emitted only after a
+   successful database update.
+7. When the database update fails after an avatar rejection, no field-skipped
+   warning is emitted and the service retains its existing full-sync failure
+   result.
+8. Repeating an eligible sync repeats the PII-safe warning without creating
+   warning-deduplication state.
+9. Existing configuration, not-found, valid-image, default-mode, forced-mode,
    and unrelated-field behavior remains intact.
 
 Add focused route coverage under
 `src/src/__tests__/api/coaches-circle-import.test.ts` to prove a partial sync
-remains HTTP 200 and serializes both the successful field results and warnings.
+remains HTTP 200, serializes both the successful field results and warnings, and
+selects the correct base message for changed, warned-without-changes, and
+already-current outcomes.
 
 Add focused component coverage under
 `src/src/__tests__/components/coach/circle-sync-button.test.tsx` to prove the
-operator sees both the ordinary success result and the nonfatal warning.
+operator sees both the ordinary success result and every nonfatal warning
+without contradictory "already up to date" copy. The warning block uses the
+non-destructive status semantics and renders all returned warning entries.
 
 No report-rendering or `safeImageSrc` semantic test changes are required. Their
 existing suites already pin rejected schemes and the deliberate
@@ -208,7 +251,7 @@ arbitrary-HTTPS-host limit.
 - image proxying, downloading, rehosting, or Blob migration;
 - changes to `safeImageSrc`;
 - production repair, data cleanup, or backfill;
-- Coach-logo layout, report chrome, email chrome, or GH #229 rework;
+- Coach byline layout, report chrome, email chrome, or GH #229 rework;
 - validation changes to read-only Circle-profile responses;
 - schema or migration changes;
 - feature flags;
@@ -217,6 +260,20 @@ arbitrary-HTTPS-host limit.
 Host policy remains a separate product decision. Shipping this design must not
 be described as preventing outbound requests to arbitrary HTTPS hosts or as
 completing that portion of GH #256.
+
+## Tracking and Closeout
+
+After this slice ships:
+
+- edit the issue #261 claim to `DONE` with the implementation PR;
+- mark only the Circle-sync validation item complete on GH #256;
+- leave GH #256 open for the host allowlist/proxy/accept-arbitrary-HTTPS product
+  decision; and
+- do not create a duplicate host-policy issue unless the product owner later
+  requests a tracking split.
+
+Neither the implementation PR nor its source-of-truth entry may describe GH
+#256 as fully resolved.
 
 ## Rollout and Rollback
 
@@ -236,7 +293,16 @@ cleanup because rejected avatars are never persisted.
 - Invalid eligible avatars preserve existing image state in both sync modes.
 - Unrelated eligible fields and `syncedAt` continue to persist.
 - The manual sync reports success and an actionable nonfatal warning.
+- Manual-sync base messaging distinguishes changed, warned-without-changes, and
+  already-current outcomes.
+- The manual UI preserves success treatment and renders all warnings in a
+  separate accessible, non-destructive status block.
 - Telemetry is structured, actionable, and excludes raw URL and email data.
+- Failed persistence emits no field-skipped warning.
+- Every rejected eligible sync attempt emits one warning after persistence;
+  warnings are not deduplicated.
 - Existing valid arbitrary-host HTTPS avatars remain accepted.
 - No host-policy, proxy, migration, backfill, or unrelated rendering behavior is
   introduced.
+- Claim and issue closeout leave the unresolved host-policy decision visible on
+  GH #256.
