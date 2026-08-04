@@ -160,6 +160,7 @@ function mockHappyInvitation(
     notifyCoachOnCompletion: boolean;
     createdByCoachId: string | null;
     creatorCoachEmail: string | null;
+    closeAt: Date | null;
   }>
 ) {
   const invitation = {
@@ -183,7 +184,7 @@ function mockHappyInvitation(
       status: "ACTIVE",
       accessMode: overrides?.accessMode ?? "INVITED",
       openAt: new Date(Date.now() - 1000),
-      closeAt: null,
+      closeAt: overrides?.closeAt ?? null,
       sendResultsToRespondent: overrides?.sendResultsToRespondent ?? true,
       notifyCoachOnCompletion: overrides?.notifyCoachOnCompletion ?? true,
       showResultsOnScreen: false,
@@ -803,9 +804,8 @@ describe("GH #257 — assessment email delivery intents", () => {
   }
 
   it("flag on atomically creates two valid intents and no direct outbox rows", async () => {
-    const invitation = mockHappyInvitation();
     const lockedCloseAt = new Date(Date.now() + 43_200_000);
-    invitation.campaign.closeAt = lockedCloseAt;
+    const invitation = mockHappyInvitation({ closeAt: lockedCloseAt });
     flagState.intents = true;
     txMock.assessmentSubmission.create.mockResolvedValue({ id: "submission-1" });
 

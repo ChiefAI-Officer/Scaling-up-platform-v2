@@ -196,6 +196,16 @@ function held(reason: (typeof EMAIL_DELIVERY_INTENT_HOLD_CODES)[number]) {
   };
 }
 
+type ReauthorizationFixture = Parameters<
+  NonNullable<Parameters<typeof evaluateRespondent>[0]>
+>[0];
+type HoldReason = (typeof EMAIL_DELIVERY_INTENT_HOLD_CODES)[number];
+type StableDecisionCase = readonly [
+  reason: HoldReason,
+  mutate: (fixture: ReauthorizationFixture) => void,
+  role?: "respondent" | "coach",
+];
+
 describe("assessment email intent current-state reauthorization", () => {
   it("pins the complete global hold-code order", () => {
     expect(EMAIL_DELIVERY_INTENT_HOLD_CODES).toEqual([
@@ -219,115 +229,116 @@ describe("assessment email intent current-state reauthorization", () => {
     ]);
   });
 
-  it.each([
+  const stableDecisionCases: readonly StableDecisionCase[] = [
     [
       "CAMPAIGN_DELETED",
-      (fixture: Parameters<NonNullable<Parameters<typeof evaluateRespondent>[0]>>[0]) => {
+      (fixture) => {
         fixture.current.campaign.exists = false;
       },
     ],
     [
       "CAMPAIGN_STATUS_CHANGED",
-      (fixture: Parameters<NonNullable<Parameters<typeof evaluateRespondent>[0]>>[0]) => {
+      (fixture) => {
         fixture.current.campaign.status = "CLOSED";
       },
     ],
     [
       "CAMPAIGN_DEADLINE_CHANGED",
-      (fixture: Parameters<NonNullable<Parameters<typeof evaluateRespondent>[0]>>[0]) => {
+      (fixture) => {
         fixture.current.campaign.closeAt = "2026-08-31T00:00:00.000Z";
       },
     ],
     [
       "INVITATION_REVOKED",
-      (fixture: Parameters<NonNullable<Parameters<typeof evaluateRespondent>[0]>>[0]) => {
+      (fixture) => {
         fixture.current.invitation.revoked = true;
       },
     ],
     [
       "INVITATION_EXPIRY_CHANGED",
-      (fixture: Parameters<NonNullable<Parameters<typeof evaluateRespondent>[0]>>[0]) => {
+      (fixture) => {
         fixture.current.invitation.expiresAt = "2026-09-01T00:00:00.000Z";
       },
     ],
     [
       "IDENTITY_LINK_CHANGED",
-      (fixture: Parameters<NonNullable<Parameters<typeof evaluateRespondent>[0]>>[0]) => {
+      (fixture) => {
         fixture.current.submission.respondentId = "respondent-2";
       },
     ],
     [
       "RESPONDENT_EMAIL_CHANGED",
-      (fixture: Parameters<NonNullable<Parameters<typeof evaluateRespondent>[0]>>[0]) => {
+      (fixture) => {
         fixture.current.respondent.canonicalMailbox = "other@example.com";
       },
     ],
     [
       "COACH_OWNER_CHANGED",
-      (fixture: Parameters<NonNullable<Parameters<typeof evaluateCoach>[0]>>[0]) => {
+      (fixture) => {
         fixture.current.campaign.createdByCoachId = "coach-2";
       },
       "coach",
     ],
     [
       "COACH_EMAIL_CHANGED",
-      (fixture: Parameters<NonNullable<Parameters<typeof evaluateCoach>[0]>>[0]) => {
+      (fixture) => {
         fixture.current.coach!.canonicalMailbox = "other-coach@example.com";
       },
       "coach",
     ],
     [
       "TEMPLATE_CHANGED",
-      (fixture: Parameters<NonNullable<Parameters<typeof evaluateRespondent>[0]>>[0]) => {
+      (fixture) => {
         fixture.current.template.alias = "replacement-template";
       },
     ],
     [
       "VERSION_CHANGED",
-      (fixture: Parameters<NonNullable<Parameters<typeof evaluateRespondent>[0]>>[0]) => {
+      (fixture) => {
         fixture.current.campaign.versionId = "version-2";
       },
     ],
     [
       "APPROVAL_REVOKED",
-      (fixture: Parameters<NonNullable<Parameters<typeof evaluateRespondent>[0]>>[0]) => {
+      (fixture) => {
         fixture.current.template.resultsEmailApproved = false;
       },
     ],
     [
       "APPROVAL_HASH_CHANGED",
-      (fixture: Parameters<NonNullable<Parameters<typeof evaluateRespondent>[0]>>[0]) => {
+      (fixture) => {
         fixture.current.template.liveContentHash = "c".repeat(64);
       },
     ],
     [
       "FEATURE_DISABLED",
-      (fixture: Parameters<NonNullable<Parameters<typeof evaluateRespondent>[0]>>[0]) => {
+      (fixture) => {
         fixture.current.features.resultsEmailEnabled = false;
       },
     ],
     [
       "PAYLOAD_INTEGRITY_FAILED",
-      (fixture: Parameters<NonNullable<Parameters<typeof evaluateRespondent>[0]>>[0]) => {
+      (fixture) => {
         fixture.intent.subject = "Mutated subject";
       },
     ],
     [
       "SCHEMA_UNSUPPORTED",
-      (fixture: Parameters<NonNullable<Parameters<typeof evaluateRespondent>[0]>>[0]) => {
+      (fixture) => {
         fixture.intent.rendererContractVersion = 2;
       },
     ],
-  ] as const)(
-    "returns the stable %s decision",
-    (reason, mutate, role = "respondent") => {
+  ];
+
+  stableDecisionCases.forEach(([reason, mutate, role = "respondent"]) => {
+    it(`returns the stable ${reason} decision`, () => {
       const decision =
         role === "coach"
-          ? evaluateCoach(mutate as Parameters<typeof evaluateCoach>[0])
-          : evaluateRespondent(mutate as Parameters<typeof evaluateRespondent>[0]);
+          ? evaluateCoach(mutate)
+          : evaluateRespondent(mutate);
       expect(decision).toEqual(held(reason));
-    },
-  );
+    });
+  });
 
   it.each([
     [
@@ -743,6 +754,12 @@ describe("assessment email intent review context hash", () => {
     };
   }
 
+  type ReviewHashInput = ReturnType<typeof hashInput>;
+  type ReviewHashMutationCase = readonly [
+    label: string,
+    mutate: (input: ReviewHashInput) => void,
+  ];
+
   it("is deterministic for the same intent identity, version, and current facts", () => {
     const input = hashInput();
     const reorderedCurrent = JSON.parse(
@@ -757,16 +774,16 @@ describe("assessment email intent review context hash", () => {
     );
   });
 
-  it.each([
+  const reviewHashMutationCases: readonly ReviewHashMutationCase[] = [
     [
       "intent ID",
-      (input: ReturnType<typeof hashInput>) => {
+      (input) => {
         input.intentId = "intent-2";
       },
     ],
     [
       "intent version",
-      (input: ReturnType<typeof hashInput>) => {
+      (input) => {
         input.intentVersion += 1;
       },
     ],
@@ -775,7 +792,7 @@ describe("assessment email intent review context hash", () => {
         (field) =>
           [
             `current.${section}.${field}`,
-            (input: ReturnType<typeof hashInput>) => {
+            (input: ReviewHashInput) => {
               const sectionFacts = input.current[
                 section as keyof CurrentAuthorizationFactsV1
               ] as unknown as Record<string, unknown>;
@@ -792,7 +809,9 @@ describe("assessment email intent review context hash", () => {
           ] as const,
       ),
     ),
-  ])("changes when %s changes", (_label, mutate) => {
+  ];
+
+  it.each(reviewHashMutationCases)("changes when %s changes", (_label, mutate) => {
     const original = hashInput();
     const changed = hashInput();
     mutate(changed);

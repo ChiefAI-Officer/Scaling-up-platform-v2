@@ -67,6 +67,17 @@ function terminalFixture() {
   };
 }
 
+function commitEnvironment(
+  overrides: Partial<
+    Pick<NodeJS.ProcessEnv, "VERCEL_GIT_COMMIT_SHA" | "GIT_COMMIT_SHA">
+  > = {},
+): NodeJS.ProcessEnv {
+  const baseEnvironment: NodeJS.ProcessEnv = { ...process.env };
+  delete baseEnvironment.VERCEL_GIT_COMMIT_SHA;
+  delete baseEnvironment.GIT_COMMIT_SHA;
+  return { ...baseEnvironment, ...overrides };
+}
+
 describe("assessment email delivery intent contract", () => {
   it("hashes the fixed payload tuple and detects every mutation", () => {
     const base = {
@@ -135,9 +146,18 @@ describe("assessment email delivery intent contract", () => {
   });
 
   it("uses deployment commit identifiers in deterministic precedence order", () => {
-    expect(sourceCommitIdentifier({ VERCEL_GIT_COMMIT_SHA: "vercel", GIT_COMMIT_SHA: "git" })).toBe("vercel");
-    expect(sourceCommitIdentifier({ GIT_COMMIT_SHA: "git" })).toBe("git");
-    expect(sourceCommitIdentifier({})).toBe("unknown");
+    expect(
+      sourceCommitIdentifier(
+        commitEnvironment({
+          VERCEL_GIT_COMMIT_SHA: "vercel",
+          GIT_COMMIT_SHA: "git",
+        }),
+      ),
+    ).toBe("vercel");
+    expect(
+      sourceCommitIdentifier(commitEnvironment({ GIT_COMMIT_SHA: "git" })),
+    ).toBe("git");
+    expect(sourceCommitIdentifier(commitEnvironment())).toBe("unknown");
   });
 
   it("purges every payload and PII-bearing snapshot field", () => {

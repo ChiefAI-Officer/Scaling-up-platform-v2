@@ -22,6 +22,6 @@ describe("assessment email delivery intents migration", () => {
     expect(sql).toContain('("status", "heldAt", "id")');
     expect(sql).toMatch(/ON DELETE CASCADE/);
     expect(sql).not.toMatch(/INSERT INTO "assessment_email_delivery_intents"/);
-    expect(sql).not.toMatch(/AssessmentEmailOutbox.*ALTER COLUMN/s);
+    expect(sql).not.toMatch(/AssessmentEmailOutbox[\s\S]*ALTER COLUMN/);
   });
 });
