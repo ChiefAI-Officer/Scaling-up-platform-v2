@@ -54,6 +54,17 @@ const snapshot = {
   readiness: "dark",
 } as const;
 
+const partialEvidenceSnapshot = {
+  generatedAt: "2026-08-04T06:00:00.000Z",
+  targetAlias: "leadership-vision-alignment",
+  effectiveGate: { state: "known", value: "enabled" },
+  template: { state: "known", value: "present" },
+  activeVersion: { state: "unknown", reason: "query_failed" },
+  storedBenchmarks: { state: "known", value: { storedRowCount: 1 } },
+  keyCoverage: { state: "unknown", reason: "dependency_unknown" },
+  readiness: "unknown",
+} as const;
+
 beforeEach(() => {
   jest.restoreAllMocks();
   jest.clearAllMocks();
@@ -104,6 +115,26 @@ it.each(["ADMIN", "STAFF"])(
     });
   },
 );
+
+it("returns partial evidence as a successful snapshot", async () => {
+  (getApiActor as jest.Mock).mockResolvedValue({
+    role: "ADMIN",
+    userId: "admin",
+    coachId: null,
+    email: "admin@example.com",
+  });
+  (buildPeerBenchmarkAuditSnapshot as jest.Mock).mockResolvedValueOnce(
+    partialEvidenceSnapshot,
+  );
+
+  const response = await GET();
+
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual({
+    success: true,
+    data: partialEvidenceSnapshot,
+  });
+});
 
 it("passes enabled without exposing the environment inputs", async () => {
   (getApiActor as jest.Mock).mockResolvedValue({
