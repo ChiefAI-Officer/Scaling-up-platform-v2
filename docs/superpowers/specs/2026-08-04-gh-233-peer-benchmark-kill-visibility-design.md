@@ -158,6 +158,10 @@ Mount it on:
 The panel owns only fetch state, refresh behavior, and presentation. It does not
 derive gate or readiness state in the browser.
 
+Place it after the existing `ObservabilityDashboard` and before
+`ImportHealthPanel`. This keeps the general counters first, the focused Wave S
+configuration diagnostic second, and the larger import-health surface last.
+
 No Phase 2 wireframe exists for the shipped Observability page. This is a small
 extension of that existing operational surface and follows the current
 `ImportHealthPanel` layout, refresh, status, and error idioms. It does not
@@ -249,8 +253,10 @@ interface PeerBenchmarkAuditSnapshot {
     publishedAt: string;
     ratingQuestionCount: number;
   }>;
-  benchmarks: Evidence<{
+  storedBenchmarks: Evidence<{
     storedRowCount: number;
+  }>;
+  keyCoverage: Evidence<{
     matchingRowCount: number;
     missingRatingQuestionCount: number;
     staleRowCount: number;
@@ -269,6 +275,12 @@ interface PeerBenchmarkAuditSnapshot {
 responses expose a stable reason code such as `query_failed` or
 `dependency_unknown`, not raw database errors.
 
+`storedBenchmarks` depends only on the template and stored-key query.
+`keyCoverage` depends on both stored keys and active rating keys. This split is
+required for truthful partial results: an active-version failure must not hide
+a successful stored-row count, and a stored-key failure must not hide a
+successful active-version/rating count.
+
 ## Readiness Derivation
 
 Readiness is display-only. It does not control the editor, reports, API, or
@@ -279,8 +291,8 @@ Apply these rules in order:
 1. If the effective gate is known dark, readiness is `dark`.
 2. If the gate is enabled but the template, active version, or rating-key
    prerequisite is known missing, readiness is `blocked`.
-3. If an enabled path requires evidence that is unknown, readiness is
-   `unknown`.
+3. If an enabled path requires active-version or key-coverage evidence that is
+   unknown, readiness is `unknown`.
 4. If zero stored rows match active rating keys, readiness is `noData`.
 5. If at least one but fewer than all active rating keys match, readiness is
    `partialData`.
