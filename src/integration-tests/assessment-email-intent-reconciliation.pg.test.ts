@@ -153,6 +153,7 @@ async function bounded<T>(
 
 type ReconcilerTestOptions = {
   paused?: boolean;
+  now?: () => Date;
   isolationLevel?: Prisma.TransactionIsolationLevel;
   beforeTransactionWork?: (tx: Prisma.TransactionClient) => Promise<void>;
   beforeAuthorizationLoad?: () => Promise<void>;
@@ -185,7 +186,7 @@ function reconcilerDeps(
 ): ReconcilerDeps {
   const production = productionAssessmentEmailIntentReconcilerDeps();
   return {
-    now: () => reconcileNow,
+    now: options.now ?? (() => new Date()),
     isPaused: () => options.paused ?? false,
     logger: {
       info: jest.fn(),
@@ -681,11 +682,19 @@ describe("assessment email intent reconciliation on PostgreSQL", () => {
         )
       `,
       `
+        CREATE TYPE "AssessmentInvitationStatus" AS ENUM (
+          'PENDING',
+          'SENT',
+          'VIEWED',
+          'SUBMITTED'
+        )
+      `,
+      `
         CREATE TABLE "assessment_invitations" (
           "id" TEXT PRIMARY KEY,
           "campaignId" TEXT NOT NULL,
           "respondentId" TEXT NOT NULL,
-          "status" TEXT NOT NULL,
+          "status" "AssessmentInvitationStatus" NOT NULL,
           "revokedAt" TIMESTAMP(3),
           "expiresAt" TIMESTAMP(3) NOT NULL,
           "submittedAt" TIMESTAMP(3)
@@ -1874,7 +1883,10 @@ describe("assessment email intent reconciliation on PostgreSQL", () => {
     });
 
     const result = await reconcileAssessmentEmailIntents(
-      reconcilerDeps(eventDb, { paused: true }),
+      reconcilerDeps(eventDb, {
+        paused: true,
+        now: () => reconcileNow,
+      }),
       { kind: "scheduled", maxRows: 50 },
     );
 
