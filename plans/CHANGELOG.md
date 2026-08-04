@@ -6,6 +6,16 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-08-04 — GH #233 peer-benchmark auditability implemented locally <!-- ENTRY_ISO:2026-08-04 ENTRY_SLUG:gh-233-peer-benchmark-auditability-local-only -->
+
+**Status: IMPLEMENTED + LOCALLY VERIFIED ONLY; not merged, deployed, or Production-observed through the new diagnostic.** The ADMIN/STAFF Observability page now has an independently refreshable, read-only LVA peer-benchmark status panel backed by a dedicated endpoint and service. It derives the effective runtime result through the same Wave S authority as editor/report paths, independently reports the active published version, rating-question count, stored benchmark-key count, and matching/missing/stale coverage, and preserves known/missing/not-applicable/unknown distinctions. It never returns raw flag inputs or benchmark values and performs no writes.
+
+**Current Production boundary.** The pre-implementation read-only browser observation remains the only live evidence: the effective capability was dark while active v3 and its 16 rating-question prerequisites were present. The current Production benchmark-row count remains unknown until a separately authorized deployment exposes the diagnostic or another authorized read-only audit establishes it. No flag, benchmark row, version, schema, customer data, or Production deployment was changed.
+
+**Next gate.** Protected-branch review and any Production deployment remain separately authorized. A future read-only Production verification may record the diagnostic's derived state and counts, but must not disclose raw environment inputs or benchmark values. Capability restoration remains a different operation.
+
+**Verification.** The final-review repair was developed through focused RED/GREEN cycles for gate-derivation failure, dark-gate/template-query failure, and persistent loading/error privacy copy; it also adds stale-only no-data coverage and no-store assertions for `401`, `403`, and `500`. Fresh final verification passed the new-feature matrix at **3 suites / 38 tests** and the prescribed Wave S regression matrix at **9 suites / 119 tests**. Changed-file ESLint exited `0` with no output; migration safety exited `0` after checking **44 migrations** with no unapproved destructive operations. `CI=true npx next build --turbopack` exited `0`, compiled successfully in **49s**, completed TypeScript, and generated **92/92** static pages. Expected local missing-Inngest and `DATABASE_URL` messages occurred during static generation without failing the build. The post-documentation freshness check passed **1 suite / 4 tests**; `git diff --check` was clean. The branch scope contains only approved GH #233 design/plan, service, route, panel, Observability page, tests, and local-only source-of-truth files—no GH #256/GH #257 source, flag, schema, migration, benchmark-writer, editor, or report changes.
+
 <a id="consolidated-progress-through-gh-257"></a>
 ### 2026-08-04 — Consolidated progress ledger current through GH #257 <!-- ENTRY_ISO:2026-08-04 ENTRY_SLUG:consolidated-progress-through-gh-257 -->
 
