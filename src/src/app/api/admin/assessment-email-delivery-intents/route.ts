@@ -30,13 +30,19 @@ const cursorSchema = z
   })
   .strict();
 
-const provenanceSchema = z.object({
-  templateId: z.string().min(1),
-  versionId: z.string().min(1),
-  templateAlias: z.string().min(1),
-  reportType: z.string().min(1),
-  rendererContractVersion: z.number().int(),
-});
+const provenanceSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    templateId: z.string().min(1),
+    versionId: z.string().min(1),
+    templateAlias: z.string().min(1),
+    reportType: z.string().min(1),
+    approvalHash: z.string().nullable(),
+    rendererContractVersion: z.literal(1),
+    sourceCommit: z.string().min(1),
+    renderInputHash: z.string().regex(/^[a-f0-9]{64}$/),
+  })
+  .strict();
 
 type HeldIntentListRow = {
   id: string;
@@ -154,7 +160,9 @@ export async function GET(request: Request): Promise<Response> {
     const hasNextPage = rows.length > limit;
     const page = rows.slice(0, limit);
     const data = page.map((row) => {
-      const parsedProvenance = provenanceSchema.parse(row.contentProvenance);
+      const parsedProvenance = provenanceSchema.safeParse(
+        row.contentProvenance,
+      );
       return {
         id: row.id,
         version: row.version,
@@ -167,14 +175,16 @@ export async function GET(request: Request): Promise<Response> {
         createdAt: row.createdAt.toISOString(),
         heldAt: row.heldAt.toISOString(),
         expiresAt: row.expiresAt.toISOString(),
-        provenance: {
-          templateId: parsedProvenance.templateId,
-          versionId: parsedProvenance.versionId,
-          templateAlias: parsedProvenance.templateAlias,
-          reportType: parsedProvenance.reportType,
-          rendererContractVersion:
-            parsedProvenance.rendererContractVersion,
-        },
+        provenance: parsedProvenance.success
+          ? {
+              templateId: parsedProvenance.data.templateId,
+              versionId: parsedProvenance.data.versionId,
+              templateAlias: parsedProvenance.data.templateAlias,
+              reportType: parsedProvenance.data.reportType,
+              rendererContractVersion:
+                parsedProvenance.data.rendererContractVersion,
+            }
+          : null,
       };
     });
 

@@ -37,8 +37,29 @@ export async function GET(
         actor: { userId: auth.actor.userId },
       },
     );
+    if (detail.kind === "CANCELLATION_ONLY") {
+      return privateJson({
+        data: {
+          kind: detail.kind,
+          id: detail.id,
+          submissionId: detail.submissionId,
+          campaignId: detail.campaignId,
+          invitationId: detail.invitationId,
+          respondentId: detail.respondentId,
+          status: detail.status,
+          version: detail.version,
+          holdReason: detail.holdReason,
+          holdReasons: detail.holdReasons,
+          createdAt: detail.createdAt,
+          updatedAt: detail.updatedAt,
+          heldAt: detail.heldAt,
+          expiresAt: detail.expiresAt,
+        },
+      });
+    }
     return privateJson({
       data: {
+        kind: detail.kind,
         id: detail.id,
         submissionId: detail.submissionId,
         campaignId: detail.campaignId,

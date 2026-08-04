@@ -255,6 +255,18 @@ async function countDeferredByPause(
   return rows[0]?.deferredByPause ?? 0;
 }
 
+async function readDatabaseNow(tx: ReconcilerTransaction): Promise<Date> {
+  const rows = await tx.$queryRaw<Array<{ databaseNow: Date }>>(Prisma.sql`
+    SELECT
+      (statement_timestamp() AT TIME ZONE 'UTC') AS "databaseNow"
+  `);
+  const databaseNow = rows[0]?.databaseNow;
+  if (!(databaseNow instanceof Date)) {
+    throw new Error("PostgreSQL did not return a reconciliation timestamp.");
+  }
+  return databaseNow;
+}
+
 async function lockAuthoritativeRows(
   tx: ReconcilerTransaction,
   intent: IntentRow,
@@ -414,8 +426,8 @@ function terminalDataFor(
           recipientEmail: null,
           subject: null,
           bodyHtml: null,
-          authorizationSnapshot: null,
-          contentProvenance: null,
+          authorizationSnapshot: Prisma.DbNull,
+          contentProvenance: Prisma.DbNull,
         };
 
   return {
@@ -505,11 +517,37 @@ type TransactionOutcome =
   | { kind: "HELD" }
   | { kind: "EXPIRED" };
 
+async function expireIntent(
+  tx: ReconcilerTransaction,
+  intent: IntentRow,
+  input: {
+    databaseNow: Date;
+    snapshot: AuthorizationSnapshotV1 | null;
+    provenance: ContentProvenanceV1 | null;
+  },
+): Promise<TransactionOutcome> {
+  await tx.assessmentEmailDeliveryIntent.update({
+    where: { id: intent.id },
+    data: terminalDataFor(intent, {
+      now: input.databaseNow,
+      status: "EXPIRED",
+      reasonCode: "INTENT_EXPIRED",
+      snapshot: input.snapshot,
+      provenance: input.provenance,
+    }),
+  });
+  await writeAudit(tx, intent, {
+    action: "ASSESSMENT_EMAIL_INTENT_EXPIRED",
+    reasonCode: "INTENT_EXPIRED",
+  });
+  return { kind: "EXPIRED" };
+}
+
 async function reconcileCandidate(
   deps: ReconcilerDeps,
   tx: ReconcilerTransaction,
   intent: IntentRow,
-  now: Date,
+  allowHandoff: boolean,
 ): Promise<TransactionOutcome> {
   const parsedSnapshot = parseAuthorizationSnapshot(
     intent.authorizationSnapshot,
@@ -519,10 +557,11 @@ async function reconcileCandidate(
   const existingOutbox = await lockAuthoritativeRows(tx, intent, snapshot);
 
   if (existingOutbox !== null) {
+    const databaseNow = await readDatabaseNow(tx);
     await tx.assessmentEmailDeliveryIntent.update({
       where: { id: intent.id },
       data: terminalDataFor(intent, {
-        now,
+        now: databaseNow,
         status: "HANDED_OFF",
         outboxId: existingOutbox.id,
         reasonCode: "EXISTING_OUTBOX_WON",
@@ -542,22 +581,20 @@ async function reconcileCandidate(
     };
   }
 
-  if (intent.expiresAt.getTime() <= now.getTime()) {
-    await tx.assessmentEmailDeliveryIntent.update({
-      where: { id: intent.id },
-      data: terminalDataFor(intent, {
-        now,
-        status: "EXPIRED",
-        reasonCode: "INTENT_EXPIRED",
-        snapshot,
-        provenance,
-      }),
+  let databaseNow = await readDatabaseNow(tx);
+  if (intent.expiresAt.getTime() <= databaseNow.getTime()) {
+    return expireIntent(tx, intent, {
+      databaseNow,
+      snapshot,
+      provenance,
     });
-    await writeAudit(tx, intent, {
-      action: "ASSESSMENT_EMAIL_INTENT_EXPIRED",
-      reasonCode: "INTENT_EXPIRED",
-    });
-    return { kind: "EXPIRED" };
+  }
+
+  // The production candidate query cannot select a live row while handoff is
+  // paused. Keep this guard at the decision boundary so a split or regressing
+  // test clock can never turn an expiry-only selection into a handoff.
+  if (!allowHandoff) {
+    return { kind: "EMPTY", deferredByPause: 0 };
   }
 
   if (
@@ -567,7 +604,7 @@ async function reconcileCandidate(
     intent.rendererContractVersion !== INTENT_RENDERER_CONTRACT_VERSION
   ) {
     await holdIntent(tx, intent, {
-      now,
+      now: databaseNow,
       primaryReason: "SCHEMA_UNSUPPORTED",
       reasons: ["SCHEMA_UNSUPPORTED"],
     });
@@ -576,7 +613,7 @@ async function reconcileCandidate(
 
   if (!contentProvenanceMatchesFrozenContract(intent, snapshot, provenance)) {
     await holdIntent(tx, intent, {
-      now,
+      now: databaseNow,
       primaryReason: "PAYLOAD_INTEGRITY_FAILED",
       reasons: ["PAYLOAD_INTEGRITY_FAILED"],
     });
@@ -611,9 +648,20 @@ async function reconcileCandidate(
     current,
   });
 
+  // Reauthorization and lock waits may cross the immutable deadline. Refresh
+  // PostgreSQL time immediately before the terminal hold/handoff decision.
+  databaseNow = await readDatabaseNow(tx);
+  if (intent.expiresAt.getTime() <= databaseNow.getTime()) {
+    return expireIntent(tx, intent, {
+      databaseNow,
+      snapshot,
+      provenance,
+    });
+  }
+
   if (decision.kind === "HELD") {
     await holdIntent(tx, intent, {
-      now,
+      now: databaseNow,
       primaryReason: decision.primaryReason,
       reasons: decision.reasons,
     });
@@ -643,7 +691,7 @@ async function reconcileCandidate(
   await tx.assessmentEmailDeliveryIntent.update({
     where: { id: intent.id },
     data: terminalDataFor(intent, {
-      now,
+      now: databaseNow,
       status: "HANDED_OFF",
       outboxId: outbox.id,
       reasonCode: "AUTHORIZED_HANDOFF",
@@ -795,7 +843,7 @@ export async function reconcileAssessmentEmailIntents(
             deferredByPause: 0,
           };
         }
-        return reconcileCandidate(deps, tx, selection.current, now);
+        return reconcileCandidate(deps, tx, selection.current, !paused);
       });
 
       if (outcome.kind === "EMPTY") {

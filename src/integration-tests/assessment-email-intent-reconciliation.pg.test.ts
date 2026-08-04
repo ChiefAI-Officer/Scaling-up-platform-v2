@@ -59,6 +59,19 @@ type OperatorModule =
   typeof import("../src/lib/assessments/assessment-email-intent-operator");
 let loadHeldIntentDetail: OperatorModule["loadHeldIntentDetail"];
 let releaseHeldIntent: OperatorModule["releaseHeldIntent"];
+type HeldIntentDetail = Awaited<
+  ReturnType<OperatorModule["loadHeldIntentDetail"]>
+>;
+
+function requireReleaseDetail(
+  detail: HeldIntentDetail,
+): Extract<HeldIntentDetail, { kind: "RELEASE_OR_CANCEL" }> {
+  expect(detail.kind).toBe("RELEASE_OR_CANCEL");
+  if (detail.kind !== "RELEASE_OR_CANCEL") {
+    throw new Error(`Expected releasable detail, received ${detail.kind}.`);
+  }
+  return detail;
+}
 
 const destructiveOptIn =
   process.env.ASSESSMENT_EMAIL_LEASE_TEST_ALLOW === "isolated-schema";
@@ -116,24 +129,6 @@ function deferred<T>(): Deferred<T> {
       settled = true;
       rejectPromise(error);
     },
-  };
-}
-
-type ExternalBarrier = {
-  wait(): Promise<void>;
-  release(): void;
-};
-
-function oneShotBarrier(parties: number): ExternalBarrier {
-  const opened = deferred<void>();
-  let arrivals = 0;
-  return {
-    wait: async () => {
-      arrivals += 1;
-      if (arrivals >= parties) opened.resolve();
-      await opened.promise;
-    },
-    release: () => opened.resolve(),
   };
 }
 
@@ -913,34 +908,55 @@ describe("assessment email intent reconciliation on PostgreSQL", () => {
     ]);
   });
 
-  it("lets exactly one of event and cron create the outbox row", async () => {
+  it("uses SKIP LOCKED so a reachable event/cron contention has one owner", async () => {
     await seedAuthorizationGraph(eventDb);
     await seedIntent(eventDb);
-    const startTogether = oneShotBarrier(2);
-
+    const eventOwnsLockedIntent = deferred<void>();
+    const releaseEvent = deferred<void>();
     const eventOperation = reconcileAssessmentEmailIntents(
       reconcilerDeps(eventDb, {
-        beforeTransactionWork: () => startTogether.wait(),
+        beforeAuthorizationLoad: async () => {
+          // This seam runs only after candidate FOR UPDATE and the complete
+          // authoritative lock chain. Hold that reachable PENDING owner while
+          // cron proves it skips, rather than waits on, the same intent.
+          eventOwnsLockedIntent.resolve();
+          await releaseEvent.promise;
+        },
       }),
       { kind: "submission", submissionId: "submission-1", maxRows: 10 },
     );
-    const cronOperation = reconcileAssessmentEmailIntents(
-      reconcilerDeps(cronDb, {
-        beforeTransactionWork: () => startTogether.wait(),
-      }),
-      { kind: "scheduled", maxRows: 50 },
-    );
-    const [eventResult, cronResult] = await (async () => {
-      try {
-        return await bounded(
-          Promise.all([eventOperation, cronOperation]),
-          "event/cron reconciliation race",
-        );
-      } finally {
-        startTogether.release();
-        await Promise.allSettled([eventOperation, cronOperation]);
-      }
-    })();
+    let eventResult:
+      | Awaited<ReturnType<typeof reconcileAssessmentEmailIntents>>
+      | undefined;
+    let cronResult:
+      | Awaited<ReturnType<typeof reconcileAssessmentEmailIntents>>
+      | undefined;
+    try {
+      await bounded(eventOwnsLockedIntent.promise, "event candidate ownership");
+      cronResult = await bounded(
+        reconcileAssessmentEmailIntents(reconcilerDeps(cronDb), {
+          kind: "scheduled",
+          maxRows: 50,
+        }),
+        "cron SKIP LOCKED result",
+      );
+      expect(cronResult).toEqual(
+        expect.objectContaining({
+          handedOff: 0,
+          held: 0,
+          expired: 0,
+          existingOutboxWon: 0,
+        }),
+      );
+      releaseEvent.resolve();
+      eventResult = await bounded(eventOperation, "event handoff owner");
+    } finally {
+      releaseEvent.resolve();
+      await Promise.allSettled([eventOperation]);
+    }
+    if (!eventResult || !cronResult) {
+      throw new Error("Expected both automatic reconciliation results.");
+    }
 
     expect(eventResult.handedOff + cronResult.handedOff).toBe(1);
     expect(
@@ -966,25 +982,24 @@ describe("assessment email intent reconciliation on PostgreSQL", () => {
     ).toBe(1);
   });
 
-  it("partitions concurrent automatic reconciliation from valid HELD release and creates one outbox", async () => {
+  it("proves the HELD/PENDING state partition prevents automatic/release same-row contention", async () => {
     await seedAuthorizationGraph(eventDb);
     await seedIntent(eventDb, { status: "HELD" });
-    const detail = await loadHeldIntentDetail(operatorDeps(eventDb), {
-      intentId: "intent-1",
-      actor: { userId: "operator-1" },
-    });
-    const startTogether = oneShotBarrier(2);
-
-    const automatic = reconcileAssessmentEmailIntents(
-      reconcilerDeps(cronDb, {
-        beforeTransactionWork: () => startTogether.wait(),
+    const detail = requireReleaseDetail(
+      await loadHeldIntentDetail(operatorDeps(eventDb), {
+        intentId: "intent-1",
+        actor: { userId: "operator-1" },
       }),
+    );
+
+    // An unexpired HELD row is outside the automatic PENDING candidate
+    // partition, so there is deliberately no race to claim here.
+    const automaticResult = await reconcileAssessmentEmailIntents(
+      reconcilerDeps(cronDb),
       { kind: "scheduled", maxRows: 50 },
     );
-    const release = releaseHeldIntent(
-      operatorDeps(eventDb, {
-        beforeTransactionWork: () => startTogether.wait(),
-      }),
+    const releaseResult = await releaseHeldIntent(
+      operatorDeps(eventDb),
       {
         intentId: "intent-1",
         actor: { userId: "operator-1" },
@@ -993,17 +1008,6 @@ describe("assessment email intent reconciliation on PostgreSQL", () => {
         reviewToken: detail.reviewToken,
       },
     );
-    const [automaticResult, releaseResult] = await (async () => {
-      try {
-        return await bounded(
-          Promise.all([automatic, release]),
-          "automatic reconciliation and HELD release partition",
-        );
-      } finally {
-        startTogether.release();
-        await Promise.allSettled([automatic, release]);
-      }
-    })();
 
     expect(automaticResult).toEqual(
       expect.objectContaining({
@@ -1058,10 +1062,12 @@ describe("assessment email intent reconciliation on PostgreSQL", () => {
   it("holds every operator authoritative lock before a relevant mutation proceeds", async () => {
     await seedAuthorizationGraph(eventDb);
     await seedIntent(eventDb, { status: "HELD" });
-    const detail = await loadHeldIntentDetail(operatorDeps(eventDb), {
-      intentId: "intent-1",
-      actor: { userId: "operator-1" },
-    });
+    const detail = requireReleaseDetail(
+      await loadHeldIntentDetail(operatorDeps(eventDb), {
+        intentId: "intent-1",
+        actor: { userId: "operator-1" },
+      }),
+    );
     const releaseHasLocks = deferred<void>();
     const continueRelease = deferred<void>();
     const release = releaseHeldIntent(
@@ -1161,10 +1167,12 @@ describe("assessment email intent reconciliation on PostgreSQL", () => {
       role: "OWNING_COACH",
       status: "HELD",
     });
-    const detail = await loadHeldIntentDetail(operatorDeps(eventDb), {
-      intentId: "intent-1",
-      actor: { userId: "operator-1" },
-    });
+    const detail = requireReleaseDetail(
+      await loadHeldIntentDetail(operatorDeps(eventDb), {
+        intentId: "intent-1",
+        actor: { userId: "operator-1" },
+      }),
+    );
     const operatorQueries: Prisma.Sql[] = [];
 
     const releaseResult = await releaseHeldIntent(
@@ -1218,10 +1226,12 @@ describe("assessment email intent reconciliation on PostgreSQL", () => {
   it("rejects release after a reviewed authoritative fact changes", async () => {
     await seedAuthorizationGraph(eventDb);
     await seedIntent(eventDb, { status: "HELD" });
-    const detail = await loadHeldIntentDetail(operatorDeps(eventDb), {
-      intentId: "intent-1",
-      actor: { userId: "operator-1" },
-    });
+    const detail = requireReleaseDetail(
+      await loadHeldIntentDetail(operatorDeps(eventDb), {
+        intentId: "intent-1",
+        actor: { userId: "operator-1" },
+      }),
+    );
     const mutationLocked = deferred<void>();
     const continueMutation = deferred<void>();
     const mutation = cronDb.$transaction(async (tx) => {
@@ -1309,10 +1319,12 @@ describe("assessment email intent reconciliation on PostgreSQL", () => {
       FROM "assessment_email_outbox"
       WHERE "id" = ${outboxId}
     `);
-    const detail = await loadHeldIntentDetail(operatorDeps(eventDb), {
-      intentId: "intent-1",
-      actor: { userId: "operator-1" },
-    });
+    const detail = requireReleaseDetail(
+      await loadHeldIntentDetail(operatorDeps(eventDb), {
+        intentId: "intent-1",
+        actor: { userId: "operator-1" },
+      }),
+    );
 
     const result = await releaseHeldIntent(operatorDeps(eventDb), {
       intentId: "intent-1",
@@ -1354,10 +1366,12 @@ describe("assessment email intent reconciliation on PostgreSQL", () => {
       id: "operator-audit-fail-release",
       status: "HELD",
     });
-    const detail = await loadHeldIntentDetail(operatorDeps(eventDb), {
-      intentId: "operator-audit-fail-release",
-      actor: { userId: "operator-1" },
-    });
+    const detail = requireReleaseDetail(
+      await loadHeldIntentDetail(operatorDeps(eventDb), {
+        intentId: "operator-audit-fail-release",
+        actor: { userId: "operator-1" },
+      }),
+    );
     const before = await readIntent(
       eventDb,
       "operator-audit-fail-release",
@@ -1638,6 +1652,44 @@ describe("assessment email intent reconciliation on PostgreSQL", () => {
     },
   );
 
+  it("adopts an existing outbox and database-nulls corrupt JSON payload evidence", async () => {
+    await seedAuthorizationGraph(eventDb);
+    await seedIntent(eventDb);
+    await eventDb.$executeRaw(Prisma.sql`
+      UPDATE "assessment_email_delivery_intents"
+      SET
+        "authorizationSnapshot" = '{"schemaVersion":999}'::jsonb,
+        "contentProvenance" = '{"schemaVersion":999}'::jsonb
+      WHERE "id" = 'intent-1'
+    `);
+    const outboxId = await seedOutbox(eventDb, "SENT");
+
+    const result = await reconcileAssessmentEmailIntents(
+      reconcilerDeps(eventDb),
+      { kind: "submission", submissionId: "submission-1", maxRows: 10 },
+    );
+    const intent = await readIntent(eventDb);
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        handedOff: 1,
+        existingOutboxWon: 1,
+        retried: 0,
+      }),
+    );
+    expect(intent).toEqual(
+      expect.objectContaining({
+        status: "HANDED_OFF",
+        handedOffOutboxId: outboxId,
+        recipientEmail: null,
+        subject: null,
+        bodyHtml: null,
+        authorizationSnapshot: null,
+        contentProvenance: null,
+      }),
+    );
+  });
+
   it("rolls back outbox creation when the required handoff audit fails", async () => {
     await seedAuthorizationGraph(eventDb);
     await seedIntent(eventDb, { id: "audit-fail-create" });
@@ -1800,6 +1852,90 @@ describe("assessment email intent reconciliation on PostgreSQL", () => {
         "ASSESSMENT_EMAIL_INTENT_EXPIRED",
       ),
     ).toBe(1);
+  });
+
+  it("uses PostgreSQL time to expire a paused candidate when the app clock trails", async () => {
+    await seedAuthorizationGraph(eventDb);
+    const clockRows = await eventDb.$queryRaw<
+      Array<{ databaseExpiredButApplicationLive: Date }>
+    >(Prisma.sql`
+      SELECT
+        (
+          statement_timestamp() AT TIME ZONE 'UTC' - interval '1 minute'
+        ) AS "databaseExpiredButApplicationLive"
+    `);
+    const databaseExpiredButApplicationLive =
+      clockRows[0].databaseExpiredButApplicationLive;
+    expect(databaseExpiredButApplicationLive.getTime()).toBeGreaterThan(
+      reconcileNow.getTime(),
+    );
+    await seedIntent(eventDb, {
+      intentExpiresAt: databaseExpiredButApplicationLive,
+    });
+
+    const result = await reconcileAssessmentEmailIntents(
+      reconcilerDeps(eventDb, { paused: true }),
+      { kind: "scheduled", maxRows: 50 },
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        expired: 1,
+        handedOff: 0,
+        existingOutboxWon: 0,
+        retried: 0,
+      }),
+    );
+    expect(await countOutboxRows(eventDb, "submission-1", "RESPONDENT")).toBe(
+      0,
+    );
+    expect(await readIntent(eventDb)).toEqual(
+      expect.objectContaining({
+        status: "EXPIRED",
+        recipientEmail: null,
+        subject: null,
+        bodyHtml: null,
+      }),
+    );
+  });
+
+  it("expires corrupt JSON evidence with real Prisma database-null writes", async () => {
+    await seedAuthorizationGraph(eventDb);
+    await seedIntent(eventDb, {
+      status: "HELD",
+      intentExpiresAt: dueAt,
+    });
+    await eventDb.$executeRaw(Prisma.sql`
+      UPDATE "assessment_email_delivery_intents"
+      SET
+        "authorizationSnapshot" = '{"schemaVersion":999}'::jsonb,
+        "contentProvenance" = '{"schemaVersion":999}'::jsonb
+      WHERE "id" = 'intent-1'
+    `);
+
+    const result = await reconcileAssessmentEmailIntents(
+      reconcilerDeps(eventDb, { paused: true }),
+      { kind: "scheduled", maxRows: 50 },
+    );
+    const intent = await readIntent(eventDb);
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        expired: 1,
+        handedOff: 0,
+        retried: 0,
+      }),
+    );
+    expect(intent).toEqual(
+      expect.objectContaining({
+        status: "EXPIRED",
+        recipientEmail: null,
+        subject: null,
+        bodyHtml: null,
+        authorizationSnapshot: null,
+        contentProvenance: null,
+      }),
+    );
   });
 
   it("retains retryable work after the real PostgreSQL lock timeout", async () => {

@@ -848,12 +848,11 @@ describe("GH #257 — assessment email delivery intents", () => {
           renderInputHash: expect.stringMatching(/^[a-f0-9]{64}$/),
         }),
       );
-      expect(row.expiresAt).toEqual(
-        new Date(
-          (txMock.assessmentInvitation.update.mock.calls[0][0].data.submittedAt as Date)
-            .getTime() +
-            30 * 24 * 60 * 60 * 1_000,
-        ),
+      const intentCreatedAt = row.createdAt as Date;
+      expect(intentCreatedAt).toBeInstanceOf(Date);
+      expect(row.nextAttemptAt).toEqual(intentCreatedAt);
+      expect((row.expiresAt as Date).getTime() - intentCreatedAt.getTime()).toBe(
+        30 * 24 * 60 * 60 * 1_000,
       );
     }
 

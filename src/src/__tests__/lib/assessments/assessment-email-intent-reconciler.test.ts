@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { assessmentEmailIntentPayloadHash } from "@/lib/assessments/assessment-email-delivery-intents";
 import type { CurrentAuthorizationFactsV1 } from "@/lib/assessments/assessment-email-intent-reauthorization";
 import {
@@ -163,6 +164,7 @@ type HarnessOptions = {
   existingOutbox?: { id: string; status: string } | null;
   paused?: boolean;
   deferredCount?: number;
+  databaseNow?: Date | (() => Date);
   facts?: CurrentAuthorizationFactsV1;
   now?: () => Date;
 };
@@ -198,6 +200,14 @@ function makeHarness(options: HarnessOptions = {}) {
       }
       if (sql.includes("deferredByPause")) {
         return [{ deferredByPause: options.deferredCount ?? 0 }];
+      }
+      if (sql.includes('"databaseNow"')) {
+        return [{
+          databaseNow:
+            typeof options.databaseNow === "function"
+              ? options.databaseNow()
+              : (options.databaseNow ?? NOW),
+        }];
       }
       if (sql.includes('"assessment_email_outbox"')) {
         return options.existingOutbox ? [options.existingOutbox] : [];
@@ -493,6 +503,116 @@ describe("reconcileAssessmentEmailIntents", () => {
     });
   });
 
+  it("uses locked database time to expire a paused candidate selected after the application clock", async () => {
+    const expiresAt = new Date("2026-08-03T00:00:01.000Z");
+    const intent = frozenIntent({ expiresAt });
+    const harness = makeHarness({
+      candidates: [intent],
+      paused: true,
+      // The injected application clock trails both candidate selection and the
+      // locked database decision. A paused expiry-only candidate must never
+      // reach automatic handoff under this split.
+      now: () => new Date("2026-08-03T00:00:00.000Z"),
+      databaseNow: new Date("2026-08-03T00:00:02.000Z"),
+    });
+
+    const result = await reconcileAssessmentEmailIntents(
+      harness.deps,
+      SUBMISSION_SCOPE,
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        expired: 1,
+        handedOff: 0,
+        existingOutboxWon: 0,
+      }),
+    );
+    expect(harness.tx.assessmentEmailOutbox.create).not.toHaveBeenCalled();
+    expect(harness.tx.assessmentEmailDeliveryIntent.update).toHaveBeenCalledWith({
+      where: { id: intent.id },
+      data: expect.objectContaining({
+        status: "EXPIRED",
+        resolvedAt: new Date("2026-08-03T00:00:02.000Z"),
+      }),
+    });
+
+    const sqlCalls = harness.tx.$queryRaw.mock.calls.map(([query]) =>
+      queryText(query),
+    );
+    const outboxLockIndex = sqlCalls.findIndex((sql) =>
+      sql.includes('"assessment_email_outbox"'),
+    );
+    const databaseTimeIndex = sqlCalls.findIndex((sql) =>
+      sql.includes('"databaseNow"'),
+    );
+    expect(databaseTimeIndex).toBeGreaterThan(outboxLockIndex);
+    expect(sqlCalls[databaseTimeIndex]).toContain("statement_timestamp()");
+  });
+
+  it("rechecks database time after reauthorization when the expiry boundary crosses", async () => {
+    const intent = frozenIntent({
+      expiresAt: new Date("2026-08-03T00:00:01.000Z"),
+    });
+    const databaseTimes = [
+      new Date("2026-08-03T00:00:00.500Z"),
+      new Date("2026-08-03T00:00:02.000Z"),
+    ];
+    const harness = makeHarness({
+      candidates: [intent],
+      databaseNow: () =>
+        databaseTimes.shift() ?? new Date("2026-08-03T00:00:02.000Z"),
+    });
+
+    const result = await reconcileAssessmentEmailIntents(
+      harness.deps,
+      SUBMISSION_SCOPE,
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        expired: 1,
+        handedOff: 0,
+      }),
+    );
+    expect(harness.loadCurrentAuthorizationFacts).toHaveBeenCalledTimes(1);
+    expect(harness.tx.assessmentEmailOutbox.create).not.toHaveBeenCalled();
+    const databaseTimeQueries = harness.tx.$queryRaw.mock.calls
+      .map(([query]) => queryText(query))
+      .filter((sql) => sql.includes('"databaseNow"'));
+    expect(databaseTimeQueries).toHaveLength(2);
+  });
+
+  it("purges corrupt expired JSON fields with Prisma database-null sentinels", async () => {
+    const intent = frozenIntent({
+      authorizationSnapshot: { schemaVersion: 999 },
+      contentProvenance: { schemaVersion: 999 },
+      expiresAt: new Date("2026-08-02T00:00:00.000Z"),
+    });
+    const harness = makeHarness({
+      candidates: [intent],
+      paused: true,
+    });
+
+    const result = await reconcileAssessmentEmailIntents(
+      harness.deps,
+      SUBMISSION_SCOPE,
+    );
+
+    expect(result.expired).toBe(1);
+    const updateData =
+      harness.tx.assessmentEmailDeliveryIntent.update.mock.calls[0][0].data;
+    expect(updateData.authorizationSnapshot).toBe(Prisma.DbNull);
+    expect(updateData.contentProvenance).toBe(Prisma.DbNull);
+    expect(updateData).toEqual(
+      expect.objectContaining({
+        recipientEmail: null,
+        subject: null,
+        bodyHtml: null,
+      }),
+    );
+  });
+
   it("counts paused due work even when expired rows consume the full scope", async () => {
     const harness = makeHarness({
       candidates: Array.from({ length: 10 }, (_, index) =>
@@ -604,6 +724,33 @@ describe("reconcileAssessmentEmailIntents", () => {
       });
     },
   );
+
+  it("adopts an existing outbox and purges corrupt JSON with Prisma database-null sentinels", async () => {
+    const intent = frozenIntent({
+      authorizationSnapshot: { schemaVersion: 999 },
+      contentProvenance: { schemaVersion: 999 },
+    });
+    const harness = makeHarness({
+      candidates: [intent],
+      existingOutbox: { id: "outbox-existing", status: "SENT" },
+    });
+
+    const result = await reconcileAssessmentEmailIntents(
+      harness.deps,
+      SUBMISSION_SCOPE,
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        handedOff: 1,
+        existingOutboxWon: 1,
+      }),
+    );
+    const updateData =
+      harness.tx.assessmentEmailDeliveryIntent.update.mock.calls[0][0].data;
+    expect(updateData.authorizationSnapshot).toBe(Prisma.DbNull);
+    expect(updateData.contentProvenance).toBe(Prisma.DbNull);
+  });
 
   it("hands off exact frozen bytes and provenance, audits, purges PII, and increments version once", async () => {
     const intent = frozenIntent();

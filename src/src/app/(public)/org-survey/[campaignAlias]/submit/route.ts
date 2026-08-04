@@ -933,6 +933,10 @@ export async function POST(
           return { kind: "conflict" as const };
         }
 
+        // One explicit ledger instant owns all intent lifecycle timestamps.
+        // Report/invitation submittedAt remains the earlier disclosure instant;
+        // intent retention is exactly 30 days from this persisted creation time.
+        const intentCreatedAt = new Date();
         const submission = await tx.assessmentSubmission.create({
           data: {
             campaignId: locked.campaignId,
@@ -1014,7 +1018,9 @@ export async function POST(
                 rendererContractVersion: INTENT_RENDERER_CONTRACT_VERSION,
                 authorizationSnapshot: snapshot,
                 contentProvenance: row.contentProvenance,
-                expiresAt: intentExpiresAt(submittedAt),
+                createdAt: intentCreatedAt,
+                nextAttemptAt: intentCreatedAt,
+                expiresAt: intentExpiresAt(intentCreatedAt),
               },
             });
           }

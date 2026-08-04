@@ -240,6 +240,7 @@ const driftDecisionSchema = z.discriminatedUnion("kind", [
 
 const heldDetailSchema = z
   .object({
+    kind: z.literal("RELEASE_OR_CANCEL"),
     id: requiredStringSchema,
     submissionId: requiredStringSchema,
     campaignId: requiredStringSchema,
@@ -285,7 +286,8 @@ const heldDetailSchema = z
       detail.respondentId === common.respondentId &&
       detail.recipientRole === common.recipientRole &&
       detail.emailType === common.emailType &&
-      detail.recipientEmail === expectedMailbox &&
+      canonicalMailboxBinding(detail.recipientEmail) ===
+        canonicalMailboxBinding(expectedMailbox) &&
       detail.contentProvenance.templateId === common.templateId &&
       detail.contentProvenance.versionId === common.versionId &&
       detail.contentProvenance.templateAlias === common.templateAlias &&
@@ -302,7 +304,33 @@ const heldDetailSchema = z
     }
   });
 
-const heldDetailResponseSchema = z.object({ data: heldDetailSchema }).strict();
+const cancellationOnlyDetailSchema = z
+  .object({
+    kind: z.literal("CANCELLATION_ONLY"),
+    id: requiredStringSchema,
+    submissionId: requiredStringSchema,
+    campaignId: requiredStringSchema,
+    invitationId: requiredStringSchema,
+    respondentId: requiredStringSchema,
+    status: z.literal("HELD"),
+    version: z.number().int().nonnegative(),
+    holdReason: holdReasonSchema.nullable(),
+    holdReasons: z.array(holdReasonSchema),
+    createdAt: dateTimeSchema,
+    updatedAt: dateTimeSchema,
+    heldAt: dateTimeSchema.nullable(),
+    expiresAt: dateTimeSchema,
+  })
+  .strict();
+
+const heldDetailResponseSchema = z
+  .object({
+    data: z.discriminatedUnion("kind", [
+      heldDetailSchema,
+      cancellationOnlyDetailSchema,
+    ]),
+  })
+  .strict();
 
 type HeldListRow = {
   id: string;
@@ -322,10 +350,19 @@ type HeldListRow = {
     templateAlias: string;
     reportType: string;
     rendererContractVersion: number;
-  };
+  } | null;
 };
 
 type HeldDetail = z.infer<typeof heldDetailSchema>;
+type CancellationOnlyDetail = z.infer<typeof cancellationOnlyDetailSchema>;
+type ReviewDetail = HeldDetail | CancellationOnlyDetail;
+type ResolutionResponse = {
+  intentId: string;
+  status: "HANDED_OFF" | "CANCELLED";
+  version: number;
+  outboxId: string | null;
+  existingOutboxWon: boolean;
+};
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -359,8 +396,17 @@ function displayValue(value: unknown): string {
 }
 
 function isListRow(value: unknown): value is HeldListRow {
-  if (!isRecord(value) || !isRecord(value.provenance)) return false;
+  if (!isRecord(value)) return false;
+  const provenance =
+    value.provenance === null ||
+    (isRecord(value.provenance) &&
+      typeof value.provenance.templateId === "string" &&
+      typeof value.provenance.versionId === "string" &&
+      typeof value.provenance.templateAlias === "string" &&
+      typeof value.provenance.reportType === "string" &&
+      typeof value.provenance.rendererContractVersion === "number");
   return (
+    provenance &&
     typeof value.id === "string" &&
     typeof value.version === "number" &&
     typeof value.submissionId === "string" &&
@@ -390,26 +436,33 @@ function parseListResponse(value: unknown): {
 function parseDetailResponse(
   value: unknown,
   requestedIntentId: string,
-): HeldDetail | null {
+): ReviewDetail | null {
   const parsed = heldDetailResponseSchema.safeParse(value);
   if (!parsed.success || parsed.data.data.id !== requestedIntentId) return null;
   return parsed.data.data;
 }
 
-function isResolutionResponse(
+function parseResolutionResponse(
   value: unknown,
   intentId: string,
   action: "release" | "cancel",
-): boolean {
-  if (!isRecord(value) || !isRecord(value.data)) return false;
+): ResolutionResponse | null {
+  if (!isRecord(value) || !isRecord(value.data)) return null;
   const data = value.data;
-  return (
+  if (
     data.intentId === intentId &&
     data.status === (action === "release" ? "HANDED_OFF" : "CANCELLED") &&
     typeof data.version === "number" &&
     (data.outboxId === null || typeof data.outboxId === "string") &&
     typeof data.existingOutboxWon === "boolean"
-  );
+  ) {
+    return data as ResolutionResponse;
+  }
+  return null;
+}
+
+function canonicalMailboxBinding(value: string): string {
+  return value.normalize("NFKC").trim().toLowerCase();
 }
 
 async function responseBody(response: Response): Promise<unknown> {
@@ -446,7 +499,7 @@ export function AssessmentEmailDeliveryHolds() {
   const [listLoading, setListLoading] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [detail, setDetail] = useState<HeldDetail | null>(null);
+  const [detail, setDetail] = useState<ReviewDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [staleReview, setStaleReview] = useState(false);
@@ -516,6 +569,9 @@ export function AssessmentEmailDeliveryHolds() {
   const resolve = useCallback(
     async (action: "release" | "cancel") => {
       if (!detail || resolving || staleReview) return;
+      if (action === "release" && detail.kind !== "RELEASE_OR_CANCEL") {
+        return;
+      }
       setResolving(true);
       setDetailError(null);
       try {
@@ -524,7 +580,10 @@ export function AssessmentEmailDeliveryHolds() {
             ? {
                 expectedVersion: detail.version,
                 reasonCode: RELEASE_REASON,
-                reviewToken: detail.reviewToken,
+                reviewToken:
+                  detail.kind === "RELEASE_OR_CANCEL"
+                    ? detail.reviewToken
+                    : "",
               }
             : {
                 expectedVersion: detail.version,
@@ -550,7 +609,8 @@ export function AssessmentEmailDeliveryHolds() {
           }
           throw new Error("RESOLUTION_REJECTED");
         }
-        if (!isResolutionResponse(body, detail.id, action)) {
+        const resolution = parseResolutionResponse(body, detail.id, action);
+        if (!resolution) {
           throw new Error("RESOLUTION_RESPONSE_INVALID");
         }
         setRows((existing) => existing.filter((row) => row.id !== detail.id));
@@ -558,7 +618,9 @@ export function AssessmentEmailDeliveryHolds() {
         setDetail(null);
         setResolutionNotice(
           action === "release"
-            ? "Frozen payload released to the existing delivery queue."
+            ? resolution.existingOutboxWon
+              ? "Existing outbox remained authoritative; no new delivery was enqueued."
+              : "Frozen payload queued for delivery."
             : "Held intent permanently cancelled.",
         );
       } catch {
@@ -760,7 +822,108 @@ export function AssessmentEmailDeliveryHolds() {
             </div>
           )}
 
-          {detail && (
+          {detail?.kind === "CANCELLATION_ONLY" && (
+            <div>
+              <div className="border-b border-destructive/30 bg-destructive/5 px-4 py-4 sm:px-6">
+                <div className="flex items-start gap-3">
+                  <ShieldAlert
+                    aria-hidden="true"
+                    className="mt-0.5 h-5 w-5 shrink-0 text-destructive"
+                  />
+                  <div>
+                    <h2
+                      id="held-detail-heading"
+                      className="font-bold text-foreground"
+                    >
+                      Cancellation-only review
+                    </h2>
+                    <p className="mt-1 text-sm leading-5 text-foreground/80">
+                      Release evidence could not be validated, so no payload
+                      content is shown and release is unavailable. Permanent,
+                      audited cancellation remains available until expiry.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-6 p-4 sm:p-6">
+                <section aria-labelledby="safe-hold-evidence-heading">
+                  <h3
+                    id="safe-hold-evidence-heading"
+                    className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground"
+                  >
+                    Safe hold evidence
+                  </h3>
+                  <dl className="mt-3 grid gap-3 rounded-lg border border-border bg-muted/20 p-4 sm:grid-cols-2">
+                    <Fact label="Intent ID" value={detail.id} />
+                    <Fact label="Submission ID" value={detail.submissionId} />
+                    <Fact label="Campaign ID" value={detail.campaignId} />
+                    <Fact
+                      label="Primary reason"
+                      value={reasonLabel(detail.holdReason ?? "HELD")}
+                    />
+                    <Fact
+                      label="Held since"
+                      value={formatDate(detail.heldAt)}
+                    />
+                    <Fact
+                      label="Expires"
+                      value={formatDate(detail.expiresAt)}
+                    />
+                  </dl>
+                </section>
+
+                <section
+                  aria-labelledby="cancellation-only-resolution-heading"
+                  className="border-t border-border pt-6"
+                >
+                  <div className="max-w-xl rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+                    <h3
+                      id="cancellation-only-resolution-heading"
+                      className="text-sm font-bold text-foreground"
+                    >
+                      Cancel permanently
+                    </h3>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                      Purges the held payload and cannot be undone.
+                    </p>
+                    <label
+                      htmlFor="cancellation-only-reason"
+                      className="mt-3 block text-xs font-semibold text-foreground"
+                    >
+                      Cancellation reason
+                    </label>
+                    <select
+                      id="cancellation-only-reason"
+                      value={cancellationReason}
+                      onChange={(event) =>
+                        setCancellationReason(event.target.value)
+                      }
+                      disabled={resolving || staleReview}
+                      className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                    >
+                      {CANCELLATION_REASONS.map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => void resolve("cancel")}
+                      disabled={resolving || staleReview}
+                      className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md bg-destructive px-3 py-2.5 text-sm font-bold text-destructive-foreground outline-none hover:bg-destructive/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50"
+                    >
+                      <XCircle aria-hidden="true" className="h-4 w-4" />
+                      Cancel permanently
+                    </button>
+                  </div>
+                </section>
+              </div>
+            </div>
+          )}
+
+          {detail?.kind === "RELEASE_OR_CANCEL" && (
             <div>
               <div className="sticky top-0 z-10 border-b border-warning/40 bg-warning/10 px-4 py-4 sm:px-6">
                 <div className="flex items-start gap-3">

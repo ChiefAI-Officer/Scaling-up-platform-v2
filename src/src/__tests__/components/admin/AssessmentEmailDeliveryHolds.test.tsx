@@ -32,6 +32,7 @@ const LIST_ROW = {
 };
 
 const DETAIL = {
+  kind: "RELEASE_OR_CANCEL",
   id: "intent-1",
   submissionId: "submission-1",
   campaignId: "campaign-1",
@@ -143,6 +144,23 @@ const DETAIL = {
   },
   reviewContextHash: "b".repeat(64),
   reviewToken: "opaque-review-token",
+};
+
+const CANCELLATION_ONLY_DETAIL = {
+  kind: "CANCELLATION_ONLY",
+  id: "intent-1",
+  submissionId: "submission-1",
+  campaignId: "campaign-1",
+  invitationId: "invitation-1",
+  respondentId: "respondent-1",
+  status: "HELD",
+  version: 7,
+  holdReason: "SCHEMA_UNSUPPORTED",
+  holdReasons: ["SCHEMA_UNSUPPORTED"],
+  createdAt: "2026-08-01T10:00:00.000Z",
+  updatedAt: "2026-08-03T04:00:00.000Z",
+  heldAt: "2026-08-03T04:00:00.000Z",
+  expiresAt: "2026-09-02T10:00:00.000Z",
 };
 
 const LIST_ROW_B = {
@@ -358,6 +376,9 @@ describe("AssessmentEmailDeliveryHolds", () => {
     await waitFor(() =>
       expect(screen.queryByText("p***@example.com")).not.toBeInTheDocument(),
     );
+    expect(
+      screen.getByText("Frozen payload queued for delivery."),
+    ).toBeInTheDocument();
     expect(screen.queryByTitle("Frozen email preview")).not.toBeInTheDocument();
     expect(mockedFetch()).toHaveBeenLastCalledWith(
       "/api/admin/assessment-email-delivery-intents/intent-1/release",
@@ -370,6 +391,33 @@ describe("AssessmentEmailDeliveryHolds", () => {
         }),
       }),
     );
+  });
+
+  it("reports existing-outbox convergence without implying a new queue entry or pending send", async () => {
+    await renderQueueAndOpenDetail();
+    mockedFetch().mockResolvedValueOnce(
+      response({
+        data: {
+          intentId: "intent-1",
+          status: "HANDED_OFF",
+          version: 8,
+          outboxId: "outbox-terminal",
+          existingOutboxWon: true,
+        },
+      }) as Response,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Release frozen payload" }),
+    );
+
+    expect(
+      await screen.findByText(
+        "Existing outbox remained authoritative; no new delivery was enqueued.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/queued for delivery/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/pending/i)).not.toBeInTheDocument();
   });
 
   it("cancels with one fixed reason and never submits the review token", async () => {
@@ -406,6 +454,144 @@ describe("AssessmentEmailDeliveryHolds", () => {
     );
     const init = mockedFetch().mock.calls.at(-1)?.[1] as RequestInit;
     expect(init.body).not.toContain("reviewToken");
+  });
+
+  it("loads a cancellation-only review, exposes no payload evidence or release action, and cancels by exact version", async () => {
+    mockedFetch()
+      .mockResolvedValueOnce(
+        response({
+          data: [{ ...LIST_ROW, provenance: null }],
+          nextCursor: null,
+        }) as Response,
+      )
+      .mockResolvedValueOnce(
+        response({ data: CANCELLATION_ONLY_DETAIL }) as Response,
+      );
+
+    render(<AssessmentEmailDeliveryHolds />);
+    expect(await screen.findByText("p***@example.com")).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Review p***@example.com" }),
+    );
+
+    expect(
+      await screen.findByText("Cancellation-only review"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Release frozen payload" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByTitle("Frozen email preview")).not.toBeInTheDocument();
+    expect(screen.queryByText("person@example.com")).not.toBeInTheDocument();
+    expect(screen.queryByText("Frozen private subject")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancel permanently" })).toBeEnabled();
+
+    mockedFetch().mockResolvedValueOnce(
+      response({
+        data: {
+          intentId: "intent-1",
+          status: "CANCELLED",
+          version: 8,
+          outboxId: null,
+          existingOutboxWon: false,
+        },
+      }) as Response,
+    );
+    fireEvent.change(screen.getByLabelText("Cancellation reason"), {
+      target: { value: "POLICY_DECISION" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Cancel permanently" }));
+
+    expect(
+      await screen.findByText("Held intent permanently cancelled."),
+    ).toBeInTheDocument();
+    expect(mockedFetch()).toHaveBeenLastCalledWith(
+      "/api/admin/assessment-email-delivery-intents/intent-1/cancel",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          expectedVersion: 7,
+          reasonCode: "POLICY_DECISION",
+        }),
+      }),
+    );
+  });
+
+  it.each([
+    ["mixed case", "Person@Example.COM", "person@example.com"],
+    ["surrounding whitespace", " person@example.com ", "person@example.com"],
+    [
+      "NFKC-equivalent characters",
+      "Ｐｅｒｓｏｎ＠Ｅｘａｍｐｌｅ．ｃｏｍ",
+      "person@example.com",
+    ],
+  ])(
+    "accepts %s frozen mailbox bytes when their normalized canonical binding matches",
+    async (_label, frozenMailbox, canonicalMailbox) => {
+      const normalizedDetail = {
+        ...DETAIL,
+        recipientEmail: frozenMailbox,
+        authorizationSnapshot: {
+          ...DETAIL.authorizationSnapshot,
+          respondentResults: {
+            ...DETAIL.authorizationSnapshot.respondentResults,
+            canonicalRecipientMailbox: canonicalMailbox,
+          },
+        },
+      };
+      mockedFetch()
+        .mockResolvedValueOnce(
+          response({ data: [LIST_ROW], nextCursor: null }) as Response,
+        )
+        .mockResolvedValueOnce(response({ data: normalizedDetail }) as Response);
+
+      render(<AssessmentEmailDeliveryHolds />);
+      expect(await screen.findByText("p***@example.com")).toBeInTheDocument();
+      fireEvent.click(
+        screen.getByRole("button", { name: "Review p***@example.com" }),
+      );
+
+      expect(
+        await screen.findByText("Frozen private subject"),
+      ).toBeInTheDocument();
+      const recipientLabel = screen.getByText("Recipient", { selector: "dt" });
+      expect(recipientLabel.nextElementSibling?.textContent).toBe(frozenMailbox);
+      expect(
+        screen.getByRole("button", { name: "Release frozen payload" }),
+      ).toBeEnabled();
+    },
+  );
+
+  it("rejects a frozen mailbox whose normalized canonical binding differs", async () => {
+    mockedFetch()
+      .mockResolvedValueOnce(
+        response({ data: [LIST_ROW], nextCursor: null }) as Response,
+      )
+      .mockResolvedValueOnce(
+        response({
+          data: {
+            ...DETAIL,
+            recipientEmail: "other@example.com",
+          },
+        }) as Response,
+      );
+
+    render(<AssessmentEmailDeliveryHolds />);
+    expect(await screen.findByText("p***@example.com")).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Review p***@example.com" }),
+    );
+
+    expect(
+      await screen.findByText(
+        "The audited held-intent detail could not be loaded. Try again.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Release frozen payload" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Cancel permanently" }),
+    ).not.toBeInTheDocument();
   });
 
   it("blocks stale release state and prompts an audited detail refresh", async () => {

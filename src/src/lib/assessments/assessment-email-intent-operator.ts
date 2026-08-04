@@ -10,9 +10,11 @@ import {
   type ContentProvenanceV1,
 } from "@/lib/assessments/assessment-email-delivery-intents";
 import {
+  EMAIL_DELIVERY_INTENT_HOLD_CODES,
   evaluateIntentReauthorization,
   reviewContextHash,
   type CurrentAuthorizationFactsV1,
+  type EmailDeliveryIntentHoldCode,
   type ReauthorizationDecision,
 } from "@/lib/assessments/assessment-email-intent-reauthorization";
 import {
@@ -193,7 +195,8 @@ export type OperatorDeps = {
   };
 };
 
-export type HeldIntentDetail = {
+export type ReleaseOrCancelHeldIntentDetail = {
+  kind: "RELEASE_OR_CANCEL";
   id: string;
   submissionId: string;
   campaignId: string;
@@ -220,6 +223,27 @@ export type HeldIntentDetail = {
   reviewContextHash: string;
   reviewToken: string;
 };
+
+export type CancellationOnlyHeldIntentDetail = {
+  kind: "CANCELLATION_ONLY";
+  id: string;
+  submissionId: string;
+  campaignId: string;
+  invitationId: string;
+  respondentId: string;
+  status: "HELD";
+  version: number;
+  holdReason: EmailDeliveryIntentHoldCode | null;
+  holdReasons: EmailDeliveryIntentHoldCode[];
+  createdAt: Date;
+  updatedAt: Date;
+  heldAt: Date | null;
+  expiresAt: Date;
+};
+
+export type HeldIntentDetail =
+  | ReleaseOrCancelHeldIntentDetail
+  | CancellationOnlyHeldIntentDetail;
 
 export type OperatorResolution = {
   intentId: string;
@@ -817,9 +841,10 @@ function toHeldIntentDetail(
   drift: ReauthorizationDecision,
   contextHash: string,
   reviewToken: string,
-): HeldIntentDetail {
+): ReleaseOrCancelHeldIntentDetail {
   const payload = requiredPayload(intent);
   return {
+    kind: "RELEASE_OR_CANCEL",
     id: intent.id,
     submissionId: intent.submissionId,
     campaignId: intent.campaignId,
@@ -845,6 +870,70 @@ function toHeldIntentDetail(
     drift,
     reviewContextHash: contextHash,
     reviewToken,
+  };
+}
+
+const CANCELLATION_ONLY_EVIDENCE_ERRORS: ReadonlySet<OperatorServiceErrorCode> =
+  new Set([
+    "SNAPSHOT_UNSUPPORTED",
+    "RENDERER_UNSUPPORTED",
+    "PROVENANCE_INVALID",
+    "PAYLOAD_INTEGRITY_FAILED",
+  ]);
+
+function isCancellationOnlyEvidenceError(
+  error: unknown,
+): error is OperatorServiceError {
+  return (
+    error instanceof OperatorServiceError &&
+    CANCELLATION_ONLY_EVIDENCE_ERRORS.has(error.code)
+  );
+}
+
+function safeHoldReason(
+  value: unknown,
+): EmailDeliveryIntentHoldCode | null {
+  return typeof value === "string" &&
+    EMAIL_DELIVERY_INTENT_HOLD_CODES.includes(
+      value as EmailDeliveryIntentHoldCode,
+    )
+    ? (value as EmailDeliveryIntentHoldCode)
+    : null;
+}
+
+function safeHoldReasons(
+  primary: EmailDeliveryIntentHoldCode | null,
+  value: unknown,
+): EmailDeliveryIntentHoldCode[] {
+  const reasons = Array.isArray(value)
+    ? value
+        .map(safeHoldReason)
+        .filter(
+          (reason): reason is EmailDeliveryIntentHoldCode => reason !== null,
+        )
+    : [];
+  return Array.from(new Set(primary === null ? reasons : [primary, ...reasons]));
+}
+
+function toCancellationOnlyHeldIntentDetail(
+  intent: OperatorIntentRow,
+): CancellationOnlyHeldIntentDetail {
+  const holdReason = safeHoldReason(intent.holdReason);
+  return {
+    kind: "CANCELLATION_ONLY",
+    id: intent.id,
+    submissionId: intent.submissionId,
+    campaignId: intent.campaignId,
+    invitationId: intent.invitationId,
+    respondentId: intent.respondentId,
+    status: "HELD",
+    version: intent.version,
+    holdReason,
+    holdReasons: safeHoldReasons(holdReason, intent.holdReasons),
+    createdAt: intent.createdAt,
+    updatedAt: intent.updatedAt,
+    heldAt: intent.heldAt,
+    expiresAt: intent.expiresAt,
   };
 }
 
@@ -904,10 +993,21 @@ export async function loadHeldIntentDetail(
       const now = deps.now();
       const intent = await readIntent(tx, input.intentId, "SHARE");
       assertHeld(intent);
-      const snapshot = requiredSnapshot(intent);
-      requiredRenderer(intent);
-      const provenance = requiredProvenance(intent, snapshot);
-      requiredPayload(intent);
+      let snapshot: AuthorizationSnapshotV1;
+      let provenance: ContentProvenanceV1;
+      try {
+        snapshot = requiredSnapshot(intent);
+        requiredRenderer(intent);
+        provenance = requiredProvenance(intent, snapshot);
+        requiredPayload(intent);
+      } catch (error) {
+        if (!isCancellationOnlyEvidenceError(error)) throw error;
+        await writeRequiredAudit(tx, intent, input.actor, {
+          action: "ASSESSMENT_EMAIL_INTENT_DETAIL_VIEWED",
+          reasonCode: "CANCELLATION_ONLY_DETAIL_VIEWED",
+        });
+        return toCancellationOnlyHeldIntentDetail(intent);
+      }
       await lockCurrentFactRows(tx, intent, snapshot, false);
       const current = await deps.loadCurrentAuthorizationFacts(
         tx,

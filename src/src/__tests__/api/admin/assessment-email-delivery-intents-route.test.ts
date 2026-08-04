@@ -118,6 +118,7 @@ const listRow = {
 };
 
 const detailResult = {
+  kind: "RELEASE_OR_CANCEL" as const,
   id: "intent-1",
   submissionId: "submission-1",
   campaignId: "campaign-1",
@@ -144,6 +145,23 @@ const detailResult = {
   drift: { decision: "HOLD" },
   reviewContextHash: "d".repeat(64),
   reviewToken: "opaque-review-token",
+};
+
+const cancellationOnlyDetailResult = {
+  kind: "CANCELLATION_ONLY" as const,
+  id: "intent-1",
+  submissionId: "submission-1",
+  campaignId: "campaign-1",
+  invitationId: "invitation-1",
+  respondentId: "respondent-1",
+  status: "HELD" as const,
+  version: 4,
+  holdReason: "SCHEMA_UNSUPPORTED",
+  holdReasons: ["SCHEMA_UNSUPPORTED"],
+  createdAt: new Date("2026-08-01T10:00:00.000Z"),
+  updatedAt: new Date("2026-08-01T11:00:00.000Z"),
+  heldAt: new Date("2026-08-01T11:00:00.000Z"),
+  expiresAt: new Date("2026-08-31T10:00:00.000Z"),
 };
 
 const releaseResult = {
@@ -368,6 +386,60 @@ describe("GET /api/admin/assessment-email-delivery-intents", () => {
     expect(JSON.stringify(body)).not.toContain("renderInputHash");
   });
 
+  it("keeps a corrupt-provenance hold beside a valid hold and marks only its provenance unavailable", async () => {
+    (db.$queryRaw as jest.Mock).mockResolvedValueOnce([
+      listRow,
+      {
+        ...listRow,
+        id: "intent-corrupt",
+        maskedRecipient: "c***@example.net",
+        contentProvenance: {
+          recipientEmail: "private-corrupt@example.net",
+          bodyHtml: "<p>must not escape</p>",
+        },
+      },
+      {
+        ...listRow,
+        id: "intent-extra-private-key",
+        maskedRecipient: "e***@example.org",
+        contentProvenance: {
+          ...provenance,
+          recipientEmail: "private-extra@example.org",
+        },
+      },
+    ]);
+
+    const response = await listHeldIntents(listRequest() as never);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.data).toHaveLength(3);
+    expect(body.data[0].provenance).toEqual({
+      templateId: "template-1",
+      versionId: "version-1",
+      templateAlias: "scaling-up",
+      reportType: "INDIVIDUAL",
+      rendererContractVersion: 1,
+    });
+    expect(body.data[1]).toEqual(
+      expect.objectContaining({
+        id: "intent-corrupt",
+        maskedRecipient: "c***@example.net",
+        provenance: null,
+      }),
+    );
+    expect(body.data[2]).toEqual(
+      expect.objectContaining({
+        id: "intent-extra-private-key",
+        maskedRecipient: "e***@example.org",
+        provenance: null,
+      }),
+    );
+    expect(JSON.stringify(body)).not.toContain("private-corrupt@example.net");
+    expect(JSON.stringify(body)).not.toContain("private-extra@example.org");
+    expect(JSON.stringify(body)).not.toContain("must not escape");
+  });
+
   it("uses HELD-only parameterized SQL, the exact masked CASE, narrow selection, and limit + 1", async () => {
     await listHeldIntents(listRequest("?status=HELD&limit=2") as never);
 
@@ -507,6 +579,51 @@ describe("GET /api/admin/assessment-email-delivery-intents/:id", () => {
     expect(body.data).not.toHaveProperty("bodyHtml");
     expect(body.data.previewDocument).toBe(detailResult.previewDocument);
     expect(JSON.stringify(body)).not.toContain("bodyHtml");
+  });
+
+  it("returns the strict audited cancellation-only variant without payload or release evidence", async () => {
+    (loadHeldIntentDetail as jest.Mock).mockResolvedValueOnce(
+      cancellationOnlyDetailResult,
+    );
+
+    const response = await getHeldIntent(detailRequest() as never, params);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual({
+      data: {
+        kind: "CANCELLATION_ONLY",
+        id: "intent-1",
+        submissionId: "submission-1",
+        campaignId: "campaign-1",
+        invitationId: "invitation-1",
+        respondentId: "respondent-1",
+        status: "HELD",
+        version: 4,
+        holdReason: "SCHEMA_UNSUPPORTED",
+        holdReasons: ["SCHEMA_UNSUPPORTED"],
+        createdAt: "2026-08-01T10:00:00.000Z",
+        updatedAt: "2026-08-01T11:00:00.000Z",
+        heldAt: "2026-08-01T11:00:00.000Z",
+        expiresAt: "2026-08-31T10:00:00.000Z",
+      },
+    });
+    for (const forbidden of [
+      "recipientEmail",
+      "subject",
+      "previewDocument",
+      "payloadHash",
+      "snapshotSchemaVersion",
+      "rendererContractVersion",
+      "authorizationSnapshot",
+      "contentProvenance",
+      "current",
+      "drift",
+      "reviewContextHash",
+      "reviewToken",
+    ]) {
+      expect(body.data).not.toHaveProperty(forbidden);
+    }
   });
 });
 

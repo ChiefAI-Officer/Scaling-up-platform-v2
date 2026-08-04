@@ -441,11 +441,28 @@ function makeHarness(options: {
   };
 }
 
+type ReleaseDetail = Extract<
+  Awaited<ReturnType<typeof loadHeldIntentDetail>>,
+  { kind: "RELEASE_OR_CANCEL" }
+>;
+
+function requireReleaseDetail(
+  detail: Awaited<ReturnType<typeof loadHeldIntentDetail>>,
+): ReleaseDetail {
+  expect(detail.kind).toBe("RELEASE_OR_CANCEL");
+  if (detail.kind !== "RELEASE_OR_CANCEL") {
+    throw new Error("Expected release-capable held-intent detail.");
+  }
+  return detail;
+}
+
 async function reviewedRelease(harness: ReturnType<typeof makeHarness>) {
-  const detail = await loadHeldIntentDetail(harness.deps, {
-    intentId: "intent-1",
-    actor: { userId: "operator-1" },
-  });
+  const detail = requireReleaseDetail(
+    await loadHeldIntentDetail(harness.deps, {
+      intentId: "intent-1",
+      actor: { userId: "operator-1" },
+    }),
+  );
   return releaseHeldIntent(harness.deps, {
     intentId: "intent-1",
     actor: { userId: "operator-1" },
@@ -534,10 +551,12 @@ describe("held assessment email intent operator services", () => {
   it("loads one consistent HELD detail in RepeatableRead, audits before issuing its actor-bound token, and returns all reviewed current facts", async () => {
     const harness = makeHarness();
 
-    const detail = await loadHeldIntentDetail(harness.deps, {
-      intentId: "intent-1",
-      actor: { userId: "operator-1" },
-    });
+    const detail = requireReleaseDetail(
+      await loadHeldIntentDetail(harness.deps, {
+        intentId: "intent-1",
+        actor: { userId: "operator-1" },
+      }),
+    );
 
     expect(harness.transactionOptions).toEqual([
       expect.objectContaining({
@@ -575,6 +594,96 @@ describe("held assessment email intent operator services", () => {
 
   it("returns no detail payload or token and rolls the audit back when detail audit persistence fails", async () => {
     const harness = makeHarness();
+    harness.failNextAudit();
+
+    await expectOperatorError(
+      () =>
+        loadHeldIntentDetail(harness.deps, {
+          intentId: "intent-1",
+          actor: { userId: "operator-1" },
+        }),
+      "AUDIT_FAILED",
+    );
+
+    expect(harness.events).not.toContain("token.issue");
+    expect(harness.getState().audits).toEqual([]);
+  });
+
+  it.each([
+    [
+      "unsupported snapshot",
+      {
+        snapshotSchemaVersion: 99,
+        authorizationSnapshot: { schemaVersion: 99, private: RECIPIENT },
+      },
+    ],
+    ["unsupported renderer", { rendererContractVersion: 99 }],
+    [
+      "invalid provenance",
+      { contentProvenance: { corrupt: `${RECIPIENT} ${SUBJECT}` } },
+    ],
+    ["payload integrity failure", { bodyHtml: `${HTML}<p>tampered</p>` }],
+  ])(
+    "returns an audited cancellation-only safe detail for %s without exposing release evidence",
+    async (_label, overrides) => {
+      const harness = makeHarness({
+        intent: frozenIntent(overrides),
+      });
+
+      const detail = await loadHeldIntentDetail(harness.deps, {
+        intentId: "intent-1",
+        actor: { userId: "operator-1" },
+      });
+
+      expect(detail).toEqual({
+        kind: "CANCELLATION_ONLY",
+        id: "intent-1",
+        submissionId: "submission-1",
+        campaignId: "campaign-1",
+        invitationId: "invitation-1",
+        respondentId: "respondent-1",
+        status: "HELD",
+        version: 7,
+        holdReason: "CAMPAIGN_STATUS_CHANGED",
+        holdReasons: ["CAMPAIGN_STATUS_CHANGED"],
+        createdAt: new Date("2026-08-01T00:00:00.000Z"),
+        updatedAt: new Date("2026-08-03T04:00:00.000Z"),
+        heldAt: new Date("2026-08-03T04:00:00.000Z"),
+        expiresAt: new Date("2026-09-02T00:00:00.000Z"),
+      });
+      const serialized = JSON.stringify(detail);
+      expect(serialized).not.toContain(RECIPIENT);
+      expect(serialized).not.toContain(SUBJECT);
+      expect(serialized).not.toContain(HTML);
+      for (const forbidden of [
+        "recipientEmail",
+        "subject",
+        "previewDocument",
+        "payloadHash",
+        "authorizationSnapshot",
+        "contentProvenance",
+        "current",
+        "drift",
+        "reviewContextHash",
+        "reviewToken",
+      ]) {
+        expect(detail).not.toHaveProperty(forbidden);
+      }
+      expect(harness.events).not.toContain("facts.load");
+      expect(harness.events).not.toContain("token.issue");
+      expect(harness.getState().audits).toEqual([
+        expect.objectContaining({
+          action: "ASSESSMENT_EMAIL_INTENT_DETAIL_VIEWED",
+          performedBy: "operator-1",
+        }),
+      ]);
+    },
+  );
+
+  it("returns no cancellation-only detail when its required audit fails", async () => {
+    const harness = makeHarness({
+      intent: frozenIntent({ contentProvenance: null }),
+    });
     harness.failNextAudit();
 
     await expectOperatorError(
@@ -798,10 +907,12 @@ describe("held assessment email intent operator services", () => {
       canonicalMailbox: "coach@example.com",
     };
     const harness = makeHarness({ intent: coachIntent, facts });
-    const detail = await loadHeldIntentDetail(harness.deps, {
-      intentId: "intent-1",
-      actor: { userId: "operator-1" },
-    });
+    const detail = requireReleaseDetail(
+      await loadHeldIntentDetail(harness.deps, {
+        intentId: "intent-1",
+        actor: { userId: "operator-1" },
+      }),
+    );
     harness.queries.length = 0;
 
     await releaseHeldIntent(harness.deps, {
@@ -929,10 +1040,12 @@ describe("held assessment email intent operator services", () => {
     code,
   }) => {
     const harness = makeHarness(options);
-    const detail = await loadHeldIntentDetail(harness.deps, {
-      intentId: "intent-1",
-      actor: { userId: "operator-1" },
-    });
+    const detail = requireReleaseDetail(
+      await loadHeldIntentDetail(harness.deps, {
+        intentId: "intent-1",
+        actor: { userId: "operator-1" },
+      }),
+    );
     mutate?.(harness);
 
     await expectOperatorError(
@@ -954,10 +1067,12 @@ describe("held assessment email intent operator services", () => {
 
   it("rejects release when reviewed current facts change and requires a new detail review", async () => {
     const harness = makeHarness();
-    const detail = await loadHeldIntentDetail(harness.deps, {
-      intentId: "intent-1",
-      actor: { userId: "operator-1" },
-    });
+    const detail = requireReleaseDetail(
+      await loadHeldIntentDetail(harness.deps, {
+        intentId: "intent-1",
+        actor: { userId: "operator-1" },
+      }),
+    );
     const changed = currentFacts();
     changed.campaign.closeAt = "2026-08-31T00:00:00.000Z";
     harness.setFacts(changed);
@@ -978,10 +1093,12 @@ describe("held assessment email intent operator services", () => {
 
   it("maps expired, cross-actor, wrong-intent, and malformed review tokens to stable service codes", async () => {
     const harness = makeHarness();
-    const detail = await loadHeldIntentDetail(harness.deps, {
-      intentId: "intent-1",
-      actor: { userId: "operator-1" },
-    });
+    const detail = requireReleaseDetail(
+      await loadHeldIntentDetail(harness.deps, {
+        intentId: "intent-1",
+        actor: { userId: "operator-1" },
+      }),
+    );
     const cases = [
       {
         code: "REVIEW_TOKEN_ACTOR_MISMATCH",
@@ -1190,10 +1307,12 @@ describe("held assessment email intent operator services", () => {
         status: "PENDING",
       },
     });
-    const detail = await loadHeldIntentDetail(harness.deps, {
-      intentId: "intent-1",
-      actor: { userId: "operator-1" },
-    });
+    const detail = requireReleaseDetail(
+      await loadHeldIntentDetail(harness.deps, {
+        intentId: "intent-1",
+        actor: { userId: "operator-1" },
+      }),
+    );
 
     await expectOperatorError(
       () =>
@@ -1210,10 +1329,12 @@ describe("held assessment email intent operator services", () => {
 
   it("rolls back new outbox creation, release audit, handoff, version increment, and purge when release audit fails", async () => {
     const harness = makeHarness();
-    const detail = await loadHeldIntentDetail(harness.deps, {
-      intentId: "intent-1",
-      actor: { userId: "operator-1" },
-    });
+    const detail = requireReleaseDetail(
+      await loadHeldIntentDetail(harness.deps, {
+        intentId: "intent-1",
+        actor: { userId: "operator-1" },
+      }),
+    );
     harness.failNextAudit();
 
     await expectOperatorError(

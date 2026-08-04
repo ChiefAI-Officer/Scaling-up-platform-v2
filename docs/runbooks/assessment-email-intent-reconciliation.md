@@ -20,21 +20,45 @@ answers, result, or raw-error columns.
 
 ## Deployment and activation
 
-1. Deploy the additive schema while
+1. Provision `ASSESSMENT_EMAIL_INTENT_REVIEW_TOKEN_SECRET` in the normal
+   protected secret store for each target environment before exercising or
+   enabling the intent path. Generate a cryptographically random value of at
+   least 32 characters. Use a separate value for local development,
+   non-production, and production; do not copy a lower-environment secret into
+   production or reuse the production secret elsewhere. Never place the value
+   in source control, deployment output, tickets, chat, shell history, or
+   operator logs.
+2. In each target deployment context, verify only that the secret is present
+   and meets the minimum length. This preflight prints no secret bytes:
+
+   ```text
+   node -e 'const value=process.env.ASSESSMENT_EMAIL_INTENT_REVIEW_TOKEN_SECRET;if(!value||value.length<32){console.error("review-token secret missing or shorter than 32 characters");process.exit(1)};console.log("review-token secret configured with minimum length")'
+   ```
+
+   A missing or short secret is a stop condition. Run this gate before the
+   non-production exercise and again against the protected production
+   environment before enabling intent creation.
+3. Deploy the additive schema while
    `ASSESSMENT_EMAIL_DELIVERY_INTENTS_ENABLED=false`. Leave
    `ASSESSMENT_SENDS_PAUSED` in its current approved state.
-2. Confirm the table exists and the unresolved queue is empty with the
+4. Confirm the table exists and the unresolved queue is empty with the
    read-only empty-queue query below. A non-empty result before activation is a
    stop condition: investigate provenance; do not delete rows.
-3. Outside production, exercise submission commit, post-commit event dispatch,
+5. Outside production, exercise submission commit, post-commit event dispatch,
    the three-minute scheduled scan, HELD review, exact frozen release,
    cancellation, duplicate-outbox convergence, and 30-day expiry. Confirm that
    payload-bearing columns purge on handoff, cancellation, and expiry.
-4. Enable `ASSESSMENT_EMAIL_DELIVERY_INTENTS_ENABLED` through the normal
+6. Enable `ASSESSMENT_EMAIL_DELIVERY_INTENTS_ENABLED` through the normal
    protected environment/deployment process and redeploy. Monitor every signal
    and threshold in this runbook.
-5. To roll back route selection, set the flag false and redeploy. New
+7. To roll back route selection, set the flag false and redeploy. New
    submissions return to the legacy direct-outbox route.
+
+Rotating `ASSESSMENT_EMAIL_INTENT_REVIEW_TOKEN_SECRET` immediately invalidates
+all outstanding review tokens. After rotation, operators must reopen each HELD
+intent detail to write a fresh detail-view audit and obtain a token bound to
+the newly reviewed version and current facts. Rotation does not alter intent or
+outbox state.
 
 Disabling the route-selection flag does **not** strand intents already created.
 The event function and scheduled reconciler must remain deployed: the flag
