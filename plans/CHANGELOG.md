@@ -6,6 +6,25 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="consolidated-progress-through-gh-257"></a>
+### 2026-08-04 — Consolidated progress ledger current through GH #257 <!-- ENTRY_ISO:2026-08-04 ENTRY_SLUG:consolidated-progress-through-gh-257 -->
+
+**Status: REPORTING LEDGER UPDATED; no runtime change.** The hard cutoff remains the already-sent `output/pdf/Scaling-Up-Progress-Report-2026-07-27-to-2026-07-31.pdf`, which covers 33 merged pull requests through PR #267. The next consolidated report now has exactly **nine** eligible product or reliability outcomes:
+
+1. **GH #222 — Welcome-screen question-bank accuracy** (PR #269): mixed respondent-visible banks use truthful format-aware wording while valid uniform slider banks retain their scale copy.
+2. **GH #242 — retired pinned-edition warning** (PR #273): shared campaign detail shows the exact pinned edition and warns when it has been retired.
+3. **GH #243 — campaign-list edition visibility** (PR #275): admin and Coach campaign lists show factual edition identity plus lifecycle-aware `Not latest` or `Retired` markers.
+4. **GH #224 — truthful Welcome sharing disclosure** (PR #278): invited and public Welcome screens describe who can review named answers instead of promising unconditional confidentiality.
+5. **GH #217 — legacy invitation fallback hardening** (PR #280): the dormant fallback renderer now carries Coach identity, a plain-text twin, and a bottom fallback URL without changing the active branded path.
+6. **Jeff #65 — stable reminder links** (PR #282): original invitation links and successfully delivered bulk-reminder links remain valid for the same invitation lifecycle; the Production global flag is enabled and the kill switch remains off.
+7. **GH #228 — Results report email branding** (PR #288): all three full-report email roles have Scaling Up-first chrome and trusted frozen Coach provenance, shipped behind absent default-off rollout variables.
+8. **GH #220 — branded campaign invitation HTML composition** (PR #292): campaign-authored HTML can be sanitized and composed inside the shared branded invitation shell, shipped behind an absent default-off rollout variable while existing full-replacement behavior stays active.
+9. **GH #257 — residual assessment-email outbox reconciliation** (PR #296): new invited submissions can durably preserve exact frozen email obligations and reconcile missed outbox creation through an event fast path plus bounded scan, with drift held for ADMIN/STAFF review and legacy candidates restricted to read-only audit; the capability is deployed behind an absent default-off rollout variable.
+
+**Counting and rollout discipline.** Each implementation counts once. PRs #270, #274, #276, #279, #281, #283–#286, #289, #293, #297, and tracking corrections are source-of-truth, receipt, acceptance, or coordination evidence and do not add outcomes. GH #217's fallback remains dormant under the active branded renderer, while GH #228, GH #220, and GH #257 remain deployed but default-off; the consolidated report must not describe any of them as active customer-visible behavior. Documentation, design, deferral, claim management, and unmerged work remain excluded from the headline count.
+
+**Closeout evidence.** All nine implementation PRs are merged and their exact production deployments were verified healthy. Their issues or source claims were closed or released as applicable, and their canonical launch records remain in this changelog. GH #257 implementation PR #296 merged as `613cb0cecc014ec767fafab82b13e393dc9740f6`; issue #257 is closed, its shared claim is released, and its Notion task is Done. Production has no `ASSESSMENT_EMAIL_DELIVERY_INTENTS_ENABLED` variable, so the new recovery path remains inactive. No production legacy audit, replay, backfill, payload reconstruction, manual database write, operator release/cancellation, or customer email send occurred.
+
 <a id="gh-257-outbox-reconciliation-launched-default-off"></a>
 ### 2026-08-04 — GH #257 residual outbox reconciliation launched default-off <!-- ENTRY_ISO:2026-08-04 ENTRY_SLUG:gh-257-outbox-reconciliation-launched-default-off -->
 
