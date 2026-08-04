@@ -17,6 +17,10 @@ import { assessmentInviteFanout } from "@/inngest/functions/assessment-invite-fa
 import { assessmentScheduledSendCron } from "@/inngest/functions/assessment-scheduled-send-cron";
 import { espertoImportAlertCron } from "@/inngest/functions/esperto-import-alert-cron";
 import {
+    assessmentEmailIntentReconciliation,
+    assessmentEmailIntentReconciliationCron,
+} from "@/inngest/functions/assessment-email-intent-reconciliation";
+import {
     stableInvitationRejectionRepairCron,
     stableInvitationRejectionRetry,
 } from "@/inngest/functions/stable-invitation-rejection-retry";
@@ -38,6 +42,8 @@ export const { GET, POST, PUT } = serve({
         assessmentInviteFanout,
         assessmentScheduledSendCron,
         espertoImportAlertCron,
+        assessmentEmailIntentReconciliation,
+        assessmentEmailIntentReconciliationCron,
         stableInvitationRejectionRetry,
         stableInvitationRejectionRepairCron,
     ],

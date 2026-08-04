@@ -43,6 +43,9 @@ const txMock = {
   assessmentEmailOutbox: {
     create: jest.fn().mockResolvedValue({}),
   },
+  assessmentEmailDeliveryIntent: {
+    create: jest.fn().mockResolvedValue({}),
+  },
 };
 
 // R3-M3: the route now does a Phase-1 read (full include) on the top-level `db`
@@ -71,17 +74,29 @@ jest.mock("@/lib/db", () => {
   return { db: dbMock };
 });
 
+// ID-only post-commit signal for the delivery-intent fast path.
+// eslint-disable-next-line no-var
+var inngestMock: { send: jest.Mock };
+jest.mock("@/inngest/client", () => {
+  inngestMock = {
+    send: jest.fn().mockResolvedValue(undefined),
+  };
+  return { inngest: inngestMock };
+});
+
 // Wave D feature flags — default ON in tests; individual tests flip them off.
 // eslint-disable-next-line no-var
 var flagState = {
   results: true,
   coach: true,
   paused: false,
+  intents: false,
 };
 jest.mock("@/lib/assessments/wave-d-feature-flags", () => ({
   waveDResultsEmailEnabled: jest.fn(() => flagState.results),
   waveDCoachNotifyEnabled: jest.fn(() => flagState.coach),
   assessmentSendsPaused: jest.fn(() => flagState.paused),
+  assessmentEmailDeliveryIntentsEnabled: jest.fn(() => flagState.intents),
 }));
 
 // Approval gate — default approved; individual tests flip it.
@@ -114,6 +129,9 @@ jest.mock("@/lib/assessments/results-email", () => {
 });
 
 import { POST } from "@/app/(public)/org-survey/[campaignAlias]/submit/route";
+import { parseAuthorizationSnapshot } from "@/lib/assessments/assessment-email-delivery-intents";
+import { assessmentEmailDeliveryIntentsEnabled } from "@/lib/assessments/wave-d-feature-flags";
+import { inngest } from "@/inngest/client";
 
 // Template version with a single required SLIDER_LIKERT q1 scale 0..3.
 const goodVersion = {
@@ -146,6 +164,7 @@ function mockHappyInvitation(
     notifyCoachOnCompletion: boolean;
     createdByCoachId: string | null;
     creatorCoachEmail: string | null;
+    closeAt: Date | null;
     creatorCoachFirstName: string;
     creatorCoachLastName: string;
     creatorCoachProfileImage: string | null;
@@ -165,14 +184,17 @@ function mockHappyInvitation(
     },
     campaign: {
       id: "c1",
+      templateId: "template-1",
+      versionId: "v1",
       alias: "demo",
       deletedAt: null,
       status: "ACTIVE",
       accessMode: overrides?.accessMode ?? "INVITED",
       openAt: new Date(Date.now() - 1000),
-      closeAt: null,
+      closeAt: overrides?.closeAt ?? null,
       sendResultsToRespondent: overrides?.sendResultsToRespondent ?? true,
       notifyCoachOnCompletion: overrides?.notifyCoachOnCompletion ?? true,
+      showResultsOnScreen: false,
       createdByCoachId:
         overrides?.createdByCoachId === undefined
           ? "coach-1"
@@ -181,6 +203,7 @@ function mockHappyInvitation(
         overrides?.creatorCoachEmail === null
           ? null
           : {
+              id: "coach-1",
               email: overrides?.creatorCoachEmail ?? "coach@example.com",
               firstName: overrides?.creatorCoachFirstName ?? "Casey",
               lastName: overrides?.creatorCoachLastName ?? "Coach",
@@ -188,17 +211,19 @@ function mockHappyInvitation(
             },
       version: {
         id: "v1",
+        templateId: "template-1",
         questions: goodVersion.questions,
         sections: goodVersion.sections,
         scoringConfig: goodVersion.scoringConfig,
       },
       template: {
+        id: "template-1",
         name: "Rockefeller Habits Checklist",
         alias: "rockefeller",
         resultsEmailSubject: "Your results",
         resultsEmailBodyMarkdown: "Here are your results.",
         resultsEmailContentApproved: true,
-        resultsEmailContentApprovedHash: "hash",
+        resultsEmailContentApprovedHash: "a".repeat(64),
       },
     },
   };
@@ -219,6 +244,7 @@ const aliasParams = (alias: string) => ({
   params: Promise.resolve({ campaignAlias: alias }),
 });
 
+const transactionCommitMarker = jest.fn();
 const originalWave228Env = {
   enabled: process.env.WAVE_228_REPORT_EMAIL_CHROME_ENABLED,
   kill: process.env.WAVE_228_REPORT_EMAIL_CHROME_KILL,
@@ -232,13 +258,23 @@ beforeEach(() => {
   flagState.results = true;
   flagState.coach = true;
   flagState.paused = false;
+  flagState.intents = false;
   approvedState.approved = true;
   process.env.APP_URL = "https://app.example.com";
+  dbMock.$transaction.mockImplementation(
+    async (fn: (tx: typeof txMock) => unknown) => {
+      const result = await fn(txMock);
+      transactionCommitMarker();
+      return result;
+    },
+  );
   delete process.env.WAVE_228_REPORT_EMAIL_CHROME_ENABLED;
   delete process.env.WAVE_228_REPORT_EMAIL_CHROME_KILL;
   delete process.env.WAVE_228_REPORT_EMAIL_CHROME_CANARY;
   txMock.assessmentSubmission.create.mockResolvedValue({ id: "sub-1" });
   txMock.assessmentEmailOutbox.create.mockResolvedValue({});
+  txMock.assessmentEmailDeliveryIntent.create.mockResolvedValue({});
+  (inngest.send as jest.Mock).mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -404,7 +440,7 @@ describe("POST submit — strict v6.6 validation", () => {
           resultsEmailSubject: "Your results",
           resultsEmailBodyMarkdown: "Here are your results.",
           resultsEmailContentApproved: true,
-          resultsEmailContentApprovedHash: "hash",
+          resultsEmailContentApprovedHash: "a".repeat(64),
         },
       },
     };
@@ -771,7 +807,7 @@ describe("Wave D C-M2 — stale email render-input re-check under the lock", () 
           resultsEmailSubject: "Your results",
           resultsEmailBodyMarkdown: "Here are your results.",
           resultsEmailContentApproved: true,
-          resultsEmailContentApprovedHash: "hash",
+          resultsEmailContentApprovedHash: "a".repeat(64),
         },
       },
     };
@@ -811,7 +847,7 @@ describe("Wave D C-M2 — stale email render-input re-check under the lock", () 
           resultsEmailSubject: "Your results",
           resultsEmailBodyMarkdown: "Here are your results.",
           resultsEmailContentApproved: true,
-          resultsEmailContentApprovedHash: "hash",
+          resultsEmailContentApprovedHash: "a".repeat(64),
         },
       },
     };
@@ -865,7 +901,7 @@ describe("Wave D C-M2 — stale email render-input re-check under the lock", () 
           resultsEmailSubject: "Your results",
           resultsEmailBodyMarkdown: "Here are your results.",
           resultsEmailContentApproved: true,
-          resultsEmailContentApprovedHash: "hash",
+          resultsEmailContentApprovedHash: "a".repeat(64),
         },
       },
     };
@@ -877,6 +913,359 @@ describe("Wave D C-M2 — stale email render-input re-check under the lock", () 
     expect(enqueuedRoles()).toContain("RESPONDENT");
     expect(enqueuedRoles()).toContain("OWNING_COACH");
     expect(enqueuedRoles()).toHaveLength(2);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/*  GH #257 — invited submission atomically freezes delivery intents          */
+/* -------------------------------------------------------------------------- */
+describe("GH #257 — assessment email delivery intents", () => {
+  function submit() {
+    return POST(
+      jsonReq({ answers: [{ stableKey: "q1", value: 2 }] }) as never,
+      aliasParams("demo"),
+    );
+  }
+
+  function intentRows(): Array<Record<string, unknown>> {
+    return txMock.assessmentEmailDeliveryIntent.create.mock.calls.map(
+      (call: Array<{ data: Record<string, unknown> }>) => call[0].data,
+    );
+  }
+
+  function intentRoles(): string[] {
+    return intentRows().map((row) => row.recipientRole as string);
+  }
+
+  it("flag on atomically creates two valid intents and no direct outbox rows", async () => {
+    const lockedCloseAt = new Date(Date.now() + 43_200_000);
+    const invitation = mockHappyInvitation({ closeAt: lockedCloseAt });
+    flagState.intents = true;
+    txMock.assessmentSubmission.create.mockResolvedValue({ id: "submission-1" });
+
+    const res = await submit();
+
+    expect(res.status).toBe(200);
+    expect(txMock.assessmentEmailDeliveryIntent.create).toHaveBeenCalledTimes(2);
+    expect(txMock.assessmentEmailOutbox.create).not.toHaveBeenCalled();
+    expect(intentRoles().sort()).toEqual(["OWNING_COACH", "RESPONDENT"]);
+
+    for (const row of intentRows()) {
+      const parsed = parseAuthorizationSnapshot(row.authorizationSnapshot);
+      expect(parsed.supported).toBe(true);
+      if (!parsed.supported) throw new Error("Expected a v1 authorization snapshot");
+      expect(parsed.value.common).toEqual(
+        expect.objectContaining({
+          campaignId: "c1",
+          invitationId: "inv-1",
+          respondentId: "r1",
+          templateId: "template-1",
+          templateAlias: "rockefeller",
+          versionId: "v1",
+          accessMode: "INVITED",
+          campaignStatus: "ACTIVE",
+          campaignDeleted: false,
+          invitationStatus: "SUBMITTED",
+          invitationRevoked: false,
+          closeAt: lockedCloseAt.toISOString(),
+          invitationExpiresAt: invitation.expiresAt.toISOString(),
+          phase2Fingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
+        }),
+      );
+      expect(row.contentProvenance).toEqual(
+        expect.objectContaining({
+          schemaVersion: 1,
+          templateId: "template-1",
+          versionId: "v1",
+          templateAlias: "rockefeller",
+          rendererContractVersion: 1,
+          renderInputHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+        }),
+      );
+      const intentCreatedAt = row.createdAt as Date;
+      expect(intentCreatedAt).toBeInstanceOf(Date);
+      expect(row.nextAttemptAt).toEqual(intentCreatedAt);
+      expect((row.expiresAt as Date).getTime() - intentCreatedAt.getTime()).toBe(
+        30 * 24 * 60 * 60 * 1_000,
+      );
+    }
+
+    const frozenJson = JSON.stringify(intentRows());
+    expect(frozenJson).not.toContain('"rawAnswers"');
+    expect(frozenJson).not.toContain('"answers"');
+    expect(frozenJson).not.toContain('"result"');
+
+    const lastIntentCreateOrder =
+      txMock.assessmentEmailDeliveryIntent.create.mock.invocationCallOrder.at(-1)!;
+    expect(lastIntentCreateOrder).toBeLessThan(
+      txMock.assessmentInvitation.update.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("evaluates the required intent-mode flag exactly once per request", async () => {
+    mockHappyInvitation();
+    flagState.intents = true;
+
+    const res = await submit();
+
+    expect(res.status).toBe(200);
+    expect(assessmentEmailDeliveryIntentsEnabled).toHaveBeenCalledTimes(1);
+  });
+
+  it("flag on still creates valid intents while sends are globally paused", async () => {
+    mockHappyInvitation();
+    flagState.intents = true;
+    flagState.paused = true;
+
+    const res = await submit();
+
+    expect(res.status).toBe(200);
+    expect(txMock.assessmentEmailDeliveryIntent.create).toHaveBeenCalledTimes(2);
+    expect(txMock.assessmentEmailOutbox.create).not.toHaveBeenCalled();
+    expect(inngestMock.send).toHaveBeenCalledTimes(1);
+  });
+
+  it("flag off preserves the existing direct-outbox path and paused early return", async () => {
+    mockHappyInvitation();
+    flagState.intents = false;
+
+    const unpaused = await submit();
+
+    expect(unpaused.status).toBe(200);
+    expect(txMock.assessmentEmailOutbox.create).toHaveBeenCalledTimes(2);
+    expect(txMock.assessmentEmailDeliveryIntent.create).not.toHaveBeenCalled();
+    expect(inngestMock.send).not.toHaveBeenCalled();
+
+    txMock.assessmentEmailOutbox.create.mockClear();
+    txMock.assessmentEmailDeliveryIntent.create.mockClear();
+    inngestMock.send.mockClear();
+    flagState.paused = true;
+
+    const paused = await submit();
+
+    expect(paused.status).toBe(200);
+    expect(txMock.assessmentEmailOutbox.create).not.toHaveBeenCalled();
+    expect(txMock.assessmentEmailDeliveryIntent.create).not.toHaveBeenCalled();
+    expect(inngestMock.send).not.toHaveBeenCalled();
+  });
+
+  it("creates no respondent intent when its feature gate is off", async () => {
+    mockHappyInvitation();
+    flagState.intents = true;
+    flagState.results = false;
+
+    const res = await submit();
+
+    expect(res.status).toBe(200);
+    expect(intentRoles()).toEqual(["OWNING_COACH"]);
+  });
+
+  it("creates no respondent intent when the report renderer signals renderError", async () => {
+    mockHappyInvitation();
+    flagState.intents = true;
+    const { buildReportEmailHtml } = jest.requireMock(
+      "@/lib/assessments/report-email",
+    );
+    (buildReportEmailHtml as jest.Mock).mockReturnValueOnce({
+      subject: "unused-report-subject",
+      bodyHtml: "<p>degraded fallback</p>",
+      renderError:
+        "private respondent@example.com subject and HTML must not be logged",
+    });
+    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+
+    const res = await submit();
+
+    expect(res.status).toBe(200);
+    expect(intentRoles()).toEqual(["OWNING_COACH"]);
+    const logJson = JSON.stringify(errorSpy.mock.calls);
+    expect(logJson).toContain("ReportRenderError");
+    expect(logJson).not.toContain("respondent@example.com");
+    expect(logJson).not.toContain("subject and HTML");
+    errorSpy.mockRestore();
+  });
+
+  it("keeps the legacy fallback row when the intent flag is off and the renderer signals renderError", async () => {
+    mockHappyInvitation();
+    flagState.intents = false;
+    const { buildReportEmailHtml } = jest.requireMock(
+      "@/lib/assessments/report-email",
+    );
+    (buildReportEmailHtml as jest.Mock).mockReturnValueOnce({
+      subject: "unused-report-subject",
+      bodyHtml: "<p>degraded fallback</p>",
+      renderError: "qualitative render failed",
+    });
+    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+
+    const res = await submit();
+
+    expect(res.status).toBe(200);
+    expect(
+      txMock.assessmentEmailOutbox.create.mock.calls.map(
+        (call: Array<{ data: { recipientRole: string } }>) =>
+          call[0].data.recipientRole,
+      ),
+    ).toEqual(["RESPONDENT", "OWNING_COACH"]);
+    errorSpy.mockRestore();
+  });
+
+  it("creates no respondent intent and sanitizes the log when rendering throws", async () => {
+    mockHappyInvitation();
+    flagState.intents = true;
+    const { buildResultsEmailHtml } = jest.requireMock(
+      "@/lib/assessments/results-email",
+    );
+    const renderFailure = Object.assign(
+      new Error(
+        "private respondent@example.com subject and HTML must not be logged",
+      ),
+      {
+        recipientEmail: "respondent@example.com",
+        subject: "private subject",
+        bodyHtml: "<p>private HTML</p>",
+        answers: [{ stableKey: "q1", value: 2 }],
+      },
+    );
+    renderFailure.name = "ResultsRenderError";
+    (buildResultsEmailHtml as jest.Mock).mockImplementationOnce(() => {
+      throw renderFailure;
+    });
+    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+
+    const res = await submit();
+
+    expect(res.status).toBe(200);
+    expect(intentRoles()).toEqual(["OWNING_COACH"]);
+    const logJson = JSON.stringify(errorSpy.mock.calls);
+    expect(logJson).toContain("ResultsRenderError");
+    expect(logJson).not.toContain("respondent@example.com");
+    expect(logJson).not.toContain("private subject");
+    expect(logJson).not.toContain("private HTML");
+    expect(logJson).not.toContain("stableKey");
+    expect(errorSpy.mock.calls.flat()).not.toContain(renderFailure);
+    errorSpy.mockRestore();
+  });
+
+  it("creates no respondent intent when its Phase-2 fingerprint is stale", async () => {
+    const invitation = mockHappyInvitation();
+    flagState.intents = true;
+    txMock.assessmentInvitation.findUnique.mockResolvedValue({
+      ...invitation,
+      campaign: {
+        ...invitation.campaign,
+        template: {
+          ...invitation.campaign.template,
+          resultsEmailContentApprovedHash: "b".repeat(64),
+        },
+      },
+    });
+
+    const res = await submit();
+
+    expect(res.status).toBe(200);
+    expect(intentRoles()).toEqual(["OWNING_COACH"]);
+  });
+
+  it("lets an intent create failure fail the whole request and leaves it retryable", async () => {
+    mockHappyInvitation();
+    flagState.intents = true;
+    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+    const persistenceFailure = Object.assign(
+      new Error(
+        "private respondent@example.com subject and HTML must not be logged",
+      ),
+      {
+        recipientEmail: "respondent@example.com",
+        subject: "private subject",
+        bodyHtml: "<p>private HTML</p>",
+        answers: [{ stableKey: "q1", value: 2 }],
+      },
+    );
+    persistenceFailure.name = "PrismaClientKnownRequestError";
+    txMock.assessmentEmailDeliveryIntent.create
+      .mockRejectedValueOnce(persistenceFailure)
+      .mockResolvedValue({});
+
+    const first = await submit();
+
+    expect(first.status).toBe(500);
+    expect(txMock.assessmentInvitation.update).not.toHaveBeenCalled();
+    expect(inngestMock.send).not.toHaveBeenCalled();
+    const failureLogJson = JSON.stringify(errorSpy.mock.calls);
+    expect(failureLogJson).toContain("PrismaClientKnownRequestError");
+    expect(failureLogJson).not.toContain("respondent@example.com");
+    expect(failureLogJson).not.toContain("private subject");
+    expect(failureLogJson).not.toContain("private HTML");
+    expect(failureLogJson).not.toContain("stableKey");
+    expect(errorSpy.mock.calls.flat()).not.toContain(persistenceFailure);
+
+    const retry = await submit();
+
+    expect(retry.status).toBe(200);
+    expect(txMock.assessmentInvitation.update).toHaveBeenCalledTimes(1);
+    expect(inngestMock.send).toHaveBeenCalledTimes(1);
+    errorSpy.mockRestore();
+  });
+
+  it("dispatches one ID-only event after commit", async () => {
+    mockHappyInvitation();
+    flagState.intents = true;
+    txMock.assessmentSubmission.create.mockResolvedValue({ id: "submission-1" });
+
+    const res = await submit();
+
+    expect(res.status).toBe(200);
+    expect(inngestMock.send).toHaveBeenCalledTimes(1);
+    expect(inngestMock.send).toHaveBeenCalledWith({
+      name: "assessment/email-delivery-intent.created",
+      data: { submissionId: "submission-1" },
+    });
+    expect(JSON.stringify(inngestMock.send.mock.calls)).not.toContain(
+      "@example.com",
+    );
+    expect(transactionCommitMarker.mock.invocationCallOrder[0]).toBeLessThan(
+      inngestMock.send.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("dispatches no event when no intent was created", async () => {
+    mockHappyInvitation({
+      sendResultsToRespondent: false,
+      notifyCoachOnCompletion: false,
+    });
+    flagState.intents = true;
+
+    const res = await submit();
+
+    expect(res.status).toBe(200);
+    expect(txMock.assessmentEmailDeliveryIntent.create).not.toHaveBeenCalled();
+    expect(inngestMock.send).not.toHaveBeenCalled();
+  });
+
+  it("keeps the 200 response when post-commit event dispatch fails and logs IDs plus error.name only", async () => {
+    mockHappyInvitation();
+    flagState.intents = true;
+    txMock.assessmentSubmission.create.mockResolvedValue({ id: "submission-1" });
+    const dispatchError = new Error(
+      "private recipient@example.com subject and html must not be logged",
+    );
+    dispatchError.name = "DispatchError";
+    inngestMock.send.mockRejectedValueOnce(dispatchError);
+    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+
+    const res = await submit();
+
+    expect(res.status).toBe(200);
+    expect(inngestMock.send).toHaveBeenCalledTimes(1);
+    const logJson = JSON.stringify(errorSpy.mock.calls);
+    expect(logJson).toContain("submission-1");
+    expect(logJson).toContain("c1");
+    expect(logJson).toContain("inv-1");
+    expect(logJson).toContain("DispatchError");
+    expect(logJson).not.toContain("recipient@example.com");
+    expect(logJson).not.toContain("subject and html");
+    errorSpy.mockRestore();
   });
 });
 
