@@ -3,6 +3,7 @@ import {
   INTENT_RENDERER_CONTRACT_VERSION,
   INTENT_SNAPSHOT_SCHEMA_VERSION,
   parseAuthorizationSnapshot,
+  parseContentProvenance,
   terminalIntentData,
   type AuthorizationSnapshotV1,
   type ContentProvenanceV1,
@@ -337,33 +338,6 @@ async function lockAuthoritativeRows(
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function parseContentProvenance(value: unknown): ContentProvenanceV1 | null {
-  if (!isRecord(value)) return null;
-  const stringFields = [
-    "templateId",
-    "versionId",
-    "templateAlias",
-    "reportType",
-    "sourceCommit",
-    "renderInputHash",
-  ] as const;
-  if (
-    value.schemaVersion !== 1 ||
-    value.rendererContractVersion !== INTENT_RENDERER_CONTRACT_VERSION ||
-    stringFields.some(
-      (field) =>
-        typeof value[field] !== "string" || value[field].length === 0,
-    ) ||
-    !(
-      value.approvalHash === null ||
-      typeof value.approvalHash === "string"
-    )
-  ) {
-    return null;
-  }
-  return value as ContentProvenanceV1;
 }
 
 function contentProvenanceMatchesFrozenContract(

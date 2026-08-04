@@ -309,7 +309,7 @@ const handlerCases: HandlerCase[] = [
 ];
 
 describe.each(handlerCases)("$name route guard matrix", ({ invoke, service }) => {
-  it("runs the standard rate limit before auth and returns a private 429", async () => {
+  it("rate limits an authenticated privileged request with a private 429", async () => {
     (withRateLimit as jest.Mock).mockResolvedValueOnce({
       allowed: false,
       headers: { "Retry-After": "10" },
@@ -321,11 +321,11 @@ describe.each(handlerCases)("$name route guard matrix", ({ invoke, service }) =>
     expect(response.headers.get("retry-after")).toBe("10");
     assertPrivate(response);
     expect(withRateLimit).toHaveBeenCalledWith(expect.any(Request), RateLimits.standard);
-    expect(getApiActor).not.toHaveBeenCalled();
+    expect(getApiActor).toHaveBeenCalledTimes(1);
     expect(service).not.toHaveBeenCalled();
   });
 
-  it("returns a private 401 for an unauthenticated request", async () => {
+  it("returns a private 401 before rate limiting an unauthenticated request", async () => {
     (getApiActor as jest.Mock).mockResolvedValueOnce(null);
 
     const response = await invoke();
@@ -333,6 +333,7 @@ describe.each(handlerCases)("$name route guard matrix", ({ invoke, service }) =>
     expect(response.status).toBe(401);
     assertPrivate(response);
     expect(await response.json()).toEqual({ error: "UNAUTHENTICATED" });
+    expect(withRateLimit).not.toHaveBeenCalled();
     expect(service).not.toHaveBeenCalled();
   });
 
@@ -344,6 +345,7 @@ describe.each(handlerCases)("$name route guard matrix", ({ invoke, service }) =>
     expect(response.status).toBe(403);
     assertPrivate(response);
     expect(await response.json()).toEqual({ error: "FORBIDDEN" });
+    expect(withRateLimit).not.toHaveBeenCalled();
     expect(service).not.toHaveBeenCalled();
   });
 });

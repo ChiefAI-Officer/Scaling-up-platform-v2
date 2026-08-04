@@ -5,6 +5,7 @@ import {
   INTENT_SNAPSHOT_SCHEMA_VERSION,
   assessmentEmailIntentPayloadHash,
   parseAuthorizationSnapshot,
+  parseContentProvenance,
   terminalIntentData,
   type AuthorizationSnapshotV1,
   type ContentProvenanceV1,
@@ -436,63 +437,6 @@ export function buildInertIntentPreviewDocument(bodyHtml: string): string {
     '<meta name="referrer" content="no-referrer"></head>' +
     `<body>${sanitized}</body></html>`
   );
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function parseContentProvenance(value: unknown): ContentProvenanceV1 | null {
-  if (!isRecord(value)) return null;
-  const exactKeys = [
-    "schemaVersion",
-    "templateId",
-    "versionId",
-    "templateAlias",
-    "reportType",
-    "approvalHash",
-    "rendererContractVersion",
-    "sourceCommit",
-    "renderInputHash",
-  ] as const;
-  const stringFields = [
-    "templateId",
-    "versionId",
-    "templateAlias",
-    "reportType",
-    "sourceCommit",
-  ] as const;
-  if (
-    Object.keys(value).length !== exactKeys.length ||
-    exactKeys.some(
-      (field) => !Object.prototype.hasOwnProperty.call(value, field),
-    ) ||
-    value.schemaVersion !== INTENT_SNAPSHOT_SCHEMA_VERSION ||
-    value.rendererContractVersion !== INTENT_RENDERER_CONTRACT_VERSION ||
-    stringFields.some(
-      (field) =>
-        typeof value[field] !== "string" || value[field].length === 0,
-    ) ||
-    typeof value.renderInputHash !== "string" ||
-    !/^[a-f0-9]{64}$/.test(value.renderInputHash) ||
-    !(
-      value.approvalHash === null ||
-      typeof value.approvalHash === "string"
-    )
-  ) {
-    return null;
-  }
-  return {
-    schemaVersion: INTENT_SNAPSHOT_SCHEMA_VERSION,
-    templateId: value.templateId as string,
-    versionId: value.versionId as string,
-    templateAlias: value.templateAlias as string,
-    reportType: value.reportType as string,
-    approvalHash: value.approvalHash as string | null,
-    rendererContractVersion: INTENT_RENDERER_CONTRACT_VERSION,
-    sourceCommit: value.sourceCommit as string,
-    renderInputHash: value.renderInputHash,
-  };
 }
 
 function snapshotMatchesIntent(

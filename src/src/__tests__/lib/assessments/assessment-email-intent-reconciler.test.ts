@@ -942,6 +942,46 @@ describe("reconcileAssessmentEmailIntents", () => {
     expect(updateData.contentProvenance).toBeUndefined();
   });
 
+  it.each([
+    {
+      label: "an extra field",
+      provenance: {
+        ...contentProvenance(),
+        recipientEmail: RECIPIENT,
+      },
+    },
+    {
+      label: "a malformed render-input hash",
+      provenance: {
+        ...contentProvenance(),
+        renderInputHash: "D".repeat(64),
+      },
+    },
+  ])("holds provenance with $label instead of handing it off", async ({
+    provenance,
+  }) => {
+    const harness = makeHarness({
+      candidates: [frozenIntent({ contentProvenance: provenance })],
+    });
+
+    const result = await reconcileAssessmentEmailIntents(
+      harness.deps,
+      SUBMISSION_SCOPE,
+    );
+
+    expect(result.held).toBe(1);
+    expect(harness.loadCurrentAuthorizationFacts).not.toHaveBeenCalled();
+    expect(harness.tx.assessmentEmailOutbox.create).not.toHaveBeenCalled();
+    expect(harness.tx.assessmentEmailDeliveryIntent.update).toHaveBeenCalledWith({
+      where: { id: "intent-1" },
+      data: expect.objectContaining({
+        status: "HELD",
+        holdReason: "SCHEMA_UNSUPPORTED",
+        holdReasons: ["SCHEMA_UNSUPPORTED"],
+      }),
+    });
+  });
+
   it("requires owning-Coach provenance to retain a null approval hash", async () => {
     const snapshot = {
       ...authorizationSnapshot(),

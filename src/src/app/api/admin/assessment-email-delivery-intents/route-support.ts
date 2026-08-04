@@ -47,6 +47,14 @@ export function privateJson(
 export async function requirePrivilegedActor(
   request: Request,
 ): Promise<{ actor: ApiActor } | { response: Response }> {
+  const actor = await getApiActor();
+  if (!actor) {
+    return { response: privateJson({ error: "UNAUTHENTICATED" }, 401) };
+  }
+  if (!isPrivilegedRole(actor.role)) {
+    return { response: privateJson({ error: "FORBIDDEN" }, 403) };
+  }
+
   const rateLimit = await withRateLimit(request, RateLimits.standard);
   if (!rateLimit.allowed) {
     return {
@@ -58,13 +66,6 @@ export async function requirePrivilegedActor(
     };
   }
 
-  const actor = await getApiActor();
-  if (!actor) {
-    return { response: privateJson({ error: "UNAUTHENTICATED" }, 401) };
-  }
-  if (!isPrivilegedRole(actor.role)) {
-    return { response: privateJson({ error: "FORBIDDEN" }, 403) };
-  }
   return { actor };
 }
 

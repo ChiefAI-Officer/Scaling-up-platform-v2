@@ -126,6 +126,20 @@ const authorizationSnapshotSchema = z
     }
   });
 
+const contentProvenanceSchema = z
+  .object({
+    schemaVersion: z.literal(INTENT_SNAPSHOT_SCHEMA_VERSION),
+    templateId: requiredString,
+    versionId: requiredString,
+    templateAlias: requiredString,
+    reportType: requiredString,
+    approvalHash: z.string().nullable(),
+    rendererContractVersion: z.literal(INTENT_RENDERER_CONTRACT_VERSION),
+    sourceCommit: requiredString,
+    renderInputHash: sha256Hex,
+  })
+  .strict();
+
 function canonicalJsonValue(value: unknown, seen: Set<object>): string {
   if (value === null) return "null";
 
@@ -205,6 +219,13 @@ export function parseAuthorizationSnapshot(value: unknown):
   return parsed.success
     ? { supported: true, value: parsed.data as AuthorizationSnapshotV1 }
     : { supported: false };
+}
+
+export function parseContentProvenance(
+  value: unknown,
+): ContentProvenanceV1 | null {
+  const parsed = contentProvenanceSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
 }
 
 export function terminalIntentData(input: {
