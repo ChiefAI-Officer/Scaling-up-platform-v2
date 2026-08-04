@@ -6,6 +6,17 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="gh-257-outbox-reconciliation-launched-default-off"></a>
+### 2026-08-04 — GH #257 residual outbox reconciliation launched default-off <!-- ENTRY_ISO:2026-08-04 ENTRY_SLUG:gh-257-outbox-reconciliation-launched-default-off -->
+
+**Protected merge and exact Production receipt.** Implementation PR [#296](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/296) received independent `jcbdelo26` approval after specification and standards reviews each reported 0 Critical / 0 Important / 0 Minor issues. It squash-merged as `613cb0cecc014ec767fafab82b13e393dc9740f6`. Exact Production deployment `dpl_CKS139kLjuXPJpFXdohxbc5384Bn` is **Ready** and GitHub deployment `5744293546` is successful on that exact SHA. It owns `platformtest.scalingup.com`, `scaling-up-platform-v2.vercel.app`, `scaling-up-platform-v2-scaling-up.vercel.app`, and the `git-main` alias. Both public `/api/health` endpoints returned HTTP `200` with healthy database and safe auth posture.
+
+**Verification and rollout state.** The final local repository run passed **621 suites / 7,655 tests / 14 snapshots**; the production build completed TypeScript and generated **92/92** static pages. Repair-scoped ESLint, changelog freshness, `git diff --check`, and migration safety across **44 migrations** passed. Refreshed main CI then passed Build, Migration Safety Gate, and Assessment Email Lease (PostgreSQL). A name-only Production environment inventory found no `ASSESSMENT_EMAIL_DELIVERY_INTENTS_ENABLED` variable, so durable intent creation remains inactive and the deployed capability is default-off. No environment value was read and no flag was changed.
+
+**Shipped recovery boundary.** When separately activated, new invited submissions atomically create exact frozen delivery intents; an ID-only event fast path and bounded three-minute scan share one reconciler. Reauthorization can hand exact stored bytes to the unchanged ADR-0030 outbox, hold drift for ADMIN/STAFF-only exact release or permanent cancellation, or purge unresolved payloads at the absolute 30-day deadline. The legacy auditor remains SELECT-only and emits unverifiable candidates without replay, reconstruction, apply, or backfill behavior.
+
+**Tracking and safety closeout.** Issue [#257](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/issues/257) is closed. The [shared claim](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/issues/261#issuecomment-5179518345) is released and the [single Notion task](https://app.notion.com/p/3af8c45dd82981ec9820d35bc4890970) is Done. GH #257 becomes the ninth eligible outcome in the next consolidated report; this launch receipt does not add another outcome. No production legacy audit, replay, backfill, payload reconstruction, manual database write, operator release/cancellation, or customer email send occurred.
+
 <a id="gh-257-outbox-reconciliation-pr-ready"></a>
 ### 2026-08-04 — GH #257 residual outbox reconciliation prepared for protected review <!-- ENTRY_ISO:2026-08-04 ENTRY_SLUG:gh-257-outbox-reconciliation-pr-ready -->
 
