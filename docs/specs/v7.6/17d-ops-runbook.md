@@ -32,7 +32,7 @@ Wave D introduces 8 features across 4 operational areas:
 | #2/#3 timing radio + auto-send | `WAVE_D_AUTO_SEND_ENABLED` | `inviteTiming`, cron + fan-out |
 | #15 results email to respondent | `WAVE_D_RESULTS_EMAIL_ENABLED` | approval-gated per template |
 | #16 coach-notify on completion | `WAVE_D_COACH_NOTIFY_ENABLED` | per-completion, opt-in |
-| #20 full-HTML invitation email | `WAVE_D_CUSTOM_HTML_EMAIL_ENABLED` | body replace only; subject separate |
+| #20 custom-HTML invitation email | `WAVE_D_CUSTOM_HTML_EMAIL_ENABLED` | capability gate; GH #220 branded-body behavior is separately default-off |
 
 **Global kill switch:** `ASSESSMENT_SENDS_PAUSED` — stops ALL assessment sends regardless
 of the per-feature flags (auto-send fan-out aborts + releases its claim; cron short-circuits).
@@ -109,12 +109,70 @@ authz-gated route). No approval gate — this is an internal coach notification.
 WAVE_D_CUSTOM_HTML_EMAIL_ENABLED=1
 ```
 
-**What it enables:** The `invitationBodyHtml` field (campaign wizard Step 4) is respected
-as a full-replace HTML body in the invitation email (subject remains the separate
-token-allowlisted field). The HTML is DOMPurify-sanitized on write; the fan-out uses
-the sanitized stored value at render time. When the field is empty, the existing
-markdown body path is used as the fallback — so enabling this flag has no effect on
-campaigns that don't supply `invitationBodyHtml`.
+**What it enables:** The `invitationBodyHtml` field (campaign wizard Step 4) becomes
+available to the invitation renderer; the subject remains the separate token-allowlisted
+field. The HTML is validated on write and sanitized after escaped interpolation at render.
+With `ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED` on, non-empty HTML is the body
+inside the shared branded shell. With that behavior flag off, token-bearing legacy HTML
+uses complete replacement and tokenless HTML uses the branded markdown/template
+fallback. Empty HTML also uses the branded markdown/template path.
+
+GH #220 separates the existing capability gate from the new composition behavior:
+
+```text
+WAVE_D_CUSTOM_HTML_EMAIL_ENABLED
+  Capability: read and render campaign invitationBodyHtml.
+
+ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED
+  Behavior: compose non-empty custom HTML as the sanitized body inside the
+  shared branded shell. Default off.
+```
+
+#### GH #220 dark rollout
+
+1. Deploy with `ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED` unset.
+2. Read the current Production values for both HTML flags and the branded-renderer
+   kill switch `ASSESSMENT_INVITE_BRANDED`. Verify the kill switch is inactive:
+   the branded renderer is active only when `ASSESSMENT_INVITE_BRANDED` is not
+   exactly `"0"`. If it is `"0"`, stop; the legacy renderer is selected before
+   custom-HTML render selection. Set `GH220_READONLY_DATABASE_URL` to the
+   operator-provided read-only connection, then run the audit with the exact
+   custom-HTML flag values. Before first activation the expected command is:
+
+   ```bash
+   WAVE_D_CUSTOM_HTML_EMAIL_ENABLED=1 ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED=0 AUDIT_READONLY_URL="$GH220_READONLY_DATABASE_URL" npm run audit:invitation-html-overrides
+   ```
+
+   The audit's current, post-activation, and rollback mode classifications apply
+   only while the branded renderer is active. They do not describe actual send
+   behavior while `ASSESSMENT_INVITE_BRANDED=0`.
+3. Stop if live overrides are nonzero until each live campaign is reviewed.
+4. Separately authorize the Production flag change, then use the repository's
+   safe write path. Target the Production project
+   `prj_xcAWuAmGZAU3DCHgAauRv2WPKneo` under
+   `team_ek3PMuEYCgI0DKZ2EFexMgya`, passing that `teamId` explicitly, and write
+   `ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED` with the Vercel REST API:
+   `POST /v10/projects/{id}/env`, `type:"encrypted"`,
+   `target:["production"]`. Do not use piped `vercel env add`; do not use the
+   repository's currently mis-paired local `.vercel` link or
+   `scripts/push-env-to-vercel.mjs`.
+5. Redeploy, then verify the exact deployment, aliases, health, and flag state.
+6. Observe organic PII-free telemetry without manufacturing a customer send.
+
+For exact value verification, follow `CLAUDE.md`'s Production flag guidance and
+use `vercel env pull --environment=production` from a correctly linked/scoped
+Vercel CLI context; never paste returned values. An authenticated
+`GET /v10/projects/{id}/env?teamId=…&decrypt=true` may confirm set/type/target
+metadata, but this plan returns ciphertext and cannot distinguish `"1"` from
+`"0"`, so it is never exact value evidence. A `sensitive`-typed flag's value
+cannot be verified from an empty read or `[SENSITIVE]`; that state is
+**unknown**, not off. Resolve a sensitive kill-switch value with a live in-app
+check or a separately authorized REST rewrite as `type:"encrypted"`, followed
+by exact verification through the correctly linked/scoped Vercel CLI, before
+activation. Do not infer flag values from the mis-paired local project link.
+
+Production activation is outside the implementation PR. Do not infer activation
+authorization from a successful deployment or audit.
 
 ### Recommended enabling order
 
@@ -127,6 +185,14 @@ campaigns that don't supply `invitationBodyHtml`.
 ```
 
 Each step is independently reversible by flipping the flag back to `0` + redeploying.
+
+### GH #220 behavior rollback
+
+Unset `ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED` and redeploy. Token-bearing
+legacy HTML becomes complete replacement, tokenless HTML uses the branded
+markdown/template fallback, and stored HTML bytes remain unchanged. Unsetting
+`WAVE_D_CUSTOM_HTML_EMAIL_ENABLED` remains the broader capability rollback and
+causes stored custom HTML to be ignored.
 
 ---
 

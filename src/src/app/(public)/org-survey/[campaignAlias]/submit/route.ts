@@ -70,6 +70,7 @@ import {
   type ContentProvenanceV1,
 } from "@/lib/assessments/assessment-email-delivery-intents";
 import { inngest } from "@/inngest/client";
+import { reportEmailChromeForCampaign } from "@/lib/assessments/wave-228-flags";
 
 const NO_STORE_HEADERS = { "Cache-Control": "no-store" } as const;
 
@@ -139,7 +140,12 @@ interface EnqueueArgs {
     sendResultsToRespondent: boolean;
     notifyCoachOnCompletion: boolean;
     createdByCoachId: string | null;
-    creatorCoach: { email: string } | null;
+    creatorCoach: {
+      email: string;
+      firstName: string;
+      lastName: string;
+      profileImage: string | null;
+    } | null;
     // Wave OSR: version CONTENT is no longer read here — the report model that
     // needed it is built by the caller. Only the id remains (fingerprinting).
     version: { id: string; templateId: string };
@@ -209,9 +215,11 @@ function buildWaveDOutboxRows({
     report !== null
   ) {
     try {
+      const chrome = reportEmailChromeForCampaign(campaign.id);
       const { bodyHtml: reportHtml, renderError } = buildReportEmailHtml({
         report,
         recipientRole: "TAKER_COPY",
+        chrome,
       });
       // M4: buildReportEmailHtml never throws — on a qualitative body-render
       // failure it degrades to a safe body + a renderError signal. Surface it
@@ -372,10 +380,12 @@ function stableInputHash(value: unknown): string {
 /**
  * C-M2: the render-input fingerprint for the prepared Wave-D email rows. The
  * #15 results row depends on the respondent toggle + the template's results-
- * email approval hash + alias + the pinned version id; the #16 coach-notify row
- * depends on the coach toggle + the owning-coach identity. Captured in Phase 1
- * (lock-free) and re-derived UNDER the lock in Phase 2 — a field change between
- * the two means the corresponding prepared row is stale and must be dropped.
+ * email approval hash + alias + the pinned version id + resolved chrome and,
+ * only for branded chrome, creator-coach presentation; the #16 coach-notify
+ * row depends on the coach toggle + the owning-coach identity. Captured in
+ * Phase 1 (lock-free) and re-derived UNDER the lock in Phase 2 — a field change
+ * between the two means the corresponding prepared row is stale and must be
+ * dropped.
  *
  * Compared by string-equality (#15 / #16 keys), so the exact field list is the
  * load-bearing contract: extend BOTH this builder and the Phase-2 locked select
@@ -396,23 +406,41 @@ interface EmailRenderFingerprint {
 }
 
 function emailRenderFingerprint(campaign: {
+  id: string;
   sendResultsToRespondent: boolean;
   notifyCoachOnCompletion: boolean;
   showResultsOnScreen: boolean;
   createdByCoachId: string | null;
-  creatorCoach: { email: string } | null;
+  creatorCoach: {
+    email: string;
+    firstName: string;
+    lastName: string;
+    profileImage: string | null;
+  } | null;
   version: { id: string };
   template: {
     alias: string;
     resultsEmailContentApprovedHash: string | null;
   } | null;
 }): EmailRenderFingerprint {
+  const chrome = reportEmailChromeForCampaign(campaign.id);
+  const brandedCoach =
+    chrome === "gh228"
+      ? [
+          campaign.createdByCoachId,
+          campaign.creatorCoach?.firstName ?? null,
+          campaign.creatorCoach?.lastName ?? null,
+          campaign.creatorCoach?.profileImage ?? null,
+        ]
+      : null;
   return {
     results: JSON.stringify([
       campaign.sendResultsToRespondent,
       campaign.template?.resultsEmailContentApprovedHash ?? null,
       campaign.template?.alias ?? null,
       campaign.version.id,
+      chrome,
+      brandedCoach,
     ]),
     coach: JSON.stringify([
       campaign.notifyCoachOnCompletion,
@@ -883,6 +911,7 @@ export async function POST(
             respondent: { select: { email: true } },
             campaign: {
               select: {
+                id: true,
                 alias: true,
                 templateId: true,
                 accessMode: true,
@@ -898,7 +927,15 @@ export async function POST(
                 // from THIS locked read, never from the Phase-1 read.
                 showResultsOnScreen: true,
                 createdByCoachId: true,
-                creatorCoach: { select: { id: true, email: true } },
+                creatorCoach: {
+                  select: {
+                    id: true,
+                    email: true,
+                    firstName: true,
+                    lastName: true,
+                    profileImage: true,
+                  },
+                },
                 version: { select: { id: true, templateId: true } },
                 template: {
                   select: {

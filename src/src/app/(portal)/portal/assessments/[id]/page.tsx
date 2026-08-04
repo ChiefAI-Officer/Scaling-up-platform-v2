@@ -22,7 +22,10 @@ import {
   getCampaignRespondents,
 } from "@/lib/assessments/campaign-detail";
 import { CampaignDetail } from "@/components/assessments/CampaignDetail";
-import { waveDCustomHtmlEmailEnabled } from "@/lib/assessments/wave-d-feature-flags";
+import {
+  assessmentInviteBrandedCustomHtmlEnabled,
+  waveDCustomHtmlEmailEnabled,
+} from "@/lib/assessments/wave-d-feature-flags";
 import {
   isGroupReportEnabled,
   isGroupReportAlias,
@@ -178,6 +181,7 @@ export default async function CampaignDetailPage({ params }: PageProps) {
       initialOverview={overview}
       initialRespondents={respondents}
       customHtmlEmailEnabled={waveDCustomHtmlEmailEnabled()}
+      brandedCustomHtmlEnabled={assessmentInviteBrandedCustomHtmlEnabled()}
       canViewGroupReport={canShowGroupReport}
       groupReportHref={`/assessments/${id}/report`}
       customSlidesEnabled={customSlidesEnabled}

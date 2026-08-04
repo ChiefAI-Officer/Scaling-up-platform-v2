@@ -8,6 +8,7 @@ import { requireCoach } from "@/lib/auth/authorization";
 import { CampaignWizard } from "@/components/assessments/CampaignWizard";
 import {
   waveDCustomHtmlEmailEnabled,
+  assessmentInviteBrandedCustomHtmlEnabled,
   waveDAutoSendEnabled,
   waveDResultsEmailEnabled,
   waveDCoachNotifyEnabled,
@@ -19,6 +20,7 @@ import { isOnScreenResultsEnabled } from "@/lib/assessments/wave-osr-flags";
 export default async function NewCampaignPage() {
   await requireCoach();
   const customHtmlEmailEnabled = waveDCustomHtmlEmailEnabled();
+  const brandedCustomHtmlEnabled = assessmentInviteBrandedCustomHtmlEnabled();
   const autoSend = waveDAutoSendEnabled();
   const resultsEmailEnabled = waveDResultsEmailEnabled();
   const coachNotifyEnabled = waveDCoachNotifyEnabled();
@@ -37,6 +39,7 @@ export default async function NewCampaignPage() {
     <div className="wf-scope max-w-3xl mx-auto">
       <CampaignWizard
         customHtmlEmailEnabled={customHtmlEmailEnabled}
+        brandedCustomHtmlEnabled={brandedCustomHtmlEnabled}
         autoSend={autoSend}
         resultsEmailEnabled={resultsEmailEnabled}
         coachNotifyEnabled={coachNotifyEnabled}

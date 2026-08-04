@@ -42,6 +42,11 @@ import {
   DEFAULT_INVITATION_BODY,
   DEFAULT_INVITATION_SUBJECT,
 } from "@/lib/assessments/invitation-defaults";
+import { resolveInvitationHtmlMode } from "@/lib/assessments/invitation-html-policy";
+import {
+  invitationHtmlEditorCopy,
+  invitationOverrideSummary,
+} from "@/lib/assessments/invitation-html-editor-copy";
 import type { CustomSlide } from "@/lib/assessments/custom-slides";
 import {
   CustomSlidesPanel,
@@ -158,7 +163,8 @@ interface WizardState {
   invitationSubject: string;
   invitationBodyMarkdown: string;
   // Task 12 (#20) — per-campaign FULL-HTML invitation body. Empty = fall back to the
-  // markdown/template default. When set + flag on, REPLACES the entire branded email.
+  // markdown/template default. When set, branded mode composes it as the shell body;
+  // legacy mode keeps full replacement only for a recognized invitation URL token.
   invitationBodyHtml: string;
   // Task 6b — #15/#16 result/notify toggles.
   /** Whether the selected template has an approved results email (server-computed).
@@ -257,6 +263,7 @@ function formatDateTimeLocal(d: Date): string {
 
 export function CampaignWizard({
   customHtmlEmailEnabled = false,
+  brandedCustomHtmlEnabled = false,
   autoSend = false,
   resultsEmailEnabled = false,
   coachNotifyEnabled = false,
@@ -264,8 +271,10 @@ export function CampaignWizard({
   waveQDefaultsEnabled = false,
   onScreenResultsEnabled = false,
 }: {
-  /** Wave D #20 — gate the full-HTML invitation editor (mirrors the server flag). */
+  /** Wave D #20 — gate the custom-HTML invitation editor (mirrors the server flag). */
   customHtmlEmailEnabled?: boolean;
+  /** GH #220 — composes custom HTML inside the branded invitation shell. */
+  brandedCustomHtmlEnabled?: boolean;
   /**
    * Wave D — gate the auto-send timing radio + the `inviteTiming` create-payload
    * field behind WAVE_D_AUTO_SEND_ENABLED (mirrors the server flag). When false
@@ -648,9 +657,11 @@ export function CampaignWizard({
             state.invitationBodyMarkdown.trim() !== ""
               ? state.invitationBodyMarkdown.trim()
               : undefined,
-          // Task 12 (#20) — full-HTML body. Sent RAW (the server validates +
-          // stores raw, then sanitizes at render). Only sent when the flag is
-          // on AND non-empty; the server ignores it when its flag is off.
+          // Task 12 (#20) — custom HTML. Sent RAW (the server validates +
+          // stores raw, then sanitizes at render). With the GH #220 behavior
+          // flag on it is a branded body fragment; otherwise legacy full
+          // replacement rules apply. Only sent when the capability flag is on
+          // AND non-empty; the server ignores it when its flag is off.
           invitationBodyHtml:
             customHtmlEmailEnabled && state.invitationBodyHtml.trim() !== ""
               ? state.invitationBodyHtml
@@ -975,6 +986,7 @@ export function CampaignWizard({
             onActivate={() => saveCampaign({ activate: true })}
             canActivate={Boolean(canActivate)}
             customHtmlEmailEnabled={customHtmlEmailEnabled}
+            brandedCustomHtmlEnabled={brandedCustomHtmlEnabled}
             autoSend={autoSend}
             onChange={(patch) => setState((s) => ({ ...s, ...patch }))}
           />
@@ -2046,6 +2058,7 @@ function ReviewStep({
   onSaveDraft,
   onActivate,
   customHtmlEmailEnabled = false,
+  brandedCustomHtmlEnabled = false,
   autoSend = false,
   onChange,
 }: {
@@ -2056,6 +2069,7 @@ function ReviewStep({
   onSaveDraft: () => void;
   onActivate: () => void;
   customHtmlEmailEnabled?: boolean;
+  brandedCustomHtmlEnabled?: boolean;
   /** Wave D auto-send flag — drives the consequence-labeled activate button. */
   autoSend?: boolean;
   onChange: (patch: Partial<WizardState>) => void;
@@ -2100,6 +2114,18 @@ function ReviewStep({
   }, [state.organizationId, state.templateId, state.respondentIds]);
 
   const ceo = respondents.find((r) => r.id === state.ceoRespondentId);
+  const invitationHtmlMode = resolveInvitationHtmlMode({
+    waveDCustomHtmlEnabled: customHtmlEmailEnabled,
+    brandedCustomHtmlEnabled,
+    rawHtml: state.invitationBodyHtml,
+  });
+  const htmlEditorCopy = invitationHtmlEditorCopy({
+    brandedCustomHtmlEnabled,
+    htmlMode: invitationHtmlMode,
+  });
+  const hasSubjectOrMarkdown =
+    state.invitationSubject.trim() !== "" ||
+    state.invitationBodyMarkdown.trim() !== "";
 
   return (
     <div className="space-y-6">
@@ -2159,10 +2185,12 @@ function ReviewStep({
               Customize invitation email
             </h3>
             <p className="text-xs text-muted-foreground mt-0.5">
-              {state.invitationSubject.trim() ||
-              state.invitationBodyMarkdown.trim()
-                ? "Custom subject/body set for this campaign"
-                : "Optional — leave blank to send the default invitation shown below"}
+              {invitationOverrideSummary({
+                htmlMode: invitationHtmlMode,
+                hasSubjectOrMarkdown,
+                emptySummary:
+                  "Optional — leave blank to send the default invitation shown below",
+              })}
             </p>
           </div>
           <span className="text-xs font-medium text-muted-foreground">
@@ -2239,18 +2267,14 @@ function ReviewStep({
             </div>
             {customHtmlEmailEnabled && (
               <div className="space-y-1 border-t border-border pt-3">
-                <label className="text-xs font-medium text-foreground">
-                  Full custom HTML (advanced)
+                <label
+                  htmlFor="invitation-html-input"
+                  className="text-xs font-medium text-foreground"
+                >
+                  {htmlEditorCopy.label}
                 </label>
                 <p className="text-[11px] text-muted-foreground">
-                  When set, this HTML <strong>replaces the entire branded
-                  email</strong> (no template wrap). It must include the survey
-                  link token{" "}
-                  <code className="px-1 py-0.5 bg-muted rounded text-[10px]">
-                    {"{{invitationUrl}}"}
-                  </code>{" "}
-                  — either as a link <code className="text-[10px]">href</code> or
-                  as plain text. The same merge tokens above are available.
+                  {htmlEditorCopy.description}
                 </p>
                 <div className="flex items-center gap-3">
                   <input
@@ -2284,19 +2308,32 @@ function ReviewStep({
                   )}
                 </div>
                 <textarea
+                  id="invitation-html-input"
                   value={state.invitationBodyHtml}
                   onChange={(e) =>
                     onChange({ invitationBodyHtml: e.target.value })
                   }
                   maxLength={50000}
                   rows={10}
-                  placeholder="Paste your full HTML email here, or upload an .html file above. Leave blank to use the body above."
+                  placeholder={
+                    brandedCustomHtmlEnabled
+                      ? "Paste a custom HTML body fragment here, or upload an .html file above. Leave blank to use the markdown body above."
+                      : "Paste your full HTML email here, or upload an .html file above. Leave blank to use the body above."
+                  }
                   className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-primary/30"
                   data-testid="invitation-html-input"
                 />
                 <p className="text-[11px] text-muted-foreground">
                   {state.invitationBodyHtml.length} / 50000 characters
                 </p>
+                {htmlEditorCopy.validationError && (
+                  <p
+                    className="text-[11px] text-destructive"
+                    data-testid="invitation-html-error"
+                  >
+                    {htmlEditorCopy.validationError}
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -2311,14 +2348,21 @@ function ReviewStep({
           <Button
             variant="outline"
             onClick={onSaveDraft}
-            disabled={submitting || !canActivate}
+            disabled={
+              submitting || !canActivate || htmlEditorCopy.validationError !== null
+            }
           >
             {submitting ? (
               <Loader2 className="w-4 h-4 animate-spin mr-2" />
             ) : null}
             Save as Draft
           </Button>
-          <Button onClick={onActivate} disabled={submitting || !canActivate}>
+          <Button
+            onClick={onActivate}
+            disabled={
+              submitting || !canActivate || htmlEditorCopy.validationError !== null
+            }
+          >
             {submitting ? (
               <Loader2 className="w-4 h-4 animate-spin mr-2" />
             ) : null}

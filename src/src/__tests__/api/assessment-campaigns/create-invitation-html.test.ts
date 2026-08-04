@@ -72,9 +72,12 @@ const NO_TOKEN_HTML = '<h1>Hi there</h1><p>No link here.</p>';
 const MISPLACED_HTML = '<img src="{{invitationUrl}}" alt="x" />';
 
 const ORIGINAL_FLAG = process.env.WAVE_D_CUSTOM_HTML_EMAIL_ENABLED;
+const ORIGINAL_BRANDED_FLAG = process.env.ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED;
 
 beforeEach(() => {
   jest.clearAllMocks();
+  delete process.env.WAVE_D_CUSTOM_HTML_EMAIL_ENABLED;
+  delete process.env.ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED;
   (getApiActor as jest.Mock).mockResolvedValue(coachActor);
   (db.accessGroupCoach.findMany as jest.Mock).mockResolvedValue([
     { accessGroupId: "g1", coachId: "coach-1", accessGroup: { id: "g1", deletedAt: null } },
@@ -99,6 +102,11 @@ beforeEach(() => {
 afterAll(() => {
   if (ORIGINAL_FLAG === undefined) delete process.env.WAVE_D_CUSTOM_HTML_EMAIL_ENABLED;
   else process.env.WAVE_D_CUSTOM_HTML_EMAIL_ENABLED = ORIGINAL_FLAG;
+  if (ORIGINAL_BRANDED_FLAG === undefined) {
+    delete process.env.ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED;
+  } else {
+    process.env.ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED = ORIGINAL_BRANDED_FLAG;
+  }
 });
 
 describe("POST /api/assessment-campaigns — invitationBodyHtml validate-on-save (#20)", () => {
@@ -149,5 +157,46 @@ describe("POST /api/assessment-campaigns — invitationBodyHtml validate-on-save
         data: expect.objectContaining({ invitationBodyHtml: null }),
       }),
     );
+  });
+
+  it("both flags ON accepts tokenless HTML and stores the raw bytes", async () => {
+    process.env.WAVE_D_CUSTOM_HTML_EMAIL_ENABLED = "1";
+    process.env.ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED = "1";
+    const raw = "<h1>Coach-authored body</h1>";
+    const response = await POST(
+      jsonReq({ ...validBody, invitationBodyHtml: raw }) as never,
+    );
+    expect(response.status).toBe(201);
+    expect(db.assessmentCampaign.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ invitationBodyHtml: raw }),
+      }),
+    );
+  });
+
+  it("branded mode OFF rejects tokenless HTML without writing", async () => {
+    process.env.WAVE_D_CUSTOM_HTML_EMAIL_ENABLED = "1";
+    delete process.env.ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED;
+    const response = await POST(
+      jsonReq({
+        ...validBody,
+        invitationBodyHtml: "<p>No URL token</p>",
+      }) as never,
+    );
+    expect(response.status).toBe(400);
+    expect(db.assessmentCampaign.create).not.toHaveBeenCalled();
+  });
+
+  it("both flags ON still rejects a URL token in img src", async () => {
+    process.env.WAVE_D_CUSTOM_HTML_EMAIL_ENABLED = "1";
+    process.env.ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED = "1";
+    const response = await POST(
+      jsonReq({
+        ...validBody,
+        invitationBodyHtml: '<img src="{{invitationUrl}}">',
+      }) as never,
+    );
+    expect(response.status).toBe(400);
+    expect(db.assessmentCampaign.create).not.toHaveBeenCalled();
   });
 });

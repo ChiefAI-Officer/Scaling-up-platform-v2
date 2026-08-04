@@ -35,6 +35,7 @@ import { splitName } from "@/lib/assessments/respondent-csv";
 import { normalizeEmail } from "@/app/api/organizations/[id]/respondents/route";
 import { buildTeamPath } from "@/app/api/assessment-campaigns/[id]/participants/route";
 import {
+  assessmentInviteBrandedCustomHtmlEnabled,
   waveDAutoSendEnabled,
   waveDCustomHtmlEmailEnabled,
 } from "@/lib/assessments/wave-d-feature-flags";
@@ -199,7 +200,9 @@ export async function POST(request: NextRequest) {
             { status: 400 }
           );
         }
-        const placement = validateInvitationHtml(rawHtml);
+        const placement = validateInvitationHtml(rawHtml, {
+          requireUrlToken: !assessmentInviteBrandedCustomHtmlEnabled(),
+        });
         if (!placement.ok) {
           return NextResponse.json(
             { success: false, error: placement.reason },

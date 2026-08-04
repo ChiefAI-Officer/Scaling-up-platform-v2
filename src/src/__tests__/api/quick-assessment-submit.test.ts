@@ -167,6 +167,56 @@ function makeParams(alias = "quick-assessment") {
   return { params: Promise.resolve({ campaignAlias: alias }) };
 }
 
+type CreatedOutboxRow = {
+  recipientRole: string;
+  bodyHtml: string;
+};
+
+function createdRows(): CreatedOutboxRow[] {
+  return txMock.assessmentEmailOutbox.create.mock.calls.map(
+    (call: Array<{ data: CreatedOutboxRow }>) => call[0].data,
+  );
+}
+
+function rowFor(role: string): CreatedOutboxRow {
+  const row = createdRows().find(
+    (candidate) => candidate.recipientRole === role,
+  );
+  if (!row) throw new Error(`${role} row was not enqueued`);
+  return row;
+}
+
+function mockActiveCoach(
+  overrides: Partial<{
+    profileImage: string | null;
+    firstName: string;
+    lastName: string;
+  }> = {},
+) {
+  (db.coach.findUnique as jest.Mock).mockResolvedValue({
+    id: "coach-1",
+    email: "coach@example.com",
+    firstName: overrides.firstName ?? "Bob",
+    lastName: overrides.lastName ?? "Coach",
+    profileImage:
+      overrides.profileImage === undefined
+        ? "https://images.example/bob.png"
+        : overrides.profileImage,
+    certificationStatus: "ACTIVE",
+    certificationExpiry: null,
+  });
+}
+
+async function submitWithCoach() {
+  return POST(
+    makeRequest({
+      ...VALID_BODY,
+      referringCoachEmail: "coach@example.com",
+    }) as never,
+    makeParams() as never,
+  );
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
   // Reset $transaction to the default callback-passthrough
@@ -197,6 +247,9 @@ beforeEach(() => {
   delete process.env.QUICK_ASSESSMENT_TEAM_EMAIL;
   delete process.env.ESCALATION_EMAIL;
   delete process.env.ADMIN_EMAIL;
+  delete process.env.WAVE_228_REPORT_EMAIL_CHROME_ENABLED;
+  delete process.env.WAVE_228_REPORT_EMAIL_CHROME_CANARY;
+  delete process.env.WAVE_228_REPORT_EMAIL_CHROME_KILL;
 });
 
 /* -------------------------------------------------------------------------- */
@@ -365,6 +418,105 @@ describe("outbox enqueue", () => {
     );
   }
 
+  it("brands taker and referring-coach reports with the verified Referring coach", async () => {
+    process.env.WAVE_228_REPORT_EMAIL_CHROME_ENABLED = "1";
+    mockActiveCoach();
+
+    await submitWithCoach();
+
+    const reports = createdRows().filter((row) =>
+      ["TAKER_COPY", "REFERRING_COACH"].includes(row.recipientRole),
+    );
+    expect(reports).toHaveLength(2);
+    for (const row of reports) {
+      expect(row.bodyHtml).toContain("cid:su-report-logo-v1");
+      expect(row.bodyHtml).toContain("Coached by Bob Coach");
+      expect(row.bodyHtml).toContain("https://images.example/bob.png");
+    }
+  });
+
+  it("uses name-only when the verified public coach image is invalid", async () => {
+    process.env.WAVE_228_REPORT_EMAIL_CHROME_ENABLED = "1";
+    mockActiveCoach({ profileImage: "http://images.example/bob.png" });
+
+    await submitWithCoach();
+
+    const taker = rowFor("TAKER_COPY");
+    expect(taker.bodyHtml).toContain("Coached by Bob Coach");
+    expect(taker.bodyHtml).not.toContain("http://images.example");
+  });
+
+  it("renders Scaling Up only when no verified coach exists", async () => {
+    process.env.WAVE_228_REPORT_EMAIL_CHROME_ENABLED = "1";
+
+    await POST(makeRequest(VALID_BODY) as never, makeParams() as never);
+
+    const taker = rowFor("TAKER_COPY");
+    expect(taker.bodyHtml).toContain("cid:su-report-logo-v1");
+    expect(taker.bodyHtml).not.toContain("Coached by");
+  });
+
+  it("keeps short SU_TEAM lead HTML unchanged", async () => {
+    process.env.WAVE_228_REPORT_EMAIL_CHROME_ENABLED = "1";
+    process.env.QUICK_ASSESSMENT_TEAM_EMAIL = "team@scalingup.com";
+
+    await POST(makeRequest(VALID_BODY) as never, makeParams() as never);
+
+    expect(rowFor("SU_TEAM").bodyHtml).not.toContain(
+      "cid:su-report-logo-v1",
+    );
+  });
+
+  it("keeps public report chrome legacy while the gate is default-off", async () => {
+    mockActiveCoach();
+
+    await submitWithCoach();
+
+    expect(rowFor("TAKER_COPY").bodyHtml).not.toContain(
+      "cid:su-report-logo-v1",
+    );
+    expect(rowFor("TAKER_COPY").bodyHtml).not.toContain("Coached by");
+  });
+
+  it("lets the kill switch override the public report chrome global gate", async () => {
+    process.env.WAVE_228_REPORT_EMAIL_CHROME_ENABLED = "1";
+    process.env.WAVE_228_REPORT_EMAIL_CHROME_KILL = "1";
+    mockActiveCoach();
+
+    await submitWithCoach();
+
+    expect(rowFor("TAKER_COPY").bodyHtml).not.toContain(
+      "cid:su-report-logo-v1",
+    );
+    expect(rowFor("TAKER_COPY").bodyHtml).not.toContain("Coached by");
+  });
+
+  it("freezes verified coach presentation in outbox HTML before later coach changes", async () => {
+    process.env.WAVE_228_REPORT_EMAIL_CHROME_ENABLED = "1";
+    const verifiedCoach = {
+      id: "coach-1",
+      email: "coach@example.com",
+      firstName: "Bob",
+      lastName: "Coach",
+      profileImage: "https://images.example/bob.png",
+      certificationStatus: "ACTIVE",
+      certificationExpiry: null,
+    };
+    (db.coach.findUnique as jest.Mock).mockResolvedValue(verifiedCoach);
+
+    await submitWithCoach();
+    const frozenHtml = rowFor("TAKER_COPY").bodyHtml;
+    verifiedCoach.firstName = "Deleted";
+    verifiedCoach.lastName = "Recovered";
+    verifiedCoach.profileImage = "https://images.example/recovered.png";
+
+    expect(rowFor("TAKER_COPY").bodyHtml).toBe(frozenHtml);
+    expect(frozenHtml).toContain("Coached by Bob Coach");
+    expect(frozenHtml).toContain("https://images.example/bob.png");
+    expect(frozenHtml).not.toContain("Deleted Recovered");
+    expect(frozenHtml).not.toContain("recovered.png");
+  });
+
   it("ALWAYS enqueues a TAKER_COPY row even with blank SU address and no coach (Spec 16 §3)", async () => {
     // No env vars set → suTeamAddress = ""; no coach → only TAKER_COPY.
     await POST(makeRequest(VALID_BODY) as never, makeParams() as never);
@@ -404,6 +556,7 @@ describe("outbox enqueue", () => {
       email: "coach@example.com",
       firstName: "Bob",
       lastName: "Coach",
+      profileImage: null,
       certificationStatus: "ACTIVE",
       certificationExpiry: null,
     });
@@ -445,12 +598,14 @@ describe("outbox enqueue", () => {
   });
 
   it("retains a cancelled coach row when taker and coach normalize to the same mailbox", async () => {
+    process.env.WAVE_228_REPORT_EMAIL_CHROME_ENABLED = "1";
     process.env.QUICK_ASSESSMENT_TEAM_EMAIL = "team@scalingup.com";
     (db.coach.findUnique as jest.Mock).mockResolvedValue({
       id: "coach-1",
       email: " JANE@EXAMPLE.COM ",
       firstName: "Jane",
       lastName: "Coach",
+      profileImage: "https://images.example/jane.png",
       certificationStatus: "ACTIVE",
       certificationExpiry: null,
     });
@@ -486,6 +641,11 @@ describe("outbox enqueue", () => {
         cancelledAt: expect.any(Date),
       }),
     );
+    expect(rowFor("TAKER_COPY").bodyHtml).toContain("Coached by Jane Coach");
+    expect(rowFor("TAKER_COPY").bodyHtml).toContain(
+      "https://images.example/jane.png",
+    );
+    expect(coachRow?.bodyHtml).toBe("");
     expect(info).toHaveBeenCalledWith(
       "[assessment-email] coach self-notification suppressed",
       expect.objectContaining({
@@ -534,6 +694,7 @@ describe("verified referring-coach ownership", () => {
       email: " Coach@Example.COM ",
       firstName: "Bob",
       lastName: "Coach",
+      profileImage: null,
       certificationStatus: "ACTIVE",
       certificationExpiry: null,
     });
@@ -566,6 +727,12 @@ describe("verified referring-coach ownership", () => {
       .map((call: Array<{ data: { recipientRole: string; recipientEmail: string } }>) => call[0].data)
       .find((row: { recipientRole: string }) => row.recipientRole === "REFERRING_COACH");
     expect(coachOutboxRow?.recipientEmail).toBe("coach@example.com");
+    expect(rowFor("TAKER_COPY").bodyHtml).toContain(
+      "mailto:coach%40example.com",
+    );
+    expect(rowFor("TAKER_COPY").bodyHtml).not.toContain(
+      "mailto:Coach%40Example.COM",
+    );
   });
 
   it("persists no ownership and sends no coach email when verification fails", async () => {
@@ -596,6 +763,9 @@ describe("verified referring-coach ownership", () => {
     (db.coach.findUnique as jest.Mock).mockResolvedValue({
       id: "coach-1",
       email: "coach@example.com",
+      firstName: "Bob",
+      lastName: "Coach",
+      profileImage: null,
       certificationStatus: "ACTIVE",
       certificationExpiry: null,
     });
@@ -662,11 +832,13 @@ describe("verified referring-coach ownership", () => {
   );
 
   it("retries as Scaling Up-only when the verified Coach is deleted before the write", async () => {
+    process.env.WAVE_228_REPORT_EMAIL_CHROME_ENABLED = "1";
     (db.coach.findUnique as jest.Mock).mockResolvedValue({
       id: "coach-1",
       email: "coach@example.com",
       firstName: "Bob",
       lastName: "Coach",
+      profileImage: "https://images.example/bob.png",
       certificationStatus: "ACTIVE",
       certificationExpiry: null,
     });
@@ -719,6 +891,12 @@ describe("verified referring-coach ownership", () => {
     expect(
       outboxRows.find((row) => row.recipientRole === "TAKER_COPY")?.bodyHtml,
     ).not.toContain("mailto:coach@example.com");
+    expect(
+      outboxRows.find((row) => row.recipientRole === "TAKER_COPY")?.bodyHtml,
+    ).toContain("cid:su-report-logo-v1");
+    expect(
+      outboxRows.find((row) => row.recipientRole === "TAKER_COPY")?.bodyHtml,
+    ).not.toContain("Coached by");
   });
 
   it.each([
@@ -738,6 +916,7 @@ describe("verified referring-coach ownership", () => {
       email: "coach@example.com",
       firstName: "Bob",
       lastName: "Coach",
+      profileImage: null,
       certificationStatus: coachState.certificationStatus,
       certificationExpiry: coachState.certificationExpiry,
     });

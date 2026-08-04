@@ -261,8 +261,10 @@ describe("sendWorkshopDateChangeEmail", () => {
 // ===========================================================================
 import { sendAssessmentInvitationEmail } from "@/services/notifications";
 
-describe("sendAssessmentInvitationEmail — full-HTML override (#20)", () => {
+describe("sendAssessmentInvitationEmail — custom HTML render selection (#220)", () => {
   const ORIGINAL_FLAG = process.env.WAVE_D_CUSTOM_HTML_EMAIL_ENABLED;
+  const ORIGINAL_BRANDED_CUSTOM_HTML =
+    process.env.ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED;
   const ORIGINAL_BRANDED = process.env.ASSESSMENT_INVITE_BRANDED;
 
   const baseData = () => ({
@@ -284,6 +286,8 @@ describe("sendAssessmentInvitationEmail — full-HTML override (#20)", () => {
   beforeEach(() => {
     mockSendEmailViaSMTP.mockClear();
     delete process.env.ASSESSMENT_INVITE_BRANDED; // branded path on
+    delete process.env.WAVE_D_CUSTOM_HTML_EMAIL_ENABLED;
+    delete process.env.ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED;
   });
 
   it("prepares the complete rendered email before exposing the provider handoff", async () => {
@@ -328,10 +332,65 @@ describe("sendAssessmentInvitationEmail — full-HTML override (#20)", () => {
     else process.env.WAVE_D_CUSTOM_HTML_EMAIL_ENABLED = ORIGINAL_FLAG;
     if (ORIGINAL_BRANDED === undefined) delete process.env.ASSESSMENT_INVITE_BRANDED;
     else process.env.ASSESSMENT_INVITE_BRANDED = ORIGINAL_BRANDED;
+    if (ORIGINAL_BRANDED_CUSTOM_HTML === undefined) {
+      delete process.env.ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED;
+    } else {
+      process.env.ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED =
+        ORIGINAL_BRANDED_CUSTOM_HTML;
+    }
   });
 
-  it("flag ON + invitationBodyHtml set → sanitized-interpolated HTML is the WHOLE email (no shell)", async () => {
-    process.env.WAVE_D_CUSTOM_HTML_EMAIL_ENABLED = "1";
+  function setEnvFlag(name: string, enabled: boolean): void {
+    if (enabled) process.env[name] = "1";
+    else delete process.env[name];
+  }
+
+  it.each([
+    ["wave D off", false, false, "<p>{{invitationUrl}}</p>", "branded"],
+    ["empty HTML", true, true, "   ", "branded"],
+    ["legacy token body", true, false, "<p>{{invitationUrl}}</p>", "full_replace"],
+    ["rollback tokenless body", true, false, "<p>Coach body</p>", "branded_fallback"],
+    ["branded token body", true, true, "<p>{{invitationUrl}}</p>", "branded_body"],
+    ["branded tokenless body", true, true, "<p>Coach body</p>", "branded_body"],
+  ] as const)(
+    "%s selects the expected mode",
+    async (_label, waveD, brandedMode, invitationBodyHtml, expected) => {
+      setEnvFlag("WAVE_D_CUSTOM_HTML_EMAIL_ENABLED", waveD);
+      setEnvFlag("ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED", brandedMode);
+      await sendAssessmentInvitationEmail({
+        ...baseData(),
+        invitationBodyHtml,
+      });
+      const options = mockSendEmailViaSMTP.mock.calls[0][0];
+
+      if (expected === "full_replace") {
+        expect(options.html).not.toContain("cid:sulogo");
+        expect(options.attachments ?? []).toHaveLength(0);
+        expect(options.telemetry.metadata).toMatchObject({
+          renderer: "custom_html",
+          bodySource: "custom_html",
+          customHtmlMode: "full_replace",
+        });
+      } else if (expected === "branded_body") {
+        expect(options.html).toContain("cid:sulogo");
+        expect(options.html).toContain("Start the assessment");
+        expect(options.attachments).toEqual(
+          expect.arrayContaining([expect.objectContaining({ cid: "sulogo" })]),
+        );
+        expect(options.telemetry.metadata).toMatchObject({
+          renderer: "custom_html",
+          bodySource: "custom_html",
+          customHtmlMode: "branded_body",
+        });
+      } else {
+        expect(options.html).toContain("cid:sulogo");
+        expect(options.telemetry.metadata.renderer).toBe("branded");
+      }
+    },
+  );
+
+  it("uses the compatibility full-replacement mode for legacy URL-token HTML", async () => {
+    setEnvFlag("WAVE_D_CUSTOM_HTML_EMAIL_ENABLED", true);
     await sendAssessmentInvitationEmail({
       ...baseData(),
       invitationBodyHtml:
@@ -343,13 +402,14 @@ describe("sendAssessmentInvitationEmail — full-HTML override (#20)", () => {
     expect(args.html).toContain("https://app.test/org-survey/abc#t=SECRET");
     // No branded shell markers.
     expect(args.html).not.toContain("Start the assessment"); // shell CTA text
-    expect(args.html).not.toContain("cid:su-logo");
+    expect(args.html).not.toContain("cid:sulogo");
     // No CID logo attachment on the full-HTML path.
     expect(args.attachments ?? []).toHaveLength(0);
   });
 
-  it("subject ALWAYS comes from invitationSubject — even on the full-HTML path", async () => {
-    process.env.WAVE_D_CUSTOM_HTML_EMAIL_ENABLED = "1";
+  it("subject ALWAYS comes from invitationSubject — including branded-body HTML", async () => {
+    setEnvFlag("WAVE_D_CUSTOM_HTML_EMAIL_ENABLED", true);
+    setEnvFlag("ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED", true);
     await sendAssessmentInvitationEmail({
       ...baseData(),
       invitationBodyHtml: '<p>{{invitationUrl}}</p>',
@@ -360,20 +420,25 @@ describe("sendAssessmentInvitationEmail — full-HTML override (#20)", () => {
     expect(args.subject).not.toContain("#t=");
   });
 
-  it("a PII token value with <script> is neutralized by the post-interpolation sanitize", async () => {
-    process.env.WAVE_D_CUSTOM_HTML_EMAIL_ENABLED = "1";
+  it("sanitizes dangerous custom markup and post-interpolation PII markup in branded-body mode", async () => {
+    setEnvFlag("WAVE_D_CUSTOM_HTML_EMAIL_ENABLED", true);
+    setEnvFlag("ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED", true);
     await sendAssessmentInvitationEmail({
       ...baseData(),
       respondent: { id: "r1", firstName: '<script>alert(1)</script>', lastName: "Doe", email: "x@y.z" },
-      invitationBodyHtml: '<p>Hi {{respondentFirstName}} {{invitationUrl}}</p>',
+      invitationBodyHtml: '<script>alert(1)</script><iframe src="https://evil.test"></iframe><p onclick="alert(1)" style="position:fixed;behavior:url(x)">Hi {{respondentFirstName}} {{invitationUrl}}</p>',
     });
     const args = mockSendEmailViaSMTP.mock.calls[0][0];
     expect(args.html).not.toContain("<script>");
     expect(args.html).not.toContain("alert(1)</script>");
+    expect(args.html).not.toContain("iframe");
+    expect(args.html).not.toContain("onclick");
+    expect(args.html).not.toContain("position:fixed");
+    expect(args.html).toContain("cid:sulogo");
   });
 
   it("flag OFF → invitationBodyHtml ignored, branded shell used", async () => {
-    delete process.env.WAVE_D_CUSTOM_HTML_EMAIL_ENABLED;
+    setEnvFlag("WAVE_D_CUSTOM_HTML_EMAIL_ENABLED", false);
     await sendAssessmentInvitationEmail({
       ...baseData(),
       invitationBodyHtml: '<h1>Custom</h1><p>{{invitationUrl}}</p>',
@@ -385,7 +450,7 @@ describe("sendAssessmentInvitationEmail — full-HTML override (#20)", () => {
   });
 
   it("markdown-only (no HTML) → branded shell", async () => {
-    process.env.WAVE_D_CUSTOM_HTML_EMAIL_ENABLED = "1";
+    setEnvFlag("WAVE_D_CUSTOM_HTML_EMAIL_ENABLED", true);
     await sendAssessmentInvitationEmail({ ...baseData(), invitationBodyHtml: null });
     const args = mockSendEmailViaSMTP.mock.calls[0][0];
     expect(args.html).toContain("Start the assessment"); // shell CTA present
@@ -393,7 +458,7 @@ describe("sendAssessmentInvitationEmail — full-HTML override (#20)", () => {
   });
 
   it("pin #2 — a stored &#123;&#123;invitationUrl&#125;&#125; stays inert (no resurrected token)", async () => {
-    process.env.WAVE_D_CUSTOM_HTML_EMAIL_ENABLED = "1";
+    setEnvFlag("WAVE_D_CUSTOM_HTML_EMAIL_ENABLED", true);
     await sendAssessmentInvitationEmail({
       ...baseData(),
       invitationBodyHtml: '<p>&#123;&#123;invitationUrl&#125;&#125; {{invitationUrl}}</p>',
@@ -401,6 +466,136 @@ describe("sendAssessmentInvitationEmail — full-HTML override (#20)", () => {
     const args = mockSendEmailViaSMTP.mock.calls[0][0];
     // The live credential appears exactly once (from the real token only).
     expect(args.html.split("#t=SECRET").length - 1).toBe(1);
+  });
+
+  it("falls back to the authored branded body without recording custom HTML PII", async () => {
+    setEnvFlag("WAVE_D_CUSTOM_HTML_EMAIL_ENABLED", true);
+    await sendAssessmentInvitationEmail({
+      ...baseData(),
+      invitationBodyHtml: "<p>Coach body</p>",
+    });
+
+    const fallback = mockSendEmailViaSMTP.mock.calls[0][0];
+    expect(fallback.html).toContain("Hi Jane");
+    expect(fallback.html).not.toContain("Coach body");
+    expect(fallback.telemetry.metadata).toMatchObject({
+      renderer: "branded",
+      bodySource: "authored",
+      customHtmlFallbackReason:
+        "branded_mode_disabled_missing_url_token",
+    });
+    expect(JSON.stringify(fallback.telemetry.metadata)).not.toContain("#t=");
+    expect(JSON.stringify(fallback.telemetry.metadata)).not.toContain("Coach body");
+  });
+
+  it("keeps an empty sanitized fragment inside the branded shell", async () => {
+    setEnvFlag("WAVE_D_CUSTOM_HTML_EMAIL_ENABLED", true);
+    setEnvFlag("ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED", true);
+    await sendAssessmentInvitationEmail({
+      ...baseData(),
+      invitationBodyHtml: '<script>alert(1)</script><iframe src="https://evil.test"></iframe>',
+    });
+
+    const args = mockSendEmailViaSMTP.mock.calls[0][0];
+    expect(args.html).toContain("cid:sulogo");
+    expect(args.html).toContain("Start the assessment");
+    expect(args.html).not.toContain("alert(1)");
+    expect(args.text).toBe(
+      "Scaling Up Platform\nCoach: Pat Coach\n\nStart the assessment: https://app.test/org-survey/abc#t=SECRET",
+    );
+  });
+
+  it("preserves duplicate authored URLs and adds the platform CTA in branded-body mode", async () => {
+    setEnvFlag("WAVE_D_CUSTOM_HTML_EMAIL_ENABLED", true);
+    setEnvFlag("ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED", true);
+    await sendAssessmentInvitationEmail({
+      ...baseData(),
+      invitationBodyHtml:
+        '<p><a href="{{invitationUrl}}">First</a> <a href="{{invitationUrl}}">Second</a></p>',
+    });
+
+    const args = mockSendEmailViaSMTP.mock.calls[0][0];
+    expect(args.html).toContain("First");
+    expect(args.html).toContain("Second");
+    expect(args.html).toContain("Start the assessment");
+    expect(args.html.match(/#t=SECRET/g)).toHaveLength(4);
+  });
+
+  it("uses the Wave-P coach image only when its URL is safe", async () => {
+    setEnvFlag("WAVE_D_CUSTOM_HTML_EMAIL_ENABLED", true);
+    setEnvFlag("ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED", true);
+    await sendAssessmentInvitationEmail({
+      ...baseData(),
+      chrome: "waveP",
+      coachLogoUrl: "https://images.example/coach.png",
+      invitationBodyHtml: "<p>Coach body</p>",
+    });
+    expect(mockSendEmailViaSMTP.mock.calls[0][0].html).toContain(
+      'src="https://images.example/coach.png"',
+    );
+
+    mockSendEmailViaSMTP.mockClear();
+    await sendAssessmentInvitationEmail({
+      ...baseData(),
+      chrome: "waveP",
+      coachLogoUrl: "javascript:alert(1)",
+      invitationBodyHtml: "<p>Coach body</p>",
+    });
+    expect(mockSendEmailViaSMTP.mock.calls[0][0].html).not.toContain("javascript:");
+  });
+
+  it("adds the survey link to branded-body plain text when custom HTML only uses it as an href", async () => {
+    setEnvFlag("WAVE_D_CUSTOM_HTML_EMAIL_ENABLED", true);
+    setEnvFlag("ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED", true);
+    await sendAssessmentInvitationEmail({
+      ...baseData(),
+      invitationBodyHtml: '<a href="{{invitationUrl}}">Open assessment</a>',
+    });
+
+    const args = mockSendEmailViaSMTP.mock.calls[0][0];
+    expect(args.text).toBe(
+      "Scaling Up Platform\nCoach: Pat Coach\n\nOpen assessment\n\nStart the assessment: https://app.test/org-survey/abc#t=SECRET",
+    );
+  });
+
+  it("adds the optional Coach line to branded-body plain text", async () => {
+    setEnvFlag("WAVE_D_CUSTOM_HTML_EMAIL_ENABLED", true);
+    setEnvFlag("ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED", true);
+    await sendAssessmentInvitationEmail({
+      ...baseData(),
+      coachName: "  Avery Coach  ",
+      invitationBodyHtml: "<p>Coach body</p>",
+    });
+
+    expect(mockSendEmailViaSMTP.mock.calls[0][0].text).toContain("Coach: Avery Coach");
+  });
+
+  it("keeps ASSESSMENT_INVITE_BRANDED=0 on the legacy renderer even when both custom HTML flags are enabled", async () => {
+    process.env.ASSESSMENT_INVITE_BRANDED = "0";
+    setEnvFlag("WAVE_D_CUSTOM_HTML_EMAIL_ENABLED", true);
+    setEnvFlag("ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED", true);
+    await sendAssessmentInvitationEmail({
+      ...baseData(),
+      invitationBodyHtml: "<p>Custom-only body</p>",
+    });
+
+    const args = mockSendEmailViaSMTP.mock.calls[0][0];
+    expect(args.html).toContain("Hi Jane");
+    expect(args.html).not.toContain("Custom-only body");
+    expect(args.telemetry.metadata.renderer).toBe("legacy");
+  });
+
+  it("propagates SMTP failures from branded-body delivery", async () => {
+    setEnvFlag("WAVE_D_CUSTOM_HTML_EMAIL_ENABLED", true);
+    setEnvFlag("ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED", true);
+    mockSendEmailViaSMTP.mockRejectedValueOnce(new Error("smtp unavailable"));
+
+    await expect(
+      sendAssessmentInvitationEmail({
+        ...baseData(),
+        invitationBodyHtml: "<p>Coach body</p>",
+      }),
+    ).rejects.toThrow("smtp unavailable");
   });
 });
 

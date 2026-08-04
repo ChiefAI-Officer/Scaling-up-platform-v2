@@ -61,6 +61,8 @@ function detailParams(id: string) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  delete process.env.WAVE_D_CUSTOM_HTML_EMAIL_ENABLED;
+  delete process.env.ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED;
   (db.accessGroupCoach.findMany as jest.Mock).mockResolvedValue([
     {
       accessGroupId: "g1",
@@ -208,6 +210,7 @@ describe("PATCH /api/assessment-campaigns/[id]", () => {
 
   // ── Task 12 (#20) — full-HTML invitation body on PATCH ──────────────────
   const ORIGINAL_HTML_FLAG = process.env.WAVE_D_CUSTOM_HTML_EMAIL_ENABLED;
+  const ORIGINAL_BRANDED_HTML_FLAG = process.env.ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED;
   const VALID_HTML = '<h1>Hi {{respondentFirstName}}</h1><a href="{{invitationUrl}}">Go</a>';
 
   function draftActorSetup() {
@@ -225,6 +228,11 @@ describe("PATCH /api/assessment-campaigns/[id]", () => {
   afterAll(() => {
     if (ORIGINAL_HTML_FLAG === undefined) delete process.env.WAVE_D_CUSTOM_HTML_EMAIL_ENABLED;
     else process.env.WAVE_D_CUSTOM_HTML_EMAIL_ENABLED = ORIGINAL_HTML_FLAG;
+    if (ORIGINAL_BRANDED_HTML_FLAG === undefined) {
+      delete process.env.ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED;
+    } else {
+      process.env.ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED = ORIGINAL_BRANDED_HTML_FLAG;
+    }
   });
 
   it("flag ON + valid invitationBodyHtml → stored RAW", async () => {
@@ -274,5 +282,46 @@ describe("PATCH /api/assessment-campaigns/[id]", () => {
     expect(res.status).toBe(200);
     const callArg = (db.assessmentCampaign.update as jest.Mock).mock.calls[0][0];
     expect(callArg.data).not.toHaveProperty("invitationBodyHtml");
+  });
+
+  it("both flags ON accepts tokenless HTML and stores the raw bytes", async () => {
+    process.env.WAVE_D_CUSTOM_HTML_EMAIL_ENABLED = "1";
+    process.env.ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED = "1";
+    draftActorSetup();
+    const raw = "<h1>Coach-authored body</h1>";
+    const response = await PATCH(
+      patchReq({ invitationBodyHtml: raw }) as never,
+      detailParams("c1"),
+    );
+    expect(response.status).toBe(200);
+    expect(db.assessmentCampaign.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ invitationBodyHtml: raw }),
+      }),
+    );
+  });
+
+  it("branded mode OFF rejects tokenless HTML without writing", async () => {
+    process.env.WAVE_D_CUSTOM_HTML_EMAIL_ENABLED = "1";
+    delete process.env.ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED;
+    draftActorSetup();
+    const response = await PATCH(
+      patchReq({ invitationBodyHtml: "<p>No URL token</p>" }) as never,
+      detailParams("c1"),
+    );
+    expect(response.status).toBe(400);
+    expect(db.assessmentCampaign.update).not.toHaveBeenCalled();
+  });
+
+  it("both flags ON still rejects a URL token in img src", async () => {
+    process.env.WAVE_D_CUSTOM_HTML_EMAIL_ENABLED = "1";
+    process.env.ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED = "1";
+    draftActorSetup();
+    const response = await PATCH(
+      patchReq({ invitationBodyHtml: '<img src="{{invitationUrl}}">' }) as never,
+      detailParams("c1"),
+    );
+    expect(response.status).toBe(400);
+    expect(db.assessmentCampaign.update).not.toHaveBeenCalled();
   });
 });

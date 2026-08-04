@@ -194,7 +194,7 @@ describe("Wave L L4a — report factor-label overrides", () => {
 });
 
 describe("Wave L — provenance", () => {
-  it("carries the render-ruleset version constant", () => {
+  it("records v2 renderer provenance on the built LVA report", () => {
     const model = buildGroupReportModel(lvaInput());
     expect(model.provenance.groupRenderVersion).toBe("lva-fidelity-v2");
   });

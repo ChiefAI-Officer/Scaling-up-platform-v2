@@ -29,6 +29,7 @@ import {
 } from "@/components/assessments/assessment-welcome";
 import { BrandedReport } from "@/components/assessments/BrandedReport";
 import { PrintReportButton } from "@/components/assessments/PrintReportButton";
+import { formatTimestamp } from "@/lib/utils";
 // The detailed report styling lives in su-report.css (scoped to .su-public-brand
 // .su-report). The invited (report) route loads it via its layout; the public
 // in-place results must load it here too, else the report renders unstyled.
@@ -228,9 +229,9 @@ export function PublicQuizClient({
                 : status === "CLOSED"
                   ? "This assessment is closed."
                   : new Date(openAtIso) > new Date()
-                    ? `This assessment opens ${new Date(openAtIso).toLocaleDateString()}.`
+                    ? `This assessment opens ${formatTimestamp(openAtIso)}.`
                     : closeAtIso
-                      ? `This assessment closed on ${new Date(closeAtIso).toLocaleDateString()}.`
+                      ? `This assessment closed on ${formatTimestamp(closeAtIso)}.`
                       : "This assessment is not currently accepting submissions."}
             </p>
           </section>

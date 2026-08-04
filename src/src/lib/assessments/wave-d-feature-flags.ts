@@ -39,6 +39,11 @@ export function assessmentEmailDeliveryIntentsEnabled(): boolean {
   return isTruthy(process.env.ASSESSMENT_EMAIL_DELIVERY_INTENTS_ENABLED);
 }
 
+/** GH #220: composes campaign custom HTML inside the branded shell. Default OFF. */
+export function assessmentInviteBrandedCustomHtmlEnabled(): boolean {
+  return isTruthy(process.env.ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED);
+}
+
 /**
  * Global assessment kill switch.
  *

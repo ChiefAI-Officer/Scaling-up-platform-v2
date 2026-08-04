@@ -16,6 +16,7 @@ import {
   waveDCoachNotifyEnabled,
   waveDCustomHtmlEmailEnabled,
   assessmentEmailDeliveryIntentsEnabled,
+  assessmentInviteBrandedCustomHtmlEnabled,
   assessmentSendsPaused,
 } from "@/lib/assessments/wave-d-feature-flags";
 
@@ -52,6 +53,7 @@ const ENABLE_FLAGS: Array<[string, () => boolean]> = [
     "ASSESSMENT_EMAIL_DELIVERY_INTENTS_ENABLED",
     assessmentEmailDeliveryIntentsEnabled,
   ],
+  ["ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED", assessmentInviteBrandedCustomHtmlEnabled],
 ];
 
 // ─── enable flags ───────────────────────────────────────────────────────────

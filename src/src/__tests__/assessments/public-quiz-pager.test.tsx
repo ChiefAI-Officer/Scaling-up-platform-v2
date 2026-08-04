@@ -29,6 +29,7 @@ jest.mock("next/navigation", () => ({
 
 import { PublicQuizClient } from "@/components/assessments/public-quiz-client";
 import { publicDraftKey } from "@/lib/assessments/use-answer-draft";
+import { formatTimestamp } from "@/lib/utils";
 
 const ALIAS = "team-alpha";
 const LVA_ALIAS = "leadership-vision-alignment";
@@ -87,6 +88,63 @@ describe("PublicQuizClient — SectionPager wiring", () => {
     jest.clearAllMocks();
     localStorage.clear();
     sessionStorage.clear();
+  });
+
+  it.each([
+    {
+      name: "future public assessment",
+      status: "ACTIVE" as const,
+      nowIso: "2026-01-01T00:00:00.000Z",
+      openAtIso: "2026-01-02T12:00:00.000Z",
+      closeAtIso: null,
+      displayedAtIso: "2026-01-02T12:00:00.000Z",
+      messagePrefix: "This assessment opens",
+    },
+    {
+      name: "past-closing public assessment",
+      status: "ACTIVE" as const,
+      nowIso: "2026-01-03T00:00:00.000Z",
+      openAtIso: "2025-12-01T12:00:00.000Z",
+      closeAtIso: "2026-01-02T12:00:00.000Z",
+      displayedAtIso: "2026-01-02T12:00:00.000Z",
+      messagePrefix: "This assessment closed on",
+    },
+  ])("renders a medium-format date in the unavailable notice for a $name", ({
+    status,
+    nowIso,
+    openAtIso,
+    closeAtIso,
+    displayedAtIso,
+    messagePrefix,
+  }) => {
+    // This fails if the notice falls back to Date#toLocaleDateString(), which
+    // produces the slash-form dates the BUG-05 guard was added to prevent.
+    jest.useFakeTimers().setSystemTime(new Date(nowIso));
+    const localDateSpy = jest
+      .spyOn(Date.prototype, "toLocaleDateString")
+      .mockReturnValue("1/2/2026");
+
+    try {
+      render(
+        <PublicQuizClient
+          {...baseProps}
+          isOpen={false}
+          status={status}
+          openAtIso={openAtIso}
+          closeAtIso={closeAtIso}
+        />,
+      );
+
+      expect(
+        screen.getByText(
+          `${messagePrefix} ${formatTimestamp(displayedAtIso)}.`,
+        ),
+      ).toBeInTheDocument();
+      expect(localDateSpy).not.toHaveBeenCalled();
+    } finally {
+      localDateSpy.mockRestore();
+      jest.useRealTimers();
+    }
   });
 
   it("renders one section per screen via the pager (not stacked)", () => {

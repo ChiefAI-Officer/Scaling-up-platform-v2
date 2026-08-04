@@ -245,6 +245,7 @@ export interface ActiveCoachDb {
       email: string;
       firstName: string;
       lastName: string;
+      profileImage: string | null;
       certificationStatus: string;
       certificationExpiry: Date | null;
     } | null>;
@@ -271,7 +272,13 @@ export async function findActiveCoachByEmail(
   db: ActiveCoachDb,
   email: string | null | undefined,
   now?: Date,
-): Promise<{ id: string; email: string; firstName: string; lastName: string } | null> {
+): Promise<{
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  profileImage: string | null;
+} | null> {
   // Guard: blank / missing email — no DB call.
   const normalized = normalizeMailbox(email);
   if (normalized.length === 0) {
@@ -285,6 +292,7 @@ export async function findActiveCoachByEmail(
       email: true,
       firstName: true,
       lastName: true,
+      profileImage: true,
       certificationStatus: true,
       certificationExpiry: true,
     },
@@ -312,5 +320,6 @@ export async function findActiveCoachByEmail(
     email: coach.email,
     firstName: coach.firstName,
     lastName: coach.lastName,
+    profileImage: coach.profileImage,
   };
 }
