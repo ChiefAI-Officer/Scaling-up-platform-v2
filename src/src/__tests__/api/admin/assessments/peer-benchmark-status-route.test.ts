@@ -80,6 +80,7 @@ it("returns 401 without querying status when unauthenticated", async () => {
   (getApiActor as jest.Mock).mockResolvedValue(null);
   const response = await GET();
   expect(response.status).toBe(401);
+  expect(response.headers.get("Cache-Control")).toBe("no-store");
   expect(buildPeerBenchmarkAuditSnapshot).not.toHaveBeenCalled();
 });
 
@@ -92,6 +93,7 @@ it("returns 403 for a COACH", async () => {
   });
   const response = await GET();
   expect(response.status).toBe(403);
+  expect(response.headers.get("Cache-Control")).toBe("no-store");
   expect(buildPeerBenchmarkAuditSnapshot).not.toHaveBeenCalled();
 });
 
@@ -152,6 +154,47 @@ it("passes enabled without exposing the environment inputs", async () => {
   );
 });
 
+it("returns database evidence when effective-gate derivation fails", async () => {
+  (getApiActor as jest.Mock).mockResolvedValue({
+    role: "ADMIN",
+    userId: "a",
+    coachId: null,
+    email: "a@example.com",
+  });
+  (isPeerBenchmarksEnabled as jest.Mock).mockImplementationOnce(() => {
+    throw new RangeError("gate derivation failed");
+  });
+  const unknownGateSnapshot = {
+    ...partialEvidenceSnapshot,
+    effectiveGate: { state: "unknown", reason: "query_failed" },
+  } as const;
+  (buildPeerBenchmarkAuditSnapshot as jest.Mock).mockResolvedValue(
+    unknownGateSnapshot,
+  );
+  const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+
+  const response = await GET();
+
+  expect(response.status).toBe(200);
+  expect(response.headers.get("Cache-Control")).toBe("no-store");
+  expect(await response.json()).toEqual({
+    success: true,
+    data: unknownGateSnapshot,
+  });
+  expect(buildPeerBenchmarkAuditSnapshot).toHaveBeenCalledWith({
+    db: expect.anything(),
+    now: expect.any(Date),
+    effectiveGate: { state: "unknown", reason: "query_failed" },
+  });
+  expect(errorSpy).toHaveBeenCalledWith(
+    "Peer benchmark gate derivation failed",
+    {
+      name: "RangeError",
+      message: "gate derivation failed",
+    },
+  );
+});
+
 it("returns 500 instead of throwing when the service fails unexpectedly", async () => {
   (getApiActor as jest.Mock).mockResolvedValue({
     role: "STAFF",
@@ -165,6 +208,7 @@ it("returns 500 instead of throwing when the service fails unexpectedly", async 
   jest.spyOn(console, "error").mockImplementation(() => {});
   const response = await GET();
   expect(response.status).toBe(500);
+  expect(response.headers.get("Cache-Control")).toBe("no-store");
   expect(await response.json()).toEqual({
     success: false,
     error: "Failed to build peer benchmark status",

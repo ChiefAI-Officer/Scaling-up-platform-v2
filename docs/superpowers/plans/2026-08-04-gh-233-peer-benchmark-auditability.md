@@ -6,7 +6,7 @@
 
 **Architecture:** A focused server-side audit service receives the already-derived effective Wave S gate, queries template/version/benchmark-key evidence with isolated failures, and returns a PII-free discriminated snapshot. A dedicated force-dynamic API route authorizes operators and a dedicated client panel fetches that snapshot independently of the existing dashboard and import-health surfaces.
 
-**Tech Stack:** Next.js 15 App Router, React 19, TypeScript, Prisma, Jest, React Testing Library, Tailwind CSS, existing Wave S flag/version/key helpers.
+**Tech Stack:** Next.js 16.1.6 App Router, React 19, TypeScript, Prisma, Jest, React Testing Library, Tailwind CSS, existing Wave S flag/version/key helpers.
 
 ## Global Constraints
 
@@ -532,6 +532,28 @@ it.each([
   expect(snapshot.keyCoverage).toEqual({ state: "known", value: coverage });
 });
 
+it("classifies stale-only stored keys as no data for active questions", async () => {
+  const { db } = makeDb({ metricKeys: ["S3_retired"] });
+  const snapshot = await buildPeerBenchmarkAuditSnapshot({
+    db,
+    now: NOW,
+    effectiveGate: knownGate("enabled"),
+  });
+  expect(snapshot.storedBenchmarks).toEqual({
+    state: "known",
+    value: { storedRowCount: 1 },
+  });
+  expect(snapshot.keyCoverage).toEqual({
+    state: "known",
+    value: {
+      matchingRowCount: 0,
+      missingRatingQuestionCount: 2,
+      staleRowCount: 1,
+    },
+  });
+  expect(snapshot.readiness).toBe("noData");
+});
+
 it("known missing template blocks readiness and marks dependents not applicable", async () => {
   const { db, assessmentTemplateVersion, assessmentBenchmark } = makeDb({
     template: null,
@@ -659,6 +681,24 @@ it("template read failure is unknown, never missing or zero", async () => {
     reason: "dependency_unknown",
   });
   expect(snapshot.readiness).toBe("unknown");
+});
+
+it("keeps dark readiness when the template read fails", async () => {
+  const { db, assessmentTemplate } = makeDb();
+  assessmentTemplate.findFirst.mockRejectedValueOnce(new Error("template down"));
+  jest.spyOn(console, "error").mockImplementation(() => {});
+  const snapshot = await buildPeerBenchmarkAuditSnapshot({
+    db,
+    now: NOW,
+    effectiveGate: knownGate("dark"),
+  });
+  expect(snapshot).toMatchObject({
+    template: { state: "unknown", reason: "query_failed" },
+    activeVersion: { state: "unknown", reason: "dependency_unknown" },
+    storedBenchmarks: { state: "unknown", reason: "dependency_unknown" },
+    keyCoverage: { state: "unknown", reason: "dependency_unknown" },
+    readiness: "dark",
+  });
 });
 
 it("unknown effective-gate evidence does not suppress database evidence", async () => {
@@ -791,15 +831,22 @@ export async function buildPeerBenchmarkAuditSnapshot({
     });
   } catch (error) {
     logReadFailure("template", error);
-    const snapshot: PeerBenchmarkAuditSnapshot = {
+    const template = queryFailed;
+    const activeVersion = dependencyUnknown;
+    const keyCoverage = dependencyUnknown;
+    return {
       ...base,
-      template: queryFailed,
-      activeVersion: dependencyUnknown,
+      template,
+      activeVersion,
       storedBenchmarks: dependencyUnknown,
-      keyCoverage: dependencyUnknown,
-      readiness: "unknown",
+      keyCoverage,
+      readiness: deriveReadiness({
+        effectiveGate,
+        template,
+        activeVersion,
+        keyCoverage,
+      }),
     };
-    return snapshot;
   }
 
   if (!templateRow) {
@@ -877,8 +924,8 @@ Run:
 npx jest src/__tests__/lib/assessments/peer-benchmark-audit.test.ts --runInBand
 ```
 
-Expected: PASS, including dark/no-data/partial/ready/stale/missing/unknown and
-privacy assertions.
+Expected: PASS, including dark/no-data/partial/ready/stale-only/missing/unknown,
+dark-gate failure precedence, and privacy assertions.
 
 - [ ] **Step 8: Run focused lint**
 
@@ -992,6 +1039,7 @@ it("returns 401 without querying status when unauthenticated", async () => {
   (getApiActor as jest.Mock).mockResolvedValue(null);
   const response = await GET();
   expect(response.status).toBe(401);
+  expect(response.headers.get("Cache-Control")).toBe("no-store");
   expect(buildPeerBenchmarkAuditSnapshot).not.toHaveBeenCalled();
 });
 
@@ -1004,6 +1052,7 @@ it("returns 403 for a COACH", async () => {
   });
   const response = await GET();
   expect(response.status).toBe(403);
+  expect(response.headers.get("Cache-Control")).toBe("no-store");
   expect(buildPeerBenchmarkAuditSnapshot).not.toHaveBeenCalled();
 });
 
@@ -1044,6 +1093,48 @@ it("passes enabled without exposing the environment inputs", async () => {
   );
 });
 
+it("returns database evidence when effective-gate derivation fails", async () => {
+  (getApiActor as jest.Mock).mockResolvedValue({
+    role: "ADMIN",
+    userId: "a",
+    coachId: null,
+    email: "a@example.com",
+  });
+  (isPeerBenchmarksEnabled as jest.Mock).mockImplementationOnce(() => {
+    throw new RangeError("gate derivation failed");
+  });
+  const unknownGateSnapshot = {
+    ...snapshot,
+    effectiveGate: { state: "unknown", reason: "query_failed" },
+    readiness: "unknown",
+  } as const;
+  (buildPeerBenchmarkAuditSnapshot as jest.Mock).mockResolvedValue(
+    unknownGateSnapshot,
+  );
+  const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+
+  const response = await GET();
+
+  expect(response.status).toBe(200);
+  expect(response.headers.get("Cache-Control")).toBe("no-store");
+  expect(await response.json()).toEqual({
+    success: true,
+    data: unknownGateSnapshot,
+  });
+  expect(buildPeerBenchmarkAuditSnapshot).toHaveBeenCalledWith({
+    db: expect.anything(),
+    now: expect.any(Date),
+    effectiveGate: { state: "unknown", reason: "query_failed" },
+  });
+  expect(errorSpy).toHaveBeenCalledWith(
+    "Peer benchmark gate derivation failed",
+    {
+      name: "RangeError",
+      message: "gate derivation failed",
+    },
+  );
+});
+
 it("returns 500 instead of throwing when the service fails unexpectedly", async () => {
   (getApiActor as jest.Mock).mockResolvedValue({
     role: "STAFF",
@@ -1057,6 +1148,7 @@ it("returns 500 instead of throwing when the service fails unexpectedly", async 
   jest.spyOn(console, "error").mockImplementation(() => {});
   const response = await GET();
   expect(response.status).toBe(500);
+  expect(response.headers.get("Cache-Control")).toBe("no-store");
   expect(await response.json()).toEqual({
     success: false,
     error: "Failed to build peer benchmark status",
@@ -1087,10 +1179,22 @@ import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import { isPeerBenchmarksEnabled } from "@/lib/assessments/wave-s-flags";
 import {
   buildPeerBenchmarkAuditSnapshot,
+  type EffectivePeerBenchmarkGate,
   type PeerBenchmarkAuditDb,
+  type PeerBenchmarkEvidence,
 } from "@/lib/assessments/peer-benchmark-audit";
 
 const NO_STORE_HEADERS = { "Cache-Control": "no-store" };
+
+function errorDiagnostic(error: unknown): {
+  name: string;
+  message: string;
+} {
+  return {
+    name: error instanceof Error ? error.name : "UnknownError",
+    message: error instanceof Error ? error.message : "Non-Error thrown",
+  };
+}
 
 export async function GET() {
   try {
@@ -1108,23 +1212,34 @@ export async function GET() {
       );
     }
 
+    let effectiveGate: PeerBenchmarkEvidence<EffectivePeerBenchmarkGate>;
+    try {
+      effectiveGate = {
+        state: "known",
+        value: isPeerBenchmarksEnabled() ? "enabled" : "dark",
+      };
+    } catch (error) {
+      console.error(
+        "Peer benchmark gate derivation failed",
+        errorDiagnostic(error),
+      );
+      effectiveGate = { state: "unknown", reason: "query_failed" };
+    }
+
     const data = await buildPeerBenchmarkAuditSnapshot({
       db: db as unknown as PeerBenchmarkAuditDb,
       now: new Date(),
-      effectiveGate: {
-        state: "known",
-        value: isPeerBenchmarksEnabled() ? "enabled" : "dark",
-      },
+      effectiveGate,
     });
     return NextResponse.json(
       { success: true, data },
       { headers: NO_STORE_HEADERS },
     );
   } catch (error) {
-    console.error("Error building peer benchmark status", {
-      name: error instanceof Error ? error.name : "UnknownError",
-      message: error instanceof Error ? error.message : "Non-Error thrown",
-    });
+    console.error(
+      "Error building peer benchmark status",
+      errorDiagnostic(error),
+    );
     return NextResponse.json(
       { success: false, error: "Failed to build peer benchmark status" },
       { status: 500, headers: NO_STORE_HEADERS },
@@ -1134,7 +1249,10 @@ export async function GET() {
 ```
 
 Do not read either Wave S environment variable in this file. The only flag
-import is `isPeerBenchmarksEnabled`.
+import is `isPeerBenchmarksEnabled`. A helper exception becomes unknown gate
+evidence and does not suppress database evidence; the route-wide `500` remains
+only for authentication, snapshot-service, serialization, or other failures
+outside the partial snapshot contract.
 
 - [ ] **Step 4: Run the route suite to verify GREEN**
 
@@ -1144,8 +1262,8 @@ Run:
 npx jest src/__tests__/api/admin/assessments/peer-benchmark-status-route.test.ts --runInBand
 ```
 
-Expected: PASS for `401`, `403`, `ADMIN`, `STAFF`, gate plumbing, no-store, and
-unexpected `500`.
+Expected: PASS for `401`, `403`, `ADMIN`, `STAFF`, gate plumbing, helper-failure
+partial `200`, no-store on every response path, and unexpected `500`.
 
 - [ ] **Step 5: Run service plus route tests together**
 
@@ -1255,6 +1373,21 @@ function mockFetch(data: PeerBenchmarkAuditSnapshot, ok = true, status = 200) {
 
 beforeEach(() => jest.restoreAllMocks());
 
+it("keeps the privacy note visible while the initial request is loading", () => {
+  global.fetch = jest.fn().mockImplementation(
+    () => new Promise(() => {}),
+  ) as unknown as typeof fetch;
+  render(<PeerBenchmarkStatusPanel />);
+  expect(
+    screen.getByText(
+      "Underlying environment inputs and peer values are not displayed.",
+    ),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByText("Loading LVA peer benchmark status…"),
+  ).toBeInTheDocument();
+});
+
 it("renders dark neutrally while preserving prerequisite evidence", async () => {
   mockFetch(snapshot());
   render(<PeerBenchmarkStatusPanel />);
@@ -1351,6 +1484,11 @@ it("isolates an endpoint error inside the peer panel", async () => {
     expect(screen.getByText("Peer benchmark status failed: HTTP 500"))
       .toBeInTheDocument(),
   );
+  expect(
+    screen.getByText(
+      "Underlying environment inputs and peer values are not displayed.",
+    ),
+  ).toBeInTheDocument();
 });
 ```
 
@@ -1501,7 +1639,7 @@ const READINESS: Record<
   },
   partialData: {
     label: "Partial benchmark data",
-    className: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
+    className: "bg-warning/10 text-warning-foreground",
     explanation: "Only some active rating questions have stored benchmark rows.",
   },
   ready: {
@@ -1511,7 +1649,7 @@ const READINESS: Record<
   },
   unknown: {
     label: "Unknown",
-    className: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
+    className: "bg-warning/10 text-warning-foreground",
     explanation: "One or more required evidence sources could not be read.",
   },
 };
@@ -1537,11 +1675,13 @@ const response = await fetch(
 ```
 
 Keep existing data visible during a refresh. Disable the refresh button while
-loading. An initial failure renders only
-`Peer benchmark status failed: HTTP 500` (or the actual caught message) inside
-this component. A refresh failure preserves the last successful snapshot and
-adds that error line above the existing cards; it must not clear verified
-evidence merely because the refresh failed.
+loading. An initial failure renders
+`Peer benchmark status failed: HTTP 500` (or the actual caught message) and the
+persistent privacy note inside this component, without fabricating evidence
+cards. A refresh failure preserves the last successful snapshot and adds that
+error line above the existing cards; it must not clear verified evidence merely
+because the refresh failed. The privacy note remains visible during initial
+loading, initial error, success, and refresh error.
 
 - [ ] **Step 4: Implement the approved panel layout**
 
@@ -1602,15 +1742,21 @@ export function PeerBenchmarkStatusPanel() {
 
   if (loading && !data) {
     return (
-      <div className="px-6 py-12 text-center text-sm text-muted-foreground">
-        Loading LVA peer benchmark status…
+      <div className="space-y-4">
+        <div className="px-6 py-12 text-center text-sm text-muted-foreground">
+          Loading LVA peer benchmark status…
+        </div>
+        <PrivacyNote />
       </div>
     );
   }
   if (!data) {
     return (
-      <div className="px-6 py-12 text-center text-sm text-destructive">
-        Peer benchmark status failed: {error ?? "Failed to load"}
+      <div className="space-y-4">
+        <div className="px-6 py-12 text-center text-sm text-destructive">
+          Peer benchmark status failed: {error ?? "Failed to load"}
+        </div>
+        <PrivacyNote />
       </div>
     );
   }
@@ -1719,17 +1865,23 @@ export function PeerBenchmarkStatusPanel() {
 
       {data.keyCoverage.state === "known" &&
         data.keyCoverage.value.staleRowCount > 0 && (
-          <p className="text-sm text-amber-700 dark:text-amber-300">
+          <p className="text-sm text-warning-foreground">
             {data.keyCoverage.value.staleRowCount.toLocaleString()} stale{" "}
             {data.keyCoverage.value.staleRowCount === 1 ? "row" : "rows"} does
             not match an active rating question.
           </p>
         )}
 
-      <p className="text-xs text-muted-foreground">
-        Underlying environment inputs and peer values are not displayed.
-      </p>
+      <PrivacyNote />
     </section>
+  );
+}
+
+function PrivacyNote(): React.JSX.Element {
+  return (
+    <p className="text-xs text-muted-foreground">
+      Underlying environment inputs and peer values are not displayed.
+    </p>
   );
 }
 

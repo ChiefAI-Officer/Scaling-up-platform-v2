@@ -43,6 +43,23 @@ function mockFetch(data: PeerBenchmarkAuditSnapshot, ok = true, status = 200) {
 
 beforeEach(() => jest.restoreAllMocks());
 
+it("keeps the privacy note visible while the initial request is loading", () => {
+  global.fetch = jest.fn().mockImplementation(
+    () => new Promise(() => {}),
+  ) as unknown as typeof fetch;
+
+  render(<PeerBenchmarkStatusPanel />);
+
+  expect(
+    screen.getByText(
+      "Underlying environment inputs and peer values are not displayed.",
+    ),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByText("Loading LVA peer benchmark status…"),
+  ).toBeInTheDocument();
+});
+
 it("renders dark neutrally while preserving prerequisite evidence", async () => {
   mockFetch(snapshot());
   render(<PeerBenchmarkStatusPanel />);
@@ -144,6 +161,11 @@ it("isolates an endpoint error inside the peer panel", async () => {
     expect(screen.getByText("Peer benchmark status failed: HTTP 500"))
       .toBeInTheDocument(),
   );
+  expect(
+    screen.getByText(
+      "Underlying environment inputs and peer values are not displayed.",
+    ),
+  ).toBeInTheDocument();
 });
 
 it("shows stale rows without downgrading ready coverage", async () => {

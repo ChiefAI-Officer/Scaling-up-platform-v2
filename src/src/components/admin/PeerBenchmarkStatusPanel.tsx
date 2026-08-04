@@ -30,7 +30,7 @@ const READINESS: Record<
   },
   partialData: {
     label: "Partial benchmark data",
-    className: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
+    className: "bg-warning/10 text-warning-foreground",
     explanation: "Only some active rating questions have stored benchmark rows.",
   },
   ready: {
@@ -40,7 +40,7 @@ const READINESS: Record<
   },
   unknown: {
     label: "Unknown",
-    className: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
+    className: "bg-warning/10 text-warning-foreground",
     explanation: "One or more required evidence sources could not be read.",
   },
 };
@@ -88,15 +88,21 @@ export function PeerBenchmarkStatusPanel(): React.JSX.Element {
 
   if (loading && !data) {
     return (
-      <div className="px-6 py-12 text-center text-sm text-muted-foreground">
-        Loading LVA peer benchmark status…
+      <div className="space-y-4">
+        <div className="px-6 py-12 text-center text-sm text-muted-foreground">
+          Loading LVA peer benchmark status…
+        </div>
+        <PrivacyNote />
       </div>
     );
   }
   if (!data) {
     return (
-      <div className="px-6 py-12 text-center text-sm text-destructive">
-        Peer benchmark status failed: {error ?? "Failed to load"}
+      <div className="space-y-4">
+        <div className="px-6 py-12 text-center text-sm text-destructive">
+          Peer benchmark status failed: {error ?? "Failed to load"}
+        </div>
+        <PrivacyNote />
       </div>
     );
   }
@@ -205,17 +211,23 @@ export function PeerBenchmarkStatusPanel(): React.JSX.Element {
 
       {data.keyCoverage.state === "known" &&
         data.keyCoverage.value.staleRowCount > 0 && (
-          <p className="text-sm text-amber-700 dark:text-amber-300">
+          <p className="text-sm text-warning-foreground">
             {data.keyCoverage.value.staleRowCount.toLocaleString()} stale{" "}
             {data.keyCoverage.value.staleRowCount === 1 ? "row" : "rows"} does
             not match an active rating question.
           </p>
         )}
 
-      <p className="text-xs text-muted-foreground">
-        Underlying environment inputs and peer values are not displayed.
-      </p>
+      <PrivacyNote />
     </section>
+  );
+}
+
+function PrivacyNote(): React.JSX.Element {
+  return (
+    <p className="text-xs text-muted-foreground">
+      Underlying environment inputs and peer values are not displayed.
+    </p>
   );
 }
 

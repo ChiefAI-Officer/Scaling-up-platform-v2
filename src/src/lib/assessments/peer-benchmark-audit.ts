@@ -260,13 +260,21 @@ export async function buildPeerBenchmarkAuditSnapshot({
     });
   } catch (error) {
     logReadFailure("template", error);
+    const template = queryFailed;
+    const activeVersion = dependencyUnknown;
+    const keyCoverage = dependencyUnknown;
     return {
       ...base,
-      template: queryFailed,
-      activeVersion: dependencyUnknown,
+      template,
+      activeVersion,
       storedBenchmarks: dependencyUnknown,
-      keyCoverage: dependencyUnknown,
-      readiness: "unknown",
+      keyCoverage,
+      readiness: deriveReadiness({
+        effectiveGate,
+        template,
+        activeVersion,
+        keyCoverage,
+      }),
     };
   }
 

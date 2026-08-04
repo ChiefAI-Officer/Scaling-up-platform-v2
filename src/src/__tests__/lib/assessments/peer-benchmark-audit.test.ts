@@ -184,6 +184,30 @@ it.each([
   expect(snapshot.keyCoverage).toEqual({ state: "known", value: coverage });
 });
 
+it("classifies stale-only stored keys as no data for active questions", async () => {
+  const { db } = makeDb({ metricKeys: ["S3_retired"] });
+
+  const snapshot = await buildPeerBenchmarkAuditSnapshot({
+    db,
+    now: NOW,
+    effectiveGate: knownGate("enabled"),
+  });
+
+  expect(snapshot.storedBenchmarks).toEqual({
+    state: "known",
+    value: { storedRowCount: 1 },
+  });
+  expect(snapshot.keyCoverage).toEqual({
+    state: "known",
+    value: {
+      matchingRowCount: 0,
+      missingRatingQuestionCount: 2,
+      staleRowCount: 1,
+    },
+  });
+  expect(snapshot.readiness).toBe("noData");
+});
+
 it("known missing template blocks readiness and marks dependents not applicable", async () => {
   const { db, assessmentTemplateVersion, assessmentBenchmark } = makeDb({
     template: null,
@@ -311,6 +335,36 @@ it("template read failure is unknown, never missing or zero", async () => {
     reason: "dependency_unknown",
   });
   expect(snapshot.readiness).toBe("unknown");
+});
+
+it("keeps dark readiness when the template read fails", async () => {
+  const { db, assessmentTemplate } = makeDb();
+  assessmentTemplate.findFirst.mockRejectedValueOnce(new Error("template down"));
+  jest.spyOn(console, "error").mockImplementation(() => {});
+
+  const snapshot = await buildPeerBenchmarkAuditSnapshot({
+    db,
+    now: NOW,
+    effectiveGate: knownGate("dark"),
+  });
+
+  expect(snapshot.template).toEqual({
+    state: "unknown",
+    reason: "query_failed",
+  });
+  expect(snapshot.activeVersion).toEqual({
+    state: "unknown",
+    reason: "dependency_unknown",
+  });
+  expect(snapshot.storedBenchmarks).toEqual({
+    state: "unknown",
+    reason: "dependency_unknown",
+  });
+  expect(snapshot.keyCoverage).toEqual({
+    state: "unknown",
+    reason: "dependency_unknown",
+  });
+  expect(snapshot.readiness).toBe("dark");
 });
 
 it("unknown effective-gate evidence does not suppress database evidence", async () => {
