@@ -434,7 +434,8 @@ async function seedAuthorizationGraph(
       "expiresAt", "submittedAt"
     ) VALUES (
       'invitation-1', 'campaign-1', 'respondent-1',
-      ${invitationStatus}, NULL, ${invitationExpiresAt},
+      ${invitationStatus}::"AssessmentInvitationStatus",
+      NULL, ${invitationExpiresAt},
       ${invitationStatus === "SUBMITTED" ? reconcileNow : null}
     )
   `);
