@@ -231,7 +231,17 @@ function DefaultReportAppearanceCard({
       <p className="text-[0.6875rem] text-muted-foreground" style={{ marginBottom: "1rem" }}>
         This default is copied into future campaigns only. Existing campaigns and reports do not change.
       </p>
-      <ReportStylePicker value={selectedStyle} onChange={setSelectedStyle} />
+      <fieldset
+        disabled={templateRowSaving}
+        aria-busy={templateRowSaving}
+        className="min-w-0 border-0 p-0"
+      >
+        <legend className="sr-only">Default report appearance options</legend>
+        <ReportStylePicker
+          value={selectedStyle}
+          onChange={templateRowSaving ? () => {} : setSelectedStyle}
+        />
+      </fieldset>
       <div className="mt-4 flex items-center gap-3">
         <button
           type="button"
@@ -241,6 +251,11 @@ function DefaultReportAppearanceCard({
         >
           {templateRowSaving ? "Saving…" : "Save default"}
         </button>
+        {templateRowSaving && (
+          <span role="status" className="text-xs text-muted-foreground">
+            Saving default…
+          </span>
+        )}
         {templateRowError && (
           <span role="alert" className="text-xs text-destructive">
             {templateRowError}

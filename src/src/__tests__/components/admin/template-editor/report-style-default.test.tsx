@@ -98,7 +98,50 @@ describe("admin default report appearance", () => {
     expect(screen.queryByTestId("settings-default-report-style-card")).toBeNull();
   });
 
-  it("saves the picked default through the immediate template-row PATCH and mirrors server truth", async () => {
+  it("disables style changes while the template-row PATCH is pending", async () => {
+    let resolvePatch!: (response: {
+      ok: boolean;
+      json: () => Promise<unknown>;
+    }) => void;
+    (global.fetch as jest.Mock).mockReturnValue(
+      new Promise((resolve) => {
+        resolvePatch = resolve;
+      }),
+    );
+    render(<TemplateEditorTabbed {...shellProps()} />);
+
+    const card = screen.getByTestId("settings-default-report-style-card");
+    const boardroom = within(card).getByRole("radio", { name: /executive boardroom/i });
+    const dashboard = within(card).getByRole("radio", { name: /modern dashboard/i });
+    fireEvent.click(boardroom);
+    fireEvent.click(within(card).getByRole("button", { name: "Save default" }));
+
+    await waitFor(() => {
+      within(card).getAllByRole("radio").forEach((radio) => expect(radio).toBeDisabled());
+    });
+    expect(within(card).getByText("Saving default…")).toBeInTheDocument();
+    expect(
+      within(card).queryByText(/changes are unavailable after the first completed response/i),
+    ).toBeNull();
+
+    fireEvent.click(dashboard);
+    expect(boardroom).toBeChecked();
+    expect(dashboard).not.toBeChecked();
+    expect(
+      within(card).getByRole("img", { name: "Executive Boardroom Cover preview" }),
+    ).toBeInTheDocument();
+
+    resolvePatch({
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: { defaultReportStyle: "EXECUTIVE_BOARDROOM" },
+      }),
+    });
+    await waitFor(() => expect(boardroom).not.toBeDisabled());
+  });
+
+  it("saves through the immediate template-row PATCH and treats the returned enum as server truth", async () => {
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -109,7 +152,7 @@ describe("admin default report appearance", () => {
     render(<TemplateEditorTabbed {...shellProps()} />);
 
     const card = screen.getByTestId("settings-default-report-style-card");
-    fireEvent.click(within(card).getByRole("radio", { name: /modern dashboard/i }));
+    fireEvent.click(within(card).getByRole("radio", { name: /executive boardroom/i }));
     fireEvent.click(within(card).getByRole("button", { name: "Save default" }));
 
     await waitFor(() => {
@@ -117,7 +160,7 @@ describe("admin default report appearance", () => {
         "/api/admin/assessment-templates/tpl_1",
         expect.objectContaining({
           method: "PATCH",
-          body: JSON.stringify({ defaultReportStyle: "MODERN_DASHBOARD" }),
+          body: JSON.stringify({ defaultReportStyle: "EXECUTIVE_BOARDROOM" }),
         }),
       );
     });
