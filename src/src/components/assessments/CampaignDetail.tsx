@@ -59,6 +59,8 @@ import {
   getInvitationBand,
 } from "@/lib/assessments/campaign-status-metrics";
 import { resolveInvitationHtmlMode } from "@/lib/assessments/invitation-html-policy";
+import { ReportStylePicker } from "@/components/assessments/ReportStylePicker";
+import type { ReportStyleKey } from "@/lib/assessments/report-style-registry";
 import {
   invitationHtmlEditorCopy,
   invitationOverrideSummary,
@@ -108,6 +110,8 @@ export interface CampaignDetailProps {
    * that already existed had no way to opt in.
    */
   onScreenResultsEnabled?: boolean;
+  /** Server-computed campaign-level report appearance capability. */
+  reportStylesAvailable?: boolean;
   /**
    * Wave M (#19) — the campaign's stored (already-sanitized) slides. Both the
    * editor's initial value AND the PATCH CAS sentinel `expectedCustomSlides`
@@ -232,6 +236,7 @@ export function CampaignDetail({
   groupReportHref,
   customSlidesEnabled = false,
   onScreenResultsEnabled = false,
+  reportStylesAvailable = false,
   initialCustomSlides = [],
   customSlidesSections = [],
   longitudinalRespondentIds = [],
@@ -240,7 +245,7 @@ export function CampaignDetail({
 }: CampaignDetailProps) {
   const { toast } = useToast();
   const router = useRouter();
-  const [overview] = useState<CampaignOverview>(initialOverview);
+  const [overview, setOverview] = useState<CampaignOverview>(initialOverview);
   const [respondents, setRespondents] =
     useState<CampaignRespondentRow[]>(initialRespondents);
   const [expandedRespondentId, setExpandedRespondentId] =
@@ -316,6 +321,10 @@ export function CampaignDetail({
   );
   const [emailHtmlError, setEmailHtmlError] = useState<string | null>(null);
   const [emailSaving, setEmailSaving] = useState(false);
+  const [reportStyle, setReportStyle] = useState<ReportStyleKey>(
+    initialOverview.campaign.reportStyle,
+  );
+  const [reportStyleSaving, setReportStyleSaving] = useState(false);
 
   const invitationHtmlMode = resolveInvitationHtmlMode({
     waveDCustomHtmlEnabled: customHtmlEmailEnabled,
@@ -360,6 +369,13 @@ export function CampaignDetail({
   const [openAtSaving, setOpenAtSaving] = useState(false);
 
   const campaign = overview.campaign;
+
+  // router.refresh() delivers a new server projection after a successful save
+  // or a lock race. Adopt it so the client never guesses a final locked value.
+  useEffect(() => {
+    setOverview(initialOverview);
+    setReportStyle(initialOverview.campaign.reportStyle);
+  }, [initialOverview]);
 
   // Wave N (#23) — O(1) lookup for the per-row "over time" affordance. The set
   // is the server-computed eligible-id allowlist; the client never recomputes
@@ -820,6 +836,44 @@ export function CampaignDetail({
       });
     } finally {
       setOnScreenSaving(false);
+    }
+  }
+
+  async function handleSaveReportStyle() {
+    if (reportStyleSaving || campaign.reportStyleLockedAt !== null) return;
+    setReportStyleSaving(true);
+    try {
+      const res = await fetch(`/api/assessment-campaigns/${campaign.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reportStyle }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || body.success === false) {
+        const message =
+          typeof body.message === "string"
+            ? body.message
+            : typeof body.error === "string"
+              ? body.error
+              : "Could not save report appearance.";
+        if (res.status === 409 && body.error === "REPORT_STYLE_LOCKED") {
+          router.refresh();
+        }
+        throw new Error(message);
+      }
+      toast({
+        title: "Report appearance saved",
+        description: "This campaign now uses the selected report style.",
+      });
+      router.refresh();
+    } catch (err) {
+      toast({
+        title: "Could not save report appearance",
+        description: err instanceof Error ? err.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setReportStyleSaving(false);
     }
   }
 
@@ -1418,6 +1472,50 @@ export function CampaignDetail({
           />
         </div>
       </div>
+
+      {/* Report styles are server-authorized. Once a first completion locks the
+          campaign, keep the selected picker and previews visible as a durable
+          record rather than hiding the immutable choice. */}
+      {reportStylesAvailable && (
+        <div
+          className="bg-card border border-border rounded-xl p-4"
+          data-testid="campaign-report-style-card"
+        >
+          <div className="mb-4">
+            <h2 className="text-sm font-semibold text-foreground">Report appearance</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Choose how completed individual reports will look.
+            </p>
+          </div>
+          <ReportStylePicker
+            value={reportStyle}
+            onChange={setReportStyle}
+            disabled={campaign.reportStyleLockedAt !== null || reportStyleSaving}
+            sourceLabel={
+              campaign.reportStyleSource === "CAMPAIGN_OVERRIDE"
+                ? "Campaign override"
+                : "Template default"
+            }
+            lockedAt={campaign.reportStyleLockedAt}
+          />
+          {campaign.reportStyleLockedAt === null && (
+            <div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-4">
+              <p className="text-xs text-muted-foreground">
+                Changes are allowed until the first response is completed.
+              </p>
+              <button
+                type="button"
+                onClick={handleSaveReportStyle}
+                disabled={reportStyleSaving || reportStyle === campaign.reportStyle}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {reportStyleSaving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                Save report appearance
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Wave OSR (#71) — "Results on screen" for an EXISTING campaign.
           Hidden when CLOSED (the PATCH route 409s a closed campaign, so offering

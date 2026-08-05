@@ -713,6 +713,9 @@ export const updateAssessmentCampaignSchema = z.object({
     // in the route, and disclosure itself is decided server-side under the Phase-2
     // submission lock, so a stored value with the flag off is inert.
     showResultsOnScreen: z.boolean().optional(),
+    // Report appearance is a closed catalog. The PATCH route separately checks
+    // campaign eligibility, flag availability, and the first-completion lock.
+    reportStyle: z.enum(REPORT_STYLE_KEYS).optional(),
 });
 
 export const assignCampaignParticipantsSchema = z

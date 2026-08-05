@@ -31,12 +31,17 @@ import {
 } from "@/lib/assessments/email-html-sanitizer";
 import { isCustomSlidesEnabled } from "@/lib/assessments/wave-m-flags";
 import { isOnScreenResultsEnabled } from "@/lib/assessments/wave-osr-flags";
+import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
+import { isReportStyleEligible } from "@/lib/assessments/report-style-policy";
 import {
   prepareCustomSlidesForSave,
   sectionStableKeysOf,
   slidesAuditMeta,
 } from "@/lib/assessments/custom-slides-write";
 import { Prisma } from "@prisma/client";
+
+const REPORT_STYLE_LOCKED_MESSAGE =
+  "Report appearance was locked when the first response completed. Refresh to see the final style.";
 
 /**
  * Wave M CAS — canonical deep-equality for the JSON `customSlides` value vs the
@@ -173,8 +178,11 @@ export async function PATCH(
       select: {
         id: true,
         status: true,
+        templateId: true,
+        reportStyleLockedAt: true,
         versionId: true,
         customSlides: true,
+        template: { select: { alias: true } },
       },
     });
     if (!campaign) {
@@ -210,6 +218,57 @@ export async function PATCH(
       );
     }
     const data = validation.data;
+
+    // Report appearance is a deliberately isolated mutation lane. The server
+    // owns its availability decision (template allowlist + feature flag), and
+    // the conditional update is the synchronization point with first completion.
+    // Do not fold this into the generic PATCH below: that branch uses an ordinary
+    // update and must never become a read-then-write escape hatch around the lock.
+    if (data.reportStyle !== undefined) {
+      const reportStylesAvailable =
+        isReportStyleEligible(campaign.template?.alias) &&
+        isReportStylesEnabled({ templateId: campaign.templateId, campaignId: id });
+      if (!reportStylesAvailable) {
+        return NextResponse.json(
+          { success: false, error: "Report appearance is not available for this campaign" },
+          { status: 400 },
+        );
+      }
+
+      const changed = await db.assessmentCampaign.updateMany({
+        where: { id, reportStyleLockedAt: null },
+        data: {
+          reportStyle: data.reportStyle,
+          reportStyleSource: "CAMPAIGN_OVERRIDE",
+        },
+      });
+      if (changed.count === 0) {
+        return NextResponse.json(
+          { error: "REPORT_STYLE_LOCKED", message: REPORT_STYLE_LOCKED_MESSAGE },
+          { status: 409 },
+        );
+      }
+
+      await logAudit({
+        entityType: "AssessmentCampaign",
+        entityId: id,
+        action: "UPDATE",
+        performedBy: actor.email,
+        changes: {
+          reportStyle: data.reportStyle,
+          reportStyleSource: "CAMPAIGN_OVERRIDE",
+        },
+      });
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          id,
+          reportStyle: data.reportStyle,
+          reportStyleSource: "CAMPAIGN_OVERRIDE",
+        },
+      });
+    }
 
     const updateData: {
       name?: string;

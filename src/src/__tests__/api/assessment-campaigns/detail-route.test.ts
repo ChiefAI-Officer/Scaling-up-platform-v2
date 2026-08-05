@@ -22,7 +22,7 @@ jest.mock("@/lib/db", () => ({
       // findUnique so existing sequencing is preserved.
       const findUnique = jest.fn();
       const findFirst = jest.fn((args) => findUnique(args));
-      return { findUnique, findFirst, update: jest.fn() };
+      return { findUnique, findFirst, update: jest.fn(), updateMany: jest.fn() };
     })(),
     auditLog: { create: jest.fn().mockResolvedValue(undefined) },
   },
@@ -63,6 +63,9 @@ beforeEach(() => {
   jest.clearAllMocks();
   delete process.env.WAVE_D_CUSTOM_HTML_EMAIL_ENABLED;
   delete process.env.ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED;
+  delete process.env.WAVE_REPORT_STYLES_ENABLED;
+  delete process.env.WAVE_REPORT_STYLES_KILL;
+  delete process.env.WAVE_REPORT_STYLES_CANARY;
   (db.accessGroupCoach.findMany as jest.Mock).mockResolvedValue([
     {
       accessGroupId: "g1",
@@ -205,6 +208,135 @@ describe("PATCH /api/assessment-campaigns/[id]", () => {
     expect(db.assessmentCampaign.update).toHaveBeenCalledWith({
       where: { id: "c1" },
       data: { name: "Renamed" },
+    });
+  });
+
+  describe("report appearance", () => {
+    function reportStyleCampaign(overrides: Record<string, unknown> = {}) {
+      return {
+        id: "c1",
+        organizationId: "org-1",
+        templateId: "tpl-1",
+        createdByCoachId: "coach-1",
+        status: "ACTIVE",
+        versionId: "v1",
+        customSlides: null,
+        reportStyleLockedAt: null,
+        template: { alias: "scaling-up-full" },
+        ...overrides,
+      };
+    }
+
+    it("owner may set an eligible available campaign style through the atomic conditional write", async () => {
+      process.env.WAVE_REPORT_STYLES_ENABLED = "1";
+      (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+      (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValue(
+        reportStyleCampaign(),
+      );
+      (db.assessmentCampaign.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+
+      const res = await PATCH(
+        patchReq({ reportStyle: "MODERN_DASHBOARD" }) as never,
+        detailParams("c1"),
+      );
+
+      expect(res.status).toBe(200);
+      expect(db.assessmentCampaign.updateMany).toHaveBeenCalledWith({
+        where: { id: "c1", reportStyleLockedAt: null },
+        data: {
+          reportStyle: "MODERN_DASHBOARD",
+          reportStyleSource: "CAMPAIGN_OVERRIDE",
+        },
+      });
+      expect(db.assessmentCampaign.update).not.toHaveBeenCalled();
+    });
+
+    it("keeps the existing cross-coach rejection behavior", async () => {
+      (getApiActor as jest.Mock).mockResolvedValue(otherCoachActor);
+      (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValue(
+        reportStyleCampaign(),
+      );
+
+      const res = await PATCH(
+        patchReq({ reportStyle: "MODERN_DASHBOARD" }) as never,
+        detailParams("c1"),
+      );
+
+      expect(res.status).toBe(404);
+      expect(db.assessmentCampaign.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("allows an admin intervention before the first completion", async () => {
+      process.env.WAVE_REPORT_STYLES_ENABLED = "1";
+      (getApiActor as jest.Mock).mockResolvedValue({
+        ...coachActor,
+        role: "ADMIN",
+        coachId: null,
+      });
+      (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValue(
+        reportStyleCampaign(),
+      );
+      (db.assessmentCampaign.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+
+      const res = await PATCH(
+        patchReq({ reportStyle: "EXECUTIVE_BOARDROOM" }) as never,
+        detailParams("c1"),
+      );
+
+      expect(res.status).toBe(200);
+      expect(db.assessmentCampaign.updateMany).toHaveBeenCalled();
+    });
+
+    it("rejects an ineligible template without mutating", async () => {
+      process.env.WAVE_REPORT_STYLES_ENABLED = "1";
+      (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+      (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValue(
+        reportStyleCampaign({ template: { alias: "rockefeller-habits" } }),
+      );
+
+      const res = await PATCH(
+        patchReq({ reportStyle: "MODERN_DASHBOARD" }) as never,
+        detailParams("c1"),
+      );
+
+      expect(res.status).toBe(400);
+      expect(db.assessmentCampaign.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("rejects flag-off updates without mutating", async () => {
+      (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+      (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValue(
+        reportStyleCampaign(),
+      );
+
+      const res = await PATCH(
+        patchReq({ reportStyle: "MODERN_DASHBOARD" }) as never,
+        detailParams("c1"),
+      );
+
+      expect(res.status).toBe(400);
+      expect(db.assessmentCampaign.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("returns the locked race contract when the conditional update finds no mutable row", async () => {
+      process.env.WAVE_REPORT_STYLES_ENABLED = "1";
+      (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+      (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValue(
+        reportStyleCampaign(),
+      );
+      (db.assessmentCampaign.updateMany as jest.Mock).mockResolvedValue({ count: 0 });
+
+      const res = await PATCH(
+        patchReq({ reportStyle: "MODERN_DASHBOARD" }) as never,
+        detailParams("c1"),
+      );
+
+      expect(res.status).toBe(409);
+      await expect(res.json()).resolves.toEqual({
+        error: "REPORT_STYLE_LOCKED",
+        message:
+          "Report appearance was locked when the first response completed. Refresh to see the final style.",
+      });
     });
   });
 
