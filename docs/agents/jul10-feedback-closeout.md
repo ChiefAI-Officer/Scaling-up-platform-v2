@@ -2,7 +2,7 @@
 
 **Source:** Jeff Verdun's 14-page *Scaling Up Assessment Platform - Feedback Report for Gabriel*, prepared 2026-07-10. Section 2 is canonical: 53 rows numbered #30-#87. Rows #31, #34, #36, #38, and #82 are intentionally absent because completed items were excluded.
 
-**Reconciled against:** `origin/main` at `15ee442b124f43155ffd3dfdc1dc08fbfa37cd5e` on 2026-08-05. Current tally: **42 DONE / 4 PARTIAL / 7 NEEDS DECISION**.
+**Reconciled against:** `origin/main` at `987eb7d82f4735e9129186d64608424cfa68b1a6` on 2026-08-05. Current tally after the approved #42 implementation: **42 DONE / 5 PARTIAL / 6 NEEDS DECISION**.
 
 **Authority:** This tracked ledger is authoritative; generated PDFs and `tmp/` files are derivatives. Completion is judged against the exact Section 2 ask. Later-discovered scope remains visible as a separately named follow-on and does not silently widen a row.
 
@@ -26,7 +26,7 @@
 | #39 | Per-respondent rate limit | Make the individual respondent report rate limit fail closed. | DONE | [Wave I hardening](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/blob/15ee442b124f43155ffd3dfdc1dc08fbfa37cd5e/plans/CHANGELOG.md#L1897) | PR #71 / `858d432` | None | Gabriel |
 | #40 | LVA Leadership Team capitalization | Use sentence-case wording consistently. | DONE | [Wave P quick fixes](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/blob/15ee442b124f43155ffd3dfdc1dc08fbfa37cd5e/plans/CHANGELOG.md#L1641) | Wave P | None | Gabriel |
 | #41 | LVA The leadership wording | Establish what the factor measures before rewording it. | NEEDS DECISION | [Decision packet](jul10-feedback-decision-packets.md#41-lva-the-leadership-wording) | None | Confirm whether the factor means leadership function, senior-leader behavior, or another construct. | Gabriel |
-| #42 | LVA Growth Financing wording | Clarify that the factor means access or ability to obtain financing for growth. | NEEDS DECISION | [Decision packet](jul10-feedback-decision-packets.md#42-lva-growth-financing-wording) | None | Approve the wording Access to financing for growth with stable keys and factor order retained. | Gabriel |
+| #42 | LVA Growth Financing wording | Clarify that the factor means access or ability to obtain financing for growth. | PARTIAL | [Approved implementation](jul10-feedback-decision-packets.md#42-lva-growth-financing-wording) | PR #304 | Merge the seed change, then separately authorize creation and visual verification of a new draft; publishing and live verification remain separate. | Gabriel |
 | #43 | LVA core-values wording | Ask for existing values first and alternatives only when values are unset. | DONE | [Wave P quick fixes](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/blob/15ee442b124f43155ffd3dfdc1dc08fbfa37cd5e/plans/CHANGELOG.md#L1641) | Wave P | None | Gabriel |
 | #44 | LVA possible duplicate | Decide whether the adjacent organization, annual, and quarterly priority questions are intentionally distinct. | NEEDS DECISION | [Verification audit](jul10-feedback-decision-packets.md#44-lva-priority-triplet) | None | Approve keeping the Esperto-faithful three-horizon priority cascade or approve replacement wording. | Gabriel |
 | #45 | LVA media wording | Identify Suzanne's specific concern before changing the question. | NEEDS DECISION | [Decision packet](jul10-feedback-decision-packets.md#45-lva-media-wording) | None | Confirm whether the concern is grammar, scope, relevance, or expected answer form. | Suzanne with Gabriel approval |
@@ -75,11 +75,11 @@
 
 ## Remaining decision queue
 
-The eleven non-DONE rows reduce to seven decision packets and four implementation/acceptance resumes:
+The eleven non-DONE rows reduce to six unresolved decisions and five implementation/acceptance resumes:
 
 1. **Benchmark contract:** #32 decides what may be called an industry benchmark; #57/#58 separately require approved LVA values and an authorized restore/live verification.
 2. **Report fidelity:** #33 needs sanitized, report-specific annotations rather than an umbrella preference.
-3. **LVA content:** #41, #42, #44, and #45 each preserve stable keys only when the approved wording is semantically continuous.
+3. **LVA content:** #42 has approved wording implemented without key/order drift but still needs an authorized draft and visual check; #41, #44, and #45 still require content intent before editing.
 4. **Invitation acceptance:** #47 can close on the standard renderer after Gabriel approves the current copy and a live smoke; full-HTML overrides remain separate.
 5. **Five Dysfunctions content:** #75 needs authored and approved result guidance, not merely the generic findings engine.
 6. **SunHub instrument:** #84 is a new eight-question PUBLIC template and must not overwrite `scaling-up-quick`.
@@ -99,5 +99,5 @@ python3 scripts/build-jul10-closeout-artifacts.py
 
 The supplied July 10 source has 83 status occurrences: 30 in Section 1 and all
 53 canonical rows in Section 2. The generator validates that count, the exact
-row set, the 42/4/7 tally, and the nine-outcome delta before writing
+row set, the 42/5/6 tally, and the nine-outcome delta before writing
 deterministic PDFs under `output/pdf/`.

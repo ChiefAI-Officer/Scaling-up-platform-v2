@@ -107,7 +107,12 @@ describe("lvaReportFactorLabel — Esperto report label overrides", () => {
     expect(lvaReportFactorLabel("S3_internal_comms", "Internal communications")).toBe(
       "Internal Communication",
     );
-    expect(lvaReportFactorLabel("S3_growth_financing", "Growth Financing")).toBe(
+    expect(
+      lvaReportFactorLabel(
+        "S3_growth_financing",
+        "Access to financing for growth",
+      ),
+    ).toBe(
       "Financing growth",
     );
   });
@@ -116,7 +121,12 @@ describe("lvaReportFactorLabel — Esperto report label overrides", () => {
     expect(lvaReportFactorLabel("recruitment", "Recruitment of new employees")).toBe(
       "Recruitment of new staff",
     );
-    expect(lvaReportFactorLabel("growth_financing", "Growth Financing")).toBe(
+    expect(
+      lvaReportFactorLabel(
+        "growth_financing",
+        "Access to financing for growth",
+      ),
+    ).toBe(
       "Financing growth",
     );
   });
@@ -184,11 +194,23 @@ describe("lvaReportQuestionLabel — S5 'why' heading consistency", () => {
       lvaReportQuestionLabel("S5_why_retaining_staff", "Why is Retaining staff a hindrance?"),
     ).toBe("Why is Keeping employees a hindrance?");
     expect(
-      lvaReportQuestionLabel("S5_why_growth_financing", "Why is Growth Financing a hindrance?"),
+      lvaReportQuestionLabel(
+        "S5_why_growth_financing",
+        "Why is Access to financing for growth a hindrance?",
+      ),
     ).toBe("Why is Financing growth a hindrance?");
     expect(
       lvaReportQuestionLabel("S5_why_the_leadership", "Why is The leadership a hindrance?"),
     ).toBe("Why is The Leadership a hindrance?");
+  });
+
+  it("continues rewriting the pre-#42 label for campaigns pinned to older versions", () => {
+    expect(
+      lvaReportQuestionLabel(
+        "S5_why_growth_financing",
+        "Why is Growth Financing a hindrance?",
+      ),
+    ).toBe("Why is Financing growth a hindrance?");
   });
 
   it("leaves a non-differing factor unchanged (survey label == report label)", () => {

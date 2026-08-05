@@ -6,6 +6,17 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="jul10-42-lva-growth-financing-copy-pr-ready"></a>
+### 2026-08-05 — July 10 #42 LVA growth-financing wording prepared <!-- ENTRY_ISO:2026-08-05 ENTRY_SLUG:jul10-42-lva-growth-financing-copy-pr-ready -->
+
+**Status: IMPLEMENTED + LOCALLY VERIFIED in protected PR [#304](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/304); review pending; no Production mutation.** Gabriel authorized proceeding with the canonical #42 decision packet. New LVA seed content now labels the sixteenth factor **“Access to financing for growth”** in both the S3 rating matrix and S4 obstacle option; the derived S5 explanation uses the same survey wording. `S3_growth_financing`, `growth_financing`, `S5_why_growth_financing`, the sixteenth factor position, scale, requiredness, and the locked Esperto crosswalk remain unchanged.
+
+**Historical compatibility.** Existing campaigns remain pinned to older versions containing “Growth Financing.” The report-label adapter now recognizes both old and new survey wording and continues rendering the source-faithful Esperto report label “Financing growth,” so the seed clarification does not rewrite historical template content or alter prior report meaning. The committed LVA label fixture and focused regression tests cover the new labels, stable keys/order, derived follow-up, old-version report compatibility, and the golden import's `growth_financing` decode.
+
+**Ledger and rollout boundary.** #42 moves from NEEDS DECISION to PARTIAL, updating the canonical tally to **42 DONE / 5 PARTIAL / 6 NEEDS DECISION**. This branch changes source and tracked evidence only. It does not run the LVA seed against Production, create or publish a template version, change any active version, submit an assessment, send an email, alter a flag, or mutate customer data. After protected merge, a separately authorized guarded seed may create a new DRAFT for desktop/mobile visual verification; publishing and live survey/report verification remain a later separate authorization.
+
+**Verification.** The agreed seed, report-compatibility, and historical-import seams passed **4 suites / 94 tests** after explicit RED/GREEN cycles; the expanded content/ledger/freshness matrix passed **6 suites / 104 tests**. The fresh full repository run passed **625 suites / 7,702 tests / 14 snapshots**. Changed-file ESLint, Python compilation, migration safety across **44 migrations**, the ledger-artifact contract, and `git diff --check` passed. `CI=true npx next build --turbopack` compiled successfully, completed TypeScript, and generated **92/92** static pages; expected local missing-Inngest and `DATABASE_URL` messages did not fail the build. The source-backed approval visual was reviewed before implementation. Independent specification review reported **0 Critical / 0 Important / 0 Minor** findings. Standards review reported one Minor duplicated-predicate judgment call; the duplicate check was removed and the affected matrix re-passed **3 suites / 50 tests** plus ESLint and the diff check.
+
 <a id="jul10-feedback-canonical-ledger"></a>
 ### 2026-08-05 — July 10 assessment-feedback canonical closeout ledger <!-- ENTRY_ISO:2026-08-05 ENTRY_SLUG:jul10-feedback-canonical-ledger -->
 
