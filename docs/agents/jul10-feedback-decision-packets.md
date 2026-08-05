@@ -1,0 +1,304 @@
+# July 10 Assessment Feedback - Approval-Ready Decision Packets
+
+These packets translate the eleven unresolved rows in the
+[canonical closeout ledger](jul10-feedback-closeout.md) into bounded decisions.
+They were reconciled against origin/main at
+15ee442b124f43155ffd3dfdc1dc08fbfa37cd5e on 2026-08-05. No production state,
+template version, feature flag, benchmark value, customer data, or email was
+changed.
+
+Gabriel may authorize the recommendations below. Publishing a template version,
+changing production benchmark data, enabling a flag, or sending an email still
+requires a separate explicit production authorization.
+
+The copy packets use this source-backed approval visual. It transcribes the
+current seed wording and proposed disposition; it is intentionally not presented
+as a live application screenshot.
+
+![LVA wording approval visual for rows 41, 42, and 45](assets/jul10-copy-decisions-41-42-45.svg)
+
+<a id="32-scaling-up-full-industry-benchmarking"></a>
+## #32 Scaling Up Full industry benchmarking
+
+**Exact ask.** Decide whether answers-versus-industry-standards benchmarking is
+universal or report-specific and identify the source of the comparison data.
+
+**Current truth.** Scaling Up Full has a separately gated, static, versioned,
+single-cohort peer dataset in
+[su-full-benchmarks.ts](../../src/src/lib/assessments/su-full-benchmarks.ts).
+It is expressly provisional and is not matched by industry, geography, or
+company size. The generic
+[AssessmentBenchmark model](../../src/prisma/schema.prisma) currently stores
+QUESTION metrics for LVA; it does not express Scaling Up Full domain, section,
+or ScaleUp-level metrics.
+
+**Recommendation.** Approve Scaling Up Full only, label the existing comparison
+**Peers - provisional reference cohort**, and do not call it industry standards.
+Universal benchmarking should wait for an authoritative cohort-data contract
+covering provenance, dimensions, effective dates, editing authority, and report
+consumers.
+
+**Compatibility.** Keep the existing Scaling Up Full keys and fail closed when
+the cohort or key set is missing. Do not stretch the QUESTION-only LVA storage
+contract into a different metric model.
+
+**Acceptance.** Scaling Up Full shows the approved provisional label and values
+only for a valid approved cohort; a missing or mismatched cohort shows no peer
+claim, and all other templates remain unchanged.
+
+**Approval sentence.** I approve #32 as Scaling Up Full report-specific
+provisional peers only; label the current one-cohort values “Peers - provisional
+reference cohort,” do not call them industry standards, and defer universal
+benchmarking until I approve an authoritative cohort-data contract.
+
+<a id="41-lva-the-leadership-wording"></a>
+## #41 LVA The leadership wording
+
+**Exact ask.** Clarify what “The leadership” measures before rewording it.
+
+**Current truth.** The phrase is a source-derived LVA factor distinct from
+“Leadership team.” Its durable identity is S3_the_leadership and the same
+semantic key drives the obstacle option and explanatory follow-up in
+[seed-lva-assessment.ts](../../src/prisma/seed-lva-assessment.ts). The
+[historical crosswalk](../../src/src/lib/assessments/esperto-import/crosswalks/lva.ts)
+depends on its factor position.
+
+**Recommendation.** Hold until the content owner chooses whether this means the
+leadership function, senior leaders' behavior, or another construct. Do not
+silently substitute “Leadership effectiveness,” because that invents meaning
+next to an already separate “Leadership team” factor.
+
+**Compatibility.** Retain S3_the_leadership only if the approved change is a
+semantic clarification. A different construct requires a new stable key and an
+explicit import/report mapping decision.
+
+**Acceptance.** A new draft version uses the approved wording in the matrix,
+obstacle option, and associated follow-up while historical answers retain the
+correct meaning.
+
+**Approval sentence.** I approve holding #41 until I confirm what “The
+leadership” measures; once confirmed, make a wording-only new-version change
+that keeps S3_the_leadership unless the meaning is materially different.
+
+<a id="42-lva-growth-financing-wording"></a>
+## #42 LVA Growth Financing wording
+
+**Exact ask.** Clarify whether “Growth Financing” means the ability to obtain
+financing, then reword it.
+
+**Current truth.** The factor uses S3_growth_financing and growth_financing in
+both LVA lists, and the locked Esperto crosswalk relies on the same factor order.
+
+**Recommendation.** Use **Access to financing for growth** in both the rating
+matrix and obstacle option. Do not change the scale, order, or associated
+follow-up scope.
+
+**Compatibility.** Retain S3_growth_financing, growth_financing, and the
+historical crosswalk position. This is a wording-only new-version change with no
+schema or import conversion.
+
+**Acceptance.** The new draft shows the approved wording in both locations,
+stable keys remain byte-identical, and the golden import still selects the same
+factor.
+
+**Approval sentence.** I approve changing LVA “Growth Financing” to “Access to
+financing for growth” as a wording-only new-version change; retain
+S3_growth_financing, growth_financing, factor order, and the historical-import
+crosswalk.
+
+<a id="44-lva-priority-triplet"></a>
+## #44 LVA priority triplet
+
+**Exact ask.** Determine whether “What is in your opinion the most important
+thing to achieve this year's goals?” duplicates the immediately preceding
+priority question.
+
+**Current truth.** The source and current seed preserve three adjacent horizons:
+the organization's overall number-one priority, the most important outcome for
+this year's goals, and the top priority for the next quarter. No later content
+decision, reword, published version, or live verification resolves the reported
+confusion. Source fidelity alone does not satisfy a clarity concern.
+
+**Recommendation.** Confirm the intended priority cascade before editing:
+organization-wide priority, annual outcome, then quarterly action. If those are
+intentional, approve distinct horizon-forward labels. If not, identify which
+construct is redundant. Preserve existing stable keys only where meaning is
+continuous.
+
+**Compatibility.** Any copy-only clarification belongs in a new LVA version and
+must retain factor order and import mappings. Removing or changing a construct
+requires a fresh stable key/mapping decision.
+
+**Acceptance.** Owner-approved wording makes the three time horizons
+unambiguous in a draft; targeted seed/import tests pass; a separately authorized
+publish is followed by a live survey check.
+
+**Approval sentence.** I approve the three-question sequence as an intentional
+organization, annual, and quarterly priority cascade; prepare distinct
+horizon-forward wording while retaining stable keys only where the meaning is
+unchanged.
+
+<a id="45-lva-media-wording"></a>
+## #45 LVA media wording
+
+**Exact ask.** Identify Suzanne's concern with “What do the media write about
+the company?” before changing it.
+
+**Current truth.** This source-faithful free-text question uses stable key
+S2_media, and the locked historical crosswalk maps the same source position.
+The available artifacts provide no authoritative replacement.
+
+**Recommendation.** Hold until Suzanne identifies whether the concern is
+grammar, scope, relevance, or answer form. If it is grammar only, propose
+**What is being said about the company in the media?** for confirmation. Do not
+expand it to customer, employee, or social-media sentiment without approval.
+
+**Compatibility.** Preserve S2_media for grammar-only clarification. A material
+scope expansion requires a new key and mapping decision.
+
+**Acceptance.** The approved label appears in a new draft with the correct
+stable-key treatment and no change to unrelated questions or imports.
+
+**Approval sentence.** I approve holding #45 until Suzanne confirms the
+concern; if she confirms grammar-only wording, use “What is being said about the
+company in the media?” in a new version while retaining S2_media.
+
+<a id="47-qsp-v2-invitation-email"></a>
+## #47 QSP v2 invitation email
+
+**Exact ask.** Add coach-logo space, mention the coach by name, revise the
+invitation copy, and enlarge the begin button.
+
+**Current truth.** The standard QSP v2 path already uses coach-forward copy,
+passes a valid coach logo into the Scaling Up-first shell, and renders the larger
+CTA through
+[invitation-email.ts](../../src/src/lib/assessments/invitation-email.ts).
+Campaign-level full-HTML overrides deliberately replace that shell and are a
+separate compatibility mode. Existing tests prove the renderer contract, but a
+current standard-path production smoke and final copy approval are absent.
+
+**Recommended body copy.**
+
+> Hi {{respondentFirstName}},
+>
+> You've been invited by {{coachName}} to complete the {{templateName}} for
+> {{organizationName}}.
+>
+> It takes just a few minutes, and there are no right or wrong answers - your
+> honest perspective is what makes the results useful. Your responses are
+> confidential.
+>
+> Click the button below to begin.
+
+**Compatibility.** Invitation copy is version content. Keep legacy full-HTML
+replacement behavior until a separate migration is approved; no question key,
+scoring, or import mapping changes.
+
+**Acceptance.** On the standard renderer, representative desktop and mobile
+email previews show the coach name, safe coach logo, approved text, and the
+larger CTA. A separately authorized live smoke confirms delivery rendering.
+
+**Approval sentence.** I approve closing #47 on the standard QSP v2 renderer
+with the current coach-forward copy, coach-logo shell, and larger CTA after a
+live smoke; legacy full-HTML override conversion remains separate.
+
+<a id="57-and-58-lva-peer-averages-and-report-comparison"></a>
+## #57 and #58 LVA peer averages and report comparison
+
+**Exact asks.** #57 requires authorable LVA question peer averages with a path
+for future templates. #58 requires populated peer comparisons in both
+individual and group LVA reports.
+
+**Current truth.** Wave S implemented tested LVA QUESTION storage, atomic admin
+authoring, keyed joins, and both report surfaces in PR #132 / 9220503f. A
+historical four-value pilot succeeded and was then cleared. The latest retained
+production receipt shows the capability effectively dark and cannot establish
+approved populated rows. Rendering remains intentionally LVA-only.
+
+**Recommendation.** Treat this as three explicit resumes: authorize restoring
+Wave S, approve a provenance-backed real LVA peer dataset, then verify populated
+individual and group reports. Decide future-template support one alias and
+metric contract at a time; do not imply universal support from the current LVA
+allowlist.
+
+**Compatibility.** Preserve QUESTION metric keys and omit-empty behavior.
+Missing values or a dark gate must show no fabricated comparison. GH #233's
+read-only observability is evidence infrastructure, not feature activation.
+
+**Acceptance.** An authorized production receipt establishes effective
+availability; approved values are visible in authoring; the individual report
+shows the peer section; the group report shows peer value and deviation; absent
+values remain omitted.
+
+**Approval sentence.** I approve a separately controlled Wave S restore for
+LVA, followed by entry of the approved peer dataset and live verification of
+both report surfaces; future-template enablement remains a separate decision.
+
+<a id="75-five-dysfunctions-answer-driven-output"></a>
+## #75 Five Dysfunctions answer-driven output
+
+**Exact ask.** Confirm and provide the reportedly missing answer-driven
+Five Dysfunctions findings/results logic.
+
+**Current truth.** Five Dysfunctions already scores five domains and has
+High/Medium/Low tier guidance. Wave U provides a launched generic,
+snapshot-frozen findings engine. The Five Dysfunctions seed does not author
+instrument-specific finding rules, and no current production report receipt
+proves that experience. Generic capability does not close the instrument ask.
+
+**Recommendation.** Have Gabriel with Jeff/Suzanne approve the Five
+Dysfunctions-specific trigger conditions, finding messages, precedence, and
+empty-state behavior. Author them in a new template version using the existing
+Wave U machinery; do not create a second findings subsystem.
+
+**Compatibility.** Preserve question/domain keys and historical results. Freeze
+resolved findings at score time under the existing ADR-0021 behavior.
+
+**Acceptance.** Boundary-answer fixtures resolve the approved findings and tier
+guidance deterministically; a representative new-version report is visually
+reviewed and then production-verified after separately authorized publishing.
+
+**Approval sentence.** I approve using the existing Wave U engine for the
+attached Five Dysfunctions-specific rules and messages in a new version;
+preserve stable keys, freeze findings at scoring, and verify a representative
+report after authorized publication.
+
+<a id="84-sunhub-eight-question-quick-quiz"></a>
+## #84 SunHub eight-question quick quiz
+
+**Exact ask.** Determine the build status of the SunHub “Scaling Up 4 Decisions
+Quick Quiz,” an eight-question lead-magnet assessment with end feedback.
+
+**Current truth.** The platform has a reusable PUBLIC assessment engine and a
+different 32-question, four-domain Scaling Up assessment in
+[seed-scaling-up-quick-assessment.ts](../../src/prisma/seed-scaling-up-quick-assessment.ts).
+No authoritative eight-question SunHub content package was found. Historical
+planning distinguishes the two instruments.
+
+**Recommendation.** Build a separate PUBLIC template named “Scaling Up 4
+Decisions Quick Quiz (SunHub).” Do not rename, reseed, or replace the existing
+32-question scaling-up-quick template. Resume only after receiving the
+authoritative eight questions, scale, scoring/tier feedback, CTA destinations,
+branding/embed requirements, and source-rights approval.
+
+**Compatibility.** Use a new alias and fresh sunhub_* section/question keys.
+Any legacy-result import needs its own discovered and locked crosswalk.
+
+**Acceptance.** An owner-approved fixture exposes exactly eight questions,
+scores and renders the approved feedback and CTAs, accepts a PUBLIC submission,
+and leaves the 32-question campaign and results unchanged.
+
+**Approval sentence.** I approve treating #84 as a separate eight-question
+SunHub PUBLIC template; preserve scaling-up-quick unchanged and do not begin the
+build until the authoritative content, feedback, CTAs, branding, and rights are
+approved.
+
+## Decision order
+
+1. Approve the bounded, no-new-product-intent packets: #42 and #47.
+2. Answer the content questions: #41, #44, and #45.
+3. Approve data/rollout contracts: #32 and #57/#58.
+4. Supply authored outcome content for #75.
+5. Supply the complete source package and build authorization for #84.
+6. Handle #33 through its dedicated report-by-report matrix rather than this
+   copy/data queue.

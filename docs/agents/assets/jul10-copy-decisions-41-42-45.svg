@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="900" viewBox="0 0 1400 900" role="img" aria-labelledby="title desc">
+  <title id="title">LVA wording approval cards for July 10 rows 41, 42, and 45</title>
+  <desc id="desc">Source-backed current wording, proposed disposition, and stable-key impact. This is an approval visual, not a live application screenshot.</desc>
+  <rect width="1400" height="900" fill="#f7f3fa"/>
+  <rect x="50" y="40" width="1300" height="820" rx="24" fill="#ffffff" stroke="#dcd4e7" stroke-width="2"/>
+  <text x="90" y="105" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="700" fill="#241833">LVA wording decisions</text>
+  <text x="90" y="142" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#6f6780">Source-backed approval visual · current main at 15ee442b · not a live UI screenshot</text>
+
+  <rect x="90" y="185" width="1220" height="185" rx="16" fill="#fbf9fc" stroke="#dcd4e7"/>
+  <rect x="112" y="207" width="74" height="32" rx="16" fill="#522583"/>
+  <text x="149" y="229" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#ffffff">#41</text>
+  <text x="210" y="230" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700" fill="#6f6780">CURRENT</text>
+  <text x="210" y="270" font-family="Arial, Helvetica, sans-serif" font-size="29" font-weight="700" fill="#241833">“The leadership”</text>
+  <text x="760" y="230" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700" fill="#6f6780">DECISION NEEDED</text>
+  <text x="760" y="270" font-family="Arial, Helvetica, sans-serif" font-size="22" fill="#241833">Leadership function, senior-leader behavior,</text>
+  <text x="760" y="300" font-family="Arial, Helvetica, sans-serif" font-size="22" fill="#241833">or another construct?</text>
+  <text x="210" y="335" font-family="Arial, Helvetica, sans-serif" font-size="17" fill="#6f6780">Stable key: S3_the_leadership · Preserve only if meaning is continuous</text>
+
+  <rect x="90" y="395" width="1220" height="185" rx="16" fill="#fbf9fc" stroke="#dcd4e7"/>
+  <rect x="112" y="417" width="74" height="32" rx="16" fill="#522583"/>
+  <text x="149" y="439" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#ffffff">#42</text>
+  <text x="210" y="440" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700" fill="#6f6780">CURRENT</text>
+  <text x="210" y="480" font-family="Arial, Helvetica, sans-serif" font-size="29" font-weight="700" fill="#241833">“Growth Financing”</text>
+  <text x="760" y="440" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700" fill="#1e824c">RECOMMENDED</text>
+  <text x="760" y="480" font-family="Arial, Helvetica, sans-serif" font-size="27" font-weight="700" fill="#241833">“Access to financing for growth”</text>
+  <text x="210" y="545" font-family="Arial, Helvetica, sans-serif" font-size="17" fill="#6f6780">Retain S3_growth_financing, growth_financing, order, and Esperto crosswalk</text>
+
+  <rect x="90" y="605" width="1220" height="185" rx="16" fill="#fbf9fc" stroke="#dcd4e7"/>
+  <rect x="112" y="627" width="74" height="32" rx="16" fill="#522583"/>
+  <text x="149" y="649" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#ffffff">#45</text>
+  <text x="210" y="650" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700" fill="#6f6780">CURRENT</text>
+  <text x="210" y="690" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" fill="#241833">“What do the media write</text>
+  <text x="210" y="720" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" fill="#241833">about the company?”</text>
+  <text x="760" y="650" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700" fill="#b26a00">IF GRAMMAR-ONLY</text>
+  <text x="760" y="690" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" fill="#241833">“What is being said about the company</text>
+  <text x="760" y="720" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" fill="#241833">in the media?”</text>
+  <text x="210" y="765" font-family="Arial, Helvetica, sans-serif" font-size="17" fill="#6f6780">Retain S2_media only for grammar-only clarification · Suzanne confirms concern first</text>
+
+  <text x="90" y="830" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#6f6780">Approval affects a future draft only. Publishing or production mutation requires separate authorization.</text>
+</svg>
