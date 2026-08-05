@@ -275,7 +275,7 @@ export function BrandedReport({
 }
 
 /** Captured byte-compatible Classic branch. Keep its markup below unchanged. */
-function LegacyClassicReport({
+export function LegacyClassicReport({
   report,
   assessmentName,
   campaignLabel,

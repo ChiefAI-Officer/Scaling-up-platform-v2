@@ -6,6 +6,14 @@ export const REPORT_STYLE_KEYS = Object.freeze([
 
 export type ReportStyleKey = (typeof REPORT_STYLE_KEYS)[number];
 
+export const REPORT_STYLE_PREVIEW_PAGES = Object.freeze([
+  "cover",
+  "summary",
+  "detail",
+] as const);
+
+export type ReportStylePreviewPage = (typeof REPORT_STYLE_PREVIEW_PAGES)[number];
+
 export type ReportStyleMetadata = Readonly<{
   label: string;
   description: string;
