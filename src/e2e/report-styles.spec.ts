@@ -5,9 +5,22 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { promisify } from "node:util";
 import { encode } from "next-auth/jwt";
+import { PrismaClient } from "@prisma/client";
 import { REPORT_STYLE_PREVIEW_VARIANTS } from "../src/lib/assessments/report-style-preview-fixture";
 import { loginAs } from "./helpers/auth";
 
+/* eslint-disable @typescript-eslint/no-require-imports */
+const {
+  assertDisposableReportStyleDatabase,
+  expectedRaceReportStyle,
+} = require("../scripts/report-style-e2e-server-contract.cjs") as {
+  assertDisposableReportStyleDatabase: (options: {
+    env: NodeJS.ProcessEnv;
+    createClient: (databaseUrl: string) => PrismaClient;
+  }) => Promise<void>;
+  expectedRaceReportStyle: (status: number) => "CLASSIC" | "MODERN_DASHBOARD";
+};
+/* eslint-enable @typescript-eslint/no-require-imports */
 
 const execFileAsync = promisify(execFile);
 
@@ -20,6 +33,8 @@ const execFileAsync = promisify(execFile);
  */
 const requiredEnvironment = [
   "E2E_REPORT_STYLES_DATABASE_URL",
+  "E2E_REPORT_STYLES_DISPOSABLE_SENTINEL_ID",
+  "E2E_REPORT_STYLES_DISPOSABLE_SENTINEL_VALUE",
   "E2E_REPORT_STYLES_ADMIN_SETTINGS_PATH",
   "E2E_REPORT_STYLES_CREATE_CAMPAIGN_BODY",
   "E2E_REPORT_STYLES_EXECUTIVE_CAMPAIGN_PATH",
@@ -40,7 +55,8 @@ const requiredEnvironment = [
 ] as const;
 
 const missingEnvironment = requiredEnvironment.filter((key) => !process.env[key]);
-const canRunWorkflow = missingEnvironment.length === 0;
+const managedServerEnabled = process.env.PLAYWRIGHT_SKIP_WEBSERVER !== "1";
+const canRunWorkflow = missingEnvironment.length === 0 && managedServerEnabled;
 
 const admin = {
   email: process.env.E2E_ADMIN_EMAIL || "admin@scalingup.com",
@@ -131,7 +147,7 @@ async function rendererCss() {
   return styles.join("\n");
 }
 
-async function setExactRendererContent(
+async function setSupplementalRendererContent(
   page: Page,
   style: "EXECUTIVE_BOARDROOM" | "MODERN_DASHBOARD",
   variant: (typeof REPORT_STYLE_PREVIEW_VARIANTS)[number],
@@ -227,8 +243,20 @@ async function selectAndSaveStyle(page: Page, styleName: RegExp) {
 test.describe("Report styles — isolated-database acceptance", () => {
   test.skip(
     !canRunWorkflow,
-    `requires isolated fixture environment: ${missingEnvironment.join(", ")}`,
+    `requires managed isolated fixture environment: ${[
+      ...missingEnvironment,
+      ...(managedServerEnabled ? [] : ["PLAYWRIGHT_SKIP_WEBSERVER must not be 1"]),
+    ].join(", ")}`,
   );
+
+  test.beforeAll(async () => {
+    if (!canRunWorkflow) return;
+    const databaseUrl = requiredValue("E2E_REPORT_STYLES_DATABASE_URL");
+    await assertDisposableReportStyleDatabase({
+      env: { ...process.env, DATABASE_URL: databaseUrl },
+      createClient: (url) => new PrismaClient({ datasourceUrl: url, log: [] }),
+    });
+  });
 
   test("admin default copies into a newly created campaign, coach overrides, then each real submission locks and renders", async ({
     page,
@@ -337,7 +365,9 @@ test.describe("Report styles — isolated-database acceptance", () => {
     const submitBody = jsonValue("E2E_REPORT_STYLES_RACE_SUBMIT_BODY");
 
     await page.goto(campaignPath);
-    await expect(page.getByTestId("campaign-report-style-card").getByRole("button", { name: /save report appearance/i })).toBeVisible();
+    const unlockedPicker = page.getByTestId("campaign-report-style-card");
+    await expect(unlockedPicker.getByRole("radio", { name: /classic/i })).toBeChecked();
+    await expect(unlockedPicker.getByRole("button", { name: /save report appearance/i })).toBeVisible();
     const exchange = await browserFetch(page, exchangePath, { method: "POST", body: { token: invitationToken } });
     expect(exchange.status).toBe(204);
 
@@ -354,12 +384,19 @@ test.describe("Report styles — isolated-database acceptance", () => {
     if (patched.status === 409) {
       expect(patched.body).toEqual(expect.objectContaining({ error: "REPORT_STYLE_LOCKED" }));
     } else {
-      expect(patched.body).toEqual(expect.objectContaining({ success: true }));
+      expect(patched.body).toEqual(expect.objectContaining({
+        success: true,
+        data: expect.objectContaining({ reportStyle: "MODERN_DASHBOARD" }),
+      }));
     }
 
     await page.goto(campaignPath);
     const lockedPicker = page.getByTestId("campaign-report-style-card");
+    const expectedStyle = expectedRaceReportStyle(patched.status);
+    const expectedChoice = expectedStyle === "MODERN_DASHBOARD" ? /modern dashboard/i : /classic/i;
     await expect(lockedPicker.getByText(/changes are unavailable after the first completed response/i)).toBeVisible();
+    await expect(lockedPicker.getByRole("radio", { name: expectedChoice })).toBeChecked();
+    await expect(lockedPicker.getByRole("radio", { name: expectedChoice })).toBeDisabled();
     await expect(lockedPicker.getByRole("button", { name: /save report appearance/i })).toHaveCount(0);
   });
 });
@@ -422,7 +459,7 @@ test.describe("Report styles — fixture-only renderer visual evidence", () => {
   });
 });
 
-test.describe("Report styles — DB-free exact renderer visual evidence", () => {
+test.describe("Report styles — DB-free supplemental component renderer evidence", () => {
   test.setTimeout(60_000);
 
   test("Boardroom and Dashboard render all safe fixtures responsively and print complete reports", async ({ page }, testInfo) => {
@@ -432,23 +469,23 @@ test.describe("Report styles — DB-free exact renderer visual evidence", () => 
     ]) {
       for (const variant of REPORT_STYLE_PREVIEW_VARIANTS) {
         await page.setViewportSize({ width: 1280, height: 900 });
-        await setExactRendererContent(page, style.key, variant);
+        await setSupplementalRendererContent(page, style.key, variant);
         const renderer = page.getByTestId(style.renderer);
         await expect(renderer).toBeVisible();
         await assertNoAxeViolations(page, `[data-testid="${style.renderer}"]`);
         await expect(renderer).toContainText(/confidential assessment report/i);
         expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
-        await captureViewportEvidence(page, testInfo, `${style.key}-${variant}-exact-desktop`);
+        await captureViewportEvidence(page, testInfo, `${style.key}-${variant}-supplemental-desktop`);
 
         await page.setViewportSize({ width: 393, height: 852 });
-        await setExactRendererContent(page, style.key, variant);
+        await setSupplementalRendererContent(page, style.key, variant);
         await expect(page.getByTestId(style.renderer)).toBeVisible();
         expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
-        await captureViewportEvidence(page, testInfo, `${style.key}-${variant}-exact-mobile`);
+        await captureViewportEvidence(page, testInfo, `${style.key}-${variant}-supplemental-mobile`);
 
         await page.setViewportSize({ width: 1280, height: 900 });
-        await setExactRendererContent(page, style.key, variant);
-        await assertLetterPdf(page, testInfo, `${style.key}-${variant}-exact-letter`);
+        await setSupplementalRendererContent(page, style.key, variant);
+        await assertLetterPdf(page, testInfo, `${style.key}-${variant}-supplemental-letter`);
       }
     }
   });
