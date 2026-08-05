@@ -144,6 +144,7 @@ const CAMPAIGN = {
   deletedAt: null as Date | null,
   templateId: "tmpl-1",
   versionId: "ver-1",
+  reportStyle: "MODERN_DASHBOARD",
   template: { name: "Scaling Up Quick Assessment" },
 };
 
@@ -394,6 +395,7 @@ describe("new submission — scoreResult + Cache-Control: no-store", () => {
     expect(body.data.scoreResult).toBeDefined();
     expect(Array.isArray(body.data.scoreResult.perDomain)).toBe(true);
     expect(body.data.scoreResult.perDomain).toHaveLength(4);
+    expect(body.data.reportStyle).toBe("MODERN_DASHBOARD");
   });
 
   it("passes idempotencyKey to the submission create inside the transaction", async () => {

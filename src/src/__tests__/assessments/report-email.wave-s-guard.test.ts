@@ -42,6 +42,7 @@ function lvaReport(): RespondentReport {
     companyName: "Northwind Logistics",
     assessmentName: "Leadership Vision Alignment",
     templateAlias: "leadership-vision-alignment",
+    reportStyle: "CLASSIC",
     campaignLabel: null,
     submittedAt: new Date("2026-04-30T10:00:00Z"),
     result: {} as ScoreResult,

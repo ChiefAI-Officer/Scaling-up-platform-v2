@@ -12,6 +12,7 @@ import {
   type RespondentReport,
   type StoredReportVersion,
 } from "@/lib/assessments/respondent-report";
+import type { ReportStyleKey } from "@/lib/assessments/report-style-registry";
 
 interface PublicSubmissionFindFirst {
   findFirst: (args: {
@@ -95,6 +96,7 @@ interface RawPublicSubmission {
   } | null;
   campaign: {
     name: string | null;
+    reportStyle: ReportStyleKey;
     importManifest?: unknown;
     template: {
       id: string;
@@ -824,6 +826,7 @@ export async function getPublicReferralReport(
           campaign: {
             select: {
               name: true,
+              reportStyle: true,
               importManifest: true,
               template: {
                 select: {
@@ -879,6 +882,7 @@ export async function getPublicReferralReport(
         respondent: publicTakerForReport(submission.publicTaker),
         campaign: {
           name: submission.campaign.name,
+          reportStyle: submission.campaign.reportStyle,
           // Public quiz reports never carried organization metadata at submit
           // time. Keep the later authenticated view artifact-identical instead
           // of injecting the campaign's current mutable organization name.

@@ -36,6 +36,10 @@ import { formatTimestamp } from "@/lib/utils";
 import "@/styles/su-report.css";
 import type { RespondentReport, QuestionMeta } from "@/lib/assessments/respondent-report";
 import type { ScoreResult } from "@/lib/assessments/scoring";
+import {
+  isReportStyleKey,
+  type ReportStyleKey,
+} from "@/lib/assessments/report-style-registry";
 
 interface SectionDef {
   stableKey: string;
@@ -169,6 +173,7 @@ export function PublicQuizClient({
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [results, setResults] = useState<ScoreResult | null>(null);
+  const [reportStyle, setReportStyle] = useState<ReportStyleKey | null>(null);
   const [submittedId, setSubmittedId] = useState<string>("");
   const [verifiedCoachEmail, setVerifiedCoachEmail] = useState<string | null>(
     null,
@@ -399,7 +404,7 @@ export function PublicQuizClient({
   }
 
   // step === "results" — render the branded in-place report.
-  if (step === "results" && results) {
+  if (step === "results" && results && reportStyle) {
     const report: RespondentReport = {
       respondentName: `${firstName.trim()} ${lastName.trim()}`.trim(),
       respondentEmail: email.trim() || null,
@@ -418,6 +423,7 @@ export function PublicQuizClient({
       // the campaign live at the time of writing, but that is a fact about DATA,
       // not about this code — so do not treat it as a guarantee. See ADR-0008.
       templateAlias: templateAlias ?? "",
+      reportStyle,
       campaignLabel: campaignName,
       submittedAt: new Date(),
       result: results,
@@ -517,8 +523,12 @@ export function PublicQuizClient({
       if (!res.ok || body.success === false) {
         throw new Error(body.error || `HTTP ${res.status}`);
       }
+      if (!isReportStyleKey(body.data.reportStyle)) {
+        throw new Error("Invalid report style response");
+      }
       clearDraft();
       setResults(body.data.scoreResult as ScoreResult);
+      setReportStyle(body.data.reportStyle);
       setSubmittedId(body.data.submissionId ?? "");
       setVerifiedCoachEmail(body.data.referringCoachEmail ?? null);
       setStep("results");

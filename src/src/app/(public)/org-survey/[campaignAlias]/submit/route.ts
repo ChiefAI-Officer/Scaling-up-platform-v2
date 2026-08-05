@@ -851,6 +851,7 @@ export async function POST(
           assessmentName:
             invitation.campaign.template?.name ?? "an assessment",
           templateAlias: invitation.campaign.template?.alias ?? "",
+          reportStyle: invitation.campaign.reportStyle,
           campaignLabel: null,
           sections: invitation.campaign.version.sections,
           questions: invitation.campaign.version.questions,

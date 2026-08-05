@@ -33,6 +33,7 @@ function baseReport(overrides: Partial<RespondentReport> = {}): RespondentReport
     assessmentName: "Scaling Up 4 Decisions Assessment",
     // Required on RespondentReport; "" == DEFAULT_REPORT_CONFIG, as before.
     templateAlias: "",
+    reportStyle: overrides.reportStyle ?? "CLASSIC",
     campaignLabel: null,
     submittedAt: new Date("2026-06-11T10:00:00Z"),
     result: {} as ScoreResult,
@@ -202,6 +203,23 @@ function neutralReport(): RespondentReport {
 // ── Tests ──────────────────────────────────────────────────────────────────
 
 describe("buildReportEmailHtml — overall score", () => {
+  it("does not change rendered email bytes when the frozen report style changes", () => {
+    const classic = buildReportEmailHtml({
+      report: fourDecisionsReport(),
+      recipientRole: "TAKER_COPY",
+    });
+    const modernReport = {
+      ...fourDecisionsReport(),
+      reportStyle: "MODERN_DASHBOARD" as const,
+    };
+    const modern = buildReportEmailHtml({
+      report: modernReport,
+      recipientRole: "TAKER_COPY",
+    });
+
+    expect(modern).toEqual(classic);
+  });
+
   it("freezes the exact legacy scored report email bytes", () => {
     const report = fourDecisionsReport();
     const legacyDefault = buildReportEmailHtml({
@@ -531,6 +549,7 @@ describe("buildRespondentReportFromSubmission — templateAlias", () => {
       submittedAt: new Date("2026-06-17T10:00:00Z"),
       submissionId: "sub-1",
       templateAlias: "RockHabits",
+      reportStyle: "MODERN_DASHBOARD",
       ...overrides,
     };
   }
@@ -538,6 +557,11 @@ describe("buildRespondentReportFromSubmission — templateAlias", () => {
   it("threads templateAlias onto the returned RespondentReport (so reportConfigFor can read it)", () => {
     const report = buildRespondentReportFromSubmission(submissionArgs());
     expect(report.templateAlias).toBe("RockHabits");
+  });
+
+  it("threads the required frozen campaign reportStyle onto the report model", () => {
+    const report = buildRespondentReportFromSubmission(submissionArgs());
+    expect(Object.getOwnPropertyDescriptor(report, "reportStyle")?.value).toBe("MODERN_DASHBOARD");
   });
 
   // ── Wave E Task 9 — thread real answers + submittedAt + submissionId ───────
@@ -670,6 +694,7 @@ describe("Wave P — blank-name respondent falls back to email (coach-facing) bu
       submittedAt: new Date("2026-07-02T10:00:00Z"),
       submissionId: "sub-blank",
       templateAlias: "four-decisions",
+      reportStyle: "CLASSIC",
     };
   }
 

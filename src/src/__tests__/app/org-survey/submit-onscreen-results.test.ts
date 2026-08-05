@@ -181,6 +181,7 @@ function invitationFixture(overrides?: {
     },
     campaign: {
       id: "c1",
+      reportStyle: "MODERN_DASHBOARD",
       alias: "demo",
       deletedAt: null,
       status: "ACTIVE",
@@ -412,6 +413,14 @@ describe("Wave OSR — the report model is built once and reused", () => {
     expect((body.data?.report as { templateAlias?: string })?.templateAlias).toBe(
       "rockefeller",
     );
+  });
+
+  it("passes the campaign's frozen reportStyle into the shared report model", async () => {
+    mockInvitation({ showResultsOnScreen: true });
+
+    await POST(jsonReq(goodAnswers) as never, aliasParams("demo"));
+
+    expect(buildState.calls[0]?.reportStyle).toBe("MODERN_DASHBOARD");
   });
 });
 

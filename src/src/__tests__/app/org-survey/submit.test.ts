@@ -197,6 +197,7 @@ function mockHappyInvitation(
     },
     campaign: {
       id: "c1",
+      reportStyle: "MODERN_DASHBOARD",
       templateId: "template-1",
       versionId: "v1",
       alias: "demo",

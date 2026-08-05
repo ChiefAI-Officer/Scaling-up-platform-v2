@@ -24,6 +24,7 @@
 import {
   onScreenResultKey,
   readOnScreenResult,
+  reviveOnScreenReport,
   writeOnScreenResult,
   clearOnScreenResult,
 } from "@/lib/assessments/onscreen-result-store";
@@ -40,6 +41,7 @@ const OTHER_KEY = "inv_respondent_b";
 const sampleReport = {
   respondentName: "Resp Ondent",
   templateAlias: "rockefeller",
+  reportStyle: "MODERN_DASHBOARD",
   assessmentName: "Rockefeller Habits Checklist",
   submittedAt: new Date("2026-07-29T10:30:00.000Z"),
   result: { countAchieved: 12 },
@@ -76,6 +78,17 @@ describe("round trip", () => {
     expect(read).not.toBeNull();
     expect(read?.respondentName).toBe("Resp Ondent");
     expect(read?.templateAlias).toBe("rockefeller");
+    expect(Object.getOwnPropertyDescriptor(read ?? {}, "reportStyle")?.value).toBe("MODERN_DASHBOARD");
+  });
+
+  it("normalizes an untrusted serialized reportStyle at revival without changing other facts", () => {
+    const revived = reviveOnScreenReport({
+      ...sampleReport,
+      reportStyle: "NOT_A_REPORT_STYLE",
+    });
+
+    expect(Object.getOwnPropertyDescriptor(revived ?? {}, "reportStyle")?.value).toBe("CLASSIC");
+    expect(revived?.respondentName).toBe("Resp Ondent");
   });
 
   it("revives submittedAt as a real Date, not the JSON string", () => {

@@ -156,6 +156,7 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
         success: true,
         data: {
           submissionId: "sub_1",
+          reportStyle: "CLASSIC",
           scoreResult: scoreResultFixture,
           redirectUrl: `/quiz/${ALIAS}/thank-you`,
         },
@@ -228,6 +229,7 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
         success: true,
         data: {
           submissionId: "sub_1",
+          reportStyle: "CLASSIC",
           scoreResult: scoreResultFixture,
           redirectUrl: `/quiz/${ALIAS}/thank-you`,
         },
@@ -273,6 +275,7 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
         success: true,
         data: {
           submissionId: "sub_1",
+          reportStyle: "CLASSIC",
           scoreResult: scoreResultFixture,
           redirectUrl: `/quiz/${ALIAS}/thank-you`,
         },
@@ -330,6 +333,7 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
         success: true,
         data: {
           submissionId: "sub_1",
+          reportStyle: "CLASSIC",
           scoreResult: scoreResultFixture,
           redirectUrl: `/quiz/${ALIAS}/thank-you`,
         },
@@ -358,6 +362,7 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
         success: true,
         data: {
           submissionId: "sub_1",
+          reportStyle: "CLASSIC",
           scoreResult: scoreResultFixture,
           referringCoachEmail: "verified@example.com",
           redirectUrl: `/quiz/${ALIAS}/thank-you`,
@@ -390,6 +395,7 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
         success: true,
         data: {
           submissionId: "sub_1",
+          reportStyle: "CLASSIC",
           scoreResult: scoreResultFixture,
           referringCoachEmail: null,
           redirectUrl: `/quiz/${ALIAS}/thank-you`,
@@ -419,6 +425,7 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
         success: true,
         data: {
           submissionId: "sub_1",
+          reportStyle: "CLASSIC",
           scoreResult: scoreResultFixture,
           redirectUrl: `/quiz/${ALIAS}/thank-you`,
         },

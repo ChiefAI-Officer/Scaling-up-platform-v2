@@ -64,6 +64,7 @@ import {
 import { isEmailFindingsEnabled } from "@/lib/assessments/wave-u3-flags";
 import { buildReportEmailChrome } from "@/lib/assessments/report-email-chrome";
 import type { ReportEmailChrome } from "@/lib/assessments/wave-228-flags";
+import type { ReportStyleKey } from "@/lib/assessments/report-style-registry";
 
 export type ReportEmailRecipientRole = "TAKER_COPY" | "REFERRING_COACH";
 
@@ -123,6 +124,8 @@ export interface BuildRespondentReportArgs {
   assessmentName: string;
   /** The template's stable alias — drives reportConfigFor (scored vs qualitative). */
   templateAlias: string;
+  /** Frozen campaign presentation snapshot; email deliberately does not render it. */
+  reportStyle: ReportStyleKey;
   campaignLabel: string | null;
   sections: unknown;
   questions: unknown;
@@ -187,6 +190,7 @@ export function buildRespondentReportFromSubmission(
     companyName: args.companyName ?? "",
     assessmentName: args.assessmentName,
     templateAlias: args.templateAlias,
+    reportStyle: args.reportStyle,
     campaignLabel: args.campaignLabel,
     submittedAt: args.submittedAt,
     result: args.result,

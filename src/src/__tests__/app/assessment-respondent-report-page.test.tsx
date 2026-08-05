@@ -126,6 +126,7 @@ function okReport() {
       companyName: "Acme Corp",
       assessmentName: "Rockefeller Habits Checklist",
       templateAlias: "RockHabits",
+      reportStyle: "CLASSIC",
       campaignLabel: "Q1 Pulse",
       submittedAt: new Date("2026-01-15T00:00:00Z"),
       result: { perSection: [], perQuestion: [] },

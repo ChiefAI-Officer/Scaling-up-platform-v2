@@ -172,6 +172,7 @@ export async function POST(
         templateId: true,
         versionId: true,
         deletedAt: true,
+        reportStyle: true,
         template: { select: { name: true, alias: true } },
       },
     });
@@ -263,6 +264,7 @@ export async function POST(
           data: {
             submissionId: existing.id,
             scoreResult: existing.result,
+            reportStyle: campaign.reportStyle,
             referringCoachEmail: replayCoachEmail,
             redirectUrl: `/quiz/${campaignAlias}/thank-you`,
           },
@@ -405,6 +407,7 @@ export async function POST(
         publicTaker: data.publicTaker,
         assessmentName,
         templateAlias,
+        reportStyle: campaign.reportStyle,
         campaignLabel: null, // campaignLabel is not rendered in the email body
         sections: version.sections,
         questions: allQuestions,
@@ -700,6 +703,7 @@ export async function POST(
         data: {
           submissionId,
           scoreResult: result,
+          reportStyle: campaign.reportStyle,
           // Only the canonical address returned by the active-Coach lookup is
           // allowed to drive the in-place report CTA. Never echo the query.
           referringCoachEmail: persistedReferringCoachEmail,

@@ -24,6 +24,7 @@ import {
   buildQuestionMetaByKey,
   type QuestionMeta,
 } from "@/lib/assessments/question-meta";
+import type { ReportStyleKey } from "@/lib/assessments/report-style-registry";
 
 // Re-export so existing `import { QuestionMeta } from "respondent-report"`
 // consumers keep working after the shared builder extraction.
@@ -70,6 +71,7 @@ interface RawSubmission {
   };
   campaign: {
     name: string | null;
+    reportStyle: ReportStyleKey;
     /** Wave V (V-3): Wave O import-round manifest; non-null ⇒ historical import. */
     importManifest?: unknown;
     template: {
@@ -126,6 +128,8 @@ export interface RespondentReport {
    * and `buildQualitativeModel` both treat "" the same as absent.
    */
   templateAlias: string;
+  /** Frozen campaign presentation snapshot; never derived from template policy. */
+  reportStyle: ReportStyleKey;
   /** campaign.name — the coach's label; null when absent or empty */
   campaignLabel: string | null;
   submittedAt: Date;
@@ -194,6 +198,7 @@ export interface StoredRespondentReportInput {
   };
   campaign: {
     name: string | null;
+    reportStyle: ReportStyleKey;
     organizationName: string;
     template: {
       id: string;
@@ -249,6 +254,7 @@ export function buildStoredRespondentReport(
     companyName: input.campaign.organizationName,
     assessmentName: input.campaign.template.name,
     templateAlias: input.campaign.template.alias,
+    reportStyle: input.campaign.reportStyle,
     campaignLabel:
       input.campaign.name && input.campaign.name.trim() !== ""
         ? input.campaign.name
@@ -327,6 +333,7 @@ export async function getRespondentReport(
         campaign: {
           select: {
             name: true,
+            reportStyle: true,
             // Wave V (V-3): presence-only — the loader derives a boolean and
             // the manifest payload never reaches the report model.
             importManifest: true,
@@ -378,6 +385,7 @@ export async function getRespondentReport(
       respondent: submission.respondent,
       campaign: {
         name: submission.campaign.name,
+        reportStyle: submission.campaign.reportStyle,
         organizationName: submission.campaign.organization.name,
         template: submission.campaign.template,
         creatorCoach: submission.campaign.creatorCoach,

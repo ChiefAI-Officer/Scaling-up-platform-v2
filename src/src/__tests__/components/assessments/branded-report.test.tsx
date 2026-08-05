@@ -42,6 +42,7 @@ function baseReport(overrides: Partial<RespondentReport> = {}): RespondentReport
     },
     degraded: false,
     ...overrides,
+    reportStyle: overrides.reportStyle ?? "CLASSIC",
   };
 }
 

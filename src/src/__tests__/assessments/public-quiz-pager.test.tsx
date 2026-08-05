@@ -223,6 +223,7 @@ describe("PublicQuizClient — SectionPager wiring", () => {
         success: true,
         data: {
           submissionId: "sub_pager_1",
+          reportStyle: "CLASSIC",
           scoreResult: {
             perQuestion: [],
             perSection: [],
@@ -292,6 +293,7 @@ describe("PublicQuizClient — SectionPager wiring", () => {
         success: true,
         data: {
           submissionId: "sub_prune_1",
+          reportStyle: "CLASSIC",
           scoreResult: {
             perQuestion: [],
             perSection: [],
@@ -342,6 +344,7 @@ describe("PublicQuizClient — SectionPager wiring", () => {
         success: true,
         data: {
           submissionId: "sub_lva_public_1",
+          reportStyle: "CLASSIC",
           scoreResult: {
             perQuestion: [],
             perSection: [],
@@ -463,6 +466,7 @@ describe("PublicQuizClient — SectionPager wiring", () => {
         success: true,
         data: {
           submissionId: "sub_qsp_public",
+          reportStyle: "CLASSIC",
           scoreResult: {
             perQuestion: [], perSection: [], overallTotal: 0, overallAverage: 0,
             countAchieved: 0, tier: null, tierMetricValue: 0, unansweredKeys: [],
