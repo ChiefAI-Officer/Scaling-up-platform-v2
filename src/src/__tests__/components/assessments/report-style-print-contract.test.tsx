@@ -270,6 +270,29 @@ describe("curated report print contracts", () => {
     }
   });
 
+  it("binds Dashboard muted text and print margin boxes to an AA ink", () => {
+    const css = source("styles/su-report-dashboard.css");
+    const accessibleMuted = cssVariable(css, "--dashboard-muted-ink");
+    const softSurface = cssVariable(css, "--dashboard-soft");
+    const page = blockFor(css, "@page dashboard-report");
+
+    expect(cssVariable(css, "--dashboard-muted")).toBe("#8A90A3");
+    expect(accessibleMuted).toBe("#646B7D");
+
+    for (const selector of [
+      ".su-report--dashboard .report-page dt",
+      ".su-report--dashboard .report-provenance",
+    ]) {
+      const foreground = cssColorBinding(css, selector, "color");
+
+      expect(foreground.variable).toBe("--dashboard-muted-ink");
+      expect(contrastRatio(foreground.color, selector.endsWith("dt") ? softSurface : "#ffffff")).toBeGreaterThanOrEqual(4.5);
+    }
+
+    expect(page.match(/@bottom-(?:left|right)\s*\{[^}]*color:\s*#646B7D;/g)).toHaveLength(2);
+    expect(contrastRatio("#646B7D", "#ffffff")).toBeGreaterThanOrEqual(4.5);
+  });
+
   it("binds Executive small insight and action text to WCAG AA colors on their white report surfaces", () => {
     const css = source("styles/su-report-executive.css");
     const bindings = [
