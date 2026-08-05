@@ -1,5 +1,9 @@
 import type { RespondentReport } from "@/lib/assessments/respondent-report";
-import { buildScoredReportViewModel } from "@/lib/assessments/scored-report-view-model";
+import {
+  applyScoredReportContactEmailOverride,
+  applyScoredReportFindingsPolicy,
+  buildScoredReportViewModel,
+} from "@/lib/assessments/scored-report-view-model";
 
 function makeReport(overrides: Partial<RespondentReport> = {}): RespondentReport {
   return {
@@ -86,7 +90,7 @@ describe("buildScoredReportViewModel", () => {
     expect(view.insights.priorities.map((decision) => decision.stableKey)).toEqual(["strategy"]);
   });
 
-  it("preserves canonical section, question, scorecard, recommendation, response, CTA, branding, and provenance semantics", () => {
+  it("preserves canonical section, question, scorecard, legacy recommendation, response, CTA, branding, and provenance semantics", () => {
     const view = buildScoredReportViewModel(makeReport());
 
     expect(view.identity).toMatchObject({
@@ -105,16 +109,78 @@ describe("buildScoredReportViewModel", () => {
     expect(view.recommendations).toEqual([
       expect.objectContaining({ sectionStableKey: "people-low", label: "People: accountability", items: [expect.objectContaining({ text: "Clarify accountability." })] }),
       expect.objectContaining({ sectionStableKey: "people-high", label: "People: talent", items: [expect.objectContaining({ text: "Keep hiring deliberately." })] }),
-      expect.objectContaining({ sectionStableKey: "strategy", label: "Strategy", items: [expect.objectContaining({ text: "Turn the strategy into a weekly cadence." })] }),
       expect.objectContaining({ sectionStableKey: null, label: "Recommendations", items: [expect.objectContaining({ text: "Make the owner explicit." })] }),
+    ]);
+    expect(view.findingRecommendations).toEqual([
+      expect.objectContaining({ sectionStableKey: "strategy", label: "Strategy", items: [expect.objectContaining({ text: "Turn the strategy into a weekly cadence." })] }),
     ]);
     expect(view.additionalResponses).toEqual([
       { label: "What must change?", answer: "A detailed answer that belongs in the report." },
       { label: "Which habits matter?", answer: "Weekly meeting" },
     ]);
-    expect(view.cta).toEqual({ eligible: true, contactEmail: "coach@example.test" });
+    expect(view.cta).toEqual({
+      eligible: true,
+      contactEmail: "coach@example.test",
+      label: "Talk to a Coach →",
+      href: "mailto:coach%40example.test",
+      learnMoreHref: "https://scalingup.com",
+    });
     expect(view.coach).toEqual({ name: "Casey Coach", logoUrl: "https://assets.example.test/logo.png" });
     expect(view.provenance).toEqual({ submissionId: "submission-test", versionId: "version-test", contentHash: "content-test", templateName: "Scaling Up Full", imported: true });
+  });
+
+  it.each([
+    ["off", false, false],
+    ["kill-equivalent off", false, false],
+    ["on", true, true],
+  ])("applies the frozen findings recommendations only when the outer renderer policy is %s", (_case, findingsEnabled, includesFindings) => {
+    const base = buildScoredReportViewModel(makeReport());
+    const selected = applyScoredReportFindingsPolicy(base, findingsEnabled);
+    const text = selected.recommendations.flatMap((group) => group.items.map((item) => item.text));
+
+    expect(text.includes("Turn the strategy into a weekly cadence.")).toBe(includesFindings);
+    expect(base.recommendations.flatMap((group) => group.items.map((item) => item.text)))
+      .not.toContain("Turn the strategy into a weekly cadence.");
+    expect(selected).not.toBe(base);
+  });
+
+  it("lets the public contact-email override win while null or empty overrides retain the referral CTA", () => {
+    const base = buildScoredReportViewModel(makeReport());
+    const overridden = applyScoredReportContactEmailOverride(base, "  override@example.test  ");
+    const nullOverride = applyScoredReportContactEmailOverride(base, null);
+    const emptyOverride = applyScoredReportContactEmailOverride(base, "  ");
+
+    expect(overridden.cta).toEqual(expect.objectContaining({
+      eligible: true,
+      label: "Talk to a Coach →",
+      contactEmail: "override@example.test",
+      href: "mailto:override%40example.test",
+    }));
+    expect(nullOverride.cta.href).toBe("mailto:coach%40example.test");
+    expect(emptyOverride.cta.href).toBe("mailto:coach%40example.test");
+    expect(base.cta.href).toBe("mailto:coach%40example.test");
+    expect(overridden).not.toBe(base);
+  });
+
+  it("provides the exact legacy display labels for subtitles, metrics, and achievement markers", () => {
+    const standard = buildScoredReportViewModel(makeReport());
+    const duplicateSubtitle = buildScoredReportViewModel(makeReport({ campaignLabel: "Scaling Up Full" }));
+    const thresholded = buildScoredReportViewModel(makeReport({
+      scoringConfig: { tierMetric: "overallAvg", passThreshold: 2, tiers: [] },
+    }));
+
+    expect(standard.identity.campaignSubtitle).toBe("FY26 leadership reset");
+    expect(duplicateSubtitle.identity.campaignSubtitle).toBeNull();
+    expect(standard.summary).toMatchObject({
+      overallTotalLabel: "25",
+      overallAverageLabel: "6.25",
+      achievementMarkersVisible: false,
+    });
+    expect(standard.sections[2]).toMatchObject({ totalPointsLabel: "11", averagePointsLabel: "5.5" });
+    expect(standard.decisions[1]).toMatchObject({ averageAcrossSectionsLabel: "5.5", totalPointsLabel: "11" });
+    expect(standard.sections[0].questions[0].achievementMarker).toBeNull();
+    expect(thresholded.summary.achievementMarkersVisible).toBe(true);
+    expect(thresholded.sections[0].questions[0].achievementMarker).toEqual({ symbol: "✕", label: "not achieved" });
   });
 
   it.each([
@@ -137,6 +203,11 @@ describe("buildScoredReportViewModel", () => {
     }));
 
     expect(view.recommendations[0].items[0].text).toBe(longText);
-    expect(view.cta).toEqual({ eligible: false, contactEmail: "coach@example.test" });
+    expect(view.cta).toEqual(expect.objectContaining({
+      eligible: false,
+      contactEmail: "coach@example.test",
+      label: "Talk to a Coach →",
+      href: "mailto:coach%40example.test",
+    }));
   });
 });

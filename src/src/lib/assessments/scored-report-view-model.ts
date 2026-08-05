@@ -5,8 +5,10 @@ import { reportConfigFor } from "@/lib/assessments/report-config";
 import {
   domainColor,
   formatReportDate,
+  formatReportMetric,
   headlineForTierMetric,
   isNeutralTier,
+  showAchievementMarkers,
 } from "@/lib/assessments/report-presentation";
 import {
   greetingName,
@@ -26,7 +28,9 @@ export interface ScoredReportQuestionView {
   unmapped: boolean;
   value: number;
   maximum: number | null;
+  scoreLabel: string;
   achieved: boolean;
+  achievementMarker: { symbol: "✓" | "✕"; label: "achieved" | "not achieved" } | null;
 }
 
 export interface ScoredReportSectionView {
@@ -35,7 +39,9 @@ export interface ScoredReportSectionView {
   domain: string | null;
   color: string | null;
   totalPoints: number;
+  totalPointsLabel: string;
   averagePoints: number;
+  averagePointsLabel: string;
   achievedCount: number;
   totalCount: number;
   questions: ScoredReportQuestionView[];
@@ -52,7 +58,9 @@ export interface ScoredReportDecisionView {
   label: string;
   /** Mean of answered section means, not the report's weighted item average. */
   averageAcrossSections: number | null;
+  averageAcrossSectionsLabel: string;
   totalPoints: number;
+  totalPointsLabel: string;
   color: string;
 }
 
@@ -60,6 +68,8 @@ export interface ScoredReportViewModel {
   identity: {
     assessmentName: string;
     campaignLabel: string | null;
+    /** Existing Classic rule: suppress a campaign label duplicating the report title. */
+    campaignSubtitle: string | null;
     respondentName: string;
     respondentEmail: string | null;
     respondentNameIsEmail: boolean;
@@ -74,9 +84,12 @@ export interface ScoredReportViewModel {
     showTier: boolean;
     neutral: boolean;
     overallAverage: number;
+    overallAverageLabel: string;
     overallTotal: number;
+    overallTotalLabel: string;
     answeredItems: number;
     sectionCount: number;
+    achievementMarkersVisible: boolean;
   };
   decisions: ScoredReportDecisionView[];
   insights: {
@@ -92,13 +105,23 @@ export interface ScoredReportViewModel {
       label: string;
       color: string | null;
       totalPoints: number;
+      totalPointsLabel: string;
       averagePoints: number;
+      averagePointsLabel: string;
     }>;
     total: { totalPoints: number; overallAverage: number };
   };
   recommendations: ScoredReportRecommendationGroup[];
+  /** Frozen non-slider findings, selected only by applyScoredReportFindingsPolicy. */
+  findingRecommendations: ScoredReportRecommendationGroup[];
   additionalResponses: Array<{ label: string; answer: string }>;
-  cta: { eligible: boolean; contactEmail: string | null };
+  cta: {
+    eligible: boolean;
+    contactEmail: string | null;
+    label: "Talk to a Coach →";
+    href: string;
+    learnMoreHref: "https://scalingup.com";
+  };
   coach: { name: string | null; logoUrl: string | null };
   provenance: {
     submissionId: string | null;
@@ -179,7 +202,11 @@ function labelFor(report: RespondentReport, stableKey: string): { label: string;
     : { label: stableKey, unmapped: true };
 }
 
-function asQuestionView(report: RespondentReport, row: PerQuestionResult): ScoredReportQuestionView {
+function asQuestionView(
+  report: RespondentReport,
+  row: PerQuestionResult,
+  achievementMarkersVisible: boolean,
+): ScoredReportQuestionView {
   const label = labelFor(report, row.stableKey);
   const maximum = report.questionsByKey?.[row.stableKey]?.max;
   return {
@@ -187,7 +214,30 @@ function asQuestionView(report: RespondentReport, row: PerQuestionResult): Score
     ...label,
     value: row.value,
     maximum: typeof maximum === "number" ? maximum : null,
+    scoreLabel: typeof maximum === "number"
+      ? `${formatReportMetric(row.value)} / ${formatReportMetric(maximum)}`
+      : formatReportMetric(row.value),
     achieved: row.achieved,
+    achievementMarker: achievementMarkersVisible
+      ? { symbol: row.achieved ? "✓" : "✕", label: row.achieved ? "achieved" : "not achieved" }
+      : null,
+  };
+}
+
+function normalizeContactEmail(value: string | null | undefined): string | null {
+  const normalized = value?.trim() ?? "";
+  return normalized === "" ? null : normalized;
+}
+
+function ctaFor(contactEmail: string | null, eligible: boolean): ScoredReportViewModel["cta"] {
+  return {
+    eligible,
+    contactEmail,
+    label: "Talk to a Coach →",
+    href: contactEmail === null
+      ? "https://scalingup.com/coaches"
+      : `mailto:${encodeURIComponent(contactEmail)}`,
+    learnMoreHref: "https://scalingup.com",
   };
 }
 
@@ -213,6 +263,7 @@ export function buildScoredReportViewModel(report: RespondentReport): ScoredRepo
   const hasSectionMetadata = questionKeysBySection.size > 0;
   const assigned = new Set<string>();
   const useDomainColors = Array.isArray(result.perDomain);
+  const achievementMarkersVisible = showAchievementMarkers(report.scoringConfig);
 
   const sections = scoredSections.map((score): ScoredReportSectionView => {
     const parsed = parsedByKey.get(score.stableKey);
@@ -225,7 +276,7 @@ export function buildScoredReportViewModel(report: RespondentReport): ScoredRepo
         return byQuestionKey.get(key);
       })
       .filter((question): question is PerQuestionResult => question !== undefined)
-      .map((question) => asQuestionView(report, question));
+      .map((question) => asQuestionView(report, question, achievementMarkersVisible));
     const domain = parsed?.domain ?? null;
     return {
       stableKey: score.stableKey,
@@ -233,7 +284,9 @@ export function buildScoredReportViewModel(report: RespondentReport): ScoredRepo
       domain,
       color: useDomainColors && domain ? domainColor(domain) : null,
       totalPoints: Number.isFinite(score.totalPoints) ? score.totalPoints : 0,
+      totalPointsLabel: formatReportMetric(score.totalPoints),
       averagePoints: Number.isFinite(score.averagePoints) ? score.averagePoints : 0,
+      averagePointsLabel: formatReportMetric(score.averagePoints),
       achievedCount: Number.isFinite(score.achievedCount) ? score.achievedCount : 0,
       totalCount: Number.isFinite(score.totalCount) ? score.totalCount : 0,
       questions,
@@ -241,7 +294,7 @@ export function buildScoredReportViewModel(report: RespondentReport): ScoredRepo
   });
   const orphanQuestions = scoredQuestions
     .filter((question) => !assigned.has(question.stableKey))
-    .map((question) => asQuestionView(report, question));
+    .map((question) => asQuestionView(report, question, achievementMarkersVisible));
 
   const decisions = (Array.isArray(result.perDomain) ? result.perDomain : [])
     .filter((domain) => domain && typeof domain.key === "string")
@@ -256,7 +309,11 @@ export function buildScoredReportViewModel(report: RespondentReport): ScoredRepo
         averageAcrossSections: typeof domain.averagePoints === "number" && Number.isFinite(domain.averagePoints)
           ? domain.averagePoints
           : null,
+        averageAcrossSectionsLabel: typeof domain.averagePoints === "number" && Number.isFinite(domain.averagePoints)
+          ? formatReportMetric(domain.averagePoints)
+          : "—",
         totalPoints,
+        totalPointsLabel: formatReportMetric(totalPoints),
         color: domainColor(stableKey),
       };
     });
@@ -288,7 +345,6 @@ export function buildScoredReportViewModel(report: RespondentReport): ScoredRepo
           .map((question) => byQuestionKey.get(question.stableKey))
           .filter((question): question is PerQuestionResult => !!question?.recommendation?.trim())
           .map((question) => ({ stableKey: question.stableKey, text: question.recommendation as string })),
-        ...(findingsBySection.get(section.stableKey) ?? []),
       ],
     }))
     .filter((group) => group.items.length > 0);
@@ -296,10 +352,19 @@ export function buildScoredReportViewModel(report: RespondentReport): ScoredRepo
     ...scoredQuestions
       .filter((question) => !assigned.has(question.stableKey) && !!question.recommendation?.trim())
       .map((question) => ({ stableKey: question.stableKey, text: question.recommendation as string })),
-    ...orphanFindings,
   ];
   if (orphanRecommendations.length > 0) {
     recommendations.push({ sectionStableKey: null, label: "Recommendations", items: orphanRecommendations });
+  }
+  const findingRecommendations: ScoredReportRecommendationGroup[] = sections
+    .map((section) => ({
+      sectionStableKey: section.stableKey,
+      label: section.label,
+      items: findingsBySection.get(section.stableKey) ?? [],
+    }))
+    .filter((group) => group.items.length > 0);
+  if (orphanFindings.length > 0) {
+    findingRecommendations.push({ sectionStableKey: null, label: "Recommendations", items: orphanFindings });
   }
 
   const additionalResponses = Array.isArray(report.rawAnswers)
@@ -322,6 +387,9 @@ export function buildScoredReportViewModel(report: RespondentReport): ScoredRepo
     identity: {
       assessmentName: report.assessmentName,
       campaignLabel: report.campaignLabel ?? null,
+      campaignSubtitle: report.campaignLabel && report.campaignLabel !== report.assessmentName
+        ? report.campaignLabel
+        : null,
       respondentName: report.respondentName,
       respondentEmail: report.respondentEmail ?? null,
       respondentNameIsEmail: respondentNameMatchesEmail(report.respondentName, report.respondentEmail),
@@ -336,9 +404,12 @@ export function buildScoredReportViewModel(report: RespondentReport): ScoredRepo
       showTier: config.showTier,
       neutral,
       overallAverage,
+      overallAverageLabel: formatReportMetric(overallAverage),
       overallTotal,
+      overallTotalLabel: formatReportMetric(overallTotal),
       answeredItems: scoredQuestions.length,
       sectionCount: scoredSections.length,
+      achievementMarkersVisible,
     },
     decisions,
     insights: { strengths, priorities },
@@ -351,13 +422,16 @@ export function buildScoredReportViewModel(report: RespondentReport): ScoredRepo
         label: section.label,
         color: section.color,
         totalPoints: section.totalPoints,
+        totalPointsLabel: section.totalPointsLabel,
         averagePoints: section.averagePoints,
+        averagePointsLabel: section.averagePointsLabel,
       })),
       total: { totalPoints: overallTotal, overallAverage },
     },
     recommendations,
+    findingRecommendations,
     additionalResponses,
-    cta: { eligible: config.showCoachCta !== false, contactEmail: report.referringCoachEmail ?? null },
+    cta: ctaFor(normalizeContactEmail(report.referringCoachEmail), config.showCoachCta !== false),
     coach: { name: report.coachName ?? null, logoUrl: report.coachLogoUrl ?? null },
     provenance: {
       submissionId: report.provenance?.submissionId ?? null,
@@ -369,4 +443,51 @@ export function buildScoredReportViewModel(report: RespondentReport): ScoredRepo
     closingGreeting: greetingName(report.respondentName),
     degraded: report.degraded === true,
   };
+}
+
+/**
+ * Applies Wave U's already-resolved findings policy without reading flags.
+ * Task 13's outer dispatch must pass `isFindingsLogicEnabled()` here; a kill
+ * switch is represented by `false`. The base model is never mutated.
+ */
+export function applyScoredReportFindingsPolicy(
+  model: ScoredReportViewModel,
+  findingsEnabled: boolean,
+): ScoredReportViewModel {
+  const baseByKey = new Map(model.recommendations.map((group) => [group.sectionStableKey, group]));
+  const findingsByKey = new Map(model.findingRecommendations.map((group) => [group.sectionStableKey, group]));
+  const orderedKeys = [
+    ...model.sections.map((section) => section.stableKey),
+    null,
+    ...model.recommendations.map((group) => group.sectionStableKey),
+    ...model.findingRecommendations.map((group) => group.sectionStableKey),
+  ];
+  const seen = new Set<string | null>();
+  const recommendations: ScoredReportRecommendationGroup[] = [];
+  for (const key of orderedKeys) {
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const base = baseByKey.get(key);
+    const findings = findingsEnabled ? findingsByKey.get(key) : undefined;
+    if (!base && !findings) continue;
+    recommendations.push({
+      sectionStableKey: key,
+      label: base?.label ?? findings?.label ?? "Recommendations",
+      items: [...(base?.items ?? []), ...(findings?.items ?? [])],
+    });
+  }
+  return { ...model, recommendations };
+}
+
+/**
+ * Applies the public report route's optional contact-email override without
+ * changing eligibility, copy, or the source model. Blank/null means use the
+ * report's referring-coach destination, matching ReportNextSteps semantics.
+ */
+export function applyScoredReportContactEmailOverride(
+  model: ScoredReportViewModel,
+  contactEmail: string | null | undefined,
+): ScoredReportViewModel {
+  const resolvedContact = normalizeContactEmail(contactEmail) ?? model.cta.contactEmail;
+  return { ...model, cta: ctaFor(resolvedContact, model.cta.eligible) };
 }
