@@ -1106,6 +1106,66 @@ describe("idempotency — duplicate idempotencyKey (P2002)", () => {
     (db.assessmentSubmission.findFirst as jest.Mock).mockResolvedValue(EXISTING_SUB);
   });
 
+  it("rolls back one locked write transaction before recovering a concurrent P2002 replay", async () => {
+    const p2002 = new Prisma.PrismaClientKnownRequestError(
+      "Unique constraint",
+      {
+        code: "P2002",
+        clientVersion: "6.0.0",
+      },
+    );
+    (db.assessmentSubmission.findFirst as jest.Mock)
+      .mockReset()
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(EXISTING_SUB);
+    txMock.assessmentSubmission.create.mockRejectedValueOnce(p2002);
+    (db.$transaction as jest.Mock).mockImplementation(
+      async (cb: (tx: typeof txMock) => Promise<unknown>) => {
+        transactionActive = true;
+        try {
+          const value = await cb(txMock);
+          transactionCommitMarker();
+          return value;
+        } catch (error) {
+          transactionRollbackMarker();
+          throw error;
+        } finally {
+          transactionActive = false;
+        }
+      },
+    );
+    const lockTransactions: unknown[] = [];
+    const lockTransactionStates: boolean[] = [];
+    reportStyleLockMock.mockImplementation((tx) => {
+      lockTransactions.push(tx);
+      lockTransactionStates.push(transactionActive);
+      return Promise.resolve();
+    });
+
+    const response = await POST(
+      makeRequest(IDEMPOTENT_BODY) as never,
+      makeParams() as never,
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      success: true,
+      data: {
+        submissionId: "sub-existing",
+        scoreResult: EXISTING_SUB.result,
+      },
+    });
+    expect(db.assessmentSubmission.findFirst).toHaveBeenCalledTimes(2);
+    expect(db.$transaction).toHaveBeenCalledTimes(1);
+    expect(reportStyleLockMock).toHaveBeenCalledTimes(1);
+    expect(lockTransactions).toEqual([txMock]);
+    expect(lockTransactionStates).toEqual([true]);
+    expect(txMock.assessmentSubmission.create).toHaveBeenCalledTimes(1);
+    expect(transactionRollbackMarker).toHaveBeenCalledTimes(1);
+    expect(transactionCommitMarker).not.toHaveBeenCalled();
+    expect(txMock.assessmentEmailOutbox.create).not.toHaveBeenCalled();
+  });
+
   it("returns 200 with existing submission data (no new create)", async () => {
     const res = await POST(makeRequest(IDEMPOTENT_BODY) as never, makeParams() as never);
     expect(res.status).toBe(200);
