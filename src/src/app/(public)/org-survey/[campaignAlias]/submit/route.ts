@@ -115,6 +115,15 @@ function gateFailed(): NextResponse {
   );
 }
 
+type SubmissionTransactionAbortKind = "not-found" | "gate" | "conflict";
+
+class SubmissionTransactionAbort extends Error {
+  constructor(readonly kind: SubmissionTransactionAbortKind) {
+    super(kind);
+    this.name = "SubmissionTransactionAbort";
+  }
+}
+
 /** An outbox row ready to INSERT — fully RENDERED (subject + bodyHtml), missing
  *  only the submissionId (assigned inside the tx once the submission exists).
  *  R3-M3: rendering produces these BEFORE the transaction opens, so the heavy
@@ -964,7 +973,7 @@ export async function POST(
         });
 
         if (!locked || locked.campaign.alias !== campaignAlias) {
-          return { kind: "not-found" as const };
+          throw new SubmissionTransactionAbort("not-found");
         }
         const now = new Date();
         if (
@@ -975,10 +984,10 @@ export async function POST(
           now < locked.campaign.openAt ||
           (locked.campaign.closeAt !== null && now >= locked.campaign.closeAt)
         ) {
-          return { kind: "gate" as const };
+          throw new SubmissionTransactionAbort("gate");
         }
         if (locked.status === "SUBMITTED") {
-          return { kind: "conflict" as const };
+          throw new SubmissionTransactionAbort("conflict");
         }
 
         // One explicit ledger instant owns all intent lifecycle timestamps.
@@ -1172,6 +1181,9 @@ export async function POST(
           createdIntentCount: intentMode ? rowsToPersist.length : 0,
           discloseOnScreen,
         };
+      }).catch((error) => {
+        if (!(error instanceof SubmissionTransactionAbort)) throw error;
+        return { kind: error.kind } as const;
       });
 
       if (result.kind === "not-found") {
