@@ -32,6 +32,30 @@ function styleSelectors(css: string): string[] {
   return selectors;
 }
 
+function cssVariable(css: string, name: string): string {
+  const match = css.match(new RegExp(`${name}:\\s*(#[0-9a-f]{6});`, "i"));
+  if (!match) throw new Error(`Missing CSS variable ${name}`);
+  return match[1];
+}
+
+function relativeLuminance(hex: string): number {
+  const channels = hex
+    .slice(1)
+    .match(/.{2}/g)
+    ?.map((channel) => Number.parseInt(channel, 16) / 255)
+    .map((channel) => (channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4));
+
+  if (!channels || channels.length !== 3) throw new Error(`Invalid hex color ${hex}`);
+  return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+}
+
+function contrastRatio(foreground: string, background: string): number {
+  const foregroundLuminance = relativeLuminance(foreground);
+  const backgroundLuminance = relativeLuminance(background);
+  return (Math.max(foregroundLuminance, backgroundLuminance) + 0.05)
+    / (Math.min(foregroundLuminance, backgroundLuminance) + 0.05);
+}
+
 describe("curated report print contracts", () => {
   it.each([
     ["Executive Boardroom", ExecutiveBoardroomReport, "su-report--executive", "report-page--executive-cover"],
@@ -111,6 +135,56 @@ describe("curated report print contracts", () => {
     for (const [decision, color] of expected) {
       expect(css).toContain(`--executive-decision-${decision}: ${color};`);
       expect(css).toMatch(new RegExp(`\\.report-decision\\[data-decision="${decision}"\\] \\{[^}]*border-left-color: var\\(--executive-decision-${decision}\\);`));
+    }
+  });
+
+  it.each([
+    {
+      style: "executive",
+      path: "styles/su-report-executive.css",
+      accents: {
+        strength: "#3E7A4A",
+        "on-track": "#5B3A8E",
+        "watch-area": "#B8791E",
+        priority: "#A23B3B",
+      },
+      statuses: ["strength", "on-track", "watch-area", "priority", "unrated"],
+    },
+    {
+      style: "dashboard",
+      path: "styles/su-report-dashboard.css",
+      accents: {
+        strength: "#0E9F6E",
+        "on-track": "#5B3FD9",
+        "watch-area": "#DB9200",
+        priority: "#E4483F",
+      },
+      statuses: ["strength", "on-track", "watch-area", "priority", "unrated"],
+    },
+  ])("keeps $style status accents authoritative while status text meets WCAG AA", ({ style, path, accents, statuses }) => {
+    const css = source(path);
+
+    for (const [status, expectedAccent] of Object.entries(accents)) {
+      expect(cssVariable(css, `--${style}-status-${status}-accent`)).toBe(expectedAccent);
+    }
+
+    for (const status of statuses) {
+      const inkVariable = `--${style}-status-${status}-ink`;
+      const surfaceVariable = `--${style}-status-${status}-surface`;
+      const ink = cssVariable(css, inkVariable);
+      const surface = cssVariable(css, surfaceVariable);
+      const statusRule = blockFor(css, `.su-report--${style} .report-status--${status}`);
+
+      expect(contrastRatio(ink, surface)).toBeGreaterThanOrEqual(4.5);
+      expect(statusRule).toContain(`background: var(${surfaceVariable})`);
+      expect(statusRule).toContain(`color: var(${inkVariable})`);
+    }
+
+    if (style === "dashboard") {
+      expect(blockFor(css, '.su-report--dashboard .report-question[data-achievement-status="achieved"] td:last-child'))
+        .toContain("color: var(--dashboard-status-strength-ink)");
+      expect(blockFor(css, '.su-report--dashboard .report-question[data-achievement-status="not-achieved"] td:last-child'))
+        .toContain("color: var(--dashboard-status-priority-ink)");
     }
   });
 
