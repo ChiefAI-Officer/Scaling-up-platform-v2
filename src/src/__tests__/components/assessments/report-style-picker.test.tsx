@@ -72,6 +72,16 @@ describe("ReportStylePicker", () => {
     expect(screen.getByRole("img", { name: "Modern Dashboard Detail preview" })).toBeInTheDocument();
   });
 
+  it("keeps every tab panel mounted for its aria-controls relationship", () => {
+    render(<PickerHarness />);
+
+    screen.getAllByRole("tab").forEach((tab) => {
+      const panelId = tab.getAttribute("aria-controls");
+      expect(panelId).toBeTruthy();
+      expect(document.getElementById(panelId!)).toHaveAttribute("role", "tabpanel");
+    });
+  });
+
   it("keeps style selection usable after a preview failure and remounts only the failed image on retry", () => {
     const { container } = render(<PickerHarness />);
 
@@ -115,5 +125,13 @@ describe("ReportStylePicker", () => {
       "2026-08-05T06:30:00.000Z",
     );
     expect(screen.getByRole("img", { name: "Executive Boardroom Cover preview" })).toBeInTheDocument();
+  });
+
+  it("explains immutable selection when optional lock context is absent", () => {
+    render(<PickerHarness initialValue="MODERN_DASHBOARD" disabled />);
+
+    expect(screen.getByText("Changes are unavailable after the first completed response.")).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /modern dashboard/i })).toBeChecked();
+    expect(screen.getByRole("img", { name: "Modern Dashboard Cover preview" })).toBeInTheDocument();
   });
 });

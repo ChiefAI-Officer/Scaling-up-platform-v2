@@ -55,8 +55,6 @@ export function ReportStylePicker({
   const [retryVersions, setRetryVersions] = useState<Readonly<Record<string, number>>>({});
 
   const selectedMetadata = REPORT_STYLE_REGISTRY[value];
-  const selectedPreviewId = previewId(value, previewPage);
-  const failedPreview = failedPreviews.has(selectedPreviewId);
   const lockedTimestamp = useMemo(
     () => (lockedAt == null ? null : formatLockTimestamp(lockedAt)),
     [lockedAt],
@@ -101,15 +99,17 @@ export function ReportStylePicker({
     setPreviewPage(nextPage);
   }
 
-  function retryPreview() {
+  function retryPreview(page: PreviewPage) {
+    const currentPreviewId = previewId(value, page);
+
     setFailedPreviews((current) => {
       const next = new Set(current);
-      next.delete(selectedPreviewId);
+      next.delete(currentPreviewId);
       return next;
     });
     setRetryVersions((current) => ({
       ...current,
-      [selectedPreviewId]: (current[selectedPreviewId] ?? 0) + 1,
+      [currentPreviewId]: (current[currentPreviewId] ?? 0) + 1,
     }));
   }
 
@@ -159,18 +159,17 @@ export function ReportStylePicker({
       {disabled && (
         <div className="space-y-1 text-sm text-slate-700" aria-live="polite">
           {sourceLabel && <p>Source: {sourceLabel}</p>}
-          {lockedAt != null && (
-            <p>
-              {lockedTimestamp ? (
+          <p>
+            {lockedAt != null &&
+              (lockedTimestamp ? (
                 <>
                   Locked on <time dateTime={lockedTimestamp.iso}>{lockedTimestamp.text}</time>.{" "}
                 </>
               ) : (
                 "Lock timestamp could not be read. "
-              )}
-              Changes are unavailable after the first completed response.
-            </p>
-          )}
+              ))}
+            Changes are unavailable after the first completed response.
+          </p>
         </div>
       )}
 
@@ -198,33 +197,48 @@ export function ReportStylePicker({
           })}
         </div>
 
-        <div id={`${radioName}-${previewPage}-panel`} role="tabpanel" aria-label={`${selectedMetadata.label} ${previewPage} preview`}>
-          {failedPreview ? (
-            <div className="space-y-2 rounded-lg border border-slate-300 p-4" role="status">
-              <p>Preview unavailable</p>
-              <button
-                type="button"
-                className="rounded-md border border-slate-500 px-3 py-1.5 text-sm font-medium text-slate-900 focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-blue-700"
-                onClick={retryPreview}
-              >
-                Retry
-              </button>
+        {PREVIEW_TABS.map((tab) => {
+          const currentPreviewId = previewId(value, tab.key);
+          const isActive = tab.key === previewPage;
+          const failedPreview = failedPreviews.has(currentPreviewId);
+
+          return (
+            <div
+              key={tab.key}
+              id={`${radioName}-${tab.key}-panel`}
+              role="tabpanel"
+              aria-labelledby={`${radioName}-${tab.key}-tab`}
+              aria-label={`${selectedMetadata.label} ${tab.key} preview`}
+              hidden={!isActive}
+            >
+              {failedPreview ? (
+                <div className="space-y-2 rounded-lg border border-slate-300 p-4" role="status">
+                  <p>Preview unavailable</p>
+                  <button
+                    type="button"
+                    className="rounded-md border border-slate-500 px-3 py-1.5 text-sm font-medium text-slate-900 focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-blue-700"
+                    onClick={() => retryPreview(tab.key)}
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : (
+                // Preview URLs are chosen at runtime from the closed registry; native image events
+                // let Retry remount only the failed preview without changing the selected style.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={`${currentPreviewId}-${retryVersions[currentPreviewId] ?? 0}`}
+                  src={selectedMetadata.previews[tab.key]}
+                  alt={`${selectedMetadata.label} ${tab.label} preview`}
+                  className="w-full rounded-lg border border-slate-300"
+                  onError={() =>
+                    setFailedPreviews((current) => new Set(current).add(currentPreviewId))
+                  }
+                />
+              )}
             </div>
-          ) : (
-            // Preview URLs are chosen at runtime from the closed registry; native image events
-            // let Retry remount only the failed preview without changing the selected style.
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              key={`${selectedPreviewId}-${retryVersions[selectedPreviewId] ?? 0}`}
-              src={selectedMetadata.previews[previewPage]}
-              alt={`${selectedMetadata.label} ${PREVIEW_TABS.find((tab) => tab.key === previewPage)?.label} preview`}
-              className="w-full rounded-lg border border-slate-300"
-              onError={() =>
-                setFailedPreviews((current) => new Set(current).add(selectedPreviewId))
-              }
-            />
-          )}
-        </div>
+          );
+        })}
       </div>
     </section>
   );
