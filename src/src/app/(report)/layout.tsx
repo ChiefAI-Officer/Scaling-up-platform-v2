@@ -17,11 +17,16 @@
 
 import "@/styles/su-public-brand.css";
 import "@/styles/su-report.css";
+import { assessmentInter, assessmentPlayfairDisplay } from "@/lib/assessments/assessment-fonts";
 
 export default function ReportLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return <div className="su-public-brand su-report">{children}</div>;
+  return (
+    <div className={`su-public-brand su-report ${assessmentInter.variable} ${assessmentPlayfairDisplay.variable}`}>
+      {children}
+    </div>
+  );
 }
