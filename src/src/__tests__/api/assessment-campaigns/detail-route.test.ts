@@ -251,6 +251,28 @@ describe("PATCH /api/assessment-campaigns/[id]", () => {
       expect(db.assessmentCampaign.update).not.toHaveBeenCalled();
     });
 
+    it("rejects a report style mixed with generic campaign fields without update or audit side effects", async () => {
+      process.env.WAVE_REPORT_STYLES_ENABLED = "1";
+      (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+      (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValue(
+        reportStyleCampaign(),
+      );
+
+      const res = await PATCH(
+        patchReq({ reportStyle: "MODERN_DASHBOARD", name: "Discarded rename" }) as never,
+        detailParams("c1"),
+      );
+
+      expect(res.status).toBe(400);
+      await expect(res.json()).resolves.toEqual({
+        success: false,
+        error: "Report appearance must be updated separately from other campaign fields",
+      });
+      expect(db.assessmentCampaign.updateMany).not.toHaveBeenCalled();
+      expect(db.assessmentCampaign.update).not.toHaveBeenCalled();
+      expect(db.auditLog.create).not.toHaveBeenCalled();
+    });
+
     it("keeps the existing cross-coach rejection behavior", async () => {
       (getApiActor as jest.Mock).mockResolvedValue(otherCoachActor);
       (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValue(

@@ -225,6 +225,18 @@ export async function PATCH(
     // Do not fold this into the generic PATCH below: that branch uses an ordinary
     // update and must never become a read-then-write escape hatch around the lock.
     if (data.reportStyle !== undefined) {
+      const bodyFields = Object.keys(body as Record<string, unknown>);
+      if (bodyFields.some((field) => field !== "reportStyle")) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "Report appearance must be updated separately from other campaign fields",
+          },
+          { status: 400 },
+        );
+      }
+
       const reportStylesAvailable =
         isReportStyleEligible(campaign.template?.alias) &&
         isReportStylesEnabled({ templateId: campaign.templateId, campaignId: id });

@@ -29,6 +29,11 @@ function overview(lockedAt: Date | null = null): CampaignOverview {
   };
 }
 
+function closedOverview(): CampaignOverview {
+  const value = overview();
+  return { ...value, campaign: { ...value.campaign, status: "CLOSED" } };
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
   global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true, data: {} }) })) as unknown as typeof fetch;
@@ -49,6 +54,17 @@ describe("CampaignDetail report appearance", () => {
     expect(screen.getByText(/Locked on/i)).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: /Classic/i })).toBeDisabled();
     expect(screen.getByRole("tab", { name: "Cover" })).toBeInTheDocument();
+  });
+
+  it("keeps report appearance visible but read-only for a closed unlocked campaign", () => {
+    render(<CampaignDetail initialOverview={closedOverview()} initialRespondents={[]} reportStylesAvailable />);
+
+    expect(screen.getByTestId("campaign-report-style-card")).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /Classic/i })).toBeDisabled();
+    expect(screen.getByRole("tab", { name: "Cover" })).toBeInTheDocument();
+    expect(screen.getByText("Closed campaigns cannot change report appearance.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Save report appearance/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/first completed response/i)).not.toBeInTheDocument();
   });
 
   it("refreshes and surfaces the exact race explanation on a locked response", async () => {

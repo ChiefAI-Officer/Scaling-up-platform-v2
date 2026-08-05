@@ -840,7 +840,7 @@ export function CampaignDetail({
   }
 
   async function handleSaveReportStyle() {
-    if (reportStyleSaving || campaign.reportStyleLockedAt !== null) return;
+    if (reportStyleSaving || campaign.reportStyleLockedAt !== null || isClosed) return;
     setReportStyleSaving(true);
     try {
       const res = await fetch(`/api/assessment-campaigns/${campaign.id}`, {
@@ -1487,18 +1487,25 @@ export function CampaignDetail({
               Choose how completed individual reports will look.
             </p>
           </div>
-          <ReportStylePicker
-            value={reportStyle}
-            onChange={setReportStyle}
-            disabled={campaign.reportStyleLockedAt !== null || reportStyleSaving}
-            sourceLabel={
-              campaign.reportStyleSource === "CAMPAIGN_OVERRIDE"
-                ? "Campaign override"
-                : "Template default"
-            }
-            lockedAt={campaign.reportStyleLockedAt}
-          />
-          {campaign.reportStyleLockedAt === null && (
+          <fieldset disabled={isClosed} className="min-w-0 border-0 p-0">
+            <ReportStylePicker
+              value={reportStyle}
+              onChange={setReportStyle}
+              disabled={campaign.reportStyleLockedAt !== null || reportStyleSaving}
+              sourceLabel={
+                campaign.reportStyleSource === "CAMPAIGN_OVERRIDE"
+                  ? "Campaign override"
+                  : "Template default"
+              }
+              lockedAt={campaign.reportStyleLockedAt}
+            />
+          </fieldset>
+          {isClosed && campaign.reportStyleLockedAt === null && (
+            <p className="mt-4 border-t border-border pt-4 text-xs text-muted-foreground">
+              Closed campaigns cannot change report appearance.
+            </p>
+          )}
+          {!isClosed && campaign.reportStyleLockedAt === null && (
             <div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-4">
               <p className="text-xs text-muted-foreground">
                 Changes are allowed until the first response is completed.

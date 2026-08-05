@@ -14,6 +14,7 @@ import {
 import { activePublishedWhere } from "@/lib/assessments/active-version";
 
 function baseCampaign() {
+  const reportStyleLockedAt = new Date("2026-05-05T12:34:56.000Z");
   return {
     id: "c1",
     name: "Q2 Rockefeller",
@@ -22,7 +23,14 @@ function baseCampaign() {
     openAt: new Date("2026-05-01T10:00:00Z"),
     closeAt: new Date("2026-05-20T23:59:00Z"),
     createdAt: new Date("2026-04-25T08:00:00Z"),
-    template: { id: "tpl-1", name: "Rockefeller Habits" },
+    template: {
+      id: "tpl-1",
+      name: "Rockefeller Habits",
+      alias: "rockefeller-habits",
+    },
+    reportStyle: "CLASSIC" as const,
+    reportStyleSource: "TEMPLATE_DEFAULT" as const,
+    reportStyleLockedAt,
     organization: { id: "org-1", name: "Acme Corp" },
   };
 }
@@ -133,6 +141,23 @@ describe("getCampaignOverview", () => {
     });
     expect(o.campaign.templateName).toBe("Rockefeller Habits");
     expect(o.campaign.organizationName).toBe("Acme Corp");
+  });
+
+  it("projects the stored report appearance values with a Date lock timestamp", async () => {
+    const { campaign } = await getCampaignOverview(buildDb({}), "c1");
+
+    expect(campaign).toEqual(
+      expect.objectContaining({
+        templateAlias: "rockefeller-habits",
+        reportStyle: "CLASSIC",
+        reportStyleSource: "TEMPLATE_DEFAULT",
+        reportStyleLockedAt: new Date("2026-05-05T12:34:56.000Z"),
+      }),
+    );
+    expect(campaign.reportStyleLockedAt).toBeInstanceOf(Date);
+    expect(campaign.reportStyleLockedAt?.toISOString()).toBe(
+      "2026-05-05T12:34:56.000Z",
+    );
   });
 
   it("all PENDING — invited/viewed/submitted = 0", async () => {
