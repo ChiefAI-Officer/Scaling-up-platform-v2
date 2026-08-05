@@ -64,19 +64,27 @@ export function StrengthsAndPriorities({ view }: { view: ScoredReportViewModel }
       <h2>Decision signals</h2>
       <h3>Strengths</h3>
       <ul>
-        {view.insights.strengths.map((item) => (
-          <li className="report-signal report-signal--strength" data-performance-status="strength" key={item.stableKey} data-testid={`report-style-strength-${item.stableKey}`}>
-            <span className="report-status report-status--strength">Strength</span> {item.label}: {item.averageAcrossSectionsLabel}
-          </li>
-        ))}
+        {view.insights.strengths.map((item) => {
+          const status = performanceStatus(item.averageAcrossSections);
+          return (
+            <li className="report-signal report-signal--top-strength" data-insight-role="top-strength" data-performance-status={status.key} key={item.stableKey} data-testid={`report-style-strength-${item.stableKey}`}>
+              <span className="report-insight-role report-insight-role--top-strength">Top strength</span>
+              <span className={`report-status report-status--${status.key}`}>{status.label}</span> {item.label}: {item.averageAcrossSectionsLabel}
+            </li>
+          );
+        })}
       </ul>
       <h3>Priorities</h3>
       <ul>
-        {view.insights.priorities.map((item) => (
-          <li className="report-signal report-signal--priority" data-action-priority="priority" key={item.stableKey} data-testid={`report-style-priority-${item.stableKey}`}>
-            <span className="report-status report-status--priority">Priority</span> {item.label}: {item.averageAcrossSectionsLabel}
-          </li>
-        ))}
+        {view.insights.priorities.map((item) => {
+          const status = performanceStatus(item.averageAcrossSections);
+          return (
+            <li className="report-signal report-signal--priority-action" data-action-priority="priority" data-insight-role="priority-action" data-performance-status={status.key} key={item.stableKey} data-testid={`report-style-priority-${item.stableKey}`}>
+              <span className="report-insight-role report-insight-role--priority-action">Priority action</span>
+              <span className={`report-status report-status--${status.key}`}>{status.label}</span> {item.label}: {item.averageAcrossSectionsLabel}
+            </li>
+          );
+        })}
       </ul>
     </section>
   );

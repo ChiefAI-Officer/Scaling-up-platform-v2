@@ -57,6 +57,70 @@ function scalingUpFullReport(
 }
 
 describe("curated report renderers", () => {
+  it("maps every score-band boundary and null to an explicit absolute status", () => {
+    const cases = [
+      ["at-strength", 8, "Strength", "strength"],
+      ["below-strength", 7.99, "On track", "on-track"],
+      ["at-on-track", 6, "On track", "on-track"],
+      ["below-on-track", 5.99, "Watch area", "watch-area"],
+      ["at-watch", 4, "Watch area", "watch-area"],
+      ["below-watch", 3.99, "Priority", "priority"],
+      ["unrated", null, "Not rated", "unrated"],
+    ] as const;
+    const view: ScoredReportViewModel = {
+      ...REPORT_STYLE_PREVIEW_FIXTURE,
+      decisions: cases.map(([stableKey, score]) => ({
+        stableKey,
+        label: stableKey,
+        averageAcrossSections: score,
+        averageAcrossSectionsLabel: score === null ? "Not rated" : String(score),
+        totalPoints: 0,
+        totalPointsLabel: "0",
+        color: "#000000",
+      })),
+    };
+    const { container } = render(<ModernDashboardReport view={view} />);
+    const report = within(container);
+
+    for (const [stableKey, , label, status] of cases) {
+      const decision = report.getByTestId(`report-style-decision-${stableKey}`);
+      expect(decision).toHaveAttribute("data-performance-status", status);
+      expect(decision).toHaveTextContent(label);
+      expect(decision.querySelector(`.report-status--${status}`)).toHaveTextContent(label);
+    }
+  });
+
+  it("keeps relative insight roles separate from their absolute score bands", () => {
+    const onTrackTopStrength = {
+      ...REPORT_STYLE_PREVIEW_FIXTURE.decisions[1],
+      averageAcrossSections: 7,
+      averageAcrossSectionsLabel: "7",
+    };
+    const watchAreaPriority = REPORT_STYLE_PREVIEW_FIXTURE.decisions[3];
+    const view: ScoredReportViewModel = {
+      ...REPORT_STYLE_PREVIEW_FIXTURE,
+      insights: {
+        strengths: [onTrackTopStrength],
+        priorities: [watchAreaPriority],
+      },
+    };
+    const { container } = render(<ExecutiveBoardroomReport view={view} />);
+    const report = within(container);
+    const strength = report.getByTestId("report-style-strength-strategy");
+    const priority = report.getByTestId("report-style-priority-cash");
+
+    expect(strength).toHaveAttribute("data-insight-role", "top-strength");
+    expect(strength).toHaveAttribute("data-performance-status", "on-track");
+    expect(strength).toHaveTextContent("Top strength");
+    expect(strength).toHaveTextContent("On track");
+    expect(priority).toHaveAttribute("data-insight-role", "priority-action");
+    expect(priority).toHaveAttribute("data-action-priority", "priority");
+    expect(priority).toHaveAttribute("data-performance-status", "watch-area");
+    expect(priority).toHaveTextContent("Priority action");
+    expect(priority).toHaveTextContent("Watch area");
+    expect(priority.querySelector(".report-status--priority")).toBeNull();
+  });
+
   it.each([
     ["EXECUTIVE_BOARDROOM", "executive-boardroom-report"],
     ["MODERN_DASHBOARD", "modern-dashboard-report"],
@@ -150,8 +214,13 @@ describe("curated report renderers", () => {
       expect(report.getByTestId("report-style-priority-cash")).toHaveTextContent("Cash: 5.5");
       expect(report.getByTestId("report-style-strength-you")).toHaveAttribute("data-performance-status", "strength");
       expect(report.getByTestId("report-style-strength-you")).toHaveTextContent("Strength");
+      expect(report.getByTestId("report-style-strength-you")).toHaveAttribute("data-insight-role", "top-strength");
+      expect(report.getByTestId("report-style-strength-you")).toHaveTextContent("Top strength");
       expect(report.getByTestId("report-style-priority-cash")).toHaveAttribute("data-action-priority", "priority");
-      expect(report.getByTestId("report-style-priority-cash")).toHaveTextContent("Priority");
+      expect(report.getByTestId("report-style-priority-cash")).toHaveAttribute("data-insight-role", "priority-action");
+      expect(report.getByTestId("report-style-priority-cash")).toHaveAttribute("data-performance-status", "watch-area");
+      expect(report.getByTestId("report-style-priority-cash")).toHaveTextContent("Priority action");
+      expect(report.getByTestId("report-style-priority-cash")).toHaveTextContent("Watch area");
       expect(report.getByText("Create a weekly cash conversion review with one owner for receivables, inventory, and commitments. Use the first two cycles to identify where decisions wait unnecessarily, then publish a small operating rule that keeps those decisions moving without adding another meeting to every calendar.")).toBeInTheDocument();
       expect(report.getByText("Resolve the frozen People finding.")).toBeInTheDocument();
       const orphan = report.getByTestId("report-style-question-orphan-check");

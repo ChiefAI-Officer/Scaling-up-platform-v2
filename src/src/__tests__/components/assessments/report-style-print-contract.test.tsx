@@ -98,6 +98,33 @@ describe("curated report print contracts", () => {
     expect(css).toMatch(/\.su-report--executive \.report-page footer \.su-report-coach-logo\s*\{[^}]*border:/);
   });
 
+  it("binds Executive decision identity to the authoritative five-color palette", () => {
+    const css = source("styles/su-report-executive.css");
+    const expected = [
+      ["people", "#C6A15B"],
+      ["strategy", "#5B8AA6"],
+      ["execution", "#A2653E"],
+      ["cash", "#4E8B5E"],
+      ["you", "#8C5BA6"],
+    ];
+
+    for (const [decision, color] of expected) {
+      expect(css).toContain(`--executive-decision-${decision}: ${color};`);
+      expect(css).toMatch(new RegExp(`\\.report-decision\\[data-decision="${decision}"\\] \\{[^}]*border-left-color: var\\(--executive-decision-${decision}\\);`));
+    }
+  });
+
+  it.each([
+    ["executive", "styles/su-report-executive.css", "var\\(--executive-gold\\)"],
+    ["dashboard", "styles/su-report-dashboard.css", "var\\(--dashboard-indigo\\)"],
+  ])("styles %s insight roles independently from score-band chips", (_, path, actionAccent) => {
+    const css = source(path);
+
+    expect(css).toMatch(/\.report-signal\[data-insight-role="top-strength"\]/);
+    expect(css).toMatch(/\.report-signal\[data-insight-role="priority-action"\]/);
+    expect(css).toMatch(new RegExp(`\\.report-action-group \\{[^}]*border-left: 4px solid ${actionAccent};`));
+  });
+
   it("does not change the Classic A4 print contract", () => {
     expect(source("styles/su-report.css")).toMatch(/@page\s*\{\s*size:\s*A4;/);
   });
