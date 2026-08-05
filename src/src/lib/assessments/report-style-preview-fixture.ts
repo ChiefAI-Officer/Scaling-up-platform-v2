@@ -154,3 +154,111 @@ export const REPORT_STYLE_PREVIEW_FIXTURE: ScoredReportViewModel = deepFreeze({
   closingGreeting: "Alex",
   degraded: false,
 });
+
+export type ReportStylePreviewVariant =
+  | "normal"
+  | "partial"
+  | "degraded"
+  | "max-length"
+  | "missing-optional"
+  | "long-branding";
+
+export const REPORT_STYLE_PREVIEW_VARIANTS: readonly ReportStylePreviewVariant[] = [
+  "normal",
+  "partial",
+  "degraded",
+  "max-length",
+  "missing-optional",
+  "long-branding",
+];
+
+const previewVariants = new Set<ReportStylePreviewVariant>(REPORT_STYLE_PREVIEW_VARIANTS);
+
+export function isReportStylePreviewVariant(value: unknown): value is ReportStylePreviewVariant {
+  return typeof value === "string" && previewVariants.has(value as ReportStylePreviewVariant);
+}
+
+/**
+ * Synthetic-only data for exact renderer visual QA. This never loads a
+ * campaign, respondent, or report: callers receive a fresh clone for every
+ * variant so the authenticated preview route and the DB-free E2E harness use
+ * precisely the same safe cases.
+ */
+export function buildReportStylePreviewFixture(variant: ReportStylePreviewVariant): ScoredReportViewModel {
+  const view = JSON.parse(JSON.stringify(REPORT_STYLE_PREVIEW_FIXTURE)) as ScoredReportViewModel;
+
+  switch (variant) {
+    case "normal":
+      return view;
+    case "partial":
+      view.summary.answeredItems = 8;
+      view.sections = view.sections.slice(0, 2).map((section) => ({
+        ...section,
+        questions: section.questions.slice(0, 2),
+      }));
+      view.decisions = view.decisions.map((decision, index) => (
+        index < 2
+          ? decision
+          : {
+              ...decision,
+              averageAcrossSections: null,
+              averageAcrossSectionsLabel: "Not rated",
+              totalPoints: 0,
+              totalPointsLabel: "0",
+            }
+      ));
+      view.insights = { strengths: view.insights.strengths.slice(0, 1), priorities: [] };
+      view.scorecard.rows = view.scorecard.rows.slice(0, 2);
+      view.recommendations = view.recommendations.slice(0, 1);
+      view.additionalResponses = [];
+      return view;
+    case "degraded":
+      view.degraded = true;
+      view.orphanQuestions = [{
+        stableKey: "missing-score",
+        label: "A previously answered item could not be matched to this version",
+        unmapped: true,
+        value: 0,
+        maximum: null,
+        scoreLabel: "Not available",
+        achieved: false,
+        achievementMarker: null,
+      }];
+      return view;
+    case "max-length": {
+      const long = "A deliberately long synthetic assessment label that verifies wrapped evidence, recommendations, and page boundaries remain readable without clipping or overlap";
+      view.identity.assessmentName = `${long} — ${long}`;
+      view.identity.campaignLabel = `${long} — Campaign`;
+      view.identity.campaignSubtitle = view.identity.campaignLabel;
+      view.identity.respondentName = "Alexandria Rivera-Montgomery-Worthington";
+      view.identity.companyName = `${long} Corporation`;
+      view.sections = view.sections.map((section) => ({
+        ...section,
+        label: `${section.label}: ${long}`,
+        questions: section.questions.map((question) => ({ ...question, label: `${question.label}. ${long}` })),
+      }));
+      view.recommendations = view.recommendations.map((group) => ({
+        ...group,
+        label: `${group.label}: ${long}`,
+        items: group.items.map((item) => ({ ...item, text: `${item.text} ${long}. ${long}.` })),
+      }));
+      view.additionalResponses = [{ label: long, answer: `${long}. ${long}. ${long}.` }];
+      return view;
+    }
+    case "missing-optional":
+      view.identity.campaignLabel = null;
+      view.identity.campaignSubtitle = null;
+      view.identity.jobTitle = null;
+      view.identity.respondentEmail = null;
+      view.coach = { name: null, logoUrl: null };
+      view.cta = { ...view.cta, eligible: false, contactEmail: null };
+      view.additionalResponses = [];
+      return view;
+    case "long-branding":
+      view.identity.companyName = "The International Association for Deliberately Long but Entirely Synthetic Enterprise Transformation and Operating-System Excellence";
+      view.coach.name = "Alexandra Montgomery-Worthington, Certified Scaling Up Coach for Enterprise Transformation and Sustainable Growth";
+      view.identity.campaignLabel = "FY2026 Enterprise Transformation, Strategic Alignment, and Operating Rhythm Planning Campaign";
+      view.identity.campaignSubtitle = view.identity.campaignLabel;
+      return view;
+  }
+}

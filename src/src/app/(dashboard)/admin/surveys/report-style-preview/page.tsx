@@ -1,8 +1,10 @@
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth/authorization";
 import {
-  REPORT_STYLE_PREVIEW_FIXTURE,
+  buildReportStylePreviewFixture,
+  isReportStylePreviewVariant,
 } from "@/lib/assessments/report-style-preview-fixture";
+import type { ScoredReportViewModel } from "@/lib/assessments/scored-report-view-model";
 import {
   isReportStyleKey,
   REPORT_STYLE_PREVIEW_PAGES,
@@ -30,14 +32,14 @@ function isPreviewPage(value: unknown): value is PreviewPage {
   return typeof value === "string" && PREVIEW_PAGES.has(value as PreviewPage);
 }
 
+
 /**
  * A safe, fixture-only approximation of the frozen Classic report. The live
  * Classic renderer intentionally consumes a frozen RespondentReport, which a
  * preview route must never load. This uses the same report CSS and the
  * canonical presentation fixture instead.
  */
-function classicPreviewReport(): BrandedReportProps["report"] {
-  const view = REPORT_STYLE_PREVIEW_FIXTURE;
+function classicPreviewReport(view: ScoredReportViewModel): BrandedReportProps["report"] {
   const recommendationByQuestion = new Map(
     view.recommendations.flatMap((group) =>
       group.items.map((item) => [item.stableKey, item.text] as const),
@@ -113,14 +115,14 @@ function classicPreviewReport(): BrandedReportProps["report"] {
       contentHash: "synthetic-preview",
       templateName: view.provenance.templateName,
     },
-    degraded: false,
+    degraded: view.degraded,
     coachName: view.coach.name,
     coachLogoUrl: view.coach.logoUrl,
   };
 }
 
-function ClassicPreviewPage({ page }: { page: PreviewPage }) {
-  const report = classicPreviewReport();
+function ClassicPreviewPage({ page, view }: { page: PreviewPage; view: ScoredReportViewModel }) {
+  const report = classicPreviewReport(view);
 
   return (
     <article className="report-style-preview--classic" data-preview-page={page} data-testid="classic-preview">
@@ -137,21 +139,21 @@ function ClassicPreviewPage({ page }: { page: PreviewPage }) {
   );
 }
 
-function ExecutivePreviewPage({ page }: { page: PreviewPage }) {
+function ExecutivePreviewPage({ page, view }: { page: PreviewPage; view: ScoredReportViewModel }) {
   return (
     <div className="report-style-preview--executive" data-preview-page={page} data-testid={`report-style-preview-page-${page}`}>
       <PreviewSelectionStyles />
-      <ExecutiveBoardroomReport view={REPORT_STYLE_PREVIEW_FIXTURE} />
+      <ExecutiveBoardroomReport view={view} />
       <PreviewEndMarker />
     </div>
   );
 }
 
-function DashboardPreviewPage({ page }: { page: PreviewPage }) {
+function DashboardPreviewPage({ page, view }: { page: PreviewPage; view: ScoredReportViewModel }) {
   return (
     <div className="report-style-preview--dashboard" data-preview-page={page} data-testid={`report-style-preview-page-${page}`}>
       <PreviewSelectionStyles />
-      <ModernDashboardReport view={REPORT_STYLE_PREVIEW_FIXTURE} />
+      <ModernDashboardReport view={view} />
       <PreviewEndMarker />
     </div>
   );
@@ -200,21 +202,22 @@ function PreviewEndMarker() {
   );
 }
 
-function PreviewRenderer({ style, page }: { style: ReportStyleKey; page: PreviewPage }) {
-  if (style === "CLASSIC") return <ClassicPreviewPage page={page} />;
-  if (style === "EXECUTIVE_BOARDROOM") return <ExecutivePreviewPage page={page} />;
-  return <DashboardPreviewPage page={page} />;
+function PreviewRenderer({ style, page, view }: { style: ReportStyleKey; page: PreviewPage; view: ScoredReportViewModel }) {
+  if (style === "CLASSIC") return <ClassicPreviewPage page={page} view={view} />;
+  if (style === "EXECUTIVE_BOARDROOM") return <ExecutivePreviewPage page={page} view={view} />;
+  return <DashboardPreviewPage page={page} view={view} />;
 }
 
 export default async function ReportStylePreviewPage({
   searchParams,
 }: {
-  searchParams: Promise<{ style?: string; page?: string; capture?: string }>;
+  searchParams: Promise<{ style?: string; page?: string; capture?: string; variant?: string }>;
 }) {
   await requireAdmin();
   const query = await searchParams;
 
-  if (!isReportStyleKey(query.style) || !isPreviewPage(query.page)) notFound();
+  const variant = query.variant ?? "normal";
+  if (!isReportStyleKey(query.style) || !isPreviewPage(query.page) || !isReportStylePreviewVariant(variant)) notFound();
 
   const letter = query.style !== "CLASSIC";
   const printPageName = query.style === "EXECUTIVE_BOARDROOM"
@@ -226,18 +229,20 @@ export default async function ReportStylePreviewPage({
   return (
     <main
       data-capture={captureMode ? "true" : "false"}
+      data-preview-variant={variant}
       data-testid="report-style-preview-root"
       style={{
         background: "#ffffff",
         boxSizing: "border-box",
-        height: letter ? "1056px" : "1123px",
+        height: captureMode ? (letter ? "1056px" : "1123px") : "auto",
         margin: "0 auto",
-        maxHeight: letter ? "1056px" : "1123px",
-        minHeight: letter ? "1056px" : "1123px",
-        overflow: "hidden",
+        maxHeight: captureMode ? (letter ? "1056px" : "1123px") : undefined,
+        maxWidth: letter ? "816px" : "794px",
+        minHeight: captureMode ? (letter ? "1056px" : "1123px") : undefined,
+        overflow: captureMode ? "hidden" : "visible",
         page: printPageName,
         position: "relative",
-        width: letter ? "816px" : "794px",
+        width: captureMode ? (letter ? "816px" : "794px") : "100%",
         zIndex: 100,
       }}
     >
@@ -261,7 +266,7 @@ export default async function ReportStylePreviewPage({
             #main-content ~ * + * { display: none !important; }
             body :has(> #main-content) > :not(#main-content) { display: none !important; }
             #main-content { display: block !important; }
-            #main-content > [data-testid="report-style-preview-root"] { height: auto !important; margin: 0 !important; max-height: none !important; min-height: 0 !important; overflow: visible !important; page: auto !important; width: 100% !important; }
+            #main-content > [data-testid="report-style-preview-root"] { height: auto !important; margin: 0 !important; max-height: none !important; min-height: 0 !important; overflow: visible !important; width: 100% !important; }
             [data-testid="report-style-preview-root"] .report-style-preview--classic,
             [data-testid="report-style-preview-root"] .report-style-preview--executive,
             [data-testid="report-style-preview-root"] .report-style-preview--dashboard,
@@ -269,7 +274,7 @@ export default async function ReportStylePreviewPage({
             [data-testid="report-style-preview-root"] .report-style-preview--classic .su-report,
             [data-testid="report-style-preview-root"] .report-style-preview--executive .su-report--executive,
             [data-testid="report-style-preview-root"] .report-style-preview--dashboard .su-report--dashboard { height: auto !important; min-height: 0 !important; }
-            [data-testid="report-style-preview-root"] .report-page { height: auto !important; min-height: 0 !important; page: auto !important; padding: 0 !important; }
+            [data-testid="report-style-preview-root"] .report-page { height: auto !important; min-height: 0 !important; padding: 0 !important; }
             [data-testid="report-style-preview-root"] .report-page-break { break-before: auto !important; page-break-before: auto !important; }
             [data-testid="report-style-preview-root"] .su-report-cover { break-after: auto !important; page-break-after: auto !important; }
             [data-testid="report-style-preview-safe-bottom"] { display: none !important; }
@@ -277,7 +282,7 @@ export default async function ReportStylePreviewPage({
           }
         `}</style>
       ) : null}
-      <PreviewRenderer style={query.style} page={query.page} />
+      <PreviewRenderer style={query.style} page={query.page} view={buildReportStylePreviewFixture(variant)} />
     </main>
   );
 }

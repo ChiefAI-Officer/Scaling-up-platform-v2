@@ -108,6 +108,7 @@ import { redirect, notFound } from "next/navigation";
 import { getApiActor } from "@/lib/auth/authorization";
 import { getRespondentReport } from "@/lib/assessments/respondent-report";
 import { checkRateLimitAsync } from "@/lib/rate-limit";
+import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
 import Page from "@/app/(report)/assessments/[id]/respondents/[respondentId]/report/page";
 import type { ApiActor } from "@/lib/auth/access-control";
 
@@ -116,6 +117,7 @@ const mockGetRespondentReport = getRespondentReport as jest.Mock;
 const mockRedirect = redirect as unknown as jest.Mock;
 const mockNotFound = notFound as unknown as jest.Mock;
 const mockRateLimit = checkRateLimitAsync as unknown as jest.Mock;
+const mockReportStylesEnabled = isReportStylesEnabled as jest.Mock;
 
 function makeProps(id = "camp-1", respondentId = "resp-1") {
   return { params: Promise.resolve({ id, respondentId }) };
@@ -165,6 +167,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockRateLimit.mockResolvedValue({ success: true, remaining: 99, resetAt: 0 });
   mockAuditCreate.mockResolvedValue({ id: "audit-1" });
+  mockReportStylesEnabled.mockReturnValue(true);
 });
 
 describe("(report) respondent report page", () => {
@@ -256,6 +259,19 @@ describe("(report) respondent report page", () => {
 
     expect(markup).toContain('data-campaign-label="Q1 Pulse"');
     expect(markup).toContain('data-report-styles-available="true"');
+    expect(markup).toContain('data-report-findings-available="true"');
+  });
+
+  it("keeps the legacy report renderer available when report styles are off", async () => {
+    mockReportStylesEnabled.mockReturnValue(false);
+    mockGetApiActor.mockResolvedValue(adminActor());
+    mockGetRespondentReport.mockResolvedValue(okReport());
+
+    const node = await Page(makeProps());
+    const markup = renderToStaticMarkup(node as React.ReactElement);
+
+    expect(markup).toContain('data-testid="branded-report"');
+    expect(markup).toContain('data-report-styles-available="false"');
     expect(markup).toContain('data-report-findings-available="true"');
   });
 

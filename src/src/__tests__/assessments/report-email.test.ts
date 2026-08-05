@@ -208,15 +208,24 @@ describe("buildReportEmailHtml — overall score", () => {
       report: fourDecisionsReport(),
       recipientRole: "TAKER_COPY",
     });
+    const boardroomReport = {
+      ...fourDecisionsReport(),
+      reportStyle: "EXECUTIVE_BOARDROOM" as const,
+    };
     const modernReport = {
       ...fourDecisionsReport(),
       reportStyle: "MODERN_DASHBOARD" as const,
     };
+    const boardroom = buildReportEmailHtml({
+      report: boardroomReport,
+      recipientRole: "TAKER_COPY",
+    });
     const modern = buildReportEmailHtml({
       report: modernReport,
       recipientRole: "TAKER_COPY",
     });
 
+    expect(boardroom).toEqual(classic);
     expect(modern).toEqual(classic);
   });
 

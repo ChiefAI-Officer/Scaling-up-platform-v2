@@ -48,11 +48,25 @@ describe("CampaignDetail report appearance", () => {
     expect(JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body)).toEqual({ reportStyle: "MODERN_DASHBOARD" });
   });
 
+  it("supports keyboard selection before the first completion", () => {
+    render(<CampaignDetail initialOverview={overview()} initialRespondents={[]} reportStylesAvailable />);
+
+    const classic = screen.getByRole("radio", { name: /Classic/i });
+    const boardroom = screen.getByRole("radio", { name: /Executive Boardroom/i });
+    classic.focus();
+    fireEvent.keyDown(classic, { key: "ArrowRight" });
+
+    expect(boardroom).toHaveFocus();
+    expect(boardroom).toBeChecked();
+  });
+
   it("keeps the chosen style and previews visible but read-only after the first completion", () => {
     render(<CampaignDetail initialOverview={overview(new Date("2026-08-03T12:00:00Z"))} initialRespondents={[]} reportStylesAvailable />);
     expect(screen.getByText(/Changes are unavailable after the first completed response/i)).toBeInTheDocument();
     expect(screen.getByText(/Locked on/i)).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: /Classic/i })).toBeDisabled();
+    expect(screen.getByRole("radio", { name: /Executive Boardroom/i })).toBeDisabled();
+    expect(screen.getByRole("radio", { name: /Modern Dashboard/i })).toBeDisabled();
     expect(screen.getByRole("tab", { name: "Cover" })).toBeInTheDocument();
   });
 

@@ -21,9 +21,9 @@ jest.mock("@/lib/assessments/respondent-report", () => {
 
 import ReportStylePreviewPage from "@/app/(dashboard)/admin/surveys/report-style-preview/page";
 
-async function renderPage(style: string, page: string) {
+async function renderPage(style: string, page: string, variant = "normal") {
   const element = await ReportStylePreviewPage({
-    searchParams: Promise.resolve({ style, page, capture: "1" }),
+    searchParams: Promise.resolve({ style, page, capture: "1", variant }),
   });
   return renderToStaticMarkup(element);
 }
@@ -82,10 +82,30 @@ describe("report style preview page", () => {
   });
 
   it.each([
+    ["partial", "Not rated"],
+    ["degraded", "Some scoring details for this submission could not be fully read."],
+    ["max-length", "A deliberately long synthetic assessment label"],
+    ["missing-optional", "Alex Rivera"],
+    ["long-branding", "The International Association for Deliberately Long"],
+  ])("renders the allow-listed %s synthetic fixture variant", async (variant, marker) => {
+    const html = await renderPage("EXECUTIVE_BOARDROOM", "detail", variant);
+
+    expect(html).toContain(`data-preview-variant="${variant}"`);
+    expect(html).toContain(marker);
+    expect(mockRequireAdmin).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
     ["UNKNOWN", "cover"],
     ["CLASSIC", "unknown"],
     ["classic", "cover"],
   ])("rejects invalid preview values (%s, %s)", async (style, page) => {
     await expect(renderPage(style, page)).rejects.toThrow("NEXT_NOT_FOUND");
+  });
+
+  it("rejects an unknown fixture variant before it can render", async () => {
+    await expect(renderPage("MODERN_DASHBOARD", "cover", "production-data")).rejects.toThrow(
+      "NEXT_NOT_FOUND",
+    );
   });
 });

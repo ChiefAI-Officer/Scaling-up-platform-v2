@@ -141,6 +141,20 @@ describe("admin default report appearance", () => {
     await waitFor(() => expect(boardroom).not.toBeDisabled());
   });
 
+  it("supports keyboard style selection with an announced selected radio", () => {
+    render(<TemplateEditorTabbed {...shellProps()} />);
+
+    const card = screen.getByTestId("settings-default-report-style-card");
+    const classic = within(card).getByRole("radio", { name: /classic/i });
+    const boardroom = within(card).getByRole("radio", { name: /executive boardroom/i });
+    classic.focus();
+    fireEvent.keyDown(classic, { key: "ArrowRight" });
+
+    expect(boardroom).toHaveFocus();
+    expect(boardroom).toBeChecked();
+    expect(within(card).getByText("Selected")).toBeInTheDocument();
+  });
+
   it("saves through the immediate template-row PATCH and treats the returned enum as server truth", async () => {
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
