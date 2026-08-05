@@ -2,7 +2,7 @@
 
 **Source:** Jeff Verdun's 14-page *Scaling Up Assessment Platform - Feedback Report for Gabriel*, prepared 2026-07-10. Section 2 is canonical: 53 rows numbered #30-#87. Rows #31, #34, #36, #38, and #82 are intentionally absent because completed items were excluded.
 
-**Reconciled against:** `origin/main` at `604e3e10c692060a095f30f890c64328e549122b` on 2026-08-05. Current tally after the approved #42 implementation: **42 DONE / 5 PARTIAL / 6 NEEDS DECISION**.
+**Reconciled against:** `origin/main` at `987eb7d82f4735e9129186d64608424cfa68b1a6` on 2026-08-05. Current tally after the approved #42 implementation: **42 DONE / 5 PARTIAL / 6 NEEDS DECISION**.
 
 **Authority:** This tracked ledger is authoritative; generated PDFs and `tmp/` files are derivatives. Completion is judged against the exact Section 2 ask. Later-discovered scope remains visible as a separately named follow-on and does not silently widen a row.
 

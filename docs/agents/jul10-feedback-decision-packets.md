@@ -3,7 +3,7 @@
 These packets translate the eleven unresolved rows in the
 [canonical closeout ledger](jul10-feedback-closeout.md) into bounded decisions.
 They were reconciled against origin/main at
-604e3e10c692060a095f30f890c64328e549122b on 2026-08-05. No production state,
+987eb7d82f4735e9129186d64608424cfa68b1a6 on 2026-08-05. No production state,
 template version, feature flag, benchmark value, customer data, or email was
 changed.
 
