@@ -42,6 +42,30 @@ async function bounded<T>(operation: Promise<T>, label: string, timeoutMs = 10_0
   }
 }
 
+async function waitForCoachUpdateLockWait(
+  observer: PrismaClient,
+  coachBackendPid: number,
+  timeoutMs = 10_000,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const blockedUpdate = await observer.$queryRaw<Array<{ pid: number }>>`
+      SELECT "pid"
+      FROM pg_stat_activity
+      WHERE "pid" = ${coachBackendPid}
+        AND "state" = ${"active"}
+        AND "wait_event_type" = ${"Lock"}
+        AND "wait_event" = ${"transactionid"}
+        AND "query" LIKE ${'%UPDATE "assessment_campaigns"%'}
+    `;
+    if (blockedUpdate.length === 1) return;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  throw new Error(
+    `Coach backend ${coachBackendPid} was not observed blocked on the campaign update`,
+  );
+}
+
 describe("report style first-completion lock on PostgreSQL", () => {
   let admin: PrismaClient;
   let completionDb: PrismaClient;
@@ -126,6 +150,7 @@ describe("report style first-completion lock on PostgreSQL", () => {
 
     const lockAcquired = deferred<void>();
     const releaseFreeze = deferred<void>();
+    const coachBackendPid = deferred<number>();
     const freeze = completionDb.$transaction(async (tx) => {
       await lockReportStyleForFirstCompletion(
         tx,
@@ -138,13 +163,24 @@ describe("report style first-completion lock on PostgreSQL", () => {
 
     try {
       await bounded(lockAcquired.promise, "completion lock acquisition");
-      const coachUpdate = coachDb.$transaction((tx) => tx.$executeRaw`
-        UPDATE "assessment_campaigns"
-        SET "reportStyle" = ${"EXECUTIVE_BOARDROOM"}
-        WHERE "id" = ${"campaign-freeze-first"}
-          AND "reportStyleLockedAt" IS NULL
-      `);
+      const coachUpdate = coachDb.$transaction(async (tx) => {
+        const backendPids = await tx.$queryRaw<Array<{ pid: number }>>`
+          SELECT pg_backend_pid()::int AS "pid"
+        `;
+        coachBackendPid.resolve(backendPids[0].pid);
+        return tx.$executeRaw`
+          UPDATE "assessment_campaigns"
+          SET "reportStyle" = ${"EXECUTIVE_BOARDROOM"}
+          WHERE "id" = ${"campaign-freeze-first"}
+            AND "reportStyleLockedAt" IS NULL
+        `;
+      });
 
+      const coachPid = await bounded(
+        coachBackendPid.promise,
+        "coach transaction startup",
+      );
+      await waitForCoachUpdateLockWait(admin, coachPid);
       releaseFreeze.resolve();
       const [, affected] = await bounded(
         Promise.all([freeze, coachUpdate]),
