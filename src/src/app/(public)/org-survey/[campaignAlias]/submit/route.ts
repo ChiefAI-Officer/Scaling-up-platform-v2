@@ -1186,7 +1186,14 @@ export async function POST(
         };
       }).catch((error) => {
         if (!(error instanceof SubmissionTransactionAbort)) throw error;
-        return { kind: error.kind } as const;
+        switch (error.kind) {
+          case "not-found":
+            return { kind: "not-found" as const };
+          case "gate":
+            return { kind: "gate" as const };
+          case "conflict":
+            return { kind: "conflict" as const };
+        }
       });
 
       if (result.kind === "not-found") {
