@@ -40,7 +40,7 @@ function cssVariable(css: string, name: string): string {
 
 function cssColorBinding(css: string, selector: string, property: "background" | "color" | "border-color") {
   const rule = blockFor(css, selector);
-  const declaration = rule.match(new RegExp(`${property}:\\s*(#[0-9a-f]{6}|var\\((--[a-z0-9-]+)\\));`, "i"));
+  const declaration = rule.match(new RegExp(`(?:^|[;{])\\s*${property}\\s*:\\s*(#[0-9a-f]{6}|var\\((--[a-z0-9-]+)\\));`, "i"));
   if (!declaration) throw new Error(`Missing ${property} declaration for ${selector}`);
 
   return {
@@ -68,6 +68,33 @@ function contrastRatio(foreground: string, background: string): number {
 }
 
 describe("curated report print contracts", () => {
+  it("parses color declarations without matching property-name suffixes", () => {
+    const css = `
+      .tokens {
+        --expected: #112233;
+        --bad: #445566;
+      }
+      .mixed {
+        border-color: var(--expected);
+        color: var(--bad);
+      }
+      .at-start { color : #AABBCC; }
+    `;
+
+    expect(cssColorBinding(css, ".mixed", "color")).toEqual({
+      color: "#445566",
+      variable: "--bad",
+    });
+    expect(cssColorBinding(css, ".mixed", "border-color")).toEqual({
+      color: "#112233",
+      variable: "--expected",
+    });
+    expect(cssColorBinding(css, ".at-start", "color")).toEqual({
+      color: "#AABBCC",
+      variable: null,
+    });
+  });
+
   it.each([
     ["Executive Boardroom", ExecutiveBoardroomReport, "su-report--executive", "report-page--executive-cover"],
     ["Modern Dashboard", ModernDashboardReport, "su-report--dashboard", "report-page--dashboard-cover"],
