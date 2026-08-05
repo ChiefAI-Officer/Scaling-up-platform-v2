@@ -148,17 +148,23 @@ export function lvaReportFactorLabel(key: string, fallback: string): string {
  * within-report inconsistency, e.g. "Recruitment of new staff" in the rating
  * section vs "Recruitment of new employees" in the S5 heading).
  */
-const LVA_SURVEY_FACTOR_LABELS: Readonly<Record<string, string>> = {
-  recruitment: "Recruitment of new employees",
-  retaining_staff: "Retaining staff",
+const LVA_SURVEY_FACTOR_LABELS: Readonly<Record<string, readonly string[]>> = {
+  recruitment: ["Recruitment of new employees"],
+  retaining_staff: ["Retaining staff"],
   // Wave P (Jeff #14) sentence-cased the SEED to "Leadership team", which
   // already matches the report label — new versions need no rewrite. This
   // find-string stays "Leadership Team" for campaigns pinned to pre-Wave-P
   // versions, whose S5 headings still carry the old wording.
-  leadership_team: "Leadership Team",
-  the_leadership: "The leadership",
-  internal_comms: "Internal communications",
-  growth_financing: "Growth Financing",
+  leadership_team: ["Leadership Team"],
+  the_leadership: ["The leadership"],
+  internal_comms: ["Internal communications"],
+  // Row #42 changes new seed content while existing campaigns remain pinned
+  // to versions carrying the source wording. Accept both inputs so both
+  // generations keep the Esperto report label.
+  growth_financing: [
+    "Access to financing for growth",
+    "Growth Financing",
+  ],
 };
 
 /**
@@ -172,7 +178,9 @@ const LVA_SURVEY_FACTOR_LABELS: Readonly<Record<string, string>> = {
 export function lvaReportQuestionLabel(key: string, label: string): string {
   if (!key.startsWith("S5_why_")) return label;
   const slug = key.slice("S5_why_".length);
-  const survey = LVA_SURVEY_FACTOR_LABELS[slug];
+  const survey = LVA_SURVEY_FACTOR_LABELS[slug]?.find((candidate) =>
+    label.includes(candidate),
+  );
   const report = LVA_REPORT_FACTOR_LABELS[slug];
   if (survey && report && label.includes(survey)) {
     return label.replace(survey, report);

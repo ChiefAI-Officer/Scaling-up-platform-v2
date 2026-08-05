@@ -7,8 +7,9 @@
  *     (crosswalk Q5a/b/c depends on all three).
  *   - LVA: "Leadership Team" → "Leadership team" in BOTH factor lists
  *     (Jeff item #14), matching the 13 sentence-case sibling factors.
- *     "The leadership"/"The Leadership" (item #15) and "Growth Financing"
- *     (item #16) are pending separate items and must NOT change here.
+ *     "The leadership"/"The Leadership" (item #15) remains pending.
+ *   - LVA: "Growth Financing" → "Access to financing for growth" in both
+ *     factor lists (July 10 row #42), with keys and factor order unchanged.
  *   - LVA: S6_core_values label replaced with Jeff's copy (item #17).
  */
 
@@ -97,9 +98,37 @@ describe("Wave P — LVA factor sentence-casing (Jeff #14)", () => {
     }
   });
 
-  it("'Growth Financing' is present unchanged in both lists (pending item #16)", () => {
-    expect(matrixLabels).toContain("Growth Financing");
-    expect(checkboxLabels).toContain("Growth Financing");
+  it("uses the approved growth-financing wording in both factor lists", () => {
+    expect(matrixLabels[15]).toBe("Access to financing for growth");
+    expect(checkboxLabels[15]).toBe("Access to financing for growth");
+    expect(matrixLabels).not.toContain("Growth Financing");
+    expect(checkboxLabels).not.toContain("Growth Financing");
+  });
+
+  it("retains the growth-financing stable keys and factor position", () => {
+    const matrixQuestion = content.questions.find(
+      (q) => q.stableKey === "S3_growth_financing"
+    );
+    const obstacleQuestion = content.questions.find(
+      (q) => q.stableKey === "S4_biggest_obstacles"
+    ) as { options: Array<{ key: string; label: string }> };
+
+    expect(matrixQuestion?.sortOrder).toBe(
+      content.questions.find((q) => q.stableKey === "S3_cash")!.sortOrder + 1
+    );
+    expect(obstacleQuestion.options[15]).toEqual({
+      key: "growth_financing",
+      label: "Access to financing for growth",
+    });
+  });
+
+  it("updates the derived follow-up label without changing its stable key", () => {
+    const whyQ = content.questions.find(
+      (q) => q.stableKey === "S5_why_growth_financing"
+    );
+    expect(whyQ?.label).toBe(
+      "Why is Access to financing for growth a hindrance?"
+    );
   });
 
   it("the derived S5 follow-up label reads 'Why is Leadership team a hindrance?'", () => {

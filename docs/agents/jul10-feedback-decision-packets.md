@@ -3,7 +3,7 @@
 These packets translate the eleven unresolved rows in the
 [canonical closeout ledger](jul10-feedback-closeout.md) into bounded decisions.
 They were reconciled against origin/main at
-15ee442b124f43155ffd3dfdc1dc08fbfa37cd5e on 2026-08-05. No production state,
+604e3e10c692060a095f30f890c64328e549122b on 2026-08-05. No production state,
 template version, feature flag, benchmark value, customer data, or email was
 changed.
 
@@ -86,25 +86,29 @@ that keeps S3_the_leadership unless the meaning is materially different.
 **Exact ask.** Clarify whether “Growth Financing” means the ability to obtain
 financing, then reword it.
 
-**Current truth.** The factor uses S3_growth_financing and growth_financing in
-both LVA lists, and the locked Esperto crosswalk relies on the same factor order.
+**Current truth.** Gabriel authorized proceeding with this packet on 2026-08-05.
+The row-specific implementation changes both new-version seed labels and the
+derived explanation label while retaining S3_growth_financing,
+growth_financing, and the locked Esperto factor position. Report rendering
+accepts both the old and new survey labels so campaigns pinned to historical
+versions retain the Esperto report wording.
 
-**Recommendation.** Use **Access to financing for growth** in both the rating
-matrix and obstacle option. Do not change the scale, order, or associated
+**Approved disposition.** Use **Access to financing for growth** in both the
+rating matrix and obstacle option. Do not change the scale, order, or associated
 follow-up scope.
 
 **Compatibility.** Retain S3_growth_financing, growth_financing, and the
 historical crosswalk position. This is a wording-only new-version change with no
 schema or import conversion.
 
-**Acceptance.** The new draft shows the approved wording in both locations,
-stable keys remain byte-identical, and the golden import still selects the same
-factor.
+**Acceptance.** Targeted seed, report-compatibility, and golden-import tests
+prove the approved wording, stable keys, historical label handling, and factor
+position. The remaining gate is a separately authorized new Production draft
+and visual review; publishing and live verification remain separately gated.
 
-**Approval sentence.** I approve changing LVA “Growth Financing” to “Access to
-financing for growth” as a wording-only new-version change; retain
-S3_growth_financing, growth_financing, factor order, and the historical-import
-crosswalk.
+**Authorization recorded.** Gabriel's “please proceed” authorizes the bounded
+wording-only implementation. It does not authorize a Production seed, template
+publish, live response, or other Production mutation.
 
 <a id="44-lva-priority-triplet"></a>
 ## #44 LVA priority triplet
@@ -295,10 +299,12 @@ approved.
 
 ## Decision order
 
-1. Approve the bounded, no-new-product-intent packets: #42 and #47.
-2. Answer the content questions: #41, #44, and #45.
-3. Approve data/rollout contracts: #32 and #57/#58.
-4. Supply authored outcome content for #75.
-5. Supply the complete source package and build authorization for #84.
-6. Handle #33 through its dedicated report-by-report matrix rather than this
+1. Complete #42's protected merge, then separately authorize a new draft and
+   visual check; publishing remains separate.
+2. Approve the remaining bounded no-new-product-intent packet: #47.
+3. Answer the content questions: #41, #44, and #45.
+4. Approve data/rollout contracts: #32 and #57/#58.
+5. Supply authored outcome content for #75.
+6. Supply the complete source package and build authorization for #84.
+7. Handle #33 through its dedicated report-by-report matrix rather than this
    copy/data queue.
