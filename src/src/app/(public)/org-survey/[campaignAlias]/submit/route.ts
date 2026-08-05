@@ -43,6 +43,7 @@ import {
 } from "@/lib/assessments/wave-d-feature-flags";
 import { isResultsEmailApproved } from "@/lib/assessments/results-email-approval";
 import { isOnScreenResultsEnabled } from "@/lib/assessments/wave-osr-flags";
+import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
 import { reportConfigFor } from "@/lib/assessments/report-config";
 import {
   buildRespondentReportFromSubmission,
@@ -1245,6 +1246,10 @@ export async function POST(
         result.discloseOnScreen && respondentReport !== null
           ? respondentReport
           : undefined;
+      const reportStylesAvailable = isReportStylesEnabled({
+        templateId: invitation.campaign.templateId,
+        campaignId: invitation.campaign.id,
+      });
 
       if (onScreenReport) {
         console.info("[assessment-report] onscreen_report_payload_issued", {
@@ -1262,6 +1267,7 @@ export async function POST(
           success: true,
           data: {
             submissionId: result.submissionId,
+            reportStylesAvailable,
             ...(onScreenReport ? { report: onScreenReport } : {}),
           },
         },

@@ -66,18 +66,25 @@ const mockAuditCreate = jest.fn().mockResolvedValue({ id: "audit-1" });
 jest.mock("@/lib/db", () => ({
   db: {
     auditLog: { create: (...args: unknown[]) => mockAuditCreate(...args) },
+    assessmentCampaign: { findFirst: jest.fn().mockResolvedValue({ id: "camp-1", templateId: "tpl-1" }) },
   },
+}));
+
+jest.mock("@/lib/assessments/wave-report-styles-flags", () => ({
+  isReportStylesEnabled: jest.fn(() => true),
 }));
 
 jest.mock("@/components/assessments/BrandedReport", () => ({
   BrandedReport: ({
     report,
     campaignLabel,
+    reportStylesAvailable,
   }: {
     report: { respondentName: string };
     campaignLabel: string | null;
+    reportStylesAvailable?: boolean;
   }) => (
-    <div data-testid="branded-report" data-campaign-label={campaignLabel ?? ""}>
+    <div data-testid="branded-report" data-campaign-label={campaignLabel ?? ""} data-report-styles-available={String(reportStylesAvailable)}>
       {report.respondentName}
     </div>
   ),
@@ -243,6 +250,7 @@ describe("(report) respondent report page", () => {
     const markup = renderToStaticMarkup(node as React.ReactElement);
 
     expect(markup).toContain('data-campaign-label="Q1 Pulse"');
+    expect(markup).toContain('data-report-styles-available="true"');
   });
 
   it("renders for an owning COACH actor", async () => {

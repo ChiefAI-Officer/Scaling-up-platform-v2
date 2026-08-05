@@ -95,6 +95,10 @@ jest.mock("@/lib/assessments/wave-osr-flags", () => ({
   isOnScreenResultsEnabled: jest.fn(() => osrState.enabled),
 }));
 
+jest.mock("@/lib/assessments/wave-report-styles-flags", () => {
+  return { isReportStylesEnabled: jest.fn() };
+});
+
 // eslint-disable-next-line no-var
 var approvedState = { approved: true };
 jest.mock("@/lib/assessments/results-email-approval", () => ({
@@ -137,8 +141,10 @@ jest.mock("@/lib/assessments/results-email", () => ({
 
 import { POST } from "@/app/(public)/org-survey/[campaignAlias]/submit/route";
 import { lockReportStyleForFirstCompletion } from "@/lib/assessments/report-style-lock";
+import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
 
 reportStyleLockMock = lockReportStyleForFirstCompletion as jest.Mock;
+const reportStylesEnabledMock = isReportStylesEnabled as jest.Mock;
 
 const goodVersion = {
   questions: [
@@ -181,6 +187,7 @@ function invitationFixture(overrides?: {
     },
     campaign: {
       id: "c1",
+      templateId: "tpl-1",
       reportStyle: "MODERN_DASHBOARD",
       alias: "demo",
       deletedAt: null,
@@ -242,7 +249,7 @@ const goodAnswers = { answers: [{ stableKey: "q1", value: 3 }] };
 
 type SubmitBody = {
   success: boolean;
-  data?: { submissionId?: string; report?: unknown };
+  data?: { submissionId?: string; report?: unknown; reportStylesAvailable?: boolean };
 };
 
 beforeEach(() => {
@@ -255,6 +262,7 @@ beforeEach(() => {
   flagState.intents = false;
   osrState.enabled = true;
   approvedState.approved = true;
+  reportStylesEnabledMock.mockReturnValue(false);
   buildState.throws = false;
   buildState.calls = [];
   process.env.APP_URL = "https://app.example.com";
@@ -291,6 +299,16 @@ describe("Wave OSR — disclosure decision", () => {
     const body = (await res.json()) as SubmitBody;
     expect(body.data?.submissionId).toBe("sub-1");
     expect(body.data?.report).toEqual(BUILT_REPORT);
+    expect(body.data?.reportStylesAvailable).toBe(false);
+  });
+
+  it("returns the report-style decision made from the locked campaign identifiers", async () => {
+    reportStylesEnabledMock.mockReturnValue(true);
+    mockInvitation({ showResultsOnScreen: true });
+    const res = await POST(jsonReq(goodAnswers) as never, aliasParams("demo"));
+    const body = (await res.json()) as SubmitBody;
+    expect(body.data?.reportStylesAvailable).toBe(true);
+    expect(reportStylesEnabledMock).toHaveBeenCalledWith({ templateId: "tpl-1", campaignId: "c1" });
   });
 
   // NOTE on the negative cases below: an "the report is absent" assertion

@@ -174,6 +174,7 @@ export function PublicQuizClient({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [results, setResults] = useState<ScoreResult | null>(null);
   const [reportStyle, setReportStyle] = useState<ReportStyleKey | null>(null);
+  const [reportStylesAvailable, setReportStylesAvailable] = useState(false);
   const [submittedId, setSubmittedId] = useState<string>("");
   const [verifiedCoachEmail, setVerifiedCoachEmail] = useState<string | null>(
     null,
@@ -462,6 +463,7 @@ export function PublicQuizClient({
             assessmentName={templateName}
             campaignLabel={campaignName}
             contactEmail={verifiedCoachEmail}
+            reportStylesAvailable={reportStylesAvailable}
           />
         </div>
       </main>
@@ -529,6 +531,7 @@ export function PublicQuizClient({
       clearDraft();
       setResults(body.data.scoreResult as ScoreResult);
       setReportStyle(body.data.reportStyle);
+      setReportStylesAvailable(body.data.reportStylesAvailable === true);
       setSubmittedId(body.data.submissionId ?? "");
       setVerifiedCoachEmail(body.data.referringCoachEmail ?? null);
       setStep("results");

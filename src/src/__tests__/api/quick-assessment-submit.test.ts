@@ -50,6 +50,10 @@ jest.mock("@/lib/assessments/report-style-lock", () => {
   return { lockReportStyleForFirstCompletion: reportStyleLockMock };
 });
 
+jest.mock("@/lib/assessments/wave-report-styles-flags", () => {
+  return { isReportStylesEnabled: jest.fn() };
+});
+
 jest.mock("@/lib/db", () => ({
   db: {
     $transaction: jest.fn((cb: (tx: unknown) => Promise<unknown>) => cb(txMock)),
@@ -129,8 +133,10 @@ import { inngest } from "@/inngest/client";
 import { withRateLimit } from "@/lib/rate-limit";
 import { Prisma } from "@prisma/client";
 import { lockReportStyleForFirstCompletion } from "@/lib/assessments/report-style-lock";
+import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
 
 reportStyleLockMock = lockReportStyleForFirstCompletion as jest.Mock;
+const reportStylesEnabledMock = isReportStylesEnabled as jest.Mock;
 
 /* -------------------------------------------------------------------------- */
 /*  Fixtures                                                                  */
@@ -238,6 +244,7 @@ let transactionActive = false;
 beforeEach(() => {
   jest.clearAllMocks();
   reportStyleLockMock.mockReset().mockResolvedValue(undefined);
+  reportStylesEnabledMock.mockReturnValue(false);
   transactionActive = false;
   // Model Prisma's all-or-nothing transaction contract so each test can prove
   // whether a held/failed lock was committed or rolled back.
@@ -396,6 +403,17 @@ describe("new submission — scoreResult + Cache-Control: no-store", () => {
     expect(Array.isArray(body.data.scoreResult.perDomain)).toBe(true);
     expect(body.data.scoreResult.perDomain).toHaveLength(4);
     expect(body.data.reportStyle).toBe("MODERN_DASHBOARD");
+    expect(body.data.reportStylesAvailable).toBe(false);
+  });
+
+  it("returns the server's exact canary decision without exposing identifiers", async () => {
+    reportStylesEnabledMock.mockReturnValue(true);
+    const res = await POST(makeRequest(VALID_BODY) as never, makeParams() as never);
+    const body = await res.json();
+    expect(body.data.reportStylesAvailable).toBe(true);
+    expect(reportStylesEnabledMock).toHaveBeenCalledWith({ templateId: "tmpl-1", campaignId: "camp-1" });
+    expect(JSON.stringify(body.data)).not.toContain("tmpl-1");
+    expect(JSON.stringify(body.data)).not.toContain("camp-1");
   });
 
   it("passes idempotencyKey to the submission create inside the transaction", async () => {
@@ -494,6 +512,8 @@ describe("report style first-completion freeze", () => {
     expect(reportStyleLockMock).not.toHaveBeenCalled();
     expect(db.$transaction).not.toHaveBeenCalled();
     expect(txMock.assessmentSubmission.create).not.toHaveBeenCalled();
+    const body = await response.json();
+    expect(body.data.reportStylesAvailable).toBe(false);
   });
 });
 

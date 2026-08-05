@@ -35,6 +35,7 @@ const REPORT = {
   companyName: "Spectrum Health",
   assessmentName: "Rockefeller Habits Checklist",
   templateAlias: "RockHabits",
+  reportStyle: "MODERN_DASHBOARD",
   campaignLabel: "Q3 2026",
   submittedAt: new Date("2026-07-29T10:30:00.000Z"),
   result: {
@@ -185,6 +186,19 @@ describe("rehydrate authorization (the /me 410 gate)", () => {
 });
 
 describe("the rendered report", () => {
+  it("fails closed to Classic for a revived report with no server availability decision", async () => {
+    writeOnScreenResult(
+      ALIAS,
+      { ...(REPORT as object), templateAlias: "scaling-up-full" } as never,
+      KEY,
+    );
+    installFetch(410);
+
+    render(<OrgSurveyClient campaignAlias={ALIAS} />);
+    await waitFor(() => expect(screen.getByTestId("report-cover")).toBeInTheDocument());
+    expect(screen.queryByTestId("modern-dashboard-report")).toBeNull();
+  });
+
   it("formats submittedAt rather than printing raw ISO text", async () => {
     writeOnScreenResult(ALIAS, REPORT, KEY);
     installFetch(410);

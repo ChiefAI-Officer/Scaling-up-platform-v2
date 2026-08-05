@@ -51,6 +51,15 @@ import type { PeerComparisonSection } from "@/lib/assessments/peer-benchmarks";
 import { CoachLogo } from "@/components/assessments/CoachLogo";
 import { ReportFooter } from "@/components/assessments/ReportFooter";
 import { ReportNextSteps } from "@/components/assessments/ReportNextSteps";
+import {
+  applyScoredReportContactEmailOverride,
+  applyScoredReportFindingsPolicy,
+  buildScoredReportViewModel,
+} from "@/lib/assessments/scored-report-view-model";
+import { isReportStyleEligible } from "@/lib/assessments/report-style-policy";
+import { isReportStyleKey } from "@/lib/assessments/report-style-registry";
+import { ExecutiveBoardroomReport } from "@/components/assessments/report-styles/ExecutiveBoardroomReport";
+import { ModernDashboardReport } from "@/components/assessments/report-styles/ModernDashboardReport";
 
 const LOGO_SRC = "/brand/su-logo-white.svg";
 
@@ -181,6 +190,8 @@ export interface BrandedReportProps {
   peerComparison?: PeerComparisonSection | null;
   /** Server-verified current coach email for the contact link. */
   contactEmail?: string | null;
+  /** Exact server-side feature/canary decision; omitted client revivals fail closed. */
+  reportStylesAvailable?: boolean;
 }
 
 export function BrandedReport({
@@ -189,6 +200,7 @@ export function BrandedReport({
   campaignLabel,
   peerComparison,
   contactEmail,
+  reportStylesAvailable,
 }: BrandedReportProps) {
   // Qualitative templates (LVA / QSP) get a wholly different per-respondent
   // renderer — their answers are mostly free-text/metrics, not scored items.
@@ -202,6 +214,61 @@ export function BrandedReport({
       />
     );
   }
+
+  // This component is imported by client result flows. Availability must arrive
+  // from their server response; WAVE_REPORT_STYLES_* is never read here.
+  if (
+    reportStylesAvailable === true &&
+    reportConfigFor(report.templateAlias).reportType === "scored" &&
+    isReportStyleEligible(report.templateAlias)
+  ) {
+    const runtimeStyle = report.reportStyle as unknown;
+    if (!isReportStyleKey(runtimeStyle)) {
+      console.warn("assessment.report_style.invalid", {
+        provenanceId: report.provenance?.submissionId ?? null,
+        templateAlias: report.templateAlias ?? null,
+        invalidStyle: typeof runtimeStyle === "string" ? runtimeStyle : null,
+      });
+    } else if (runtimeStyle === "EXECUTIVE_BOARDROOM" || runtimeStyle === "MODERN_DASHBOARD") {
+      // Preserve BrandedReport's existing title/subtitle override contract
+      // before deriving the renderer-only view model.
+      const reportForView =
+        assessmentName === undefined && campaignLabel === undefined
+          ? report
+          : {
+              ...report,
+              assessmentName: assessmentName ?? report.assessmentName,
+              campaignLabel:
+                campaignLabel !== undefined ? campaignLabel : report.campaignLabel,
+            };
+      const withFindings = applyScoredReportFindingsPolicy(
+        buildScoredReportViewModel(reportForView),
+        isFindingsLogicEnabled(),
+      );
+      const view = applyScoredReportContactEmailOverride(withFindings, contactEmail);
+      return runtimeStyle === "EXECUTIVE_BOARDROOM"
+        ? <ExecutiveBoardroomReport view={view} />
+        : <ModernDashboardReport view={view} />;
+    }
+  }
+
+  return (
+    <LegacyClassicReport
+      report={report}
+      assessmentName={assessmentName}
+      campaignLabel={campaignLabel}
+      contactEmail={contactEmail}
+    />
+  );
+}
+
+/** Captured byte-compatible Classic branch. Keep its markup below unchanged. */
+function LegacyClassicReport({
+  report,
+  assessmentName,
+  campaignLabel,
+  contactEmail,
+}: Omit<BrandedReportProps, "reportStylesAvailable" | "peerComparison">) {
 
   const result: ScoreResult = report.result ?? ({} as ScoreResult);
   const perQuestion: PerQuestionResult[] = Array.isArray(result.perQuestion)

@@ -56,20 +56,30 @@ jest.mock("@/lib/db", () => ({
     auditLog: {
       create: (...args: unknown[]) => mockAuditCreate(...args),
     },
+    assessmentSubmission: {
+      findFirst: jest.fn().mockResolvedValue({ campaign: { id: "camp-83", templateId: "tpl-83" } }),
+    },
   },
+}));
+
+jest.mock("@/lib/assessments/wave-report-styles-flags", () => ({
+  isReportStylesEnabled: jest.fn(() => true),
 }));
 
 const mockBrandedReport = jest.fn(
   ({
     report,
     campaignLabel,
+    reportStylesAvailable,
   }: {
     report: { respondentName: string };
     campaignLabel: string | null;
+    reportStylesAvailable?: boolean;
   }) => (
     <div
       data-testid="branded-report"
       data-campaign-label={campaignLabel ?? ""}
+      data-report-styles-available={String(reportStylesAvailable)}
     >
       {report.respondentName}
     </div>
@@ -196,6 +206,7 @@ describe("public referral report page", () => {
     expect(markup).toContain('data-testid="branded-report"');
     expect(markup).toContain("Taylor Taker");
     expect(markup).toContain('data-campaign-label="Quick Assessment"');
+    expect(markup).toContain('data-report-styles-available="true"');
     expect(markup).toContain('data-testid="print-report-button"');
     expect(markup).toContain(
       'data-file-name="Taylor Taker - Rockefeller Habits Checklist - Report"',

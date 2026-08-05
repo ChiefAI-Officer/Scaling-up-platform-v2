@@ -211,6 +211,31 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
     expect(mockPush).not.toHaveBeenCalled();
   });
 
+  it("forwards an explicit server availability decision to the curated renderer", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        success: true,
+        data: {
+          submissionId: "sub_1",
+          reportStyle: "MODERN_DASHBOARD",
+          reportStylesAvailable: true,
+          scoreResult: scoreResultFixture,
+          redirectUrl: `/quiz/${ALIAS}/thank-you`,
+        },
+      }),
+    });
+    render(<PublicQuizClient {...baseProps} templateAlias="scaling-up-full" />);
+    reachFormStep();
+    fireEvent.change(screen.getByRole("slider"), { target: { value: "6" } });
+    fireEvent.click(screen.getByRole("button", { name: /submit/i }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("modern-dashboard-report")).toBeInTheDocument(),
+    );
+  });
+
   // ── F4 (Wave OSR / Jeff #71 review): templateAlias must reach BrandedReport ─
   //
   // The hand-built RespondentReport here OMITTED templateAlias, so every public
