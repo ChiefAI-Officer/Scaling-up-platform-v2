@@ -123,6 +123,22 @@ export function headlineForTierMetric(
   };
 }
 
+/**
+ * Stable human-readable report date. A malformed legacy date degrades to its
+ * string representation rather than preventing an otherwise usable report.
+ */
+export function formatReportDate(d: Date): string {
+  try {
+    return new Intl.DateTimeFormat("en-US", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }).format(d);
+  } catch {
+    return String(d);
+  }
+}
+
 /** Compact metric formatting: integers stay whole, fractions trim to 1 dp. */
 function formatMetric(n: number): string {
   if (!Number.isFinite(n)) return "0";
