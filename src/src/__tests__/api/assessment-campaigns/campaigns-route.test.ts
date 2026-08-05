@@ -20,7 +20,7 @@ jest.mock("@/lib/db", () => ({
     coach: { findUnique: jest.fn() },
     accessGroupCoach: { findMany: jest.fn().mockResolvedValue([]) },
     accessGroupTemplate: { findMany: jest.fn().mockResolvedValue([]) },
-    assessmentTemplate: { findUnique: jest.fn() },
+    assessmentTemplate: { findUnique: jest.fn(), findMany: jest.fn() },
     assessmentTemplateVersion: { findFirst: jest.fn() },
     assessmentCampaign: {
       findMany: jest.fn(),
@@ -49,6 +49,7 @@ jest.mock("@/lib/rate-limit", () => ({
 }));
 
 import { GET, POST } from "@/app/api/assessment-campaigns/route";
+import { GET as listTemplates } from "@/app/api/assessment-templates/route";
 import { db } from "@/lib/db";
 import { getApiActor } from "@/lib/auth/authorization";
 
@@ -77,6 +78,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   delete process.env.WAVE_REPORT_STYLES_ENABLED;
   delete process.env.WAVE_REPORT_STYLES_KILL;
+  delete process.env.WAVE_REPORT_STYLES_CANARY;
   // Default access-group state: coach in 1 group that grants the template.
   (db.accessGroupCoach.findMany as jest.Mock).mockResolvedValue([
     {
@@ -112,6 +114,52 @@ beforeEach(() => {
   mockWaveDCampaignCreate.mockResolvedValue({
     id: "c-wave-d",
     alias: "acme_scaling_up_full_260601100000",
+  });
+});
+
+describe("GET /api/assessment-templates report-style availability", () => {
+  it("exposes a matching template canary without enabling nonmatching templates", async () => {
+    process.env.WAVE_REPORT_STYLES_CANARY = "tpl-1";
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    (db.assessmentTemplate.findMany as jest.Mock).mockResolvedValue([
+      {
+        id: "tpl-1",
+        name: "Scaling Up Full",
+        alias: "scaling-up-full",
+        description: null,
+        aggregationMode: "FULL_VISIBILITY",
+        defaultReportStyle: "MODERN_DASHBOARD",
+        sendResultsDefault: false,
+        resultsEmailContentApproved: false,
+        resultsEmailContentApprovedHash: null,
+        resultsEmailSubject: null,
+        resultsEmailBodyMarkdown: null,
+      },
+      {
+        id: "tpl-2",
+        name: "Scaling Up Full copy",
+        alias: "scaling-up-full",
+        description: null,
+        aggregationMode: "FULL_VISIBILITY",
+        defaultReportStyle: "CLASSIC",
+        sendResultsDefault: false,
+        resultsEmailContentApproved: false,
+        resultsEmailContentApprovedHash: null,
+        resultsEmailSubject: null,
+        resultsEmailBodyMarkdown: null,
+      },
+    ]);
+
+    const res = await listTemplates(
+      new Request("http://localhost/api/assessment-templates") as never,
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data).toEqual([
+      expect.objectContaining({ id: "tpl-1", reportStylesEnabled: true }),
+      expect.objectContaining({ id: "tpl-2", reportStylesEnabled: false }),
+    ]);
   });
 });
 

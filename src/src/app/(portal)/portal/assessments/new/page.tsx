@@ -16,7 +16,6 @@ import {
 import { isCustomSlidesEnabled } from "@/lib/assessments/wave-m-flags";
 import { isWaveQAdminControlsEnabled } from "@/lib/assessments/wave-q-flags";
 import { isOnScreenResultsEnabled } from "@/lib/assessments/wave-osr-flags";
-import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
 
 export default async function NewCampaignPage() {
   await requireCoach();
@@ -36,7 +35,6 @@ export default async function NewCampaignPage() {
   // can show/hide the checkbox. The flag is ALSO enforced at disclosure time in
   // the submit route; this prop only governs the UI.
   const onScreenResultsEnabled = isOnScreenResultsEnabled();
-  const reportStylesEnabled = isReportStylesEnabled();
   return (
     <div className="wf-scope max-w-3xl mx-auto">
       <CampaignWizard
@@ -48,7 +46,6 @@ export default async function NewCampaignPage() {
         customSlidesEnabled={customSlidesEnabled}
         waveQDefaultsEnabled={waveQDefaultsEnabled}
         onScreenResultsEnabled={onScreenResultsEnabled}
-        reportStylesEnabled={reportStylesEnabled}
       />
     </div>
   );

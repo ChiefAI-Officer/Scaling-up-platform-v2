@@ -103,6 +103,7 @@ function extractErrorMessage(error: unknown, fallback: string): string {
 }
 
 type EndMode = "OPEN_END" | "ENDS_AFTER";
+type ReportStyleIntent = "INHERITED" | "EXPLICIT";
 
 interface Organization {
   id: string;
@@ -127,6 +128,8 @@ interface TemplateSummary {
   sendResultsDefault?: boolean;
   /** Admin-owned default copied into a new eligible campaign. */
   defaultReportStyle?: ReportStyleKey;
+  /** Server-computed per-template availability, including template canaries. */
+  reportStylesEnabled?: boolean;
 }
 
 interface Respondent {
@@ -165,6 +168,8 @@ interface WizardState {
   templateDefaultReportStyle: ReportStyleKey;
   /** Campaign-level style choice persisted in the draft and create request. */
   reportStyle: ReportStyleKey;
+  reportStyleIntent: ReportStyleIntent;
+  templateReportStylesEnabled: boolean;
   respondentIds: string[];
   ceoRespondentId: string | null;
   name: string;
@@ -282,7 +287,6 @@ export function CampaignWizard({
   customSlidesEnabled = false,
   waveQDefaultsEnabled = false,
   onScreenResultsEnabled = false,
-  reportStylesEnabled = false,
 }: {
   /** Wave D #20 — gate the custom-HTML invitation editor (mirrors the server flag). */
   customHtmlEmailEnabled?: boolean;
@@ -339,8 +343,6 @@ export function CampaignWizard({
    * toggles — a stored `showResultsOnScreen` is NEVER coerced when this is off.
    */
   onScreenResultsEnabled?: boolean;
-  /** Server-computed Wave Report Styles availability. */
-  reportStylesEnabled?: boolean;
 } = {}) {
   const router = useRouter();
   const { toast } = useToast();
@@ -356,6 +358,8 @@ export function CampaignWizard({
       templateAlias: "",
       templateDefaultReportStyle: "CLASSIC",
       reportStyle: "CLASSIC",
+      reportStyleIntent: "INHERITED",
+      templateReportStylesEnabled: false,
       respondentIds: [],
       ceoRespondentId: null,
       name: "",
@@ -418,6 +422,37 @@ export function CampaignWizard({
           if (!cancelled) setDraftLoaded(true);
           return;
         }
+        let selectedTemplate: TemplateSummary | undefined;
+        if (parsed.templateId) {
+          try {
+            const templateRes = await fetch("/api/assessment-templates");
+            const templateBody = await templateRes.json();
+            if (templateRes.ok && templateBody.success) {
+              selectedTemplate = (templateBody.data as TemplateSummary[]).find(
+                (template) => template.id === parsed?.templateId,
+              );
+            }
+          } catch {
+            // Draft resume remains available if template metadata cannot be
+            // refreshed. The create route still reloads and validates it.
+          }
+        }
+        const reportStyleIntent: ReportStyleIntent =
+          parsed.reportStyleIntent === "EXPLICIT" ? "EXPLICIT" : "INHERITED";
+        const templateAlias = selectedTemplate?.alias ??
+          (typeof parsed.templateAlias === "string" ? parsed.templateAlias : "");
+        const templateDefaultReportStyle = isReportStyleKey(
+          selectedTemplate?.defaultReportStyle,
+        )
+          ? selectedTemplate.defaultReportStyle
+          : isReportStyleKey(parsed.templateDefaultReportStyle)
+            ? parsed.templateDefaultReportStyle
+            : "CLASSIC";
+        const inheritedReportStyle =
+          selectedTemplate?.reportStylesEnabled === true &&
+          isReportStyleEligible(templateAlias)
+            ? templateDefaultReportStyle
+            : "CLASSIC";
         const merged: WizardState = {
           step: typeof draft.currentStep === "number" ? draft.currentStep : 0,
           organizationId: parsed.organizationId ?? "",
@@ -427,14 +462,16 @@ export function CampaignWizard({
           // Store only the template metadata needed to describe the saved
           // presentation choice on resume. The create route still reloads the
           // template and never trusts these client-held values.
-          templateAlias:
-            typeof parsed.templateAlias === "string" ? parsed.templateAlias : "",
-          templateDefaultReportStyle: isReportStyleKey(parsed.templateDefaultReportStyle)
-            ? parsed.templateDefaultReportStyle
-            : "CLASSIC",
-          reportStyle: isReportStyleKey(parsed.reportStyle)
-            ? parsed.reportStyle
-            : "CLASSIC",
+          templateAlias,
+          templateDefaultReportStyle,
+          reportStyle:
+            reportStyleIntent === "EXPLICIT" && isReportStyleKey(parsed.reportStyle)
+              ? parsed.reportStyle
+              : inheritedReportStyle,
+          reportStyleIntent,
+          templateReportStylesEnabled:
+            selectedTemplate?.reportStylesEnabled === true &&
+            isReportStyleEligible(templateAlias),
           respondentIds: Array.isArray(parsed.respondentIds)
             ? parsed.respondentIds
             : [],
@@ -517,6 +554,7 @@ export function CampaignWizard({
             endMode: snapshot.endMode,
             closeAt: snapshot.closeAt,
             reportStyle: snapshot.reportStyle,
+            reportStyleIntent: snapshot.reportStyleIntent,
           },
         }),
       });
@@ -718,7 +756,9 @@ export function CampaignWizard({
           // decides disclosure itself, so a stored `true` with the flag off
           // promises nobody anything. Flags gate capability, not data.
           showResultsOnScreen: state.showResultsOnScreen,
-          reportStyle: state.reportStyle,
+          ...(state.reportStyleIntent === "EXPLICIT"
+            ? { reportStyle: state.reportStyle }
+            : {}),
           // Task 10 — #2/#3 timing radio: tell server when to send invitations.
           // Gated on the auto-send flag (dark-merge fix): when auto-send is OFF
           // we MUST NOT send inviteTiming — sending it marks the create as a
@@ -937,7 +977,15 @@ export function CampaignWizard({
         {state.step === 1 && (
           <TemplateStep
             value={state.templateId}
-            onChange={(id, name, alias, defaultReportStyle, resultsEmailApproved, sendResultsDefault) =>
+            onChange={(
+              id,
+              name,
+              alias,
+              defaultReportStyle,
+              templateReportStylesEnabled,
+              resultsEmailApproved,
+              sendResultsDefault,
+            ) =>
               setState((s) => ({
                 ...s,
                 templateId: id,
@@ -945,9 +993,11 @@ export function CampaignWizard({
                 templateAlias: alias,
                 templateDefaultReportStyle: defaultReportStyle,
                 reportStyle:
-                  reportStylesEnabled && isReportStyleEligible(alias)
+                  templateReportStylesEnabled && isReportStyleEligible(alias)
                     ? defaultReportStyle
                     : "CLASSIC",
+                reportStyleIntent: "INHERITED",
+                templateReportStylesEnabled,
                 templateResultsEmailApproved: resultsEmailApproved,
                 // Wave Q (#1): with the flag on, template selection/switch
                 // re-derives #15 from the picked template's admin default —
@@ -995,10 +1045,10 @@ export function CampaignWizard({
             sendResultsToRespondent={state.sendResultsToRespondent}
             notifyCoachOnCompletion={state.notifyCoachOnCompletion}
             showResultsOnScreen={state.showResultsOnScreen}
-            reportStylesEnabled={reportStylesEnabled}
+            reportStylesEnabled={state.templateReportStylesEnabled}
             reportStyleEligible={isReportStyleEligible(state.templateAlias)}
             reportStyle={state.reportStyle}
-            templateDefaultReportStyle={state.templateDefaultReportStyle}
+            reportStyleIntent={state.reportStyleIntent}
             inviteTiming={state.inviteTiming}
             autoSend={autoSend}
             resultsEmailEnabled={resultsEmailEnabled}
@@ -1031,7 +1081,7 @@ export function CampaignWizard({
             customHtmlEmailEnabled={customHtmlEmailEnabled}
             brandedCustomHtmlEnabled={brandedCustomHtmlEnabled}
             autoSend={autoSend}
-            reportStylesEnabled={reportStylesEnabled}
+            reportStylesEnabled={state.templateReportStylesEnabled}
             onChange={(patch) => setState((s) => ({ ...s, ...patch }))}
           />
         )}
@@ -1156,6 +1206,7 @@ function TemplateStep({
     name: string,
     alias: string,
     defaultReportStyle: ReportStyleKey,
+    reportStylesEnabled: boolean,
     resultsEmailApproved: boolean,
     sendResultsDefault: boolean,
   ) => void;
@@ -1234,6 +1285,8 @@ function TemplateStep({
                     isReportStyleKey(t.defaultReportStyle)
                       ? t.defaultReportStyle
                       : "CLASSIC",
+                    t.reportStylesEnabled === true &&
+                      isReportStyleEligible(t.alias),
                     t.resultsEmailApproved,
                     t.sendResultsDefault === true,
                   )
@@ -1734,7 +1787,7 @@ function ScheduleStep({
   reportStylesEnabled,
   reportStyleEligible,
   reportStyle,
-  templateDefaultReportStyle,
+  reportStyleIntent,
   inviteTiming,
   autoSend,
   resultsEmailEnabled,
@@ -1756,7 +1809,7 @@ function ScheduleStep({
   reportStylesEnabled: boolean;
   reportStyleEligible: boolean;
   reportStyle: ReportStyleKey;
-  templateDefaultReportStyle: ReportStyleKey;
+  reportStyleIntent: ReportStyleIntent;
   inviteTiming: "IMMEDIATELY" | "ON_OPEN";
   /** Wave D auto-send flag — when false, hide the timing radio + show the
    *  legacy openAt picker (the inviteTiming state is ignored on the create). */
@@ -2003,14 +2056,16 @@ function ScheduleStep({
           <div>
             <h3 className="text-sm font-semibold text-foreground">Report appearance</h3>
             <p className="text-xs text-muted-foreground mt-1">
-              {reportStyle === templateDefaultReportStyle
+              {reportStyleIntent === "INHERITED"
                 ? "Using the admin default for this template."
-                : "Coach override for this campaign."}
+                : "Coach selection for this campaign."}
             </p>
           </div>
           <ReportStylePicker
             value={reportStyle}
-            onChange={(value) => onChange({ reportStyle: value })}
+            onChange={(value) =>
+              onChange({ reportStyle: value, reportStyleIntent: "EXPLICIT" })
+            }
           />
         </div>
       )}
@@ -2230,9 +2285,9 @@ function ReviewStep({
           <div className="flex justify-between gap-4">
             <span className="text-muted-foreground">Report appearance</span>
             <span className="font-medium text-foreground text-right">
-              {state.reportStyle === state.templateDefaultReportStyle
+              {state.reportStyleIntent === "INHERITED"
                 ? "Admin default"
-                : "Coach override"}
+                : "Coach selection"}
             </span>
           </div>
         )}

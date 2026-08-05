@@ -26,6 +26,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import { isResultsEmailApproved } from "@/lib/assessments/results-email-approval";
+import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
+import { isReportStyleEligible } from "@/lib/assessments/report-style-policy";
+import type { ReportStyleKey } from "@/lib/assessments/report-style-registry";
 
 interface TemplateSummary {
   id: string;
@@ -37,6 +40,8 @@ interface TemplateSummary {
   resultsEmailApproved: boolean;
   /** Wave Q (#1) — raw stored template-level default for "send results to respondent". */
   sendResultsDefault: boolean;
+  defaultReportStyle: ReportStyleKey;
+  reportStylesEnabled: boolean;
 }
 
 export async function GET(request: NextRequest) {
@@ -80,6 +85,9 @@ export async function GET(request: NextRequest) {
           description: t.description,
           aggregationMode: t.aggregationMode,
           defaultReportStyle: t.defaultReportStyle,
+          reportStylesEnabled:
+            isReportStyleEligible(t.alias) &&
+            isReportStylesEnabled({ templateId: t.id }),
           resultsEmailApproved: isResultsEmailApproved(t),
           sendResultsDefault: t.sendResultsDefault,
         })) satisfies TemplateSummary[],
@@ -159,6 +167,9 @@ export async function GET(request: NextRequest) {
         description: t.description,
         aggregationMode: t.aggregationMode,
         defaultReportStyle: t.defaultReportStyle,
+        reportStylesEnabled:
+          isReportStyleEligible(t.alias) &&
+          isReportStylesEnabled({ templateId: t.id }),
         resultsEmailApproved: isResultsEmailApproved(t),
         sendResultsDefault: t.sendResultsDefault,
       })) satisfies TemplateSummary[],
