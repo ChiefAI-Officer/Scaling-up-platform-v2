@@ -6,6 +6,17 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="jul10-42-lva-growth-financing-production-closeout"></a>
+### 2026-08-05 — July 10 #42 LVA growth-financing wording launched <!-- ENTRY_ISO:2026-08-05 ENTRY_SLUG:jul10-42-lva-growth-financing-production-closeout -->
+
+**Status: DONE + ACTIVE IN PRODUCTION.** PR [#304](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/304) passed Build, Migration Safety Gate, Assessment Email Lease (PostgreSQL), Vercel, and Vercel Preview Comments, then squash-merged as `f02d85f201cc1500381126c8f6f21f50a1e6f60f`. Exact Production deployment `dpl_5WzpABF36e6AryZ4GyfPtMNSHkzU` reached Ready and owns the production aliases. The final local integration run passed **626 suites / 7,704 tests / 14 snapshots**.
+
+**Authenticated Production change and receipt.** Gabriel explicitly authorized `jcbdelo26` to complete #42. Existing untouched LVA DRAFT v4 (`cmrn4n7dr0004hd4v6hi01as1`), duplicated from active v3 with zero campaigns and an identical pre-edit hash, was edited through the Production admin UI by `jcbdelossantos.va@gmail.com`. The S3 rating label, S4 `growth_financing` obstacle option, and S5 explanation prompt now use **“Access to financing for growth”**. The editor recomputed content hash `9d2f9052b0a358b91659aa8e6decdcecb16911e3cc5a8b9bb953d7e0572f17ac` and wrote an audit row before v4 was published at `2026-08-05T10:02:52.008Z`; a separate publish audit row records the same actor. Production verification confirms v4 is the latest active version and v3/v2 retain their historical wording.
+
+**Visual and compatibility verification.** Authenticated respondent-preview review covered the draft rating matrix and obstacle list: the new wording renders cleanly without clipping or ambiguity. Safe-to-Publish reported **0 blockers**; its two advisories are the intentional questionless Welcome and Completion sections. Stable keys `S3_growth_financing`, `growth_financing`, and `S5_why_growth_financing`, factor order, scale, requiredness, locked Esperto crosswalk, and historical report-label compatibility remain unchanged. The public health endpoint returned healthy database and safe auth posture after publish. No assessment response was submitted and no email, flag, schema, migration, benchmark, or unrelated Production state changed.
+
+**Ledger and reporting effect.** July 10 row #42 moves from PARTIAL to DONE, updating the canonical tally to **43 DONE / 4 PARTIAL / 6 NEEDS DECISION**. It is the tenth eligible product/reliability outcome after the July 31 reporting cutoff. Generated status and delta PDFs remain review-only derivatives and were not sent externally.
+
 <a id="jul10-42-lva-growth-financing-copy-pr-ready"></a>
 ### 2026-08-05 — July 10 #42 LVA growth-financing wording prepared <!-- ENTRY_ISO:2026-08-05 ENTRY_SLUG:jul10-42-lva-growth-financing-copy-pr-ready -->
 

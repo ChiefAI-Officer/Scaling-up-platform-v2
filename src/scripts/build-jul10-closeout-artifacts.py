@@ -18,7 +18,7 @@ EXPECTED_ROWS = [
     66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81,
     83, 84, 85, 86, 87,
 ]
-EXPECTED_TALLY = {"DONE": 42, "PARTIAL": 5, "NEEDS DECISION": 6}
+EXPECTED_TALLY = {"DONE": 43, "PARTIAL": 4, "NEEDS DECISION": 6}
 PDF_DEPENDENCIES = ("pdfplumber", "pypdf", "reportlab")
 
 
@@ -123,8 +123,8 @@ def parse_delta(path: Path) -> list[DeltaRow]:
                 rollout=cells[3],
             )
         )
-    if [row.number for row in rows] != list(range(1, 10)):
-        raise ValueError("Progress delta must contain exactly nine ordered outcomes")
+    if [row.number for row in rows] != list(range(1, 11)):
+        raise ValueError("Progress delta must contain exactly ten ordered outcomes")
     return rows
 
 
@@ -365,7 +365,7 @@ def build_progress_delta(output: Path, rows: list[DeltaRow]) -> None:
         Paragraph("Scaling Up Platform Progress Delta", styles["DeltaTitle"]),
         Paragraph("August 1-5, 2026 | Prepared for review only", styles["DeltaLead"]),
         Paragraph(
-            "<b>Nine outcomes after the July 31 reporting cutoff.</b> "
+            "<b>Ten outcomes after the July 31 reporting cutoff.</b> "
             "Each outcome is merged and production-verified. Default-off and "
             "dormant capabilities are labelled explicitly and are not described "
             "as active customer-visible behavior.",
@@ -451,7 +451,7 @@ def build_progress_delta(output: Path, rows: list[DeltaRow]) -> None:
         bottomMargin=0.62 * inch,
         title="Scaling Up Platform Progress Delta - August 1-5, 2026",
         author="Scaling Up Platform",
-        subject="Nine outcomes after the July 31 reporting cutoff",
+        subject="Ten outcomes after the July 31 reporting cutoff",
         invariant=1,
     )
     document.build(story, onFirstPage=footer, onLaterPages=footer)
@@ -484,8 +484,8 @@ def main() -> None:
     )
     ledger_rows = parse_ledger(ledger_path)
     delta_rows = parse_delta(delta_path)
-    print("53 rows: 42 DONE / 5 PARTIAL / 6 NEEDS DECISION")
-    print("9 post-cutoff outcomes")
+    print("53 rows: 43 DONE / 4 PARTIAL / 6 NEEDS DECISION")
+    print("10 post-cutoff outcomes")
     if args.check:
         return
     if not args.source.is_file():
