@@ -182,7 +182,7 @@ export function lvaReportQuestionLabel(key: string, label: string): string {
     label.includes(candidate),
   );
   const report = LVA_REPORT_FACTOR_LABELS[slug];
-  if (survey && report && label.includes(survey)) {
+  if (survey && report) {
     return label.replace(survey, report);
   }
   return label;
