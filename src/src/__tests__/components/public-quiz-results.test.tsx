@@ -221,7 +221,17 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
           submissionId: "sub_1",
           reportStyle: "MODERN_DASHBOARD",
           reportStylesAvailable: true,
-          scoreResult: scoreResultFixture,
+          reportFindingsAvailable: true,
+          scoreResult: {
+            ...scoreResultFixture,
+            findings: [{
+              stableKey: "q_number",
+              questionType: "NUMBER",
+              sectionStableKey: "S1",
+              questionLabel: "Headcount",
+              text: "Fresh server-authorized finding",
+            }],
+          },
           redirectUrl: `/quiz/${ALIAS}/thank-you`,
         },
       }),
@@ -234,6 +244,7 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
     await waitFor(() =>
       expect(screen.getByTestId("modern-dashboard-report")).toBeInTheDocument(),
     );
+    expect(screen.getByText("Fresh server-authorized finding")).toBeInTheDocument();
   });
 
   // ── F4 (Wave OSR / Jeff #71 review): templateAlias must reach BrandedReport ─

@@ -44,7 +44,6 @@ import {
   buildFindingsSection,
   type FindingsSection,
 } from "@/lib/assessments/findings-section-model";
-import { isFindingsLogicEnabled } from "@/lib/assessments/wave-u-flags";
 import { CoachLogo } from "@/components/assessments/CoachLogo";
 import { ReportFooter } from "@/components/assessments/ReportFooter";
 import { ImportedBadge } from "@/components/assessments/ImportedBadge";
@@ -420,6 +419,7 @@ export function QualitativeReport({
   report,
   peerComparison,
   contactEmail,
+  reportFindingsAvailable,
 }: {
   report: RespondentReport;
   /** Server-verified current coach email for the contact link. */
@@ -434,6 +434,8 @@ export function QualitativeReport({
    * (spec 19s D9).
    */
   peerComparison?: PeerComparisonSection | null;
+  /** Exact server-side Wave U decision; omission fails closed. */
+  reportFindingsAvailable?: boolean;
 }) {
   const model = buildQualitativeModel({
     templateAlias: report.templateAlias,
@@ -452,7 +454,7 @@ export function QualitativeReport({
 
   // Wave U — build the findings section from the frozen snapshot (total-
   // tolerant: absent/malformed → null → no section). Flag-gated at render.
-  const findingsSection = isFindingsLogicEnabled()
+  const findingsSection = reportFindingsAvailable === true
     ? buildFindingsSection(
         parseResolvedFindings(
           (report.result as { findings?: unknown } | null | undefined)?.findings,

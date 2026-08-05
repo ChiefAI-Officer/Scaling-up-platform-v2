@@ -65,21 +65,27 @@ jest.mock("@/lib/db", () => ({
 jest.mock("@/lib/assessments/wave-report-styles-flags", () => ({
   isReportStylesEnabled: jest.fn(() => true),
 }));
+jest.mock("@/lib/assessments/wave-u-flags", () => ({
+  isFindingsLogicEnabled: jest.fn(() => true),
+}));
 
 const mockBrandedReport = jest.fn(
   ({
     report,
     campaignLabel,
     reportStylesAvailable,
+    reportFindingsAvailable,
   }: {
     report: { respondentName: string };
     campaignLabel: string | null;
     reportStylesAvailable?: boolean;
+    reportFindingsAvailable?: boolean;
   }) => (
     <div
       data-testid="branded-report"
       data-campaign-label={campaignLabel ?? ""}
       data-report-styles-available={String(reportStylesAvailable)}
+      data-report-findings-available={String(reportFindingsAvailable)}
     >
       {report.respondentName}
     </div>
@@ -207,6 +213,7 @@ describe("public referral report page", () => {
     expect(markup).toContain("Taylor Taker");
     expect(markup).toContain('data-campaign-label="Quick Assessment"');
     expect(markup).toContain('data-report-styles-available="true"');
+    expect(markup).toContain('data-report-findings-available="true"');
     expect(markup).toContain('data-testid="print-report-button"');
     expect(markup).toContain(
       'data-file-name="Taylor Taker - Rockefeller Habits Checklist - Report"',

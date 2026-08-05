@@ -41,6 +41,7 @@ import {
 } from "@/lib/assessments/peer-benchmarks";
 import type { RespondentReport } from "@/lib/assessments/respondent-report";
 import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
+import { isFindingsLogicEnabled } from "@/lib/assessments/wave-u-flags";
 
 // H15: never statically render or cache the report (PII).
 export const dynamic = "force-dynamic";
@@ -113,6 +114,7 @@ export default async function RespondentReportPage({ params }: PageProps) {
         campaignLabel={report.campaignLabel}
         peerComparison={peerComparison}
         reportStylesAvailable={reportStylesAvailable}
+        reportFindingsAvailable={isFindingsLogicEnabled()}
       />
     </div>
   );

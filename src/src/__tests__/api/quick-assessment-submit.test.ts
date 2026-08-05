@@ -53,6 +53,9 @@ jest.mock("@/lib/assessments/report-style-lock", () => {
 jest.mock("@/lib/assessments/wave-report-styles-flags", () => {
   return { isReportStylesEnabled: jest.fn() };
 });
+jest.mock("@/lib/assessments/wave-u-flags", () => {
+  return { isFindingsLogicEnabled: jest.fn() };
+});
 
 jest.mock("@/lib/db", () => ({
   db: {
@@ -134,9 +137,11 @@ import { withRateLimit } from "@/lib/rate-limit";
 import { Prisma } from "@prisma/client";
 import { lockReportStyleForFirstCompletion } from "@/lib/assessments/report-style-lock";
 import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
+import { isFindingsLogicEnabled } from "@/lib/assessments/wave-u-flags";
 
 reportStyleLockMock = lockReportStyleForFirstCompletion as jest.Mock;
 const reportStylesEnabledMock = isReportStylesEnabled as jest.Mock;
+const findingsEnabledMock = isFindingsLogicEnabled as jest.Mock;
 
 /* -------------------------------------------------------------------------- */
 /*  Fixtures                                                                  */
@@ -245,6 +250,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   reportStyleLockMock.mockReset().mockResolvedValue(undefined);
   reportStylesEnabledMock.mockReturnValue(false);
+  findingsEnabledMock.mockReturnValue(false);
   transactionActive = false;
   // Model Prisma's all-or-nothing transaction contract so each test can prove
   // whether a held/failed lock was committed or rolled back.
@@ -404,6 +410,16 @@ describe("new submission — scoreResult + Cache-Control: no-store", () => {
     expect(body.data.scoreResult.perDomain).toHaveLength(4);
     expect(body.data.reportStyle).toBe("MODERN_DASHBOARD");
     expect(body.data.reportStylesAvailable).toBe(false);
+    expect(body.data.reportFindingsAvailable).toBe(false);
+  });
+
+  it("returns the exact server findings decision without exposing identifiers", async () => {
+    findingsEnabledMock.mockReturnValue(true);
+    const res = await POST(makeRequest(VALID_BODY) as never, makeParams() as never);
+    const body = await res.json();
+    expect(body.data.reportFindingsAvailable).toBe(true);
+    expect(findingsEnabledMock).toHaveBeenCalled();
+    expect(JSON.stringify(body.data)).not.toContain("WAVE_U_FINDINGS");
   });
 
   it("returns the server's exact canary decision without exposing identifiers", async () => {
@@ -514,6 +530,7 @@ describe("report style first-completion freeze", () => {
     expect(txMock.assessmentSubmission.create).not.toHaveBeenCalled();
     const body = await response.json();
     expect(body.data.reportStylesAvailable).toBe(false);
+    expect(body.data.reportFindingsAvailable).toBe(false);
   });
 });
 

@@ -73,18 +73,23 @@ jest.mock("@/lib/db", () => ({
 jest.mock("@/lib/assessments/wave-report-styles-flags", () => ({
   isReportStylesEnabled: jest.fn(() => true),
 }));
+jest.mock("@/lib/assessments/wave-u-flags", () => ({
+  isFindingsLogicEnabled: jest.fn(() => true),
+}));
 
 jest.mock("@/components/assessments/BrandedReport", () => ({
   BrandedReport: ({
     report,
     campaignLabel,
     reportStylesAvailable,
+    reportFindingsAvailable,
   }: {
     report: { respondentName: string };
     campaignLabel: string | null;
     reportStylesAvailable?: boolean;
+    reportFindingsAvailable?: boolean;
   }) => (
-    <div data-testid="branded-report" data-campaign-label={campaignLabel ?? ""} data-report-styles-available={String(reportStylesAvailable)}>
+    <div data-testid="branded-report" data-campaign-label={campaignLabel ?? ""} data-report-styles-available={String(reportStylesAvailable)} data-report-findings-available={String(reportFindingsAvailable)}>
       {report.respondentName}
     </div>
   ),
@@ -251,6 +256,7 @@ describe("(report) respondent report page", () => {
 
     expect(markup).toContain('data-campaign-label="Q1 Pulse"');
     expect(markup).toContain('data-report-styles-available="true"');
+    expect(markup).toContain('data-report-findings-available="true"');
   });
 
   it("renders for an owning COACH actor", async () => {

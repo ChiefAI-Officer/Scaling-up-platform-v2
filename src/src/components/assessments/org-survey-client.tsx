@@ -145,7 +145,7 @@ type Phase =
    * submit whose response carried a report, or rehydrated from sessionStorage on
    * a refresh (spec 19an §4).
    */
-  | { kind: "results"; report: RespondentReport; reportStylesAvailable?: boolean }
+  | { kind: "results"; report: RespondentReport; reportStylesAvailable?: boolean; reportFindingsAvailable?: boolean }
   | { kind: "error"; message: string };
 
 export function OrgSurveyClient({
@@ -479,7 +479,7 @@ export function OrgSurveyClient({
       // server to disagree (spec 19an §6).
       const submitBody = (await submitRes
         .json()
-        .catch(() => null)) as { data?: { report?: unknown; reportStylesAvailable?: unknown } } | null;
+        .catch(() => null)) as { data?: { report?: unknown; reportStylesAvailable?: unknown; reportFindingsAvailable?: unknown } } | null;
       // Revive across the JSON boundary: `submittedAt` is typed Date but arrives
       // as an ISO string, and the renderers hand it to Intl.DateTimeFormat,
       // which throws on a string and falls back to printing raw ISO text. The
@@ -501,6 +501,7 @@ export function OrgSurveyClient({
           kind: "results",
           report: onScreenReport,
           reportStylesAvailable: submitBody?.data?.reportStylesAvailable === true,
+          reportFindingsAvailable: submitBody?.data?.reportFindingsAvailable === true,
         });
         return;
       }
@@ -566,6 +567,7 @@ export function OrgSurveyClient({
             assessmentName={phase.report.assessmentName}
             campaignLabel={phase.report.campaignLabel ?? null}
             reportStylesAvailable={phase.reportStylesAvailable === true}
+            reportFindingsAvailable={phase.reportFindingsAvailable === true}
           />
         </div>
       </main>

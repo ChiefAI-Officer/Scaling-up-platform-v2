@@ -39,7 +39,6 @@ import {
   headlineForTierMetric,
 } from "@/lib/assessments/report-presentation";
 import { reportConfigFor } from "@/lib/assessments/report-config";
-import { isFindingsLogicEnabled } from "@/lib/assessments/wave-u-flags";
 import { parseResolvedFindings } from "@/lib/assessments/findings-section-model";
 import {
   greetingName,
@@ -56,8 +55,10 @@ import {
   applyScoredReportFindingsPolicy,
   buildScoredReportViewModel,
 } from "@/lib/assessments/scored-report-view-model";
-import { isReportStyleEligible } from "@/lib/assessments/report-style-policy";
-import { isReportStyleKey } from "@/lib/assessments/report-style-registry";
+import {
+  effectiveReportStyle,
+  isReportStyleEligible,
+} from "@/lib/assessments/report-style-policy";
 import { ExecutiveBoardroomReport } from "@/components/assessments/report-styles/ExecutiveBoardroomReport";
 import { ModernDashboardReport } from "@/components/assessments/report-styles/ModernDashboardReport";
 
@@ -192,6 +193,8 @@ export interface BrandedReportProps {
   contactEmail?: string | null;
   /** Exact server-side feature/canary decision; omitted client revivals fail closed. */
   reportStylesAvailable?: boolean;
+  /** Exact server-side Wave U decision; omitted client revivals fail closed. */
+  reportFindingsAvailable?: boolean;
 }
 
 export function BrandedReport({
@@ -201,6 +204,7 @@ export function BrandedReport({
   peerComparison,
   contactEmail,
   reportStylesAvailable,
+  reportFindingsAvailable,
 }: BrandedReportProps) {
   // Qualitative templates (LVA / QSP) get a wholly different per-respondent
   // renderer — their answers are mostly free-text/metrics, not scored items.
@@ -211,45 +215,52 @@ export function BrandedReport({
         report={report}
         peerComparison={peerComparison}
         contactEmail={contactEmail}
+        reportFindingsAvailable={reportFindingsAvailable === true}
       />
     );
   }
 
   // This component is imported by client result flows. Availability must arrive
   // from their server response; WAVE_REPORT_STYLES_* is never read here.
-  if (
-    reportStylesAvailable === true &&
-    reportConfigFor(report.templateAlias).reportType === "scored" &&
-    isReportStyleEligible(report.templateAlias)
-  ) {
-    const runtimeStyle = report.reportStyle as unknown;
-    if (!isReportStyleKey(runtimeStyle)) {
+  const runtimeStyle = typeof report.reportStyle === "string" ? report.reportStyle : undefined;
+  const resolvedStyle = effectiveReportStyle({
+    alias: report.templateAlias,
+    storedStyle: runtimeStyle,
+    available: reportStylesAvailable === true,
+  });
+  if (resolvedStyle === "CLASSIC") {
+    if (
+      reportStylesAvailable === true &&
+      isReportStyleEligible(report.templateAlias) &&
+      runtimeStyle !== undefined &&
+      runtimeStyle !== "CLASSIC"
+    ) {
       console.warn("assessment.report_style.invalid", {
         provenanceId: report.provenance?.submissionId ?? null,
         templateAlias: report.templateAlias ?? null,
-        invalidStyle: typeof runtimeStyle === "string" ? runtimeStyle : null,
+        invalidStyle: runtimeStyle,
       });
-    } else if (runtimeStyle === "EXECUTIVE_BOARDROOM" || runtimeStyle === "MODERN_DASHBOARD") {
-      // Preserve BrandedReport's existing title/subtitle override contract
-      // before deriving the renderer-only view model.
-      const reportForView =
-        assessmentName === undefined && campaignLabel === undefined
-          ? report
-          : {
-              ...report,
-              assessmentName: assessmentName ?? report.assessmentName,
-              campaignLabel:
-                campaignLabel !== undefined ? campaignLabel : report.campaignLabel,
-            };
-      const withFindings = applyScoredReportFindingsPolicy(
-        buildScoredReportViewModel(reportForView),
-        isFindingsLogicEnabled(),
-      );
-      const view = applyScoredReportContactEmailOverride(withFindings, contactEmail);
-      return runtimeStyle === "EXECUTIVE_BOARDROOM"
-        ? <ExecutiveBoardroomReport view={view} />
-        : <ModernDashboardReport view={view} />;
     }
+  } else {
+    // Preserve BrandedReport's existing title/subtitle override contract
+    // before deriving the renderer-only view model.
+    const reportForView =
+      assessmentName === undefined && campaignLabel === undefined
+        ? report
+        : {
+            ...report,
+            assessmentName: assessmentName ?? report.assessmentName,
+            campaignLabel:
+              campaignLabel !== undefined ? campaignLabel : report.campaignLabel,
+          };
+    const withFindings = applyScoredReportFindingsPolicy(
+      buildScoredReportViewModel(reportForView),
+      reportFindingsAvailable === true,
+    );
+    const view = applyScoredReportContactEmailOverride(withFindings, contactEmail);
+    return resolvedStyle === "EXECUTIVE_BOARDROOM"
+      ? <ExecutiveBoardroomReport view={view} />
+      : <ModernDashboardReport view={view} />;
   }
 
   return (
@@ -258,6 +269,7 @@ export function BrandedReport({
       assessmentName={assessmentName}
       campaignLabel={campaignLabel}
       contactEmail={contactEmail}
+      reportFindingsAvailable={reportFindingsAvailable}
     />
   );
 }
@@ -268,6 +280,7 @@ function LegacyClassicReport({
   assessmentName,
   campaignLabel,
   contactEmail,
+  reportFindingsAvailable,
 }: Omit<BrandedReportProps, "reportStylesAvailable" | "peerComparison">) {
 
   const result: ScoreResult = report.result ?? ({} as ScoreResult);
@@ -401,7 +414,7 @@ function LegacyClassicReport({
   // from the legacy per-row `recommendation` (old submissions have no
   // snapshot and must render unchanged; no double display). Flag OFF or no
   // snapshot → this block is byte-identical to pre-Wave-U output.
-  const snapshotFindings = isFindingsLogicEnabled()
+  const snapshotFindings = reportFindingsAvailable === true
     ? parseResolvedFindings(
         (result as ScoreResult & { findings?: unknown }).findings,
       ).filter((f) => f.questionType !== "SLIDER_LIKERT")

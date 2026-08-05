@@ -62,6 +62,7 @@ import { isCoachCurrentlyCertified } from "@/lib/auth/coach-status";
 import { reportEmailChromeForCampaign } from "@/lib/assessments/wave-228-flags";
 import { lockReportStyleForFirstCompletion } from "@/lib/assessments/report-style-lock";
 import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
+import { isFindingsLogicEnabled } from "@/lib/assessments/wave-u-flags";
 
 // ---------------------------------------------------------------------------
 // Request body schema
@@ -194,6 +195,7 @@ export async function POST(
       templateId: campaign.templateId,
       campaignId: campaign.id,
     });
+    const reportFindingsAvailable = isFindingsLogicEnabled();
     const now = new Date();
 
     const findExistingIdempotentSubmission = async () => {
@@ -271,6 +273,7 @@ export async function POST(
             scoreResult: existing.result,
             reportStyle: campaign.reportStyle,
             reportStylesAvailable,
+            reportFindingsAvailable,
             referringCoachEmail: replayCoachEmail,
             redirectUrl: `/quiz/${campaignAlias}/thank-you`,
           },
@@ -711,6 +714,7 @@ export async function POST(
           scoreResult: result,
           reportStyle: campaign.reportStyle,
           reportStylesAvailable,
+          reportFindingsAvailable,
           // Only the canonical address returned by the active-Coach lookup is
           // allowed to drive the in-place report CTA. Never echo the query.
           referringCoachEmail: persistedReferringCoachEmail,

@@ -44,6 +44,7 @@ import {
 import { isResultsEmailApproved } from "@/lib/assessments/results-email-approval";
 import { isOnScreenResultsEnabled } from "@/lib/assessments/wave-osr-flags";
 import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
+import { isFindingsLogicEnabled } from "@/lib/assessments/wave-u-flags";
 import { reportConfigFor } from "@/lib/assessments/report-config";
 import {
   buildRespondentReportFromSubmission,
@@ -1250,6 +1251,7 @@ export async function POST(
         templateId: invitation.campaign.templateId,
         campaignId: invitation.campaign.id,
       });
+      const reportFindingsAvailable = isFindingsLogicEnabled();
 
       if (onScreenReport) {
         console.info("[assessment-report] onscreen_report_payload_issued", {
@@ -1268,6 +1270,7 @@ export async function POST(
           data: {
             submissionId: result.submissionId,
             reportStylesAvailable,
+            reportFindingsAvailable,
             ...(onScreenReport ? { report: onScreenReport } : {}),
           },
         },

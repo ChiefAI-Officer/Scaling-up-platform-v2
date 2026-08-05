@@ -17,6 +17,7 @@ import {
 } from "@/lib/assessments/report-access-gate";
 import { db } from "@/lib/db";
 import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
+import { isFindingsLogicEnabled } from "@/lib/assessments/wave-u-flags";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -56,6 +57,7 @@ export default async function PublicSubmissionReportPage({
         report={report}
         campaignLabel={report.campaignLabel}
         reportStylesAvailable={reportStylesAvailable}
+        reportFindingsAvailable={isFindingsLogicEnabled()}
       />
     </div>
   );

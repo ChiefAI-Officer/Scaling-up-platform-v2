@@ -98,6 +98,9 @@ jest.mock("@/lib/assessments/wave-osr-flags", () => ({
 jest.mock("@/lib/assessments/wave-report-styles-flags", () => {
   return { isReportStylesEnabled: jest.fn() };
 });
+jest.mock("@/lib/assessments/wave-u-flags", () => ({
+  isFindingsLogicEnabled: jest.fn(),
+}));
 
 // eslint-disable-next-line no-var
 var approvedState = { approved: true };
@@ -142,9 +145,11 @@ jest.mock("@/lib/assessments/results-email", () => ({
 import { POST } from "@/app/(public)/org-survey/[campaignAlias]/submit/route";
 import { lockReportStyleForFirstCompletion } from "@/lib/assessments/report-style-lock";
 import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
+import { isFindingsLogicEnabled } from "@/lib/assessments/wave-u-flags";
 
 reportStyleLockMock = lockReportStyleForFirstCompletion as jest.Mock;
 const reportStylesEnabledMock = isReportStylesEnabled as jest.Mock;
+const findingsEnabledMock = isFindingsLogicEnabled as jest.Mock;
 
 const goodVersion = {
   questions: [
@@ -249,7 +254,7 @@ const goodAnswers = { answers: [{ stableKey: "q1", value: 3 }] };
 
 type SubmitBody = {
   success: boolean;
-  data?: { submissionId?: string; report?: unknown; reportStylesAvailable?: boolean };
+  data?: { submissionId?: string; report?: unknown; reportStylesAvailable?: boolean; reportFindingsAvailable?: boolean };
 };
 
 beforeEach(() => {
@@ -263,6 +268,7 @@ beforeEach(() => {
   osrState.enabled = true;
   approvedState.approved = true;
   reportStylesEnabledMock.mockReturnValue(false);
+  findingsEnabledMock.mockReturnValue(false);
   buildState.throws = false;
   buildState.calls = [];
   process.env.APP_URL = "https://app.example.com";
@@ -300,6 +306,16 @@ describe("Wave OSR — disclosure decision", () => {
     expect(body.data?.submissionId).toBe("sub-1");
     expect(body.data?.report).toEqual(BUILT_REPORT);
     expect(body.data?.reportStylesAvailable).toBe(false);
+    expect(body.data?.reportFindingsAvailable).toBe(false);
+  });
+
+  it("returns the server-authoritative findings decision with an on-screen report", async () => {
+    findingsEnabledMock.mockReturnValue(true);
+    mockInvitation({ showResultsOnScreen: true });
+    const res = await POST(jsonReq(goodAnswers) as never, aliasParams("demo"));
+    const body = (await res.json()) as SubmitBody;
+    expect(body.data?.reportFindingsAvailable).toBe(true);
+    expect(findingsEnabledMock).toHaveBeenCalled();
   });
 
   it("returns the report-style decision made from the locked campaign identifiers", async () => {
