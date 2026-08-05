@@ -104,6 +104,10 @@ describe("report style policy", () => {
       reportStyle: "MODERN_DASHBOARD",
       reportStyleSource: "TEMPLATE_DEFAULT",
     });
+    expect(resolveCampaignReportStyle("MODERN_DASHBOARD", "MODERN_DASHBOARD")).toEqual({
+      reportStyle: "MODERN_DASHBOARD",
+      reportStyleSource: "TEMPLATE_DEFAULT",
+    });
     expect(resolveCampaignReportStyle("CLASSIC", "MODERN_DASHBOARD")).toEqual({
       reportStyle: "CLASSIC",
       reportStyleSource: "CAMPAIGN_OVERRIDE",

@@ -39,7 +39,7 @@ export function resolveCampaignReportStyle(
   explicit: ReportStyleKey | null | undefined,
   templateDefault: ReportStyleKey,
 ): CampaignReportStyleResolution {
-  if (explicit !== null && explicit !== undefined) {
+  if (explicit !== null && explicit !== undefined && explicit !== templateDefault) {
     return {
       reportStyle: explicit,
       reportStyleSource: "CAMPAIGN_OVERRIDE",
