@@ -92,6 +92,21 @@ const removableRespondent: CampaignRespondentRow = {
   submittedAt: null,
 };
 
+/**
+ * A FAITHFUL Response stub — `json()` must reject when there is no body.
+ *
+ * This is load-bearing, not pedantry. The production defect behind Jeff #59 was
+ * a bodyless `204` being handed JSON: a real `Response` with no body REJECTS on
+ * `.json()` with a SyntaxError, and that reject is what threw after the
+ * transaction had already committed. A stub that resolves `undefined` instead
+ * makes the whole bug class invisible — reading the body before checking the
+ * status would pass here and still fail in production.
+ *
+ * Verified by mutation: inserting `await res.json()` above the `res.status === 204`
+ * check in `handleConfirmRemove` passes against a resolving stub and FAILS
+ * against this one. Matches the faithful-Response approach the route-level
+ * regression test already uses for the same reason.
+ */
 function response({
   ok,
   status,
@@ -104,7 +119,12 @@ function response({
   return {
     ok,
     status,
-    json: jest.fn().mockResolvedValue(body),
+    json:
+      body === undefined
+        ? jest
+            .fn()
+            .mockRejectedValue(new SyntaxError("Unexpected end of JSON input"))
+        : jest.fn().mockResolvedValue(body),
   } as unknown as Response;
 }
 
