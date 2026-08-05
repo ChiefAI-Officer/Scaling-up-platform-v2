@@ -273,24 +273,36 @@ describe("curated report print contracts", () => {
   it("binds Dashboard muted text and print margin boxes to an AA ink", () => {
     const css = source("styles/su-report-dashboard.css");
     const accessibleMuted = cssVariable(css, "--dashboard-muted-ink");
-    const softSurface = cssVariable(css, "--dashboard-soft");
     const page = blockFor(css, "@page dashboard-report");
 
     expect(cssVariable(css, "--dashboard-muted")).toBe("#8A90A3");
     expect(accessibleMuted).toBe("#646B7D");
 
-    for (const selector of [
-      ".su-report--dashboard .report-page dt",
-      ".su-report--dashboard .report-provenance",
+    for (const binding of [
+      {
+        foregroundSelector: ".su-report--dashboard .report-page dt",
+        surfaceSelector: ".su-report--dashboard .report-page dl > div",
+      },
+      {
+        foregroundSelector: ".su-report--dashboard .report-provenance",
+        surfaceSelector: ".su-report--dashboard",
+      },
     ]) {
-      const foreground = cssColorBinding(css, selector, "color");
+      const foreground = cssColorBinding(css, binding.foregroundSelector, "color");
+      const surface = cssColorBinding(css, binding.surfaceSelector, "background");
 
       expect(foreground.variable).toBe("--dashboard-muted-ink");
-      expect(contrastRatio(foreground.color, selector.endsWith("dt") ? softSurface : "#ffffff")).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(foreground.color, surface.color)).toBeGreaterThanOrEqual(4.5);
     }
 
-    expect(page.match(/@bottom-(?:left|right)\s*\{[^}]*color:\s*#646B7D;/g)).toHaveLength(2);
-    expect(contrastRatio("#646B7D", "#ffffff")).toBeGreaterThanOrEqual(4.5);
+    const reportSurface = cssColorBinding(css, ".su-report--dashboard", "background");
+    for (const marginBox of ["@bottom-left", "@bottom-right"]) {
+      const marginBoxInk = cssColorBinding(page, marginBox, "color");
+
+      expect(marginBoxInk.variable).toBeNull();
+      expect(marginBoxInk.color).toBe(accessibleMuted);
+      expect(contrastRatio(marginBoxInk.color, reportSurface.color)).toBeGreaterThanOrEqual(4.5);
+    }
   });
 
   it("binds Executive small insight and action text to WCAG AA colors on their white report surfaces", () => {
