@@ -10,13 +10,9 @@ import {
   type ReportStylePreviewPage,
 } from "@/lib/assessments/report-style-registry";
 import {
-  DecisionLedger,
-  Recommendations,
-  ReportIdentityHeader,
-  ScoreMatrix,
-  SectionEvidence,
-  SummaryFacts,
-} from "@/components/assessments/report-styles/ReportSharedContent";
+  ExecutiveBoardroomReport,
+} from "@/components/assessments/report-styles/ExecutiveBoardroomReport";
+import { ModernDashboardReport } from "@/components/assessments/report-styles/ModernDashboardReport";
 import {
   type BrandedReportProps,
   LegacyClassicReport,
@@ -32,23 +28,6 @@ const PREVIEW_PAGES = new Set<PreviewPage>(REPORT_STYLE_PREVIEW_PAGES);
 
 function isPreviewPage(value: unknown): value is PreviewPage {
   return typeof value === "string" && PREVIEW_PAGES.has(value as PreviewPage);
-}
-
-function ReportProvenance() {
-  return (
-    <p className="report-provenance">
-      Confidential assessment report · prepared for {REPORT_STYLE_PREVIEW_FIXTURE.identity.companyName}
-    </p>
-  );
-}
-
-function detailPreviewView() {
-  const view = REPORT_STYLE_PREVIEW_FIXTURE;
-  return {
-    ...view,
-    recommendations: view.recommendations.slice(0, 1),
-    sections: view.sections.slice(0, 1),
-  };
 }
 
 /**
@@ -159,67 +138,55 @@ function ClassicPreviewPage({ page }: { page: PreviewPage }) {
 }
 
 function ExecutivePreviewPage({ page }: { page: PreviewPage }) {
-  const view = REPORT_STYLE_PREVIEW_FIXTURE;
-
   return (
-    <article className="su-report--executive" data-testid="executive-boardroom-report">
-      {page === "cover" ? (
-        <section className="report-page report-page--executive-cover" data-testid="report-style-preview-page-cover">
-          <ReportIdentityHeader view={view} eyebrow="Executive decision brief" />
-          <ReportProvenance />
-        </section>
-      ) : null}
-      {page === "summary" ? (
-        <section className="report-page report-page--executive-summary" data-testid="report-style-preview-page-summary">
-          <SummaryFacts view={view} />
-          <DecisionLedger view={view} />
-          <ReportProvenance />
-        </section>
-      ) : null}
-      {page === "detail" ? (
-        <section className="report-page report-page--executive-detail" data-testid="report-style-preview-page-detail">
-          <SectionEvidence view={detailPreviewView()} />
-          <Recommendations view={detailPreviewView()} />
-          <ReportProvenance />
-        </section>
-      ) : null}
+    <div className="report-style-preview--executive" data-preview-page={page} data-testid={`report-style-preview-page-${page}`}>
+      <PreviewSelectionStyles />
+      <ExecutiveBoardroomReport view={REPORT_STYLE_PREVIEW_FIXTURE} />
       <PreviewEndMarker />
-    </article>
+    </div>
   );
 }
 
 function DashboardPreviewPage({ page }: { page: PreviewPage }) {
-  const view = REPORT_STYLE_PREVIEW_FIXTURE;
-
   return (
-    <article className="su-report--dashboard" data-testid="modern-dashboard-report">
-      {page === "cover" ? (
-        <section className="report-page report-page--dashboard-cover" data-testid="report-style-preview-page-cover">
-          <ReportIdentityHeader view={view} eyebrow="Diagnostic console" />
-          <SummaryFacts view={view} />
-          <ReportProvenance />
-        </section>
-      ) : null}
-      {page === "summary" ? (
-        <section className="report-page report-page--dashboard-summary" data-testid="report-style-preview-page-summary">
-          <section className="report-pulse" aria-labelledby="dashboard-preview-pulse-title">
-            <h2 id="dashboard-preview-pulse-title">Five-domain pulse</h2>
-            <p>{view.summary.headline}</p>
-            <p>{view.summary.headlineLabel}</p>
-          </section>
-          <ScoreMatrix view={view} />
-          <ReportProvenance />
-        </section>
-      ) : null}
-      {page === "detail" ? (
-        <section className="report-page report-page--dashboard-detail" data-testid="report-style-preview-page-detail">
-          <SectionEvidence view={detailPreviewView()} />
-          <Recommendations view={detailPreviewView()} />
-          <ReportProvenance />
-        </section>
-      ) : null}
+    <div className="report-style-preview--dashboard" data-preview-page={page} data-testid={`report-style-preview-page-${page}`}>
+      <PreviewSelectionStyles />
+      <ModernDashboardReport view={REPORT_STYLE_PREVIEW_FIXTURE} />
       <PreviewEndMarker />
-    </article>
+    </div>
+  );
+}
+
+/**
+ * Capture-only selection: render the real report first, then isolate one
+ * representative, complete physical segment. Nothing here alters live report
+ * markup or data; it only prevents a long renderer page from being cropped.
+ */
+function PreviewSelectionStyles() {
+  return (
+    <style>{`
+      .report-style-preview--executive[data-preview-page="cover"] .su-report--executive > .report-page:not(.report-page--executive-cover),
+      .report-style-preview--dashboard[data-preview-page="cover"] .su-report--dashboard > .report-page:not(.report-page--dashboard-cover),
+      .report-style-preview--executive[data-preview-page="summary"] .su-report--executive > .report-page:not(.report-page--executive-summary),
+      .report-style-preview--dashboard[data-preview-page="summary"] .su-report--dashboard > .report-page:not(.report-page--dashboard-summary),
+      .report-style-preview--executive[data-preview-page="detail"] .su-report--executive > .report-page:not(.report-page--executive-detail),
+      .report-style-preview--dashboard[data-preview-page="detail"] .su-report--dashboard > .report-page:not(.report-page--dashboard-detail) { display: none; }
+
+      .report-style-preview--executive[data-preview-page="summary"] .report-page--executive-summary [aria-label="Strengths and priorities"],
+      .report-style-preview--dashboard[data-preview-page="summary"] .report-page--dashboard-summary [aria-labelledby="report-style-decisions-title"],
+      .report-style-preview--dashboard[data-preview-page="summary"] .report-page--dashboard-summary [aria-label="Strengths and priorities"] { display: none; }
+
+      .report-style-preview--executive[data-preview-page="detail"] .report-page--executive-detail [aria-label="Section scorecard"],
+      .report-style-preview--dashboard[data-preview-page="detail"] .report-page--dashboard-detail [aria-label="Section scorecard"],
+      .report-style-preview--executive[data-preview-page="detail"] .report-page--executive-detail [aria-label="Section and question evidence"] > .report-section:not(:first-of-type),
+      .report-style-preview--dashboard[data-preview-page="detail"] .report-page--dashboard-detail [aria-label="Section and question evidence"] > .report-section:not(:first-of-type),
+      .report-style-preview--executive[data-preview-page="detail"] .report-page--executive-detail [aria-labelledby="report-style-actions-title"] .report-action-group:not(:first-of-type),
+      .report-style-preview--dashboard[data-preview-page="detail"] .report-page--dashboard-detail [aria-labelledby="report-style-actions-title"] .report-action-group:not(:first-of-type),
+      .report-style-preview--executive[data-preview-page="detail"] .report-page--executive-detail [aria-labelledby="report-style-additional-title"],
+      .report-style-preview--dashboard[data-preview-page="detail"] .report-page--dashboard-detail [aria-labelledby="report-style-additional-title"],
+      .report-style-preview--executive[data-preview-page="detail"] .report-page--executive-detail footer,
+      .report-style-preview--dashboard[data-preview-page="detail"] .report-page--dashboard-detail footer { display: none; }
+    `}</style>
   );
 }
 
@@ -277,22 +244,35 @@ export default async function ReportStylePreviewPage({
       {captureMode ? (
         <style>{`
           [data-capture="true"] .report-style-preview--classic,
+          [data-capture="true"] .report-style-preview--executive,
+          [data-capture="true"] .report-style-preview--dashboard { box-sizing: border-box; height: calc(100% - 1px); min-height: calc(100% - 1px); }
           [data-capture="true"] .report-style-preview--classic > div,
           [data-capture="true"] .report-style-preview--classic .su-report,
+          [data-capture="true"] .report-style-preview--executive .su-report--executive,
+          [data-capture="true"] .report-style-preview--dashboard .su-report--dashboard,
           [data-capture="true"] .report-page--executive-cover,
           [data-capture="true"] .report-page--dashboard-cover { box-sizing: border-box; height: 100%; min-height: 100%; }
-          [data-capture="true"] > .su-report--executive,
-          [data-capture="true"] > .su-report--dashboard,
-          [data-capture="true"] > .report-style-preview--classic { height: 100%; }
+          [data-capture="true"] > .report-style-preview--classic { height: calc(100% - 1px); }
           [data-capture="true"] .report-style-preview--classic[data-preview-page="cover"] .su-report-cover { box-sizing: border-box; height: 100%; min-height: 100%; }
           @media print {
             #main-content { max-width: none !important; padding: 0 !important; }
             #main-content > :not([data-testid="report-style-preview-root"]),
             #main-content ~ *,
             #main-content ~ * + * { display: none !important; }
+            body :has(> #main-content) > :not(#main-content) { display: none !important; }
             #main-content { display: block !important; }
-            #main-content > [data-testid="report-style-preview-root"] { height: auto !important; margin: 0 !important; max-height: none !important; min-height: 0 !important; overflow: visible !important; width: 100% !important; }
-            [data-testid="report-style-preview-root"] .report-page { page: auto !important; }
+            #main-content > [data-testid="report-style-preview-root"] { height: auto !important; margin: 0 !important; max-height: none !important; min-height: 0 !important; overflow: visible !important; page: auto !important; width: 100% !important; }
+            [data-testid="report-style-preview-root"] .report-style-preview--classic,
+            [data-testid="report-style-preview-root"] .report-style-preview--executive,
+            [data-testid="report-style-preview-root"] .report-style-preview--dashboard,
+            [data-testid="report-style-preview-root"] .report-style-preview--classic > div,
+            [data-testid="report-style-preview-root"] .report-style-preview--classic .su-report,
+            [data-testid="report-style-preview-root"] .report-style-preview--executive .su-report--executive,
+            [data-testid="report-style-preview-root"] .report-style-preview--dashboard .su-report--dashboard { height: auto !important; min-height: 0 !important; }
+            [data-testid="report-style-preview-root"] .report-page { height: auto !important; min-height: 0 !important; page: auto !important; padding: 0 !important; }
+            [data-testid="report-style-preview-root"] .report-page-break { break-before: auto !important; page-break-before: auto !important; }
+            [data-testid="report-style-preview-root"] .su-report-cover { break-after: auto !important; page-break-after: auto !important; }
+            [data-testid="report-style-preview-safe-bottom"] { display: none !important; }
             nav[aria-label="Main navigation"], body > div > a[href="#main-content"] { display: none !important; }
           }
         `}</style>

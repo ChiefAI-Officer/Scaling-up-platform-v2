@@ -67,6 +67,20 @@ describe("report style preview page", () => {
     expect(html).toContain("How you scored, by decision");
   });
 
+  it("mounts the complete Boardroom and Dashboard renderers before capture-only selection", async () => {
+    const [executive, dashboard] = await Promise.all([
+      renderPage("EXECUTIVE_BOARDROOM", "summary"),
+      renderPage("MODERN_DASHBOARD", "summary"),
+    ]);
+
+    // These elements are intentionally present in the actual renderer DOM even
+    // when preview CSS hides them to keep a representative canvas uncut.
+    expect(executive).toContain("Decision signals");
+    expect(executive).toContain("su-report--executive");
+    expect(dashboard).toContain("Five Decisions");
+    expect(dashboard).toContain("su-report--dashboard");
+  });
+
   it.each([
     ["UNKNOWN", "cover"],
     ["CLASSIC", "unknown"],

@@ -58,6 +58,21 @@ function convertPngToWebp(input, output) {
   execFileSync("cwebp", ["-quiet", "-q", "88", input, "-o", output], { stdio: "pipe" });
 }
 
+function assertSinglePagePdf(path, format) {
+  const info = execFileSync("pdfinfo", [path], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  const pages = Number(info.match(/^Pages:\s+(\d+)$/m)?.[1]);
+  assert(pages === 1, `Preview PDF must be exactly one page for ${path}; got ${pages || "unknown"}`);
+
+  const pageSize = info.match(/^Page size:\s+([\d.]+) x ([\d.]+) pts/m);
+  assert(pageSize, `Preview PDF has no readable page size: ${path}`);
+  const [width, height] = pageSize.slice(1).map(Number);
+  const expected = format === "A4" ? [595.28, 841.89] : [612, 792];
+  assert(
+    Math.abs(width - expected[0]) < 2 && Math.abs(height - expected[1]) < 2,
+    `Preview PDF is not ${format}: ${width}x${height} pts for ${path}`,
+  );
+}
+
 async function login(page) {
   await page.goto(`${baseUrl}/login`, { waitUntil: "networkidle" });
   await page.getByLabel(/email/i).fill(email);
@@ -104,10 +119,19 @@ async function main() {
       );
       const output = join(previewRoot, entry.rendererKey, `${entry.page}.webp`);
       const temporaryPng = join(temporaryRoot, `${entry.rendererKey}-${entry.page}.png`);
+      const temporaryPdf = join(temporaryRoot, `${entry.rendererKey}-${entry.page}.pdf`);
       await mkdir(dirname(output), { recursive: true });
       await root.screenshot({ path: temporaryPng, type: "png", animations: "disabled" });
       convertPngToWebp(temporaryPng, output);
       await assertWebp(output);
+      const pdfFormat = entry.rendererKey === "classic" ? "A4" : "Letter";
+      await page.pdf({
+        format: pdfFormat,
+        path: temporaryPdf,
+        preferCSSPageSize: false,
+        printBackground: true,
+      });
+      assertSinglePagePdf(temporaryPdf, pdfFormat);
       process.stdout.write(`${basename(output)} ${entry.style}/${entry.page}\n`);
     }
     await context.close();
