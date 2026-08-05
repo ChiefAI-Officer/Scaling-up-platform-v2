@@ -40,6 +40,16 @@ const txMock = {
   },
 };
 
+// The primitive's SQL is covered separately. This controllable seam proves the
+// route awaits the freeze before any later transaction work and couples it to
+// the transaction commit/rollback outcome.
+// eslint-disable-next-line no-var
+var reportStyleLockMock: jest.Mock;
+jest.mock("@/lib/assessments/report-style-lock", () => {
+  reportStyleLockMock = jest.fn().mockResolvedValue(undefined);
+  return { lockReportStyleForFirstCompletion: reportStyleLockMock };
+});
+
 jest.mock("@/lib/db", () => ({
   db: {
     $transaction: jest.fn((cb: (tx: unknown) => Promise<unknown>) => cb(txMock)),
@@ -118,6 +128,9 @@ import { db } from "@/lib/db";
 import { inngest } from "@/inngest/client";
 import { withRateLimit } from "@/lib/rate-limit";
 import { Prisma } from "@prisma/client";
+import { lockReportStyleForFirstCompletion } from "@/lib/assessments/report-style-lock";
+
+reportStyleLockMock = lockReportStyleForFirstCompletion as jest.Mock;
 
 /* -------------------------------------------------------------------------- */
 /*  Fixtures                                                                  */
@@ -217,11 +230,30 @@ async function submitWithCoach() {
   );
 }
 
+const transactionCommitMarker = jest.fn();
+const transactionRollbackMarker = jest.fn();
+let transactionActive = false;
+
 beforeEach(() => {
   jest.clearAllMocks();
-  // Reset $transaction to the default callback-passthrough
+  reportStyleLockMock.mockReset().mockResolvedValue(undefined);
+  transactionActive = false;
+  // Model Prisma's all-or-nothing transaction contract so each test can prove
+  // whether a held/failed lock was committed or rolled back.
   (db.$transaction as jest.Mock).mockImplementation(
-    (cb: (tx: unknown) => Promise<unknown>) => cb(txMock),
+    async (cb: (tx: unknown) => Promise<unknown>) => {
+      transactionActive = true;
+      try {
+        const value = await cb(txMock);
+        transactionCommitMarker();
+        return value;
+      } catch (error) {
+        transactionRollbackMarker();
+        throw error;
+      } finally {
+        transactionActive = false;
+      }
+    },
   );
   // Default: rate limit allowed
   (withRateLimit as jest.Mock).mockResolvedValue({ allowed: true, headers: {} });
@@ -373,6 +405,93 @@ describe("new submission — scoreResult + Cache-Control: no-store", () => {
         data: expect.objectContaining({ idempotencyKey: "client-key-abc" }),
       }),
     );
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/*  Report style first-completion freeze                                       */
+/* -------------------------------------------------------------------------- */
+describe("report style first-completion freeze", () => {
+  it("awaits the campaign freeze before creating the submission and commits the same completion instant", async () => {
+    let releaseLock: (() => void) | undefined;
+    const lockStarted = new Promise<void>((resolve) => {
+      reportStyleLockMock.mockImplementationOnce(() => {
+        resolve();
+        return new Promise<void>((release) => {
+          releaseLock = release;
+        });
+      });
+    });
+
+    const responsePromise = POST(
+      makeRequest(VALID_BODY) as never,
+      makeParams() as never,
+    );
+    const firstEvent = await Promise.race([
+      lockStarted.then(() => "lock-started"),
+      responsePromise.then(() => "response-completed"),
+    ]);
+
+    expect(firstEvent).toBe("lock-started");
+    expect(txMock.coach.findFirst).not.toHaveBeenCalled();
+    expect(txMock.assessmentSubmission.create).not.toHaveBeenCalled();
+    expect(txMock.assessmentEmailOutbox.create).not.toHaveBeenCalled();
+    expect(transactionCommitMarker).not.toHaveBeenCalled();
+
+    releaseLock?.();
+    const response = await responsePromise;
+
+    expect(response.status).toBe(200);
+    const [lockedTx, lockedCampaignId, lockedSubmittedAt] =
+      reportStyleLockMock.mock.calls[0];
+    const submissionData =
+      txMock.assessmentSubmission.create.mock.calls[0][0].data;
+    expect(lockedTx).toBe(txMock);
+    expect(lockedCampaignId).toBe("camp-1");
+    expect(submissionData.submittedAt).toBe(lockedSubmittedAt);
+    expect(transactionCommitMarker).toHaveBeenCalledTimes(1);
+    expect(transactionRollbackMarker).not.toHaveBeenCalled();
+  });
+
+  it("rolls back the freeze when referral validation fails inside the transaction", async () => {
+    mockActiveCoach();
+    const lockTransactionStates: boolean[] = [];
+    reportStyleLockMock.mockImplementation(() => {
+      lockTransactionStates.push(transactionActive);
+      return Promise.resolve();
+    });
+    txMock.coach.findFirst.mockRejectedValueOnce(
+      new Error("referral validation failed"),
+    );
+
+    const response = await submitWithCoach();
+
+    expect(response.status).toBe(500);
+    expect(lockTransactionStates).toEqual([true]);
+    expect(txMock.assessmentSubmission.create).not.toHaveBeenCalled();
+    expect(transactionCommitMarker).not.toHaveBeenCalled();
+    expect(transactionRollbackMarker).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not freeze or open a transaction for a pure idempotent replay", async () => {
+    (db.assessmentSubmission.findFirst as jest.Mock).mockResolvedValue({
+      id: "sub-existing",
+      campaignId: "camp-1",
+      publicTaker: VALID_BODY.publicTaker,
+      answers: VALID_BODY.answers,
+      referringCoach: null,
+      result: { overallScore: 7, perDomain: [] },
+    });
+
+    const response = await POST(
+      makeRequest({ ...VALID_BODY, idempotencyKey: "existing-key" }) as never,
+      makeParams() as never,
+    );
+
+    expect(response.status).toBe(200);
+    expect(reportStyleLockMock).not.toHaveBeenCalled();
+    expect(db.$transaction).not.toHaveBeenCalled();
+    expect(txMock.assessmentSubmission.create).not.toHaveBeenCalled();
   });
 });
 
@@ -868,6 +987,16 @@ describe("verified referring-coach ownership", () => {
 
     expect(res.status).toBe(200);
     expect(db.$transaction).toHaveBeenCalledTimes(2);
+    expect(reportStyleLockMock).toHaveBeenCalledTimes(2);
+    expect(reportStyleLockMock.mock.calls).toEqual([
+      [txMock, "camp-1", expect.any(Date)],
+      [txMock, "camp-1", expect.any(Date)],
+    ]);
+    expect(reportStyleLockMock.mock.calls[1][2]).toBe(
+      reportStyleLockMock.mock.calls[0][2],
+    );
+    expect(transactionRollbackMarker).toHaveBeenCalledTimes(1);
+    expect(transactionCommitMarker).toHaveBeenCalledTimes(1);
     expect(txMock.assessmentSubmission.create).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({

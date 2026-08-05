@@ -60,6 +60,7 @@ import type { PagerQuestion } from "@/lib/assessments/section-pages";
 import { inngest } from "@/inngest/client";
 import { isCoachCurrentlyCertified } from "@/lib/auth/coach-status";
 import { reportEmailChromeForCampaign } from "@/lib/assessments/wave-228-flags";
+import { lockReportStyleForFirstCompletion } from "@/lib/assessments/report-style-lock";
 
 // ---------------------------------------------------------------------------
 // Request body schema
@@ -539,6 +540,11 @@ export async function POST(
       payloads: typeof outboxPayloads,
     ) =>
       db.$transaction(async (tx) => {
+        // The first operation under this transaction locks the campaign style
+        // with the same completion instant persisted on the submission. Any
+        // later error rejects this callback, so Prisma rolls the freeze back.
+        await lockReportStyleForFirstCompletion(tx, campaign.id, now);
+
         // The Coach may be deactivated/expired between the public pre-read and
         // this write. Re-read eligibility in the write transaction; this is
         // the linearization point for ownership, delivery, and response CTA.
@@ -580,6 +586,7 @@ export async function POST(
             referringCoachId: verifiedReferral?.id ?? null,
             referringCoachEmail: verifiedReferral?.email ?? null,
             idempotencyKey: data.idempotencyKey ?? null,
+            submittedAt: now,
           },
           select: { id: true },
         });
