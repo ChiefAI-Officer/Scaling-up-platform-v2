@@ -8,6 +8,30 @@ import { REPORT_STYLE_PREVIEW_FIXTURE } from "@/lib/assessments/report-style-pre
 
 const source = (path: string) => readFileSync(join(process.cwd(), "src", path), "utf8");
 
+function blockFor(css: string, prelude: string): string {
+  const start = css.indexOf(prelude);
+  if (start < 0) return "";
+  const open = css.indexOf("{", start);
+  let depth = 0;
+  for (let index = open; index < css.length; index += 1) {
+    if (css[index] === "{") depth += 1;
+    if (css[index] === "}") depth -= 1;
+    if (depth === 0) return css.slice(start, index + 1);
+  }
+  return "";
+}
+
+function styleSelectors(css: string): string[] {
+  const selectors: string[] = [];
+  const withoutComments = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  for (const match of withoutComments.matchAll(/([^{}]+)\{/g)) {
+    const prelude = match[1].trim();
+    if (prelude.startsWith("@")) continue;
+    selectors.push(...prelude.split(",").map((selector) => selector.trim()));
+  }
+  return selectors;
+}
+
 describe("curated report print contracts", () => {
   it.each([
     ["Executive Boardroom", ExecutiveBoardroomReport, "su-report--executive", "report-page--executive-cover"],
@@ -52,10 +76,26 @@ describe("curated report print contracts", () => {
   ])("keeps %s CSS rooted and on a named Letter print page", (_, path, pageName, margin) => {
     const css = source(path);
 
-    expect(css).toContain(`@page ${pageName} { size: Letter; margin: ${margin}; }`);
+    const page = blockFor(css, `@page ${pageName}`);
+    const print = blockFor(css, "@media print");
+    const root = `.su-report--${_}`;
+
+    expect(page).toContain("size: Letter");
+    expect(page).toContain(`margin: ${margin}`);
+    expect(page).toMatch(/@bottom-left\s*\{[^}]*content:\s*"Confidential assessment report · Scaling Up";/);
+    expect(page).toMatch(/@bottom-right\s*\{[^}]*content:\s*"Page " counter\(page\) " of " counter\(pages\);/);
     expect(css).toContain("print-color-adjust: exact");
     expect(css).toMatch(new RegExp(`\\.su-report--${_} \\.report-page \\{[^}]*page: ${pageName};`));
-    expect(css).not.toMatch(/(^|[,{]\s*)\.su-report(?=[\s.{:#[]|$)/m);
+    expect(print).toMatch(new RegExp(`\\.su-report--${_} \\.report-page-break \\{[^}]*break-before: page;`));
+    expect(styleSelectors(css.replace(page, "")).every((selector) => selector === root || selector.startsWith(`${root} `))).toBe(true);
+    expect(css).not.toMatch(/:nth-child\(/);
+  });
+
+  it("overrides inherited Classic coach presentation on the light Executive CTA", () => {
+    const css = source("styles/su-report-executive.css");
+
+    expect(css).toMatch(/\.su-report--executive \.report-page footer \.su-report-coach-name\s*\{[^}]*color:\s*var\(--executive-ink\)/);
+    expect(css).toMatch(/\.su-report--executive \.report-page footer \.su-report-coach-logo\s*\{[^}]*border:/);
   });
 
   it("does not change the Classic A4 print contract", () => {

@@ -148,6 +148,10 @@ describe("curated report renderers", () => {
       expect(summary).toHaveTextContent("Sections5");
       expect(report.getByTestId("report-style-strength-you")).toHaveTextContent("You: 8");
       expect(report.getByTestId("report-style-priority-cash")).toHaveTextContent("Cash: 5.5");
+      expect(report.getByTestId("report-style-strength-you")).toHaveAttribute("data-performance-status", "strength");
+      expect(report.getByTestId("report-style-strength-you")).toHaveTextContent("Strength");
+      expect(report.getByTestId("report-style-priority-cash")).toHaveAttribute("data-action-priority", "priority");
+      expect(report.getByTestId("report-style-priority-cash")).toHaveTextContent("Priority");
       expect(report.getByText("Create a weekly cash conversion review with one owner for receivables, inventory, and commitments. Use the first two cycles to identify where decisions wait unnecessarily, then publish a small operating rule that keeps those decisions moving without adding another meeting to every calendar.")).toBeInTheDocument();
       expect(report.getByText("Resolve the frozen People finding.")).toBeInTheDocument();
       const orphan = report.getByTestId("report-style-question-orphan-check");
@@ -166,8 +170,20 @@ describe("curated report renderers", () => {
       );
       for (const decision of completeView.decisions) {
         const decisionNode = report.getByTestId(`report-style-decision-${decision.stableKey}`);
+        expect(decisionNode).toHaveAttribute("data-decision", decision.stableKey);
+        expect(decisionNode).toHaveAttribute("data-performance-status");
         expect(decisionNode).toHaveTextContent(`${decision.label}: ${decision.averageAcrossSectionsLabel}`);
         expect(decisionNode).toHaveTextContent(`${decision.totalPointsLabel} total points`);
+      }
+      expect(report.getByTestId("report-style-decision-you")).toHaveAttribute("data-performance-status", "strength");
+      expect(report.getByTestId("report-style-decision-cash")).toHaveAttribute("data-performance-status", "watch-area");
+      if (container === dashboard) {
+        const cashMatrix = report.getByTestId("report-style-matrix-cash");
+        expect(cashMatrix).toHaveAttribute("data-decision", "cash");
+        expect(cashMatrix).toHaveAttribute("data-performance-status", "watch-area");
+        expect(cashMatrix).toHaveAttribute("data-action-priority", "priority");
+        expect(cashMatrix).toHaveTextContent("Watch area");
+        expect(cashMatrix).toHaveTextContent("Priority action");
       }
       for (const section of completeView.sections) {
         const sectionNode = report.getByTestId(`report-style-section-${section.stableKey}`);
@@ -178,8 +194,14 @@ describe("curated report renderers", () => {
         for (const question of section.questions) {
           expect(report.getByTestId(`report-style-question-${question.stableKey}`)).toHaveTextContent(`${question.label}${question.scoreLabel}`);
         }
-        expect(report.getByTestId(`report-style-scorecard-${section.stableKey}`)).toHaveTextContent(section.totalPointsLabel);
+        const scorecardNode = report.getByTestId(`report-style-scorecard-${section.stableKey}`);
+        expect(scorecardNode).toHaveTextContent(section.totalPointsLabel);
+        expect(scorecardNode).toHaveAttribute("data-performance-status");
+        expect(scorecardNode).toHaveTextContent(/Strength|On track|Watch area|Priority/);
       }
+      expect(report.getByTestId("report-style-scorecard-you")).toHaveAttribute("data-performance-status", "strength");
+      expect(report.getByTestId("report-style-scorecard-cash")).toHaveAttribute("data-performance-status", "watch-area");
+      expect(report.getByText("Resolve the frozen People finding.").closest(".report-action-group")).toHaveAttribute("data-action-priority", "priority");
     }
   });
 
