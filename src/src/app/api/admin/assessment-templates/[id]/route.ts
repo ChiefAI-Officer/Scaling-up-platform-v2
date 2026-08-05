@@ -18,6 +18,11 @@ import { logAudit } from "@/lib/audit";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
 import { resultsEmailContentHash } from "@/lib/assessments/results-email-approval";
 import { isWaveQAdminControlsEnabled } from "@/lib/assessments/wave-q-flags";
+import {
+  REPORT_STYLE_KEYS,
+  type ReportStyleKey,
+} from "@/lib/assessments/report-style-registry";
+import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
 
 export async function GET(
   _request: NextRequest,
@@ -103,6 +108,7 @@ const PatchTemplateBodySchema = z.object({
   // of the results-email approval hash; `disabled` maps to `disabledAt`.
   sendResultsDefault: z.boolean().optional(),
   disabled: z.boolean().optional(),
+  defaultReportStyle: z.enum(REPORT_STYLE_KEYS).optional(),
 });
 
 export async function PATCH(
@@ -162,10 +168,24 @@ export async function PATCH(
       );
     }
 
+    // Report-style writes are unavailable by default. The gate applies to
+    // every catalog value, including CLASSIC, so a disabled wave cannot
+    // silently mutate stored report-style intent.
+    if (
+      data.defaultReportStyle !== undefined &&
+      !isReportStylesEnabled({ templateId: id })
+    ) {
+      return NextResponse.json(
+        { error: "REPORT_STYLE_UNAVAILABLE" },
+        { status: 400 },
+      );
+    }
+
     const existing = await db.assessmentTemplate.findFirst({
       where: { id, deletedAt: null },
       select: {
         id: true,
+        alias: true,
         resultsEmailSubject: true,
         resultsEmailBodyMarkdown: true,
         sendResultsDefault: true,
@@ -192,6 +212,7 @@ export async function PATCH(
       resultsEmailContentApprovedBy?: string | null;
       sendResultsDefault?: boolean;
       disabledAt?: Date | null;
+      defaultReportStyle?: ReportStyleKey;
     } = {};
     if (data.name !== undefined) updateData.name = data.name;
     if (data.description !== undefined) updateData.description = data.description;
@@ -201,6 +222,20 @@ export async function PATCH(
       updateData.invitationBodyMarkdown = data.invitationBodyMarkdown;
     if (data.aggregationMode !== undefined)
       updateData.aggregationMode = data.aggregationMode;
+    if (data.defaultReportStyle !== undefined) {
+      // Only the canonical Scaling Up template may opt into a non-Classic
+      // renderer. CLASSIC remains a valid reset for every template.
+      if (
+        data.defaultReportStyle !== "CLASSIC" &&
+        existing.alias !== "scaling-up-full"
+      ) {
+        return NextResponse.json(
+          { error: "REPORT_STYLE_NOT_ELIGIBLE" },
+          { status: 400 },
+        );
+      }
+      updateData.defaultReportStyle = data.defaultReportStyle;
+    }
     if (data.resultsEmailSubject !== undefined)
       updateData.resultsEmailSubject = data.resultsEmailSubject;
     if (data.resultsEmailBodyMarkdown !== undefined)
@@ -269,7 +304,7 @@ export async function PATCH(
       disableAudit = "TEMPLATE_ENABLED";
     }
 
-    await db.assessmentTemplate.update({ where: { id }, data: updateData });
+    const template = await db.assessmentTemplate.update({ where: { id }, data: updateData });
 
     await logAudit({
       entityType: "AssessmentTemplate",
@@ -309,7 +344,7 @@ export async function PATCH(
       });
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, data: template });
   } catch (error) {
     console.error("Error updating template:", error);
     return NextResponse.json(

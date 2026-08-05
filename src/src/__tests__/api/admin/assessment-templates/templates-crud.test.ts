@@ -174,6 +174,183 @@ describe("PATCH /api/admin/assessment-templates/[id]", () => {
   }
   const detailParams = { params: Promise.resolve({ id: "tpl-1" }) };
 
+  describe("report-style default writes", () => {
+    const savedEnabled = process.env.WAVE_REPORT_STYLES_ENABLED;
+    const savedKill = process.env.WAVE_REPORT_STYLES_KILL;
+    const savedCanary = process.env.WAVE_REPORT_STYLES_CANARY;
+
+    function existingReportStyleTemplate(over: Record<string, unknown> = {}) {
+      return {
+        id: "tpl-1",
+        alias: "scaling-up-full",
+        resultsEmailSubject: null,
+        resultsEmailBodyMarkdown: null,
+        sendResultsDefault: false,
+        disabledAt: null,
+        defaultReportStyle: "CLASSIC",
+        ...over,
+      };
+    }
+
+    beforeEach(() => {
+      delete process.env.WAVE_REPORT_STYLES_ENABLED;
+      delete process.env.WAVE_REPORT_STYLES_KILL;
+      delete process.env.WAVE_REPORT_STYLES_CANARY;
+      (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+      (db.assessmentTemplate.findFirst as jest.Mock).mockResolvedValue(
+        existingReportStyleTemplate(),
+      );
+      (db.assessmentTemplate.update as jest.Mock).mockResolvedValue(
+        existingReportStyleTemplate({ defaultReportStyle: "EXECUTIVE_BOARDROOM" }),
+      );
+    });
+
+    afterEach(() => {
+      if (savedEnabled === undefined) delete process.env.WAVE_REPORT_STYLES_ENABLED;
+      else process.env.WAVE_REPORT_STYLES_ENABLED = savedEnabled;
+      if (savedKill === undefined) delete process.env.WAVE_REPORT_STYLES_KILL;
+      else process.env.WAVE_REPORT_STYLES_KILL = savedKill;
+      if (savedCanary === undefined) delete process.env.WAVE_REPORT_STYLES_CANARY;
+      else process.env.WAVE_REPORT_STYLES_CANARY = savedCanary;
+    });
+
+    it("rejects an unauthenticated report-style write before reading or writing", async () => {
+      (getApiActor as jest.Mock).mockResolvedValue(null);
+
+      const res = await detailPATCH(
+        patchReq({ defaultReportStyle: "EXECUTIVE_BOARDROOM" }) as never,
+        detailParams,
+      );
+
+      expect(res.status).toBe(401);
+      expect(db.assessmentTemplate.findFirst).not.toHaveBeenCalled();
+      expect(db.assessmentTemplate.update).not.toHaveBeenCalled();
+    });
+
+    it("rejects a non-privileged report-style write before reading or writing", async () => {
+      (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+
+      const res = await detailPATCH(
+        patchReq({ defaultReportStyle: "EXECUTIVE_BOARDROOM" }) as never,
+        detailParams,
+      );
+
+      expect(res.status).toBe(403);
+      expect(db.assessmentTemplate.findFirst).not.toHaveBeenCalled();
+      expect(db.assessmentTemplate.update).not.toHaveBeenCalled();
+    });
+
+    it("rejects report-style keys outside the closed catalog", async () => {
+      process.env.WAVE_REPORT_STYLES_ENABLED = "1";
+
+      const res = await detailPATCH(
+        patchReq({ defaultReportStyle: "UNRECOGNIZED_STYLE" }) as never,
+        detailParams,
+      );
+
+      expect(res.status).toBe(400);
+      expect(db.assessmentTemplate.findFirst).not.toHaveBeenCalled();
+      expect(db.assessmentTemplate.update).not.toHaveBeenCalled();
+    });
+
+    it.each(["CLASSIC", "EXECUTIVE_BOARDROOM", "MODERN_DASHBOARD"])(
+      "rejects %s while report styles are unavailable without changing the stored choice",
+      async (defaultReportStyle) => {
+        const res = await detailPATCH(
+          patchReq({ defaultReportStyle }) as never,
+          detailParams,
+        );
+
+        expect(res.status).toBe(400);
+        await expect(res.json()).resolves.toEqual({ error: "REPORT_STYLE_UNAVAILABLE" });
+        expect(db.assessmentTemplate.update).not.toHaveBeenCalled();
+        expect(db.auditLog.create).not.toHaveBeenCalled();
+      },
+    );
+
+    it("rejects a non-Classic report style for an ineligible template alias", async () => {
+      process.env.WAVE_REPORT_STYLES_ENABLED = "1";
+      (db.assessmentTemplate.findFirst as jest.Mock).mockResolvedValue(
+        existingReportStyleTemplate({ alias: "another-template" }),
+      );
+
+      const res = await detailPATCH(
+        patchReq({ defaultReportStyle: "EXECUTIVE_BOARDROOM" }) as never,
+        detailParams,
+      );
+
+      expect(res.status).toBe(400);
+      await expect(res.json()).resolves.toEqual({ error: "REPORT_STYLE_NOT_ELIGIBLE" });
+      expect(db.assessmentTemplate.update).not.toHaveBeenCalled();
+      expect(db.auditLog.create).not.toHaveBeenCalled();
+    });
+
+    it("allows Classic reset for any template when report styles are available", async () => {
+      process.env.WAVE_REPORT_STYLES_ENABLED = "1";
+      (db.assessmentTemplate.findFirst as jest.Mock).mockResolvedValue(
+        existingReportStyleTemplate({ alias: "another-template" }),
+      );
+      (db.assessmentTemplate.update as jest.Mock).mockResolvedValue(
+        existingReportStyleTemplate({
+          alias: "another-template",
+          defaultReportStyle: "CLASSIC",
+        }),
+      );
+
+      const res = await detailPATCH(
+        patchReq({ defaultReportStyle: "CLASSIC" }) as never,
+        detailParams,
+      );
+
+      expect(res.status).toBe(200);
+      expect(db.assessmentTemplate.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: "tpl-1" },
+          data: expect.objectContaining({ defaultReportStyle: "CLASSIC" }),
+        }),
+      );
+      await expect(res.json()).resolves.toEqual({
+        success: true,
+        data: existingReportStyleTemplate({
+          alias: "another-template",
+          defaultReportStyle: "CLASSIC",
+        }),
+      });
+    });
+
+    it.each(["EXECUTIVE_BOARDROOM", "MODERN_DASHBOARD"] as const)(
+      "allows a privileged Scaling Up template update to %s and audits only the enum key",
+      async (defaultReportStyle) => {
+        process.env.WAVE_REPORT_STYLES_ENABLED = "1";
+        (db.assessmentTemplate.update as jest.Mock).mockResolvedValue(
+          existingReportStyleTemplate({ defaultReportStyle }),
+        );
+
+        const res = await detailPATCH(
+          patchReq({ defaultReportStyle }) as never,
+          detailParams,
+        );
+
+        expect(res.status).toBe(200);
+        expect(db.assessmentTemplate.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              defaultReportStyle,
+            }),
+          }),
+        );
+        const auditArgs = (db.auditLog.create as jest.Mock).mock.calls[0][0];
+        expect(JSON.parse(auditArgs.data.changes)).toEqual({
+          defaultReportStyle,
+        });
+        await expect(res.json()).resolves.toEqual({
+          success: true,
+          data: existingReportStyleTemplate({ defaultReportStyle }),
+        });
+      },
+    );
+  });
+
   it("404 when template missing or deleted", async () => {
     (getApiActor as jest.Mock).mockResolvedValue(adminActor);
     (db.assessmentTemplate.findFirst as jest.Mock).mockResolvedValue(null);
