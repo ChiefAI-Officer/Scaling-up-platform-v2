@@ -38,6 +38,17 @@ function cssVariable(css: string, name: string): string {
   return match[1];
 }
 
+function cssColorBinding(css: string, selector: string, property: "background" | "color" | "border-color") {
+  const rule = blockFor(css, selector);
+  const declaration = rule.match(new RegExp(`${property}:\\s*(#[0-9a-f]{6}|var\\((--[a-z0-9-]+)\\));`, "i"));
+  if (!declaration) throw new Error(`Missing ${property} declaration for ${selector}`);
+
+  return {
+    color: declaration[2] ? cssVariable(css, declaration[2]) : declaration[1],
+    variable: declaration[2] ?? null,
+  };
+}
+
 function relativeLuminance(hex: string): number {
   const channels = hex
     .slice(1)
@@ -165,7 +176,11 @@ describe("curated report print contracts", () => {
     const css = source(path);
 
     for (const [status, expectedAccent] of Object.entries(accents)) {
-      expect(cssVariable(css, `--${style}-status-${status}-accent`)).toBe(expectedAccent);
+      const accentVariable = `--${style}-status-${status}-accent`;
+      const statusRule = blockFor(css, `.su-report--${style} .report-status--${status}`);
+
+      expect(cssVariable(css, accentVariable)).toBe(expectedAccent);
+      expect(statusRule).toContain(`border-color: var(${accentVariable})`);
     }
 
     for (const status of statuses) {
@@ -179,12 +194,83 @@ describe("curated report print contracts", () => {
       expect(statusRule).toContain(`background: var(${surfaceVariable})`);
       expect(statusRule).toContain(`color: var(${inkVariable})`);
     }
+  });
 
-    if (style === "dashboard") {
-      expect(blockFor(css, '.su-report--dashboard .report-question[data-achievement-status="achieved"] td:last-child'))
-        .toContain("color: var(--dashboard-status-strength-ink)");
-      expect(blockFor(css, '.su-report--dashboard .report-question[data-achievement-status="not-achieved"] td:last-child'))
-        .toContain("color: var(--dashboard-status-priority-ink)");
+  it.each([
+    ["achieved", "--dashboard-status-strength-ink"],
+    ["not-achieved", "--dashboard-status-priority-ink"],
+  ])("binds Dashboard %s table text to a WCAG AA ink on the rendered cell surface", (status, expectedInkVariable) => {
+    const css = source("styles/su-report-dashboard.css");
+    const foreground = cssColorBinding(
+      css,
+      `.su-report--dashboard .report-question[data-achievement-status="${status}"] td:last-child`,
+      "color",
+    );
+    const surface = cssColorBinding(css, ".su-report--dashboard .report-page th,", "background");
+
+    expect(foreground.variable).toBe(expectedInkVariable);
+    expect(surface.variable).toBe("--dashboard-soft");
+    expect(contrastRatio(foreground.color, surface.color)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("binds Dashboard small insight and action text to WCAG AA colors on their rendered card surfaces", () => {
+    const css = source("styles/su-report-dashboard.css");
+    const bindings = [
+      {
+        foregroundSelector: ".su-report--dashboard .report-insight-role--top-strength",
+        foregroundVariable: "--dashboard-slate",
+        surfaceSelector: '.su-report--dashboard .report-signal[data-insight-role="top-strength"]',
+      },
+      {
+        foregroundSelector: ".su-report--dashboard .report-insight-role--priority-action",
+        foregroundVariable: "--dashboard-indigo",
+        surfaceSelector: '.su-report--dashboard .report-signal[data-insight-role="priority-action"]',
+      },
+      {
+        foregroundSelector: ".su-report--dashboard .report-action-group h3",
+        foregroundVariable: "--dashboard-indigo",
+        surfaceSelector: ".su-report--dashboard .report-action-group",
+      },
+    ];
+
+    for (const binding of bindings) {
+      const foreground = cssColorBinding(css, binding.foregroundSelector, "color");
+      const surface = cssColorBinding(css, binding.surfaceSelector, "background");
+
+      expect(foreground.variable).toBe(binding.foregroundVariable);
+      expect(surface.variable).toBe("--dashboard-soft");
+      expect(contrastRatio(foreground.color, surface.color)).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("binds Executive small insight and action text to WCAG AA colors on their white report surfaces", () => {
+    const css = source("styles/su-report-executive.css");
+    const bindings = [
+      {
+        foregroundSelector: ".su-report--executive .report-insight-role--top-strength",
+        foregroundVariable: "--executive-ink",
+        surfaceSelector: ".su-report--executive .report-page--executive-summary",
+      },
+      {
+        foregroundSelector: ".su-report--executive .report-insight-role--priority-action",
+        foregroundVariable: "--executive-purple-700",
+        surfaceSelector: ".su-report--executive .report-page--executive-summary",
+      },
+      {
+        foregroundSelector: ".su-report--executive .report-page h3",
+        foregroundVariable: "--executive-purple-700",
+        surfaceSelector: ".su-report--executive .report-page--executive-detail",
+      },
+    ];
+
+    for (const binding of bindings) {
+      const foreground = cssColorBinding(css, binding.foregroundSelector, "color");
+      const surface = cssColorBinding(css, binding.surfaceSelector, "background");
+
+      expect(foreground.variable).toBe(binding.foregroundVariable);
+      expect(surface.variable).toBeNull();
+      expect(surface.color.toLowerCase()).toBe("#ffffff");
+      expect(contrastRatio(foreground.color, surface.color)).toBeGreaterThanOrEqual(4.5);
     }
   });
 
