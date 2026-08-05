@@ -1168,6 +1168,17 @@ model OrgRespondent {
   @@map("org_respondents")
 }
 
+enum AssessmentReportStyle {
+  CLASSIC
+  EXECUTIVE_BOARDROOM
+  MODERN_DASHBOARD
+}
+
+enum AssessmentReportStyleSource {
+  TEMPLATE_DEFAULT
+  CAMPAIGN_OVERRIDE
+}
+
 model AssessmentTemplate {
   id                            String                              @id @default(cuid())
   name                          String
@@ -1195,6 +1206,7 @@ model AssessmentTemplate {
   // results-email content is approved (approval always wins); the coach's
   // per-campaign flip is the override. Inert data otherwise.
   sendResultsDefault            Boolean                             @default(false)
+  defaultReportStyle            AssessmentReportStyle               @default(CLASSIC)
   // Wave Q (Jeff July-1 #6) — "disabled" third lifecycle state, distinct from
   // soft-delete: hidden from NEW-campaign template pickers + rejected at
   // campaign create, but existing campaigns/reports/trends/re-seeds are
@@ -1297,6 +1309,9 @@ model AssessmentCampaign {
   sendResultsToRespondent Boolean                  @default(false)
   notifyCoachOnCompletion Boolean                  @default(false)
   showResultsOnScreen     Boolean                  @default(false) // Wave OSR (Jeff #71) — render the respondent's own Results report in place at submit. Additive, default-OFF behind WAVE_OSR_RESPONDENT_RESULTS_ENABLED. Independent of sendResultsToRespondent (email) and of the results-email approval hash.
+  reportStyle             AssessmentReportStyle       @default(CLASSIC)
+  reportStyleSource       AssessmentReportStyleSource @default(TEMPLATE_DEFAULT)
+  reportStyleLockedAt     DateTime?
   invitationBodyHtml      String?                  // optional rich-HTML invitation body
   customSlides            Json?                    // Wave M — coach-authored branded interstitial slides (CustomSlide[]); null = none. Additive, default-OFF behind WAVE_M_CUSTOM_SLIDES_ENABLED.
   importManifest          Json?                    // Wave O — historical Esperto SU-Full import round manifest (cid provenance, canonical roundLabel, batch content fingerprint, per-respondent {saltedMidHash, saltedReportIdHash, answerHash} for exact/superset/divergent reuse reconciliation, versionId, crosswalkId, skip reasons); null = not an imported round. Additive, default-OFF behind WAVE_O_ESPERTO_SUFULL_IMPORT.
