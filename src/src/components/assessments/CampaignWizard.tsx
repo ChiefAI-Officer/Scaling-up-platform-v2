@@ -58,6 +58,12 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { AddMemberModal } from "@/components/organizations/add-member-modal";
 import type { MemberCreatedResult } from "@/components/organizations/add-member-modal";
+import { ReportStylePicker } from "@/components/assessments/ReportStylePicker";
+import {
+  isReportStyleKey,
+  type ReportStyleKey,
+} from "@/lib/assessments/report-style-registry";
+import { isReportStyleEligible } from "@/lib/assessments/report-style-policy";
 
 const DRAFT_ENDPOINT = "/api/assessment-campaign-drafts";
 const DRAFT_DEBOUNCE_MS = 800;
@@ -119,6 +125,8 @@ interface TemplateSummary {
    * AND the template's results email is approved — approval always wins.
    */
   sendResultsDefault?: boolean;
+  /** Admin-owned default copied into a new eligible campaign. */
+  defaultReportStyle?: ReportStyleKey;
 }
 
 interface Respondent {
@@ -153,6 +161,10 @@ interface WizardState {
   /** Display name of the selected template — shown on the Schedule step (#17).
    *  NOT persisted to the draft (ephemeral UI label only). */
   templateName: string;
+  templateAlias: string;
+  templateDefaultReportStyle: ReportStyleKey;
+  /** Campaign-level style choice persisted in the draft and create request. */
+  reportStyle: ReportStyleKey;
   respondentIds: string[];
   ceoRespondentId: string | null;
   name: string;
@@ -270,6 +282,7 @@ export function CampaignWizard({
   customSlidesEnabled = false,
   waveQDefaultsEnabled = false,
   onScreenResultsEnabled = false,
+  reportStylesEnabled = false,
 }: {
   /** Wave D #20 — gate the custom-HTML invitation editor (mirrors the server flag). */
   customHtmlEmailEnabled?: boolean;
@@ -326,6 +339,8 @@ export function CampaignWizard({
    * toggles — a stored `showResultsOnScreen` is NEVER coerced when this is off.
    */
   onScreenResultsEnabled?: boolean;
+  /** Server-computed Wave Report Styles availability. */
+  reportStylesEnabled?: boolean;
 } = {}) {
   const router = useRouter();
   const { toast } = useToast();
@@ -338,6 +353,9 @@ export function CampaignWizard({
       orgName: "",
       templateId: "",
       templateName: "",
+      templateAlias: "",
+      templateDefaultReportStyle: "CLASSIC",
+      reportStyle: "CLASSIC",
       respondentIds: [],
       ceoRespondentId: null,
       name: "",
@@ -406,6 +424,17 @@ export function CampaignWizard({
           orgName: "", // ephemeral — not persisted; will re-populate when org is re-selected
           templateId: parsed.templateId ?? "",
           templateName: "", // ephemeral — not persisted; will re-populate when template is re-selected
+          // Store only the template metadata needed to describe the saved
+          // presentation choice on resume. The create route still reloads the
+          // template and never trusts these client-held values.
+          templateAlias:
+            typeof parsed.templateAlias === "string" ? parsed.templateAlias : "",
+          templateDefaultReportStyle: isReportStyleKey(parsed.templateDefaultReportStyle)
+            ? parsed.templateDefaultReportStyle
+            : "CLASSIC",
+          reportStyle: isReportStyleKey(parsed.reportStyle)
+            ? parsed.reportStyle
+            : "CLASSIC",
           respondentIds: Array.isArray(parsed.respondentIds)
             ? parsed.respondentIds
             : [],
@@ -479,12 +508,15 @@ export function CampaignWizard({
           data: {
             organizationId: snapshot.organizationId,
             templateId: snapshot.templateId,
+            templateAlias: snapshot.templateAlias,
+            templateDefaultReportStyle: snapshot.templateDefaultReportStyle,
             respondentIds: snapshot.respondentIds,
             ceoRespondentId: snapshot.ceoRespondentId,
             name: snapshot.name,
             openAt: snapshot.openAt,
             endMode: snapshot.endMode,
             closeAt: snapshot.closeAt,
+            reportStyle: snapshot.reportStyle,
           },
         }),
       });
@@ -686,6 +718,7 @@ export function CampaignWizard({
           // decides disclosure itself, so a stored `true` with the flag off
           // promises nobody anything. Flags gate capability, not data.
           showResultsOnScreen: state.showResultsOnScreen,
+          reportStyle: state.reportStyle,
           // Task 10 — #2/#3 timing radio: tell server when to send invitations.
           // Gated on the auto-send flag (dark-merge fix): when auto-send is OFF
           // we MUST NOT send inviteTiming — sending it marks the create as a
@@ -904,11 +937,17 @@ export function CampaignWizard({
         {state.step === 1 && (
           <TemplateStep
             value={state.templateId}
-            onChange={(id, name, resultsEmailApproved, sendResultsDefault) =>
+            onChange={(id, name, alias, defaultReportStyle, resultsEmailApproved, sendResultsDefault) =>
               setState((s) => ({
                 ...s,
                 templateId: id,
                 templateName: name,
+                templateAlias: alias,
+                templateDefaultReportStyle: defaultReportStyle,
+                reportStyle:
+                  reportStylesEnabled && isReportStyleEligible(alias)
+                    ? defaultReportStyle
+                    : "CLASSIC",
                 templateResultsEmailApproved: resultsEmailApproved,
                 // Wave Q (#1): with the flag on, template selection/switch
                 // re-derives #15 from the picked template's admin default —
@@ -956,6 +995,10 @@ export function CampaignWizard({
             sendResultsToRespondent={state.sendResultsToRespondent}
             notifyCoachOnCompletion={state.notifyCoachOnCompletion}
             showResultsOnScreen={state.showResultsOnScreen}
+            reportStylesEnabled={reportStylesEnabled}
+            reportStyleEligible={isReportStyleEligible(state.templateAlias)}
+            reportStyle={state.reportStyle}
+            templateDefaultReportStyle={state.templateDefaultReportStyle}
             inviteTiming={state.inviteTiming}
             autoSend={autoSend}
             resultsEmailEnabled={resultsEmailEnabled}
@@ -988,6 +1031,7 @@ export function CampaignWizard({
             customHtmlEmailEnabled={customHtmlEmailEnabled}
             brandedCustomHtmlEnabled={brandedCustomHtmlEnabled}
             autoSend={autoSend}
+            reportStylesEnabled={reportStylesEnabled}
             onChange={(patch) => setState((s) => ({ ...s, ...patch }))}
           />
         )}
@@ -1110,6 +1154,8 @@ function TemplateStep({
   onChange: (
     id: string,
     name: string,
+    alias: string,
+    defaultReportStyle: ReportStyleKey,
     resultsEmailApproved: boolean,
     sendResultsDefault: boolean,
   ) => void;
@@ -1184,6 +1230,10 @@ function TemplateStep({
                   onChange(
                     t.id,
                     t.name,
+                    t.alias,
+                    isReportStyleKey(t.defaultReportStyle)
+                      ? t.defaultReportStyle
+                      : "CLASSIC",
                     t.resultsEmailApproved,
                     t.sendResultsDefault === true,
                   )
@@ -1681,6 +1731,10 @@ function ScheduleStep({
   sendResultsToRespondent,
   notifyCoachOnCompletion,
   showResultsOnScreen,
+  reportStylesEnabled,
+  reportStyleEligible,
+  reportStyle,
+  templateDefaultReportStyle,
   inviteTiming,
   autoSend,
   resultsEmailEnabled,
@@ -1699,6 +1753,10 @@ function ScheduleStep({
   sendResultsToRespondent: boolean;
   notifyCoachOnCompletion: boolean;
   showResultsOnScreen: boolean;
+  reportStylesEnabled: boolean;
+  reportStyleEligible: boolean;
+  reportStyle: ReportStyleKey;
+  templateDefaultReportStyle: ReportStyleKey;
   inviteTiming: "IMMEDIATELY" | "ON_OPEN";
   /** Wave D auto-send flag — when false, hide the timing radio + show the
    *  legacy openAt picker (the inviteTiming state is ignored on the create). */
@@ -1940,6 +1998,23 @@ function ScheduleStep({
         </div>
       )}
 
+      {reportStylesEnabled && reportStyleEligible && (
+        <div className="space-y-3 border border-border rounded-lg p-4">
+          <div>
+            <h3 className="text-sm font-semibold text-foreground">Report appearance</h3>
+            <p className="text-xs text-muted-foreground mt-1">
+              {reportStyle === templateDefaultReportStyle
+                ? "Using the admin default for this template."
+                : "Coach override for this campaign."}
+            </p>
+          </div>
+          <ReportStylePicker
+            value={reportStyle}
+            onChange={(value) => onChange({ reportStyle: value })}
+          />
+        </div>
+      )}
+
       {(resultsEmailEnabled || coachNotifyEnabled) && (
         <div className="space-y-3 border border-border rounded-lg p-4">
           <h3 className="text-sm font-semibold text-foreground">Email notifications</h3>
@@ -2060,6 +2135,7 @@ function ReviewStep({
   customHtmlEmailEnabled = false,
   brandedCustomHtmlEnabled = false,
   autoSend = false,
+  reportStylesEnabled = false,
   onChange,
 }: {
   state: WizardState;
@@ -2072,6 +2148,7 @@ function ReviewStep({
   brandedCustomHtmlEnabled?: boolean;
   /** Wave D auto-send flag — drives the consequence-labeled activate button. */
   autoSend?: boolean;
+  reportStylesEnabled?: boolean;
   onChange: (patch: Partial<WizardState>) => void;
 }) {
   const [orgName, setOrgName] = useState<string>("");
@@ -2149,6 +2226,16 @@ function ReviewStep({
           <span className="text-muted-foreground">Template</span>
           <span className="font-medium text-foreground text-right">{templateName}</span>
         </div>
+        {reportStylesEnabled && isReportStyleEligible(state.templateAlias) && (
+          <div className="flex justify-between gap-4">
+            <span className="text-muted-foreground">Report appearance</span>
+            <span className="font-medium text-foreground text-right">
+              {state.reportStyle === state.templateDefaultReportStyle
+                ? "Admin default"
+                : "Coach override"}
+            </span>
+          </div>
+        )}
         <div className="flex justify-between gap-4">
           <span className="text-muted-foreground">Participants</span>
           <span className="font-medium text-foreground text-right">

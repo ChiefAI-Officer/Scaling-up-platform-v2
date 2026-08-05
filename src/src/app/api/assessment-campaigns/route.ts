@@ -54,6 +54,11 @@ import { inngest } from "@/inngest/client";
 // Import the event name from the side-effect-free constants module (NOT the
 // fan-out function module) so the route never evaluates inngest.createFunction.
 import { ASSESSMENT_SEND_INVITES_EVENT } from "@/inngest/functions/assessment-invite-fanout-event";
+import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
+import {
+  isReportStyleEligible,
+  resolveCampaignReportStyle,
+} from "@/lib/assessments/report-style-policy";
 
 // C4 (Wave ED8) — the local `CAMPAIGN_LANGUAGE_DEFAULT = "enUS"` constant was
 // replaced by the shared DEFAULT_TEMPLATE_LANGUAGE (value-identical) so
@@ -271,7 +276,7 @@ export async function POST(request: NextRequest) {
 
     const template = await db.assessmentTemplate.findUnique({
       where: { id: data.templateId },
-      select: { id: true, alias: true, disabledAt: true },
+      select: { id: true, alias: true, disabledAt: true, defaultReportStyle: true },
     });
     if (!template) {
       return NextResponse.json(
@@ -296,6 +301,28 @@ export async function POST(request: NextRequest) {
         { status: 409 }
       );
     }
+
+    // The browser may only opt into a non-Classic style for the exact eligible
+    // instrument. A flag-off eligible request is deliberately harmless: it
+    // falls back to Classic below rather than persisting a hidden opt-in.
+    if (
+      data.reportStyle !== undefined &&
+      data.reportStyle !== "CLASSIC" &&
+      !isReportStyleEligible(template.alias)
+    ) {
+      return NextResponse.json(
+        { success: false, error: "Report appearance is only available for Scaling Up Full." },
+        { status: 400 },
+      );
+    }
+
+    const reportStylesAvailable =
+      isReportStylesEnabled({ templateId: template.id }) &&
+      isReportStyleEligible(template.alias);
+    const reportStylePolicy = resolveCampaignReportStyle(
+      reportStylesAvailable ? data.reportStyle : undefined,
+      reportStylesAvailable ? template.defaultReportStyle : "CLASSIC",
+    );
 
     const org = await db.organization.findUnique({
       where: { id: data.organizationId },
@@ -468,6 +495,8 @@ export async function POST(request: NextRequest) {
         sendResultsToRespondent: data.sendResultsToRespondent,
         notifyCoachOnCompletion: data.notifyCoachOnCompletion,
         showResultsOnScreen: data.showResultsOnScreen,
+        reportStyle: reportStylePolicy.reportStyle,
+        reportStyleSource: reportStylePolicy.reportStyleSource,
         // Wave M (#19): sanitized slides (flag-gated) or null. `Prisma.JsonNull`
         // is required for a nullable `Json?` column (plain `null` is rejected);
         // the persisted shape is the sanitized PersistedSlide[] (sanitize-on-save).
