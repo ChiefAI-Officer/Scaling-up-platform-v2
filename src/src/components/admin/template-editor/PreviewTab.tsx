@@ -66,6 +66,8 @@ export interface PreviewTabProps {
   template: { name: string; alias: string | null };
   /** The Active published version snapshot; null when nothing is published. */
   activePreview: ActivePreview | null;
+  /** Server-resolved QSP core-values story-group presentation gate. */
+  qspStoryGroupEnabled?: boolean;
 }
 
 type Side = "active" | "draft";
@@ -82,6 +84,7 @@ export function PreviewTab({
   version,
   template,
   activePreview,
+  qspStoryGroupEnabled = false,
 }: PreviewTabProps) {
   const hasActive = activePreview !== null;
 
@@ -174,9 +177,9 @@ export function PreviewTab({
       {/* ───────────────────── Read-only render ─────────────────────
           The audience/visibility policy is already applied by
           `assembleSurveyPages` above (templateAlias + isCEO:false). We do NOT
-          pass templateAlias/isCEO to the pager: those only drive the SU-Full
-          CEO-only growth-phase interstitial, which a plain-respondent preview
-          never shows. previewMode freezes every control + disables Submit. */}
+          pass `isCEO`: it remains false/omitted, so the SU-Full CEO tile cannot
+          fire. `templateAlias` is passed for the QSP presentation adapter.
+          previewMode freezes every control + disables Submit. */}
       <SectionPager
         previewMode
         pages={pages}
@@ -184,6 +187,8 @@ export function PreviewTab({
         onAnswerChange={() => {}}
         onSubmit={() => {}}
         assessmentName={template.name}
+        templateAlias={template.alias ?? undefined}
+        qspStoryGroupEnabled={qspStoryGroupEnabled}
       />
     </div>
   );

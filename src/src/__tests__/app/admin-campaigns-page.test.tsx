@@ -20,9 +20,17 @@ jest.mock("next-auth/next", () => ({
 }));
 jest.mock("@/lib/auth/auth", () => ({ authOptions: {} }));
 
-const mockFindMany = jest.fn().mockResolvedValue([]);
+const mockCampaignFindMany = jest.fn().mockResolvedValue([]);
+const mockVersionFindMany = jest.fn().mockResolvedValue([]);
 jest.mock("@/lib/db", () => ({
-  db: { assessmentCampaign: { findMany: (...a: unknown[]) => mockFindMany(...a) } },
+  db: {
+    assessmentCampaign: {
+      findMany: (...args: unknown[]) => mockCampaignFindMany(...args),
+    },
+    assessmentTemplateVersion: {
+      findMany: (...args: unknown[]) => mockVersionFindMany(...args),
+    },
+  },
 }));
 
 let listProps: Record<string, unknown> | null = null;
@@ -47,7 +55,8 @@ async function renderPage() {
 beforeEach(() => {
   jest.clearAllMocks();
   listProps = null;
-  mockFindMany.mockResolvedValue([]);
+  mockCampaignFindMany.mockResolvedValue([]);
+  mockVersionFindMany.mockResolvedValue([]);
 });
 
 describe("Admin Campaigns page — auth gate", () => {
@@ -66,21 +75,66 @@ describe("Admin Campaigns page — auth gate", () => {
   it.each(["ADMIN", "STAFF"])("renders for %s", async (role) => {
     mockGetServerSession.mockResolvedValue({ user: { role } });
     await renderPage();
-    expect(mockFindMany).toHaveBeenCalledTimes(1);
+    expect(mockCampaignFindMany).toHaveBeenCalledTimes(1);
   });
 });
 
 describe("Admin Campaigns page — data + reuse", () => {
-  it("queries INVITED, non-deleted campaigns (PUBLIC excluded) and passes the admin detail base path", async () => {
+  it("queries INVITED, non-deleted campaigns and projects their edition", async () => {
     mockGetServerSession.mockResolvedValue({ user: { role: "ADMIN" } });
+    const pinned = {
+      templateId: "tpl-1",
+      versionNumber: 3,
+      language: "enUS",
+      publishedAt: new Date("2026-07-01T00:00:00.000Z"),
+      archivedAt: null,
+    };
+    mockCampaignFindMany.mockResolvedValue([
+      {
+        id: "c1",
+        name: "Acme Q3",
+        alias: "acme-q3",
+        status: "ACTIVE",
+        openAt: new Date("2026-07-31T00:00:00.000Z"),
+        template: { id: "tpl-1", name: "QSP v2" },
+        version: pinned,
+        organization: { id: "org-1", name: "Acme" },
+        participants: [],
+        invitations: [],
+      },
+    ]);
+    mockVersionFindMany.mockResolvedValue([pinned]);
     await renderPage();
 
-    const arg = mockFindMany.mock.calls[0][0] as {
+    const arg = mockCampaignFindMany.mock.calls[0][0] as {
       where: Record<string, unknown>;
+      include: Record<string, unknown>;
     };
     expect(arg.where).toMatchObject({ accessMode: "INVITED", deletedAt: null });
+    expect(arg.include).toMatchObject({
+      version: {
+        select: {
+          templateId: true,
+          versionNumber: true,
+          language: true,
+          publishedAt: true,
+          archivedAt: true,
+        },
+      },
+    });
+    expect(mockVersionFindMany).toHaveBeenCalledTimes(1);
     expect(listProps).toMatchObject({
       detailBasePath: "/admin/assessments/campaigns",
+      campaigns: [
+        expect.objectContaining({
+          id: "c1",
+          edition: {
+            versionNumber: 3,
+            newerEditionAvailable: false,
+            pinnedRetired: false,
+          },
+        }),
+      ],
     });
   });
 });

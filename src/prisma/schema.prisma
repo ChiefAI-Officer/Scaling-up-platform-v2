@@ -117,6 +117,7 @@ model Coach {
   orgOwnershipEventsFromCoach OrganizationOwnershipEvent[]    @relation("OrgOwnershipFromCoach")
   orgOwnershipEventsToCoach   OrganizationOwnershipEvent[]    @relation("OrgOwnershipToCoach")
   campaignWizardDraft         CampaignWizardDraft?
+  referredAssessmentSubmissions AssessmentSubmission[] @relation("AssessmentSubmissionReferringCoach")
 
   @@map("coaches")
 }
@@ -593,6 +594,7 @@ model AuditLog {
   timestamp   DateTime @default(now())
 
   @@index([entityType, entityId])
+  @@index([action, timestamp])
   @@index([timestamp])
   @@map("audit_logs")
 }
@@ -1294,6 +1296,7 @@ model AssessmentCampaign {
   invitesSentAt           DateTime?                // completion marker — set once invites finished sending
   sendResultsToRespondent Boolean                  @default(false)
   notifyCoachOnCompletion Boolean                  @default(false)
+  showResultsOnScreen     Boolean                  @default(false) // Wave OSR (Jeff #71) — render the respondent's own Results report in place at submit. Additive, default-OFF behind WAVE_OSR_RESPONDENT_RESULTS_ENABLED. Independent of sendResultsToRespondent (email) and of the results-email approval hash.
   invitationBodyHtml      String?                  // optional rich-HTML invitation body
   customSlides            Json?                    // Wave M — coach-authored branded interstitial slides (CustomSlide[]); null = none. Additive, default-OFF behind WAVE_M_CUSTOM_SLIDES_ENABLED.
   importManifest          Json?                    // Wave O — historical Esperto SU-Full import round manifest (cid provenance, canonical roundLabel, batch content fingerprint, per-respondent {saltedMidHash, saltedReportIdHash, answerHash} for exact/superset/divergent reuse reconciliation, versionId, crosswalkId, skip reasons); null = not an imported round. Additive, default-OFF behind WAVE_O_ESPERTO_SUFULL_IMPORT.
@@ -1350,13 +1353,40 @@ model AssessmentInvitation {
   resentCount  Int                        @default(0)
   lastResentAt DateTime?
   createdAt    DateTime                   @default(now())
+  stableTokenSequence         Int       @default(0)
+  stableFallbackTokenHash     String?
+  stableFallbackExpiresAt     DateTime?
+  stableFallbackTokenSequence Int       @default(0)
 
   campaign   AssessmentCampaign    @relation(fields: [campaignId], references: [id])
   respondent OrgRespondent         @relation(fields: [respondentId], references: [id])
   submission AssessmentSubmission?
+  tokens     AssessmentInvitationToken[]
 
   @@unique([campaignId, respondentId])
   @@map("assessment_invitations")
+}
+
+model AssessmentInvitationToken {
+  id                  String                                 @id @default(cuid())
+  invitationId        String
+  tokenHash           String                                 @unique
+  sequence            Int
+  expiresAtSnapshot   DateTime
+  source              AssessmentInvitationTokenSource
+  deliveryState       AssessmentInvitationTokenDeliveryState
+  deliveryConfirmedAt DateTime?
+  previousTokenHash   String?
+  previousExpiresAt   DateTime?
+  createdAt           DateTime                               @default(now())
+  updatedAt           DateTime                               @updatedAt
+
+  invitation AssessmentInvitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+
+  @@index([invitationId])
+  @@index([invitationId, previousTokenHash])
+  @@unique([invitationId, sequence])
+  @@map("assessment_invitation_tokens")
 }
 
 model AssessmentSubmission {
@@ -1369,6 +1399,7 @@ model AssessmentSubmission {
   result                Json // frozen ScoreResult cache
   publicTaker           Json? // {email, firstName, lastName, ...} for PUBLIC
   referringCoachEmail   String?
+  referringCoachId      String?
   idempotencyKey        String? // PUBLIC submit idempotency; partial-unique via raw SQL
   resultsTokenHash      String?
   resultsTokenIssuedAt  DateTime?
@@ -1379,11 +1410,14 @@ model AssessmentSubmission {
   campaign   AssessmentCampaign    @relation(fields: [campaignId], references: [id])
   respondent OrgRespondent?        @relation(fields: [respondentId], references: [id])
   invitation AssessmentInvitation? @relation(fields: [invitationId], references: [id])
+  referringCoach Coach?            @relation("AssessmentSubmissionReferringCoach", fields: [referringCoachId], references: [id], onDelete: Restrict)
   outboxEmails AssessmentEmailOutbox[]
+  deliveryIntents AssessmentEmailDeliveryIntent[]
 
   @@index([campaignId])
   @@index([respondentId, submittedAt])
   @@index([referringCoachEmail])
+  @@index([referringCoachId, submittedAt])
   // Partial unique indexes added via raw SQL:
   //   - (campaignId, respondentId) WHERE respondentId IS NOT NULL
   //   - (resultsTokenHash) WHERE resultsTokenHash IS NOT NULL
@@ -1394,27 +1428,79 @@ model AssessmentSubmission {
 /// Durable outbox for Quick Assessment lead/result emails (claudex R2 hardening).
 /// Enqueued in the submit transaction; drained by an Inngest worker with retries.
 model AssessmentEmailOutbox {
-  id             String    @id @default(cuid())
-  submissionId   String
-  recipientEmail String
-  recipientRole  String // "REFERRING_COACH" | "SU_TEAM"
-  emailType      String // "QUICK_ASSESSMENT_LEAD"
-  subject        String
-  bodyHtml       String
-  status         String    @default("PENDING") // PENDING | SENT | FAILED
-  attempts       Int       @default(0)
-  lastError      String?
-  sentAt         DateTime?
-  nextAttemptAt  DateTime  @default(now())
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id                      String    @id @default(cuid())
+  submissionId            String
+  recipientEmail          String
+  recipientRole           String // "TAKER_COPY" | "REFERRING_COACH" | "SU_TEAM"
+  emailType               String // "QUICK_ASSESSMENT_LEAD"
+  subject                 String
+  bodyHtml                String
+  status                  String    @default("PENDING") // PENDING | SENDING | SENT | FAILED | CANCELLED
+  attempts                Int       @default(0)
+  lastError               String?
+  sentAt                  DateTime?
+  nextAttemptAt           DateTime  @default(now())
+  leaseToken              String?
+  leaseExpiresAt          DateTime?
+  cancelledAt             DateTime?
+  cancelReason            String?
+  featureKey              String?
+  authorizationProvenance Json?
+  contentProvenance       Json?
+  sendFenceGeneration     Int       @default(0)
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
 
   submission AssessmentSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
 
   @@unique([submissionId, recipientRole]) // idempotent enqueue per role
   @@index([status, nextAttemptAt])
+  @@index([status, nextAttemptAt, createdAt])
+  @@index([status, leaseExpiresAt])
   @@index([submissionId])
   @@map("assessment_email_outbox")
+}
+
+model AssessmentEmailDeliveryIntent {
+  id                       String   @id @default(cuid())
+  submissionId             String
+  campaignId               String
+  invitationId             String
+  respondentId             String
+  recipientRole            String
+  emailType                String
+  recipientEmail           String?
+  subject                  String?
+  bodyHtml                 String?
+  payloadHash              String
+  snapshotSchemaVersion    Int      @default(1)
+  rendererContractVersion  Int      @default(1)
+  authorizationSnapshot    Json?
+  contentProvenance        Json?
+  status                   String   @default("PENDING")
+  version                  Int      @default(0)
+  holdReason               String?
+  holdReasons              Json?
+  attempts                 Int      @default(0)
+  lastErrorClass           String?
+  nextAttemptAt            DateTime @default(now())
+  heldAt                   DateTime?
+  expiresAt                DateTime
+  handedOffOutboxId        String?
+  resolvedAt               DateTime?
+  resolvedBy               String?
+  resolutionReasonCode     String?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  submission AssessmentSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@unique([submissionId, recipientRole])
+  @@index([status, nextAttemptAt, createdAt, id])
+  @@index([status, expiresAt, id])
+  @@index([status, heldAt, id])
+  @@index([submissionId])
+  @@map("assessment_email_delivery_intents")
 }
 
 // v7.6: AccessGroup replaces TemplateAccessGrant. Groups grant template
@@ -1534,6 +1620,19 @@ enum AssessmentInvitationStatus {
   SENT
   VIEWED
   SUBMITTED
+}
+
+enum AssessmentInvitationTokenSource {
+  LEGACY_CURRENT
+  ORIGINAL
+  REMINDER
+}
+
+enum AssessmentInvitationTokenDeliveryState {
+  STAGED
+  SENT
+  UNCERTAIN
+  REJECTED
 }
 
 enum AssessmentQuestionType {

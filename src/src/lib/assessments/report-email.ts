@@ -48,6 +48,7 @@ import { reportConfigFor } from "@/lib/assessments/report-config";
 import {
   respondentDisplayName,
   greetingName,
+  respondentNameMatchesEmail,
 } from "@/lib/assessments/respondent-display-name";
 import {
   buildQualitativeModel,
@@ -61,12 +62,15 @@ import {
   buildFindingsSection,
 } from "@/lib/assessments/findings-section-model";
 import { isEmailFindingsEnabled } from "@/lib/assessments/wave-u3-flags";
+import { buildReportEmailChrome } from "@/lib/assessments/report-email-chrome";
+import type { ReportEmailChrome } from "@/lib/assessments/wave-228-flags";
 
 export type ReportEmailRecipientRole = "TAKER_COPY" | "REFERRING_COACH";
 
 export interface BuildReportEmailArgs {
   report: RespondentReport;
   recipientRole: ReportEmailRecipientRole;
+  chrome?: ReportEmailChrome;
 }
 
 export interface ReportEmail {
@@ -130,6 +134,22 @@ export interface BuildRespondentReportArgs {
   submissionId: string;
   /** Optional: the coach who referred this taker. Wired into the CTA mailto link. */
   referringCoachEmail?: string | null;
+  /**
+   * Wave OSR (#71) — fields the INVITED path knows but a PUBLIC quiz taker does
+   * not. All optional and all defaulting to the previous hardcoded values, so
+   * the public-quiz callers are byte-unchanged.
+   *
+   * Without these the invited respondent's report would render an orphan " · "
+   * where the org name belongs, and would carry NO coach byline — contradicting
+   * the byline placement Jeff asked for in #63/#67/#73/#78/#81 (PR #230) and the
+   * "same artifact" claim in ADR-0027.
+   */
+  companyName?: string;
+  jobTitle?: string | null;
+  coachLogoUrl?: string | null;
+  coachName?: string | null;
+  /** True when the frozen result is not ScoreResult-shaped → renders the notice. */
+  degraded?: boolean;
 }
 
 /**
@@ -162,8 +182,9 @@ export function buildRespondentReportFromSubmission(
 
   return {
     respondentName: name,
-    jobTitle: null,
-    companyName: "",
+    respondentEmail: args.publicTaker.email.trim() || null,
+    jobTitle: args.jobTitle ?? null,
+    companyName: args.companyName ?? "",
     assessmentName: args.assessmentName,
     templateAlias: args.templateAlias,
     campaignLabel: args.campaignLabel,
@@ -180,7 +201,9 @@ export function buildRespondentReportFromSubmission(
       contentHash: "",
       templateName: args.assessmentName,
     },
-    degraded: false,
+    degraded: args.degraded ?? false,
+    coachLogoUrl: args.coachLogoUrl ?? null,
+    coachName: args.coachName ?? null,
     referringCoachEmail: args.referringCoachEmail ?? null,
   };
 }
@@ -195,6 +218,40 @@ const SOFT = "#faf8fd";
 const PURPLE_TINT = "#f0e9fa";
 const FONT =
   "'Helvetica Neue', Roboto, Arial, sans-serif";
+
+function buildEmailNextSteps(
+  report: RespondentReport,
+  recipientRole: ReportEmailRecipientRole,
+  showCoachLink = true,
+): string {
+  const takerEmail = report.respondentEmail?.trim() ?? "";
+  const coachEmail = report.referringCoachEmail?.trim() ?? "";
+  const contactHref =
+    recipientRole === "REFERRING_COACH"
+      ? takerEmail
+        ? `mailto:${encodeURIComponent(takerEmail)}`
+        : ""
+      : coachEmail
+        ? `mailto:${encodeURIComponent(coachEmail)}`
+        : "https://scalingup.com/coaches";
+  const contactLabel =
+    recipientRole === "REFERRING_COACH"
+      ? "Contact the Taker →"
+      : "Talk to your Scaling Up Certified Coach →";
+  const showContactLink =
+    recipientRole === "REFERRING_COACH" || showCoachLink;
+  const contactLink =
+    showContactLink && contactHref
+      ? `<a href="${contactHref}" style="display:inline-block;background:${PURPLE};color:#ffffff;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:11px;font-size:14px;margin:5px;">${contactLabel}</a>`
+      : "";
+
+  return `<tr>
+    <td align="center" style="padding:18px 32px 0;">
+      <a href="https://scalingup.com" style="display:inline-block;background:#ffffff;color:${PURPLE};border:1px solid ${PURPLE};text-decoration:none;font-weight:700;padding:11px 22px;border-radius:11px;font-size:14px;margin:5px;">Learn More →</a>
+      ${contactLink}
+    </td>
+  </tr>`;
+}
 
 // Four-Decisions stripe colors (mockup .stripe).
 const D_PEOPLE = "#f7a600";
@@ -564,7 +621,7 @@ function buildQualitativeReportEmail({
   cover,
   escName,
   escFirst,
-  escDate,
+  footerCellHtml,
 }: {
   report: RespondentReport;
   recipientRole: ReportEmailRecipientRole;
@@ -572,7 +629,7 @@ function buildQualitativeReportEmail({
   cover: string;
   escName: string;
   escFirst: string;
-  escDate: string;
+  footerCellHtml: string;
 }): ReportEmail {
   // M2: guard a non-string assessmentName so escaping the title can never throw
   // out of buildReportEmailHtml (the "never throws" contract). escTitle is used
@@ -581,6 +638,11 @@ function buildQualitativeReportEmail({
     typeof report.assessmentName === "string"
       ? report.assessmentName
       : "Assessment",
+  );
+  const nextSteps = buildEmailNextSteps(
+    report,
+    recipientRole,
+    reportConfigFor(report.templateAlias).showCoachCta !== false,
   );
 
   const shell = (inner: string): string => `<!DOCTYPE html>
@@ -597,8 +659,9 @@ function buildQualitativeReportEmail({
         <table role="presentation" width="640" cellpadding="0" cellspacing="0" border="0" style="max-width:640px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden;">
           ${cover}
           ${inner}
+          ${nextSteps}
           <tr>
-            <td align="center" style="padding:18px 32px 26px;font-size:11px;color:${MUTED};">${escDate} &middot; Generated by Scaling Up Platform</td>
+            ${footerCellHtml}
           </tr>
         </table>
       </td>
@@ -653,6 +716,7 @@ function buildQualitativeReportEmail({
 export function buildReportEmailHtml({
   report,
   recipientRole,
+  chrome = "legacy",
 }: BuildReportEmailArgs): ReportEmail {
   const result: ScoreResult = report.result ?? ({} as ScoreResult);
   const perSection: PerSectionResult[] = Array.isArray(result.perSection)
@@ -678,6 +742,21 @@ export function buildReportEmailHtml({
   const escName = escapeHtml(report.respondentName);
   const escTitle = escapeHtml(report.assessmentName);
   const escDate = escapeHtml(formatSubmittedAt(report.submittedAt));
+  const emailChrome = buildReportEmailChrome({
+    chrome,
+    coachName: report.coachName,
+    coachLogoUrl: report.coachLogoUrl,
+    escapedDate: escDate,
+  });
+  const reportTitleTopMargin =
+    chrome === "gh228" ? "margin-top:20px;" : "";
+  const escEmail = report.respondentEmail
+    ? escapeHtml(report.respondentEmail)
+    : "";
+  const respondentNameIsEmail = respondentNameMatchesEmail(
+    report.respondentName,
+    report.respondentEmail,
+  );
   const escFirst = escapeHtml(greetingName(report.respondentName));
   const escHeadlinePrimary = escapeHtml(headline.primary);
   const escHeadlineLabel = escapeHtml(headline.label);
@@ -713,9 +792,10 @@ export function buildReportEmailHtml({
   </tr>
   <tr>
     <td style="background:${PURPLE};background-image:linear-gradient(135deg,${PURPLE},${PURPLE_DEEP});padding:28px 32px 26px;color:#ffffff;">
-      <div style="font-weight:800;letter-spacing:0.04em;font-size:14px;color:#ffffff;margin-bottom:14px;">SCALING UP</div>
-      <div style="font-size:21px;font-weight:800;color:#ffffff;line-height:1.2;margin-bottom:4px;">${escTitle}</div>
-      <div style="font-size:13px;color:#ffffff;opacity:0.85;">Report for ${escName} &middot; ${escDate}</div>
+      ${emailChrome.coverBrandHtml}
+      <div style="${reportTitleTopMargin}font-size:21px;font-weight:800;color:#ffffff;line-height:1.2;margin-bottom:4px;">${escTitle}</div>
+      <div style="font-size:13px;color:#ffffff;opacity:0.85;">${respondentNameIsEmail ? escDate : `Report for ${escName} &middot; ${escDate}`}</div>
+      ${escEmail ? `<div style="font-size:13px;color:#ffffff;opacity:0.85;margin-top:4px;">Email: ${escEmail}</div>` : ""}
     </td>
   </tr>`;
 
@@ -732,7 +812,7 @@ export function buildReportEmailHtml({
       cover,
       escName,
       escFirst,
-      escDate,
+      footerCellHtml: emailChrome.footerCellHtml,
     });
   }
 
@@ -988,12 +1068,6 @@ export function buildReportEmailHtml({
       ? `Reach out to turn these results into a 90-day plan together.`
       : `You&rsquo;ve completed your assessment. Turn these results into a 90-day plan with your Scaling Up Certified Coach.`;
 
-  // CTA href: if the report has a referring coach email, link to mailto; else
-  // fall back to the SU coaches directory.
-  const ctaHref = report.referringCoachEmail
-    ? `mailto:${encodeURIComponent(report.referringCoachEmail)}`
-    : "https://scalingup.com/coaches";
-  const ctaLabel = "Talk to your Scaling Up Certified Coach →";
   // #81 — Five Dysfunctions suppresses the coach CTA (report-config), same as
   // the on-screen BrandedReport. Omitted config = shown.
   const showCoachCta =
@@ -1007,14 +1081,14 @@ export function buildReportEmailHtml({
           <td align="center" style="padding:20px;">
             <div style="font-size:16px;font-weight:800;color:${INK};margin-bottom:6px;">${conclusionTitle}</div>
             <div style="font-size:13px;color:${MUTED};line-height:1.5;margin-bottom:14px;">${conclusionBody}</div>
-            ${showCoachCta ? `<a href="${ctaHref}" style="display:inline-block;background:${PURPLE};color:#ffffff;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:11px;font-size:14px;">${ctaLabel}</a>` : ""}
           </td>
         </tr>
       </table>
     </td>
   </tr>
+  ${buildEmailNextSteps(report, recipientRole, showCoachCta)}
   <tr>
-    <td align="center" style="padding:18px 32px 26px;font-size:11px;color:${MUTED};">${escDate} &middot; Generated by Scaling Up Platform</td>
+    ${emailChrome.footerCellHtml}
   </tr>`;
 
   // ── Assemble — single centered column, table layout, inline styles only ────

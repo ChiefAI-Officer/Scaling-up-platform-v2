@@ -55,12 +55,36 @@ The participant UI tints each section by its **Domain** using the Scaling Up bra
 ### Sending & answering
 
 **Campaign**:
-One send of a template version to a chosen subset of a company's members.
+One send of a template version to a chosen subset of a company's members. Its unchanged `closeAt` is a clock-based intake cutoff, while stored `status = CLOSED` is an explicit lifecycle transition. For an Email Delivery Intent created by a valid submission, merely passing `closeAt` does not revoke the obligation; changing the deadline or stored status triggers review.
 _Avoid_: assessment instance, test, run.
+
+**Email Delivery Intent**:
+The frozen submission-time expectation that one invited assessment email should be delivered for one recipient role. It exists before an outbox row and remains authoritative until reconciliation hands it off or resolves it. Handoff reauthorizes under row locks on every authoritative record used by the decision, so a concurrent policy edit cannot slip between the check and outbox creation. Its payload has one absolute 30-day retention deadline from creation; pause and hold transitions never extend that deadline.
+_Avoid_: recovery intent (the intent exists before any failure), outbox row, delivery attempt.
+
+**Delivery Hold**:
+An Email Delivery Intent withheld from automatic handoff because current authorization, ownership, campaign lifecycle, recipient identity, payload integrity, or retry safety no longer matches its frozen contract. ADMIN and STAFF may inspect the exact frozen payload through an audited detail view, then release that exact payload or cancel it; they cannot edit or rerender it. Release is bound to the current facts shown during that review and requires a fresh review if those facts change again.
+_Avoid_: failed email (no outbox send may have occurred), retry queue, editable draft.
+
+**Global assessment-send pause**:
+An operational delivery defer that blocks Email Delivery Intent handoff and operator release, but not the atomic capture of a valid submission-time intent. It never erases an obligation, increments retry attempts, or extends the intent's 30-day payload deadline.
+_Avoid_: authorization revocation, feature disablement, permanent cancellation.
+
+**Completed invited submission**:
+An invited assessment submission whose answers and every Email Delivery Intent required by its locked submission-time gates committed atomically. A failed intent write leaves the invitation retryable and the client-held answer draft intact; it is not a completed submission.
+_Avoid_: treating an answers-only commit as complete when an expected email has no durable intent or outbox row.
 
 **Public Campaign**:
 A **Campaign** with `accessMode = PUBLIC` — anyone with the link self-enrolls and answers via `/quiz/[alias]` (no invitation, no roster membership required). Admin/STAFF-only to create; it still belongs to a chosen **Organization** (`organizationId` is non-nullable). The admin nav entry and its management page are labelled **"Public Campaigns"** and live at `/admin/assessments/public-campaigns`.
 _Avoid_: "Public Quiz" / "Public Quizzes" as a label (the glossary avoids "quiz" — the `/quiz/...` URL is not the domain term); conflating it with the INVITED flow (roster + emailed invitations).
+
+**Referring coach**:
+The verified active **Coach** associated with a **Public Campaign** submission at the moment the taker submits. That association is frozen on the submission, while viewing eligibility remains current: the referring coach may access the taker's full **Results report** only while active; deactivation or certification expiry suspends access, and reactivation of the same coach restores it. A **Results report email** queued for that verified coach is a submission-time delivery artifact: its recipient and **Coach byline** are not re-resolved if the coach's status or profile changes before the worker sends it. This does not grant ongoing report access. ADMIN/STAFF retain oversight regardless. A Coach with referred submissions cannot be hard-deleted; deactivation is the offboarding path, while privacy-driven deletion of taker data is a separate explicit operation. Historical ownership is recognized only when the record proves the active-coach verification succeeded **and** an explicit review maps the submission to a Coach identity; neither a taker-supplied email nor a historical delivery email is sufficient by itself. A missing or unverified referral leaves the submission without a referring coach and therefore ADMIN/STAFF-only.
+_Avoid_: treating the referring coach as the campaign creator or organization owner; resolving access from the coach's current email instead of the submission's frozen coach identity; transferring an existing submission when a coach's email later changes.
+
+**Referred Results**:
+The dedicated Coach-lane collection of **Public Campaign** submissions whose frozen **Referring coach** is the signed-in coach. It also owns the coach's shareable Quick Assessment link, so distribution and the results it generates live together. Each entry gives an at-a-glance result and opens the same canonical **Results report** the taker received through an authenticated report-access gate. It is read-only: the coach may view and print results, but cannot edit answers, reassign ownership, delete submissions, manage the Public Campaign, or run a lead-management workflow. It is separate from **My Campaigns** because the coach receives the referral but does not create or own the underlying Public Campaign.
+_Avoid_: “My Campaigns” for referred submissions; implying the coach owns or may manage the Public Campaign; creating a reduced coach-only report; treating Referred Results as a CRM pipeline.
 
 **Respondent**:
 A person in a company's roster (`OrgRespondent`) who can be invited to answer. Distinct from a **Participant** — the record of a respondent's inclusion in a *specific* campaign (`AssessmentCampaignParticipant`).
@@ -116,6 +140,10 @@ _Avoid_: recommendation = tier; "findings" = survey branching (that is condition
 A campaign-progress label for a respondent — new / invited / started / completed (revoked excluded). Purely workflow state; carries no scoring meaning.
 _Avoid_: confusing this with a scoring tier.
 
+**Invitation link**:
+A secret, emailed entry URL for one Respondent's invitation to an invited Campaign. The original invitation and every successfully sent reminder may carry different tokens, but Jeff #65's locked lifecycle contract treats them as sibling doors to the same Invitation: every one remains valid until submission, explicit revocation, expiry, or Campaign closure. A failed reminder creates no usable new door and invalidates none of the existing ones. Manual **Resend** is outside that contract unless separately approved.
+_Avoid_: calling the newest link a replacement link, assuming a successful reminder may invalidate earlier links, or treating multiple links as multiple Invitations.
+
 **ScaleUp Score**:
 Scaling Up Full's overall weighted 0–100 score (can exceed 100 via bonus). Its exact weighting formula is owned by Esperto and not in our source export.
 
@@ -130,12 +158,22 @@ A checklist item counts as "passed" when rated **2 or 3** on its 0–3 scale (a 
 An instrument with no real scoring — Quarterly Session Prep v1 and v2. Responses are aggregated (means) for discussion, not banded. Represented internally by a single neutral tier (see ADR-0002).
 
 **Results report** (a.k.a. "the report", "the PDF"):
-The branded, printable **per-respondent** document a coach/admin views for *one* completed submission — cover, overall result, per-section breakdown, scores table, recommendations (when present), conclusion. It is the human-readable view that **replaces the raw answer (`stableKey`) view**. It is per individual.
+The branded, printable **per-respondent** document for *one* completed submission — cover, overall result, per-section breakdown, scores table, recommendations (when present), conclusion. It is the human-readable view that **replaces the raw answer (`stableKey`) view**. It is per individual.
+Its **audience is a property of where it is reached, not of the document**: a coach/admin views it through the **Report access gate**; when a **Campaign** opts in, the **Respondent** sees the *same* artifact rendered in place immediately after submitting (ADR-0027); and a public quiz taker sees it in place too (ADR-0008). One document, three readers — no reduced "respondent edition" exists. (Precision: the same *component*, minus cohort sections a given reader is not entitled to — the coach/admin route can pass a Wave S `peerComparison` section that the respondent's copy structurally cannot receive. See ADR-0027.)
+_Avoid_: calling it "the coach's view" — that was true only while the gated route was the only door.
 _Avoid_: conflating the per-respondent **Results report** with a cohort **Aggregate report** (Esperto's "group" / "self-comparison" report — the facilitator's all-responses dashboard; shipped for LVA in Wave F).
 
+**Coach image**:
+The single image associated with a Coach, whether it is a headshot or a company mark. It may appear alone or as the image within a **Coach byline**.
+_Avoid_: "coach logo" and "coach photo" as general terms; "Circle avatar" for the stored concept (a Circle avatar is only one possible upstream source).
+
+**Results report email**:
+An email that carries the complete **Results report** inline. It includes invited-respondent delivery and public taker/referring-coach copies; it is distinct from the invited **Results Email** template setting and its authored copy, and from short completion or lead notifications.
+_Avoid_: "Results Email" for the delivered artifact, and the less precise "full-report email" or "complete-report email."
+
 **Coach byline**:
-The creator coach's identity as it appears on a **Results report** / **Aggregate report** — an image plus "Coached by {name}", in the cover masthead and the page footer. It is an *acknowledgement*, deliberately subordinate to the Scaling Up mark, never a co-brand of equal weight: the report is a Scaling Up product artifact that names the coach who ran it.
-_Avoid_: "coach logo" as though it were always a firm's logo, and "coach photo" as though it were always a headshot — the same single image (`Coach.profileImage`) serves both, so neither word is safe as the general term; say **coach byline** for the whole unit (image + name) and "the coach's image" for the picture alone. Also avoid treating it as co-branding — that framing invites peer-weight sizing, which this deliberately is not.
+The trusted Coach identity as it appears on a **Results report** / **Aggregate report** — "Coached by {name}" with an optional adjacent image, in the cover masthead and the page footer. A usable coach name is required; an image is never shown alone. Invited and other campaign-owned artifacts use the campaign's creator coach; a referred **Public Campaign** submission uses its frozen verified **Referring coach** (ADR-0028). In a **Results report email**, the displayed name and image URL are a presentation snapshot frozen when the email is queued; later coach-profile edits do not restyle that queued artifact. It is an *acknowledgement*, deliberately subordinate to the Scaling Up mark, never a co-brand of equal weight: the report is a Scaling Up product artifact that names the coach attached to that result.
+_Avoid_: "coach logo" as though it were always a firm's logo, and "coach photo" as though it were always a headshot — the same single image (`Coach.profileImage`) serves both, so neither word is safe as the general term; say **Coach byline** for the whole unit and "the coach's image" for the optional picture. Also avoid showing the image without a usable name, treating it as co-branding, substituting the Organization owner, or treating a Public Campaign's Referring coach as its creator/owner.
 
 **Cohort trend** (a.k.a. longitudinal trend):
 The coach-facing view that charts an **Organization**'s *aggregate* results for one scored **Template** across its successive **Campaigns** over time (per-campaign means + per-question sparklines). It answers "is this whole team improving each quarter?" — every person is invisible inside the average. (Already shipped at `/portal/assessments/trends`.)
@@ -160,9 +198,12 @@ _Avoid_: "delete admin" implying a hard row delete (FKs forbid it); assuming a k
 
 - An **Assessment Template** has one or more **Template Versions**; only published versions are selectable by a campaign.
 - A **Campaign** pins exactly one **Template Version** and targets many **Respondents** (each via a **Participant** record).
+- A **Completed invited submission** owns one **Email Delivery Intent** per expected recipient role; reconciliation hands each intent to at most one outbox row.
 - The **Invitation email copy** (subject + body) lives on the **Template** itself — read live at send time by every send path, so editing it immediately affects future sends of in-flight campaigns. It is *not* pinned by a Template Version; only a per-campaign override shields a campaign from template-level copy edits.
+- An invited Respondent has one **Invitation**, which may be reached through its original **Invitation link** or any successfully sent reminder link; those sibling links share one lifecycle and never create extra Invitations.
 - A scored **Template Version** defines **Scoring Tiers**; a Scaling Up Full version additionally defines **Domains** and per-question **Recommendations**.
 - A **Respondent**'s progress in a campaign is an **Invitation status band**; their answers, once submitted, may produce a **Scoring tier** result.
+- A **Results report email** carries the complete **Results report** inline to an invited respondent, public taker, or verified referring coach.
 - A **Results report** (per-respondent) and an **Aggregate report** (cohort) are both viewed through the **Report access gate**, which wraps each one's **loader**.
 - A **Cohort trend** aggregates one scored **Template**'s results across an **Organization**'s **Campaigns** over time; a **Per-respondent longitudinal comparison** does the same for a single **Respondent** (scored templates only — ADR-0016).
 - A **Campaign** may carry coach-authored **Custom slides** that its **Section pager** weaves in as non-question pages.

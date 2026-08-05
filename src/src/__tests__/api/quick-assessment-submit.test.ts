@@ -29,6 +29,9 @@ jest.mock("next/server", () => ({
 
 // Transaction mock: tx callback gets txMock; resolve with callback's return value.
 const txMock = {
+  coach: {
+    findFirst: jest.fn(),
+  },
   assessmentSubmission: {
     create: jest.fn(),
   },
@@ -125,6 +128,7 @@ const CAMPAIGN = {
   accessMode: "PUBLIC",
   openAt: new Date("2026-01-01T00:00:00Z"),
   closeAt: null as Date | null,
+  deletedAt: null as Date | null,
   templateId: "tmpl-1",
   versionId: "ver-1",
   template: { name: "Scaling Up Quick Assessment" },
@@ -163,6 +167,56 @@ function makeParams(alias = "quick-assessment") {
   return { params: Promise.resolve({ campaignAlias: alias }) };
 }
 
+type CreatedOutboxRow = {
+  recipientRole: string;
+  bodyHtml: string;
+};
+
+function createdRows(): CreatedOutboxRow[] {
+  return txMock.assessmentEmailOutbox.create.mock.calls.map(
+    (call: Array<{ data: CreatedOutboxRow }>) => call[0].data,
+  );
+}
+
+function rowFor(role: string): CreatedOutboxRow {
+  const row = createdRows().find(
+    (candidate) => candidate.recipientRole === role,
+  );
+  if (!row) throw new Error(`${role} row was not enqueued`);
+  return row;
+}
+
+function mockActiveCoach(
+  overrides: Partial<{
+    profileImage: string | null;
+    firstName: string;
+    lastName: string;
+  }> = {},
+) {
+  (db.coach.findUnique as jest.Mock).mockResolvedValue({
+    id: "coach-1",
+    email: "coach@example.com",
+    firstName: overrides.firstName ?? "Bob",
+    lastName: overrides.lastName ?? "Coach",
+    profileImage:
+      overrides.profileImage === undefined
+        ? "https://images.example/bob.png"
+        : overrides.profileImage,
+    certificationStatus: "ACTIVE",
+    certificationExpiry: null,
+  });
+}
+
+async function submitWithCoach() {
+  return POST(
+    makeRequest({
+      ...VALID_BODY,
+      referringCoachEmail: "coach@example.com",
+    }) as never,
+    makeParams() as never,
+  );
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
   // Reset $transaction to the default callback-passthrough
@@ -175,6 +229,10 @@ beforeEach(() => {
   (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValue(CAMPAIGN);
   (db.assessmentTemplateVersion.findUnique as jest.Mock).mockResolvedValue(VERSION);
   // Default tx: submission create returns id
+  txMock.coach.findFirst.mockResolvedValue({
+    id: "coach-1",
+    email: "coach@example.com",
+  });
   txMock.assessmentSubmission.create.mockResolvedValue({ id: "sub-1" });
   txMock.assessmentEmailOutbox.create.mockResolvedValue({});
   // Default: no existing submission (idempotency)
@@ -189,6 +247,9 @@ beforeEach(() => {
   delete process.env.QUICK_ASSESSMENT_TEAM_EMAIL;
   delete process.env.ESCALATION_EMAIL;
   delete process.env.ADMIN_EMAIL;
+  delete process.env.WAVE_228_REPORT_EMAIL_CHROME_ENABLED;
+  delete process.env.WAVE_228_REPORT_EMAIL_CHROME_CANARY;
+  delete process.env.WAVE_228_REPORT_EMAIL_CHROME_KILL;
 });
 
 /* -------------------------------------------------------------------------- */
@@ -357,6 +418,105 @@ describe("outbox enqueue", () => {
     );
   }
 
+  it("brands taker and referring-coach reports with the verified Referring coach", async () => {
+    process.env.WAVE_228_REPORT_EMAIL_CHROME_ENABLED = "1";
+    mockActiveCoach();
+
+    await submitWithCoach();
+
+    const reports = createdRows().filter((row) =>
+      ["TAKER_COPY", "REFERRING_COACH"].includes(row.recipientRole),
+    );
+    expect(reports).toHaveLength(2);
+    for (const row of reports) {
+      expect(row.bodyHtml).toContain("cid:su-report-logo-v1");
+      expect(row.bodyHtml).toContain("Coached by Bob Coach");
+      expect(row.bodyHtml).toContain("https://images.example/bob.png");
+    }
+  });
+
+  it("uses name-only when the verified public coach image is invalid", async () => {
+    process.env.WAVE_228_REPORT_EMAIL_CHROME_ENABLED = "1";
+    mockActiveCoach({ profileImage: "http://images.example/bob.png" });
+
+    await submitWithCoach();
+
+    const taker = rowFor("TAKER_COPY");
+    expect(taker.bodyHtml).toContain("Coached by Bob Coach");
+    expect(taker.bodyHtml).not.toContain("http://images.example");
+  });
+
+  it("renders Scaling Up only when no verified coach exists", async () => {
+    process.env.WAVE_228_REPORT_EMAIL_CHROME_ENABLED = "1";
+
+    await POST(makeRequest(VALID_BODY) as never, makeParams() as never);
+
+    const taker = rowFor("TAKER_COPY");
+    expect(taker.bodyHtml).toContain("cid:su-report-logo-v1");
+    expect(taker.bodyHtml).not.toContain("Coached by");
+  });
+
+  it("keeps short SU_TEAM lead HTML unchanged", async () => {
+    process.env.WAVE_228_REPORT_EMAIL_CHROME_ENABLED = "1";
+    process.env.QUICK_ASSESSMENT_TEAM_EMAIL = "team@scalingup.com";
+
+    await POST(makeRequest(VALID_BODY) as never, makeParams() as never);
+
+    expect(rowFor("SU_TEAM").bodyHtml).not.toContain(
+      "cid:su-report-logo-v1",
+    );
+  });
+
+  it("keeps public report chrome legacy while the gate is default-off", async () => {
+    mockActiveCoach();
+
+    await submitWithCoach();
+
+    expect(rowFor("TAKER_COPY").bodyHtml).not.toContain(
+      "cid:su-report-logo-v1",
+    );
+    expect(rowFor("TAKER_COPY").bodyHtml).not.toContain("Coached by");
+  });
+
+  it("lets the kill switch override the public report chrome global gate", async () => {
+    process.env.WAVE_228_REPORT_EMAIL_CHROME_ENABLED = "1";
+    process.env.WAVE_228_REPORT_EMAIL_CHROME_KILL = "1";
+    mockActiveCoach();
+
+    await submitWithCoach();
+
+    expect(rowFor("TAKER_COPY").bodyHtml).not.toContain(
+      "cid:su-report-logo-v1",
+    );
+    expect(rowFor("TAKER_COPY").bodyHtml).not.toContain("Coached by");
+  });
+
+  it("freezes verified coach presentation in outbox HTML before later coach changes", async () => {
+    process.env.WAVE_228_REPORT_EMAIL_CHROME_ENABLED = "1";
+    const verifiedCoach = {
+      id: "coach-1",
+      email: "coach@example.com",
+      firstName: "Bob",
+      lastName: "Coach",
+      profileImage: "https://images.example/bob.png",
+      certificationStatus: "ACTIVE",
+      certificationExpiry: null,
+    };
+    (db.coach.findUnique as jest.Mock).mockResolvedValue(verifiedCoach);
+
+    await submitWithCoach();
+    const frozenHtml = rowFor("TAKER_COPY").bodyHtml;
+    verifiedCoach.firstName = "Deleted";
+    verifiedCoach.lastName = "Recovered";
+    verifiedCoach.profileImage = "https://images.example/recovered.png";
+
+    expect(rowFor("TAKER_COPY").bodyHtml).toBe(frozenHtml);
+    expect(frozenHtml).toContain("Coached by Bob Coach");
+    expect(frozenHtml).toContain("https://images.example/bob.png");
+    expect(frozenHtml).not.toContain("Deleted Recovered");
+    expect(frozenHtml).not.toContain("recovered.png");
+  });
+
   it("ALWAYS enqueues a TAKER_COPY row even with blank SU address and no coach (Spec 16 §3)", async () => {
     // No env vars set → suTeamAddress = ""; no coach → only TAKER_COPY.
     await POST(makeRequest(VALID_BODY) as never, makeParams() as never);
@@ -396,6 +556,7 @@ describe("outbox enqueue", () => {
       email: "coach@example.com",
       firstName: "Bob",
       lastName: "Coach",
+      profileImage: null,
       certificationStatus: "ACTIVE",
       certificationExpiry: null,
     });
@@ -436,6 +597,65 @@ describe("outbox enqueue", () => {
     expect(roles).not.toContain("REFERRING_COACH");
   });
 
+  it("retains a cancelled coach row when taker and coach normalize to the same mailbox", async () => {
+    process.env.WAVE_228_REPORT_EMAIL_CHROME_ENABLED = "1";
+    process.env.QUICK_ASSESSMENT_TEAM_EMAIL = "team@scalingup.com";
+    (db.coach.findUnique as jest.Mock).mockResolvedValue({
+      id: "coach-1",
+      email: " JANE@EXAMPLE.COM ",
+      firstName: "Jane",
+      lastName: "Coach",
+      profileImage: "https://images.example/jane.png",
+      certificationStatus: "ACTIVE",
+      certificationExpiry: null,
+    });
+    const info = jest.spyOn(console, "info").mockImplementation(() => undefined);
+
+    await POST(
+      makeRequest({
+        ...VALID_BODY,
+        referringCoachEmail: "jane@example.com",
+      }) as never,
+      makeParams() as never,
+    );
+
+    expect(enqueuedRoles()).toEqual([
+      "TAKER_COPY",
+      "REFERRING_COACH",
+      "SU_TEAM",
+    ]);
+    const coachRow = txMock.assessmentEmailOutbox.create.mock.calls
+      .map(
+        (call: Array<{ data: Record<string, unknown> }>) =>
+          call[0].data,
+      )
+      .find((row) => row.recipientRole === "REFERRING_COACH");
+    expect(coachRow).toEqual(
+      expect.objectContaining({
+        recipientEmail: "jane@example.com",
+        recipientRole: "REFERRING_COACH",
+        subject: "",
+        bodyHtml: "",
+        status: "CANCELLED",
+        cancelReason: "SAME_MAILBOX_AS_TAKER",
+        cancelledAt: expect.any(Date),
+      }),
+    );
+    expect(rowFor("TAKER_COPY").bodyHtml).toContain("Coached by Jane Coach");
+    expect(rowFor("TAKER_COPY").bodyHtml).toContain(
+      "https://images.example/jane.png",
+    );
+    expect(coachRow?.bodyHtml).toBe("");
+    expect(info).toHaveBeenCalledWith(
+      "[assessment-email] coach self-notification suppressed",
+      expect.objectContaining({
+        submissionScope: "public-quiz",
+        coachId: "coach-1",
+      }),
+    );
+    info.mockRestore();
+  });
+
   it("outbox rows are created inside the transaction (via txMock)", async () => {
     process.env.QUICK_ASSESSMENT_TEAM_EMAIL = "team@scalingup.com";
     // Verify it's txMock.assessmentEmailOutbox.create being called (not db.assessmentEmailOutbox)
@@ -465,6 +685,266 @@ describe("outbox enqueue", () => {
 });
 
 /* -------------------------------------------------------------------------- */
+/*  Jeff #83: verified referring-coach ownership                              */
+/* -------------------------------------------------------------------------- */
+describe("verified referring-coach ownership", () => {
+  it("persists the resolved Coach identity and canonical email", async () => {
+    (db.coach.findUnique as jest.Mock).mockResolvedValue({
+      id: "coach-1",
+      email: " Coach@Example.COM ",
+      firstName: "Bob",
+      lastName: "Coach",
+      profileImage: null,
+      certificationStatus: "ACTIVE",
+      certificationExpiry: null,
+    });
+
+    const response = await POST(
+      makeRequest({
+        ...VALID_BODY,
+        referringCoachEmail: "  COACH@example.com  ",
+      }) as never,
+      makeParams() as never,
+    );
+    expect((await response.json()).data.referringCoachEmail).toBe(
+      "coach@example.com",
+    );
+
+    expect(db.coach.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { email: "coach@example.com" },
+      }),
+    );
+    expect(txMock.assessmentSubmission.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          referringCoachId: "coach-1",
+          referringCoachEmail: "coach@example.com",
+        }),
+      }),
+    );
+    const coachOutboxRow = txMock.assessmentEmailOutbox.create.mock.calls
+      .map((call: Array<{ data: { recipientRole: string; recipientEmail: string } }>) => call[0].data)
+      .find((row: { recipientRole: string }) => row.recipientRole === "REFERRING_COACH");
+    expect(coachOutboxRow?.recipientEmail).toBe("coach@example.com");
+    expect(rowFor("TAKER_COPY").bodyHtml).toContain(
+      "mailto:coach%40example.com",
+    );
+    expect(rowFor("TAKER_COPY").bodyHtml).not.toContain(
+      "mailto:Coach%40Example.COM",
+    );
+  });
+
+  it("persists no ownership and sends no coach email when verification fails", async () => {
+    const response = await POST(
+      makeRequest({
+        ...VALID_BODY,
+        referringCoachEmail: "unknown@example.com",
+      }) as never,
+      makeParams() as never,
+    );
+    expect((await response.json()).data.referringCoachEmail).toBeNull();
+
+    expect(txMock.assessmentSubmission.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          referringCoachId: null,
+          referringCoachEmail: null,
+        }),
+      }),
+    );
+    const enqueuedRoles = txMock.assessmentEmailOutbox.create.mock.calls.map(
+      (call: Array<{ data: { recipientRole: string } }>) => call[0].data.recipientRole,
+    );
+    expect(enqueuedRoles).not.toContain("REFERRING_COACH");
+  });
+
+  it("drops ownership, coach delivery, and response contact when eligibility changes before the write", async () => {
+    (db.coach.findUnique as jest.Mock).mockResolvedValue({
+      id: "coach-1",
+      email: "coach@example.com",
+      firstName: "Bob",
+      lastName: "Coach",
+      profileImage: null,
+      certificationStatus: "ACTIVE",
+      certificationExpiry: null,
+    });
+    txMock.coach.findFirst.mockResolvedValueOnce(null);
+
+    const response = await POST(
+      makeRequest({
+        ...VALID_BODY,
+        referringCoachEmail: "coach@example.com",
+      }) as never,
+      makeParams() as never,
+    );
+    const body = await response.json();
+
+    expect(body.data.referringCoachEmail).toBeNull();
+    expect(txMock.assessmentSubmission.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          referringCoachId: null,
+          referringCoachEmail: null,
+        }),
+      }),
+    );
+    expect(
+      txMock.assessmentEmailOutbox.create.mock.calls
+        .map((call) => call[0].data.recipientRole)
+        .filter((role) => role === "REFERRING_COACH"),
+    ).toHaveLength(0);
+  });
+
+  it.each([
+    "not-an-email",
+    "   ",
+    "coach@example.com extra",
+    42,
+    [],
+    { email: "coach@example.com" },
+  ])(
+    "degrades malformed referral %p to Scaling Up-only without blocking submission",
+    async (referringCoachEmail) => {
+      const res = await POST(
+        makeRequest({
+          ...VALID_BODY,
+          referringCoachEmail,
+        }) as never,
+        makeParams() as never,
+      );
+
+      expect(res.status).toBe(200);
+      expect(db.coach.findUnique).not.toHaveBeenCalled();
+      expect(txMock.assessmentSubmission.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            referringCoachId: null,
+            referringCoachEmail: null,
+          }),
+        }),
+      );
+      const enqueuedRoles = txMock.assessmentEmailOutbox.create.mock.calls.map(
+        (call: Array<{ data: { recipientRole: string } }>) => call[0].data.recipientRole,
+      );
+      expect(enqueuedRoles).not.toContain("REFERRING_COACH");
+    },
+  );
+
+  it("retries as Scaling Up-only when the verified Coach is deleted before the write", async () => {
+    process.env.WAVE_228_REPORT_EMAIL_CHROME_ENABLED = "1";
+    (db.coach.findUnique as jest.Mock).mockResolvedValue({
+      id: "coach-1",
+      email: "coach@example.com",
+      firstName: "Bob",
+      lastName: "Coach",
+      profileImage: "https://images.example/bob.png",
+      certificationStatus: "ACTIVE",
+      certificationExpiry: null,
+    });
+    txMock.assessmentSubmission.create
+      .mockRejectedValueOnce(
+        new Prisma.PrismaClientKnownRequestError(
+          "Foreign key constraint failed",
+          {
+            code: "P2003",
+            clientVersion: "6.0",
+            meta: {
+              field_name:
+                "assessment_submissions_referringCoachId_fkey (index)",
+            },
+          },
+        ),
+      )
+      .mockResolvedValueOnce({ id: "sub-1" });
+
+    const res = await POST(
+      makeRequest({
+        ...VALID_BODY,
+        referringCoachEmail: "coach@example.com",
+      }) as never,
+      makeParams() as never,
+    );
+
+    expect(res.status).toBe(200);
+    expect(db.$transaction).toHaveBeenCalledTimes(2);
+    expect(txMock.assessmentSubmission.create).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        data: expect.objectContaining({
+          referringCoachId: null,
+          referringCoachEmail: null,
+        }),
+      }),
+    );
+    const outboxRows = txMock.assessmentEmailOutbox.create.mock.calls.map(
+      (call: Array<{
+        data: {
+          recipientRole: string;
+          bodyHtml: string;
+        };
+      }>) => call[0].data,
+    );
+    expect(outboxRows.map((row) => row.recipientRole)).not.toContain(
+      "REFERRING_COACH",
+    );
+    expect(
+      outboxRows.find((row) => row.recipientRole === "TAKER_COPY")?.bodyHtml,
+    ).not.toContain("mailto:coach@example.com");
+    expect(
+      outboxRows.find((row) => row.recipientRole === "TAKER_COPY")?.bodyHtml,
+    ).toContain("cid:su-report-logo-v1");
+    expect(
+      outboxRows.find((row) => row.recipientRole === "TAKER_COPY")?.bodyHtml,
+    ).not.toContain("Coached by");
+  });
+
+  it.each([
+    {
+      label: "inactive",
+      certificationStatus: "INACTIVE",
+      certificationExpiry: null,
+    },
+    {
+      label: "expired",
+      certificationStatus: "ACTIVE",
+      certificationExpiry: new Date("2020-01-01T00:00:00Z"),
+    },
+  ])("persists no ownership for a known $label Coach", async (coachState) => {
+    (db.coach.findUnique as jest.Mock).mockResolvedValue({
+      id: "coach-1",
+      email: "coach@example.com",
+      firstName: "Bob",
+      lastName: "Coach",
+      profileImage: null,
+      certificationStatus: coachState.certificationStatus,
+      certificationExpiry: coachState.certificationExpiry,
+    });
+
+    await POST(
+      makeRequest({
+        ...VALID_BODY,
+        referringCoachEmail: "coach@example.com",
+      }) as never,
+      makeParams() as never,
+    );
+
+    expect(txMock.assessmentSubmission.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          referringCoachId: null,
+          referringCoachEmail: null,
+        }),
+      }),
+    );
+    const enqueuedRoles = txMock.assessmentEmailOutbox.create.mock.calls.map(
+      (call: Array<{ data: { recipientRole: string } }>) => call[0].data.recipientRole,
+    );
+    expect(enqueuedRoles).not.toContain("REFERRING_COACH");
+  });
+});
+
+/* -------------------------------------------------------------------------- */
 /*  Task 6 new behavior: idempotency (P2002 on duplicate idempotencyKey)     */
 /* -------------------------------------------------------------------------- */
 describe("idempotency — duplicate idempotencyKey (P2002)", () => {
@@ -473,6 +953,10 @@ describe("idempotency — duplicate idempotencyKey (P2002)", () => {
   // Existing submission stored in DB
   const EXISTING_SUB = {
     id: "sub-existing",
+    campaignId: "camp-1",
+    publicTaker: VALID_BODY.publicTaker,
+    answers: VALID_BODY.answers,
+    referringCoach: null,
     result: {
       tier: { label: "Good" },
       overallScore: 7,
@@ -505,6 +989,85 @@ describe("idempotency — duplicate idempotencyKey (P2002)", () => {
     expect(body.data.redirectUrl).toBe("/quiz/quick-assessment/thank-you");
   });
 
+  it("recovers a matching lost response after the campaign closes", async () => {
+    (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValue({
+      ...CAMPAIGN,
+      status: "CLOSED",
+      closeAt: new Date("2026-01-02T00:00:00.000Z"),
+    });
+
+    const res = await POST(
+      makeRequest(IDEMPOTENT_BODY) as never,
+      makeParams() as never,
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      success: true,
+      data: {
+        submissionId: "sub-existing",
+        scoreResult: EXISTING_SUB.result,
+      },
+    });
+    expect(db.$transaction).not.toHaveBeenCalled();
+    expect(db.auditLog.create).not.toHaveBeenCalled();
+    expect(inngest.send).not.toHaveBeenCalled();
+  });
+
+  it("matches a lost-response retry against the originally pruned answers", async () => {
+    const rawAnswers = [
+      { stableKey: "Q_GATE", value: ["cash"] },
+      { stableKey: "Q_DEP", value: "hidden answer from the client" },
+    ];
+    (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValue({
+      ...CAMPAIGN,
+      status: "CLOSED",
+      closeAt: new Date("2026-01-02T00:00:00.000Z"),
+    });
+    (db.assessmentTemplateVersion.findUnique as jest.Mock).mockResolvedValue({
+      ...VERSION,
+      questions: [
+        {
+          stableKey: "Q_GATE",
+          sortOrder: 1,
+          sectionStableKey: "S1",
+          type: "MULTI_CHOICE",
+          label: "Gate",
+          isRequired: false,
+          options: [
+            { key: "sales", label: "Sales" },
+            { key: "cash", label: "Cash" },
+          ],
+        },
+        {
+          stableKey: "Q_DEP",
+          sortOrder: 2,
+          sectionStableKey: "S1",
+          type: "TEXT",
+          label: "Dependent",
+          isRequired: false,
+          showIf: { questionKey: "Q_GATE", optionKey: "sales" },
+        },
+      ],
+    });
+    (db.assessmentSubmission.findFirst as jest.Mock).mockResolvedValue({
+      ...EXISTING_SUB,
+      answers: [{ stableKey: "Q_GATE", value: ["cash"] }],
+    });
+
+    const res = await POST(
+      makeRequest({ ...IDEMPOTENT_BODY, answers: rawAnswers }) as never,
+      makeParams() as never,
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      success: true,
+      data: { submissionId: "sub-existing" },
+    });
+    expect(db.$transaction).not.toHaveBeenCalled();
+  });
+
   it("does NOT call inngest.send on duplicate key path", async () => {
     await POST(makeRequest(IDEMPOTENT_BODY) as never, makeParams() as never);
     expect(inngest.send).not.toHaveBeenCalled();
@@ -522,6 +1085,44 @@ describe("idempotency — duplicate idempotencyKey (P2002)", () => {
         where: expect.objectContaining({ idempotencyKey: "client-key-xyz" }),
       }),
     );
+  });
+
+  it("returns 409 when a key is reused for different submission input", async () => {
+    const res = await POST(
+      makeRequest({
+        ...IDEMPOTENT_BODY,
+        publicTaker: {
+          ...IDEMPOTENT_BODY.publicTaker,
+          email: "different@example.com",
+        },
+      }) as never,
+      makeParams() as never,
+    );
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({
+      success: false,
+      error: "IDEMPOTENCY_KEY_REUSED",
+    });
+  });
+
+  it("returns 409 when a key is reused across campaigns", async () => {
+    (db.assessmentSubmission.findFirst as jest.Mock).mockResolvedValue({
+      ...EXISTING_SUB,
+      campaignId: "camp-other",
+    });
+
+    const res = await POST(
+      makeRequest(IDEMPOTENT_BODY) as never,
+      makeParams() as never,
+    );
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({
+      success: false,
+      error: "IDEMPOTENCY_KEY_REUSED",
+    });
+    expect(db.$transaction).not.toHaveBeenCalled();
   });
 
   it("500s if P2002 fires but no existing row found (idempotencyKey race-lost)", async () => {

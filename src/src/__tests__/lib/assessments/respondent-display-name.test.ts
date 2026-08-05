@@ -14,6 +14,7 @@
 import {
   respondentDisplayName,
   greetingName,
+  respondentNameMatchesEmail,
 } from "@/lib/assessments/respondent-display-name";
 
 describe("respondentDisplayName", () => {
@@ -93,5 +94,21 @@ describe("greetingName", () => {
   it("returns 'there' when the value contains '@' (email must never be a greeting)", () => {
     expect(greetingName("jane@example.com")).toBe("there");
     expect(greetingName("  jane@example.com  ")).toBe("there");
+  });
+});
+
+describe("respondentNameMatchesEmail", () => {
+  it("matches the normalized email fallback without matching blanks", () => {
+    expect(
+      respondentNameMatchesEmail(
+        "  JANE@EXAMPLE.COM ",
+        "jane@example.com",
+      ),
+    ).toBe(true);
+    expect(respondentNameMatchesEmail("Jane Doe", "jane@example.com")).toBe(
+      false,
+    );
+    expect(respondentNameMatchesEmail("", "")).toBe(false);
+    expect(respondentNameMatchesEmail(null, null)).toBe(false);
   });
 });

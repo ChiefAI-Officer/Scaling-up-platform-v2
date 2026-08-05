@@ -42,6 +42,11 @@ import {
   DEFAULT_INVITATION_BODY,
   DEFAULT_INVITATION_SUBJECT,
 } from "@/lib/assessments/invitation-defaults";
+import { resolveInvitationHtmlMode } from "@/lib/assessments/invitation-html-policy";
+import {
+  invitationHtmlEditorCopy,
+  invitationOverrideSummary,
+} from "@/lib/assessments/invitation-html-editor-copy";
 import type { CustomSlide } from "@/lib/assessments/custom-slides";
 import {
   CustomSlidesPanel,
@@ -158,7 +163,8 @@ interface WizardState {
   invitationSubject: string;
   invitationBodyMarkdown: string;
   // Task 12 (#20) — per-campaign FULL-HTML invitation body. Empty = fall back to the
-  // markdown/template default. When set + flag on, REPLACES the entire branded email.
+  // markdown/template default. When set, branded mode composes it as the shell body;
+  // legacy mode keeps full replacement only for a recognized invitation URL token.
   invitationBodyHtml: string;
   // Task 6b — #15/#16 result/notify toggles.
   /** Whether the selected template has an approved results email (server-computed).
@@ -168,6 +174,10 @@ interface WizardState {
   sendResultsToRespondent: boolean;
   /** #16: Send coach a notification when a respondent completes. */
   notifyCoachOnCompletion: boolean;
+  /** Wave OSR (#71): show each respondent their own report on screen right
+   *  after they submit. Independent of sendResultsToRespondent (email) and of
+   *  the results-email approval gate — this render carries no authored copy. */
+  showResultsOnScreen: boolean;
   // Task 10 — #2/#3 timing radio.
   /** IMMEDIATELY: invitations send at creation (openAt forced to now by server).
    *  ON_OPEN: invitations send when campaign opens (openAt must be future). */
@@ -253,14 +263,18 @@ function formatDateTimeLocal(d: Date): string {
 
 export function CampaignWizard({
   customHtmlEmailEnabled = false,
+  brandedCustomHtmlEnabled = false,
   autoSend = false,
   resultsEmailEnabled = false,
   coachNotifyEnabled = false,
   customSlidesEnabled = false,
   waveQDefaultsEnabled = false,
+  onScreenResultsEnabled = false,
 }: {
-  /** Wave D #20 — gate the full-HTML invitation editor (mirrors the server flag). */
+  /** Wave D #20 — gate the custom-HTML invitation editor (mirrors the server flag). */
   customHtmlEmailEnabled?: boolean;
+  /** GH #220 — composes custom HTML inside the branded invitation shell. */
+  brandedCustomHtmlEnabled?: boolean;
   /**
    * Wave D — gate the auto-send timing radio + the `inviteTiming` create-payload
    * field behind WAVE_D_AUTO_SEND_ENABLED (mirrors the server flag). When false
@@ -304,6 +318,14 @@ export function CampaignWizard({
    * only a template-switch after resume re-derives.
    */
   waveQDefaultsEnabled?: boolean;
+  /**
+   * Wave OSR (#71) — mirrors `WAVE_OSR_RESPONDENT_RESULTS_ENABLED`, read
+   * server-side and passed down so the wizard can show/hide the on-screen
+   * results checkbox. UI-only: the flag is enforced again at disclosure time in
+   * the submit route (under the submission lock), and — unlike the two email
+   * toggles — a stored `showResultsOnScreen` is NEVER coerced when this is off.
+   */
+  onScreenResultsEnabled?: boolean;
 } = {}) {
   const router = useRouter();
   const { toast } = useToast();
@@ -328,6 +350,7 @@ export function CampaignWizard({
       templateResultsEmailApproved: false,
       sendResultsToRespondent: false,
       notifyCoachOnCompletion: false,
+      showResultsOnScreen: false,
       inviteTiming: "IMMEDIATELY" as const,
       customSlides: [],
       customSlidesVersionId: "",
@@ -403,11 +426,20 @@ export function CampaignWizard({
             typeof parsed.invitationBodyHtml === "string"
               ? parsed.invitationBodyHtml
               : "",
-          // Task 6b — not persisted to draft (approved state is re-derived from template);
-          // toggles are persisted so a resumed draft keeps the user's choices.
+          // Task 6b — approved state is re-derived from the template, never stored.
+          //
+          // ⚠️ The rest of this comment used to claim "toggles are persisted so a
+          // resumed draft keeps the user's choices". That is FALSE: `persistDraft`
+          // below writes org/template/respondents/CEO/name/openAt/endMode/closeAt
+          // and no toggle at all, so these three reads are dead — a resumed draft
+          // always rehydrates them false. Established while proving that the
+          // "stale draft true" hazard ADR-0027 originally cited cannot occur.
+          // Left in place (harmless, and correct if persistDraft ever widens),
+          // but do not rely on the claim.
           templateResultsEmailApproved: false,
           sendResultsToRespondent: parsed.sendResultsToRespondent === true,
           notifyCoachOnCompletion: parsed.notifyCoachOnCompletion === true,
+          showResultsOnScreen: parsed.showResultsOnScreen === true,
           // Task 10 — inviteTiming defaults to IMMEDIATELY if not persisted.
           inviteTiming:
             parsed.inviteTiming === "ON_OPEN" ? "ON_OPEN" : "IMMEDIATELY",
@@ -625,9 +657,11 @@ export function CampaignWizard({
             state.invitationBodyMarkdown.trim() !== ""
               ? state.invitationBodyMarkdown.trim()
               : undefined,
-          // Task 12 (#20) — full-HTML body. Sent RAW (the server validates +
-          // stores raw, then sanitizes at render). Only sent when the flag is
-          // on AND non-empty; the server ignores it when its flag is off.
+          // Task 12 (#20) — custom HTML. Sent RAW (the server validates +
+          // stores raw, then sanitizes at render). With the GH #220 behavior
+          // flag on it is a branded body fragment; otherwise legacy full
+          // replacement rules apply. Only sent when the capability flag is on
+          // AND non-empty; the server ignores it when its flag is off.
           invitationBodyHtml:
             customHtmlEmailEnabled && state.invitationBodyHtml.trim() !== ""
               ? state.invitationBodyHtml
@@ -644,6 +678,14 @@ export function CampaignWizard({
           notifyCoachOnCompletion: coachNotifyEnabled
             ? state.notifyCoachOnCompletion
             : false,
+          // Wave OSR (#71) — deliberately NOT coerced to false when the flag is
+          // off, unlike the two toggles above. Their coercion exists because a
+          // stale draft `true` would make the thank-you page promise an email
+          // the send path won't deliver — a user-visible lie. No such hazard
+          // here: the server re-reads this column UNDER the submission lock and
+          // decides disclosure itself, so a stored `true` with the flag off
+          // promises nobody anything. Flags gate capability, not data.
+          showResultsOnScreen: state.showResultsOnScreen,
           // Task 10 — #2/#3 timing radio: tell server when to send invitations.
           // Gated on the auto-send flag (dark-merge fix): when auto-send is OFF
           // we MUST NOT send inviteTiming — sending it marks the create as a
@@ -913,10 +955,12 @@ export function CampaignWizard({
             resultsEmailApproved={state.templateResultsEmailApproved}
             sendResultsToRespondent={state.sendResultsToRespondent}
             notifyCoachOnCompletion={state.notifyCoachOnCompletion}
+            showResultsOnScreen={state.showResultsOnScreen}
             inviteTiming={state.inviteTiming}
             autoSend={autoSend}
             resultsEmailEnabled={resultsEmailEnabled}
             coachNotifyEnabled={coachNotifyEnabled}
+            onScreenResultsEnabled={onScreenResultsEnabled}
             onChange={(patch) => setState((s) => ({ ...s, ...patch }))}
             onBack={back}
             onNext={next}
@@ -942,6 +986,7 @@ export function CampaignWizard({
             onActivate={() => saveCampaign({ activate: true })}
             canActivate={Boolean(canActivate)}
             customHtmlEmailEnabled={customHtmlEmailEnabled}
+            brandedCustomHtmlEnabled={brandedCustomHtmlEnabled}
             autoSend={autoSend}
             onChange={(patch) => setState((s) => ({ ...s, ...patch }))}
           />
@@ -1635,10 +1680,12 @@ function ScheduleStep({
   resultsEmailApproved,
   sendResultsToRespondent,
   notifyCoachOnCompletion,
+  showResultsOnScreen,
   inviteTiming,
   autoSend,
   resultsEmailEnabled,
   coachNotifyEnabled,
+  onScreenResultsEnabled,
   onChange,
   onBack,
   onNext,
@@ -1651,6 +1698,7 @@ function ScheduleStep({
   resultsEmailApproved: boolean;
   sendResultsToRespondent: boolean;
   notifyCoachOnCompletion: boolean;
+  showResultsOnScreen: boolean;
   inviteTiming: "IMMEDIATELY" | "ON_OPEN";
   /** Wave D auto-send flag — when false, hide the timing radio + show the
    *  legacy openAt picker (the inviteTiming state is ignored on the create). */
@@ -1659,6 +1707,8 @@ function ScheduleStep({
   resultsEmailEnabled: boolean;
   /** Wave D FIX 2 — gate the #16 coach-notify checkbox (mirrors server flag). */
   coachNotifyEnabled: boolean;
+  /** Wave OSR (#71) — gate the on-screen-results checkbox (mirrors server flag). */
+  onScreenResultsEnabled: boolean;
   onChange: (patch: Partial<WizardState>) => void;
   onBack: () => void;
   onNext: () => void;
@@ -1850,6 +1900,46 @@ function ScheduleStep({
           the create (in saveCampaign) — so the thank-you page can never promise
           a results email the (flag-gated) send path won't actually deliver.
           The whole panel is hidden when BOTH flags are off. */}
+      {/* Wave OSR (#71) — on-screen results. A separate panel from "Email
+          notifications" on purpose: this is not an email, and grouping it under
+          that heading would misdescribe it. */}
+      {onScreenResultsEnabled && (
+        <div className="space-y-3 border border-border rounded-lg p-4">
+          <h3 className="text-sm font-semibold text-foreground">
+            Results on screen
+          </h3>
+          <div className="space-y-1">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                id="showResultsOnScreen"
+                type="checkbox"
+                checked={showResultsOnScreen}
+                onChange={(e) =>
+                  onChange({ showResultsOnScreen: e.target.checked })
+                }
+                className="accent-primary w-4 h-4"
+                aria-label="Show each respondent their results on screen after they submit"
+              />
+              <span className="text-sm text-foreground">
+                Show each respondent their results on screen after they submit
+              </span>
+            </label>
+            {/* The operator needs to know this is a ONE-LOOK experience whenever
+                the emailed copy isn't also going out — otherwise the tradeoff is
+                invisible at the moment they make it. */}
+            {showResultsOnScreen &&
+              !(resultsEmailEnabled && sendResultsToRespondent) && (
+                <p className="text-xs text-muted-foreground pl-7">
+                  Respondents will see their results once, right after
+                  submitting, and can print or download a copy. They are not
+                  emailed a copy, so they will not be able to return to it
+                  later.
+                </p>
+              )}
+          </div>
+        </div>
+      )}
+
       {(resultsEmailEnabled || coachNotifyEnabled) && (
         <div className="space-y-3 border border-border rounded-lg p-4">
           <h3 className="text-sm font-semibold text-foreground">Email notifications</h3>
@@ -1968,6 +2058,7 @@ function ReviewStep({
   onSaveDraft,
   onActivate,
   customHtmlEmailEnabled = false,
+  brandedCustomHtmlEnabled = false,
   autoSend = false,
   onChange,
 }: {
@@ -1978,6 +2069,7 @@ function ReviewStep({
   onSaveDraft: () => void;
   onActivate: () => void;
   customHtmlEmailEnabled?: boolean;
+  brandedCustomHtmlEnabled?: boolean;
   /** Wave D auto-send flag — drives the consequence-labeled activate button. */
   autoSend?: boolean;
   onChange: (patch: Partial<WizardState>) => void;
@@ -2022,6 +2114,18 @@ function ReviewStep({
   }, [state.organizationId, state.templateId, state.respondentIds]);
 
   const ceo = respondents.find((r) => r.id === state.ceoRespondentId);
+  const invitationHtmlMode = resolveInvitationHtmlMode({
+    waveDCustomHtmlEnabled: customHtmlEmailEnabled,
+    brandedCustomHtmlEnabled,
+    rawHtml: state.invitationBodyHtml,
+  });
+  const htmlEditorCopy = invitationHtmlEditorCopy({
+    brandedCustomHtmlEnabled,
+    htmlMode: invitationHtmlMode,
+  });
+  const hasSubjectOrMarkdown =
+    state.invitationSubject.trim() !== "" ||
+    state.invitationBodyMarkdown.trim() !== "";
 
   return (
     <div className="space-y-6">
@@ -2081,10 +2185,12 @@ function ReviewStep({
               Customize invitation email
             </h3>
             <p className="text-xs text-muted-foreground mt-0.5">
-              {state.invitationSubject.trim() ||
-              state.invitationBodyMarkdown.trim()
-                ? "Custom subject/body set for this campaign"
-                : "Optional — leave blank to send the default invitation shown below"}
+              {invitationOverrideSummary({
+                htmlMode: invitationHtmlMode,
+                hasSubjectOrMarkdown,
+                emptySummary:
+                  "Optional — leave blank to send the default invitation shown below",
+              })}
             </p>
           </div>
           <span className="text-xs font-medium text-muted-foreground">
@@ -2161,18 +2267,14 @@ function ReviewStep({
             </div>
             {customHtmlEmailEnabled && (
               <div className="space-y-1 border-t border-border pt-3">
-                <label className="text-xs font-medium text-foreground">
-                  Full custom HTML (advanced)
+                <label
+                  htmlFor="invitation-html-input"
+                  className="text-xs font-medium text-foreground"
+                >
+                  {htmlEditorCopy.label}
                 </label>
                 <p className="text-[11px] text-muted-foreground">
-                  When set, this HTML <strong>replaces the entire branded
-                  email</strong> (no template wrap). It must include the survey
-                  link token{" "}
-                  <code className="px-1 py-0.5 bg-muted rounded text-[10px]">
-                    {"{{invitationUrl}}"}
-                  </code>{" "}
-                  — either as a link <code className="text-[10px]">href</code> or
-                  as plain text. The same merge tokens above are available.
+                  {htmlEditorCopy.description}
                 </p>
                 <div className="flex items-center gap-3">
                   <input
@@ -2206,19 +2308,32 @@ function ReviewStep({
                   )}
                 </div>
                 <textarea
+                  id="invitation-html-input"
                   value={state.invitationBodyHtml}
                   onChange={(e) =>
                     onChange({ invitationBodyHtml: e.target.value })
                   }
                   maxLength={50000}
                   rows={10}
-                  placeholder="Paste your full HTML email here, or upload an .html file above. Leave blank to use the body above."
+                  placeholder={
+                    brandedCustomHtmlEnabled
+                      ? "Paste a custom HTML body fragment here, or upload an .html file above. Leave blank to use the markdown body above."
+                      : "Paste your full HTML email here, or upload an .html file above. Leave blank to use the body above."
+                  }
                   className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-primary/30"
                   data-testid="invitation-html-input"
                 />
                 <p className="text-[11px] text-muted-foreground">
                   {state.invitationBodyHtml.length} / 50000 characters
                 </p>
+                {htmlEditorCopy.validationError && (
+                  <p
+                    className="text-[11px] text-destructive"
+                    data-testid="invitation-html-error"
+                  >
+                    {htmlEditorCopy.validationError}
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -2233,14 +2348,21 @@ function ReviewStep({
           <Button
             variant="outline"
             onClick={onSaveDraft}
-            disabled={submitting || !canActivate}
+            disabled={
+              submitting || !canActivate || htmlEditorCopy.validationError !== null
+            }
           >
             {submitting ? (
               <Loader2 className="w-4 h-4 animate-spin mr-2" />
             ) : null}
             Save as Draft
           </Button>
-          <Button onClick={onActivate} disabled={submitting || !canActivate}>
+          <Button
+            onClick={onActivate}
+            disabled={
+              submitting || !canActivate || htmlEditorCopy.validationError !== null
+            }
+          >
             {submitting ? (
               <Loader2 className="w-4 h-4 animate-spin mr-2" />
             ) : null}

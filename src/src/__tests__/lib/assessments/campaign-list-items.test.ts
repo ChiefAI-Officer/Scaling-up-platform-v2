@@ -18,6 +18,13 @@ function row(overrides: Partial<CampaignListRow> = {}): CampaignListRow {
     status: "ACTIVE",
     openAt: new Date("2026-06-01T00:00:00.000Z"),
     template: { name: "QSP v2" },
+    version: {
+      templateId: "tpl-1",
+      versionNumber: 3,
+      publishedAt: new Date("2026-07-01T00:00:00.000Z"),
+      archivedAt: null,
+      language: "enUS",
+    },
     organization: { id: "org-1", name: "Acme Corp" },
     participants: [],
     invitations: [],
@@ -27,7 +34,7 @@ function row(overrides: Partial<CampaignListRow> = {}): CampaignListRow {
 
 describe("toCampaignListItems", () => {
   it("projects the flat fields + ISO openAt + org/template names", () => {
-    const [item] = toCampaignListItems([row()]);
+    const [item] = toCampaignListItems([row()], new Map([["c1", null]]));
     expect(item).toMatchObject({
       id: "c1",
       name: "Acme Q3",
@@ -53,12 +60,43 @@ describe("toCampaignListItems", () => {
           { respondentId: "r2", status: "SENT", sentAt: new Date(), revokedAt: null },
         ],
       }),
-    ]);
+    ], new Map([["c1", null]]));
     // Two participants, both with active invitations → total counts them.
     expect(item.metrics.total).toBe(2);
   });
 
   it("maps an empty list to an empty list", () => {
-    expect(toCampaignListItems([])).toEqual([]);
+    expect(toCampaignListItems([], new Map())).toEqual([]);
+  });
+
+  it("projects only the client-safe edition facts", () => {
+    const publishedAt = new Date("2026-07-01T00:00:00.000Z");
+    const [item] = toCampaignListItems(
+      [row()],
+      new Map([
+        [
+          "c1",
+          {
+            versionNumber: 3,
+            publishedAt,
+            newerEditionAvailable: true,
+            pinnedRetired: false,
+          },
+        ],
+      ]),
+    );
+
+    expect(item.edition).toEqual({
+      versionNumber: 3,
+      newerEditionAvailable: true,
+      pinnedRetired: false,
+    });
+    expect(item.edition).not.toHaveProperty("publishedAt");
+    expect(item.edition).not.toHaveProperty("language");
+  });
+
+  it("maps unknown standing to an explicit null edition", () => {
+    const [item] = toCampaignListItems([row()], new Map([["c1", null]]));
+    expect(item.edition).toBeNull();
   });
 });

@@ -24,10 +24,12 @@ import {
   WelcomeShellHeader,
   WelcomeExpectations,
   WelcomeStats,
-  deriveScaleLabel,
+  deriveWelcomePresentation,
   deriveTimeEstimate,
 } from "@/components/assessments/assessment-welcome";
 import { BrandedReport } from "@/components/assessments/BrandedReport";
+import { PrintReportButton } from "@/components/assessments/PrintReportButton";
+import { formatTimestamp } from "@/lib/utils";
 // The detailed report styling lives in su-report.css (scoped to .su-public-brand
 // .su-report). The invited (report) route loads it via its layout; the public
 // in-place results must load it here too, else the report renders unstyled.
@@ -96,6 +98,8 @@ interface PublicQuizClientProps {
   closeAtIso: string | null;
   sections: unknown;
   questions: unknown;
+  referredResultsEnabled?: boolean;
+  qspStoryGroupEnabled?: boolean;
   /**
    * Wave M (#19): already-sanitized custom slides (SERVER-sanitized into
    * `safeHtml` by the page loader). Empty/omitted ⇒ the mergeCustomSlides
@@ -120,6 +124,8 @@ export function PublicQuizClient({
   sections: rawSections,
   questions: rawQuestions,
   customSlides,
+  referredResultsEnabled = false,
+  qspStoryGroupEnabled = false,
 }: PublicQuizClientProps) {
   const sections = useMemo(() => toSections(rawSections), [rawSections]);
   const questions = useMemo(() => toQuestions(rawQuestions), [rawQuestions]);
@@ -144,9 +150,12 @@ export function PublicQuizClient({
     [sections],
   );
 
-  // Welcome stat chips + expectation copy derive from the ACTUAL data (never
-  // hardcoded counts/scale).
-  const scaleLabel = useMemo(() => deriveScaleLabel(sortedQuestions), [sortedQuestions]);
+  // Welcome stat chips + expectation copy derive from the complete ACTUAL
+  // question bank (never hardcoded counts/scale).
+  const welcomePresentation = useMemo(
+    () => deriveWelcomePresentation(sortedQuestions),
+    [sortedQuestions],
+  );
   const timeEstimate = useMemo(
     () => deriveTimeEstimate(sortedQuestions.length),
     [sortedQuestions.length],
@@ -161,6 +170,9 @@ export function PublicQuizClient({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [results, setResults] = useState<ScoreResult | null>(null);
   const [submittedId, setSubmittedId] = useState<string>("");
+  const [verifiedCoachEmail, setVerifiedCoachEmail] = useState<string | null>(
+    null,
+  );
   // Stable idempotency key — generated once per component mount and reused on retries.
   const idemRef = useRef<string>("");
 
@@ -217,9 +229,9 @@ export function PublicQuizClient({
                 : status === "CLOSED"
                   ? "This assessment is closed."
                   : new Date(openAtIso) > new Date()
-                    ? `This assessment opens ${new Date(openAtIso).toLocaleDateString()}.`
+                    ? `This assessment opens ${formatTimestamp(openAtIso)}.`
                     : closeAtIso
-                      ? `This assessment closed on ${new Date(closeAtIso).toLocaleDateString()}.`
+                      ? `This assessment closed on ${formatTimestamp(closeAtIso)}.`
                       : "This assessment is not currently accepting submissions."}
             </p>
           </section>
@@ -255,15 +267,15 @@ export function PublicQuizClient({
             )}
             <WelcomeExpectations
               timeLabel={timeEstimate}
-              questionCount={sortedQuestions.length}
-              scaleLabel={scaleLabel}
-              confidentialSub="Your results are shown to you the moment you submit."
+              expectationText={welcomePresentation.expectationText}
+              sharingLabel="How your results are shared"
+              sharingSub="You receive your results immediately. Authorized Scaling Up staff can review your full report; your referring coach can too, if you used their link."
               scoresSub="See where you stand across each category."
             />
             <WelcomeStats
               questionCount={sortedQuestions.length}
               sectionCount={sortedSections.length}
-              scaleLabel={scaleLabel}
+              scaleLabel={welcomePresentation.scaleLabel}
             />
             <div className="su-welcome-cta-row">
               <button
@@ -277,9 +289,7 @@ export function PublicQuizClient({
             </div>
             <p className="su-welcome-fine">
               Free to take — you&apos;ll get your results on screen and a copy
-              by email. Your responses are also shared with the Scaling Up team
-              and the coach who referred you (if any), who receives the full
-              report.
+              by email.
             </p>
           </section>
         </main>
@@ -392,9 +402,22 @@ export function PublicQuizClient({
   if (step === "results" && results) {
     const report: RespondentReport = {
       respondentName: `${firstName.trim()} ${lastName.trim()}`.trim(),
+      respondentEmail: email.trim() || null,
       jobTitle: null,
       companyName: "",
       assessmentName: templateName,
+      // Was OMITTED here, which silently forced every public report through
+      // DEFAULT_REPORT_CONFIG regardless of the instrument (BrandedReport reads
+      // it at four sites). Now threaded, which ALIGNS this in-place render with
+      // the public quiz's own email twin — quiz/[campaignAlias]/submit already
+      // passes the real alias into the report model.
+      //
+      // ⚠️ This is a real dispatch change, not a no-op: for a PUBLIC campaign on
+      // a REPORT_CONFIG-mapped alias, the report type itself can change (qsp-v1 /
+      // qsp-v2 / leadership-vision-alignment are "qualitative"). It is inert for
+      // the campaign live at the time of writing, but that is a fact about DATA,
+      // not about this code — so do not treat it as a guarantee. See ADR-0008.
+      templateAlias: templateAlias ?? "",
       campaignLabel: campaignName,
       submittedAt: new Date(),
       result: results,
@@ -425,10 +448,14 @@ export function PublicQuizClient({
         {/* Scope wrapper so su-report.css applies (ADR-0005) — same wrapper the
             invited (report) route layout provides. */}
         <div className="su-public-brand su-report">
+          <PrintReportButton
+            fileName={`${templateName} — ${report.respondentName}`}
+          />
           <BrandedReport
             report={report}
             assessmentName={templateName}
             campaignLabel={campaignName}
+            contactEmail={verifiedCoachEmail}
           />
         </div>
       </main>
@@ -493,6 +520,7 @@ export function PublicQuizClient({
       clearDraft();
       setResults(body.data.scoreResult as ScoreResult);
       setSubmittedId(body.data.submissionId ?? "");
+      setVerifiedCoachEmail(body.data.referringCoachEmail ?? null);
       setStep("results");
     } catch (err) {
       setSubmitError(
@@ -550,6 +578,8 @@ export function PublicQuizClient({
             submitting={submitting}
             onExit={() => setStep("info")}
             assessmentName={campaignName}
+            templateAlias={templateAlias ?? undefined}
+            qspStoryGroupEnabled={qspStoryGroupEnabled}
             requireAtLeastOneAnswer
           />
 
@@ -558,9 +588,25 @@ export function PublicQuizClient({
             style={{ fontSize: "0.75rem", textAlign: "center", margin: "0.5rem 0 0" }}
             data-testid="quiz-consent"
           >
-            By submitting, you agree that your results will be shown to you and
-            emailed to you, and shared with the Scaling Up team and the coach who
-            referred you (if any) — who receives the full report.
+            {referredResultsEnabled ? (
+              <>
+                By submitting, you agree that your full report will be shown and
+                emailed to you. It will also be shared with the Scaling Up team
+                and, if you used a coach referral link, made available to that
+                verified coach while their account remains active. Scaling Up
+                retains personal data as described in its{" "}
+                <a href="https://scalingup.com/privacy-policy/">
+                  Privacy Policy
+                </a>
+                .
+              </>
+            ) : (
+              <>
+                By submitting, you agree that your results will be shown to you
+                and emailed to you, and shared with the Scaling Up team and the
+                coach who referred you (if any) — who receives the full report.
+              </>
+            )}
           </p>
 
           {!canSubmit && (

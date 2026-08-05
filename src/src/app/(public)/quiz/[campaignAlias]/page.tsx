@@ -13,6 +13,8 @@ import { db } from "@/lib/db";
 import { PublicQuizClient } from "@/components/assessments/public-quiz-client";
 import { isCustomSlidesEnabled } from "@/lib/assessments/wave-m-flags";
 import { loadSafeSlides } from "@/lib/assessments/load-safe-slides";
+import { isReferredResultsEnabled } from "@/lib/assessments/wave-83-flags";
+import { isQspStoryGroupEnabled } from "@/lib/assessments/wave-48-flags";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -97,6 +99,12 @@ export default async function PublicQuizPage({
       sections={version.sections as unknown}
       questions={version.questions as unknown}
       customSlides={customSlides}
+      {...(isReferredResultsEnabled()
+        ? { referredResultsEnabled: true }
+        : {})}
+      {...(isQspStoryGroupEnabled()
+        ? { qspStoryGroupEnabled: true }
+        : {})}
     />
   );
 }

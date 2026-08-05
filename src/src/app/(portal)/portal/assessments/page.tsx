@@ -19,6 +19,11 @@ import {
   type CampaignListItem,
 } from "@/components/assessments/CampaignsListWithFilter";
 import { toCampaignListItems } from "@/lib/assessments/campaign-list-items";
+import {
+  asCampaignListEditionDb,
+  resolveCampaignListEditions,
+} from "@/lib/assessments/campaign-list-editions";
+import { isReferredResultsEnabled } from "@/lib/assessments/wave-83-flags";
 
 const APP_URL =
   process.env.APP_URL || "https://scaling-up-platform-v2.vercel.app";
@@ -46,9 +51,14 @@ async function resolvePublicQuickAlias(): Promise<string | null> {
 
 export default async function CoachAssessmentsPage() {
   const { coach } = await requireCoach();
+  const referredResultsEnabled = isReferredResultsEnabled();
 
   // §4 — per-coach attributed share link for the public Quick Assessment.
-  const publicQuickAlias = await resolvePublicQuickAlias();
+  // #83 moves this card to Referred Results while its read surface is enabled.
+  // The disabled path deliberately retains the existing query and markup.
+  const publicQuickAlias = referredResultsEnabled
+    ? null
+    : await resolvePublicQuickAlias();
   const coachLink =
     publicQuickAlias && coach.email
       ? `${APP_URL}/quiz/${publicQuickAlias}?coach=${encodeURIComponent(coach.email)}`
@@ -62,6 +72,15 @@ export default async function CoachAssessmentsPage() {
     include: {
       organization: { select: { id: true, name: true } },
       template: { select: { id: true, name: true } },
+      version: {
+        select: {
+          templateId: true,
+          versionNumber: true,
+          language: true,
+          publishedAt: true,
+          archivedAt: true,
+        },
+      },
       participants: {
         select: { id: true, respondentId: true },
       },
@@ -78,7 +97,14 @@ export default async function CoachAssessmentsPage() {
   });
 
   // Wave Z (Z-2) — shared mapper (identical to the admin oversight page).
-  const items: CampaignListItem[] = toCampaignListItems(campaigns);
+  const editionsByCampaignId = await resolveCampaignListEditions(
+    asCampaignListEditionDb(db),
+    campaigns,
+  );
+  const items: CampaignListItem[] = toCampaignListItems(
+    campaigns,
+    editionsByCampaignId,
+  );
 
   return (
     <div className="space-y-6">

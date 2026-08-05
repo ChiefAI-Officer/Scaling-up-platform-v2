@@ -178,9 +178,27 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
 
     // The report MUST be wrapped in `.su-public-brand .su-report` so the scoped
     // su-report.css applies on-screen (else it renders bare — the in-place CSS bug).
-    expect(
-      screen.getByTestId("quiz-results").querySelector(".su-public-brand.su-report"),
-    ).not.toBeNull();
+    const reportWrapper = screen
+      .getByTestId("quiz-results")
+      .querySelector(".su-public-brand.su-report");
+    expect(reportWrapper).not.toBeNull();
+
+    const printButton = screen.getByRole("button", { name: "Print" });
+    const downloadButton = screen.getByRole("button", { name: "Download PDF" });
+    expect(reportWrapper).toContainElement(printButton);
+    expect(reportWrapper).toContainElement(downloadButton);
+    expect(screen.getAllByRole("button", { name: "Print" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Download PDF" })).toHaveLength(1);
+
+    const originalTitle = document.title;
+    Object.defineProperty(window, "print", {
+      value: jest.fn(),
+      configurable: true,
+    });
+    fireEvent.click(downloadButton);
+    expect(document.title).toBe("Scaling Up Full — Jane Doe");
+    window.dispatchEvent(new Event("afterprint"));
+    expect(document.title).toBe(originalTitle);
 
     // BrandedReport renders the assessment name.
     expect(screen.getByText("Scaling Up Full")).toBeInTheDocument();
@@ -190,6 +208,60 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
 
     // router.push must NOT have been called.
     expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  // ── F4 (Wave OSR / Jeff #71 review): templateAlias must reach BrandedReport ─
+  //
+  // The hand-built RespondentReport here OMITTED templateAlias, so every public
+  // report silently resolved to DEFAULT_REPORT_CONFIG no matter the instrument.
+  // These tests make the wiring observable: RockHabits sets showScoreTable:false
+  // while DEFAULT sets true, so the score table's presence IS the signal that
+  // the alias flowed through. Positive/negative control — neither can pass
+  // vacuously. The third test covers the qualitative dispatch, which is the
+  // starkest consequence (a wholly different renderer) and was otherwise
+  // exercised by nothing.
+  async function submitAndRender(props: { templateAlias?: string } = {}) {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        success: true,
+        data: {
+          submissionId: "sub_1",
+          scoreResult: scoreResultFixture,
+          redirectUrl: `/quiz/${ALIAS}/thank-you`,
+        },
+      }),
+    });
+    render(<PublicQuizClient {...baseProps} {...props} />);
+    reachFormStep();
+    fireEvent.change(screen.getByRole("slider"), { target: { value: "6" } });
+    fireEvent.click(screen.getByRole("button", { name: /submit/i }));
+    await waitFor(() =>
+      expect(screen.getByTestId("quiz-results")).toBeInTheDocument(),
+    );
+  }
+
+  it("honours a mapped templateAlias — RockHabits hides the score table", async () => {
+    await submitAndRender({ templateAlias: "RockHabits" });
+    expect(screen.queryByTestId("report-scores-table")).toBeNull();
+  });
+
+  it("positive control — with no alias the DEFAULT config still shows it", async () => {
+    await submitAndRender();
+    expect(screen.getByTestId("report-scores-table")).toBeInTheDocument();
+  });
+
+  it("a qualitative alias swaps the renderer without crashing on the public payload", async () => {
+    // The public payload is thinner than the authorized one — scoringConfig is
+    // undefined and provenance.versionId is "" — so the qualitative path had to
+    // be proven to render rather than throw. qsp-v2 is reportType "qualitative".
+    await submitAndRender({ templateAlias: "qsp-v2" });
+    const results = screen.getByTestId("quiz-results");
+    expect(results).toBeInTheDocument();
+    // Scored chrome must be gone: no score table, no "/ 100" ScaleUp headline.
+    expect(screen.queryByTestId("report-scores-table")).toBeNull();
+    expect(screen.queryByText(/60\s*\/\s*100/)).toBeNull();
   });
 
   // ── T7-3: POST body includes idempotencyKey ──────────────────────────────
@@ -277,6 +349,67 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
     expect(body.referringCoachEmail).toBe("coach@example.com");
   });
 
+  it("uses only the server-verified coach email in the results CTA", async () => {
+    mockSearchParams = { coach: "forged@example.com" };
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        success: true,
+        data: {
+          submissionId: "sub_1",
+          scoreResult: scoreResultFixture,
+          referringCoachEmail: "verified@example.com",
+          redirectUrl: `/quiz/${ALIAS}/thank-you`,
+        },
+      }),
+    });
+
+    render(<PublicQuizClient {...baseProps} />);
+    reachFormStep();
+    fireEvent.change(screen.getByRole("slider"), { target: { value: "6" } });
+    fireEvent.click(screen.getByRole("button", { name: /submit/i }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("quiz-results")).toBeInTheDocument(),
+    );
+
+    expect(screen.getByText(/jane@example\.com/)).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /talk to a coach/i }),
+    ).toHaveAttribute("href", "mailto:verified%40example.com");
+    expect(document.querySelector('a[href="mailto:forged%40example.com"]')).toBeNull();
+  });
+
+  it("does not trust the query email when the server does not verify a coach", async () => {
+    mockSearchParams = { coach: "forged@example.com" };
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        success: true,
+        data: {
+          submissionId: "sub_1",
+          scoreResult: scoreResultFixture,
+          referringCoachEmail: null,
+          redirectUrl: `/quiz/${ALIAS}/thank-you`,
+        },
+      }),
+    });
+
+    render(<PublicQuizClient {...baseProps} />);
+    reachFormStep();
+    fireEvent.change(screen.getByRole("slider"), { target: { value: "6" } });
+    fireEvent.click(screen.getByRole("button", { name: /submit/i }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("quiz-results")).toBeInTheDocument(),
+    );
+    expect(
+      screen.getByRole("link", { name: /talk to a coach/i }),
+    ).toHaveAttribute("href", "https://scalingup.com/coaches");
+  });
+
   it("omits referringCoachEmail entirely when no ?coach= param is present", async () => {
     // mockSearchParams reset to {} in beforeEach → no coach.
     global.fetch = jest.fn().mockResolvedValue({
@@ -313,5 +446,27 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
     const consent = screen.getByTestId("quiz-consent");
     expect(consent).toHaveTextContent(/emailed to you/i);
     expect(consent).toHaveTextContent(/full report/i);
+    expect(
+      screen.queryByRole("link", { name: "Privacy Policy" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows the feature-matched verified-Coach disclosure and privacy link", () => {
+    render(
+      <PublicQuizClient
+        {...baseProps}
+        referredResultsEnabled
+      />,
+    );
+    reachFormStep();
+
+    const consent = screen.getByTestId("quiz-consent");
+    expect(consent).toHaveTextContent(
+      "available to that verified coach while their account remains active",
+    );
+    expect(screen.getByRole("link", { name: "Privacy Policy" })).toHaveAttribute(
+      "href",
+      "https://scalingup.com/privacy-policy/",
+    );
   });
 });

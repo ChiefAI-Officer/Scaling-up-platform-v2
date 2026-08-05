@@ -13,6 +13,7 @@ import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth/auth";
 import { ObservabilityDashboard } from "@/components/admin/ObservabilityDashboard";
+import { PeerBenchmarkStatusPanel } from "@/components/admin/PeerBenchmarkStatusPanel";
 import { ImportHealthPanel } from "@/components/admin/ImportHealthPanel";
 
 export default async function AdminObservabilityPage() {
@@ -38,6 +39,7 @@ export default async function AdminObservabilityPage() {
         </p>
       </header>
       <ObservabilityDashboard />
+      <PeerBenchmarkStatusPanel />
       <ImportHealthPanel />
     </div>
   );

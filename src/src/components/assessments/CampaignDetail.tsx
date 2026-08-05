@@ -42,6 +42,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { AssessmentResultView } from "./AssessmentResultView";
+import { formatTimestamp } from "@/lib/utils";
 import { CampaignStatusMetrics } from "./CampaignStatusMetrics";
 import {
   CustomSlidesPanel,
@@ -57,6 +58,12 @@ import {
   computeCampaignStatusMetrics,
   getInvitationBand,
 } from "@/lib/assessments/campaign-status-metrics";
+import { resolveInvitationHtmlMode } from "@/lib/assessments/invitation-html-policy";
+import {
+  invitationHtmlEditorCopy,
+  invitationOverrideSummary,
+  invitationSaveConfirmation,
+} from "@/lib/assessments/invitation-html-editor-copy";
 
 const REASON_MAX_LENGTH = 500;
 
@@ -74,6 +81,8 @@ export interface CampaignDetailProps {
   initialRespondents: CampaignRespondentRow[];
   /** Wave D #20 — gate the full-HTML invitation editor (mirrors the server flag). */
   customHtmlEmailEnabled?: boolean;
+  /** GH #220 — server-computed branded HTML-body mode; defaults fail-closed. */
+  brandedCustomHtmlEnabled?: boolean;
   /**
    * Wave F #22 (T10) — gates the campaign-level "View group report" entry
    * point. Computed SERVER-side (accessMode==="INVITED" && flag/canary &&
@@ -90,6 +99,15 @@ export interface CampaignDetailProps {
    * editor.
    */
   customSlidesEnabled?: boolean;
+  /**
+   * Wave OSR (#71) — gates the "Results on screen" control. Computed SERVER-side
+   * from the same flag the PATCH route enforces; the client receives ONLY the
+   * boolean and never recomputes the gate. Fail-closed: absent/false → no control.
+   *
+   * Why this control exists: the toggle was writable only at CREATE, so a campaign
+   * that already existed had no way to opt in.
+   */
+  onScreenResultsEnabled?: boolean;
   /**
    * Wave M (#19) — the campaign's stored (already-sanitized) slides. Both the
    * editor's initial value AND the PATCH CAS sentinel `expectedCustomSlides`
@@ -209,9 +227,11 @@ export function CampaignDetail({
   initialOverview,
   initialRespondents,
   customHtmlEmailEnabled = false,
+  brandedCustomHtmlEnabled = false,
   canViewGroupReport = false,
   groupReportHref,
   customSlidesEnabled = false,
+  onScreenResultsEnabled = false,
   initialCustomSlides = [],
   customSlidesSections = [],
   longitudinalRespondentIds = [],
@@ -269,6 +289,12 @@ export function CampaignDetail({
 
   // Task O UI follow-on — email overrides post-create edit panel.
   const [emailOpen, setEmailOpen] = useState(false);
+  // Wave OSR (#71) — optimistic local mirror of the stored toggle. Reverted on a
+  // failed PATCH so the checkbox can never sit in a state the server rejected.
+  const [onScreenResults, setOnScreenResults] = useState(
+    initialOverview.campaign.showResultsOnScreen === true,
+  );
+  const [onScreenSaving, setOnScreenSaving] = useState(false);
   const [emailSubject, setEmailSubject] = useState<string>(
     overview.campaign.invitationSubject ?? "",
   );
@@ -279,8 +305,33 @@ export function CampaignDetail({
   const [emailHtml, setEmailHtml] = useState<string>(
     overview.campaign.invitationBodyHtml ?? "",
   );
+  const [persistedEmailSubject, setPersistedEmailSubject] = useState<string>(
+    overview.campaign.invitationSubject ?? "",
+  );
+  const [persistedEmailBody, setPersistedEmailBody] = useState<string>(
+    overview.campaign.invitationBodyMarkdown ?? "",
+  );
+  const [persistedHtml, setPersistedHtml] = useState<string>(
+    overview.campaign.invitationBodyHtml ?? "",
+  );
   const [emailHtmlError, setEmailHtmlError] = useState<string | null>(null);
   const [emailSaving, setEmailSaving] = useState(false);
+
+  const invitationHtmlMode = resolveInvitationHtmlMode({
+    waveDCustomHtmlEnabled: customHtmlEmailEnabled,
+    brandedCustomHtmlEnabled,
+    rawHtml: emailHtml,
+  });
+  const persistedInvitationHtmlMode = resolveInvitationHtmlMode({
+    waveDCustomHtmlEnabled: customHtmlEmailEnabled,
+    brandedCustomHtmlEnabled,
+    rawHtml: persistedHtml,
+  });
+  const emailHtmlChanged = emailHtml !== persistedHtml;
+  const htmlEditorCopy = invitationHtmlEditorCopy({
+    brandedCustomHtmlEnabled,
+    htmlMode: invitationHtmlMode,
+  });
 
   // Wave M (#19) — custom-slides editor state. `slidesValue` is the controlled
   // editor list; `slidesLoaded` is the CAS sentinel (the exact stored value the
@@ -294,10 +345,9 @@ export function CampaignDetail({
   const [slidesWarning, setSlidesWarning] = useState<string | null>(null);
 
   const emailDirty =
-    emailSubject !== (overview.campaign.invitationSubject ?? "") ||
-    emailBody !== (overview.campaign.invitationBodyMarkdown ?? "") ||
-    (customHtmlEmailEnabled &&
-      emailHtml !== (overview.campaign.invitationBodyHtml ?? ""));
+    emailSubject !== persistedEmailSubject ||
+    emailBody !== persistedEmailBody ||
+    (customHtmlEmailEnabled && emailHtmlChanged);
 
   // Follow-on (May 21) — coach edit start-date affordance.
   // openAt is set in the wizard and locked post-creation in earlier UI;
@@ -715,6 +765,64 @@ export function CampaignDetail({
     }
   }
 
+  // Wave OSR (#71) — persist the on-screen-results toggle via PATCH. Optimistic:
+  // the checkbox moves immediately and is REVERTED if the server refuses, because
+  // a checkbox that disagrees with the stored value would misdescribe what
+  // respondents are about to see.
+  //
+  // The revert triggers on a SILENT no-op as well as an error, which matters: the
+  // route ignores this field when the flag is off and still answers
+  // 200 {success:true}, so trusting `res.ok` alone would leave the box ticked
+  // over a column that never changed. Hence the echo check on the returned row.
+  async function handleToggleOnScreenResults(next: boolean) {
+    if (onScreenSaving) return;
+    const previous = onScreenResults;
+    setOnScreenResults(next);
+    setOnScreenSaving(true);
+    try {
+      const res = await fetch(`/api/assessment-campaigns/${campaign.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ showResultsOnScreen: next }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || body.success === false) {
+        throw new Error(
+          typeof body.error === "string"
+            ? body.error
+            : "The change was not saved.",
+        );
+      }
+      // The route echoes the updated row. A 200 whose row does NOT carry the value
+      // we asked for means the field was dropped (flag off), which is a failure
+      // from the operator's point of view even though the request "succeeded".
+      if (
+        body?.data &&
+        typeof body.data === "object" &&
+        "showResultsOnScreen" in body.data &&
+        body.data.showResultsOnScreen !== next
+      ) {
+        throw new Error("This setting is not currently available.");
+      }
+      toast({
+        title: next
+          ? "Respondents will see their results on screen"
+          : "Respondents will not see their results on screen",
+      });
+      router.refresh();
+    } catch (err) {
+      setOnScreenResults(previous);
+      toast({
+        title: "Could not change the results setting",
+        description:
+          err instanceof Error ? err.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setOnScreenSaving(false);
+    }
+  }
+
   // Task O UI follow-on — save email overrides via PATCH /api/assessment-campaigns/[id].
   async function handleSaveEmailOverrides() {
     if (emailSaving) return;
@@ -726,9 +834,13 @@ export function CampaignDetail({
         invitationBodyMarkdown:
           emailBody.trim() === "" ? null : emailBody.trim(),
       };
-      // Task 12 (#20) — only send the full-HTML field when the flag is on.
-      // The server validates token placement + length and rejects with a reason.
-      if (customHtmlEmailEnabled) {
+      // A retained tokenless override becomes inactive when the branded mode is
+      // rolled back. Omit it from unrelated edits so the server does not reject
+      // a value the operator did not change; changed or cleared HTML is always sent.
+      if (
+        customHtmlEmailEnabled &&
+        (persistedInvitationHtmlMode !== "branded_fallback" || emailHtmlChanged)
+      ) {
         payload.invitationBodyHtml = emailHtml.trim() === "" ? null : emailHtml;
       }
       const res = await fetch(`/api/assessment-campaigns/${campaign.id}`, {
@@ -746,12 +858,54 @@ export function CampaignDetail({
         }
         throw new Error(reason);
       }
+      // The route returns its updated row. Keep the controlled values aligned
+      // with those canonical values too, otherwise a trimmed successful save
+      // reopens as a false dirty draft against its normalized baseline.
+      const savedSubject =
+        body?.data &&
+        typeof body.data === "object" &&
+        "invitationSubject" in body.data
+          ? typeof body.data.invitationSubject === "string"
+            ? body.data.invitationSubject
+            : ""
+          : typeof payload.invitationSubject === "string"
+            ? payload.invitationSubject
+            : "";
+      const savedBody =
+        body?.data &&
+        typeof body.data === "object" &&
+        "invitationBodyMarkdown" in body.data
+          ? typeof body.data.invitationBodyMarkdown === "string"
+            ? body.data.invitationBodyMarkdown
+            : ""
+          : typeof payload.invitationBodyMarkdown === "string"
+            ? payload.invitationBodyMarkdown
+            : "";
+      setEmailSubject(savedSubject);
+      setPersistedEmailSubject(savedSubject);
+      setEmailBody(savedBody);
+      setPersistedEmailBody(savedBody);
+      if ("invitationBodyHtml" in payload) {
+        const savedHtml =
+          body?.data &&
+          typeof body.data === "object" &&
+          "invitationBodyHtml" in body.data
+            ? typeof body.data.invitationBodyHtml === "string"
+              ? body.data.invitationBodyHtml
+              : ""
+            : typeof payload.invitationBodyHtml === "string"
+              ? payload.invitationBodyHtml
+              : "";
+        setEmailHtml(savedHtml);
+        setPersistedHtml(savedHtml);
+      }
       toast({
         title: "Invitation email saved",
-        description:
-          emailSubject.trim() === "" && emailBody.trim() === ""
-            ? "Using template default."
-            : "New campaign overrides applied.",
+        description: invitationSaveConfirmation({
+          htmlMode: invitationHtmlMode,
+          hasSubjectOrMarkdown:
+            emailSubject.trim() !== "" || emailBody.trim() !== "",
+        }),
       });
       setEmailOpen(false);
       router.refresh();
@@ -1118,6 +1272,51 @@ export function CampaignDetail({
             <div className="mt-1 font-medium text-foreground">
               {campaign.templateName}
             </div>
+            {/* Wave EV — which EDITION this campaign serves, and whether its
+                pinned edition has been retired or fallen behind. A campaign
+                pins a version at creation and has no edition-changing write
+                path, so without these warnings the screen silently shows frozen
+                content — the cause of Jeff's #40/#43 being re-reports of
+                already-shipped work. Absent `edition` (unpublished pin, or a
+                degraded lookup) renders nothing, exactly as before.
+
+                NOTE the deliberate wording: "Edition", not "Version". The word
+                "version" is already spent on the instrument's own name in front
+                of coaches ("Quarterly Session Prep v2" is a different product
+                from v1, not a newer edition), and reusing it is precisely how
+                this got confusing.
+
+                The stale warning deliberately does NOT say "Newer edition
+                available": "available" would promise an upgrade button that
+                does not exist. It states the frozen fact instead, which is what
+                a tester actually needs. */}
+            {campaign.edition && (
+              <>
+                <div
+                  className="mt-1 text-xs text-muted-foreground tabular-nums"
+                  data-testid="campaign-edition-line"
+                >
+                  Edition {campaign.edition.versionNumber} &middot; published{" "}
+                  {formatTimestamp(campaign.edition.publishedAt)}
+                </div>
+                {campaign.edition.pinnedRetired ? (
+                  <span
+                    className="mt-1.5 inline-flex items-center gap-1 rounded-md border bg-destructive/10 px-1.5 py-0.5 text-xs font-semibold text-destructive"
+                    data-testid="campaign-edition-retired"
+                    style={{ borderColor: "hsl(var(--destructive))" }}
+                  >
+                    This edition has been retired
+                  </span>
+                ) : campaign.edition.newerEditionAvailable ? (
+                  <span
+                    className="mt-1.5 inline-flex items-center gap-1 rounded-md border border-warning/30 bg-warning/10 px-1.5 py-0.5 text-xs font-semibold text-warning"
+                    data-testid="campaign-edition-stale"
+                  >
+                    Not the latest edition
+                  </span>
+                ) : null}
+              </>
+            )}
           </div>
           <div>
             <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -1220,6 +1419,45 @@ export function CampaignDetail({
         </div>
       </div>
 
+      {/* Wave OSR (#71) — "Results on screen" for an EXISTING campaign.
+          Hidden when CLOSED (the PATCH route 409s a closed campaign, so offering
+          the control there would promise an edit the server refuses) and when the
+          flag is off (server-computed; the client never recomputes the gate).
+
+          A separate card from "Invitation email" on purpose: this is not an email,
+          and it changes what the respondent sees at submit. */}
+      {onScreenResultsEnabled && !isClosed && (
+        <div
+          className="bg-card border border-border rounded-xl p-4"
+          data-testid="campaign-onscreen-results-card"
+        >
+          <h2 className="text-sm font-semibold text-foreground">
+            Results on screen
+          </h2>
+          <label className="mt-3 flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              className="accent-primary w-4 h-4 mt-0.5"
+              checked={onScreenResults}
+              disabled={onScreenSaving}
+              onChange={(e) => handleToggleOnScreenResults(e.target.checked)}
+              data-testid="campaign-onscreen-results-toggle"
+              aria-label="Show each respondent their results on screen after they submit"
+            />
+            <span className="text-sm text-foreground">
+              Show each respondent their results on screen after they submit
+              {/* The operator is choosing this AFTER the campaign exists, so say
+                  plainly which respondents it can still reach — anyone who has
+                  already submitted will never see it. */}
+              <span className="block text-xs text-muted-foreground mt-1">
+                Applies to respondents who submit from now on. People who have
+                already submitted are unaffected.
+              </span>
+            </span>
+          </label>
+        </div>
+      )}
+
       {/* Task O UI follow-on — invitation email overrides edit panel.
           Hidden when campaign is CLOSED (no further sends to customize). */}
       {!isClosed && (
@@ -1238,10 +1476,13 @@ export function CampaignDetail({
                 Invitation email
               </h2>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {overview.campaign.invitationSubject ||
-                overview.campaign.invitationBodyMarkdown
-                  ? "Custom subject/body set for this campaign"
-                  : "Using template default — click to customize"}
+                {invitationOverrideSummary({
+                  htmlMode: persistedInvitationHtmlMode,
+                  hasSubjectOrMarkdown:
+                    persistedEmailSubject.trim() !== "" ||
+                    persistedEmailBody.trim() !== "",
+                  emptySummary: "Using template default — click to customize",
+                })}
               </p>
             </div>
             <span className="text-xs font-medium text-muted-foreground">
@@ -1306,17 +1547,14 @@ export function CampaignDetail({
               </div>
               {customHtmlEmailEnabled && (
                 <div className="space-y-1 border-t border-border pt-3">
-                  <label className="text-xs font-medium text-foreground">
-                    Full custom HTML (advanced)
+                  <label
+                    htmlFor="email-overrides-html"
+                    className="text-xs font-medium text-foreground"
+                  >
+                    {htmlEditorCopy.label}
                   </label>
                   <p className="text-[11px] text-muted-foreground">
-                    When set, this HTML <strong>replaces the entire branded
-                    email</strong> (no template wrap). It must include{" "}
-                    <code className="px-1 py-0.5 bg-muted rounded text-[10px]">
-                      {"{{invitationUrl}}"}
-                    </code>{" "}
-                    as a link <code className="text-[10px]">href</code> or as
-                    plain text.
+                    {htmlEditorCopy.description}
                   </p>
                   <div className="flex items-center gap-3">
                     <input
@@ -1355,6 +1593,7 @@ export function CampaignDetail({
                     )}
                   </div>
                   <textarea
+                    id="email-overrides-html"
                     value={emailHtml}
                     onChange={(e) => {
                       setEmailHtml(e.target.value);
@@ -1362,13 +1601,22 @@ export function CampaignDetail({
                     }}
                     maxLength={50000}
                     rows={10}
-                    placeholder="Paste your full HTML email here, or upload an .html file above. Leave blank to use the body above."
+                    placeholder={
+                      brandedCustomHtmlEnabled
+                        ? "Paste a custom HTML body fragment here, or upload an .html file above. Leave blank to use the markdown body above."
+                        : "Paste your full HTML email here, or upload an .html file above. Leave blank to use the body above."
+                    }
                     className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-primary/30"
                     data-testid="email-overrides-html"
                   />
                   <p className="text-[11px] text-muted-foreground">
                     {emailHtml.length} / 50000 characters
                   </p>
+                  {emailHtmlChanged && htmlEditorCopy.validationError && (
+                    <p className="text-[11px] text-destructive">
+                      {htmlEditorCopy.validationError}
+                    </p>
+                  )}
                   {emailHtmlError && (
                     <p
                       className="text-[11px] text-destructive"
@@ -1383,11 +1631,9 @@ export function CampaignDetail({
                 <button
                   type="button"
                   onClick={() => {
-                    setEmailSubject(overview.campaign.invitationSubject ?? "");
-                    setEmailBody(
-                      overview.campaign.invitationBodyMarkdown ?? "",
-                    );
-                    setEmailHtml(overview.campaign.invitationBodyHtml ?? "");
+                    setEmailSubject(persistedEmailSubject);
+                    setEmailBody(persistedEmailBody);
+                    setEmailHtml(persistedHtml);
                     setEmailHtmlError(null);
                     setEmailOpen(false);
                   }}

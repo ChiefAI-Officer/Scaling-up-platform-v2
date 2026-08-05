@@ -9,6 +9,7 @@
  *  - Inline links accept only http/https/relative URLs (javascript:/data:/protocol-relative rejected).
  */
 import { escapeHtml } from "@/lib/templates/interpolate-content-html";
+import { safeImageSrc } from "@/lib/assessments/safe-image-src";
 import { SU_LOGO_CID } from "@/lib/assets/invitation-logo";
 import { sanitizeEmailHtml } from "@/lib/assessments/email-html-sanitizer";
 
@@ -164,20 +165,15 @@ function safeHref(raw: string): string | null {
 /**
  * Returns a safe image src or null — STRICTER than `safeHref`: HTTPS only
  * (the email sanitizer already strips http: images — stay consistent).
- * Rejects http:, javascript:, data:, protocol-relative, bare filenames,
- * empty/null, and anything `new URL` cannot parse.
+ *
+ * MOVED to `@/lib/assessments/safe-image-src` (GH #229) so the report chrome can
+ * share it without dragging this email module into a client bundle. Re-exported
+ * here so every existing importer and test keeps working.
+ *
+ * NOTE: imported at the top of this file, not `export … from` — this module calls
+ * `safeImageSrc` itself, and a bare re-export would not bind the name locally.
  */
-export function safeImageSrc(raw: string | null | undefined): string | null {
-  if (typeof raw !== "string") return null;
-  const url = raw.trim();
-  if (!url) return null;
-  try {
-    const parsed = new URL(url);
-    return parsed.protocol === "https:" ? url : null;
-  } catch {
-    return null;
-  }
-}
+export { safeImageSrc };
 
 // ── Markdown-lite (links + bold), escape-first ──────────────────────────────
 function renderInline(escaped: string): string {
@@ -228,8 +224,9 @@ export function renderTextBody(template: string, vars: InvitationVars): string {
 
 // ── Full-HTML override (#20) ────────────────────────────────────────────────
 //
-// When a campaign sets `invitationBodyHtml`, that HTML REPLACES the entire
-// branded shell (no wrap). Render = interpolate → sanitize:
+// When a campaign sets `invitationBodyHtml`, the selected flag mode either
+// REPLACES the entire email (legacy full_replace) or composes the fragment
+// inside the branded shell (branded_body). Both render interpolate → sanitize:
 //   1. Interpolate the RAW stored bytes with Wave A's `interpolateTokens`
 //      (SAME `TOKEN_RE` the placement validator counts with — PIN #1) so the
 //      bytes that reach the sanitizer match the bytes the validator vetted.
@@ -253,23 +250,28 @@ function buildEscapedTokenValues(vars: InvitationVars): Record<string, string> {
 }
 
 /**
- * Render a per-campaign full-HTML invitation body. interpolate (Wave A
- * TOKEN_RE, escaped values, raw bytes) → strict sanitize. The RESULT is the
- * ENTIRE email body — NO branded shell wrap.
+ * Render a sanitized per-campaign custom-HTML fragment. Interpolate (Wave A
+ * TOKEN_RE, escaped values, raw bytes) → strict sanitize.
  */
-export function renderFullHtmlBody(rawHtml: string, vars: InvitationVars): string {
+export function renderCustomHtmlFragment(rawHtml: string, vars: InvitationVars): string {
   const values = buildEscapedTokenValues(vars);
-  const interpolated = interpolateTokens(rawHtml, values); // PIN #1 + #2
-  return sanitizeEmailHtml(interpolated);                  // second gate
+  return sanitizeEmailHtml(interpolateTokens(rawHtml, values)); // PIN #1 + #2
 }
 
-/** Plain-text twin derived from the rendered full-HTML body (tags stripped). */
-export function renderFullTextBody(rawHtml: string, vars: InvitationVars): string {
-  const html = renderFullHtmlBody(rawHtml, vars);
-  const text = html
-    .replace(/<\s*br\s*\/?\s*>/gi, "\n")        // <br> → newline
-    .replace(/<\/(p|div|tr|h[1-4]|li)\s*>/gi, "\n") // block close → newline
-    .replace(/<[^>]+>/g, "")                          // strip remaining tags
+/**
+ * Compatibility wrapper for the legacy complete-replacement full-HTML path.
+ * The returned fragment remains unwrapped so callers can roll back safely.
+ */
+export function renderFullHtmlBody(rawHtml: string, vars: InvitationVars): string {
+  return renderCustomHtmlFragment(rawHtml, vars);
+}
+
+/** Convert an already-sanitized HTML fragment into readable plain text. */
+function htmlFragmentToText(sanitizedFragment: string): string {
+  return sanitizedFragment
+    .replace(/<\s*br\s*\/?\s*>/gi, "\n")
+    .replace(/<\/(p|div|tr|h[1-4]|li)\s*>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
@@ -277,6 +279,11 @@ export function renderFullTextBody(rawHtml: string, vars: InvitationVars): strin
     .replace(/&#x27;/g, "'")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+/** Plain-text twin derived from the rendered full-HTML body (tags stripped). */
+export function renderFullTextBody(rawHtml: string, vars: InvitationVars): string {
+  const text = htmlFragmentToText(renderFullHtmlBody(rawHtml, vars));
   // Guarantee the survey link is reachable in the plain-text twin even if the
   // coach only used it as an href (tags — and their hrefs — are stripped above).
   if (vars.invitationUrl && !text.includes(vars.invitationUrl)) {
@@ -293,8 +300,8 @@ const D_PEOPLE = "#E4002B", D_STRATEGY = "#00A6CE", D_EXECUTION = "#FFB81C", D_C
 /** Chrome variant for the branded shell. "legacy" (the default) is byte-identical to pre-Wave-P output. */
 export type InvitationChrome = "legacy" | "waveP";
 
-export function buildInvitationEmailHtml(input: {
-  bodyMarkdown: string;
+export function buildInvitationEmailShell(input: {
+  bodyHtml: string;
   vars: InvitationVars;
   /**
    * Wave P chrome (Jeff #2.1 coach logo + #2.4 larger CTA). DEFAULT "legacy":
@@ -304,9 +311,8 @@ export function buildInvitationEmailHtml(input: {
    */
   chrome?: InvitationChrome;
 }): string {
-  const { bodyMarkdown, vars } = input;
+  const { bodyHtml, vars } = input;
   const waveP = (input.chrome ?? "legacy") === "waveP";
-  const bodyHtml = renderHtmlBody(bodyMarkdown, vars);
   const orgLine =
     vars.organizationName && vars.showOrgLine !== false ? escapeHtml(vars.organizationName) : "";
   // Coach logo (waveP only): https-gated src, escaped; alt = coach name,
@@ -343,6 +349,32 @@ export function buildInvitationEmailHtml(input: {
   </div>
   <div style="padding:18px 32px;border-top:1px solid #e5e7eb;color:#9ca3af;font-size:12px;">&mdash; Scaling Up Platform</div>
 </div>`.trim();
+}
+
+export function buildInvitationEmailHtml(input: {
+  bodyMarkdown: string;
+  vars: InvitationVars;
+  chrome?: InvitationChrome;
+}): string {
+  return buildInvitationEmailShell({
+    bodyHtml: renderHtmlBody(input.bodyMarkdown, input.vars),
+    vars: input.vars,
+    chrome: input.chrome,
+  });
+}
+
+/** Plain-text branded counterpart for an already-sanitized custom-HTML fragment. */
+export function renderBrandedCustomHtmlText(
+  sanitizedFragment: string,
+  vars: InvitationVars,
+): string {
+  const lines = ["Scaling Up Platform"];
+  const coachName = (vars.coachName ?? "").trim();
+  if (coachName.length > 0) lines.push(`Coach: ${coachName}`);
+  const bodyText = htmlFragmentToText(sanitizedFragment);
+  if (bodyText.length > 0) lines.push("", bodyText);
+  lines.push("", `Start the assessment: ${vars.invitationUrl}`);
+  return lines.join("\n");
 }
 
 // ── Coach-name resolver (creator coach ?? org owner) ────────────────────────

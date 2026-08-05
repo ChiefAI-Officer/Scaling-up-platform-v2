@@ -21,12 +21,16 @@ import {
 import { loadLiveCampaign } from "@/lib/assessments/campaign-live";
 import { logAudit } from "@/lib/audit";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
-import { waveDCustomHtmlEmailEnabled } from "@/lib/assessments/wave-d-feature-flags";
+import {
+  assessmentInviteBrandedCustomHtmlEnabled,
+  waveDCustomHtmlEmailEnabled,
+} from "@/lib/assessments/wave-d-feature-flags";
 import {
   validateInvitationHtml,
   MAX_INVITATION_HTML_LENGTH,
 } from "@/lib/assessments/email-html-sanitizer";
 import { isCustomSlidesEnabled } from "@/lib/assessments/wave-m-flags";
+import { isOnScreenResultsEnabled } from "@/lib/assessments/wave-osr-flags";
 import {
   prepareCustomSlidesForSave,
   sectionStableKeysOf,
@@ -216,6 +220,7 @@ export async function PATCH(
       invitationSubject?: string | null;
       invitationBodyMarkdown?: string | null;
       invitationBodyHtml?: string | null;
+      showResultsOnScreen?: boolean;
     } = {};
 
     if (data.name !== undefined) updateData.name = data.name;
@@ -244,7 +249,9 @@ export async function PATCH(
             { status: 400 }
           );
         }
-        const placement = validateInvitationHtml(rawHtml);
+        const placement = validateInvitationHtml(rawHtml, {
+          requireUrlToken: !assessmentInviteBrandedCustomHtmlEnabled(),
+        });
         if (!placement.ok) {
           return NextResponse.json(
             { success: false, error: placement.reason },
@@ -254,6 +261,36 @@ export async function PATCH(
         updateData.invitationBodyHtml = rawHtml;
       }
     }
+    // ─────────────────────────────────────────────────────────────────────
+    // Wave OSR (#71) — on-screen respondent results toggle (flag-gated WRITE).
+    //
+    //   - Flag OFF (or `_KILL` set) → the field is IGNORED, not written, for
+    //     CONSISTENCY with the other two flag-gated fields on this route
+    //     (`invitationBodyHtml` Task 12, `customSlides` Wave M R1-High-1): a
+    //     hidden control should not be drivable from this route. This does NOT
+    //     contradict `wave-osr-flags.ts`'s "flags gate capability, never persisted
+    //     data" rule — refusing a NEW write is not coercing a STORED value, and
+    //     nothing here rewrites the column.
+    //
+    //     ⚠️ It is NOT a security boundary, so do not describe it as one: the
+    //     CREATE route writes this same column with no flag check, and disclosure
+    //     is decided server-side under the Phase-2 submission lock regardless of
+    //     what is stored. The gate is tidiness, and the lock is the control.
+    //   - Flag ON → written in both directions (an explicit opt-OUT is a write,
+    //     so the check is `!== undefined`, never truthiness).
+    //
+    // No CAS sentinel, unlike slides: a boolean has no authored content that a
+    // last-write-wins clobber could destroy. The audit trail needs no new code —
+    // the legacy single-update path below logs `changes: updateData`, so the
+    // toggle rides along in it.
+    //
+    // WHY this exists at all: the column was writable only at CREATE, so a
+    // campaign that already existed had no way to opt in.
+    // ─────────────────────────────────────────────────────────────────────
+    if (data.showResultsOnScreen !== undefined && isOnScreenResultsEnabled()) {
+      updateData.showResultsOnScreen = data.showResultsOnScreen;
+    }
+
     if (data.openAt !== undefined) {
       const d = new Date(data.openAt);
       if (Number.isNaN(d.getTime())) {

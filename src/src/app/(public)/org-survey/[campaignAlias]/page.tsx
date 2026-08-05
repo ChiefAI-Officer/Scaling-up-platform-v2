@@ -8,6 +8,7 @@
  */
 import type { Metadata } from "next";
 import { OrgSurveyClient } from "@/components/assessments/org-survey-client";
+import { isQspStoryGroupEnabled } from "@/lib/assessments/wave-48-flags";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -27,5 +28,12 @@ export default async function OrgSurveyPage({
   params: Promise<{ campaignAlias: string }>;
 }) {
   const { campaignAlias } = await params;
-  return <OrgSurveyClient campaignAlias={campaignAlias} />;
+  return (
+    <OrgSurveyClient
+      campaignAlias={campaignAlias}
+      {...(isQspStoryGroupEnabled()
+        ? { qspStoryGroupEnabled: true }
+        : {})}
+    />
+  );
 }

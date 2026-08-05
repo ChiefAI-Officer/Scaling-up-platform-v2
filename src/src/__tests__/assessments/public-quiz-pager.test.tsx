@@ -29,6 +29,7 @@ jest.mock("next/navigation", () => ({
 
 import { PublicQuizClient } from "@/components/assessments/public-quiz-client";
 import { publicDraftKey } from "@/lib/assessments/use-answer-draft";
+import { formatTimestamp } from "@/lib/utils";
 
 const ALIAS = "team-alpha";
 const LVA_ALIAS = "leadership-vision-alignment";
@@ -87,6 +88,63 @@ describe("PublicQuizClient — SectionPager wiring", () => {
     jest.clearAllMocks();
     localStorage.clear();
     sessionStorage.clear();
+  });
+
+  it.each([
+    {
+      name: "future public assessment",
+      status: "ACTIVE" as const,
+      nowIso: "2026-01-01T00:00:00.000Z",
+      openAtIso: "2026-01-02T12:00:00.000Z",
+      closeAtIso: null,
+      displayedAtIso: "2026-01-02T12:00:00.000Z",
+      messagePrefix: "This assessment opens",
+    },
+    {
+      name: "past-closing public assessment",
+      status: "ACTIVE" as const,
+      nowIso: "2026-01-03T00:00:00.000Z",
+      openAtIso: "2025-12-01T12:00:00.000Z",
+      closeAtIso: "2026-01-02T12:00:00.000Z",
+      displayedAtIso: "2026-01-02T12:00:00.000Z",
+      messagePrefix: "This assessment closed on",
+    },
+  ])("renders a medium-format date in the unavailable notice for a $name", ({
+    status,
+    nowIso,
+    openAtIso,
+    closeAtIso,
+    displayedAtIso,
+    messagePrefix,
+  }) => {
+    // This fails if the notice falls back to Date#toLocaleDateString(), which
+    // produces the slash-form dates the BUG-05 guard was added to prevent.
+    jest.useFakeTimers().setSystemTime(new Date(nowIso));
+    const localDateSpy = jest
+      .spyOn(Date.prototype, "toLocaleDateString")
+      .mockReturnValue("1/2/2026");
+
+    try {
+      render(
+        <PublicQuizClient
+          {...baseProps}
+          isOpen={false}
+          status={status}
+          openAtIso={openAtIso}
+          closeAtIso={closeAtIso}
+        />,
+      );
+
+      expect(
+        screen.getByText(
+          `${messagePrefix} ${formatTimestamp(displayedAtIso)}.`,
+        ),
+      ).toBeInTheDocument();
+      expect(localDateSpy).not.toHaveBeenCalled();
+    } finally {
+      localDateSpy.mockRestore();
+      jest.useRealTimers();
+    }
   });
 
   it("renders one section per screen via the pager (not stacked)", () => {
@@ -397,6 +455,65 @@ describe("PublicQuizClient — SectionPager wiring", () => {
     expect(screen.getByTestId("quiz-email")).toBeInTheDocument();
   });
 
+  it("groups the QSP core-values stories and submits their three stable keys unchanged", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        success: true,
+        data: {
+          submissionId: "sub_qsp_public",
+          scoreResult: {
+            perQuestion: [], perSection: [], overallTotal: 0, overallAverage: 0,
+            countAchieved: 0, tier: null, tierMetricValue: 0, unansweredKeys: [],
+          },
+        },
+      }),
+    });
+    const qspStoryQuestions = [1, 2, 3].map((index) => ({
+      stableKey: `P1_core_values_story_${index}`,
+      sortOrder: index,
+      sectionStableKey: "P1_retrospective",
+      type: "TEXT",
+      label: `Core-values story ${index}`,
+      isRequired: false,
+    }));
+
+    render(
+      <PublicQuizClient
+        {...baseProps}
+        templateAlias="qsp-v2"
+        sections={[{ stableKey: "P1_retrospective", sortOrder: 1, name: "Core values" }]}
+        questions={qspStoryQuestions}
+        qspStoryGroupEnabled
+      />,
+    );
+    reachFormStep();
+    expect(screen.getByTestId("qsp-story-group")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Person and story 1 of 3" }), {
+      target: { value: "Ada led the launch" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /add another person/i }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Person and story 2 of 3" }), {
+      target: { value: "Grace coached the team" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /add another person/i }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Person and story 3 of 3" }), {
+      target: { value: "Lin removed a blocker" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /submit/i }));
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
+    const [, init] = (global.fetch as jest.Mock).mock.calls[0];
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body.answers).toEqual([
+      { stableKey: "P1_core_values_story_1", value: "Ada led the launch" },
+      { stableKey: "P1_core_values_story_2", value: "Grace coached the team" },
+      { stableKey: "P1_core_values_story_3", value: "Lin removed a blocker" },
+    ]);
+  });
+
   it("info step does NOT promise emailed results (D3 policy)", () => {
     render(<PublicQuizClient {...baseProps} />);
     fireEvent.click(screen.getByTestId("quiz-start"));
@@ -411,17 +528,34 @@ describe("PublicQuizClient — SectionPager wiring", () => {
   });
 
   it("Screen 1 (welcome) renders the value-prop 'what to expect' list and stat chips from ACTUAL data", () => {
-    render(<PublicQuizClient {...baseProps} />);
+    const { container } = render(<PublicQuizClient {...baseProps} />);
     // The de-bared welcome renders the value-prop expectation list...
     const expectations = screen.getByTestId("welcome-expectations");
     expect(expectations).toBeInTheDocument();
-    expect(within(expectations).getByText(/honest & confidential/i)).toBeInTheDocument();
+    expect(
+      within(expectations).getByText("How your results are shared"),
+    ).toBeInTheDocument();
+    expect(
+      within(expectations).getByText(
+        "You receive your results immediately. Authorized Scaling Up staff can review your full report; your referring coach can too, if you used their link.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/\b(?:confidential|anonymous|private)\b/i),
+    ).not.toBeInTheDocument();
+    expect(container.querySelector(".su-welcome-fine")).toHaveTextContent(
+      "Free to take — you'll get your results on screen and a copy by email.",
+    );
+    expect(container.querySelector(".su-welcome-fine")).not.toHaveTextContent(
+      /responses are also shared/i,
+    );
     // ...and the stat chips reflect the real counts (2 questions, 2 sections)
-    // and the derived 0–3 scale — NOT hardcoded 38/5/1–5.
+    // and the uniform 0–3 scale — NOT hardcoded 38/5/1–5.
     const stats = screen.getByTestId("welcome-stats");
     // 2 questions + 2 sections → both chips read "2"; the scale chip reads "0–3".
     expect(within(stats).getAllByText("2")).toHaveLength(2);
     expect(within(stats).getByText("0–3")).toBeInTheDocument(); // derived from the slider scale
+    expect(stats.querySelectorAll(".su-welcome-chip")).toHaveLength(3);
     expect(within(stats).queryByText("38")).not.toBeInTheDocument();
     // The expectation row also states the real count + scale.
     expect(within(expectations).getByText(/2 short statements, rated 0–3\./i)).toBeInTheDocument();

@@ -20,6 +20,12 @@ import type { CampaignStatusMetrics as CampaignStatusMetricsType } from "@/lib/a
 
 export type CampaignStatus = "DRAFT" | "ACTIVE" | "CLOSED";
 
+export interface CampaignListEdition {
+  versionNumber: number;
+  newerEditionAvailable: boolean;
+  pinnedRetired: boolean;
+}
+
 export interface CampaignListItem {
   id: string;
   name: string;
@@ -30,6 +36,7 @@ export interface CampaignListItem {
   organizationName: string;
   openAt: string; // ISO date so server -> client serializes safely
   metrics: CampaignStatusMetricsType;
+  edition: CampaignListEdition | null;
 }
 
 type FilterValue = "ALL" | CampaignStatus;
@@ -85,6 +92,8 @@ function CompanySection({
         <div className="divide-y divide-border">
           {campaigns.map((c) => {
             const isDraftNoInvites = c.status === "DRAFT" && c.metrics.total === 0;
+            const canShowEditionWarning =
+              c.status === "DRAFT" || c.status === "ACTIVE";
             return (
               <div
                 key={c.id}
@@ -93,7 +102,7 @@ function CompanySection({
               >
                 {/* Top row: name + template + status + date + action */}
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-0 basis-full sm:flex-1">
                     <Link
                       href={`${detailBasePath}/${c.id}`}
                       className="font-medium text-foreground hover:text-primary text-sm"
@@ -102,9 +111,35 @@ function CompanySection({
                     </Link>
                     <div className="text-xs text-muted-foreground">{c.alias}</div>
                   </div>
-                  <span className="text-xs text-muted-foreground hidden sm:inline">
+                  <span
+                    className="min-w-0 max-w-full text-xs text-muted-foreground break-words"
+                    data-testid={`campaign-edition-identity-${c.id}`}
+                  >
                     {c.templateName}
+                    {c.edition ? (
+                      <>
+                        <span aria-hidden="true"> &middot; </span>
+                        <span className="whitespace-nowrap tabular-nums">
+                          Edition {c.edition.versionNumber}
+                        </span>
+                      </>
+                    ) : null}
                   </span>
+                  {canShowEditionWarning && c.edition?.pinnedRetired ? (
+                    <span
+                      className="inline-flex items-center rounded-md border border-destructive bg-destructive/10 px-1.5 py-0.5 text-xs font-semibold text-destructive"
+                      data-testid={`campaign-edition-retired-${c.id}`}
+                    >
+                      Retired
+                    </span>
+                  ) : canShowEditionWarning && c.edition?.newerEditionAvailable ? (
+                    <span
+                      className="inline-flex items-center rounded-md border border-warning/30 bg-warning/10 px-1.5 py-0.5 text-xs font-semibold text-warning"
+                      data-testid={`campaign-edition-stale-${c.id}`}
+                    >
+                      Not latest
+                    </span>
+                  ) : null}
                   <span
                     className={`inline-flex items-center text-xs font-medium px-2 py-0.5 rounded border ${
                       STATUS_TONE[c.status] ?? "bg-muted text-muted-foreground border-border"

@@ -46,25 +46,38 @@
 
 import { inngest } from "@/inngest/client";
 import { db } from "@/lib/db";
-import { sendAssessmentInvitationEmail } from "@/services/notifications";
+import {
+  prepareAssessmentInvitationEmail,
+  sendAssessmentInvitationEmail,
+} from "@/services/notifications";
 import {
   resolveCoachName,
   resolveCoachLogo,
 } from "@/lib/assessments/invitation-email";
 import { isInviteEmailChromeEnabled } from "@/lib/assessments/wave-p-flags";
 import {
+  createStableOriginalTokenAdapter,
   sendInvitesBatch as realSendInvitesBatch,
   INVITE_BATCH_CAP,
   type InviteMailer,
+  type PreparedInviteEmail,
+  type RejectedCleanupAuditInput,
   type SendInvitesDeps,
   type SendInvitesInput,
   type SendInvitesResult,
+  type StableOriginalTokenAdapter,
 } from "@/lib/assessments/invite-send";
 import {
   waveDAutoSendEnabled,
   assessmentSendsPaused,
 } from "@/lib/assessments/wave-d-feature-flags";
+import { isStableInvitationLinksEnabled } from "@/lib/assessments/wave-j65-flags";
 import { ASSESSMENT_SEND_INVITES_EVENT } from "./assessment-invite-fanout-event";
+import { STABLE_INVITATION_REJECTION_RETRY_EVENT } from "./stable-invitation-rejection-retry-event";
+import {
+  persistStableInvitationRejectionRepairPending,
+  type StableInvitationRejectionOutboxDb,
+} from "@/lib/assessments/stable-invitation-rejection-outbox";
 
 // ---------------------------------------------------------------------------
 // Event
@@ -145,6 +158,15 @@ export interface InviteFanoutDeps {
   db: FanoutCampaignDb;
   /** The real per-recipient invitation mailer. */
   sendEmail: InviteMailer;
+  prepareEmail: (data: Parameters<InviteMailer>[0]) => PreparedInviteEmail;
+  stableTokens: StableOriginalTokenAdapter;
+  persistRejectedCleanupAudit: (
+    input: RejectedCleanupAuditInput,
+  ) => Promise<void>;
+  enqueueRejectedQuarantineRetry: (
+    input: { invitationId: string; tokenId: string },
+  ) => Promise<void>;
+  isStableLinksEnabled: (campaignAlias?: string) => boolean;
   /** Shared per-recipient create+send (injected so tests can stub it). */
   sendInvitesBatch?: (
     deps: SendInvitesDeps,
@@ -325,6 +347,7 @@ export async function runInviteFanout(
   );
   const organizationName = campaign.organization?.name ?? null;
   const templateName = campaign.template?.name ?? null;
+  const stableLinksEnabled = deps.isStableLinksEnabled(campaign.alias);
 
   // Wave P — invitation-email chrome (#2.1 coach logo + #2.4 larger CTA).
   // Flag evaluated ONCE per fan-out run; logo identity MIRRORS resolveCoachName
@@ -393,7 +416,21 @@ export async function runInviteFanout(
 
     const result = await deps.runStep(`send-batch-${i + 1}`, () =>
       sendBatch(
-        { db: deps.db as unknown as SendInvitesDeps["db"], sendEmail: deps.sendEmail, now: deps.now },
+        {
+          db: deps.db as unknown as SendInvitesDeps["db"],
+          sendEmail: deps.sendEmail,
+          now: deps.now,
+          ...(stableLinksEnabled
+            ? {
+                prepareEmail: deps.prepareEmail,
+                stableTokens: deps.stableTokens,
+                persistRejectedCleanupAudit:
+                  deps.persistRejectedCleanupAudit,
+                enqueueRejectedQuarantineRetry:
+                  deps.enqueueRejectedQuarantineRetry,
+              }
+            : {}),
+        },
         {
           campaign: {
             id: campaign.id,
@@ -416,6 +453,7 @@ export async function runInviteFanout(
           templateName,
           chrome,
           coachLogoUrl: coachLogo.coachLogoUrl,
+          stableLinksEnabled,
         },
       ),
     );
@@ -525,6 +563,30 @@ export const assessmentInviteFanout = inngest.createFunction(
       {
         db: db as unknown as FanoutCampaignDb,
         sendEmail: sendAssessmentInvitationEmail,
+        prepareEmail: (data) =>
+          prepareAssessmentInvitationEmail({
+            ...data,
+            redactErrors: true,
+            coalesceVerification: true,
+          }),
+        stableTokens: createStableOriginalTokenAdapter(db),
+        enqueueRejectedQuarantineRetry: async (input) => {
+          await inngest.send({
+            id: `stable-invitation-rejection-${input.tokenId}`,
+            name: STABLE_INVITATION_REJECTION_RETRY_EVENT,
+            data: input,
+          });
+        },
+        persistRejectedCleanupAudit: (input) =>
+          persistStableInvitationRejectionRepairPending(
+            db as unknown as StableInvitationRejectionOutboxDb,
+            {
+              invitationId: input.invitationId,
+              tokenId: input.tokenId,
+              performedBy: "system:assessment-invite-fanout",
+            },
+          ),
+        isStableLinksEnabled: isStableInvitationLinksEnabled,
         isPaused: assessmentSendsPaused,
         isAutoSendEnabled: waveDAutoSendEnabled,
         now: () => new Date(),

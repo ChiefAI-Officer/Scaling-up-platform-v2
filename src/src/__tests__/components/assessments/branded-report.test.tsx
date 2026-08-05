@@ -18,9 +18,14 @@ import type { ScoreResult } from "@/lib/assessments/scoring";
 function baseReport(overrides: Partial<RespondentReport> = {}): RespondentReport {
   return {
     respondentName: "Sarah Chen",
+    respondentEmail: "sarah@example.com",
     jobTitle: "Chief Executive Officer",
     companyName: "Northwind Logistics",
     assessmentName: "Rockefeller Habits Checklist",
+    // Required on RespondentReport. "" resolves to DEFAULT_REPORT_CONFIG, which
+    // is exactly what omitting it used to do — so these fixtures are unchanged
+    // in behaviour. Cases that need a real instrument override it.
+    templateAlias: "",
     campaignLabel: null,
     submittedAt: new Date("2026-06-05T10:00:00Z"),
     result: {} as ScoreResult,
@@ -39,6 +44,34 @@ function baseReport(overrides: Partial<RespondentReport> = {}): RespondentReport
     ...overrides,
   };
 }
+
+describe("BrandedReport — respondent identity and next steps", () => {
+  it("shows the taker's email and both next-step links", () => {
+    render(
+      <BrandedReport
+        report={rockefellerReport()}
+        contactEmail="coach@example.com"
+      />,
+    );
+
+    expect(screen.getByText(/sarah@example\.com/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /learn more/i })).toHaveAttribute(
+      "href",
+      "https://scalingup.com",
+    );
+    expect(
+      screen.getByRole("link", { name: /talk to a coach/i }),
+    ).toHaveAttribute("href", "mailto:coach%40example.com");
+  });
+
+  it("falls back to the certified-coach directory when no verified email exists", () => {
+    render(<BrandedReport report={rockefellerReport()} />);
+
+    expect(
+      screen.getByRole("link", { name: /talk to a coach/i }),
+    ).toHaveAttribute("href", "https://scalingup.com/coaches");
+  });
+});
 
 // ── Rockefeller — countAchieved + real tiers + checkmarks, no domains/recs ──
 
@@ -691,7 +724,7 @@ describe("BrandedReport — conclusion + footer", () => {
   it("renders a coach CTA as text and a clean footer (#25): submission date + credit, no provenance", () => {
     render(<BrandedReport report={rockefellerReport()} />);
     expect(screen.getByTestId("report-conclusion").textContent).toMatch(
-      /Scaling Up Certified Coach/i,
+      /Talk to a Coach/i,
     );
     const footer = screen.getByTestId("report-footer");
     // #25 — credit line is exactly the platform name; no provenance metadata.
@@ -796,5 +829,32 @@ describe("BrandedReport — conclusion greeting guard (Wave P)", () => {
     expect(screen.getByTestId("report-conclusion").textContent).toContain(
       "Keep Scaling, Sarah.",
     );
+  });
+});
+
+// ─── PR #236 round-2 finding #10 — the orphan-separator guard was untested ────
+//
+// The cover subtitle used to interpolate `{companyName} · {date}` unconditionally,
+// so an empty company name rendered a naked leading " · ". Wave OSR added the
+// guard but nothing pinned it: reverting either renderer failed no test. The one
+// live surface that exercises it is the PUBLIC quiz, which hardcodes
+// `companyName: ""` (the invited path always has an org, since
+// AssessmentCampaign.organizationId is NOT NULL).
+describe("cover subtitle separator (empty companyName)", () => {
+  function subtitleText(companyName: string): string {
+    const { container } = render(
+      <BrandedReport report={baseReport({ companyName })} />,
+    );
+    return container.querySelector(".su-report-sub")?.textContent ?? "";
+  }
+
+  it("emits no leading separator when there is no company name", () => {
+    const text = subtitleText("");
+    expect(text).not.toMatch(/^\s*·/);
+    expect(text).not.toContain("·");
+  });
+
+  it("positive control — still separates the company name from the date", () => {
+    expect(subtitleText("Northwind Logistics")).toContain("Northwind Logistics ·");
   });
 });

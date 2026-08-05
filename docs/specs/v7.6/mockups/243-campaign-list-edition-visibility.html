@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>GH #243 campaign-list edition states</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f8fa;
+      --card: #fff;
+      --text: #172033;
+      --muted: #667085;
+      --border: #e4e7ec;
+      --primary: #3157a4;
+      --warning: #a15c00;
+      --warning-bg: #fff7e8;
+      --warning-border: #f2c46d;
+      --danger: #b42318;
+      --danger-bg: #fff1f0;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 Inter, system-ui, sans-serif; }
+    main { width: min(980px, calc(100% - 32px)); margin: 32px auto; }
+    h1 { margin: 0 0 16px; font-size: 20px; }
+    .list { overflow: hidden; border: 1px solid var(--border); border-radius: 12px; background: var(--card); }
+    .row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; padding: 12px 16px; border-top: 1px solid var(--border); }
+    .row:first-child { border-top: 0; }
+    .campaign { min-width: 170px; flex: 1 1 220px; }
+    .name { display: block; color: var(--primary); font-weight: 600; }
+    .alias, .identity, .opens, .view { color: var(--muted); font-size: 12px; }
+    .identity { min-width: 0; overflow-wrap: anywhere; }
+    .edition { white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .badge { display: inline-flex; align-items: center; border: 1px solid var(--border); border-radius: 6px; padding: 2px 6px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+    .stale { border-color: var(--warning-border); background: var(--warning-bg); color: var(--warning); }
+    .retired { border-color: var(--danger); background: var(--danger-bg); color: var(--danger); }
+    .status { background: #f2f4f7; color: #475467; }
+    .view { margin-left: auto; color: var(--primary); }
+    @media (max-width: 520px) {
+      main { width: calc(100% - 20px); margin: 16px auto; }
+      .row { align-items: flex-start; gap: 6px 10px; padding: 12px; }
+      .campaign { flex-basis: 100%; }
+      .identity { flex: 1 1 210px; }
+      .view { margin-left: 0; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Campaign edition row states</h1>
+  <div class="list">
+    <div class="row"><div class="campaign"><span class="name">Q3 Planning</span><span class="alias">q3-planning</span></div><span class="identity">Quarterly Session Prep v2 · <span class="edition">Edition 3</span></span><span class="badge status">Active</span><span class="opens">Opens Jul 31, 2026</span><span class="view">View</span></div>
+    <div class="row"><div class="campaign"><span class="name">Leadership Pulse</span><span class="alias">leadership-pulse</span></div><span class="identity">Leadership Vision Alignment · <span class="edition">Edition 2</span></span><span class="badge stale">Not latest</span><span class="badge status">Draft</span><span class="opens">Opens Aug 4, 2026</span><span class="view">View</span></div>
+    <div class="row"><div class="campaign"><span class="name">Legacy Habits</span><span class="alias">legacy-habits</span></div><span class="identity">Rockefeller Habits · <span class="edition">Edition 1</span></span><span class="badge retired">Retired</span><span class="badge status">Active</span><span class="opens">Opens Jul 1, 2026</span><span class="view">View</span></div>
+    <div class="row"><div class="campaign"><span class="name">2024 Imported Round</span><span class="alias">imported-2024</span></div><span class="identity">Scaling Up Full · <span class="edition">Edition 1</span></span><span class="badge status">Closed</span><span class="opens">Opened Dec 1, 2024</span><span class="view">View</span></div>
+    <div class="row"><div class="campaign"><span class="name">Unresolved Fixture</span><span class="alias">unresolved</span></div><span class="identity">Five Dysfunctions</span><span class="badge status">Active</span><span class="opens">Opens Aug 8, 2026</span><span class="view">View</span></div>
+  </div>
+</main>
+</body>
+</html>

@@ -13,13 +13,33 @@
  * PUBLIC campaigns with no creator coach) this renders NOTHING, so the report
  * looks exactly as it did before (SU logo only). No broken image.
  *
- * Security: `url` is a coach/admin-set URL rendered ONLY as an <img src> (safe;
- * no XSS via img src). `name` is React-escaped text. Neither is interpolated
- * into raw HTML/markdown.
+ * Security (GH #229): `url` is an OPERATOR-set string. It is never interpolated
+ * into raw HTML/markdown, so this is NOT an XSS concern. Wave OSR (#71) renders
+ * this report to UNAUTHENTICATED respondents, which is what makes the src worth
+ * gating at all — #229's own "impact is narrow" reasoning rested on the Report
+ * access gate that #71 removes.
+ *
+ * The url goes through the same https-only `safeImageSrc` gate the invitation
+ * email applies. Be precise about what that buys, because it is easy to overstate:
+ *   - BLOCKED: http: (mixed content on an https page), `javascript:`/`data:`,
+ *     protocol-relative, root-relative, and unparseable values.
+ *   - NOT BLOCKED: an arbitrary HTTPS **host**. The gate has no host constraint,
+ *     so a rendered logo can still cause an outbound request from every
+ *     respondent's browser. Constraining the host is the open part of #229; an
+ *     allowlist is not applied here because Circle-synced avatars are
+ *     legitimately third-party hosted.
+ *
+ * A REJECTED url degrades to the name-only state rather than rendering nothing:
+ * the byline is the half Jeff actually asked for (#63/#67/#73/#78/#81), and a bad
+ * image URL must not delete it.
+ *
+ * `name` is React-escaped text.
  *
  * `variant` swaps the scoped CSS class (cover vs footer sizing). The logo keeps
  * `data-testid="coach-logo"`; the name carries `data-testid="coach-name"`.
  */
+
+import { safeImageSrc } from "@/lib/assessments/safe-image-src";
 
 export function CoachLogo({
   url,
@@ -31,8 +51,11 @@ export function CoachLogo({
   variant: "cover" | "footer";
 }) {
   const displayName = (name ?? "").trim();
-  // Nothing to show when the coach has neither a logo nor a name.
-  if (!url && !displayName) return null;
+  // GH #229 — an src that fails the https-only gate is treated as ABSENT, which
+  // routes it into the existing name-only fallback below.
+  const safeUrl = safeImageSrc(url);
+  // Nothing to show when the coach has neither a renderable logo nor a name.
+  if (!safeUrl && !displayName) return null;
 
   const wrapCls =
     variant === "cover"
@@ -45,12 +68,12 @@ export function CoachLogo({
 
   return (
     <span className={wrapCls}>
-      {url ? (
+      {safeUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           className={imgCls}
           data-testid="coach-logo"
-          src={url}
+          src={safeUrl}
           // a11y: when the name is shown as adjacent visible text the logo is
           // decorative (alt="") so screen readers don't announce the name
           // twice; otherwise the name labels the logo.

@@ -4,7 +4,13 @@
  * Uses shared SMTP transport from lib/smtp-transport.ts.
  */
 
-import { sendEmailViaSMTP, type SmtpAttachment } from "@/lib/smtp-transport";
+import {
+    prepareEmailViaSMTP,
+    sendEmailViaSMTP,
+    type PreparedEmail,
+    type SendEmailOptions,
+    type SmtpAttachment,
+} from "@/lib/smtp-transport";
 import { db } from "@/lib/db";
 import { generateIcsContent, buildLocationString } from "@/lib/ics-generator";
 import { formatEventDateUTC, formatTimeWithZone } from "@/lib/utils";
@@ -17,6 +23,9 @@ import {
     renderTextBody,
     renderFullHtmlBody,
     renderFullTextBody,
+    renderCustomHtmlFragment,
+    buildInvitationEmailShell,
+    renderBrandedCustomHtmlText,
     shouldShowOrgLine,
     type InvitationVars,
 } from "@/lib/assessments/invitation-email";
@@ -25,8 +34,12 @@ import {
     DEFAULT_INVITATION_SUBJECT,
     DEFAULT_INVITATION_VERSION,
 } from "@/lib/assessments/invitation-defaults";
-import { waveDCustomHtmlEmailEnabled } from "@/lib/assessments/wave-d-feature-flags";
+import {
+    assessmentInviteBrandedCustomHtmlEnabled,
+    waveDCustomHtmlEmailEnabled,
+} from "@/lib/assessments/wave-d-feature-flags";
 import { SU_LOGO_PNG, SU_LOGO_CID } from "@/lib/assets/invitation-logo";
+import { resolveInvitationHtmlMode } from "@/lib/assessments/invitation-html-policy";
 
 // ============================================
 // Types
@@ -1098,15 +1111,16 @@ export async function sendCoachDeclinedCounterEmail(data: {
  * Throws on SMTP failure so the caller (the invite route) can mark the
  * invitation row as send-failed instead of optimistically flipping to SENT.
  */
-export async function sendAssessmentInvitationEmail(data: {
+export interface AssessmentInvitationEmailInput {
     invitation: { id: string; expiresAt: Date };
     respondent: { id: string; firstName: string; lastName: string; email: string };
     campaign: { id: string; name: string; alias: string; closeAt: Date | null };
     template: { alias: string; invitationSubject: string; invitationBodyMarkdown: string };
     /**
-     * Per-campaign full-HTML invitation override (#20). When non-empty AND
-     * waveDCustomHtmlEmailEnabled(), this REPLACES the entire branded shell
-     * (the subject still comes from invitationSubject — never the HTML).
+     * Per-campaign custom-HTML invitation override (#20). When non-empty and
+     * Wave D is enabled, the GH #220 behavior flag composes it as a branded
+     * body fragment; otherwise only token-bearing legacy HTML replaces the
+     * shell. The subject still comes from invitationSubject — never the HTML.
      */
     invitationBodyHtml?: string | null;
     organizationName?: string | null;
@@ -1118,13 +1132,28 @@ export async function sendAssessmentInvitationEmail(data: {
      * Wave P — invitation-email chrome (coach logo + larger CTA). Callers
      * evaluate `isInviteEmailChromeEnabled` once per send and pass the
      * variant; this chokepoint never reads the flag. Defaults to "legacy"
-     * (byte-identical branded shell). The full-HTML override path is
-     * EXCLUDED: chrome/logo never alter a custom-HTML invitation.
+     * (byte-identical branded shell). Branded custom HTML receives this chrome;
+     * only the legacy full-replacement path is excluded.
      */
     chrome?: "legacy" | "waveP";
     /** Wave P — coach logo (creator coach ?? org owner profileImage; https-gated at render). */
     coachLogoUrl?: string | null;
-}): Promise<void> {
+    /** Jeff #65 enabled delivery keeps provider errors out of persistence. */
+    redactErrors?: boolean;
+    /** Jeff #65 enabled delivery shares concurrent SMTP verification. */
+    coalesceVerification?: boolean;
+}
+
+export async function sendAssessmentInvitationEmail(
+    data: AssessmentInvitationEmailInput,
+): Promise<void> {
+    const prepared = prepareAssessmentInvitationEmail(data);
+    await prepared.send();
+}
+
+export function prepareAssessmentInvitationEmail(
+    data: AssessmentInvitationEmailInput,
+): PreparedEmail {
     const trimmedBase = data.baseUrl.replace(/\/+$/, "");
     const invitationUrl = `${trimmedBase}/org-survey/${data.campaign.alias}#t=${data.rawToken}`;
 
@@ -1145,19 +1174,21 @@ export async function sendAssessmentInvitationEmail(data: {
     const branded = process.env.ASSESSMENT_INVITE_BRANDED !== "0";
 
     if (!branded) {
-        await sendLegacyInvitationEmail({
+        return prepareEmailViaSMTP(buildLegacyInvitationEmailOptions({
             invitation: data.invitation,
             respondent: data.respondent,
             campaign: data.campaign,
             organizationName: data.organizationName ?? null,
             templateName: data.templateName ?? null,
+            coachName: data.coachName ?? null,
             invitationUrl,
             effectiveSubject,
             effectiveBodyMarkdown,
             subjectSource,
             bodySource,
-        });
-        return;
+            redactErrors: data.redactErrors,
+            coalesceVerification: data.coalesceVerification,
+        }));
     }
 
     const vars: InvitationVars = {
@@ -1183,18 +1214,16 @@ export async function sendAssessmentInvitationEmail(data: {
     // NEVER derived from the full-HTML body. This holds on every render path.
     const subject = renderSubject(effectiveSubject, vars);
 
-    // Render precedence (#20):
-    //   invitationBodyHtml (full HTML, flag on) > invitationBodyMarkdown (shell) > template default.
-    // The full-HTML body REPLACES the branded shell entirely (no wrap, no CID
-    // logo attachment). buildTokenValues already neutralizes markdown in PII;
-    // renderFullHtmlBody additionally HTML-escapes every token value BEFORE
-    // substitution and strict-sanitizes the result (the second gate).
-    const fullHtml =
-        waveDCustomHtmlEmailEnabled() &&
+    const rawCustomHtml =
         typeof data.invitationBodyHtml === "string" &&
         data.invitationBodyHtml.trim().length > 0
             ? data.invitationBodyHtml
             : null;
+    const customHtmlMode = resolveInvitationHtmlMode({
+        waveDCustomHtmlEnabled: waveDCustomHtmlEmailEnabled(),
+        brandedCustomHtmlEnabled: assessmentInviteBrandedCustomHtmlEnabled(),
+        rawHtml: rawCustomHtml,
+    });
 
     let html: string;
     let text: string;
@@ -1202,31 +1231,54 @@ export async function sendAssessmentInvitationEmail(data: {
         { filename: "su-logo.png", content: SU_LOGO_PNG, contentType: "image/png", cid: SU_LOGO_CID },
     ];
 
-    if (fullHtml) {
-        // Full-HTML override: the rendered body IS the whole email — no shell,
-        // and no CID logo attachment (the coach controls all imagery). The
-        // default body never applies here (the full HTML replaces the body).
-        html = renderFullHtmlBody(fullHtml, vars);
-        text = renderFullTextBody(fullHtml, vars);
+    if (customHtmlMode === "full_replace" && rawCustomHtml !== null) {
+        html = renderFullHtmlBody(rawCustomHtml, vars);
+        text = renderFullTextBody(rawCustomHtml, vars);
         attachments = [];
+    } else if (customHtmlMode === "branded_body" && rawCustomHtml !== null) {
+        const fragment = renderCustomHtmlFragment(rawCustomHtml, vars);
+        html = buildInvitationEmailShell({
+            bodyHtml: fragment,
+            vars,
+            chrome: data.chrome ?? "legacy",
+        });
+        text = renderBrandedCustomHtmlText(fragment, vars);
     } else {
         html = buildInvitationEmailHtml({ bodyMarkdown: effectiveBodyMarkdown, vars, chrome: data.chrome ?? "legacy" });
         text = renderTextBody(effectiveBodyMarkdown, vars);
     }
 
     // Telemetry (PII-FREE): which renderer + whether defaults filled a blank.
-    const renderer: "branded" | "custom_html" = fullHtml ? "custom_html" : "branded";
-    const effectiveBodySource: "authored" | "default" | "custom_html" = fullHtml ? "custom_html" : bodySource;
+    const customHtmlRendered =
+        customHtmlMode === "full_replace" || customHtmlMode === "branded_body";
+    const renderer: "branded" | "custom_html" = customHtmlRendered ? "custom_html" : "branded";
+    const effectiveBodySource: "authored" | "default" | "custom_html" =
+        customHtmlRendered ? "custom_html" : bodySource;
+    const customHtmlMetadata =
+        customHtmlMode === "full_replace" || customHtmlMode === "branded_body"
+            ? { customHtmlMode }
+            : customHtmlMode === "branded_fallback"
+                ? {
+                    customHtmlFallbackReason:
+                        "branded_mode_disabled_missing_url_token" as const,
+                }
+                : {};
     const usedDefault = subjectSource === "default" || effectiveBodySource === "default";
 
     // STRICT: failures propagate. The invite route catches and marks the
     // invitation row as send-failed instead of optimistically flipping SENT.
-    await sendEmailViaSMTP({
+    return prepareEmailViaSMTP({
         to: data.respondent.email,
         subject,
         html,
         text,
         attachments,
+        ...(data.redactErrors
+            ? {
+                redactErrors: true,
+                coalesceVerification: data.coalesceVerification === true,
+              }
+            : {}),
         telemetry: {
             recipientRole: "CUSTOM",
             metadata: {
@@ -1238,24 +1290,28 @@ export async function sendAssessmentInvitationEmail(data: {
                 subjectSource,
                 bodySource: effectiveBodySource,
                 defaultVersion: usedDefault ? DEFAULT_INVITATION_VERSION : null,
+                ...customHtmlMetadata,
             },
         },
     });
 }
 
 /** Legacy plain invitation renderer — retained as the ASSESSMENT_INVITE_BRANDED=0 off-switch. */
-async function sendLegacyInvitationEmail(data: {
+function buildLegacyInvitationEmailOptions(data: {
     invitation: { id: string; expiresAt: Date };
     respondent: { id: string; firstName: string; lastName: string; email: string };
     campaign: { id: string; name: string; alias: string; closeAt: Date | null };
     organizationName: string | null;
     templateName: string | null;
+    coachName: string | null;
     invitationUrl: string;
     effectiveSubject: string;
     effectiveBodyMarkdown: string;
     subjectSource: "authored" | "default";
     bodySource: "authored" | "default";
-}): Promise<void> {
+    redactErrors?: boolean;
+    coalesceVerification?: boolean;
+}): SendEmailOptions {
     // Build the SAME InvitationVars the branded path uses so {{organizationName}}
     // / {{templateName}} (and every other token) resolve here too. The old legacy
     // substitute() didn't know those tokens.
@@ -1268,7 +1324,7 @@ async function sendLegacyInvitationEmail(data: {
         organizationName: data.organizationName,
         campaignName: data.campaign.name,
         templateName: data.templateName,
-        coachName: null,
+        coachName: data.coachName,
         invitationUrl: data.invitationUrl,
         closeAt: data.campaign.closeAt,
     };
@@ -1287,13 +1343,32 @@ async function sendLegacyInvitationEmail(data: {
         .split(/\n\s*\n/)
         .map((p) => `<p style="margin:0 0 12px;color:#374151;">${p.replace(/\n/g, "<br/>")}</p>`)
         .join("");
-    const html = `<div style="font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;max-width:560px;margin:0 auto;">${paragraphs}<br/><div style="text-align:center;"><a href="${data.invitationUrl}" style="display:inline-block;background-color:#1D4ED8;color:#ffffff;padding:14px 28px;text-decoration:none;border-radius:8px;font-weight:600;font-size:15px;">Start the assessment</a></div></div>`;
+    const escapedInvitationUrl = escapeHtml(data.invitationUrl);
+    const html =
+        `<div style="font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;max-width:560px;margin:0 auto;">` +
+        `${paragraphs}<br/>` +
+        `<div style="text-align:center;">` +
+        `<a href="${escapedInvitationUrl}" style="display:inline-block;background-color:#1D4ED8;color:#ffffff;padding:14px 28px;text-decoration:none;border-radius:8px;font-weight:600;font-size:15px;">Start the assessment</a>` +
+        `</div>` +
+        `<p style="color:#9ca3af;font-size:12px;margin-top:20px;">` +
+        `If the button doesn't work, paste this into your browser:<br/>` +
+        `<span style="word-break:break-all;color:#6b7280;">${escapedInvitationUrl}</span>` +
+        `</p>` +
+        `</div>`;
+    const text = renderTextBody(data.effectiveBodyMarkdown, vars);
 
     const usedDefault = data.subjectSource === "default" || data.bodySource === "default";
-    await sendEmailViaSMTP({
+    return {
         to: data.respondent.email,
         subject,
         html,
+        text,
+        ...(data.redactErrors
+            ? {
+                redactErrors: true,
+                coalesceVerification: data.coalesceVerification === true,
+              }
+            : {}),
         telemetry: {
             recipientRole: "CUSTOM",
             metadata: {
@@ -1307,7 +1382,7 @@ async function sendLegacyInvitationEmail(data: {
                 defaultVersion: usedDefault ? DEFAULT_INVITATION_VERSION : null,
             },
         },
-    });
+    };
 }
 
 // ============================================

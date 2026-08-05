@@ -1,0 +1,509 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Jeff #83 — Referred Results scope wireframe</title>
+  <style>
+    :root {
+      --purple: #522583;
+      --purple-deep: #3d1a63;
+      --purple-soft: #f2ebf8;
+      --ink: #252033;
+      --muted: #6b6480;
+      --line: #e6e2ec;
+      --canvas: #f6f7fa;
+      --card: #ffffff;
+      --people: #f7a600;
+      --strategy: #008bd2;
+      --execution: #946b36;
+      --cash: #95c11f;
+      --green: #257a4a;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: #ebeaf0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    button, input, select { font: inherit; }
+    .board {
+      width: 1440px;
+      margin: 0 auto;
+      padding: 30px;
+    }
+    .board-head {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      margin-bottom: 18px;
+    }
+    .board-kicker {
+      color: var(--purple);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+    .board-title {
+      margin: 5px 0 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 28px;
+      font-weight: 500;
+    }
+    .board-note {
+      max-width: 470px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+      text-align: right;
+    }
+    .frame {
+      overflow: hidden;
+      margin-bottom: 24px;
+      border: 1px solid #d7d3df;
+      border-radius: 14px;
+      background: var(--canvas);
+      box-shadow: 0 16px 45px rgba(36, 26, 51, .12);
+    }
+    .frame-label {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      padding: 9px 16px;
+      color: #4f485e;
+      background: #f1f0f4;
+      border-bottom: 1px solid #ddd9e4;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #c7c2ce; }
+    .app-top {
+      display: flex;
+      align-items: center;
+      height: 58px;
+      padding: 0 24px;
+      background: var(--purple-deep);
+      color: white;
+    }
+    .brand {
+      width: 218px;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 19px;
+      letter-spacing: .02em;
+    }
+    .top-nav {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      height: 100%;
+      font-size: 13px;
+    }
+    .top-nav span { padding: 10px 12px; border-radius: 7px; opacity: .72; }
+    .top-nav .active { background: rgba(255,255,255,.14); opacity: 1; font-weight: 700; }
+    .user {
+      margin-left: auto;
+      font-size: 12px;
+      opacity: .82;
+    }
+    .app-body { display: grid; grid-template-columns: 218px 1fr; min-height: 640px; }
+    .sidebar {
+      padding: 20px 13px;
+      background: #fff;
+      border-right: 1px solid var(--line);
+    }
+    .side-label {
+      margin: 12px 12px 7px;
+      color: #8b8498;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: .11em;
+      text-transform: uppercase;
+    }
+    .side-link {
+      display: flex;
+      gap: 9px;
+      align-items: center;
+      margin: 2px 0;
+      padding: 10px 12px;
+      border-radius: 8px;
+      color: #4e485a;
+      font-size: 13px;
+    }
+    .side-link::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #cbc6d2;
+    }
+    .side-link.active {
+      color: var(--purple);
+      background: var(--purple-soft);
+      font-weight: 750;
+    }
+    .side-link.active::before { background: var(--purple); }
+    .main { padding: 30px 34px 38px; }
+    .crumb { margin-bottom: 10px; color: #8a8494; font-size: 12px; }
+    h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 31px; font-weight: 500; }
+    .lede { margin: 7px 0 23px; color: var(--muted); font-size: 14px; }
+    .link-card {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 18px;
+      align-items: center;
+      padding: 19px 21px;
+      margin-bottom: 20px;
+      border: 1px solid #d8cae6;
+      border-left: 5px solid var(--purple);
+      border-radius: 10px;
+      background: linear-gradient(100deg, #fff 0%, #faf7fd 100%);
+    }
+    .link-title { margin: 0 0 5px; font-size: 14px; font-weight: 800; }
+    .link-help { margin: 0; color: var(--muted); font-size: 12px; }
+    .link-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-top: 12px;
+    }
+    .url {
+      width: 470px;
+      padding: 9px 11px;
+      overflow: hidden;
+      color: #514a5c;
+      background: white;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .btn {
+      padding: 9px 13px;
+      border: 0;
+      border-radius: 7px;
+      color: white;
+      background: var(--purple);
+      font-size: 12px;
+      font-weight: 750;
+    }
+    .stat {
+      min-width: 135px;
+      padding-left: 18px;
+      border-left: 1px solid var(--line);
+      text-align: center;
+    }
+    .stat strong { display: block; color: var(--purple); font-family: Georgia, serif; font-size: 28px; font-weight: 500; }
+    .stat span { color: var(--muted); font-size: 11px; }
+    .toolbar {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .field {
+      min-width: 260px;
+      padding: 9px 11px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      color: #776f84;
+      background: white;
+      font-size: 12px;
+    }
+    select.field { min-width: 205px; }
+    .result-count { margin-left: auto; color: var(--muted); font-size: 12px; }
+    .table-card {
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: white;
+    }
+    table { width: 100%; border-collapse: collapse; }
+    th {
+      padding: 11px 14px;
+      color: #81798f;
+      background: #f8f7fa;
+      border-bottom: 1px solid var(--line);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-align: left;
+      text-transform: uppercase;
+    }
+    td {
+      padding: 14px;
+      border-bottom: 1px solid #efedf2;
+      font-size: 12px;
+      vertical-align: middle;
+    }
+    tr:last-child td { border-bottom: 0; }
+    .person strong { display: block; margin-bottom: 3px; font-size: 13px; }
+    .person span, .subtle { color: var(--muted); font-size: 11px; }
+    .score-wrap { display: flex; gap: 10px; align-items: center; }
+    .score {
+      min-width: 40px;
+      color: var(--purple);
+      font-family: Georgia, serif;
+      font-size: 22px;
+    }
+    .tier { font-size: 11px; font-weight: 700; }
+    .decision-strip {
+      display: grid;
+      grid-template-columns: repeat(4, 22px);
+      gap: 3px;
+      margin-top: 5px;
+    }
+    .decision-strip span {
+      height: 4px;
+      border-radius: 4px;
+    }
+    .people { background: var(--people); }
+    .strategy { background: var(--strategy); }
+    .execution { background: var(--execution); }
+    .cash { background: var(--cash); }
+    .text-btn {
+      color: var(--purple);
+      background: transparent;
+      border: 1px solid #d4c5e2;
+      border-radius: 7px;
+      padding: 7px 10px;
+      font-size: 11px;
+      font-weight: 750;
+    }
+    .actions { display: flex; gap: 6px; align-items: center; white-space: nowrap; }
+    .details-btn {
+      color: #62596e;
+      background: transparent;
+      border: 0;
+      padding: 7px 4px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .expanded td { padding-top: 0; background: #fcfbfd; }
+    .domains {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      padding: 13px 15px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: white;
+    }
+    .domain { padding-left: 10px; border-left: 4px solid; }
+    .domain small { display: block; color: var(--muted); font-size: 10px; }
+    .domain strong { font-size: 14px; }
+    .domain.people { border-color: var(--people); background: white; }
+    .domain.strategy { border-color: var(--strategy); background: white; }
+    .domain.execution { border-color: var(--execution); background: white; }
+    .domain.cash { border-color: var(--cash); background: white; }
+    .pager {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 14px;
+      color: var(--muted);
+      background: #faf9fb;
+      border-top: 1px solid var(--line);
+      font-size: 11px;
+    }
+    .admin-body { min-height: 530px; }
+    .admin-main { padding: 30px 34px; }
+    .campaign-head {
+      display: grid;
+      grid-template-columns: 1.7fr 1.6fr 1.7fr .7fr .7fr;
+      gap: 12px;
+      align-items: center;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-bottom: 0;
+      border-radius: 10px 10px 0 0;
+      background: white;
+      font-size: 12px;
+    }
+    .campaign-head strong { font-size: 13px; }
+    .status {
+      display: inline-block;
+      padding: 4px 7px;
+      color: var(--green);
+      background: #eaf5ef;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 800;
+    }
+    .admin-table { border-radius: 0 0 10px 10px; }
+    .privacy-note {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 12px;
+      align-items: start;
+      margin-top: 18px;
+      padding: 14px 16px;
+      color: #51495c;
+      background: #f7f3fa;
+      border: 1px dashed #cdbbdb;
+      border-radius: 8px;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .privacy-note strong { color: var(--purple); }
+  </style>
+</head>
+<body>
+  <div class="board">
+    <div class="board-head">
+      <div>
+        <div class="board-kicker">Jeff feedback #83 · Target-state wireframe</div>
+        <div class="board-title">Public referrals become visible without becoming campaigns</div>
+      </div>
+      <div class="board-note">Target-state visual: core launch keeps this information architecture and report action; search, filters, inline details, and admin pagination may follow. Preserve the existing portal chrome and render Four Decisions colors only when the frozen result supports them.</div>
+    </div>
+
+    <section class="frame">
+      <div class="frame-label"><span class="dot"></span>Coach view · dedicated Referred Results destination</div>
+      <div class="app-top">
+        <div class="brand">Scaling Up</div>
+        <div class="top-nav"><span>Dashboard</span><span>Workshops</span><span class="active">Assessments</span><span>Files</span><span>Partners</span></div>
+        <div class="user">Alex Morgan · Coach</div>
+      </div>
+      <div class="app-body">
+        <aside class="sidebar">
+          <div class="side-label">Coach lane</div>
+          <div class="side-link">My Campaigns</div>
+          <div class="side-link active">Referred Results</div>
+          <div class="side-link">Members</div>
+        </aside>
+        <main class="main">
+          <div class="crumb">Assessments / Referred Results</div>
+          <h1>Referred Results</h1>
+          <p class="lede">See the Quick Assessment results attributed to your coach link.</p>
+
+          <section class="link-card">
+            <div>
+              <p class="link-title">Your Quick Assessment link</p>
+              <p class="link-help">Share this link. Completed assessments will appear below.</p>
+              <div class="link-row">
+                <div class="url">https://platformtest.scalingup.com/quiz/scaling-up-quick?coach=alex%40example.com</div>
+                <button class="btn">Copy link</button>
+              </div>
+            </div>
+            <div class="stat"><strong>18</strong><span>referred results</span></div>
+          </section>
+
+          <div class="toolbar">
+            <div class="field">Search by name or email…</div>
+            <select class="field"><option>All assessments</option></select>
+            <span class="result-count">18 results · newest first</span>
+          </div>
+
+          <section class="table-card">
+            <table>
+              <thead>
+                <tr><th>Taker</th><th>Assessment</th><th>Result</th><th>Submitted</th><th></th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="person"><strong>Jordan Lee</strong><span>jordan@example.com</span></td>
+                  <td><strong>Scaling Up 4 Decisions</strong><br><span class="subtle">Public assessment</span></td>
+                  <td>
+                    <div class="score-wrap">
+                      <span class="score">7.4</span>
+                      <div><span class="tier">Accelerating</span><div class="decision-strip"><span class="people"></span><span class="strategy"></span><span class="execution"></span><span class="cash"></span></div></div>
+                    </div>
+                  </td>
+                  <td>Jul 10, 2026<br><span class="subtle">10:42 AM</span></td>
+                  <td><div class="actions"><button class="details-btn">Hide details</button><button class="text-btn">View report</button></div></td>
+                </tr>
+                <tr class="expanded">
+                  <td colspan="5">
+                    <div class="domains">
+                      <div class="domain people"><small>People</small><strong>8.1</strong></div>
+                      <div class="domain strategy"><small>Strategy</small><strong>7.6</strong></div>
+                      <div class="domain execution"><small>Execution</small><strong>6.2</strong></div>
+                      <div class="domain cash"><small>Cash</small><strong>7.7</strong></div>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="person"><strong>Sam Rivera</strong><span>sam@example.com</span></td>
+                  <td><strong>Scaling Up 4 Decisions</strong><br><span class="subtle">Public assessment</span></td>
+                  <td>
+                    <div class="score-wrap">
+                      <span class="score">5.8</span>
+                      <div><span class="tier">Building</span><div class="decision-strip"><span class="people"></span><span class="strategy"></span><span class="execution"></span><span class="cash"></span></div></div>
+                    </div>
+                  </td>
+                  <td>Jul 9, 2026<br><span class="subtle">3:15 PM</span></td>
+                  <td><div class="actions"><button class="details-btn">Details</button><button class="text-btn">View report</button></div></td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="pager"><span>Showing 1–18 of 18</span><span>Previous&nbsp;&nbsp;&nbsp; Next</span></div>
+          </section>
+        </main>
+      </div>
+    </section>
+
+    <section class="frame">
+      <div class="frame-label"><span class="dot"></span>ADMIN/STAFF view · enrich the existing Public Campaigns expander</div>
+      <div class="app-top">
+        <div class="brand">Scaling Up</div>
+        <div class="top-nav"><span>Dashboard</span><span>Workshops</span><span class="active">Assessments</span><span>Files</span><span>Partners</span></div>
+        <div class="user">Operations · Admin</div>
+      </div>
+      <div class="app-body admin-body">
+        <aside class="sidebar">
+          <div class="side-label">Assessments</div>
+          <div class="side-link">Dashboard</div>
+          <div class="side-link">Organizations</div>
+          <div class="side-link">Campaigns</div>
+          <div class="side-link active">Public Campaigns</div>
+          <div class="side-link">Aggregate Report</div>
+        </aside>
+        <main class="admin-main">
+          <div class="crumb">Assessments / Public Campaigns</div>
+          <h1>Public Campaigns</h1>
+          <p class="lede">Manage public assessment links and review submissions.</p>
+          <div class="campaign-head">
+            <strong>Scaling Up 4 Decisions Assessment</strong>
+            <span class="subtle">scaling_up_quick_public</span>
+            <span>Scaling Up 4 Decisions</span>
+            <span class="status">ACTIVE</span>
+            <button class="text-btn">Hide</button>
+          </div>
+          <section class="table-card admin-table">
+            <table>
+              <thead><tr><th>Respondent</th><th>Referring coach</th><th>Result</th><th>Submitted</th><th></th></tr></thead>
+              <tbody>
+                <tr>
+                  <td class="person"><strong>Jordan Lee</strong><span>jordan@example.com</span></td>
+                  <td>Alex Morgan<br><span class="subtle">alex@example.com</span></td>
+                  <td><div class="score-wrap"><span class="score">7.4</span><div><span class="tier">Accelerating</span><div class="decision-strip"><span class="people"></span><span class="strategy"></span><span class="execution"></span><span class="cash"></span></div></div></div></td>
+                  <td>Jul 10, 2026</td>
+                  <td><div class="actions"><button class="details-btn">Details</button><button class="text-btn">View report</button></div></td>
+                </tr>
+                <tr>
+                  <td class="person"><strong>Taylor Chen</strong><span>taylor@example.com</span></td>
+                  <td>—<br><span class="subtle">Scaling Up only</span></td>
+                  <td><div class="score-wrap"><span class="score">6.3</span><div><span class="tier">Building</span><div class="decision-strip"><span class="people"></span><span class="strategy"></span><span class="execution"></span><span class="cash"></span></div></div></div></td>
+                  <td>Jul 9, 2026</td>
+                  <td><div class="actions"><button class="details-btn">Details</button><button class="text-btn">View report</button></div></td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+          <div class="privacy-note">
+            <strong>Launch requirement</strong>
+            <span>Public pre-submit copy discloses ongoing access by the verified referring coach and links to the official Scaling Up Privacy Policy for retention and privacy rights.</span>
+          </div>
+        </main>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

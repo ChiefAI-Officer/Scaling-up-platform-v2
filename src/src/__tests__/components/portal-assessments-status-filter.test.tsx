@@ -10,6 +10,15 @@ import {
   type CampaignListItem,
 } from "@/components/assessments/CampaignsListWithFilter";
 
+const zeroMetrics = {
+  total: 0,
+  new: 0,
+  invited: 0,
+  started: 0,
+  completed: 0,
+  revoked: 0,
+};
+
 const fixture: CampaignListItem[] = [
   {
     id: "c1",
@@ -17,7 +26,10 @@ const fixture: CampaignListItem[] = [
     alias: "q1-pulse",
     status: "DRAFT",
     templateName: "Rockefeller Habits",
+    organizationId: "org-acme",
     organizationName: "Acme",
+    metrics: zeroMetrics,
+    edition: null,
     openAt: "2026-05-01T00:00:00Z",
   },
   {
@@ -26,7 +38,10 @@ const fixture: CampaignListItem[] = [
     alias: "q2-pulse",
     status: "ACTIVE",
     templateName: "Rockefeller Habits",
+    organizationId: "org-acme",
     organizationName: "Acme",
+    metrics: zeroMetrics,
+    edition: null,
     openAt: "2026-06-01T00:00:00Z",
   },
   {
@@ -35,7 +50,10 @@ const fixture: CampaignListItem[] = [
     alias: "q3-pulse",
     status: "ACTIVE",
     templateName: "Rockefeller Habits",
+    organizationId: "org-beta",
     organizationName: "Beta",
+    metrics: zeroMetrics,
+    edition: null,
     openAt: "2026-07-01T00:00:00Z",
   },
   {
@@ -44,7 +62,10 @@ const fixture: CampaignListItem[] = [
     alias: "old-pulse",
     status: "CLOSED",
     templateName: "Rockefeller Habits",
+    organizationId: "org-beta",
     organizationName: "Beta",
+    metrics: zeroMetrics,
+    edition: null,
     openAt: "2026-01-01T00:00:00Z",
   },
 ];
@@ -111,7 +132,10 @@ describe("CampaignsListWithFilter", () => {
         alias: "q1",
         status: "DRAFT",
         templateName: "Rock",
+        organizationId: "org-acme",
         organizationName: "Acme",
+        metrics: zeroMetrics,
+        edition: null,
         openAt: "2026-05-01T00:00:00Z",
       },
     ];

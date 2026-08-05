@@ -10,7 +10,7 @@
  * patch script + prod row are THREE homes for the same bytes that provably
  * diverge (ADR-0025). Here there is ONE home, so a full-byte pin would only
  * fail in the same commit that changed the map. What IS asserted:
- *   - the DEFAULT is byte-exact (it must not drift while being moved out of JSX)
+ *   - the DEFAULT is byte-exact (it must not regain a privacy claim)
  *   - each alias resolves to ITS OWN copy (guards the alias/copy mix-up)
  *   - paragraph counts (guards the multi-paragraph render path)
  *   - fail-open for every out-of-scope, unknown, or empty alias
@@ -25,22 +25,24 @@ import {
 } from "@/lib/assessments/welcome-copy";
 
 /**
- * Derived mechanically from the pre-change JSX at org-survey-client.tsx:429-433
- * by applying JSX whitespace collapsing (trim each line, join with one space) —
- * NOT retyped. 135 chars, em dash is U+2014.
+ * Approved GH #224 default. It preserves the truthful resume promise while
+ * removing the unsupported "confidential" adjective.
  */
-const LEGACY_LEDE =
-  "A quick, confidential check on how your team works together. You can answer in one sitting or come back later — your link stays active.";
+const APPROVED_DEFAULT_LEDE =
+  "A quick check on how your team works together. You can answer in one sitting or come back later — your link stays active.";
 
 describe("DEFAULT_WELCOME_LEDE", () => {
-  it("is byte-identical to the copy that shipped before this change", () => {
-    expect(DEFAULT_WELCOME_LEDE).toEqual([LEGACY_LEDE]);
+  it("uses the approved truthful default copy", () => {
+    expect(DEFAULT_WELCOME_LEDE).toEqual([APPROVED_DEFAULT_LEDE]);
+    expect(DEFAULT_WELCOME_LEDE[0]).not.toMatch(
+      /\b(?:confidential|anonymous|private)\b/i,
+    );
   });
 
   // Cheap transcription tripwire: a curly apostrophe, an en dash, or a doubled
   // space would all change the length while still reading correctly to a human.
-  it("is exactly 135 characters and uses an em dash (U+2014)", () => {
-    expect(DEFAULT_WELCOME_LEDE[0]).toHaveLength(135);
+  it("is exactly 121 characters and uses an em dash (U+2014)", () => {
+    expect(DEFAULT_WELCOME_LEDE[0]).toHaveLength(121);
     expect(DEFAULT_WELCOME_LEDE[0]).toContain("—");
     expect(DEFAULT_WELCOME_LEDE[0]).not.toMatch(/ {2}/);
   });

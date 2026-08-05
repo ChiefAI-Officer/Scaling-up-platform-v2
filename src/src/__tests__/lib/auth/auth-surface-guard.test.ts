@@ -56,7 +56,13 @@ const ALLOWLIST: string[] = [
   "app/(dashboard)/admin/assessments/access-groups/page.tsx",
   "app/(dashboard)/admin/assessments/aggregate/page.tsx",
   "app/(dashboard)/admin/assessments/layout.tsx",
+  // [LAYOUT] campaign oversight is nested under the dashboard layout, whose
+  // unconditional deletedAt check runs before this page can render.
+  "app/(dashboard)/admin/assessments/campaigns/page.tsx",
   "app/(dashboard)/admin/assessments/observability/page.tsx",
+  // [LAYOUT] organizations directory is nested under the dashboard layout,
+  // whose unconditional deletedAt check runs before this page can render.
+  "app/(dashboard)/admin/assessments/organizations/page.tsx",
   "app/(dashboard)/admin/assessments/public-campaigns/page.tsx",
   "app/(dashboard)/admin/assessments/templates/[id]/page.tsx",
   "app/(dashboard)/admin/assessments/templates/[id]/versions/[versionId]/edit/page.tsx",

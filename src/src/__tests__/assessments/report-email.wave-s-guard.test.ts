@@ -37,6 +37,7 @@ describe("Wave S — email twin carries no peers (source guard)", () => {
 function lvaReport(): RespondentReport {
   return {
     respondentName: "John CEOExec",
+    respondentEmail: "john@example.com",
     jobTitle: "CEO",
     companyName: "Northwind Logistics",
     assessmentName: "Leadership Vision Alignment",

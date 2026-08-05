@@ -5,7 +5,6 @@
  *   - 7 admin entries render for ADMIN role (with Aggregate Report visible)
  *   - Aggregate Report row hidden when canAccessAggregateReport returns false
  *   - Admin section hidden when role is COACH
- *   - Coach-lane section renders ONLY when role is COACH
  */
 
 jest.mock("next/navigation", () => ({
@@ -13,10 +12,15 @@ jest.mock("next/navigation", () => ({
 }));
 
 const mockCanAccessAggregateReport = jest.fn<boolean, [{ role: string }]>();
+const mockIsReferredResultsEnabled = jest.fn<boolean, []>();
 
 jest.mock("@/lib/assessments/access-control", () => ({
   canAccessAggregateReport: (actor: { role: string }) =>
     mockCanAccessAggregateReport(actor),
+}));
+
+jest.mock("@/lib/assessments/wave-83-flags", () => ({
+  isReferredResultsEnabled: () => mockIsReferredResultsEnabled(),
 }));
 
 import { render, screen } from "@testing-library/react";
@@ -27,9 +31,9 @@ function makeSession(role: "ADMIN" | "STAFF" | "COACH"): Session {
   return {
     expires: "9999-01-01",
     user: {
+      id: "user-1",
       name: "Test",
       email: "test@example.com",
-      // @ts-expect-error — extended session shape in NextAuth typing
       role,
     },
   };
@@ -38,6 +42,7 @@ function makeSession(role: "ADMIN" | "STAFF" | "COACH"): Session {
 beforeEach(() => {
   jest.clearAllMocks();
   mockCanAccessAggregateReport.mockReturnValue(true);
+  mockIsReferredResultsEnabled.mockReturnValue(false);
 });
 
 describe("AssessmentsSidebar", () => {
@@ -58,9 +63,30 @@ describe("AssessmentsSidebar", () => {
     expect(link).toHaveAttribute("href", "/admin/assessments/observability");
   });
 
+  it.each(["ADMIN", "STAFF"] as const)(
+    "renders Delivery Holds beside Observability for %s",
+    (role) => {
+      render(<AssessmentsSidebar session={makeSession(role)} />);
+      const deliveryHolds = screen.getByText("Delivery Holds").closest("a");
+      expect(deliveryHolds).toHaveAttribute(
+        "href",
+        "/admin/assessments/delivery-holds",
+      );
+      const links = screen.getAllByRole("link");
+      expect(
+        links.indexOf(screen.getByText("Delivery Holds").closest("a")!),
+      ).toBe(links.indexOf(screen.getByText("Observability").closest("a")!) + 1);
+    },
+  );
+
   it("does NOT render Observability for COACH (admin-only surface)", () => {
     render(<AssessmentsSidebar session={makeSession("COACH")} />);
     expect(screen.queryByText("Observability")).not.toBeInTheDocument();
+  });
+
+  it("does NOT render Delivery Holds for COACH", () => {
+    render(<AssessmentsSidebar session={makeSession("COACH")} />);
+    expect(screen.queryByText("Delivery Holds")).not.toBeInTheDocument();
   });
 
   it("hides Aggregate Report when canAccessAggregateReport returns false", () => {
@@ -76,7 +102,7 @@ describe("AssessmentsSidebar", () => {
     render(<AssessmentsSidebar session={makeSession("COACH")} />);
     // Admin-only labels disappear (Organizations / Access Groups / Templates /
     // Campaigns / Public Campaigns / Aggregate Report). The "Dashboard" label
-    // is admin-only as well — coaches see "My Campaigns" / "Members".
+    // is admin-only as well.
     expect(screen.queryByText("Organizations")).not.toBeInTheDocument();
     expect(screen.queryByText("Access Groups")).not.toBeInTheDocument();
     expect(screen.queryByText("Templates")).not.toBeInTheDocument();
@@ -85,23 +111,28 @@ describe("AssessmentsSidebar", () => {
     expect(screen.queryByText("Aggregate Report")).not.toBeInTheDocument();
   });
 
-  it("renders the coach-lane section ONLY when role is COACH", () => {
+  it("preserves the existing Coach lane exactly while Referred Results is off", () => {
     render(<AssessmentsSidebar session={makeSession("COACH")} />);
-    expect(screen.getByText("My Campaigns")).toBeInTheDocument();
-    expect(screen.getByText("Members")).toBeInTheDocument();
+
+    expect(
+      screen.getAllByRole("link").map((link) => link.textContent?.trim()),
+    ).toEqual(["My Campaigns", "Members"]);
     expect(screen.getByText(/coach lane/i)).toBeInTheDocument();
+    expect(screen.queryByText("Referred Results")).not.toBeInTheDocument();
   });
 
-  it("does NOT render the coach-lane section for ADMIN", () => {
+  it("does NOT render coach portal entries for ADMIN", () => {
     render(<AssessmentsSidebar session={makeSession("ADMIN")} />);
     expect(screen.queryByText("My Campaigns")).not.toBeInTheDocument();
     expect(screen.queryByText("Members")).not.toBeInTheDocument();
+    expect(screen.queryByText("Referred Results")).not.toBeInTheDocument();
   });
 
-  it("does NOT render the coach-lane section for STAFF", () => {
+  it("does NOT render coach portal entries for STAFF", () => {
     render(<AssessmentsSidebar session={makeSession("STAFF")} />);
     expect(screen.queryByText("My Campaigns")).not.toBeInTheDocument();
     expect(screen.queryByText("Members")).not.toBeInTheDocument();
+    expect(screen.queryByText("Referred Results")).not.toBeInTheDocument();
   });
 
   it("renders 7 admin entries for STAFF role too", () => {
@@ -170,19 +201,5 @@ describe("AssessmentsSidebar", () => {
       );
     });
 
-    it("marks neither coach-lane entry as a placeholder (both are real routes)", () => {
-      render(<AssessmentsSidebar session={makeSession("COACH")} />);
-
-      const membersAnchor = anchorFor("Members");
-      expect(membersAnchor).not.toHaveAttribute("aria-disabled");
-      expect(membersAnchor.className).not.toMatch(/opacity-60/);
-
-      const campaignsAnchor = anchorFor("My Campaigns");
-      expect(campaignsAnchor).not.toHaveAttribute("aria-disabled");
-      expect(campaignsAnchor.className).not.toMatch(/opacity-60/);
-
-      // No "(coming soon)" markers on the coach lane (both entries are live).
-      expect(screen.queryAllByText(/coming soon/i).length).toBe(0);
-    });
   });
 });

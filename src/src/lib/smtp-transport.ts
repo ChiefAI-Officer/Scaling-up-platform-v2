@@ -22,10 +22,19 @@ export interface SendEmailOptions {
   text?: string; // plain-text alternative → multipart/alternative
   attachments?: SmtpAttachment[];
   telemetry?: Omit<DeliveryTelemetryEvent, "recipient" | "subject" | "status" | "provider">;
+  /** Persist only an allowlisted error classification for credential-bearing emails. */
+  redactErrors?: boolean;
+  /** Share concurrent SMTP verification only for the stable invitation handoff. */
+  coalesceVerification?: boolean;
+}
+
+export interface PreparedEmail {
+  send(): Promise<void>;
 }
 
 let _transporter: nodemailer.Transporter | null = null;
 let _verified = false;
+let _verificationInFlight: Promise<void> | null = null;
 
 function getTransporter(): nodemailer.Transporter {
   if (!_transporter) {
@@ -50,79 +59,161 @@ function getTransporter(): nodemailer.Transporter {
   return _transporter;
 }
 
+async function verifyTransporter(
+  transporter: nodemailer.Transporter,
+  coalesceVerification: boolean,
+): Promise<void> {
+  if (_verified) return;
+
+  if (!coalesceVerification) {
+    try {
+      await transporter.verify();
+      console.log(
+        "[smtp-transport] SMTP verify() succeeded: host=" +
+          process.env.SMTP_HOST
+      );
+      _verified = true;
+    } catch (verifyErr) {
+      console.error("[smtp-transport] SMTP verify() FAILED:", verifyErr);
+    }
+    return;
+  }
+
+  if (!_verificationInFlight) {
+    _verificationInFlight = (async () => {
+      try {
+        await transporter.verify();
+        console.log(
+          "[smtp-transport] SMTP verify() succeeded: host=" +
+            process.env.SMTP_HOST
+        );
+        _verified = true;
+      } catch {
+        console.error("[smtp-transport] SMTP verify() FAILED");
+      }
+    })();
+  }
+
+  const verification = _verificationInFlight;
+  try {
+    await verification;
+  } finally {
+    // Clear outside the verification closure so even a synchronous throw from
+    // verify() cannot be overwritten by the initial promise assignment.
+    if (_verificationInFlight === verification) {
+      _verificationInFlight = null;
+    }
+  }
+}
+
+/**
+ * Complete deterministic validation, SMTP configuration, and mail-option
+ * construction before exposing the provider-facing handoff.
+ */
+export function prepareEmailViaSMTP(options: SendEmailOptions): PreparedEmail {
+  if (
+    typeof options.to !== "string" ||
+    options.to.trim().length === 0 ||
+    typeof options.subject !== "string" ||
+    typeof options.html !== "string"
+  ) {
+    throw new Error("Invalid email options");
+  }
+
+  const smtpConfigured = Boolean(process.env.SMTP_HOST);
+  if (smtpConfigured) {
+    const configuredPort = Number.parseInt(process.env.SMTP_PORT || "587", 10);
+    if (
+      !Number.isInteger(configuredPort) ||
+      configuredPort < 1 ||
+      configuredPort > 65_535
+    ) {
+      throw new Error("Invalid SMTP port");
+    }
+  }
+
+  const provider = smtpConfigured ? "SMTP" : "MOCK";
+  const transporter = smtpConfigured ? getTransporter() : null;
+  const mailOptions = {
+    from:
+      process.env.SMTP_FROM ||
+      '"Scaling Up Platform" <noreply@scalingup.com>',
+    to: options.to,
+    subject: options.subject,
+    html: options.html,
+    ...(options.text !== undefined ? { text: options.text } : {}),
+    attachments: options.attachments?.map((a) => ({
+      filename: a.filename,
+      ...(a.content !== undefined ? { content: a.content } : {}),
+      ...(a.path !== undefined ? { path: a.path } : {}),
+      ...(a.cid !== undefined ? { cid: a.cid } : {}),
+      contentType: a.contentType,
+    })),
+  };
+
+  return {
+    async send(): Promise<void> {
+      if (!transporter) {
+        console.log(
+          `[Mock Email] To: ${options.to}, Subject: ${options.subject}, Attachments: ${options.attachments?.length || 0}`
+        );
+        if (options.telemetry) {
+          await recordDeliveryTelemetry({
+            recipient: options.to,
+            subject: options.subject,
+            status: "MOCK",
+            provider,
+            ...options.telemetry,
+          });
+        }
+        return;
+      }
+
+      try {
+        await verifyTransporter(
+          transporter,
+          options.coalesceVerification === true,
+        );
+        await transporter.sendMail(mailOptions);
+
+        if (options.telemetry) {
+          await recordDeliveryTelemetry({
+            recipient: options.to,
+            subject: options.subject,
+            status: "SENT",
+            provider,
+            ...options.telemetry,
+          });
+        }
+        console.log(`Email sent to ${options.to}: ${options.subject}`);
+      } catch (error) {
+        if (options.telemetry) {
+          await recordDeliveryTelemetry({
+            recipient: options.to,
+            subject: options.subject,
+            status: "FAILED",
+            provider,
+            errorMessage:
+              options.redactErrors
+                ? "SENSITIVE_EMAIL_SEND_FAILED"
+                : error instanceof Error
+                ? error.message
+                : "Unknown email send error",
+            ...options.telemetry,
+          });
+        }
+        throw error;
+      }
+    }
+  };
+}
+
 /**
  * Send an email via SMTP with automatic telemetry recording.
  * Falls back to mock logging when SMTP_HOST is not configured.
  * Throws on failure — callers that want to swallow errors should catch.
  */
 export async function sendEmailViaSMTP(options: SendEmailOptions): Promise<void> {
-  const provider = process.env.SMTP_HOST ? "SMTP" : "MOCK";
-
-  if (!process.env.SMTP_HOST) {
-    console.log(
-      `[Mock Email] To: ${options.to}, Subject: ${options.subject}, Attachments: ${options.attachments?.length || 0}`
-    );
-    if (options.telemetry) {
-      await recordDeliveryTelemetry({
-        recipient: options.to,
-        subject: options.subject,
-        status: "MOCK",
-        provider,
-        ...options.telemetry,
-      });
-    }
-    return;
-  }
-
-  try {
-    const transporter = getTransporter();
-    if (!_verified) {
-      try {
-        await transporter.verify();
-        console.log("[smtp-transport] SMTP verify() succeeded: host=" + process.env.SMTP_HOST);
-        // Only latch on success — a failed verify must not permanently suppress
-        // re-verification for the rest of the process lifetime.
-        _verified = true;
-      } catch (verifyErr) {
-        console.error("[smtp-transport] SMTP verify() FAILED:", verifyErr);
-      }
-    }
-    await transporter.sendMail({
-      from: process.env.SMTP_FROM || '"Scaling Up Platform" <noreply@scalingup.com>',
-      to: options.to,
-      subject: options.subject,
-      html: options.html,
-      ...(options.text !== undefined ? { text: options.text } : {}),
-      attachments: options.attachments?.map((a) => ({
-        filename: a.filename,
-        ...(a.content !== undefined ? { content: a.content } : {}),
-        ...(a.path !== undefined ? { path: a.path } : {}),
-        ...(a.cid !== undefined ? { cid: a.cid } : {}),
-        contentType: a.contentType,
-      })),
-    });
-
-    if (options.telemetry) {
-      await recordDeliveryTelemetry({
-        recipient: options.to,
-        subject: options.subject,
-        status: "SENT",
-        provider,
-        ...options.telemetry,
-      });
-    }
-    console.log(`Email sent to ${options.to}: ${options.subject}`);
-  } catch (error) {
-    if (options.telemetry) {
-      await recordDeliveryTelemetry({
-        recipient: options.to,
-        subject: options.subject,
-        status: "FAILED",
-        provider,
-        errorMessage: error instanceof Error ? error.message : "Unknown email send error",
-        ...options.telemetry,
-      });
-    }
-    throw error;
-  }
+  const prepared = prepareEmailViaSMTP(options);
+  await prepared.send();
 }

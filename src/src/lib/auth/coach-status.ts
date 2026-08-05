@@ -33,3 +33,18 @@ export type CoachCertificationStatus =
 export function isCertified(coach: { certificationStatus: string }): boolean {
   return coach.certificationStatus === CERTIFIED_STATUS;
 }
+
+export function isCoachCurrentlyCertified(
+  coach: {
+    certificationStatus: string;
+    certificationExpiry: Date | null;
+  } | null,
+  now = new Date(),
+): boolean {
+  return Boolean(
+    coach &&
+      isCertified(coach) &&
+      (coach.certificationExpiry === null ||
+        coach.certificationExpiry.getTime() > now.getTime()),
+  );
+}

@@ -44,6 +44,15 @@ export interface LeadRecipient {
 /** Canonical Four Decisions order — immutable. */
 const CANONICAL_ORDER: string[] = ["people", "strategy", "execution", "cash"];
 
+/**
+ * Shared mailbox normalization for attribution, collision suppression, alias
+ * lookup, throttling, and backfill. Provider-specific dot/plus folding is
+ * intentionally excluded because it can merge distinct mailboxes.
+ */
+export function normalizeMailbox(value: string | null | undefined): string {
+  return (value ?? "").normalize("NFKC").trim().toLowerCase();
+}
+
 // ---------------------------------------------------------------------------
 // lowestDecision
 // ---------------------------------------------------------------------------
@@ -209,8 +218,8 @@ export function resolveLeadRecipients(input: {
 }): LeadRecipient[] {
   const recipients: LeadRecipient[] = [];
 
-  const suEmail = input.suTeamAddress.trim().toLowerCase();
-  const coachEmail = input.activeCoachEmail?.trim().toLowerCase() ?? "";
+  const suEmail = normalizeMailbox(input.suTeamAddress);
+  const coachEmail = normalizeMailbox(input.activeCoachEmail);
 
   recipients.push({ role: "SU_TEAM", email: suEmail });
 
@@ -236,6 +245,7 @@ export interface ActiveCoachDb {
       email: string;
       firstName: string;
       lastName: string;
+      profileImage: string | null;
       certificationStatus: string;
       certificationExpiry: Date | null;
     } | null>;
@@ -262,9 +272,15 @@ export async function findActiveCoachByEmail(
   db: ActiveCoachDb,
   email: string | null | undefined,
   now?: Date,
-): Promise<{ id: string; email: string; firstName: string; lastName: string } | null> {
+): Promise<{
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  profileImage: string | null;
+} | null> {
   // Guard: blank / missing email — no DB call.
-  const normalized = (email ?? "").trim().toLowerCase();
+  const normalized = normalizeMailbox(email);
   if (normalized.length === 0) {
     return null;
   }
@@ -276,6 +292,7 @@ export async function findActiveCoachByEmail(
       email: true,
       firstName: true,
       lastName: true,
+      profileImage: true,
       certificationStatus: true,
       certificationExpiry: true,
     },
@@ -303,5 +320,6 @@ export async function findActiveCoachByEmail(
     email: coach.email,
     firstName: coach.firstName,
     lastName: coach.lastName,
+    profileImage: coach.profileImage,
   };
 }

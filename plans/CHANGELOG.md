@@ -6,6 +6,888 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="gh-233-peer-benchmark-auditability-launched"></a>
+### 2026-08-04 — GH #233 peer-benchmark auditability launched <!-- ENTRY_ISO:2026-08-04 ENTRY_SLUG:gh-233-peer-benchmark-auditability-launched -->
+
+**Protected merge and exact Production receipt.** Implementation PR [#300](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/300), authored by `jcbdelo26`, received independent `GabrielChiefAIOfficer` approval at head `f7d01d52`. Build, Migration Safety Gate, Assessment Email Lease (PostgreSQL), Vercel, and Vercel Preview Comments passed, and the PR squash-merged as `df3f2f51a5be56b49dc032e9eb0aa868cccfe10f`. Exact Production deployment `dpl_EMoVJ6H2VFBrwTBZquXEcCCAffpd` is **Ready**, and GitHub deployment `5746429992` is successful on that exact SHA. It owns `platformtest.scalingup.com`, `scaling-up-platform-v2.vercel.app`, `scaling-up-platform-v2-scaling-up.vercel.app`, and `scaling-up-platform-v2-git-main-scaling-up.vercel.app`. Both public `/api/health` aliases returned HTTP `200` with healthy database and safe auth posture.
+
+**Shipped auditability boundary.** The ADMIN/STAFF Observability page now exposes an independently refreshable peer-benchmark status surface. It derives effective capability state through the same Wave S authority as editor/report paths, reports active-version and rating-question prerequisites, and compares stored `metricKey` coverage without returning raw flag inputs or benchmark values. Gate, template, and benchmark evidence can fail independently; known-dark state retains precedence while unavailable facts remain explicitly unknown. The endpoint and panel use force-dynamic/no-store behavior and introduce no schema, migration, write path, background task, editor mutation, or report mutation.
+
+**Read-only live verification and unresolved evidence.** An unauthenticated request to `/api/admin/assessments/peer-benchmark-status` was intercepted by the existing middleware with an HTTP `307` redirect to sign-in and `Cache-Control: no-store`; no diagnostic values were disclosed. No authenticated Production admin session was available, so the new diagnostic's benchmark-row coverage was not retrieved and remains unknown. The earlier read-only browser observation that the effective capability was dark with active v3 and 16 rating-question prerequisites remains the current value-free capability evidence. No environment value or flag was read or changed, and no benchmark row, template version, schema, migration, customer data, capability state, or live customer behavior was mutated.
+
+**Verification and tracking closeout.** The fresh closeout repository run passed **624 suites / 7,693 tests / 14 snapshots**. Before push, the focused GH #233 + Wave S + freshness matrix passed **13 suites / 161 tests**; changed-file ESLint, migration safety across **44 migrations**, `git diff --check`, and `CI=true npx next build --turbopack` passed, with TypeScript complete and **92/92** static pages generated. Issue [#233](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/issues/233) is closed. The [shared claim](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/issues/261#issuecomment-5181041189) is released and the [matching Notion task](https://app.notion.com/p/3b28c45dd8298179bc6affe41ee8e3be) is Done. GH #256 and GH #257 ownership boundaries remain untouched.
+
+### 2026-08-04 — GH #233 peer-benchmark auditability implemented locally <!-- ENTRY_ISO:2026-08-04 ENTRY_SLUG:gh-233-peer-benchmark-auditability-local-only -->
+
+**Status: IMPLEMENTED + LOCALLY VERIFIED ONLY; not merged, deployed, or Production-observed through the new diagnostic.** The ADMIN/STAFF Observability page now has an independently refreshable, read-only LVA peer-benchmark status panel backed by a dedicated endpoint and service. It derives the effective runtime result through the same Wave S authority as editor/report paths, independently reports the active published version, rating-question count, stored benchmark-key count, and matching/missing/stale coverage, and preserves known/missing/not-applicable/unknown distinctions. It never returns raw flag inputs or benchmark values and performs no writes.
+
+**Current Production boundary.** The pre-implementation read-only browser observation remains the only live evidence: the effective capability was dark while active v3 and its 16 rating-question prerequisites were present. The current Production benchmark-row count remains unknown until a separately authorized deployment exposes the diagnostic or another authorized read-only audit establishes it. No flag, benchmark row, version, schema, customer data, or Production deployment was changed.
+
+**Next gate.** Protected-branch review and any Production deployment remain separately authorized. A future read-only Production verification may record the diagnostic's derived state and counts, but must not disclose raw environment inputs or benchmark values. Capability restoration remains a different operation.
+
+**Verification.** The final-review repair was developed through focused RED/GREEN cycles for gate-derivation failure, dark-gate/template-query failure, and persistent loading/error privacy copy; it also adds stale-only no-data coverage and no-store assertions for `401`, `403`, and `500`. Fresh final verification passed the new-feature matrix at **3 suites / 38 tests** and the prescribed Wave S regression matrix at **9 suites / 119 tests**. Changed-file ESLint exited `0` with no output; migration safety exited `0` after checking **44 migrations** with no unapproved destructive operations. `CI=true npx next build --turbopack` exited `0`, compiled successfully in **49s**, completed TypeScript, and generated **92/92** static pages. Expected local missing-Inngest and `DATABASE_URL` messages occurred during static generation without failing the build. The post-documentation freshness check passed **1 suite / 4 tests**; `git diff --check` was clean. The branch scope contains only approved GH #233 design/plan, service, route, panel, Observability page, tests, and local-only source-of-truth files—no GH #256/GH #257 source, flag, schema, migration, benchmark-writer, editor, or report changes.
+
+<a id="consolidated-progress-through-gh-257"></a>
+### 2026-08-04 — Consolidated progress ledger current through GH #257 <!-- ENTRY_ISO:2026-08-04 ENTRY_SLUG:consolidated-progress-through-gh-257 -->
+
+**Status: REPORTING LEDGER UPDATED; no runtime change.** The hard cutoff remains the already-sent `output/pdf/Scaling-Up-Progress-Report-2026-07-27-to-2026-07-31.pdf`, which covers 33 merged pull requests through PR #267. The next consolidated report now has exactly **nine** eligible product or reliability outcomes:
+
+1. **GH #222 — Welcome-screen question-bank accuracy** (PR #269): mixed respondent-visible banks use truthful format-aware wording while valid uniform slider banks retain their scale copy.
+2. **GH #242 — retired pinned-edition warning** (PR #273): shared campaign detail shows the exact pinned edition and warns when it has been retired.
+3. **GH #243 — campaign-list edition visibility** (PR #275): admin and Coach campaign lists show factual edition identity plus lifecycle-aware `Not latest` or `Retired` markers.
+4. **GH #224 — truthful Welcome sharing disclosure** (PR #278): invited and public Welcome screens describe who can review named answers instead of promising unconditional confidentiality.
+5. **GH #217 — legacy invitation fallback hardening** (PR #280): the dormant fallback renderer now carries Coach identity, a plain-text twin, and a bottom fallback URL without changing the active branded path.
+6. **Jeff #65 — stable reminder links** (PR #282): original invitation links and successfully delivered bulk-reminder links remain valid for the same invitation lifecycle; the Production global flag is enabled and the kill switch remains off.
+7. **GH #228 — Results report email branding** (PR #288): all three full-report email roles have Scaling Up-first chrome and trusted frozen Coach provenance, shipped behind absent default-off rollout variables.
+8. **GH #220 — branded campaign invitation HTML composition** (PR #292): campaign-authored HTML can be sanitized and composed inside the shared branded invitation shell, shipped behind an absent default-off rollout variable while existing full-replacement behavior stays active.
+9. **GH #257 — residual assessment-email outbox reconciliation** (PR #296): new invited submissions can durably preserve exact frozen email obligations and reconcile missed outbox creation through an event fast path plus bounded scan, with drift held for ADMIN/STAFF review and legacy candidates restricted to read-only audit; the capability is deployed behind an absent default-off rollout variable.
+
+**Counting and rollout discipline.** Each implementation counts once. PRs #270, #274, #276, #279, #281, #283–#286, #289, #293, #297, and tracking corrections are source-of-truth, receipt, acceptance, or coordination evidence and do not add outcomes. GH #217's fallback remains dormant under the active branded renderer, while GH #228, GH #220, and GH #257 remain deployed but default-off; the consolidated report must not describe any of them as active customer-visible behavior. Documentation, design, deferral, claim management, and unmerged work remain excluded from the headline count.
+
+**Closeout evidence.** All nine implementation PRs are merged and their exact production deployments were verified healthy. Their issues or source claims were closed or released as applicable, and their canonical launch records remain in this changelog. GH #257 implementation PR #296 merged as `613cb0cecc014ec767fafab82b13e393dc9740f6`; issue #257 is closed, its shared claim is released, and its Notion task is Done. Production has no `ASSESSMENT_EMAIL_DELIVERY_INTENTS_ENABLED` variable, so the new recovery path remains inactive. No production legacy audit, replay, backfill, payload reconstruction, manual database write, operator release/cancellation, or customer email send occurred.
+
+<a id="gh-257-outbox-reconciliation-launched-default-off"></a>
+### 2026-08-04 — GH #257 residual outbox reconciliation launched default-off <!-- ENTRY_ISO:2026-08-04 ENTRY_SLUG:gh-257-outbox-reconciliation-launched-default-off -->
+
+**Protected merge and exact Production receipt.** Implementation PR [#296](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/296) received independent `jcbdelo26` approval after specification and standards reviews each reported 0 Critical / 0 Important / 0 Minor issues. It squash-merged as `613cb0cecc014ec767fafab82b13e393dc9740f6`. Exact Production deployment `dpl_CKS139kLjuXPJpFXdohxbc5384Bn` is **Ready** and GitHub deployment `5744293546` is successful on that exact SHA. It owns `platformtest.scalingup.com`, `scaling-up-platform-v2.vercel.app`, `scaling-up-platform-v2-scaling-up.vercel.app`, and the `git-main` alias. Both public `/api/health` endpoints returned HTTP `200` with healthy database and safe auth posture.
+
+**Verification and rollout state.** The final local repository run passed **621 suites / 7,655 tests / 14 snapshots**; the production build completed TypeScript and generated **92/92** static pages. Repair-scoped ESLint, changelog freshness, `git diff --check`, and migration safety across **44 migrations** passed. Refreshed main CI then passed Build, Migration Safety Gate, and Assessment Email Lease (PostgreSQL). A name-only Production environment inventory found no `ASSESSMENT_EMAIL_DELIVERY_INTENTS_ENABLED` variable, so durable intent creation remains inactive and the deployed capability is default-off. No environment value was read and no flag was changed.
+
+**Shipped recovery boundary.** When separately activated, new invited submissions atomically create exact frozen delivery intents; an ID-only event fast path and bounded three-minute scan share one reconciler. Reauthorization can hand exact stored bytes to the unchanged ADR-0030 outbox, hold drift for ADMIN/STAFF-only exact release or permanent cancellation, or purge unresolved payloads at the absolute 30-day deadline. The legacy auditor remains SELECT-only and emits unverifiable candidates without replay, reconstruction, apply, or backfill behavior.
+
+**Tracking and safety closeout.** Issue [#257](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/issues/257) is closed. The [shared claim](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/issues/261#issuecomment-5179518345) is released and the [single Notion task](https://app.notion.com/p/3af8c45dd82981ec9820d35bc4890970) is Done. GH #257 becomes the ninth eligible outcome in the next consolidated report; this launch receipt does not add another outcome. No production legacy audit, replay, backfill, payload reconstruction, manual database write, operator release/cancellation, or customer email send occurred.
+
+<a id="gh-257-outbox-reconciliation-pr-ready"></a>
+### 2026-08-04 — GH #257 residual outbox reconciliation prepared for protected review <!-- ENTRY_ISO:2026-08-04 ENTRY_SLUG:gh-257-outbox-reconciliation-pr-ready -->
+
+**Status: IMPLEMENTED + INDEPENDENTLY CODE-APPROVED + FULLY LOCALLY VERIFIED; default off; protected PR #296 closeout in progress; not merged, launched, or deployed.** Invited submissions on the gated path now atomically commit zero to two durable `AssessmentEmailDeliveryIntent` obligations with the submission. Each stores the exact recipient, subject, HTML, authorization snapshot, and content provenance at submission time. The existing `AssessmentEmailOutbox` remains the only SMTP queue and retains its ADR-0030 lease, retry, uncertainty, and terminal-state semantics.
+
+**Reconciliation and recovery contract.** After commit, an ID-only Inngest event attempts immediate reconciliation; a scheduled three-minute scan repairs missed events and transient failures in bounded batches. Reauthorization uses current authoritative campaign, invitation, respondent, Coach-owner, template, version, approval, feature, schema, provenance, hash, pause, and existing-outbox facts without rerendering or replacing frozen bytes. Drift moves the intent to `HELD`; an already-authoritative outbox row wins; an authorized handoff creates at most one outbox row. `ASSESSMENT_SENDS_PAUSED` blocks handoff and release but not durable intent creation or absolute expiry, while disabling the default-off route flag sends new submissions back to the legacy path without stranding existing intents.
+
+**Operator and retention controls.** The narrow delivery-holds surface is ADMIN/STAFF-only; Coaches have no retroactive-delivery capability. It masks list identity, audits full-detail access, renders preview content in an inert sandbox document, forbids editing, and offers only exact frozen release after a fresh review-token and state recheck or permanent allowlisted cancellation. Handoff, cancellation, and absolute `createdAt + 30 days` expiry clear payload-bearing intent fields; the existing worker separately purges outbox HTML after `SENT` or terminal `FAILED`. Required audit records are transactional and contain IDs, roles, allowlisted reasons, versions, and provenance hashes rather than addresses, subject text, HTML, answers, or raw errors.
+
+**Forward-only legacy boundary and operations.** The new legacy auditor requires an explicit closed-open `--until=<ISO>` rollout boundary, accepts an optional `--since=<ISO>`, performs one parameterized SELECT-only query, and emits only IDs, missing `RESPONDENT`/`OWNING_COACH` roles, allowlisted current-evidence codes, counts, and the classification `UNVERIFIABLE_CANDIDATE`. It has no render, reconstruction, apply, replay, backfill, or write mode and was not run against any database. The runbook records flag-off schema deployment, read-only queue and age/expiry/hold/handoff monitoring, exact alert thresholds, pause and operator response, route-flag rollback, and the requirement to keep the reconciler deployed while unresolved intents exist.
+
+**Verification and outstanding gates.** After integrating current `main`, the final GH #257 matrix passed **14 suites / 452 tests**. A later independent closeout review found authentication/rate-limit ordering, source-of-truth inventory, and duplicated provenance-parser issues. The repair authenticates and authorizes before rate limiting, inventories the new page/component/routes/model, and makes the operator and reconciler share one strict exact-key/lowercase-SHA-256 provenance parser; focused TDD verification passed **4 suites / 179 tests**. The resulting complete repository run passed **621 suites / 7,655 tests / 14 snapshots**. Migration safety across **44 migrations**, repair-scoped ESLint, `git diff --check`, and `CI=true npx --no-install next build --turbopack` passed; the build completed TypeScript and generated **92/92** static pages. Final specification and standards re-reviews each report **0 Critical / 0 Important / 0 Minor** issues. PR #296's pre-repair head passed every required hosted check, including the isolated PostgreSQL suite. Repair push and refreshed hosted gates remain pending.
+
+**No-production-operation boundary.** No production database connection, read-only legacy audit, replay, backfill, payload reconstruction, manual data write, environment or flag change, deployment, or customer email send occurred. This open PR does not close the issue or release its claim; final independent approval, refreshed gates, merge, additive schema deployment, default-off production verification, issue/claim closeout, and any later deliberate activation remain separate steps.
+
+---
+<a id="gh-220-branded-invitation-html-launched-default-off"></a>
+### 2026-08-04 — GH #220 branded invitation HTML launched default-off <!-- ENTRY_ISO:2026-08-04 ENTRY_SLUG:gh-220-branded-invitation-html-launched-default-off -->
+
+**Protected merge and exact deployment receipt.** Implementation PR [#292](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/292) was independently approved and squash-merged as `fe3deeba2384aaf504c40b758aad7399880899af`. Exact Production deployment `dpl_AJ2gQhRtmuYYP6dU8bhT2a4mQfx4` is **READY**, and GitHub deployment `5729526511` ties it to that exact SHA. It owns `platformtest.scalingup.com`, `scaling-up-platform-v2.vercel.app`, `scaling-up-platform-v2-scaling-up.vercel.app`, and `scaling-up-platform-v2-git-main-scaling-up.vercel.app`. Both public health aliases returned HTTP `200` with healthy database and safe auth posture. Refreshed hosted **Build**, **Migration Safety Gate**, **Assessment Email Lease (PostgreSQL)**, **Vercel**, and **Vercel Preview Comments** checks passed.
+
+**Production rollout state by variable name only.** A name-only Production inventory found pre-existing capability variable `WAVE_D_CUSTOM_HTML_EMAIL_ENABLED` present. New branded-body variable `ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED` is absent, and renderer kill variable `ASSESSMENT_INVITE_BRANDED` is absent. Therefore the new branded-body composition remains default-off and existing `full_replace` semantics remain active. No flag value was read, no flag was changed, no live email was sent, and no override audit, activation, or production-data write ran.
+
+**Verification and scope boundaries.** The final local full Jest run passed **609 suites / 7,259 tests / 14 snapshots**. Changed-file ESLint, migration safety across **43 migrations**, whitespace/diff checks, and the Turbopack production build passed; the build generated **92/92** static pages. The shipped implementation composes safe campaign-authored content inside the existing branded invitation shell only when separately activated, while retaining stored bytes, platform-owned logo/CTA/fallback/footer behavior, canonical plain text, SMTP failure propagation, and fail-safe rollback behavior. GH #228 report branding, GH #256 image-host policy, and GH #257 outbox reconciliation remain separate and unchanged.
+
+**Tracking, receipt, and reporting closeout.** Issue [#220](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/issues/220) auto-closed with the implementation merge. Launch-record PR [#293](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/293) was independently approved and squash-merged as `dc82651b1879696355d02fbbfea8100c550ee7c0`; its exact-SHA CI passed, Production deployment `dpl_FPQmpzw39pjKR6bknFAT2BGDwZuF` reached **Ready**, GitHub deployment `5729718845` succeeded, and both public health aliases returned HTTP `200` with healthy database and safe auth posture. The [shared claim](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/issues/261#issuecomment-5168968677) is released and the [matching Notion task](https://app.notion.com/p/3b18c45dd829814aac48dc656a96e4a1) is Done. GH #220 is therefore the **eighth** eligible outcome in the next consolidated report; the launch record and this tracking correction are operational evidence, not additional outcomes.
+
+<a id="gh-256-circle-sync-image-validation-launched"></a>
+### 2026-08-03 — GH #256 Circle-sync Coach image validation launched <!-- ENTRY_ISO:2026-08-03 ENTRY_SLUG:gh-256-circle-sync-image-validation-launched -->
+
+**Protected merge and exact production receipt.** Implementation PR [#287](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/287) was independently approved, all refreshed hosted Build, Migration Safety Gate, Assessment Email Lease (PostgreSQL), Vercel, and Vercel Preview Comments checks passed, and it squash-merged as `cc38dd501271747438dde8562954ead0f193f4ac`. Exact Production deployment `dpl_4yDfLC92HEPVinAVxsVSEXQnhu7o` is **Ready**, carries that merge SHA, and owns `scaling-up-platform-v2.vercel.app`, `platformtest.scalingup.com`, the Scaling Up alias, and the `git-main` alias. Both required public `/api/health` aliases returned HTTP `200` with healthy database and safe auth posture.
+
+**Shipped narrow behavior.** Circle-supplied Coach avatars now pass through the existing HTTPS-only `safeImageSrc` policy immediately before persistence. Rejected values preserve the stored image in both normal and force modes, do not prevent unrelated profile updates or `syncedAt` advancement, surface field-level operator warnings, and emit PII-safe post-persistence telemetry without a raw URL or email. No schema, migration, feature flag, proxy, rehosting job, backfill, production repair, invalid Circle profile, Coach-image mutation, or manual sync was used to obtain this receipt.
+
+**Residual policy remains explicit.** The narrow #261 claim is [released](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/issues/261#issuecomment-5162188735) and GH #256's `circle-sync.ts` validation checkbox is checked. GH #256 remains **open**: arbitrary parseable HTTPS hosts are still accepted, and its host allowlist/proxy/rehosting decision checkbox remains unchecked. This launch receipt does not claim or introduce any broader host policy.
+
+<a id="consolidated-progress-through-gh-220"></a>
+### 2026-08-03 — Consolidated progress ledger current through GH #220 <!-- ENTRY_ISO:2026-08-03 ENTRY_SLUG:consolidated-progress-through-gh-220 -->
+
+**Status: REPORTING LEDGER UPDATED; no runtime change.** The hard cutoff remains the already-sent `output/pdf/Scaling-Up-Progress-Report-2026-07-27-to-2026-07-31.pdf`, which covers 33 merged pull requests through PR #267. The next consolidated report now has exactly **eight** eligible product or reliability outcomes:
+
+1. **GH #222 — Welcome-screen question-bank accuracy** (PR #269): mixed respondent-visible banks use truthful format-aware wording while valid uniform slider banks retain their scale copy.
+2. **GH #242 — retired pinned-edition warning** (PR #273): shared campaign detail shows the exact pinned edition and warns when it has been retired.
+3. **GH #243 — campaign-list edition visibility** (PR #275): admin and Coach campaign lists show factual edition identity plus lifecycle-aware `Not latest` or `Retired` markers.
+4. **GH #224 — truthful Welcome sharing disclosure** (PR #278): invited and public Welcome screens describe who can review named answers instead of promising unconditional confidentiality.
+5. **GH #217 — legacy invitation fallback hardening** (PR #280): the dormant fallback renderer now carries Coach identity, a plain-text twin, and a bottom fallback URL without changing the active branded path.
+6. **Jeff #65 — stable reminder links** (PR #282): original invitation links and successfully delivered bulk-reminder links remain valid for the same invitation lifecycle; the Production global flag is enabled and the kill switch remains off.
+7. **GH #228 — Results report email branding** (PR #288): all three full-report email roles have Scaling Up-first chrome and trusted frozen Coach provenance, shipped behind absent default-off rollout variables.
+8. **GH #220 — branded campaign invitation HTML composition** (PR #292): campaign-authored HTML can be sanitized and composed inside the shared branded invitation shell, shipped behind an absent default-off rollout variable while existing full-replacement behavior stays active.
+
+**Counting and rollout discipline.** Each implementation counts once. PRs #270, #274, #276, #279, #281, #283–#286, #289, #293, and the final tracking correction are source-of-truth, receipt, acceptance, or coordination evidence and do not add outcomes. GH #217's fallback remains dormant under the active branded renderer, while GH #228 and GH #220 remain deployed but default-off; the consolidated report must not describe any of them as active customer-visible behavior. Documentation, design, deferral, claim management, and unmerged work remain excluded from the headline count.
+
+**Closeout evidence.** All eight implementation PRs are merged, their exact production deployments were verified healthy, their issues or source claims were closed or released, and their canonical launch records remain in this changelog. GH #257 residual outbox reconciliation is not part of this eight-outcome window because its separate implementation and production closeout are not present on `main`.
+
+<a id="gh-220-branded-invitation-html-dark"></a>
+### 2026-08-03 — GH #220 branded invitation HTML implemented dark <!-- ENTRY_ISO:2026-08-03 ENTRY_SLUG:gh-220-branded-invitation-html-dark -->
+
+**Status: IMPLEMENTED + LOCALLY VERIFIED + DEFAULT-OFF; not production-activated.** Campaign-authored `invitationBodyHtml` now has a flag-controlled branded-body mode. `WAVE_D_CUSTOM_HTML_EMAIL_ENABLED` remains the capability gate, while new default-off `ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED` composes escaped/interpolated/sanitized authored content inside the existing Scaling Up/Coach invitation shell. The platform owns the CID logo, Coach-logo behavior, CTA, visible fallback URL, footer, and canonical plain-text URL. Subjects and SMTP failure propagation are unchanged.
+
+**Rollback and stored data.** Existing HTML bytes are neither rewritten nor migrated. With the new behavior flag off, recognized-token legacy HTML retains complete replacement and tokenless HTML uses the branded markdown/template fallback, preventing a linkless rollback. Create/update validation permits tokenless bodies only while branded mode is active and continues to reject unsafe token placement.
+
+**Authoring and observability.** Campaign Wizard and Campaign Detail receive the server-derived mode and disclose branded-body, complete-replacement, or retained-fallback state. Campaign Detail omits unchanged retained tokenless HTML from unrelated rollback edits. Existing `renderer:"custom_html"` and `bodySource:"custom_html"` telemetry remain stable; PII-free metadata adds the custom-HTML mode or safe-fallback reason.
+
+**Activation boundary.** `npm run audit:invitation-html-overrides` requires a dedicated `AUDIT_READONLY_URL`, enforces a read-only transaction, and prints only counts, campaign IDs, template aliases, token presence, and current/post-activation/rollback modes. Production activation is separate: re-run the audit, manually review every live override, then explicitly authorize the flag and redeploy. No production data, flag, invitation, migration, GH #228 report branding, GH #256 image policy, or GH #257 outbox behavior changed in this implementation.
+
+<a id="gh-228-report-email-branding-launched"></a>
+### 2026-08-03 — GH #228 Results report email branding launched default-off <!-- ENTRY_ISO:2026-08-03 ENTRY_SLUG:gh-228-report-email-branding-launched -->
+
+**Merge and protected gates.** Implementation PR [#288](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/288) squash-merged as `5f1d53d3fd97121411df8a300811ed374f057279` after independent approval and green hosted Build, Migration Safety Gate, Assessment Email Lease (PostgreSQL), Vercel, and Vercel Preview Comments checks. The merged implementation supplies the approved Scaling Up-first chrome to invited `ASSESSMENT_RESULTS`, public `TAKER_COPY`, and public `REFERRING_COACH`; invited rows use the campaign creator Coach, public rows use the submission-time frozen verified Referring coach, and neither path substitutes the Organization owner. Missing or rejected Coach images degrade to name-only and missing names to Scaling Up-only. The disabled renderer remains byte-identical, and short notifications, recipients, approval hashes, outbox schema, leases, retries, dead-letter behavior, and provider handoff remain unchanged.
+
+**Production receipt and rollout state.** Exact production deployment `dpl_R5KcAvkxxQyYTfbch16K9pWwQyLu` is **Ready** and owns `platformtest.scalingup.com`, `scaling-up-platform-v2.vercel.app`, `scaling-up-platform-v2-scaling-up.vercel.app`, and the `git-main` alias. Both public `/api/health` endpoints returned healthy database and safe auth posture. A read-only Production environment inventory found no `WAVE_228_REPORT_EMAIL_CHROME_ENABLED`, `WAVE_228_REPORT_EMAIL_CHROME_CANARY`, or `WAVE_228_REPORT_EMAIL_CHROME_KILL` variable, so the shipped feature remains default-off and existing legacy email bytes remain active. No customer assessment was submitted and no live email was sent. Enabling, canarying, or killing the feature remains a separate explicit rollout action; containing already-queued rows still requires pausing both Inngest drainers before quarantine or rollback.
+
+**Verification and closeout.** The final local focused matrix passed **14 suites / 269 tests / 2 snapshots**; changed-file ESLint, 43-migration safety, changelog freshness, current/range whitespace checks, and the **92/92-page** Turbopack production build passed. The required full local Jest run reproduced its inherited baseline—**597 suites / 7,147 tests passed; 6 unrelated suites / 15 tests failed**—and none of the failing-suite files changed on the branch. Hosted CI then passed the database-backed lease coverage and production build. [Issue #228](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/issues/228) is closed, the [shared claim is released](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/issues/261#issuecomment-5166913739), and the [single Notion task](https://app.notion.com/p/3b18c45dd82981dc80caf51e78c91808) is Done. GH #220, #233, #256, and #257 remain untouched.
+
+<a id="gh-228-report-email-branding-pr-ready"></a>
+### 2026-08-03 — GH #228 Results report email branding implemented and locally verified <!-- ENTRY_ISO:2026-08-03 ENTRY_SLUG:gh-228-report-email-branding-pr-ready -->
+
+**Status: IMPLEMENTED + LOCALLY VERIFIED + DEFAULT-OFF.** GH #228 adds approved Scaling Up-first report-email chrome to exactly the three Results report roles: invited `ASSESSMENT_RESULTS`, public `TAKER_COPY`, and public `REFERRING_COACH`. The Scaling Up mark remains primary in the cover and footer. Invited reports use the campaign creator Coach; attributed public reports use the submission-time frozen verified Referring coach; neither path substitutes the Organization owner. A usable Coach name is required, with a valid HTTPS image shown only alongside that name; missing or rejected images degrade to name-only, and absent names render Scaling Up-only.
+
+**Frozen rendering, exact attachment, and rollout boundary.** The shared pure renderer remains legacy by default and disabled output is byte-identical. `WAVE_228_REPORT_EMAIL_CHROME_ENABLED` enables globally, `WAVE_228_REPORT_EMAIL_CHROME_CANARY` matches exact campaign IDs, and `WAVE_228_REPORT_EMAIL_CHROME_KILL` overrides both for newly rendered rows; unset or unrecognized values are off. Existing outbox rows, their frozen HTML and Coach presentation snapshot, recipients, approval hashes, send leases, retries, dead-letter behavior, and provider handoff remain unchanged. The worker derives one static inline attachment only when frozen HTML contains the exact platform-owned `<img src="cid:su-report-logo-v1"` prefix; bare CID, `data-src`, escaped, non-image, or unrelated text attaches nothing. The dedicated kill does not rewrite already-queued branded rows. `ASSESSMENT_SENDS_PAUSED` stops applicable new enqueue activity; containing queued rows requires pausing both Inngest functions `quick-assessment-lead-email` and `quick-assessment-lead-email-cron` before quarantine or rollback.
+
+**Approved visual review artifacts.** The approved email-safe mockups are [`228-report-email-branding.html`](../docs/specs/v7.6/mockups/228-report-email-branding.html), [`desktop receipt`](../docs/specs/v7.6/mockups/228-report-email-branding-desktop.png), and [`mobile receipt`](../docs/specs/v7.6/mockups/228-report-email-branding-mobile.png). They cover scored and qualitative report anatomy plus image-and-name, blocked-image/name-visible, name-only, and Scaling Up-only fallbacks.
+
+**Verification.** The complete prescribed focused Jest matrix exited `0`: **14 suites passed / 269 tests passed / 2 snapshots passed**. The prescribed changed-file ESLint command exited `0` with no output (no warnings). `node scripts/check-migration-safety.mjs` exited `0`: `✓ Checked 43 migration(s) — no unapproved destructive ops.` `CI=true npx next build --turbopack` exited `0`, compiled in **28.3s**, completed TypeScript, and generated **92/92** static pages; expected local missing-Inngest and `DATABASE_URL` messages occurred during static generation without failing the build. `git diff --check` exited `0` with no output before documentation update. No full-repository Jest baseline is claimed; its known unrelated failures were not part of this task.
+
+**Scope and rollout limitation.** No production flag was enabled, no deployment was made, and no live customer email was sent or checked. GH #220 (campaign full-HTML precedence), GH #233 (flag visibility/production-state investigation), GH #256 (coach-logo host policy), and GH #257 (outbox reconciliation/backfill) were untouched.
+<a id="gh-256-circle-sync-image-validation-pr-ready"></a>
+### 2026-08-03 — Circle-sync Coach image validation implemented (GH #256 slice) <!-- ENTRY_ISO:2026-08-03 ENTRY_SLUG:gh-256-circle-sync-image-validation-pr-ready -->
+
+**Status: IMPLEMENTED + LOCALLY VERIFIED; not yet merged or launched.** Circle sync now applies the existing HTTPS-only `safeImageSrc` policy immediately before an eligible Circle avatar would be written to the stored Coach image. A rejected avatar preserves existing image state in both fill-empty and forced modes, does not block unrelated field updates, and still advances `syncedAt`.
+
+**Operator and telemetry behavior.** Manual import remains successful and reports every nonfatal warning separately from truthful changed / warned-without-changes / already-current base copy. PII-safe field-skipped telemetry emits only after persistence and contains Coach ID, sync mode, field, and reason without the raw URL or email. Repeated eligible attempts emit repeated events; failed persistence emits no field-skipped event.
+
+**Scope and tracking boundary.** This slice changes no host policy: arbitrary parseable HTTPS hosts remain accepted. There is no proxy, rehosting, migration, schema, feature flag, backfill, repair, or production-data write. GH #256 remains open for the allowlist/proxy/accept-arbitrary-HTTPS product decision; only its Circle-sync validation checkbox and the narrow issue #261 claim become eligible for closeout after protected merge and production verification. GH #257 remains separately owned.
+
+**Local verification.** The complete focused regression matrix passed **7 suites / 131 tests / 1 snapshot**. Changed-file ESLint exited `0`; migration safety exited `0` after reporting **43 migrations** with no unapproved destructive operations; `git diff --check` exited `0` with no output; and `CI=true npx next build --turbopack` exited `0`, compiled successfully, and generated **92/92** static pages. The build reported the expected local warnings for unset Inngest keys and missing `DATABASE_URL` during static generation; neither prevented its zero exit.
+<a id="gh-217-accepted-gh-257-primed"></a>
+### 2026-08-01 — GH #217 accepted; GH #257 reconciliation primed <!-- ENTRY_ISO:2026-08-01 ENTRY_SLUG:gh-217-accepted-gh-257-primed -->
+
+**GH #217 owner acceptance and final closeout.** The owner accepted the completed legacy invitation fallback hardening after the launch and Manila-date receipt corrections. Implementation PR [#280](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/280) remains merged as `a683e55dfb84eb8606b7d79c9701637fac86ca2b`; receipt PRs [#283](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/283) and [#284](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/284) landed as `aae96d44cc117739e8bc48762871967d8b91fe5a` and `2a858e0737c4dfa73c3c03b78e83e5217f2a5cdf`. Final production deployment `dpl_HD6UVhYtVYhmmXVi8ifLJBsKj1Md` is **Ready**, owns both required aliases, and both aliases returned HTTP `200` with healthy database and safe auth posture on the final verification. The dormant path remains off because Production leaves `ASSESSMENT_INVITE_BRANDED` unset. Issue #217 is closed, its [shared claim is released](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/issues/261#issuecomment-5145377446), and its Notion task is Done.
+
+**Verification accounting.** The focused GH #217 matrix passed **3 suites / 82 tests / 1 snapshot**. The complete repository run on the final GH #217 tree reported **586 passing suites / 6,956 passing tests** and **8 failing suites / 17 failing tests**; the failures were outside the GH #217 diff and were not represented as GH #217 regressions. The production walk remained read-only and sent no invitation. Audit worktrees were preserved rather than removed as part of this non-destructive closeout.
+
+**Next item: GH #257 residual outbox reconciliation.** The open issue is now [claimed](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/issues/261#issuecomment-5148844996) on clean branch `codex/257-outbox-reconciliation`, and a dedicated [Notion design task](https://app.notion.com/p/3af8c45dd82981ec9820d35bc4890970) is In progress. This was selected over GH #233, which already has an active claim; GH #220 and #256, which still need product-policy decisions; and GH #228, which is net-new scope. The completed GH #257 transaction-semantics correction remains closed; this residual owns only recovery when a positively identified pre-database enqueue failure leaves a committed submission without an expected outbox row.
+
+**Design gate and exclusions.** Before code, the next session must agree how expected rows are reconstructed from the existing `buildWaveDOutboxRows` inputs and `emailRenderFingerprint`, how historical campaign/template drift and terminal invitation/submission states affect eligibility, and how the existing `(submissionId, recipientRole)` uniqueness contract prevents duplicates. Send-lease behavior, provider delivery, email copy/chrome, production backfill, and unrelated outbox types are excluded until that contract is approved. No GH #257 implementation code was written while priming.
+
+---
+
+<a id="jeff-65-stable-reminder-links-launched"></a>
+### 2026-08-01 — Jeff #65 stable reminder links launched <!-- ENTRY_ISO:2026-08-01 ENTRY_SLUG:jeff-65-stable-reminder-links-launched -->
+
+**Status: MERGED + GLOBALLY ENABLED + PRODUCTION-VERIFIED + CLAIM-RELEASED.** Implementation PR [#282](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/282) passed the protected **Build**, **Migration Safety Gate**, **Assessment Email Lease (PostgreSQL)**, **Vercel**, and **Vercel Preview Comments** checks, then squash-merged at `2026-08-01T01:16:55Z` as `050573fa09a6d8587ad7026aabe4021e35c26c35`. The shared Jeff #65 claim was [released](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/issues/261#issuecomment-5148842955) after production verification.
+
+**Dark migration deployment.** Exact production deployment `dpl_A6DPitCUbVt1Wpqz1GcJNZa1gpj2` (`scaling-up-platform-v2-iuk2oo1ko-scaling-up.vercel.app`) was created at `2026-08-01T01:16:58.142Z` and reached **READY** at `2026-08-01T01:18:08.902Z`, with Vercel metadata bound to `main` at the merge SHA. Its build ran Prisma generation, the 43-migration safety gate, `prisma migrate deploy`, and the Turbopack build while all Jeff #65 rollout controls remained dark. Read-only production SQL then found **103 invitations / 103 token-history rows**, zero invitations without a history row, zero duplicate token-hash groups, and zero duplicate invitation/sequence groups.
+
+**Global activation.** Production had no Jeff #65 environment variables: global enabled false, kill false, and no canary. `WAVE_J65_STABLE_LINKS_ENABLED=1` was added only to Production; the kill switch remained off and no canary override was introduced. Vercel then rebuilt the exact merged artifact as production deployment `dpl_HAF1FS2BpUXQxjVLXz4Tu1h3YoJB` (`scaling-up-platform-v2-5p61fw6su-scaling-up.vercel.app`), created at `2026-08-01T01:21:03.090Z` and **READY** at `2026-08-01T01:22:10.083Z`. Metadata remained bound to `main` at `050573fa`, and the deployment owns both production aliases.
+
+**Post-activation evidence and scope boundary.** The immutable deployment, `scaling-up-platform-v2.vercel.app`, and `platformtest.scalingup.com` each returned HTTP `200` with `status: healthy`, `database: healthy`, and `authPosture: safe`. A second read-only SQL audit remained 103/103 with zero missing parents or duplicate hash/sequence groups. The public root redirected to the production login page and rendered the expected sign-in form. No production invitation, reminder, token exchange, assessment submission, authenticated admin action, or customer-data mutation was manufactured; end-to-end multi-link behavior is therefore supported by the pre-merge 15-suite / 257-test matrix rather than a live email walk. Manual **Resend** remains outside the locked guarantee, and there is no invitation-copy or UI change.
+
+**Behavior and rollback.** Original invitation links and every successfully delivered bulk-reminder link now authenticate the same invitation until submission, explicit revocation, expiry, or campaign closure. Failed sends create no newly usable link and invalidate none of the existing links; exact rejected-token tombstones fail closed. Immediate rollback is setting `WAVE_J65_STABLE_LINKS_KILL=1` and redeploying, which restores the exact legacy parent-only lookup. Full rollback is disabling the global flag or reverting PR #282; the additive hashed history may remain in place and requires no destructive migration.
+
+---
+
+<a id="jeff-65-outbox-fairness-correction-local-only"></a>
+### 2026-08-01 — Jeff #65 outbox fairness correction locally verified (not launched) <!-- ENTRY_ISO:2026-08-01 ENTRY_SLUG:jeff-65-outbox-fairness-correction-local-only -->
+
+**Status: IMPLEMENTED + LOCALLY VERIFIED ONLY; not merged, deployed, canaried, globally enabled, or closed.** This is a correctness correction to the existing unlaunched Jeff #65 branch. It does not increase the consolidated shipped-outcome count or release the shared claim.
+
+**Forward-progress state machine.** The five-minute concurrency-one drain still selects at most 50 `STABLE_INVITATION_REJECTION_REPAIR_PENDING` AuditLog rows oldest-first, but every selected row now leaves `PENDING`. An existing resolved marker consumes late duplicates. A deleted token row—including invitation cascade deletion—cannot authenticate and therefore receives the deterministic `TARGET_DELETED` terminal outcome. Malformed metadata receives a deterministic row-keyed `MALFORMED_METADATA` dead letter. A transient repair failure becomes `STABLE_INVITATION_REJECTION_REPAIR_FAILED_ATTEMPT` with monotonic attempt count and an allowlisted reason, while one deterministic strict `{invitationId}` pending row is enqueued at the tail. No audit history is deleted, and the next scheduled drain continues recovery indefinitely without allowing poison head rows to starve newer work.
+
+**Concurrency, privacy, and migration.** Conditional pending-state transitions, deterministic marker/retry IDs, marker rechecks, and the existing identity-guarded token service keep duplicate and concurrent event/cron work convergent. The direct ID-only event also terminalizes a missing target. Audit state contains only invitation/token-row IDs, allowlisted reasons, and attempt count—never raw tokens, hashes, or serialized error objects. The existing additive migration now adds `audit_logs_action_timestamp_idx` over `(action, timestamp)`, matching the bounded action-filtered oldest-first query. Default-off flags, kill behavior, partial-503 contract, UI, and invitation copy are unchanged.
+
+**TDD and verification.** RED evidence reproduced all five starvation modes: resolved duplicates stayed pending, deleted work retried impossibly, malformed rows were filtered before consumption, transient rows remained at the head, and row 51 was not reached; the migration index was absent. GREEN coverage proves resolved sweeping, deleted-target terminalization, malformed dead-lettering, transient attempt rotation, privacy, concurrent event resolution, target identity checks, and 50 transient rows moving behind a valid row 51 within the next bounded drain. The affected outbox/event/service/migration slice passed **4 suites / 68 tests** and the complete Jeff #65 focused matrix passed **15 suites / 252 tests**. Prisma validate/generate passed with inert local PostgreSQL URLs; migration safety checked all **43 migrations**. Changed-file ESLint and the zero-diagnostic scoped TypeScript scan passed, as did privacy, UI no-change, changelog freshness, and `git diff --check`. `CI=true npx next build --turbopack` exited `0`, compiled in **38.8s**, completed TypeScript, and generated **92/92** static pages. Expected missing local Inngest and unreachable inert-database warnings appeared during static generation. The full Jest suite was deliberately not rerun and is not claimed.
+
+**Rollout boundary.** Branch `codex/jeff-65-stable-reminder-links` is pushed and PR [#282](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/282) is open for review. Nothing is merged or deployed. Normal protected-branch review, merge, migration deployment, explicit canary, exact-SHA production verification, global enablement, claim release, and launch closeout remain outstanding.
+
+---
+
+<a id="gh-217-legacy-invite-fallback-launched"></a>
+### 2026-08-01 — Legacy invitation fallback hardening launched (GH #217) <!-- ENTRY_ISO:2026-08-01 ENTRY_SLUG:gh-217-legacy-invite-fallback-launched -->
+
+**Date basis.** The canonical launch date is `2026-08-01` in Asia/Manila: the implementation merge at `2026-07-31T16:28:23Z` occurred at `2026-08-01 00:28:23` locally, and the implementation and launch-record deployments were likewise created and reached Ready on August 1 locally. Immutable GitHub and Vercel receipt timestamps below remain exactly as recorded in UTC (`Z`).
+
+**Status: MERGED + LIVE, dormant unless the existing kill switch is activated.** Implementation PR [#280](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/280) passed the protected **Build**, **Migration Safety Gate**, **Assessment Email Lease (PostgreSQL)**, **Vercel**, and **Vercel Preview Comments** checks and squash-merged at `2026-07-31T16:28:23Z` as `a683e55dfb84eb8606b7d79c9701637fac86ca2b`. Issue [#217](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/issues/217) closed at `2026-07-31T16:28:24Z`.
+
+**Exact deployment and health evidence.** Production deployment `dpl_uM3anRWbD3Nmzuqi3dStdEGyVfLW`, target `production`, was created at `2026-07-31T16:28:26.146Z` (`2026-08-01 00:28:26` Asia/Manila) and reached **READY** at `2026-07-31T16:29:47.434Z` (`2026-08-01 00:29:47` Asia/Manila), with Vercel metadata bound to `main` at the exact merge SHA. It owns both `scaling-up-platform-v2.vercel.app` and `platformtest.scalingup.com`. Read-only health calls returned HTTP `200` with `status: healthy`, `database: healthy`, and `authPosture: safe` at `2026-07-31T16:36:59.367Z` and `2026-07-31T16:37:00.075Z`, respectively.
+
+**Launch-record closeout evidence.** Launch SoT PR [#281](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/281) passed **Build**, **Migration Safety Gate**, **Assessment Email Lease (PostgreSQL)**, **Vercel**, and **Vercel Preview Comments**, then squash-merged at `2026-07-31T16:50:53Z` as `6ba3221e89a6f6cfa90ade0c20aa46f955ebe14d`. Its exact production deployment `dpl_Cdk5VxnKcjs6RofueeAJw9tGVzA9`, target `production`, was created at `2026-07-31T16:50:56.255Z` and reached **READY** at `2026-07-31T16:52:08.650Z`, with Vercel metadata bound to `main` at that exact launch-record merge SHA and both required aliases attached. Post-launch read-only health calls to `scaling-up-platform-v2.vercel.app` and `platformtest.scalingup.com` returned HTTP `200` with `status: healthy`, `database: healthy`, and `authPosture: safe` at `2026-07-31T16:52:34Z` and `2026-07-31T16:52:35Z`, respectively.
+
+**Flag state, live limitation, and scope.** A key/type-only Production environment query found zero `ASSESSMENT_INVITE_BRANDED` entries; no environment values were requested or printed, and no flag was created or changed. The live branded renderer therefore remains active and the hardened legacy renderer stays dormant unless the existing off-switch is deliberately activated. Production verification sent no invitation and mutated no production data; the focused implementation tests are the acceptance evidence for the dormant path. The implementation changes no schema, migration, API, route, scoring, report, scheduler, invitation copy, custom-HTML precedence, telemetry contract, attachment behavior, or SMTP error propagation.
+
+**Reporting classification and rollback.** GH #217 is the fifth reportable product or reliability outcome after the already-sent July 27–31 report, following GH #222, GH #242, GH #243, and GH #224. This launch record is operational evidence, not a sixth outcome. Roll back by reverting implementation squash `a683e55dfb84eb8606b7d79c9701637fac86ca2b`; no migration rollback, data cleanup, environment rollback, scheduler action, or new flag operation is required.
+
+---
+
+<a id="jeff-65-stable-reminder-links-implemented-local-only"></a>
+### 2026-07-31 — Jeff #65 stable reminder links implemented locally (not launched) <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:jeff-65-stable-reminder-links-implemented-local-only -->
+
+**Status: Jeff #65 is implemented on the branch and locally verified only; it is not merged, deployed, canaried, globally enabled, or closed.** This record does not increase the consolidated shipped-outcome count and does not release the shared claim.
+
+**Architecture and lifecycle.** Additive `AssessmentInvitationToken` child rows hold only independent SHA-256 token hashes. The parent `AssessmentInvitation` remains the sole authority for submission, revocation, expiry, campaign lifecycle, and session state, while its non-null `tokenHash` remains the newest-token compatibility mirror. Enabled original sends create a random, never-delivered parent rollback root and then stage an `ORIGINAL` child; enabled bulk reminders promote the prior mirror when needed, stage a `REMINDER` child, and retain every sibling. Exchange uses child-first lookup with parent fallback, so original and successfully delivered bulk-reminder links share one invitation and terminal lifecycle gates invalidate every sibling together.
+
+**Boundaries.** `WAVE_J65_STABLE_LINKS_KILL` forces the legacy path; otherwise `WAVE_J65_STABLE_LINKS_ENABLED` enables globally and `WAVE_J65_STABLE_LINKS_CANARY` matches exact campaign aliases. All three are default-off. The enabled provider-handoff path prepares rendering before staging, retains uncertain tokens, and rolls back only typed definite rejections with compare-and-swap safety. Manual **Resend** remains parent-only and works through the enabled exchange fallback; it is not granted stable-link semantics. There is no UI, invitation-copy, invitation-chrome, expiry-policy, public-assessment, or batch-cap change.
+
+**Migration and privacy.** Migration `20260731110000_add_stable_invitation_tokens` adds the two token enums and `assessment_invitation_tokens`, its unique hash/index/foreign-key constraints, and one child row for every existing parent hash. It preserves the parent column and persists no raw token. Backfilled delivery state is derived from the parent invitation state. Raw tokens and hashes are excluded from responses, audit payloads, and enabled-path error observability.
+
+**Task 7 review correction.** Two-axis review found that shared SMTP changes had accidentally applied credential-error redaction and verification coalescing to J65-disabled invitation sends. The corrective change makes both behaviors explicit enabled-handoff options; default sends retain their independent verification/error-telemetry behavior, while stable-link adapters opt in. Review also identified three equivalent bounded retry loops; a token-domain retry helper now keeps retry policy consistent without moving invitation identity or compare-and-swap rules out of the service. RED evidence: the reminder suite returned `500` in six retry cases and the manual-invite suite returned `500` instead of its expected `503`, because their explicit stable-token Jest mocks omitted the newly extracted helper. Adding the public seam to both mocks produced the final **12 suites / 219 tests** focused matrix; the enabled-only handoff correction separately produced **6 suites / 137 tests** plus **2 suites / 27 tests** for SMTP/notification boundaries.
+
+**Final whole-branch correction.** Blocking review found that a rejected brand-new original could fall back to the delivered parent hash, and that exhausted rollback retries could leave a definitely rejected token exchangeable. The corrected migration adds durable `REJECTED` tombstones. Definite rejection now commits the tombstone and compare-and-swap restores the first viable non-rejected predecessor before a separately retryable successor reconciliation. Exact rejected-child lookup denies without parent fallback; `STAGED` remains exchangeable because provider acceptance may precede confirmation persistence. Brand-new enabled originals use the same stage-based `ORIGINAL` rotation over a never-delivered root. Default-off/kill exchange remains the exact parent-only query, made safe by parent restoration. Stateful coverage proves that an unreconciled rejected A cannot be resurrected when newer B later rejects; this is state-machine evidence, not a PostgreSQL lock-interleaving claim. A strict-audit 503 after partial reminder progress now returns the completed ledger, remaining count, and `retrySafe: false`.
+
+**Fix Round 2 — durable quarantine and operator-safe partial failure.** Parent restoration no longer depends on predecessor traversal. The migration now adds parent-owned `stableFallbackTokenHash`/expiry/sequence state plus monotonic child sequences and expiry snapshots. `SENT` and `UNCERTAIN` advance the safe fallback only when newer; quarantine commits the exact `REJECTED` tombstone and compare-and-swap parent restore in the same transaction. If its bounded synchronous retries exhaust, both original-invite and reminder paths dispatch the ID-only `assessment/invitation.rejection-retry` Inngest job, whose replay quarantines before optional successor reconciliation and throws for durable retry on infrastructure failure. Stateful coverage locks both A/B confirmation and uncertainty orderings, later-token rejection restore, delayed confirmation after rejection, dispatch payload privacy, handler order, and replay convergence. Partial-batch 503 bodies now put the warning in `error`—the string the existing caller displays—state that some reminders were already sent and the whole request must not be retried, provide sent/skipped/failed/remaining counts plus completed and remaining invitation/participant identifiers, and declare `retrySafe: false`. No UI component changed.
+
+**Fix Round 2 verification.** The fresh J65-focused matrix passed **14 suites / 238 tests**, adding the durable retry handler to the prior matrix. Prisma validate and generate passed with inert local PostgreSQL URLs; migration safety checked all **43 migrations**; all branch-changed TypeScript files passed ESLint; the changed-file TypeScript diagnostic scan returned **zero diagnostics**; changelog freshness, privacy/event-payload scans, and `git diff --check` passed. `CI=true npx next build --turbopack` exited `0`, compiled in **26.1s**, completed TypeScript, and generated **92/92** static pages. Expected local missing-Inngest and unreachable dummy-database warnings appeared during static generation. The full Jest suite was deliberately not rerun and is not claimed.
+
+**Fix Round 3 — strict audit outbox closes the event-dispatch gap.** The Round 2 event is now explicitly a fast path, not the durability claim. On quarantine or reconciliation exhaustion, original-invite and reminder flows first strict-persist the single allowlisted AuditLog shape: entity type `AssessmentInvitationToken`, entity ID equal to the invitation-token row ID, action `STABLE_INVITATION_REJECTION_REPAIR_PENDING`, and structured metadata exactly `{invitationId}`. Only then do they attempt the ID-only event. The registered direct worker and new five-minute concurrency-one drain both idempotently quarantine, reconcile, and upsert the same deterministic `STABLE_INVITATION_REJECTION_REPAIR_RESOLVED` marker. The drain selects at most 50 pending rows oldest-first; completion transitions all duplicate pending rows for that token out of future selection, preventing a bounded queue from starving behind completed intents. If event submission fails, the existing explicit 503/partial ledger remains, while the already-persisted outbox guarantees later recovery. If event-worker retries exhaust, the pending intent likewise remains for the cron. Event/cron overlap is safe through exact token identity checks, idempotent service transitions, and resolution checks. Payloads and audit metadata contain IDs only; default-off/kill and UI remain unchanged.
+
+**Fix Round 3 verification.** The fresh final matrix passed **15 suites / 244 tests**, including the new strict-audit outbox/drain suite. The affected invite, reminder, fanout, direct-event, and scheduled-drain slice passed **6 suites / 124 tests**. All branch-changed TypeScript files passed ESLint and the changed-file TypeScript diagnostic scan returned **zero diagnostics**. Prisma validate/generate passed with inert local PostgreSQL URLs; migration safety checked all **43 migrations**; privacy/event/audit-shape scans, changelog freshness, UI no-change, and `git diff --check` passed. `CI=true npx next build --turbopack` exited `0`, compiled successfully in **4.4 minutes** under concurrent local build load, completed TypeScript, and generated **92/92** static pages. Expected missing local Inngest and unreachable dummy-database warnings appeared during static generation. The full Jest suite was deliberately not rerun and is not claimed.
+
+**Local validation.** The final corrected J65-focused matrix passed **13 suites / 226 tests**: flags, migration, token service, composed stateful acceptance, exchange and timezone, reminders, invite-send, manual invite, fanout, notifications, SMTP, and changelog freshness. The last test-only discriminated-union correction left the affected fanout suite at **32/32** and the changed-file TypeScript scan at **zero diagnostics**. Prisma validate/generate passed with inert local connection strings; migration safety checked all **43 migrations**; all branch-changed TypeScript files passed ESLint; `git diff --check` and the raw-token/hash sink scan passed. `CI=true npx next build --turbopack` then exited `0`, compiled in **20.0s**, completed TypeScript, generated **92/92** static pages, and printed the final route table. Expected local missing-Inngest and missing-`DATABASE_URL` warnings appeared during static generation. An earlier Task 7 repository-wide `tsc --noEmit` remained nonzero with `412` diagnostics versus `433` at exact merge target `634a7eab79f710f9d436b6a71bebe433939b27b7`; it was not represented as a passing gate. The complete Jest command was invoked exactly once before this final correction and lacked captured terminal summary/exit evidence; it was deliberately not rerun and this entry does not assert a full-suite pass. Final evidence is recorded in the final-fix report.
+
+**Rollout and rollback.** Production remains on the legacy behavior until a protected PR merges and an explicit global/campaign canary setting is applied. The default is off; `_KILL` immediately forces legacy parent-only behavior. Rollback before launch is a normal code revert. No production migration execution, data cleanup, deployment, canary, global enablement, or claim release has occurred.
+
+---
+
+<a id="gh-217-legacy-invite-fallback-pr-ready"></a>
+### 2026-07-31 — Legacy invitation fallback hardened (GH #217) <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:gh-217-legacy-invite-fallback-pr-ready -->
+
+**Status: IMPLEMENTED + LOCALLY VERIFIED; not yet merged or launched.** The dormant `ASSESSMENT_INVITE_BRANDED=0` renderer now threads the supplied Coach name into its existing token variables (retaining the established neutral `your coach` fallback), sends a plain-text twin through the shared text renderer, and adds one visible copy/paste URL beneath its existing blue CTA. The generated invitation URL is HTML-escaped in both the button `href` and visible fallback.
+
+**Preserved contracts and scope.** The branded and campaign full-HTML renderers are byte-unmodified, custom-HTML precedence and existing template/campaign invitation copy are unchanged, and the legacy path remains attachment-free. Telemetry type, renderer, source fields, and default version are unchanged; SMTP errors still propagate to the caller. There is no schema, migration, API, route, scoring, report, scheduler, environment, production-data, or new-feature-flag change. Production continues to leave `ASSESSMENT_INVITE_BRANDED` unset, and this work did not mutate it, so the live branded renderer remains active.
+
+**Local verification.** The complete focused regression command passed **8/8 suites, 112/112 tests, and 1/1 snapshot**, covering the notification service, shared invitation renderer, all five seeded invitation-copy contracts, and changelog freshness. Scoped ESLint exited `0` with **0 errors and 2 existing `@typescript-eslint/no-unused-vars` warnings** in the notification test. Migration safety checked **42 migrations** with no unapproved destructive operations. `git diff --check` and the final standalone changelog-freshness run passed. `CI=true npx next build --turbopack` exited `0`, compiled successfully, and generated **92/92** static pages; it retained the known middleware deprecation notice, seven missing-`INNGEST_EVENT_KEY` notices, seven missing-`INNGEST_SIGNING_KEY` notices, and three non-fatal missing-`DATABASE_URL` Prisma validation messages during static collection.
+
+**Rollout, reporting, and rollback.** This is implemented and locally verified only. It becomes the next eligible reliability outcome after protected merge, verification of the exact production deployment and unchanged/unset production flag, issue closeout, claim release, and launch SoT. Rollback is a normal code revert; no migration rollback, data cleanup, flag operation, environment rollback, or scheduler action is required.
+
+---
+
+<a id="gh-224-truthful-welcome-sharing-copy-launched"></a>
+### 2026-07-31 — Truthful Welcome sharing disclosure launched (GH #224) <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:gh-224-truthful-welcome-sharing-copy-launched -->
+
+**Status: MERGED + LIVE.** Implementation PR [#278](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/278) was promoted from draft only after **Build**, **Migration Safety Gate**, **Assessment Email Lease (PostgreSQL)**, **Vercel**, and **Vercel Preview Comments** passed. GitHub reported the PR `CLEAN` and `MERGEABLE`; it squash-merged at `2026-07-31T11:48:33Z` as `e66c85ee87b45adceaecab3b2dd9e391bed3d183`, and issue [#224](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/issues/224) auto-closed at `2026-07-31T11:48:34Z`.
+
+**Exact deployment and health evidence.** Production deployment `dpl_51NbhFeR1oPKdFXXo9K4dhRx88Gj` (`scaling-up-platform-v2-gh3g4cikz-scaling-up.vercel.app`), target `production`, was created at `2026-07-31T11:48:36.051Z` and reached **READY** at `2026-07-31T11:49:37.883Z`, with Vercel metadata bound to `main` at the exact merge SHA. It owns both `scaling-up-platform-v2.vercel.app` and `platformtest.scalingup.com`. Health calls to both aliases returned HTTP `200` with `status: healthy`, `database: healthy`, and `authPosture: safe` at `2026-07-31T11:49:47.991Z` and `2026-07-31T11:49:47.379Z`.
+
+**Read-only production smoke.** `https://platformtest.scalingup.com/quiz/scaling_up_quick_pub_260610041810` returned HTTP `200`, rendered **How your results are shared** and the authorized-Scaling-Up-staff disclosure, and contained no **Honest & confidential**, `anonymous`, or `private` claim. No assessment was started or submitted, no lead data was entered, and no production write occurred. The invited disclosure remains covered by the focused flow suite because opening it live would require a participant invitation.
+
+**Tracking and reporting closeout.** The stale `needs-triage` label was removed from the closed issue. The shared claim on issue [#261](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/issues/261#issuecomment-5142563965) was released after production verification. GH #224 is the fourth reportable product outcome after the already-sent July 27–31 report, following GH #222, GH #242, and GH #243. This launch record is operational evidence, not a fifth outcome.
+
+**Rollback.** Revert merge squash `e66c85ee87b45adceaecab3b2dd9e391bed3d183`. No migration rollback, data cleanup, feature-flag operation, environment change, or scheduler action is required.
+
+---
+
+<a id="gh-224-truthful-welcome-sharing-copy-pr-ready"></a>
+### 2026-07-31 — Truthful Welcome sharing disclosure implemented (GH #224) <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:gh-224-truthful-welcome-sharing-copy-pr-ready -->
+
+**Status: IMPLEMENTED + LOCALLY VERIFIED; not yet merged or launched.** Both respondent Welcome flows now use a shared people icon and exact disclosure copy instead of the unconditional **Honest & confidential** lock claim. Invited assessments state that the coach or facilitator and authorized Scaling Up staff can review named individual answers. Public assessments state that the participant receives results immediately, authorized Scaling Up staff can review the full report, and a referring coach can too when the participant used that coach's link.
+
+**Copy and boundary.** The shared Welcome component accepts explicit `sharingLabel` and `sharingSub` inputs; each owning flow supplies its approved wording. The default invited lede is now factual and no longer claims confidentiality. Invited fine print retains only the resume note for a bespoke lede and otherwise omits the empty paragraph; public fine print retains only the on-screen-and-email delivery note. This is a flagless presentation correction. It does not infer or expose `aggregationMode`, and it changes no API, schema, authorization, report, scoring, invitation, submission, or result-sharing behavior.
+
+**Verification.** The five focused Welcome/copy suites passed **78 tests**; migration safety across **42 migrations**, changelog freshness, `git diff --check`, and the Turbopack production build passed, producing **92/92** static pages. Changed-file ESLint reported zero errors and one pre-existing `@next/next/no-img-element` warning. A fresh non-incremental repository-wide type-check reported the same **433 errors across 58 files** on this branch and exact current `origin/main`, with zero GH #224-scoped errors. The full Jest run passed **587 suites / 6,952 tests** and failed seven suites outside GH #224: six non-database failures were reproduced unchanged at the fixed pre-implementation commit, while the migration-verification suite lacked `DATABASE_URL`; every GH #224 test passed. Real-CSS visual review at 1440px and 390px confirmed both disclosures fit without horizontal overflow and the default invited flow leaves no empty fine-print gap.
+
+**Rollout and rollback.** The change is not live until its protected PR merges and the exact merge deployment reaches Ready. Rollback is a normal code revert with no migration, data cleanup, flag operation, or environment change.
+
+---
+
+### 2026-07-31 — Consolidated progress ledger current through GH #243; GH #217 primed <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:consolidated-progress-through-gh-243 -->
+
+**Status: REPORTING LEDGER UPDATED; no runtime change.** The hard cutoff remains the already-sent `output/pdf/Scaling-Up-Progress-Report-2026-07-27-to-2026-07-31.pdf`, which covers work through PR #267. The next consolidated report currently has exactly **three** eligible product outcomes:
+
+1. **GH #222 — Welcome-screen question-bank accuracy**, launched in PR #269.
+2. **GH #242 — retired pinned-edition warning**, launched in PR #273.
+3. **GH #243 — campaign-list edition visibility**, launched in PR #275 and production-verified before its claim was released.
+
+The corresponding launch-record PRs #270, #274, and #276 are operational evidence, not additional outcomes. PR #268's Jeff #33 deferral and PR #272's Jeff #65 contract lock are dispositions/design work, not shipped product. Active unmerged work, including Jeff #65 and GH #224, remains excluded until it is merged, deployed, verified, claim-released, and recorded in the SoT.
+
+**Next-item coordination.** The shared claim board and current branches were re-read after GH #243 closed. Jeff #65 and GH #224 already have active claims and unmerged implementation work, so neither is available for a new owner. GH #217 was confirmed open, unclaimed, absent from all PR history and remote/local branch names, and still reproducible on `origin/main`: the dormant `ASSESSMENT_INVITE_BRANDED=0` renderer hardcodes `coachName: null`, sends no plain-text twin, and supplies no bottom fallback URL. It is now primed on claim-board issue #261 for `codex/217-legacy-invite-fallback-hardening`.
+
+**Primed scope and gate.** GH #217 owns only those three fallback-path corrections plus characterization coverage for both invite-renderer flag states. It does not change the live branded renderer, invitation copy, campaign overrides, SMTP delivery semantics, or production flag state. The next session must fetch `origin/main`, re-read issue #261, and complete the design/verification gate before writing feature code.
+
+---
+
+### 2026-07-31 — Campaign-list edition visibility launched (GH #243) <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:gh-243-campaign-list-edition-visibility-launched -->
+
+**Status: LAUNCHED + PRODUCTION-VERIFIED.** Implementation PR [#275](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/275) squash-merged through the protected path at `2026-07-31T10:30:05Z` as `bdda554c8f0bb765bc78e7854eaa8a203b0ec6db`; GitHub auto-closed issue #243 at `2026-07-31T10:30:06Z`. Required **Build**, **Migration Safety Gate**, **Assessment Email Lease**, and **Vercel** checks all passed. This records the completed release of the existing implementation; it is not new feature work.
+
+**Exact deployment and health evidence.** Production deployment `dpl_3y6aVniQT9KkKJ9fFvfCy2y3Y3ct`, target `production`, bound to `main` at merge SHA `bdda554c8f0bb765bc78e7854eaa8a203b0ec6db`, was created at `2026-07-31T10:30:08.719Z` and reached **READY** at `2026-07-31T10:31:19.660Z` (epoch `1785493879660`). It owns `scaling-up-platform-v2.vercel.app` and `platformtest.scalingup.com`. Both health calls returned `status: healthy`, `database: healthy`, and `authPosture: safe` at `2026-07-31T10:32:33.906Z` and `2026-07-31T10:32:36.971Z`.
+
+**Read-only production smoke.** `/admin/assessments/campaigns` rendered five existing Spectrum campaigns with factual edition identities: LVA Edition 3, QSP v2 Edition 3, Rockefeller Edition 2, Scaling Up Full Edition 3, and Five Dysfunctions Edition 1. No campaign was created or changed. An authorized test coach opened `/portal/assessments`; the page rendered one Assessments heading and its existing no-template/no-campaign empty state. That account has no campaign or published-template access, so no coach row was manufactured. Neither smoke performed a production write.
+
+**Rollback.** Normal revert of the implementation is sufficient. No migration rollback, data cleanup, flag or environment action is required.
+
+---
+
+### 2026-07-31 — Campaign-list edition visibility implemented (GH #243) <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:gh-243-campaign-list-edition-visibility-pr-ready -->
+
+**Status: IMPLEMENTED + LOCALLY VERIFIED; not yet merged or launched.** The shared admin and coach campaign lists now show the pinned assessment identity as `Template · Edition N`. DRAFT and ACTIVE rows show a compact `Not latest` marker when a newer active edition exists and a stronger `Retired` marker when the pin itself is retired; retirement has precedence. CLOSED rows, including imported historical campaigns, keep factual edition identity but suppress both actionable markers. Current rows have no positive badge.
+
+**Architecture and safety.** Both page queries project the same pinned-version fields. One server-only resolver deduplicates exact `(templateId, language)` pairs, performs one additional `findMany` using `activePublishedWhere`, groups the complete candidate set in memory, and delegates decisions to the GH #242 `resolveEditionStanding` contract. A failed query, invalid pin, or incomplete nonretired group yields null edition metadata and preserves the prior template-only row; it never asserts currency. The client DTO contains only edition number and the two standing booleans.
+
+**Presentation and scope.** Desktop and 390px mobile receipts were approved before feature code and retained under `docs/specs/v7.6/mockups/`. Existing grouping, filtering, metrics, ordering, links, actions, and the Coach Quick-link path remain unchanged. There is no edition filter, sort, date, repinning action, migration, API route, feature flag, report change, scoring change, or write-path change.
+
+**Verification.** The focused resolver, mapper, shared-list, filter, admin-page, coach-page, referred-results, and edition-standing suites passed. Changed-file ESLint, migration safety, changelog freshness, `git diff --check`, and `CI=true npx next build --turbopack` passed.
+
+**Rollout and rollback.** This is a flagless read-only presentation change. It is not live until its PR merges and the exact merge deployment reaches Ready. Rollback is a normal revert with no data cleanup, flag operation, or environment change.
+
+---
+
+<a id="gh-242-retired-edition-warning-launched"></a>
+### 2026-07-31 — GH #242 retired pinned-edition warning launched <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:gh-242-retired-edition-warning-launched -->
+
+**Status: MERGED + LIVE.** PR [#273](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/273) squash-merged through the normal protected path as `54d0c215983f2d27d84056fbb7e1ca99a5e36b55`. Vercel production deployment `dpl_Do162d5YEbpUjDyUTNXEo2HEQYzi` (`scaling-up-platform-v2-f9t8c463p-scaling-up.vercel.app`) reached Ready with metadata bound to that exact `main` SHA and owns both production aliases.
+
+**Live behavior.** The shared admin/Coach campaign detail now preserves the exact pinned-edition provenance and shows the destructive **This edition has been retired** warning when that `AssessmentTemplateVersion.archivedAt` is non-null. Retirement suppresses the amber **Not the latest edition** warning; non-retired current, behind, unpublished, and fail-quiet states remain unchanged. The change is read-only and flagless, with no migration, backfill, environment change, campaign-list change, lifecycle write, scoring/report change, or production-data operation. GH #243 owns the now-unblocked campaign-list presentation.
+
+**Protected release and production verification.** Before merge, PR checks **Build**, **Migration Safety Gate**, **Assessment Email Lease (PostgreSQL)**, **Vercel**, and **Vercel Preview Comments** all passed; GitHub reported the PR `CLEAN` and `MERGEABLE`, and no admin override was used. Both `https://scaling-up-platform-v2.vercel.app/api/health` and `https://platformtest.scalingup.com/api/health` returned HTTP `200` with `status: healthy`, `database: healthy`, and `authPosture: safe` on the new process. A read-only authenticated smoke opened the existing **QSP v2 for Spectrum 2026** admin campaign detail and confirmed the page rendered its title, `ACTIVE` status, Quarterly Session Prep v2 template, **Edition 3 · published Jul 2, 2026** provenance, and organization. No button, form, export, archive/unarchive, submission, invitation, or other mutation was exercised.
+
+**Fixture limitation and reporting.** The 2026-07-31 production audit found zero non-deleted campaigns pinned to archived editions, so launch verification deliberately did not manufacture a retired campaign. The warning itself is proven by the focused 55-test suite and local real-component visual review recorded in the implementation entry below. GH #242 is the second reportable product outcome after the sent July 27–31 report, following GH #222; this launch-record follow-up is operational evidence, not a third outcome.
+
+**Rollback:** revert squash `54d0c215983f2d27d84056fbb7e1ca99a5e36b55`. No migration rollback, data cleanup, flag operation, environment change, or scheduler action is required.
+
+---
+
+<a id="gh-242-retired-edition-warning-pr-ready"></a>
+### 2026-07-31 — GH #242 retired pinned-edition warning implemented <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:gh-242-retired-edition-warning-pr-ready -->
+
+**Status: IMPLEMENTED + LOCALLY VERIFIED; PR-ready, not merged or launched.** Campaign detail now preserves its pinned-edition provenance and shows the destructive **This edition has been retired** warning when that exact `AssessmentTemplateVersion` has a non-null `archivedAt`. Retirement has presentation precedence over the existing amber **Not the latest edition** warning.
+
+**Boundary and behavior.** The existing Wave EV seam now projects pinned `archivedAt`, derives the independent `pinnedRetired` fact, and avoids the sibling-version lookup when retirement is already known. Non-retired sibling-query failure remains fail-quiet with `edition: null`. The final narrow inline semantic `borderColor` override is necessary because the unlayered global neutral `border-color` reset outranks Tailwind's layered `border-destructive` utility; it confines the correction to this approved badge while leaving `globals.css` untouched. The change is shared by admin and coach through `CampaignDetail`, is read-only and flagless, and does not alter campaign lists, edition lifecycle writes, scoring, reports, submissions, schema, data, or environment configuration. GH #243 continues to own campaign-list indicators.
+
+**Evidence.** The focused Jest command passed **3 suites / 55 tests** (the fixture's intentional sibling-lookup failure cases logged two `connection terminated` errors); scoped ESLint exited 0; migration safety exited 0 after checking **42 migrations** with no unapproved destructive operations; and `CI=true npx next build --turbopack` exited 0. The Turbopack output included the non-fatal middleware-to-proxy deprecation notice, seven missing `INNGEST_EVENT_KEY` notices, seven missing `INNGEST_SIGNING_KEY` notices, and three non-fatal `DATABASE_URL` Prisma validation errors during static collection. Local visual review used only the existing `retired pinned edition` component-test fixture (`QSP v2 for Spectrum 2026` / `qsp_spectrum_2026`, Quarterly Session Prep v2, Spectrum Health, Edition 3 published Jul 2, 2026, `pinnedRetired: true`, `newerEditionAvailable: true`) in a temporary in-memory `http://localhost:3000/visual-review-gh242` harness importing the real shared `CampaignDetail`; it inspected the admin and coach compositions that both render that component. At **1440 × 900** and **390 × 844**, computed badge border/text were red (`rgb(239, 68, 68)`) with the destructive tint (`oklab(0.636841 0.187813 0.0888874 / 0.1)`); provenance preceded exactly one complete retirement warning, which took precedence over the stale badge, with Template/Organization alignment, no clipping or collision, and no horizontal overflow (1440 `scrollWidth=clientWidth`; mobile scrollbar-adjusted `scrollWidth=clientWidth=375`). No database or production connection/mutation occurred, no screenshot was retained, and the temporary route, middleware exception, browser viewport, and local dev server were removed/reset. The 2026-07-31 read-only production audit found zero non-deleted campaigns pinned to archived editions, so post-merge smoke must not manufacture one.
+
+**Rollout:** merge through the protected PR flow, wait for a Ready production deployment of the merge SHA, and smoke the unaffected campaign-detail route plus `/api/health`. Rollback is a code revert; no migration, backfill, flag, environment, scheduler, or data cleanup is involved.
+
+---
+
+### 2026-07-31 — Jeff #65 stable reminder-link contract locked <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:jeff-65-reminder-link-contract-locked -->
+
+**Status: CLAIMED + PRODUCT CONTRACT LOCKED; design only, no runtime change.** A fresh audit of `origin/main` at `aed1342934e6ab80160aa9aef658306e0c4ca0af`, merged and open pull requests, remote branches, the shared claim board, production flags, and the deployed production SHA found no implementation of Jeff's July-10 item #65. Reminder sending is built and live, but a successful reminder still overwrites the invitation row's only `tokenHash`; the original link and every earlier successful reminder link therefore stop matching at exchange. The shipped Wave A safety repair covers failed sends only. No flag can flip multi-link validity on. Jeff #65 was claimed on [issue #261](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/issues/261#issuecomment-5140577904) only after that audit.
+
+**Locked contract.** Every original invitation link and every successfully sent reminder link remains valid until the underlying invitation becomes unusable through submission, explicit revocation, expiry, or campaign closure. All sibling links resolve to the same invitation and assessment state. A failed reminder creates no newly usable link and invalidates none of the existing links. Raw token storage remains prohibited.
+
+**Boundary.** Manual **Resend**, invitation/reminder copy or visuals, public-assessment access, expiry-duration changes, and recovery of already-overwritten historical tokens are excluded unless separately approved. The product behavior is locked in `docs/specs/v7.6/20-jeff-65-stable-reminder-links-contract.md`; storage, migration, exchange, concurrency, rollout, and rollback choices remain for the next technical-design gate. No implementation, migration, feature flag, PR launch, or production write is represented by this entry.
+
+**Reporting classification.** This resolves a product decision and starts work; it is not a shipped outcome. The fresh consolidated-report window remains at one product outcome, GH #222, until #65 is implemented, merged, deployed, verified, claim-released, and closed out in the SoT.
+
+---
+
+### 2026-07-31 — Consolidated progress-report window reset after PR #267 <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:consolidated-report-window-reset-after-pr-267 -->
+
+**Status: REPORTING BASELINE LOCKED; no runtime change.** The consolidated report at `output/pdf/Scaling-Up-Progress-Report-2026-07-27-to-2026-07-31.pdf` has already been sent. It explicitly covers **33 merged pull requests through PR #267** and groups them into **ten product and reliability outcomes**. Invitation emails, per-assessment Welcome wording, the report Coach byline, on-screen respondent results, QSP story grouping, public-result Print/Download, Coach Referred Results and the remaining #83 gaps, campaign-edition visibility, respondent-removal messaging, and email/outbox reliability are therefore prior-window work. Do not present any of them, their launch-record PRs, or their retained screenshots as new progress.
+
+**Current fresh-window count: one reportable product outcome.** GH **#222 Welcome-screen question-bank accuracy** shipped after the sent-report cutoff in PR [#269](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/269), squash `b350ff2267fc690568f5aa75e00cb90a414e2d8c`. Mixed respondent-visible question banks now use truthful format-aware wording and omit the scale chip; uniform valid slider banks retain their rated copy. The exact merge SHA deployed successfully, the production health check was green, issue #222 is closed, and its shared-board claim is released. This is the only product outcome currently eligible for the next consolidated progress report.
+
+**Post-cutoff work that does not increase the progress count.**
+
+- PR #268 records Jeff's July-10 item #33 as **DEFERRED / NEEDS INPUT** pending report-by-report side-by-side notes. It is a disposition, not implementation or completion.
+- PR #270 corrects the #222 source-of-truth status from pre-merge wording to **MERGED + LIVE**. It is documentation closeout, not a second product outcome.
+- Claim-board and Notion closeout keep ownership and payment records accurate. They are operational receipts, not user-facing product changes.
+
+**Rule for the next consolidated report.** Add an outcome only after its implementation is merged, its exact production deployment is verified, its claim is released, and the SoT records what shipped and what remains. Work already present in the sent July 27-31 PDF may appear only as a clearly labelled **Before** comparison for a new change. Documentation corrections, deferrals, research, plans, and coordination updates may be listed in an internal ledger when useful, but must not inflate the product-outcome headline.
+
+---
+
+### 2026-07-31 — Welcome-screen question-bank accuracy launched (GH #222) <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:gh-222-welcome-screen-accuracy-launched -->
+
+**Status: MERGED + LIVE.** PR [#269](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/269) merged as squash `b350ff2267fc690568f5aa75e00cb90a414e2d8c` on 2026-07-31. Vercel completed the production deployment for that exact SHA. The canonical production health endpoint returned `healthy`, with `database: healthy` and `authPosture: safe` on the new process.
+
+**Behavior.** A respondent-visible bank shows its existing `short statements, rated …` sentence and scale chip only when every question is `SLIDER_LIKERT`, every range is finite and increasing, and every range matches. LVA, QSP v1, and QSP v2 use `questions using a mix of response formats` and retain only the existing question-count and section-count chips. Scaling Up Full is role-dependent: non-CEOs do not receive the `S_BACKGROUND` number questions, so their uniform visible slider bank retains rated copy and the scale chip; CEOs receive the slider and background-number questions, so their mixed visible bank uses mixed-format copy and two chips. Rockefeller Habits, Five Dysfunctions, and Scaling Up Quick retain their existing rated copy and three-chip layout. Invited and public flows use one shared derivation.
+
+**Scope.** `deriveTimeEstimate` is unchanged. No template-specific rule, percentage threshold, CSS change, API change, migration, seed edit, feature flag, or unrelated Welcome copy is included.
+
+**Verification.** Before merge, the focused shared-component, invited-pager, public-pager, and changelog-freshness suites passed 43/43 tests. Changed-file ESLint had zero errors, migration safety checked 42 migrations, `git diff --check` passed, and `CI=true npx next build --turbopack` generated 92/92 pages. After merge, GitHub Build, Migration Safety Gate, and Assessment Email Lease checks passed; the production deployment and health check then passed.
+
+**Rollout and rollback.** This is a live, flagless presentation fix with no stored-data change. Rollback is a normal revert of PR #269.
+
+---
+
+### 2026-07-31 — Jeff July-10 #33 deferred pending report-by-report fidelity notes <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:jeff-33-report-fidelity-deferred -->
+
+**Status: DEFERRED / NEEDS INPUT — reporting disposition only.** Jeff's July-10 feedback describes #33 as an all-reports fidelity review: the reports are close to, but not exactly aligned with, the originals, and Jeff will perform the full side-by-side review and provide detailed follow-up. The latest status overlay likewise marks the item **NEEDS INPUT**, waiting for the report-by-report comparison notes. This records the decision to take #33 out of the selectable work queue; it does not mark the item Complete.
+
+**Boundary.** Report work already shipped—including Wave E's shared report polish and subsequent report-specific improvements—does not close this umbrella acceptance item. There is no dedicated #33 implementation claim, feature flag, merge, launch, or production write to record. The earlier Wave E entry and design artifacts already preserve the same dependency on Jeff's side-by-side differences.
+
+**Resume gate.** Wait for Jeff (or Suzanne relaying Jeff's review) to identify the exact report, surface, expected original, and observable mismatch for each comparison. Convert those notes into narrow, independently claimable items, then re-check the current claim board and `main` before selecting one. Do not claim #33 broadly or infer acceptance from adjacent shipped work.
+
+**Reporting cutoff.** This is a docs-only disposition created after the prior consolidated report was sent. It is not implementation progress and must not be used to re-report prior-cycle shipped work as new.
+
+---
+
+### 2026-07-31 — Jeff public-survey closure launched; consolidated item #83 is Complete <!-- ENTRY_ISO:2026-07-31 ENTRY_SLUG:jeff-public-survey-closure-launched -->
+
+**Status: MERGED + LIVE.** PR [#266](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/266) merged as squash `ddc83e8f799cbdac5e2e5eae7cca37f6ce53c629` on 2026-07-31 Manila time. Vercel's Production deployment for that exact SHA completed successfully at `scaling-up-platform-v2-mwymzwu2n-scaling-up.vercel.app`; both production aliases, `scaling-up-platform-v2.vercel.app` and `platformtest.scalingup.com`, returned `200` from `/api/health` with `database: healthy` and `authPosture: safe` on the new process uptime.
+
+**What is now live.**
+
+- Public scored and qualitative reports—and their report emails—show the taker's submitted email separately from the display name.
+- Reports always offer **Learn More** and offer **Talk to a Coach** only from a server-verified, currently eligible referral; referring-Coach mail instead offers **Contact the Taker**.
+- The already-live Coach Referred Results surface now includes filtered CSV export with exactly `Taker Name`, `Taker Email`, `Assessment`, `Result`, and `Submitted At`, bounded to 5,000 rows with strict authorization, distributed fail-closed rate limiting, formula protection, private caching, and strict PII-free audit persistence.
+- Matching lost-response retries use the same show-if-pruned answer identity as the original write, including after campaign close; changed-input and cross-campaign key reuse return `409`.
+
+**Consolidated progress-report classification.** July-10 PDF item **#83 is now Complete**, superseding the earlier Partial classification in `issue-238-jeff-number-mapping-corrected`. PR #245 supplied Coach-facing ownership, list/search/filter, and report access; PR #266 closes the remaining identity/action/export gaps. The screenshot's duplicate-email symptom is also Complete through the separately launched PR #250 atomic outbox lease and same-mailbox suppression. Do not report PR #266 as a new scheduler or delivery cutover: it added no cron, worker, migration, Azure dependency, environment variable, or new feature flag.
+
+**Launch verification.** All protected PR checks passed: Build, Migration Safety Gate, Assessment Email Lease (PostgreSQL), and Vercel. Read-only production QA opened the existing public Scaling Up 4 Decisions campaign, advanced to the non-writing **About you** screen, and confirmed the new export route is deployed and answers an unauthenticated request with `401` plus `Cache-Control: no-store` rather than `404`. No production form was submitted and no real account was used. On the isolated branch preview, the seeded Coach account logged in successfully, but Referred Results correctly remained `404` because the preview environment does not enable the production-only Wave-83 flag; the flag was not changed merely to manufacture a smoke result. The public page still emits the pre-existing missing Vercel Insights script console error; it does not block rendering or this launch.
+
+**Pre-merge evidence retained.** Focused coverage passed **19 suites / 317 tests**; the complete branch run passed **583 suites / 6,905 tests** with the same **8 suites / 22 tests** failing as untouched fixed point `48b68d37` (zero new failures). Changed-file ESLint, changelog freshness, migration safety across 42 migrations, `git diff --check`, and `CI=true npx next build --turbopack` passed. Actual desktop and 390px mobile `BrandedReport` render receipts remain under `docs/specs/v7.6/mockups/`; final independent standards and spec-compliance re-reviews both returned **CLEAN**.
+
+**Rollback:** revert squash `ddc83e8f`. No data cleanup, scheduler change, flag flip, or environment rollback is required. The existing Wave-83 kill switch remains the independent emergency control for the Coach surface.
+
+---
+
+### 2026-07-30 — Jeff public-survey closure implemented: report identity, verified actions, and Coach CSV <!-- ENTRY_ISO:2026-07-30 ENTRY_SLUG:jeff-public-survey-closure-pr-ready -->
+
+**Status: IMPLEMENTED + LOCALLY VERIFIED; PR-ready, not yet merged or launched.** This closes the remaining product gaps in Jeff Verdun's public-survey screenshot while preserving the already-launched delivery fix from PR #250.
+
+- **Duplicate result emails:** no new delivery code is introduced here. PR #250 already launched atomic PostgreSQL outbox leases plus same-mailbox suppression and completed its controlled Inngest cutover. This branch adds no schedule, cron, worker, migration, or Azure requirement.
+- **Taker identity:** scored and qualitative on-screen reports and their email equivalents now show the submitted email separately from the display name. Legacy rows with no email remain blank rather than inventing an `"Anonymous"` address.
+- **Two next steps:** both report families show **Learn More** linking to `https://scalingup.com`. **Talk to a Coach** is shown only from the server-verified, currently eligible referring Coach address (with the existing directory fallback where applicable); Five Dysfunctions continues to suppress only the Coach action. Coach notification email instead offers **Contact the Taker**, so it does not mail the Coach back to themself.
+- **Verified referral boundary:** the public client never trusts the raw `?coach=` value. The submit transaction rechecks current Coach certification before persisting referral ownership, queuing the Coach notification, or returning a contact address. Unique-key recovery is bound to the original campaign/taker/answers so a reused idempotency key with different input returns `409`.
+- **Coach export:** the existing flag-gated Referred Results screen now offers a filtered CSV with exactly `Taker Name`, `Taker Email`, `Assessment`, `Result`, and `Submitted At`. The Coach-only endpoint preserves immutable `referringCoachId` ownership and current-certification checks, caps exports at 5,000 rows, applies RFC 4180 quoting and spreadsheet-formula protection, sends private/no-store responses, rate-limits by immutable Coach ID through a distributed fail-closed limiter, and refuses the CSV when its PII-free audit row cannot be persisted.
+
+**Design/process receipt.** The approved grill-with-docs design and implementation plan live under `docs/superpowers/`; the visual review artifact and rendered mockup live under `docs/specs/v7.6/mockups/`. Two substantive Claudex passes were incorporated before implementation; a third pass was unavailable because that external account reached its usage limit. The actual production `BrandedReport` component was rendered and inspected at desktop and 390px mobile widths; the retained receipts are `jeff-public-survey-closure-actual-desktop.png` and `jeff-public-survey-closure-actual-mobile.png` beside the mockup. The approved Referred Results mockup was also inspected at both widths. Independent standards and spec-compliance reviewers found the export-eligibility sentinel, role-specific CTA, qualitative-policy, audit-deduplication, and pruned-idempotency edge cases; every finding was corrected, and both final re-reviews returned **CLEAN**.
+
+**Local verification against fixed point `48b68d37`.**
+
+- Focused report, email, submit, referral, export, presentation, and adjacent submit-regression coverage: **19 suites / 317 tests passed**.
+- Complete branch Jest: **583 passing suites / 6,905 passing tests**, with **8 failing suites / 22 failing tests**. The failed suite names and failed assertion names exactly match the untouched-main baseline (**580 passing suites / 6,861 passing tests**, the same 8/22 failures); the branch adds **3 passing suites / 44 passing tests** and zero full-suite regressions.
+- Changed-file ESLint, `git diff --check`, and migration safety passed; migration safety inspected **42 migrations** with no unapproved destructive operation.
+- `CI=true npx next build --turbopack` completed successfully, including type checking and generation of the new `/api/assessments/referred-results/export.csv` route. Local static collection emitted the expected missing `DATABASE_URL`/Inngest-key warnings; the command exited `0`.
+
+**Rollback:** revert the eventual merge commit. No data cleanup, environment-variable change, flag operation, or scheduler action is required.
+
+---
+
+### 2026-07-30 — Consolidated mapping correction: GH #238 is a Jeff #64 follow-up, not a new PDF item <!-- ENTRY_ISO:2026-07-30 ENTRY_SLUG:issue-238-jeff-number-mapping-corrected -->
+
+**Status: SOURCE-OF-TRUTH CORRECTED; no runtime change.** The July-10 feedback report and GitHub use independent number spaces. The work launched in PR [#255](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/255) closed **GitHub issue #238**, but there is no numbered “#238” item in `Scaling-Up-Assessment-Feedback-Report-2026-07-10.pdf`.
+
+The correct consolidated mapping is:
+
+- **July-10 PDF item #64 — Complete before this work.** Item #64 asks to split the combined LVA report action into separate **Print** and **Download** buttons. That original request shipped in PR #208 and is recorded below in `jeff-jul10-forks-72-64`.
+- **GitHub #238 — Complete follow-up to PDF #64.** PR #255 reused the already-shipped Print/Download control on the public quiz's one-time result screen. The PDF does not list this public-quiz retention gap as its own numbered item. In Jeff-facing reporting, label it **“#64 follow-up — Public Quiz Print/Download”** rather than claiming a newly completed PDF item.
+- **July-10 PDF item #83 — Not completed by GitHub #238.** PDF #83 asks whether public-quiz submissions/results are recorded and visible to the coach associated with the link. PR #205 surfaced public submissions to admins but not result/score detail or coach-facing access, so the existing SoT classification remains **partial**.
+
+**Consolidated progress statement:** PDF #64 remains complete; its unnumbered public-quiz follow-up is also complete; PDF #83 remains a separate partial item. This correction changes reporting only—no code, schema, flag, deployment behavior, or production data.
+
+---
+
+### 2026-07-30 — Outbox enqueue: a documented guarantee PostgreSQL cannot provide <!-- ENTRY_ISO:2026-07-30 ENTRY_SLUG:outbox-enqueue-transaction-semantics -->
+
+**Status: MERGED + LIVE.** PR **#263** (`4e930535`, the proof) and PR **#264** (`d9cb250b`, the fix); prod deploy READY on `d9cb250b`. Closes the code half of GH **#257**; the issue stays open for the residual.
+
+**The claim that was false, and had been since Wave E / PR #67.** The invited submit route inserts its outbox rows inside `db.$transaction`, wrapping each insert in `try/catch` on this contract:
+
+> a write failure for one email NEVER rolls back the submission — it is simply skipped
+
+**Proven against real PostgreSQL** (`integration-tests/tx-swallowed-error.pg.test.ts`, running on a `postgres:17` service in the existing lease CI job):
+
+| Failure | Reality |
+|---|---|
+| **Reached the database** (unique violation, timeout, reset) | The transaction is **aborted** (`25P02`). Every later statement fails, so the submission **does not commit**. A JavaScript `catch` cannot un-abort it — Prisma adds no per-operation savepoints, so there is nothing to roll back *to*. |
+| **Raised before the statement was sent** (client-side validation) | Transaction intact — genuinely skippable; the submission commits without that email. |
+
+🔑 **So this was a diagnosability defect, not the silent data-loss bug it was filed as.** The database case is loud and retryable (the invitation is never marked `SUBMITTED`, so the respondent can resubmit) — but the swallow **destroyed the real cause**, leaving the operator with a `25P02` raised by the *invitation update*, pointing at the wrong line, beneath a log line reading "skipped" when nothing had been skipped.
+
+**Two corrections to our own issue text, made before writing any code:** #257 claimed the submission commits and the email is lost forever, and that there was no log at all. Both were wrong — there was already a `console.error` (it merely lacked `submissionId`), and for database failures nothing commits. Both retractions are recorded on the issue.
+
+**The fix.** New `classifyOutboxEnqueueFailure`: swallow **only** a positively identified pre-database failure, and **default to rethrow**. The default is the load-bearing part — "we cannot prove the transaction is intact" and "the transaction is intact" are different claims, and only one is safe to act on. It matches Prisma's error `.name` rather than `instanceof`, which breaks across duplicate `@prisma/client` copies and mocked clients. Both branches now log ids only (`submissionId`, `campaignId`, `invitationId`, `recipientRole`, `emailType`) plus an explicit consequence.
+
+**Verified safe to rethrow before changing it:** the 409 "Already submitted" comes from a returned `result.kind === "conflict"`, decided by a status check at lock time — **not** from catching `P2002`, and the file has no `PrismaClientKnownRequestError` handling at all. A rethrown Prisma error therefore lands in the generic 500 path and cannot produce a spurious 409.
+
+🔑 **Why it survived review for months: a mocked Prisma has no transaction state, so a unit test will cheerfully confirm the false comment.** That is why the guard for the *semantics* is an integration test against real PostgreSQL, and the unit suite pins only the *decision*. Generalise it — when a claim is about database behaviour, a mock cannot be the witness.
+
+**Verification.** 12 new unit tests, **mutation-proved in both directions** (forcing always-rethrow fails the skip case; forcing always-skip fails 11 of 12). Existing org-survey submit suites green — 3 suites / 56 tests together. ESLint clean; `CI=true npx next build --turbopack` green; all five GitHub checks green on both PRs.
+
+⚠️ **Two traps hit while running the gates for real.** `CI=true next build --turbopack` fails in a fresh worktree with `TurbopackInternalError — Symlink node_modules is invalid, it points out of the filesystem root` if you symlink `node_modules` from the main checkout; a real `npm ci` is required, so a local build gate is not free in a worktree. And `locked.campaign` carries no `id` in its selected shape — the file's other log lines use `locked.campaignId`.
+
+**Residual, deliberately left open on #257:** the pre-database dropped-email case is now **detectable but not recoverable** — nothing retries a row that was never created. Reconciliation is tractable (the expected-rows rule is derivable from the same `buildWaveDOutboxRows` inputs plus `emailRenderFingerprint`) but was out of scope. Unrelated to #250 / ADR-0030, which govern the send side and presuppose the row exists.
+
+⚠️ **Process note against ourselves:** PR #262 established, hours earlier, that the SoT update belongs in the same PR as the code it describes. #263 and #264 both shipped without one, and this entry is the catch-up. The rule was right; following it needs to be automatic.
+
+---
+
+### 2026-07-30 — Issue #238: public quiz takers can keep their one-time report <!-- ENTRY_ISO:2026-07-30 ENTRY_SLUG:issue-238-public-quiz-print-download-launched -->
+
+**Status: LAUNCHED on production (PR [#255](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/255), merged 2026-07-30 13:40:41 UTC as `15cfdd5cc5bd0cd38b5c47f35ca7dbb525d9e692`; deployment `dpl_AoW4aC4XL2qZ5LB6pFnm8BztoS12`, `scaling-up-platform-v2-h05onegdc-scaling-up.vercel.app`).** GitHub issue [#238](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/issues/238) is closed. The exact merged-source deployment reached Ready and owns both production aliases, `platformtest.scalingup.com` and `scaling-up-platform-v2.vercel.app`.
+
+**Jeff tracker mapping:** this is an unnumbered follow-up to July-10 PDF item #64, not a new numbered PDF item. The original #64 Print/Download split had already shipped in PR #208. This public-quiz extension does not complete PDF item #83.
+
+The public quiz already rendered the full branded report immediately after submission, but unlike the authenticated report surfaces it omitted the shared `PrintReportButton`. That was a retention defect because the public result is deliberately one-time: a taker who navigated away had no supported way to keep it.
+
+The public result now renders the existing `PrintReportButton` once inside `.su-public-brand.su-report`, immediately before `BrandedReport`. The shared control provides **Print** and **Download PDF** and uses the deterministic document title/filename `${templateName} — ${respondentName}`. Reuse preserves the established print lifecycle, report-only DOM isolation, browser print flow, and title restoration instead of creating a second public-only implementation.
+
+This is a narrow, flagless presentation fix. It changes no assessment answers, scoring, report model, submission contract, persistence, schema, migration, or production environment variable. Rollback is a revert of PR #255; no data cleanup or flag operation is required.
+
+**Validation and review receipt.**
+
+- The focused public-result suite and adjacent shared-button suite passed **18/18 tests**. Scoped ESLint, `git diff --check`, and migration safety all passed; migration safety inspected **42 migrations** with no unapproved destructive operation. `CI=true npx next build --turbopack` passed.
+- The complete local Jest run reported **580 passing suites / 6,859 passing tests** and **8 failing suites / 22 failing tests**. Every failure reproduced on `origin/main`; the branch introduced zero full-suite regressions.
+- Independent task-spec, task-quality, and whole-branch final reviews found no Critical or Important issue. The only optional Minor note concerned restoring a test's `window.print` descriptor; it does not affect production behavior.
+- PR checks passed: **Build**, **Migration Safety Gate**, **Assessment Email Lease (PostgreSQL)**, and **Vercel**.
+
+**Production smoke.** Both aliases returned HTTP `200` from `/api/health` with `database: healthy` and `authPosture: safe`. The existing public campaign route `/quiz/scaling_up_quick_pub_260610041810` also returned HTTP `200` on both aliases. No live assessment was submitted during smoke verification, so production data was not created merely to re-exercise the already-covered post-submit state.
+
+---
+
+### 2026-07-30 — Wave OSR review corrections, and a review loop that outran its own merge <!-- ENTRY_ISO:2026-07-30 ENTRY_SLUG:wave-osr-review-corrections -->
+
+**Status: MERGED + LIVE (PR #252, squash `002e58fd`).** Follow-up to PR #249 (Wave OSR reachability + GH #229). One runtime change; the rest corrects what #249 *said* about itself.
+
+**The process fact worth recording: #249 merged while its review loop was still running.** It merged at 06:52:50Z with head `21f8c3bb` — a single commit — and the first round of review fixes did not exist until 07:44:40Z. A squash-merged PR cannot be updated, so `main` briefly carried working code alongside an overclaimed security note, a **false** code comment, and an untested guard. #252 is where those landed. **Lesson: a PR driven by a review loop is not merge-ready just because its checks are green** — the checks have no opinion about prose.
+
+**Three rounds, ~20 findings, ZERO runtime defects.** Every important finding was an artifact disagreeing with the code — the third consecutive wave (after #241 and #230) where that held. Treat it as the default expectation, not a surprise.
+
+**Round 1 (10 findings, 3 important).**
+- 🔑 **The headline security claim was broader than the fix.** `safeImageSrc` requires `https:` but places **no constraint on the host**, so `https://tracker.example.net/pixel.png` passes and a respondent's browser still calls out. #249's body sold the fix as preventing "IP/UA disclosure to an arbitrary host". It does not. Restated in five places and pinned by a test that asserts the **limit** rather than a guard we do not have. **No host allowlist was applied**, deliberately: `services/circle-sync.ts` writes Circle-hosted avatar URLs, so coach logos are legitimately third-party hosted and an allowlist would silently drop real ones. Residual → **GH #256**.
+- **Prod measurements were baked into four source comments and two test docblocks** — a direct violation of the repo's own rule, and the same finding PR #236 round 2 raised. One of them, "the production flag (already enabled)", is not even knowable: the REST read cannot distinguish `"1"` from `"0"`.
+- 🔑 **"No UI sends this field" was FALSE, and a real 400 sat behind it.** The Bio editor PATCHes `profileImage` **seeded from the stored value**, and `updateCoachSchema = createCoachSchema.partial()` retains the refine — so a coach whose stored image is not https would get a 400 on an unrelated bio save, surfaced as `[object Object]`. Verified against prod before believing either version: **2 coach images, 0 non-https**, so no live 400 path. The comment was the defect, not the code.
+
+**Round 2 reviewed round 1's fixes and found five of them wrong.**
+- 🔑 **The new guard was completely untested** — deleting it left the suite green. Round 1 shipped an unguarded guard, and the comment justifying its mock change was *inverted* (the check is presence-gated, so a bare `data: {}` takes the success path).
+- 🔑 **The timeout fix could not work.** jest's `testTimeout` defaults to 5s and this repo sets none, so a 15s `waitFor` is unreachable — the test dies at 5s first. Fixed with real per-test budgets.
+
+**Round 3 reviewed round 2's fixes and found five more, two of them mine.**
+- 🔑 **A measurement was cited from the failing run.** Round 2 justified a 20s budget with "confirmed by the new test taking 15057ms". That number came from the **mutated run with the guard removed** — it measured the failure, not the test. Real figure under full parallel load: **~0.5s**. Budgets right-sized, and the retracted number is recorded in the docblock so it cannot be restored. **Generalise: a timing taken from a red run is not evidence about a green one.**
+- 🔑 **A guard added to close a test gap was itself vacuous.** With Prisma mocked, asserting on the echoed response body passes whether or not the route narrows the query — so adding a `select` would have made the client guard inert with the test still green. That is the round-2 finding repeating one layer down. The assertion is now the **absence of a `select`**, the only observable form, and it fails under that mutation.
+
+**The one runtime change:** the campaign PATCH route ignores `showResultsOnScreen` when the flag is off and still answers `200 {success:true}`, so the operator's checkbox would stay ticked over a column that never changed. The client now compares the echoed row against what it sent and reverts on a silent no-op. Both PATCH success paths `update()` without a `select`, so the non-nullable column is always echoed, and the toggle can never enter the slides branch.
+
+**Also corrected:** the flag module still listed this column under "deliberately NOT gated" after PATCH began gating writes to it; and the route comment claimed the gate stops "a stale client switching on a respondent-facing disclosure" — it does not, because **CREATE writes the same column with no flag check**. The write-gate is consistency, not a security boundary; disclosure is decided under the submission lock either way.
+
+**Verification.** 5 suites / 88 tests, jest-verified per suite: `coach-logo` 15 · `validations` 38 · `patch-onscreen-results` 9 · `campaign-detail-onscreen-results` 8 · `org-survey-onscreen-results` 18. **Two guards mutation-proved** (removing the client echo check fails exactly one test; adding a `select` fails exactly the route test). Full suite measured **9 failing suites / 16 tests in one run — one sample in an unstable 9-14 band, never a floor.** ESLint clean; `CI=true npx next build --turbopack` green; all five GitHub checks green after a rebase that picked up the new `Assessment Email Lease (PostgreSQL)` job.
+
+⚠️ **NEW OPS GOTCHA — a green CI Build does not mean the Vercel deploy ran at all.** The first production deployment of `002e58fd` reported **ERROR after 200ms**, before any build step, with *"We were unable to fetch required git information required to complete the deployment."* That is a Vercel↔GitHub integration failure, not a code failure — nothing in the repo was wrong and CI's own Build job had passed. An API-triggered redeploy of the **same commit** reached Ready. Two lessons: **always confirm the prod deployment state after a merge** (a failed deploy silently leaves the previous commit serving), and the redeploy call needs the project's real `repoId` from `GET /v9/projects/{id}` — a guessed one returns `incorrect_git_source_info`.
+
+**Not done here, deliberately.** #71's live walk was already performed by another thread and verified against prod (`closeout-71-20260730`, created 07:03, soft-deleted 07:05, one invitation, one submission, `showResultsOnScreen=true`), so repeating it would have been a duplicate production write for no new information. **GH #229 is correctly closed** — its ask was parity with the invite-email path and the fix achieves exactly that; the host question is new scope in **#256**. The org-survey outbox INSERT that silently drops an email with no replay is filed as **#257** (unrelated to #250 / ADR-0030, which govern the send side and presuppose the row exists).
+
+---
+
+### 2026-07-30 — Jeff #48: QSP core-values story group launched <!-- ENTRY_ISO:2026-07-30 ENTRY_SLUG:jeff-48-qsp-story-group-launched -->
+
+**Status: LAUNCHED on production (PR #251, squash `d676aa77caf328afd113f297d90ca8d41d036caf`; launch deployment `dpl_BK3vSFFQPyo6REpXq74sFmPrX5tJ`, `scaling-up-platform-v2-du38i25fc-scaling-up.vercel.app`).** The exact deployment belongs to the Scaling Up production project/team, targets `main` at the merged SHA, reached Ready, and serves healthy `scaling-up-platform-v2.vercel.app` and `platformtest.scalingup.com` aliases.
+
+The rollout was deliberately staged and its interruption is part of the receipt. The first production attempt, `dpl_8hRSBbEQrGXaKRnQQa56V7sCdSHD`, ended in `ERROR` because an unrelated Preview-only migration, `20260730050000`, attempted to add the already-present `referringCoachId` change and failed with Prisma `P3009`. Read-only diagnosis proved the migration transaction rolled back and left no partial DDL. Its active migration row was marked rolled back through Prisma's supported migration-resolution operation; all **41** migrations on merged `main` then reported up to date. A clean dark deployment from the merged source, `dpl_2WugBEPrsymdCcTDgxmjnE7fjeow` (`scaling-up-platform-v2-1jt6vahaz-scaling-up.vercel.app`), reached Ready and healthy before any #48 flag enablement.
+
+**Launch controls.** `WAVE_48_QSP_STORY_GROUP_KILL=0` and `WAVE_48_QSP_STORY_GROUP_ENABLED=1` are encrypted, Production-only Vercel variables. Each value was verified by its environment-variable ID through `GET /v1/projects/{project}/env/{id}` with decryption enabled, followed by a fresh bulk relist to prove the exact production entry and preserve any Preview/Development entries. The corrected runner also treats Vercel deployment-list summaries as `uid` records, not `id` records. It then redeployed the exact `d676aa77` source and waited for the exact launch hostname—not a timestamp-correlated candidate—to reach Ready.
+
+**Production smoke boundary.**
+
+- The invited QSP route `/org-survey/spectrum_qsp_v2_260724133919` returned HTTP `200`, and its live RSC payload contained `qspStoryGroupEnabled=true`.
+- A valid invited token was not opened because doing so would mark the participant `VIEWED`; a live submission was prohibited by the production-test safety boundary. No respondent, answer, submission, admin, template, or campaign write was made.
+- No PUBLIC QSP campaign exists, so that lane could not be exercised live.
+- The existing non-QSP PUBLIC campaign `/quiz/scaling_up_quick_pub_260610041810` rendered cleanly and responsively at desktop and mobile sizes, and **Start** advanced to **About You**. The observed Vercel Insights script `404`/MIME console pair predates and is unrelated to #48.
+- Authenticated editor Preview was not opened in production. This launch does not claim a live editor session, Add/restore interaction, live submission, or admin-visible stable-key inspection.
+
+**Compatibility and pre-launch evidence.** The stable keys remain exactly `P1_core_values_story_1`, `P1_core_values_story_2`, and `P1_core_values_story_3`; Esperto remains `Q5a/Q5b/Q5c` one-to-one. That contract, three-value respondent payloads, logical one-question progress, Add/focus/restore behavior, and read-only editor Preview were proved before launch by the production-context real-component harness and the complete focused regression run: **15/15 suites, 224/224 tests**. No schema, QSP seed content/count, import crosswalk, payload, scoring, report, export, or historical-answer change shipped with #48.
+
+**Rollback.** Run the corrected launch runner with `QSP48_ACTION="rollback"`: verify or replace the Production-only encrypted `WAVE_48_QSP_STORY_GROUP_KILL` entry with `1` through the per-ID decrypted verifier, relist to prove the entry set, redeploy the pinned launch commit `d676aa77caf328afd113f297d90ca8d41d036caf`, and wait for that exact new deployment to reach Ready. The runner confirms that commit still exists and is an ancestor of fetched `origin/main`, but it never substitutes the current `origin/main` tip. Logged environment receipts redact every readable value or ciphertext; raw values remain confined to an internal comparison record that is neither logged nor returned. The ordinary three-question presentation returns without data cleanup.
+
+Tracker item **#48 is complete and launched** within the explicit no-production-submission/no-authenticated-editor-smoke boundary above.
+
+---
+
+### 2026-07-30 — Assessment email duplicate-delivery hotfix launched <!-- ENTRY_ISO:2026-07-30 ENTRY_SLUG:assessment-email-lease-hotfix-implemented -->
+
+**Status: LAUNCHED from PR #250 (squash `d4df6db1`; production
+`dpl_94JiUEjjpDrwpg4ng6a2oEAxef6R`).** This is the narrow replacement for broad
+draft PR #248. It does not rebuild Jeff #83 Referred Results or add CSV export.
+
+The reported three-message mailbox had two causes: the taker and verified
+Referring coach normalized to one mailbox, creating two legitimate role rows,
+and the event/cron workers could race the same coach row. The approved Spec
+19ao behavior sends the taker copy only for a same-mailbox collision while
+retaining an empty `CANCELLED` coach-role row with reason
+`SAME_MAILBOX_AS_TAKER`.
+
+All assessment-email roles now use one atomic PostgreSQL claim. A
+`FOR UPDATE SKIP LOCKED` CTE selects a due row and, in the same statement,
+moves it to `SENDING`, increments attempts, and installs a unique lease token.
+Eligibility and expiry use PostgreSQL's clock. Completion, requeue, and
+terminal failure require the token; terminal failure and dead-letter audit are
+one transaction. SMTP delivery remains at-least-once: a crash after provider
+acceptance but before `SENT` persistence can still duplicate. The worker retries
+the `SENT` write without resending and emits a structured uncertainty signal
+even when the audit database path is unavailable.
+
+Event and cron share an environment-scoped Inngest concurrency key. The default
+cap is four and can be reduced with `ASSESSMENT_SMTP_CONCURRENCY`. The provider
+is Azure Communication Services over SMTP. Microsoft's documented ceiling of
+250 authenticated connections makes four connection-safe, but the initial
+custom-domain send quota is only 30 messages/minute and 100/hour unless the
+resource has an approved increase; Inngest concurrency is not rate limiting.
+The account-specific Azure quota and provider-backed load exercise remain
+follow-up capacity work, not launch blockers for this hotfix: it keeps the
+existing provider and email categories, constrains the previously unshared
+event/cron workers, and removes a known duplicate send path rather than adding
+intended volume.
+The PostgreSQL CI exercise now also races four workers over mixed
+`QUICK_ASSESSMENT_LEAD`, `ASSESSMENT_RESULTS`, and `COACH_COMPLETION` rows and
+fails on duplicates or an undrained row type. Because it uses a fake SMTP sink
+and calls the worker seam directly, provider throttling, Inngest scheduling, and
+the 30-minute pending-age budget remain explicit follow-up risks. The launch
+gate is the quiesced handoff: the cutover runbook requires both old workers to
+be paused and drained before the lease worker starts. Rolling deployment or a
+flag flip is not sufficient.
+
+The additive migration
+`20260730040000_add_assessment_outbox_leases` was already applied to production
+by PR #248's Vercel preview because that preview was connected to the shared
+database. Its checksum is therefore frozen. The overlapping later migration
+failed before applying any step, was marked rolled back, and Prisma subsequently
+reported the production ledger healthy. Reserved provenance/generation columns
+remain inert; removing the redundant index is deferred until measured rather
+than rewriting an applied migration.
+
+A focused CI job now races independent Prisma/PostgreSQL connections inside a
+random isolated schema and requires exactly one lease. Local mock-seam coverage
+also pins same-mailbox suppression, token-guarded transitions, no deliberate
+requeue after SMTP success, terminal audit atomicity, and original-error
+preservation.
+
+**Launch receipt.** The final PR candidate passed GitHub Build, Migration Safety
+Gate, Assessment Email Lease (PostgreSQL), and Vercel checks. Both production
+Inngest functions were paused with the default “pause immediately, then cancel
+after 7 days” behavior. Their run lists showed no active runs; the final old cron
+run ended at 17:12:02 PST, and the five-minute default Vercel function-duration
+window elapsed before the database gate. The outbox then contained 23 `SENT`
+rows and zero `PENDING` or `SENDING` rows, with zero delivery-uncertainty audits.
+
+After PR #250 merged, Vercel deployment
+`dpl_94JiUEjjpDrwpg4ng6a2oEAxef6R` reached Ready and owned
+`scaling-up-platform-v2.vercel.app` plus `platformtest.scalingup.com`. Inngest's
+automatic Vercel sync was not installed or did not fire: its app still showed a
+five-day-old account-scoped plan limit. The production app was therefore
+manually resynced against the canonical `/api/inngest` endpoint at 17:24:43 PST.
+Both paused functions then showed the new shared environment-scoped concurrency
+limit of four. Cron resumed first; its 17:27:00 run completed successfully in one
+second. The event worker then resumed.
+
+Post-cutover verification returned `200` and healthy database/auth posture from
+`/api/health`; the login surface rendered cleanly; Vercel reported zero
+production error logs after the new deployment timestamp; and the outbox still
+contained only the 23 prior `SENT` rows, with zero in-flight, recent failed, or
+delivery-uncertainty rows. No production assessment was submitted because no
+test recipients were explicitly approved. The two-recipient and same-mailbox
+controlled submissions remain immediate follow-up acceptance checks.
+
+---
+
+### 2026-07-30 — July-10 session closeouts: #59, #67, #70, and #71 <!-- ENTRY_ISO:2026-07-30 ENTRY_SLUG:jeff-jul10-session-closeouts-59-67-70-71 -->
+
+Four July-10 assessment rows were closed from shipped code plus fresh production evidence; none required a new feature implementation in this branch.
+
+- **#71 — Results on screen: Complete.** PR #249 merged through the protected `main` branch as squash `36131fe4`; GitHub Build and Migration Safety passed, the production deployment reached Ready, and `/api/health` returned `200` with healthy database/auth posture and `no-store`. A controlled no-email production campaign with `showResultsOnScreen=true` submitted one scored answer through the public invited flow and rendered the full branded respondent report in place, including the overall result, section breakdown, Print, and Download PDF controls. The exact canary was then closed and soft-deleted; its single submission remains as the audit receipt. This also closes GH #229: PR #249 moved the shared coach-image source through the validated safe-image policy before exposing the report to invited respondents.
+- **#67 — QSP report header: Complete.** A read-only production check removed the prior data caveat: both the original `2026 QSP Q2` campaign and its active replacement have a real `creatorCoach` with a non-empty profile image, and the replacement has completed submissions. The shared report byline code is template-agnostic and its focused cover/footer suites passed 27/27 on current `main`. The auth-gated report itself was not opened with a production account; that is optional pixel-level acceptance, not a code or data blocker.
+- **#70 — Rockefeller Welcome wording: Complete by product decision.** The shipped wording keeps every accurate fact: respondents rate each statement 0–3 and each habit has four items. The omitted “table on page 4” clause remains intentionally omitted because Jeff #24 removed the Rockefeller score table and the report has no page numbering. Restoring that clause would make the Welcome screen promise an artifact that does not exist. GH #223 is closed on this decision.
+- **#59 — false removal error: Complete.** The production audit trail on the report date contains two `AssessmentCampaignParticipant` DELETE events from the affected Spectrum campaign, followed by the campaign deletion; this maps the report to the campaign-detail Respondents table, not to deleting an individual result. The exact UI path is `/portal/assessments/{campaignId}` → Respondents → the row action labelled `Remove {firstName} {lastName}` → confirmation button `Remove` → `DELETE /api/assessment-campaigns/{campaignId}/participants/{participantId}`. Before PR #198, that route committed the invitation/participant transaction and audit row, then threw while constructing an invalid JSON-bodied `204`, so the UI showed “Could not remove respondent” even though removal succeeded. Current code returns `new NextResponse(null, { status: 204 })`; the client treats `204` as success and shows “Respondent removed.” The shipped route regression test uses a faithful `Response` implementation specifically to prevent this production-only failure from returning.
+
+**#48 travels with this closeout PR but remains a launch step, not one of the four completed production rows.** The QSP story-grouping branch is integrated with current `main`, retains the default-off flag/kill switch and three stable-key compatibility boundary, and its runtime whole-branch review passed. Launch-runbook re-review requested fail-closed corrections; those corrections are now recorded, with final runbook verification still pending. The branch remains unmerged and unlaunched and proceeds only after that review clears, followed by a CI-gated PR, merge, and separate flag launch.
+
+---
+
+### 2026-07-30 — Jeff #48: QSP core-values story group built default-OFF <!-- ENTRY_ISO:2026-07-30 ENTRY_SLUG:jeff-48-qsp-story-group-built -->
+
+**Status: BUILT on `codex/issue-48-qsp-story-ui-design`, DEFAULT-OFF, runtime whole-branch review passed; launch-runbook re-review requested fail-closed corrections, now applied with final verification pending; pending PR, merge, and production launch.** This entry records local implementation and verification only. No merge, Vercel environment write, deployment, or launch occurred.
+
+The approved presentation adapter recognizes only the exact consecutive, same-section, optional `TEXT` triplet on template alias `qsp-v2`. When `WAVE_48_QSP_STORY_GROUP_ENABLED` is on, public assessment, invited survey, and editor Preview paths render one prompt with up to three fixed-order story slots and count it as one logical progress item. `WAVE_48_QSP_STORY_GROUP_ENABLED` remains default-OFF; `WAVE_48_QSP_STORY_GROUP_KILL` wins over enablement and restores the ordinary three-question rendering.
+
+**Compatibility boundary.** There is no Prisma schema migration, QSP seed-content or question-count change, Esperto crosswalk/import change, answer-state or submission-payload change, scoring/report/export change, or historical-data rewrite. The stable keys remain exactly `P1_core_values_story_1`, `P1_core_values_story_2`, and `P1_core_values_story_3`; Esperto remains `Q5a/Q5b/Q5c` one-to-one with those slots. Public and invited component tests submit the same three stable-key/value objects, and editor Preview delegates to the same pager in read-only mode.
+
+**Validation receipt.**
+
+- Final complete focused regression command passed **15/15 suites and 224/224 tests** with **0 snapshots**, including QSP seed invariants, Wave-P seed labels, Esperto crosswalk/results planning, ordinary pager/slides/phase-tile behavior, public/invited payloads, ED10 Preview/prop threading, and preservation of a revealed blank story slot across Next → Back navigation:
+
+```bash
+npx jest \
+  src/__tests__/lib/assessments/wave-48-flags.test.ts \
+  src/__tests__/lib/assessments/qsp-story-group.test.ts \
+  src/__tests__/assessments/qsp-story-group.test.tsx \
+  src/__tests__/assessments/section-pager-qsp-stories.test.tsx \
+  src/__tests__/assessments/section-pager.test.tsx \
+  src/__tests__/assessments/section-pager-slides.test.tsx \
+  src/__tests__/assessments/section-pager-phase-tile.test.tsx \
+  src/__tests__/assessments/public-quiz-pager.test.tsx \
+  src/__tests__/assessments/org-survey-pager.test.tsx \
+  src/__tests__/components/admin/template-editor/preview-tab.test.tsx \
+  src/__tests__/components/admin/template-editor/tabbed-shell-panels.wave-ed10.test.tsx \
+  src/__tests__/seed/qsp-v2-content.test.ts \
+  src/__tests__/seed/wave-p-seed-labels.test.ts \
+  src/__tests__/lib/assessments/esperto-import/crosswalk.test.ts \
+  src/__tests__/lib/assessments/esperto-import/results-plan.test.ts \
+  --runInBand
+```
+- Placeholder correction proof: `npx jest src/__tests__/assessments/qsp-story-group.test.tsx src/__tests__/components/assessments/question-input.test.tsx --runInBand` passed **2/2 suites and 27/27 tests**. Scoped ESLint over both components/tests returned no findings.
+- `node scripts/check-migration-safety.mjs` passed: **41 migrations checked**, no unapproved destructive operations.
+- Final `CI=true npx next build --turbopack` passed with exit 0 on Next.js 16.1.6. The local environment emitted the known middleware deprecation and missing `DATABASE_URL` / Inngest-key page-generation warnings; compilation, TypeScript, static generation, and final route output completed.
+
+The first two build attempts usefully caught two TypeScript union-widening defects that Jest could not see: `Math.max(current, restoredCount)` returned `number`, then `visibleCount + 1` returned `number`. They were corrected without behavior changes in isolated commits `830a103e` and `621fae31`; the existing component interaction suite passed **10/10** and scoped ESLint was clean after each correction. The visual pass then found the generic `Type your answer here…` placeholder did not match the approved mockup. Commit `23b35622` added an optional `QuestionInput` text-placeholder override whose default remains unchanged and passed the exact approved QSP copy: **“Name the person, then describe what they did…”**
+
+**Visual review evidence.** A local authenticated editor Preview used the real QSP v2 published v3 at desktop (`1440×783`) and mobile (`390×844`) and compared it with `docs/specs/v7.6/mockups/48-qsp-core-values-progressive.html`. Flag on showed one grouped prompt, one visible story textarea, `1 of 3`, the approved placeholder, and disabled Preview textarea/Add controls; logical progress max was **20**. Flag off showed no group, all **3** ordinary underlying story textareas, and raw progress max **22**. At 390px the document scroll width was **375px**, so the grouped card introduced no horizontal overflow. With the Jeff #48 flag on, a non-QSP Leadership Vision Alignment Preview showed **0** QSP groups, **9** ordinary question cards on the inspected section, and unchanged progress max **51**. Screenshots were written only to the OS temporary directory and were not added to git.
+
+The published-version boundary is explicit: editor Preview hardcodes empty answers and disables Add, while ED1 Test Mode is draft-only. Creating a shared-database draft solely for screenshots was rejected, and no isolated Postgres path was available. The first temporary interaction harness used `wireframe-scope`, which is not a production CSS scope; its field-count/focus/announcement/restore observations remain valid behavior evidence, but its production-styling claim and three PNGs are retracted.
+
+A fresh temporary uncommitted DB-free Next route corrected the harness. It mounted the real production `QspStoryGroup`, canonical three-question fixture, and local React answer state under the relevant `SectionPager` DOM exactly: `main.wf-scope > .su-assessment-brand.survey-section > ul.survey-question-list > li.survey-question.qsp-story-question`. The loaded stylesheet list included the generated `src_styles_wireframes-scoped` chunk. At `1440×900`, computed styles proved `--primary: 269 56% 33%`; a white question card with `rgb(232, 226, 242)` border, `14px` radius, `28px` padding, and purple shadow; a `48px`/`638px` grid prompt row with `16px` gap; a purple `48px` Q mark with `14px` radius; tinted story entries with `rgb(222, 211, 236)` borders, `12px` radius, and `16px` padding; and the production textarea class/border/radius. Initial state showed 1 textarea and 1 Add button. Add once rendered 2 textareas, focused `q-P1_core_values_story_2`, retained 1 Add button, announced slot 2, and activated the production focus-within border `rgb(185, 169, 214)` plus purple shadow. Add twice rendered 3 textareas, focused `q-P1_core_values_story_3`, removed Add, announced slot 3, and retained those styles. A fresh restored-slot-3 load rendered all 3 styled entries, no Add, and `Grace coached the whole team.` at the original slot-3 DOM id.
+
+Corrected accessibility snapshots and the full computed-style JSON receipt were saved as `/tmp/jeff-48-production-context-*`, outside git. The connected Chrome adapter did not support screenshot capture, so no corrected harness PNG is claimed; the published editor Preview PNGs remain the desktop/mobile styling evidence. This is documented as production-context real-component harness evidence, not as editor Preview or Test Mode evidence.
+
+After the corrected route source was removed and the dev server stopped, `CI=true npx next build --turbopack` passed with exit 0 and omitted the validation route from the production route table. Next retained the separate `.next/dev` tree, so the prior “removed completely” cache claim was also retracted. The exact disposable `src/.next/dev` directory was moved recoverably to `/tmp/qsp48-next-dev-cache-add882f5`. Exact `rg` searches for `qsp48-validation` / `qsp48-validation-client`, `find` searches for matching paths, and manifest searches across the remaining `.next` all returned no matches. The worktree contains neither temporary source nor compiled-route residue.
+
+---
+
+### 2026-07-30 — Jeff #83: verified Coach Referred Results launched <!-- ENTRY_ISO:2026-07-30 ENTRY_SLUG:jeff-83-referred-results-launched -->
+
+**Status: LAUNCHED on production (PR #245, squash `e0e2bc9b`; deployment `dpl_BZtaegoNCrfjpZAoVPpYQu7LxeDX`).** `WAVE_83_REFERRED_RESULTS_ENABLED=1` is an encrypted Production-only Vercel variable; `WAVE_83_REFERRED_RESULTS_KILL` remains the immediate rollback lever. The Ready deployment owns `scaling-up-platform-v2.vercel.app`, `platformtest.scalingup.com`, and the main aliases.
+
+The launched capability freezes canonical Coach ownership for new verified PUBLIC referrals, gives an active authenticated Coach a paginated/searchable **Referred Results** workspace and canonical report links, and gives ADMIN/STAFF the same referral/result context in the Public Campaign submissions table. Collection responses omit raw answers; report authorization uses frozen ownership, remains enumeration-safe, and writes the report-view audit before returning the report.
+
+**Review and verification receipt.** The repository's Greptile integration was unavailable: an `@greptile review` request produced neither a Greptile check nor bot response, and no Greptile CLI was installed. It is therefore **not recorded as a Greptile pass**. The fallback was the project `check-pr` gate plus independent spec and standards reviews. The standards review found and closed three issues: stale SoT/inventories, duplicate foreign-key conflict classification, and an open-string outbox recipient role/stale schema comment. Both re-reviews returned no findings. Final evidence before merge: **22 Jest suites / 249 tests passed**, changed-file ESLint passed, Prisma schema validation passed, all **41** migrations passed the safety gate, `git diff --check` passed, Turbopack production build passed, and GitHub Build/Migration Safety/Vercel checks were green.
+
+**Approved disclosure, now live before submission:** “By submitting, you agree that your full report will be shown and emailed to you. It will also be shared with the Scaling Up team and, if you used a coach referral link, made available to that verified coach while their account remains active. Scaling Up retains personal data as described in its Privacy Policy.” The live form presents this exact wording and links **Privacy Policy** to `https://scalingup.com/privacy-policy/`.
+
+**Historical backfill was deliberately not applied.** The read-only production review found **4 candidates and 0 exclusions**: two submissions grouped under Gabriel Test and two under Martin Segnitz, all for the Scaling Up 4 Decisions Assessment. Because the evidence does not independently prove the intended canonical Coach identity, the approved launch choice was to leave those historical submissions unassigned. No mapping file was approved and no backfill writes ran.
+
+**Launch walk:** a temporary Preview-only flag was canaried, then removed. In Preview, the seed Coach reached Referred Results and its empty state/Quick Assessment link; the seed STAFF account reached Public Campaigns and verified **Referring coach**, **Result**, and **View report** columns against existing submissions. No submission, campaign, mapping, or other product data was written. Production was then enabled and rebuilt from the merged commit. Vercel reported **Ready**; both production domains returned `200`, healthy database/auth posture, and `Cache-Control: no-store, max-age=0` on health. The protected referred-results API returned an unauthenticated redirect with `Cache-Control: no-store, max-age=0`. The exact disclosure and privacy link were verified on the live quiz without submitting.
+
+**Verification boundary:** no seed Coach owned a canary result, and the production walk intentionally did not create a synthetic assessment submission. Therefore an authenticated live report render and its audit-row write were verified by the passing route/gate tests rather than by mutating production. The Preview role/UI canary and production public/health/cache checks are the live evidence.
+
+---
+
+### 2026-07-30 — Jeff #83: verified Coach Referred Results implemented default-OFF <!-- ENTRY_ISO:2026-07-30 ENTRY_SLUG:jeff-83-referred-results-implemented-dark -->
+
+**Status: IMPLEMENTED on `codex/design-83-public-results`, DEFAULT-OFF, NOT LAUNCHED.** This entry records implementation state only. It does not change the `CLAUDE.md` production anchor, provision Vercel variables, apply a historical ownership mapping, approve legal copy, merge, or deploy.
+
+Jeff #83 adds immutable canonical ownership for verified PUBLIC referrals and an authenticated Coach **Referred Results** surface. New valid referrals dual-write `referringCoachId` and the email snapshot independently of the read flag; unknown, inactive, expired, malformed, or absent referrals remain Scaling Up-only. The report loader uses frozen submission data, enforces active canonical Coach ownership with enumeration-safe denial, permits ADMIN/STAFF oversight, and never exposes raw answers through collection APIs.
+
+The default-OFF read wave adds Coach navigation, a server-paginated/searchable/filterable result list, Four Decisions summaries/details, canonical report links, and the relocated Quick Assessment referral-link card. The existing ADMIN/STAFF Public Campaign expander is enriched only while the flag is on; its legacy response and three-column UI remain unchanged while off. The public pre-submit disclosure is also server-flag-matched and links to the Scaling Up Privacy Policy. **Its candidate wording still requires product/legal approval before launch.**
+
+Historical ownership remains human-reviewed. `scripts/review-public-referral-backfill.mjs` emits read-only normalized evidence and explicitly unapproved candidate Coach identities. It does not write or emit an apply-ready mapping. `scripts/apply-public-referral-backfill.mjs --mapping <reviewed.json>` consumes only an explicit array of `{submissionId, coachId}`, validates the entire batch inside one transaction, requires PUBLIC scope plus matching `REFERRING_COACH` outbox evidence, rejects missing/conflicting owners, and writes only null ownership through a compare-and-set. **No historical mapping was applied as part of implementation.**
+
+Rollout controls are documented in `.env.example`: `WAVE_83_REFERRED_RESULTS_ENABLED` and the winning `WAVE_83_REFERRED_RESULTS_KILL`, both default false. Launch remains a separate reviewed operation after the migration, approved disclosure, reviewed backfill, required checks, merge, production deployment, and smoke verification.
+
+---
+
+### 2026-07-30 — Wave EV: the campaign screen now says which template edition it is serving <!-- ENTRY_ISO:2026-07-30 ENTRY_SLUG:wave-ev-campaign-edition-visibility -->
+
+**PR #241** (squash `cc370aa9`). Read-only, **flagless**, no migration. Rollback is a revert.
+
+#### Why
+
+A campaign pins an `AssessmentTemplateVersion` at creation and **can never move off it** — the PATCH route only ever *reads* `versionId`; there is no write path. That pinning is correct: a live campaign must not have its questions change under the people answering it, and issued reports are stamped with their version's `contentHash` (`ReportProvenance`).
+
+What was wrong is that the pinning was **invisible**. The campaign screen showed the template's name and nothing else, so a tester opening a campaign created before a fix published read the old wording and filed it as broken — correctly, from what was on screen.
+
+This is the most likely mechanism behind Jeff July-10 rows **#40** and **#43** being re-reports of work that shipped eight days before he wrote them. **Precision on that citation:** the CHANGELOG records the re-reports, *not* the mechanism. The inference is ours and rests on both rows being LVA wording asks while Wave P published LVA v3 on 2026-07-02 — so a campaign pinned to LVA v2 would still serve pre-Wave-P wording.
+
+⚠️ **A framing correction worth carrying forward:** this was first written up as something only Jeff could fix by testing differently. That was wrong — he had no way to know. The gap was ours. The customer-facing message is *"you couldn't have known, and here's the fix"*, never *"you tested wrong."*
+
+#### What ships
+
+The Template tile gains the edition it is serving, plus a chip when it has fallen behind:
+
+```
+Quarterly Session Prep v2
+Edition 3 · published Jul 2, 2026
+[ Not the latest edition ]
+```
+
+Quiet when the campaign is on the newest edition. Lands for **admin and coach at once** — `CampaignDetail` is shared.
+
+**Two wording calls, both deliberate:**
+- **"Edition", not "Version".** "Version" is already spent on the instrument's own name in front of coaches — "Quarterly Session Prep v2" is a different *product* from v1, not a newer edition — and reusing it is precisely how this became confusing.
+- **"Not the latest edition", not "Newer edition available."** A campaign cannot move editions, so "available" promised an upgrade button that does not exist. The chip states the frozen fact.
+
+**Exactly one date**, on the edition being served. An earlier draft printed the newer edition's date beside it with nothing disambiguating them; the pinned date is the load-bearing one, because *"this campaign serves content from 2 Jul"* is what lets a tester reason *"the fix shipped later, so of course it isn't here."* A test guards that only one date reaches the screen.
+
+#### The mechanism, and its two traps
+
+A sibling counts as newer only when it is published, **not archived** (Wave ED8), the **same language** (versions are unique per `[templateId, versionNumber, language]`), the **same template**, and strictly higher-numbered. The query spreads **`activePublishedWhere`** from `active-version.ts` — the one place that definition lives — because a sibling only counts if it is what campaign-create would actually offer; a future ED8 predicate would otherwise stop create offering a version while the badge kept advertising it.
+
+🔑 **Trap 1 — fail-quiet must mean `null`, never `false`.** A thrown lookup, a missing version, or an unpublished pin all yield `edition: null`, rendering nothing. The tempting shape — falling back to an empty sibling list — makes the resolver return `newerEditionAvailable: false`, which the tile renders as an **affirmative currency claim**. A transient Neon cold-start would then assert exactly the falsehood the feature prevents. Same defect shape as Wave OSR's round-2 finding.
+
+🔑 **Trap 2 — the duplicated predicates are projection-sensitive, and that direction fails toward the reassuring answer.** `resolveEditionStanding` re-applies every predicate the query filters on (defense-in-depth against a future *loosening*). But a **narrowed `SELECT`** inverts it: drop `versionNumber` and `Number.isFinite(undefined)` is false, so every sibling is rejected and the tile makes the same false currency claim — with the full suite green. Four of the five projected fields fail this way; only `archivedAt` is shielded, because `undefined == null` is true under loose equality. The projection is therefore pinned by a `toEqual` test on **values**, not key names — Prisma reads `select: { f: false }` as an exclusion, so a truthiness flip would slip past a key-presence check.
+
+**The `templateId` re-check is tautological in production** and that is fine — the query filters on the same value. Sourcing it from `campaign.version.templateId` rather than `campaign.template.id` buys the correct comparison *scope* (a mis-pinned campaign's served edition is compared against its own template's lineage), delivered by the query, not the guard. `templateId` and `versionId` are independent FKs with no composite constraint, so mis-pinning is genuinely possible.
+
+**The Prisma bridge cannot be type-checked.** `CampaignDetailDb`'s methods deliberately return narrow row shapes that do not overlap Prisma's generics, so `prisma as CampaignDetailDb` is TS2352 and a double cast is unavoidable — meaning a *required* delegate constrains test mocks only and buys nothing at the four bridge call sites. `Pick<PrismaClient, keyof CampaignDetailDb>` guards the delegate **names** instead (probe-verified: typo → TS2551 + TS2344).
+
+#### Deliberately out of scope
+
+- **Letting a campaign move to a newer edition.** Looks like the obvious next step and isn't: the moment editions can change, every report already issued becomes ambiguous about which questions produced it, and ADR-0016 restricts deltas to a single version. Needs its own design pass.
+- **GH #242** — a campaign pinned to an *archived* edition renders reassuring text with no chip. Arguably more urgent than "not the latest"; needs its own copy decision.
+- **GH #243** — the campaign *list* has no edition signal, so "which campaigns are stale?" is unanswerable at a glance. Detail was fixed first because it is where the mistake was made.
+
+#### Review — five rounds, and the lesson is about prose
+
+**32 new tests / 3 suites** (14 `edition-standing` · 9 `campaign-edition-tile` · 9 in the Wave EV block of `campaign-detail`; 48 in those files), jest-verified per suite. Tile assertions are timezone-independent — `formatTimestamp` renders in the viewer's zone and hardcoded dates failed under `TZ=Pacific/Honolulu`.
+
+⚠️ **After round 1 there were no further runtime defects — every subsequent round found the write-up disagreeing with the code**, and each round's *fix* introduced or left a fresh one. Round 2 caught round 1's corrections going into a commit message instead of the PR body. Round 3 caught round 2's body rewrite adding a false claim (the `templateId` guard "catches mis-pinning"). Round 4 caught round 3 fixing that in the body while leaving **the identical sentence live in `campaign-detail.ts`** — its commit message asserting the overclaim was "confined to the body" — plus a tally of these very defects that was itself unverified and contradicted its own commit.
+
+**Standing lessons, both earned here:**
+1. **When you correct a claim, grep for every copy of it.** Fixing the artifact while leaving the source contradicting it is worse than not fixing it.
+2. **Do not state counts you have not audited** — including counts *of your own errors*. The commit history is the auditable record; the PR body deliberately states no tally.
+
+Also recorded: "matches 10 assessments-local uses" was repeated from a reviewer without checking (actual: four). Reviewers are not oracles either.
+
+### 2026-07-29 — Wave OSR: invited respondents see their own report on screen at submit (Jeff #71) <!-- ENTRY_ISO:2026-07-29 ENTRY_SLUG:jeff-jul10-71-onscreen-respondent-results -->
+
+**Status: MERGED (`26f18701`, squash of PR #236), ships DARK** behind `WAVE_OSR_RESPONDENT_RESULTS_ENABLED` (+ `_KILL`), default-OFF. Four commits: `a89470fe` build · `25eef0f2` review round 1 · `58384040` F4 · `8da65fff` review round 2. Migration additive (`NOT NULL DEFAULT false`). Spec `docs/specs/v7.6/19an`; decision record **ADR-0027**, plus an amendment to **ADR-0008**.
+
+Sixth item in the one-item-at-a-time July-10 pass. A campaign may opt in (`AssessmentCampaign.showResultsOnScreen`) to rendering an invited respondent's **own Results report in place** immediately after they submit, instead of the text-only thank-you page.
+
+**It is the same artifact for a new audience** — the identical `BrandedReport` a coach/admin sees, and the one public quiz takers have seen since ADR-0008. The invited submit route already computed the score and threw it away.
+
+**Worth more than the row suggests.** Jeff framed this as "in addition to" emailing results, but the results-email lane is **dormant** — no template has approved results-email copy and no live campaign has `sendResultsToRespondent` on — so on-screen is currently the **only** way an invited respondent ever sees their own result, while public-quiz takers already got one.
+
+**Why it needed an ADR.** ADR-0007 called the report "invited-only, coach/admin-gated"; ADR-0008 said "INVITED flows are untouched". Both now carry supersession pointers and `CONTEXT.md` no longer defines the report as "the coach's view". The insight: **audience was a property of the ROUTE, never of the document.**
+
+**Load-bearing decisions:** disclosure is decided **server-side inside the Phase-2 locked transaction** (reusing `emailRenderFingerprint`, so a toggle flipped in the Phase-1→Phase-2 window suppresses the payload) with **no client-visible flag** — payload presence IS the signal, so client and server cannot disagree. The model is built **once, pre-commit and lock-free** and shared with the #15 results email; a build failure degrades to the normal thank-you, because a throw *after* commit would 500 and the retry would hit the hard double-submit **409** — an unrecoverable dead-end with the answers already saved. `CEO_ONLY` needs no check (only the respondent's own `scoreResult` is in scope). Independent of the results-email approval hash, which approves authored EMAIL copy — coupling them would have shipped this permanently dark. `org-survey-client` imports `su-public-brand.css` + `su-report.css` itself (this route group has no `(report)` layout). **Print/Download is load-bearing, not cosmetic** — under show-once it is the only way the respondent keeps the report.
+
+---
+
+#### Review round 1 — 10 findings, 3 blocking
+
+The architecture held; the failures clustered in the **client auth surface** and the **"same artifact" claim.**
+
+1. 🔴 **HIGH — PII exposure on a tokenless reload.** `readOnScreenResult` ran unconditionally BEFORE `/me`, so a stored report (name, answers, scores) was served to whoever next reloaded an abandoned tab, **with no credential at all**. 🔑 **The token-exchange purge did not cover it, and the reason generalises: the exchange STRIPS THE FRAGMENT, so a plain reload never re-enters the exchange branch — the tokenless reload is the COMMON path, not an exotic one.**
+2. **Raw ISO timestamp on the PRIMARY render path.** Revival lived only in `readOnScreenResult`, so the first render after submit printed `2026-07-29T10:30:00.000Z` while a refresh printed "July 29, 2026" — **the same report, two date formats**. Extracted `reviveOnScreenReport`, applied at BOTH JSON boundaries. (The public quiz never hit this because it substitutes `submittedAt: new Date()` client-side.)
+3. **"Same artifact" was materially FALSE.** `buildRespondentReportFromSubmission` exists for the PUBLIC quiz, where org and coach are genuinely unknown: it hardcoded `companyName: ""` (interpolated unconditionally → an orphan `" · "`) and omitted `coachLogoUrl`/`coachName`, so the respondent's copy carried **no coach byline** — the exact placement Jeff asked for in #63/#67/#73/#78/#81, shipped days earlier in PR #230. Builder now takes them as **optional** args defaulting to the previous values (public callers byte-unchanged).
+4. The "no cohort data" guard **asserted against a mocked constant**.
+5. The non-coercion invariant is **genuinely untestable** (`persistDraft` stores no toggle, so the "stale draft `true`" hazard cannot arise) — documented, not faked.
+6. `degraded` hardcoded `false`. 7. The model was built on **100% of invited submissions**, pre-flag-check → `mayNeedReport`. 8. `StoredEnvelope.v` written but never validated. 10. Dead `EnqueueArgs.campaign.version` fields; duplicated flag read.
+9. ⚠️ **The PR body's test count was wrong** — "27 new across 3 suites" when the verified actual was **46**. Counts now taken from jest's summary line.
+
+**F4 — `RespondentReport.templateAlias` is now REQUIRED** (the gate's own Q11 scope, unshipped until the fix round). `public-quiz-client.tsx` hand-built the report shape and **omitted `templateAlias`**, which every renderer dispatches on via `reportConfigFor()` (four sites in `BrandedReport` alone). So **every public report silently resolved to `DEFAULT_REPORT_CONFIG` regardless of instrument**. 🔑 **Making the field required IS the fix, not merely passing the value** — the optional type is what made the omission invisible to the compiler, and requiring it found every site instantly.
+
+---
+
+#### Review round 2 — 8 of the 10 fixes held; 2 did not
+
+Round 2 reviewed the **fix commits**, not the base — specifically to catch what the fixes themselves introduced. It was worth it: **the round-1 security fix was wrong in a way the round-1 reasoning could not see.**
+
+1. 🔴 **HIGH — fix #1 TIME-BOUNDED the leak; it did not close it.** Gating rehydrate on a `/me` **410** is a sound proof of *a live sealed cookie* (verified path by path: `/me` answers 401 for a missing/mismatched cookie **before** it evaluates any lifecycle gate). But it proves the wrong thing. 🔑 **`sessionStorage` is per-TAB while cookies are per-origin**, so a 410 establishes only that *some* live invitation exists in this browser — **never whose report is in a given tab's slot.** The surviving leak: A submits in tab 1; co-invitee B opens their own link in tab 2, which replaces the shared cookie and purges **only tab 2**; B later reloads tab 1, gets a *perfectly valid* 410 on their own cookie, and is shown **A's** full report. Closed by adding **ownership on top of authorization**: the 410 now echoes `respondentKey`, the envelope records the key it was written for, and they must match — blank or mismatched refuses **and** purges, with no skip-the-check path, and envelope `v` bumped 1→2 so pre-ownership slots are discarded rather than trusted. Proven non-vacuous: removing the check fails 3 tests, one of which drives the client end-to-end through B's valid 410 against A's slot.
+   ⚠️ **Accepted, NOT fixed:** a respondent who abandons their **own** unlocked browser leaves the report readable until the cookie lapses (≤29 min from exchange). There the attacker holds both the cookie and the slot, so no server-side check can distinguish them. The docs said "prevented"; they now say **bounded**.
+2. 🔴 **HIGH — fix #1's purge branch destroyed a legitimate respondent's only copy.** It purged on **every** non-410. `/me` has a real 500 path and this repo has documented Neon cold-start timeouts, so: submit → report renders → F5 during a 2-second DB blip → 500 → **slot deleted** → the next reload 410s onto an empty slot → *"This survey has closed."* Under show-once with a dormant results email the report was **permanently unrecoverable — and the pre-fix code would have shown it.** Now only 401/404 purge; 5xx leaves the slot alone, and the purge sits inside the `cancelled` guard.
+3. **F4 was a real public-surface dispatch change, not a behaviour-neutral type fix.** It passes the real, always-present alias, so for a PUBLIC campaign on a mapped alias the report **type** changes (`qsp-v1`/`qsp-v2`/`leadership-vision-alignment` → qualitative; `RockHabits` loses its score table; `five-dysfunctions` loses the coach CTA). It had been justified by a **prod-data claim baked into three source comments** — the unfalsifiable-comment pattern this project has been burned by. So the claim was **actually verified**: a read-only prod query returned **exactly 1 PUBLIC campaign, on `scaling-up-quick`, absent from `REPORT_CONFIG`** → inert at merge. That fact then **moved out of code into ADR-0008 with its date**, because it is a fact about DATA, not about this code; the comments now state the mechanism and warn it is not a guarantee. The previously untested qualitative path (thinner payload: `scoringConfig` undefined, `versionId` `""`) now has a test.
+
+**Also closed in round 2:** the store's module docstring, `clearOnScreenResult`'s docstring and the store test's header each **still asserted the retracted "exchange purge is the boundary" rule**, ten lines from the text contradicting it — all three now record why it is wrong, so a reader cannot reintroduce the round-1 defect. The `mayNeedReport` guard was correct but **untested and resting on an unnamed invariant** (`showResultsOnScreen` must stay inside the `onScreen` fingerprint, or it becomes a **silent** missing-report bug) — invariant named in code, three tests pin both directions. The cohort guard was rescoped to what it can prove (the builder *adds* nothing; `result`/`sections`/`rawAnswers` pass through verbatim) and switched off a substring sweep that would false-positive the day an instrument asks about peers. The separator guard gained a test. Three prose overclaims corrected: `coachBylineName` does **not** match the authorized loader byte-for-byte (the loader does not trim, yielding `" "`), `degraded` is defence rather than a fixed defect with a victim (`computeScoreResult` always builds those arrays, so the flag is always `false` here, and `QualitativeReport` ignores it entirely), and `CampaignWizard`'s comment wrongly claimed toggles are persisted to drafts.
+
+---
+
+**Tests: 92 new, jest-verified per suite** — flags 19 · store 20 · report model 11 · submit route 15 · survey client 13 · wizard 9 (**87** OSR-owned), plus **+3** in `public-quiz-results` (8→11) and **+2** in `branded-report` (30→32). `CI=true npx next build --turbopack` green; ESLint clean; all four PR checks green.
+
+⚠️ **CORRECTION to a claim this project keeps making: "the pre-existing floor of 9 failing suites / 32 tests" is NOT a stable number.** Identical code measured **9, 11 and 14** failing suites across runs, varying with machine load and DB warmth. The failures were established as unrelated **rather than assumed**: **none** of the failing suites import any module this PR changed, and jest runs via `next/jest` (SWC, **no typechecking**), so the required-field change **cannot** fail a test at runtime. Spot-checked causes are all foreign — a `db.$transaction` mock gap, `undefined.firstName`/`undefined.total` fixture gaps, a drifted provenance constant, and `exchange.test.ts`'s documented 410-vs-425 drift. **State a range and a mechanism, never a single sample.**
+
+**⚠️ OPEN BEFORE LAUNCH — two things the flag flip does NOT resolve:**
+1. **`showResultsOnScreen` is create-only (no PATCH).** Existing live campaigns cannot opt in without a new campaign or a direct DB write, so **flipping the flag alone surfaces nothing.** Consistent with its `sendResultsToRespondent`/`notifyCoachOnCompletion` siblings, but a real ops constraint.
+2. **This wave widens the audience of an unvalidated coach-controlled `<img src>`** (`creatorCoach.profileImage` via `CoachLogo`, **GH #229**). That `<img>` previously rendered only on the authenticated `(report)/` route; it now also renders to an **unauthenticated respondent**, so a coach-set remote URL makes every respondent fetch it while their own PII report renders, and a dead URL shows a broken image to the client rather than to a coach's inbox (the Jeff #69 red-X symptom, relocated). Settle before flipping, not after.
+
+**Launch is a separate ops step, NOT done here:** write the flag via the **Vercel REST API as `type:"encrypted"`** (never piped `vercel env add` — it defaults to `sensitive` since CLI 51.8.0 and yields a value that can never be read back), then redeploy. Production is `prj_xcAWuAmGZAU3DCHgAauRv2WPKneo` under team `scaling-up`.
+
+**PROCESS LESSONS (the most valuable output of this item):**
+- 🔑 **A purge is not an authorization check, and a live session is not an identity.** Two consecutive rounds died on this. Round 1 kept respondents apart with a cleanup that only ran on the *token-bearing* path while the *tokenless* path was the common one; round 2's predecessor then proved "a live cookie exists" and treated it as "this is whose report this is". **Ask what the check actually establishes, then ask what you need it to establish.**
+- 🔑 **Per-tab vs per-origin is a security boundary.** `sessionStorage` is per-tab; cookies are per-origin. Any argument that pairs the two — "the cookie proves the tab" — is wrong by construction.
+- 🔑 **A destructive cleanup on an error path needs the error path enumerated.** Purging on "not 410" silently included 5xx, converting a transient DB blip into permanent data loss for the user.
+- 🔑 **"It's the same artifact" is a claim about DATA and must be verified field-by-field.** Three of five identity fields diverged between the authorized loader and the submit-path builder while the ADR asserted equivalence.
+- 🔑 **An optional field is an uncatchable omission** — making `templateAlias` required converted a silent misrender into a compile error and found every site instantly.
+- 🔑 **Never justify code with a prod-data claim in a source comment.** Verify it, then put the verified fact — with its date — in the ADR, where it is allowed to go stale visibly.
+- **Verify prose like code, third item running.** The wrong test count, the stale "read before `/me`" wording, the retracted purge rule in three docstrings, and three overclaims were all in prose, not logic.
+
+---
+
 ### 2026-07-29 — SoT RE-correction: yesterday's flag correction was itself wrong (an empty read is not an empty value) <!-- ENTRY_ISO:2026-07-29 ENTRY_SLUG:flag-state-recorrection -->
 
 **Status: DOCS-ONLY. Supersedes the entry immediately below (`flag-state-correction-ed1-ed8`), which was published earlier the same day and is now partly retracted.** No code. One prod env write (ED1/ED8 rewritten as `encrypted "1"`, not yet deployed). Two independent adversarial reviews — one against Vercel's primary docs, one against this repo — both returned **"NOT safe to publish as written"** on the draft correction, which is why this third version exists.

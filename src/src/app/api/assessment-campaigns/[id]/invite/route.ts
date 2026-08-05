@@ -40,12 +40,25 @@ import {
   resolveCoachLogo,
 } from "@/lib/assessments/invitation-email";
 import { isInviteEmailChromeEnabled } from "@/lib/assessments/wave-p-flags";
-import { sendAssessmentInvitationEmail } from "@/services/notifications";
 import {
+  prepareAssessmentInvitationEmail,
+  sendAssessmentInvitationEmail,
+} from "@/services/notifications";
+import {
+  createStableOriginalTokenAdapter,
   sendInvitesBatch,
+  StableInvitationCleanupAuditError,
+  StableInvitationQuarantineError,
   INVITE_BATCH_CAP,
 } from "@/lib/assessments/invite-send";
 import { waveDAutoSendEnabled } from "@/lib/assessments/wave-d-feature-flags";
+import { isStableInvitationLinksEnabled } from "@/lib/assessments/wave-j65-flags";
+import { inngest } from "@/inngest/client";
+import { STABLE_INVITATION_REJECTION_RETRY_EVENT } from "@/inngest/functions/stable-invitation-rejection-retry-event";
+import {
+  persistStableInvitationRejectionRepairPending,
+  type StableInvitationRejectionOutboxDb,
+} from "@/lib/assessments/stable-invitation-rejection-outbox";
 
 const InviteBodySchema = z.object({
   respondentIds: z.array(z.string().min(1)).optional(),
@@ -236,42 +249,106 @@ export async function POST(
       logoIncluded: chrome === "waveP" && logoRejectedReason === null,
       logoRejectedReason,
     });
+    const stableLinksEnabled = isStableInvitationLinksEnabled(campaign.alias);
 
     // Shared per-recipient create+send (also used by the Wave-D fan-out).
-    const { results } = await sendInvitesBatch(
-      { db, sendEmail: sendAssessmentInvitationEmail },
-      {
-        campaign: {
-          id: campaign.id,
-          name: campaign.name,
-          alias: campaign.alias,
-          closeAt: campaign.closeAt,
-          invitationSubject: campaign.invitationSubject,
-          invitationBodyMarkdown: campaign.invitationBodyMarkdown,
-          invitationBodyHtml: campaign.invitationBodyHtml,
-          template: {
-            alias: campaign.template.alias,
-            invitationSubject: campaign.template.invitationSubject,
-            invitationBodyMarkdown: campaign.template.invitationBodyMarkdown,
-          },
+    let inviteResult;
+    try {
+      inviteResult = await sendInvitesBatch(
+        {
+          db,
+          sendEmail: sendAssessmentInvitationEmail,
+          ...(stableLinksEnabled
+            ? {
+                prepareEmail: (data) =>
+                  prepareAssessmentInvitationEmail({
+                    ...data,
+                    redactErrors: true,
+                    coalesceVerification: true,
+                  }),
+                stableTokens: createStableOriginalTokenAdapter(db),
+                enqueueRejectedQuarantineRetry: async (input) => {
+                  await inngest.send({
+                    id: `stable-invitation-rejection-${input.tokenId}`,
+                    name: STABLE_INVITATION_REJECTION_RETRY_EVENT,
+                    data: input,
+                  });
+                },
+                persistRejectedCleanupAudit: (input) =>
+                  persistStableInvitationRejectionRepairPending(
+                    db as unknown as StableInvitationRejectionOutboxDb,
+                    {
+                      invitationId: input.invitationId,
+                      tokenId: input.tokenId,
+                      performedBy: actor.email,
+                    },
+                  ),
+              }
+            : {}),
         },
-        recipients: targets.map((p) => ({
-          respondentId: p.respondentId,
-          respondent: {
-            id: p.respondent!.id,
-            firstName: p.respondent!.firstName,
-            lastName: p.respondent!.lastName,
-            email: p.respondent!.email,
+        {
+          campaign: {
+            id: campaign.id,
+            name: campaign.name,
+            alias: campaign.alias,
+            closeAt: campaign.closeAt,
+            invitationSubject: campaign.invitationSubject,
+            invitationBodyMarkdown: campaign.invitationBodyMarkdown,
+            invitationBodyHtml: campaign.invitationBodyHtml,
+            template: {
+              alias: campaign.template.alias,
+              invitationSubject: campaign.template.invitationSubject,
+              invitationBodyMarkdown: campaign.template.invitationBodyMarkdown,
+            },
           },
-        })),
-        baseUrl: appUrl,
-        organizationName,
-        coachName,
-        templateName,
-        chrome,
-        coachLogoUrl,
+          recipients: targets.map((p) => ({
+            respondentId: p.respondentId,
+            respondent: {
+              id: p.respondent!.id,
+              firstName: p.respondent!.firstName,
+              lastName: p.respondent!.lastName,
+              email: p.respondent!.email,
+            },
+          })),
+          baseUrl: appUrl,
+          organizationName,
+          coachName,
+          templateName,
+          chrome,
+          coachLogoUrl,
+          stableLinksEnabled,
+        },
+      );
+    } catch (error) {
+      if (error instanceof StableInvitationCleanupAuditError) {
+        console.error("[assessment-invite] cleanup audit persistence failed", {
+          campaignId,
+          disposition: "CRITICAL_AUDIT_PERSIST_FAILED",
+        });
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Failed to persist invitation cleanup audit",
+          },
+          { status: 503 },
+        );
       }
-    );
+      if (error instanceof StableInvitationQuarantineError) {
+        console.error("[assessment-invite] rejected token quarantine failed", {
+          campaignId,
+          disposition: "DEFINITE_REJECTION_QUARANTINE_EXHAUSTED",
+        });
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Failed to quarantine rejected invitation token",
+          },
+          { status: 503 },
+        );
+      }
+      throw error;
+    }
+    const { results } = inviteResult;
 
     await logAudit({
       entityType: "AssessmentInvitation",

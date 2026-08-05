@@ -35,6 +35,7 @@ import { splitName } from "@/lib/assessments/respondent-csv";
 import { normalizeEmail } from "@/app/api/organizations/[id]/respondents/route";
 import { buildTeamPath } from "@/app/api/assessment-campaigns/[id]/participants/route";
 import {
+  assessmentInviteBrandedCustomHtmlEnabled,
   waveDAutoSendEnabled,
   waveDCustomHtmlEmailEnabled,
 } from "@/lib/assessments/wave-d-feature-flags";
@@ -199,7 +200,9 @@ export async function POST(request: NextRequest) {
             { status: 400 }
           );
         }
-        const placement = validateInvitationHtml(rawHtml);
+        const placement = validateInvitationHtml(rawHtml, {
+          requireUrlToken: !assessmentInviteBrandedCustomHtmlEnabled(),
+        });
         if (!placement.ok) {
           return NextResponse.json(
             { success: false, error: placement.reason },
@@ -464,6 +467,7 @@ export async function POST(request: NextRequest) {
         invitationBodyHtml: invitationBodyHtmlToStore,
         sendResultsToRespondent: data.sendResultsToRespondent,
         notifyCoachOnCompletion: data.notifyCoachOnCompletion,
+        showResultsOnScreen: data.showResultsOnScreen,
         // Wave M (#19): sanitized slides (flag-gated) or null. `Prisma.JsonNull`
         // is required for a nullable `Json?` column (plain `null` is rejected);
         // the persisted shape is the sanitized PersistedSlide[] (sanitize-on-save).

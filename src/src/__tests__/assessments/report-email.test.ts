@@ -27,9 +27,12 @@ import type { ScoreResult } from "@/lib/assessments/scoring";
 function baseReport(overrides: Partial<RespondentReport> = {}): RespondentReport {
   return {
     respondentName: "Monks Koala",
+    respondentEmail: "monks@example.com",
     jobTitle: null,
     companyName: "Acme Corp",
     assessmentName: "Scaling Up 4 Decisions Assessment",
+    // Required on RespondentReport; "" == DEFAULT_REPORT_CONFIG, as before.
+    templateAlias: "",
     campaignLabel: null,
     submittedAt: new Date("2026-06-11T10:00:00Z"),
     result: {} as ScoreResult,
@@ -199,6 +202,24 @@ function neutralReport(): RespondentReport {
 // ── Tests ──────────────────────────────────────────────────────────────────
 
 describe("buildReportEmailHtml — overall score", () => {
+  it("freezes the exact legacy scored report email bytes", () => {
+    const report = fourDecisionsReport();
+    const legacyDefault = buildReportEmailHtml({
+      report,
+      recipientRole: "TAKER_COPY",
+    });
+    const legacyExplicit = buildReportEmailHtml({
+      report,
+      recipientRole: "TAKER_COPY",
+      chrome: "legacy",
+    });
+
+    expect(legacyExplicit).toEqual(legacyDefault);
+    expect(JSON.stringify(legacyExplicit.bodyHtml)).toMatchSnapshot(
+      "legacy-scored-report-email",
+    );
+  });
+
   it("renders the overall headline metric (ScaleUp score)", () => {
     const { bodyHtml } = buildReportEmailHtml({
       report: fourDecisionsReport(),
@@ -308,6 +329,70 @@ describe("buildReportEmailHtml — email safety", () => {
   });
 });
 
+describe("buildReportEmailHtml — GH 228 branded chrome", () => {
+  it("adds the approved 20px separation before the scored report title", () => {
+    const branded = buildReportEmailHtml({
+      report: fourDecisionsReport(),
+      recipientRole: "TAKER_COPY",
+      chrome: "gh228",
+    });
+
+    expect(branded.bodyHtml).toContain(
+      '<div style="margin-top:20px;font-size:21px;font-weight:800;color:#ffffff;line-height:1.2;margin-bottom:4px;">Scaling Up 4 Decisions Assessment</div>',
+    );
+  });
+
+  it.each(["TAKER_COPY", "REFERRING_COACH"] as const)(
+    "renders both Scaling Up logo placements before the coach byline for %s",
+    (recipientRole) => {
+      const branded = buildReportEmailHtml({
+        report: fourDecisionsReport({
+          coachName: "Alex Coach",
+          coachLogoUrl: "https://images.example/coach.png",
+        }),
+        recipientRole,
+        chrome: "gh228",
+      });
+
+      expect(branded.bodyHtml.match(/cid:su-report-logo-v1/g)).toHaveLength(2);
+      expect(branded.bodyHtml.indexOf("cid:su-report-logo-v1")).toBeLessThan(
+        branded.bodyHtml.indexOf("Coached by Alex Coach"),
+      );
+      expect(branded.bodyHtml).not.toMatch(/display:(?:flex|grid)/);
+      expect(branded.bodyHtml).not.toContain("<style");
+      expect(branded.bodyHtml).not.toContain("<link");
+    },
+  );
+
+  it("falls back to the coach name when the image URL is rejected", () => {
+    const branded = buildReportEmailHtml({
+      report: fourDecisionsReport({
+        coachName: "Alex Coach",
+        coachLogoUrl: "javascript:alert(1)",
+      }),
+      recipientRole: "TAKER_COPY",
+      chrome: "gh228",
+    });
+
+    expect(branded.bodyHtml).toContain("Coached by Alex Coach");
+    expect(branded.bodyHtml).not.toContain("javascript:alert(1)");
+  });
+
+  it("suppresses a valid coach image when the coach name is blank", () => {
+    const branded = buildReportEmailHtml({
+      report: fourDecisionsReport({
+        coachName: "   ",
+        coachLogoUrl: "https://images.example/coach.png",
+      }),
+      recipientRole: "TAKER_COPY",
+      chrome: "gh228",
+    });
+
+    expect(branded.bodyHtml).not.toContain("Coached by");
+    expect(branded.bodyHtml).not.toContain("https://images.example/coach.png");
+  });
+});
+
 describe("buildReportEmailHtml — coach CTA gating (#81)", () => {
   const CTA = "Talk to your Scaling Up Certified Coach";
 
@@ -325,6 +410,50 @@ describe("buildReportEmailHtml — coach CTA gating (#81)", () => {
       recipientRole: "TAKER_COPY",
     });
     expect(bodyHtml).not.toContain(CTA);
+  });
+
+  it("five-dysfunctions Coach copy still offers Contact the Taker", () => {
+    const { bodyHtml } = buildReportEmailHtml({
+      report: fourDecisionsReport({
+        templateAlias: "five-dysfunctions",
+        respondentEmail: "taker@example.com",
+      }),
+      recipientRole: "REFERRING_COACH",
+    });
+
+    expect(bodyHtml).toContain("Contact the Taker");
+    expect(bodyHtml).toContain('href="mailto:taker%40example.com"');
+    expect(bodyHtml).not.toContain(CTA);
+  });
+});
+
+describe("buildReportEmailHtml — report identity and next steps", () => {
+  it("shows the taker's email plus Learn More and the verified coach link", () => {
+    const { bodyHtml } = buildReportEmailHtml({
+      report: fourDecisionsReport({
+        respondentEmail: "taker@example.com",
+        referringCoachEmail: "coach@example.com",
+      }),
+      recipientRole: "TAKER_COPY",
+    });
+
+    expect(bodyHtml).toContain("taker@example.com");
+    expect(bodyHtml).toContain('href="https://scalingup.com"');
+    expect(bodyHtml).toContain('href="mailto:coach%40example.com"');
+  });
+
+  it("gives the coach a taker-contact link instead of emailing themselves", () => {
+    const { bodyHtml } = buildReportEmailHtml({
+      report: fourDecisionsReport({
+        respondentEmail: "taker@example.com",
+        referringCoachEmail: "coach@example.com",
+      }),
+      recipientRole: "REFERRING_COACH",
+    });
+
+    expect(bodyHtml).toContain("Contact the Taker");
+    expect(bodyHtml).toContain('href="mailto:taker%40example.com"');
+    expect(bodyHtml).not.toContain('href="mailto:coach%40example.com"');
   });
 });
 

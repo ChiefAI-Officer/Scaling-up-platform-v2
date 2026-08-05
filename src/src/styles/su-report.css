@@ -93,6 +93,21 @@
   border-radius: 8px;
 }
 
+/* Wave OSR (#71) — the respondent-facing note above their own in-place report.
+   Carries the "your coach will review this with you" framing that the bypassed
+   thank-you page used to own, plus the keep-a-copy hint (Print/Download is the
+   only way to retain a show-once report). Screen-only: it sits inside .no-print,
+   so it never reaches the PDF. The print-actions bar above is position:fixed, so
+   this note is the first thing in the normal flow. */
+.su-public-brand .su-report-onscreen-note {
+  max-width: 46em;
+  margin: 0 auto 18px;
+  padding: 0 20px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: rgba(58, 36, 0, 0.85);
+}
+
 /* ══════════════════════════════════════════════════════════════════════════
    1. COVER
    ══════════════════════════════════════════════════════════════════════════ */
@@ -755,6 +770,32 @@
   padding: 12px 22px;
   border-radius: 11px;
   transition: background 0.15s;
+}
+
+.su-public-brand .su-report-email {
+  margin-top: 4px;
+  font-size: 13px;
+  color: #ffffff;
+  opacity: 0.9;
+  overflow-wrap: anywhere;
+}
+
+.su-public-brand .su-report-next-steps {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+.su-public-brand .su-report-cta-secondary {
+  background: #ffffff;
+  color: #522583;
+  border: 1px solid #522583;
+}
+
+.su-public-brand .su-report-cta-secondary:hover {
+  background: #f0e9fa;
+  color: #3d1a63;
 }
 
 .su-public-brand .su-report-cta:hover {

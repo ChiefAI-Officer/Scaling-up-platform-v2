@@ -23,6 +23,7 @@
 import {
   runInviteFanout,
   ASSESSMENT_SEND_INVITES_EVENT,
+  type FanoutResult,
   type InviteFanoutDeps,
 } from "@/inngest/functions/assessment-invite-fanout";
 
@@ -64,6 +65,7 @@ function makeCampaign(
         ? overrides.invitationBodyMarkdown
         : null,
     template: {
+      alias: "five-dysfunctions",
       name: "Five Dysfunctions",
       invitationSubject: "You're invited",
       invitationBodyMarkdown: "Hello {{first_name}}",
@@ -108,6 +110,20 @@ function makeDeps(
     .fn()
     .mockResolvedValue({ sent: [], skipped: [], failed: [], results: [] });
   const sendEmail = jest.fn().mockResolvedValue(undefined);
+  const prepareEmail = jest.fn();
+  const stableTokens = {
+    stageExistingOriginal: jest.fn(),
+    registerOriginal: jest.fn(),
+    confirm: jest.fn(),
+    uncertain: jest.fn(),
+    removeRegistered: jest.fn(),
+    rollbackRejected: jest.fn(),
+  };
+  const persistRejectedCleanupAudit = jest.fn().mockResolvedValue(undefined);
+  const enqueueRejectedQuarantineRetry = jest
+    .fn()
+    .mockResolvedValue(undefined);
+  const isStableLinksEnabled = jest.fn().mockReturnValue(false);
   const isPaused = jest.fn().mockReturnValue(false);
   const isAutoSendEnabled = jest.fn().mockReturnValue(true);
   // Mirror REAL Inngest: every step.run return is JSON-serialized + parsed back,
@@ -128,6 +144,11 @@ function makeDeps(
       },
     },
     sendEmail,
+    prepareEmail,
+    stableTokens,
+    persistRejectedCleanupAudit,
+    enqueueRejectedQuarantineRetry,
+    isStableLinksEnabled,
     sendInvitesBatch,
     isPaused,
     isAutoSendEnabled,
@@ -155,6 +176,30 @@ function findMarkSent(updateMany: jest.Mock) {
     (c: any) => c[0]?.data && c[0].data.invitesSentAt !== undefined,
   );
   return call ? call[0] : undefined;
+}
+
+function requireCompleted(
+  result: FanoutResult,
+): Extract<FanoutResult, { claimed: true; aborted: false }> {
+  expect(result).toEqual(
+    expect.objectContaining({ claimed: true, aborted: false }),
+  );
+  if (!result.claimed || result.aborted) {
+    throw new Error("Expected a completed fan-out result");
+  }
+  return result;
+}
+
+function requireAborted(
+  result: FanoutResult,
+): Extract<FanoutResult, { claimed: true; aborted: true }> {
+  expect(result).toEqual(
+    expect.objectContaining({ claimed: true, aborted: true }),
+  );
+  if (!result.claimed || !result.aborted) {
+    throw new Error("Expected an aborted fan-out result");
+  }
+  return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -210,8 +255,7 @@ describe("runInviteFanout", () => {
     expect(markCall.where.id).toBe(CAMPAIGN_ID);
     expect(markCall.data.invitesSentAt).toEqual(FIXED_NOW);
 
-    expect(result.claimed).toBe(true);
-    expect(result.sent).toBe(2);
+    expect(requireCompleted(result).sent).toBe(2);
   });
 
   // -------------------------------------------------------------------------
@@ -304,6 +348,70 @@ describe("runInviteFanout", () => {
     expect(typeof batchDeps.now).toBe("function");
   });
 
+  it("passes enabled stable-link context and adapters using the exact campaign alias", async () => {
+    const deps = makeDeps();
+    const isStableLinksEnabled = jest.fn().mockReturnValue(true);
+    const prepareEmail = jest.fn();
+    const stableTokens = {
+      stageExistingOriginal: jest.fn(),
+      registerOriginal: jest.fn(),
+      confirm: jest.fn(),
+      uncertain: jest.fn(),
+      removeRegistered: jest.fn(),
+      rollbackRejected: jest.fn(),
+    };
+    const persistRejectedCleanupAudit = jest.fn();
+    Object.assign(deps, {
+      isStableLinksEnabled,
+      prepareEmail,
+      stableTokens,
+      persistRejectedCleanupAudit,
+    });
+
+    await runInviteFanout(deps, { campaignId: CAMPAIGN_ID });
+
+    expect(isStableLinksEnabled).toHaveBeenCalledWith("q3-team");
+    const [batchDeps, batchInput] = deps.sendInvitesBatch.mock.calls[0];
+    expect(batchInput.stableLinksEnabled).toBe(true);
+    expect(batchDeps.prepareEmail).toBe(prepareEmail);
+    expect(batchDeps.stableTokens).toBe(stableTokens);
+    expect(batchDeps.persistRejectedCleanupAudit).toBe(
+      persistRejectedCleanupAudit,
+    );
+  });
+
+  it("passes disabled stable-link context without adapters or changing fanout steps", async () => {
+    const deps = makeDeps();
+    const isStableLinksEnabled = jest.fn().mockReturnValue(false);
+    const prepareEmail = jest.fn();
+    const stableTokens = {
+      stageExistingOriginal: jest.fn(),
+      registerOriginal: jest.fn(),
+      confirm: jest.fn(),
+      uncertain: jest.fn(),
+      removeRegistered: jest.fn(),
+      rollbackRejected: jest.fn(),
+    };
+    Object.assign(deps, {
+      isStableLinksEnabled,
+      prepareEmail,
+      stableTokens,
+    });
+
+    await runInviteFanout(deps, { campaignId: CAMPAIGN_ID });
+
+    expect(isStableLinksEnabled).toHaveBeenCalledWith("q3-team");
+    const [batchDeps, batchInput] = deps.sendInvitesBatch.mock.calls[0];
+    expect(batchInput.stableLinksEnabled).toBe(false);
+    expect(batchDeps.prepareEmail).toBeUndefined();
+    expect(batchDeps.stableTokens).toBeUndefined();
+    expect(batchDeps.persistRejectedCleanupAudit).toBeUndefined();
+    expect(deps.sendInvitesBatch).toHaveBeenCalledTimes(1);
+    expect(deps.runStep.mock.calls.map(([name]) => name)).toContain(
+      "heartbeat-1",
+    );
+  });
+
   it("flips ON_OPEN DRAFT campaign to ACTIVE on completion", async () => {
     const deps = makeDeps();
     deps.findUnique.mockResolvedValue(
@@ -368,8 +476,7 @@ describe("runInviteFanout", () => {
 
     const result = await runInviteFanout(deps, { campaignId: CAMPAIGN_ID });
 
-    expect(result.aborted).toBe(true);
-    expect(result.reason).toBe("deleted");
+    expect(requireAborted(result).reason).toBe("deleted");
     expect(deps.sendInvitesBatch).not.toHaveBeenCalled();
     // claim happened (count=1), but NO further updateMany (no mark-sent, no release)
     expect(deps.updateMany).toHaveBeenCalledTimes(1);
@@ -384,8 +491,7 @@ describe("runInviteFanout", () => {
 
     const result = await runInviteFanout(deps, { campaignId: CAMPAIGN_ID });
 
-    expect(result.aborted).toBe(true);
-    expect(result.reason).toBe("paused");
+    expect(requireAborted(result).reason).toBe("paused");
     expect(deps.sendInvitesBatch).not.toHaveBeenCalled();
 
     // claim + release (2 updateMany), NO mark-sent
@@ -402,8 +508,7 @@ describe("runInviteFanout", () => {
 
     const result = await runInviteFanout(deps, { campaignId: CAMPAIGN_ID });
 
-    expect(result.aborted).toBe(true);
-    expect(result.reason).toBe("flag-off");
+    expect(requireAborted(result).reason).toBe("flag-off");
     expect(deps.sendInvitesBatch).not.toHaveBeenCalled();
 
     expect(deps.updateMany).toHaveBeenCalledTimes(2);
@@ -477,8 +582,7 @@ describe("runInviteFanout", () => {
 
     // only batch 1 ran before the deletion was observed
     expect(deps.sendInvitesBatch).toHaveBeenCalledTimes(1);
-    expect(result.aborted).toBe(true);
-    expect(result.reason).toBe("deleted-mid-run");
+    expect(requireAborted(result).reason).toBe("deleted-mid-run");
 
     // NOT marked sent (incomplete)
     const markCalls = deps.updateMany.mock.calls.filter(
@@ -501,8 +605,7 @@ describe("runInviteFanout", () => {
     const result = await runInviteFanout(deps, { campaignId: CAMPAIGN_ID });
 
     expect(deps.sendInvitesBatch).toHaveBeenCalledTimes(1);
-    expect(result.aborted).toBe(true);
-    expect(result.reason).toBe("paused-mid-run");
+    expect(requireAborted(result).reason).toBe("paused-mid-run");
 
     const markCalls = deps.updateMany.mock.calls.filter(
       (c: any) => c[0].data && c[0].data.invitesSentAt !== undefined,
@@ -524,7 +627,7 @@ describe("runInviteFanout", () => {
     expect(deps.sendInvitesBatch).not.toHaveBeenCalled();
     const markCall = findMarkSent(deps.updateMany);
     expect(markCall.data.invitesSentAt).toEqual(FIXED_NOW);
-    expect(result.sent).toBe(0);
+    expect(requireCompleted(result).sent).toBe(0);
   });
 
   it("skips soft-deleted participants (respondent.deletedAt set)", async () => {
@@ -552,8 +655,7 @@ describe("runInviteFanout", () => {
 
     const result = await runInviteFanout(deps, { campaignId: CAMPAIGN_ID });
 
-    expect(result.aborted).toBe(true);
-    expect(result.reason).toBe("not-found");
+    expect(requireAborted(result).reason).toBe("not-found");
     expect(deps.sendInvitesBatch).not.toHaveBeenCalled();
   });
 
@@ -579,7 +681,7 @@ describe("runInviteFanout", () => {
     // closeAt.toLocaleDateString — a TypeError on a string).
     const result = await runInviteFanout(deps, { campaignId: CAMPAIGN_ID });
 
-    expect(result.aborted).toBe(false);
+    requireCompleted(result);
     const input = deps.sendInvitesBatch.mock.calls[0][1];
     expect(input.campaign.closeAt).toBeInstanceOf(Date);
     expect(input.campaign.closeAt.toISOString()).toBe(closeAt.toISOString());
@@ -632,8 +734,7 @@ describe("runInviteFanout", () => {
 
     const result = await runInviteFanout(deps, { campaignId: CAMPAIGN_ID });
 
-    expect(result.aborted).toBe(false);
-    expect(result.sent).toBe(1);
+    expect(requireCompleted(result).sent).toBe(1);
     const markCall = findMarkSent(deps.updateMany);
     expect(markCall).toBeDefined();
     expect(markCall.data.invitesSentAt).toEqual(FIXED_NOW);
@@ -653,7 +754,7 @@ describe("runInviteFanout", () => {
 
     const result = await runInviteFanout(deps, { campaignId: CAMPAIGN_ID });
 
-    expect(result.aborted).toBe(false);
+    requireCompleted(result);
     const markCall = findMarkSent(deps.updateMany);
     expect(markCall).toBeDefined();
     expect(markCall.data.invitesSentAt).toEqual(FIXED_NOW);

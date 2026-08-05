@@ -5,6 +5,7 @@
 
 import { z } from "zod";
 import { RESPONDENT_LEVEL_VALUES } from "./assessments/respondent-levels";
+import { safeImageSrc } from "./assessments/safe-image-src";
 
 // ============================================================
 // Common Schemas
@@ -170,7 +171,29 @@ export const createCoachSchema = z.object({
     phone: phoneSchema,
     company: z.string().optional(),
     bio: z.string().optional(),
-    profileImage: z.string().optional(),
+    // GH #229 — defence in depth at the write boundary. This field is rendered as
+    // an <img src> on reports that Wave OSR (#71) now shows to UNAUTHENTICATED
+    // respondents. The load-bearing guard is at the render site (`CoachLogo`),
+    // which also covers rows already stored and every other writer; this one stops
+    // new non-https values entering through the ADMIN/STAFF-only coach API
+    // (`POST /api/coaches`, `PATCH /api/coaches/[id]`).
+    //
+    // Permissive about ABSENCE (undefined / "") because callers send both — the
+    // Bio editor clears a photo with "".
+    //
+    // ⚠️ This DOES reach a UI, via `.partial()` on updateCoachSchema: the Bio
+    // editor (`app/(dashboard)/bio/[id]/page.tsx` handleSave) PATCHes
+    // `profileImage` seeded from the STORED value, so a coach whose stored value
+    // is not https would get a 400 on an otherwise unrelated save. Two writers
+    // bypass this schema entirely and could create such a row: the Blob upload
+    // route and `services/circle-sync.ts` (third-party avatar URLs, unvalidated).
+    // Constraining THAT path is the residual on #229.
+    profileImage: z
+        .string()
+        .optional()
+        .refine((v) => v === undefined || v === "" || safeImageSrc(v) !== null, {
+            message: "Profile image must be an https:// URL",
+        }),
     territory: z.string().optional(),
     hubspotId: z.string().optional(),
     circleId: z.string().optional(),
@@ -530,6 +553,11 @@ export const createAssessmentCampaignSchema = z
         // Task 6b — #15/#16 toggles
         sendResultsToRespondent: z.boolean().default(false),
         notifyCoachOnCompletion: z.boolean().default(false),
+        // Wave OSR (#71) — show the respondent their own report on screen at
+        // submit. Not flag-gated here: the flag is enforced server-side at
+        // disclosure time (submit route, under the lock), so a stored value with
+        // the flag off is inert rather than rejected.
+        showResultsOnScreen: z.boolean().default(false),
         // Task 9 (Wave D) — invite timing. Its PRESENCE (or `waveD: true`, or a
         // non-empty participantIds array) marks a Wave-D create (atomic create +
         // participant attach + lifecycle + auto-send). Absence = legacy create
@@ -672,6 +700,15 @@ export const updateAssessmentCampaignSchema = z.object({
     invitationBodyMarkdown: z.string().max(5000).transform(_trim).nullable().optional(),
     // Task 12 (#20) — per-campaign FULL-HTML invitation body (validate-on-save in the route).
     invitationBodyHtml: z.string().max(50_000).nullable().optional(),
+    // Wave OSR (#71) — let an EXISTING campaign opt in to showing each respondent
+    // their own report on screen at submit. This schema previously omitted the
+    // field, so a campaign could only ever be opted in at CREATE time and an
+    // existing one had no way to change it.
+    //
+    // Not flag-gated HERE (mirrors the create schema): the flag decides capability
+    // in the route, and disclosure itself is decided server-side under the Phase-2
+    // submission lock, so a stored value with the flag off is inert.
+    showResultsOnScreen: z.boolean().optional(),
 });
 
 export const assignCampaignParticipantsSchema = z

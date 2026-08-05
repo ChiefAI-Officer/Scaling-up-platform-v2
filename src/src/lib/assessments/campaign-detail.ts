@@ -27,7 +27,12 @@
  *   → 0% (not NaN).
  */
 
-import type { AssessmentInvitationStatus } from "@prisma/client";
+import { activePublishedWhere } from "./active-version";
+import {
+  resolveEditionStanding,
+  type EditionStanding,
+} from "./edition-standing";
+import type { AssessmentInvitationStatus, PrismaClient } from "@prisma/client";
 
 // ────────────────────────────────────────────────────────────────────────
 // Public types (consumed by the API route + UI client component).
@@ -78,12 +83,37 @@ export interface CampaignOverview {
     invitationBodyMarkdown: string | null;
     invitationBodyHtml: string | null;
     /**
+     * Wave OSR (#71) — whether respondents see their own report on screen at
+     * submit. Surfaced so the screen can both SHOW and CHANGE the setting, which
+     * was previously impossible for a campaign that already existed.
+     *
+     * Optional, matching `isImported` / `edition` above, so older fixtures stay
+     * valid. Absent ⇒ off is safe for the RESPONDENT (disclosure is decided from
+     * the DB under the submission lock, never from this projection) but NOT for the
+     * OPERATOR: an omitted value renders the checkbox unticked for a campaign that
+     * IS opted in, and a tick→untick would then write `false` and disable a live
+     * opt-in. `getCampaignOverview` reads with `include`, so every scalar is
+     * present — keep it that way if this ever becomes an explicit `select`.
+     */
+    showResultsOnScreen?: boolean;
+    /**
      * Wave V (V-3) — true when this campaign is a Wave O historical Esperto
      * import (`importManifest != null`). Boolean ONLY (the manifest payload
      * never leaves the server); optional so older fixtures stay valid —
      * absent ⇒ no badge (fail-closed).
      */
     isImported?: boolean;
+    /**
+     * Wave EV / GH #242 — which EDITION of the template this campaign is serving,
+     * whether its pinned edition is retired, and whether a newer active sibling
+     * exists. A campaign pins a version at creation and can never move off it, so
+     * without this the screen silently shows frozen content (the cause of Jeff's
+     * #40/#43 re-reports).
+     *
+     * Optional, and null when the pin is missing or unpublished, or the sibling
+     * lookup fails — older fixtures stay valid and the tile renders fail-quiet.
+     */
+    edition?: EditionStanding | null;
   };
   stats: {
     totalParticipants: number;
@@ -124,6 +154,30 @@ export interface CampaignDetailDb {
       select?: Record<string, unknown>;
     }) => Promise<SubmissionRow[]>;
   };
+  /**
+   * Wave EV — sibling versions, for the newer-edition check.
+   *
+   * REQUIRED, not optional. An optional delegate would make the hole silent for
+   * the next author: add `version` to a mock and you'd get a confident, wrong
+   * "no newer edition" with no compiler complaint. Same reasoning as Wave OSR's
+   * F4, where making `RespondentReport.templateAlias` required was itself the fix
+   * — requiring the field is what lets the compiler find the omission.
+   */
+  assessmentTemplateVersion: {
+    findMany: (args: {
+      where: Record<string, unknown>;
+      select?: Record<string, unknown>;
+    }) => Promise<TemplateVersionRow[]>;
+  };
+}
+
+/** Wave EV — the sibling-version shape the edition check reads. */
+export interface TemplateVersionRow {
+  templateId: string;
+  versionNumber: number;
+  language: string;
+  publishedAt: Date | null;
+  archivedAt: Date | null;
 }
 
 interface CampaignWithRels {
@@ -137,10 +191,25 @@ interface CampaignWithRels {
   invitationSubject: string | null;
   invitationBodyMarkdown: string | null;
   invitationBodyHtml: string | null;
+  /**
+   * Wave OSR (#71) — whether this campaign shows each respondent their own report
+   * on screen at submit. Optional so older fixtures stay valid; absent ⇒ treated
+   * as off (fail-closed).
+   */
+  showResultsOnScreen?: boolean;
   /** Wave V (V-3): Wave O import-round manifest; non-null ⇒ historical import. */
   importManifest?: unknown;
   template: { id: string; name: string };
   organization: { id: string; name: string };
+  /** Wave EV / GH #242 — the pinned version, including retirement state and the
+   * sibling-currency inputs. Optional so older fixtures stay valid. */
+  version?: {
+    templateId: string;
+    versionNumber: number;
+    publishedAt: Date | null;
+    archivedAt: Date | null;
+    language: string;
+  } | null;
 }
 
 interface ParticipantWithRespondent {
@@ -240,6 +309,26 @@ export async function getCampaignOverview(
     include: {
       template: { select: { id: true, name: true } },
       organization: { select: { id: true, name: true } },
+      // Wave EV — the pinned edition, so the screen can say which one it serves.
+      version: {
+        // templateId comes from the VERSION, not the campaign: the two are
+        // independent FKs with no composite constraint tying them together.
+        // Sourcing it here gives the sibling QUERY the right comparison SCOPE —
+        // a mis-pinned campaign's served edition is compared against its own
+        // template's lineage, not another instrument's numbering.
+        //
+        // It does NOT make the templateId re-check in resolveEditionStanding
+        // able to fire: the query filters on this same value, so that check is
+        // tautological in production and is defense-in-depth against a future
+        // loosening of the query only.
+        select: {
+          templateId: true,
+          versionNumber: true,
+          publishedAt: true,
+          language: true,
+          archivedAt: true,
+        },
+      },
     },
   });
   if (!campaign) {
@@ -266,6 +355,59 @@ export async function getCampaignOverview(
 
   const stats = computeStats(participants, invitations);
 
+  // Wave EV / GH #242 — resolve the pinned edition. Retirement is known from
+  // the pinned row and needs no sibling query. Non-retired currency remains
+  // fail-quiet: a missing version, unpublished pin, or sibling-query failure
+  // yields `null`, so a decorative badge never blocks the campaign screen.
+  let edition: EditionStanding | null = null;
+  if (campaign.version != null) {
+    const pinned = {
+      templateId: campaign.version.templateId,
+      versionNumber: campaign.version.versionNumber,
+      publishedAt: campaign.version.publishedAt,
+      archivedAt: campaign.version.archivedAt,
+      language: campaign.version.language,
+    };
+    if (pinned.archivedAt != null) {
+      edition = resolveEditionStanding(pinned, []);
+    } else {
+      try {
+        const siblings: TemplateVersionRow[] =
+          await db.assessmentTemplateVersion.findMany({
+            where: {
+              templateId: pinned.templateId,
+              language: pinned.language,
+              versionNumber: { gt: pinned.versionNumber },
+              // The ONE definition of published-and-not-retired lives in
+              // active-version.ts. A sibling counts as newer only if it is what
+              // campaign-create would actually offer, so this filter has to be the
+              // same object create resolves through — otherwise a future ED8
+              // predicate would stop create offering a version while this badge
+              // kept pointing a coach at an edition they cannot get.
+              ...activePublishedWhere,
+            },
+            select: {
+              templateId: true,
+              versionNumber: true,
+              language: true,
+              publishedAt: true,
+              archivedAt: true,
+            },
+          });
+        edition = resolveEditionStanding(pinned, siblings);
+      } catch (err) {
+        // Leave `edition` NULL — never claim currency we did not verify.
+        //
+        // The tempting shape here is `siblings = []` on failure, but that makes
+        // resolveEditionStanding return `newerEditionAvailable: false`, which the
+        // tile renders as an affirmative "you are on the newest edition". A
+        // transient read failure would then tell a tester exactly the falsehood
+        // this feature exists to prevent. Null renders no edition info at all.
+        console.error("[campaign-detail] edition sibling lookup failed:", err);
+      }
+    }
+  }
+
   return {
     campaign: {
       id: campaign.id,
@@ -282,8 +424,12 @@ export async function getCampaignOverview(
       invitationSubject: campaign.invitationSubject,
       invitationBodyMarkdown: campaign.invitationBodyMarkdown,
       invitationBodyHtml: campaign.invitationBodyHtml,
+      // Wave OSR (#71) — absent ⇒ off (fail-closed), matching the column default.
+      showResultsOnScreen: campaign.showResultsOnScreen === true,
       // Wave V (V-3): boolean only — the manifest payload stays server-side.
       isImported: campaign.importManifest != null,
+      // Wave EV — null ⇒ nothing rendered (unpublished pin, or lookup degraded).
+      edition,
     },
     stats,
   };
@@ -371,6 +517,30 @@ export async function getCampaignRespondents(
 // asCampaignDetailDb — bridge the real Prisma client to the narrow type.
 // ────────────────────────────────────────────────────────────────────────
 
-export function asCampaignDetailDb(prisma: unknown): CampaignDetailDb {
-  return prisma as CampaignDetailDb;
+/**
+ * Compile-time check that the REAL Prisma client carries every delegate this
+ * module names.
+ *
+ * Why this exists: the cast below cannot be checked. `CampaignDetailDb`'s methods
+ * deliberately return our own narrow row shapes, which do not overlap Prisma's
+ * generic delegate signatures, so `prisma as CampaignDetailDb` is rejected and a
+ * double cast is unavoidable. That means declaring a delegate REQUIRED on the
+ * interface constrains test mocks only — it buys nothing at the four call sites
+ * that go through the bridge (three reach getCampaignOverview; export.csv uses
+ * getCampaignRespondents).
+ *
+ * `Pick` closes the half that actually matters: a typo'd or removed delegate
+ * NAME fails the build here. Signatures stay intentionally unchecked.
+ */
+type RequiredDelegates = keyof CampaignDetailDb;
+// The type's EXISTENCE is the assertion: `Pick` fails to compile if any delegate
+// name is missing from PrismaClient. Nothing consumes it at runtime, by design —
+// hence the disable directive on the declaration itself.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _DelegatesExistOnPrismaClient = Pick<PrismaClient, RequiredDelegates>;
+
+export function asCampaignDetailDb(prisma: PrismaClient): CampaignDetailDb {
+  // Double cast is required — see the note above. The parameter type is what
+  // stops an arbitrary object being passed in place of the client.
+  return prisma as unknown as CampaignDetailDb;
 }

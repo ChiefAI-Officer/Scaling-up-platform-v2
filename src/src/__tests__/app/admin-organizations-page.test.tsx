@@ -40,7 +40,13 @@ beforeEach(() => {
   jest.clearAllMocks();
   viewProps = null;
   mockFindMany.mockResolvedValue([
-    { id: "o1", name: "Acme Corp", ownerCoachId: "c1", externalId: null },
+    {
+      id: "o1",
+      name: "Acme Corp",
+      ownerCoachId: "c1",
+      externalId: null,
+      owner: { firstName: "Ada", lastName: "Lovelace" },
+    },
   ]);
 });
 
@@ -81,5 +87,12 @@ describe("Admin Organizations page — data + reduced host", () => {
     expect(
       (viewProps?.initialOrganizations as unknown[]).length,
     ).toBe(1);
+    expect(viewProps?.initialOrganizations).toEqual([
+      expect.objectContaining({
+        id: "o1",
+        ownerCoachId: "c1",
+        ownerCoachName: "Ada Lovelace",
+      }),
+    ]);
   });
 });

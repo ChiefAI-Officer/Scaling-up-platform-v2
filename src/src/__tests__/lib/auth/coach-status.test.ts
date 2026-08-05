@@ -13,6 +13,7 @@ import {
   PENDING_STATUS,
   DEACTIVATED_STATUS,
   isCertified,
+  isCoachCurrentlyCertified,
 } from "@/lib/auth/coach-status";
 
 describe("coach-status constants", () => {
@@ -58,5 +59,60 @@ describe("isCertified", () => {
     // The pre-v7.6 spec mistakenly assumed the constant was "CERTIFIED".
     // If anyone ever flips back, this test catches the drift.
     expect(isCertified({ certificationStatus: "CERTIFIED" })).toBe(false);
+  });
+});
+
+describe("isCoachCurrentlyCertified", () => {
+  const now = new Date("2026-07-30T00:00:00.000Z");
+
+  it("requires ACTIVE status and a future or absent expiry", () => {
+    expect(
+      isCoachCurrentlyCertified(
+        {
+          certificationStatus: "ACTIVE",
+          certificationExpiry: null,
+        },
+        now,
+      ),
+    ).toBe(true);
+    expect(
+      isCoachCurrentlyCertified(
+        {
+          certificationStatus: "ACTIVE",
+          certificationExpiry: new Date("2026-07-31T00:00:00.000Z"),
+        },
+        now,
+      ),
+    ).toBe(true);
+  });
+
+  it("rejects inactive, expired, and boundary-expired coaches", () => {
+    expect(
+      isCoachCurrentlyCertified(
+        {
+          certificationStatus: "DEACTIVATED",
+          certificationExpiry: null,
+        },
+        now,
+      ),
+    ).toBe(false);
+    expect(
+      isCoachCurrentlyCertified(
+        {
+          certificationStatus: "ACTIVE",
+          certificationExpiry: new Date("2026-07-29T00:00:00.000Z"),
+        },
+        now,
+      ),
+    ).toBe(false);
+    expect(
+      isCoachCurrentlyCertified(
+        {
+          certificationStatus: "ACTIVE",
+          certificationExpiry: now,
+        },
+        now,
+      ),
+    ).toBe(false);
   });
 });
