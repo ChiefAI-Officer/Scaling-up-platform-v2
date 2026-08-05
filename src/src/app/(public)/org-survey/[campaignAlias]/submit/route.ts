@@ -71,6 +71,7 @@ import {
 } from "@/lib/assessments/assessment-email-delivery-intents";
 import { inngest } from "@/inngest/client";
 import { reportEmailChromeForCampaign } from "@/lib/assessments/wave-228-flags";
+import { lockReportStyleForFirstCompletion } from "@/lib/assessments/report-style-lock";
 
 const NO_STORE_HEADERS = { "Cache-Control": "no-store" } as const;
 
@@ -894,6 +895,16 @@ export async function POST(
 
       // ── Phase 2 (locked tx): re-validate → create submission → INSERT rows ─
       const result = await db.$transaction(async (tx) => {
+        // Lock the campaign row before any other transactional operation, so a
+        // concurrent report-style update deterministically orders with this
+        // first completion. This must remain in this transaction: any later
+        // failed validation or write then rolls the freeze back with the submit.
+        await lockReportStyleForFirstCompletion(
+          tx,
+          invitation.campaignId,
+          submittedAt,
+        );
+
         // SELECT FOR UPDATE on the invitation row — Postgres-level lock to
         // prevent concurrent submit races for the same invitation.
         await tx.$executeRaw`SELECT id FROM assessment_invitations WHERE id = ${invitationId} FOR UPDATE`;
@@ -981,6 +992,7 @@ export async function POST(
             invitationId,
             answers: rawAnswers as unknown as object, // ALL answers stored
             result: scoreResult as unknown as object,
+            submittedAt,
           },
           select: { id: true },
         });

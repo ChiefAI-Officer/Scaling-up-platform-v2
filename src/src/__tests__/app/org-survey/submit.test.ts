@@ -31,6 +31,16 @@ jest.mock("@/lib/assessments/invitation-cookie", () => ({
   getInvitationSession: jest.fn(() => Promise.resolve(sessionState)),
 }));
 
+// The lock itself is covered by its unit and PostgreSQL suites. This route
+// double keeps it controllable so the test can prove the transaction awaits it
+// before beginning any later under-lock operation.
+// eslint-disable-next-line no-var
+var reportStyleLockMock: jest.Mock;
+jest.mock("@/lib/assessments/report-style-lock", () => {
+  reportStyleLockMock = jest.fn().mockResolvedValue(undefined);
+  return { lockReportStyleForFirstCompletion: reportStyleLockMock };
+});
+
 const txMock = {
   $executeRaw: jest.fn().mockResolvedValue(1),
   assessmentInvitation: {
@@ -130,8 +140,11 @@ jest.mock("@/lib/assessments/results-email", () => {
 
 import { POST } from "@/app/(public)/org-survey/[campaignAlias]/submit/route";
 import { parseAuthorizationSnapshot } from "@/lib/assessments/assessment-email-delivery-intents";
+import { lockReportStyleForFirstCompletion } from "@/lib/assessments/report-style-lock";
 import { assessmentEmailDeliveryIntentsEnabled } from "@/lib/assessments/wave-d-feature-flags";
 import { inngest } from "@/inngest/client";
+
+reportStyleLockMock = lockReportStyleForFirstCompletion as jest.Mock;
 
 // Template version with a single required SLIDER_LIKERT q1 scale 0..3.
 const goodVersion = {
@@ -476,6 +489,79 @@ describe("POST submit — strict v6.6 validation", () => {
       aliasParams("demo")
     );
     expect(res.status).toBe(401);
+  });
+});
+
+describe("report style first-completion freeze", () => {
+  it("awaits the campaign freeze before any later transaction operation and reuses its completion instant", async () => {
+    mockHappyInvitation();
+    let releaseLock: (() => void) | undefined;
+    const lockStarted = new Promise<void>((resolve) => {
+      reportStyleLockMock.mockImplementationOnce(() => {
+        resolve();
+        return new Promise<void>((release) => {
+          releaseLock = release;
+        });
+      });
+    });
+
+    const request = POST(
+      jsonReq({ answers: [{ stableKey: "q1", value: 2 }] }) as never,
+      aliasParams("demo"),
+    );
+    const firstEvent = await Promise.race([
+      lockStarted.then(() => "lock-started"),
+      request.then(() => "request-completed"),
+    ]);
+
+    expect(firstEvent).toBe("lock-started");
+    expect(txMock.$executeRaw).not.toHaveBeenCalled();
+    expect(txMock.assessmentInvitation.findUnique).not.toHaveBeenCalled();
+    expect(txMock.assessmentSubmission.create).not.toHaveBeenCalled();
+
+    releaseLock?.();
+    const response = await request;
+    expect(response.status).toBe(200);
+    const [lockedTx, lockedCampaignId, lockedSubmittedAt] =
+      reportStyleLockMock.mock.calls[0];
+    const submissionData =
+      txMock.assessmentSubmission.create.mock.calls[0][0].data;
+    expect(lockedTx).toBe(txMock);
+    expect(lockedCampaignId).toBe("c1");
+    expect(submissionData.submittedAt).toBe(lockedSubmittedAt);
+  });
+
+  it("does not leave a report-style freeze outside a transaction when a later write fails", async () => {
+    mockHappyInvitation();
+    let transactionActive = false;
+    dbMock.$transaction.mockImplementation(
+      async (fn: (tx: typeof txMock) => unknown) => {
+        transactionActive = true;
+        try {
+          return await fn(txMock);
+        } finally {
+          transactionActive = false;
+        }
+      },
+    );
+    const lockTransactionStates: boolean[] = [];
+    reportStyleLockMock.mockImplementation(() => {
+      lockTransactionStates.push(transactionActive);
+      return Promise.resolve();
+    });
+    txMock.assessmentSubmission.create.mockRejectedValueOnce(
+      new Error("later transaction write failed"),
+    );
+
+    const response = await POST(
+      jsonReq({ answers: [{ stableKey: "q1", value: 2 }] }) as never,
+      aliasParams("demo"),
+    );
+
+    expect(response.status).toBe(500);
+    expect(lockTransactionStates).toEqual([true]);
+    expect(reportStyleLockMock).toHaveBeenCalledTimes(1);
+    expect(transactionCommitMarker).not.toHaveBeenCalled();
   });
 });
 

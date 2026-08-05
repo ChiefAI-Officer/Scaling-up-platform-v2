@@ -38,6 +38,15 @@ jest.mock("@/lib/assessments/invitation-cookie", () => ({
   getInvitationSession: jest.fn(() => Promise.resolve(sessionState)),
 }));
 
+// Keep the transaction-scoped primitive observable at the route boundary; its
+// SQL contract is covered independently by report-style-lock.test.ts.
+// eslint-disable-next-line no-var
+var reportStyleLockMock: jest.Mock;
+jest.mock("@/lib/assessments/report-style-lock", () => {
+  reportStyleLockMock = jest.fn().mockResolvedValue(undefined);
+  return { lockReportStyleForFirstCompletion: reportStyleLockMock };
+});
+
 const txMock = {
   $executeRaw: jest.fn().mockResolvedValue(1),
   assessmentInvitation: {
@@ -127,6 +136,9 @@ jest.mock("@/lib/assessments/results-email", () => ({
 }));
 
 import { POST } from "@/app/(public)/org-survey/[campaignAlias]/submit/route";
+import { lockReportStyleForFirstCompletion } from "@/lib/assessments/report-style-lock";
+
+reportStyleLockMock = lockReportStyleForFirstCompletion as jest.Mock;
 
 const goodVersion = {
   questions: [
@@ -247,6 +259,25 @@ beforeEach(() => {
   process.env.APP_URL = "https://app.example.com";
   txMock.assessmentSubmission.create.mockResolvedValue({ id: "sub-1" });
   txMock.assessmentEmailOutbox.create.mockResolvedValue({});
+});
+
+describe("report style first-completion freeze with on-screen results", () => {
+  it("uses the same completion instant for the transaction freeze and stored submission", async () => {
+    mockInvitation({ showResultsOnScreen: true });
+
+    const response = await POST(
+      jsonReq(goodAnswers) as never,
+      aliasParams("demo"),
+    );
+
+    expect(response.status).toBe(200);
+    const [tx, campaignId, submittedAt] = reportStyleLockMock.mock.calls[0];
+    const submissionData =
+      txMock.assessmentSubmission.create.mock.calls[0][0].data;
+    expect(tx).toBe(txMock);
+    expect(campaignId).toBe("c1");
+    expect(submissionData.submittedAt).toBe(submittedAt);
+  });
 });
 
 // ─── the disclosure decision ───────────────────────────────────────────────
