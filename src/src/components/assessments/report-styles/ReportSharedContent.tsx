@@ -1,220 +1,205 @@
-import type { ScoredReportViewModel } from "@/lib/assessments/scored-report-view-model";
 import { CoachLogo } from "@/components/assessments/CoachLogo";
-
-type PerformanceStatus = "strength" | "on-track" | "watch-area" | "priority" | "unrated";
-
-function performanceStatus(score: number | null): { key: PerformanceStatus; label: string } {
-  if (score === null) return { key: "unrated", label: "Not rated" };
-  if (score >= 8) return { key: "strength", label: "Strength" };
-  if (score >= 6) return { key: "on-track", label: "On track" };
-  if (score >= 4) return { key: "watch-area", label: "Watch area" };
-  return { key: "priority", label: "Priority" };
-}
+import type {
+  AdditionalResponseBlock,
+  ClosingBlock,
+  CoachCtaBlock,
+  FindingBlock,
+  IndividualReportBlock,
+  IndividualReportPresentation,
+  MetricGroupBlock,
+  NarrativeResponseBlock,
+  QualitativeScaleBlock,
+  RecommendationBlock,
+  ReportMetric,
+  ScoreSummaryBlock,
+  ThemeBlock,
+} from "@/lib/assessments/individual-report-presentation";
 
 export function ReportIdentityHeader({
-  view,
+  presentation,
   eyebrow,
 }: {
-  view: ScoredReportViewModel;
+  presentation: IndividualReportPresentation;
   eyebrow: string;
 }) {
+  const { identity } = presentation;
   return (
     <header>
       <p>{eyebrow}</p>
-      <h1>{view.identity.assessmentName}</h1>
-      {view.identity.campaignSubtitle ? <p>{view.identity.campaignSubtitle}</p> : null}
+      <h1>{identity.assessmentName}</h1>
+      {identity.campaignSubtitle ? <p>{identity.campaignSubtitle}</p> : null}
       <p>
-        {view.identity.respondentName}
-        {view.identity.jobTitle ? ` · ${view.identity.jobTitle}` : ""}
-        {` · ${view.identity.companyName} · ${view.identity.submittedAtLabel}`}
+        {identity.respondentName}
+        {identity.jobTitle ? ` · ${identity.jobTitle}` : ""}
+        {` · ${identity.companyName} · ${identity.submittedAtLabel}`}
       </p>
-      {view.identity.respondentEmail && !view.identity.respondentNameIsEmail ? (
-        <p>{view.identity.respondentEmail}</p>
+      {identity.respondentEmail && !identity.respondentNameIsEmail ? (
+        <p>{identity.respondentEmail}</p>
       ) : null}
     </header>
   );
 }
 
-export function DegradedNotice({ view }: { view: ScoredReportViewModel }) {
-  return view.degraded ? (
-    <p role="status">Some scoring details for this submission could not be fully read.</p>
-  ) : null;
+export function ReportProvenance({
+  presentation,
+}: {
+  presentation: IndividualReportPresentation;
+}) {
+  return (
+    <p className="report-provenance" data-testid="report-style-provenance">
+      Confidential assessment report · {presentation.provenance.templateName} ·
+      submission {presentation.provenance.submissionId ?? "unavailable"} ·
+      version {presentation.provenance.versionId ?? "unavailable"} · hash{" "}
+      {presentation.provenance.contentHash ?? "unavailable"}
+      {presentation.provenance.imported ? " · imported" : ""}
+    </p>
+  );
 }
 
-export function SummaryFacts({ view }: { view: ScoredReportViewModel }) {
+function ScoreSummary({ block }: { block: ScoreSummaryBlock }) {
   return (
-    <section aria-label="Report summary">
-      <h2>Overall result</h2>
-      <p>{view.summary.headline}</p>
-      <p>{view.summary.headlineLabel}</p>
-      {view.summary.tierMessage ? <p>{view.summary.tierMessage}</p> : null}
+    <section data-report-block="score-summary">
+      <p>{block.headlineLabel}</p>
+      <h2>{block.headline}</h2>
+      {block.showTier && block.tierMessage ? <p>{block.tierMessage}</p> : null}
       <dl>
-        <div><dt>Total points</dt><dd>{view.summary.overallTotalLabel}</dd></div>
-        <div><dt>Average per item</dt><dd>{view.summary.overallAverageLabel}</dd></div>
-        <div><dt>Answered items</dt><dd>{view.summary.answeredItems}</dd></div>
-        <div><dt>Sections</dt><dd>{view.summary.sectionCount}</dd></div>
+        <div>
+          <dt>Total points</dt>
+          <dd>{block.overallTotalLabel}</dd>
+        </div>
+        <div>
+          <dt>Average per item</dt>
+          <dd>{block.overallAverageLabel}</dd>
+        </div>
+        <div>
+          <dt>Answered items</dt>
+          <dd>{block.answeredItems}</dd>
+        </div>
+        <div>
+          <dt>Sections</dt>
+          <dd>{block.sectionCount}</dd>
+        </div>
       </dl>
     </section>
   );
 }
 
-export function StrengthsAndPriorities({ view }: { view: ScoredReportViewModel }) {
+function MetricValue({ metric }: { metric: ReportMetric }) {
   return (
-    <section aria-label="Strengths and priorities">
-      <h2>Decision signals</h2>
-      <h3>Strengths</h3>
-      <ul>
-        {view.insights.strengths.map((item) => {
-          const status = performanceStatus(item.averageAcrossSections);
-          return (
-            <li className="report-signal report-signal--top-strength" data-insight-role="top-strength" data-performance-status={status.key} key={item.stableKey} data-testid={`report-style-strength-${item.stableKey}`}>
-              <span className="report-insight-role report-insight-role--top-strength">Top strength</span>
-              <span className={`report-status report-status--${status.key}`}>{status.label}</span> {item.label}: {item.averageAcrossSectionsLabel}
-            </li>
-          );
-        })}
-      </ul>
-      <h3>Priorities</h3>
-      <ul>
-        {view.insights.priorities.map((item) => {
-          const status = performanceStatus(item.averageAcrossSections);
-          return (
-            <li className="report-signal report-signal--priority-action" data-action-priority="priority" data-insight-role="priority-action" data-performance-status={status.key} key={item.stableKey} data-testid={`report-style-priority-${item.stableKey}`}>
-              <span className="report-insight-role report-insight-role--priority-action">Priority action</span>
-              <span className={`report-status report-status--${status.key}`}>{status.label}</span> {item.label}: {item.averageAcrossSectionsLabel}
-            </li>
-          );
-        })}
-      </ul>
-    </section>
+    <div
+      className="report-metric"
+      data-achievement-status={
+        metric.achievementMarker?.label.replace(" ", "-") ?? undefined
+      }
+      data-testid={`report-style-question-${metric.stableKey}`}
+    >
+      <dt>{metric.label}{metric.unmapped ? " (unmapped)" : ""}</dt>
+      <dd>{metric.valueLabel}</dd>
+      {metric.achievementMarker ? (
+        <dd className="report-achievement">
+          <span aria-hidden="true">{metric.achievementMarker.symbol}</span>{" "}
+          {metric.achievementMarker.label}
+        </dd>
+      ) : null}
+      {typeof metric.min === "number" && typeof metric.max === "number" ? (
+        <dd className="report-range">
+          <span>Range</span> {metric.min}–{metric.max}
+        </dd>
+      ) : null}
+    </div>
   );
 }
 
-/** Shared semantic ledger: the two renderers differ in placement, never facts. */
-export function DecisionLedger({ view }: { view: ScoredReportViewModel }) {
+function MetricGroup({ block }: { block: MetricGroupBlock }) {
   return (
-    <section aria-labelledby="report-style-decisions-title">
-      <h2 id="report-style-decisions-title">Five Decisions</h2>
-      <p>Average across sections</p>
-      <ol>
-        {view.decisions.map((decision) => {
-          const status = performanceStatus(decision.averageAcrossSections);
-          return (
-            <li className="report-decision" data-decision={decision.stableKey} data-performance-status={status.key} key={decision.stableKey} data-testid={`report-style-decision-${decision.stableKey}`}>
-              <span className="report-decision-metric"><strong>{decision.label}</strong>: {decision.averageAcrossSectionsLabel} · {decision.totalPointsLabel} total points</span>
-              <span className={`report-status report-status--${status.key}`}>{status.label}</span>
-            </li>
-          );
-        })}
-      </ol>
-    </section>
-  );
-}
-
-export function ScoreMatrix({ view }: { view: ScoredReportViewModel }) {
-  return (
-    <section aria-labelledby="report-style-scorecard-title">
-      <h2 id="report-style-scorecard-title">Decision score matrix</h2>
-      <table>
-        <thead>
-          <tr><th>Decision</th><th>Score</th><th>Status</th></tr>
-        </thead>
-        <tbody>
-          {view.decisions.map((decision) => {
-            const status = performanceStatus(decision.averageAcrossSections);
-            return (
-              <tr className="report-score-row" data-decision={decision.stableKey} data-performance-status={status.key} data-testid={`report-style-matrix-${decision.stableKey}`} key={decision.stableKey}>
-                <th scope="row">{decision.label}</th>
-                <td>{decision.averageAcrossSectionsLabel}</td>
-                <td><span className={`report-status report-status--${status.key}`}>{status.label}</span></td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </section>
-  );
-}
-
-export function SectionEvidence({ view }: { view: ScoredReportViewModel }) {
-  return (
-    <section aria-label="Section and question evidence">
-      <h2>Section evidence</h2>
-      {view.sections.map((section) => {
-        const status = performanceStatus(section.averagePoints);
-        return (
-          <section className="report-section" data-performance-status={status.key} key={section.stableKey} data-testid={`report-style-section-${section.stableKey}`}>
-            <h3>{section.label}</h3>
-            <p>{section.totalPointsLabel} total points · {section.averagePointsLabel} average · {section.achievedCount} of {section.totalCount} achieved · <span className={`report-status report-status--${status.key}`}>{status.label}</span></p>
-            <table>
-              <thead><tr><th>Question</th><th>Value</th><th>Status</th></tr></thead>
-              <tbody>
-                {section.questions.map((question) => (
-                  <tr className="report-question" data-achievement-status={question.achieved ? "achieved" : "not-achieved"} key={question.stableKey} data-testid={`report-style-question-${question.stableKey}`}>
-                    <th scope="row">{question.label}{question.unmapped ? " (unmapped)" : ""}</th>
-                    <td>{question.scoreLabel}</td>
-                    <td>{question.achievementMarker?.label ?? (question.achieved ? "achieved" : "not achieved")}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </section>
-        );
-      })}
-      {view.orphanQuestions.length > 0 ? (
-        <section>
-          <h3>Other questions</h3>
-          <table>
-            <thead><tr><th>Question</th><th>Value</th><th>Status</th></tr></thead>
-            <tbody>
-              {view.orphanQuestions.map((question) => (
-                <tr className="report-question" data-achievement-status={question.achieved ? "achieved" : "not-achieved"} key={question.stableKey} data-testid={`report-style-question-${question.stableKey}`}>
-                  <th scope="row">{question.label}{question.unmapped ? " (unmapped)" : ""}</th>
-                  <td>{question.scoreLabel}</td>
-                  <td>{question.achievementMarker?.label ?? (question.achieved ? "achieved" : "not achieved")}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
+    <section
+      data-report-block="metric-group"
+      data-report-role={block.role}
+      data-testid={`report-style-group-${block.stableKey}`}
+    >
+      <h2>{block.label}</h2>
+      {block.description ? <p>{block.description}</p> : null}
+      {block.summary ? (
+        <dl className="report-group-summary">
+          <div>
+            <dt>Total</dt>
+            <dd>{block.summary.totalLabel}</dd>
+          </div>
+          <div>
+            <dt>Average</dt>
+            <dd>{block.summary.averageLabel}</dd>
+          </div>
+          {typeof block.summary.achievedCount === "number" &&
+          typeof block.summary.totalCount === "number" ? (
+            <div>
+              <dt>Achieved</dt>
+              <dd>
+                {block.summary.achievedCount} of {block.summary.totalCount}
+              </dd>
+            </div>
+          ) : null}
+        </dl>
+      ) : null}
+      {block.metrics.length > 0 ? (
+        <dl className="report-metrics">
+          {block.metrics.map((metric) => (
+            <MetricValue key={metric.stableKey} metric={metric} />
+          ))}
+        </dl>
       ) : null}
     </section>
   );
 }
 
-export function SectionScorecard({ view }: { view: ScoredReportViewModel }) {
-  if (!view.scorecard.visible) return null;
+function QualitativeScale({ block }: { block: QualitativeScaleBlock }) {
   return (
-    <section aria-label="Section scorecard">
-      <h2>Section scorecard</h2>
-      <table>
-        <thead><tr><th>Section</th><th>Total points</th><th>Average</th><th>Status</th></tr></thead>
-        <tbody>
-          {view.scorecard.rows.map((row) => {
-            const status = performanceStatus(row.averagePoints);
-            return (
-              <tr className="report-score-row" data-performance-status={status.key} key={row.stableKey} data-testid={`report-style-scorecard-${row.stableKey}`}>
-                <th scope="row">{row.label}</th><td>{row.totalPointsLabel}</td><td>{row.averagePointsLabel}</td><td><span className={`report-status report-status--${status.key}`}>{status.label}</span></td>
-              </tr>
-            );
-          })}
-        </tbody>
-        <tfoot><tr><th scope="row">Total</th><td>{view.scorecard.total.totalPoints}</td><td>{view.scorecard.total.overallAverage}</td><td>Overall</td></tr></tfoot>
-      </table>
+    <section
+      data-report-block="qualitative-scale"
+      data-testid={`report-style-scale-${block.stableKey}`}
+    >
+      <h2>{block.label}</h2>
+      {block.description ? <p>{block.description}</p> : null}
+      <dl className="report-metrics">
+        {block.items.map((item) => (
+          <MetricValue key={item.stableKey} metric={item} />
+        ))}
+      </dl>
     </section>
   );
 }
 
-export function Recommendations({ view }: { view: ScoredReportViewModel }) {
-  if (view.recommendations.length === 0) return null;
+function Theme({ block }: { block: ThemeBlock }) {
   return (
-    <section aria-labelledby="report-style-actions-title">
-      <h2 id="report-style-actions-title">Prioritized board actions</h2>
-      {view.recommendations.map((group) => (
-        <div className="report-action-group" data-action-priority="priority" key={group.sectionStableKey ?? group.label}>
-          <h3>{group.label}</h3>
+    <section
+      data-report-block="theme"
+      data-testid={`report-style-theme-${block.stableKey}`}
+    >
+      <h2>{block.label}</h2>
+      {block.description ? <p>{block.description}</p> : null}
+      <dl className="report-metrics">
+        {block.items.map((item) => (
+          <MetricValue key={item.stableKey} metric={item} />
+        ))}
+      </dl>
+    </section>
+  );
+}
+
+function Finding({ block }: { block: FindingBlock }) {
+  return (
+    <section data-report-block="finding">
+      <p>{block.eyebrow}</p>
+      <h2>{block.label}</h2>
+      {block.groups.map((group, groupIndex) => (
+        <div
+          className="report-finding-group"
+          key={`${group.sectionName ?? "unsectioned"}-${groupIndex}`}
+        >
+          {group.sectionName ? <h3>{group.sectionName}</h3> : null}
           <ul>
-            {group.items.map((item) => <li key={item.stableKey}>{item.text}</li>)}
+            {group.items.map((item) => (
+              <li key={item.stableKey}>{item.text}</li>
+            ))}
           </ul>
         </div>
       ))}
@@ -222,32 +207,157 @@ export function Recommendations({ view }: { view: ScoredReportViewModel }) {
   );
 }
 
-export function AdditionalResponses({ view }: { view: ScoredReportViewModel }) {
-  if (view.additionalResponses.length === 0) return null;
+function Recommendation({ block }: { block: RecommendationBlock }) {
   return (
-    <section aria-labelledby="report-style-additional-title">
-      <h2 id="report-style-additional-title">Additional responses</h2>
-      <dl>
-        {view.additionalResponses.map((response) => (
-          <div key={response.label}><dt>{response.label}</dt><dd>{response.answer}</dd></div>
+    <section data-report-block="recommendation">
+      {block.groups.map((group, groupIndex) => (
+        <div
+          className="report-action-group"
+          key={`${group.sectionStableKey ?? "unsectioned"}-${groupIndex}`}
+        >
+          <h2>{group.label}</h2>
+          <ul>
+            {group.items.map((item) => (
+              <li key={item.stableKey}>{item.text}</li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function NarrativeResponse({
+  block,
+}: {
+  block: NarrativeResponseBlock;
+}) {
+  return (
+    <section
+      data-report-block="narrative-response"
+      data-testid={`report-style-narrative-${block.stableKey}`}
+    >
+      <h2>{block.label}</h2>
+      {block.description ? <p>{block.description}</p> : null}
+      <dl className="report-responses">
+        {block.responses.map((response) => (
+          <div key={response.stableKey}>
+            <dt>{response.label}</dt>
+            <dd>{response.answer}</dd>
+            {typeof response.min === "number" &&
+            typeof response.max === "number" ? (
+              <dd className="report-range">
+                <span>Range</span> {response.min}–{response.max}
+              </dd>
+            ) : null}
+          </div>
         ))}
       </dl>
     </section>
   );
 }
 
-export function ReportCta({ view }: { view: ScoredReportViewModel }) {
+function AdditionalResponse({ block }: { block: AdditionalResponseBlock }) {
   return (
-    <footer>
-      <h2>Keep Scaling, {view.closingGreeting}.</h2>
-      <p>You&apos;ve completed your assessment. Turn these results into a 90-day plan with your coach.</p>
-      <CoachLogo url={view.coach.logoUrl} name={view.coach.name} variant="footer" />
-      <p>
-        Confidential assessment report · {view.provenance.templateName} · submission {view.provenance.submissionId ?? "unavailable"} · version {view.provenance.versionId ?? "unavailable"} · hash {view.provenance.contentHash ?? "unavailable"}
-        {view.provenance.imported ? " · imported" : ""}
-      </p>
-      <a href={view.cta.learnMoreHref}>Learn More →</a>
-      {view.cta.eligible ? <a href={view.cta.href}>{view.cta.label}</a> : null}
+    <section data-report-block="additional-response">
+      <dl className="report-responses">
+        {block.responses.map((response) => (
+          <div key={response.stableKey}>
+            <dt>{response.label}</dt>
+            <dd>{response.answer}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+}
+
+function CoachCta({ block }: { block: CoachCtaBlock }) {
+  return (
+    <nav aria-label="Report actions" data-report-block="coach-cta">
+      <a href={block.learnMoreHref}>Learn More →</a>
+      <a href={block.href}>{block.label}</a>
+    </nav>
+  );
+}
+
+function Closing({ block }: { block: ClosingBlock }) {
+  return (
+    <footer data-report-block="closing">
+      <h2>Keep Scaling, {block.greeting}.</h2>
+      <CoachLogo
+        url={block.coach.logoUrl}
+        name={block.coach.name}
+        variant="footer"
+      />
     </footer>
   );
+}
+
+function unreachableBlock(block: never): never {
+  throw new Error(
+    `Unsupported individual report block: ${String(
+      (block as { kind?: unknown }).kind,
+    )}`,
+  );
+}
+
+function ReportBlock({ block }: { block: IndividualReportBlock }) {
+  switch (block.kind) {
+    case "score-summary":
+      return <ScoreSummary block={block} />;
+    case "metric-group":
+      return <MetricGroup block={block} />;
+    case "qualitative-scale":
+      return <QualitativeScale block={block} />;
+    case "theme":
+      return <Theme block={block} />;
+    case "finding":
+      return <Finding block={block} />;
+    case "recommendation":
+      return <Recommendation block={block} />;
+    case "narrative-response":
+      return <NarrativeResponse block={block} />;
+    case "additional-response":
+      return <AdditionalResponse block={block} />;
+    case "coach-cta":
+      return <CoachCta block={block} />;
+    case "closing":
+      return <Closing block={block} />;
+    default:
+      return unreachableBlock(block);
+  }
+}
+
+export function ReportBlocks({
+  blocks,
+}: {
+  blocks: readonly IndividualReportBlock[];
+}) {
+  return blocks.map((block, index) => (
+    <ReportBlock key={`${block.kind}-${index}`} block={block} />
+  ));
+}
+
+export function partitionReportBlocks(
+  blocks: readonly IndividualReportBlock[],
+): {
+  summary: IndividualReportBlock[];
+  detail: IndividualReportBlock[];
+} {
+  const summary: IndividualReportBlock[] = [];
+  const detail: IndividualReportBlock[] = [];
+
+  for (const block of blocks) {
+    if (
+      block.kind === "score-summary" ||
+      (block.kind === "metric-group" && block.role === "domain")
+    ) {
+      summary.push(block);
+    } else {
+      detail.push(block);
+    }
+  }
+
+  return { summary, detail };
 }

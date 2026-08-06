@@ -5,6 +5,8 @@ import {
   isReportStylePreviewVariant,
 } from "@/lib/assessments/report-style-preview-fixture";
 import type { ScoredReportViewModel } from "@/lib/assessments/scored-report-view-model";
+import { buildScoredReportPresentationBlocks } from "@/lib/assessments/scored-report-view-model";
+import type { IndividualReportPresentation } from "@/lib/assessments/individual-report-presentation";
 import {
   isReportStyleKey,
   REPORT_STYLE_PREVIEW_PAGES,
@@ -139,11 +141,21 @@ function ClassicPreviewPage({ page, view }: { page: PreviewPage; view: ScoredRep
   );
 }
 
+function alternatePreviewPresentation(
+  view: ScoredReportViewModel,
+): IndividualReportPresentation {
+  return {
+    identity: view.identity,
+    blocks: buildScoredReportPresentationBlocks(view),
+    provenance: view.provenance,
+  };
+}
+
 function ExecutivePreviewPage({ page, view }: { page: PreviewPage; view: ScoredReportViewModel }) {
   return (
     <div className="report-style-preview--executive" data-preview-page={page} data-testid={`report-style-preview-page-${page}`}>
       <PreviewSelectionStyles />
-      <ExecutiveBoardroomReport view={view} />
+      <ExecutiveBoardroomReport presentation={alternatePreviewPresentation(view)} />
       <PreviewEndMarker />
     </div>
   );
@@ -153,7 +165,7 @@ function DashboardPreviewPage({ page, view }: { page: PreviewPage; view: ScoredR
   return (
     <div className="report-style-preview--dashboard" data-preview-page={page} data-testid={`report-style-preview-page-${page}`}>
       <PreviewSelectionStyles />
-      <ModernDashboardReport view={view} />
+      <ModernDashboardReport presentation={alternatePreviewPresentation(view)} />
       <PreviewEndMarker />
     </div>
   );
@@ -174,20 +186,16 @@ function PreviewSelectionStyles() {
       .report-style-preview--executive[data-preview-page="detail"] .su-report--executive > .report-page:not(.report-page--executive-detail),
       .report-style-preview--dashboard[data-preview-page="detail"] .su-report--dashboard > .report-page:not(.report-page--dashboard-detail) { display: none; }
 
-      .report-style-preview--executive[data-preview-page="summary"] .report-page--executive-summary [aria-label="Strengths and priorities"],
-      .report-style-preview--dashboard[data-preview-page="summary"] .report-page--dashboard-summary [aria-labelledby="report-style-decisions-title"],
-      .report-style-preview--dashboard[data-preview-page="summary"] .report-page--dashboard-summary [aria-label="Strengths and priorities"] { display: none; }
-
-      .report-style-preview--executive[data-preview-page="detail"] .report-page--executive-detail [aria-label="Section scorecard"],
-      .report-style-preview--dashboard[data-preview-page="detail"] .report-page--dashboard-detail [aria-label="Section scorecard"],
-      .report-style-preview--executive[data-preview-page="detail"] .report-page--executive-detail [aria-label="Section and question evidence"] > .report-section:not(:first-of-type),
-      .report-style-preview--dashboard[data-preview-page="detail"] .report-page--dashboard-detail [aria-label="Section and question evidence"] > .report-section:not(:first-of-type),
-      .report-style-preview--executive[data-preview-page="detail"] .report-page--executive-detail [aria-labelledby="report-style-actions-title"] .report-action-group:not(:first-of-type),
-      .report-style-preview--dashboard[data-preview-page="detail"] .report-page--dashboard-detail [aria-labelledby="report-style-actions-title"] .report-action-group:not(:first-of-type),
-      .report-style-preview--executive[data-preview-page="detail"] .report-page--executive-detail [aria-labelledby="report-style-additional-title"],
-      .report-style-preview--dashboard[data-preview-page="detail"] .report-page--dashboard-detail [aria-labelledby="report-style-additional-title"],
-      .report-style-preview--executive[data-preview-page="detail"] .report-page--executive-detail footer,
-      .report-style-preview--dashboard[data-preview-page="detail"] .report-page--dashboard-detail footer { display: none; }
+      .report-style-preview--executive[data-preview-page="detail"] .report-page--executive-detail [data-report-role="section"] ~ [data-report-role="section"],
+      .report-style-preview--dashboard[data-preview-page="detail"] .report-page--dashboard-detail [data-report-role="section"] ~ [data-report-role="section"],
+      .report-style-preview--executive[data-preview-page="detail"] .report-page--executive-detail .report-action-group:not(:first-child),
+      .report-style-preview--dashboard[data-preview-page="detail"] .report-page--dashboard-detail .report-action-group:not(:first-child),
+      .report-style-preview--executive[data-preview-page="detail"] .report-page--executive-detail [data-report-block="additional-response"],
+      .report-style-preview--dashboard[data-preview-page="detail"] .report-page--dashboard-detail [data-report-block="additional-response"],
+      .report-style-preview--executive[data-preview-page="detail"] .report-page--executive-detail [data-report-block="coach-cta"],
+      .report-style-preview--dashboard[data-preview-page="detail"] .report-page--dashboard-detail [data-report-block="coach-cta"],
+      .report-style-preview--executive[data-preview-page="detail"] .report-page--executive-detail [data-report-block="closing"],
+      .report-style-preview--dashboard[data-preview-page="detail"] .report-page--dashboard-detail [data-report-block="closing"] { display: none; }
     `}</style>
   );
 }

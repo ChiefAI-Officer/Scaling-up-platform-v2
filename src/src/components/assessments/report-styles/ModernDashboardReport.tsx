@@ -1,56 +1,47 @@
-import type { ScoredReportViewModel } from "@/lib/assessments/scored-report-view-model";
 import { assessmentInter } from "@/lib/assessments/assessment-fonts";
+import type { IndividualReportPresentation } from "@/lib/assessments/individual-report-presentation";
 import "@/styles/su-report-dashboard.css";
 import {
-  AdditionalResponses,
-  DegradedNotice,
-  DecisionLedger,
-  Recommendations,
-  ReportCta,
+  partitionReportBlocks,
+  ReportBlocks,
   ReportIdentityHeader,
-  SectionEvidence,
-  SectionScorecard,
-  ScoreMatrix,
-  StrengthsAndPriorities,
-  SummaryFacts,
+  ReportProvenance,
 } from "@/components/assessments/report-styles/ReportSharedContent";
 
-function ReportProvenance({ view }: { view: ScoredReportViewModel }) {
-  return (
-    <p className="report-provenance" data-testid="report-style-provenance">
-      Confidential assessment report · prepared for {view.identity.companyName}
-    </p>
-  );
-}
+export function ModernDashboardReport({
+  presentation,
+}: {
+  presentation: IndividualReportPresentation;
+}) {
+  const { summary, detail } = partitionReportBlocks(presentation.blocks);
+  const coverBlocks = summary.filter((block) => block.kind === "score-summary");
+  const summaryBlocks = summary.filter((block) => block.kind !== "score-summary");
 
-export function ModernDashboardReport({ view }: { view: ScoredReportViewModel }) {
   return (
-    <article className={`su-report--dashboard ${assessmentInter.variable}`} data-testid="modern-dashboard-report">
+    <article
+      className={`su-report--dashboard ${assessmentInter.variable}`}
+      data-testid="modern-dashboard-report"
+    >
       <section className="report-page report-page--dashboard-cover">
-        <DegradedNotice view={view} />
-        <ReportIdentityHeader view={view} eyebrow="Diagnostic console" />
-        <SummaryFacts view={view} />
-        <ReportProvenance view={view} />
+        <ReportIdentityHeader
+          presentation={presentation}
+          eyebrow="Diagnostic console"
+        />
+        <ReportBlocks blocks={coverBlocks} />
+        <ReportProvenance presentation={presentation} />
       </section>
-      <section className="report-page report-page--dashboard-summary report-page-break">
-        <section className="report-pulse" aria-labelledby="dashboard-pulse-title">
-          <h2 id="dashboard-pulse-title">Five-domain pulse</h2>
-          <p>{view.summary.headline}</p>
-          <p>{view.summary.headlineLabel}</p>
+      {summaryBlocks.length > 0 ? (
+        <section className="report-page report-page--dashboard-summary report-page-break">
+          <ReportBlocks blocks={summaryBlocks} />
+          <ReportProvenance presentation={presentation} />
         </section>
-        <DecisionLedger view={view} />
-        <StrengthsAndPriorities view={view} />
-        <ScoreMatrix view={view} />
-        <ReportProvenance view={view} />
-      </section>
-      <section className="report-page report-page--dashboard-detail report-page-break">
-        <SectionScorecard view={view} />
-        <SectionEvidence view={view} />
-        <Recommendations view={view} />
-        <AdditionalResponses view={view} />
-        <ReportCta view={view} />
-        <ReportProvenance view={view} />
-      </section>
+      ) : null}
+      {detail.length > 0 ? (
+        <section className="report-page report-page--dashboard-detail report-page-break">
+          <ReportBlocks blocks={detail} />
+          <ReportProvenance presentation={presentation} />
+        </section>
+      ) : null}
     </article>
   );
 }

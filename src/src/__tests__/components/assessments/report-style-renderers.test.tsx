@@ -1,44 +1,293 @@
 import { render, screen, within } from "@testing-library/react";
 
-import { BrandedReport } from "@/components/assessments/BrandedReport";
+import {
+  BrandedReport,
+  LegacyClassicReport,
+} from "@/components/assessments/BrandedReport";
 import { ExecutiveBoardroomReport } from "@/components/assessments/report-styles/ExecutiveBoardroomReport";
 import { ModernDashboardReport } from "@/components/assessments/report-styles/ModernDashboardReport";
-import { REPORT_STYLE_PREVIEW_FIXTURE } from "@/lib/assessments/report-style-preview-fixture";
+import type { IndividualReportPresentation } from "@/lib/assessments/individual-report-presentation";
 import type { RespondentReport } from "@/lib/assessments/respondent-report";
 import type { ScoreResult } from "@/lib/assessments/scoring";
-import type { ScoredReportViewModel } from "@/lib/assessments/scored-report-view-model";
 
-function scalingUpFullReport(
-  reportStyle: "CLASSIC" | "EXECUTIVE_BOARDROOM" | "MODERN_DASHBOARD" | string,
-): RespondentReport {
-  const decisions = REPORT_STYLE_PREVIEW_FIXTURE.decisions;
+const identity = {
+  assessmentName: "Authored assessment title",
+  campaignLabel: "Authored campaign label",
+  campaignSubtitle: "Authored campaign label",
+  respondentName: "Safe Test Name",
+  respondentEmail: "safe@example.test",
+  respondentNameIsEmail: false,
+  jobTitle: "Chief Executive Officer",
+  companyName: "Example Co",
+  submittedAtLabel: "January 15, 2026",
+} as const;
+
+const provenance = {
+  submissionId: "campaign-safe-id",
+  versionId: "version-safe-id",
+  contentHash: "hash-safe",
+  templateName: "Authored template name",
+  imported: false,
+} as const;
+
+const scoredPresentation: IndividualReportPresentation = {
+  identity,
+  provenance,
+  blocks: [
+    {
+      kind: "score-summary",
+      headline: "68 / 100",
+      headlineLabel: "ScaleUp",
+      tierMessage: null,
+      showTier: false,
+      neutral: false,
+      overallAverage: 6.8,
+      overallAverageLabel: "6.80",
+      overallTotal: 136,
+      overallTotalLabel: "136",
+      answeredItems: 20,
+      sectionCount: 5,
+      achievementMarkersVisible: true,
+    },
+    {
+      kind: "metric-group",
+      stableKey: "people",
+      label: "People",
+      role: "domain",
+      color: "#f7a600",
+      summary: {
+        average: 7.5,
+        averageLabel: "7.50",
+        total: 30,
+        totalLabel: "30",
+      },
+      metrics: [],
+    },
+    {
+      kind: "metric-group",
+      stableKey: "operating-rhythm",
+      label: "Operating rhythm",
+      role: "section",
+      description: "Authored section description.",
+      summary: {
+        average: 7,
+        averageLabel: "7.00",
+        total: 14,
+        totalLabel: "14",
+        achievedCount: 1,
+        totalCount: 2,
+      },
+      metrics: [
+        {
+          stableKey: "weekly-measure",
+          label: "A visible weekly measure",
+          value: 7,
+          valueLabel: "7 / 10",
+          maximum: 10,
+          achieved: false,
+          achievementMarker: { symbol: "✕", label: "not achieved" },
+        },
+      ],
+      scorecardVisible: true,
+    },
+    {
+      kind: "recommendation",
+      groups: [
+        {
+          sectionStableKey: "operating-rhythm",
+          label: "Authored action group",
+          items: [
+            {
+              stableKey: "weekly-measure",
+              text: "Use the authored recommendation exactly.",
+            },
+          ],
+        },
+      ],
+    },
+    {
+      kind: "additional-response",
+      responses: [
+        {
+          stableKey: "reflection",
+          label: "What would make the biggest difference?",
+          answer: "A shared weekly decision rhythm.",
+        },
+      ],
+    },
+    {
+      kind: "coach-cta",
+      eligible: true,
+      contactEmail: "coach@example.test",
+      label: "Talk to a Coach →",
+      href: "mailto:coach%40example.test",
+      learnMoreHref: "https://scalingup.com",
+    },
+    {
+      kind: "closing",
+      greeting: "Safe",
+      coach: { name: "Morgan Coach", logoUrl: null },
+    },
+  ],
+};
+
+const qualitativePresentation: IndividualReportPresentation = {
+  identity: {
+    ...identity,
+    assessmentName: "Quarterly Reflection",
+  },
+  provenance: {
+    ...provenance,
+    templateName: "Quarterly Reflection",
+  },
+  blocks: [
+    {
+      kind: "metric-group",
+      stableKey: "financials",
+      label: "Future financials",
+      role: "qualitative",
+      description: "Authored metric description.",
+      metrics: [
+        {
+          stableKey: "revenue",
+          label: "Revenue in three years",
+          type: "NUMBER",
+          value: 0,
+          valueLabel: "0",
+        },
+      ],
+    },
+    {
+      kind: "qualitative-scale",
+      stableKey: "confidence",
+      label: "Leadership confidence",
+      description: "Authored scale description.",
+      items: [
+        {
+          stableKey: "confidence-item",
+          label: "Confidence",
+          type: "SLIDER_LIKERT",
+          value: 2,
+          valueLabel: "2",
+          min: 1,
+          max: 3,
+        },
+      ],
+    },
+    {
+      kind: "theme",
+      stableKey: "themes",
+      label: "Themes",
+      items: [
+        {
+          stableKey: "priorities",
+          label: "Which themes matter?",
+          type: "MULTI_CHOICE",
+          value: ["cash", "people"],
+          valueLabel: "Cash, People",
+          chosenLabels: ["Cash", "People"],
+        },
+      ],
+    },
+    {
+      kind: "narrative-response",
+      stableKey: "mixed-focus",
+      label: "Focus",
+      description: "Authored mixed-section description.",
+      responses: [
+        {
+          stableKey: "rehire-percentage",
+          label: "What percentage would you rehire?",
+          answer: "75",
+          type: "NUMBER",
+          value: 75,
+          valueLabel: "75",
+          min: 0,
+          max: 100,
+        },
+        {
+          stableKey: "focus-answer",
+          label: "What deserves focus?",
+          answer: "The leadership bench.",
+          type: "TEXT",
+          value: "The leadership bench.",
+          valueLabel: "The leadership bench.",
+        },
+      ],
+    },
+    {
+      kind: "finding",
+      eyebrow: "What to work on next",
+      label: "Your recommendations",
+      groups: [
+        {
+          sectionName: "Authored finding section",
+          items: [
+            {
+              stableKey: "focus-answer",
+              text: "Protect the authored planning rhythm.",
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
+const sparsePresentation: IndividualReportPresentation = {
+  identity: {
+    ...identity,
+    assessmentName: "Custom founder prompts",
+    campaignLabel: null,
+    campaignSubtitle: null,
+  },
+  provenance: {
+    ...provenance,
+    templateName: "Custom founder prompts",
+  },
+  blocks: [
+    {
+      kind: "narrative-response",
+      stableKey: "founder-reflections",
+      label: "Founder reflections",
+      responses: [
+        {
+          stableKey: "attention",
+          label: "What deserves attention?",
+          answer: "Our onboarding handoff.",
+          type: "TEXT",
+          value: "Our onboarding handoff.",
+          valueLabel: "Our onboarding handoff.",
+        },
+      ],
+    },
+  ],
+};
+
+const renderers = [
+  ["Executive Boardroom", ExecutiveBoardroomReport, "executive-boardroom-report"],
+  ["Modern Dashboard", ModernDashboardReport, "modern-dashboard-report"],
+] as const;
+
+function scalingUpFullReport(reportStyle: string): RespondentReport {
   return {
-    respondentName: "Safe Test Name",
-    respondentEmail: "safe@example.test",
+    respondentName: "Private Person Name",
+    respondentEmail: "private-person@example.test",
     jobTitle: "CEO",
-    companyName: "Example Co",
+    companyName: "Private Company Name",
     assessmentName: "Scaling Up Full",
     templateAlias: "scaling-up-full",
-    reportStyle,
+    reportStyle: reportStyle as RespondentReport["reportStyle"],
     campaignLabel: "Planning",
     submittedAt: new Date("2026-01-15T12:00:00.000Z"),
     result: {
       perQuestion: [],
       perSection: [],
-      perDomain: decisions.map((decision) => ({
-        key: decision.stableKey,
-        label: decision.label,
-        averagePoints: decision.averageAcrossSections ?? 0,
-        answeredSectionCount: 1,
-        totalSectionCount: 1,
-        tier: null,
-      })),
-      overallTotal: 136,
-      overallAverage: 6.8,
+      overallTotal: 0,
+      overallAverage: 0,
       countAchieved: 0,
       tier: null,
-      tierMetricValue: 6.8,
-      scaleUpScore: 68,
+      tierMetricValue: 0,
       unansweredKeys: [],
     } as ScoreResult,
     sections: [],
@@ -47,7 +296,7 @@ function scalingUpFullReport(
     rawAnswers: [],
     scoringConfig: {},
     provenance: {
-      submissionId: "campaign-safe-id",
+      submissionId: "submission-safe-id",
       versionId: "version-safe-id",
       contentHash: "hash-safe",
       templateName: "Scaling Up Full",
@@ -56,277 +305,197 @@ function scalingUpFullReport(
   };
 }
 
-describe("curated report renderers", () => {
-  it("maps every score-band boundary and null to an explicit absolute status", () => {
-    const cases = [
-      ["at-strength", 8, "Strength", "strength"],
-      ["below-strength", 7.99, "On track", "on-track"],
-      ["at-on-track", 6, "On track", "on-track"],
-      ["below-on-track", 5.99, "Watch area", "watch-area"],
-      ["at-watch", 4, "Watch area", "watch-area"],
-      ["below-watch", 3.99, "Priority", "priority"],
-      ["unrated", null, "Not rated", "unrated"],
-    ] as const;
-    const view: ScoredReportViewModel = {
-      ...REPORT_STYLE_PREVIEW_FIXTURE,
-      decisions: cases.map(([stableKey, score]) => ({
-        stableKey,
-        label: stableKey,
-        averageAcrossSections: score,
-        averageAcrossSectionsLabel: score === null ? "Not rated" : String(score),
-        totalPoints: 0,
-        totalPointsLabel: "0",
-        color: "#000000",
-      })),
-    };
-    const { container } = render(<ModernDashboardReport view={view} />);
-    const report = within(container);
+describe("adaptive alternate report renderers", () => {
+  it.each(renderers)(
+    "%s renders every scored semantic block exactly once without renderer-authored score bands",
+    (_, Renderer) => {
+      const { container } = render(<Renderer presentation={scoredPresentation} />);
+      const report = within(container);
 
-    for (const [stableKey, , label, status] of cases) {
-      const decision = report.getByTestId(`report-style-decision-${stableKey}`);
-      expect(decision).toHaveAttribute("data-performance-status", status);
-      expect(decision).toHaveTextContent(label);
-      expect(decision.querySelector(`.report-status--${status}`)).toHaveTextContent(label);
-    }
-  });
+      for (const kind of [
+        "score-summary",
+        "metric-group",
+        "recommendation",
+        "additional-response",
+        "coach-cta",
+        "closing",
+      ]) {
+        expect(
+          container.querySelectorAll(`[data-report-block="${kind}"]`),
+        ).toHaveLength(
+          scoredPresentation.blocks.filter((block) => block.kind === kind).length,
+        );
+      }
 
-  it("keeps relative insight roles separate from their absolute score bands", () => {
-    const onTrackTopStrength = {
-      ...REPORT_STYLE_PREVIEW_FIXTURE.decisions[1],
-      averageAcrossSections: 7,
-      averageAcrossSectionsLabel: "7",
-    };
-    const watchAreaPriority = REPORT_STYLE_PREVIEW_FIXTURE.decisions[3];
-    const view: ScoredReportViewModel = {
-      ...REPORT_STYLE_PREVIEW_FIXTURE,
-      insights: {
-        strengths: [onTrackTopStrength],
-        priorities: [watchAreaPriority],
-      },
-    };
-    const { container } = render(<ExecutiveBoardroomReport view={view} />);
-    const report = within(container);
-    const strength = report.getByTestId("report-style-strength-strategy");
-    const priority = report.getByTestId("report-style-priority-cash");
+      for (const authoredText of [
+        "68 / 100",
+        "ScaleUp",
+        "People",
+        "7.50",
+        "Operating rhythm",
+        "Authored section description.",
+        "A visible weekly measure",
+        "7 / 10",
+        "not achieved",
+        "Use the authored recommendation exactly.",
+        "What would make the biggest difference?",
+        "A shared weekly decision rhythm.",
+      ]) {
+        expect(report.getAllByText(authoredText)).toHaveLength(1);
+      }
 
-    expect(strength).toHaveAttribute("data-insight-role", "top-strength");
-    expect(strength).toHaveAttribute("data-performance-status", "on-track");
-    expect(strength).toHaveTextContent("Top strength");
-    expect(strength).toHaveTextContent("On track");
-    expect(priority).toHaveAttribute("data-insight-role", "priority-action");
-    expect(priority).toHaveAttribute("data-action-priority", "priority");
-    expect(priority).toHaveAttribute("data-performance-status", "watch-area");
-    expect(priority).toHaveTextContent("Priority action");
-    expect(priority).toHaveTextContent("Watch area");
-    expect(priority.querySelector(".report-status--priority")).toBeNull();
-  });
+      expect(report.queryByText("Five Decisions")).not.toBeInTheDocument();
+      expect(report.queryByText("Strength")).not.toBeInTheDocument();
+      expect(report.queryByText("On track")).not.toBeInTheDocument();
+      expect(report.queryByText("Watch area")).not.toBeInTheDocument();
+      expect(report.queryByText("Priority")).not.toBeInTheDocument();
+      expect(report.queryByText("Decision score matrix")).not.toBeInTheDocument();
+      expect(report.queryByText("Section scorecard")).not.toBeInTheDocument();
+    },
+  );
 
+  it.each(renderers)(
+    "%s preserves qualitative metric, scale, theme, mixed narrative, and finding blocks without scored semantics",
+    (_, Renderer) => {
+      const { container } = render(
+        <Renderer presentation={qualitativePresentation} />,
+      );
+      const report = within(container);
+
+      for (const kind of [
+        "metric-group",
+        "qualitative-scale",
+        "theme",
+        "narrative-response",
+        "finding",
+      ]) {
+        expect(
+          container.querySelectorAll(`[data-report-block="${kind}"]`),
+        ).toHaveLength(1);
+      }
+
+      for (const authoredText of [
+        "Future financials",
+        "Authored metric description.",
+        "Revenue in three years",
+        "0",
+        "Leadership confidence",
+        "Authored scale description.",
+        "Confidence",
+        "2",
+        "Themes",
+        "Which themes matter?",
+        "Cash, People",
+        "Focus",
+        "Authored mixed-section description.",
+        "What percentage would you rehire?",
+        "75",
+        "What deserves focus?",
+        "The leadership bench.",
+        "What to work on next",
+        "Your recommendations",
+        "Authored finding section",
+        "Protect the authored planning rhythm.",
+      ]) {
+        expect(report.getAllByText(authoredText)).toHaveLength(1);
+      }
+
+      expect(report.queryByText("Five Decisions")).not.toBeInTheDocument();
+      expect(report.queryByText(/total points/i)).not.toBeInTheDocument();
+      expect(report.queryByText(/scorecard/i)).not.toBeInTheDocument();
+      expect(report.queryByText(/overall result/i)).not.toBeInTheDocument();
+      expect(report.queryByText(/not rated/i)).not.toBeInTheDocument();
+    },
+  );
+
+  it.each(renderers)(
+    "%s renders a sparse custom presentation without empty cards or placeholder headings",
+    (_, Renderer) => {
+      const { container } = render(<Renderer presentation={sparsePresentation} />);
+      const report = within(container);
+
+      expect(container.querySelectorAll("[data-report-block]")).toHaveLength(1);
+      expect(
+        container.querySelectorAll('[data-report-block="narrative-response"]'),
+      ).toHaveLength(1);
+      expect(report.getByText("Founder reflections")).toBeInTheDocument();
+      expect(report.getByText("What deserves attention?")).toBeInTheDocument();
+      expect(report.getByText("Our onboarding handoff.")).toBeInTheDocument();
+      for (const inventedHeading of [
+        "Overall result",
+        "Decision score matrix",
+        "Section scorecard",
+        "Five Decisions",
+        "Recommendations",
+      ]) {
+        expect(report.queryByText(inventedHeading)).not.toBeInTheDocument();
+      }
+      expect(container.querySelectorAll(".report-page")).toHaveLength(2);
+      expect(container.querySelectorAll(".report-page:empty")).toHaveLength(0);
+    },
+  );
+});
+
+describe("BrandedReport explicit appearance dispatch", () => {
   it.each([
     ["EXECUTIVE_BOARDROOM", "executive-boardroom-report"],
     ["MODERN_DASHBOARD", "modern-dashboard-report"],
-  ] as const)("selects %s only with a server-authoritative availability decision", (reportStyle, renderer) => {
-    const { rerender } = render(
-      <BrandedReport
-        report={scalingUpFullReport(reportStyle)}
-        reportStylesAvailable
-      />,
-    );
-    expect(screen.getByTestId(renderer)).toBeInTheDocument();
+  ] as const)(
+    "selects %s only with a server-authoritative availability decision",
+    (reportStyle, renderer) => {
+      const { rerender } = render(
+        <BrandedReport
+          report={scalingUpFullReport(reportStyle)}
+          reportStylesAvailable
+        />,
+      );
+      expect(screen.getByTestId(renderer)).toBeInTheDocument();
 
-    rerender(<BrandedReport report={scalingUpFullReport(reportStyle)} />);
-    expect(screen.queryByTestId(renderer)).toBeNull();
-    expect(screen.getByTestId("report-cover")).toBeInTheDocument();
-  });
+      rerender(<BrandedReport report={scalingUpFullReport(reportStyle)} />);
+      expect(screen.queryByTestId(renderer)).toBeNull();
+      expect(screen.getByTestId("report-cover")).toBeInTheDocument();
+    },
+  );
 
-  it("retains the legacy Classic renderer for Classic, unavailable, and invalid selections", () => {
+  it("falls back malformed styles to byte-identical Classic and emits only privacy-safe diagnostics", () => {
+    const report = scalingUpFullReport("NOT_A_STYLE");
     const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
-    const { rerender } = render(
-      <BrandedReport
-        report={scalingUpFullReport("CLASSIC")}
-        reportStylesAvailable
-      />,
+    const { container, unmount } = render(
+      <BrandedReport report={report} reportStylesAvailable />,
     );
-    expect(screen.getByTestId("report-cover")).toBeInTheDocument();
+    const fallbackHtml = container.innerHTML;
+    unmount();
 
-    rerender(
-      <BrandedReport
-        report={scalingUpFullReport("NOT_A_STYLE")}
-        reportStylesAvailable
-      />,
-    );
-    expect(screen.getByTestId("report-cover")).toBeInTheDocument();
+    const classic = render(<LegacyClassicReport report={report} />);
+    expect(fallbackHtml).toBe(classic.container.innerHTML);
     expect(warn).toHaveBeenCalledWith(
       "assessment.report_style.invalid",
-      expect.objectContaining({
-        provenanceId: "campaign-safe-id",
+      {
+        submissionId: "submission-safe-id",
+        versionId: "version-safe-id",
         templateAlias: "scaling-up-full",
-        invalidStyle: "NOT_A_STYLE",
-      }),
+        archetype: "scored",
+        requestedStyle: "INVALID",
+        resolvedStyle: "CLASSIC",
+      },
     );
-    expect(JSON.stringify(warn.mock.calls)).not.toContain("Safe Test Name");
-    expect(JSON.stringify(warn.mock.calls)).not.toContain("safe@example.test");
+    expect(JSON.stringify(warn.mock.calls)).not.toContain("Private Person Name");
+    expect(JSON.stringify(warn.mock.calls)).not.toContain(
+      "private-person@example.test",
+    );
+    expect(JSON.stringify(warn.mock.calls)).not.toContain("Private Company Name");
     warn.mockRestore();
   });
 
-  it("keeps canonical report facts aligned across the two curated compositions", () => {
-    const completeView: ScoredReportViewModel = {
-      ...REPORT_STYLE_PREVIEW_FIXTURE,
-      identity: {
-        ...REPORT_STYLE_PREVIEW_FIXTURE.identity,
-        respondentEmail: "alex@example.com",
-      },
-      orphanQuestions: [{
-        stableKey: "orphan-check",
-        label: "Unassigned operating check",
-        unmapped: false,
-        value: 4,
-        maximum: 10,
-        scoreLabel: "4 / 10",
-        achieved: false,
-        achievementMarker: { symbol: "✕", label: "not achieved" },
-      }],
-      recommendations: [
-        ...REPORT_STYLE_PREVIEW_FIXTURE.recommendations,
-        { sectionStableKey: "people", label: "People", items: [{ stableKey: "people-finding", text: "Resolve the frozen People finding." }] },
-      ],
-      coach: { name: "Morgan Coach", logoUrl: "https://cdn.example.test/coach.png" },
-      provenance: { submissionId: "sub-complete", versionId: "ver-complete", contentHash: "hash-complete", templateName: "Scaling Up Full", imported: true },
-      degraded: true,
-    };
-    const { container: executive } = render(
-      <ExecutiveBoardroomReport view={completeView} />,
-    );
-    const { container: dashboard } = render(
-      <ModernDashboardReport view={completeView} />,
-    );
+  it("keeps scored Classic byte-identical for available and unavailable style rollout", () => {
+    const report = scalingUpFullReport("CLASSIC");
+    const direct = render(<LegacyClassicReport report={report} />).container.innerHTML;
+    const unavailable = render(<BrandedReport report={report} />).container.innerHTML;
+    const available = render(
+      <BrandedReport report={report} reportStylesAvailable />,
+    ).container.innerHTML;
 
-    for (const container of [executive, dashboard]) {
-      const report = within(container);
-      expect(report.getByRole("heading", { name: "Scaling Up Full" })).toBeInTheDocument();
-      expect(report.getByText(/Chief Executive Officer/)).toBeInTheDocument();
-      expect(report.getByText("alex@example.com")).toBeInTheDocument();
-      expect(report.getAllByText("68 / 100").length).toBeGreaterThan(0);
-      const summary = report.getByRole("region", { name: "Report summary" });
-      expect(summary).toHaveTextContent("Total points136");
-      expect(summary).toHaveTextContent("Answered items20");
-      expect(summary).toHaveTextContent("Sections5");
-      expect(report.getByTestId("report-style-strength-you")).toHaveTextContent("You: 8");
-      expect(report.getByTestId("report-style-priority-cash")).toHaveTextContent("Cash: 5.5");
-      expect(report.getByTestId("report-style-strength-you")).toHaveAttribute("data-performance-status", "strength");
-      expect(report.getByTestId("report-style-strength-you")).toHaveTextContent("Strength");
-      expect(report.getByTestId("report-style-strength-you")).toHaveAttribute("data-insight-role", "top-strength");
-      expect(report.getByTestId("report-style-strength-you")).toHaveTextContent("Top strength");
-      expect(report.getByTestId("report-style-priority-cash")).toHaveAttribute("data-action-priority", "priority");
-      expect(report.getByTestId("report-style-priority-cash")).toHaveAttribute("data-insight-role", "priority-action");
-      expect(report.getByTestId("report-style-priority-cash")).toHaveAttribute("data-performance-status", "watch-area");
-      expect(report.getByTestId("report-style-priority-cash")).toHaveTextContent("Priority action");
-      expect(report.getByTestId("report-style-priority-cash")).toHaveTextContent("Watch area");
-      expect(report.getByText("Create a weekly cash conversion review with one owner for receivables, inventory, and commitments. Use the first two cycles to identify where decisions wait unnecessarily, then publish a small operating rule that keeps those decisions moving without adding another meeting to every calendar.")).toBeInTheDocument();
-      expect(report.getByText("Resolve the frozen People finding.")).toBeInTheDocument();
-      const orphan = report.getByTestId("report-style-question-orphan-check");
-      expect(orphan).toHaveTextContent("Unassigned operating check");
-      expect(orphan).toHaveTextContent("4 / 10");
-      expect(orphan).toHaveTextContent(/not achieved/i);
-      expect(report.getByText("Coached by Morgan Coach")).toBeInTheDocument();
-      expect(report.getByText(/Keep Scaling, Alex/i)).toBeInTheDocument();
-      expect(report.getByRole("status")).toHaveTextContent(/could not be fully read/i);
-      expect(report.getByText(/sub-complete.*ver-complete.*hash-complete/i)).toBeInTheDocument();
-      expect(report.getByText(/What would make the biggest difference this quarter/i)).toBeInTheDocument();
-      expect(report.getByText(/A shared rhythm for turning strategic choices/i)).toBeInTheDocument();
-      expect(report.getByRole("link", { name: "Talk to a Coach →" })).toHaveAttribute(
-        "href",
-        "https://scalingup.com/coaches",
-      );
-      for (const decision of completeView.decisions) {
-        const decisionNode = report.getByTestId(`report-style-decision-${decision.stableKey}`);
-        expect(decisionNode).toHaveAttribute("data-decision", decision.stableKey);
-        expect(decisionNode).toHaveAttribute("data-performance-status");
-        expect(decisionNode).toHaveTextContent(`${decision.label}: ${decision.averageAcrossSectionsLabel}`);
-        expect(decisionNode).toHaveTextContent(`${decision.totalPointsLabel} total points`);
-      }
-      expect(report.getByTestId("report-style-decision-you")).toHaveAttribute("data-performance-status", "strength");
-      expect(report.getByTestId("report-style-decision-cash")).toHaveAttribute("data-performance-status", "watch-area");
-      if (container === dashboard) {
-        const cashMatrix = report.getByTestId("report-style-matrix-cash");
-        expect(cashMatrix).toHaveAttribute("data-decision", "cash");
-        expect(cashMatrix).toHaveAttribute("data-performance-status", "watch-area");
-        expect(cashMatrix).toHaveTextContent("Watch area");
-        expect(cashMatrix).not.toHaveAttribute("data-action-priority");
-        expect(cashMatrix).not.toHaveTextContent(/Priority action|Maintain momentum/);
-      }
-      for (const section of completeView.sections) {
-        const sectionNode = report.getByTestId(`report-style-section-${section.stableKey}`);
-        expect(sectionNode).toHaveTextContent(section.label);
-        expect(sectionNode).toHaveTextContent(section.totalPointsLabel);
-        expect(sectionNode).toHaveTextContent(section.averagePointsLabel);
-        expect(sectionNode).toHaveTextContent(`${section.achievedCount} of ${section.totalCount} achieved`);
-        for (const question of section.questions) {
-          expect(report.getByTestId(`report-style-question-${question.stableKey}`)).toHaveTextContent(`${question.label}${question.scoreLabel}`);
-        }
-        const scorecardNode = report.getByTestId(`report-style-scorecard-${section.stableKey}`);
-        expect(scorecardNode).toHaveTextContent(section.totalPointsLabel);
-        expect(scorecardNode).toHaveAttribute("data-performance-status");
-        expect(scorecardNode).toHaveTextContent(/Strength|On track|Watch area|Priority/);
-      }
-      expect(report.getByTestId("report-style-scorecard-you")).toHaveAttribute("data-performance-status", "strength");
-      expect(report.getByTestId("report-style-scorecard-cash")).toHaveAttribute("data-performance-status", "watch-area");
-      expect(report.getByText("Resolve the frozen People finding.").closest(".report-action-group")).toHaveAttribute("data-action-priority", "priority");
-    }
-  });
-
-  it("renders only canonical recommendation copy and never renderer-authored action advice", () => {
-    const canonicalAdvice = "Use the frozen recommendation exactly as written.";
-    const view: ScoredReportViewModel = {
-      ...REPORT_STYLE_PREVIEW_FIXTURE,
-      recommendations: [
-        {
-          sectionStableKey: "cash",
-          label: "Cash",
-          items: [{ stableKey: "cash-advice", text: canonicalAdvice }],
-        },
-      ],
-    };
-
-    for (const Renderer of [
-      ExecutiveBoardroomReport,
-      ModernDashboardReport,
-    ]) {
-      const { container, unmount } = render(<Renderer view={view} />);
-      const report = within(container);
-      expect(report.getByText(canonicalAdvice)).toBeInTheDocument();
-      expect(report.queryAllByText("Maintain momentum")).toHaveLength(0);
-
-      for (const decision of view.decisions) {
-        const matrixRow = report.queryByTestId(
-          `report-style-matrix-${decision.stableKey}`,
-        );
-        if (matrixRow) {
-          expect(matrixRow).not.toHaveTextContent(/Priority action|Maintain momentum/);
-        }
-      }
-      unmount();
-    }
-  });
-
-  it("keeps every Classic/fallback decision byte-identical to its absent-prop legacy baseline", () => {
-    const html = (report: RespondentReport, props: Record<string, unknown> = {}) => {
-      const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
-      const { container, unmount } = render(<BrandedReport report={report} {...props} />);
-      const value = container.innerHTML;
-      unmount();
-      warn.mockRestore();
-      return value;
-    };
-    const classic = scalingUpFullReport("CLASSIC");
-    expect(html(classic, { reportStylesAvailable: false })).toBe(html(classic));
-    expect(html(classic, { reportStylesAvailable: true })).toBe(html(classic));
-    const rolloutOff = scalingUpFullReport("EXECUTIVE_BOARDROOM");
-    expect(html(rolloutOff, { reportStylesAvailable: false })).toBe(html(rolloutOff));
-    const invalid = scalingUpFullReport("NOT_A_STYLE");
-    expect(html(invalid, { reportStylesAvailable: true })).toBe(html(invalid));
-    const ineligible = { ...scalingUpFullReport("MODERN_DASHBOARD"), templateAlias: "scaling-up-full-v2" };
-    expect(html(ineligible, { reportStylesAvailable: true })).toBe(html(ineligible));
-    const qualitative = { ...scalingUpFullReport("MODERN_DASHBOARD"), templateAlias: "leadership-vision-alignment" };
-    expect(html(qualitative, { reportStylesAvailable: true, reportFindingsAvailable: false })).toBe(html(qualitative));
+    expect(unavailable).toBe(direct);
+    expect(available).toBe(direct);
   });
 });

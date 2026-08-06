@@ -75,15 +75,17 @@ describe("report style preview page", () => {
 
     // These elements are intentionally present in the actual renderer DOM even
     // when preview CSS hides them to keep a representative canvas uncut.
-    expect(executive).toContain("Decision signals");
+    expect(executive).toContain('data-report-block="score-summary"');
+    expect(executive).toContain('data-report-role="domain"');
     expect(executive).toContain("su-report--executive");
-    expect(dashboard).toContain("Five Decisions");
+    expect(dashboard).toContain('data-report-block="score-summary"');
+    expect(dashboard).toContain('data-report-role="domain"');
     expect(dashboard).toContain("su-report--dashboard");
   });
 
   it.each([
-    ["partial", "Not rated"],
-    ["degraded", "Some scoring details for this submission could not be fully read."],
+    ["partial", 'data-testid="report-style-question-strategy-differentiator"'],
+    ["degraded", "Not available"],
     ["max-length", "A deliberately long synthetic assessment label"],
     ["missing-optional", "Alex Rivera"],
     ["long-branding", "The International Association for Deliberately Long"],
