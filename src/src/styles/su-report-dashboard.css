@@ -66,6 +66,7 @@
 .su-report--dashboard .su-report-comparison h3 { color: var(--dashboard-indigo); margin-top: 1.65rem; }
 .su-report--dashboard .su-report-comparison-coverage { color: var(--dashboard-slate); font-size: .88rem; }
 .su-report--dashboard .su-report-comparison-status { color: var(--dashboard-muted-ink); }
+.su-report--dashboard .su-report-comparison-delta-status { background: #ffffff; border: 1px solid var(--dashboard-line); border-radius: 999px; color: var(--dashboard-muted-ink); font-size: .64rem; font-weight: 800; letter-spacing: .025em; padding: .08rem .32rem; }
 .su-report--dashboard .report-page h2 { font-size: clamp(1.6rem, 3vw, 2.25rem); font-weight: 900; letter-spacing: -.04em; line-height: 1.05; margin: 0 0 .8rem; }
 .su-report--dashboard .report-page h3 { font-size: .78rem; font-weight: 800; letter-spacing: .1em; margin: 1.4rem 0 .55rem; text-transform: uppercase; }
 .su-report--dashboard .report-page section { margin: 0 0 1.65rem; }

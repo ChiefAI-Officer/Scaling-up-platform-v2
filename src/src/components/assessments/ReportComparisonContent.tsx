@@ -37,7 +37,11 @@ export function DeltaValue({ value }: { value: ComparableValue }) {
     const label = value.status === "different-version"
       ? "Different version"
       : "Not comparable";
-    return <span aria-label={label}>—</span>;
+    return (
+      <span aria-label={label}>
+        — <span className="su-report-comparison-delta-status" aria-hidden="true">{label}</span>
+      </span>
+    );
   }
 
   const direction = value.delta > 0 ? "increase" : value.delta < 0 ? "decrease" : "no change";

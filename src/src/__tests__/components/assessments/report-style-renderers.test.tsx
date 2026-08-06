@@ -312,7 +312,7 @@ function scalingUpFullReport(reportStyle: string): RespondentReport {
 }
 
 describe("adaptive alternate report renderers", () => {
-  it("renders the same frozen comparison facts in every launched report style without screen controls", () => {
+  it("keeps visible compatibility explanations in printable comparison facts for every launched report style", () => {
     const comparison: ReportComparisonModel = {
       baseline: {
         submissionId: "prior-submission",
@@ -327,11 +327,14 @@ describe("adaptive alternate report renderers", () => {
       overall: { current: 72, previous: 64, delta: null, status: "different-version" },
       domains: { people: { current: 7, previous: 6, delta: null, status: "different-version" } },
       sections: { people: { current: 7, previous: 6, delta: null, status: "different-version" } },
-      questions: { q1: { current: 8, previous: 5, delta: 3, status: "comparable" } },
+      questions: {
+        q1: { current: 8, previous: 5, delta: 3, status: "comparable" },
+        q2: { current: 4, previous: null, delta: null, status: "unmatched" },
+      },
       coverage: {
-        currentQuestionCount: 1,
+        currentQuestionCount: 2,
         matchedQuestionCount: 1,
-        unmatchedCurrentCount: 0,
+        unmatchedCurrentCount: 1,
         baselineOnlyCount: 0,
       },
     };
@@ -354,7 +357,12 @@ describe("adaptive alternate report renderers", () => {
       expect(compared.getByText("q1")).toBeInTheDocument();
       expect(compared.getByLabelText("increase 3")).toHaveTextContent("▲ +3");
       expect(compared.getAllByLabelText("Different version").length).toBeGreaterThan(0);
-      expect(compared.getByText("1 of 1 current question matched the earlier version.")).toBeInTheDocument();
+      expect(compared.getAllByText("Different version").length).toBeGreaterThan(0);
+      expect(compared.getAllByLabelText("Not comparable").length).toBeGreaterThan(0);
+      expect(compared.getAllByText("Not comparable").length).toBeGreaterThan(0);
+      expect(compared.getAllByText("Different version")[0].closest(".no-print")).toBeNull();
+      expect(compared.getByText("Not comparable").closest(".no-print")).toBeNull();
+      expect(compared.getByText("1 of 2 current questions matched the earlier version. 1 new or changed question has no comparison.")).toBeInTheDocument();
       expect(container.querySelector(".su-report-comparison-controls")).not.toBeInTheDocument();
       unmount();
     }

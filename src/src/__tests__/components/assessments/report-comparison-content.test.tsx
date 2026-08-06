@@ -61,6 +61,7 @@ describe("ReportComparisonContent", () => {
     expect(screen.getByText("Weekly meeting rhythm")).toBeInTheDocument();
     expect(screen.queryByText("removed")).not.toBeInTheDocument();
     expect(screen.getAllByLabelText("Different version")).toHaveLength(3);
+    expect(screen.getAllByText("Different version")).toHaveLength(3);
     expect(screen.getByLabelText("increase 3")).toHaveTextContent("▲ +3");
     expect(screen.getByText("New or changed question")).toBeInTheDocument();
     expect(screen.getByText(/1 of 2 current questions matched the earlier version/i)).toBeInTheDocument();
@@ -80,6 +81,7 @@ describe("ReportComparisonContent", () => {
 
     rerender(<DeltaValue value={{ current: null, previous: 3, delta: null, status: "unmatched" }} />);
     expect(screen.getByLabelText("Not comparable")).toHaveTextContent("—");
+    expect(screen.getByText("Not comparable")).toBeInTheDocument();
   });
 
   it("adds the dated baseline subtitle and returns nothing when no comparison exists", () => {
