@@ -8,7 +8,10 @@ import {
   applyScoredReportFindingsPolicy,
   buildScoredReportViewModel,
 } from "@/lib/assessments/scored-report-view-model";
-import { buildQualitativeModel } from "@/lib/assessments/qualitative-report-model";
+import {
+  buildQualitativeModel,
+  buildQualitativeReportPresentationBlocks,
+} from "@/lib/assessments/qualitative-report-model";
 
 function scoredReport(overrides: Partial<RespondentReport> = {}): RespondentReport {
   return {
@@ -558,6 +561,20 @@ describe("buildIndividualReportPresentation", () => {
         ],
       },
     ]);
+  });
+
+  it("emits no block for an empty canonical qualitative section of any kind", () => {
+    const blocks = buildQualitativeReportPresentationBlocks({
+      sections: [
+        { stableKey: "empty-metrics", name: "Metrics", kind: "metric-table", items: [] },
+        { stableKey: "empty-percent", name: "Percent", kind: "percent-bar", items: [] },
+        { stableKey: "empty-rating", name: "Rating", kind: "rating", items: [] },
+        { stableKey: "empty-choices", name: "Choices", kind: "choices", items: [] },
+        { stableKey: "empty-qa", name: "Questions", kind: "qa", items: [] },
+      ],
+    });
+
+    expect(blocks).toEqual([]);
   });
 
   it("is independent of appearance and deeply freezes the shared semantic object", () => {

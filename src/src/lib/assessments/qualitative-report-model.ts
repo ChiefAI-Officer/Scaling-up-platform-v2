@@ -616,6 +616,8 @@ export function buildQualitativeReportPresentationBlocks(
       continue;
     }
 
+    if (section.items.length === 0) continue;
+
     switch (section.kind) {
       case "metric-table":
       case "percent-bar":
