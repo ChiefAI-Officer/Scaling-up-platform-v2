@@ -157,13 +157,6 @@ async function patchReportAppearance(
     );
   }
 
-  // The lock is permanent and actor-independent. Return the stored final
-  // appearance before evaluating ownership so every authenticated writer gets
-  // the same deterministic completion-won contract.
-  if (campaign.reportStyleLockedAt !== null) {
-    return lockedReportAppearanceResponse(campaign);
-  }
-
   // This endpoint owns coach-campaign appearance changes only. Privileged
   // public-campaign writes use the dedicated Task 5 route; they cannot pass
   // through this coach-owned lane.
@@ -192,6 +185,13 @@ async function patchReportAppearance(
       { success: false, error: "Forbidden" },
       { status: 403 },
     );
+  }
+
+  // Only an authorized campaign owner receives stored appearance metadata.
+  // Once authorized, a pre-existing lock and a completion race share the same
+  // deterministic final-appearance contract.
+  if (campaign.reportStyleLockedAt !== null) {
+    return lockedReportAppearanceResponse(campaign);
   }
 
   const reportStylesAvailable =

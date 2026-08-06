@@ -451,14 +451,9 @@ describe("PATCH /api/assessment-campaigns/[id]", () => {
       });
     });
 
-    it.each([
-      ["owning coach", coachActor],
-      ["different coach", otherCoachActor],
-      ["admin", { ...coachActor, role: "ADMIN" as const, coachId: null }],
-      ["staff", { ...coachActor, role: "STAFF" as const, coachId: null }],
-    ])("returns 409 to %s when the campaign appearance is already locked", async (_label, actor) => {
+    it("returns the final locked appearance to the authorized owner", async () => {
       process.env.WAVE_REPORT_STYLES_ENABLED = "1";
-      (getApiActor as jest.Mock).mockResolvedValue(actor);
+      (getApiActor as jest.Mock).mockResolvedValue(coachActor);
       (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValue(
         reportStyleCampaign({
           reportStyle: "MODERN_DASHBOARD",
@@ -483,6 +478,34 @@ describe("PATCH /api/assessment-campaigns/[id]", () => {
           reportStyleSource: "CAMPAIGN_OVERRIDE",
           reportStyleLockedAt: "2026-08-05T09:30:00.000Z",
         },
+      });
+      expect(db.assessmentCampaign.updateMany).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["different coach", otherCoachActor],
+      ["admin", { ...coachActor, role: "ADMIN" as const, coachId: null }],
+      ["staff", { ...coachActor, role: "STAFF" as const, coachId: null }],
+    ])("returns metadata-free 403 to %s when the campaign appearance is already locked", async (_label, actor) => {
+      process.env.WAVE_REPORT_STYLES_ENABLED = "1";
+      (getApiActor as jest.Mock).mockResolvedValue(actor);
+      (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValue(
+        reportStyleCampaign({
+          reportStyle: "MODERN_DASHBOARD",
+          reportStyleSource: "CAMPAIGN_OVERRIDE",
+          reportStyleLockedAt: new Date("2026-08-05T09:30:00.000Z"),
+        }),
+      );
+
+      const res = await PATCH(
+        patchReq({ reportStyle: "CLASSIC" }) as never,
+        detailParams("c1"),
+      );
+
+      expect(res.status).toBe(403);
+      await expect(res.json()).resolves.toEqual({
+        success: false,
+        error: "Forbidden",
       });
       expect(db.assessmentCampaign.updateMany).not.toHaveBeenCalled();
     });
