@@ -1122,7 +1122,16 @@ export function computeGlobalTierDomain(
  * ScoringValidationError) and the publish-time Zod schema (where issues
  * are routed via ctx.addIssue). Empty array === valid tiling.
  */
+export type TierTilingIssueCode =
+  | "EMPTY_TIERS"
+  | "FIRST_RANGE_START"
+  | "EARLY_NO_MAXIMUM"
+  | "RANGE_GAP"
+  | "RANGE_OVERLAP"
+  | "LAST_RANGE_END";
+
 export interface TierTilingIssue {
+  code: TierTilingIssueCode;
   path: (string | number)[];
   message: string;
   details: Record<string, unknown>;
@@ -1136,6 +1145,7 @@ export function validateTierTiling(
   const issues: TierTilingIssue[] = [];
   if (tiers.length === 0) {
     issues.push({
+      code: "EMPTY_TIERS",
       path: [...pathPrefix],
       message: "tiers must contain at least one entry",
       details: { reason: "empty tiers" },
@@ -1149,6 +1159,7 @@ export function validateTierTiling(
 
   if (sorted[0].t.minMetric !== domain.min) {
     issues.push({
+      code: "FIRST_RANGE_START",
       path: [...pathPrefix, sorted[0].idx, "minMetric"],
       message: `first tier minMetric must equal domain min (${domain.min}); got ${sorted[0].t.minMetric}`,
       details: {
@@ -1166,6 +1177,7 @@ export function validateTierTiling(
     if (a.maxMetric === undefined) {
       // Only the last tier may have undefined maxMetric.
       issues.push({
+        code: "EARLY_NO_MAXIMUM",
         path: [...pathPrefix, sorted[i].idx, "maxMetric"],
         message: "only the highest tier may omit maxMetric (open-ended above)",
         details: {
@@ -1181,6 +1193,7 @@ export function validateTierTiling(
     const expectedNextMin = domain.isInteger ? a.maxMetric + 1 : a.maxMetric;
     if (b.minMetric !== expectedNextMin) {
       issues.push({
+        code: b.minMetric > expectedNextMin ? "RANGE_GAP" : "RANGE_OVERLAP",
         path: [...pathPrefix, sorted[i + 1].idx, "minMetric"],
         message:
           b.minMetric > expectedNextMin
@@ -1204,6 +1217,7 @@ export function validateTierTiling(
   const last = sorted[sorted.length - 1].t;
   if (last.maxMetric !== undefined && last.maxMetric !== domain.max) {
     issues.push({
+      code: "LAST_RANGE_END",
       path: [...pathPrefix, sorted[sorted.length - 1].idx, "maxMetric"],
       message: `last tier maxMetric must equal domain max (${domain.max}) or be omitted (open-ended); got ${last.maxMetric}`,
       details: {

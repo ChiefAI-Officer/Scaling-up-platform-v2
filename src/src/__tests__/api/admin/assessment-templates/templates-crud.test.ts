@@ -63,6 +63,7 @@ import {
 import { POST as publishPOST } from "@/app/api/admin/assessment-templates/[id]/versions/[versionId]/publish/route";
 import { db } from "@/lib/db";
 import { getApiActor } from "@/lib/auth/authorization";
+import { withRateLimit } from "@/lib/rate-limit";
 
 const adminActor = {
   userId: "u1",
@@ -95,6 +96,19 @@ beforeEach(() => {
 });
 
 describe("POST /api/admin/assessment-templates (create)", () => {
+  const simplifiedCreationEnvironment = [
+    "WAVE_TEMPLATE_CREATION_SIMPLIFIED_ENABLED",
+    "WAVE_TEMPLATE_CREATION_SIMPLIFIED_KILL",
+    "WAVE_ED6_SINGLE_COLUMN_ENABLED",
+    "WAVE_ED9_FORMS_BUILD_ENABLED",
+    "WAVE_ED9_FORMS_BUILD_KILL",
+    "WAVE_T_QUESTION_EDITOR_ENABLED",
+    "WAVE_T_QUESTION_EDITOR_KILL",
+  ] as const;
+  const savedSimplifiedCreationEnvironment = new Map(
+    simplifiedCreationEnvironment.map((key) => [key, process.env[key]]),
+  );
+
   const validBody = {
     name: "Test Template",
     alias: "test-template",
@@ -104,6 +118,35 @@ describe("POST /api/admin/assessment-templates (create)", () => {
     sections: [{ id: "s1" }],
     scoringConfig: { tiers: [] },
   };
+
+  function enableSimplifiedCreation(): void {
+    process.env.WAVE_TEMPLATE_CREATION_SIMPLIFIED_ENABLED = "1";
+    process.env.WAVE_ED6_SINGLE_COLUMN_ENABLED = "1";
+    process.env.WAVE_ED9_FORMS_BUILD_ENABLED = "1";
+    process.env.WAVE_T_QUESTION_EDITOR_ENABLED = "1";
+  }
+
+  beforeEach(() => {
+    for (const key of simplifiedCreationEnvironment) delete process.env[key];
+    (db.$transaction as jest.Mock)
+      .mockReset()
+      .mockImplementation((fn) => fn(txMock));
+    (txMock.assessmentTemplate.create as jest.Mock).mockReset().mockResolvedValue({
+      id: "tpl-1",
+      alias: "test-template",
+    });
+    (txMock.assessmentTemplateVersion.create as jest.Mock)
+      .mockReset()
+      .mockResolvedValue({ id: "ver-1" });
+  });
+
+  afterEach(() => {
+    for (const key of simplifiedCreationEnvironment) {
+      const value = savedSimplifiedCreationEnvironment.get(key);
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  });
 
   it("401 when unauthenticated", async () => {
     (getApiActor as jest.Mock).mockResolvedValue(null);
@@ -142,13 +185,259 @@ describe("POST /api/admin/assessment-templates (create)", () => {
     expect(res.status).toBe(409);
   });
 
+  it("keeps the exact legacy request and response while every flag is on", async () => {
+    enableSimplifiedCreation();
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    (txMock.assessmentTemplate.create as jest.Mock).mockResolvedValue({
+      id: "tpl-1",
+      alias: "test-template",
+    });
+    (txMock.assessmentTemplateVersion.create as jest.Mock).mockResolvedValue({
+      id: "ver-1",
+    });
+
+    const res = await listPOST(
+      jsonReq("http://localhost/api/admin/assessment-templates", validBody) as never,
+    );
+
+    await expect(res.json()).resolves.toEqual({
+      success: true,
+      data: { id: "tpl-1", alias: "test-template" },
+    });
+  });
+
+  it("server-owns the exact empty v1 defaults in simplified mode", async () => {
+    enableSimplifiedCreation();
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    (txMock.assessmentTemplate.create as jest.Mock).mockImplementation(
+      ({ data }: { data: { alias: string } }) => ({
+        id: "tpl-1",
+        alias: data.alias,
+      }),
+    );
+    (txMock.assessmentTemplateVersion.create as jest.Mock).mockResolvedValue({
+      id: "ver-1",
+    });
+
+    const res = await listPOST(
+      jsonReq("http://localhost/api/admin/assessment-templates", {
+        creationMode: "simplified",
+        name: "Test Template",
+      }) as never,
+    );
+
+    expect(res.status).toBe(201);
+    await expect(res.json()).resolves.toEqual({
+      success: true,
+      data: {
+        id: "tpl-1",
+        alias: "test-template",
+        versionId: "ver-1",
+      },
+    });
+    expect(txMock.assessmentTemplateVersion.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          language: "enUS",
+          questions: [],
+          sections: [],
+          scoringConfig: {
+            tierMetric: "countAchieved",
+            passThreshold: 0,
+            tiers: [],
+          },
+          publishedAt: null,
+        }),
+      }),
+    );
+    expect(txMock.assessmentTemplate.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          name: "Test Template",
+          alias: "test-template",
+          description: null,
+          invitationSubject: "You're invited to take an assessment",
+          aggregationMode: "FULL_VISIBILITY",
+        }),
+      }),
+    );
+  });
+
+  it("retries generated IDs through the third available alias exactly once per transaction", async () => {
+    enableSimplifiedCreation();
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    (txMock.assessmentTemplate.create as jest.Mock).mockImplementation(
+      ({ data }: { data: { alias: string } }) => ({ id: "tpl-1", alias: data.alias }),
+    );
+    let transactionAttempt = 0;
+    (db.$transaction as jest.Mock).mockImplementation(async (fn) => {
+      transactionAttempt += 1;
+      const result = await fn(txMock);
+      if (transactionAttempt < 3) throw { code: "P2002" };
+      return result;
+    });
+
+    const res = await listPOST(
+      jsonReq("http://localhost/api/admin/assessment-templates", {
+        creationMode: "simplified",
+        name: "Test Template",
+      }) as never,
+    );
+
+    expect(res.status).toBe(201);
+    await expect(res.json()).resolves.toEqual({
+      success: true,
+      data: { id: "tpl-1", alias: "test-template-3", versionId: "ver-1" },
+    });
+    expect(withRateLimit).toHaveBeenCalledTimes(1);
+    expect(db.$transaction).toHaveBeenCalledTimes(3);
+    expect(txMock.assessmentTemplate.create).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ data: expect.objectContaining({ alias: "test-template" }) }),
+    );
+    expect(txMock.assessmentTemplate.create).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ data: expect.objectContaining({ alias: "test-template-2" }) }),
+    );
+    expect(txMock.assessmentTemplate.create).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({ data: expect.objectContaining({ alias: "test-template-3" }) }),
+    );
+    expect(db.auditLog.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns 409 without changing a colliding manual ID", async () => {
+    enableSimplifiedCreation();
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    (db.$transaction as jest.Mock).mockRejectedValueOnce({ code: "P2002" });
+
+    const res = await listPOST(
+      jsonReq("http://localhost/api/admin/assessment-templates", {
+        creationMode: "simplified",
+        name: "Test Template",
+        internalId: "my-stable-id",
+      }) as never,
+    );
+
+    expect(res.status).toBe(409);
+    expect(db.$transaction).toHaveBeenCalledTimes(1);
+    expect(txMock.assessmentTemplate.create).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["the release flag is off", () => undefined],
+    ["the release flag is killed", () => {
+      enableSimplifiedCreation();
+      process.env.WAVE_TEMPLATE_CREATION_SIMPLIFIED_KILL = "1";
+    }],
+    ["the ED6 prerequisite is off", () => {
+      enableSimplifiedCreation();
+      delete process.env.WAVE_ED6_SINGLE_COLUMN_ENABLED;
+    }],
+    ["the ED9 prerequisite is killed", () => {
+      enableSimplifiedCreation();
+      process.env.WAVE_ED9_FORMS_BUILD_KILL = "1";
+    }],
+    ["the Wave T prerequisite is killed", () => {
+      enableSimplifiedCreation();
+      process.env.WAVE_T_QUESTION_EDITOR_KILL = "1";
+    }],
+  ])("rejects simplified mode before a transaction when %s", async (_reason, configure) => {
+    configure();
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+
+    const res = await listPOST(
+      jsonReq("http://localhost/api/admin/assessment-templates", {
+        creationMode: "simplified",
+        name: "Test Template",
+      }) as never,
+    );
+
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({
+      success: false,
+      error: "Simplified creation is unavailable",
+    });
+    expect(db.$transaction).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { creationMode: "simplified", name: "Test Template", unexpected: true },
+    { creationMode: "simplified", name: "Test Template", internalId: "Not Valid" },
+  ])("rejects malformed simplified requests before a transaction", async (body) => {
+    enableSimplifiedCreation();
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+
+    const res = await listPOST(
+      jsonReq("http://localhost/api/admin/assessment-templates", body) as never,
+    );
+
+    expect(res.status).toBe(400);
+    expect(db.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("rejects a whitespace-only simplified name even with a manual internal ID", async () => {
+    enableSimplifiedCreation();
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+
+    const res = await listPOST(
+      jsonReq("http://localhost/api/admin/assessment-templates", {
+        creationMode: "simplified",
+        name: "   ",
+        internalId: "valid-id",
+      }) as never,
+    );
+
+    expect(res.status).toBe(400);
+    expect(db.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("stops generated collision retries at 25 attempts", async () => {
+    enableSimplifiedCreation();
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    (db.$transaction as jest.Mock).mockRejectedValue({ code: "P2002" });
+
+    const res = await listPOST(
+      jsonReq("http://localhost/api/admin/assessment-templates", {
+        creationMode: "simplified",
+        name: "Test Template",
+      }) as never,
+    );
+
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toEqual({
+      success: false,
+      error: "Internal ID is already in use",
+    });
+    expect(db.$transaction).toHaveBeenCalledTimes(25);
+    expect(db.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it("returns 500 without an audit for a non-unique transaction error", async () => {
+    enableSimplifiedCreation();
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    (db.$transaction as jest.Mock).mockRejectedValue({ code: "P2003" });
+
+    const res = await listPOST(
+      jsonReq("http://localhost/api/admin/assessment-templates", {
+        creationMode: "simplified",
+        name: "Test Template",
+      }) as never,
+    );
+
+    expect(res.status).toBe(500);
+    expect(db.auditLog.create).not.toHaveBeenCalled();
+  });
+
   it("201 + creates template + first draft version + audit", async () => {
     (getApiActor as jest.Mock).mockResolvedValue(adminActor);
     (txMock.assessmentTemplate.create as jest.Mock).mockResolvedValue({
       id: "tpl-1",
       alias: "test-template",
     });
-    (txMock.assessmentTemplateVersion.create as jest.Mock).mockResolvedValue({});
+    (txMock.assessmentTemplateVersion.create as jest.Mock).mockResolvedValue({
+      id: "ver-1",
+    });
     const res = await listPOST(
       jsonReq("http://localhost/api/admin/assessment-templates", validBody) as never,
     );

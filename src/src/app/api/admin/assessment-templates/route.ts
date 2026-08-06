@@ -13,6 +13,11 @@ import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import { logAudit } from "@/lib/audit";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
 import { computeTemplateContentHash } from "@/lib/assessments/template-content-hash";
+import { isTemplateCreationSimplifiedEnabled } from "@/lib/assessments/wave-template-creation-flags";
+import {
+  generateTemplateInternalId,
+  templateInternalIdForAttempt,
+} from "@/lib/assessments/template-internal-id";
 
 interface AdminTemplateSummary {
   id: string;
@@ -93,6 +98,50 @@ const CreateTemplateBodySchema = z.object({
   reportConfig: z.unknown().optional().nullable(),
 });
 
+const InternalIdSchema = z
+  .string()
+  .min(1)
+  .max(80)
+  .regex(/^[a-z0-9][a-z0-9-]*$/);
+
+const SimplifiedCreateBodySchema = z
+  .object({
+    creationMode: z.literal("simplified"),
+    name: z.string().trim().min(1).max(200),
+    internalId: InternalIdSchema.optional(),
+  })
+  .strict();
+
+const MAX_GENERATED_INTERNAL_ID_ATTEMPTS = 25;
+
+const SIMPLIFIED_DEFAULTS = {
+  description: null,
+  invitationSubject: "You're invited to take an assessment",
+  invitationBodyMarkdown:
+    "Hi {{respondentFirstName}},\n\nYou've been invited to take the {{campaignName}} assessment.\n\n[Start the assessment]({{invitationUrl}})\n\nThe survey closes on {{closeAt}}.",
+  aggregationMode: "FULL_VISIBILITY" as const,
+  language: "enUS",
+  questions: [] as unknown[],
+  sections: [] as unknown[],
+  scoringConfig: {
+    tierMetric: "countAchieved",
+    passThreshold: 0,
+    tiers: [],
+  },
+  reportConfig: null,
+};
+
+type NormalizedCreateData = z.infer<typeof CreateTemplateBodySchema>;
+
+function isPrismaUniqueError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code: string }).code === "P2002"
+  );
+}
+
 export async function POST(request: NextRequest) {
   try {
     const rate = await withRateLimit(request, RateLimits.standard);
@@ -116,86 +165,169 @@ export async function POST(request: NextRequest) {
         { status: 403 },
       );
     }
+    const actorUserId = actor.userId;
 
     const body = await request.json().catch(() => ({}));
-    const parsed = CreateTemplateBodySchema.safeParse(body);
-    if (!parsed.success) {
-      return NextResponse.json(
-        { success: false, error: "Invalid body", details: parsed.error.flatten() },
-        { status: 400 },
-      );
+    const simplified =
+      typeof body === "object" &&
+      body !== null &&
+      "creationMode" in body &&
+      body.creationMode === "simplified";
+    let data: NormalizedCreateData;
+    let manualInternalId = false;
+
+    if (simplified) {
+      if (!isTemplateCreationSimplifiedEnabled()) {
+        return NextResponse.json(
+          { success: false, error: "Simplified creation is unavailable" },
+          { status: 400 },
+        );
+      }
+
+      const parsed = SimplifiedCreateBodySchema.safeParse(body);
+      if (!parsed.success) {
+        return NextResponse.json(
+          { success: false, error: "Invalid body", details: parsed.error.flatten() },
+          { status: 400 },
+        );
+      }
+
+      const generatedBase = generateTemplateInternalId(parsed.data.name);
+      if (!parsed.data.internalId && !generatedBase) {
+        return NextResponse.json(
+          { success: false, error: "Internal ID is required" },
+          { status: 400 },
+        );
+      }
+
+      data = {
+        name: parsed.data.name,
+        alias: parsed.data.internalId ?? generatedBase,
+        ...SIMPLIFIED_DEFAULTS,
+      };
+      manualInternalId = parsed.data.internalId !== undefined;
+    } else {
+      const parsed = CreateTemplateBodySchema.safeParse(body);
+      if (!parsed.success) {
+        return NextResponse.json(
+          { success: false, error: "Invalid body", details: parsed.error.flatten() },
+          { status: 400 },
+        );
+      }
+      data = parsed.data;
     }
-    const data = parsed.data;
 
-    const contentHash = computeTemplateContentHash({
-      questions: data.questions,
-      sections: data.sections,
-      scoringConfig: data.scoringConfig,
-      reportConfig: data.reportConfig ?? null,
-      invitationSubject: data.invitationSubject,
-      invitationBodyMarkdown: data.invitationBodyMarkdown,
-    });
+    async function createOnce(createData: NormalizedCreateData) {
+      const contentHash = computeTemplateContentHash({
+        questions: createData.questions,
+        sections: createData.sections,
+        scoringConfig: createData.scoringConfig,
+        reportConfig: createData.reportConfig ?? null,
+        invitationSubject: createData.invitationSubject,
+        invitationBodyMarkdown: createData.invitationBodyMarkdown,
+      });
 
-    try {
-      const template = await db.$transaction(async (tx) => {
+      const created = await db.$transaction(async (tx) => {
         const tpl = await tx.assessmentTemplate.create({
           data: {
-            name: data.name,
-            alias: data.alias,
-            description: data.description ?? null,
-            invitationSubject: data.invitationSubject,
-            invitationBodyMarkdown: data.invitationBodyMarkdown,
-            aggregationMode: data.aggregationMode,
-            createdBy: actor.userId,
+            name: createData.name,
+            alias: createData.alias,
+            description: createData.description ?? null,
+            invitationSubject: createData.invitationSubject,
+            invitationBodyMarkdown: createData.invitationBodyMarkdown,
+            aggregationMode: createData.aggregationMode,
+            createdBy: actorUserId,
           },
           select: { id: true, alias: true },
         });
-        await tx.assessmentTemplateVersion.create({
+        const version = await tx.assessmentTemplateVersion.create({
           data: {
             templateId: tpl.id,
             versionNumber: 1,
-            language: data.language,
-            questions: data.questions as Prisma.InputJsonValue,
-            sections: data.sections as Prisma.InputJsonValue,
-            scoringConfig: data.scoringConfig as Prisma.InputJsonValue,
+            language: createData.language,
+            questions: createData.questions as Prisma.InputJsonValue,
+            sections: createData.sections as Prisma.InputJsonValue,
+            scoringConfig: createData.scoringConfig as Prisma.InputJsonValue,
             reportConfig:
-              data.reportConfig === null || data.reportConfig === undefined
+              createData.reportConfig === null || createData.reportConfig === undefined
                 ? Prisma.JsonNull
-                : (data.reportConfig as Prisma.InputJsonValue),
+                : (createData.reportConfig as Prisma.InputJsonValue),
             contentHash,
             publishedAt: null,
             publishedBy: null,
           },
         });
-        return tpl;
+        return { template: tpl, versionId: version.id };
       });
 
-      await logAudit({
-        entityType: "AssessmentTemplate",
-        entityId: template.id,
-        action: "CREATE",
-        performedBy: actor.email ?? actor.userId,
-        changes: { alias: template.alias, contentHash, language: data.language },
-      });
-
-      return NextResponse.json(
-        { success: true, data: { id: template.id, alias: template.alias } },
-        { status: 201 },
-      );
-    } catch (error) {
-      if (
-        typeof error === "object" &&
-        error !== null &&
-        "code" in error &&
-        (error as { code: string }).code === "P2002"
-      ) {
-        return NextResponse.json(
-          { success: false, error: "alias already in use" },
-          { status: 409 },
-        );
-      }
-      throw error;
+      return { ...created, contentHash };
     }
+
+    let created: Awaited<ReturnType<typeof createOnce>>;
+    if (!simplified) {
+      try {
+        created = await createOnce(data);
+      } catch (error) {
+        if (isPrismaUniqueError(error)) {
+          return NextResponse.json(
+            { success: false, error: "alias already in use" },
+            { status: 409 },
+          );
+        }
+        throw error;
+      }
+    } else {
+      let successfulCreation: Awaited<ReturnType<typeof createOnce>> | undefined;
+      for (
+        let attempt = 1;
+        attempt <= (manualInternalId ? 1 : MAX_GENERATED_INTERNAL_ID_ATTEMPTS);
+        attempt += 1
+      ) {
+        const alias = manualInternalId
+          ? data.alias
+          : templateInternalIdForAttempt(data.alias, attempt);
+        try {
+          successfulCreation = await createOnce({ ...data, alias });
+          break;
+        } catch (error) {
+          if (!isPrismaUniqueError(error)) throw error;
+          if (manualInternalId || attempt === MAX_GENERATED_INTERNAL_ID_ATTEMPTS) {
+            return NextResponse.json(
+              { success: false, error: "Internal ID is already in use" },
+              { status: 409 },
+            );
+          }
+        }
+      }
+      if (!successfulCreation) throw new Error("Template creation did not complete");
+      created = successfulCreation;
+    }
+
+    await logAudit({
+      entityType: "AssessmentTemplate",
+      entityId: created.template.id,
+      action: "CREATE",
+      performedBy: actor.email ?? actor.userId,
+      changes: {
+        alias: created.template.alias,
+        contentHash: created.contentHash,
+        language: data.language,
+      },
+    });
+
+    return NextResponse.json(
+      {
+        success: true,
+        data: simplified
+          ? {
+              id: created.template.id,
+              alias: created.template.alias,
+              versionId: created.versionId,
+            }
+          : { id: created.template.id, alias: created.template.alias },
+      },
+      { status: 201 },
+    );
   } catch (error) {
     console.error("Error creating template:", error);
     return NextResponse.json(
