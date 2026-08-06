@@ -287,6 +287,22 @@ export async function POST(
       );
     };
 
+    const readFrozenReportStyleForReplay = async (): Promise<ReportStyleKey> => {
+      const frozenCampaign = await db.assessmentCampaign.findUnique({
+        where: { id: campaign.id },
+        select: {
+          reportStyle: true,
+          reportStyleLockedAt: true,
+        },
+      });
+      if (!frozenCampaign || frozenCampaign.reportStyleLockedAt === null) {
+        throw new Error(
+          "Idempotent submission replay found no frozen campaign appearance",
+        );
+      }
+      return frozenCampaign.reportStyle;
+    };
+
     const existingIdempotentSubmission =
       await findExistingIdempotentSubmission();
     if (
@@ -378,6 +394,7 @@ export async function POST(
       return resolveIdempotentReplay(
         existingIdempotentSubmission,
         submittedAnswers,
+        await readFrozenReportStyleForReplay(),
       );
     }
 
@@ -479,9 +496,27 @@ export async function POST(
     }
 
     const suEmail = suTeamAddress.trim().toLowerCase();
+    const suTeamPayload: PublicQuizOutboxPayload | null =
+      suEmail.length > 0
+        ? {
+            recipient: { role: "SU_TEAM", email: suEmail },
+            ...buildLeadEmail({
+              taker: data.publicTaker,
+              assessmentName,
+              perDomain: domainInputs,
+              lowestLabel: lowest?.label ?? null,
+              recipientRole: "SU_TEAM",
+            }),
+          }
+        : null;
+    type PublicReportEmailRenderCache = {
+      takerCopy?: { subject: string; bodyHtml: string };
+      coachCopy?: { subject: string; bodyHtml: string };
+    };
     const buildOutboxPayloads = (
       reportStyle: ReportStyleKey,
       verifiedCoach: typeof coach | null,
+      renderCache: PublicReportEmailRenderCache,
     ): PublicQuizOutboxPayload[] => {
       const payloads: PublicQuizOutboxPayload[] = [];
       const respondentReport = buildRespondentReport(
@@ -490,11 +525,14 @@ export async function POST(
       );
 
       // TAKER_COPY — always (the taker submitted their own email + consented).
-      const takerCopy = buildReportEmailHtml({
-        report: respondentReport,
-        recipientRole: "TAKER_COPY",
-        chrome,
-      });
+      const takerCopy =
+        renderCache.takerCopy ??
+        buildReportEmailHtml({
+          report: respondentReport,
+          recipientRole: "TAKER_COPY",
+          chrome,
+        });
+      renderCache.takerCopy = takerCopy;
       payloads.push({
         recipient: { role: "TAKER_COPY", email: data.publicTaker.email },
         ...takerCopy,
@@ -514,11 +552,14 @@ export async function POST(
             cancelReason: "SAME_MAILBOX_AS_TAKER",
           });
         } else {
-          const coachCopy = buildReportEmailHtml({
-            report: respondentReport,
-            recipientRole: "REFERRING_COACH",
-            chrome,
-          });
+          const coachCopy =
+            renderCache.coachCopy ??
+            buildReportEmailHtml({
+              report: respondentReport,
+              recipientRole: "REFERRING_COACH",
+              chrome,
+            });
+          renderCache.coachCopy = coachCopy;
           payloads.push({
             recipient: { role: "REFERRING_COACH", email: activeCoachEmail },
             ...coachCopy,
@@ -527,19 +568,7 @@ export async function POST(
       }
 
       // SU_TEAM — unchanged lead-alert summary, only when an SU address is set.
-      if (suEmail.length > 0) {
-        const lead = buildLeadEmail({
-          taker: data.publicTaker,
-          assessmentName,
-          perDomain: domainInputs,
-          lowestLabel: lowest?.label ?? null,
-          recipientRole: "SU_TEAM",
-        });
-        payloads.push({
-          recipient: { role: "SU_TEAM", email: suEmail },
-          ...lead,
-        });
-      }
+      if (suTeamPayload) payloads.push(suTeamPayload);
 
       return payloads;
     };
@@ -555,12 +584,25 @@ export async function POST(
         withoutReferral: PublicQuizOutboxPayload[];
       }
     >();
+    // Build every style-specific canonical model outside the lock. The email
+    // renderer itself does not read `reportStyle`, so cache only its
+    // byte-identical output per referral/recipient variant.
+    const withoutReferralRenderCache: PublicReportEmailRenderCache = {};
+    const withVerifiedReferralRenderCache: PublicReportEmailRenderCache = {};
     for (const style of REPORT_STYLE_KEYS) {
-      const withoutReferral = buildOutboxPayloads(style, null);
+      const withoutReferral = buildOutboxPayloads(
+        style,
+        null,
+        withoutReferralRenderCache,
+      );
       outboxCandidates.set(style, {
         withoutReferral,
         withVerifiedReferral: coach
-          ? buildOutboxPayloads(style, coach)
+          ? buildOutboxPayloads(
+              style,
+              coach,
+              withVerifiedReferralRenderCache,
+            )
           : withoutReferral,
       });
     }
@@ -569,7 +611,6 @@ export async function POST(
     // Transactional write: freeze appearance + submission + selected outbox.
     // All heavy candidates above were built before this row-locking section.
     // -----------------------------------------------------------------------
-    let orderedReportStyle: ReportStyleKey | null = null;
     const persistSubmission = (
       referral: { id: string; email: string } | null,
     ) =>
@@ -582,7 +623,6 @@ export async function POST(
           campaign.id,
           now,
         );
-        orderedReportStyle = reportStyle;
 
         // The Coach may be deactivated/expired between the public pre-read and
         // this write. Re-read eligibility in the write transaction; this is
@@ -701,7 +741,7 @@ export async function POST(
           return resolveIdempotentReplay(
             concurrentExisting,
             submittedAnswers,
-            orderedReportStyle ?? campaign.reportStyle,
+            await readFrozenReportStyleForReplay(),
           );
         }
         // Race condition: P2002 but row not found → rethrow as 500.

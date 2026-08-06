@@ -18,8 +18,10 @@
  *
  * SAFETY INVARIANTS (S1 — non-negotiable):
  *   - Insert / create-only upsert ONLY, except for the narrow conditional
- *     campaign lock written when an empty reused campaign gains its first
- *     imported completion. NEVER delete / deleteMany / updateMany.
+ *     campaign `updateMany` that moves the appearance lock earlier when a
+ *     reused campaign gains an older imported completion. It targets one
+ *     unique id, changes only `reportStyleLockedAt`, and is monotonic.
+ *     NEVER delete / deleteMany.
  *   - NO raw SQL (the campaign is keyed by its unique externalId).
  *   - Imported invitations are born `status:"SUBMITTED"` and the importer NEVER
  *     calls any email-send function — there is no send path in this module.
@@ -137,10 +139,16 @@ export interface ResultsCommitTx {
       select: { id: true };
     }) => Promise<IdRow | null>;
     create: (args: { data: Record<string, unknown> }) => Promise<IdRow>;
-    update: (args: {
-      where: { id: string; reportStyleLockedAt: null };
+    updateMany: (args: {
+      where: {
+        id: string;
+        OR: Array<
+          | { reportStyleLockedAt: null }
+          | { reportStyleLockedAt: { gt: Date } }
+        >;
+      };
       data: { reportStyleLockedAt: Date };
-    }) => Promise<IdRow>;
+    }) => Promise<{ count: number }>;
   };
   orgRespondent: {
     findMany: (args: {
@@ -315,24 +323,6 @@ export async function commitResultsImport(
         campaignAction = "create";
       }
 
-      const firstImportedCompletion = earliestImportedSubmissionTime(
-        campaign.rows,
-      );
-      if (
-        campaignAction === "reuse" &&
-        existing?.reportStyleLockedAt == null &&
-        firstImportedCompletion
-      ) {
-        // Empty imports are valid. If a later reuse adds the first historical
-        // completion, freeze the existing stored appearance before creating
-        // that submission. The conditional update orders with concurrent
-        // appearance saves and preserves style + provenance.
-        await tx.assessmentCampaign.update({
-          where: { id: campaignId, reportStyleLockedAt: null },
-          data: { reportStyleLockedAt: firstImportedCompletion },
-        });
-      }
-
       // ── 2. Single-CEO guard: resolve roleType for the campaign's respondent
       //    ids; if EXACTLY ONE is CEO-family, that respondent is the CEO. 0 or
       //    >1 → no CEO (never silently first-wins under ambiguity). ──────────
@@ -355,8 +345,15 @@ export async function commitResultsImport(
       let submissionsSkipped = 0;
 
       // ── 3. Per-row chain: participant → invitation (SUBMITTED) → submission. ─
+      // Prepare every create-only participant/invitation and discover which
+      // submissions are genuinely new before freezing the historical minimum.
+      // The campaign lock is then written before any new completion row.
       const expiresAt = new Date(campaign.closeAt ?? campaign.openAt);
       const sentAt = new Date(campaign.openAt);
+      const pendingSubmissions: Array<{
+        row: (typeof campaign.rows)[number];
+        invitationId: string;
+      }> = [];
 
       for (const row of campaign.rows) {
         const isCEO = row.respondentId === ceoRespondentId;
@@ -414,7 +411,29 @@ export async function commitResultsImport(
           submissionsSkipped++;
           continue;
         }
+        pendingSubmissions.push({ row, invitationId: invitation.id });
+      }
 
+      const firstNewImportedCompletion = earliestImportedSubmissionTime(
+        pendingSubmissions.map(({ row }) => row),
+      );
+      if (campaignAction === "reuse" && firstNewImportedCompletion) {
+        // Atomically apply MIN(existing lock, earliest NEW completion). The
+        // predicate is re-evaluated after any concurrent campaign-row writer,
+        // so a later importer can never overwrite an earlier timestamp.
+        await tx.assessmentCampaign.updateMany({
+          where: {
+            id: campaignId,
+            OR: [
+              { reportStyleLockedAt: null },
+              { reportStyleLockedAt: { gt: firstNewImportedCompletion } },
+            ],
+          },
+          data: { reportStyleLockedAt: firstNewImportedCompletion },
+        });
+      }
+
+      for (const { row, invitationId } of pendingSubmissions) {
         const answers: Answer[] = row.answers.map((a) => ({
           stableKey: a.stableKey,
           value: a.value,
@@ -427,7 +446,7 @@ export async function commitResultsImport(
           data: {
             campaignId,
             respondentId: row.respondentId,
-            invitationId: invitation.id,
+            invitationId,
             answers: answers as unknown as object,
             result: scoreResult as unknown as object,
             submittedAt: new Date(row.submittedAt),

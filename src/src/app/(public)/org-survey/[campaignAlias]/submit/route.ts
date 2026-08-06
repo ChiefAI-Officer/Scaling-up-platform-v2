@@ -59,7 +59,6 @@ import {
   buildCoachNotifyEmail,
 } from "@/lib/assessments/results-email";
 import { respondentDisplayName } from "@/lib/assessments/respondent-display-name";
-import { classifyOutboxEnqueueFailure } from "@/lib/assessments/outbox-enqueue-failure";
 import { normalizeMailbox } from "@/lib/assessments/quick-assessment-lead";
 import {
   INTENT_RENDERER_CONTRACT_VERSION,
@@ -147,6 +146,16 @@ type PreparedDeliveryRow = PreparedOutboxRow & {
   contentProvenance: ContentProvenanceV1;
 };
 
+interface SharedWaveDEmailRenderCache {
+  /** `undefined` = not attempted, `null` = attempted but safely dropped. */
+  results?: { bodyHtml: string } | null;
+  coach?: {
+    subject: string;
+    bodyHtml: string;
+    renderInputHash: string;
+  } | null;
+}
+
 interface EnqueueArgs {
   campaign: {
     id: string;
@@ -179,6 +188,7 @@ interface EnqueueArgs {
   reportRenderInputHash: string;
   respectGlobalPause: boolean;
   prepareIntentMetadata: boolean;
+  renderCache: SharedWaveDEmailRenderCache;
   /**
    * Wave OSR: one prebuilt style candidate. The transaction selects exactly
    * one model and shares it between #15 email and on-screen payload.
@@ -204,6 +214,7 @@ function buildWaveDOutboxRows({
   reportRenderInputHash,
   respectGlobalPause,
   prepareIntentMetadata,
+  renderCache,
 }: EnqueueArgs): PreparedDeliveryRow[] {
   const rows: PreparedDeliveryRow[] = [];
 
@@ -226,82 +237,88 @@ function buildWaveDOutboxRows({
     // drops this email exactly as the old in-place try/catch did.
     report !== null
   ) {
-    try {
-      const chrome = reportEmailChromeForCampaign(campaign.id);
-      const { bodyHtml: reportHtml, renderError } = buildReportEmailHtml({
-        report,
-        recipientRole: "TAKER_COPY",
-        chrome,
-      });
-      // M4: buildReportEmailHtml never throws — on a qualitative body-render
-      // failure it degrades to a safe body + a renderError signal. Surface it
-      // (the submission still succeeds) so the fallback is diagnosable.
-      //
-      // R3-M1 / T11-M4: the assessment /admin/observability dashboard (spec-06)
-      // is v1 DB-derived with NO metric counter backend, so there is no
-      // lightweight counter to increment. Emit a STRUCTURED, greppable
-      // render-failure log instead — labeled by templateAlias / reportType /
-      // recipientRole / emailType — which is the v1 alert source (a dashboard
-      // panel is a tracked follow-up; see 17e-ops-runbook §Observability).
-      if (renderError) {
-        console.error("[assessment-report] render-failure", {
-          templateAlias: template.alias,
-          reportType: reportConfigFor(template.alias).reportType,
-          renderPath: "email",
-          recipientRole: "RESPONDENT",
-          emailType: "ASSESSMENT_RESULTS",
+    if (renderCache.results === undefined) {
+      try {
+        // Report style changes the on-screen/PDF presentation only. The email
+        // renderer deliberately does not read `reportStyle`, so render its
+        // byte-identical HTML once while keeping each style's canonical report
+        // model and provenance hash distinct.
+        const chrome = reportEmailChromeForCampaign(campaign.id);
+        const { bodyHtml: reportHtml, renderError } = buildReportEmailHtml({
+          report,
+          recipientRole: "TAKER_COPY",
+          chrome,
+        });
+        // M4: buildReportEmailHtml never throws — on a qualitative body-render
+        // failure it degrades to a safe body + a renderError signal. Surface it
+        // (the submission still succeeds) so the fallback is diagnosable.
+        if (renderError) {
+          console.error("[assessment-report] render-failure", {
+            templateAlias: template.alias,
+            reportType: reportConfigFor(template.alias).reportType,
+            renderPath: "email",
+            recipientRole: "RESPONDENT",
+            emailType: "ASSESSMENT_RESULTS",
+            campaignId: campaign.id,
+            errorName: "ReportRenderError",
+          });
+        }
+        renderCache.results =
+          !renderError || !prepareIntentMetadata
+            ? {
+                bodyHtml: buildResultsEmailHtml({
+                  bodyMarkdown: template.resultsEmailBodyMarkdown ?? "",
+                  reportHtml,
+                }),
+              }
+            : null;
+      } catch (err) {
+        renderCache.results = null;
+        // Do NOT abort the submission — drop this email only.
+        console.error("[assessment-submit] #15 results render skipped", {
           campaignId: campaign.id,
-          errorName: "ReportRenderError",
-        });
-      }
-      if (!renderError || !prepareIntentMetadata) {
-        const bodyHtml = buildResultsEmailHtml({
-          bodyMarkdown: template.resultsEmailBodyMarkdown ?? "",
-          reportHtml,
-        });
-        const contentProvenance: ContentProvenanceV1 = prepareIntentMetadata
-          ? {
-              schemaVersion: INTENT_SNAPSHOT_SCHEMA_VERSION,
-              templateId: template.id,
-              versionId: campaign.version.id,
-              templateAlias: template.alias,
-              reportType: reportConfigFor(template.alias).reportType,
-              approvalHash: template.resultsEmailContentApprovedHash,
-              rendererContractVersion: INTENT_RENDERER_CONTRACT_VERSION,
-              sourceCommit: sourceCommitIdentifier(),
-              renderInputHash: reportRenderInputHash,
-            }
-          : {
-              schemaVersion: INTENT_SNAPSHOT_SCHEMA_VERSION,
-              templateId: template.id,
-              versionId: campaign.version.id,
-              templateAlias: template.alias,
-              reportType: "unused-in-legacy-mode",
-              approvalHash: template.resultsEmailContentApprovedHash,
-              rendererContractVersion: INTENT_RENDERER_CONTRACT_VERSION,
-              sourceCommit: "unused-in-legacy-mode",
-              renderInputHash: "",
-            };
-        rows.push({
-          recipientEmail: respondentEmail,
-          canonicalRecipientMailbox: prepareIntentMetadata
-            ? normalizeMailbox(respondentEmail)
-            : "",
           recipientRole: "RESPONDENT",
           emailType: "ASSESSMENT_RESULTS",
-          subject: template.resultsEmailSubject ?? "Your assessment results",
-          bodyHtml,
-          renderInputHash: prepareIntentMetadata ? reportRenderInputHash : "",
-          contentProvenance,
+          errorName: errorNameOnly(err),
         });
       }
-    } catch (err) {
-      // Do NOT abort the submission — drop this email only.
-      console.error("[assessment-submit] #15 results render skipped", {
-        campaignId: campaign.id,
+    }
+
+    if (renderCache.results) {
+      const contentProvenance: ContentProvenanceV1 = prepareIntentMetadata
+        ? {
+            schemaVersion: INTENT_SNAPSHOT_SCHEMA_VERSION,
+            templateId: template.id,
+            versionId: campaign.version.id,
+            templateAlias: template.alias,
+            reportType: reportConfigFor(template.alias).reportType,
+            approvalHash: template.resultsEmailContentApprovedHash,
+            rendererContractVersion: INTENT_RENDERER_CONTRACT_VERSION,
+            sourceCommit: sourceCommitIdentifier(),
+            renderInputHash: reportRenderInputHash,
+          }
+        : {
+            schemaVersion: INTENT_SNAPSHOT_SCHEMA_VERSION,
+            templateId: template.id,
+            versionId: campaign.version.id,
+            templateAlias: template.alias,
+            reportType: "unused-in-legacy-mode",
+            approvalHash: template.resultsEmailContentApprovedHash,
+            rendererContractVersion: INTENT_RENDERER_CONTRACT_VERSION,
+            sourceCommit: "unused-in-legacy-mode",
+            renderInputHash: "",
+          };
+      rows.push({
+        recipientEmail: respondentEmail,
+        canonicalRecipientMailbox: prepareIntentMetadata
+          ? normalizeMailbox(respondentEmail)
+          : "",
         recipientRole: "RESPONDENT",
         emailType: "ASSESSMENT_RESULTS",
-        errorName: errorNameOnly(err),
+        subject: template.resultsEmailSubject ?? "Your assessment results",
+        bodyHtml: renderCache.results.bodyHtml,
+        renderInputHash: prepareIntentMetadata ? reportRenderInputHash : "",
+        contentProvenance,
       });
     }
   }
@@ -314,24 +331,40 @@ function buildWaveDOutboxRows({
     campaign.createdByCoachId &&
     coachEmail
   ) {
-    try {
-      const coachRenderInput = {
-        appUrl: process.env.APP_URL ?? "",
-        campaignId: campaign.id,
-        respondentId,
-        assessmentName: campaign.template?.name ?? "an assessment",
-        // Jeff #50 — show the coach WHO completed it. respondentDisplayName
-        // falls back to the email when the roster name is blank (Wave P).
-        respondentName: respondentDisplayName(
-          respondent?.firstName,
-          respondent?.lastName,
-          respondent?.email,
-        ),
-      };
-      const { subject, bodyHtml } = buildCoachNotifyEmail(coachRenderInput);
-      const renderInputHash = prepareIntentMetadata
-        ? stableInputHash(coachRenderInput)
-        : "";
+    if (renderCache.coach === undefined) {
+      try {
+        const coachRenderInput = {
+          appUrl: process.env.APP_URL ?? "",
+          campaignId: campaign.id,
+          respondentId,
+          assessmentName: campaign.template?.name ?? "an assessment",
+          // Jeff #50 — show the coach WHO completed it. respondentDisplayName
+          // falls back to the email when the roster name is blank (Wave P).
+          respondentName: respondentDisplayName(
+            respondent?.firstName,
+            respondent?.lastName,
+            respondent?.email,
+          ),
+        };
+        renderCache.coach = {
+          ...buildCoachNotifyEmail(coachRenderInput),
+          renderInputHash: prepareIntentMetadata
+            ? stableInputHash(coachRenderInput)
+            : "",
+        };
+      } catch (err) {
+        renderCache.coach = null;
+        console.error("[assessment-submit] #16 coach-notify render skipped", {
+          campaignId: campaign.id,
+          recipientRole: "OWNING_COACH",
+          emailType: "COACH_COMPLETION",
+          errorName: errorNameOnly(err),
+        });
+      }
+    }
+
+    if (renderCache.coach) {
+      const { subject, bodyHtml, renderInputHash } = renderCache.coach;
       const contentProvenance: ContentProvenanceV1 = prepareIntentMetadata
         ? {
             schemaVersion: INTENT_SNAPSHOT_SCHEMA_VERSION,
@@ -368,13 +401,6 @@ function buildWaveDOutboxRows({
         bodyHtml,
         renderInputHash,
         contentProvenance,
-      });
-    } catch (err) {
-      console.error("[assessment-submit] #16 coach-notify render skipped", {
-        campaignId: campaign.id,
-        recipientRole: "OWNING_COACH",
-        emailType: "COACH_COMPLETION",
-        errorName: errorNameOnly(err),
       });
     }
   }
@@ -844,6 +870,7 @@ export async function POST(
         ReportStyleKey,
         { report: RespondentReport | null; rows: PreparedDeliveryRow[] }
       >();
+      const sharedEmailRenders: SharedWaveDEmailRenderCache = {};
       for (const reportStyle of REPORT_STYLE_KEYS) {
         let report: RespondentReport | null = null;
         let reportRenderInputHash = "";
@@ -902,6 +929,7 @@ export async function POST(
             reportRenderInputHash,
             respectGlobalPause: !intentMode,
             prepareIntentMetadata: intentMode,
+            renderCache: sharedEmailRenders,
           }),
         });
       }
@@ -1123,30 +1151,21 @@ export async function POST(
                 versionId: locked.campaign.version?.id ?? null,
               });
             } catch (err) {
-              const { disposition } = classifyOutboxEnqueueFailure(err);
-              if (disposition === "rethrow") {
-                console.error("[assessment-submit] outbox enqueue FAILED IN-TX", {
-                  submissionId: submission.id,
-                  campaignId: locked.campaignId,
-                  invitationId,
-                  recipientRole: row.recipientRole,
-                  emailType: row.emailType,
-                  consequence:
-                    "transaction aborted — this submission will NOT commit and the respondent must resubmit",
-                  errorName: errorNameOnly(err),
-                });
-                throw err;
-              }
-              console.error("[assessment-submit] outbox email DROPPED", {
+              // Every row reaching this point is fully rendered and authorized.
+              // A persistence failure therefore has no safe "skip" outcome:
+              // committing would lose the required delivery with no durable
+              // retry obligation. Abort so the invitation stays retryable.
+              console.error("[assessment-submit] outbox enqueue FAILED IN-TX", {
                 submissionId: submission.id,
                 campaignId: locked.campaignId,
                 invitationId,
                 recipientRole: row.recipientRole,
                 emailType: row.emailType,
                 consequence:
-                  "submission commits without this email; no retry will occur",
+                  "transaction aborted — this submission will NOT commit and the respondent must resubmit",
                 errorName: errorNameOnly(err),
               });
+              throw err;
             }
           }
         }

@@ -289,6 +289,29 @@ class FakeDb implements RestrictedCommitDb {
       }
       return { id: args.where.id };
     },
+    updateMany: async (args: {
+      where: {
+        id: string;
+        OR: Array<
+          | { reportStyleLockedAt: null }
+          | { reportStyleLockedAt: { gt: Date } }
+        >;
+      };
+      data: { reportStyleLockedAt: Date };
+    }) => {
+      this.campaignUpdates.push({ where: args.where, data: args.data });
+      for (const row of this.campaignsByExternalId.values()) {
+        if (
+          row.id === args.where.id &&
+          (row.reportStyleLockedAt === null ||
+            row.reportStyleLockedAt > args.data.reportStyleLockedAt)
+        ) {
+          row.reportStyleLockedAt = args.data.reportStyleLockedAt;
+          return { count: 1 };
+        }
+      }
+      return { count: 0 };
+    },
     // Extra delegate used only by canCreateCampaign's canAccessTemplate path — not part of
     // RestrictedCommitDb's declared surface but harmless to include for the fake.
   };
@@ -827,14 +850,16 @@ describe("commitRestrictedImport — REUSE exact no-op", () => {
 // ────────────────────────────────────────────────────────────────────────
 
 describe("commitRestrictedImport — REUSE superset append", () => {
-  function newBatchWithOneNewRespondent(): RestrictedImportPlan {
+  function newBatchWithOneNewRespondent(
+    submittedAt = "2025-03-04T09:00:00-04:00",
+  ): RestrictedImportPlan {
     const oldCampaign = makeCampaign();
     const oldManifest = makeManifest();
     const newRow = {
       respondentId: "resp-C",
       mid: RAW_MID_C_NEW,
       reportid: "rep-C",
-      submittedAt: "2025-03-04T09:00:00-04:00", // latest → new closeAt
+      submittedAt,
       answers: [{ stableKey: "SUF_rate_a", value: 9 }],
       answerHash: "hash-C-1",
     };
@@ -848,6 +873,56 @@ describe("commitRestrictedImport — REUSE superset append", () => {
       }),
     });
   }
+
+  it("backdates the lock when a newly discovered restricted completion is older", async () => {
+    const lockedAt = new Date("2025-03-01T10:00:00-04:00");
+    const olderSubmittedAt = "2025-02-15T08:30:00-05:00";
+    const db = makeFakeDbWithAccess();
+    const existing = db.seedExistingCampaign({
+      externalId: "esperto:sufull:cidSUFULL01:2025-annual",
+      organizationId: "org-1",
+      templateId: "tmpl-sufull",
+      versionId: EXISTING_CAMPAIGN_VERSION_ID,
+      importManifest: makeManifest(),
+      reportStyle: "EXECUTIVE_BOARDROOM",
+      reportStyleSource: "CAMPAIGN_OVERRIDE",
+      reportStyleLockedAt: lockedAt,
+    });
+    db.versions.set(EXISTING_CAMPAIGN_VERSION_ID, {
+      id: EXISTING_CAMPAIGN_VERSION_ID,
+      questions: [],
+      sections: [],
+      scoringConfig: {},
+    });
+    db.seedOrg("org-1", "cidSUFULL01");
+
+    await commitRestrictedImport(
+      db,
+      newBatchWithOneNewRespondent(olderSubmittedAt),
+      baseCtx(),
+      actor,
+    );
+
+    expect(existing).toMatchObject({
+      reportStyle: "EXECUTIVE_BOARDROOM",
+      reportStyleSource: "CAMPAIGN_OVERRIDE",
+      reportStyleLockedAt: new Date(olderSubmittedAt),
+    });
+    expect(
+      db.campaignUpdates.find((entry) =>
+        Object.hasOwn(entry.data, "reportStyleLockedAt"),
+      ),
+    ).toEqual({
+      where: {
+        id: existing.id,
+        OR: [
+          { reportStyleLockedAt: null },
+          { reportStyleLockedAt: { gt: new Date(olderSubmittedAt) } },
+        ],
+      },
+      data: { reportStyleLockedAt: new Date(olderSubmittedAt) },
+    });
+  });
 
   it("locks an empty first import at its first appended completion while preserving stored appearance", async () => {
     const db = makeFakeDbWithAccess();
@@ -882,7 +957,17 @@ describe("commitRestrictedImport — REUSE superset append", () => {
         Object.hasOwn(entry.data, "reportStyleLockedAt"),
       ),
     ).toEqual({
-      where: { id: existing.id, reportStyleLockedAt: null },
+      where: {
+        id: existing.id,
+        OR: [
+          { reportStyleLockedAt: null },
+          {
+            reportStyleLockedAt: {
+              gt: new Date("2025-03-01T10:00:00-04:00"),
+            },
+          },
+        ],
+      },
       data: {
         reportStyleLockedAt: new Date("2025-03-01T10:00:00-04:00"),
       },

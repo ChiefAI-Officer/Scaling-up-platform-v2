@@ -42,9 +42,10 @@ async function bounded<T>(operation: Promise<T>, label: string, timeoutMs = 10_0
   }
 }
 
-async function waitForCoachUpdateLockWait(
+async function waitForCampaignUpdateLockWait(
   observer: PrismaClient,
-  coachBackendPid: number,
+  backendPid: number,
+  actor: string,
   timeoutMs = 10_000,
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
@@ -52,7 +53,7 @@ async function waitForCoachUpdateLockWait(
     const blockedUpdate = await observer.$queryRaw<Array<{ pid: number }>>`
       SELECT "pid"
       FROM pg_stat_activity
-      WHERE "pid" = ${coachBackendPid}
+      WHERE "pid" = ${backendPid}
         AND "state" = ${"active"}
         AND "wait_event_type" = ${"Lock"}
         AND "wait_event" = ${"transactionid"}
@@ -62,7 +63,7 @@ async function waitForCoachUpdateLockWait(
     await new Promise((resolve) => setTimeout(resolve, 25));
   }
   throw new Error(
-    `Coach backend ${coachBackendPid} was not observed blocked on the campaign update`,
+    `${actor} backend ${backendPid} was not observed blocked on the campaign update`,
   );
 }
 
@@ -117,18 +118,59 @@ describe("report style first-completion lock on PostgreSQL", () => {
       VALUES (${"campaign-update-first"}, ${"CLASSIC"})
     `;
 
-    const updated = await coachDb.$transaction((tx) => tx.$executeRaw`
-      UPDATE "assessment_campaigns"
-      SET "reportStyle" = ${"MODERN_DASHBOARD"}
-      WHERE "id" = ${"campaign-update-first"}
-        AND "reportStyleLockedAt" IS NULL
-    `);
-    expect(updated).toBe(1);
-
+    const saveAcquired = deferred<void>();
+    const releaseSave = deferred<void>();
+    const completionBackendPid = deferred<number>();
+    let completion: Promise<unknown> | null = null;
     const submittedAt = new Date("2026-08-05T06:31:00.000Z");
-    await completionDb.$transaction(async (tx) => {
-      await lockReportStyleForFirstCompletion(tx, "campaign-update-first", submittedAt);
+    const save = coachDb.$transaction(async (tx) => {
+      const updated = await tx.$executeRaw`
+        UPDATE "assessment_campaigns"
+        SET "reportStyle" = ${"MODERN_DASHBOARD"}
+        WHERE "id" = ${"campaign-update-first"}
+          AND "reportStyleLockedAt" IS NULL
+      `;
+      expect(updated).toBe(1);
+      saveAcquired.resolve();
+      await releaseSave.promise;
     });
+
+    try {
+      await bounded(saveAcquired.promise, "appearance save acquisition");
+      completion = completionDb.$transaction(async (tx) => {
+        const backendPids = await tx.$queryRaw<Array<{ pid: number }>>`
+          SELECT pg_backend_pid()::int AS "pid"
+        `;
+        completionBackendPid.resolve(backendPids[0].pid);
+        return lockReportStyleForFirstCompletion(
+          tx,
+          "campaign-update-first",
+          submittedAt,
+        );
+      });
+
+      const completionPid = await bounded(
+        completionBackendPid.promise,
+        "completion transaction startup",
+      );
+      await waitForCampaignUpdateLockWait(
+        admin,
+        completionPid,
+        "Completion",
+      );
+      releaseSave.resolve();
+      const [, frozenStyle] = await bounded(
+        Promise.all([save, completion]),
+        "save-first transaction ordering",
+      );
+      expect(frozenStyle).toBe("MODERN_DASHBOARD");
+    } finally {
+      releaseSave.resolve();
+      await Promise.allSettled([
+        save,
+        ...(completion === null ? [] : [completion]),
+      ]);
+    }
 
     const rows = await coachDb.$queryRaw<
       Array<{ reportStyle: string; reportStyleLockedAt: Date | null }>
@@ -180,7 +222,7 @@ describe("report style first-completion lock on PostgreSQL", () => {
         coachBackendPid.promise,
         "coach transaction startup",
       );
-      await waitForCoachUpdateLockWait(admin, coachPid);
+      await waitForCampaignUpdateLockWait(admin, coachPid, "Coach");
       releaseFreeze.resolve();
       const [, affected] = await bounded(
         Promise.all([freeze, coachUpdate]),

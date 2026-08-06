@@ -748,6 +748,32 @@ describe("Wave D — outbox enqueue", () => {
     expect(roles).toHaveLength(2);
   });
 
+  it("builds three style-specific report models but renders style-independent email HTML once", async () => {
+    mockHappyInvitation();
+    const reportEmail = jest.requireMock(
+      "@/lib/assessments/report-email",
+    ) as {
+      buildRespondentReportFromSubmission: jest.Mock;
+      buildReportEmailHtml: jest.Mock;
+    };
+    const resultsEmail = jest.requireMock(
+      "@/lib/assessments/results-email",
+    ) as {
+      buildResultsEmailHtml: jest.Mock;
+      buildCoachNotifyEmail: jest.Mock;
+    };
+
+    const res = await submit();
+
+    expect(res.status).toBe(200);
+    expect(
+      reportEmail.buildRespondentReportFromSubmission,
+    ).toHaveBeenCalledTimes(3);
+    expect(reportEmail.buildReportEmailHtml).toHaveBeenCalledTimes(1);
+    expect(resultsEmail.buildResultsEmailHtml).toHaveBeenCalledTimes(1);
+    expect(resultsEmail.buildCoachNotifyEmail).toHaveBeenCalledTimes(1);
+  });
+
   it("#15 RESPONDENT row carries the respondent email + ASSESSMENT_RESULTS type + submission id", async () => {
     mockHappyInvitation();
     await submit();
@@ -844,6 +870,21 @@ describe("Wave D — outbox enqueue", () => {
     // #15 skipped (render threw); #16 still enqueued.
     expect(enqueuedRoles()).not.toContain("RESPONDENT");
     expect(enqueuedRoles()).toContain("OWNING_COACH");
+  });
+
+  it("aborts completion when a prepared legacy outbox row fails Prisma validation", async () => {
+    mockHappyInvitation();
+    const validationError = new Error("prepared outbox row rejected");
+    validationError.name = "PrismaClientValidationError";
+    txMock.assessmentEmailOutbox.create.mockRejectedValueOnce(validationError);
+
+    const res = await submit();
+
+    expect(res.status).toBe(500);
+    expect(txMock.assessmentSubmission.create).toHaveBeenCalledTimes(1);
+    expect(txMock.assessmentInvitation.update).not.toHaveBeenCalled();
+    expect(transactionCommitMarker).not.toHaveBeenCalled();
+    expect(transactionRollbackMarker).toHaveBeenCalledTimes(1);
   });
 });
 

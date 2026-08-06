@@ -88,6 +88,16 @@ export interface RestrictedCommitDb {
       where: { id: string; reportStyleLockedAt?: null };
       data: object;
     }): Promise<unknown>;
+    updateMany(args: {
+      where: {
+        id: string;
+        OR: Array<
+          | { reportStyleLockedAt: null }
+          | { reportStyleLockedAt: { gt: Date } }
+        >;
+      };
+      data: { reportStyleLockedAt: Date };
+    }): Promise<{ count: number }>;
   };
   assessmentTemplateVersion: {
     findUnique(args: {
@@ -635,14 +645,22 @@ async function commitReusePath(
     return { kind: "reused-noop", campaignId: existing.id };
   }
 
-  const firstImportedCompletion = earliestImportedSubmissionTime(campaign.rows);
-  if (existing.reportStyleLockedAt === null && firstImportedCompletion) {
-    // An empty first import creates a valid unlocked campaign. Freeze its
-    // existing stored appearance before a superset reuse appends the first
-    // historical submission; style and provenance are deliberately untouched.
-    await tx.assessmentCampaign.update({
-      where: { id: existing.id, reportStyleLockedAt: null },
-      data: { reportStyleLockedAt: firstImportedCompletion },
+  const firstNewImportedCompletion = earliestImportedSubmissionTime(
+    newOnly.map(({ row }) => row),
+  );
+  if (firstNewImportedCompletion) {
+    // Atomically apply MIN(existing lock, earliest NEW completion). This
+    // handles both an empty first import and a later-discovered older row while
+    // leaving reportStyle/reportStyleSource untouched.
+    await tx.assessmentCampaign.updateMany({
+      where: {
+        id: existing.id,
+        OR: [
+          { reportStyleLockedAt: null },
+          { reportStyleLockedAt: { gt: firstNewImportedCompletion } },
+        ],
+      },
+      data: { reportStyleLockedAt: firstNewImportedCompletion },
     });
   }
 

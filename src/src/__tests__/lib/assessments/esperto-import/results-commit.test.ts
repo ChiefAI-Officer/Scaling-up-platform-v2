@@ -18,7 +18,8 @@
  *   - an existing submission for the invitation is SKIPPED (create-only re-import);
  *   - an externalId that resolves to a different org/template throws;
  *   - a plan with blocks throws BEFORE any write;
- *   - NO delete / deleteMany / updateMany is ever called.
+ *   - NO delete / deleteMany is ever called; campaign updateMany is restricted
+ *     to the monotonic historical appearance-lock minimum.
  */
 
 // scoreSubmission is mocked so the commit logic is tested in isolation; a spy
@@ -58,7 +59,7 @@ const ctx = {
 };
 
 interface MockTx {
-  assessmentCampaign: { findUnique: jest.Mock; findFirst: jest.Mock; create: jest.Mock; update: jest.Mock };
+  assessmentCampaign: { findUnique: jest.Mock; findFirst: jest.Mock; create: jest.Mock; updateMany: jest.Mock };
   orgRespondent: { findMany: jest.Mock };
   assessmentCampaignParticipant: { upsert: jest.Mock; delete: jest.Mock; deleteMany: jest.Mock; updateMany: jest.Mock };
   assessmentInvitation: { upsert: jest.Mock; delete: jest.Mock; deleteMany: jest.Mock; updateMany: jest.Mock };
@@ -74,7 +75,7 @@ function makeTx(overrides: Partial<MockTx> = {}): MockTx {
       create: jest.fn().mockImplementation(({ data }) =>
         Promise.resolve({ id: "camp-new", ...data }),
       ),
-      update: jest.fn().mockResolvedValue({ id: "camp-existing" }),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
     orgRespondent: { findMany: jest.fn().mockResolvedValue([]) },
     assessmentCampaignParticipant: {
@@ -178,7 +179,7 @@ describe("commitResultsImport — campaign create", () => {
           .mockResolvedValue({ id: "camp-existing", organizationId: "org-1", templateId: "tmpl-1" }),
         findFirst: jest.fn().mockResolvedValue(null),
         create: jest.fn(),
-        update: jest.fn().mockResolvedValue({ id: "camp-existing" }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
     });
     const db = makeDb(tx);
@@ -232,7 +233,7 @@ describe("commitResultsImport — campaign create", () => {
         findUnique: jest.fn().mockResolvedValue(existing),
         findFirst: jest.fn().mockResolvedValue(null),
         create: jest.fn(),
-        update: jest.fn().mockResolvedValue({ id: "camp-existing" }),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
     });
 
@@ -246,6 +247,69 @@ describe("commitResultsImport — campaign create", () => {
     });
   });
 
+  it("backdates a reused campaign lock when a newly discovered completion is older", async () => {
+    const lockedAt = new Date("2026-06-04T15:53:27-04:00");
+    const olderSubmittedAt = "2026-06-03T08:15:00-04:00";
+    const existing = {
+      id: "camp-existing",
+      organizationId: "org-1",
+      templateId: "tmpl-1",
+      reportStyle: "EXECUTIVE_BOARDROOM",
+      reportStyleSource: "CAMPAIGN_OVERRIDE",
+      reportStyleLockedAt: lockedAt,
+    };
+    const updateMany = jest.fn().mockImplementation(({ data }) => {
+      existing.reportStyleLockedAt = data.reportStyleLockedAt;
+      return Promise.resolve({ count: 1 });
+    });
+    const tx = makeTx({
+      assessmentCampaign: {
+        findUnique: jest.fn().mockResolvedValue(existing),
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn(),
+        updateMany,
+      },
+    });
+    const currentRow = makeCampaign().rows[0];
+    const campaign = makeCampaign({
+      rows: [
+        currentRow,
+        {
+          ...currentRow,
+          respondentId: "resp-new-older",
+          memberid: "member-new-older",
+          submittedAt: olderSubmittedAt,
+        },
+      ],
+    });
+    tx.assessmentSubmission.findUnique
+      .mockResolvedValueOnce({ id: "sub-existing" })
+      .mockResolvedValueOnce(null);
+
+    await commitResultsImport(
+      makeDb(tx) as never,
+      basePlan({ campaigns: [campaign] }),
+      ctx,
+      actor,
+    );
+
+    expect(existing).toMatchObject({
+      reportStyle: "EXECUTIVE_BOARDROOM",
+      reportStyleSource: "CAMPAIGN_OVERRIDE",
+      reportStyleLockedAt: new Date(olderSubmittedAt),
+    });
+    expect(updateMany).toHaveBeenCalledWith({
+      where: {
+        id: existing.id,
+        OR: [
+          { reportStyleLockedAt: null },
+          { reportStyleLockedAt: { gt: new Date(olderSubmittedAt) } },
+        ],
+      },
+      data: { reportStyleLockedAt: new Date(olderSubmittedAt) },
+    });
+  });
+
   it("throws externalId-conflict when the existing campaign belongs to a different org/template", async () => {
     const tx = makeTx({
       assessmentCampaign: {
@@ -254,7 +318,7 @@ describe("commitResultsImport — campaign create", () => {
           .mockResolvedValue({ id: "camp-other", organizationId: "org-OTHER", templateId: "tmpl-1" }),
         findFirst: jest.fn().mockResolvedValue(null),
         create: jest.fn(),
-        update: jest.fn().mockResolvedValue({ id: "camp-existing" }),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
     });
     const db = makeDb(tx);
@@ -273,9 +337,9 @@ describe("commitResultsImport — campaign create", () => {
       reportStyleSource: "CAMPAIGN_OVERRIDE",
       reportStyleLockedAt: null as Date | null,
     };
-    const update = jest.fn().mockImplementation(({ data }) => {
+    const updateMany = jest.fn().mockImplementation(({ data }) => {
       existing.reportStyleLockedAt = data.reportStyleLockedAt;
-      return Promise.resolve({ id: existing.id });
+      return Promise.resolve({ count: 1 });
     });
     const tx = makeTx({
       assessmentCampaign: {
@@ -285,7 +349,7 @@ describe("commitResultsImport — campaign create", () => {
           .mockResolvedValue(existing),
         findFirst: jest.fn().mockResolvedValue(null),
         create: jest.fn().mockResolvedValue({ id: existing.id }),
-        update,
+        updateMany,
       },
     });
     const db = makeDb(tx);
@@ -298,8 +362,18 @@ describe("commitResultsImport — campaign create", () => {
     );
     await commitResultsImport(db as never, basePlan(), ctx, actor);
 
-    expect(update).toHaveBeenCalledWith({
-      where: { id: existing.id, reportStyleLockedAt: null },
+    expect(updateMany).toHaveBeenCalledWith({
+      where: {
+        id: existing.id,
+        OR: [
+          { reportStyleLockedAt: null },
+          {
+            reportStyleLockedAt: {
+              gt: new Date("2026-06-04T15:53:27-04:00"),
+            },
+          },
+        ],
+      },
       data: {
         reportStyleLockedAt: new Date("2026-06-04T15:53:27-04:00"),
       },

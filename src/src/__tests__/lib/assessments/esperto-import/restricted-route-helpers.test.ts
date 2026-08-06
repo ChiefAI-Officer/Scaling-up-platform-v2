@@ -238,6 +238,7 @@ function makePrismaLike(
       }),
       create: jest.fn().mockResolvedValue({ id: "camp-new" }),
       update: jest.fn().mockResolvedValue({}),
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
     },
     assessmentTemplateVersion: {
       findUnique: jest.fn().mockResolvedValue(null),
@@ -326,6 +327,7 @@ describe("buildRealRestrictedCommitDb — assessmentCampaign.findUnique soft-del
         }),
         create: jest.fn().mockResolvedValue({ id: "camp-new" }),
         update: jest.fn().mockResolvedValue({}),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
     });
     const commitDb = buildRealRestrictedCommitDb(prisma);

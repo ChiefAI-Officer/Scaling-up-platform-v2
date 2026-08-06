@@ -240,6 +240,28 @@ class E2EFakeDb implements RestrictedCommitDb {
       }
       return { id: args.where.id };
     },
+    updateMany: async (args: {
+      where: {
+        id: string;
+        OR: Array<
+          | { reportStyleLockedAt: null }
+          | { reportStyleLockedAt: { gt: Date } }
+        >;
+      };
+      data: { reportStyleLockedAt: Date };
+    }) => {
+      for (const row of this.campaigns.values()) {
+        if (
+          row.id === args.where.id &&
+          (row.reportStyleLockedAt === null ||
+            row.reportStyleLockedAt > args.data.reportStyleLockedAt)
+        ) {
+          row.reportStyleLockedAt = args.data.reportStyleLockedAt;
+          return { count: 1 };
+        }
+      }
+      return { count: 0 };
+    },
   };
 
   assessmentTemplateVersion = {

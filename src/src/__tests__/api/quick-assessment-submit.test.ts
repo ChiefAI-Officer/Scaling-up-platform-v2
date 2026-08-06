@@ -127,6 +127,25 @@ jest.mock("@/lib/assessments/scoring", () => {
   };
 });
 
+jest.mock("@/lib/assessments/report-email", () => {
+  const actual = jest.requireActual("@/lib/assessments/report-email");
+  return {
+    ...actual,
+    buildRespondentReportFromSubmission: jest.fn(
+      actual.buildRespondentReportFromSubmission,
+    ),
+    buildReportEmailHtml: jest.fn(actual.buildReportEmailHtml),
+  };
+});
+
+jest.mock("@/lib/assessments/quick-assessment-lead", () => {
+  const actual = jest.requireActual("@/lib/assessments/quick-assessment-lead");
+  return {
+    ...actual,
+    buildLeadEmail: jest.fn(actual.buildLeadEmail),
+  };
+});
+
 /* -------------------------------------------------------------------------- */
 /*  Imports (after mocks)                                                     */
 /* -------------------------------------------------------------------------- */
@@ -156,6 +175,7 @@ const CAMPAIGN = {
   templateId: "tmpl-1",
   versionId: "ver-1",
   reportStyle: "MODERN_DASHBOARD",
+  reportStyleLockedAt: new Date("2026-01-02T00:00:00.000Z"),
   template: { name: "Scaling Up Quick Assessment" },
 };
 
@@ -532,6 +552,48 @@ describe("report style first-completion freeze", () => {
     expect(body.data.reportStylesAvailable).toBe(false);
     expect(body.data.reportFindingsAvailable).toBe(false);
   });
+
+  it("re-reads the frozen campaign style for an early lost-response replay", async () => {
+    (db.assessmentCampaign.findUnique as jest.Mock)
+      .mockResolvedValueOnce({
+        ...CAMPAIGN,
+        reportStyle: "CLASSIC",
+      })
+      .mockResolvedValueOnce({
+        reportStyle: "EXECUTIVE_BOARDROOM",
+        reportStyleLockedAt: new Date("2026-08-06T04:00:00.000Z"),
+      });
+    (db.assessmentSubmission.findFirst as jest.Mock).mockResolvedValue({
+      id: "sub-existing",
+      campaignId: "camp-1",
+      publicTaker: VALID_BODY.publicTaker,
+      answers: VALID_BODY.answers,
+      referringCoach: null,
+      result: { overallScore: 7, perDomain: [] },
+    });
+
+    const response = await POST(
+      makeRequest({ ...VALID_BODY, idempotencyKey: "existing-key" }) as never,
+      makeParams() as never,
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      data: {
+        submissionId: "sub-existing",
+        reportStyle: "EXECUTIVE_BOARDROOM",
+      },
+    });
+    expect(db.assessmentCampaign.findUnique).toHaveBeenNthCalledWith(2, {
+      where: { id: "camp-1" },
+      select: {
+        reportStyle: true,
+        reportStyleLockedAt: true,
+      },
+    });
+    expect(reportStyleLockMock).not.toHaveBeenCalled();
+    expect(db.$transaction).not.toHaveBeenCalled();
+  });
 });
 
 /* -------------------------------------------------------------------------- */
@@ -738,6 +800,29 @@ describe("outbox enqueue", () => {
     expect(coachRow).toBeDefined();
     expect(coachRow!.recipientEmail).toBe("coach@example.com");
     expect(coachRow!.bodyHtml).toContain("<table");
+  });
+
+  it("renders each style-independent public email variant only once", async () => {
+    process.env.QUICK_ASSESSMENT_TEAM_EMAIL = "team@scalingup.com";
+    mockActiveCoach();
+    const reportEmail = jest.requireMock(
+      "@/lib/assessments/report-email",
+    ) as {
+      buildRespondentReportFromSubmission: jest.Mock;
+      buildReportEmailHtml: jest.Mock;
+    };
+    const leadEmail = jest.requireMock(
+      "@/lib/assessments/quick-assessment-lead",
+    ) as { buildLeadEmail: jest.Mock };
+
+    const response = await submitWithCoach();
+
+    expect(response.status).toBe(200);
+    expect(
+      reportEmail.buildRespondentReportFromSubmission,
+    ).toHaveBeenCalledTimes(6);
+    expect(reportEmail.buildReportEmailHtml).toHaveBeenCalledTimes(3);
+    expect(leadEmail.buildLeadEmail).toHaveBeenCalledTimes(1);
   });
 
   it("REFERRING_COACH row is NOT enqueued when the coach is not active (guard returns null)", async () => {
@@ -1180,10 +1265,15 @@ describe("idempotency — duplicate idempotencyKey (P2002)", () => {
     );
     const lockTransactions: unknown[] = [];
     const lockTransactionStates: boolean[] = [];
-    (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValue({
-      ...CAMPAIGN,
-      reportStyle: "CLASSIC",
-    });
+    (db.assessmentCampaign.findUnique as jest.Mock)
+      .mockResolvedValueOnce({
+        ...CAMPAIGN,
+        reportStyle: "CLASSIC",
+      })
+      .mockResolvedValue({
+        reportStyle: "EXECUTIVE_BOARDROOM",
+        reportStyleLockedAt: new Date("2026-08-06T04:00:00.000Z"),
+      });
     reportStyleLockMock.mockImplementation((tx) => {
       lockTransactions.push(tx);
       lockTransactionStates.push(transactionActive);
