@@ -1,6 +1,6 @@
 # Template Creation Simplification and Scoring Language Cleanup
 
-**Status:** Approved design; pending written-spec review
+**Status:** Grilled design; pending final written-spec approval
 **Date:** 2026-08-06
 **Scope:** Admin assessment-template creation and the existing Scoring & Tiers authoring tab
 **Source:** August 5, 2026 Scaling Up touch point with Jeff Verdun
@@ -115,7 +115,16 @@ While the operator has not edited the Internal ID manually:
 
 Once the operator edits the Internal ID, later name changes do not overwrite it.
 
-The application does not silently append a suffix when an ID is already used. On a `409` collision it:
+When an automatically generated ID is already used, creation retries with the next
+available numeric suffix: `team-health`, `team-health-2`, `team-health-3`, and so on.
+This keeps the normal journey name-only.
+
+The retry belongs to the new creation flow. The API keeps its existing `409`
+collision contract so legacy callers and manually entered IDs retain their current
+behavior.
+
+Once the operator has manually edited the Internal ID, the application never changes
+it silently. A `409` collision then:
 
 1. keeps the entered assessment name;
 2. expands Advanced;
@@ -186,7 +195,8 @@ The existing `POST /api/admin/assessment-templates` transaction remains the owne
 1. the `AssessmentTemplate` row; and
 2. its unpublished `AssessmentTemplateVersion` v1 row.
 
-The transaction returns the created version's ID in addition to the existing template ID and alias:
+When the simplified-creation gate is active, the transaction response includes the
+created version's ID in addition to the existing template ID and alias:
 
 ```json
 {
@@ -199,7 +209,9 @@ The transaction returns the created version's ID in addition to the existing tem
 }
 ```
 
-Returning `versionId` is additive. The legacy flag-off form may ignore it.
+When the gate is inactive, the route returns the exact legacy response shape. This
+keeps the project's flag-off byte-identity contract while giving the new form the ID
+it needs for the direct Build redirect.
 
 ### 7.3 Draft and publish boundaries
 
@@ -256,7 +268,7 @@ The tab must not expose implementation or project-history language such as:
 Other visible strings on this tab follow the same rule:
 
 - **Global tiers** becomes **Overall result tiers**.
-- **Per-domain tiers** becomes **Category result tiers**.
+- **Per-domain tiers** becomes **Results by area**.
 - **Preview — Tier Resolution** becomes **Example result**.
 - The midpoint simulation is described as an example using middle answers.
 - The validation card is headed **Before you can publish**.
@@ -265,8 +277,7 @@ Other visible strings on this tab follow the same rule:
 
 The existing slider wording **Label for the lowest point** and **Label for the highest point** is already plain language and remains unchanged.
 
-“Category” is display language for the existing scoring-domain concept. Domain
-keys, domain membership, calculations, and saved payloads remain unchanged.
+Domain keys, domain membership, calculations, and saved payloads remain unchanged.
 
 ## 9. Failure Behavior
 
@@ -274,7 +285,8 @@ keys, domain membership, calculations, and saved payloads remain unchanged.
 | --- | --- |
 | Blank name | Inline required-field error; no request |
 | Invalid generated ID | Expand Advanced and request a valid Internal ID |
-| Duplicate Internal ID | Preserve input, expand Advanced, focus the field, show collision copy |
+| Duplicate generated Internal ID | Retry with the next numeric suffix without interrupting the operator |
+| Duplicate manually edited Internal ID | Preserve input, expand Advanced, focus the field, show collision copy |
 | Rate limit | Preserve input and show a retry-later message |
 | Authentication/authorization loss | Follow the existing admin error/session behavior; create nothing |
 | Network or server error | Preserve input and show **We couldn't create this assessment. Try again.** |
@@ -304,7 +316,7 @@ Flag off or killed:
 
 - the existing creation form remains available;
 - the existing Scoring & Tiers copy remains unchanged; and
-- the additive `versionId` response is harmless and ignored.
+- the creation API preserves its exact legacy response shape.
 
 The new form sends `enUS` explicitly. This release does not alter the legacy form's request or globally change unrelated API callers.
 
@@ -354,7 +366,8 @@ Tests prove:
 - generation continues until manual ID editing;
 - manual ID survives later name edits;
 - invalid or empty IDs expand Advanced;
-- duplicate-ID responses preserve the name, expand Advanced, focus the ID, and show the approved message;
+- duplicate generated IDs retry with the next numeric suffix;
+- duplicate manually edited IDs preserve the name, expand Advanced, focus the ID, and show the approved message;
 - submit disables during the request;
 - the payload contains empty content and the approved defaults;
 - a successful response redirects to the exact Build URL; and
@@ -366,7 +379,8 @@ Tests prove:
 
 - empty questions, sections, and tiers are accepted as draft content;
 - the transaction creates exactly one template and one unpublished v1;
-- the response includes `versionId`;
+- the response includes `versionId` when the simplified flow is active;
+- flag off preserves the exact legacy response body;
 - the content hash and audit entry still occur;
 - collisions remain `409`; and
 - authorization, validation, rate limiting, and transaction failure behavior remain intact.
