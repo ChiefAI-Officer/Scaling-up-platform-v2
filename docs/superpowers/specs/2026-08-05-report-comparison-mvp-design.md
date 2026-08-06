@@ -2,9 +2,10 @@
 
 **Date:** 2026-08-05
 
-**Status:** Product direction approved; awaiting written-spec review
+**Status:** Product direction approved; CEO self-access amendment approved
 
-**Scope:** Scaling Up Full respondent reports, operated by coaches and admins
+**Scope:** Scaling Up Full respondent reports for coaches, admins, and the
+designated CEO viewing only their own history
 
 ## 1. Outcome
 
@@ -14,7 +15,10 @@ branded report and exports through the existing Print / Download PDF path.
 
 The intended task is concrete: a coach or admin opens the Q1 2026 report,
 selects the Q1 2025 report, and sees current, previous, and change without
-leaving the report or building a separate report artifact.
+leaving the report or building a separate report artifact. A CEO who is
+designated on the current campaign may receive the same comparison for their
+own submissions through a secure, expiring self-access link. CEO access never
+opens another participant, company, group report, or operator navigation.
 
 This replaces the current discovery path for per-person comparison. It does
 not replace cohort trends, compare respondents with each other, or merge peer
@@ -73,13 +77,14 @@ selected, and compare exactly one current report with exactly one prior report.
 | --- | --- |
 | Home | Existing branded respondent report |
 | Operators | Coach and admin/staff roles already authorized to view the report |
-| Participant access | None; respondents do not receive comparison controls or comparison data |
+| CEO self-access | A designated campaign CEO may view only their own focus report and eligible earlier submissions through an expiring, signed self-access session |
+| Other participant access | None; non-CEO respondents receive no comparison controls or comparison data |
 | Focus | The report currently open |
 | Baseline | Exactly one earlier eligible report |
 | Default | Most recent eligible earlier report is preselected, but comparison starts only after **Compare** is pressed |
-| Alternative | Operator may select another eligible earlier report |
+| Alternative | Authorized viewer may select another eligible earlier report |
 | Export | Existing browser Print / Save as PDF flow |
-| Sharing | Operator manually shares the exported PDF |
+| Sharing | Operator may manually share the exported PDF; the CEO may print their own authorized comparison |
 | Persistence | None; selection is encoded in the URL and rebuilt from frozen submissions |
 | Cross-version | Exact stable-key question matching with compatibility checks; unmatched or incompatible items have no delta |
 | Peer benchmarks | Remain separate and unchanged |
@@ -92,6 +97,8 @@ selected, and compare exactly one current report with exactly one prior report.
 - `templateAlias === "scaling-up-full"` only;
 - invited, per-respondent reports on the canonical report route;
 - coach and admin/staff operation through the same UI;
+- designated-CEO self-access to that CEO's own comparison through an expiring
+  signed session;
 - historical Esperto-imported Scaling Up Full submissions;
 - current versus one prior report;
 - same-version aggregate and question deltas;
@@ -105,7 +112,10 @@ selected, and compare exactly one current report with exactly one prior report.
 - LVA, QSP, public quiz reports, and group reports;
 - comparing two people or teams;
 - averaging multiple earlier reports;
-- participant-facing controls, links, or comparison emails;
+- comparison access for non-CEO participants;
+- CEO access to another respondent, organization, group report, cohort Trends,
+  or operator navigation;
+- permanent CEO accounts, a CEO dashboard, or a new `User.role`;
 - a saved report library, report checkout, or database record for a comparison;
 - manual question mapping;
 - editing or overriding historical scores;
@@ -177,6 +187,40 @@ the normal focus report and show one generic screen-only message:
 The message must not reveal whether the supplied submission exists. Direct
 unauthorized access to the focus report continues to use the current
 enumeration-safe 404 behavior.
+
+### 5.5 CEO self-access entry
+
+CEO self-access is not a new navbar destination. `CEO` remains the existing
+per-campaign `AssessmentCampaignParticipant.isCEO` designation, not a platform
+login role.
+
+When the report-comparison feature is enabled, the focus campaign is
+`INVITED`, the submitting participant is the campaign's designated CEO, and
+the campaign already permits respondent results disclosure through
+`showResultsOnScreen` or `sendResultsToRespondent`, the server may issue a
+30-day, purpose-bound report-access token for that focus submission.
+
+The token is delivered only through an already-authorized disclosure path:
+
+- the post-submit response when `showResultsOnScreen` is enabled; and/or
+- the CEO's own results email when `sendResultsToRespondent` is enabled and
+  the existing results-email approval/send gates pass.
+
+The email link first lands on a token-exchange route. That route verifies the
+signature and expiry, stores the grant in a `Secure`, `HttpOnly`, `SameSite=Lax`
+cookie scoped to assessment reports, and immediately redirects to the clean
+canonical report URL. The bearer token must not remain in the report URL,
+browser history, client JavaScript state, audit metadata, metrics, or logs.
+
+The CEO sees the same current/previous/change presentation and may select among
+their own eligible earlier submissions. The report shell contains no coach or
+admin navbar. If no eligible baseline exists, the CEO sees only their current
+report, matching the operator no-candidate behavior.
+
+Possession of a valid self-access session never authorizes the existing group
+report. The shipped group report remains a separate, single-campaign
+CEO-versus-team artifact. Group comparison across time is not part of this
+MVP.
 
 ## 6. Comparison presentation
 
@@ -333,6 +377,22 @@ interface ReportComparisonModel {
 
 The model contains no raw email, raw answers, or baseline recommendations.
 
+The service accepts an explicit viewer context:
+
+```ts
+type ReportComparisonViewer =
+  | { kind: "operator"; actor: ApiActor }
+  | {
+      kind: "ceo-self";
+      focusCampaignId: string;
+      focusSubmissionId: string;
+      respondentId: string;
+    };
+```
+
+The CEO context is constructed only after server-side self-access token
+verification. Browser input must never be cast directly into this type.
+
 ### 7.4 Frozen inputs only
 
 Build both sides from persisted `submission.result`, the submission's pinned
@@ -357,7 +417,13 @@ A candidate must satisfy every rule:
 - submitted strictly before the focus submission;
 - not in the focus campaign;
 - valid scored result, not a degraded result; and
-- independently readable by the current actor.
+- readable under the active viewer policy.
+
+For an operator viewer, each baseline remains independently readable through
+`canManageCampaign(..., "read")`. For a CEO self-viewer, a baseline is readable
+only when it passes the same organization/template/person/chronology rules and
+belongs to the token-bound CEO identity. A CEO grant never supplies general
+campaign read authority.
 
 Esperto-imported campaigns are eligible. Within one campaign, duplicate rows
 from the identity union collapse to one candidate using the existing Wave N
@@ -382,12 +448,14 @@ silently lift these bounds in the report page.
 
 ### 8.1 Focus report
 
-Keep `viewRespondentReport` and ADR-0012 as the focus-report gate. The report
-route remains dynamic, private, no-store, and enumeration-safe.
+Keep `viewRespondentReport` and ADR-0012 as the operator focus-report gate.
+Add a separate CEO self gate that admits only a validated token-bound focus
+submission. The report route remains dynamic, private, no-store, and
+enumeration-safe in both modes.
 
 ### 8.2 Baseline
 
-Resolve the current actor server-side. For the selected baseline:
+Resolve the current viewer server-side. For an operator-selected baseline:
 
 - independently apply `canManageCampaign(..., "read")` to its campaign;
 - verify organization, template, identity, chronology, and live-record scope;
@@ -404,14 +472,58 @@ Privileged admin/staff behavior comes from the same access-control primitive as
 the current report. Coaches and admins receive the same report component; only
 authorization scope differs.
 
-### 8.3 Participants and public reports
+### 8.3 CEO self-access authorization
 
-The comparison loader and controls are not called from public or participant
-report paths. Possessing a copied operator report URL does not grant access.
-Manual PDF sharing is outside the authenticated product surface and contains
-only what is rendered in the comparison report.
+Add a purpose-specific HMAC token helper for CEO self-access. The signed claims
+contain only:
 
-### 8.4 Audit and metrics
+```ts
+interface CeoReportAccessClaims {
+  version: 1;
+  purpose: "assessment-report-comparison-self";
+  focusCampaignId: string;
+  focusSubmissionId: string;
+  respondentId: string;
+  expiresAt: number;
+}
+```
+
+Use a dedicated `ASSESSMENT_REPORT_ACCESS_SECRET`; do not reuse invitation raw
+tokens or expose `NEXTAUTH_SECRET`. Missing/invalid secret, signature, purpose,
+version, claim shape, or expiry fails closed. Token verification uses
+constant-time signature comparison.
+
+Every CEO report request revalidates server-side that:
+
+- the grant is bound to the requested focus campaign, submission, and
+  respondent;
+- the focus campaign, submission, respondent, and participant are live;
+- the focus campaign uses `INVITED` access;
+- the participant row still has `isCEO === true`;
+- the focus submission belongs to that campaign and respondent;
+- the campaign still permits respondent disclosure through
+  `showResultsOnScreen || sendResultsToRespondent`; and
+- the feature flag is enabled and not killed.
+
+Turning both disclosure toggles off, removing the CEO designation, deleting
+the live records, token expiry, or the comparison kill switch therefore
+revokes access without storing a grant row. This preserves the MVP's no-schema
+boundary.
+
+The token grants only the focus report and that person's eligible comparison
+history. It does not grant group-report, campaign-detail, exports containing
+other participants, Trends, admin, coach, API, or arbitrary report-route
+access. All self-access responses remain `Cache-Control: private, no-store`
+with `Referrer-Policy: no-referrer`.
+
+### 8.4 Other participants and public reports
+
+The comparison loader and controls are not called from public reports or
+non-CEO participant paths. Possessing a copied operator report URL does not
+grant access. Manual PDF sharing is outside the authenticated product surface
+and contains only what is rendered in the comparison report.
+
+### 8.5 Audit and metrics
 
 Before returning a valid comparison for rendering, write one
 `VIEW_REPORT_COMPARISON` audit event with `logAuditStrict` and add that literal
@@ -420,6 +532,10 @@ baseline campaign/submission identifiers; do not copy email or answer content
 into metadata. If the audit write fails, omit the comparison and use the same
 generic screen-only error while retaining the focus report. This is a
 type/helper change, not a schema migration.
+
+For CEO self-access, record viewer kind `CEO_SELF` instead of inventing a user
+id. Audit the token exchange, focus-report view, and comparison view without
+recording the raw token, cookie, respondent email, or token signature.
 
 Add PII-free structured markers under `assessment.report_comparison.*` for:
 
@@ -477,6 +593,13 @@ The report page becomes the only promoted entry for per-person comparison. It
 owns candidate resolution, selected-baseline resolution, action controls,
 export filename, and the comparison model passed into `BrandedReport`.
 
+The page resolves exactly one of two authorization modes:
+
+- signed-in operator through the existing `viewRespondentReport` gate; or
+- valid CEO self-access cookie through the new narrowly scoped self gate.
+
+The presentation component is shared; authorization is not.
+
 ### Campaign detail
 
 For eligible Scaling Up Full respondents, replace **View across campaigns**
@@ -490,6 +613,13 @@ Keep the current coach-only route, API/service, flag helper, component, and
 tests during the MVP rollback window. Remove promoted entry points only; do not
 delete the implementation in this change. Retiring it is a separate follow-up
 after the report-native path is stable.
+
+### CEO participant surface
+
+The post-submit results surface and approved results email may link the
+designated CEO into the canonical branded report through the token exchange.
+No CEO navigation item, dashboard, account role, or group-report entry is
+added.
 
 ### Cohort trends
 
@@ -510,6 +640,9 @@ this feature answers how one respondent changed between two reports.
 | Question added/removed/scale-changed | `—`, never zero; included in coverage note |
 | Candidate query throws | Normal focus report and PII-free failure metric |
 | More than bounds | Newest 12 candidates and explicit bounded note |
+| Invalid/expired CEO token | Generic unavailable response; no existence detail and no cookie |
+| CEO designation or disclosure revoked | Existing self-access cookie stops authorizing immediately |
+| CEO requests another respondent/focus submission | Enumeration-safe denial |
 
 Comparison failure must never break Print / Download PDF for the focus report.
 
@@ -533,6 +666,14 @@ Comparison failure must never break Print / Download PDF for the focus report.
 
 ### Unit and service tests
 
+- CEO access tokens round-trip only with the dedicated secret and exact
+  version/purpose/claim shape;
+- malformed, tampered, expired, wrong-purpose, and wrong-secret tokens fail
+  closed;
+- CEO self gate binds the requested campaign/submission/respondent, requires
+  `INVITED` + live `isCEO`, and rechecks the disclosure toggles;
+- CEO viewer policy reads only same-person history and never grants general
+  campaign access;
 - normalized-email identity union stays within one organization;
 - respondent-id fallback works without normalized email;
 - different org/template/person submissions are excluded;
@@ -554,7 +695,18 @@ Comparison failure must never break Print / Download PDF for the focus report.
 ### Page and component tests
 
 - coach and admin render the same comparison controls and report output;
-- participants/public routes expose neither controls nor baseline data;
+- a designated CEO with a valid self-access session renders only their own
+  comparison;
+- non-CEO participants and public routes expose neither controls nor baseline
+  data;
+- CEO self-access cannot open another respondent, company, group report,
+  Trends, campaign detail, or operator navigation;
+- token exchange removes the bearer token from the visible URL and sets only a
+  secure, HttpOnly, scoped cookie;
+- expired, malformed, wrong-purpose, wrong-focus, and tampered tokens fail
+  closed without revealing record existence;
+- disabling both disclosure toggles or removing `isCEO` revokes an existing
+  self-access session;
 - default candidate is most recent but does not auto-activate;
 - Compare, Change comparison, and Remove comparison update the URL correctly;
 - invalid/forbidden ids show one non-enumerating message and retain the focus
@@ -591,17 +743,22 @@ The MVP is ready to launch when all of the following are true:
    matches; aggregate and incompatible deltas are explicitly withheld.
 5. The exported PDF contains the comparison and excludes operational controls.
 6. Existing peer benchmarks remain clearly separate.
-7. Participants receive no new authenticated comparison access.
-8. Invalid baseline ids reveal nothing and never break the authorized focus
+7. A designated CEO can securely open and export only their own comparison
+   without receiving coach/admin navigation or broader campaign access.
+8. Non-CEO participants and public takers receive no comparison access.
+9. Invalid baseline ids reveal nothing and never break the authorized focus
    report.
-9. Flag off produces the current report with no comparison reads or markup.
-10. The old Wave N path remains available for rollback while its promoted entry
+10. Flag off produces the current report with no comparison reads or markup.
+11. The old Wave N path remains available for rollback while its promoted entry
     points are removed.
 
 ## 16. Deferred follow-ups
 
 - compare against an average of several earlier reports;
-- participant-facing comparison delivery;
+- durable CEO accounts, permanent report libraries, and non-CEO participant
+  comparison delivery;
+- CEO access to the single-round group report;
+- group comparison across campaigns;
 - saved comparison report library;
 - qualitative/LVA answer comparison;
 - manual mapping for renamed or structurally changed questions;
