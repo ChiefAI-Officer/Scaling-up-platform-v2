@@ -2,6 +2,11 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 type GuardModule = {
+  createAssessmentReportE2eWebServer: (env: NodeJS.ProcessEnv) => undefined | {
+    command: string;
+    reuseExistingServer: boolean;
+    env: NodeJS.ProcessEnv;
+  };
   createReportStyleWebServer: (env: NodeJS.ProcessEnv) => undefined | {
     command: string;
     reuseExistingServer: boolean;
@@ -31,6 +36,12 @@ type GuardModule = {
     runBuild: (env: NodeJS.ProcessEnv) => Promise<void>;
     startProductionServer: (env: NodeJS.ProcessEnv) => Promise<void>;
   }) => Promise<void>;
+  runAssessmentReportE2eServer: (options: {
+    env: NodeJS.ProcessEnv;
+    createClient: (databaseUrl: string) => unknown;
+    runBuild: (env: NodeJS.ProcessEnv) => Promise<void>;
+    startProductionServer: (env: NodeJS.ProcessEnv) => Promise<void>;
+  }) => Promise<void>;
 };
 
 const guardPath = resolve(process.cwd(), "scripts/report-style-e2e-server-contract.cjs");
@@ -50,7 +61,36 @@ const fixtureEnvironment: NodeJS.ProcessEnv = {
     "report-style-e2e-disposable:0123456789abcdefghijklmnopqrstuvwxyz_ABCD",
 };
 
+const comparisonFixtureEnvironment: NodeJS.ProcessEnv = {
+  NODE_ENV: "test",
+  DATABASE_URL: "postgresql://fixture.invalid/report_comparison_e2e",
+  E2E_REPORT_COMPARISON_DATABASE_URL: "postgresql://fixture.invalid/report_comparison_e2e",
+  E2E_REPORT_COMPARISON_DISPOSABLE_SENTINEL_ID:
+    "report-comparison-e2e-sentinel-0123456789abcdefghijkl",
+  E2E_REPORT_COMPARISON_DISPOSABLE_SENTINEL_VALUE:
+    "report-comparison-e2e-disposable:0123456789abcdefghijklmnopqrstuvwxyz_ABCD",
+  E2E_REPORT_COMPARISON_FIXTURE: "{}",
+};
+
 describe("report-style isolated Playwright database contract", () => {
+  it("binds report-comparison acceptance to its fixture database and rejects competing fixture lanes", () => {
+    const { createAssessmentReportE2eWebServer } = loadGuard();
+    const config = createAssessmentReportE2eWebServer({
+      ...comparisonFixtureEnvironment,
+      DATABASE_URL: "postgresql://ambient.invalid/production",
+    });
+
+    expect(config).toEqual(expect.objectContaining({
+      command: "node scripts/start-report-style-e2e.mjs",
+      reuseExistingServer: false,
+    }));
+    expect(config?.env.DATABASE_URL).toBe(comparisonFixtureEnvironment.E2E_REPORT_COMPARISON_DATABASE_URL);
+    expect(() => createAssessmentReportE2eWebServer({
+      ...fixtureEnvironment,
+      ...comparisonFixtureEnvironment,
+    })).toThrow("Only one managed assessment report E2E fixture lane may be configured.");
+  });
+
   it("binds the app server to the explicit fixture URL and never reuses an ambient server", () => {
     const { createReportStyleWebServer } = loadGuard();
     const config = createReportStyleWebServer({
@@ -177,6 +217,39 @@ describe("report-style isolated Playwright database contract", () => {
       startProductionServer: async (env) => {
         expect(env.NODE_ENV).toBe("production");
         expect(env.DATABASE_URL).toBe(fixtureEnvironment.E2E_REPORT_STYLES_DATABASE_URL);
+        events.push("start");
+      },
+    });
+
+    expect(events).toEqual(["sentinel", "build", "start"]);
+  });
+
+  it("checks the comparison sentinel before building and starting the production server", async () => {
+    const { runAssessmentReportE2eServer } = loadGuard();
+    const events: string[] = [];
+    const createClient = jest.fn().mockReturnValue({
+      organization: {
+        findUnique: jest.fn().mockImplementation(async () => {
+          events.push("sentinel");
+          return {
+            id: comparisonFixtureEnvironment.E2E_REPORT_COMPARISON_DISPOSABLE_SENTINEL_ID,
+            name: comparisonFixtureEnvironment.E2E_REPORT_COMPARISON_DISPOSABLE_SENTINEL_VALUE,
+            deletedAt: null,
+          };
+        }),
+      },
+      $disconnect: jest.fn().mockResolvedValue(undefined),
+    });
+
+    await runAssessmentReportE2eServer({
+      env: comparisonFixtureEnvironment,
+      createClient,
+      runBuild: async (env) => {
+        expect(env.DATABASE_URL).toBe(comparisonFixtureEnvironment.E2E_REPORT_COMPARISON_DATABASE_URL);
+        events.push("build");
+      },
+      startProductionServer: async (env) => {
+        expect(env.DATABASE_URL).toBe(comparisonFixtureEnvironment.E2E_REPORT_COMPARISON_DATABASE_URL);
         events.push("start");
       },
     });

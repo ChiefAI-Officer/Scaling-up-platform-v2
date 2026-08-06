@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { PrismaClient } from "@prisma/client";
 import reportStyleE2eContract from "./report-style-e2e-server-contract.cjs";
 
-const { productionServerCommands, runReportStyleE2eServer } = reportStyleE2eContract;
+const { productionServerCommands, runAssessmentReportE2eServer } = reportStyleE2eContract;
 
 function runCommand(command, args, env, { inheritOutput = false, forwardSignals = false } = {}) {
   return new Promise((resolveCommand, rejectCommand) => {
@@ -35,7 +35,7 @@ const commands = productionServerCommands({
 });
 
 try {
-  await runReportStyleE2eServer({
+  await runAssessmentReportE2eServer({
     env: process.env,
     createClient: (databaseUrl) => new PrismaClient({ datasourceUrl: databaseUrl, log: [] }),
     runBuild: (env) => runCommand(commands.build.command, commands.build.args, env),
@@ -47,6 +47,6 @@ try {
     ),
   });
 } catch {
-  console.error("Report-style E2E server startup was refused.");
+  console.error("Assessment report E2E server startup was refused.");
   process.exitCode = 1;
 }
