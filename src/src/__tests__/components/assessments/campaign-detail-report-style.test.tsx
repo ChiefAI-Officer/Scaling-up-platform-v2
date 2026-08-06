@@ -55,6 +55,31 @@ describe("CampaignDetail report appearance", () => {
     expect(JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body)).toEqual({ reportStyle: "MODERN_DASHBOARD" });
   });
 
+  it("uses sparse custom preview assets from pinned narrative-only capabilities", () => {
+    const custom = overview();
+    custom.campaign.templateAlias = "founder-prompts-custom";
+    render(
+      <CampaignDetail
+        initialOverview={custom}
+        initialRespondents={[]}
+        reportStylesAvailable
+        canEditReportAppearance
+        reportStylePreviewCapabilities={{
+          reportType: "scored",
+          hasMetrics: false,
+          hasNarrativeResponses: true,
+        }}
+      />,
+    );
+
+    expect(
+      screen.getByRole("img", { name: "Classic Cover preview" }),
+    ).toHaveAttribute(
+      "src",
+      "/report-style-previews/sparse-custom/classic/cover.webp",
+    );
+  });
+
   it("preserves an unsaved style when an equivalent server projection gets a new object identity", () => {
     const { rerender } = render(
       <CampaignDetail

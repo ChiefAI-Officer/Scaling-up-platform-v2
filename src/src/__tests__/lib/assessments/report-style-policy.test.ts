@@ -1,5 +1,6 @@
 import {
   REPORT_STYLE_KEYS,
+  deriveReportStylePreviewCapabilities,
   getReportStyleMetadata,
   getReportStylePreviewPath,
   isReportStyleKey,
@@ -59,8 +60,43 @@ describe("report style registry", () => {
       .toBe("qualitative");
     expect(resolveReportStylePreviewAnatomy({
       templateAlias: "qsp-v2",
-      capabilities: { hasMetrics: false, hasNarrativeResponses: true },
+      capabilities: {
+        reportType: "qualitative",
+        hasMetrics: false,
+        hasNarrativeResponses: true,
+      },
     })).toBe("sparse-custom");
+    expect(resolveReportStylePreviewAnatomy({
+      templateAlias: "custom-founder-prompts",
+      capabilities: {
+        reportType: "scored",
+        hasMetrics: false,
+        hasNarrativeResponses: true,
+      },
+    })).toBe("sparse-custom");
+
+    expect(deriveReportStylePreviewCapabilities({
+      templateAlias: "custom-founder-prompts",
+      questions: [
+        { stableKey: "reflection", type: "TEXT" },
+        { stableKey: "plan", type: "TEXTAREA" },
+      ],
+    })).toEqual({
+      reportType: "scored",
+      hasMetrics: false,
+      hasNarrativeResponses: true,
+    });
+    expect(deriveReportStylePreviewCapabilities({
+      templateAlias: "qsp-v2",
+      questions: [
+        { stableKey: "confidence", type: "SLIDER_LIKERT" },
+        { stableKey: "reflection", type: "TEXT" },
+      ],
+    })).toEqual({
+      reportType: "qualitative",
+      hasMetrics: true,
+      hasNarrativeResponses: true,
+    });
 
     expect(getReportStylePreviewPath(
       "EXECUTIVE_BOARDROOM",

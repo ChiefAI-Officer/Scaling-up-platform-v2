@@ -64,6 +64,7 @@ import {
   REPORT_STYLE_REGISTRY,
   resolveReportStylePreviewAnatomy,
   type ReportStyleKey,
+  type ReportStylePreviewCapabilities,
 } from "@/lib/assessments/report-style-registry";
 import {
   invitationHtmlEditorCopy,
@@ -130,6 +131,8 @@ export interface CampaignDetailProps {
   onScreenResultsEnabled?: boolean;
   /** Server-computed campaign-level report appearance capability. */
   reportStylesAvailable?: boolean;
+  /** Canonical report family + pinned version-question capabilities. */
+  reportStylePreviewCapabilities?: ReportStylePreviewCapabilities;
   /**
    * Exact server-authorized appearance write capability. Fail-closed: absent
    * or false keeps the stored selection visible without rendering a picker or
@@ -261,6 +264,7 @@ export function CampaignDetail({
   customSlidesEnabled = false,
   onScreenResultsEnabled = false,
   reportStylesAvailable = false,
+  reportStylePreviewCapabilities,
   canEditReportAppearance = false,
   initialCustomSlides = [],
   customSlidesSections = [],
@@ -1545,6 +1549,7 @@ export function CampaignDetail({
               disabled={reportStyleSaving}
               previewAnatomy={resolveReportStylePreviewAnatomy({
                 templateAlias: campaign.templateAlias,
+                capabilities: reportStylePreviewCapabilities,
               })}
             />
             <p className="mt-3 text-xs text-muted-foreground">

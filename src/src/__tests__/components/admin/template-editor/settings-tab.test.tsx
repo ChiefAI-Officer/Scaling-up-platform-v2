@@ -73,6 +73,11 @@ function makeProps(overrides: Partial<SettingsTabProps> = {}): SettingsTabProps 
     onSendResultsDefaultChange: jest.fn(),
     savingSendResultsDefault: false,
     waveQEnabled: true,
+    reportStylePreviewCapabilities: {
+      reportType: "scored",
+      hasMetrics: true,
+      hasNarrativeResponses: false,
+    },
     ...overrides,
   };
 }

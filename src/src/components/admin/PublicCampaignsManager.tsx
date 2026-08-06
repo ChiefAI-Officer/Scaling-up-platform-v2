@@ -21,6 +21,7 @@ import {
   REPORT_STYLE_REGISTRY,
   resolveReportStylePreviewAnatomy,
   type ReportStyleKey,
+  type ReportStylePreviewCapabilities,
 } from "@/lib/assessments/report-style-registry";
 
 interface TemplateSummary {
@@ -30,6 +31,7 @@ interface TemplateSummary {
   disabledAt?: string | null;
   defaultReportStyle: ReportStyleKey;
   reportStylesEnabled: boolean;
+  reportStylePreviewCapabilities: ReportStylePreviewCapabilities;
 }
 
 interface OrgSummary {
@@ -49,6 +51,7 @@ interface PublicCampaignRow {
   reportStyleSource: "TEMPLATE_DEFAULT" | "CAMPAIGN_OVERRIDE";
   reportStyleLockedAt: string | null;
   reportStylesAvailable: boolean;
+  reportStylePreviewCapabilities: ReportStylePreviewCapabilities;
   template?: { id: string; name: string; alias: string } | null;
   organization?: { id: string; name: string } | null;
 }
@@ -515,6 +518,7 @@ export function PublicCampaignsManager() {
                               lockedAt={c.reportStyleLockedAt}
                               previewAnatomy={resolveReportStylePreviewAnatomy({
                                 templateAlias: c.template?.alias,
+                                capabilities: c.reportStylePreviewCapabilities,
                               })}
                             />
                           ) : (
@@ -778,6 +782,8 @@ export function PublicCampaignsManager() {
                   compact
                   previewAnatomy={resolveReportStylePreviewAnatomy({
                     templateAlias: selectedTemplate.alias,
+                    capabilities:
+                      selectedTemplate.reportStylePreviewCapabilities,
                   })}
                   onChange={(value) => {
                     setReportStyle(value);

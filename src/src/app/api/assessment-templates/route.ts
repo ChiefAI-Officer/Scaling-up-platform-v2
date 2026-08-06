@@ -28,7 +28,15 @@ import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import { isResultsEmailApproved } from "@/lib/assessments/results-email-approval";
 import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
 import { isReportStyleEligible } from "@/lib/assessments/report-style-policy";
-import type { ReportStyleKey } from "@/lib/assessments/report-style-registry";
+import {
+  deriveReportStylePreviewCapabilities,
+  type ReportStyleKey,
+  type ReportStylePreviewCapabilities,
+} from "@/lib/assessments/report-style-registry";
+import {
+  activePublishedWhere,
+  DEFAULT_TEMPLATE_LANGUAGE,
+} from "@/lib/assessments/active-version";
 
 interface TemplateSummary {
   id: string;
@@ -42,7 +50,18 @@ interface TemplateSummary {
   sendResultsDefault: boolean;
   defaultReportStyle: ReportStyleKey;
   reportStylesEnabled: boolean;
+  reportStylePreviewCapabilities: ReportStylePreviewCapabilities;
 }
+
+const previewVersionSelection = {
+  where: {
+    language: DEFAULT_TEMPLATE_LANGUAGE,
+    ...activePublishedWhere,
+  },
+  orderBy: { versionNumber: "desc" as const },
+  take: 1,
+  select: { questions: true },
+};
 
 export async function GET(request: NextRequest) {
   try {
@@ -73,6 +92,7 @@ export async function GET(request: NextRequest) {
           resultsEmailContentApprovedHash: true,
           resultsEmailSubject: true,
           resultsEmailBodyMarkdown: true,
+          versions: previewVersionSelection,
         },
         orderBy: { name: "asc" },
       });
@@ -90,6 +110,10 @@ export async function GET(request: NextRequest) {
             isReportStylesEnabled({ templateId: t.id }),
           resultsEmailApproved: isResultsEmailApproved(t),
           sendResultsDefault: t.sendResultsDefault,
+          reportStylePreviewCapabilities: deriveReportStylePreviewCapabilities({
+            templateAlias: t.alias,
+            questions: t.versions?.[0]?.questions ?? [],
+          }),
         })) satisfies TemplateSummary[],
       });
     }
@@ -154,6 +178,7 @@ export async function GET(request: NextRequest) {
         resultsEmailContentApprovedHash: true,
         resultsEmailSubject: true,
         resultsEmailBodyMarkdown: true,
+        versions: previewVersionSelection,
       },
       orderBy: { name: "asc" },
     });
@@ -172,6 +197,10 @@ export async function GET(request: NextRequest) {
           isReportStylesEnabled({ templateId: t.id }),
         resultsEmailApproved: isResultsEmailApproved(t),
         sendResultsDefault: t.sendResultsDefault,
+        reportStylePreviewCapabilities: deriveReportStylePreviewCapabilities({
+          templateAlias: t.alias,
+          questions: t.versions?.[0]?.questions ?? [],
+        }),
       })) satisfies TemplateSummary[],
     });
   } catch (error) {

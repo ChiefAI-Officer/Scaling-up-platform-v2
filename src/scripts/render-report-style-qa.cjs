@@ -1,6 +1,10 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 
 const Module = require("node:module");
+const { resolve } = require("node:path");
+const {
+  loadReportStyleFontSeam,
+} = require("./report-style-font-seam.cjs");
 const React = require("react");
 const { renderToStaticMarkup } = require("react-dom/server");
 
@@ -10,11 +14,17 @@ if (!new Set(["CLASSIC", "EXECUTIVE_BOARDROOM", "MODERN_DASHBOARD"]).has(style))
 }
 
 require.extensions[".css"] = function ignoreCss() {};
+const fontSeam = loadReportStyleFontSeam(
+  process.env.REPORT_STYLE_FONT_ASSET_ROOT || resolve(__dirname, ".."),
+);
 const originalLoad = Module._load;
 Module._load = function loadWithFontStub(request, parent, isMain) {
   if (request === "next/font/google") {
-    const font = () => ({ variable: "" });
-    return { Inter: font, Playfair_Display: font, Roboto: font };
+    return {
+      Inter: () => fontSeam.variables.Inter,
+      Playfair_Display: () => fontSeam.variables.Playfair_Display,
+      Roboto: () => fontSeam.variables.Roboto,
+    };
   }
   return originalLoad.call(this, request, parent, isMain);
 };

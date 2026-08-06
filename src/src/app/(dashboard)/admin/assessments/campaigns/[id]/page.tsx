@@ -44,6 +44,7 @@ import {
   groupReportRequiresPublishedVersion,
 } from "@/lib/assessments/wave-f-flags";
 import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
+import { deriveReportStylePreviewCapabilities } from "@/lib/assessments/report-style-registry";
 
 const ADMIN_CAMPAIGNS = "/admin/assessments/campaigns";
 
@@ -88,7 +89,7 @@ export default async function AdminCampaignDetailPage({ params }: PageProps) {
       createdByCoachId: true,
       organizationId: true,
       template: { select: { alias: true } },
-      version: { select: { id: true, publishedAt: true } },
+      version: { select: { id: true, publishedAt: true, questions: true } },
     },
   });
   const canShowGroupReport =
@@ -133,6 +134,10 @@ export default async function AdminCampaignDetailPage({ params }: PageProps) {
         // 409s it), so this is the flag check only.
         onScreenResultsEnabled={isOnScreenResultsEnabled()}
         reportStylesAvailable={reportStylesAvailable}
+        reportStylePreviewCapabilities={deriveReportStylePreviewCapabilities({
+          templateAlias: overview.campaign.templateAlias,
+          questions: campaignForFlag?.version?.questions ?? [],
+        })}
         canEditReportAppearance={false}
         basePath={ADMIN_CAMPAIGNS}
         hidePortalOnlyLinks

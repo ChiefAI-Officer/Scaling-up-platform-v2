@@ -424,6 +424,7 @@ function reportForAnatomy(anatomy: ReportStylePreviewAnatomy): RespondentReport 
 function applyPreviewVariant(
   report: RespondentReport,
   variant: ReportStylePreviewVariant,
+  anatomy: ReportStylePreviewAnatomy,
 ): void {
   switch (variant) {
     case "normal":
@@ -435,8 +436,9 @@ function applyPreviewVariant(
         report.result.perDomain = report.result.perDomain?.slice(0, 2);
         report.sections = (report.sections as unknown[]).slice(0, 2);
       } else {
-        report.sections = (report.sections as unknown[]).slice(0, 2);
-        report.rawAnswers = (report.rawAnswers as unknown[]).slice(0, 2);
+        const limit = anatomy === "sparse-custom" ? 1 : 2;
+        report.sections = (report.sections as unknown[]).slice(0, limit);
+        report.rawAnswers = (report.rawAnswers as unknown[]).slice(0, limit);
       }
       report.result.findings = [];
       return;
@@ -450,6 +452,18 @@ function applyPreviewVariant(
           achieved: false,
         });
         report.questionByKey["preview-missing-score"] = "Not available";
+      } else if (anatomy === "sparse-custom") {
+        report.questionByKey["preserved-unmapped-response"] =
+          "Preserved response";
+        report.questionsByKey["preserved-unmapped-response"] = {
+          type: "TEXT",
+          label: "Preserved response",
+        };
+        (report.rawAnswers as Array<{ stableKey: string; value: unknown }>).push({
+          stableKey: "preserved-unmapped-response",
+          value:
+            "This synthetic response is preserved even though its section metadata is unavailable.",
+        });
       }
       return;
     case "max-length": {
@@ -506,6 +520,11 @@ function applyPreviewVariant(
           recommendation: undefined,
         }));
         report.rawAnswers = [];
+      } else if (anatomy === "sparse-custom") {
+        report.sections = (report.sections as unknown[]).slice(1);
+        report.rawAnswers = (
+          report.rawAnswers as Array<{ stableKey: string; value: unknown }>
+        ).filter((answer) => answer.stableKey === "handoff");
       }
       return;
     case "long-branding":
@@ -529,7 +548,7 @@ export function buildReportStylePreviewReport(
   variant: ReportStylePreviewVariant,
 ): RespondentReport {
   const report = reportForAnatomy(anatomy);
-  applyPreviewVariant(report, variant);
+  applyPreviewVariant(report, variant, anatomy);
   return deepFreeze(report);
 }
 

@@ -32,6 +32,17 @@ const NON_CANARY_TEMPLATE = {
   id: "tpl-non-canary",
   reportStylesEnabled: false,
 };
+const NARRATIVE_CUSTOM_TEMPLATE = {
+  ...TEMPLATE,
+  id: "tpl-narrative-custom",
+  name: "Founder Prompts",
+  alias: "founder-prompts-custom",
+  reportStylePreviewCapabilities: {
+    reportType: "scored" as const,
+    hasMetrics: false,
+    hasNarrativeResponses: true,
+  },
+};
 const RESPONDENT = {
   id: "resp-1",
   firstName: "Alice",
@@ -122,9 +133,20 @@ describe("CampaignWizard — report appearance", () => {
   });
 
   it("renders report appearance for a template with an arbitrary alias", async () => {
-    await advanceToSchedule(OTHER_TEMPLATE, true);
+    await advanceToSchedule(OTHER_TEMPLATE);
 
     expect(screen.getByRole("heading", { name: "Report appearance" })).toBeInTheDocument();
+  });
+
+  it("uses sparse custom preview assets for a narrative-only custom template", async () => {
+    await advanceToSchedule(NARRATIVE_CUSTOM_TEMPLATE);
+
+    expect(
+      screen.getByRole("img", { name: "Modern Dashboard Cover preview" }),
+    ).toHaveAttribute(
+      "src",
+      "/report-style-previews/sparse-custom/modern-dashboard/cover.webp",
+    );
   });
 
   it("does not render report appearance for an eligible template outside the canary", async () => {

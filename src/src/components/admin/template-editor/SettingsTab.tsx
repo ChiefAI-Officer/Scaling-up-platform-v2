@@ -41,6 +41,7 @@ import {
 import {
   resolveReportStylePreviewAnatomy,
   type ReportStyleKey,
+  type ReportStylePreviewCapabilities,
 } from "@/lib/assessments/report-style-registry";
 
 // ────────────────────────────────────────────────────────────────────────
@@ -105,6 +106,8 @@ export interface SettingsTabProps {
   waveQEnabled: boolean;
   /** Server-computed; the client still checks the exact eligible alias. */
   reportStylesEnabled?: boolean;
+  /** Canonical report family + stored version-question capabilities. */
+  reportStylePreviewCapabilities: ReportStylePreviewCapabilities;
 }
 
 // ────────────────────────────────────────────────────────────────────────
@@ -158,6 +161,7 @@ export function SettingsTab({
   savingSendResultsDefault,
   waveQEnabled,
   reportStylesEnabled = false,
+  reportStylePreviewCapabilities,
 }: SettingsTabProps) {
   return (
     <div className="space-y-6 max-w-2xl">
@@ -170,6 +174,7 @@ export function SettingsTab({
       {reportStylesEnabled && isReportStyleEligible(templateValues.alias) && (
         <DefaultReportAppearanceCard
           templateAlias={templateValues.alias}
+          previewCapabilities={reportStylePreviewCapabilities}
           defaultReportStyle={templateValues.defaultReportStyle ?? "CLASSIC"}
           handleTemplateRowSave={handleTemplateRowSave}
           templateRowSaving={templateRowSaving}
@@ -207,12 +212,14 @@ export function SettingsTab({
 
 function DefaultReportAppearanceCard({
   templateAlias,
+  previewCapabilities,
   defaultReportStyle,
   handleTemplateRowSave,
   templateRowSaving,
   templateRowError,
 }: {
   templateAlias: string;
+  previewCapabilities: ReportStylePreviewCapabilities;
   defaultReportStyle: ReportStyleKey;
   handleTemplateRowSave: (patch: SettingsRowPatch) => void | Promise<void>;
   templateRowSaving: boolean;
@@ -246,7 +253,10 @@ function DefaultReportAppearanceCard({
         <ReportStylePicker
           value={selectedStyle}
           onChange={templateRowSaving ? () => {} : setSelectedStyle}
-          previewAnatomy={resolveReportStylePreviewAnatomy({ templateAlias })}
+          previewAnatomy={resolveReportStylePreviewAnatomy({
+            templateAlias,
+            capabilities: previewCapabilities,
+          })}
         />
       </fieldset>
       <div className="mt-4 flex items-center gap-3">

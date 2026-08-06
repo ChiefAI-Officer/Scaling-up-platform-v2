@@ -63,6 +63,7 @@ import {
   isReportStyleKey,
   resolveReportStylePreviewAnatomy,
   type ReportStyleKey,
+  type ReportStylePreviewCapabilities,
 } from "@/lib/assessments/report-style-registry";
 
 const DRAFT_ENDPOINT = "/api/assessment-campaign-drafts";
@@ -130,6 +131,7 @@ interface TemplateSummary {
   defaultReportStyle?: ReportStyleKey;
   /** Server-computed per-template availability, including template canaries. */
   reportStylesEnabled?: boolean;
+  reportStylePreviewCapabilities?: ReportStylePreviewCapabilities;
 }
 
 interface Respondent {
@@ -170,6 +172,7 @@ interface WizardState {
   reportStyle: ReportStyleKey;
   reportStyleIntent: ReportStyleIntent;
   templateReportStylesEnabled: boolean;
+  templatePreviewCapabilities?: ReportStylePreviewCapabilities;
   respondentIds: string[];
   ceoRespondentId: string | null;
   name: string;
@@ -360,6 +363,7 @@ export function CampaignWizard({
       reportStyle: "CLASSIC",
       reportStyleIntent: "INHERITED",
       templateReportStylesEnabled: false,
+      templatePreviewCapabilities: undefined,
       respondentIds: [],
       ceoRespondentId: null,
       name: "",
@@ -470,6 +474,8 @@ export function CampaignWizard({
           reportStyleIntent,
           templateReportStylesEnabled:
             selectedTemplate?.reportStylesEnabled === true,
+          templatePreviewCapabilities:
+            selectedTemplate?.reportStylePreviewCapabilities,
           respondentIds: Array.isArray(parsed.respondentIds)
             ? parsed.respondentIds
             : [],
@@ -981,6 +987,7 @@ export function CampaignWizard({
               alias,
               defaultReportStyle,
               templateReportStylesEnabled,
+              templatePreviewCapabilities,
               resultsEmailApproved,
               sendResultsDefault,
             ) =>
@@ -996,6 +1003,7 @@ export function CampaignWizard({
                     : "CLASSIC",
                 reportStyleIntent: "INHERITED",
                 templateReportStylesEnabled,
+                templatePreviewCapabilities,
                 templateResultsEmailApproved: resultsEmailApproved,
                 // Wave Q (#1): with the flag on, template selection/switch
                 // re-derives #15 from the picked template's admin default —
@@ -1040,6 +1048,7 @@ export function CampaignWizard({
             closeAt={state.closeAt}
             templateName={state.templateName}
             templateAlias={state.templateAlias}
+            previewCapabilities={state.templatePreviewCapabilities}
             resultsEmailApproved={state.templateResultsEmailApproved}
             sendResultsToRespondent={state.sendResultsToRespondent}
             notifyCoachOnCompletion={state.notifyCoachOnCompletion}
@@ -1205,6 +1214,7 @@ function TemplateStep({
     alias: string,
     defaultReportStyle: ReportStyleKey,
     reportStylesEnabled: boolean,
+    previewCapabilities: ReportStylePreviewCapabilities | undefined,
     resultsEmailApproved: boolean,
     sendResultsDefault: boolean,
   ) => void;
@@ -1284,6 +1294,7 @@ function TemplateStep({
                       ? t.defaultReportStyle
                       : "CLASSIC",
                     t.reportStylesEnabled === true,
+                    t.reportStylePreviewCapabilities,
                     t.resultsEmailApproved,
                     t.sendResultsDefault === true,
                   )
@@ -1778,6 +1789,7 @@ function ScheduleStep({
   closeAt,
   templateName,
   templateAlias,
+  previewCapabilities,
   resultsEmailApproved,
   sendResultsToRespondent,
   notifyCoachOnCompletion,
@@ -1800,6 +1812,7 @@ function ScheduleStep({
   closeAt: string;
   templateName: string;
   templateAlias: string;
+  previewCapabilities?: ReportStylePreviewCapabilities;
   resultsEmailApproved: boolean;
   sendResultsToRespondent: boolean;
   notifyCoachOnCompletion: boolean;
@@ -2060,7 +2073,10 @@ function ScheduleStep({
           </div>
           <ReportStylePicker
             value={reportStyle}
-            previewAnatomy={resolveReportStylePreviewAnatomy({ templateAlias })}
+            previewAnatomy={resolveReportStylePreviewAnatomy({
+              templateAlias,
+              capabilities: previewCapabilities,
+            })}
             onChange={(value) =>
               onChange({ reportStyle: value, reportStyleIntent: "EXPLICIT" })
             }

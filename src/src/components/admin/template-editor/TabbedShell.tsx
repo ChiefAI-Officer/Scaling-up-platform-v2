@@ -74,7 +74,10 @@ import {
   AGGREGATION_MODE_LABELS,
 } from "@/components/admin/template-editor/enum-labels";
 import type { QuestionDraftRow } from "@/components/admin/template-editor/question-serialization";
-import type { ReportStyleKey } from "@/lib/assessments/report-style-registry";
+import {
+  deriveReportStylePreviewCapabilities,
+  type ReportStyleKey,
+} from "@/lib/assessments/report-style-registry";
 
 // ────────────────────────────────────────────────────────────────────────
 // Tab definitions
@@ -485,6 +488,14 @@ export function TabbedShell({
     previewSettingsEnabled &&
     formsBuildEnabled &&
     activeAuthoringMode === "single";
+  const reportStylePreviewCapabilities = useMemo(
+    () =>
+      deriveReportStylePreviewCapabilities({
+        templateAlias: template.alias,
+        questions: version.questions,
+      }),
+    [template.alias, version.questions],
+  );
 
   // ─── Tab selection ────────────────────────────────────────────────────
   // Wave ED4/ED6 — when a workspace mode is on (single or three), the Questions
@@ -1093,6 +1104,7 @@ export function TabbedShell({
                 savingSendResultsDefault={savingSendResultsDefault}
                 waveQEnabled={waveQEnabled}
                 reportStylesEnabled={reportStylesEnabled}
+                reportStylePreviewCapabilities={reportStylePreviewCapabilities}
               />
             </div>
           </TabsContent>

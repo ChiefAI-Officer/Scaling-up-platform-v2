@@ -27,7 +27,12 @@ const PUBLIC_CAMPAIGN = {
   reportStyleSource: "CAMPAIGN_OVERRIDE",
   reportStyleLockedAt: null,
   reportStylesAvailable: true,
-  template: { id: "t1", name: "Scaling Up Quick", alias: "scaling-up-quick" },
+  reportStylePreviewCapabilities: {
+    reportType: "scored",
+    hasMetrics: false,
+    hasNarrativeResponses: true,
+  },
+  template: { id: "t1", name: "Founder Prompts", alias: "founder-prompts-custom" },
   organization: { id: "o1", name: "Acme Corp" },
 };
 
@@ -42,11 +47,16 @@ beforeEach(() => {
               success: true,
               data: [{
                 id: "t1",
-                name: "Scaling Up Quick",
-                alias: "scaling-up-quick",
+                name: "Founder Prompts",
+                alias: "founder-prompts-custom",
                 disabledAt: null,
                 defaultReportStyle: "MODERN_DASHBOARD",
                 reportStylesEnabled: true,
+                reportStylePreviewCapabilities: {
+                  reportType: "scored",
+                  hasMetrics: false,
+                  hasNarrativeResponses: true,
+                },
               }],
             }
           : url.endsWith("/api/organizations")
@@ -90,7 +100,10 @@ describe("PublicCampaignsManager — orphaned-page render smoke (Z-1)", () => {
       within(createSection).getByRole("img", {
         name: "Modern Dashboard selected thumbnail",
       }),
-    ).toBeInTheDocument();
+    ).toHaveAttribute(
+      "src",
+      "/report-style-previews/sparse-custom/modern-dashboard/cover.webp",
+    );
     expect(
       within(createSection).queryByRole("img", {
         name: "Modern Dashboard Cover preview",
@@ -157,7 +170,10 @@ describe("PublicCampaignsManager — orphaned-page render smoke (Z-1)", () => {
       within(editor).getByRole("img", {
         name: "Executive Boardroom Cover preview",
       }),
-    ).toBeInTheDocument();
+    ).toHaveAttribute(
+      "src",
+      "/report-style-previews/sparse-custom/executive-boardroom/cover.webp",
+    );
     fireEvent.click(
       within(editor).getByRole("radio", { name: /Modern Dashboard/i }),
     );

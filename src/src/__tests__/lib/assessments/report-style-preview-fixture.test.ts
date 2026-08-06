@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { join } from "node:path";
 import {
   REPORT_STYLE_PREVIEW_ANATOMIES,
@@ -115,6 +116,54 @@ describe("report-style preview fixtures", () => {
       expect(missing.blocks.some((block) => block.kind === "recommendation")).toBe(false);
       expect(missing.blocks.some((block) => block.kind === "finding")).toBe(false);
     }
+  });
+
+  it("makes every sparse stress variant semantically and visually distinct without metrics", () => {
+    const variants = [
+      "normal",
+      "partial",
+      "degraded",
+      "max-length",
+      "missing-blocks",
+    ] as const;
+    const presentations = variants.map((variant) =>
+      buildReportStylePreviewPresentation("sparse-custom", variant),
+    );
+    const fingerprints = presentations.map((presentation) =>
+      createHash("sha256").update(JSON.stringify(presentation)).digest("hex"),
+    );
+
+    expect(new Set(fingerprints).size).toBe(variants.length);
+    for (const presentation of presentations) {
+      expect(
+        presentation.blocks.some((block) =>
+          ["score-summary", "metric-group", "qualitative-scale", "theme"].includes(
+            block.kind,
+          ),
+        ),
+      ).toBe(false);
+    }
+    expect(presentations[0].blocks).toHaveLength(2);
+    expect(presentations[1].blocks).toEqual([
+      expect.objectContaining({
+        kind: "narrative-response",
+        stableKey: "founder-reflections",
+      }),
+    ]);
+    expect(presentations[2].blocks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: "additional-response" }),
+      ]),
+    );
+    expect(JSON.stringify(presentations[3])).toContain(
+      "deliberately long synthetic",
+    );
+    expect(presentations[4].blocks).toEqual([
+      expect.objectContaining({
+        kind: "narrative-response",
+        stableKey: "operating-reflections",
+      }),
+    ]);
   });
 
   it("returns fresh deeply frozen reports and presentations", () => {

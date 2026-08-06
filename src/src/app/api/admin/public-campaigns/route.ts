@@ -23,6 +23,7 @@ import {
 } from "@/lib/assessments/campaign-create-service";
 import { DEFAULT_TEMPLATE_LANGUAGE } from "@/lib/assessments/active-version";
 import {
+  deriveReportStylePreviewCapabilities,
   REPORT_STYLE_KEYS,
   type ReportStyleKey,
 } from "@/lib/assessments/report-style-registry";
@@ -97,6 +98,7 @@ export async function GET() {
       include: {
         organization: { select: { id: true, name: true } },
         template: { select: { id: true, name: true, alias: true } },
+        version: { select: { questions: true } },
       },
       orderBy: { createdAt: "desc" },
     });
@@ -108,6 +110,10 @@ export async function GET() {
         reportStylesAvailable: isReportStylesEnabled({
           templateId: campaign.templateId,
           campaignId: campaign.id,
+        }),
+        reportStylePreviewCapabilities: deriveReportStylePreviewCapabilities({
+          templateAlias: campaign.template?.alias,
+          questions: campaign.version?.questions ?? [],
         }),
       })),
     });

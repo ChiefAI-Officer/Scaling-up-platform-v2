@@ -8,7 +8,8 @@
  * form using explicit E2E_ADMIN_EMAIL/E2E_ADMIN_PASSWORD values.
  */
 import { execFile, execFileSync } from "node:child_process";
-import { copyFile, mkdtemp, mkdir, readFile, rm, stat } from "node:fs/promises";
+import { createRequire } from "node:module";
+import { copyFile, mkdtemp, mkdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
@@ -18,6 +19,13 @@ const previewRoot = join(appRoot, "public", "report-style-previews");
 const registryPath = join(appRoot, "src", "lib", "assessments", "report-style-registry.ts");
 const baseUrl = (process.env.REPORT_STYLE_PREVIEW_BASE_URL || "http://127.0.0.1:3000").replace(/\/$/, "");
 const execFileAsync = promisify(execFile);
+const require = createRequire(import.meta.url);
+const { loadReportStyleFontSeam } = require("./report-style-font-seam.cjs");
+const {
+  assertMeaningfulImage,
+  assertSinglePagePdf,
+  assertWebpContainer,
+} = require("./report-style-capture-integrity.cjs");
 
 const anatomies = Object.freeze(["scored", "qualitative", "sparse-custom"]);
 const pages = Object.freeze(["cover", "summary", "detail"]);
@@ -54,10 +62,9 @@ async function assertRegistryManifest() {
   }
 }
 
-async function assertWebp(path) {
-  const [info, bytes] = await Promise.all([stat(path), readFile(path)]);
-  assert(info.size > 0, `Generated preview is empty: ${path}`);
-  assert(bytes.length >= 12 && bytes.subarray(0, 4).toString("ascii") === "RIFF" && bytes.subarray(8, 12).toString("ascii") === "WEBP", `Preview is not a true WebP: ${path}`);
+async function assertWebp(path, expected = {}) {
+  assertWebpContainer(path);
+  return assertMeaningfulImage(path, expected);
 }
 
 function convertPngToWebp(input, output) {
@@ -66,19 +73,117 @@ function convertPngToWebp(input, output) {
   execFileSync("cwebp", ["-quiet", "-q", "88", input, "-o", output], { stdio: "pipe" });
 }
 
-function assertSinglePagePdf(path, format) {
-  const info = execFileSync("pdfinfo", [path], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
-  const pages = Number(info.match(/^Pages:\s+(\d+)$/m)?.[1]);
-  assert(pages === 1, `Preview PDF must be exactly one page for ${path}; got ${pages || "unknown"}`);
+function representativeContentMarker(entry) {
+  if (entry.page === "cover") {
+    return entry.anatomy === "scored"
+      ? "Scaling Up Full"
+      : entry.anatomy === "qualitative"
+        ? "Quarterly Reflection"
+        : "Custom Founder Prompts";
+  }
+  if (entry.anatomy === "scored") {
+    return entry.page === "summary"
+      ? entry.style === "CLASSIC" ? "Total points" : "People"
+      : entry.style === "CLASSIC" ? "Your recommendations" : "Recommendations";
+  }
+  if (entry.anatomy === "qualitative") {
+    return entry.page === "summary"
+      ? entry.style === "CLASSIC" ? "Dear Alex" : "Operating facts"
+      : "Reflection";
+  }
+  return entry.page === "summary"
+    ? "Founder reflections"
+    : "Operating reflections";
+}
 
-  const pageSize = info.match(/^Page size:\s+([\d.]+) x ([\d.]+) pts/m);
-  assert(pageSize, `Preview PDF has no readable page size: ${path}`);
-  const [width, height] = pageSize.slice(1).map(Number);
-  const expected = format === "A4" ? [595.28, 841.89] : [612, 792];
+async function assertCaptureDom(page, root, entry) {
+  const marker = representativeContentMarker(entry);
+  const matches = root.getByText(marker, { exact: false });
+  let markerVisible = false;
+  for (let index = 0; index < await matches.count(); index += 1) {
+    if (await matches.nth(index).isVisible()) {
+      markerVisible = true;
+      break;
+    }
+  }
   assert(
-    Math.abs(width - expected[0]) < 2 && Math.abs(height - expected[1]) < 2,
-    `Preview PDF is not ${format}: ${width}x${height} pts for ${path}`,
+    markerVisible,
+    `Representative content "${marker}" is not visible for ${entry.anatomy}/${entry.style}/${entry.page}`,
   );
+
+  if (entry.style !== "CLASSIC") {
+    const provenance = root.getByTestId("report-style-provenance");
+    let provenanceVisible = false;
+    for (let index = 0; index < await provenance.count(); index += 1) {
+      if (await provenance.nth(index).isVisible()) {
+        provenanceVisible = true;
+        break;
+      }
+    }
+    assert(
+      provenanceVisible,
+      `Renderer provenance is not visible for ${entry.anatomy}/${entry.style}/${entry.page}`,
+    );
+  }
+
+  const geometry = await root.evaluate((canvas) => {
+    const rootElement = canvas;
+    const rootRect = rootElement.getBoundingClientRect();
+    const rootStyle = window.getComputedStyle(rootElement);
+    const violations = [];
+    for (const node of rootElement.querySelectorAll("*")) {
+      const element = node;
+      const style = window.getComputedStyle(element);
+      if (
+        style.display === "none" ||
+        style.visibility === "hidden" ||
+        Number(style.opacity) === 0
+      ) {
+        continue;
+      }
+      const rect = element.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) continue;
+      if (
+        rect.left < rootRect.left - 1 ||
+        rect.right > rootRect.right + 1 ||
+        rect.top < rootRect.top - 1 ||
+        rect.bottom > rootRect.bottom + 1
+      ) {
+        violations.push({
+          tag: element.tagName,
+          testId: element.getAttribute("data-testid"),
+          left: Math.round(rect.left - rootRect.left),
+          top: Math.round(rect.top - rootRect.top),
+          right: Math.round(rect.right - rootRect.right),
+          bottom: Math.round(rect.bottom - rootRect.bottom),
+        });
+      }
+    }
+    return {
+      clientWidth: rootElement.clientWidth,
+      clientHeight: rootElement.clientHeight,
+      scrollWidth: rootElement.scrollWidth,
+      scrollHeight: rootElement.scrollHeight,
+      overflowX: rootStyle.overflowX,
+      overflowY: rootStyle.overflowY,
+      violations: violations.slice(0, 12),
+    };
+  });
+  assert(
+    geometry.overflowX !== "hidden" && geometry.overflowY !== "hidden",
+    `Capture root hides overflow for ${entry.anatomy}/${entry.style}/${entry.page}`,
+  );
+  assert(
+    geometry.scrollWidth <= geometry.clientWidth + 1 &&
+      geometry.scrollHeight <= geometry.clientHeight + 1,
+    `Selected content exceeds its capture canvas for ${entry.anatomy}/${entry.style}/${entry.page}: ${JSON.stringify(geometry)}`,
+  );
+  assert(
+    geometry.violations.length === 0,
+    `Visible renderer content is clipped for ${entry.anatomy}/${entry.style}/${entry.page}: ${JSON.stringify(geometry.violations)}`,
+  );
+
+  return marker;
 }
 
 async function login(page, credentials) {
@@ -97,7 +202,8 @@ async function rendererCss() {
     readFile(join(stylesRoot, "su-report-executive.css"), "utf8"),
     readFile(join(stylesRoot, "su-report-dashboard.css"), "utf8"),
   ]);
-  return styles.join("\n");
+  const fontSeam = loadReportStyleFontSeam(appRoot);
+  return `${fontSeam.css}\n${styles.join("\n")}`;
 }
 
 const selectionCss = String.raw`
@@ -161,7 +267,7 @@ async function setDatabaseFreeContent(page, entry, styles) {
   const height = entry.rendererKey === "classic" ? 1123 : 1056;
   await page.setContent(`<!doctype html><html><head><meta charset="utf-8"><style>
     html, body { margin: 0; padding: 0; background: #fff; }
-    #report-style-preview-root { box-sizing: border-box; width: ${entry.width}px; height: ${height}px; max-height: ${height}px; overflow: hidden; }
+    #report-style-preview-root { box-sizing: border-box; width: ${entry.width}px; height: ${height}px; }
     #report-style-preview-root > .su-report,
     #report-style-preview-root > .su-report--executive,
     #report-style-preview-root > .su-report--dashboard,
@@ -255,13 +361,25 @@ async function main() {
           `Preview content crosses its canvas bottom for ${entry.style}/${entry.page}`,
         );
       }
+      const representativeMarker = await assertCaptureDom(
+        page,
+        root,
+        entry,
+      );
       const output = join(previewRoot, entry.output);
       const temporaryPng = join(temporaryRoot, `${entry.anatomy}-${entry.rendererKey}-${entry.page}.png`);
       const temporaryPdf = join(temporaryRoot, `${entry.anatomy}-${entry.rendererKey}-${entry.page}.pdf`);
       await mkdir(dirname(output), { recursive: true });
       await root.screenshot({ path: temporaryPng, type: "png", animations: "disabled" });
+      await assertMeaningfulImage(temporaryPng, {
+        width: entry.width,
+        height: entry.rendererKey === "classic" ? 1123 : 1056,
+      });
       convertPngToWebp(temporaryPng, output);
-      await assertWebp(output);
+      await assertWebp(output, {
+        width: entry.width,
+        height: entry.rendererKey === "classic" ? 1123 : 1056,
+      });
       await page.pdf({
         format: entry.format,
         path: temporaryPdf,
@@ -269,7 +387,15 @@ async function main() {
         printBackground: true,
         scale: 1,
       });
-      assertSinglePagePdf(temporaryPdf, entry.format);
+      await assertSinglePagePdf(temporaryPdf, entry.format, {
+        markers: [
+          representativeMarker,
+          ...(entry.style === "CLASSIC"
+            ? []
+            : ["Confidential assessment report"]),
+        ],
+        rasterDirectory: temporaryRoot,
+      });
       if (entry.anatomy === "scored") {
         const compatibilityOutput = join(
           previewRoot,
@@ -278,7 +404,10 @@ async function main() {
         );
         await mkdir(dirname(compatibilityOutput), { recursive: true });
         await copyFile(output, compatibilityOutput);
-        await assertWebp(compatibilityOutput);
+        await assertWebp(compatibilityOutput, {
+          width: entry.width,
+          height: entry.rendererKey === "classic" ? 1123 : 1056,
+        });
       }
       process.stdout.write(`${basename(output)} ${entry.anatomy}/${entry.style}/${entry.page}\n`);
     }
