@@ -1,6 +1,6 @@
 # Template Creation Simplification and Scoring Language Cleanup
 
-**Status:** Grilled design; pending final written-spec approval
+**Status:** Approved and implementation-planned
 **Date:** 2026-08-06
 **Scope:** Admin assessment-template creation and the existing Scoring & Tiers authoring tab
 **Source:** August 5, 2026 Scaling Up touch point with Jeff Verdun
@@ -115,13 +115,15 @@ While the operator has not edited the Internal ID manually:
 
 Once the operator edits the Internal ID, later name changes do not overwrite it.
 
-When an automatically generated ID is already used, creation retries with the next
-available numeric suffix: `team-health`, `team-health-2`, `team-health-3`, and so on.
-This keeps the normal journey name-only.
+When an automatically generated ID is already used, the server retries with the
+next numeric suffix: `team-health`, `team-health-2`, `team-health-3`, and so
+on. The retry is bounded; exhausting the bound expands Advanced and asks the
+operator to enter an Internal ID. This keeps the normal journey name-only
+without an unbounded client request loop.
 
-The retry belongs to the new creation flow. The API keeps its existing `409`
-collision contract so legacy callers and manually entered IDs retain their current
-behavior.
+The simplified request is a narrow, discriminated branch of the existing
+creation endpoint. The legacy request and `409` collision contract remain
+unchanged.
 
 Once the operator has manually edited the Internal ID, the application never changes
 it silently. A `409` collision then:
@@ -138,7 +140,7 @@ If the assessment name cannot produce a valid Internal ID, Advanced expands and 
 The primary action:
 
 1. disables while the request is in flight;
-2. posts the template metadata and empty draft content;
+2. posts the name and, only when manually edited, the Internal ID;
 3. receives both the template ID and v1 version ID; and
 4. navigates to:
 
@@ -156,7 +158,7 @@ The existing FormsBuilder renders:
 - zero questions;
 - zero sections;
 - the existing optional description editor; and
-- the empty-state action **Add your first section**.
+- the existing empty-state message and **+ Add section** action.
 
 No placeholder content is stored.
 
@@ -166,12 +168,19 @@ After the operator adds a section and question, the question card uses the exist
 
 ### 7.1 Creation payload
 
-The simplified form sends:
+The simplified form sends only:
 
-| Field | Initial value |
+| Field | Value |
 | --- | --- |
+| `creationMode` | `"simplified"` |
 | `name` | Trimmed operator input |
-| `alias` | Generated or manually edited Internal ID |
+| `internalId` | Omitted while generated; included only after manual editing |
+
+The server owns the persisted defaults:
+
+| Persisted field | Initial value |
+| --- | --- |
+| `alias` | Generated from `name`, or the manually supplied `internalId` |
 | `description` | `null` |
 | `invitationSubject` | Existing starter subject |
 | `invitationBodyMarkdown` | Existing starter message |
@@ -185,18 +194,23 @@ The simplified form sends:
 `enUS` is deliberate. It matches `DEFAULT_TEMPLATE_LANGUAGE`, the seeded version convention, and campaign Active-version resolution. The legacy creation form's `en` value must not be carried forward.
 
 The invitation subject and message are copied byte-for-byte from the current
-`AssessmentTemplateForm` starter values. Changing invitation copy is outside this
-release; the operator may edit it later in Settings.
+`AssessmentTemplateForm` starter values into server constants. Changing
+invitation copy is outside this release; the operator may edit it later in
+Settings.
 
 ### 7.2 Atomic create
 
-The existing `POST /api/admin/assessment-templates` transaction remains the owner of:
+The existing `POST /api/admin/assessment-templates` remains the owner of:
 
 1. the `AssessmentTemplate` row; and
 2. its unpublished `AssessmentTemplateVersion` v1 row.
 
-When the simplified-creation gate is active, the transaction response includes the
-created version's ID in addition to the existing template ID and alias:
+When `creationMode` is `"simplified"` and the effective release gate is active,
+the route validates the narrow request, applies the server defaults, and retries
+generated-alias collisions inside the single rate-limited request. Each failed
+unique attempt rolls back before the next suffix is tried.
+
+The simplified response includes the created version's ID:
 
 ```json
 {
@@ -209,9 +223,10 @@ created version's ID in addition to the existing template ID and alias:
 }
 ```
 
-When the gate is inactive, the route returns the exact legacy response shape. This
-keeps the project's flag-off byte-identity contract while giving the new form the ID
-it needs for the direct Build redirect.
+Requests without `creationMode: "simplified"` retain the exact legacy schema,
+transaction behavior, collision response, and response shape in every flag
+state. This keeps the project's flag-off byte-identity contract while giving
+the new form the ID it needs for the direct Build redirect.
 
 ### 7.3 Draft and publish boundaries
 
@@ -285,7 +300,8 @@ Domain keys, domain membership, calculations, and saved payloads remain unchange
 | --- | --- |
 | Blank name | Inline required-field error; no request |
 | Invalid generated ID | Expand Advanced and request a valid Internal ID |
-| Duplicate generated Internal ID | Retry with the next numeric suffix without interrupting the operator |
+| Duplicate generated Internal ID | Server retries with the next numeric suffix inside the same request |
+| Generated-ID retry bound exhausted | Preserve the name, expand Advanced, focus Internal ID, ask the operator to enter one |
 | Duplicate manually edited Internal ID | Preserve input, expand Advanced, focus the field, show collision copy |
 | Rate limit | Preserve input and show a retry-later message |
 | Authentication/authorization loss | Follow the existing admin error/session behavior; create nothing |
@@ -306,6 +322,18 @@ WAVE_TEMPLATE_CREATION_SIMPLIFIED_KILL
 
 The kill switch overrides enablement.
 
+The effective gate is true only when the new release flag and the already-live
+editor prerequisites are all active:
+
+- `WAVE_TEMPLATE_CREATION_SIMPLIFIED_ENABLED`;
+- ED6 single-column editor;
+- ED9 Forms Build; and
+- Wave T question-type unlock.
+
+The new kill switch still overrides the complete result. This prevents the
+creation screen from promising the current Build/type-picker experience when a
+prerequisite has been killed.
+
 The effective gate controls the complete approved package:
 
 - simplified creation screen;
@@ -316,9 +344,11 @@ Flag off or killed:
 
 - the existing creation form remains available;
 - the existing Scoring & Tiers copy remains unchanged; and
-- the creation API preserves its exact legacy response shape.
+- simplified-mode requests are unavailable while the legacy API preserves its
+  exact request and response contract.
 
-The new form sends `enUS` explicitly. This release does not alter the legacy form's request or globally change unrelated API callers.
+The simplified server branch persists `enUS` explicitly. This release does not
+alter the legacy form's request or globally change unrelated API callers.
 
 Launch dark, verify both flag states, enable in production, and visually smoke the creation-to-Build journey. Rollback is the kill switch plus redeploy; no data cleanup is required because both paths create the same two persisted models.
 
@@ -327,16 +357,19 @@ Launch dark, verify both flag states, enable in production, and visually smoke t
 Planning should preserve these responsibilities:
 
 1. **Creation presentation**
-   - Owns name, derived Internal ID, Advanced disclosure, validation presentation, and submitting state.
+   - Owns name, a preview of the derived Internal ID, Advanced disclosure, validation presentation, and submitting state.
    - Knows nothing about section, question, scoring, or report editing.
 2. **Creation API**
-   - Owns authorization, rate limiting, request validation, the atomic transaction, content hash, audit log, and created IDs.
+   - Owns authorization, rate limiting, narrow-mode validation, generated-ID
+     collision retries, persisted defaults, the atomic transaction, content
+     hash, audit log, and created IDs.
 3. **Existing template editor**
    - Owns all post-create authoring and persistence.
    - Receives no special “new template” mode.
-4. **Scoring label adapter**
-   - Maps raw metric values to approved labels.
-   - Does not translate or reshape stored payloads.
+4. **Scoring presentation adapter**
+   - Maps raw metric values and stable validation issue codes to approved labels.
+   - Selects legacy or friendly copy only at the rendering boundary.
+   - Does not fork validation rules or translate or reshape stored payloads.
 5. **Feature resolver**
    - Owns enable/kill precedence.
    - Supplies one resolved boolean to the affected admin surfaces.
@@ -366,10 +399,9 @@ Tests prove:
 - generation continues until manual ID editing;
 - manual ID survives later name edits;
 - invalid or empty IDs expand Advanced;
-- duplicate generated IDs retry with the next numeric suffix;
-- duplicate manually edited IDs preserve the name, expand Advanced, focus the ID, and show the approved message;
+- `409` preserves the name, expands Advanced, focuses the ID, and shows the approved message;
 - submit disables during the request;
-- the payload contains empty content and the approved defaults;
+- the payload contains only simplified mode, name, and an optional manually edited Internal ID;
 - a successful response redirects to the exact Build URL; and
 - flag off renders the legacy creation surface.
 
@@ -379,17 +411,21 @@ Tests prove:
 
 - empty questions, sections, and tiers are accepted as draft content;
 - the transaction creates exactly one template and one unpublished v1;
-- the response includes `versionId` when the simplified flow is active;
+- simplified mode accepts only name plus an optional manually edited Internal ID;
+- simplified mode owns the exact empty-draft defaults;
+- generated collisions retry through numeric suffixes within a fixed bound;
+- manual collisions remain `409`;
+- the simplified response includes `versionId`;
 - flag off preserves the exact legacy response body;
 - the content hash and audit entry still occur;
-- collisions remain `409`; and
+- legacy and manually entered collisions remain `409`; and
 - authorization, validation, rate limiting, and transaction failure behavior remain intact.
 
 ### 13.3 Existing editor
 
 Tests prove:
 
-- the empty FormsBuilder state still offers only **Add your first section**;
+- the empty FormsBuilder state still offers only its existing **+ Add section** action;
 - empty Preview remains graceful and non-submittable;
 - adding a question mounts the existing four-type picker;
 - question types retain the same Wave T and inheritance locks; and
@@ -403,7 +439,8 @@ Tests prove:
 - raw enums and forbidden engineering terms do not render while the feature is active;
 - flag off preserves the previous text;
 - tier edits emit the same raw values and payload shape; and
-- tier validation behavior is unchanged.
+- tier validation behavior is unchanged while stable issue codes select the
+  appropriate legacy or friendly rendering copy.
 
 ### 13.5 Required gates
 
