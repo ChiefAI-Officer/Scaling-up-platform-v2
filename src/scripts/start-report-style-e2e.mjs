@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { PrismaClient } from "@prisma/client";
 import reportStyleE2eContract from "./report-style-e2e-server-contract.cjs";
+import { provisionReportComparisonFixture } from "./provision-report-comparison-e2e.mjs";
 
 const { productionServerCommands, runAssessmentReportE2eServer } = reportStyleE2eContract;
 
@@ -35,6 +36,14 @@ const commands = productionServerCommands({
 });
 
 try {
+  if (process.env.E2E_REPORT_COMPARISON_DATABASE_URL) {
+    const fixture = await provisionReportComparisonFixture({
+      env: process.env,
+      createClient: (databaseUrl) => new PrismaClient({ datasourceUrl: databaseUrl, log: [] }),
+    });
+    process.env.ADMIN_EMAIL = fixture.adminEmail;
+    process.env.WAVE_RC_REPORT_COMPARISON_ENABLED = "1";
+  }
   await runAssessmentReportE2eServer({
     env: process.env,
     createClient: (databaseUrl) => new PrismaClient({ datasourceUrl: databaseUrl, log: [] }),

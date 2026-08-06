@@ -30,6 +30,13 @@ type GuardModule = {
       $disconnect: () => Promise<void>;
     };
   }) => Promise<void>;
+  assertDisposableReportComparisonDatabase: (options: {
+    env: NodeJS.ProcessEnv;
+    createClient: (databaseUrl: string) => {
+      organization: { findUnique: (args: unknown) => Promise<{ id: string; name: string; deletedAt: Date | null } | null> };
+      $disconnect: () => Promise<void>;
+    };
+  }) => Promise<void>;
   runReportStyleE2eServer: (options: {
     env: NodeJS.ProcessEnv;
     createClient: (databaseUrl: string) => unknown;
@@ -160,6 +167,17 @@ describe("report-style isolated Playwright database contract", () => {
       },
       createClient,
     })).rejects.toThrow("Report-style E2E database contract is invalid.");
+    expect(createClient).not.toHaveBeenCalled();
+  });
+
+  it("gives the comparison provisioner the same hard refusal before it can mutate", async () => {
+    const { assertDisposableReportComparisonDatabase } = loadGuard();
+    const createClient = jest.fn();
+
+    await expect(assertDisposableReportComparisonDatabase({
+      env: { ...comparisonFixtureEnvironment, DATABASE_URL: "postgresql://ambient.invalid/customer" },
+      createClient,
+    })).rejects.toThrow("Report-comparison E2E database contract is invalid.");
     expect(createClient).not.toHaveBeenCalled();
   });
 

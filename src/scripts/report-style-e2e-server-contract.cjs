@@ -62,6 +62,10 @@ async function assertDisposableReportStyleDatabase({ env, createClient }) {
   return assertDisposableFixtureDatabase({ env, createClient, lane: REPORT_STYLE_LANE });
 }
 
+async function assertDisposableReportComparisonDatabase({ env, createClient }) {
+  return assertDisposableFixtureDatabase({ env, createClient, lane: REPORT_COMPARISON_LANE });
+}
+
 async function assertDisposableFixtureDatabase({ env, createClient, lane }) {
   const { databaseUrl, sentinelId, sentinelValue } = validateFixtureDatabaseEnvironment(env, lane);
   const client = createClient(databaseUrl);
@@ -167,6 +171,7 @@ function expectedRaceReportStyle(patchStatus) {
 
 module.exports = {
   createAssessmentReportE2eWebServer,
+  assertDisposableReportComparisonDatabase,
   assertDisposableReportStyleDatabase,
   createReportStyleWebServer,
   expectedRaceReportStyle,

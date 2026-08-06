@@ -82,6 +82,17 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="report-comparison-fixture-hardening"></a>
+### 2026-08-06 — Report-comparison fixture hardening and Jest runtime correction <!-- ENTRY_ISO:2026-08-06 ENTRY_SLUG:report-comparison-fixture-hardening -->
+
+**Status: IMPLEMENTED, DEFAULT-OFF, AND NOT LAUNCHED.** The comparison acceptance lane no longer accepts caller-provided fixture JSON containing report paths, candidate IDs, labels, or claimed render facts. `scripts/provision-report-comparison-e2e.mjs` first invokes the shared exact-URL, strong-sentinel, live-sentinel-row guard, then creates a namespaced disposable topology: fixture admin/coach credentials, one native current CEO submission, native and imported prior CEO submissions, one non-CEO, a same-normalized-email respondent in a different organization, and Classic, Executive Boardroom, and Modern Dashboard campaign rows. The app launcher provisions before its production build/start and refuses the same unsafe inputs before any fixture write.
+
+**Acceptance and security-runtime correction.** The Playwright suite queries those namespaced rows to derive actual candidate IDs, imported badges, coverage, and the deployed renderer test IDs; it does not trust a parent-process declaration of those facts. Contract coverage proves the deterministic topology and hard refusal. A real `iron-session` runtime regression test reproduced Jest/jsdom resolving `uncrypto`'s browser ESM export through CommonJS `iron-session`; Jest now maps that one dependency to its supplied Node CommonJS export. This is not a mock or a bypass of cookie capability behavior.
+
+**Boundary and evidence.** No Production URL, production/customer database, credentials, flag, deployment, canary, invitation delivery, or assessment response was used. The fixture browser workflow remains intentionally unrun until a migrated disposable database, exact sentinel row, and required secrets are supplied. It must still be visually reviewed before any launch decision.
+
+---
+
 <a id="report-comparison-verification-prepared"></a>
 ### 2026-08-06 — Report-native comparison verification and rollout package prepared <!-- ENTRY_ISO:2026-08-06 ENTRY_SLUG:report-comparison-verification-prepared -->
 
