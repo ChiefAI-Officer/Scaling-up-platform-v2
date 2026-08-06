@@ -1,6 +1,6 @@
 # Template Creation Simplification and Scoring Language Cleanup
 
-**Status:** Approved and implementation-planned
+**Status:** Implemented locally; pending review
 **Date:** 2026-08-06
 **Scope:** Admin assessment-template creation and the existing Scoring & Tiers authoring tab
 **Source:** August 5, 2026 Scaling Up touch point with Jeff Verdun
