@@ -31,6 +31,7 @@ import { isFormsBuildEnabled } from "@/lib/assessments/wave-ed9-flags";
 import { isPreviewSettingsEnabled } from "@/lib/assessments/wave-ed10-flags";
 import { isQspStoryGroupEnabled } from "@/lib/assessments/wave-48-flags";
 import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
+import { isTemplateCreationSimplifiedEnabled } from "@/lib/assessments/wave-template-creation-flags";
 import { computePublishedQuestionUnions } from "@/lib/assessments/published-question-unions";
 import {
   activePublishedWhere,
@@ -298,6 +299,9 @@ export default async function AdminAssessmentVersionEditPage({
         // yet. Default false ⇒ byte-identical ED9 shell. Presentation-only,
         // kill = flag off + redeploy.
         previewSettingsEnabled={isPreviewSettingsEnabled()}
+        // Template-creation simplification — resolved on this server page and
+        // forwarded solely to the existing Scoring & Tiers presentation.
+        plainLanguageScoringEnabled={isTemplateCreationSimplifiedEnabled()}
         reportStylesEnabled={isReportStylesEnabled({ templateId: template.id })}
         qspStoryGroupEnabled={isQspStoryGroupEnabled()}
         // Wave ED10 (spec 19am-plan, Task 5) — the Active published version
