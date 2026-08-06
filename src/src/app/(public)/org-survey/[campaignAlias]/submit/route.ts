@@ -1117,7 +1117,7 @@ export async function POST(
           // Lock its exact row before reading it: an isCEO revocation must queue
           // behind this submit transaction instead of committing between our
           // authorization decision and the capability-bearing outbox INSERT.
-          await tx.$executeRaw`SELECT id FROM assessment_campaign_participants WHERE campaign_id = ${locked.campaignId} AND respondent_id = ${locked.respondentId} FOR UPDATE`;
+          await tx.$executeRaw`SELECT "id" FROM "assessment_campaign_participants" WHERE "campaignId" = ${locked.campaignId} AND "respondentId" = ${locked.respondentId} FOR UPDATE`;
           // This current locked read is the authorization decision for every
           // capability-bearing email row and the response disclosure below.
           const lockedParticipant = await tx.assessmentCampaignParticipant.findUnique({

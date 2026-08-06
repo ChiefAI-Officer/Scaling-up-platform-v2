@@ -728,8 +728,15 @@ describe("CEO self-access is delivered only through approved disclosures", () =>
         .includes("assessment_campaign_participants"),
     );
     expect(participantLock).toBeDefined();
-    expect(Array.from(participantLock?.[0] as TemplateStringsArray).join(""))
-      .toContain("FOR UPDATE");
+    const participantLockSql = Array.from(
+      participantLock?.[0] as TemplateStringsArray,
+    ).join("");
+    expect(participantLockSql).toContain(
+      'FROM "assessment_campaign_participants"',
+    );
+    expect(participantLockSql).toContain('"campaignId" = ');
+    expect(participantLockSql).toContain('"respondentId" = ');
+    expect(participantLockSql).toContain("FOR UPDATE");
     expect(
       txMock.$executeRaw.mock.invocationCallOrder[
         txMock.$executeRaw.mock.calls.indexOf(participantLock!)
