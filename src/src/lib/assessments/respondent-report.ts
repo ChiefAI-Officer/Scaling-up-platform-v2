@@ -26,6 +26,11 @@ import {
 } from "@/lib/assessments/question-meta";
 import type { ReportStyleKey } from "@/lib/assessments/report-style-registry";
 import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
+import {
+  revalidateCeoReportAccessInTransaction,
+  type CeoReportAccessTransaction,
+} from "@/lib/assessments/ceo-report-access";
+import type { CeoReportSessionPayload } from "@/lib/assessments/ceo-report-access-cookie";
 
 // Re-export so existing `import { QuestionMeta } from "respondent-report"`
 // consumers keep working after the shared builder extraction.
@@ -35,14 +40,18 @@ export type { QuestionMeta } from "@/lib/assessments/question-meta";
 
 interface SubmissionFindFirst {
   findFirst: (args: {
-    where: { campaignId: string; respondentId: string };
+    where: { id?: string; campaignId: string; respondentId: string };
     select: Record<string, unknown>;
   }) => Promise<RawSubmission | null>;
 }
 
 interface ReportDb {
   $transaction: <T>(
-    cb: (tx: { assessmentSubmission: SubmissionFindFirst }) => Promise<T>,
+    cb: (tx: {
+      assessmentSubmission: SubmissionFindFirst;
+      assessmentCampaignParticipant: CeoReportAccessTransaction["assessmentCampaignParticipant"];
+      assessmentInvitation: CeoReportAccessTransaction["assessmentInvitation"];
+    }) => Promise<T>,
     options?: { maxWait?: number; timeout?: number },
   ) => Promise<T>;
 }
@@ -287,6 +296,57 @@ export function buildStoredRespondentReport(
   };
 }
 
+/** The shared row-to-report body; authorization always happens before this seam. */
+function reportOutcomeFromStoredSubmission(
+  submission: RawSubmission,
+  campaignId: string,
+): RespondentReportOutcome {
+  return {
+    status: "ok",
+    report: buildStoredRespondentReport({
+      submission: {
+        id: submission.id,
+        submittedAt: submission.submittedAt,
+        answers: submission.answers,
+        result: submission.result,
+      },
+      respondent: submission.respondent,
+      campaign: {
+        name: submission.campaign.name,
+        reportStyle: submission.campaign.reportStyle,
+        organizationName: submission.campaign.organization.name,
+        template: submission.campaign.template,
+        creatorCoach: submission.campaign.creatorCoach,
+        version: submission.campaign.version,
+        importManifest: submission.campaign.importManifest,
+      },
+    }),
+    reportStylesAvailable: isReportStylesEnabled({
+      templateId: submission.campaign.template.id,
+      campaignId,
+    }),
+  };
+}
+
+const respondentReportSelect = {
+  id: true,
+  submittedAt: true,
+  answers: true,
+  result: true,
+  respondent: { select: { id: true, firstName: true, lastName: true, email: true, jobTitle: true } },
+  campaign: {
+    select: {
+      name: true,
+      reportStyle: true,
+      importManifest: true,
+      template: { select: { id: true, name: true, alias: true } },
+      organization: { select: { name: true } },
+      creatorCoach: { select: { profileImage: true, firstName: true, lastName: true } },
+      version: { select: { id: true, contentHash: true, sections: true, questions: true, scoringConfig: true } },
+    },
+  },
+} as const;
+
 // ─── Main loader ──────────────────────────────────────────────────────────
 
 /**
@@ -321,97 +381,53 @@ export async function getRespondentReport(
     // Fetch submission keyed by (campaignId, respondentId) — H4
     const submission = await tx.assessmentSubmission.findFirst({
       where: { campaignId, respondentId },
-      select: {
-        id: true,
-        submittedAt: true,
-        answers: true,
-        result: true,
-        respondent: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            // Wave P (Jeff #5): fallback display name when the roster name is blank
-            email: true,
-            jobTitle: true,
-          },
-        },
-        campaign: {
-          select: {
-            name: true,
-            reportStyle: true,
-            // Wave V (V-3): presence-only — the loader derives a boolean and
-            // the manifest payload never reaches the report model.
-            importManifest: true,
-            template: {
-              select: {
-                id: true,
-                name: true,
-                alias: true,
-              },
-            },
-            organization: {
-              select: { name: true },
-            },
-            // Wave K: the creator coach's logo + name (no migration — reuses
-            // the existing Coach.profileImage). Nullable relation: null on
-            // admin PUBLIC campaigns (createdByCoachId null).
-            creatorCoach: {
-              select: {
-                profileImage: true,
-                firstName: true,
-                lastName: true,
-              },
-            },
-            version: {
-              select: {
-                id: true,
-                contentHash: true,
-                sections: true,
-                questions: true,
-                scoringConfig: true,
-              },
-            },
-          },
-        },
-      },
+      select: respondentReportSelect,
     });
 
     if (!submission) {
       return { status: "not-found" } as const;
     }
 
-    const report = buildStoredRespondentReport({
-      submission: {
-        id: submission.id,
-        submittedAt: submission.submittedAt,
-        answers: submission.answers,
-        result: submission.result,
-      },
-      respondent: submission.respondent,
-      campaign: {
-        name: submission.campaign.name,
-        reportStyle: submission.campaign.reportStyle,
-        organizationName: submission.campaign.organization.name,
-        template: submission.campaign.template,
-        creatorCoach: submission.campaign.creatorCoach,
-        version: submission.campaign.version,
-        importManifest: submission.campaign.importManifest,
-      },
-    });
-
-    return {
-      status: "ok",
-      report,
-      reportStylesAvailable: isReportStylesEnabled({
-        templateId: submission.campaign.template.id,
-        campaignId,
-      }),
-    } as const;
+    return reportOutcomeFromStoredSubmission(submission, campaignId);
   },
   // V-4 (Wave V): explicit budget over Prisma's 5s interactive-transaction
   // default — a Neon cold start / high-latency client can P2028 a report
   // view (read-path analog of the #117 commit-path fix). Tactical: the
   // transaction itself is load-bearing (auth + fetch in one snapshot, H14).
   { maxWait: 10_000, timeout: 15_000 });
+}
+
+/**
+ * Self-only report path. Its sealed session is revalidated against live rows in
+ * this exact transaction before the frozen report can be fetched.
+ */
+export async function getCeoSelfRespondentReport(
+  db: ReportDb,
+  session: CeoReportSessionPayload,
+): Promise<RespondentReportOutcome> {
+  return db.$transaction(async (tx) => {
+    const expiresAt = new Date(session.expiresAt).getTime() / 1000;
+    const authorized = await revalidateCeoReportAccessInTransaction(tx, {
+      version: 1,
+      purpose: "assessment-report-comparison-self",
+      focusCampaignId: session.focusCampaignId,
+      invitationId: session.invitationId,
+      respondentId: session.respondentId,
+      expiresAt,
+    });
+    if (!authorized || authorized.focusSubmissionId !== session.focusSubmissionId) {
+      return { status: "forbidden" };
+    }
+    const submission = await tx.assessmentSubmission.findFirst({
+      where: {
+        id: authorized.focusSubmissionId,
+        campaignId: authorized.focusCampaignId,
+        respondentId: authorized.respondentId,
+      },
+      select: respondentReportSelect,
+    });
+    return submission
+      ? reportOutcomeFromStoredSubmission(submission, authorized.focusCampaignId)
+      : { status: "not-found" };
+  }, { maxWait: 10_000, timeout: 15_000 });
 }

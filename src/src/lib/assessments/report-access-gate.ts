@@ -25,8 +25,10 @@ import {
 } from "@/lib/assessments/report-gate-core";
 import {
   getRespondentReport,
+  getCeoSelfRespondentReport,
   type RespondentReportOutcome,
 } from "@/lib/assessments/respondent-report";
+import type { CeoReportSessionPayload } from "@/lib/assessments/ceo-report-access-cookie";
 import {
   getPublicReferralReport,
   type PublicReferralReportOutcome,
@@ -105,6 +107,51 @@ export async function viewRespondentReport(
   });
 
   return { outcome, metricRole };
+}
+
+/**
+ * Exact-session CEO path. There is intentionally no actor: the sealed session
+ * is the only capability and the loader revalidates it in the report-read tx.
+ */
+export async function viewCeoSelfRespondentReport(
+  deps: ReportGateDeps,
+  session: CeoReportSessionPayload,
+): Promise<{ outcome: RespondentReportOutcome; metricRole: "CEO_SELF" }> {
+  const h = await headers();
+  const ip = ipFromHeaders(h);
+  const userAgent = h.get("user-agent");
+  const reportDb = db as unknown as Parameters<typeof getCeoSelfRespondentReport>[0];
+  const outcome = await viewReport<RespondentReportOutcome>(deps, {
+    surface: "respondent",
+    actor: null,
+    noActorPolicy: "tolerate",
+    flagGate: undefined,
+    ip,
+    userAgent,
+    rateLimitKey: `report:ceo-self:${session.focusCampaignId}:${session.respondentId}:${ip}`,
+    rateLimitConfig: RateLimits.standard,
+    load: () => getCeoSelfRespondentReport(reportDb, session),
+    classify: (value) => value.status === "ok" ? "ok" : value.status === "forbidden" ? "forbidden" : "not-found",
+    auditOf: (value) => {
+      if (value.status !== "ok") throw new Error("unreachable: auditOf on non-ok CEO self outcome");
+      return {
+        entityType: "AssessmentSubmission",
+        entityId: value.report.provenance.submissionId,
+        action: "CEO_SELF_REPORT_VIEW",
+        changes: {
+          kind: "ceo-self-report",
+          focusCampaignId: session.focusCampaignId,
+          focusSubmissionId: session.focusSubmissionId,
+          respondentId: session.respondentId,
+          templateAlias: value.report.templateAlias,
+          versionId: value.report.provenance.versionId,
+          contentHash: value.report.provenance.contentHash,
+        },
+      };
+    },
+    metricRole: "CEO_SELF",
+  });
+  return { outcome, metricRole: "CEO_SELF" };
 }
 
 /**
