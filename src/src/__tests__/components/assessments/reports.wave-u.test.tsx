@@ -17,23 +17,6 @@ import { QualitativeReport } from "@/components/assessments/QualitativeReport";
 import type { RespondentReport } from "@/lib/assessments/respondent-report";
 import type { ScoreResult } from "@/lib/assessments/scoring";
 
-const FLAG = "WAVE_U_FINDINGS_ENABLED";
-const KILL = "WAVE_U_FINDINGS_KILL";
-const saved: Record<string, string | undefined> = {};
-
-beforeEach(() => {
-  for (const k of [FLAG, KILL]) {
-    saved[k] = process.env[k];
-    delete process.env[k];
-  }
-});
-afterEach(() => {
-  for (const k of [FLAG, KILL]) {
-    if (saved[k] === undefined) delete process.env[k];
-    else process.env[k] = saved[k];
-  }
-});
-
 // ── Fixtures ────────────────────────────────────────────────────────────────
 
 function baseReport(overrides: Partial<RespondentReport> = {}): RespondentReport {
@@ -60,6 +43,7 @@ function baseReport(overrides: Partial<RespondentReport> = {}): RespondentReport
     },
     degraded: false,
     ...overrides,
+    reportStyle: overrides.reportStyle ?? "CLASSIC",
   };
 }
 
@@ -139,9 +123,8 @@ function qualReport(withFindings: boolean): RespondentReport {
 // ── Scored merge ────────────────────────────────────────────────────────────
 
 describe("BrandedReport — scored findings merge", () => {
-  it("flag ON: non-slider findings merge into 'What to work on next'; slider snapshot entries are IGNORED", () => {
-    process.env[FLAG] = "1";
-    render(<BrandedReport report={scoredReport(true)} />);
+  it("server decision ON: non-slider findings merge into 'What to work on next'; slider snapshot entries are IGNORED", () => {
+    render(<BrandedReport report={scoredReport(true)} reportFindingsAvailable />);
     const recs = screen.getByTestId("report-recommendations");
     // Legacy slider rec still renders exactly once.
     expect(recs.textContent).toContain("LEGACY ROW RECOMMENDATION");
@@ -155,18 +138,16 @@ describe("BrandedReport — scored findings merge", () => {
 
   it("flag OFF: output is identical to a report with no snapshot at all", () => {
     const { container: withSnapshot } = render(
-      <BrandedReport report={scoredReport(true)} />
+      <BrandedReport report={scoredReport(true)} reportFindingsAvailable={false} />
     );
     const { container: withoutSnapshot } = render(
-      <BrandedReport report={scoredReport(false)} />
+      <BrandedReport report={scoredReport(false)} reportFindingsAvailable={false} />
     );
     expect(withSnapshot.innerHTML).toBe(withoutSnapshot.innerHTML);
     expect(withSnapshot.textContent).not.toContain("NUMBER finding text");
   });
 
-  it("KILL overrides ENABLED", () => {
-    process.env[FLAG] = "1";
-    process.env[KILL] = "1";
+  it("an omitted decision fails closed", () => {
     render(<BrandedReport report={scoredReport(true)} />);
     expect(screen.getByTestId("report-recommendations").textContent).not.toContain(
       "NUMBER finding text"
@@ -174,20 +155,32 @@ describe("BrandedReport — scored findings merge", () => {
   });
 
   it("flag ON with pre-Wave-U frozen result (no findings key): renders unchanged", () => {
-    process.env[FLAG] = "1";
-    render(<BrandedReport report={scoredReport(false)} />);
+    render(<BrandedReport report={scoredReport(false)} reportFindingsAvailable />);
     const recs = screen.getByTestId("report-recommendations");
     expect(recs.textContent).toContain("LEGACY ROW RECOMMENDATION");
     expect(recs.textContent).not.toContain("NUMBER finding text");
+  });
+
+  it("applies the same server decision to a curated renderer", () => {
+    const report = {
+      ...scoredReport(true),
+      templateAlias: "scaling-up-full",
+      reportStyle: "MODERN_DASHBOARD" as const,
+    };
+    const { rerender } = render(
+      <BrandedReport report={report} reportStylesAvailable reportFindingsAvailable={false} />,
+    );
+    expect(screen.queryByText("NUMBER finding text")).toBeNull();
+    rerender(<BrandedReport report={report} reportStylesAvailable reportFindingsAvailable />);
+    expect(screen.getByText("NUMBER finding text")).toBeInTheDocument();
   });
 });
 
 // ── Qualitative section ─────────────────────────────────────────────────────
 
 describe("QualitativeReport — findings section", () => {
-  it("flag ON: renders ALL snapshot kinds grouped by section, after the last section, before the footer", () => {
-    process.env[FLAG] = "1";
-    render(<QualitativeReport report={qualReport(true)} />);
+  it("server decision ON: renders ALL snapshot kinds grouped by section, after the last section, before the footer", () => {
+    render(<QualitativeReport report={qualReport(true)} reportFindingsAvailable />);
     const section = screen.getByTestId("qual-section-findings");
     expect(section.textContent).toContain("What to work on next");
     expect(section.textContent).toContain("Your recommendations");
@@ -207,24 +200,22 @@ describe("QualitativeReport — findings section", () => {
   });
 
   it("flag OFF: section absent; output identical to a report with no snapshot", () => {
-    const { container: a } = render(<QualitativeReport report={qualReport(true)} />);
-    const { container: b } = render(<QualitativeReport report={qualReport(false)} />);
+    const { container: a } = render(<QualitativeReport report={qualReport(true)} reportFindingsAvailable={false} />);
+    const { container: b } = render(<QualitativeReport report={qualReport(false)} reportFindingsAvailable={false} />);
     expect(a.innerHTML).toBe(b.innerHTML);
     expect(a.querySelector("[data-testid='qual-section-findings']")).toBeNull();
   });
 
   it("flag ON with empty/absent snapshot: section absent", () => {
-    process.env[FLAG] = "1";
-    const { container } = render(<QualitativeReport report={qualReport(false)} />);
+    const { container } = render(<QualitativeReport report={qualReport(false)} reportFindingsAvailable />);
     expect(container.querySelector("[data-testid='qual-section-findings']")).toBeNull();
   });
 
   it("malformed snapshot never crashes the render", () => {
-    process.env[FLAG] = "1";
     const report = qualReport(false);
     (report.result as unknown as Record<string, unknown>).findings = {
       not: "an array",
     };
-    expect(() => render(<QualitativeReport report={report} />)).not.toThrow();
+    expect(() => render(<QualitativeReport report={report} reportFindingsAvailable />)).not.toThrow();
   });
 });

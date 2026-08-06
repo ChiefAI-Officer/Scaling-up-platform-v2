@@ -1,0 +1,131 @@
+@page executive-report {
+  size: Letter;
+  margin: 0.55in;
+
+  @bottom-left {
+    content: "Confidential assessment report · Scaling Up";
+    color: #6B6478;
+    font-family: Inter, Arial, sans-serif;
+    font-size: 8pt;
+  }
+
+  @bottom-right {
+    content: "Page " counter(page) " of " counter(pages);
+    color: #6B6478;
+    font-family: Inter, Arial, sans-serif;
+    font-size: 8pt;
+  }
+}
+
+.su-report--executive {
+  --executive-purple-900: #2E1A4D;
+  --executive-purple-700: #4A2E82;
+  --executive-purple-500: #5B3A8E;
+  --executive-gold: #C6A15B;
+  --executive-gold-light: #E8D9B5;
+  --executive-cream: #FAF7F1;
+  --executive-ink: #241B36;
+  --executive-muted: #6B6478;
+  --executive-line: #E7DFCE;
+  --executive-decision-people: #C6A15B;
+  --executive-decision-strategy: #5B8AA6;
+  --executive-decision-execution: #A2653E;
+  --executive-decision-cash: #4E8B5E;
+  --executive-decision-you: #8C5BA6;
+  --executive-status-strength-accent: #3E7A4A;
+  --executive-status-on-track-accent: #5B3A8E;
+  --executive-status-watch-area-accent: #B8791E;
+  --executive-status-priority-accent: #A23B3B;
+  --executive-status-strength-ink: #356A40;
+  --executive-status-on-track-ink: #4A2E82;
+  --executive-status-watch-area-ink: #80520B;
+  --executive-status-priority-ink: #7E2D2D;
+  --executive-status-unrated-ink: #6B6478;
+  --executive-status-strength-surface: #EDF5EF;
+  --executive-status-on-track-surface: #F1EDF8;
+  --executive-status-watch-area-surface: #FFF5E8;
+  --executive-status-priority-surface: #FAEEEE;
+  --executive-status-unrated-surface: #FAF7F1;
+  background: var(--executive-cream);
+  color: var(--executive-ink);
+  font-family: var(--font-assessment-inter), Arial, sans-serif;
+  line-height: 1.55;
+  max-width: 8.5in;
+  margin: 0 auto;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+.su-report--executive .report-page { page: executive-report; position: relative; box-sizing: border-box; min-height: 10in; padding: clamp(2rem, 5vw, 4.5rem); }
+.su-report--executive .report-page--executive-cover { background: linear-gradient(140deg, var(--executive-purple-700), var(--executive-purple-900)); color: #ffffff; display: flex; flex-direction: column; justify-content: center; }
+.su-report--executive .report-page--executive-cover header { max-width: 38rem; }
+.su-report--executive .report-page--executive-cover header > p:first-child { color: var(--executive-gold); font-size: .72rem; font-weight: 700; letter-spacing: .22em; text-transform: uppercase; }
+.su-report--executive .report-page--executive-cover h1 { color: #ffffff; font-family: var(--font-assessment-display), Georgia, serif; font-size: clamp(3rem, 8vw, 5.25rem); font-weight: 700; letter-spacing: -.045em; line-height: .96; margin: .6rem 0 1.75rem; overflow-wrap: anywhere; }
+.su-report--executive .report-page--executive-cover header p { color: #efe9f8; margin: .35rem 0; overflow-wrap: anywhere; }
+.su-report--executive .report-page--executive-summary,
+.su-report--executive .report-page--executive-detail { background: #ffffff; }
+.su-report--executive .report-page h2 { color: var(--executive-purple-900); font-family: var(--font-assessment-display), Georgia, serif; font-size: clamp(1.7rem, 3vw, 2.5rem); letter-spacing: -.025em; line-height: 1.12; margin: 0 0 1rem; }
+.su-report--executive .report-page h3 { color: var(--executive-purple-700); font-size: .8rem; letter-spacing: .12em; margin: 1.75rem 0 .6rem; text-transform: uppercase; }
+.su-report--executive .report-page h2 + p,
+.su-report--executive .report-page h3 + p { max-width: 68ch; }
+.su-report--executive .report-page section { margin: 0 0 2.5rem; }
+.su-report--executive .report-page dl { display: grid; gap: 1px; grid-template-columns: repeat(2, minmax(0, 1fr)); background: var(--executive-line); border: 1px solid var(--executive-line); }
+.su-report--executive .report-page dl > div { background: var(--executive-cream); padding: 1rem; min-width: 0; }
+.su-report--executive .report-page dt { color: var(--executive-muted); font-size: .7rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.su-report--executive .report-page dd { color: var(--executive-purple-700); font-family: var(--font-assessment-display), Georgia, serif; font-size: 1.65rem; margin: .25rem 0 0; overflow-wrap: anywhere; }
+.su-report--executive .report-page ol,
+.su-report--executive .report-page ul { margin: 0; padding-left: 1.3rem; }
+.su-report--executive .report-page li { margin: .65rem 0; overflow-wrap: anywhere; }
+.su-report--executive .report-page ol > li { border-bottom: 1px solid var(--executive-line); padding: .8rem .85rem; }
+.su-report--executive .report-decision { border-left: 4px solid var(--executive-purple-500); display: grid; gap: .2rem; grid-template-columns: minmax(0, 1fr) auto; }
+.su-report--executive .report-decision[data-decision="people"] { border-left-color: var(--executive-decision-people); }
+.su-report--executive .report-decision[data-decision="strategy"] { border-left-color: var(--executive-decision-strategy); }
+.su-report--executive .report-decision[data-decision="execution"] { border-left-color: var(--executive-decision-execution); }
+.su-report--executive .report-decision[data-decision="cash"] { border-left-color: var(--executive-decision-cash); }
+.su-report--executive .report-decision[data-decision="you"] { border-left-color: var(--executive-decision-you); }
+.su-report--executive .report-decision .report-status { align-self: center; }
+.su-report--executive .report-status { border: 1px solid currentColor; border-radius: 999px; display: inline-block; font-family: var(--font-assessment-inter), Arial, sans-serif; font-size: .64rem; font-weight: 700; letter-spacing: .055em; padding: .18rem .48rem; text-transform: uppercase; white-space: nowrap; }
+.su-report--executive .report-status--strength { background: var(--executive-status-strength-surface); border-color: var(--executive-status-strength-accent); color: var(--executive-status-strength-ink); }
+.su-report--executive .report-status--on-track { background: var(--executive-status-on-track-surface); border-color: var(--executive-status-on-track-accent); color: var(--executive-status-on-track-ink); }
+.su-report--executive .report-status--watch-area { background: var(--executive-status-watch-area-surface); border-color: var(--executive-status-watch-area-accent); color: var(--executive-status-watch-area-ink); }
+.su-report--executive .report-status--priority { background: var(--executive-status-priority-surface); border-color: var(--executive-status-priority-accent); color: var(--executive-status-priority-ink); }
+.su-report--executive .report-status--unrated { background: var(--executive-status-unrated-surface); color: var(--executive-status-unrated-ink); }
+.su-report--executive .report-signal { border: 1px solid var(--executive-line); list-style: none; margin-left: -1.3rem; padding: .75rem; }
+.su-report--executive .report-signal[data-insight-role="top-strength"] { border-left: 4px solid var(--executive-gold); }
+.su-report--executive .report-signal[data-insight-role="priority-action"] { border-left: 4px solid var(--executive-purple-700); }
+.su-report--executive .report-insight-role { display: block; font-size: .64rem; font-weight: 700; letter-spacing: .085em; margin-bottom: .4rem; text-transform: uppercase; }
+.su-report--executive .report-insight-role--top-strength { color: var(--executive-ink); }
+.su-report--executive .report-insight-role--priority-action { color: var(--executive-purple-700); }
+.su-report--executive .report-page table { border-collapse: collapse; font-size: .9rem; width: 100%; }
+.su-report--executive .report-page th,
+.su-report--executive .report-page td { border-bottom: 1px solid var(--executive-line); padding: .7rem .55rem; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+.su-report--executive .report-page th { color: var(--executive-purple-900); font-weight: 700; }
+.su-report--executive .report-page footer { border-top: 2px solid var(--executive-gold); margin-top: 2.75rem; padding-top: 1.5rem; }
+.su-report--executive .report-page footer .su-report-coach { color: var(--executive-ink); flex-wrap: wrap; }
+.su-report--executive .report-page footer .su-report-coach-name { color: var(--executive-ink); font-family: var(--font-assessment-inter), Arial, sans-serif; white-space: normal; }
+.su-report--executive .report-page footer .su-report-coach-logo { background: #ffffff; border: 1px solid var(--executive-line); }
+.su-report--executive .report-page footer a { color: var(--executive-purple-700); display: inline-block; font-weight: 700; margin: .5rem 1rem .5rem 0; outline-offset: 4px; }
+.su-report--executive .report-page footer a:focus-visible { outline: 3px solid var(--executive-gold); }
+.su-report--executive .report-provenance { border-top: 1px solid var(--executive-line); color: var(--executive-muted); font-size: .68rem; letter-spacing: .035em; margin: auto 0 0; padding-top: 1rem; overflow-wrap: anywhere; }
+.su-report--executive .report-page--executive-cover .report-provenance { border-color: rgba(232, 217, 181, .4); color: var(--executive-gold-light); }
+.su-report--executive [role="status"] { background: #fff3f1; border-left: 4px solid #A23B3B; color: #6a2020; margin: 0; padding: .75rem 1rem; }
+.su-report--executive .report-action-group { border-left: 4px solid var(--executive-gold); padding: .2rem 0 .2rem 1rem; }
+
+@media screen and (max-width: 640px) {
+  .su-report--executive .report-page { min-height: auto; padding: 1.5rem; }
+  .su-report--executive .report-page dl { grid-template-columns: 1fr; }
+  .su-report--executive .report-decision { grid-template-columns: 1fr; }
+}
+
+@media print {
+  .su-report--executive { max-width: none; }
+  .su-report--executive .report-page { min-height: 0; padding: 0; }
+  .su-report--executive .report-page-break { break-before: page; page-break-before: always; }
+  .su-report--executive .report-page section,
+  .su-report--executive .report-page footer,
+  .su-report--executive .report-page tr { break-inside: avoid; page-break-inside: avoid; }
+  .su-report--executive .report-page h2,
+  .su-report--executive .report-page h3 { break-after: avoid; page-break-after: avoid; }
+  .su-report--executive .report-page h2 + *,
+  .su-report--executive .report-page h3 + * { break-before: avoid; page-break-before: avoid; }
+}

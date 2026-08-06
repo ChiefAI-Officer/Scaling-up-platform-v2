@@ -43,6 +43,8 @@ import {
 } from "@/lib/assessments/wave-d-feature-flags";
 import { isResultsEmailApproved } from "@/lib/assessments/results-email-approval";
 import { isOnScreenResultsEnabled } from "@/lib/assessments/wave-osr-flags";
+import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
+import { isFindingsLogicEnabled } from "@/lib/assessments/wave-u-flags";
 import { reportConfigFor } from "@/lib/assessments/report-config";
 import {
   buildRespondentReportFromSubmission,
@@ -71,6 +73,7 @@ import {
 } from "@/lib/assessments/assessment-email-delivery-intents";
 import { inngest } from "@/inngest/client";
 import { reportEmailChromeForCampaign } from "@/lib/assessments/wave-228-flags";
+import { lockReportStyleForFirstCompletion } from "@/lib/assessments/report-style-lock";
 
 const NO_STORE_HEADERS = { "Cache-Control": "no-store" } as const;
 
@@ -112,6 +115,15 @@ function gateFailed(): NextResponse {
     { success: false, error: "This survey is no longer available." },
     { status: 410, headers: NO_STORE_HEADERS }
   );
+}
+
+type SubmissionTransactionAbortKind = "not-found" | "gate" | "conflict";
+
+class SubmissionTransactionAbort extends Error {
+  constructor(readonly kind: SubmissionTransactionAbortKind) {
+    super(kind);
+    this.name = "SubmissionTransactionAbort";
+  }
 }
 
 /** An outbox row ready to INSERT — fully RENDERED (subject + bodyHtml), missing
@@ -841,6 +853,7 @@ export async function POST(
           assessmentName:
             invitation.campaign.template?.name ?? "an assessment",
           templateAlias: invitation.campaign.template?.alias ?? "",
+          reportStyle: invitation.campaign.reportStyle,
           campaignLabel: null,
           sections: invitation.campaign.version.sections,
           questions: invitation.campaign.version.questions,
@@ -894,6 +907,16 @@ export async function POST(
 
       // ── Phase 2 (locked tx): re-validate → create submission → INSERT rows ─
       const result = await db.$transaction(async (tx) => {
+        // Lock the campaign row before any other transactional operation, so a
+        // concurrent report-style update deterministically orders with this
+        // first completion. This must remain in this transaction: any later
+        // failed validation or write then rolls the freeze back with the submit.
+        await lockReportStyleForFirstCompletion(
+          tx,
+          invitation.campaignId,
+          submittedAt,
+        );
+
         // SELECT FOR UPDATE on the invitation row — Postgres-level lock to
         // prevent concurrent submit races for the same invitation.
         await tx.$executeRaw`SELECT id FROM assessment_invitations WHERE id = ${invitationId} FOR UPDATE`;
@@ -953,7 +976,7 @@ export async function POST(
         });
 
         if (!locked || locked.campaign.alias !== campaignAlias) {
-          return { kind: "not-found" as const };
+          throw new SubmissionTransactionAbort("not-found");
         }
         const now = new Date();
         if (
@@ -964,10 +987,10 @@ export async function POST(
           now < locked.campaign.openAt ||
           (locked.campaign.closeAt !== null && now >= locked.campaign.closeAt)
         ) {
-          return { kind: "gate" as const };
+          throw new SubmissionTransactionAbort("gate");
         }
         if (locked.status === "SUBMITTED") {
-          return { kind: "conflict" as const };
+          throw new SubmissionTransactionAbort("conflict");
         }
 
         // One explicit ledger instant owns all intent lifecycle timestamps.
@@ -981,6 +1004,7 @@ export async function POST(
             invitationId,
             answers: rawAnswers as unknown as object, // ALL answers stored
             result: scoreResult as unknown as object,
+            submittedAt,
           },
           select: { id: true },
         });
@@ -1160,6 +1184,16 @@ export async function POST(
           createdIntentCount: intentMode ? rowsToPersist.length : 0,
           discloseOnScreen,
         };
+      }).catch((error) => {
+        if (!(error instanceof SubmissionTransactionAbort)) throw error;
+        switch (error.kind) {
+          case "not-found":
+            return { kind: "not-found" as const };
+          case "gate":
+            return { kind: "gate" as const };
+          case "conflict":
+            return { kind: "conflict" as const };
+        }
       });
 
       if (result.kind === "not-found") {
@@ -1220,6 +1254,11 @@ export async function POST(
         result.discloseOnScreen && respondentReport !== null
           ? respondentReport
           : undefined;
+      const reportStylesAvailable = isReportStylesEnabled({
+        templateId: invitation.campaign.templateId,
+        campaignId: invitation.campaign.id,
+      });
+      const reportFindingsAvailable = isFindingsLogicEnabled();
 
       if (onScreenReport) {
         console.info("[assessment-report] onscreen_report_payload_issued", {
@@ -1237,6 +1276,8 @@ export async function POST(
           success: true,
           data: {
             submissionId: result.submissionId,
+            reportStylesAvailable,
+            reportFindingsAvailable,
             ...(onScreenReport ? { report: onScreenReport } : {}),
           },
         },

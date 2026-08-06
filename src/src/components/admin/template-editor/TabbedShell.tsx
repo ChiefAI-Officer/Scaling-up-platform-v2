@@ -74,6 +74,7 @@ import {
   AGGREGATION_MODE_LABELS,
 } from "@/components/admin/template-editor/enum-labels";
 import type { QuestionDraftRow } from "@/components/admin/template-editor/question-serialization";
+import type { ReportStyleKey } from "@/lib/assessments/report-style-registry";
 
 // ────────────────────────────────────────────────────────────────────────
 // Tab definitions
@@ -151,6 +152,8 @@ export interface TemplateEditorTabbedTemplate {
    * inert until the results email content is approved.
    */
   sendResultsDefault?: boolean;
+  /** Admin policy copied into future eligible campaigns. */
+  defaultReportStyle?: ReportStyleKey;
   aggregationMode: "FULL_VISIBILITY" | "CEO_ONLY";
   accessMode?: "INVITED" | "PUBLIC";
 }
@@ -318,6 +321,8 @@ export interface TabbedShellProps {
    * inert today (accepted + defaulted, not yet read). Presentation-only.
    */
   previewSettingsEnabled?: boolean;
+  /** Server-computed availability for the report-style release. */
+  reportStylesEnabled?: boolean;
   /**
    * Wave 48 — QSP core-values stories presentation. Server-computed and
    * forwarded to the read-only Preview pager; default false preserves ED10.
@@ -434,6 +439,7 @@ export function TabbedShell({
   // it feeds `ed10Active` (below), which humanizes the header pills; Task 10
   // mounts the Preview + Settings tabs when `ed10Active`.
   previewSettingsEnabled = false,
+  reportStylesEnabled = false,
   qspStoryGroupEnabled = false,
   // ED10 (spec 19am-plan, Task 5/10) — Active published-version snapshot for
   // the Preview tab's "Active" side; null when nothing is published (or the
@@ -1086,6 +1092,7 @@ export function TabbedShell({
                 onSendResultsDefaultChange={handleSendResultsDefaultChange}
                 savingSendResultsDefault={savingSendResultsDefault}
                 waveQEnabled={waveQEnabled}
+                reportStylesEnabled={reportStylesEnabled}
               />
             </div>
           </TabsContent>

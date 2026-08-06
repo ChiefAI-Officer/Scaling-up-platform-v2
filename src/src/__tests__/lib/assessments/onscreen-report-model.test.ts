@@ -34,6 +34,7 @@ function build(overrides?: Record<string, unknown>) {
     },
     assessmentName: "Rockefeller Habits Checklist",
     templateAlias: "RockHabits",
+    ...{ reportStyle: "MODERN_DASHBOARD" },
     campaignLabel: "Q3 2026",
     sections: [{ stableKey: "s1", sortOrder: 1, name: "S1" }],
     questions: [
@@ -154,6 +155,12 @@ describe("templateAlias", () => {
   it("is always populated, so reportConfigFor can dispatch scored vs qualitative", () => {
     expect(build().templateAlias).toBe("RockHabits");
     expect(build({ templateAlias: "qsp-v2" }).templateAlias).toBe("qsp-v2");
+  });
+});
+
+describe("reportStyle", () => {
+  it("preserves the required frozen campaign style", () => {
+    expect(Object.getOwnPropertyDescriptor(build(), "reportStyle")?.value).toBe("MODERN_DASHBOARD");
   });
 });
 

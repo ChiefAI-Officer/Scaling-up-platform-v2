@@ -33,6 +33,8 @@ import {
 } from "@/lib/assessments/wave-f-flags";
 import { isCustomSlidesEnabled } from "@/lib/assessments/wave-m-flags";
 import { isOnScreenResultsEnabled } from "@/lib/assessments/wave-osr-flags";
+import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
+import { isReportStyleEligible } from "@/lib/assessments/report-style-policy";
 import {
   hasComparableLongitudinal,
   asLongitudinalEligibilityDb,
@@ -129,6 +131,14 @@ export default async function CampaignDetailPage({ params }: PageProps) {
     ? projectSections(campaignForFlag?.version?.sections)
     : [];
 
+  // Report appearance availability is a server decision. The client receives
+  // only this resolved capability and never derives ownership, template
+  // eligibility, or flag/canary status itself.
+  const reportStylesAvailable =
+    campaignForFlag !== null &&
+    isReportStyleEligible(overview.campaign.templateAlias) &&
+    isReportStylesEnabled({ templateId: overview.campaign.templateId, campaignId: id });
+
   // Wave N (#23) — per-row "over time" eligibility. Each submitted respondent
   // gets a longitudinal entry link ONLY when `hasComparableLongitudinal` is
   // true (flag on, scored template, current template access, ≥2 scored
@@ -191,6 +201,7 @@ export default async function CampaignDetailPage({ params }: PageProps) {
       onScreenResultsEnabled={isOnScreenResultsEnabled()}
       initialCustomSlides={initialCustomSlides}
       customSlidesSections={customSlidesSections}
+      reportStylesAvailable={reportStylesAvailable}
       longitudinalRespondentIds={longitudinalRespondentIds}
     />
   );

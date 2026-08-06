@@ -51,6 +51,7 @@ function qualReport(args: QualFixtureArgs): RespondentReport {
     companyName: "Acme Corp",
     assessmentName: "Leadership Vision Alignment",
     templateAlias: args.templateAlias,
+    reportStyle: "CLASSIC",
     campaignLabel: null,
     submittedAt: new Date("2026-06-17T10:00:00Z"),
     result: {} as ScoreResult,

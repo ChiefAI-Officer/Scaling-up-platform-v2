@@ -30,6 +30,7 @@ import { isVersionLifecycleEnabled } from "@/lib/assessments/wave-ed8-flags";
 import { isFormsBuildEnabled } from "@/lib/assessments/wave-ed9-flags";
 import { isPreviewSettingsEnabled } from "@/lib/assessments/wave-ed10-flags";
 import { isQspStoryGroupEnabled } from "@/lib/assessments/wave-48-flags";
+import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
 import { computePublishedQuestionUnions } from "@/lib/assessments/published-question-unions";
 import {
   activePublishedWhere,
@@ -76,6 +77,7 @@ export default async function AdminAssessmentVersionEditPage({
         resultsEmailContentApproved: true,
         // Wave Q (#1) — template-row results-email default toggle.
         sendResultsDefault: true,
+        defaultReportStyle: true,
         aggregationMode: true,
       },
     }),
@@ -221,6 +223,7 @@ export default async function AdminAssessmentVersionEditPage({
           resultsEmailBodyMarkdown: template.resultsEmailBodyMarkdown,
           resultsEmailContentApproved: template.resultsEmailContentApproved,
           sendResultsDefault: template.sendResultsDefault,
+          defaultReportStyle: template.defaultReportStyle,
           aggregationMode: template.aggregationMode,
           // accessMode is a campaign-level concept; templates default to INVITED
           // (v1 PUBLIC mode is hardcoded for Website Assessment per WF16 spec).
@@ -295,6 +298,7 @@ export default async function AdminAssessmentVersionEditPage({
         // yet. Default false ⇒ byte-identical ED9 shell. Presentation-only,
         // kill = flag off + redeploy.
         previewSettingsEnabled={isPreviewSettingsEnabled()}
+        reportStylesEnabled={isReportStylesEnabled({ templateId: template.id })}
         qspStoryGroupEnabled={isQspStoryGroupEnabled()}
         // Wave ED10 (spec 19am-plan, Task 5) — the Active published version
         // snapshot for the Preview tab's read-only "Active" mode. Null when

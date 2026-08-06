@@ -38,6 +38,15 @@ jest.mock("@/lib/assessments/invitation-cookie", () => ({
   getInvitationSession: jest.fn(() => Promise.resolve(sessionState)),
 }));
 
+// Keep the transaction-scoped primitive observable at the route boundary; its
+// SQL contract is covered independently by report-style-lock.test.ts.
+// eslint-disable-next-line no-var
+var reportStyleLockMock: jest.Mock;
+jest.mock("@/lib/assessments/report-style-lock", () => {
+  reportStyleLockMock = jest.fn().mockResolvedValue(undefined);
+  return { lockReportStyleForFirstCompletion: reportStyleLockMock };
+});
+
 const txMock = {
   $executeRaw: jest.fn().mockResolvedValue(1),
   assessmentInvitation: {
@@ -86,6 +95,13 @@ jest.mock("@/lib/assessments/wave-osr-flags", () => ({
   isOnScreenResultsEnabled: jest.fn(() => osrState.enabled),
 }));
 
+jest.mock("@/lib/assessments/wave-report-styles-flags", () => {
+  return { isReportStylesEnabled: jest.fn() };
+});
+jest.mock("@/lib/assessments/wave-u-flags", () => ({
+  isFindingsLogicEnabled: jest.fn(),
+}));
+
 // eslint-disable-next-line no-var
 var approvedState = { approved: true };
 jest.mock("@/lib/assessments/results-email-approval", () => ({
@@ -127,6 +143,13 @@ jest.mock("@/lib/assessments/results-email", () => ({
 }));
 
 import { POST } from "@/app/(public)/org-survey/[campaignAlias]/submit/route";
+import { lockReportStyleForFirstCompletion } from "@/lib/assessments/report-style-lock";
+import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
+import { isFindingsLogicEnabled } from "@/lib/assessments/wave-u-flags";
+
+reportStyleLockMock = lockReportStyleForFirstCompletion as jest.Mock;
+const reportStylesEnabledMock = isReportStylesEnabled as jest.Mock;
+const findingsEnabledMock = isFindingsLogicEnabled as jest.Mock;
 
 const goodVersion = {
   questions: [
@@ -169,6 +192,8 @@ function invitationFixture(overrides?: {
     },
     campaign: {
       id: "c1",
+      templateId: "tpl-1",
+      reportStyle: "MODERN_DASHBOARD",
       alias: "demo",
       deletedAt: null,
       status: "ACTIVE",
@@ -229,7 +254,7 @@ const goodAnswers = { answers: [{ stableKey: "q1", value: 3 }] };
 
 type SubmitBody = {
   success: boolean;
-  data?: { submissionId?: string; report?: unknown };
+  data?: { submissionId?: string; report?: unknown; reportStylesAvailable?: boolean; reportFindingsAvailable?: boolean };
 };
 
 beforeEach(() => {
@@ -242,11 +267,32 @@ beforeEach(() => {
   flagState.intents = false;
   osrState.enabled = true;
   approvedState.approved = true;
+  reportStylesEnabledMock.mockReturnValue(false);
+  findingsEnabledMock.mockReturnValue(false);
   buildState.throws = false;
   buildState.calls = [];
   process.env.APP_URL = "https://app.example.com";
   txMock.assessmentSubmission.create.mockResolvedValue({ id: "sub-1" });
   txMock.assessmentEmailOutbox.create.mockResolvedValue({});
+});
+
+describe("report style first-completion freeze with on-screen results", () => {
+  it("uses the same completion instant for the transaction freeze and stored submission", async () => {
+    mockInvitation({ showResultsOnScreen: true });
+
+    const response = await POST(
+      jsonReq(goodAnswers) as never,
+      aliasParams("demo"),
+    );
+
+    expect(response.status).toBe(200);
+    const [tx, campaignId, submittedAt] = reportStyleLockMock.mock.calls[0];
+    const submissionData =
+      txMock.assessmentSubmission.create.mock.calls[0][0].data;
+    expect(tx).toBe(txMock);
+    expect(campaignId).toBe("c1");
+    expect(submissionData.submittedAt).toBe(submittedAt);
+  });
 });
 
 // ─── the disclosure decision ───────────────────────────────────────────────
@@ -259,6 +305,26 @@ describe("Wave OSR — disclosure decision", () => {
     const body = (await res.json()) as SubmitBody;
     expect(body.data?.submissionId).toBe("sub-1");
     expect(body.data?.report).toEqual(BUILT_REPORT);
+    expect(body.data?.reportStylesAvailable).toBe(false);
+    expect(body.data?.reportFindingsAvailable).toBe(false);
+  });
+
+  it("returns the server-authoritative findings decision with an on-screen report", async () => {
+    findingsEnabledMock.mockReturnValue(true);
+    mockInvitation({ showResultsOnScreen: true });
+    const res = await POST(jsonReq(goodAnswers) as never, aliasParams("demo"));
+    const body = (await res.json()) as SubmitBody;
+    expect(body.data?.reportFindingsAvailable).toBe(true);
+    expect(findingsEnabledMock).toHaveBeenCalled();
+  });
+
+  it("returns the report-style decision made from the locked campaign identifiers", async () => {
+    reportStylesEnabledMock.mockReturnValue(true);
+    mockInvitation({ showResultsOnScreen: true });
+    const res = await POST(jsonReq(goodAnswers) as never, aliasParams("demo"));
+    const body = (await res.json()) as SubmitBody;
+    expect(body.data?.reportStylesAvailable).toBe(true);
+    expect(reportStylesEnabledMock).toHaveBeenCalledWith({ templateId: "tpl-1", campaignId: "c1" });
   });
 
   // NOTE on the negative cases below: an "the report is absent" assertion
@@ -381,6 +447,14 @@ describe("Wave OSR — the report model is built once and reused", () => {
     expect((body.data?.report as { templateAlias?: string })?.templateAlias).toBe(
       "rockefeller",
     );
+  });
+
+  it("passes the campaign's frozen reportStyle into the shared report model", async () => {
+    mockInvitation({ showResultsOnScreen: true });
+
+    await POST(jsonReq(goodAnswers) as never, aliasParams("demo"));
+
+    expect(buildState.calls[0]?.reportStyle).toBe("MODERN_DASHBOARD");
   });
 });
 

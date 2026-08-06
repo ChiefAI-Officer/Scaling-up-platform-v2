@@ -66,18 +66,30 @@ const mockAuditCreate = jest.fn().mockResolvedValue({ id: "audit-1" });
 jest.mock("@/lib/db", () => ({
   db: {
     auditLog: { create: (...args: unknown[]) => mockAuditCreate(...args) },
+    assessmentCampaign: { findFirst: jest.fn().mockResolvedValue({ id: "camp-1", templateId: "tpl-1" }) },
   },
+}));
+
+jest.mock("@/lib/assessments/wave-report-styles-flags", () => ({
+  isReportStylesEnabled: jest.fn(() => true),
+}));
+jest.mock("@/lib/assessments/wave-u-flags", () => ({
+  isFindingsLogicEnabled: jest.fn(() => true),
 }));
 
 jest.mock("@/components/assessments/BrandedReport", () => ({
   BrandedReport: ({
     report,
     campaignLabel,
+    reportStylesAvailable,
+    reportFindingsAvailable,
   }: {
     report: { respondentName: string };
     campaignLabel: string | null;
+    reportStylesAvailable?: boolean;
+    reportFindingsAvailable?: boolean;
   }) => (
-    <div data-testid="branded-report" data-campaign-label={campaignLabel ?? ""}>
+    <div data-testid="branded-report" data-campaign-label={campaignLabel ?? ""} data-report-styles-available={String(reportStylesAvailable)} data-report-findings-available={String(reportFindingsAvailable)}>
       {report.respondentName}
     </div>
   ),
@@ -96,6 +108,7 @@ import { redirect, notFound } from "next/navigation";
 import { getApiActor } from "@/lib/auth/authorization";
 import { getRespondentReport } from "@/lib/assessments/respondent-report";
 import { checkRateLimitAsync } from "@/lib/rate-limit";
+import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
 import Page from "@/app/(report)/assessments/[id]/respondents/[respondentId]/report/page";
 import type { ApiActor } from "@/lib/auth/access-control";
 
@@ -104,6 +117,7 @@ const mockGetRespondentReport = getRespondentReport as jest.Mock;
 const mockRedirect = redirect as unknown as jest.Mock;
 const mockNotFound = notFound as unknown as jest.Mock;
 const mockRateLimit = checkRateLimitAsync as unknown as jest.Mock;
+const mockReportStylesEnabled = isReportStylesEnabled as jest.Mock;
 
 function makeProps(id = "camp-1", respondentId = "resp-1") {
   return { params: Promise.resolve({ id, respondentId }) };
@@ -126,6 +140,7 @@ function okReport() {
       companyName: "Acme Corp",
       assessmentName: "Rockefeller Habits Checklist",
       templateAlias: "RockHabits",
+      reportStyle: "CLASSIC",
       campaignLabel: "Q1 Pulse",
       submittedAt: new Date("2026-01-15T00:00:00Z"),
       result: { perSection: [], perQuestion: [] },
@@ -152,6 +167,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockRateLimit.mockResolvedValue({ success: true, remaining: 99, resetAt: 0 });
   mockAuditCreate.mockResolvedValue({ id: "audit-1" });
+  mockReportStylesEnabled.mockReturnValue(true);
 });
 
 describe("(report) respondent report page", () => {
@@ -242,6 +258,21 @@ describe("(report) respondent report page", () => {
     const markup = renderToStaticMarkup(node as React.ReactElement);
 
     expect(markup).toContain('data-campaign-label="Q1 Pulse"');
+    expect(markup).toContain('data-report-styles-available="true"');
+    expect(markup).toContain('data-report-findings-available="true"');
+  });
+
+  it("keeps the legacy report renderer available when report styles are off", async () => {
+    mockReportStylesEnabled.mockReturnValue(false);
+    mockGetApiActor.mockResolvedValue(adminActor());
+    mockGetRespondentReport.mockResolvedValue(okReport());
+
+    const node = await Page(makeProps());
+    const markup = renderToStaticMarkup(node as React.ReactElement);
+
+    expect(markup).toContain('data-testid="branded-report"');
+    expect(markup).toContain('data-report-styles-available="false"');
+    expect(markup).toContain('data-report-findings-available="true"');
   });
 
   it("renders for an owning COACH actor", async () => {

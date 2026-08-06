@@ -40,6 +40,8 @@ import {
   type PeerComparisonSection,
 } from "@/lib/assessments/peer-benchmarks";
 import type { RespondentReport } from "@/lib/assessments/respondent-report";
+import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
+import { isFindingsLogicEnabled } from "@/lib/assessments/wave-u-flags";
 
 // H15: never statically render or cache the report (PII).
 export const dynamic = "force-dynamic";
@@ -86,6 +88,7 @@ export default async function RespondentReportPage({ params }: PageProps) {
   // benchmark queries, byte-identical page — spec 19s S-2). Fail-soft like the
   // longitudinal entry: any error ⇒ no section, never a broken report.
   const peerComparison = await resolvePeerComparison(id, report);
+  const reportStylesAvailable = await resolveReportStylesAvailable(id);
 
   return (
     <div className="su-report-page">
@@ -110,9 +113,25 @@ export default async function RespondentReportPage({ params }: PageProps) {
         report={report}
         campaignLabel={report.campaignLabel}
         peerComparison={peerComparison}
+        reportStylesAvailable={reportStylesAvailable}
+        reportFindingsAvailable={isFindingsLogicEnabled()}
       />
     </div>
   );
+}
+
+async function resolveReportStylesAvailable(campaignId: string): Promise<boolean> {
+  try {
+    const campaign = await db.assessmentCampaign.findFirst({
+      where: { id: campaignId, deletedAt: null },
+      select: { id: true, templateId: true },
+    });
+    return campaign
+      ? isReportStylesEnabled({ templateId: campaign.templateId, campaignId: campaign.id })
+      : false;
+  } catch {
+    return false;
+  }
 }
 
 /**

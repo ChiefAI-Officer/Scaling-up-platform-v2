@@ -22,6 +22,7 @@ jest.mock("next/server", () => ({
 jest.mock("@/lib/db", () => {
   const assessmentSubmission = { create: jest.fn() };
   const assessmentEmailOutbox = { create: jest.fn() };
+  const executeRaw = jest.fn().mockResolvedValue(1);
   return {
     db: {
       assessmentCampaign: { findUnique: jest.fn() },
@@ -33,13 +34,16 @@ jest.mock("@/lib/db", () => {
           callback: (tx: {
             assessmentSubmission: { create: jest.Mock };
             assessmentEmailOutbox: { create: jest.Mock };
+            $executeRaw: jest.Mock;
           }) => Promise<unknown>,
         ) =>
           callback({
             assessmentSubmission,
             assessmentEmailOutbox,
+            $executeRaw: executeRaw,
           }),
       ),
+      $executeRaw: executeRaw,
     },
   };
 });
@@ -193,6 +197,7 @@ describe("POST /api/quiz/[campaignAlias]/submit", () => {
     expect(body.success).toBe(true);
     expect(body.data.submissionId).toBe("sub-1");
     expect(body.data.redirectUrl).toBe("/quiz/demo/thank-you");
+    expect((db as unknown as { $executeRaw: jest.Mock }).$executeRaw).toHaveBeenCalledTimes(1);
     const createArgs = (db.assessmentSubmission.create as jest.Mock).mock
       .calls[0][0];
     expect(createArgs.data.respondentId).toBeNull();

@@ -16,6 +16,8 @@ import { db } from "@/lib/db";
 import { getInvitationSession } from "@/lib/assessments/invitation-cookie";
 import { isCustomSlidesEnabled } from "@/lib/assessments/wave-m-flags";
 import { loadSafeSlides } from "@/lib/assessments/load-safe-slides";
+import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
+import { isFindingsLogicEnabled } from "@/lib/assessments/wave-u-flags";
 
 const NO_STORE_HEADERS = { "Cache-Control": "no-store" } as const;
 
@@ -44,9 +46,20 @@ const NO_STORE_HEADERS = { "Cache-Control": "no-store" } as const;
  * B's cookie and render A's report to B. Echoing the key lets the client
  * require slot-owner == cookie-owner before rehydrating, which closes that.
  */
-function gateFailed(respondentKey: string): NextResponse {
+function gateFailed(
+  respondentKey: string,
+  decisions: {
+    reportStylesAvailable: boolean;
+    reportFindingsAvailable: boolean;
+  },
+): NextResponse {
   return NextResponse.json(
-    { success: false, error: "This survey is no longer available.", respondentKey },
+    {
+      success: false,
+      error: "This survey is no longer available.",
+      respondentKey,
+      ...decisions,
+    },
     { status: 410, headers: NO_STORE_HEADERS }
   );
 }
@@ -93,19 +106,38 @@ export async function GET(
       );
     }
 
+    const reportDecisions = {
+      reportStylesAvailable: isReportStylesEnabled({
+        templateId: invitation.campaign.templateId,
+        campaignId: invitation.campaign.id,
+      }),
+      reportFindingsAvailable: isFindingsLogicEnabled(),
+    };
     const now = new Date();
     // SEC-M6: a soft-deleted campaign is no longer available.
-    if (invitation.campaign.deletedAt !== null) return gateFailed(invitation.id);
-    if (invitation.revokedAt !== null) return gateFailed(invitation.id);
-    if (now >= invitation.expiresAt) return gateFailed(invitation.id);
-    if (invitation.status === "SUBMITTED") return gateFailed(invitation.id);
-    if (invitation.campaign.status !== "ACTIVE") return gateFailed(invitation.id);
-    if (now < invitation.campaign.openAt) return gateFailed(invitation.id);
+    if (invitation.campaign.deletedAt !== null) {
+      return gateFailed(invitation.id, reportDecisions);
+    }
+    if (invitation.revokedAt !== null) {
+      return gateFailed(invitation.id, reportDecisions);
+    }
+    if (now >= invitation.expiresAt) {
+      return gateFailed(invitation.id, reportDecisions);
+    }
+    if (invitation.status === "SUBMITTED") {
+      return gateFailed(invitation.id, reportDecisions);
+    }
+    if (invitation.campaign.status !== "ACTIVE") {
+      return gateFailed(invitation.id, reportDecisions);
+    }
+    if (now < invitation.campaign.openAt) {
+      return gateFailed(invitation.id, reportDecisions);
+    }
     if (
       invitation.campaign.closeAt !== null &&
       now >= invitation.campaign.closeAt
     ) {
-      return gateFailed(invitation.id);
+      return gateFailed(invitation.id, reportDecisions);
     }
 
     // Return ALL question types — the client's QuestionInput component

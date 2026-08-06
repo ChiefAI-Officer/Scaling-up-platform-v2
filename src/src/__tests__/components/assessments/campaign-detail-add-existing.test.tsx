@@ -19,8 +19,10 @@ import type {
 
 // ─── next/navigation and useToast mocked globally via jest.setup.js ───────
 
+const mockUseToast = jest.fn(() => ({ toast: jest.fn() }));
+
 jest.mock("@/components/ui/use-toast", () => ({
-  useToast: () => ({ toast: jest.fn() }),
+  useToast: () => mockUseToast(),
 }));
 
 // AssessmentResultView is not exercised by these tests.
@@ -43,6 +45,10 @@ const BASE_OVERVIEW: CampaignOverview = {
     organizationName: "Acme Corp",
     templateId: "tpl-1",
     templateName: "Rockefeller Habits",
+    templateAlias: "rockefeller-habits",
+    reportStyle: "CLASSIC",
+    reportStyleSource: "TEMPLATE_DEFAULT",
+    reportStyleLockedAt: null,
     openAt: new Date("2026-06-01T00:00:00Z"),
     closeAt: null,
     createdAt: new Date("2026-05-01T00:00:00Z"),
@@ -480,12 +486,7 @@ describe("CampaignDetail — Add Respondent dialog (pick-existing)", () => {
   it("keeps dialog open on a failed add and does not crash", async () => {
     installFetch({ addOk: false });
     const toastFn = jest.fn();
-    jest
-      .spyOn(
-        require("@/components/ui/use-toast"),
-        "useToast",
-      )
-      .mockReturnValue({ toast: toastFn });
+    mockUseToast.mockReturnValue({ toast: toastFn });
 
     renderDetail();
 
@@ -517,12 +518,7 @@ describe("CampaignDetail — Add Respondent dialog (pick-existing)", () => {
   it("partial failure: reports '1 added, 1 couldn't be added', refreshes table, keeps dialog open", async () => {
     installFetchPartialFailure();
     const toastFn = jest.fn();
-    jest
-      .spyOn(
-        require("@/components/ui/use-toast"),
-        "useToast",
-      )
-      .mockReturnValue({ toast: toastFn });
+    mockUseToast.mockReturnValue({ toast: toastFn });
 
     renderDetail();
 

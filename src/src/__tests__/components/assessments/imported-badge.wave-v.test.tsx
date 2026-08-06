@@ -78,6 +78,7 @@ function baseReport(overrides: Partial<RespondentReport> = {}): RespondentReport
     },
     degraded: false,
     ...overrides,
+    reportStyle: overrides.reportStyle ?? "CLASSIC",
   };
 }
 
@@ -92,6 +93,10 @@ function makeOverview(isImported?: boolean): CampaignOverview {
       status: "CLOSED",
       templateId: "tpl-1",
       templateName: "Scaling Up Full",
+      templateAlias: "scaling-up-full",
+      reportStyle: "CLASSIC",
+      reportStyleSource: "TEMPLATE_DEFAULT",
+      reportStyleLockedAt: null,
       organizationId: "org-1",
       organizationName: "Acme Corp",
       openAt: new Date("2025-01-01T00:00:00Z"),

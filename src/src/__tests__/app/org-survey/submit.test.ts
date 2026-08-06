@@ -31,6 +31,16 @@ jest.mock("@/lib/assessments/invitation-cookie", () => ({
   getInvitationSession: jest.fn(() => Promise.resolve(sessionState)),
 }));
 
+// The lock itself is covered by its unit and PostgreSQL suites. This route
+// double keeps it controllable so the test can prove the transaction awaits it
+// before beginning any later under-lock operation.
+// eslint-disable-next-line no-var
+var reportStyleLockMock: jest.Mock;
+jest.mock("@/lib/assessments/report-style-lock", () => {
+  reportStyleLockMock = jest.fn().mockResolvedValue(undefined);
+  return { lockReportStyleForFirstCompletion: reportStyleLockMock };
+});
+
 const txMock = {
   $executeRaw: jest.fn().mockResolvedValue(1),
   assessmentInvitation: {
@@ -130,8 +140,11 @@ jest.mock("@/lib/assessments/results-email", () => {
 
 import { POST } from "@/app/(public)/org-survey/[campaignAlias]/submit/route";
 import { parseAuthorizationSnapshot } from "@/lib/assessments/assessment-email-delivery-intents";
+import { lockReportStyleForFirstCompletion } from "@/lib/assessments/report-style-lock";
 import { assessmentEmailDeliveryIntentsEnabled } from "@/lib/assessments/wave-d-feature-flags";
 import { inngest } from "@/inngest/client";
+
+reportStyleLockMock = lockReportStyleForFirstCompletion as jest.Mock;
 
 // Template version with a single required SLIDER_LIKERT q1 scale 0..3.
 const goodVersion = {
@@ -184,6 +197,7 @@ function mockHappyInvitation(
     },
     campaign: {
       id: "c1",
+      reportStyle: "MODERN_DASHBOARD",
       templateId: "template-1",
       versionId: "v1",
       alias: "demo",
@@ -245,6 +259,8 @@ const aliasParams = (alias: string) => ({
 });
 
 const transactionCommitMarker = jest.fn();
+const transactionRollbackMarker = jest.fn();
+let transactionActive = false;
 const originalWave228Env = {
   enabled: process.env.WAVE_228_REPORT_EMAIL_CHROME_ENABLED,
   kill: process.env.WAVE_228_REPORT_EMAIL_CHROME_KILL,
@@ -253,6 +269,8 @@ const originalWave228Env = {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  reportStyleLockMock.mockReset().mockResolvedValue(undefined);
+  transactionActive = false;
   sessionState.invitationId = "inv-1";
   sessionState.campaignAlias = "demo";
   flagState.results = true;
@@ -263,9 +281,17 @@ beforeEach(() => {
   process.env.APP_URL = "https://app.example.com";
   dbMock.$transaction.mockImplementation(
     async (fn: (tx: typeof txMock) => unknown) => {
-      const result = await fn(txMock);
-      transactionCommitMarker();
-      return result;
+      transactionActive = true;
+      try {
+        const result = await fn(txMock);
+        transactionCommitMarker();
+        return result;
+      } catch (error) {
+        transactionRollbackMarker();
+        throw error;
+      } finally {
+        transactionActive = false;
+      }
     },
   );
   delete process.env.WAVE_228_REPORT_EMAIL_CHROME_ENABLED;
@@ -466,6 +492,37 @@ describe("POST submit — strict v6.6 validation", () => {
     // Prove this exercised the locked path, NOT the Phase-1 early return: the tx
     // opened and the under-lock re-read actually ran.
     expect(txMock.assessmentInvitation.findUnique).toHaveBeenCalledTimes(1);
+    expect(transactionCommitMarker).not.toHaveBeenCalled();
+    expect(transactionRollbackMarker).toHaveBeenCalledTimes(1);
+  });
+
+  it("rolls back the freeze when the invitation is revoked under the lock", async () => {
+    const phase1Invitation = mockHappyInvitation();
+    txMock.assessmentInvitation.findUnique.mockResolvedValue({
+      ...phase1Invitation,
+      revokedAt: new Date(),
+    });
+    const lockTransactionStates: boolean[] = [];
+    reportStyleLockMock.mockImplementation(() => {
+      lockTransactionStates.push(transactionActive);
+      return Promise.resolve();
+    });
+
+    const res = await POST(
+      jsonReq({ answers: [{ stableKey: "q1", value: 2 }] }) as never,
+      aliasParams("demo"),
+    );
+
+    expect(res.status).toBe(410);
+    await expect(res.json()).resolves.toEqual({
+      success: false,
+      error: "This survey is no longer available.",
+    });
+    expect(lockTransactionStates).toEqual([true]);
+    expect(transactionCommitMarker).not.toHaveBeenCalled();
+    expect(transactionRollbackMarker).toHaveBeenCalledTimes(1);
+    expect(txMock.assessmentSubmission.create).not.toHaveBeenCalled();
+    expect(txMock.assessmentEmailOutbox.create).not.toHaveBeenCalled();
   });
 
   it("401 when no session", async () => {
@@ -476,6 +533,69 @@ describe("POST submit — strict v6.6 validation", () => {
       aliasParams("demo")
     );
     expect(res.status).toBe(401);
+  });
+});
+
+describe("report style first-completion freeze", () => {
+  it("awaits the campaign freeze before any later transaction operation and reuses its completion instant", async () => {
+    mockHappyInvitation();
+    let releaseLock: (() => void) | undefined;
+    const lockStarted = new Promise<void>((resolve) => {
+      reportStyleLockMock.mockImplementationOnce(() => {
+        resolve();
+        return new Promise<void>((release) => {
+          releaseLock = release;
+        });
+      });
+    });
+
+    const request = POST(
+      jsonReq({ answers: [{ stableKey: "q1", value: 2 }] }) as never,
+      aliasParams("demo"),
+    );
+    const firstEvent = await Promise.race([
+      lockStarted.then(() => "lock-started"),
+      request.then(() => "request-completed"),
+    ]);
+
+    expect(firstEvent).toBe("lock-started");
+    expect(txMock.$executeRaw).not.toHaveBeenCalled();
+    expect(txMock.assessmentInvitation.findUnique).not.toHaveBeenCalled();
+    expect(txMock.assessmentSubmission.create).not.toHaveBeenCalled();
+
+    releaseLock?.();
+    const response = await request;
+    expect(response.status).toBe(200);
+    const [lockedTx, lockedCampaignId, lockedSubmittedAt] =
+      reportStyleLockMock.mock.calls[0];
+    const submissionData =
+      txMock.assessmentSubmission.create.mock.calls[0][0].data;
+    expect(lockedTx).toBe(txMock);
+    expect(lockedCampaignId).toBe("c1");
+    expect(submissionData.submittedAt).toBe(lockedSubmittedAt);
+  });
+
+  it("does not leave a report-style freeze outside a transaction when a later write fails", async () => {
+    mockHappyInvitation();
+    const lockTransactionStates: boolean[] = [];
+    reportStyleLockMock.mockImplementation(() => {
+      lockTransactionStates.push(transactionActive);
+      return Promise.resolve();
+    });
+    txMock.assessmentSubmission.create.mockRejectedValueOnce(
+      new Error("later transaction write failed"),
+    );
+
+    const response = await POST(
+      jsonReq({ answers: [{ stableKey: "q1", value: 2 }] }) as never,
+      aliasParams("demo"),
+    );
+
+    expect(response.status).toBe(500);
+    expect(lockTransactionStates).toEqual([true]);
+    expect(reportStyleLockMock).toHaveBeenCalledTimes(1);
+    expect(transactionCommitMarker).not.toHaveBeenCalled();
+    expect(transactionRollbackMarker).toHaveBeenCalledTimes(1);
   });
 });
 

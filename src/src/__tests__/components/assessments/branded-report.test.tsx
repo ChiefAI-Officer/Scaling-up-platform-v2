@@ -9,6 +9,7 @@
  */
 
 import { render, screen, within } from "@testing-library/react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { BrandedReport } from "@/components/assessments/BrandedReport";
 import type { RespondentReport } from "@/lib/assessments/respondent-report";
 import type { ScoreResult } from "@/lib/assessments/scoring";
@@ -42,6 +43,7 @@ function baseReport(overrides: Partial<RespondentReport> = {}): RespondentReport
     },
     degraded: false,
     ...overrides,
+    reportStyle: overrides.reportStyle ?? "CLASSIC",
   };
 }
 
@@ -299,6 +301,14 @@ function suFullReport(): RespondentReport {
 // ════════════════════════════════════════════════════════════════════════════
 
 describe("BrandedReport — cover", () => {
+  it("keeps the representative Scaling Up Full Classic DOM unchanged when styles are unavailable", () => {
+    expect(
+      renderToStaticMarkup(
+        <BrandedReport report={suFullReport()} />,
+      ),
+    ).toMatchSnapshot();
+  });
+
   it("renders respondent, company, assessment name, submitted date, and the white logo", () => {
     render(<BrandedReport report={rockefellerReport()} />);
     const cover = screen.getByTestId("report-cover");

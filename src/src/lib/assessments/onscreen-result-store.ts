@@ -73,6 +73,7 @@
  */
 
 import type { RespondentReport } from "./respondent-report";
+import { isReportStyleKey } from "./report-style-registry";
 
 const PREFIX = "su-onscreen-result:";
 
@@ -242,12 +243,24 @@ export function reviveOnScreenReport(
   report: unknown,
 ): RespondentReport | null {
   if (typeof report !== "object" || report === null) return null;
-  const revived = report as RespondentReport & { submittedAt?: unknown };
-  if (typeof revived.submittedAt === "string") {
-    const asDate = new Date(revived.submittedAt);
-    if (!Number.isNaN(asDate.getTime())) revived.submittedAt = asDate;
-  }
-  return revived as RespondentReport;
+  const serialized = report as { submittedAt?: unknown; reportStyle?: unknown };
+  const submittedAt =
+    typeof serialized.submittedAt === "string"
+      ? new Date(serialized.submittedAt)
+      : serialized.submittedAt;
+
+  return {
+    ...serialized,
+    submittedAt:
+      submittedAt instanceof Date && !Number.isNaN(submittedAt.getTime())
+        ? submittedAt
+        : serialized.submittedAt,
+    // This is the untrusted JSON boundary. It protects the renderer without
+    // rewriting any persisted report fact or falling back during construction.
+    reportStyle: isReportStyleKey(serialized.reportStyle)
+      ? serialized.reportStyle
+      : "CLASSIC",
+  } as RespondentReport;
 }
 
 /**

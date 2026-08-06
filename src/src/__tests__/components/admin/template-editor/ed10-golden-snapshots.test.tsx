@@ -80,6 +80,7 @@ afterEach(() => cleanup());
 function stabilize(html: string): string {
   let out = html
     .replace(/radix-_r_[0-9a-z]+_/g, "radix-_rID_")
+    .replace(/_r_[0-9a-z]+_/g, "_rID_")
     .replace(/Dnd(DescribedBy|LiveRegion)-\d+/g, "Dnd$1-N");
   const uids = new Set<string>();
   const attrs =
@@ -191,6 +192,30 @@ describe("ED10 golden — forms-mode editor shell (ED10 flag OFF)", () => {
     );
     expect(screen.getByTestId("tab-panel-metadata")).toBeInTheDocument();
 
+    expect(stabilize(container.innerHTML)).toMatchSnapshot();
+  });
+});
+
+describe("ED10 golden — eligible Settings default report appearance", () => {
+  it("adds only the approved report-default card to the current Settings tab", () => {
+    mockSearchParams = new URLSearchParams("tab=settings");
+    const props = formsModeProps();
+    const { container } = render(
+      <TemplateEditorTabbed
+        {...props}
+        template={{
+          ...props.template,
+          alias: "scaling-up-full",
+          defaultReportStyle: "CLASSIC",
+        }}
+        previewSettingsEnabled
+        reportStylesEnabled
+      />,
+    );
+
+    expect(screen.getByTestId("settings-audience-card")).toBeInTheDocument();
+    expect(screen.getByTestId("settings-default-report-style-card")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save default" })).toBeDisabled();
     expect(stabilize(container.innerHTML)).toMatchSnapshot();
   });
 });

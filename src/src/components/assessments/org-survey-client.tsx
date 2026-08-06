@@ -145,7 +145,7 @@ type Phase =
    * submit whose response carried a report, or rehydrated from sessionStorage on
    * a refresh (spec 19an §4).
    */
-  | { kind: "results"; report: RespondentReport }
+  | { kind: "results"; report: RespondentReport; reportStylesAvailable?: boolean; reportFindingsAvailable?: boolean }
   | { kind: "error"; message: string };
 
 export function OrgSurveyClient({
@@ -275,6 +275,8 @@ export function OrgSurveyClient({
             // Safe to consume: readError returns a constant for 410.
             const gateBody = (await meRes.json().catch(() => null)) as {
               respondentKey?: unknown;
+              reportStylesAvailable?: unknown;
+              reportFindingsAvailable?: unknown;
             } | null;
             const ownerKey =
               typeof gateBody?.respondentKey === "string"
@@ -282,7 +284,16 @@ export function OrgSurveyClient({
                 : "";
             const stored = readOnScreenResult(campaignAlias, ownerKey);
             if (stored) {
-              if (!cancelled) setPhase({ kind: "results", report: stored });
+              if (!cancelled) {
+                setPhase({
+                  kind: "results",
+                  report: stored,
+                  reportStylesAvailable:
+                    gateBody?.reportStylesAvailable === true,
+                  reportFindingsAvailable:
+                    gateBody?.reportFindingsAvailable === true,
+                });
+              }
               return;
             }
           } else if (meRes.status === 401 || meRes.status === 404) {
@@ -479,7 +490,7 @@ export function OrgSurveyClient({
       // server to disagree (spec 19an §6).
       const submitBody = (await submitRes
         .json()
-        .catch(() => null)) as { data?: { report?: unknown } } | null;
+        .catch(() => null)) as { data?: { report?: unknown; reportStylesAvailable?: unknown; reportFindingsAvailable?: unknown } } | null;
       // Revive across the JSON boundary: `submittedAt` is typed Date but arrives
       // as an ISO string, and the renderers hand it to Intl.DateTimeFormat,
       // which throws on a string and falls back to printing raw ISO text. The
@@ -497,7 +508,12 @@ export function OrgSurveyClient({
           onScreenReport,
           submittingData.respondentKey ?? "",
         );
-        setPhase({ kind: "results", report: onScreenReport });
+        setPhase({
+          kind: "results",
+          report: onScreenReport,
+          reportStylesAvailable: submitBody?.data?.reportStylesAvailable === true,
+          reportFindingsAvailable: submitBody?.data?.reportFindingsAvailable === true,
+        });
         return;
       }
 
@@ -561,6 +577,8 @@ export function OrgSurveyClient({
             report={phase.report}
             assessmentName={phase.report.assessmentName}
             campaignLabel={phase.report.campaignLabel ?? null}
+            reportStylesAvailable={phase.reportStylesAvailable === true}
+            reportFindingsAvailable={phase.reportFindingsAvailable === true}
           />
         </div>
       </main>

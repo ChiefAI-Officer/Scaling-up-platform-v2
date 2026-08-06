@@ -33,6 +33,7 @@ import {
   type EditionStanding,
 } from "./edition-standing";
 import type { AssessmentInvitationStatus, PrismaClient } from "@prisma/client";
+import type { ReportStyleKey } from "./report-style-registry";
 
 // ────────────────────────────────────────────────────────────────────────
 // Public types (consumed by the API route + UI client component).
@@ -77,11 +78,15 @@ export interface CampaignOverview {
     createdAt: Date;
     templateId: string;
     templateName: string;
+    templateAlias: string;
     organizationId: string;
     organizationName: string;
     invitationSubject: string | null;
     invitationBodyMarkdown: string | null;
     invitationBodyHtml: string | null;
+    reportStyle: ReportStyleKey;
+    reportStyleSource: "TEMPLATE_DEFAULT" | "CAMPAIGN_OVERRIDE";
+    reportStyleLockedAt: Date | null;
     /**
      * Wave OSR (#71) — whether respondents see their own report on screen at
      * submit. Surfaced so the screen can both SHOW and CHANGE the setting, which
@@ -191,6 +196,9 @@ interface CampaignWithRels {
   invitationSubject: string | null;
   invitationBodyMarkdown: string | null;
   invitationBodyHtml: string | null;
+  reportStyle: ReportStyleKey;
+  reportStyleSource: "TEMPLATE_DEFAULT" | "CAMPAIGN_OVERRIDE";
+  reportStyleLockedAt: Date | null;
   /**
    * Wave OSR (#71) — whether this campaign shows each respondent their own report
    * on screen at submit. Optional so older fixtures stay valid; absent ⇒ treated
@@ -199,7 +207,7 @@ interface CampaignWithRels {
   showResultsOnScreen?: boolean;
   /** Wave V (V-3): Wave O import-round manifest; non-null ⇒ historical import. */
   importManifest?: unknown;
-  template: { id: string; name: string };
+  template: { id: string; name: string; alias: string };
   organization: { id: string; name: string };
   /** Wave EV / GH #242 — the pinned version, including retirement state and the
    * sibling-currency inputs. Optional so older fixtures stay valid. */
@@ -307,7 +315,7 @@ export async function getCampaignOverview(
   const campaign = await db.assessmentCampaign.findUnique({
     where: { id: campaignId },
     include: {
-      template: { select: { id: true, name: true } },
+      template: { select: { id: true, name: true, alias: true } },
       organization: { select: { id: true, name: true } },
       // Wave EV — the pinned edition, so the screen can say which one it serves.
       version: {
@@ -419,11 +427,15 @@ export async function getCampaignOverview(
       createdAt: campaign.createdAt,
       templateId: campaign.template.id,
       templateName: campaign.template.name,
+      templateAlias: campaign.template.alias,
       organizationId: campaign.organization.id,
       organizationName: campaign.organization.name,
       invitationSubject: campaign.invitationSubject,
       invitationBodyMarkdown: campaign.invitationBodyMarkdown,
       invitationBodyHtml: campaign.invitationBodyHtml,
+      reportStyle: campaign.reportStyle,
+      reportStyleSource: campaign.reportStyleSource,
+      reportStyleLockedAt: campaign.reportStyleLockedAt,
       // Wave OSR (#71) — absent ⇒ off (fail-closed), matching the column default.
       showResultsOnScreen: campaign.showResultsOnScreen === true,
       // Wave V (V-3): boolean only — the manifest payload stays server-side.

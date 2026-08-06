@@ -156,6 +156,7 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
         success: true,
         data: {
           submissionId: "sub_1",
+          reportStyle: "CLASSIC",
           scoreResult: scoreResultFixture,
           redirectUrl: `/quiz/${ALIAS}/thank-you`,
         },
@@ -210,6 +211,42 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
     expect(mockPush).not.toHaveBeenCalled();
   });
 
+  it("forwards an explicit server availability decision to the curated renderer", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        success: true,
+        data: {
+          submissionId: "sub_1",
+          reportStyle: "MODERN_DASHBOARD",
+          reportStylesAvailable: true,
+          reportFindingsAvailable: true,
+          scoreResult: {
+            ...scoreResultFixture,
+            findings: [{
+              stableKey: "q_number",
+              questionType: "NUMBER",
+              sectionStableKey: "S1",
+              questionLabel: "Headcount",
+              text: "Fresh server-authorized finding",
+            }],
+          },
+          redirectUrl: `/quiz/${ALIAS}/thank-you`,
+        },
+      }),
+    });
+    render(<PublicQuizClient {...baseProps} templateAlias="scaling-up-full" />);
+    reachFormStep();
+    fireEvent.change(screen.getByRole("slider"), { target: { value: "6" } });
+    fireEvent.click(screen.getByRole("button", { name: /submit/i }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("modern-dashboard-report")).toBeInTheDocument(),
+    );
+    expect(screen.getByText("Fresh server-authorized finding")).toBeInTheDocument();
+  });
+
   // ── F4 (Wave OSR / Jeff #71 review): templateAlias must reach BrandedReport ─
   //
   // The hand-built RespondentReport here OMITTED templateAlias, so every public
@@ -228,6 +265,7 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
         success: true,
         data: {
           submissionId: "sub_1",
+          reportStyle: "CLASSIC",
           scoreResult: scoreResultFixture,
           redirectUrl: `/quiz/${ALIAS}/thank-you`,
         },
@@ -273,6 +311,7 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
         success: true,
         data: {
           submissionId: "sub_1",
+          reportStyle: "CLASSIC",
           scoreResult: scoreResultFixture,
           redirectUrl: `/quiz/${ALIAS}/thank-you`,
         },
@@ -330,6 +369,7 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
         success: true,
         data: {
           submissionId: "sub_1",
+          reportStyle: "CLASSIC",
           scoreResult: scoreResultFixture,
           redirectUrl: `/quiz/${ALIAS}/thank-you`,
         },
@@ -358,6 +398,7 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
         success: true,
         data: {
           submissionId: "sub_1",
+          reportStyle: "CLASSIC",
           scoreResult: scoreResultFixture,
           referringCoachEmail: "verified@example.com",
           redirectUrl: `/quiz/${ALIAS}/thank-you`,
@@ -390,6 +431,7 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
         success: true,
         data: {
           submissionId: "sub_1",
+          reportStyle: "CLASSIC",
           scoreResult: scoreResultFixture,
           referringCoachEmail: null,
           redirectUrl: `/quiz/${ALIAS}/thank-you`,
@@ -419,6 +461,7 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
         success: true,
         data: {
           submissionId: "sub_1",
+          reportStyle: "CLASSIC",
           scoreResult: scoreResultFixture,
           redirectUrl: `/quiz/${ALIAS}/thank-you`,
         },

@@ -123,6 +123,36 @@ export function headlineForTierMetric(
   };
 }
 
+/**
+ * Stable human-readable report date. A malformed legacy date degrades to its
+ * string representation rather than preventing an otherwise usable report.
+ */
+export function formatReportDate(d: Date): string {
+  try {
+    return new Intl.DateTimeFormat("en-US", {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    }).format(d);
+  } catch {
+    return String(d);
+  }
+}
+
+/** Exact compact metric text used by the existing Classic report. */
+export function formatReportMetric(n: number): string {
+  if (!Number.isFinite(n)) return "0";
+  if (Number.isInteger(n)) return String(n);
+  return (Math.round(n * 100) / 100).toString();
+}
+
+/** Existing Classic rule: achievement marks appear only for positive thresholds. */
+export function showAchievementMarkers(scoringConfig: unknown): boolean {
+  if (!scoringConfig || typeof scoringConfig !== "object") return false;
+  const passThreshold = (scoringConfig as Record<string, unknown>).passThreshold;
+  return typeof passThreshold === "number" && passThreshold > 0;
+}
+
 /** Compact metric formatting: integers stay whole, fractions trim to 1 dp. */
 function formatMetric(n: number): string {
   if (!Number.isFinite(n)) return "0";

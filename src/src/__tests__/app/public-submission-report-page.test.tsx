@@ -56,20 +56,36 @@ jest.mock("@/lib/db", () => ({
     auditLog: {
       create: (...args: unknown[]) => mockAuditCreate(...args),
     },
+    assessmentSubmission: {
+      findFirst: jest.fn().mockResolvedValue({ campaign: { id: "camp-83", templateId: "tpl-83" } }),
+    },
   },
+}));
+
+jest.mock("@/lib/assessments/wave-report-styles-flags", () => ({
+  isReportStylesEnabled: jest.fn(() => true),
+}));
+jest.mock("@/lib/assessments/wave-u-flags", () => ({
+  isFindingsLogicEnabled: jest.fn(() => true),
 }));
 
 const mockBrandedReport = jest.fn(
   ({
     report,
     campaignLabel,
+    reportStylesAvailable,
+    reportFindingsAvailable,
   }: {
     report: { respondentName: string };
     campaignLabel: string | null;
+    reportStylesAvailable?: boolean;
+    reportFindingsAvailable?: boolean;
   }) => (
     <div
       data-testid="branded-report"
       data-campaign-label={campaignLabel ?? ""}
+      data-report-styles-available={String(reportStylesAvailable)}
+      data-report-findings-available={String(reportFindingsAvailable)}
     >
       {report.respondentName}
     </div>
@@ -94,6 +110,7 @@ jest.mock("@/components/assessments/PrintReportButton", () => ({
 import { renderToStaticMarkup } from "react-dom/server";
 import { getApiActor } from "@/lib/auth/authorization";
 import { isReferredResultsEnabled } from "@/lib/assessments/wave-83-flags";
+import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
 import { getPublicReferralReport } from "@/lib/assessments/public-referrals";
 import { checkRateLimitAsync } from "@/lib/rate-limit";
 import Page from "@/app/(report)/assessments/public-submissions/[submissionId]/report/page";
@@ -101,6 +118,7 @@ import type { ApiActor } from "@/lib/auth/access-control";
 
 const mockGetApiActor = getApiActor as jest.Mock;
 const mockIsEnabled = isReferredResultsEnabled as jest.Mock;
+const mockReportStylesEnabled = isReportStylesEnabled as jest.Mock;
 const mockGetPublicReferralReport = getPublicReferralReport as jest.Mock;
 const mockRateLimit = checkRateLimitAsync as jest.Mock;
 
@@ -152,6 +170,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockGetApiActor.mockResolvedValue(ownerActor());
   mockIsEnabled.mockReturnValue(true);
+  mockReportStylesEnabled.mockReturnValue(true);
   mockRateLimit.mockResolvedValue({
     success: true,
     remaining: 99,
@@ -196,6 +215,8 @@ describe("public referral report page", () => {
     expect(markup).toContain('data-testid="branded-report"');
     expect(markup).toContain("Taylor Taker");
     expect(markup).toContain('data-campaign-label="Quick Assessment"');
+    expect(markup).toContain('data-report-styles-available="true"');
+    expect(markup).toContain('data-report-findings-available="true"');
     expect(markup).toContain('data-testid="print-report-button"');
     expect(markup).toContain(
       'data-file-name="Taylor Taker - Rockefeller Habits Checklist - Report"',
@@ -228,6 +249,17 @@ describe("public referral report page", () => {
       versionId: "version-83",
       contentHash: "hash-83",
     });
+  });
+
+  it("retains the existing public-referral report surface when report styles are killed", async () => {
+    mockReportStylesEnabled.mockReturnValue(false);
+
+    const node = await Page(makeProps());
+    const markup = renderToStaticMarkup(node as React.ReactElement);
+
+    expect(markup).toContain('data-testid="branded-report"');
+    expect(markup).toContain('data-report-styles-available="false"');
+    expect(markup).toContain('data-testid="print-report-button"');
   });
 
   it.each(["forbidden", "not-found"] as const)(

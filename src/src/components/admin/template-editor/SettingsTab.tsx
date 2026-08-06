@@ -31,9 +31,14 @@
  */
 
 import Link from "next/link";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 
 import { LANGUAGE_LABELS } from "./enum-labels";
+import { ReportStylePicker } from "@/components/assessments/ReportStylePicker";
+import {
+  isReportStyleEligible,
+} from "@/lib/assessments/report-style-policy";
+import type { ReportStyleKey } from "@/lib/assessments/report-style-registry";
 
 // ────────────────────────────────────────────────────────────────────────
 // Props
@@ -52,6 +57,8 @@ export interface SettingsTabTemplateValues {
   resultsEmailBodyMarkdown: string | null;
   resultsEmailContentApproved: boolean;
   aggregationMode: "FULL_VISIBILITY" | "CEO_ONLY";
+  /** Optional only for legacy isolated editor fixtures; live page always supplies it. */
+  defaultReportStyle?: ReportStyleKey;
 }
 
 /**
@@ -67,6 +74,7 @@ export type SettingsRowPatch = Partial<{
   resultsEmailSubject: string | null;
   resultsEmailBodyMarkdown: string | null;
   resultsEmailContentApproved: boolean;
+  defaultReportStyle: ReportStyleKey;
 }>;
 
 export interface SettingsTabProps {
@@ -92,6 +100,8 @@ export interface SettingsTabProps {
   onSendResultsDefaultChange: (next: boolean) => void;
   savingSendResultsDefault: boolean;
   waveQEnabled: boolean;
+  /** Server-computed; the client still checks the exact eligible alias. */
+  reportStylesEnabled?: boolean;
 }
 
 // ────────────────────────────────────────────────────────────────────────
@@ -144,6 +154,7 @@ export function SettingsTab({
   onSendResultsDefaultChange,
   savingSendResultsDefault,
   waveQEnabled,
+  reportStylesEnabled = false,
 }: SettingsTabProps) {
   return (
     <div className="space-y-6 max-w-2xl">
@@ -153,6 +164,14 @@ export function SettingsTab({
         templateRowSaving={templateRowSaving}
         templateRowError={templateRowError}
       />
+      {reportStylesEnabled && isReportStyleEligible(templateValues.alias) && (
+        <DefaultReportAppearanceCard
+          defaultReportStyle={templateValues.defaultReportStyle ?? "CLASSIC"}
+          handleTemplateRowSave={handleTemplateRowSave}
+          templateRowSaving={templateRowSaving}
+          templateRowError={templateRowError}
+        />
+      )}
       <LanguageCard
         language={language}
         onVersionFieldChange={onVersionFieldChange}
@@ -179,6 +198,71 @@ export function SettingsTab({
       <AccessGroupsRow />
       <AdvancedCard alias={templateValues.alias} />
     </div>
+  );
+}
+
+function DefaultReportAppearanceCard({
+  defaultReportStyle,
+  handleTemplateRowSave,
+  templateRowSaving,
+  templateRowError,
+}: {
+  defaultReportStyle: ReportStyleKey;
+  handleTemplateRowSave: (patch: SettingsRowPatch) => void | Promise<void>;
+  templateRowSaving: boolean;
+  templateRowError: string | null;
+}) {
+  const [selectedStyle, setSelectedStyle] = useState(defaultReportStyle);
+  const dirty = selectedStyle !== defaultReportStyle;
+
+  useEffect(() => {
+    setSelectedStyle(defaultReportStyle);
+  }, [defaultReportStyle]);
+
+  return (
+    <section
+      className="wf-card"
+      style={{ padding: "1.5rem" }}
+      data-testid="settings-default-report-style-card"
+    >
+      <h3 className="wf-card-title" style={{ marginBottom: "0.25rem" }}>
+        Default report appearance
+      </h3>
+      <p className="text-[0.6875rem] text-muted-foreground" style={{ marginBottom: "1rem" }}>
+        This default is copied into future campaigns only. Existing campaigns and reports do not change.
+      </p>
+      <fieldset
+        disabled={templateRowSaving}
+        aria-busy={templateRowSaving}
+        className="min-w-0 border-0 p-0"
+      >
+        <legend className="sr-only">Default report appearance options</legend>
+        <ReportStylePicker
+          value={selectedStyle}
+          onChange={templateRowSaving ? () => {} : setSelectedStyle}
+        />
+      </fieldset>
+      <div className="mt-4 flex items-center gap-3">
+        <button
+          type="button"
+          disabled={!dirty || templateRowSaving}
+          onClick={() => handleTemplateRowSave({ defaultReportStyle: selectedStyle })}
+          className="wf-btn wf-btn-primary disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {templateRowSaving ? "Saving…" : "Save default"}
+        </button>
+        {templateRowSaving && (
+          <span role="status" className="text-xs text-muted-foreground">
+            Saving default…
+          </span>
+        )}
+        {templateRowError && (
+          <span role="alert" className="text-xs text-destructive">
+            {templateRowError}
+          </span>
+        )}
+      </div>
+    </section>
   );
 }
 

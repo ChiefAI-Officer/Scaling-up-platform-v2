@@ -94,6 +94,7 @@ const GOOD_SUBMISSION = {
   },
   campaign: {
     name: "Acme Q1 Campaign",
+    reportStyle: "MODERN_DASHBOARD" as const,
     template: {
       id: "tpl-1",
       name: "Rockefeller",
@@ -153,6 +154,7 @@ test("buildStoredRespondentReport exposes the shared pure frozen-report seam", (
       email: "alice@example.com",
     },
     campaign: {
+      ...GOOD_SUBMISSION.campaign,
       name: GOOD_SUBMISSION.campaign.name,
       organizationName: GOOD_SUBMISSION.campaign.organization.name,
       template: GOOD_SUBMISSION.campaign.template,
@@ -164,6 +166,7 @@ test("buildStoredRespondentReport exposes the shared pure frozen-report seam", (
   expect(report.result).toBe(GOOD_SCORE_RESULT);
   expect(report.respondentEmail).toBe("alice@example.com");
   expect(report.rawAnswers).toBe(GOOD_SUBMISSION.answers);
+  expect(Object.getOwnPropertyDescriptor(report, "reportStyle")?.value).toBe("MODERN_DASHBOARD");
   expect(report.provenance).toEqual({
     submissionId: "sub-1",
     versionId: "ver-1",
@@ -198,6 +201,7 @@ test("1. owning coach + submission → status:ok, all fields populated, provenan
   expect(report.assessmentName).toBe("Rockefeller");
   // templateAlias is the stable instrument slug (template.alias)
   expect(report.templateAlias).toBe("leadership-vision-alignment");
+  expect(Object.getOwnPropertyDescriptor(report, "reportStyle")?.value).toBe("MODERN_DASHBOARD");
   // campaignLabel is the coach's label when present
   expect(report.campaignLabel).toBe("Acme Q1 Campaign");
 

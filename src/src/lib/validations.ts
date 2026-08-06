@@ -6,6 +6,7 @@
 import { z } from "zod";
 import { RESPONDENT_LEVEL_VALUES } from "./assessments/respondent-levels";
 import { safeImageSrc } from "./assessments/safe-image-src";
+import { REPORT_STYLE_KEYS } from "./assessments/report-style-registry";
 
 // ============================================================
 // Common Schemas
@@ -558,6 +559,9 @@ export const createAssessmentCampaignSchema = z
         // disclosure time (submit route, under the lock), so a stored value with
         // the flag off is inert rather than rejected.
         showResultsOnScreen: z.boolean().default(false),
+        // Report style is a closed, optional campaign-creation choice. The
+        // route owns template eligibility and feature-availability policy.
+        reportStyle: z.enum(REPORT_STYLE_KEYS).optional(),
         // Task 9 (Wave D) — invite timing. Its PRESENCE (or `waveD: true`, or a
         // non-empty participantIds array) marks a Wave-D create (atomic create +
         // participant attach + lifecycle + auto-send). Absence = legacy create
@@ -709,6 +713,9 @@ export const updateAssessmentCampaignSchema = z.object({
     // in the route, and disclosure itself is decided server-side under the Phase-2
     // submission lock, so a stored value with the flag off is inert.
     showResultsOnScreen: z.boolean().optional(),
+    // Report appearance is a closed catalog. The PATCH route separately checks
+    // campaign eligibility, flag availability, and the first-completion lock.
+    reportStyle: z.enum(REPORT_STYLE_KEYS).optional(),
 });
 
 export const assignCampaignParticipantsSchema = z

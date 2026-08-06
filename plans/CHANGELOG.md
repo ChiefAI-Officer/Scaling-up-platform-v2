@@ -6,6 +6,19 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="report-style-rollout-prepared"></a>
+### 2026-08-06 — Scaling Up Full report-style rollout prepared <!-- ENTRY_ISO:2026-08-06 ENTRY_SLUG:report-style-rollout-prepared -->
+
+**Status: IMPLEMENTATION COMPLETE; DARK ROLLOUT PREPARED; Production remains Classic.** The completed report-style wave adds `CLASSIC`, `EXECUTIVE_BOARDROOM`, and `MODERN_DASHBOARD` choices only for individual scored `scaling-up-full` on-screen/browser-print reports. The additive migration `20260805090000_add_assessment_report_styles` defaults both `AssessmentTemplate.defaultReportStyle` and `AssessmentCampaign.reportStyle` to `CLASSIC`; existing campaigns therefore retain Classic. Admin selects the global template default only in the current ED10 Settings tab and only for future campaigns. The owning coach may choose during campaign creation or change their campaign before the first successful completion. Both completion routes atomically record `reportStyleLockedAt` before submission creation; later owner/admin style updates return `409`, and a rollback cannot strand a lock.
+
+**Dark gates and rollback.** `WAVE_REPORT_STYLES_ENABLED` is the global gate; `WAVE_REPORT_STYLES_CANARY` accepts exact template/campaign IDs; `WAVE_REPORT_STYLES_KILL` takes precedence over both. Flag-off, kill, invalid key, ineligible template, and missing-style cases resolve to Classic without erasing persisted enum values. The dedicated [report-style rollout runbook](../docs/runbooks/report-style-rollout.md) specifies migrate/flag-off verification, canary sequencing, acceptance criteria, read-only validation queries, and the kill procedure. General picker enablement still leaves the global default Classic; any default change is a deliberate later ADMIN action.
+
+**Validation and evidence.** Targeted Tasks 1–16 Jest coverage, including the Task 16 hardened E2E contract, ESLint across every branch-changed TS/TSX file, migration safety, Turbopack production build, and diff hygiene were run for the final repository gate. The DB-free supplemental component-renderer lane passed **2 styles × 6 variants, 12 Axe scans, 24 responsive screenshots, and 12 Letter PDFs / 111 physical pages**. This is supporting renderer/layout evidence only: it bypasses compiled CSS imports and stubs `next/font`. The authoritative isolated production-route workflow — admin default → campaign inheritance → coach override → synthetic submission → lock → authorized report route → desktop/mobile/Axe/Letter print — is **NOT RUN** because the required exact disposable fixture database and strong sentinel were unavailable. No Production database URL, credentials, or canonical-checkout remote environment file was requested, copied, or used. Production must remain Classic until that workflow passes and both new styles receive authoritative visual acceptance.
+
+**Non-goals.** Qualitative, group, other scored instruments, and results-email HTML are unchanged. The active admin top navigation and coach sidebar are preserved; no new shell was added. Canonical values, wording, recommendations, CTA eligibility, and the campaign snapshot remain shared across report styles.
+
+---
+
 <a id="jul10-42-lva-growth-financing-production-closeout"></a>
 ### 2026-08-05 — July 10 #42 LVA growth-financing wording launched <!-- ENTRY_ISO:2026-08-05 ENTRY_SLUG:jul10-42-lva-growth-financing-production-closeout -->
 

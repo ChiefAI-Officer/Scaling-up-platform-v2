@@ -49,6 +49,10 @@ import type {
   TemplateEditorTabbedVersion,
   DirtyFlags,
 } from "@/components/admin/template-editor/TabbedShell";
+import {
+  isReportStyleKey,
+  type ReportStyleKey,
+} from "@/lib/assessments/report-style-registry";
 
 export interface UseTemplateEditorDraftArgs {
   template: TemplateEditorTabbedTemplate;
@@ -105,6 +109,7 @@ export type TemplateRowPatch = Partial<{
   resultsEmailSubject: string | null;
   resultsEmailBodyMarkdown: string | null;
   resultsEmailContentApproved: boolean;
+  defaultReportStyle: ReportStyleKey;
 }>;
 
 export function useTemplateEditorDraft({
@@ -145,6 +150,7 @@ export function useTemplateEditorDraft({
     resultsEmailContentApproved:
       template.resultsEmailContentApproved ?? false,
     aggregationMode: template.aggregationMode,
+    defaultReportStyle: template.defaultReportStyle ?? "CLASSIC",
   });
 
   // Version-level editable fields (language only, in this checkpoint).
@@ -377,7 +383,14 @@ export function useTemplateEditorDraft({
         // non-null case — `?? ""` is a no-op on a value already carried from
         // `prev` or a non-empty patch).
         setTemplateValues((prev) => {
-          const merged = { ...prev, ...patch };
+          const merged = {
+            ...prev,
+            ...patch,
+            ...(patch.defaultReportStyle !== undefined &&
+            isReportStyleKey(body?.data?.defaultReportStyle)
+              ? { defaultReportStyle: body.data.defaultReportStyle }
+              : {}),
+          };
           return {
             ...merged,
             resultsEmailSubject: merged.resultsEmailSubject ?? "",

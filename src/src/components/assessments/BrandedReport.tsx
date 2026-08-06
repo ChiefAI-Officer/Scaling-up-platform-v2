@@ -39,7 +39,6 @@ import {
   headlineForTierMetric,
 } from "@/lib/assessments/report-presentation";
 import { reportConfigFor } from "@/lib/assessments/report-config";
-import { isFindingsLogicEnabled } from "@/lib/assessments/wave-u-flags";
 import { parseResolvedFindings } from "@/lib/assessments/findings-section-model";
 import {
   greetingName,
@@ -51,6 +50,17 @@ import type { PeerComparisonSection } from "@/lib/assessments/peer-benchmarks";
 import { CoachLogo } from "@/components/assessments/CoachLogo";
 import { ReportFooter } from "@/components/assessments/ReportFooter";
 import { ReportNextSteps } from "@/components/assessments/ReportNextSteps";
+import {
+  applyScoredReportContactEmailOverride,
+  applyScoredReportFindingsPolicy,
+  buildScoredReportViewModel,
+} from "@/lib/assessments/scored-report-view-model";
+import {
+  effectiveReportStyle,
+  isReportStyleEligible,
+} from "@/lib/assessments/report-style-policy";
+import { ExecutiveBoardroomReport } from "@/components/assessments/report-styles/ExecutiveBoardroomReport";
+import { ModernDashboardReport } from "@/components/assessments/report-styles/ModernDashboardReport";
 
 const LOGO_SRC = "/brand/su-logo-white.svg";
 
@@ -181,6 +191,10 @@ export interface BrandedReportProps {
   peerComparison?: PeerComparisonSection | null;
   /** Server-verified current coach email for the contact link. */
   contactEmail?: string | null;
+  /** Exact server-side feature/canary decision; omitted client revivals fail closed. */
+  reportStylesAvailable?: boolean;
+  /** Exact server-side Wave U decision; omitted client revivals fail closed. */
+  reportFindingsAvailable?: boolean;
 }
 
 export function BrandedReport({
@@ -189,6 +203,8 @@ export function BrandedReport({
   campaignLabel,
   peerComparison,
   contactEmail,
+  reportStylesAvailable,
+  reportFindingsAvailable,
 }: BrandedReportProps) {
   // Qualitative templates (LVA / QSP) get a wholly different per-respondent
   // renderer — their answers are mostly free-text/metrics, not scored items.
@@ -199,9 +215,73 @@ export function BrandedReport({
         report={report}
         peerComparison={peerComparison}
         contactEmail={contactEmail}
+        reportFindingsAvailable={reportFindingsAvailable === true}
       />
     );
   }
+
+  // This component is imported by client result flows. Availability must arrive
+  // from their server response; WAVE_REPORT_STYLES_* is never read here.
+  const runtimeStyle = typeof report.reportStyle === "string" ? report.reportStyle : undefined;
+  const resolvedStyle = effectiveReportStyle({
+    alias: report.templateAlias,
+    storedStyle: runtimeStyle,
+    available: reportStylesAvailable === true,
+  });
+  if (resolvedStyle === "CLASSIC") {
+    if (
+      reportStylesAvailable === true &&
+      isReportStyleEligible(report.templateAlias) &&
+      runtimeStyle !== undefined &&
+      runtimeStyle !== "CLASSIC"
+    ) {
+      console.warn("assessment.report_style.invalid", {
+        provenanceId: report.provenance?.submissionId ?? null,
+        templateAlias: report.templateAlias ?? null,
+        invalidStyle: runtimeStyle,
+      });
+    }
+  } else {
+    // Preserve BrandedReport's existing title/subtitle override contract
+    // before deriving the renderer-only view model.
+    const reportForView =
+      assessmentName === undefined && campaignLabel === undefined
+        ? report
+        : {
+            ...report,
+            assessmentName: assessmentName ?? report.assessmentName,
+            campaignLabel:
+              campaignLabel !== undefined ? campaignLabel : report.campaignLabel,
+          };
+    const withFindings = applyScoredReportFindingsPolicy(
+      buildScoredReportViewModel(reportForView),
+      reportFindingsAvailable === true,
+    );
+    const view = applyScoredReportContactEmailOverride(withFindings, contactEmail);
+    return resolvedStyle === "EXECUTIVE_BOARDROOM"
+      ? <ExecutiveBoardroomReport view={view} />
+      : <ModernDashboardReport view={view} />;
+  }
+
+  return (
+    <LegacyClassicReport
+      report={report}
+      assessmentName={assessmentName}
+      campaignLabel={campaignLabel}
+      contactEmail={contactEmail}
+      reportFindingsAvailable={reportFindingsAvailable}
+    />
+  );
+}
+
+/** Captured byte-compatible Classic branch. Keep its markup below unchanged. */
+export function LegacyClassicReport({
+  report,
+  assessmentName,
+  campaignLabel,
+  contactEmail,
+  reportFindingsAvailable,
+}: Omit<BrandedReportProps, "reportStylesAvailable" | "peerComparison">) {
 
   const result: ScoreResult = report.result ?? ({} as ScoreResult);
   const perQuestion: PerQuestionResult[] = Array.isArray(result.perQuestion)
@@ -334,7 +414,7 @@ export function BrandedReport({
   // from the legacy per-row `recommendation` (old submissions have no
   // snapshot and must render unchanged; no double display). Flag OFF or no
   // snapshot → this block is byte-identical to pre-Wave-U output.
-  const snapshotFindings = isFindingsLogicEnabled()
+  const snapshotFindings = reportFindingsAvailable === true
     ? parseResolvedFindings(
         (result as ScoreResult & { findings?: unknown }).findings,
       ).filter((f) => f.questionType !== "SLIDER_LIKERT")

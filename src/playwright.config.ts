@@ -1,5 +1,12 @@
 import { defineConfig, devices } from "@playwright/test";
 
+// Kept in a plain Node module so its fail-closed behavior can be unit-tested
+// without importing Playwright's browser runtime into Jest.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { createReportStyleWebServer } = require("./scripts/report-style-e2e-server-contract.cjs") as {
+  createReportStyleWebServer: (env: NodeJS.ProcessEnv) => ReturnType<typeof defineConfig>["webServer"];
+};
+
 /**
  * Playwright configuration for E2E tests
  * @see https://playwright.dev/docs/test-configuration
@@ -59,11 +66,6 @@ export default defineConfig({
     // },
   ],
 
-  /* Run your local dev server before starting the tests */
-  webServer: {
-    command: "npm run dev",
-    url: "http://localhost:3000",
-    reuseExistingServer: !process.env.CI,
-    timeout: 120 * 1000,
-  },
+  /* Build and run a production server only after the disposable DB guard. */
+  webServer: createReportStyleWebServer(process.env),
 });

@@ -1,3 +1,5 @@
+const mockWaveDCampaignCreate = jest.fn();
+
 /**
  * Assessment v7.6 — GET/POST /api/assessment-campaigns.
  */
@@ -18,12 +20,20 @@ jest.mock("@/lib/db", () => ({
     coach: { findUnique: jest.fn() },
     accessGroupCoach: { findMany: jest.fn().mockResolvedValue([]) },
     accessGroupTemplate: { findMany: jest.fn().mockResolvedValue([]) },
-    assessmentTemplate: { findUnique: jest.fn() },
+    assessmentTemplate: { findUnique: jest.fn(), findMany: jest.fn() },
     assessmentTemplateVersion: { findFirst: jest.fn() },
     assessmentCampaign: {
       findMany: jest.fn(),
       create: jest.fn(),
     },
+    orgTeam: { findMany: jest.fn().mockResolvedValue([]) },
+    $transaction: jest.fn(async (callback) =>
+      callback({
+        assessmentCampaign: { create: mockWaveDCampaignCreate },
+        assessmentCampaignParticipant: { createMany: jest.fn() },
+        auditLog: { create: jest.fn() },
+      }),
+    ),
     auditLog: { create: jest.fn().mockResolvedValue(undefined) },
   },
 }));
@@ -39,6 +49,7 @@ jest.mock("@/lib/rate-limit", () => ({
 }));
 
 import { GET, POST } from "@/app/api/assessment-campaigns/route";
+import { GET as listTemplates } from "@/app/api/assessment-templates/route";
 import { db } from "@/lib/db";
 import { getApiActor } from "@/lib/auth/authorization";
 
@@ -65,6 +76,9 @@ function jsonReq(body: unknown, method = "POST"): Request {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  delete process.env.WAVE_REPORT_STYLES_ENABLED;
+  delete process.env.WAVE_REPORT_STYLES_KILL;
+  delete process.env.WAVE_REPORT_STYLES_CANARY;
   // Default access-group state: coach in 1 group that grants the template.
   (db.accessGroupCoach.findMany as jest.Mock).mockResolvedValue([
     {
@@ -96,6 +110,56 @@ beforeEach(() => {
     language: "enUS",
     versionNumber: 1,
     publishedAt: new Date(),
+  });
+  mockWaveDCampaignCreate.mockResolvedValue({
+    id: "c-wave-d",
+    alias: "acme_scaling_up_full_260601100000",
+  });
+});
+
+describe("GET /api/assessment-templates report-style availability", () => {
+  it("exposes a matching template canary without enabling nonmatching templates", async () => {
+    process.env.WAVE_REPORT_STYLES_CANARY = "tpl-1";
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    (db.assessmentTemplate.findMany as jest.Mock).mockResolvedValue([
+      {
+        id: "tpl-1",
+        name: "Scaling Up Full",
+        alias: "scaling-up-full",
+        description: null,
+        aggregationMode: "FULL_VISIBILITY",
+        defaultReportStyle: "MODERN_DASHBOARD",
+        sendResultsDefault: false,
+        resultsEmailContentApproved: false,
+        resultsEmailContentApprovedHash: null,
+        resultsEmailSubject: null,
+        resultsEmailBodyMarkdown: null,
+      },
+      {
+        id: "tpl-2",
+        name: "Scaling Up Full copy",
+        alias: "scaling-up-full",
+        description: null,
+        aggregationMode: "FULL_VISIBILITY",
+        defaultReportStyle: "CLASSIC",
+        sendResultsDefault: false,
+        resultsEmailContentApproved: false,
+        resultsEmailContentApprovedHash: null,
+        resultsEmailSubject: null,
+        resultsEmailBodyMarkdown: null,
+      },
+    ]);
+
+    const res = await listTemplates(
+      new Request("http://localhost/api/assessment-templates") as never,
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data).toEqual([
+      expect.objectContaining({ id: "tpl-1", reportStylesEnabled: true }),
+      expect.objectContaining({ id: "tpl-2", reportStylesEnabled: false }),
+    ]);
   });
 });
 
@@ -318,6 +382,190 @@ describe("POST /api/assessment-campaigns", () => {
           organizationId: "org-1",
           versionId: "ver-1",
           language: "enUS",
+        }),
+      }),
+    );
+  });
+
+  it("copies the freshly loaded Scaling Up Full template default when no report style is chosen", async () => {
+    process.env.WAVE_REPORT_STYLES_ENABLED = "1";
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    (db.assessmentTemplate.findUnique as jest.Mock).mockResolvedValue({
+      id: "tpl-1",
+      alias: "scaling-up-full",
+      disabledAt: null,
+      defaultReportStyle: "MODERN_DASHBOARD",
+    });
+    (db.assessmentCampaign.create as jest.Mock).mockResolvedValue({
+      id: "c1",
+      alias: "acme_scaling_up_full_260601100000",
+    });
+
+    const res = await POST(jsonReq(validBody) as never);
+
+    expect(res.status).toBe(201);
+    expect(db.assessmentCampaign.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          reportStyle: "MODERN_DASHBOARD",
+          reportStyleSource: "TEMPLATE_DEFAULT",
+        }),
+      }),
+    );
+  });
+
+  it("records TEMPLATE_DEFAULT when the explicit style equals the current template default", async () => {
+    process.env.WAVE_REPORT_STYLES_ENABLED = "1";
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    (db.assessmentTemplate.findUnique as jest.Mock).mockResolvedValue({
+      id: "tpl-1",
+      alias: "scaling-up-full",
+      disabledAt: null,
+      defaultReportStyle: "MODERN_DASHBOARD",
+    });
+    (db.assessmentCampaign.create as jest.Mock).mockResolvedValue({ id: "c1" });
+
+    const res = await POST(
+      jsonReq({ ...validBody, reportStyle: "MODERN_DASHBOARD" }) as never,
+    );
+
+    expect(res.status).toBe(201);
+    expect(db.assessmentCampaign.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          reportStyle: "MODERN_DASHBOARD",
+          reportStyleSource: "TEMPLATE_DEFAULT",
+        }),
+      }),
+    );
+  });
+
+  it("records CAMPAIGN_OVERRIDE when the explicit style differs from the current template default", async () => {
+    process.env.WAVE_REPORT_STYLES_ENABLED = "1";
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    (db.assessmentTemplate.findUnique as jest.Mock).mockResolvedValue({
+      id: "tpl-1",
+      alias: "scaling-up-full",
+      disabledAt: null,
+      defaultReportStyle: "MODERN_DASHBOARD",
+    });
+    (db.assessmentCampaign.create as jest.Mock).mockResolvedValue({ id: "c1" });
+
+    const res = await POST(
+      jsonReq({ ...validBody, reportStyle: "EXECUTIVE_BOARDROOM" }) as never,
+    );
+
+    expect(res.status).toBe(201);
+    expect(db.assessmentCampaign.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          reportStyle: "EXECUTIVE_BOARDROOM",
+          reportStyleSource: "CAMPAIGN_OVERRIDE",
+        }),
+      }),
+    );
+  });
+
+  it("400 rejects a report style outside the closed catalog before it creates a campaign", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+
+    const res = await POST(
+      jsonReq({ ...validBody, reportStyle: "NOT_A_STYLE" }) as never,
+    );
+
+    expect(res.status).toBe(400);
+    expect(db.assessmentCampaign.create).not.toHaveBeenCalled();
+  });
+
+  it("400 rejects a non-Classic report style for an ineligible template", async () => {
+    process.env.WAVE_REPORT_STYLES_ENABLED = "1";
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+
+    const res = await POST(
+      jsonReq({ ...validBody, reportStyle: "EXECUTIVE_BOARDROOM" }) as never,
+    );
+
+    expect(res.status).toBe(400);
+    expect(db.assessmentCampaign.create).not.toHaveBeenCalled();
+  });
+
+  it("forces Classic in the legacy lane while report styles are unavailable", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    (db.assessmentTemplate.findUnique as jest.Mock).mockResolvedValue({
+      id: "tpl-1",
+      alias: "scaling-up-full",
+      disabledAt: null,
+      defaultReportStyle: "MODERN_DASHBOARD",
+    });
+    (db.assessmentCampaign.create as jest.Mock).mockResolvedValue({ id: "c1" });
+
+    const res = await POST(
+      jsonReq({ ...validBody, reportStyle: "EXECUTIVE_BOARDROOM" }) as never,
+    );
+
+    expect(res.status).toBe(201);
+    expect(db.assessmentCampaign.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          reportStyle: "CLASSIC",
+          reportStyleSource: "TEMPLATE_DEFAULT",
+        }),
+      }),
+    );
+  });
+
+  it("persists the same resolved fields in the Wave-D transaction lane", async () => {
+    process.env.WAVE_REPORT_STYLES_ENABLED = "1";
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    (db.assessmentTemplate.findUnique as jest.Mock).mockResolvedValue({
+      id: "tpl-1",
+      alias: "scaling-up-full",
+      disabledAt: null,
+      defaultReportStyle: "MODERN_DASHBOARD",
+    });
+
+    const res = await POST(
+      jsonReq({
+        ...validBody,
+        reportStyle: "EXECUTIVE_BOARDROOM",
+        waveD: true,
+      }) as never,
+    );
+
+    expect(res.status).toBe(201);
+    expect(mockWaveDCampaignCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          reportStyle: "EXECUTIVE_BOARDROOM",
+          reportStyleSource: "CAMPAIGN_OVERRIDE",
+        }),
+      }),
+    );
+  });
+
+  it("forces Classic in the Wave-D transaction lane while report styles are unavailable", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    (db.assessmentTemplate.findUnique as jest.Mock).mockResolvedValue({
+      id: "tpl-1",
+      alias: "scaling-up-full",
+      disabledAt: null,
+      defaultReportStyle: "MODERN_DASHBOARD",
+    });
+
+    const res = await POST(
+      jsonReq({
+        ...validBody,
+        reportStyle: "EXECUTIVE_BOARDROOM",
+        waveD: true,
+      }) as never,
+    );
+
+    expect(res.status).toBe(201);
+    expect(mockWaveDCampaignCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          reportStyle: "CLASSIC",
+          reportStyleSource: "TEMPLATE_DEFAULT",
         }),
       }),
     );

@@ -250,6 +250,7 @@ const PUBLIC_SUBMISSION = {
   },
   campaign: {
     name: "Quick Assessment",
+    reportStyle: "MODERN_DASHBOARD",
     status: "ACTIVE",
     accessMode: "PUBLIC",
     deletedAt: null,
@@ -325,6 +326,7 @@ describe("getPublicReferralReport", () => {
       companyName: "",
       assessmentName: "Scaling Up Full",
       templateAlias: "scaling-up-full",
+      reportStyle: "MODERN_DASHBOARD",
       result: FROZEN_RESULT,
       rawAnswers: PUBLIC_SUBMISSION.answers,
       provenance: {
@@ -336,6 +338,9 @@ describe("getPublicReferralReport", () => {
     expect(
       db.findFirst.mock.calls[0][0].select.campaign.select,
     ).not.toHaveProperty("organization");
+    expect(
+      db.findFirst.mock.calls[0][0].select.campaign.select,
+    ).toHaveProperty("reportStyle", true);
     expect(
       db.findFirst.mock.calls[0][0].select.referringCoach.select,
     ).toHaveProperty("email", true);
