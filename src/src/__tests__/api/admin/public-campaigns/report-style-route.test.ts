@@ -9,6 +9,7 @@ jest.mock("@/lib/db", () => ({
   db: {
     assessmentCampaign: {
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       updateMany: jest.fn(),
     },
   },
@@ -82,6 +83,7 @@ beforeEach(() => {
   (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValue(
     publicCampaign(),
   );
+  (db.assessmentCampaign.findFirst as jest.Mock).mockResolvedValue(null);
   (db.assessmentCampaign.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
 });
 
@@ -213,15 +215,16 @@ describe("PATCH /api/admin/public-campaigns/[id]/report-style", () => {
 
   it("returns 409 with the final locked appearance when completion wins the conditional race", async () => {
     process.env.WAVE_REPORT_STYLES_ENABLED = "1";
-    (db.assessmentCampaign.findUnique as jest.Mock)
-      .mockResolvedValueOnce(publicCampaign())
-      .mockResolvedValueOnce(
-        publicCampaign({
-          reportStyle: "CLASSIC",
-          reportStyleSource: "TEMPLATE_DEFAULT",
-          reportStyleLockedAt: new Date("2026-08-06T05:00:00.000Z"),
-        }),
-      );
+    (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValueOnce(
+      publicCampaign(),
+    );
+    (db.assessmentCampaign.findFirst as jest.Mock).mockResolvedValueOnce(
+      publicCampaign({
+        reportStyle: "CLASSIC",
+        reportStyleSource: "TEMPLATE_DEFAULT",
+        reportStyleLockedAt: new Date("2026-08-06T05:00:00.000Z"),
+      }),
+    );
     (db.assessmentCampaign.updateMany as jest.Mock).mockResolvedValue({ count: 0 });
 
     const res = await PATCH(
@@ -242,6 +245,76 @@ describe("PATCH /api/admin/public-campaigns/[id]/report-style", () => {
     );
     expect(logAudit).not.toHaveBeenCalled();
   });
+
+  it.each([
+    [
+      "after an access transition without a lock",
+      {
+        accessMode: "INVITED",
+        reportStyleLockedAt: null,
+      },
+    ],
+    [
+      "after an ownership transition with a lock",
+      {
+        createdByCoachId: "coach-1",
+        reportStyleLockedAt: new Date("2026-08-06T05:00:00.000Z"),
+      },
+    ],
+    [
+      "after deletion with a lock",
+      {
+        deletedAt: new Date("2026-08-06T05:00:00.000Z"),
+        reportStyleLockedAt: new Date("2026-08-06T05:00:00.000Z"),
+      },
+    ],
+  ])(
+    "fails closed without appearance metadata %s",
+    async (_label, transition) => {
+      process.env.WAVE_REPORT_STYLES_ENABLED = "1";
+      const transitionedCampaign = publicCampaign({
+        reportStyle: "EXECUTIVE_BOARDROOM",
+        reportStyleSource: "CAMPAIGN_OVERRIDE",
+        ...transition,
+      });
+      (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValueOnce(
+        publicCampaign(),
+      );
+      (db.assessmentCampaign.findFirst as jest.Mock).mockImplementationOnce(
+        async ({ where }: { where: Record<string, unknown> }) =>
+          transitionedCampaign.id === where.id &&
+          transitionedCampaign.accessMode === where.accessMode &&
+          transitionedCampaign.createdByCoachId === where.createdByCoachId &&
+          transitionedCampaign.deletedAt === where.deletedAt
+            ? transitionedCampaign
+            : null,
+      );
+      (db.assessmentCampaign.updateMany as jest.Mock).mockResolvedValue({
+        count: 0,
+      });
+
+      const res = await PATCH(
+        patchRequest("MODERN_DASHBOARD") as never,
+        routeParams(),
+      );
+
+      expect(res.status).toBe(404);
+      await expect(res.json()).resolves.toEqual({
+        success: false,
+        error: "Campaign not found",
+      });
+      expect(db.assessmentCampaign.findFirst).toHaveBeenCalledWith({
+        where: {
+          id: "camp-1",
+          accessMode: "PUBLIC",
+          createdByCoachId: null,
+          deletedAt: null,
+        },
+        select: expect.any(Object),
+      });
+      expect(logAudit).not.toHaveBeenCalled();
+    },
+  );
 
   it("audits a successful atomic override", async () => {
     process.env.WAVE_REPORT_STYLES_ENABLED = "1";

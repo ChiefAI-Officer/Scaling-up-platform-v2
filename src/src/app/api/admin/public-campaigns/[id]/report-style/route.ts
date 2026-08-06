@@ -146,12 +146,21 @@ export async function PATCH(
       },
     });
     if (changed.count === 0) {
-      const finalCampaign = (await db.assessmentCampaign.findUnique({
-        where: { id },
+      const finalCampaign = (await db.assessmentCampaign.findFirst({
+        where: {
+          id,
+          accessMode: "PUBLIC",
+          createdByCoachId: null,
+          deletedAt: null,
+        },
         select: PUBLIC_APPEARANCE_SELECT,
       })) as PublicAppearanceCampaign | null;
-      return lockedResponse(
-        finalCampaign?.reportStyleLockedAt ? finalCampaign : null,
+      if (finalCampaign?.reportStyleLockedAt) {
+        return lockedResponse(finalCampaign);
+      }
+      return NextResponse.json(
+        { success: false, error: "Campaign not found" },
+        { status: 404 },
       );
     }
 

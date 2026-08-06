@@ -236,13 +236,12 @@ describe("PublicCampaignsManager — orphaned-page render smoke (Z-1)", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("replaces a losing client draft with the final locked appearance after a 409", async () => {
-    let completionWon = false;
+  it("reconciles a 409 immediately from authoritative response data without reloading the list", async () => {
+    let campaignLoads = 0;
     (global.fetch as jest.Mock).mockImplementation(
       async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = typeof input === "string" ? input : String(input);
         if (url.endsWith("/pc-1/report-style") && init?.method === "PATCH") {
-          completionWon = true;
           return {
             ok: false,
             status: 409,
@@ -250,28 +249,27 @@ describe("PublicCampaignsManager — orphaned-page render smoke (Z-1)", () => {
               error: "REPORT_STYLE_LOCKED",
               message:
                 "Report appearance was locked when the first response completed. Refresh to see the final style.",
+              data: {
+                id: "pc-1",
+                reportStyle: "CLASSIC",
+                reportStyleSource: "TEMPLATE_DEFAULT",
+                reportStyleLockedAt: "2026-08-06T05:00:00.000Z",
+              },
             }),
           } as unknown as Response;
         }
-        const json = url.endsWith("/api/admin/public-campaigns")
-          ? {
-              success: true,
-              data: [
-                completionWon
-                  ? {
-                      ...PUBLIC_CAMPAIGN,
-                      reportStyle: "CLASSIC",
-                      reportStyleSource: "TEMPLATE_DEFAULT",
-                      reportStyleLockedAt: "2026-08-06T05:00:00.000Z",
-                    }
-                  : PUBLIC_CAMPAIGN,
-              ],
-            }
-          : { success: true, data: [] };
+        if (url.endsWith("/api/admin/public-campaigns")) {
+          campaignLoads += 1;
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ success: true, data: [PUBLIC_CAMPAIGN] }),
+          } as unknown as Response;
+        }
         return {
           ok: true,
           status: 200,
-          json: async () => json,
+          json: async () => ({ success: true, data: [] }),
         } as unknown as Response;
       },
     );
@@ -291,14 +289,28 @@ describe("PublicCampaignsManager — orphaned-page render smoke (Z-1)", () => {
       within(panel).getByRole("button", { name: "Save report appearance" }),
     );
 
-    await waitFor(() =>
+    await waitFor(() => {
+      const reconciledPanel = screen.getByRole("region", {
+        name: "Quick Scaling Up Check report appearance",
+      });
       expect(
-        within(panel).getByRole("radio", { name: /Classic/i }),
-      ).toBeChecked(),
-    );
+        within(reconciledPanel).getByRole("radio", { name: /Classic/i }),
+      ).toBeChecked();
+      expect(
+        within(reconciledPanel).getByRole("radio", { name: /Classic/i }),
+      ).toBeDisabled();
+    });
+    const reconciledPanel = screen.getByRole("region", {
+      name: "Quick Scaling Up Check report appearance",
+    });
     expect(
-      within(panel).getByRole("radio", { name: /Classic/i }),
-    ).toBeDisabled();
+      within(reconciledPanel).getByText("Source: Template default"),
+    ).toBeInTheDocument();
+    expect(within(reconciledPanel).getByRole("time")).toHaveAttribute(
+      "datetime",
+      "2026-08-06T05:00:00.000Z",
+    );
+    expect(campaignLoads).toBe(1);
   });
 });
 

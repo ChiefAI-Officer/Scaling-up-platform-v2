@@ -322,6 +322,12 @@ export function PublicCampaignsManager() {
         success?: boolean;
         error?: string;
         message?: string;
+        data?: {
+          id: string;
+          reportStyle: ReportStyleKey;
+          reportStyleSource: "TEMPLATE_DEFAULT" | "CAMPAIGN_OVERRIDE";
+          reportStyleLockedAt: string | null;
+        };
       };
       if (!res.ok || body.success === false) {
         setFormError(
@@ -329,6 +335,30 @@ export function PublicCampaignsManager() {
             body.error ??
             `Could not save report appearance (${res.status}).`,
         );
+        if (
+          res.status === 409 &&
+          body.data?.id === campaign.id &&
+          body.data.reportStyleLockedAt !== null
+        ) {
+          const finalAppearance = body.data;
+          setCampaigns((current) =>
+            current.map((item) =>
+              item.id === campaign.id
+                ? {
+                    ...item,
+                    reportStyle: finalAppearance.reportStyle,
+                    reportStyleSource: finalAppearance.reportStyleSource,
+                    reportStyleLockedAt: finalAppearance.reportStyleLockedAt,
+                  }
+                : item,
+            ),
+          );
+          setAppearanceDrafts((current) => ({
+            ...current,
+            [campaign.id]: finalAppearance.reportStyle,
+          }));
+          return;
+        }
         if (res.status === 409) await loadData();
         return;
       }
