@@ -47,6 +47,7 @@ import {
 import { QualitativeReport } from "@/components/assessments/QualitativeReport";
 import { ImportedBadge } from "@/components/assessments/ImportedBadge";
 import type { PeerComparisonSection } from "@/lib/assessments/peer-benchmarks";
+import type { ReportComparisonModel } from "@/lib/assessments/report-comparison-model";
 import { CoachLogo } from "@/components/assessments/CoachLogo";
 import { ReportFooter } from "@/components/assessments/ReportFooter";
 import { ReportNextSteps } from "@/components/assessments/ReportNextSteps";
@@ -191,6 +192,8 @@ export interface BrandedReportProps {
   reportStylesAvailable?: boolean;
   /** Exact server-side Wave U decision; omitted client revivals fail closed. */
   reportFindingsAvailable?: boolean;
+  /** Server-authorized frozen baseline facts; renderers consume this in Task 7. */
+  comparison?: ReportComparisonModel | null;
 }
 
 export function BrandedReport({

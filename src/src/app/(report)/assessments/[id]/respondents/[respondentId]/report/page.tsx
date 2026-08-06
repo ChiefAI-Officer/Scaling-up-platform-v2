@@ -21,6 +21,7 @@
 import { notFound } from "next/navigation";
 import {
   viewRespondentReport,
+  viewCeoSelfRespondentReport,
   defaultReportGateDeps,
 } from "@/lib/assessments/report-access-gate";
 import { reportConfigFor } from "@/lib/assessments/report-config";
@@ -28,12 +29,19 @@ import { emitReportMetric } from "@/lib/assessments/report-metrics";
 import { BrandedReport } from "@/components/assessments/BrandedReport";
 import { ReportStyleScope } from "@/components/assessments/ReportStyleScope";
 import { PrintReportButton } from "@/components/assessments/PrintReportButton";
+import { ReportComparisonControls } from "@/components/assessments/ReportComparisonControls";
 import { db } from "@/lib/db";
 import { getApiActor } from "@/lib/auth/authorization";
 import {
-  hasComparableLongitudinal,
-  asLongitudinalEligibilityDb,
-} from "@/lib/assessments/longitudinal-eligibility";
+  asReportComparisonDb,
+  listReportComparisonCandidates,
+  loadReportComparison,
+  type ReportComparisonViewer,
+} from "@/lib/assessments/report-comparison";
+import { REPORT_COMPARISON_ALIAS, isReportComparisonEnabled } from "@/lib/assessments/wave-report-comparison-flags";
+import { resolveCeoViewerFromExactPathSession } from "@/lib/assessments/ceo-report-access";
+import { getCeoReportAccessSession } from "@/lib/assessments/ceo-report-access-cookie";
+import { logAuditStrict } from "@/lib/audit";
 import { isPeerBenchmarksEnabled } from "@/lib/assessments/wave-s-flags";
 import {
   buildPeerComparisonSection,
@@ -49,15 +57,21 @@ export const revalidate = 0;
 
 interface PageProps {
   params: Promise<{ id: string; respondentId: string }>;
+  searchParams?: Promise<{ compareTo?: string }>;
 }
 
-export default async function RespondentReportPage({ params }: PageProps) {
+export default async function RespondentReportPage({ params, searchParams }: PageProps) {
   const { id, respondentId } = await params;
+  const compareTo = (await searchParams)?.compareTo;
+  const actor = await getApiActor();
+  const viewer: ReportComparisonViewer | null = actor
+    ? { kind: "operator", actor }
+    : await resolveCeoViewerFromExactPathSession(id, respondentId);
 
-  const { outcome, metricRole } = await viewRespondentReport(defaultReportGateDeps(), {
-    campaignId: id,
-    respondentId,
-  });
+  const gate = viewer?.kind === "ceo-self"
+    ? await viewCeoReport(viewer, id, respondentId)
+    : await viewRespondentReport(defaultReportGateDeps(), { campaignId: id, respondentId });
+  const { outcome, metricRole } = gate;
 
   // forbidden / not-found already 404'd inside the gate; this narrows the type.
   if (outcome.status !== "ok") {
@@ -73,15 +87,17 @@ export default async function RespondentReportPage({ params }: PageProps) {
     reportType: reportConfigFor(report.templateAlias).reportType,
   });
 
-  // Wave N (#23) — "View across campaigns" entry link. The link is rendered
-  // ONLY when the longitudinal eligibility predicate is true: feature flag on,
-  // scored template, current template access, AND ≥2 scored submissions for
-  // this person on this template. Computed SERVER-side here (the gate already
-  // authorized the report); the campaign carries the organizationId + templateId
-  // the helper + URL need (the report payload only carries the alias). The
-  // actor is re-resolved (cheap; the gate consumed it internally). Fail-soft:
-  // any error / no actor / not-eligible ⇒ no link.
-  const longitudinal = await resolveLongitudinalEntry(id, respondentId);
+  const canonicalHref = `/assessments/${encodeURIComponent(id)}/respondents/${encodeURIComponent(respondentId)}/report`;
+  const comparison = viewer
+    ? await resolveReportComparison({
+        viewer,
+        campaignId: id,
+        respondentId,
+        submissionId: report.provenance.submissionId,
+        templateAlias: report.templateAlias,
+        compareTo,
+      })
+    : { candidates: [], bounded: false, model: null, error: false };
 
   // Wave S (Jeff #12/#13) — the optional "compared to peers" section. Gated on
   // the wave flag + render-enabled alias BEFORE any DB read (flag OFF ⇒ zero
@@ -96,80 +112,121 @@ export default async function RespondentReportPage({ params }: PageProps) {
       <div className="su-report-page">
         <div className="su-report-actions no-print">
           <PrintReportButton
-            fileName={`${report.respondentName} - ${report.assessmentName} - Report`}
+            fileName={reportExportName(report, comparison.model)}
           />
-          {longitudinal && (
-            // prefetch is irrelevant for a plain <a>, but per spec the
-            // longitudinal surface is NEVER prefetched: a plain anchor (not a
-            // Next <Link>) guarantees no prefetch of the named-PII view.
-            <a
-              href={longitudinal.href}
-              className="su-cta su-report-longitudinal-link"
-              data-testid="respondent-report-longitudinal-link"
-            >
-              View across campaigns
-            </a>
-          )}
+          {comparison.candidates.length > 0 ? (
+            <ReportComparisonControls
+              candidates={comparison.candidates}
+              selectedSubmissionId={comparison.model?.baseline.submissionId ?? null}
+              bounded={comparison.bounded}
+              canonicalHref={canonicalHref}
+            />
+          ) : null}
         </div>
+        {comparison.error ? (
+          <p className="no-print su-report-comparison-error" role="alert">
+            That earlier assessment cannot be compared with this report.
+          </p>
+        ) : null}
         <BrandedReport
           report={report}
           campaignLabel={report.campaignLabel}
           peerComparison={peerComparison}
           reportStylesAvailable={reportStylesAvailable}
           reportFindingsAvailable={isFindingsLogicEnabled()}
+          comparison={comparison.model}
         />
       </div>
     </ReportStyleScope>
   );
 }
 
-/**
- * Resolve the Wave N "View across campaigns" entry for this report, or null
- * when ineligible. Loads the campaign's organizationId + templateId (+ template
- * alias) — the report payload carries only the alias, and the helper + URL need
- * the ids — re-resolves the actor, and runs `hasComparableLongitudinal`.
- * Fail-soft: a missing actor, a missing/soft-deleted campaign, or a thrown
- * helper all resolve to null (no link), never a crash on the report render.
- */
-async function resolveLongitudinalEntry(
+async function viewCeoReport(
+  viewer: Extract<ReportComparisonViewer, { kind: "ceo-self" }>,
   campaignId: string,
   respondentId: string,
-): Promise<{ href: string } | null> {
-  try {
-    const actor = await getApiActor();
-    if (!actor) return null;
-
-    const campaign = await db.assessmentCampaign.findFirst({
-      where: { id: campaignId, deletedAt: null },
-      select: {
-        organizationId: true,
-        templateId: true,
-        template: { select: { alias: true } },
-      },
-    });
-    if (!campaign) return null;
-
-    const eligible = await hasComparableLongitudinal(
-      asLongitudinalEligibilityDb(db),
-      actor,
-      {
-        organizationId: campaign.organizationId,
-        respondentId,
-        templateId: campaign.templateId,
-        templateAlias: campaign.template?.alias ?? null,
-      },
-    );
-    if (!eligible) return null;
-
-    const href =
-      `/portal/assessments/respondents/${encodeURIComponent(respondentId)}/longitudinal` +
-      `?templateId=${encodeURIComponent(campaign.templateId)}` +
-      `&organizationId=${encodeURIComponent(campaign.organizationId)}`;
-    return { href };
-  } catch {
-    // Never let the entry-link computation break the report render.
-    return null;
+) {
+  const session = await getCeoReportAccessSession(campaignId, respondentId);
+  if (
+    !session ||
+    session.focusCampaignId !== viewer.focusCampaignId ||
+    session.focusSubmissionId !== viewer.focusSubmissionId ||
+    session.respondentId !== viewer.respondentId
+  ) {
+    notFound();
   }
+  return viewCeoSelfRespondentReport(defaultReportGateDeps(), session);
+}
+
+async function resolveReportComparison(input: {
+  viewer: ReportComparisonViewer;
+  campaignId: string;
+  respondentId: string;
+  submissionId: string;
+  templateAlias: string | null;
+  compareTo?: string;
+}) {
+  const empty = { candidates: [], bounded: false, model: null, error: false };
+  if (input.templateAlias !== REPORT_COMPARISON_ALIAS) return empty;
+
+  try {
+    const campaign = await db.assessmentCampaign.findFirst({
+      where: { id: input.campaignId, deletedAt: null },
+      select: { organizationId: true, templateId: true, template: { select: { alias: true } } },
+    });
+    if (
+      !campaign ||
+      campaign.template?.alias !== REPORT_COMPARISON_ALIAS ||
+      !isReportComparisonEnabled({ organizationId: campaign.organizationId, templateId: campaign.templateId })
+    ) return empty;
+
+    const focus = {
+      campaignId: input.campaignId,
+      respondentId: input.respondentId,
+      submissionId: input.submissionId,
+    };
+    const candidates = await listReportComparisonCandidates(asReportComparisonDb(db), input.viewer, focus);
+    if (candidates.kind !== "ok") return empty;
+    if (!input.compareTo) return { ...empty, candidates: candidates.candidates, bounded: candidates.bounded };
+
+    const selected = await loadReportComparison(
+      asReportComparisonDb(db),
+      input.viewer,
+      focus,
+      input.compareTo,
+    );
+    if (selected.kind !== "ok") {
+      return { candidates: candidates.candidates, bounded: candidates.bounded, model: null, error: true };
+    }
+    try {
+      await logAuditStrict({
+        entityType: "AssessmentSubmission",
+        entityId: input.submissionId,
+        action: "VIEW_REPORT_COMPARISON",
+        performedBy: input.viewer.kind === "operator" ? input.viewer.actor.email : "ceo-self",
+        changes: {
+          kind: "report-native-comparison",
+          baselineSubmissionId: selected.model.baseline.submissionId,
+          baselineCampaignId: selected.model.baseline.campaignId,
+        },
+      });
+    } catch {
+      return { candidates: candidates.candidates, bounded: candidates.bounded, model: null, error: true };
+    }
+    return { candidates: candidates.candidates, bounded: candidates.bounded, model: selected.model, error: false };
+  } catch {
+    return input.compareTo ? { ...empty, error: true } : empty;
+  }
+}
+
+function reportExportName(
+  report: RespondentReport,
+  comparison: import("@/lib/assessments/report-comparison-model").ReportComparisonModel | null,
+): string {
+  if (!comparison) return `${report.respondentName} - ${report.assessmentName} - Report`;
+  const focus = report.campaignLabel?.trim() || report.assessmentName;
+  const baseline = comparison.baseline.campaignLabel?.trim() || "Scaling Up Assessment";
+  return `${report.respondentName} - ${report.assessmentName} - ${focus} vs ${baseline}`;
 }
 
 /**
