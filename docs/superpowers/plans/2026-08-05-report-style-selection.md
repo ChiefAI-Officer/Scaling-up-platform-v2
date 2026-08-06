@@ -431,6 +431,8 @@ export interface ScoredReportViewModel {
 - Create: `src/styles/su-report-dashboard.css`
 - Modify: `src/components/assessments/report-styles/ExecutiveBoardroomReport.tsx`
 - Modify: `src/components/assessments/report-styles/ModernDashboardReport.tsx`
+- Modify: `src/components/assessments/report-styles/ReportSharedContent.tsx`
+- Modify: `src/__tests__/components/assessments/report-style-renderers.test.tsx`
 - Create: `src/__tests__/components/assessments/report-style-print-contract.test.tsx`
 
 **Interfaces:** New renderer roots use `.su-report--executive` and `.su-report--dashboard`; new CSS is nested beneath those roots. Classic continues using existing `su-report.css` and A4 rules. New styles use named US Letter pages.
@@ -458,6 +460,7 @@ export interface ScoredReportViewModel {
 **Files:**
 
 - Create: `src/app/(dashboard)/admin/surveys/report-style-preview/page.tsx`
+- Modify: `src/components/assessments/BrandedReport.tsx`
 - Create: `scripts/capture-report-style-previews.mjs`
 - Create: `public/report-style-previews/classic/{cover,summary,detail}.webp`
 - Create: `public/report-style-previews/executive-boardroom/{cover,summary,detail}.webp`
@@ -481,6 +484,14 @@ export interface ScoredReportViewModel {
 **Files:**
 
 - Create: `e2e/report-styles.spec.ts`
+- Create: `scripts/render-report-style-qa.cjs`
+- Create: `scripts/report-style-e2e-server-contract.cjs`
+- Create: `scripts/start-report-style-e2e.mjs`
+- Modify: `playwright.config.ts`
+- Create: `src/__tests__/e2e/report-style-e2e-contract.test.ts`
+- Modify: `src/app/(dashboard)/admin/surveys/report-style-preview/page.tsx`
+- Modify: `src/__tests__/app/report-style-preview-page.test.tsx`
+- Modify: `src/lib/assessments/report-style-preview-fixture.ts`
 - Modify: `src/__tests__/app/assessment-respondent-report-page.test.tsx`
 - Modify: `src/__tests__/app/public-submission-report-page.test.tsx`
 - Modify: `src/__tests__/app/group-report-route.test.tsx`
@@ -527,6 +538,8 @@ npx jest \
 - Modify: `CLAUDE.md`
 - Modify: `plans/CHANGELOG.md`
 - Create: `docs/runbooks/report-style-rollout.md`
+- Modify: `docs/superpowers/specs/2026-08-05-report-style-selection-design.md`
+- Modify: `src/src/__tests__/components/assessments/campaign-detail-add-existing.test.tsx`
 
 **Interfaces:** Runbook defines env levers, canary identifiers, validation queries, kill procedure, and the rule that the production default remains Classic until visual acceptance.
 
