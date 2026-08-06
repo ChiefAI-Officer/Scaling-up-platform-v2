@@ -66,7 +66,7 @@ test.describe("Report comparison — sentinel-provisioned acceptance", () => {
       where: { id: process.env.E2E_REPORT_COMPARISON_DISPOSABLE_SENTINEL_ID },
       select: { name: true, deletedAt: true },
     });
-    if (sentinel?.name !== process.env.E2E_REPORT_COMPARISON_DISPOSABLE_SENTINEL_VALUE || sentinel.deletedAt !== null) {
+    if (!sentinel || sentinel.name !== process.env.E2E_REPORT_COMPARISON_DISPOSABLE_SENTINEL_VALUE || sentinel.deletedAt !== null) {
       throw new Error("Disposable report-comparison E2E database sentinel was not found.");
     }
     const campaigns = await fixtureDatabase.assessmentCampaign.findMany({
@@ -133,36 +133,56 @@ test.describe("Report comparison — sentinel-provisioned acceptance", () => {
     test.skip(test.info().project.name !== "chromium", "Run the fixture workflow once through Chromium.");
     const style = styles[0];
     if (!style || !fixtureDatabase) throw new Error("Missing provisioned CEO fixture.");
+    const database = fixtureDatabase;
+    const [campaign, participant] = await Promise.all([
+      database.assessmentCampaign.findUniqueOrThrow({
+        where: { id: style.currentCampaignId },
+        select: { showResultsOnScreen: true, sendResultsToRespondent: true },
+      }),
+      database.assessmentCampaignParticipant.findUniqueOrThrow({
+        where: { campaignId_respondentId: { campaignId: style.currentCampaignId, respondentId: style.currentRespondentId } },
+        select: { isCEO: true },
+      }),
+    ]);
     const token = createCeoReportAccessToken({ focusCampaignId: style.currentCampaignId, invitationId: style.currentInvitationId, respondentId: style.currentRespondentId });
     const context = await browser.newContext();
-    const page = await context.newPage();
-    await page.goto(`/assessments/self-report#t=${encodeURIComponent(token)}`);
-    await expect(page).toHaveURL(new RegExp(`${reportPath(style)}$`));
-    await expect.poll(() => new URL(page.url()).hash).toBe("");
-    const picker = page.getByLabel("Compare to previous assessment");
-    await expect(picker.locator(`option[value="${style.nativeSubmissionId}"]`)).toBeVisible();
-    await expect(picker.locator(`option[value="${style.otherOrganizationSubmissionId}"]`)).toHaveCount(0);
-    for (const denied of [
-      `/assessments/${style.currentCampaignId}/respondents/${style.nonCeoRespondentId}/report`,
-      `/assessments/${style.currentCampaignId}/report`,
-      "/portal/assessments/trends",
-      `/admin/assessments/campaigns/${style.currentCampaignId}`,
-      `/assessments/${style.currentCampaignId}/respondents/${style.currentRespondentId}-altered/report`,
-    ]) {
-      await expectDenied(page, denied);
+    let nonCeoContext: Awaited<ReturnType<typeof browser.newContext>> | undefined;
+    let completed = false;
+    try {
+      const page = await context.newPage();
+      await page.goto(`/assessments/self-report#t=${encodeURIComponent(token)}`);
+      await expect(page).toHaveURL(new RegExp(`${reportPath(style)}$`));
+      await expect.poll(() => new URL(page.url()).hash).toBe("");
+      const picker = page.getByLabel("Compare to previous assessment");
+      await expect(picker.locator(`option[value="${style.nativeSubmissionId}"]`)).toBeVisible();
+      await expect(picker.locator(`option[value="${style.otherOrganizationSubmissionId}"]`)).toHaveCount(0);
+      for (const denied of [
+        `/assessments/${style.currentCampaignId}/respondents/${style.nonCeoRespondentId}/report`,
+        `/assessments/${style.currentCampaignId}/report`, "/portal/assessments/trends",
+        `/admin/assessments/campaigns/${style.currentCampaignId}`,
+        `/assessments/${style.currentCampaignId}/respondents/${style.currentRespondentId}-altered/report`,
+      ]) await expectDenied(page, denied);
+      await database.assessmentCampaign.update({ where: { id: style.currentCampaignId }, data: { showResultsOnScreen: false, sendResultsToRespondent: false } });
+      await expectDenied(page, reportPath(style));
+      await database.assessmentCampaignParticipant.updateMany({ where: { campaignId: style.currentCampaignId, respondentId: style.currentRespondentId }, data: { isCEO: false } });
+      await expectDenied(page, reportPath(style));
+      const nonCeoToken = createCeoReportAccessToken({ focusCampaignId: style.currentCampaignId, invitationId: style.nonCeoInvitationId, respondentId: style.nonCeoRespondentId });
+      nonCeoContext = await browser.newContext();
+      const nonCeoPage = await nonCeoContext.newPage();
+      await nonCeoPage.goto(`/assessments/self-report#t=${encodeURIComponent(nonCeoToken)}`);
+      await expect(nonCeoPage.getByText("This report link is no longer available.")).toBeVisible();
+      completed = true;
+    } finally {
+      const restore = async () => {
+        await database.assessmentCampaign.update({ where: { id: style.currentCampaignId }, data: { showResultsOnScreen: campaign.showResultsOnScreen, sendResultsToRespondent: campaign.sendResultsToRespondent } });
+        await database.assessmentCampaignParticipant.updateMany({ where: { campaignId: style.currentCampaignId, respondentId: style.currentRespondentId }, data: { isCEO: participant.isCEO } });
+      };
+      try { await restore(); } catch (error) {
+        if (completed) throw error;
+        console.error("Report-comparison fixture cleanup failed after a test failure.", error);
+      }
+      await nonCeoContext?.close().catch(() => undefined);
+      await context.close().catch(() => undefined);
     }
-    await fixtureDatabase.assessmentCampaign.update({ where: { id: style.currentCampaignId }, data: { showResultsOnScreen: false, sendResultsToRespondent: false } });
-    await expectDenied(page, reportPath(style));
-    await fixtureDatabase.assessmentCampaign.update({ where: { id: style.currentCampaignId }, data: { showResultsOnScreen: true, sendResultsToRespondent: true } });
-    await fixtureDatabase.assessmentCampaignParticipant.updateMany({ where: { campaignId: style.currentCampaignId, respondentId: style.currentRespondentId }, data: { isCEO: false } });
-    await expectDenied(page, reportPath(style));
-    await fixtureDatabase.assessmentCampaignParticipant.updateMany({ where: { campaignId: style.currentCampaignId, respondentId: style.currentRespondentId }, data: { isCEO: true } });
-    await context.close();
-    const nonCeoToken = createCeoReportAccessToken({ focusCampaignId: style.currentCampaignId, invitationId: style.nonCeoInvitationId, respondentId: style.nonCeoRespondentId });
-    const nonCeoContext = await browser.newContext();
-    const nonCeoPage = await nonCeoContext.newPage();
-    await nonCeoPage.goto(`/assessments/self-report#t=${encodeURIComponent(nonCeoToken)}`);
-    await expect(nonCeoPage.getByText("This report link is no longer available.")).toBeVisible();
-    await nonCeoContext.close();
   });
 });

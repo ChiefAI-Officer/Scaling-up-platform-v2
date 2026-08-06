@@ -1,4 +1,6 @@
 import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 const sentinelId = "report-comparison-e2e-sentinel-0123456789abcdefghijkl";
 
@@ -53,5 +55,15 @@ describe("report-comparison fixture provisioner contract", () => {
       otherOrganizationHasEligibleHistory: true,
       currentCeoDisclosureEnabled: true,
     });
+  });
+
+  it("keeps CEO fixture mutations in a structural try/finally cleanup boundary", () => {
+    const spec = readFileSync(resolve(process.cwd(), "e2e/report-comparison.spec.ts"), "utf8");
+    expect(spec).toMatch(/const \[campaign, participant\] = await Promise\.all/);
+    expect(spec).toMatch(/try \{[\s\S]*showResultsOnScreen: false[\s\S]*isCEO: false[\s\S]*\} finally \{/);
+    expect(spec).toMatch(/showResultsOnScreen: campaign\.showResultsOnScreen/);
+    expect(spec).toMatch(/isCEO: participant\.isCEO/);
+    expect(spec).toMatch(/await nonCeoContext\?\.close\(\)\.catch/);
+    expect(spec).toMatch(/await context\.close\(\)\.catch/);
   });
 });
