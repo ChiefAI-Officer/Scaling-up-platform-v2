@@ -376,6 +376,22 @@ describe("POST /api/admin/assessment-templates (create)", () => {
     expect(db.$transaction).not.toHaveBeenCalled();
   });
 
+  it("rejects a whitespace-only simplified name even with a manual internal ID", async () => {
+    enableSimplifiedCreation();
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+
+    const res = await listPOST(
+      jsonReq("http://localhost/api/admin/assessment-templates", {
+        creationMode: "simplified",
+        name: "   ",
+        internalId: "valid-id",
+      }) as never,
+    );
+
+    expect(res.status).toBe(400);
+    expect(db.$transaction).not.toHaveBeenCalled();
+  });
+
   it("stops generated collision retries at 25 attempts", async () => {
     enableSimplifiedCreation();
     (getApiActor as jest.Mock).mockResolvedValue(adminActor);

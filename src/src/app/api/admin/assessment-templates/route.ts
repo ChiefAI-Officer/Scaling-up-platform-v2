@@ -107,7 +107,7 @@ const InternalIdSchema = z
 const SimplifiedCreateBodySchema = z
   .object({
     creationMode: z.literal("simplified"),
-    name: z.string().min(1).max(200).trim(),
+    name: z.string().trim().min(1).max(200),
     internalId: InternalIdSchema.optional(),
   })
   .strict();
