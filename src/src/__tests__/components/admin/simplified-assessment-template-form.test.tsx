@@ -70,6 +70,26 @@ describe("SimplifiedAssessmentTemplateForm", () => {
     expect(screen.getByLabelText("Internal ID")).toHaveValue("team-check");
   });
 
+  it("preserves a manually entered uppercase Internal ID and rejects its format locally", () => {
+    render(<SimplifiedAssessmentTemplateForm />);
+
+    enterName();
+    fireEvent.click(screen.getByRole("button", { name: "Advanced" }));
+    fireEvent.change(screen.getByLabelText("Internal ID"), {
+      target: { value: "Team-Check" },
+    });
+
+    expect(screen.getByLabelText("Internal ID")).toHaveValue("Team-Check");
+    fireEvent.click(screen.getByRole("button", { name: "Create and start building" }));
+
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(
+      screen.getByText(
+        "Use lowercase letters, numbers, and hyphens for the Internal ID.",
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("posts the simplified payload without an Internal ID and starts building on success", async () => {
     (global.fetch as jest.Mock).mockResolvedValue(
       jsonResponse(201, {
