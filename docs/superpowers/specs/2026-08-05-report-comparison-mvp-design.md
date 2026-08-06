@@ -2,7 +2,8 @@
 
 **Date:** 2026-08-05
 
-**Status:** Product direction approved; CEO self-access amendment approved
+**Status:** Product direction approved; CEO self-access amendment approved;
+implementation plan prepared
 
 **Scope:** Scaling Up Full respondent reports for coaches, admins, and the
 designated CEO viewing only their own history
@@ -496,11 +497,18 @@ interface CeoReportAccessClaims {
   version: 1;
   purpose: "assessment-report-comparison-self";
   focusCampaignId: string;
-  focusSubmissionId: string;
+  invitationId: string;
   respondentId: string;
   expiresAt: number;
 }
 ```
+
+The signed link binds to `invitationId` because the existing delivery pipeline
+renders results email content before the submission transaction assigns a
+submission id. The exchange route resolves that invitation's unique completed
+submission and stores the resolved `focusSubmissionId` only in the sealed
+cookie. This preserves the current render-before-transaction invariant and
+does not loosen the focus binding.
 
 Use a dedicated `ASSESSMENT_REPORT_ACCESS_SECRET`; do not reuse invitation raw
 tokens or expose `NEXTAUTH_SECRET`. Missing/invalid secret, signature, purpose,
@@ -509,8 +517,8 @@ constant-time signature comparison.
 
 Every CEO report request revalidates server-side that:
 
-- the grant is bound to the requested focus campaign, submission, and
-  respondent;
+- the grant is bound to the requested focus campaign, invitation, resolved
+  submission, and respondent;
 - the focus campaign, submission, respondent, and participant are live;
 - the focus campaign uses `INVITED` access;
 - the participant row still has `isCEO === true`;
