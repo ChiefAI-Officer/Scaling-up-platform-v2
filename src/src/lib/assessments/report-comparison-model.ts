@@ -74,10 +74,12 @@ function rows(result: unknown, field: string): FrozenRow[] {
 }
 
 function indexedValues(result: unknown, field: string, keyField: string, valueField: string): Record<string, number | null> {
-  return Object.fromEntries(rows(result, field).flatMap((row) => {
+  const values: Record<string, number | null> = Object.create(null);
+  rows(result, field).forEach((row) => {
     const key = row[keyField];
-    return typeof key === "string" ? [[key, finite(row[valueField])]] : [];
-  }));
+    if (typeof key === "string") values[key] = finite(row[valueField]);
+  });
+  return values;
 }
 
 function comparable(current: number | null, previous: number | null): ComparableValue {
@@ -112,10 +114,15 @@ function comparisonRows(
   valueFor: (currentValue: number | null, previousValue: number | null, key: string) => ComparableValue,
 ): Record<string, ComparableValue> {
   const keys = new Set([...Object.keys(current), ...Object.keys(previous)]);
-  return Object.fromEntries([...keys].map((key) => [
-    key,
-    valueFor(current[key] ?? null, previous[key] ?? null, key),
-  ]));
+  const values: Record<string, ComparableValue> = Object.create(null);
+  keys.forEach((key) => {
+    values[key] = valueFor(
+      Object.hasOwn(current, key) ? current[key] : null,
+      Object.hasOwn(previous, key) ? previous[key] : null,
+      key,
+    );
+  });
+  return values;
 }
 
 function toCandidate(snapshot: ComparisonSnapshot): ReportComparisonCandidate {
@@ -137,7 +144,7 @@ export function buildReportComparisonModel({ focus, baseline }: ReportComparison
       : { current, previous, delta: null, status: "unmatched" },
   );
   const matchedQuestionCount = Object.entries(questions).filter(
-    ([key, value]) => key in currentQuestions && value.status === "comparable",
+    ([key, value]) => Object.hasOwn(currentQuestions, key) && value.status === "comparable",
   ).length;
 
   return {
@@ -151,7 +158,7 @@ export function buildReportComparisonModel({ focus, baseline }: ReportComparison
       currentQuestionCount: Object.keys(currentQuestions).length,
       matchedQuestionCount,
       unmatchedCurrentCount: Object.keys(currentQuestions).length - matchedQuestionCount,
-      baselineOnlyCount: Object.keys(previousQuestions).filter((key) => !(key in currentQuestions)).length,
+      baselineOnlyCount: Object.keys(previousQuestions).filter((key) => !Object.hasOwn(currentQuestions, key)).length,
     },
   };
 }

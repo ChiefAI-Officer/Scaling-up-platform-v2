@@ -168,4 +168,28 @@ describe("buildReportComparisonModel", () => {
       baselineOnlyCount: 1,
     });
   });
+
+  it("treats a prototype-named baseline-only stable key as missing from the current result", () => {
+    const focus = snapshot({ submissionId: "focus", versionId: "v2" });
+    const baseline = snapshot({
+      submissionId: "baseline",
+      versionId: "v1",
+      questions: [{ stableKey: "toString", value: 5 }],
+    });
+
+    const model = buildReportComparisonModel({ focus, baseline });
+
+    expect(model.questions.toString).toEqual({
+      current: null,
+      previous: 5,
+      delta: null,
+      status: "unmatched",
+    });
+    expect(model.coverage).toEqual({
+      currentQuestionCount: 0,
+      matchedQuestionCount: 0,
+      unmatchedCurrentCount: 0,
+      baselineOnlyCount: 1,
+    });
+  });
 });
