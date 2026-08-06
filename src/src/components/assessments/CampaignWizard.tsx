@@ -63,7 +63,6 @@ import {
   isReportStyleKey,
   type ReportStyleKey,
 } from "@/lib/assessments/report-style-registry";
-import { isReportStyleEligible } from "@/lib/assessments/report-style-policy";
 
 const DRAFT_ENDPOINT = "/api/assessment-campaign-drafts";
 const DRAFT_DEBOUNCE_MS = 800;
@@ -449,8 +448,7 @@ export function CampaignWizard({
             ? parsed.templateDefaultReportStyle
             : "CLASSIC";
         const inheritedReportStyle =
-          selectedTemplate?.reportStylesEnabled === true &&
-          isReportStyleEligible(templateAlias)
+          selectedTemplate?.reportStylesEnabled === true
             ? templateDefaultReportStyle
             : "CLASSIC";
         const merged: WizardState = {
@@ -470,8 +468,7 @@ export function CampaignWizard({
               : inheritedReportStyle,
           reportStyleIntent,
           templateReportStylesEnabled:
-            selectedTemplate?.reportStylesEnabled === true &&
-            isReportStyleEligible(templateAlias),
+            selectedTemplate?.reportStylesEnabled === true,
           respondentIds: Array.isArray(parsed.respondentIds)
             ? parsed.respondentIds
             : [],
@@ -993,7 +990,7 @@ export function CampaignWizard({
                 templateAlias: alias,
                 templateDefaultReportStyle: defaultReportStyle,
                 reportStyle:
-                  templateReportStylesEnabled && isReportStyleEligible(alias)
+                  templateReportStylesEnabled
                     ? defaultReportStyle
                     : "CLASSIC",
                 reportStyleIntent: "INHERITED",
@@ -1046,7 +1043,6 @@ export function CampaignWizard({
             notifyCoachOnCompletion={state.notifyCoachOnCompletion}
             showResultsOnScreen={state.showResultsOnScreen}
             reportStylesEnabled={state.templateReportStylesEnabled}
-            reportStyleEligible={isReportStyleEligible(state.templateAlias)}
             reportStyle={state.reportStyle}
             reportStyleIntent={state.reportStyleIntent}
             inviteTiming={state.inviteTiming}
@@ -1285,8 +1281,7 @@ function TemplateStep({
                     isReportStyleKey(t.defaultReportStyle)
                       ? t.defaultReportStyle
                       : "CLASSIC",
-                    t.reportStylesEnabled === true &&
-                      isReportStyleEligible(t.alias),
+                    t.reportStylesEnabled === true,
                     t.resultsEmailApproved,
                     t.sendResultsDefault === true,
                   )
@@ -1785,7 +1780,6 @@ function ScheduleStep({
   notifyCoachOnCompletion,
   showResultsOnScreen,
   reportStylesEnabled,
-  reportStyleEligible,
   reportStyle,
   reportStyleIntent,
   inviteTiming,
@@ -1807,7 +1801,6 @@ function ScheduleStep({
   notifyCoachOnCompletion: boolean;
   showResultsOnScreen: boolean;
   reportStylesEnabled: boolean;
-  reportStyleEligible: boolean;
   reportStyle: ReportStyleKey;
   reportStyleIntent: ReportStyleIntent;
   inviteTiming: "IMMEDIATELY" | "ON_OPEN";
@@ -2051,7 +2044,7 @@ function ScheduleStep({
         </div>
       )}
 
-      {reportStylesEnabled && reportStyleEligible && (
+      {reportStylesEnabled && (
         <div className="space-y-3 border border-border rounded-lg p-4">
           <div>
             <h3 className="text-sm font-semibold text-foreground">Report appearance</h3>
@@ -2281,7 +2274,7 @@ function ReviewStep({
           <span className="text-muted-foreground">Template</span>
           <span className="font-medium text-foreground text-right">{templateName}</span>
         </div>
-        {reportStylesEnabled && isReportStyleEligible(state.templateAlias) && (
+        {reportStylesEnabled && (
           <div className="flex justify-between gap-4">
             <span className="text-muted-foreground">Report appearance</span>
             <span className="font-medium text-foreground text-right">

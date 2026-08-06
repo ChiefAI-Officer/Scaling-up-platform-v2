@@ -121,10 +121,10 @@ describe("CampaignWizard — report appearance", () => {
     expect(screen.getByRole("heading", { name: "Report appearance" })).toBeInTheDocument();
   });
 
-  it("does not render report appearance for an ineligible template", async () => {
+  it("renders report appearance for a template with an arbitrary alias", async () => {
     await advanceToSchedule(OTHER_TEMPLATE, true);
 
-    expect(screen.queryByRole("heading", { name: "Report appearance" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Report appearance" })).toBeInTheDocument();
   });
 
   it("does not render report appearance for an eligible template outside the canary", async () => {
@@ -208,7 +208,7 @@ describe("CampaignWizard — report appearance", () => {
     });
   });
 
-  it("clears explicit intent when the coach switches to an ineligible template", async () => {
+  it("keeps report appearance available when the coach switches to another template", async () => {
     installFetch(null, [TEMPLATE, OTHER_TEMPLATE]);
     render(<CampaignWizard />);
 
@@ -226,7 +226,7 @@ describe("CampaignWizard — report appearance", () => {
     fireEvent.click(screen.getByRole("button", { name: /^next/i }));
     fireEvent.click(screen.getByRole("button", { name: /^next/i }));
 
-    expect(screen.queryByRole("heading", { name: "Report appearance" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Report appearance" })).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Campaign name"), {
       target: { value: "Q3" },
     });

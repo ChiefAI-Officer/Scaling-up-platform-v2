@@ -1,9 +1,13 @@
 import { isReportStyleKey, type ReportStyleKey } from "@/lib/assessments/report-style-registry";
 
-const REPORT_STYLE_ELIGIBLE_ALIAS = "scaling-up-full";
-
-export function isReportStyleEligible(alias: string | null | undefined): boolean {
-  return alias === REPORT_STYLE_ELIGIBLE_ALIAS;
+/**
+ * Kept as a compatibility seam for existing callers. Report-style eligibility
+ * is catalog-wide; launch availability is decided separately by
+ * isReportStylesEnabled.
+ */
+export function isReportStyleEligible(_alias: string | null | undefined): boolean {
+  void _alias;
+  return true;
 }
 
 /**
@@ -11,7 +15,7 @@ export function isReportStyleEligible(alias: string | null | undefined): boolean
  * persisted data, so this function validates them rather than trusting a cast.
  */
 export function effectiveReportStyle({
-  alias,
+  alias: _alias,
   storedStyle,
   available,
 }: {
@@ -19,7 +23,8 @@ export function effectiveReportStyle({
   storedStyle: string | null | undefined;
   available: boolean;
 }): ReportStyleKey {
-  if (!available || !isReportStyleEligible(alias) || !isReportStyleKey(storedStyle)) {
+  void _alias;
+  if (!available || !isReportStyleKey(storedStyle)) {
     return "CLASSIC";
   }
 
@@ -39,7 +44,7 @@ export function resolveCampaignReportStyle(
   explicit: ReportStyleKey | null | undefined,
   templateDefault: ReportStyleKey,
 ): CampaignReportStyleResolution {
-  if (explicit !== null && explicit !== undefined && explicit !== templateDefault) {
+  if (explicit !== null && explicit !== undefined) {
     return {
       reportStyle: explicit,
       reportStyleSource: "CAMPAIGN_OVERRIDE",

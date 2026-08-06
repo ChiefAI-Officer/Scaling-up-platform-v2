@@ -51,7 +51,7 @@ export const REPORT_STYLE_REGISTRY: Readonly<Record<ReportStyleKey, ReportStyleM
   Object.freeze({
     CLASSIC: metadata(
       "Classic",
-      "The current Scaling Up report presentation.",
+      "A clear, familiar report presentation.",
       "A4",
       "classic",
     ),

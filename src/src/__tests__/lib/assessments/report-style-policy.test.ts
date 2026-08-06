@@ -19,7 +19,7 @@ describe("report style registry", () => {
     expect(Object.isFrozen(REPORT_STYLE_KEYS)).toBe(true);
     expect(getReportStyleMetadata("CLASSIC")).toEqual({
       label: "Classic",
-      description: "The current Scaling Up report presentation.",
+      description: "A clear, familiar report presentation.",
       paperFormat: "A4",
       rendererKey: "classic",
       previews: {
@@ -52,13 +52,16 @@ describe("report style registry", () => {
 });
 
 describe("report style policy", () => {
-  it("limits report styles to the scaling-up-full template alias", () => {
+  it("makes every template alias eligible for catalog report styles", () => {
     expect(isReportStyleEligible("scaling-up-full")).toBe(true);
-    expect(isReportStyleEligible("scaling-up-full-v2")).toBe(false);
-    expect(isReportStyleEligible(undefined)).toBe(false);
+    expect(isReportStyleEligible("scored-instrument")).toBe(true);
+    expect(isReportStyleEligible("qualitative-instrument")).toBe(true);
+    expect(isReportStyleEligible("custom-instrument")).toBe(true);
+    expect(isReportStyleEligible(null)).toBe(true);
+    expect(isReportStyleEligible(undefined)).toBe(true);
   });
 
-  it("falls back to Classic for unknown, ineligible, missing, or unavailable rendering styles", () => {
+  it("falls back to Classic for unknown, missing, or unavailable rendering styles", () => {
     expect(
       effectiveReportStyle({
         alias: "scaling-up-full",
@@ -72,7 +75,7 @@ describe("report style policy", () => {
         storedStyle: "MODERN_DASHBOARD",
         available: true,
       }),
-    ).toBe("CLASSIC");
+    ).toBe("MODERN_DASHBOARD");
     expect(
       effectiveReportStyle({
         alias: "scaling-up-full",
@@ -89,7 +92,7 @@ describe("report style policy", () => {
     ).toBe("CLASSIC");
   });
 
-  it("uses a valid eligible available stored style for rendering", () => {
+  it("uses a valid available stored style for every template", () => {
     expect(
       effectiveReportStyle({
         alias: "scaling-up-full",
@@ -97,6 +100,13 @@ describe("report style policy", () => {
         available: true,
       }),
     ).toBe("MODERN_DASHBOARD");
+    expect(
+      effectiveReportStyle({
+        alias: null,
+        storedStyle: "EXECUTIVE_BOARDROOM",
+        available: true,
+      }),
+    ).toBe("EXECUTIVE_BOARDROOM");
   });
 
   it("records whether a campaign style comes from its template default or override", () => {
@@ -106,7 +116,7 @@ describe("report style policy", () => {
     });
     expect(resolveCampaignReportStyle("MODERN_DASHBOARD", "MODERN_DASHBOARD")).toEqual({
       reportStyle: "MODERN_DASHBOARD",
-      reportStyleSource: "TEMPLATE_DEFAULT",
+      reportStyleSource: "CAMPAIGN_OVERRIDE",
     });
     expect(resolveCampaignReportStyle("CLASSIC", "MODERN_DASHBOARD")).toEqual({
       reportStyle: "CLASSIC",
