@@ -47,9 +47,9 @@ styles have been reviewed.
 2. Deploy with all three variables absent/off. Verify an existing
    `scaling-up-full` campaign still renders Classic, and that existing report
    routes do not change.
-3. Select disposable, synthetic canary campaigns only. Record their exact
-   template/campaign IDs in the rollout ticket; do not put names, respondent
-   emails, tokens, or report URLs in an environment value or this runbook.
+3. Select the canary lane appropriate to the behavior under test. Record only
+   exact IDs in the rollout ticket; do not put names, respondent emails, tokens,
+   or report URLs in an environment value or this runbook.
 4. Keep `WAVE_REPORT_STYLES_ENABLED` off. Set only
    `WAVE_REPORT_STYLES_CANARY=<exact-id[,exact-id]>`, deploy, and verify that
    non-canary campaigns remain Classic.
@@ -71,12 +71,22 @@ WHERE "deletedAt" IS NULL
 GROUP BY "reportStyle", "reportStyleSource"
 ORDER BY "reportStyle", "reportStyleSource";
 
--- Lock inventory: submissions and a non-null lock must agree.
+-- Lock inventory: submitted campaigns must be locked exactly at their first
+-- successful submission; campaigns without submissions must remain unlocked.
 SELECT
-  count(*) FILTER (WHERE submissions > 0 AND "reportStyleLockedAt" IS NULL) AS missing_lock,
-  count(*) FILTER (WHERE submissions = 0 AND "reportStyleLockedAt" IS NOT NULL) AS unexpected_lock
+  count(*) FILTER (
+    WHERE "firstSubmittedAt" IS NOT NULL
+      AND "reportStyleLockedAt" IS DISTINCT FROM "firstSubmittedAt"
+  ) AS submitted_lock_mismatches,
+  count(*) FILTER (
+    WHERE "firstSubmittedAt" IS NULL
+      AND "reportStyleLockedAt" IS NOT NULL
+  ) AS unexpected_locks_without_submissions
 FROM (
-  SELECT c.id, c."reportStyleLockedAt", count(s.id) AS submissions
+  SELECT
+    c.id,
+    c."reportStyleLockedAt",
+    MIN(s."submittedAt") AS "firstSubmittedAt"
   FROM "AssessmentCampaign" c
   LEFT JOIN "AssessmentSubmission" s ON s."campaignId" = c.id
   WHERE c."deletedAt" IS NULL
@@ -89,12 +99,21 @@ nonzero, stop and investigate; do not repair style data ad hoc.
 
 ## Canary sequence
 
-1. Leave the global flag off and set the canary to the synthetic campaign or
-   `scaling-up-full` template IDs. Deploy.
-2. As ADMIN, set the Scaling Up Full ED10 Settings default once to Executive
-   Boardroom and once to Modern Dashboard. It applies only to future campaigns;
-   it does not rewrite existing campaigns. Confirm no default control appears
-   for another instrument.
+1. Leave the global flag off and choose one explicit canary lane before deploy:
+   - **Campaign-ID canary (safe lane):** set the allowlist to the exact ID of
+     an existing disposable campaign. It enables only that campaign and is the
+     safe lane for coach override and report-rendering verification.
+   - **Template-ID canary (broad lane):** set the allowlist to the exact ID of
+     a template. It enables every campaign under that template. This lane is
+     required to verify the ADMIN template-default write and new-campaign
+     creation flow, so use it only with a disposable isolated template or
+     after explicitly acknowledging that broader blast radius in the rollout
+     ticket. Do not label a production `scaling-up-full` template ID as
+     “synthetic canary campaigns only.”
+2. For the template-ID broad lane only, as ADMIN set the isolated Scaling Up
+   Full ED10 Settings default once to Executive Boardroom and once to Modern
+   Dashboard. It applies only to future campaigns; it does not rewrite existing
+   campaigns. Confirm no default control appears for another instrument.
 3. Create a fresh canary campaign for each style. As its owning coach, verify
    the report-appearance picker at campaign creation and campaign detail.
    Change the style before a completion to prove the campaign override path.

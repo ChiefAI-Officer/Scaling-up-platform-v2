@@ -1,7 +1,7 @@
 # Scaling Up Full Report Style Selection
 
-**Status:** Approved design  
-**Date:** 2026-08-05  
+**Status:** Approved design
+**Date:** 2026-08-05
 **Scope:** Scaling Up Full individual on-screen and printed/downloaded reports
 
 ## 1. Problem
