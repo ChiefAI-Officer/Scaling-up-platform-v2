@@ -73,6 +73,7 @@ export function buildReportComparisonFixturePlan(env = process.env) {
       currentCeoDisclosureEnabled: true,
       actualSubmissionInvitationsStartPending: true,
       actualSubmissionUsesSeparateFocusCampaign: true,
+      actualSubmissionDisablesOutboundEmail: true,
       stylesUseDistinctSamePersonIdentities: true,
       reusesNamespacedTemplateVersion: true,
     },
@@ -240,7 +241,7 @@ export async function provisionReportComparisonFixture({ env = process.env, crea
             reportStyle: style,
             reportStyleSource: "CAMPAIGN_OVERRIDE",
             showResultsOnScreen: true,
-            sendResultsToRespondent: true,
+            sendResultsToRespondent: false,
           } });
           const liveNativeCampaign = await tx.assessmentCampaign.create({ data: {
             templateId: template.id,

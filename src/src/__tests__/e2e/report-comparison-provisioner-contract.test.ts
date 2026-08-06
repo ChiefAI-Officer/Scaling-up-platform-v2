@@ -65,6 +65,7 @@ describe("report-comparison fixture provisioner contract", () => {
       currentCeoDisclosureEnabled: true,
       actualSubmissionInvitationsStartPending: true,
       actualSubmissionUsesSeparateFocusCampaign: true,
+      actualSubmissionDisablesOutboundEmail: true,
       stylesUseDistinctSamePersonIdentities: true,
       reusesNamespacedTemplateVersion: true,
     });
@@ -79,6 +80,8 @@ describe("report-comparison fixture provisioner contract", () => {
     expect(source).toContain('process.env.WAVE_RC_REPORT_COMPARISON_ENABLED = "1"');
     expect(source).toContain('process.env.WAVE_REPORT_STYLES_ENABLED = "1"');
     expect(source).toContain('process.env.WAVE_OSR_RESPONDENT_RESULTS_ENABLED = "1"');
+    expect(source).toContain('process.env.WAVE_D_RESULTS_EMAIL_ENABLED = "0"');
+    expect(source).toContain('process.env.ASSESSMENT_EMAIL_DELIVERY_INTENTS_ENABLED = "0"');
     expect(source).toContain('process.env.APP_URL = "http://localhost:3000"');
   });
 
@@ -104,6 +107,9 @@ describe("report-comparison fixture provisioner contract", () => {
     expect(source).toContain("otherOrganizationCampaignId");
     expect(source).toContain("reportStyleLockedAt");
     expect(source).toContain("submissionCampaignExternalId");
+    expect(source).toContain("excludedDifferentIdentitySubmissionId");
+    expect(source).toContain("exerciseOperatorComparison");
+    expect(source).toContain("captureArtifacts: false");
   });
 
   it("reuses its deterministic published fixture version on reprovision", () => {

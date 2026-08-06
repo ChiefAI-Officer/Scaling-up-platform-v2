@@ -1,4 +1,10 @@
-import { expect, test, type BrowserContext, type Page } from "@playwright/test";
+import {
+  expect,
+  test,
+  type BrowserContext,
+  type Page,
+  type TestInfo,
+} from "@playwright/test";
 import { PrismaClient } from "@prisma/client";
 import { loginAs } from "./helpers/auth";
 import { runWithReportComparisonCleanup } from "./helpers/report-comparison-cleanup";
@@ -40,6 +46,7 @@ type FixtureStyle = {
 
 type SubmissionFixture = {
   style: FixtureStyle;
+  excludedDifferentIdentitySubmissionId: string;
   ceoRespondentId: string;
   ceoInvitationId: string;
   ceoRawInvitationToken: string;
@@ -111,6 +118,87 @@ async function completeInvitedSurvey(
   await slider.fill("8");
   await page.getByRole("button", { name: "Submit", exact: true }).click();
   await expect(page.getByTestId("org-survey-results")).toBeVisible();
+}
+
+async function exerciseOperatorComparison({
+  reportPage,
+  style,
+  testInfo,
+  captureArtifacts,
+}: {
+  reportPage: Page;
+  style: FixtureStyle;
+  testInfo: TestInfo;
+  captureArtifacts: boolean;
+}) {
+  await expect(reportPage.getByTestId(expectedRenderer(style))).toBeVisible();
+  const picker = reportPage.getByLabel("Compare to previous assessment");
+  await expect(picker).toHaveValue(style.nativeSubmissionId);
+  await expect(
+    picker.locator(`option[value="${style.nativeSubmissionId}"]`),
+  ).toContainText(style.nativeCampaignName);
+  await expect(
+    picker.locator(`option[value="${style.importedSubmissionId}"]`),
+  ).toContainText("Imported");
+  await expect(
+    picker.locator(
+      `option[value="${style.otherOrganizationSubmissionId}"]`,
+    ),
+  ).toHaveCount(0);
+
+  await picker.selectOption(style.nativeSubmissionId);
+  await reportPage
+    .getByRole("button", { name: "Compare", exact: true })
+    .click();
+  await expect(reportPage).toHaveURL(
+    new RegExp(`compareTo=${style.nativeSubmissionId}`),
+  );
+  const comparison = reportPage.getByTestId("report-comparison-content");
+  await expect(comparison).toContainText(style.expectedCoverage);
+  await expect(comparison.getByLabel("increase 10")).toBeVisible();
+
+  await reportPage.getByRole("button", { name: "Change comparison" }).click();
+  await reportPage
+    .getByLabel("Compare to previous assessment")
+    .selectOption(style.importedSubmissionId);
+  await reportPage
+    .getByRole("button", { name: "Compare", exact: true })
+    .click();
+  await expect(
+    reportPage.getByTestId("report-comparison-cover-subtitle"),
+  ).toContainText("Imported");
+
+  if (captureArtifacts) {
+    await reportPage.setViewportSize({ width: 1440, height: 1000 });
+    await reportPage.screenshot({
+      path: testInfo.outputPath(`${style.style}-1440.png`),
+      fullPage: true,
+    });
+    await reportPage.setViewportSize({ width: 390, height: 844 });
+    await reportPage.screenshot({
+      path: testInfo.outputPath(`${style.style}-390.png`),
+      fullPage: true,
+    });
+    await reportPage.emulateMedia({ media: "print" });
+    await expect(reportPage.getByLabel("Report comparison")).toBeHidden();
+    await expect(
+      reportPage.getByTestId("report-comparison-content"),
+    ).toBeVisible();
+    const pdf = await reportPage.pdf({
+      path: testInfo.outputPath(`${style.style}.pdf`),
+      format: "Letter",
+      printBackground: true,
+    });
+    expect(pdf.subarray(0, 4).toString()).toBe("%PDF");
+    expect(pdf.length).toBeGreaterThan(1_000);
+    await reportPage.emulateMedia({ media: "screen" });
+  }
+
+  await reportPage.getByRole("button", { name: "Remove comparison" }).click();
+  await expect(reportPage).not.toHaveURL(/compareTo=/);
+  await expect(
+    reportPage.getByTestId("report-comparison-content"),
+  ).toHaveCount(0);
 }
 
 test.describe("Report comparison — sentinel-provisioned acceptance", () => {
@@ -258,12 +346,16 @@ test.describe("Report comparison — sentinel-provisioned acceptance", () => {
       (campaign) =>
         campaign.externalId === `${fixture.key}:CLASSIC:live-imported`,
     );
+    const liveNativeSubmission = liveNativeCampaign?.submissions[0];
+    const liveImportedSubmission = liveImportedCampaign?.submissions[0];
     if (
       !submissionCampaign ||
       submissionCampaign.status !== "ACTIVE" ||
       submissionCampaign.submissions.length !== 0 ||
-      !liveNativeCampaign?.submissions[0]?.invitationId ||
-      !liveImportedCampaign?.submissions[0]?.invitationId
+      !liveNativeCampaign ||
+      !liveImportedCampaign ||
+      !liveNativeSubmission?.invitationId ||
+      !liveImportedSubmission?.invitationId
     ) {
       throw new Error(
         "Separate live-submission focus and baseline campaigns are incomplete.",
@@ -331,7 +423,13 @@ test.describe("Report comparison — sentinel-provisioned acceptance", () => {
         currentCampaignAlias: submissionCampaign.alias,
         currentRespondentId: pendingCeo.id,
         currentSubmissionId: "",
+        nativeSubmissionId: liveNativeSubmission.id,
+        importedSubmissionId: liveImportedSubmission.id,
+        nativeCampaignName: liveNativeCampaign.name,
+        importedCampaignName: liveImportedCampaign.name,
+        expectedCoverage: "1 of 1 current question matched the earlier version.",
       },
+      excludedDifferentIdentitySubmissionId: classic.nativeSubmissionId,
       ceoRespondentId: pendingCeo.id,
       ceoInvitationId: ceoInvitation.id,
       ceoRawInvitationToken: reportComparisonInvitationToken(
@@ -390,84 +488,12 @@ test.describe("Report comparison — sentinel-provisioned acceptance", () => {
             `/portal/assessments/${style.currentCampaignId}`,
             style.currentRespondentId,
           );
-          await expect(
-            reportPage.getByTestId(expectedRenderer(style)),
-          ).toBeVisible();
-          const picker = reportPage.getByLabel(
-            "Compare to previous assessment",
-          );
-          await expect(picker).toHaveValue(style.nativeSubmissionId);
-          await expect(
-            picker.locator(`option[value="${style.nativeSubmissionId}"]`),
-          ).toContainText(style.nativeCampaignName);
-          await expect(
-            picker.locator(`option[value="${style.importedSubmissionId}"]`),
-          ).toContainText("Imported");
-          await expect(
-            picker.locator(
-              `option[value="${style.otherOrganizationSubmissionId}"]`,
-            ),
-          ).toHaveCount(0);
-
-          await picker.selectOption(style.nativeSubmissionId);
-          await reportPage
-            .getByRole("button", { name: "Compare", exact: true })
-            .click();
-          await expect(reportPage).toHaveURL(
-            new RegExp(`compareTo=${style.nativeSubmissionId}`),
-          );
-          const comparison = reportPage.getByTestId(
-            "report-comparison-content",
-          );
-          await expect(comparison).toContainText(style.expectedCoverage);
-          await expect(comparison.getByLabel("increase 10")).toBeVisible();
-
-          await reportPage
-            .getByRole("button", { name: "Change comparison" })
-            .click();
-          await reportPage
-            .getByLabel("Compare to previous assessment")
-            .selectOption(style.importedSubmissionId);
-          await reportPage
-            .getByRole("button", { name: "Compare", exact: true })
-            .click();
-          await expect(
-            reportPage.getByTestId("report-comparison-cover-subtitle"),
-          ).toContainText("Imported");
-
-          await reportPage.setViewportSize({ width: 1440, height: 1000 });
-          await reportPage.screenshot({
-            path: testInfo.outputPath(`${style.style}-1440.png`),
-            fullPage: true,
+          await exerciseOperatorComparison({
+            reportPage,
+            style,
+            testInfo,
+            captureArtifacts: true,
           });
-          await reportPage.setViewportSize({ width: 390, height: 844 });
-          await reportPage.screenshot({
-            path: testInfo.outputPath(`${style.style}-390.png`),
-            fullPage: true,
-          });
-          await reportPage.emulateMedia({ media: "print" });
-          await expect(
-            reportPage.getByLabel("Report comparison"),
-          ).toBeHidden();
-          await expect(
-            reportPage.getByTestId("report-comparison-content"),
-          ).toBeVisible();
-          const pdf = await reportPage.pdf({
-            path: testInfo.outputPath(`${style.style}.pdf`),
-            format: "Letter",
-            printBackground: true,
-          });
-          expect(pdf.subarray(0, 4).toString()).toBe("%PDF");
-          expect(pdf.length).toBeGreaterThan(1_000);
-          await reportPage.emulateMedia({ media: "screen" });
-
-          await reportPage
-            .getByRole("button", { name: "Remove comparison" })
-            .click();
-          await expect(reportPage).not.toHaveURL(/compareTo=/);
-          await expect(
-            reportPage.getByTestId("report-comparison-content"),
-          ).toHaveCount(0);
           await reportPage.close();
         }
 
@@ -478,20 +504,20 @@ test.describe("Report comparison — sentinel-provisioned acceptance", () => {
           expectedUrl: /\/admin\//,
         });
         await adminHome.close();
-        const classic = styles.find((style) => style.style === "CLASSIC");
-        if (!classic) throw new Error("Classic fixture is missing.");
-        const adminReport = await openReportFromCampaignDetail(
-          adminContext,
-          `/admin/assessments/campaigns/${classic.currentCampaignId}`,
-          classic.currentRespondentId,
-        );
-        await expect(
-          adminReport.getByTestId(expectedRenderer(classic)),
-        ).toBeVisible();
-        await expect(
-          adminReport.getByLabel("Compare to previous assessment"),
-        ).toBeVisible();
-        await adminReport.close();
+        for (const style of styles) {
+          const adminReport = await openReportFromCampaignDetail(
+            adminContext,
+            `/admin/assessments/campaigns/${style.currentCampaignId}`,
+            style.currentRespondentId,
+          );
+          await exerciseOperatorComparison({
+            reportPage: adminReport,
+            style,
+            testInfo,
+            captureArtifacts: false,
+          });
+          await adminReport.close();
+        }
       },
       cleanup: [
         { name: "close coach context", run: () => coachContext.close() },
@@ -561,16 +587,49 @@ test.describe("Report comparison — sentinel-provisioned acceptance", () => {
           ),
         );
         await expect.poll(() => new URL(ceoPage.url()).hash).toBe("");
+        const ceoPicker = ceoPage.getByLabel(
+          "Compare to previous assessment",
+        );
+        await expect(ceoPicker).toHaveValue(
+          fixture.style.nativeSubmissionId,
+        );
         await expect(
-          ceoPage.getByLabel("Compare to previous assessment"),
-        ).toBeVisible();
+          ceoPicker.locator(
+            `option[value="${fixture.style.nativeSubmissionId}"]`,
+          ),
+        ).toContainText(fixture.style.nativeCampaignName);
         await expect(
-          ceoPage
-            .getByLabel("Compare to previous assessment")
-            .locator(
-              `option[value="${fixture.style.otherOrganizationSubmissionId}"]`,
-            ),
+          ceoPicker.locator(
+            `option[value="${fixture.style.importedSubmissionId}"]`,
+          ),
+        ).toContainText("Imported");
+        await expect(
+          ceoPicker.locator(
+            `option[value="${fixture.excludedDifferentIdentitySubmissionId}"]`,
+          ),
         ).toHaveCount(0);
+        await expect(
+          ceoPicker.locator(
+            `option[value="${fixture.style.otherOrganizationSubmissionId}"]`,
+          ),
+        ).toHaveCount(0);
+        await ceoPicker.selectOption(fixture.style.importedSubmissionId);
+        await ceoPage
+          .getByRole("button", { name: "Compare", exact: true })
+          .click();
+        await expect(ceoPage).toHaveURL(
+          new RegExp(`compareTo=${fixture.style.importedSubmissionId}`),
+        );
+        const ceoComparison = ceoPage.getByTestId(
+          "report-comparison-content",
+        );
+        await expect(ceoComparison).toContainText(
+          fixture.style.expectedCoverage,
+        );
+        await expect(ceoComparison.getByLabel("increase 20")).toBeVisible();
+        await expect(
+          ceoPage.getByTestId("report-comparison-cover-subtitle"),
+        ).toContainText("Imported");
 
         const nonCeoPage = await nonCeoContext.newPage();
         await completeInvitedSurvey(

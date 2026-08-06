@@ -48,6 +48,8 @@ try {
     process.env.WAVE_REPORT_STYLES_KILL = "0";
     process.env.WAVE_OSR_RESPONDENT_RESULTS_ENABLED = "1";
     process.env.WAVE_OSR_RESPONDENT_RESULTS_KILL = "0";
+    process.env.WAVE_D_RESULTS_EMAIL_ENABLED = "0";
+    process.env.ASSESSMENT_EMAIL_DELIVERY_INTENTS_ENABLED = "0";
     process.env.APP_URL = "http://localhost:3000";
   }
   await runAssessmentReportE2eServer({
