@@ -165,6 +165,7 @@ export async function POST(request: NextRequest) {
         { status: 403 },
       );
     }
+    const actorUserId = actor.userId;
 
     const body = await request.json().catch(() => ({}));
     const simplified =
@@ -235,7 +236,7 @@ export async function POST(request: NextRequest) {
             invitationSubject: createData.invitationSubject,
             invitationBodyMarkdown: createData.invitationBodyMarkdown,
             aggregationMode: createData.aggregationMode,
-            createdBy: actor.userId,
+            createdBy: actorUserId,
           },
           select: { id: true, alias: true },
         });
