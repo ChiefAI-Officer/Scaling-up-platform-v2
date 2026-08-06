@@ -105,6 +105,132 @@ function makeProps(
 // ─── Tests ──────────────────────────────────────────────────────────────
 
 describe("ScoringTiersTab — F4 (Checkpoint 3)", () => {
+  describe("plain-language scoring copy", () => {
+    it("shows approved author language while preserving raw metric values and callbacks", () => {
+      const onChange = jest.fn();
+      const { container } = render(
+        <ScoringTiersTab
+          {...makeProps({ onScoringConfigChange: onChange })}
+          plainLanguageEnabled
+        />,
+      );
+
+      expect(screen.getByText("How results are calculated")).toBeInTheDocument();
+      const metricSelect = screen.getByLabelText("Overall result is based on");
+      expect(metricSelect).toBeInTheDocument();
+      expect(
+        screen.getByRole("option", { name: "Questions passed" }),
+      ).toHaveValue("countAchieved");
+      expect(
+        screen.getByRole("option", { name: "Sum of all answers" }),
+      ).toHaveValue("overallTotal");
+      expect(
+        screen.getByRole("option", {
+          name: "Average across all questions",
+        }),
+      ).toHaveValue("overallAvg");
+      expect(screen.getByText("Overall result tiers")).toBeInTheDocument();
+      expect(
+        screen.getByRole("columnheader", { name: "Starts at" }),
+      ).toBeInTheDocument();
+      expect(screen.getAllByPlaceholderText("No maximum")).not.toHaveLength(0);
+      expect(screen.getByText("Before you can publish")).toBeInTheDocument();
+      expect(screen.getByText("Example result")).toBeInTheDocument();
+
+      for (const forbiddenTerm of [
+        "countAchieved",
+        "overallTotal",
+        "overallAvg",
+        "minMetric",
+        "maxMetric",
+        "Zod refine",
+        "Gap D",
+        "D2 extension",
+        "Tier Resolution",
+        "unbounded",
+      ]) {
+        expect(container.textContent).not.toContain(forbiddenTerm);
+      }
+
+      fireEvent.change(metricSelect, { target: { value: "overallTotal" } });
+      expect(onChange).toHaveBeenCalledWith(
+        expect.objectContaining({ tierMetric: "overallTotal" }),
+      );
+    });
+
+    it("labels area tiers and editable cells for authors and assistive technology", () => {
+      render(
+        <ScoringTiersTab
+          {...makeProps({ scoringConfig: suFullScoringConfig })}
+          plainLanguageEnabled
+        />,
+      );
+
+      expect(screen.getByText("Results by area")).toBeInTheDocument();
+      expect(screen.getAllByLabelText("Starts at for Critical")).not.toHaveLength(0);
+      expect(screen.getAllByLabelText("Ends at for Critical")).not.toHaveLength(0);
+      expect(screen.getAllByLabelText("Result name for tier 1")).not.toHaveLength(0);
+      expect(screen.getAllByLabelText("Message shown for Critical")).not.toHaveLength(0);
+    });
+
+    it("formats local range validation without exposing stored field names", () => {
+      const broken = {
+        ...rockefellerScoringConfig,
+        tiers: [
+          { minMetric: 0, maxMetric: 16, label: "Low", message: "." },
+          { minMetric: 18, maxMetric: 32, label: "OK", message: "." },
+        ],
+      };
+      render(
+        <ScoringTiersTab
+          {...makeProps({ scoringConfig: broken })}
+          plainLanguageEnabled
+        />,
+      );
+
+      const alert = screen.getByRole("alert");
+      expect(alert).toHaveTextContent(
+        'Overall result tiers: "Low" ends at 16; "OK" must start at 17.',
+      );
+      expect(alert).not.toHaveTextContent(/minMetric|maxMetric|Global tiers/);
+    });
+
+    it("keeps every legacy label verbatim when the prop is absent", () => {
+      render(
+        <ScoringTiersTab
+          {...makeProps({ scoringConfig: suFullScoringConfig })}
+        />,
+      );
+
+      expect(screen.getByText("Scoring Configuration")).toBeInTheDocument();
+      expect(screen.getByLabelText("Tier Metric")).toBeInTheDocument();
+      expect(
+        screen.getByRole("option", {
+          name: "countAchieved — Count of questions with score ≥ passThreshold",
+        }),
+      ).toHaveValue("countAchieved");
+      expect(
+        screen.getByRole("option", {
+          name: "overallTotal — Sum of all numeric values",
+        }),
+      ).toHaveValue("overallTotal");
+      expect(
+        screen.getByRole("option", {
+          name: "overallAvg — Mean of all numeric values",
+        }),
+      ).toHaveValue("overallAvg");
+      expect(screen.getByLabelText("Pass Threshold")).toBeInTheDocument();
+      expect(
+        screen.getAllByRole("columnheader", { name: "minMetric" }),
+      ).not.toHaveLength(0);
+      expect(
+        screen.getAllByRole("columnheader", { name: "maxMetric" }),
+      ).not.toHaveLength(0);
+      expect(screen.getByText("Preview — Tier Resolution")).toBeInTheDocument();
+      expect(screen.getByText("Per-domain tiers")).toBeInTheDocument();
+    });
+  });
+
   describe("Scoring Configuration card (WF18)", () => {
     it("renders the card with title 'Scoring Configuration' + WF18 subtitle", () => {
       render(<ScoringTiersTab {...makeProps()} />);

@@ -25,6 +25,11 @@ import {
   validateTierTiling,
   type TierDomain,
 } from "@/lib/assessments/scoring";
+import {
+  FRIENDLY_SCORING_COPY,
+  formatFriendlyTilingIssue,
+  friendlyMetricLabel,
+} from "./scoring-tier-copy";
 import { TierBandBar } from "./TierBandBar";
 
 // ─── Types ──────────────────────────────────────────────────────────────
@@ -85,6 +90,7 @@ export interface ScoringTiersTabProps {
   scoringConfig: ScoringConfigShape;
   isReadOnly: boolean;
   onScoringConfigChange: (next: ScoringConfigShape) => void;
+  plainLanguageEnabled?: boolean;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────
@@ -98,6 +104,25 @@ function getGlobalMetricMode(
   return "integer";
 }
 
+type ClientTierIssue =
+  | { code: "EMPTY" }
+  | { code: "MISSING_COPY" }
+  | {
+      code: "END_BEFORE_START";
+      label: string;
+      startsAt: number;
+      endsAt: number;
+    }
+  | { code: "EARLY_NO_MAXIMUM" }
+  | {
+      code: "RANGE_GAP" | "RANGE_OVERLAP";
+      currentLabel: string;
+      nextLabel: string;
+      currentEndsAt: number;
+      nextStartsAt: number;
+      expectedNextStart: number;
+    };
+
 interface TilingIssue {
   message: string;
 }
@@ -105,20 +130,20 @@ interface TilingIssue {
 function validateTiersClient(
   tiers: TierRow[],
   mode: "integer" | "fractional",
-  surfaceLabel: string,
-): TilingIssue | null {
+): ClientTierIssue | null {
   if (tiers.length === 0) {
-    return { message: `${surfaceLabel}: add at least one tier.` };
+    return { code: "EMPTY" };
   }
   for (const t of tiers) {
     if (!t.label.trim() || !t.message.trim()) {
-      return {
-        message: `${surfaceLabel}: every tier needs a label and a message.`,
-      };
+      return { code: "MISSING_COPY" };
     }
     if (t.maxMetric !== undefined && t.maxMetric < t.minMetric) {
       return {
-        message: `${surfaceLabel}: tier "${t.label}" max (${t.maxMetric}) is less than min (${t.minMetric}).`,
+        code: "END_BEFORE_START",
+        label: t.label,
+        startsAt: t.minMetric,
+        endsAt: t.maxMetric,
       };
     }
   }
@@ -129,26 +154,66 @@ function validateTiersClient(
     const a = sorted[i];
     const b = sorted[i + 1];
     if (a.maxMetric === undefined) {
-      return {
-        message: `${surfaceLabel}: only the highest tier may omit max (open-ended).`,
-      };
+      return { code: "EARLY_NO_MAXIMUM" };
     }
     const expected = mode === "integer" ? a.maxMetric + 1 : a.maxMetric;
     if (b.minMetric !== expected) {
-      if (mode === "integer") {
-        return {
-          message: `${surfaceLabel}: tier "${a.label}" ends at ${a.maxMetric}; tier "${b.label}" must start at ${expected} (no gap, no overlap).`,
-        };
-      }
       return {
-        message:
-          b.minMetric > expected
-            ? `${surfaceLabel}: gap between tier "${a.label}" (max ${a.maxMetric}) and tier "${b.label}" (min ${b.minMetric}) — tiers must touch.`
-            : `${surfaceLabel}: overlap between tier "${a.label}" (max ${a.maxMetric}) and tier "${b.label}" (min ${b.minMetric}).`,
+        code: b.minMetric > expected ? "RANGE_GAP" : "RANGE_OVERLAP",
+        currentLabel: a.label,
+        nextLabel: b.label,
+        currentEndsAt: a.maxMetric,
+        nextStartsAt: b.minMetric,
+        expectedNextStart: expected,
       };
     }
   }
   return null;
+}
+
+function formatLegacyClientIssue(
+  issue: ClientTierIssue,
+  surfaceLabel: string,
+  mode: "integer" | "fractional",
+): string {
+  switch (issue.code) {
+    case "EMPTY":
+      return `${surfaceLabel}: add at least one tier.`;
+    case "MISSING_COPY":
+      return `${surfaceLabel}: every tier needs a label and a message.`;
+    case "END_BEFORE_START":
+      return `${surfaceLabel}: tier "${issue.label}" max (${issue.endsAt}) is less than min (${issue.startsAt}).`;
+    case "EARLY_NO_MAXIMUM":
+      return `${surfaceLabel}: only the highest tier may omit max (open-ended).`;
+    case "RANGE_GAP":
+    case "RANGE_OVERLAP":
+      if (mode === "integer") {
+        return `${surfaceLabel}: tier "${issue.currentLabel}" ends at ${issue.currentEndsAt}; tier "${issue.nextLabel}" must start at ${issue.expectedNextStart} (no gap, no overlap).`;
+      }
+      return issue.code === "RANGE_GAP"
+        ? `${surfaceLabel}: gap between tier "${issue.currentLabel}" (max ${issue.currentEndsAt}) and tier "${issue.nextLabel}" (min ${issue.nextStartsAt}) — tiers must touch.`
+        : `${surfaceLabel}: overlap between tier "${issue.currentLabel}" (max ${issue.currentEndsAt}) and tier "${issue.nextLabel}" (min ${issue.nextStartsAt}).`;
+  }
+}
+
+function formatFriendlyClientIssue(
+  issue: ClientTierIssue,
+  surfaceLabel: string,
+): string {
+  switch (issue.code) {
+    case "EMPTY":
+      return `${surfaceLabel}: add at least one tier.`;
+    case "MISSING_COPY":
+      return `${surfaceLabel}: every range needs a result name and message.`;
+    case "END_BEFORE_START":
+      return `${surfaceLabel}: the range "${issue.label}" ends at ${issue.endsAt}, before it starts at ${issue.startsAt}.`;
+    case "EARLY_NO_MAXIMUM":
+      return `${surfaceLabel}: only the last range can have no maximum.`;
+    case "RANGE_GAP":
+      return `${surfaceLabel}: "${issue.currentLabel}" ends at ${issue.currentEndsAt}; "${issue.nextLabel}" must start at ${issue.expectedNextStart}.`;
+    case "RANGE_OVERLAP":
+      return `${surfaceLabel}: "${issue.currentLabel}" ends at ${issue.currentEndsAt}; "${issue.nextLabel}" starts at ${issue.nextStartsAt}, so the ranges overlap.`;
+  }
 }
 
 function computeMidpointPreview(
@@ -184,9 +249,16 @@ interface TierTableProps {
   onChange: (next: TierRow[]) => void;
   isReadOnly: boolean;
   testIdPrefix: string;
+  plainLanguageEnabled: boolean;
 }
 
-function TierTable({ tiers, onChange, isReadOnly, testIdPrefix }: TierTableProps) {
+function TierTable({
+  tiers,
+  onChange,
+  isReadOnly,
+  testIdPrefix,
+  plainLanguageEnabled,
+}: TierTableProps) {
   const updateTier = (idx: number, patch: Partial<TierRow>) => {
     const next = tiers.map((t, i) => (i === idx ? { ...t, ...patch } : t));
     onChange(next);
@@ -207,23 +279,34 @@ function TierTable({ tiers, onChange, isReadOnly, testIdPrefix }: TierTableProps
   return (
     <div className="space-y-2">
       <div className="overflow-x-auto rounded-md border border-border">
-        <table className="w-full text-sm" aria-label="Tier definitions">
+        <table
+          className="w-full text-sm"
+          aria-label={plainLanguageEnabled ? "Result ranges" : "Tier definitions"}
+        >
           <thead className="bg-muted/50">
             <tr>
               <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground w-16">
                 Order
               </th>
               <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground w-24">
-                minMetric
+                {plainLanguageEnabled
+                  ? FRIENDLY_SCORING_COPY.startsAt
+                  : "minMetric"}
               </th>
               <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground w-24">
-                maxMetric
+                {plainLanguageEnabled
+                  ? FRIENDLY_SCORING_COPY.endsAt
+                  : "maxMetric"}
               </th>
               <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground w-40">
-                Label
+                {plainLanguageEnabled
+                  ? FRIENDLY_SCORING_COPY.resultName
+                  : "Label"}
               </th>
               <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Message
+                {plainLanguageEnabled
+                  ? FRIENDLY_SCORING_COPY.messageShown
+                  : "Message"}
               </th>
               <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground w-24">
                 Action
@@ -251,6 +334,13 @@ function TierTable({ tiers, onChange, isReadOnly, testIdPrefix }: TierTableProps
                     }
                     disabled={isReadOnly}
                     data-testid={`${testIdPrefix}-min-${idx}`}
+                    aria-label={
+                      plainLanguageEnabled
+                        ? `${FRIENDLY_SCORING_COPY.startsAt} for ${
+                            tier.label || `tier ${idx + 1}`
+                          }`
+                        : undefined
+                    }
                     className="wf-input disabled:opacity-60"
                   />
                 </td>
@@ -268,8 +358,19 @@ function TierTable({ tiers, onChange, isReadOnly, testIdPrefix }: TierTableProps
                     }
                     disabled={isReadOnly}
                     data-testid={`${testIdPrefix}-max-${idx}`}
+                    aria-label={
+                      plainLanguageEnabled
+                        ? `${FRIENDLY_SCORING_COPY.endsAt} for ${
+                            tier.label || `tier ${idx + 1}`
+                          }`
+                        : undefined
+                    }
                     className="wf-input disabled:opacity-60"
-                    placeholder="(unbounded)"
+                    placeholder={
+                      plainLanguageEnabled
+                        ? FRIENDLY_SCORING_COPY.noMaximum
+                        : "(unbounded)"
+                    }
                   />
                 </td>
                 <td className="px-3 py-2">
@@ -281,6 +382,13 @@ function TierTable({ tiers, onChange, isReadOnly, testIdPrefix }: TierTableProps
                     }
                     disabled={isReadOnly}
                     data-testid={`${testIdPrefix}-label-${idx}`}
+                    aria-label={
+                      plainLanguageEnabled
+                        ? `${FRIENDLY_SCORING_COPY.resultName} for tier ${
+                            idx + 1
+                          }`
+                        : undefined
+                    }
                     className="wf-input disabled:opacity-60"
                   />
                 </td>
@@ -293,6 +401,13 @@ function TierTable({ tiers, onChange, isReadOnly, testIdPrefix }: TierTableProps
                     }
                     disabled={isReadOnly}
                     data-testid={`${testIdPrefix}-message-${idx}`}
+                    aria-label={
+                      plainLanguageEnabled
+                        ? `${FRIENDLY_SCORING_COPY.messageShown} for ${
+                            tier.label || `tier ${idx + 1}`
+                          }`
+                        : undefined
+                    }
                     className="wf-input disabled:opacity-60"
                   />
                 </td>
@@ -317,7 +432,7 @@ function TierTable({ tiers, onChange, isReadOnly, testIdPrefix }: TierTableProps
         disabled={isReadOnly}
         className="wf-btn wf-btn-secondary disabled:opacity-50"
       >
-        + Add Tier
+        {plainLanguageEnabled ? FRIENDLY_SCORING_COPY.addTier : "+ Add Tier"}
       </button>
     </div>
   );
@@ -331,6 +446,7 @@ export function ScoringTiersTab({
   scoringConfig,
   isReadOnly,
   onScoringConfigChange,
+  plainLanguageEnabled = false,
 }: ScoringTiersTabProps) {
   const tierMetric = scoringConfig.tierMetric;
   const passThreshold = scoringConfig.passThreshold;
@@ -359,7 +475,21 @@ export function ScoringTiersTab({
 
   // Validation
   const globalMode = getGlobalMetricMode(tierMetric, rollupOverall);
-  const globalIssue = validateTiersClient(tiers, globalMode, "Global tiers");
+  const globalIssueData = validateTiersClient(tiers, globalMode);
+  const globalIssue = globalIssueData
+    ? {
+        message: plainLanguageEnabled
+          ? formatFriendlyClientIssue(
+              globalIssueData,
+              FRIENDLY_SCORING_COPY.overallTiers,
+            )
+          : formatLegacyClientIssue(
+              globalIssueData,
+              "Global tiers",
+              globalMode,
+            ),
+      }
+    : null;
 
   // ED5 T16/T17 (B-5) — the REAL metric domain, computed client-side from the
   // slider questions + config (all tab questions are SLIDER_LIKERT). Null when
@@ -392,8 +522,16 @@ export function ScoringTiersTab({
       tiers as unknown as Parameters<typeof validateTierTiling>[0],
       globalDomain,
     );
-    return issues.length > 0 ? { message: `Global tiers: ${issues[0].message}` } : null;
-  }, [globalDomain, tiers]);
+    if (issues.length === 0) return null;
+    return {
+      message: plainLanguageEnabled
+        ? formatFriendlyTilingIssue(
+            issues[0],
+            FRIENDLY_SCORING_COPY.overallTiers,
+          )
+        : `Global tiers: ${issues[0].message}`,
+    };
+  }, [globalDomain, plainLanguageEnabled, tiers]);
 
   // ED5 T18 (B-5) — per-domain metric bounds for the per-domain band bars. The
   // already-exported computePerDomainTierContexts owns the (fractional) domain
@@ -421,15 +559,24 @@ export function ScoringTiersTab({
     const out: TilingIssue[] = [];
     for (const d of domains) {
       // Per-domain tiers always fractional
-      const issue = validateTiersClient(
-        d.tiers,
-        "fractional",
-        `Domain "${d.label}"`,
-      );
-      if (issue) out.push(issue);
+      const issue = validateTiersClient(d.tiers, "fractional");
+      if (issue) {
+        out.push({
+          message: plainLanguageEnabled
+            ? formatFriendlyClientIssue(
+                issue,
+                `${FRIENDLY_SCORING_COPY.areaTiers} — ${d.label}`,
+              )
+            : formatLegacyClientIssue(
+                issue,
+                `Domain "${d.label}"`,
+                "fractional",
+              ),
+        });
+      }
     }
     return out;
-  }, [domains]);
+  }, [domains, plainLanguageEnabled]);
 
   const firstIssue =
     globalIssue ?? globalDomainIssue ?? domainIssues[0] ?? null;
@@ -458,10 +605,14 @@ export function ScoringTiersTab({
       <section className="wf-card space-y-4" style={{ padding: "1.5rem" }}>
         <header className="space-y-1">
           <h3 className="wf-card-title">
-            Scoring Configuration
+            {plainLanguageEnabled
+              ? FRIENDLY_SCORING_COPY.title
+              : "Scoring Configuration"}
           </h3>
           <p className="text-sm text-muted-foreground">
-            How responses convert into a headline metric and tier message.
+            {plainLanguageEnabled
+              ? "Choose how answers become an overall result and message."
+              : "How responses convert into a headline metric and tier message."}
           </p>
         </header>
 
@@ -471,7 +622,9 @@ export function ScoringTiersTab({
               htmlFor="tier-metric"
               className="wf-label"
             >
-              Tier Metric
+              {plainLanguageEnabled
+                ? FRIENDLY_SCORING_COPY.metricLabel
+                : "Tier Metric"}
             </label>
             <select
               id="tier-metric"
@@ -483,17 +636,25 @@ export function ScoringTiersTab({
               className="wf-input disabled:opacity-60"
             >
               <option value="countAchieved">
-                countAchieved — Count of questions with score ≥ passThreshold
+                {plainLanguageEnabled
+                  ? friendlyMetricLabel("countAchieved")
+                  : "countAchieved — Count of questions with score ≥ passThreshold"}
               </option>
               <option value="overallTotal">
-                overallTotal — Sum of all numeric values
+                {plainLanguageEnabled
+                  ? friendlyMetricLabel("overallTotal")
+                  : "overallTotal — Sum of all numeric values"}
               </option>
               <option value="overallAvg">
-                overallAvg — Mean of all numeric values
+                {plainLanguageEnabled
+                  ? friendlyMetricLabel("overallAvg")
+                  : "overallAvg — Mean of all numeric values"}
               </option>
             </select>
             <p className="text-xs text-muted-foreground">
-              Drives the headline metric the tier ranges resolve against.
+              {plainLanguageEnabled
+                ? "Choose the method used to calculate the overall result."
+                : "Drives the headline metric the tier ranges resolve against."}
             </p>
           </div>
 
@@ -502,7 +663,9 @@ export function ScoringTiersTab({
               htmlFor="pass-threshold"
               className="wf-label"
             >
-              Pass Threshold
+              {plainLanguageEnabled
+                ? FRIENDLY_SCORING_COPY.passThresholdLabel
+                : "Pass Threshold"}
             </label>
             <input
               id="pass-threshold"
@@ -517,8 +680,16 @@ export function ScoringTiersTab({
               className="wf-input disabled:opacity-60"
             />
             <p className="text-xs text-muted-foreground">
-              A question counts as &ldquo;achieved&rdquo; when its score ≥ this
-              value. Rockefeller uses 2 (on a 0–3 scale).
+              {plainLanguageEnabled ? (
+                <>
+                  Used only when <strong>Questions passed</strong> is selected.
+                </>
+              ) : (
+                <>
+                  A question counts as &ldquo;achieved&rdquo; when its score ≥
+                  this value. Rockefeller uses 2 (on a 0–3 scale).
+                </>
+              )}
             </p>
           </div>
         </div>
@@ -526,11 +697,15 @@ export function ScoringTiersTab({
         {/* Tiers table */}
         <div className="space-y-3 pt-2">
           <header className="space-y-1">
-            <h4 className="text-sm font-semibold text-foreground">Tiers</h4>
+            <h4 className="text-sm font-semibold text-foreground">
+              {plainLanguageEnabled
+                ? FRIENDLY_SCORING_COPY.overallTiers
+                : "Tiers"}
+            </h4>
             <p className="text-xs text-muted-foreground">
-              Each tier defines a metric range + label + message shown on the
-              results page. Tiers must cover the full metric domain with no
-              gaps or overlaps (Zod refine enforces this on save).
+              {plainLanguageEnabled
+                ? "Tiers apply to the whole assessment—not to individual sections. Together, the ranges must cover every possible overall result without gaps."
+                : "Each tier defines a metric range + label + message shown on the results page. Tiers must cover the full metric domain with no gaps or overlaps (Zod refine enforces this on save)."}
             </p>
           </header>
           {globalDomain ? (
@@ -548,8 +723,9 @@ export function ScoringTiersTab({
               className="text-[0.625rem] italic text-muted-foreground"
               data-testid="global-tier-band-unavailable"
             >
-              Visual band editor unavailable for this metric (open-ended or
-              ambiguous domain) — use the table below.
+              {plainLanguageEnabled
+                ? "The visual range editor is unavailable for the selected method—use the table below."
+                : "Visual band editor unavailable for this metric (open-ended or ambiguous domain) — use the table below."}
             </p>
           )}
           <TierTable
@@ -557,6 +733,7 @@ export function ScoringTiersTab({
             onChange={handleTiersChange}
             isReadOnly={isReadOnly}
             testIdPrefix="global-tier"
+            plainLanguageEnabled={plainLanguageEnabled}
           />
 
           {/* Validation hint card */}
@@ -565,20 +742,31 @@ export function ScoringTiersTab({
             className="rounded-md border border-border bg-muted/30 px-4 py-3 text-xs text-muted-foreground"
           >
             <p className="font-semibold text-foreground mb-1">
-              Validation rules (Zod refine on save)
+              {plainLanguageEnabled
+                ? FRIENDLY_SCORING_COPY.publishHelp
+                : "Validation rules (Zod refine on save)"}
             </p>
-            <ul className="list-disc list-inside space-y-0.5">
-              <li>
-                All tiers&apos; <code>[minMetric, maxMetric]</code> ranges must
-                cover <code>[0, maxPossibleMetric]</code>.
-              </li>
-              <li>No gaps allowed between consecutive tiers.</li>
-              <li>No overlaps allowed.</li>
-              <li>
-                <code>maxMetric</code> of the last tier may be omitted (treated
-                as unbounded).
-              </li>
-            </ul>
+            {plainLanguageEnabled ? (
+              <ul className="list-disc list-inside space-y-0.5">
+                <li>Every possible overall result must be covered by a range.</li>
+                <li>Ranges cannot have gaps.</li>
+                <li>Ranges cannot overlap.</li>
+                <li>Only the last range may have no maximum.</li>
+              </ul>
+            ) : (
+              <ul className="list-disc list-inside space-y-0.5">
+                <li>
+                  All tiers&apos; <code>[minMetric, maxMetric]</code> ranges
+                  must cover <code>[0, maxPossibleMetric]</code>.
+                </li>
+                <li>No gaps allowed between consecutive tiers.</li>
+                <li>No overlaps allowed.</li>
+                <li>
+                  <code>maxMetric</code> of the last tier may be omitted
+                  (treated as unbounded).
+                </li>
+              </ul>
+            )}
           </div>
 
           {/* Live preview card */}
@@ -588,29 +776,38 @@ export function ScoringTiersTab({
             style={{ padding: "0.75rem 1rem" }}
           >
             <p className="text-sm font-semibold text-foreground mb-1">
-              Preview — Tier Resolution
+              {plainLanguageEnabled
+                ? FRIENDLY_SCORING_COPY.exampleResult
+                : "Preview — Tier Resolution"}
             </p>
             {preview ? (
               <div className="text-sm">
                 <span className="text-muted-foreground">
-                  Midpoint-answer simulation:
+                  {plainLanguageEnabled
+                    ? "Using middle answers:"
+                    : "Midpoint-answer simulation:"}
                 </span>{" "}
                 <span className="font-medium">
                   score = {preview.score.toFixed(2)}
                 </span>{" "}
                 →{" "}
                 <span className="inline-flex items-center px-2 py-0.5 rounded bg-primary/10 text-primary text-xs font-medium">
-                  tier: {preview.tier ?? "(unresolved)"}
+                  {plainLanguageEnabled ? "result" : "tier"}:{" "}
+                  {preview.tier ??
+                    (plainLanguageEnabled ? "(no matching range)" : "(unresolved)")}
                 </span>
               </div>
             ) : (
               <p className="text-sm text-muted-foreground italic">
-                Preview unavailable — provide sample submission
+                {plainLanguageEnabled
+                  ? "Example unavailable — add questions and ranges to see a result"
+                  : "Preview unavailable — provide sample submission"}
               </p>
             )}
             <p className="text-xs text-muted-foreground mt-1">
-              Preview uses midpoint-answer simulation against the scoring
-              engine.
+              {plainLanguageEnabled
+                ? "This example uses the middle answer for every question."
+                : "Preview uses midpoint-answer simulation against the scoring engine."}
             </p>
           </div>
         </div>
@@ -623,11 +820,14 @@ export function ScoringTiersTab({
         <section className="space-y-4">
           <header className="space-y-1">
             <h3 className="wf-card-title">
-              Per-domain tiers
+              {plainLanguageEnabled
+                ? FRIENDLY_SCORING_COPY.areaTiers
+                : "Per-domain tiers"}
             </h3>
             <p className="text-sm text-muted-foreground">
-              Resolved per domain when this template has a nested rollup. Same
-              touching/coverage rules per domain.
+              {plainLanguageEnabled
+                ? "Each area uses ranges that cover every possible result without gaps."
+                : "Resolved per domain when this template has a nested rollup. Same touching/coverage rules per domain."}
             </p>
           </header>
           {domains.map((domain) => (
@@ -660,6 +860,7 @@ export function ScoringTiersTab({
                 onChange={(next) => handleDomainTiersChange(domain.key, next)}
                 isReadOnly={isReadOnly}
                 testIdPrefix={`domain-tier-${domain.key}`}
+                plainLanguageEnabled={plainLanguageEnabled}
               />
             </div>
           ))}
