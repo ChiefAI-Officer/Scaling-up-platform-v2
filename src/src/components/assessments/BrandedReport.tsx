@@ -246,23 +246,29 @@ export function BrandedReport({
     });
 
   switch (resolvedStyle) {
-    case "CLASSIC":
-      if (
-        reportStylesAvailable === true &&
+    case "CLASSIC": {
+      const fallbackReason =
         rawStyle !== null &&
         rawStyle !== undefined &&
         !isReportStyleKey(rawStyle)
-      ) {
-        console.warn("assessment.report_style.invalid", {
+          ? "INVALID"
+          : isReportStyleKey(rawStyle) && rawStyle !== "CLASSIC"
+            ? "UNAVAILABLE"
+            : null;
+      if (fallbackReason) {
+        console.warn("assessment.report_style.fallback", {
           submissionId: report.provenance?.submissionId ?? null,
           versionId: report.provenance?.versionId ?? null,
           templateAlias: report.templateAlias ?? null,
           archetype: config.reportType,
-          requestedStyle: "INVALID",
+          requestedStyle:
+            fallbackReason === "INVALID" ? "INVALID" : rawStyle,
           resolvedStyle: "CLASSIC",
+          fallbackReason,
         });
       }
       return classic();
+    }
     case "EXECUTIVE_BOARDROOM":
       return <ExecutiveBoardroomReport presentation={presentation()} />;
     case "MODERN_DASHBOARD":

@@ -81,6 +81,9 @@ describe("report style preview page", () => {
     expect(dashboard).toContain('data-report-block="score-summary"');
     expect(dashboard).toContain('data-report-role="domain"');
     expect(dashboard).toContain("su-report--dashboard");
+    expect(executive).toContain(
+      ".report-action-group ~ .report-action-group",
+    );
   });
 
   it.each([

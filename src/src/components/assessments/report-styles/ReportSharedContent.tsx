@@ -115,6 +115,7 @@ function MetricGroup({ block }: { block: MetricGroupBlock }) {
     <section
       data-report-block="metric-group"
       data-report-role={block.role}
+      data-decision={block.role === "domain" ? block.stableKey : undefined}
       data-testid={`report-style-group-${block.stableKey}`}
     >
       <h2>{block.label}</h2>
@@ -209,13 +210,17 @@ function Finding({ block }: { block: FindingBlock }) {
 
 function Recommendation({ block }: { block: RecommendationBlock }) {
   return (
-    <section data-report-block="recommendation">
+    <section
+      aria-labelledby="report-style-actions-title"
+      data-report-block="recommendation"
+    >
+      <h2 id="report-style-actions-title">Recommendations</h2>
       {block.groups.map((group, groupIndex) => (
         <div
           className="report-action-group"
           key={`${group.sectionStableKey ?? "unsectioned"}-${groupIndex}`}
         >
-          <h2>{group.label}</h2>
+          <h3>{group.label}</h3>
           <ul>
             {group.items.map((item) => (
               <li key={item.stableKey}>{item.text}</li>
@@ -274,10 +279,12 @@ function AdditionalResponse({ block }: { block: AdditionalResponseBlock }) {
 
 function CoachCta({ block }: { block: CoachCtaBlock }) {
   return (
-    <nav aria-label="Report actions" data-report-block="coach-cta">
-      <a href={block.learnMoreHref}>Learn More →</a>
-      <a href={block.href}>{block.label}</a>
-    </nav>
+    <footer data-report-block="coach-cta">
+      <nav aria-label="Report actions">
+        <a href={block.learnMoreHref}>Learn More →</a>
+        <a href={block.href}>{block.label}</a>
+      </nav>
+    </footer>
   );
 }
 

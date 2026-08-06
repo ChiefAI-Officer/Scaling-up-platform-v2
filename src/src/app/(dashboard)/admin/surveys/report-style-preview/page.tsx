@@ -188,8 +188,8 @@ function PreviewSelectionStyles() {
 
       .report-style-preview--executive[data-preview-page="detail"] .report-page--executive-detail [data-report-role="section"] ~ [data-report-role="section"],
       .report-style-preview--dashboard[data-preview-page="detail"] .report-page--dashboard-detail [data-report-role="section"] ~ [data-report-role="section"],
-      .report-style-preview--executive[data-preview-page="detail"] .report-page--executive-detail .report-action-group:not(:first-child),
-      .report-style-preview--dashboard[data-preview-page="detail"] .report-page--dashboard-detail .report-action-group:not(:first-child),
+      .report-style-preview--executive[data-preview-page="detail"] .report-page--executive-detail .report-action-group ~ .report-action-group,
+      .report-style-preview--dashboard[data-preview-page="detail"] .report-page--dashboard-detail .report-action-group ~ .report-action-group,
       .report-style-preview--executive[data-preview-page="detail"] .report-page--executive-detail [data-report-block="additional-response"],
       .report-style-preview--dashboard[data-preview-page="detail"] .report-page--dashboard-detail [data-report-block="additional-response"],
       .report-style-preview--executive[data-preview-page="detail"] .report-page--executive-detail [data-report-block="coach-cta"],

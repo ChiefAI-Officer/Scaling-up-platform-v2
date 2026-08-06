@@ -351,6 +351,30 @@ describe("adaptive alternate report renderers", () => {
       expect(report.queryByText("Priority")).not.toBeInTheDocument();
       expect(report.queryByText("Decision score matrix")).not.toBeInTheDocument();
       expect(report.queryByText("Section scorecard")).not.toBeInTheDocument();
+
+      const recommendation = report
+        .getByText("Use the authored recommendation exactly.")
+        .closest('[data-report-block="recommendation"]');
+      expect(recommendation).toHaveAttribute(
+        "aria-labelledby",
+        "report-style-actions-title",
+      );
+      expect(
+        within(recommendation as HTMLElement).getByRole("heading", {
+          name: "Recommendations",
+        }),
+      ).toHaveAttribute("id", "report-style-actions-title");
+      expect(
+        within(recommendation as HTMLElement).getByRole("heading", {
+          name: "Authored action group",
+        }).tagName,
+      ).toBe("H3");
+
+      const cta = report.getByRole("link", { name: "Talk to a Coach →" });
+      expect(cta.closest("footer")).toHaveAttribute(
+        "data-report-block",
+        "coach-cta",
+      );
     },
   );
 
@@ -443,6 +467,7 @@ describe("BrandedReport explicit appearance dispatch", () => {
   ] as const)(
     "selects %s only with a server-authoritative availability decision",
     (reportStyle, renderer) => {
+      const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
       const { rerender } = render(
         <BrandedReport
           report={scalingUpFullReport(reportStyle)}
@@ -454,6 +479,24 @@ describe("BrandedReport explicit appearance dispatch", () => {
       rerender(<BrandedReport report={scalingUpFullReport(reportStyle)} />);
       expect(screen.queryByTestId(renderer)).toBeNull();
       expect(screen.getByTestId("report-cover")).toBeInTheDocument();
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(
+        "assessment.report_style.fallback",
+        {
+          submissionId: "submission-safe-id",
+          versionId: "version-safe-id",
+          templateAlias: "scaling-up-full",
+          archetype: "scored",
+          requestedStyle: reportStyle,
+          resolvedStyle: "CLASSIC",
+          fallbackReason: "UNAVAILABLE",
+        },
+      );
+      expect(JSON.stringify(warn.mock.calls)).not.toContain("Private Person Name");
+      expect(JSON.stringify(warn.mock.calls)).not.toContain(
+        "private-person@example.test",
+      );
+      warn.mockRestore();
     },
   );
 
@@ -469,7 +512,7 @@ describe("BrandedReport explicit appearance dispatch", () => {
     const classic = render(<LegacyClassicReport report={report} />);
     expect(fallbackHtml).toBe(classic.container.innerHTML);
     expect(warn).toHaveBeenCalledWith(
-      "assessment.report_style.invalid",
+      "assessment.report_style.fallback",
       {
         submissionId: "submission-safe-id",
         versionId: "version-safe-id",
@@ -477,8 +520,10 @@ describe("BrandedReport explicit appearance dispatch", () => {
         archetype: "scored",
         requestedStyle: "INVALID",
         resolvedStyle: "CLASSIC",
+        fallbackReason: "INVALID",
       },
     );
+    expect(warn).toHaveBeenCalledTimes(1);
     expect(JSON.stringify(warn.mock.calls)).not.toContain("Private Person Name");
     expect(JSON.stringify(warn.mock.calls)).not.toContain(
       "private-person@example.test",
