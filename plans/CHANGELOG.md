@@ -6,6 +6,17 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="report-style-canary-picker-fix-prepared"></a>
+### 2026-08-06 — Report-style exact-campaign canary and picker correction prepared <!-- ENTRY_ISO:2026-08-06 ENTRY_SLUG:report-style-canary-picker-fix-prepared -->
+
+**Dark deployment and controlled canary receipt.** Report-style PR [#306](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/306) passed Build, Migration Safety Gate, Assessment Email Lease (PostgreSQL), Vercel, and Vercel Preview Comments, then squash-merged as `44a6733c9630bdc56cb9ed3024c6c33ab6d6a0d5`. The first Production deployment was verified dark with all three rollout variables absent. A disposable Scaling Up Full campaign, `cmsgz5uw900043ath2xee900i`, was then created through the real Coach APIs with DRAFT status, zero participants, invitations, submissions, or email sends. Production now has only `WAVE_REPORT_STYLES_CANARY` set to that exact campaign; `WAVE_REPORT_STYLES_ENABLED` and `WAVE_REPORT_STYLES_KILL` remain absent. Exact deployment `dpl_9uwU9FjmEtwHCDnmmc8VgT2puCAF` is Ready on both production aliases, whose health endpoints report a healthy database and safe auth posture.
+
+**Canary finding and containment.** The three-preset picker rendered for the canary Coach, but a newly selected style reverted to the authoritative Classic value before Save became usable. The campaign remained `CLASSIC` with `TEMPLATE_DEFAULT`; no style override, response, invitation, participant, or email was persisted. The cause is the Campaign Detail synchronization effect treating a referentially new but semantically unchanged `initialOverview` object as authoritative style change. Exposure remains contained to the disposable exact campaign, and the global gate is still off.
+
+**Test-first correction and remaining gate.** A regression test now recreates the live object-identity churn and proves an unsaved Executive Boardroom choice remains selected and Save remains enabled when the server projection is equivalent. The test failed against the shipped code, then passed after splitting overview adoption from report-style synchronization and keying the latter only to campaign ID, authoritative style, and lock state. A companion case confirms a genuinely changed authoritative style/lock is still adopted. The full Campaign Detail component matrix passed **12 suites / 71 tests** before that companion assertion was added; the fresh repository run passed **641 suites / 7,869 tests / 16 snapshots**. Changed-file ESLint, changelog freshness, migration safety across **45 migrations**, diff hygiene, and the Turbopack production build passed, with TypeScript complete and **93/93** static pages generated. Protected review, merge, Production redeployment under the unchanged exact-campaign canary, live save/persistence verification, and visual acceptance remain pending. Do not broaden the canary or enable the global gate until those checks pass.
+
+---
+
 <a id="report-style-rollout-prepared"></a>
 ### 2026-08-06 — Scaling Up Full report-style rollout prepared <!-- ENTRY_ISO:2026-08-06 ENTRY_SLUG:report-style-rollout-prepared -->
 

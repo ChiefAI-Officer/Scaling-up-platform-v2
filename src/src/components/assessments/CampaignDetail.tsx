@@ -374,8 +374,18 @@ export function CampaignDetail({
   // or a lock race. Adopt it so the client never guesses a final locked value.
   useEffect(() => {
     setOverview(initialOverview);
-    setReportStyle(initialOverview.campaign.reportStyle);
   }, [initialOverview]);
+
+  // Keep an in-progress choice when React receives an equivalent projection
+  // with a new object identity. Reset only when the authoritative style,
+  // campaign, or lock state actually changes.
+  useEffect(() => {
+    setReportStyle(initialOverview.campaign.reportStyle);
+  }, [
+    initialOverview.campaign.id,
+    initialOverview.campaign.reportStyle,
+    initialOverview.campaign.reportStyleLockedAt,
+  ]);
 
   // Wave N (#23) — O(1) lookup for the per-row "over time" affordance. The set
   // is the server-computed eligible-id allowlist; the client never recomputes

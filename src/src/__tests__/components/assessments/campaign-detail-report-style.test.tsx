@@ -48,6 +48,40 @@ describe("CampaignDetail report appearance", () => {
     expect(JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body)).toEqual({ reportStyle: "MODERN_DASHBOARD" });
   });
 
+  it("preserves an unsaved style when an equivalent server projection gets a new object identity", () => {
+    const { rerender } = render(
+      <CampaignDetail initialOverview={overview()} initialRespondents={[]} reportStylesAvailable />,
+    );
+
+    fireEvent.click(screen.getByRole("radio", { name: /Executive Boardroom/i }));
+    expect(screen.getByRole("radio", { name: /Executive Boardroom/i })).toBeChecked();
+    expect(screen.getByRole("button", { name: /Save report appearance/i })).toBeEnabled();
+
+    rerender(
+      <CampaignDetail initialOverview={overview()} initialRespondents={[]} reportStylesAvailable />,
+    );
+
+    expect(screen.getByRole("radio", { name: /Executive Boardroom/i })).toBeChecked();
+    expect(screen.getByRole("button", { name: /Save report appearance/i })).toBeEnabled();
+  });
+
+  it("adopts an authoritative style and lock delivered by a refreshed server projection", () => {
+    const { rerender } = render(
+      <CampaignDetail initialOverview={overview()} initialRespondents={[]} reportStylesAvailable />,
+    );
+    fireEvent.click(screen.getByRole("radio", { name: /Executive Boardroom/i }));
+
+    const refreshed = overview(new Date("2026-08-06T04:00:00Z"));
+    refreshed.campaign.reportStyle = "MODERN_DASHBOARD";
+    refreshed.campaign.reportStyleSource = "CAMPAIGN_OVERRIDE";
+    rerender(
+      <CampaignDetail initialOverview={refreshed} initialRespondents={[]} reportStylesAvailable />,
+    );
+
+    expect(screen.getByRole("radio", { name: /Modern Dashboard/i })).toBeChecked();
+    expect(screen.getByRole("radio", { name: /Modern Dashboard/i })).toBeDisabled();
+  });
+
   it("supports keyboard selection before the first completion", () => {
     render(<CampaignDetail initialOverview={overview()} initialRespondents={[]} reportStylesAvailable />);
 
