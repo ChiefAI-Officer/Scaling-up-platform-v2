@@ -18,6 +18,24 @@ import { escapeHtml } from "@/lib/templates/interpolate-content-html";
 
 const PURPLE = "#522583";
 
+/** A CEO capability must never be delivered via an ambiguous or remote HTTP URL. */
+function safeCeoSelfAccessHref(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  try {
+    const url = new URL(raw.trim());
+    if (url.username || url.password) return null;
+    if (url.protocol === "https:") return url.href;
+    const localHost =
+      url.hostname === "localhost" ||
+      url.hostname === "127.0.0.1" ||
+      url.hostname === "[::1]" ||
+      url.hostname.endsWith(".test");
+    return url.protocol === "http:" && localHost ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Accept only http(s) and root-relative URLs in markdown links. */
 function safeHref(raw: string): string | null {
   const url = raw.trim();
@@ -66,6 +84,8 @@ export interface BuildResultsEmailArgs {
   bodyMarkdown: string;
   /** Pre-rendered Spec-16 report HTML (from buildReportEmailHtml). */
   reportHtml: string;
+  /** Purpose-bound CEO self-access URL, delivered only through approved #15 email. */
+  ceoSelfAccessUrl?: string | null;
 }
 
 /**
@@ -76,12 +96,17 @@ export interface BuildResultsEmailArgs {
 export function buildResultsEmailHtml({
   bodyMarkdown,
   reportHtml,
+  ceoSelfAccessUrl,
 }: BuildResultsEmailArgs): string {
   const intro = renderResultsEmailBodyHtml(bodyMarkdown);
   const introBlock = intro
     ? `<div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;max-width:640px;margin:0 auto 16px;padding:0 8px;">${intro}</div>`
     : "";
-  return `${introBlock}${reportHtml}`;
+  const href = safeCeoSelfAccessHref(ceoSelfAccessUrl);
+  const ceoSelfAccessCta = href
+    ? `<p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;text-align:center;margin:20px 0;"><a href="${escapeHtml(href)}" style="display:inline-block;background:${PURPLE};color:#ffffff;padding:12px 22px;text-decoration:none;border-radius:8px;font-weight:700;font-size:14px;">View and compare your reports</a></p>`
+    : "";
+  return `${introBlock}${reportHtml}${ceoSelfAccessCta}`;
 }
 
 export interface BuildCoachNotifyArgs {

@@ -13,7 +13,7 @@
  */
 
 import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { OrgSurveyClient } from "@/components/assessments/org-survey-client";
 import {
   writeOnScreenResult,
@@ -391,6 +391,72 @@ describe("the rendered report", () => {
     expect(
       screen.getByText(/your coach will review these results with you/i),
     ).toBeInTheDocument();
+  });
+
+  it("renders the server-issued CEO comparison link beside Print without persisting it", async () => {
+    global.fetch = jest.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : String(input);
+      if (url.includes("/me")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            success: true,
+            data: {
+              respondentKey: KEY,
+              campaign: { name: "Demo", alias: ALIAS, templateAlias: "RockHabits" },
+              version: { language: "en" },
+              sections: [{ stableKey: "s1", sortOrder: 1, name: "S1" }],
+              questions: [{
+                stableKey: "q1",
+                sortOrder: 1,
+                type: "SLIDER_LIKERT",
+                label: "Question",
+                sectionStableKey: "s1",
+                isRequired: true,
+                scale: { min: 0, max: 3, step: 1, anchorMin: "Low", anchorMax: "High" },
+              }],
+            },
+          }),
+        } as unknown as Response;
+      }
+      if (url.includes("/submit")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            success: true,
+            data: {
+              report: {
+                ...(REPORT as object),
+                submittedAt: "2026-07-29T10:30:00.000Z",
+              },
+              ceoSelfAccessUrl:
+                "https://app.example.com/assessments/self-report#t=signed-token",
+            },
+          }),
+        } as unknown as Response;
+      }
+      return { ok: false, status: 404, json: async () => ({}) } as unknown as Response;
+    }) as unknown as typeof fetch;
+
+    render(<OrgSurveyClient campaignAlias={ALIAS} />);
+    await screen.findByRole("button", { name: /start the assessment/i });
+    fireEvent.click(screen.getByRole("button", { name: /start the assessment/i }));
+    fireEvent.change(screen.getByRole("slider"), { target: { value: "3" } });
+    fireEvent.click(screen.getByRole("button", { name: /^submit$/i }));
+
+    const link = await screen.findByRole("link", {
+      name: "Compare with a previous assessment",
+    });
+    expect(link).toHaveAttribute(
+      "href",
+      "https://app.example.com/assessments/self-report#t=signed-token",
+    );
+    expect(screen.getByTestId("org-survey-results")).toContainElement(link);
+    expect(
+      window.sessionStorage.getItem(`su-onscreen-result:${ALIAS}`),
+    ).not.toContain("signed-token");
   });
 });
 

@@ -77,6 +77,8 @@ import {
   type ReportStyleKey,
 } from "@/lib/assessments/report-style-registry";
 import { lockReportStyleForFirstCompletion } from "@/lib/assessments/report-style-lock";
+import { isReportComparisonEnabled } from "@/lib/assessments/wave-report-comparison-flags";
+import { createCeoReportAccessToken } from "@/lib/assessments/ceo-report-access-token";
 
 const NO_STORE_HEADERS = { "Cache-Control": "no-store" } as const;
 
@@ -144,6 +146,8 @@ type PreparedDeliveryRow = PreparedOutboxRow & {
   canonicalRecipientMailbox: string;
   renderInputHash: string;
   contentProvenance: ContentProvenanceV1;
+  /** The body carries a short-lived CEO capability and needs a second locked gate. */
+  hasCeoSelfAccessUrl?: boolean;
 };
 
 interface SharedWaveDEmailRenderCache {
@@ -194,6 +198,30 @@ interface EnqueueArgs {
    * one model and shares it between #15 email and on-screen payload.
    */
   report: RespondentReport | null;
+  /** Prepared in Phase 1 only after the CEO capability gate succeeds. */
+  ceoSelfAccessUrl: string | null;
+}
+
+function ceoSelfAccessUrl(token: string): string | null {
+  try {
+    const origin = new URL(process.env.APP_URL ?? "");
+    const localHost =
+      origin.hostname === "localhost" ||
+      origin.hostname === "127.0.0.1" ||
+      origin.hostname === "[::1]" ||
+      origin.hostname.endsWith(".test");
+    if (
+      origin.username ||
+      origin.password ||
+      (origin.protocol !== "https:" &&
+        !(origin.protocol === "http:" && localHost))
+    ) {
+      return null;
+    }
+    return `${origin.origin}/assessments/self-report#t=${encodeURIComponent(token)}`;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -215,6 +243,7 @@ function buildWaveDOutboxRows({
   respectGlobalPause,
   prepareIntentMetadata,
   renderCache,
+  ceoSelfAccessUrl,
 }: EnqueueArgs): PreparedDeliveryRow[] {
   const rows: PreparedDeliveryRow[] = [];
 
@@ -269,6 +298,7 @@ function buildWaveDOutboxRows({
                 bodyHtml: buildResultsEmailHtml({
                   bodyMarkdown: template.resultsEmailBodyMarkdown ?? "",
                   reportHtml,
+                  ceoSelfAccessUrl,
                 }),
               }
             : null;
@@ -319,6 +349,7 @@ function buildWaveDOutboxRows({
         bodyHtml: renderCache.results.bodyHtml,
         renderInputHash: prepareIntentMetadata ? reportRenderInputHash : "",
         contentProvenance,
+        hasCeoSelfAccessUrl: ceoSelfAccessUrl !== null,
       });
     }
   }
@@ -700,7 +731,7 @@ export async function POST(
             include: {
               // Wave OSR (#71): the org name fills the cover subtitle (an empty
               // one renders an orphan " · ").
-              organization: { select: { name: true } },
+              organization: { select: { id: true, name: true } },
               // Wave D: per-campaign send toggles + the owning coach (#16).
               // Wave OSR (#71): profileImage + names build the coach byline that
               // PR #230 shipped on the coach/admin report (Jeff #63/#67/#73/#78/#81)
@@ -783,6 +814,7 @@ export async function POST(
       let scoredSections = invitation.campaign.version.sections as Array<
         Record<string, unknown>
       >;
+      let phase1IsCeo = false;
       if (invitation.campaign.template?.alias === SU_FULL_ALIAS) {
         const participant = await db.assessmentCampaignParticipant.findUnique({
           where: {
@@ -793,9 +825,10 @@ export async function POST(
           },
           select: { isCEO: true },
         });
+        phase1IsCeo = participant?.isCEO === true;
         // Fail-safe: no participant row → treat as non-CEO (drop the section),
         // matching the survey-render policy (me/route.ts + org-survey-client).
-        if (participant?.isCEO !== true) {
+        if (!phase1IsCeo) {
           // Mirror assembleSurveyPages EXACTLY: drop the CEO-only section from
           // BOTH the questions AND the sections, so scoring never sees an empty
           // S_BACKGROUND section that a non-CEO respondent never had.
@@ -859,6 +892,41 @@ export async function POST(
         (isOnScreenResultsEnabled() &&
           invitation.campaign.showResultsOnScreen === true) ||
         invitation.campaign.sendResultsToRespondent === true;
+
+      // Prepare the short-lived CEO capability before rendering. It binds the
+      // invitation (the submission does not exist yet); Phase 2 revalidates the
+      // CEO designation under lock before any capability-bearing row persists.
+      const phase1CeoSelfAccessAuthorized =
+        invitation.campaign.template?.alias === SU_FULL_ALIAS &&
+        phase1IsCeo &&
+        invitation.campaign.accessMode === "INVITED" &&
+        (invitation.campaign.showResultsOnScreen ||
+          invitation.campaign.sendResultsToRespondent) &&
+        isReportComparisonEnabled({
+          organizationId: invitation.campaign.organization.id,
+          templateId: invitation.campaign.templateId,
+        });
+      let preparedCeoSelfAccessUrl: string | null = null;
+      if (phase1CeoSelfAccessAuthorized) {
+        try {
+          preparedCeoSelfAccessUrl = ceoSelfAccessUrl(
+            createCeoReportAccessToken({
+              focusCampaignId: invitation.campaign.id,
+              invitationId,
+              respondentId: invitation.respondentId,
+            }),
+          );
+        } catch (err) {
+          console.warn(
+            "[assessment-submit] CEO self-access link unavailable — submission unaffected",
+            {
+              campaignId: invitation.campaign.id,
+              invitationId,
+              errorName: errorNameOnly(err),
+            },
+          );
+        }
+      }
 
       let respondentReport: RespondentReport | null = null;
 
@@ -930,6 +998,7 @@ export async function POST(
             respectGlobalPause: !intentMode,
             prepareIntentMetadata: intentMode,
             renderCache: sharedEmailRenders,
+            ceoSelfAccessUrl: preparedCeoSelfAccessUrl,
           }),
         });
       }
@@ -974,6 +1043,7 @@ export async function POST(
                 id: true,
                 alias: true,
                 templateId: true,
+                organizationId: true,
                 accessMode: true,
                 deletedAt: true,
                 status: true,
@@ -1040,6 +1110,40 @@ export async function POST(
         }
         respondentReport = selectedCandidate.report;
         const preparedRows = selectedCandidate.rows;
+
+        let ceoSelfAccessAuthorized = false;
+        if (preparedCeoSelfAccessUrl !== null) {
+          // CEO is a campaign-participant designation, never a platform role.
+          // Lock its exact row before reading it: an isCEO revocation must queue
+          // behind this submit transaction instead of committing between our
+          // authorization decision and the capability-bearing outbox INSERT.
+          await tx.$executeRaw`SELECT id FROM assessment_campaign_participants WHERE campaign_id = ${locked.campaignId} AND respondent_id = ${locked.respondentId} FOR UPDATE`;
+          // This current locked read is the authorization decision for every
+          // capability-bearing email row and the response disclosure below.
+          const lockedParticipant = await tx.assessmentCampaignParticipant.findUnique({
+            where: {
+              campaignId_respondentId: {
+                campaignId: locked.campaignId,
+                respondentId: locked.respondentId,
+              },
+            },
+            select: { isCEO: true },
+          });
+          ceoSelfAccessAuthorized =
+            locked.campaign.template?.alias === SU_FULL_ALIAS &&
+            isReportComparisonEnabled({
+              organizationId: locked.campaign.organizationId,
+              templateId: locked.campaign.templateId,
+            }) &&
+            lockedParticipant?.isCEO === true &&
+            locked.campaign.accessMode === "INVITED" &&
+            (locked.campaign.showResultsOnScreen ||
+              locked.campaign.sendResultsToRespondent);
+        }
+
+        // One explicit ledger instant owns all intent lifecycle timestamps.
+        // Report/invitation submittedAt remains the earlier disclosure instant;
+        // intent retention is exactly 30 days from this persisted creation time.
         const intentCreatedAt = new Date();
 
         const submission = await tx.assessmentSubmission.create({
@@ -1059,6 +1163,12 @@ export async function POST(
         // decision snapshot without extending the row-lock duration.
         const phase2Fingerprint = emailRenderFingerprint(locked.campaign);
         const rowsToPersist = preparedRows.filter((row) => {
+          if (row.hasCeoSelfAccessUrl && !ceoSelfAccessAuthorized) {
+            console.warn(
+              `[assessment-submit] CEO self-access results row dropped — authorization changed under lock (campaignId=${locked.campaignId})`,
+            );
+            return false;
+          }
           if (
             row.emailType === "ASSESSMENT_RESULTS" &&
             phase2Fingerprint.results !== phase1Fingerprint.results
@@ -1205,6 +1315,7 @@ export async function POST(
           campaignId: locked.campaignId,
           createdIntentCount: intentMode ? rowsToPersist.length : 0,
           discloseOnScreen,
+          ceoSelfAccessAuthorized,
         };
       }).catch((error) => {
         if (!(error instanceof SubmissionTransactionAbort)) throw error;
@@ -1301,6 +1412,11 @@ export async function POST(
             reportStylesAvailable,
             reportFindingsAvailable,
             ...(onScreenReport ? { report: onScreenReport } : {}),
+            ...(result.discloseOnScreen &&
+            result.ceoSelfAccessAuthorized &&
+            preparedCeoSelfAccessUrl
+              ? { ceoSelfAccessUrl: preparedCeoSelfAccessUrl }
+              : {}),
           },
         },
         { status: 200, headers: NO_STORE_HEADERS }
