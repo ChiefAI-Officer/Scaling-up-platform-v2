@@ -90,6 +90,7 @@ function makeReportComparisonDbFixture(options: {
   canRead?: (campaignId: string) => boolean;
 } = {}): ReportComparisonDb & {
   limits: number[];
+  submissionQueries: Array<{ where: Record<string, unknown>; take?: number }>;
   transactions: number;
   rows: ReturnType<typeof row>[];
 } {
@@ -106,14 +107,17 @@ function makeReportComparisonDbFixture(options: {
     row({ id: "prior-imported", campaignId: "prior-imported-campaign", submittedAt: new Date("2025-01-01T00:00:00.000Z"), importManifest: { round: 1 } }),
   ];
   const limits: number[] = [];
+  const submissionQueries: Array<{ where: Record<string, unknown>; take?: number }> = [];
   type Fixture = ReportComparisonDb & {
     limits: number[];
+    submissionQueries: Array<{ where: Record<string, unknown>; take?: number }>;
     transactions: number;
     rows: ReturnType<typeof row>[];
   };
   const fixture = {} as Fixture;
   Object.assign(fixture, {
     limits,
+    submissionQueries,
     transactions: 0,
     rows,
     orgRespondent: {
@@ -127,9 +131,19 @@ function makeReportComparisonDbFixture(options: {
         const id = args.where.id;
         return [focusRow, ...rows].find((entry) => entry.id === id) ?? null;
       }),
-      findMany: jest.fn(async (args: { take?: number }) => {
+      findMany: jest.fn(async (args: { where: Record<string, unknown>; take?: number }) => {
+        submissionQueries.push(args);
         limits.push(args.take ?? -1);
-        return rows;
+        let selected = rows;
+        const submittedAt = args.where.submittedAt as { lt?: Date } | undefined;
+        if (submittedAt?.lt) {
+          selected = selected.filter((entry) => entry.submittedAt < submittedAt.lt!);
+        }
+        const campaignId = args.where.campaignId as { not?: string } | undefined;
+        if (campaignId?.not) {
+          selected = selected.filter((entry) => entry.campaignId !== campaignId.not);
+        }
+        return selected.slice(0, args.take);
       }),
     },
     $transaction: jest.fn(async <T>(callback: (tx: ReportComparisonDb) => Promise<T>): Promise<T> => {
@@ -220,6 +234,56 @@ describe("listReportComparisonCandidates", () => {
     }
   });
 
+  it("applies chronology and focus-campaign eligibility before the 200-row inspection cap", async () => {
+    const laterRows = Array.from({ length: 200 }, (_, index) => row({
+      id: `later-${index}`,
+      campaignId: `later-campaign-${index}`,
+      submittedAt: new Date("2026-02-01T00:00:00.000Z"),
+    }));
+    const db = makeReportComparisonDbFixture({
+      priorRows: [
+        ...laterRows,
+        row({ id: "eligible-prior", campaignId: "eligible-prior-campaign" }),
+      ],
+    });
+
+    await expect(listReportComparisonCandidates(db, operatorViewer, focus)).resolves.toMatchObject({
+      kind: "ok",
+      candidates: [{ submissionId: "eligible-prior" }],
+    });
+    expect(db.submissionQueries[0]?.where).toMatchObject({
+      submittedAt: { lt: new Date("2026-01-01T00:00:00.000Z") },
+      campaignId: { not: focus.campaignId },
+    });
+  });
+
+  it("denies operator candidate discovery before history reads when the focus campaign is unauthorized", async () => {
+    const db = makeReportComparisonDbFixture({
+      canRead: (campaignId) => campaignId !== focus.campaignId,
+    });
+
+    await expect(listReportComparisonCandidates(db, operatorViewer, focus)).resolves.toEqual({
+      kind: "unavailable",
+    });
+    expect(mockCanManageCampaign.mock.calls.map((call) => call[2])).toEqual([focus.campaignId]);
+    expect(db.submissionQueries).toHaveLength(0);
+  });
+
+  it("rejects a cross-tenant focus respondent before CEO same-person discovery", async () => {
+    const db = makeReportComparisonDbFixture({
+      priorRows: [row({ id: "prior-native", campaignId: "prior-native-campaign" })],
+    });
+    const focusRow = await db.assessmentSubmission.findFirst({ where: { id: focus.submissionId } });
+    if (!focusRow?.respondent) throw new Error("fixture focus respondent missing");
+    focusRow.respondent.organizationId = "other-org";
+
+    await expect(listReportComparisonCandidates(db, ceoViewer, focus)).resolves.toEqual({
+      kind: "not-applicable",
+    });
+    expect(db.submissionQueries).toHaveLength(0);
+    expect(mockCanManageCampaign).not.toHaveBeenCalled();
+  });
+
   it("checks every operator candidate independently and never gives the CEO an operator bypass", async () => {
     const db = makeReportComparisonDbFixture({ canRead: (campaignId) => campaignId !== "prior-imported-campaign" });
 
@@ -227,7 +291,7 @@ describe("listReportComparisonCandidates", () => {
       candidates: [{ submissionId: "prior-native" }],
     });
     expect(mockCanManageCampaign.mock.calls.map((call) => call[2])).toEqual([
-      "prior-native-campaign", "prior-imported-campaign",
+      "focus-campaign", "prior-native-campaign", "prior-imported-campaign",
     ]);
 
     mockCanManageCampaign.mockClear();

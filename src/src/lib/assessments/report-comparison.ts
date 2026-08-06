@@ -123,6 +123,7 @@ function isApplicableFocus(submission: ComparisonSubmission | null, focus: Repor
     submission.respondentId === focus.respondentId &&
     submission.respondent !== null &&
     submission.respondent.id === focus.respondentId &&
+    submission.respondent.organizationId === submission.campaign.organizationId &&
     submission.respondent.deletedAt === null &&
     submission.campaign.deletedAt === null &&
     submission.campaign.accessMode === "INVITED" &&
@@ -223,9 +224,14 @@ export async function listReportComparisonCandidates(
     if (!isApplicableFocus(focusSubmission, focus) || !ceoFocusMatches(viewer, focus)) {
       return { kind: "not-applicable" };
     }
+    if (!await operatorCanRead(db, viewer, focus.campaignId)) {
+      return { kind: "unavailable" };
+    }
     const ids = await identityIds(db, focusSubmission);
     const rows = await db.assessmentSubmission.findMany({
       where: {
+        campaignId: { not: focusSubmission.campaignId },
+        submittedAt: { lt: focusSubmission.submittedAt },
         respondentId: { in: ids },
         campaign: {
           organizationId: focusSubmission.campaign.organizationId,
