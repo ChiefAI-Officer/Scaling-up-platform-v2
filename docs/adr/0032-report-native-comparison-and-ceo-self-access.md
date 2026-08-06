@@ -11,7 +11,8 @@ status: accepted
 3. ADR-0016 remains in force except for exact-key/type/scale question deltas in
    this report-native surface.
 4. Aggregate deltas remain same-version-only.
-5. Operator and CEO-self viewer policies are separate.
+5. Operator and CEO-self viewer policies are separate. A CEO-self viewer is
+   identified by `AssessmentCampaignParticipant.isCEO`, never by `User.role`.
 6. CEO access is an expiring capability exchanged into an exact-path sealed
    cookie.
 7. The single-round group report and group-over-time comparison are outside
