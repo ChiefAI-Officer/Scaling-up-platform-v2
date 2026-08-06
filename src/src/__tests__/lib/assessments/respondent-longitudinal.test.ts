@@ -22,6 +22,10 @@ import {
   type LongitudinalSubmissionRow,
   type RespondentLongitudinalPoint,
 } from "@/lib/assessments/respondent-longitudinal";
+import {
+  collectRepoLocalModuleGraph,
+  findIndividualAppearanceModules,
+} from "@/__tests__/helpers/module-dependency-boundary";
 
 // ── Mock access-control: authz fully controllable; reportConfigFor is REAL ──
 const mockCanAccessOrganization = jest.fn<Promise<boolean>, unknown[]>();
@@ -899,26 +903,19 @@ test("single submission ⇒ ok with comparableCount 0 (need ≥2 to compare)", a
   expect(out.data.points[0].overall.tier).toBe("Good");
 });
 
-test("longitudinal and cohort-trend families never import or dispatch individual appearance renderers", async () => {
-  const fs = await import("node:fs");
-  const path = await import("node:path");
-  const excludedFamilyFiles = [
+test("individual appearance modules stay unreachable from longitudinal and cohort-trend dependency graphs", () => {
+  const entryPoints = [
     "src/lib/assessments/respondent-longitudinal.ts",
     "src/lib/assessments/respondent-longitudinal-metrics.ts",
-    "src/components/assessments/RespondentLongitudinalView.tsx",
     "src/app/(portal)/portal/assessments/respondents/[respondentId]/longitudinal/page.tsx",
+    "src/app/api/assessment-templates/[id]/longitudinal/route.ts",
     "src/lib/assessments/trends.ts",
-    "src/components/assessments/CampaignTrendsView.tsx",
     "src/app/(portal)/portal/assessments/trends/page.tsx",
   ];
 
-  for (const file of excludedFamilyFiles) {
-    const source = fs.readFileSync(path.join(process.cwd(), file), "utf8");
-    expect(source).not.toMatch(
-      /from\s+["'][^"']*(?:BrandedReport|report-styles|individual-report-presentation|wave-report-styles-flags)[^"']*["']/,
-    );
-    expect(source).not.toMatch(/\breportStylesAvailable\b|\breportStyle\b/);
-  }
+  const reachableModules = collectRepoLocalModuleGraph(entryPoints);
+
+  expect(findIndividualAppearanceModules(reachableModules)).toEqual([]);
 });
 
 // ─── No raw emails anywhere in returned data (R2-Med-6) ─────────────────────

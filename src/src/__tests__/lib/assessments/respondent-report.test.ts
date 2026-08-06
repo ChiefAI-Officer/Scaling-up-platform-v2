@@ -257,6 +257,29 @@ test("1. owning coach + submission → status:ok, all fields populated, provenan
   expect(report.degraded).toBe(false);
 });
 
+test("1b. gate false propagates exactly while preserving the frozen non-Classic appearance", async () => {
+  mockCanManageCampaign.mockResolvedValue(true);
+  mockReportStylesEnabled.mockReturnValue(false);
+  const { $transaction } = makeMockDb(GOOD_SUBMISSION);
+
+  const result = await getRespondentReport(
+    { $transaction } as unknown as Parameters<typeof getRespondentReport>[0],
+    makeActor(),
+    "camp-1",
+    "resp-1",
+  );
+
+  expect(result.status).toBe("ok");
+  if (result.status !== "ok") return;
+  expect(result.reportStylesAvailable).toBe(false);
+  expect(result.report.reportStyle).toBe("MODERN_DASHBOARD");
+  expect(mockReportStylesEnabled).toHaveBeenCalledTimes(1);
+  expect(mockReportStylesEnabled).toHaveBeenCalledWith({
+    templateId: "tpl-1",
+    campaignId: "camp-1",
+  });
+});
+
 test("2. ADMIN actor → status:ok (not blocked by canManageCampaign)", async () => {
   mockCanManageCampaign.mockResolvedValue(true);
   const { $transaction } = makeMockDb(GOOD_SUBMISSION);
@@ -297,6 +320,7 @@ test("3. canManageCampaign → false → status:forbidden", async () => {
   );
 
   expect(result.status).toBe("forbidden");
+  expect(mockReportStylesEnabled).not.toHaveBeenCalled();
 });
 
 test("4. no submission → status:not-found", async () => {
@@ -311,6 +335,7 @@ test("4. no submission → status:not-found", async () => {
   );
 
   expect(result.status).toBe("not-found");
+  expect(mockReportStylesEnabled).not.toHaveBeenCalled();
 });
 
 test("5. duplicate stableKey in version.questions → first-wins, no throw", async () => {

@@ -317,7 +317,7 @@ function makeReportDb(submission: typeof PUBLIC_SUBMISSION | null) {
 
 describe("getPublicReferralReport", () => {
   beforeEach(() => {
-    mockReportStylesEnabled.mockReturnValue(true);
+    mockReportStylesEnabled.mockClear().mockReturnValue(true);
   });
 
   it("returns the frozen public report to its immutable active Coach owner", async () => {
@@ -364,6 +364,27 @@ describe("getPublicReferralReport", () => {
     expect(db.$transaction).toHaveBeenCalledTimes(1);
   });
 
+  it("propagates gate false exactly while preserving the frozen non-Classic appearance", async () => {
+    mockReportStylesEnabled.mockReturnValue(false);
+    const db = makeReportDb(PUBLIC_SUBMISSION);
+
+    const outcome = await getPublicReferralReport(
+      db as never,
+      actor(),
+      "sub-1",
+    );
+
+    expect(outcome.status).toBe("ok");
+    if (outcome.status !== "ok") return;
+    expect(outcome.reportStylesAvailable).toBe(false);
+    expect(outcome.report.reportStyle).toBe("MODERN_DASHBOARD");
+    expect(mockReportStylesEnabled).toHaveBeenCalledTimes(1);
+    expect(mockReportStylesEnabled).toHaveBeenCalledWith({
+      templateId: "template-four-decisions",
+      campaignId: "campaign-public",
+    });
+  });
+
   it("forbids another Coach even when their email matches the delivery snapshot", async () => {
     const db = makeReportDb(PUBLIC_SUBMISSION);
 
@@ -381,6 +402,7 @@ describe("getPublicReferralReport", () => {
     expect(db.findFirst.mock.calls[0][0].select).not.toHaveProperty(
       "referringCoachEmail",
     );
+    expect(mockReportStylesEnabled).not.toHaveBeenCalled();
   });
 
   it("forbids the immutable owner when the current Coach is inactive", async () => {
@@ -395,6 +417,7 @@ describe("getPublicReferralReport", () => {
     await expect(
       getPublicReferralReport(db as never, actor(), "sub-1"),
     ).resolves.toEqual({ status: "forbidden" });
+    expect(mockReportStylesEnabled).not.toHaveBeenCalled();
   });
 
   it("forbids the immutable owner when certification has expired", async () => {
@@ -409,6 +432,7 @@ describe("getPublicReferralReport", () => {
     await expect(
       getPublicReferralReport(db as never, actor(), "sub-1"),
     ).resolves.toEqual({ status: "forbidden" });
+    expect(mockReportStylesEnabled).not.toHaveBeenCalled();
   });
 
   it.each(["ADMIN", "STAFF"] as const)(
@@ -465,6 +489,7 @@ describe("getPublicReferralReport", () => {
         },
       }),
     );
+    expect(mockReportStylesEnabled).not.toHaveBeenCalled();
   });
 });
 
