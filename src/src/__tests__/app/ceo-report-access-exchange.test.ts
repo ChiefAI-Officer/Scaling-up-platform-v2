@@ -18,7 +18,7 @@ const mockAuthorize = jest.fn();
 const mockSession = { save: jest.fn() };
 const mockGetSession = jest.fn();
 const mockAudit = jest.fn();
-const mockWithRateLimit = jest.fn();
+const mockWithRateLimitStrict = jest.fn();
 
 jest.mock("@/lib/assessments/ceo-report-access-token", () => ({
   verifyCeoReportAccessToken: (...args: unknown[]) => mockVerify(...args),
@@ -34,7 +34,7 @@ jest.mock("@/lib/audit", () => ({
 }));
 jest.mock("@/lib/rate-limit", () => ({
   RateLimits: { standard: { interval: 60_000, maxRequests: 100 } },
-  withRateLimit: (...args: unknown[]) => mockWithRateLimit(...args),
+  withRateLimitStrict: (...args: unknown[]) => mockWithRateLimitStrict(...args),
 }));
 jest.mock("@/lib/db", () => ({ db: { marker: "db" } }));
 
@@ -82,7 +82,7 @@ beforeEach(() => {
   mockGetSession.mockResolvedValue(mockSession);
   mockAudit.mockResolvedValue(undefined);
   mockSession.save.mockResolvedValue(undefined);
-  mockWithRateLimit.mockResolvedValue({
+  mockWithRateLimitStrict.mockResolvedValue({
     allowed: true,
     headers: {
       "X-RateLimit-Limit": "100",
@@ -98,17 +98,17 @@ describe("CEO report access exchange", () => {
 
     await POST(malformedRequest);
 
-    expect(mockWithRateLimit).toHaveBeenCalledWith(
+    expect(mockWithRateLimitStrict).toHaveBeenCalledWith(
       malformedRequest,
       { interval: 60_000, maxRequests: 100 },
     );
-    expect(mockWithRateLimit.mock.invocationCallOrder[0]).toBeLessThan(
+    expect(mockWithRateLimitStrict.mock.invocationCallOrder[0]).toBeLessThan(
       mockVerify.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
     );
   });
 
   it("returns the generic token-safe response without examining the capability when rate limited", async () => {
-    mockWithRateLimit.mockResolvedValue({
+    mockWithRateLimitStrict.mockResolvedValue({
       allowed: false,
       headers: {
         "X-RateLimit-Limit": "100",
@@ -127,7 +127,7 @@ describe("CEO report access exchange", () => {
   });
 
   it("fails closed with the generic response when the standard limiter is unavailable", async () => {
-    mockWithRateLimit.mockRejectedValue(new Error("limiter unavailable"));
+    mockWithRateLimitStrict.mockRejectedValue(new Error("limiter unavailable"));
 
     await expectUnavailable(await POST(request(JSON.stringify({ token: rawToken }))));
     expect(mockVerify).not.toHaveBeenCalled();

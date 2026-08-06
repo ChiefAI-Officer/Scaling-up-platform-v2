@@ -29,16 +29,24 @@ export function reportComparisonFixtureIdentity(env = process.env) {
  */
 export function buildReportComparisonFixturePlan(env = process.env) {
   const identity = reportComparisonFixtureIdentity(env);
+  const styles = [
+    ["CLASSIC", "Classic"],
+    ["EXECUTIVE_BOARDROOM", "Executive Boardroom"],
+    ["MODERN_DASHBOARD", "Modern Dashboard"],
+  ];
   return {
     ...identity,
     organizationExternalId: `${identity.key}:organization`,
     otherOrganizationExternalId: `${identity.key}:other-organization`,
+    submissionCampaignExternalId: `${identity.key}:CLASSIC:live-submit`,
     templateAlias: "scaling-up-full",
-    styles: [
-      ["CLASSIC", "Classic"],
-      ["EXECUTIVE_BOARDROOM", "Executive Boardroom"],
-      ["MODERN_DASHBOARD", "Modern Dashboard"],
-    ],
+    styles,
+    styleCeoEmails: Object.fromEntries(
+      styles.map(([style]) => [
+        style,
+        `report-comparison-${style.toLowerCase()}-ceo-${identity.key.slice(-16)}@fixture.invalid`,
+      ]),
+    ),
     roles: [
       "current-ceo",
       "prior-native-ceo",
@@ -55,6 +63,8 @@ export function buildReportComparisonFixturePlan(env = process.env) {
       "imported-prior",
       "pending-submit-ceo",
       "pending-submit-non-ceo",
+      "pending-submit-native-prior",
+      "pending-submit-imported-prior",
       "other-org",
     ],
     relationshipContract: {
@@ -62,6 +72,9 @@ export function buildReportComparisonFixturePlan(env = process.env) {
       otherOrganizationHasEligibleHistory: true,
       currentCeoDisclosureEnabled: true,
       actualSubmissionInvitationsStartPending: true,
+      actualSubmissionUsesSeparateFocusCampaign: true,
+      stylesUseDistinctSamePersonIdentities: true,
+      reusesNamespacedTemplateVersion: true,
     },
   };
 }
@@ -138,15 +151,10 @@ export async function provisionReportComparisonFixture({ env = process.env, crea
         tx.organization.create({ data: { externalId: plan.otherOrganizationExternalId, name: "Report comparison E2E other organization", ownerCoachId: coach.id } }),
       ]);
       const team = await tx.orgTeam.create({ data: { organizationId: organization.id, name: "Leadership" } });
-      const [current, nativePrior, importedPrior, nonCeo, pendingSubmitCeo, pendingSubmitNonCeo] = await Promise.all([
-        tx.orgRespondent.create({ data: { organizationId: organization.id, teamId: team.id, email: plan.ceoEmail, normalizedEmail: plan.ceoEmail, firstName: "Current", lastName: "CEO", dedupeSource: "external", dedupeValue: `${plan.key}:current`, externalId: `${plan.key}:current` } }),
-        tx.orgRespondent.create({ data: { organizationId: organization.id, teamId: team.id, email: plan.ceoEmail, normalizedEmail: plan.ceoEmail, firstName: "Native", lastName: "CEO", dedupeSource: "external", dedupeValue: `${plan.key}:native`, externalId: `${plan.key}:native` } }),
-        tx.orgRespondent.create({ data: { organizationId: organization.id, teamId: team.id, email: plan.ceoEmail, normalizedEmail: plan.ceoEmail, firstName: "Imported", lastName: "CEO", dedupeSource: "external", dedupeValue: `${plan.key}:imported`, externalId: `${plan.key}:imported` } }),
-        tx.orgRespondent.create({ data: { organizationId: organization.id, teamId: team.id, email: `non-ceo-${plan.ceoEmail}`, normalizedEmail: `non-ceo-${plan.ceoEmail}`, firstName: "Non", lastName: "CEO", dedupeSource: "external", dedupeValue: `${plan.key}:non-ceo`, externalId: `${plan.key}:non-ceo` } }),
+      const [pendingSubmitCeo, pendingSubmitNonCeo] = await Promise.all([
         tx.orgRespondent.create({ data: { organizationId: organization.id, teamId: team.id, email: plan.ceoEmail, normalizedEmail: plan.ceoEmail, firstName: "Pending", lastName: "CEO", dedupeSource: "external", dedupeValue: `${plan.key}:pending-submit-ceo`, externalId: `${plan.key}:pending-submit-ceo` } }),
         tx.orgRespondent.create({ data: { organizationId: organization.id, teamId: team.id, email: `pending-non-ceo-${plan.ceoEmail}`, normalizedEmail: `pending-non-ceo-${plan.ceoEmail}`, firstName: "Pending", lastName: "Participant", dedupeSource: "external", dedupeValue: `${plan.key}:pending-submit-non-ceo`, externalId: `${plan.key}:pending-submit-non-ceo` } }),
       ]);
-      const otherOrgSameEmail = await tx.orgRespondent.create({ data: { organizationId: otherOrganization.id, email: plan.ceoEmail, normalizedEmail: plan.ceoEmail, firstName: "Other", lastName: "Organization", dedupeSource: "external", dedupeValue: `${plan.key}:other`, externalId: `${plan.key}:other` } });
       const template = await tx.assessmentTemplate.upsert({
         where: { alias: plan.templateAlias },
         update: {},
@@ -156,7 +164,16 @@ export async function provisionReportComparisonFixture({ env = process.env, crea
         where: { templateId: template.id, language: "enUS" },
         _max: { versionNumber: true },
       });
-      const version = await tx.assessmentTemplateVersion.create({ data: {
+      const fixtureContentHash = createHash("sha256").update(plan.key).digest("hex");
+      const existingFixtureVersion = await tx.assessmentTemplateVersion.findFirst({
+        where: {
+          templateId: template.id,
+          language: "enUS",
+          contentHash: fixtureContentHash,
+        },
+        orderBy: { versionNumber: "desc" },
+      });
+      const version = existingFixtureVersion ?? await tx.assessmentTemplateVersion.create({ data: {
         templateId: template.id, versionNumber: Math.max(9000, (latestVersion._max.versionNumber ?? 0) + 1),
         language: "enUS", questions: [{ stableKey: "Q_E2E", label: "Fixture question", type: "SLIDER_LIKERT", sectionStableKey: "S_E2E", sortOrder: 1, isRequired: true, scale: { min: 0, max: 10, step: 1, anchorMin: "Not true", anchorMax: "Completely true" } }],
         sections: [{ stableKey: "S_E2E", name: "Fixture section", domain: "people", sortOrder: 1 }], scoringConfig: {
@@ -166,16 +183,24 @@ export async function provisionReportComparisonFixture({ env = process.env, crea
             { minMetric: 0, maxMetric: 5.99, label: "Priority", message: "Priority" },
             { minMetric: 6, label: "On track", message: "On track" },
           ],
-        }, contentHash: createHash("sha256").update(plan.key).digest("hex"), publishedAt: new Date(), publishedBy: admin.id,
+        }, contentHash: fixtureContentHash, publishedAt: new Date(), publishedBy: admin.id,
       } });
       const group = await tx.accessGroup.create({ data: { name: `${plan.key}:access`, createdBy: admin.id } });
       await tx.accessGroupTemplate.create({ data: { accessGroupId: group.id, templateId: template.id, addedBy: admin.id } });
       await tx.accessGroupCoach.create({ data: { accessGroupId: group.id, coachId: coach.id, addedBy: admin.id } });
       for (const [style, label] of plan.styles) {
-        const currentCampaign = await tx.assessmentCampaign.create({ data: { templateId: template.id, versionId: version.id, organizationId: organization.id, language: "enUS", alias: `${plan.key}:${style}:current`, externalId: `${plan.key}:${style}:current`, name: `${label} current`, status: "ACTIVE", accessMode: "INVITED", openAt: new Date("2026-01-01T00:00:00.000Z"), endMode: "OPEN_END", createdBy: admin.id, createdByCoachId: coach.id, reportStyle: style, reportStyleSource: "CAMPAIGN_OVERRIDE", showResultsOnScreen: true, sendResultsToRespondent: true } });
-        const nativeCampaign = await tx.assessmentCampaign.create({ data: { templateId: template.id, versionId: version.id, organizationId: organization.id, language: "enUS", alias: `${plan.key}:${style}:native`, externalId: `${plan.key}:${style}:native`, name: `${label} native baseline`, status: "CLOSED", accessMode: "INVITED", openAt: new Date("2025-01-01T00:00:00.000Z"), endMode: "OPEN_END", createdBy: admin.id, createdByCoachId: coach.id, reportStyle: style, reportStyleSource: "CAMPAIGN_OVERRIDE" } });
-        const importedCampaign = await tx.assessmentCampaign.create({ data: { templateId: template.id, versionId: version.id, organizationId: organization.id, language: "enUS", alias: `${plan.key}:${style}:imported`, externalId: `${plan.key}:${style}:imported`, name: `${label} imported baseline`, status: "CLOSED", accessMode: "INVITED", openAt: new Date("2024-01-01T00:00:00.000Z"), endMode: "OPEN_END", createdBy: admin.id, createdByCoachId: coach.id, reportStyle: style, reportStyleSource: "CAMPAIGN_OVERRIDE", importManifest: { fixture: true } } });
-        const otherOrgCampaign = await tx.assessmentCampaign.create({ data: { templateId: template.id, versionId: version.id, organizationId: otherOrganization.id, language: "enUS", alias: `${plan.key}:${style}:other-org`, externalId: `${plan.key}:${style}:other-org`, name: `${label} other organization baseline`, status: "CLOSED", accessMode: "INVITED", openAt: new Date("2025-06-01T00:00:00.000Z"), endMode: "OPEN_END", createdBy: admin.id, createdByCoachId: coach.id, reportStyle: style, reportStyleSource: "CAMPAIGN_OVERRIDE" } });
+        const styleCeoEmail = plan.styleCeoEmails[style];
+        const [current, nativePrior, importedPrior, nonCeo, otherOrgSameEmail] = await Promise.all([
+          tx.orgRespondent.create({ data: { organizationId: organization.id, teamId: team.id, email: styleCeoEmail, normalizedEmail: styleCeoEmail, firstName: label, lastName: "Current CEO", dedupeSource: "external", dedupeValue: `${plan.key}:${style}:current`, externalId: `${plan.key}:${style}:current` } }),
+          tx.orgRespondent.create({ data: { organizationId: organization.id, teamId: team.id, email: styleCeoEmail, normalizedEmail: styleCeoEmail, firstName: label, lastName: "Native CEO", dedupeSource: "external", dedupeValue: `${plan.key}:${style}:native`, externalId: `${plan.key}:${style}:native` } }),
+          tx.orgRespondent.create({ data: { organizationId: organization.id, teamId: team.id, email: styleCeoEmail, normalizedEmail: styleCeoEmail, firstName: label, lastName: "Imported CEO", dedupeSource: "external", dedupeValue: `${plan.key}:${style}:imported`, externalId: `${plan.key}:${style}:imported` } }),
+          tx.orgRespondent.create({ data: { organizationId: organization.id, teamId: team.id, email: `non-ceo-${styleCeoEmail}`, normalizedEmail: `non-ceo-${styleCeoEmail}`, firstName: label, lastName: "Non CEO", dedupeSource: "external", dedupeValue: `${plan.key}:${style}:non-ceo`, externalId: `${plan.key}:${style}:non-ceo` } }),
+          tx.orgRespondent.create({ data: { organizationId: otherOrganization.id, email: styleCeoEmail, normalizedEmail: styleCeoEmail, firstName: label, lastName: "Other Organization", dedupeSource: "external", dedupeValue: `${plan.key}:${style}:other`, externalId: `${plan.key}:${style}:other` } }),
+        ]);
+        const currentCampaign = await tx.assessmentCampaign.create({ data: { templateId: template.id, versionId: version.id, organizationId: organization.id, language: "enUS", alias: `${plan.key}:${style}:current`, externalId: `${plan.key}:${style}:current`, name: `${label} current`, status: "CLOSED", accessMode: "INVITED", openAt: new Date("2026-01-01T00:00:00.000Z"), endMode: "OPEN_END", createdBy: admin.id, createdByCoachId: coach.id, reportStyle: style, reportStyleSource: "CAMPAIGN_OVERRIDE", reportStyleLockedAt: new Date("2026-02-01T00:00:00.000Z"), showResultsOnScreen: true, sendResultsToRespondent: true } });
+        const nativeCampaign = await tx.assessmentCampaign.create({ data: { templateId: template.id, versionId: version.id, organizationId: organization.id, language: "enUS", alias: `${plan.key}:${style}:native`, externalId: `${plan.key}:${style}:native`, name: `${label} native baseline`, status: "CLOSED", accessMode: "INVITED", openAt: new Date("2025-01-01T00:00:00.000Z"), endMode: "OPEN_END", createdBy: admin.id, createdByCoachId: coach.id, reportStyle: style, reportStyleSource: "CAMPAIGN_OVERRIDE", reportStyleLockedAt: new Date("2025-02-01T00:00:00.000Z") } });
+        const importedCampaign = await tx.assessmentCampaign.create({ data: { templateId: template.id, versionId: version.id, organizationId: organization.id, language: "enUS", alias: `${plan.key}:${style}:imported`, externalId: `${plan.key}:${style}:imported`, name: `${label} imported baseline`, status: "CLOSED", accessMode: "INVITED", openAt: new Date("2024-01-01T00:00:00.000Z"), endMode: "OPEN_END", createdBy: admin.id, createdByCoachId: coach.id, reportStyle: style, reportStyleSource: "CAMPAIGN_OVERRIDE", reportStyleLockedAt: new Date("2024-02-01T00:00:00.000Z"), importManifest: { fixture: true } } });
+        const otherOrgCampaign = await tx.assessmentCampaign.create({ data: { templateId: template.id, versionId: version.id, organizationId: otherOrganization.id, language: "enUS", alias: `${plan.key}:${style}:other-org`, externalId: `${plan.key}:${style}:other-org`, name: `${label} other organization baseline`, status: "CLOSED", accessMode: "INVITED", openAt: new Date("2025-06-01T00:00:00.000Z"), endMode: "OPEN_END", createdBy: admin.id, createdByCoachId: coach.id, reportStyle: style, reportStyleSource: "CAMPAIGN_OVERRIDE", reportStyleLockedAt: new Date("2025-06-01T00:00:00.000Z") } });
         await tx.assessmentCampaignParticipant.createMany({ data: [
           { campaignId: currentCampaign.id, respondentId: current.id, isCEO: true, teamPathAtAdd: [team.id], teamLabelsAtAdd: [team.name] },
           { campaignId: currentCampaign.id, respondentId: nonCeo.id, isCEO: false, teamPathAtAdd: [team.id], teamLabelsAtAdd: [team.name] },
@@ -198,13 +223,95 @@ export async function provisionReportComparisonFixture({ env = process.env, crea
           { campaignId: otherOrgCampaign.id, respondentId: otherOrgSameEmail.id, invitationId: otherOrgInvitation.id, submittedAt: new Date("2025-06-01T00:00:00.000Z"), answers: [], result: result(75) },
         ] });
         if (style === "CLASSIC") {
+          const liveSubmitCampaign = await tx.assessmentCampaign.create({ data: {
+            templateId: template.id,
+            versionId: version.id,
+            organizationId: organization.id,
+            language: "enUS",
+            alias: plan.submissionCampaignExternalId,
+            externalId: plan.submissionCampaignExternalId,
+            name: "Classic live submission focus",
+            status: "ACTIVE",
+            accessMode: "INVITED",
+            openAt: new Date("2026-07-01T00:00:00.000Z"),
+            endMode: "OPEN_END",
+            createdBy: admin.id,
+            createdByCoachId: coach.id,
+            reportStyle: style,
+            reportStyleSource: "CAMPAIGN_OVERRIDE",
+            showResultsOnScreen: true,
+            sendResultsToRespondent: true,
+          } });
+          const liveNativeCampaign = await tx.assessmentCampaign.create({ data: {
+            templateId: template.id,
+            versionId: version.id,
+            organizationId: organization.id,
+            language: "enUS",
+            alias: `${plan.key}:CLASSIC:live-native`,
+            externalId: `${plan.key}:CLASSIC:live-native`,
+            name: "Classic live-submission native baseline",
+            status: "CLOSED",
+            accessMode: "INVITED",
+            openAt: new Date("2025-03-01T00:00:00.000Z"),
+            endMode: "OPEN_END",
+            createdBy: admin.id,
+            createdByCoachId: coach.id,
+            reportStyle: style,
+            reportStyleSource: "CAMPAIGN_OVERRIDE",
+            reportStyleLockedAt: new Date("2025-04-01T00:00:00.000Z"),
+          } });
+          const liveImportedCampaign = await tx.assessmentCampaign.create({ data: {
+            templateId: template.id,
+            versionId: version.id,
+            organizationId: organization.id,
+            language: "enUS",
+            alias: `${plan.key}:CLASSIC:live-imported`,
+            externalId: `${plan.key}:CLASSIC:live-imported`,
+            name: "Classic live-submission imported baseline",
+            status: "CLOSED",
+            accessMode: "INVITED",
+            openAt: new Date("2024-03-01T00:00:00.000Z"),
+            endMode: "OPEN_END",
+            createdBy: admin.id,
+            createdByCoachId: coach.id,
+            reportStyle: style,
+            reportStyleSource: "CAMPAIGN_OVERRIDE",
+            reportStyleLockedAt: new Date("2024-04-01T00:00:00.000Z"),
+            importManifest: { fixture: true, purpose: "live-submit-baseline" },
+          } });
           await tx.assessmentCampaignParticipant.createMany({ data: [
-            { campaignId: currentCampaign.id, respondentId: pendingSubmitCeo.id, isCEO: true, teamPathAtAdd: [team.id], teamLabelsAtAdd: [team.name] },
-            { campaignId: currentCampaign.id, respondentId: pendingSubmitNonCeo.id, isCEO: false, teamPathAtAdd: [team.id], teamLabelsAtAdd: [team.name] },
+            { campaignId: liveSubmitCampaign.id, respondentId: pendingSubmitCeo.id, isCEO: true, teamPathAtAdd: [team.id], teamLabelsAtAdd: [team.name] },
+            { campaignId: liveSubmitCampaign.id, respondentId: pendingSubmitNonCeo.id, isCEO: false, teamPathAtAdd: [team.id], teamLabelsAtAdd: [team.name] },
+            { campaignId: liveNativeCampaign.id, respondentId: pendingSubmitCeo.id, isCEO: true, teamPathAtAdd: [team.id], teamLabelsAtAdd: [team.name] },
+            { campaignId: liveImportedCampaign.id, respondentId: pendingSubmitCeo.id, isCEO: true, teamPathAtAdd: [team.id], teamLabelsAtAdd: [team.name] },
+          ] });
+          const [liveNativeInvitation, liveImportedInvitation] = await Promise.all([
+            tx.assessmentInvitation.create({ data: {
+              campaignId: liveNativeCampaign.id,
+              respondentId: pendingSubmitCeo.id,
+              tokenHash: tokenHash(reportComparisonInvitationToken(plan, style, "pending-submit-native-prior")),
+              status: "SUBMITTED",
+              sentAt: new Date("2025-03-02T00:00:00.000Z"),
+              submittedAt: new Date("2025-04-01T00:00:00.000Z"),
+              expiresAt,
+            } }),
+            tx.assessmentInvitation.create({ data: {
+              campaignId: liveImportedCampaign.id,
+              respondentId: pendingSubmitCeo.id,
+              tokenHash: tokenHash(reportComparisonInvitationToken(plan, style, "pending-submit-imported-prior")),
+              status: "SUBMITTED",
+              sentAt: new Date("2024-03-02T00:00:00.000Z"),
+              submittedAt: new Date("2024-04-01T00:00:00.000Z"),
+              expiresAt,
+            } }),
+          ]);
+          await tx.assessmentSubmission.createMany({ data: [
+            { campaignId: liveNativeCampaign.id, respondentId: pendingSubmitCeo.id, invitationId: liveNativeInvitation.id, submittedAt: new Date("2025-04-01T00:00:00.000Z"), answers: [], result: result(70) },
+            { campaignId: liveImportedCampaign.id, respondentId: pendingSubmitCeo.id, invitationId: liveImportedInvitation.id, submittedAt: new Date("2024-04-01T00:00:00.000Z"), answers: [], result: result(60) },
           ] });
           await Promise.all([
             tx.assessmentInvitation.create({ data: {
-              campaignId: currentCampaign.id,
+              campaignId: liveSubmitCampaign.id,
               respondentId: pendingSubmitCeo.id,
               tokenHash: tokenHash(reportComparisonInvitationToken(plan, style, "pending-submit-ceo")),
               status: "SENT",
@@ -212,7 +319,7 @@ export async function provisionReportComparisonFixture({ env = process.env, crea
               expiresAt,
             } }),
             tx.assessmentInvitation.create({ data: {
-              campaignId: currentCampaign.id,
+              campaignId: liveSubmitCampaign.id,
               respondentId: pendingSubmitNonCeo.id,
               tokenHash: tokenHash(reportComparisonInvitationToken(plan, style, "pending-submit-non-ceo")),
               status: "SENT",

@@ -3,6 +3,7 @@ import { PrismaClient } from "@prisma/client";
 import { loginAs } from "./helpers/auth";
 import { runWithReportComparisonCleanup } from "./helpers/report-comparison-cleanup";
 import {
+  buildReportComparisonFixturePlan,
   REPORT_COMPARISON_FIXTURE_PASSWORD,
   reportComparisonFixtureIdentity,
   reportComparisonInvitationToken,
@@ -31,6 +32,8 @@ type FixtureStyle = {
   importedSubmissionId: string;
   nativeCampaignName: string;
   importedCampaignName: string;
+  otherOrganizationCampaignId: string;
+  otherOrganizationRespondentId: string;
   otherOrganizationSubmissionId: string;
   expectedCoverage: string;
 };
@@ -127,7 +130,7 @@ test.describe("Report comparison — sentinel-provisioned acceptance", () => {
       datasourceUrl: process.env.DATABASE_URL,
       log: [],
     });
-    const fixture = reportComparisonFixtureIdentity();
+    const fixture = buildReportComparisonFixturePlan();
     const sentinel = await fixtureDatabase.organization.findUnique({
       where: { id: process.env.E2E_REPORT_COMPARISON_DISPOSABLE_SENTINEL_ID },
       select: { name: true, deletedAt: true },
@@ -185,6 +188,7 @@ test.describe("Report comparison — sentinel-provisioned acceptance", () => {
           !otherOrganization ||
           !ceo ||
           !nonCeo ||
+          !campaign.reportStyleLockedAt ||
           native.importManifest !== null ||
           imported.importManifest === null
         ) {
@@ -201,12 +205,15 @@ test.describe("Report comparison — sentinel-provisioned acceptance", () => {
         const nativeSubmission = native.submissions[0];
         const importedSubmission = imported.submissions[0];
         const otherOrganizationSubmission = otherOrganization.submissions[0];
+        const otherOrganizationRespondent =
+          otherOrganization.participants.find((participant) => participant.isCEO);
         if (
           !currentSubmission?.invitationId ||
           !nonCeoSubmission?.invitationId ||
           !nativeSubmission?.invitationId ||
           !importedSubmission?.invitationId ||
-          !otherOrganizationSubmission?.invitationId
+          !otherOrganizationSubmission?.invitationId ||
+          !otherOrganizationRespondent
         ) {
           throw new Error(
             "Provisioned invited submissions must be bound to invitations.",
@@ -229,6 +236,8 @@ test.describe("Report comparison — sentinel-provisioned acceptance", () => {
           importedSubmissionId: importedSubmission.id,
           nativeCampaignName: native.name,
           importedCampaignName: imported.name,
+          otherOrganizationCampaignId: otherOrganization.id,
+          otherOrganizationRespondentId: otherOrganizationRespondent.respondentId,
           otherOrganizationSubmissionId: otherOrganizationSubmission.id,
           expectedCoverage: `${Math.min(currentQuestions, baselineQuestions)} of ${currentQuestions} current question${currentQuestions === 1 ? "" : "s"} matched the earlier version.`,
         };
@@ -237,6 +246,29 @@ test.describe("Report comparison — sentinel-provisioned acceptance", () => {
 
     const classic = styles.find((style) => style.style === "CLASSIC");
     if (!classic) throw new Error("Classic submission fixture is missing.");
+    const submissionCampaign = campaigns.find(
+      (campaign) =>
+        campaign.externalId === fixture.submissionCampaignExternalId,
+    );
+    const liveNativeCampaign = campaigns.find(
+      (campaign) =>
+        campaign.externalId === `${fixture.key}:CLASSIC:live-native`,
+    );
+    const liveImportedCampaign = campaigns.find(
+      (campaign) =>
+        campaign.externalId === `${fixture.key}:CLASSIC:live-imported`,
+    );
+    if (
+      !submissionCampaign ||
+      submissionCampaign.status !== "ACTIVE" ||
+      submissionCampaign.submissions.length !== 0 ||
+      !liveNativeCampaign?.submissions[0]?.invitationId ||
+      !liveImportedCampaign?.submissions[0]?.invitationId
+    ) {
+      throw new Error(
+        "Separate live-submission focus and baseline campaigns are incomplete.",
+      );
+    }
     const [pendingCeo, pendingNonCeo] = await Promise.all([
       fixtureDatabase.orgRespondent.findFirst({
         where: {
@@ -264,7 +296,7 @@ test.describe("Report comparison — sentinel-provisioned acceptance", () => {
       fixtureDatabase.assessmentInvitation.findUnique({
         where: {
           campaignId_respondentId: {
-            campaignId: classic.currentCampaignId,
+            campaignId: submissionCampaign.id,
             respondentId: pendingCeo.id,
           },
         },
@@ -273,7 +305,7 @@ test.describe("Report comparison — sentinel-provisioned acceptance", () => {
       fixtureDatabase.assessmentInvitation.findUnique({
         where: {
           campaignId_respondentId: {
-            campaignId: classic.currentCampaignId,
+            campaignId: submissionCampaign.id,
             respondentId: pendingNonCeo.id,
           },
         },
@@ -293,11 +325,17 @@ test.describe("Report comparison — sentinel-provisioned acceptance", () => {
       );
     }
     submissionFixture = {
-      style: classic,
+      style: {
+        ...classic,
+        currentCampaignId: submissionCampaign.id,
+        currentCampaignAlias: submissionCampaign.alias,
+        currentRespondentId: pendingCeo.id,
+        currentSubmissionId: "",
+      },
       ceoRespondentId: pendingCeo.id,
       ceoInvitationId: ceoInvitation.id,
       ceoRawInvitationToken: reportComparisonInvitationToken(
-        fixture,
+          fixture,
         "CLASSIC",
         "pending-submit-ceo",
       ),
@@ -313,8 +351,8 @@ test.describe("Report comparison — sentinel-provisioned acceptance", () => {
     const sameEmailOtherOrganization =
       await fixtureDatabase.orgRespondent.findFirst({
         where: {
-          externalId: `${fixture.key}:other`,
-          normalizedEmail: fixture.ceoEmail,
+          externalId: `${fixture.key}:CLASSIC:other`,
+          normalizedEmail: fixture.styleCeoEmails.CLASSIC,
         },
         select: { organizationId: true },
       });
@@ -477,7 +515,11 @@ test.describe("Report comparison — sentinel-provisioned acceptance", () => {
     const [campaign, participant] = await Promise.all([
       database.assessmentCampaign.findUniqueOrThrow({
         where: { id: fixture.style.currentCampaignId },
-        select: { showResultsOnScreen: true, sendResultsToRespondent: true },
+        select: {
+          showResultsOnScreen: true,
+          sendResultsToRespondent: true,
+          reportStyleLockedAt: true,
+        },
       }),
       database.assessmentCampaignParticipant.findUniqueOrThrow({
         where: {
@@ -551,6 +593,8 @@ test.describe("Report comparison — sentinel-provisioned acceptance", () => {
             fixture.style,
             `${fixture.ceoRespondentId}-altered`,
           ),
+          `/assessments/${fixture.style.otherOrganizationCampaignId}` +
+            `/respondents/${fixture.style.otherOrganizationRespondentId}/report`,
         ]) {
           await expectDenied(ceoPage, denied);
         }
@@ -602,6 +646,7 @@ test.describe("Report comparison — sentinel-provisioned acceptance", () => {
               data: {
                 showResultsOnScreen: campaign.showResultsOnScreen,
                 sendResultsToRespondent: campaign.sendResultsToRespondent,
+                reportStyleLockedAt: campaign.reportStyleLockedAt,
               },
             });
           },

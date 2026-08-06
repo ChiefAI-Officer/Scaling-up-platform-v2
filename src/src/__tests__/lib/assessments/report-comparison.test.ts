@@ -88,6 +88,12 @@ function row(options: RowOptions = {}) {
 function makeReportComparisonDbFixture(options: {
   focus?: ReportComparisonFocus;
   normalizedEmail?: string | null;
+  identityRows?: Array<{
+    id: string;
+    organizationId: string;
+    normalizedEmail: string;
+    deletedAt: Date | null;
+  }>;
   priorRows?: ReturnType<typeof row>[];
   canRead?: (campaignId: string) => boolean;
 } = {}): ReportComparisonDb & {
@@ -216,7 +222,8 @@ function makeReportComparisonDbFixture(options: {
     orgRespondent: {
       findMany: jest.fn(async (args: { take?: number }) => {
         limits.push(args.take ?? -1);
-        return [focusRow.respondent, ...rows.map((entry) => entry.respondent)];
+        return options.identityRows ??
+          [focusRow.respondent, ...rows.map((entry) => entry.respondent)];
       }),
     },
     assessmentSubmission: {
@@ -346,6 +353,23 @@ describe("listReportComparisonCandidates", () => {
     ).resolves.toMatchObject({
       kind: "ok",
       candidates: [expect.objectContaining({ campaignId: "one-prior-campaign" })],
+      bounded: true,
+    });
+  });
+
+  it("marks the result bounded when the 50-identity lookup cap is saturated", async () => {
+    const identityRows = Array.from({ length: 50 }, (_, index) => ({
+      id: index === 0 ? focus.respondentId : `same-email-${index}`,
+      organizationId: "org-1",
+      normalizedEmail: "ceo@example.com",
+      deletedAt: null,
+    }));
+    const db = makeReportComparisonDbFixture({ identityRows });
+
+    await expect(
+      listReportComparisonCandidates(db, operatorViewer, focus),
+    ).resolves.toMatchObject({
+      kind: "ok",
       bounded: true,
     });
   });

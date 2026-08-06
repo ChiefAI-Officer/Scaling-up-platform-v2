@@ -17,7 +17,7 @@ jest.mock("ioredis", () => {
   };
 });
 
-import { checkRateLimitStrict } from "@/lib/rate-limit";
+import { checkRateLimitStrict, withRateLimitStrict } from "@/lib/rate-limit";
 
 const config = { interval: 60_000, maxRequests: 10 };
 const successfulPipeline = (count: number) => [
@@ -81,4 +81,15 @@ it("propagates command errors returned by the Redis pipeline", async () => {
   await expect(
     checkRateLimitStrict("referred-results-export:coach-1", config),
   ).rejects.toThrow("zadd failed");
+});
+
+it("keeps the request wrapper fail-closed when the distributed backend fails", async () => {
+  mockExec.mockRejectedValue(new Error("redis unavailable"));
+  const request = new Request("https://platform.example/sensitive", {
+    headers: { "x-forwarded-for": "203.0.113.7" },
+  });
+
+  await expect(withRateLimitStrict(request, config)).rejects.toThrow(
+    "redis unavailable",
+  );
 });

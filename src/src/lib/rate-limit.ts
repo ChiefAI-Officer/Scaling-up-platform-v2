@@ -303,3 +303,24 @@ export async function withRateLimit(
     headers,
   };
 }
+
+/**
+ * Request-shaped wrapper for sensitive capability endpoints. Unlike
+ * `withRateLimit`, distributed-backend failures propagate so callers can fail
+ * closed before parsing or examining bearer material.
+ */
+export async function withRateLimitStrict(
+  request: Request,
+  config: RateLimitConfig = RateLimits.standard,
+): Promise<{ allowed: boolean; headers: Record<string, string> }> {
+  const result = await checkRateLimitStrict(getClientIdentifier(request), config);
+  const headers: Record<string, string> = {
+    "X-RateLimit-Limit": config.maxRequests.toString(),
+    "X-RateLimit-Remaining": result.remaining.toString(),
+    "X-RateLimit-Reset": result.resetAt.toString(),
+  };
+  if (!result.success && result.retryAfter) {
+    headers["Retry-After"] = result.retryAfter.toString();
+  }
+  return { allowed: result.success, headers };
+}

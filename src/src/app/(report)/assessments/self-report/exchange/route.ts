@@ -8,7 +8,7 @@ import {
   type CeoReportSessionPayload,
 } from "@/lib/assessments/ceo-report-access-cookie";
 import { verifyCeoReportAccessToken } from "@/lib/assessments/ceo-report-access-token";
-import { RateLimits, withRateLimit } from "@/lib/rate-limit";
+import { RateLimits, withRateLimitStrict } from "@/lib/rate-limit";
 
 const exchangeRequest = z.object({ token: z.string().min(1).max(4096) });
 
@@ -33,9 +33,9 @@ function reportHref(payload: CeoReportSessionPayload): string {
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
-  let rateLimit: Awaited<ReturnType<typeof withRateLimit>>;
+  let rateLimit: Awaited<ReturnType<typeof withRateLimitStrict>>;
   try {
-    rateLimit = await withRateLimit(request, RateLimits.standard);
+    rateLimit = await withRateLimitStrict(request, RateLimits.standard);
   } catch {
     return unavailable();
   }

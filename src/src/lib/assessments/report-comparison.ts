@@ -166,11 +166,14 @@ async function loadFocus(db: ReportComparisonDb, focus: ReportComparisonFocus): 
   });
 }
 
-async function identityIds(db: ReportComparisonDb, focus: ComparisonSubmission): Promise<string[]> {
+async function identityIds(
+  db: ReportComparisonDb,
+  focus: ComparisonSubmission,
+): Promise<{ ids: string[]; bounded: boolean }> {
   const respondent = focus.respondent;
-  if (!respondent) return [];
+  if (!respondent) return { ids: [], bounded: false };
   const normalizedEmail = respondent.normalizedEmail?.trim();
-  if (!normalizedEmail) return [respondent.id];
+  if (!normalizedEmail) return { ids: [respondent.id], bounded: false };
 
   const rows = await db.orgRespondent.findMany({
     where: {
@@ -190,7 +193,12 @@ async function identityIds(db: ReportComparisonDb, focus: ComparisonSubmission):
   // The query is bounded at 50, but retain the exact focus identity even if a
   // broad same-email set causes the database ordering to omit it.
   const others = [...ids].filter((id) => id !== respondent.id).sort();
-  return [respondent.id, ...others].slice(0, MAX_REPORT_COMPARISON_IDENTITIES).sort();
+  return {
+    ids: [respondent.id, ...others]
+      .slice(0, MAX_REPORT_COMPARISON_IDENTITIES)
+      .sort(),
+    bounded: rows.length >= MAX_REPORT_COMPARISON_IDENTITIES,
+  };
 }
 
 function candidateFor(submission: ComparisonSubmission): ReportComparisonCandidate {
@@ -241,7 +249,8 @@ export async function listReportComparisonCandidates(
     if (!await operatorCanRead(db, viewer, focus.campaignId)) {
       return { kind: "unavailable" };
     }
-    const ids = await identityIds(db, focusSubmission);
+    const identity = await identityIds(db, focusSubmission);
+    const ids = identity.ids;
     const rows = await db.assessmentSubmission.findMany({
       where: {
         campaignId: { not: focusSubmission.campaignId },
@@ -274,6 +283,7 @@ export async function listReportComparisonCandidates(
       if (await operatorCanRead(db, viewer, row.campaignId)) authorized.push(row);
     }
     const bounded =
+      identity.bounded ||
       rows.length >= MAX_REPORT_COMPARISON_INSPECTED ||
       authorized.length > MAX_REPORT_COMPARISON_CANDIDATES;
     const candidates = authorized.slice(0, MAX_REPORT_COMPARISON_CANDIDATES).map(candidateFor);
@@ -341,7 +351,7 @@ export async function loadReportComparison(
         ]);
         if (!focusAllowed || !baselineAllowed) return { kind: "invalid" } as const;
       }
-      const ids = new Set(await identityIds(tx, focusSubmission));
+      const ids = new Set((await identityIds(tx, focusSubmission)).ids);
       if (!isEarlierSamePerson(baseline, focusSubmission, ids)) return { kind: "invalid" } as const;
       return { kind: "ok", model: buildReportComparisonModel({ focus: snapshot(focusSubmission), baseline: snapshot(baseline) }) } as const;
     }, { isolationLevel: "Serializable" });

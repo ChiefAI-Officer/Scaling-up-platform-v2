@@ -20,6 +20,8 @@ function plan() {
     adminEmail: string;
     coachEmail: string;
     ceoEmail: string;
+    styleCeoEmails: Record<string, string>;
+    submissionCampaignExternalId: string;
     templateAlias: string;
     styles: Array<[string, string]>;
     roles: string[];
@@ -39,6 +41,11 @@ describe("report-comparison fixture provisioner contract", () => {
     expect(fixture.adminEmail).toMatch(/@fixture\.invalid$/);
     expect(fixture.coachEmail).toMatch(/@fixture\.invalid$/);
     expect(fixture.ceoEmail).toMatch(/@fixture\.invalid$/);
+    expect(new Set(Object.values(fixture.styleCeoEmails))).toHaveProperty("size", 3);
+    expect(Object.values(fixture.styleCeoEmails)).not.toContain(fixture.ceoEmail);
+    expect(fixture.submissionCampaignExternalId).toBe(
+      `${fixture.key}:CLASSIC:live-submit`,
+    );
     expect(fixture.styles).toEqual([
       ["CLASSIC", "Classic"],
       ["EXECUTIVE_BOARDROOM", "Executive Boardroom"],
@@ -57,6 +64,9 @@ describe("report-comparison fixture provisioner contract", () => {
       otherOrganizationHasEligibleHistory: true,
       currentCeoDisclosureEnabled: true,
       actualSubmissionInvitationsStartPending: true,
+      actualSubmissionUsesSeparateFocusCampaign: true,
+      stylesUseDistinctSamePersonIdentities: true,
+      reusesNamespacedTemplateVersion: true,
     });
   });
 
@@ -91,5 +101,18 @@ describe("report-comparison fixture provisioner contract", () => {
     expect(source).toContain('showResultsOnScreen: false');
     expect(source).toContain('data: { isCEO: false }');
     expect(source).toContain('status: "SENT"');
+    expect(source).toContain("otherOrganizationCampaignId");
+    expect(source).toContain("reportStyleLockedAt");
+    expect(source).toContain("submissionCampaignExternalId");
+  });
+
+  it("reuses its deterministic published fixture version on reprovision", () => {
+    const source = readFileSync(
+      join(process.cwd(), "scripts/provision-report-comparison-e2e.mjs"),
+      "utf8",
+    );
+
+    expect(source).toContain("existingFixtureVersion");
+    expect(source).toContain("fixtureContentHash");
   });
 });
