@@ -19,6 +19,7 @@ import {
 import { ReportStylePicker } from "@/components/assessments/ReportStylePicker";
 import {
   REPORT_STYLE_REGISTRY,
+  resolveReportStylePreviewAnatomy,
   type ReportStyleKey,
 } from "@/lib/assessments/report-style-registry";
 
@@ -512,6 +513,9 @@ export function PublicCampaignsManager() {
                                   : "Template default"
                               }
                               lockedAt={c.reportStyleLockedAt}
+                              previewAnatomy={resolveReportStylePreviewAnatomy({
+                                templateAlias: c.template?.alias,
+                              })}
                             />
                           ) : (
                             <div className="rounded-lg border border-slate-300 bg-white p-4">
@@ -772,6 +776,9 @@ export function PublicCampaignsManager() {
                 <ReportStylePicker
                   value={reportStyle}
                   compact
+                  previewAnatomy={resolveReportStylePreviewAnatomy({
+                    templateAlias: selectedTemplate.alias,
+                  })}
                   onChange={(value) => {
                     setReportStyle(value);
                     setReportStyleIntent("EXPLICIT");

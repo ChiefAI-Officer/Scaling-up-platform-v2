@@ -61,6 +61,7 @@ import type { MemberCreatedResult } from "@/components/organizations/add-member-
 import { ReportStylePicker } from "@/components/assessments/ReportStylePicker";
 import {
   isReportStyleKey,
+  resolveReportStylePreviewAnatomy,
   type ReportStyleKey,
 } from "@/lib/assessments/report-style-registry";
 
@@ -1038,6 +1039,7 @@ export function CampaignWizard({
             endMode={state.endMode}
             closeAt={state.closeAt}
             templateName={state.templateName}
+            templateAlias={state.templateAlias}
             resultsEmailApproved={state.templateResultsEmailApproved}
             sendResultsToRespondent={state.sendResultsToRespondent}
             notifyCoachOnCompletion={state.notifyCoachOnCompletion}
@@ -1775,6 +1777,7 @@ function ScheduleStep({
   endMode,
   closeAt,
   templateName,
+  templateAlias,
   resultsEmailApproved,
   sendResultsToRespondent,
   notifyCoachOnCompletion,
@@ -1796,6 +1799,7 @@ function ScheduleStep({
   endMode: EndMode;
   closeAt: string;
   templateName: string;
+  templateAlias: string;
   resultsEmailApproved: boolean;
   sendResultsToRespondent: boolean;
   notifyCoachOnCompletion: boolean;
@@ -2056,6 +2060,7 @@ function ScheduleStep({
           </div>
           <ReportStylePicker
             value={reportStyle}
+            previewAnatomy={resolveReportStylePreviewAnatomy({ templateAlias })}
             onChange={(value) =>
               onChange({ reportStyle: value, reportStyleIntent: "EXPLICIT" })
             }

@@ -70,6 +70,8 @@
 .su-report--executive .report-page h3 + p { max-width: 68ch; }
 .su-report--executive .report-page section { margin: 0 0 2.5rem; }
 .su-report--executive .report-page dl { display: grid; gap: 1px; grid-template-columns: repeat(2, minmax(0, 1fr)); background: var(--executive-line); border: 1px solid var(--executive-line); }
+.su-report--executive .report-page .report-metrics,
+.su-report--executive .report-page .report-responses { grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); }
 .su-report--executive .report-page dl > div { background: var(--executive-cream); padding: 1rem; min-width: 0; }
 .su-report--executive .report-page dt { color: var(--executive-muted); font-size: .7rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 .su-report--executive .report-page dd { color: var(--executive-purple-700); font-family: var(--font-assessment-display), Georgia, serif; font-size: 1.65rem; margin: .25rem 0 0; overflow-wrap: anywhere; }

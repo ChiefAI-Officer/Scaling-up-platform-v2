@@ -1,7 +1,9 @@
 import {
   REPORT_STYLE_KEYS,
   getReportStyleMetadata,
+  getReportStylePreviewPath,
   isReportStyleKey,
+  resolveReportStylePreviewAnatomy,
 } from "@/lib/assessments/report-style-registry";
 import {
   effectiveReportStyle,
@@ -48,6 +50,28 @@ describe("report style registry", () => {
     expect(isReportStyleKey("classic")).toBe(false);
     expect(isReportStyleKey("FUTURE_STYLE")).toBe(false);
     expect(isReportStyleKey(undefined)).toBe(false);
+  });
+
+  it("selects preview anatomy from the canonical report family and optional content capabilities", () => {
+    expect(resolveReportStylePreviewAnatomy({ templateAlias: "scaling-up-full" }))
+      .toBe("scored");
+    expect(resolveReportStylePreviewAnatomy({ templateAlias: "qsp-v2" }))
+      .toBe("qualitative");
+    expect(resolveReportStylePreviewAnatomy({
+      templateAlias: "qsp-v2",
+      capabilities: { hasMetrics: false, hasNarrativeResponses: true },
+    })).toBe("sparse-custom");
+
+    expect(getReportStylePreviewPath(
+      "EXECUTIVE_BOARDROOM",
+      "qualitative",
+      "detail",
+    )).toBe(
+      "/report-style-previews/qualitative/executive-boardroom/detail.webp",
+    );
+    expect(getReportStylePreviewPath("CLASSIC", "scored", "cover")).toBe(
+      "/report-style-previews/classic/cover.webp",
+    );
   });
 });
 

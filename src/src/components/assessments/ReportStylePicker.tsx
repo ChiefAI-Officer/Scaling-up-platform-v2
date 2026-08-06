@@ -4,6 +4,8 @@ import { useId, useMemo, useState } from "react";
 import {
   REPORT_STYLE_KEYS,
   REPORT_STYLE_REGISTRY,
+  getReportStylePreviewPath,
+  type ReportStylePreviewAnatomy,
   type ReportStyleKey,
 } from "@/lib/assessments/report-style-registry";
 
@@ -22,10 +24,15 @@ export interface ReportStylePickerProps {
   sourceLabel?: string;
   lockedAt?: Date | string | null;
   compact?: boolean;
+  previewAnatomy?: ReportStylePreviewAnatomy;
 }
 
-function previewId(style: ReportStyleKey, page: PreviewPage) {
-  return `${style}:${page}`;
+function previewId(
+  anatomy: ReportStylePreviewAnatomy,
+  style: ReportStyleKey,
+  page: PreviewPage,
+) {
+  return `${anatomy}:${style}:${page}`;
 }
 
 function formatLockTimestamp(lockedAt: Date | string) {
@@ -50,6 +57,7 @@ export function ReportStylePicker({
   sourceLabel,
   lockedAt,
   compact = false,
+  previewAnatomy = "scored",
 }: ReportStylePickerProps) {
   const radioName = useId();
   const [previewPage, setPreviewPage] = useState<PreviewPage>("cover");
@@ -58,7 +66,7 @@ export function ReportStylePicker({
   const [retryVersions, setRetryVersions] = useState<Readonly<Record<string, number>>>({});
 
   const selectedMetadata = REPORT_STYLE_REGISTRY[value];
-  const selectedThumbnailId = previewId(value, "cover");
+  const selectedThumbnailId = previewId(previewAnatomy, value, "cover");
   const selectedThumbnailFailed = failedPreviews.has(selectedThumbnailId);
   const lockedTimestamp = useMemo(
     () => (lockedAt == null ? null : formatLockTimestamp(lockedAt)),
@@ -105,7 +113,7 @@ export function ReportStylePicker({
   }
 
   function retryPreview(page: PreviewPage) {
-    const currentPreviewId = previewId(value, page);
+    const currentPreviewId = previewId(previewAnatomy, value, page);
 
     setFailedPreviews((current) => {
       const next = new Set(current);
@@ -204,7 +212,7 @@ export function ReportStylePicker({
           // eslint-disable-next-line @next/next/no-img-element
           <img
             key={`${selectedThumbnailId}-${retryVersions[selectedThumbnailId] ?? 0}`}
-            src={selectedMetadata.previews.cover}
+            src={getReportStylePreviewPath(value, previewAnatomy, "cover")}
             alt={`${selectedMetadata.label} selected thumbnail`}
             className="h-28 w-full rounded-lg border border-slate-300 object-cover object-top"
             onError={() =>
@@ -251,7 +259,7 @@ export function ReportStylePicker({
         </div>
 
         {PREVIEW_TABS.map((tab) => {
-          const currentPreviewId = previewId(value, tab.key);
+          const currentPreviewId = previewId(previewAnatomy, value, tab.key);
           const isActive = tab.key === previewPage;
           const failedPreview = failedPreviews.has(currentPreviewId);
 
@@ -281,7 +289,11 @@ export function ReportStylePicker({
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   key={`${currentPreviewId}-${retryVersions[currentPreviewId] ?? 0}`}
-                  src={selectedMetadata.previews[tab.key]}
+                  src={getReportStylePreviewPath(
+                    value,
+                    previewAnatomy,
+                    tab.key,
+                  )}
                   alt={`${selectedMetadata.label} ${tab.label} preview`}
                   className="w-full rounded-lg border border-slate-300"
                   onError={() =>

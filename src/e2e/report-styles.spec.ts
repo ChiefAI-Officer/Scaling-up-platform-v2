@@ -6,7 +6,10 @@ import { resolve } from "node:path";
 import { promisify } from "node:util";
 import { encode } from "next-auth/jwt";
 import { PrismaClient } from "@prisma/client";
-import { REPORT_STYLE_PREVIEW_VARIANTS } from "../src/lib/assessments/report-style-preview-fixture";
+import {
+  REPORT_STYLE_PREVIEW_ANATOMIES,
+  REPORT_STYLE_PREVIEW_VARIANTS,
+} from "../src/lib/assessments/report-style-preview-fixture";
 import { loginAs } from "./helpers/auth";
 
 /* eslint-disable @typescript-eslint/no-require-imports */
@@ -90,6 +93,37 @@ async function assertNoAxeViolations(page: Page, selector: string) {
   expect(results.violations).toEqual([]);
 }
 
+async function assertNoEmptyReportComposition(page: Page, selector: string) {
+  const emptyBlocks = await page.locator(`${selector} [data-report-block]`).evaluateAll(
+    (blocks) =>
+      blocks
+        .filter((block) => (block.textContent ?? "").trim() === "")
+        .map((block) => block.getAttribute("data-report-block")),
+  );
+  expect(emptyBlocks).toEqual([]);
+
+  const emptyVisiblePages = await page.locator(`${selector} .report-page`).evaluateAll(
+    (pages) =>
+      pages.filter((candidate) => {
+        const element = candidate as HTMLElement;
+        const style = window.getComputedStyle(element);
+        return style.display !== "none" && (element.textContent ?? "").trim() === "";
+      }).length,
+  );
+  expect(emptyVisiblePages).toBe(0);
+}
+
+async function assertNoColorOnlyStatus(page: Page, selector: string) {
+  const colorOnlyStatuses = await page
+    .locator(`${selector} [data-achievement-status]`)
+    .evaluateAll((statuses) =>
+      statuses
+        .filter((status) => !/achieved/i.test(status.textContent ?? ""))
+        .map((status) => status.getAttribute("data-achievement-status")),
+    );
+  expect(colorOnlyStatuses).toEqual([]);
+}
+
 async function captureViewportEvidence(page: Page, testInfo: TestInfo, name: string) {
   await page.evaluate(async () => {
     await document.fonts.ready;
@@ -141,6 +175,7 @@ async function rendererCss() {
   const stylesRoot = resolve(process.cwd(), "src/styles");
   const styles = await Promise.all([
     readFile(resolve(stylesRoot, "su-public-brand.css"), "utf8"),
+    readFile(resolve(stylesRoot, "su-report.css"), "utf8"),
     readFile(resolve(stylesRoot, "su-report-executive.css"), "utf8"),
     readFile(resolve(stylesRoot, "su-report-dashboard.css"), "utf8"),
   ]);
@@ -150,11 +185,17 @@ async function rendererCss() {
 async function setSupplementalRendererContent(
   page: Page,
   style: "EXECUTIVE_BOARDROOM" | "MODERN_DASHBOARD",
+  anatomy: (typeof REPORT_STYLE_PREVIEW_ANATOMIES)[number],
   variant: (typeof REPORT_STYLE_PREVIEW_VARIANTS)[number],
 ) {
   const { stdout: markup } = await execFileAsync(
     process.execPath,
-    [resolve(process.cwd(), "scripts/render-report-style-qa.cjs"), style, variant],
+    [
+      resolve(process.cwd(), "scripts/render-report-style-qa.cjs"),
+      style,
+      anatomy,
+      variant,
+    ],
     { encoding: "utf8" },
   );
   await page.setContent(`<!doctype html><html><head><style>${await rendererCss()}</style></head><body>${markup}</body></html>`);
@@ -410,82 +451,95 @@ test.describe("Report styles — fixture-only renderer visual evidence", () => {
   test("Boardroom and Dashboard remain readable across all safe variants", async ({ page }, testInfo) => {
     await seedPreviewAdminSession(page);
 
-    for (const style of [
-      { key: "EXECUTIVE_BOARDROOM", renderer: "executive-boardroom-report" },
-      { key: "MODERN_DASHBOARD", renderer: "modern-dashboard-report" },
-    ]) {
-      for (const variant of ["normal", "partial", "degraded", "max-length", "missing-optional", "long-branding"]) {
-        const previewPage = variant === "max-length" ? "detail" : "summary";
-        const screenQuery = new URLSearchParams({
-          style: style.key,
-          page: previewPage,
-          variant,
-        });
+    for (const anatomy of REPORT_STYLE_PREVIEW_ANATOMIES) {
+      for (const style of [
+        { key: "EXECUTIVE_BOARDROOM", renderer: "executive-boardroom-report" },
+        { key: "MODERN_DASHBOARD", renderer: "modern-dashboard-report" },
+      ]) {
+        for (const variant of REPORT_STYLE_PREVIEW_VARIANTS) {
+          const previewPage = variant === "max-length" ? "detail" : "summary";
+          const screenQuery = new URLSearchParams({
+            anatomy,
+            style: style.key,
+            page: previewPage,
+            variant,
+          });
 
-        await page.setViewportSize({ width: 1280, height: 900 });
-        await page.goto(`${previewBaseUrl}/admin/surveys/report-style-preview?${screenQuery}`);
-        const root = page.getByTestId("report-style-preview-root");
-        const renderer = page.getByTestId(style.renderer);
-        await expect(root).toHaveAttribute("data-preview-variant", variant);
-        await expect(renderer).toBeVisible();
-        await assertNoAxeViolations(page, `[data-testid="${style.renderer}"]`);
-        await expect(renderer).toContainText(/confidential assessment report/i);
-        const desktopOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
-        expect(desktopOverflow).toBe(false);
-        await captureViewportEvidence(page, testInfo, `${style.key}-${variant}-desktop`);
+          await page.setViewportSize({ width: 1280, height: 900 });
+          await page.goto(`${previewBaseUrl}/admin/surveys/report-style-preview?${screenQuery}`);
+          const root = page.getByTestId("report-style-preview-root");
+          const renderer = page.getByTestId(style.renderer);
+          await expect(root).toHaveAttribute("data-preview-anatomy", anatomy);
+          await expect(root).toHaveAttribute("data-preview-variant", variant);
+          await expect(renderer).toBeVisible();
+          await assertNoAxeViolations(page, `[data-testid="${style.renderer}"]`);
+          await assertNoEmptyReportComposition(page, `[data-testid="${style.renderer}"]`);
+          await assertNoColorOnlyStatus(page, `[data-testid="${style.renderer}"]`);
+          await expect(renderer).toContainText(/confidential assessment report/i);
+          const desktopOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+          expect(desktopOverflow).toBe(false);
+          await captureViewportEvidence(page, testInfo, `${anatomy}-${style.key}-${variant}-desktop`);
 
-        await page.setViewportSize({ width: 393, height: 852 });
-        await page.goto(`${previewBaseUrl}/admin/surveys/report-style-preview?${screenQuery}`);
-        await expect(page.getByTestId(style.renderer)).toBeVisible();
-        const mobileOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
-        expect(mobileOverflow).toBe(false);
-        await captureViewportEvidence(page, testInfo, `${style.key}-${variant}-mobile`);
+          await page.setViewportSize({ width: 393, height: 852 });
+          await page.goto(`${previewBaseUrl}/admin/surveys/report-style-preview?${screenQuery}`);
+          await expect(page.getByTestId(style.renderer)).toBeVisible();
+          const mobileOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+          expect(mobileOverflow).toBe(false);
+          await captureViewportEvidence(page, testInfo, `${anatomy}-${style.key}-${variant}-mobile`);
 
-        // Print is a deliberately separate, fixed Letter canvas. Every safe
-        // fixture uses the same representative page as its screen review, so
-        // long and incomplete data can surface a real pagination regression.
-        const printQuery = new URLSearchParams({
-          style: style.key,
-          page: previewPage,
-          variant,
-          capture: "1",
-        });
-        await page.setViewportSize({ width: 1280, height: 900 });
-        await page.goto(`${previewBaseUrl}/admin/surveys/report-style-preview?${printQuery}`);
-        await expect(page.getByTestId(style.renderer)).toBeVisible();
-        await assertLetterPdf(page, testInfo, `${style.key}-${variant}-letter`, { expectedPages: 1 });
+          // Print is a deliberately separate, fixed Letter canvas. Every safe
+          // fixture uses the same representative page as its screen review, so
+          // long and incomplete data can surface a real pagination regression.
+          const printQuery = new URLSearchParams({
+            anatomy,
+            style: style.key,
+            page: previewPage,
+            variant,
+            capture: "1",
+          });
+          await page.setViewportSize({ width: 1280, height: 900 });
+          await page.goto(`${previewBaseUrl}/admin/surveys/report-style-preview?${printQuery}`);
+          await expect(page.getByTestId(style.renderer)).toBeVisible();
+          await assertLetterPdf(page, testInfo, `${anatomy}-${style.key}-${variant}-letter`, { expectedPages: 1 });
+        }
       }
     }
   });
 });
 
 test.describe("Report styles — DB-free supplemental component renderer evidence", () => {
-  test.setTimeout(60_000);
+  // This deliberately exercises every anatomy/style/variant through the real
+  // server renderer and produces both screenshot and PDF evidence per case.
+  test.setTimeout(10 * 60_000);
 
   test("Boardroom and Dashboard render all safe fixtures responsively and print complete reports", async ({ page }, testInfo) => {
-    for (const style of [
-      { key: "EXECUTIVE_BOARDROOM" as const, renderer: "executive-boardroom-report" },
-      { key: "MODERN_DASHBOARD" as const, renderer: "modern-dashboard-report" },
-    ]) {
-      for (const variant of REPORT_STYLE_PREVIEW_VARIANTS) {
-        await page.setViewportSize({ width: 1280, height: 900 });
-        await setSupplementalRendererContent(page, style.key, variant);
-        const renderer = page.getByTestId(style.renderer);
-        await expect(renderer).toBeVisible();
-        await assertNoAxeViolations(page, `[data-testid="${style.renderer}"]`);
-        await expect(renderer).toContainText(/confidential assessment report/i);
-        expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
-        await captureViewportEvidence(page, testInfo, `${style.key}-${variant}-supplemental-desktop`);
+    for (const anatomy of REPORT_STYLE_PREVIEW_ANATOMIES) {
+      for (const style of [
+        { key: "EXECUTIVE_BOARDROOM" as const, renderer: "executive-boardroom-report" },
+        { key: "MODERN_DASHBOARD" as const, renderer: "modern-dashboard-report" },
+      ]) {
+        for (const variant of REPORT_STYLE_PREVIEW_VARIANTS) {
+          await page.setViewportSize({ width: 1280, height: 900 });
+          await setSupplementalRendererContent(page, style.key, anatomy, variant);
+          const renderer = page.getByTestId(style.renderer);
+          await expect(renderer).toBeVisible();
+          await assertNoAxeViolations(page, `[data-testid="${style.renderer}"]`);
+          await assertNoEmptyReportComposition(page, `[data-testid="${style.renderer}"]`);
+          await assertNoColorOnlyStatus(page, `[data-testid="${style.renderer}"]`);
+          await expect(renderer).toContainText(/confidential assessment report/i);
+          expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
+          await captureViewportEvidence(page, testInfo, `${anatomy}-${style.key}-${variant}-supplemental-desktop`);
 
-        await page.setViewportSize({ width: 393, height: 852 });
-        await setSupplementalRendererContent(page, style.key, variant);
-        await expect(page.getByTestId(style.renderer)).toBeVisible();
-        expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
-        await captureViewportEvidence(page, testInfo, `${style.key}-${variant}-supplemental-mobile`);
+          await page.setViewportSize({ width: 393, height: 852 });
+          await setSupplementalRendererContent(page, style.key, anatomy, variant);
+          await expect(page.getByTestId(style.renderer)).toBeVisible();
+          expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
+          await captureViewportEvidence(page, testInfo, `${anatomy}-${style.key}-${variant}-supplemental-mobile`);
 
-        await page.setViewportSize({ width: 1280, height: 900 });
-        await setSupplementalRendererContent(page, style.key, variant);
-        await assertLetterPdf(page, testInfo, `${style.key}-${variant}-supplemental-letter`);
+          await page.setViewportSize({ width: 1280, height: 900 });
+          await setSupplementalRendererContent(page, style.key, anatomy, variant);
+          await assertLetterPdf(page, testInfo, `${anatomy}-${style.key}-${variant}-supplemental-letter`);
+        }
       }
     }
   });

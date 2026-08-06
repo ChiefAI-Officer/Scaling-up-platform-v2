@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 type GuardModule = {
@@ -193,5 +194,23 @@ describe("report-style completion/PATCH race outcome", () => {
   it("locks Modern Dashboard when the PATCH commits before completion", () => {
     const { expectedRaceReportStyle } = loadGuard();
     expect(expectedRaceReportStyle(200)).toBe("MODERN_DASHBOARD");
+  });
+});
+
+describe("report-style fixture-only visual matrix", () => {
+  it("walks all three anatomies and all safe content variants through the renderer lane", () => {
+    const source = readFileSync(resolve(process.cwd(), "e2e/report-styles.spec.ts"), "utf8");
+
+    expect(source).toContain("REPORT_STYLE_PREVIEW_ANATOMIES");
+    expect(source).toContain("REPORT_STYLE_PREVIEW_VARIANTS");
+    expect(source).toMatch(/for \(const anatomy of REPORT_STYLE_PREVIEW_ANATOMIES\)/);
+    expect(source).toMatch(/for \(const variant of REPORT_STYLE_PREVIEW_VARIANTS\)/);
+    expect(source).toContain("data-preview-anatomy");
+    expect(source).toContain("data-preview-variant");
+    expect(source).toContain("assertNoEmptyReportComposition");
+    expect(source).toContain("assertNoColorOnlyStatus");
+    expect(source).toContain(
+      'readFile(resolve(stylesRoot, "su-report.css"), "utf8")',
+    );
   });
 });

@@ -103,8 +103,9 @@ export class ResultsCommitError extends Error {
 
 // ────────────────────────────────────────────────────────────────────────
 // Minimal tx interface — narrow to the delegates this writer touches.
-// (No delete/deleteMany/updateMany delegate is declared — they cannot be
-//  called because they are not on the type; the tests assert it at runtime.)
+// No delete/deleteMany delegate is declared. The sole updateMany capability
+// below is the conditional MIN-style appearance-lock write; tests assert the
+// narrow runtime surface so the import remains otherwise create-only.
 // ────────────────────────────────────────────────────────────────────────
 
 interface ExistingCampaignRow {

@@ -69,7 +69,7 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe("admin default report appearance", () => {
-  it("appears after Audience only for Scaling Up Full when ED10 and report styles are available", () => {
+  it("appears after Audience for every template when ED10 and report styles are available", () => {
     render(<TemplateEditorTabbed {...shellProps()} />);
 
     const audience = screen.getByTestId("settings-audience-card");
@@ -90,12 +90,25 @@ describe("admin default report appearance", () => {
 
   it.each([
     ["report styles unavailable", { reportStylesEnabled: false }],
-    ["a non-eligible alias", { alias: "scaling-up-full-v2" }],
     ["ED10 unavailable", { previewSettingsEnabled: false }],
   ])("is absent for %s", (_label, overrides) => {
     render(<TemplateEditorTabbed {...shellProps(overrides)} />);
 
     expect(screen.queryByTestId("settings-default-report-style-card")).toBeNull();
+  });
+
+  it("uses the canonical qualitative preview anatomy for qualitative aliases", () => {
+    render(<TemplateEditorTabbed {...shellProps({ alias: "qsp-v2" })} />);
+
+    expect(
+      within(screen.getByTestId("settings-default-report-style-card")).getByRole(
+        "img",
+        { name: "Classic Cover preview" },
+      ),
+    ).toHaveAttribute(
+      "src",
+      "/report-style-previews/qualitative/classic/cover.webp",
+    );
   });
 
   it("disables style changes while the template-row PATCH is pending", async () => {

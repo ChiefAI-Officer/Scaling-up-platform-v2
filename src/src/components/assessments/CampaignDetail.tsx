@@ -62,6 +62,7 @@ import { resolveInvitationHtmlMode } from "@/lib/assessments/invitation-html-pol
 import { ReportStylePicker } from "@/components/assessments/ReportStylePicker";
 import {
   REPORT_STYLE_REGISTRY,
+  resolveReportStylePreviewAnatomy,
   type ReportStyleKey,
 } from "@/lib/assessments/report-style-registry";
 import {
@@ -424,7 +425,10 @@ export function CampaignDetail({
     canEditReportAppearance &&
     reportStylesAvailable &&
     campaign.reportStyleLockedAt === null;
-  const selectedReportStyle = REPORT_STYLE_REGISTRY[campaign.reportStyle];
+  // Older cached/test projections can predate the additive appearance fields.
+  // Keep the read-only record fail-safe and truthful to the database default.
+  const selectedReportStyle =
+    REPORT_STYLE_REGISTRY[campaign.reportStyle] ?? REPORT_STYLE_REGISTRY.CLASSIC;
   const reportStyleProvenance =
     campaign.reportStyleSource === "CAMPAIGN_OVERRIDE"
       ? "Campaign choice"
@@ -1539,6 +1543,9 @@ export function CampaignDetail({
               value={reportStyle}
               onChange={setReportStyle}
               disabled={reportStyleSaving}
+              previewAnatomy={resolveReportStylePreviewAnatomy({
+                templateAlias: campaign.templateAlias,
+              })}
             />
             <p className="mt-3 text-xs text-muted-foreground">
               Provenance: {reportStyleProvenance}

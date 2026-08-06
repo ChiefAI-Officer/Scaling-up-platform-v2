@@ -72,6 +72,23 @@ describe("ReportStylePicker", () => {
     expect(screen.getByRole("img", { name: "Modern Dashboard Detail preview" })).toBeInTheDocument();
   });
 
+  it("selects the committed preview anatomy without changing appearance selection", () => {
+    render(
+      <PickerHarness
+        initialValue="EXECUTIVE_BOARDROOM"
+        previewAnatomy="qualitative"
+      />,
+    );
+
+    expect(screen.getByRole("radio", { name: /executive boardroom/i })).toBeChecked();
+    expect(
+      screen.getByRole("img", { name: "Executive Boardroom Cover preview" }),
+    ).toHaveAttribute(
+      "src",
+      "/report-style-previews/qualitative/executive-boardroom/cover.webp",
+    );
+  });
+
   it("keeps every tab panel mounted for its aria-controls relationship", () => {
     render(<PickerHarness />);
 

@@ -579,4 +579,15 @@ describe("adaptive report print and responsive contracts", () => {
       );
     },
   );
+
+  it.each(renderers)(
+    "$label collapses unused authored-response grid tracks instead of painting blank columns",
+    ({ cssPath }) => {
+      const css = source(cssPath);
+
+      expect(css).toMatch(
+        /\.report-metrics,\s*\n?\s*\.su-report--(?:executive|dashboard)[^{]*\.report-responses\s*\{[^}]*grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(14rem,\s*1fr\)\);/,
+      );
+    },
+  );
 });

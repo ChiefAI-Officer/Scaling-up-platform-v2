@@ -38,7 +38,10 @@ import { ReportStylePicker } from "@/components/assessments/ReportStylePicker";
 import {
   isReportStyleEligible,
 } from "@/lib/assessments/report-style-policy";
-import type { ReportStyleKey } from "@/lib/assessments/report-style-registry";
+import {
+  resolveReportStylePreviewAnatomy,
+  type ReportStyleKey,
+} from "@/lib/assessments/report-style-registry";
 
 // ────────────────────────────────────────────────────────────────────────
 // Props
@@ -166,6 +169,7 @@ export function SettingsTab({
       />
       {reportStylesEnabled && isReportStyleEligible(templateValues.alias) && (
         <DefaultReportAppearanceCard
+          templateAlias={templateValues.alias}
           defaultReportStyle={templateValues.defaultReportStyle ?? "CLASSIC"}
           handleTemplateRowSave={handleTemplateRowSave}
           templateRowSaving={templateRowSaving}
@@ -202,11 +206,13 @@ export function SettingsTab({
 }
 
 function DefaultReportAppearanceCard({
+  templateAlias,
   defaultReportStyle,
   handleTemplateRowSave,
   templateRowSaving,
   templateRowError,
 }: {
+  templateAlias: string;
   defaultReportStyle: ReportStyleKey;
   handleTemplateRowSave: (patch: SettingsRowPatch) => void | Promise<void>;
   templateRowSaving: boolean;
@@ -240,6 +246,7 @@ function DefaultReportAppearanceCard({
         <ReportStylePicker
           value={selectedStyle}
           onChange={templateRowSaving ? () => {} : setSelectedStyle}
+          previewAnatomy={resolveReportStylePreviewAnatomy({ templateAlias })}
         />
       </fieldset>
       <div className="mt-4 flex items-center gap-3">

@@ -1,3 +1,5 @@
+import { reportConfigFor } from "@/lib/assessments/report-config";
+
 export const REPORT_STYLE_KEYS = Object.freeze([
   "CLASSIC",
   "EXECUTIVE_BOARDROOM",
@@ -13,6 +15,20 @@ export const REPORT_STYLE_PREVIEW_PAGES = Object.freeze([
 ] as const);
 
 export type ReportStylePreviewPage = (typeof REPORT_STYLE_PREVIEW_PAGES)[number];
+
+export const REPORT_STYLE_PREVIEW_ANATOMIES = Object.freeze([
+  "scored",
+  "qualitative",
+  "sparse-custom",
+] as const);
+
+export type ReportStylePreviewAnatomy =
+  (typeof REPORT_STYLE_PREVIEW_ANATOMIES)[number];
+
+export type ReportStylePreviewCapabilities = Readonly<{
+  hasMetrics?: boolean;
+  hasNarrativeResponses?: boolean;
+}>;
 
 export type ReportStyleMetadata = Readonly<{
   label: string;
@@ -75,4 +91,36 @@ export function isReportStyleKey(value: unknown): value is ReportStyleKey {
 
 export function getReportStyleMetadata(style: ReportStyleKey): ReportStyleMetadata {
   return REPORT_STYLE_REGISTRY[style];
+}
+
+export function getReportStylePreviewPath(
+  style: ReportStyleKey,
+  anatomy: ReportStylePreviewAnatomy,
+  page: ReportStylePreviewPage,
+): string {
+  const metadata = getReportStyleMetadata(style);
+  if (anatomy === "scored") return metadata.previews[page];
+  return `/report-style-previews/${anatomy}/${metadata.rendererKey}/${page}.webp`;
+}
+
+/**
+ * Chooses illustrative content from the template's existing report family.
+ * Capabilities refine a qualitative family to the sparse narrative sample;
+ * they never reclassify a scored template or change real report semantics.
+ */
+export function resolveReportStylePreviewAnatomy({
+  templateAlias,
+  capabilities,
+}: {
+  templateAlias: string | null | undefined;
+  capabilities?: ReportStylePreviewCapabilities;
+}): ReportStylePreviewAnatomy {
+  if (reportConfigFor(templateAlias).reportType === "scored") return "scored";
+  if (
+    capabilities?.hasMetrics === false &&
+    capabilities.hasNarrativeResponses === true
+  ) {
+    return "sparse-custom";
+  }
+  return "qualitative";
 }
