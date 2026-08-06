@@ -838,10 +838,15 @@ export function ScoringTiersTab({
             >
               <header>
                 <h4 className="text-sm font-semibold text-foreground">
-                  {domain.label}{" "}
-                  <span className="text-xs font-normal text-muted-foreground">
-                    ({domain.key})
-                  </span>
+                  {domain.label}
+                  {!plainLanguageEnabled && (
+                    <>
+                      {" "}
+                      <span className="text-xs font-normal text-muted-foreground">
+                        ({domain.key})
+                      </span>
+                    </>
+                  )}
                 </h4>
               </header>
               {perDomainBounds.has(domain.key) && (

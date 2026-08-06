@@ -158,7 +158,7 @@ describe("ScoringTiersTab — F4 (Checkpoint 3)", () => {
       );
     });
 
-    it("labels area tiers and editable cells for authors and assistive technology", () => {
+    it("hides stored area keys and labels editable cells for assistive technology", () => {
       render(
         <ScoringTiersTab
           {...makeProps({ scoringConfig: suFullScoringConfig })}
@@ -167,6 +167,7 @@ describe("ScoringTiersTab — F4 (Checkpoint 3)", () => {
       );
 
       expect(screen.getByText("Results by area")).toBeInTheDocument();
+      expect(screen.queryByText("(PEOPLE)")).not.toBeInTheDocument();
       expect(screen.getAllByLabelText("Starts at for Critical")).not.toHaveLength(0);
       expect(screen.getAllByLabelText("Ends at for Critical")).not.toHaveLength(0);
       expect(screen.getAllByLabelText("Result name for tier 1")).not.toHaveLength(0);
@@ -228,6 +229,7 @@ describe("ScoringTiersTab — F4 (Checkpoint 3)", () => {
       ).not.toHaveLength(0);
       expect(screen.getByText("Preview — Tier Resolution")).toBeInTheDocument();
       expect(screen.getByText("Per-domain tiers")).toBeInTheDocument();
+      expect(screen.getByText("(PEOPLE)")).toBeInTheDocument();
     });
   });
 
