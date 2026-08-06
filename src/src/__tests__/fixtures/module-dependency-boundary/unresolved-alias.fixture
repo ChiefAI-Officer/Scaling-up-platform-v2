@@ -1,0 +1,1 @@
+import "@/__tests__/fixtures/module-dependency-boundary/missing-alias";

@@ -1,4 +1,5 @@
 import "./static-leaf";
+import "./appearance.server";
 
 export * from "./barrel";
 

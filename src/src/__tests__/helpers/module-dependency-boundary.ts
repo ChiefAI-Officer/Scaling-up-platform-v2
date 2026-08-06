@@ -116,8 +116,11 @@ function isInsideSourceRoot(path: string): boolean {
 function moduleCandidates(basePath: string): string[] {
   const candidates: string[] = [];
   const extension = extname(basePath);
+  const hasKnownSourceExtension = MODULE_EXTENSIONS.some(
+    (candidateExtension) => candidateExtension === extension,
+  );
 
-  if (extension) {
+  if (hasKnownSourceExtension) {
     candidates.push(basePath);
     if ([".js", ".jsx", ".mjs", ".cjs"].includes(extension)) {
       const withoutExtension = basePath.slice(0, -extension.length);
@@ -163,6 +166,10 @@ function resolveRepoLocalModule(
   return null;
 }
 
+function isRepoLocalModuleSpecifier(moduleSpecifier: string): boolean {
+  return moduleSpecifier.startsWith("@/") || moduleSpecifier.startsWith(".");
+}
+
 function resolveEntryPoint(entryPoint: string): string {
   const absolutePath = isAbsolute(entryPoint)
     ? entryPoint
@@ -198,15 +205,20 @@ export function collectRepoLocalModuleGraph(
     if (!current || visited.has(current)) continue;
     visited.add(current);
 
-    const dependencies = extractModuleSpecifiers(
+    const dependencies: string[] = [];
+    for (const moduleSpecifier of extractModuleSpecifiers(
       readFileSync(current, "utf8"),
-    )
-      .map((moduleSpecifier) =>
-        resolveRepoLocalModule(current, moduleSpecifier),
-      )
-      .filter((dependency): dependency is string => dependency !== null)
-      .filter((dependency) => !visited.has(dependency))
-      .sort();
+    )) {
+      if (!isRepoLocalModuleSpecifier(moduleSpecifier)) continue;
+      const dependency = resolveRepoLocalModule(current, moduleSpecifier);
+      if (!dependency) {
+        throw new Error(
+          `Unresolved repo-local dependency "${moduleSpecifier}" imported by "${projectRelative(current)}"`,
+        );
+      }
+      if (!visited.has(dependency)) dependencies.push(dependency);
+    }
+    dependencies.sort();
     pending.push(...dependencies);
     pending.sort();
   }
@@ -219,6 +231,7 @@ const INDIVIDUAL_APPEARANCE_MODULES = new Set([
   "src/lib/assessments/individual-report-presentation.ts",
   "src/lib/assessments/report-style-policy.ts",
   "src/lib/assessments/report-style-registry.ts",
+  "src/lib/assessments/wave-report-styles-flags.ts",
 ]);
 const INDIVIDUAL_RENDERER_DIRECTORY =
   "src/components/assessments/report-styles/";
@@ -233,4 +246,56 @@ export function findIndividualAppearanceModules(
         modulePath.startsWith(INDIVIDUAL_RENDERER_DIRECTORY),
     )
     .sort();
+}
+
+const INDIVIDUAL_APPEARANCE_IDENTIFIERS = new Set([
+  "reportStyle",
+  "reportStylesAvailable",
+]);
+
+export interface IndividualAppearanceSourceCoupling {
+  modulePath: string;
+  identifiers: string[];
+}
+
+/**
+ * Finds direct appearance-state identifier usage in the resolved graph while
+ * ignoring comments and string contents.
+ */
+export function findIndividualAppearanceSourceCouplings(
+  reachableModules: readonly string[],
+): IndividualAppearanceSourceCoupling[] {
+  const couplings: IndividualAppearanceSourceCoupling[] = [];
+
+  for (const modulePath of [...reachableModules].sort()) {
+    const absolutePath = resolve(PROJECT_ROOT, modulePath);
+    const sourceFile = ts.createSourceFile(
+      modulePath,
+      readFileSync(absolutePath, "utf8"),
+      ts.ScriptTarget.Latest,
+      true,
+      ts.ScriptKind.TSX,
+    );
+    const identifiers = new Set<string>();
+
+    const visit = (node: ts.Node): void => {
+      if (
+        ts.isIdentifier(node) &&
+        INDIVIDUAL_APPEARANCE_IDENTIFIERS.has(node.text)
+      ) {
+        identifiers.add(node.text);
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(sourceFile);
+
+    if (identifiers.size > 0) {
+      couplings.push({
+        modulePath,
+        identifiers: [...identifiers].sort(),
+      });
+    }
+  }
+
+  return couplings;
 }

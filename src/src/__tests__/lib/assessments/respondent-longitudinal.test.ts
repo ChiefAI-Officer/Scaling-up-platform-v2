@@ -25,6 +25,7 @@ import {
 import {
   collectRepoLocalModuleGraph,
   findIndividualAppearanceModules,
+  findIndividualAppearanceSourceCouplings,
 } from "@/__tests__/helpers/module-dependency-boundary";
 
 // ── Mock access-control: authz fully controllable; reportConfigFor is REAL ──
@@ -916,6 +917,9 @@ test("individual appearance modules stay unreachable from longitudinal and cohor
   const reachableModules = collectRepoLocalModuleGraph(entryPoints);
 
   expect(findIndividualAppearanceModules(reachableModules)).toEqual([]);
+  expect(findIndividualAppearanceSourceCouplings(reachableModules)).toEqual(
+    [],
+  );
 });
 
 // ─── No raw emails anywhere in returned data (R2-Med-6) ─────────────────────

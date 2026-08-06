@@ -150,6 +150,7 @@ import {
   collectRepoLocalModuleGraph,
   extractModuleSpecifiers,
   findIndividualAppearanceModules,
+  findIndividualAppearanceSourceCouplings,
 } from "@/__tests__/helpers/module-dependency-boundary";
 
 const mockGetApiActor = getApiActor as jest.Mock;
@@ -402,16 +403,53 @@ describe("(report) campaign group report page", () => {
 
     expect(reachableModules).toEqual(
       expect.arrayContaining([
+        "src/__tests__/fixtures/module-dependency-boundary/appearance.server.ts",
         "src/__tests__/fixtures/module-dependency-boundary/barrel.ts",
         "src/__tests__/fixtures/module-dependency-boundary/dynamic-leaf.ts",
         "src/__tests__/fixtures/module-dependency-boundary/entry.ts",
         "src/__tests__/fixtures/module-dependency-boundary/require-leaf.ts",
         "src/__tests__/fixtures/module-dependency-boundary/static-leaf.ts",
         "src/lib/assessments/report-style-registry.ts",
+        "src/lib/assessments/wave-report-styles-flags.ts",
       ]),
     );
     expect(findIndividualAppearanceModules(reachableModules)).toEqual([
       "src/lib/assessments/report-style-registry.ts",
+      "src/lib/assessments/wave-report-styles-flags.ts",
+    ]);
+  });
+
+  it.each([
+    [
+      "src/__tests__/fixtures/module-dependency-boundary/unresolved-relative.fixture",
+      "./missing.relative",
+    ],
+    [
+      "src/__tests__/fixtures/module-dependency-boundary/unresolved-alias.fixture",
+      "@/__tests__/fixtures/module-dependency-boundary/missing-alias",
+    ],
+  ])(
+    "fails closed when %s contains unresolved repo-local dependency %s",
+    (importer, moduleSpecifier) => {
+      expect(() => collectRepoLocalModuleGraph([importer])).toThrow(
+        `Unresolved repo-local dependency "${moduleSpecifier}" imported by "${importer}"`,
+      );
+    },
+  );
+
+  it("detects direct appearance-state identifiers in reachable source", () => {
+    const reachableModules = collectRepoLocalModuleGraph([
+      "src/__tests__/fixtures/module-dependency-boundary/appearance-source-coupling.ts",
+    ]);
+
+    expect(
+      findIndividualAppearanceSourceCouplings(reachableModules),
+    ).toEqual([
+      {
+        modulePath:
+          "src/__tests__/fixtures/module-dependency-boundary/appearance-source-coupling.ts",
+        identifiers: ["reportStyle", "reportStylesAvailable"],
+      },
     ]);
   });
 
@@ -425,6 +463,9 @@ describe("(report) campaign group report page", () => {
     const reachableModules = collectRepoLocalModuleGraph(entryPoints);
 
     expect(findIndividualAppearanceModules(reachableModules)).toEqual([]);
+    expect(
+      findIndividualAppearanceSourceCouplings(reachableModules),
+    ).toEqual([]);
   });
 
   it("GROUP_REPORT_VIEW is a valid member of the AuditAction type", () => {
