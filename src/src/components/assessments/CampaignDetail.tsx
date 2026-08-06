@@ -148,14 +148,6 @@ export interface CampaignDetailProps {
   /** Wave M (#19) — the pinned version's sections — the "Before section" picker. */
   customSlidesSections?: CustomSlidesPanelSection[];
   /**
-   * Wave N (#23) — respondent ids (this campaign's roster) that pass the
-   * longitudinal eligibility predicate (flag on, scored template, current
-   * template access, ≥2 scored submissions). Computed SERVER-side; the client
-   * shows the per-row "over time" link ONLY for ids in this set and never
-   * recomputes auth. Fail-closed: absent/empty → no links.
-   */
-  longitudinalRespondentIds?: string[];
-  /**
    * Wave Z (Z-2) — base path for the "Back to Assessments" link and the
    * post-delete redirect. Default is the coach portal; the admin campaigns
    * host passes "/admin/assessments/campaigns" so admin/STAFF don't bounce
@@ -167,8 +159,6 @@ export interface CampaignDetailProps {
    * have no admin equivalent: "View Trends" (`/portal/assessments/trends`) and
    * the empty-state "Add members in the Members lane" (`/portal/members`).
    * Default false (coach portal shows them). The admin host sets this true.
-   * (The per-respondent "Over time" longitudinal link is suppressed separately
-   * by the admin page passing `longitudinalRespondentIds={[]}`.)
    */
   hidePortalOnlyLinks?: boolean;
 }
@@ -268,7 +258,6 @@ export function CampaignDetail({
   canEditReportAppearance = false,
   initialCustomSlides = [],
   customSlidesSections = [],
-  longitudinalRespondentIds = [],
   basePath = "/portal/assessments",
   hidePortalOnlyLinks = false,
 }: CampaignDetailProps) {
@@ -416,13 +405,6 @@ export function CampaignDetail({
     initialOverview.campaign.reportStyleLockedAt,
   ]);
 
-  // Wave N (#23) — O(1) lookup for the per-row "over time" affordance. The set
-  // is the server-computed eligible-id allowlist; the client never recomputes
-  // eligibility. Empty/absent ⇒ no links (the dark / flag-off state).
-  const longitudinalEligible = useMemo(
-    () => new Set(longitudinalRespondentIds),
-    [longitudinalRespondentIds],
-  );
   const isDraft = campaign.status === "DRAFT";
   const isClosed = campaign.status === "CLOSED";
   const canShowReportAppearanceEditor =
@@ -2195,26 +2177,6 @@ export function CampaignDetail({
                             >
                               <FileText className="w-3.5 h-3.5" />
                               View report
-                            </a>
-                          )}
-                          {longitudinalEligible.has(row.respondent.id) && (
-                            // Wave N (#23) — per-row "over time" affordance.
-                            // Shown ONLY for server-eligible respondents (flag
-                            // on, scored template, ≥2 scored submissions). A
-                            // PLAIN <a> (NOT a Next <Link>): NEVER prefetch the
-                            // named-PII longitudinal view (mirrors the report +
-                            // group-report links). target="_blank" opens its own
-                            // tab; rel guards the opener.
-                            <a
-                              href={`/portal/assessments/respondents/${encodeURIComponent(row.respondent.id)}/longitudinal?templateId=${encodeURIComponent(campaign.templateId)}&organizationId=${encodeURIComponent(campaign.organizationId)}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded border border-border text-foreground hover:bg-muted"
-                              data-testid={`view-over-time-link-${row.respondent.id}`}
-                              title="View this person's results across campaigns over time"
-                            >
-                              <LineChart className="w-3.5 h-3.5" />
-                              Over time
                             </a>
                           )}
                           {row.hasSubmission && (

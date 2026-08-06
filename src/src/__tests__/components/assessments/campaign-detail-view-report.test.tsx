@@ -219,4 +219,28 @@ describe("CampaignDetail — View report is the primary results action (Task 5, 
       within(row).getByTestId(`view-result-btn-${SUBMITTED_ROW.respondent.id}`),
     ).toBeInTheDocument();
   });
+
+  it("keeps the canonical View report action when a legacy longitudinal allowlist is supplied, without rendering Over time", () => {
+    const legacyProps = {
+      longitudinalRespondentIds: [SUBMITTED_ROW.respondent.id],
+    };
+
+    render(
+      <CampaignDetail
+        initialOverview={makeOverview()}
+        initialRespondents={[SUBMITTED_ROW]}
+        {...(legacyProps as React.ComponentProps<typeof CampaignDetail>)}
+      />,
+    );
+
+    expect(
+      screen.getByTestId(`view-report-link-${SUBMITTED_ROW.respondent.id}`),
+    ).toHaveAttribute(
+      "href",
+      `/assessments/${CAMPAIGN_ID}/respondents/${SUBMITTED_ROW.respondent.id}/report`,
+    );
+    expect(
+      screen.queryByTestId(`view-over-time-link-${SUBMITTED_ROW.respondent.id}`),
+    ).not.toBeInTheDocument();
+  });
 });

@@ -3,9 +3,9 @@
  *
  * Gate: no actor → /login; non-privileged → /unauthorized; canManageCampaign
  * "read" false → redirect to the ADMIN campaigns list (NEVER /portal). On ok,
- * CampaignDetail is rendered as a reduced-nav admin host: basePath = admin
- * list, hidePortalOnlyLinks = true, and longitudinal is OMITTED (no prop →
- * CampaignDetail's own [] default → no "Over time" dead-ends).
+ * CampaignDetail is rendered inside production admin chrome as a reduced-nav
+ * host: basePath = admin list and portal-only links are hidden. The shared
+ * canonical report anchor remains the report-native individual entry point.
  */
 
 jest.mock("next/navigation", () => ({
@@ -116,8 +116,8 @@ describe("Admin campaign detail — auth gate", () => {
   );
 });
 
-describe("Admin campaign detail — reduced-nav host props", () => {
-  it("renders CampaignDetail with admin basePath, portal-only links hidden, longitudinal omitted", async () => {
+describe("Admin campaign detail — production chrome and report-native placement", () => {
+  it("renders CampaignDetail in admin chrome with the shared canonical report destination", async () => {
     mockGetApiActor.mockResolvedValue({ role: "ADMIN", coachId: null, userId: "u1", email: "a@x.com" });
     mockCanManage.mockResolvedValue(true);
 
@@ -131,7 +131,11 @@ describe("Admin campaign detail — reduced-nav host props", () => {
       reportStylesAvailable: true,
       canEditReportAppearance: false,
     });
-    // Longitudinal is intentionally NOT passed → CampaignDetail's own [] default.
+    expect(detailProps).toHaveProperty(
+      "groupReportHref",
+      "/assessments/camp-1/report",
+    );
+    // The retired affordance is not promoted into the shared campaign surface.
     expect(detailProps).not.toHaveProperty("longitudinalRespondentIds");
   });
 });
