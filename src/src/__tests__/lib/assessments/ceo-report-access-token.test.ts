@@ -2,6 +2,7 @@ import {
   createCeoReportAccessToken,
   verifyCeoReportAccessToken,
 } from "@/lib/assessments/ceo-report-access-token";
+import { createHmac } from "node:crypto";
 
 const SECRET = "test-secret-at-least-thirty-two-characters";
 
@@ -15,6 +16,10 @@ function claims() {
 
 function encode(payload: unknown): string {
   return Buffer.from(JSON.stringify(payload)).toString("base64url");
+}
+
+function sign(payload: string): string {
+  return createHmac("sha256", SECRET).update(payload).digest("base64url");
 }
 
 describe("CEO report access token", () => {
@@ -37,6 +42,17 @@ describe("CEO report access token", () => {
       expiresAt: now + 60,
     });
     expect(verifyCeoReportAccessToken(`${token}tampered`, now)).toBeNull();
+  });
+
+  test("rejects non-canonical base64url payload and signature segments", () => {
+    const now = 1_800_000_000;
+    const token = createCeoReportAccessToken(claims(), 60, now);
+    const [payload, signature] = token.split(".");
+    const paddedPayload = `${payload}=`;
+
+    expect(verifyCeoReportAccessToken(`${payload}.${signature}!`, now)).toBeNull();
+    expect(verifyCeoReportAccessToken(`${payload}.${signature}=`, now)).toBeNull();
+    expect(verifyCeoReportAccessToken(`${paddedPayload}.${sign(paddedPayload)}`, now)).toBeNull();
   });
 
   test("fails closed for malformed parts and incomplete or invalid signed claims", () => {

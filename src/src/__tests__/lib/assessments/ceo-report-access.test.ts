@@ -49,6 +49,7 @@ function liveInvitation(overrides: Record<string, unknown> = {}) {
       showResultsOnScreen: true,
       sendResultsToRespondent: false,
       template: { alias: "scaling-up-full" },
+      organization: { id: "organization-1", deletedAt: null },
     },
     respondent: { id: "respondent-1", organizationId: "organization-1", deletedAt: null },
     participant: { campaignId: "campaign-1", respondentId: "respondent-1", isCEO: true },
@@ -130,6 +131,20 @@ describe("CEO self report access", () => {
     ["not a current CEO", liveInvitation({ participant: { campaignId: "campaign-1", respondentId: "respondent-1", isCEO: false } })],
   ])("revokes access for %s", async (_reason, invitation) => {
     const fixture = accessDb(invitation as ReturnType<typeof liveInvitation> | null);
+    await expect(authorizeCeoReportAccess(fixture as never, claims)).resolves.toBeNull();
+  });
+
+  test("revokes access when the campaign organization is soft-deleted", async () => {
+    const fixture = accessDb(liveInvitation({
+      campaign: {
+        ...liveInvitation().campaign,
+        organization: {
+          id: "organization-1",
+          deletedAt: new Date("2026-08-05T00:00:00.000Z"),
+        },
+      },
+    }));
+
     await expect(authorizeCeoReportAccess(fixture as never, claims)).resolves.toBeNull();
   });
 

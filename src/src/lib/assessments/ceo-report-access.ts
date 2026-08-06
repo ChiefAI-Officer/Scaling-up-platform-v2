@@ -29,6 +29,7 @@ interface LiveInvitation {
     showResultsOnScreen: boolean;
     sendResultsToRespondent: boolean;
     template: { alias: string };
+    organization: { id: string; deletedAt: Date | null };
   };
   respondent: { id: string; organizationId: string; deletedAt: Date | null };
 }
@@ -102,7 +103,7 @@ export async function revalidateCeoReportAccessInTransaction(
         },
         include: {
           submission: true,
-          campaign: { include: { template: true } },
+          campaign: { include: { template: true, organization: true } },
           respondent: true,
         },
       });
@@ -127,6 +128,8 @@ export async function revalidateCeoReportAccessInTransaction(
         invitation.respondentId !== claims.respondentId ||
         invitation.campaign.id !== claims.focusCampaignId ||
         invitation.campaign.deletedAt !== null ||
+        invitation.campaign.organization.id !== invitation.campaign.organizationId ||
+        invitation.campaign.organization.deletedAt !== null ||
         invitation.campaign.accessMode !== "INVITED" ||
         invitation.campaign.template.alias !== REPORT_COMPARISON_ALIAS ||
         invitation.respondent.id !== claims.respondentId ||

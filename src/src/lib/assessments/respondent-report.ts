@@ -40,7 +40,12 @@ export type { QuestionMeta } from "@/lib/assessments/question-meta";
 
 interface SubmissionFindFirst {
   findFirst: (args: {
-    where: { id?: string; campaignId: string; respondentId: string };
+    where: {
+      id?: string;
+      campaignId: string;
+      respondentId: string;
+      [key: string]: unknown;
+    };
     select: Record<string, unknown>;
   }) => Promise<RawSubmission | null>;
 }
@@ -423,6 +428,45 @@ export async function getCeoSelfRespondentReport(
         id: authorized.focusSubmissionId,
         campaignId: authorized.focusCampaignId,
         respondentId: authorized.respondentId,
+        invitationId: session.invitationId,
+        invitation: {
+          is: {
+            id: session.invitationId,
+            campaignId: authorized.focusCampaignId,
+            respondentId: authorized.respondentId,
+            status: "SUBMITTED",
+            revokedAt: null,
+          },
+        },
+        respondent: {
+          is: {
+            id: authorized.respondentId,
+            deletedAt: null,
+          },
+        },
+        campaign: {
+          is: {
+            id: authorized.focusCampaignId,
+            deletedAt: null,
+            accessMode: "INVITED",
+            template: { is: { alias: "scaling-up-full" } },
+            organization: {
+              is: {
+                deletedAt: null,
+                respondents: {
+                  some: { id: authorized.respondentId, deletedAt: null },
+                },
+              },
+            },
+            participants: {
+              some: { respondentId: authorized.respondentId, isCEO: true },
+            },
+            OR: [
+              { showResultsOnScreen: true },
+              { sendResultsToRespondent: true },
+            ],
+          },
+        },
       },
       select: respondentReportSelect,
     });

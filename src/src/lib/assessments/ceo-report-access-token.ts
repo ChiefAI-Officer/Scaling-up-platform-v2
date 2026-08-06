@@ -32,6 +32,12 @@ function signature(payload: string, secret: string): Buffer {
   return createHmac("sha256", secret).update(payload).digest();
 }
 
+function decodeCanonicalBase64Url(segment: string): Buffer | null {
+  if (!/^[A-Za-z0-9_-]+$/.test(segment)) return null;
+  const decoded = Buffer.from(segment, "base64url");
+  return decoded.toString("base64url") === segment ? decoded : null;
+}
+
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.length > 0;
 }
@@ -86,12 +92,14 @@ export function verifyCeoReportAccessToken(
   if (parts.length !== 2 || !parts[0] || !parts[1]) return null;
 
   try {
-    const suppliedSignature = Buffer.from(parts[1], "base64url");
+    const payload = decodeCanonicalBase64Url(parts[0]);
+    const suppliedSignature = decodeCanonicalBase64Url(parts[1]);
+    if (!payload || !suppliedSignature) return null;
     const expectedSignature = signature(parts[0], secret);
     if (suppliedSignature.length !== expectedSignature.length || !timingSafeEqual(suppliedSignature, expectedSignature)) {
       return null;
     }
-    const claims: unknown = JSON.parse(Buffer.from(parts[0], "base64url").toString("utf8"));
+    const claims: unknown = JSON.parse(payload.toString("utf8"));
     if (!isClaims(claims) || claims.expiresAt <= nowSeconds) return null;
     return claims;
   } catch {
