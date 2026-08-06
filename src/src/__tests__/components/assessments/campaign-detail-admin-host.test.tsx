@@ -7,8 +7,8 @@
  *   - `basePath` drives the "Back to Assessments" link (default coach portal),
  *   - `hidePortalOnlyLinks` suppresses "View Trends" + the empty-state
  *     "Add members in the Members lane" link (no admin equivalents).
- * (The per-respondent "Over time" longitudinal link is handled separately by
- * the admin page passing `longitudinalRespondentIds={[]}`.)
+ * (The coach-only per-respondent "Over time" rollback entry is handled
+ * separately by the admin page omitting its eligibility prop.)
  *
  * Regression: with no host props, the coach portal behaviour is unchanged.
  */

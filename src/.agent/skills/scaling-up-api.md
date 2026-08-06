@@ -42,6 +42,31 @@ return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 return NextResponse.json({ error: "Not found" }, { status: 404 });
 ```
 
+## Capability endpoints outside `/api`
+
+Two security-sensitive POST endpoints intentionally live beside their public
+pages rather than under `src/app/api/`:
+
+- `POST /org-survey/[campaignAlias]/exchange` accepts an invitation bearer from
+  the URL fragment, validates the exact campaign/invitation lifecycle, and
+  saves the invited-survey session. The raw bearer is never copied into a query
+  string or persistent client state.
+- `POST /assessments/self-report/exchange` accepts a CEO report bearer, applies
+  `RateLimits.standard` through the strict fail-closed wrapper **before** body
+  parsing or token examination, revalidates the exact live CEO grant, writes
+  the `CEO_SELF` exchange audit, and saves an HTTP-only sealed session scoped
+  to the exact individual report path. Missing or failing distributed limiter
+  backing returns the same generic unavailable response before the bearer is
+  examined.
+
+The invited-survey exchange returns lifecycle-specific errors and
+`Cache-Control: no-store`. The CEO self-report exchange returns only generic,
+enumeration-safe failures and always uses `Cache-Control: no-store, private`
+plus `Referrer-Policy: no-referrer`. Do not apply the ordinary authenticated
+API example below to them: the bearer/session capability is their
+authentication, and the individual report revalidates all live grant facts
+again on every read.
+
 ## Auth Pattern for API Routes
 ```typescript
 import { getApiActor } from "@/lib/authorization";
