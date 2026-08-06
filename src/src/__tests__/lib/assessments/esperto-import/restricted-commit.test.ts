@@ -174,6 +174,9 @@ interface FakeCampaignRow {
   importManifest: unknown;
   openAt: Date;
   closeAt: Date;
+  reportStyle: string;
+  reportStyleSource: string;
+  reportStyleLockedAt: Date | null;
 }
 
 interface FakeCoachRow {
@@ -241,6 +244,7 @@ class FakeDb implements RestrictedCommitDb {
         templateId: row.templateId,
         versionId: row.versionId,
         importManifest: row.importManifest,
+        reportStyleLockedAt: row.reportStyleLockedAt,
       };
     },
     create: async (args: { data: Record<string, unknown> }) => {
@@ -261,17 +265,26 @@ class FakeDb implements RestrictedCommitDb {
         importManifest: args.data.importManifest,
         openAt: args.data.openAt as Date,
         closeAt: args.data.closeAt as Date,
+        reportStyle: args.data.reportStyle as string,
+        reportStyleSource: args.data.reportStyleSource as string,
+        reportStyleLockedAt: args.data.reportStyleLockedAt as Date | null,
       };
       this.campaignsByExternalId.set(row.externalId, row);
       return { id };
     },
-    update: async (args: { where: { id: string }; data: Record<string, unknown> }) => {
+    update: async (args: {
+      where: { id: string; reportStyleLockedAt?: null };
+      data: Record<string, unknown>;
+    }) => {
       this.campaignUpdates.push({ where: args.where, data: args.data });
       for (const row of this.campaignsByExternalId.values()) {
         if (row.id === args.where.id) {
           if ("openAt" in args.data) row.openAt = args.data.openAt as Date;
           if ("closeAt" in args.data) row.closeAt = args.data.closeAt as Date;
           if ("importManifest" in args.data) row.importManifest = args.data.importManifest;
+          if ("reportStyleLockedAt" in args.data) {
+            row.reportStyleLockedAt = args.data.reportStyleLockedAt as Date;
+          }
         }
       }
       return { id: args.where.id };
@@ -393,6 +406,9 @@ class FakeDb implements RestrictedCommitDb {
       importManifest: row.importManifest ?? null,
       openAt: row.openAt ?? new Date("2025-03-01T10:00:00-04:00"),
       closeAt: row.closeAt ?? new Date("2025-03-02T11:00:00-04:00"),
+      reportStyle: row.reportStyle ?? "CLASSIC",
+      reportStyleSource: row.reportStyleSource ?? "TEMPLATE_DEFAULT",
+      reportStyleLockedAt: row.reportStyleLockedAt ?? null,
     };
     this.campaignsByExternalId.set(full.externalId, full);
     return full;
@@ -681,6 +697,45 @@ describe("commitRestrictedImport — CREATE path", () => {
     }
   });
 
+  it("snapshots Classic with template-default provenance and locks at the earliest imported completion", async () => {
+    const campaign = makeCampaign();
+    const earlierSubmittedAt = "2025-02-28T07:30:00-04:00";
+    const plan = basePlan({
+      campaign: makeCampaign({
+        rows: [
+          ...campaign.rows,
+          {
+            ...campaign.rows[0],
+            respondentId: "resp-earliest",
+            mid: "RAW_MID_EARLIEST",
+            reportid: "rep-earliest",
+            submittedAt: earlierSubmittedAt,
+            answerHash: "hash-earliest",
+          },
+        ],
+      }),
+      manifest: makeManifest({
+        respondents: [
+          ...makeManifest().respondents,
+          {
+            saltedMidHash: "salted-earliest",
+            saltedReportIdHash: "salted-rep-earliest",
+            answerHash: "hash-earliest",
+          },
+        ],
+      }),
+    });
+    const db = makeFakeDbWithAccess();
+
+    await commitRestrictedImport(db, plan, baseCtx(), actor);
+
+    expect(db.campaignCreates[0].data).toMatchObject({
+      reportStyle: "CLASSIC",
+      reportStyleSource: "TEMPLATE_DEFAULT",
+      reportStyleLockedAt: new Date(earlierSubmittedAt),
+    });
+  });
+
   it("recomputes openAt/closeAt via the DB aggregate over persisted submissions", async () => {
     const db = makeFakeDbWithAccess();
     await commitRestrictedImport(db, basePlan(), baseCtx(), actor);
@@ -739,6 +794,32 @@ describe("commitRestrictedImport — REUSE exact no-op", () => {
     expect(db.orgUpdates).toHaveLength(0);
     expect(db.aggregateCalls).toBe(0);
   });
+
+  it("preserves the stored appearance and first-import lock on retry", async () => {
+    const lockedAt = new Date("2024-12-15T09:00:00.000Z");
+    const db = makeFakeDbWithAccess();
+    const existing = db.seedExistingCampaign({
+      externalId: "esperto:sufull:cidSUFULL01:2025-annual",
+      organizationId: "org-1",
+      templateId: "tmpl-sufull",
+      versionId: EXISTING_CAMPAIGN_VERSION_ID,
+      importManifest: makeManifest(),
+      reportStyle: "EXECUTIVE_BOARDROOM",
+      reportStyleSource: "CAMPAIGN_OVERRIDE",
+      reportStyleLockedAt: lockedAt,
+    });
+    db.seedOrg("org-1", "cidSUFULL01");
+
+    await commitRestrictedImport(db, basePlan(), baseCtx(), actor);
+
+    expect(existing).toMatchObject({
+      reportStyle: "EXECUTIVE_BOARDROOM",
+      reportStyleSource: "CAMPAIGN_OVERRIDE",
+      reportStyleLockedAt: lockedAt,
+    });
+    expect(db.campaignCreates).toHaveLength(0);
+    expect(db.campaignUpdates).toHaveLength(0);
+  });
 });
 
 // ────────────────────────────────────────────────────────────────────────
@@ -767,6 +848,46 @@ describe("commitRestrictedImport — REUSE superset append", () => {
       }),
     });
   }
+
+  it("locks an empty first import at its first appended completion while preserving stored appearance", async () => {
+    const db = makeFakeDbWithAccess();
+    const emptyPlan = basePlan({
+      campaign: makeCampaign({ rows: [] }),
+      manifest: makeManifest({ respondents: [] }),
+    });
+
+    await commitRestrictedImport(db, emptyPlan, baseCtx(), actor);
+    const existing = db.campaignsByExternalId.get(
+      "esperto:sufull:cidSUFULL01:2025-annual",
+    );
+    if (!existing) throw new Error("empty campaign was not created");
+    existing.reportStyle = "EXECUTIVE_BOARDROOM";
+    existing.reportStyleSource = "CAMPAIGN_OVERRIDE";
+    db.versions.set(NEW_CAMPAIGN_VERSION_ID, {
+      id: NEW_CAMPAIGN_VERSION_ID,
+      questions: [],
+      sections: [],
+      scoringConfig: {},
+    });
+
+    await commitRestrictedImport(db, basePlan(), baseCtx(), actor);
+
+    expect(existing).toMatchObject({
+      reportStyle: "EXECUTIVE_BOARDROOM",
+      reportStyleSource: "CAMPAIGN_OVERRIDE",
+      reportStyleLockedAt: new Date("2025-03-01T10:00:00-04:00"),
+    });
+    expect(
+      db.campaignUpdates.find((entry) =>
+        Object.hasOwn(entry.data, "reportStyleLockedAt"),
+      ),
+    ).toEqual({
+      where: { id: existing.id, reportStyleLockedAt: null },
+      data: {
+        reportStyleLockedAt: new Date("2025-03-01T10:00:00-04:00"),
+      },
+    });
+  });
 
   it("creates exactly 1 new invitation+submission, scored against the EXISTING campaign's pinned version", async () => {
     const db = makeFakeDbWithAccess();

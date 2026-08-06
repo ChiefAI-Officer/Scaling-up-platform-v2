@@ -22,28 +22,33 @@ jest.mock("next/server", () => ({
 jest.mock("@/lib/db", () => {
   const assessmentSubmission = { create: jest.fn() };
   const assessmentEmailOutbox = { create: jest.fn() };
-  const executeRaw = jest.fn().mockResolvedValue(1);
+  const queryRaw = jest.fn().mockResolvedValue([{ reportStyle: "CLASSIC" }]);
   return {
     db: {
       assessmentCampaign: { findUnique: jest.fn() },
       assessmentTemplateVersion: { findUnique: jest.fn() },
       assessmentSubmission,
-      assessmentEmailOutbox,
       $transaction: jest.fn(
         (
           callback: (tx: {
             assessmentSubmission: { create: jest.Mock };
             assessmentEmailOutbox: { create: jest.Mock };
-            $executeRaw: jest.Mock;
+            $queryRaw: jest.Mock;
           }) => Promise<unknown>,
-        ) =>
-          callback({
-            assessmentSubmission,
-            assessmentEmailOutbox,
-            $executeRaw: executeRaw,
-          }),
+        ) => {
+          mockSubmitPostTransactionActive = true;
+          return Promise.resolve(
+            callback({
+              assessmentSubmission,
+              assessmentEmailOutbox,
+              $queryRaw: queryRaw,
+            }),
+          ).finally(() => {
+            mockSubmitPostTransactionActive = false;
+          });
+        },
       ),
-      $executeRaw: executeRaw,
+      $queryRaw: queryRaw,
     },
   };
 });
@@ -60,6 +65,26 @@ jest.mock("@/lib/rate-limit", () => ({
   RateLimits: { standard: {} },
   withRateLimit: jest.fn().mockResolvedValue({ allowed: true, headers: {} }),
 }));
+
+// eslint-disable-next-line no-var
+var reportBuildInputs: Array<Record<string, unknown>>;
+// eslint-disable-next-line no-var
+var reportBuildTransactionStates: boolean[];
+// eslint-disable-next-line no-var
+var mockSubmitPostTransactionActive = false;
+jest.mock("@/lib/assessments/report-email", () => {
+  const actual = jest.requireActual("@/lib/assessments/report-email");
+  return {
+    ...actual,
+    buildRespondentReportFromSubmission: jest.fn(
+      (args: Record<string, unknown>) => {
+        reportBuildInputs.push(args);
+        reportBuildTransactionStates.push(mockSubmitPostTransactionActive);
+        return actual.buildRespondentReportFromSubmission(args);
+      },
+    ),
+  };
+});
 
 // Scoring helper is real — feed it a valid template version + valid answers
 // so we don't have to deal with stubbing the engine internals.
@@ -118,6 +143,8 @@ const activeOpenCampaign = {
   templateId: "tpl-1",
   versionId: "ver-1",
   deletedAt: null,
+  reportStyle: "CLASSIC",
+  template: { name: "Scaling Up Quick Assessment", alias: "quick-assessment" },
 };
 
 function jsonReq(body: unknown): Request {
@@ -132,6 +159,12 @@ const aliasParams = { params: Promise.resolve({ campaignAlias: "demo" }) };
 
 beforeEach(() => {
   jest.clearAllMocks();
+  reportBuildInputs = [];
+  reportBuildTransactionStates = [];
+  mockSubmitPostTransactionActive = false;
+  (db as unknown as { $queryRaw: jest.Mock }).$queryRaw.mockResolvedValue([
+    { reportStyle: "CLASSIC" },
+  ]);
 });
 
 describe("POST /api/quiz/[campaignAlias]/submit", () => {
@@ -197,7 +230,7 @@ describe("POST /api/quiz/[campaignAlias]/submit", () => {
     expect(body.success).toBe(true);
     expect(body.data.submissionId).toBe("sub-1");
     expect(body.data.redirectUrl).toBe("/quiz/demo/thank-you");
-    expect((db as unknown as { $executeRaw: jest.Mock }).$executeRaw).toHaveBeenCalledTimes(1);
+    expect((db as unknown as { $queryRaw: jest.Mock }).$queryRaw).toHaveBeenCalledTimes(1);
     const createArgs = (db.assessmentSubmission.create as jest.Mock).mock
       .calls[0][0];
     expect(createArgs.data.respondentId).toBeNull();
@@ -207,5 +240,33 @@ describe("POST /api/quiz/[campaignAlias]/submit", () => {
       lastName: "Doe",
       email: "alex@example.com",
     });
+  });
+
+  it("uses the style saved before completion wins the lock, not the stale campaign pre-read", async () => {
+    (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValue({
+      ...activeOpenCampaign,
+      reportStyle: "CLASSIC",
+    });
+    (db.assessmentTemplateVersion.findUnique as jest.Mock).mockResolvedValue(
+      validVersion,
+    );
+    (db.assessmentSubmission.create as jest.Mock).mockResolvedValue({
+      id: "sub-race",
+    });
+    (db as unknown as { $queryRaw: jest.Mock }).$queryRaw.mockResolvedValueOnce([
+      { reportStyle: "EXECUTIVE_BOARDROOM" },
+    ]);
+
+    const res = await POST(jsonReq(validBody) as never, aliasParams);
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data.reportStyle).toBe("EXECUTIVE_BOARDROOM");
+    expect(
+      reportBuildInputs.some(
+        (input) => input.reportStyle === "EXECUTIVE_BOARDROOM",
+      ),
+    ).toBe(true);
+    expect(reportBuildTransactionStates).toEqual([false, false, false]);
   });
 });

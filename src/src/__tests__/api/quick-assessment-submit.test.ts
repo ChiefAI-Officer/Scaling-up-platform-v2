@@ -46,7 +46,7 @@ const txMock = {
 // eslint-disable-next-line no-var
 var reportStyleLockMock: jest.Mock;
 jest.mock("@/lib/assessments/report-style-lock", () => {
-  reportStyleLockMock = jest.fn().mockResolvedValue(undefined);
+  reportStyleLockMock = jest.fn().mockResolvedValue("MODERN_DASHBOARD");
   return { lockReportStyleForFirstCompletion: reportStyleLockMock };
 });
 
@@ -248,7 +248,7 @@ let transactionActive = false;
 
 beforeEach(() => {
   jest.clearAllMocks();
-  reportStyleLockMock.mockReset().mockResolvedValue(undefined);
+  reportStyleLockMock.mockReset().mockResolvedValue("MODERN_DASHBOARD");
   reportStylesEnabledMock.mockReturnValue(false);
   findingsEnabledMock.mockReturnValue(false);
   transactionActive = false;
@@ -453,8 +453,8 @@ describe("report style first-completion freeze", () => {
     const lockStarted = new Promise<void>((resolve) => {
       reportStyleLockMock.mockImplementationOnce(() => {
         resolve();
-        return new Promise<void>((release) => {
-          releaseLock = release;
+        return new Promise<string>((release) => {
+          releaseLock = () => release("MODERN_DASHBOARD");
         });
       });
     });
@@ -814,12 +814,17 @@ describe("outbox enqueue", () => {
     info.mockRestore();
   });
 
-  it("outbox rows are created inside the transaction (via txMock)", async () => {
+  it("persists the selected pre-rendered rows inside the completion transaction", async () => {
     process.env.QUICK_ASSESSMENT_TEAM_EMAIL = "team@scalingup.com";
-    // Verify it's txMock.assessmentEmailOutbox.create being called (not db.assessmentEmailOutbox)
+    const outboxTransactionStates: boolean[] = [];
+    txMock.assessmentEmailOutbox.create.mockImplementation(async () => {
+      outboxTransactionStates.push(transactionActive);
+      return {};
+    });
+
     await POST(makeRequest(VALID_BODY) as never, makeParams() as never);
-    // txMock.assessmentEmailOutbox.create was called → confirms it's inside $transaction
-    expect(txMock.assessmentEmailOutbox.create).toHaveBeenCalled();
+
+    expect(outboxTransactionStates).toEqual([true, true]);
   });
 
   // Wave D regression: the PUBLIC quiz path must NOT read the INVITED-only
@@ -1175,10 +1180,14 @@ describe("idempotency — duplicate idempotencyKey (P2002)", () => {
     );
     const lockTransactions: unknown[] = [];
     const lockTransactionStates: boolean[] = [];
+    (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValue({
+      ...CAMPAIGN,
+      reportStyle: "CLASSIC",
+    });
     reportStyleLockMock.mockImplementation((tx) => {
       lockTransactions.push(tx);
       lockTransactionStates.push(transactionActive);
-      return Promise.resolve();
+      return Promise.resolve("EXECUTIVE_BOARDROOM");
     });
 
     const response = await POST(
@@ -1192,6 +1201,7 @@ describe("idempotency — duplicate idempotencyKey (P2002)", () => {
       data: {
         submissionId: "sub-existing",
         scoreResult: EXISTING_SUB.result,
+        reportStyle: "EXECUTIVE_BOARDROOM",
       },
     });
     expect(db.assessmentSubmission.findFirst).toHaveBeenCalledTimes(2);

@@ -157,6 +157,7 @@ interface E2ECampaignRow {
   versionId: string;
   importManifest: unknown;
   externalId: string;
+  reportStyleLockedAt: Date | null;
 }
 
 class E2EFakeDb implements RestrictedCommitDb {
@@ -220,14 +221,21 @@ class E2EFakeDb implements RestrictedCommitDb {
         versionId: args.data.versionId as string,
         importManifest: args.data.importManifest,
         externalId: args.data.externalId as string,
+        reportStyleLockedAt: args.data.reportStyleLockedAt as Date | null,
       };
       this.campaigns.set(row.externalId, row);
       return { id };
     },
-    update: async (args: { where: { id: string }; data: Record<string, unknown> }) => {
+    update: async (args: {
+      where: { id: string; reportStyleLockedAt?: null };
+      data: Record<string, unknown>;
+    }) => {
       for (const row of this.campaigns.values()) {
         if (row.id === args.where.id && "importManifest" in args.data) {
           row.importManifest = args.data.importManifest;
+        }
+        if (row.id === args.where.id && "reportStyleLockedAt" in args.data) {
+          row.reportStyleLockedAt = args.data.reportStyleLockedAt as Date;
         }
       }
       return { id: args.where.id };

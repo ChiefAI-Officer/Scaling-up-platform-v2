@@ -295,9 +295,13 @@ export interface RestrictedCommitPrismaLike {
       templateId: string;
       versionId: string;
       importManifest: unknown;
+      reportStyleLockedAt: Date | null;
     } | null>;
     create: (args: { data: object }) => Promise<{ id: string }>;
-    update: (args: { where: { id: string }; data: object }) => Promise<unknown>;
+    update: (args: {
+      where: { id: string; reportStyleLockedAt?: null };
+      data: object;
+    }) => Promise<unknown>;
   };
   assessmentTemplateVersion: {
     findUnique: (args: { where: { id: string }; select?: object }) => Promise<{

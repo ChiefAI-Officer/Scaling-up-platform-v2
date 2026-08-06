@@ -306,6 +306,7 @@ describe("buildRealRestrictedCommitDb — assessmentCampaign.findUnique soft-del
       templateId: "tmpl-sufull",
       versionId: "ver-1",
       importManifest: null,
+      reportStyleLockedAt: null,
       deletedAt: new Date("2026-01-01T00:00:00Z"),
     };
     const prisma = makePrismaLike({

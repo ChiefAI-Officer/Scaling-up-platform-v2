@@ -17,7 +17,9 @@
  * INSIDE the tx so a failed audit rolls the whole campaign back.
  *
  * SAFETY INVARIANTS (S1 — non-negotiable):
- *   - Insert / create-only upsert ONLY. NEVER delete / deleteMany / updateMany.
+ *   - Insert / create-only upsert ONLY, except for the narrow conditional
+ *     campaign lock written when an empty reused campaign gains its first
+ *     imported completion. NEVER delete / deleteMany / updateMany.
  *   - NO raw SQL (the campaign is keyed by its unique externalId).
  *   - Imported invitations are born `status:"SUBMITTED"` and the importer NEVER
  *     calls any email-send function — there is no send path in this module.
@@ -107,6 +109,7 @@ interface ExistingCampaignRow {
   id: string;
   organizationId: string;
   templateId: string;
+  reportStyleLockedAt: Date | null;
 }
 
 interface ExistingRespondentRow {
@@ -122,13 +125,22 @@ export interface ResultsCommitTx {
   assessmentCampaign: {
     findUnique: (args: {
       where: { externalId: string };
-      select: { id: true; organizationId: true; templateId: true };
+      select: {
+        id: true;
+        organizationId: true;
+        templateId: true;
+        reportStyleLockedAt: true;
+      };
     }) => Promise<ExistingCampaignRow | null>;
     findFirst: (args: {
       where: { alias: string };
       select: { id: true };
     }) => Promise<IdRow | null>;
     create: (args: { data: Record<string, unknown> }) => Promise<IdRow>;
+    update: (args: {
+      where: { id: string; reportStyleLockedAt: null };
+      data: { reportStyleLockedAt: Date };
+    }) => Promise<IdRow>;
   };
   orgRespondent: {
     findMany: (args: {
@@ -196,6 +208,15 @@ export function slugifyForAlias(s: string): string {
   );
 }
 
+export function earliestImportedSubmissionTime(
+  rows: ReadonlyArray<{ submittedAt: string }>,
+): Date | null {
+  return rows.reduce<Date | null>((earliest, row) => {
+    const submittedAt = new Date(row.submittedAt);
+    return earliest === null || submittedAt < earliest ? submittedAt : earliest;
+  }, null);
+}
+
 // ────────────────────────────────────────────────────────────────────────
 // commitResultsImport
 // ────────────────────────────────────────────────────────────────────────
@@ -226,7 +247,12 @@ export async function commitResultsImport(
       //    cannot target). Reuse only on (organizationId, templateId) match. ──
       const existing = await tx.assessmentCampaign.findUnique({
         where: { externalId: campaign.externalId },
-        select: { id: true, organizationId: true, templateId: true },
+        select: {
+          id: true,
+          organizationId: true,
+          templateId: true,
+          reportStyleLockedAt: true,
+        },
       });
 
       let campaignId: string;
@@ -276,12 +302,35 @@ export async function commitResultsImport(
             endMode: "OPEN_END",
             openAt: new Date(campaign.openAt),
             closeAt: campaign.closeAt ? new Date(campaign.closeAt) : null,
+            // Historical completions predate appearance selection. Match the
+            // migration baseline so importing later cannot restyle history.
+            reportStyle: "CLASSIC",
+            reportStyleSource: "TEMPLATE_DEFAULT",
+            reportStyleLockedAt: earliestImportedSubmissionTime(campaign.rows),
             createdBy: ctx.createdByUserId,
             createdByCoachId: ctx.ownerCoachId,
           },
         });
         campaignId = created.id;
         campaignAction = "create";
+      }
+
+      const firstImportedCompletion = earliestImportedSubmissionTime(
+        campaign.rows,
+      );
+      if (
+        campaignAction === "reuse" &&
+        existing?.reportStyleLockedAt == null &&
+        firstImportedCompletion
+      ) {
+        // Empty imports are valid. If a later reuse adds the first historical
+        // completion, freeze the existing stored appearance before creating
+        // that submission. The conditional update orders with concurrent
+        // appearance saves and preserves style + provenance.
+        await tx.assessmentCampaign.update({
+          where: { id: campaignId, reportStyleLockedAt: null },
+          data: { reportStyleLockedAt: firstImportedCompletion },
+        });
       }
 
       // ── 2. Single-CEO guard: resolve roleType for the campaign's respondent

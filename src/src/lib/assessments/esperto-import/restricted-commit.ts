@@ -44,6 +44,7 @@ import type {
   RestrictedRow,
 } from "./restricted-plan";
 import {
+  earliestImportedSubmissionTime,
   importInvitationTokenHash,
   slugifyForAlias,
 } from "./results-commit";
@@ -63,6 +64,7 @@ export interface RestrictedExistingCampaignRow {
   templateId: string;
   versionId: string;
   importManifest: unknown;
+  reportStyleLockedAt: Date | null;
 }
 
 export interface RestrictedCommitDb {
@@ -82,7 +84,10 @@ export interface RestrictedCommitDb {
       select?: object;
     }): Promise<RestrictedExistingCampaignRow | null>;
     create(args: { data: object }): Promise<{ id: string }>;
-    update(args: { where: { id: string }; data: object }): Promise<unknown>;
+    update(args: {
+      where: { id: string; reportStyleLockedAt?: null };
+      data: object;
+    }): Promise<unknown>;
   };
   assessmentTemplateVersion: {
     findUnique(args: {
@@ -436,6 +441,7 @@ export async function commitRestrictedImport(
         templateId: true,
         versionId: true,
         importManifest: true,
+        reportStyleLockedAt: true,
       },
     });
 
@@ -466,6 +472,7 @@ export async function commitRestrictedImport(
             templateId: true,
             versionId: true,
             importManifest: true,
+            reportStyleLockedAt: true,
           },
         });
         if (
@@ -523,6 +530,11 @@ async function commitCreatePath(
       endMode: "OPEN_END",
       openAt: new Date(campaign.openAt),
       closeAt: new Date(campaign.closeAt),
+      // Historical completions predate appearance selection. Match the
+      // migration baseline so importing later cannot restyle history.
+      reportStyle: "CLASSIC",
+      reportStyleSource: "TEMPLATE_DEFAULT",
+      reportStyleLockedAt: earliestImportedSubmissionTime(campaign.rows),
       createdBy: ctx.createdByUserId,
       createdByCoachId: ctx.ownerCoachId,
       importManifest: {
@@ -621,6 +633,17 @@ async function commitReusePath(
   if (newOnly.length === 0) {
     // Exact reuse — a TRUE no-op. No writes at all.
     return { kind: "reused-noop", campaignId: existing.id };
+  }
+
+  const firstImportedCompletion = earliestImportedSubmissionTime(campaign.rows);
+  if (existing.reportStyleLockedAt === null && firstImportedCompletion) {
+    // An empty first import creates a valid unlocked campaign. Freeze its
+    // existing stored appearance before a superset reuse appends the first
+    // historical submission; style and provenance are deliberately untouched.
+    await tx.assessmentCampaign.update({
+      where: { id: existing.id, reportStyleLockedAt: null },
+      data: { reportStyleLockedAt: firstImportedCompletion },
+    });
   }
 
   // SUPERSET APPEND — score new respondents against the EXISTING campaign's
