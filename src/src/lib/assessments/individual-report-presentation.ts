@@ -63,6 +63,7 @@ export type ReportMetric = Readonly<{
   maximum?: number | null;
   min?: number;
   max?: number;
+  chosenLabels?: readonly string[];
   achieved?: boolean;
   achievementMarker?: Readonly<{
     symbol: "✓" | "✕";
@@ -106,12 +107,7 @@ export type ThemeBlock = Readonly<{
   stableKey: string;
   label: string;
   description?: string;
-  items: readonly Readonly<{
-    stableKey: string;
-    label: string;
-    values: readonly unknown[];
-    chosenLabels: readonly string[];
-  }>[];
+  items: readonly ReportMetric[];
 }>;
 
 export type FindingBlock = Readonly<{
@@ -142,12 +138,21 @@ export type NarrativeResponseBlock = Readonly<{
     stableKey: string;
     label: string;
     answer: string;
+    type: string;
+    value: unknown;
+    valueLabel: string;
+    min?: number;
+    max?: number;
   }>[];
 }>;
 
 export type AdditionalResponseBlock = Readonly<{
   kind: "additional-response";
-  responses: readonly Readonly<{ label: string; answer: string }>[];
+  responses: readonly Readonly<{
+    stableKey: string;
+    label: string;
+    answer: string;
+  }>[];
 }>;
 
 export type CoachCtaBlock = Readonly<{

@@ -140,7 +140,7 @@ export const REPORT_STYLE_PREVIEW_FIXTURE: ScoredReportViewModel = deepFreeze({
   ],
   findingRecommendations: [],
   additionalResponses: [
-    { label: "What would make the biggest difference this quarter?", answer: "A shared rhythm for turning strategic choices into weekly commitments, without losing the candor that made our planning workshop useful." },
+    { stableKey: "preview-biggest-difference", label: "What would make the biggest difference this quarter?", answer: "A shared rhythm for turning strategic choices into weekly commitments, without losing the candor that made our planning workshop useful." },
   ],
   cta: {
     eligible: true,
@@ -242,7 +242,7 @@ export function buildReportStylePreviewFixture(variant: ReportStylePreviewVarian
         label: `${group.label}: ${long}`,
         items: group.items.map((item) => ({ ...item, text: `${item.text} ${long}. ${long}.` })),
       }));
-      view.additionalResponses = [{ label: long, answer: `${long}. ${long}. ${long}.` }];
+      view.additionalResponses = [{ stableKey: "preview-max-length-response", label: long, answer: `${long}. ${long}. ${long}.` }];
       return view;
     }
     case "missing-optional":

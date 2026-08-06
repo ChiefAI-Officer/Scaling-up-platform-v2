@@ -310,6 +310,10 @@ describe("buildIndividualReportPresentation", () => {
         (block) => block.responses,
       ),
     ).toEqual(canonical.additionalResponses);
+    expect(
+      blocksOfKind(presentation.blocks, "additional-response")[0].responses[0]
+        .stableKey,
+    ).toBe("strategy-answer");
     expect(blocksOfKind(presentation.blocks, "coach-cta")).toEqual([
       { kind: "coach-cta", ...canonical.cta },
     ]);
@@ -360,7 +364,9 @@ describe("buildIndividualReportPresentation", () => {
         {
           stableKey: "priorities",
           label: "Which themes matter?",
-          values: ["cash", "people"],
+          type: "MULTI_CHOICE",
+          value: ["cash", "people"],
+          valueLabel: "Cash, People",
           chosenLabels: ["Cash", "People"],
         },
       ],
@@ -442,6 +448,9 @@ describe("buildIndividualReportPresentation", () => {
             stableKey: "custom_prompt",
             label: "What deserves attention?",
             answer: "Our onboarding handoff.",
+            type: "TEXT",
+            value: "Our onboarding handoff.",
+            valueLabel: "Our onboarding handoff.",
           },
         ],
       },
@@ -459,6 +468,96 @@ describe("buildIndividualReportPresentation", () => {
         ].includes(block.kind),
       ),
     ).toBe(false);
+  });
+
+  it("keeps a mixed LVA qa section canonical instead of reclassifying its numeric item as a metric group", () => {
+    const report = qualitativeReport({
+      templateAlias: "leadership-vision-alignment",
+      sections: [{ stableKey: "S6_focus", name: "Focus" }],
+      questionByKey: {
+        S6_rehire_pct: "What percentage would you enthusiastically rehire?",
+        S6_focus_answer: "What deserves your focus?",
+      },
+      questionsByKey: {
+        S6_rehire_pct: {
+          type: "NUMBER",
+          label: "What percentage would you enthusiastically rehire?",
+          sectionStableKey: "S6_focus",
+          min: 0,
+          max: 100,
+        },
+        S6_focus_answer: {
+          type: "TEXT",
+          label: "What deserves your focus?",
+          sectionStableKey: "S6_focus",
+        },
+      },
+      rawAnswers: [
+        { stableKey: "S6_rehire_pct", value: 75 },
+        { stableKey: "S6_focus_answer", value: "The leadership bench." },
+      ],
+    });
+
+    const presentation = buildIndividualReportPresentation(report);
+
+    expect(
+      blocksOfKind(presentation.blocks, "metric-group").filter(
+        (block) => block.stableKey === "S6_focus",
+      ),
+    ).toEqual([]);
+    expect(blocksOfKind(presentation.blocks, "narrative-response")).toContainEqual({
+      kind: "narrative-response",
+      stableKey: "S6_focus",
+      label: "Focus",
+      responses: [
+        {
+          stableKey: "S6_rehire_pct",
+          label: "What percentage would you enthusiastically rehire?",
+          answer: "75",
+          type: "NUMBER",
+          value: 75,
+          valueLabel: "75",
+          min: 0,
+          max: 100,
+        },
+        {
+          stableKey: "S6_focus_answer",
+          label: "What deserves your focus?",
+          answer: "The leadership bench.",
+          type: "TEXT",
+          value: "The leadership bench.",
+          valueLabel: "The leadership bench.",
+        },
+      ],
+    });
+  });
+
+  it("preserves the stable key of an orphan qualitative additional response", () => {
+    const report = qualitativeReport({
+      sections: [],
+      questionByKey: { orphan_prompt: "Anything else?" },
+      questionsByKey: {
+        orphan_prompt: { type: "TEXT", label: "Anything else?" },
+      },
+      rawAnswers: [
+        { stableKey: "orphan_prompt", value: "Keep the cadence." },
+      ],
+    });
+
+    const presentation = buildIndividualReportPresentation(report);
+
+    expect(blocksOfKind(presentation.blocks, "additional-response")).toEqual([
+      {
+        kind: "additional-response",
+        responses: [
+          {
+            stableKey: "orphan_prompt",
+            label: "Anything else?",
+            answer: "Keep the cadence.",
+          },
+        ],
+      },
+    ]);
   });
 
   it("is independent of appearance and deeply freezes the shared semantic object", () => {

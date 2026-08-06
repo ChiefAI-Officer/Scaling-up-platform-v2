@@ -115,8 +115,8 @@ describe("buildScoredReportViewModel", () => {
       expect.objectContaining({ sectionStableKey: "strategy", label: "Strategy", items: [expect.objectContaining({ text: "Turn the strategy into a weekly cadence." })] }),
     ]);
     expect(view.additionalResponses).toEqual([
-      { label: "What must change?", answer: "A detailed answer that belongs in the report." },
-      { label: "Which habits matter?", answer: "Weekly meeting" },
+      { stableKey: "strategy-answer", label: "What must change?", answer: "A detailed answer that belongs in the report." },
+      { stableKey: "choices", label: "Which habits matter?", answer: "Weekly meeting" },
     ]);
     expect(view.cta).toEqual({
       eligible: true,

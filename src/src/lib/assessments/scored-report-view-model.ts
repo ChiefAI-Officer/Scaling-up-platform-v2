@@ -119,7 +119,11 @@ export interface ScoredReportViewModel {
   recommendations: ScoredReportRecommendationGroup[];
   /** Frozen non-slider findings, selected only by applyScoredReportFindingsPolicy. */
   findingRecommendations: ScoredReportRecommendationGroup[];
-  additionalResponses: Array<{ label: string; answer: string }>;
+  additionalResponses: Array<{
+    stableKey: string;
+    label: string;
+    answer: string;
+  }>;
   cta: {
     eligible: boolean;
     contactEmail: string | null;
@@ -407,7 +411,11 @@ export function buildScoredReportViewModel(report: RespondentReport): ScoredRepo
       if (typeof answer.stableKey !== "string") return [];
       const meta = report.questionsByKey?.[answer.stableKey];
       if (!meta || meta.type === "SLIDER_LIKERT") return [];
-      return [{ label: meta.label || answer.stableKey, answer: displayAnswer(answer.value, meta) }];
+      return [{
+        stableKey: answer.stableKey,
+        label: meta.label || answer.stableKey,
+        answer: displayAnswer(answer.value, meta),
+      }];
     })
     : [];
   const config = reportConfigFor(report.templateAlias);
