@@ -144,6 +144,46 @@ describe("BrandedReport badge", () => {
   });
 });
 
+describe("alternate individual report badge", () => {
+  it.each([
+    ["EXECUTIVE_BOARDROOM", "executive-boardroom-report"],
+    ["MODERN_DASHBOARD", "modern-dashboard-report"],
+  ] as const)(
+    "%s preserves the canonical imported marker through BrandedReport dispatch",
+    (reportStyle, renderer) => {
+      const { container } = render(
+        <BrandedReport
+          report={baseReport({ isImported: true, reportStyle })}
+          reportStylesAvailable
+        />,
+      );
+
+      expect(screen.getByTestId(renderer)).toBeInTheDocument();
+      const pages = container.querySelectorAll(".report-page");
+      const badges = screen.getAllByTestId("imported-badge");
+      expect(badges).toHaveLength(pages.length);
+      for (const badge of badges) {
+        expect(badge).toHaveTextContent(BADGE_COPY);
+      }
+    },
+  );
+
+  it.each(["EXECUTIVE_BOARDROOM", "MODERN_DASHBOARD"] as const)(
+    "%s omits the marker when imported provenance is false",
+    (reportStyle) => {
+      render(
+        <BrandedReport
+          report={baseReport({ isImported: false, reportStyle })}
+          reportStylesAvailable
+        />,
+      );
+
+      expect(screen.queryByTestId("imported-badge")).toBeNull();
+      expect(screen.queryByText(BADGE_COPY)).toBeNull();
+    },
+  );
+});
+
 describe("QualitativeReport badge", () => {
   it("shows the badge when report.isImported", () => {
     render(<QualitativeReport report={baseReport({ isImported: true })} />);

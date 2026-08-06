@@ -373,6 +373,85 @@ describe("adaptive alternate report renderers", () => {
   );
 
   it.each(renderers)(
+    "%s preserves the safe imported fact across immediate and later report provenance without exposing internal values",
+    (_, Renderer) => {
+      const immediate: IndividualReportPresentation = {
+        ...sparsePresentation,
+        provenance: {
+          submissionId: "public-imported-submission-secret",
+          versionId: "",
+          contentHash: "",
+          templateName: "Custom founder prompts",
+          imported: true,
+        },
+      };
+      const later: IndividualReportPresentation = {
+        ...immediate,
+        provenance: {
+          ...immediate.provenance,
+          versionId: "imported-version-secret",
+          contentHash: "imported-content-hash-secret",
+        },
+      };
+
+      const immediateHtml = renderToStaticMarkup(
+        <Renderer presentation={immediate} />,
+      );
+      const laterHtml = renderToStaticMarkup(
+        <Renderer presentation={later} />,
+      );
+
+      expect(immediateHtml).toBe(laterHtml);
+      for (const internalValue of [
+        "public-imported-submission-secret",
+        "imported-version-secret",
+        "imported-content-hash-secret",
+      ]) {
+        expect(immediateHtml).not.toContain(internalValue);
+        expect(laterHtml).not.toContain(internalValue);
+      }
+
+      const { container } = render(<Renderer presentation={immediate} />);
+      const pages = container.querySelectorAll(".report-page");
+      const provenanceFooters = container.querySelectorAll(
+        '[data-testid="report-style-provenance"]',
+      );
+      const importedBadges = container.querySelectorAll(
+        '[data-testid="imported-badge"]',
+      );
+      expect(provenanceFooters).toHaveLength(pages.length);
+      expect(importedBadges).toHaveLength(pages.length);
+      for (const badge of importedBadges) {
+        expect(badge).toHaveTextContent("Imported from Esperto (historical)");
+      }
+    },
+  );
+
+  it.each(renderers)(
+    "%s omits the imported marker when canonical provenance says false",
+    (_, Renderer) => {
+      const { container } = render(
+        <Renderer
+          presentation={{
+            ...sparsePresentation,
+            provenance: {
+              ...sparsePresentation.provenance,
+              imported: false,
+            },
+          }}
+        />,
+      );
+
+      expect(
+        container.querySelectorAll('[data-testid="imported-badge"]'),
+      ).toHaveLength(0);
+      expect(container).not.toHaveTextContent(
+        "Imported from Esperto (historical)",
+      );
+    },
+  );
+
+  it.each(renderers)(
     "%s renders every scored semantic block exactly once without renderer-authored score bands",
     (_, Renderer) => {
       const { container } = render(<Renderer presentation={scoredPresentation} />);

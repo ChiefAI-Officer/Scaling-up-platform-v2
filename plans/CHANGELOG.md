@@ -6,6 +6,17 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="universal-individual-report-imported-provenance-correction"></a>
+### 2026-08-07 — Universal individual-report imported provenance correction <!-- ENTRY_ISO:2026-08-07 ENTRY_SLUG:universal-individual-report-imported-provenance-correction -->
+
+**Status and scope.** **LOCALLY IMPLEMENTED AND VERIFIED; not pushed, merged, deployed, activated, or written to Production.** A final specification review correctly distinguished sensitive internal provenance from the safe canonical historical-import fact. Executive Boardroom and Modern Dashboard now render the existing `Imported from Esperto (historical)` marker inside their repeated report provenance only when `IndividualReportPresentation.provenance.imported` is true. The marker uses the same shared component and copy as Classic, with appearance-specific, print-safe border and inherited-ink treatment. False or absent imported state remains fail-closed and produces no marker.
+
+**Privacy and route parity.** The correction does not restore any submission ID, template-version ID, content hash, unavailable placeholder, or debug code. Mutation-sensitive renderer tests prove that immediate public-shape and later loaded reports remain byte-identical despite different internal IDs/hashes while imported truth is preserved. Branded-report dispatch tests cover both alternate appearances; false-state tests cover direct and dispatched rendering; and the public immediate scored, qualitative, and sparse-custom matrix explicitly proves no imported marker is synthesized.
+
+**Visual and verification evidence.** Focused RED failed all four imported-true alternate assertions because zero markers rendered; the minimal shared-renderer correction then passed **3 suites / 49 tests**. The deterministic DB-free capture completed all **27 canonical previews** plus compatibility copies and produced **zero asset diffs**, as every committed preview fixture intentionally has `isImported: false`; its capture contract passed **6/6 tests**. The exhaustive DB-free Chromium lane passed all **54 anatomy/style/variant combinations** with its responsive, accessibility, overflow, and print checks. The full repository passed **642 suites / 7,999 tests / 16 snapshots**. Changed-file ESLint and diff hygiene passed. Repository-wide TypeScript remains at the same **401 inherited diagnostics**, with **zero diagnostics in a changed file**. Migration safety passed across **45 migrations**. `CI=true npx next build --turbopack` compiled successfully in **13.6 seconds**, completed TypeScript, and generated **93/93** static pages; expected local missing-Inngest and `DATABASE_URL` messages did not fail the build.
+
+**Remaining gates.** Protected review, isolated PostgreSQL concurrency coverage, authenticated E2E, merge/deploy, separately authorized synthetic completion/report acceptance, and any global activation remain pending. The existing Production exact-campaign canary and global-off state were not inspected or changed during this correction.
+
 <a id="universal-individual-report-appearance-final-review-corrections"></a>
 ### 2026-08-07 — Universal individual-report appearance final-review corrections <!-- ENTRY_ISO:2026-08-07 ENTRY_SLUG:universal-individual-report-appearance-final-review-corrections -->
 

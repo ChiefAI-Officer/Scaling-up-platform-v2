@@ -2121,3 +2121,16 @@
   letter-spacing: 0.02em;
   margin-top: 6px;
 }
+
+/* Alternate reports reuse the canonical imported marker in their repeating
+   provenance line. Keep the print-safe treatment shared so both appearances
+   cannot drift while allowing the provenance ink to follow each theme. */
+.su-public-brand :where(.su-report--executive, .su-report--dashboard) .report-provenance .su-imported-badge {
+  background: transparent;
+  border-color: currentColor;
+  border-radius: 999px;
+  color: inherit;
+  font-size: .62rem;
+  margin: .35rem 0 0 .45rem;
+  padding: .15rem .45rem;
+}

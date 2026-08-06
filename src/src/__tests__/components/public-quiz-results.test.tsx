@@ -327,6 +327,9 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
       expect(renderer).not.toHaveTextContent("sub_matrix");
       expect(renderer).not.toHaveTextContent(/version unavailable|hash unavailable/i);
       expect(renderer.textContent).not.toContain(" ·  · ");
+      expect(
+        renderer.querySelector('[data-testid="imported-badge"]'),
+      ).toBeNull();
     },
   );
 

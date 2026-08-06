@@ -1,4 +1,5 @@
 import { CoachLogo } from "@/components/assessments/CoachLogo";
+import { ImportedBadge } from "@/components/assessments/ImportedBadge";
 import type {
   AdditionalResponseBlock,
   ClosingBlock,
@@ -57,6 +58,7 @@ export function ReportProvenance({
     <p className="report-provenance" data-testid="report-style-provenance">
       Confidential assessment report
       {templateName ? ` · ${templateName}` : ""}
+      {presentation.provenance.imported ? <ImportedBadge /> : null}
     </p>
   );
 }
