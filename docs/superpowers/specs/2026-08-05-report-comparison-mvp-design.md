@@ -103,6 +103,8 @@ selected, and compare exactly one current report with exactly one prior report.
 - current versus one prior report;
 - same-version aggregate and question deltas;
 - compatible cross-version question deltas;
+- comparison rendering in every launched Scaling Up Full report style:
+  Classic, Executive Boardroom, and Modern Dashboard;
 - print and Save as PDF output;
 - accessible screen and print presentation; and
 - feature flags, audit, metrics, and bounded data access.
@@ -206,11 +208,17 @@ The token is delivered only through an already-authorized disclosure path:
 - the CEO's own results email when `sendResultsToRespondent` is enabled and
   the existing results-email approval/send gates pass.
 
-The email link first lands on a token-exchange route. That route verifies the
-signature and expiry, stores the grant in a `Secure`, `HttpOnly`, `SameSite=Lax`
-cookie scoped to assessment reports, and immediately redirects to the clean
-canonical report URL. The bearer token must not remain in the report URL,
-browser history, client JavaScript state, audit metadata, metrics, or logs.
+The email link first lands on a token-exchange page with the raw token in the
+URL fragment (`#t=...`), matching the existing assessment-invitation exchange
+pattern. The fragment is never sent in the HTTP request. A small client
+exchange component reads it into a function-local variable, posts it once to
+the exchange route, and strips the fragment on every outcome without writing
+it to React state, web storage, or a report URL. The route verifies the
+signature and expiry, stores the grant in a `Secure`, `HttpOnly`,
+`SameSite=Strict` sealed cookie scoped to the exact assessment report path,
+and returns the clean canonical report URL for navigation. The bearer token
+must not remain in browser history, audit metadata, metrics, or application
+logs.
 
 The CEO sees the same current/previous/change presentation and may select among
 their own eligible earlier submissions. The report shell contains no coach or
@@ -226,6 +234,12 @@ MVP.
 
 The approved visual direction is an extension of the existing branded report,
 not a separate blue dashboard or Esperto-style report wizard.
+
+The comparison content is part of the canonical report model and must render
+in all three launched Scaling Up Full styles. Classic, Executive Boardroom,
+and Modern Dashboard may use their own spacing, typography, and visual
+emphasis, but they display the same current/previous/change facts, compatibility
+states, coverage counts, and focus-only content rules.
 
 ### 6.1 Cover
 
@@ -600,6 +614,11 @@ The page resolves exactly one of two authorization modes:
 
 The presentation component is shared; authorization is not.
 
+`BrandedReport` passes the comparison model through its existing style
+dispatcher. The legacy Classic branch and both view-model-backed renderers
+must consume the same immutable comparison model; no style may recompute
+deltas or silently omit comparison data.
+
 ### Campaign detail
 
 For eligible Scaling Up Full respondents, replace **View across campaigns**
@@ -713,6 +732,8 @@ Comparison failure must never break Print / Download PDF for the focus report.
   report;
 - no candidate leaves existing report actions unchanged;
 - comparison controls are absent from print output;
+- Classic, Executive Boardroom, and Modern Dashboard render the same
+  comparison facts and compatibility states;
 - PDF filename contains focus and baseline labels;
 - recommendations, free text, and peers remain focus-only/separate; and
 - old longitudinal entry links are replaced without deleting its route.
