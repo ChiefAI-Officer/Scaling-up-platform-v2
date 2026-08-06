@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { PrismaClient } from "@prisma/client";
 import { loginAs } from "./helpers/auth";
+import { runWithReportComparisonCleanup } from "./helpers/report-comparison-cleanup";
 import {
   REPORT_COMPARISON_FIXTURE_PASSWORD,
   reportComparisonFixtureIdentity,
@@ -147,42 +148,40 @@ test.describe("Report comparison — sentinel-provisioned acceptance", () => {
     const token = createCeoReportAccessToken({ focusCampaignId: style.currentCampaignId, invitationId: style.currentInvitationId, respondentId: style.currentRespondentId });
     const context = await browser.newContext();
     let nonCeoContext: Awaited<ReturnType<typeof browser.newContext>> | undefined;
-    let completed = false;
-    try {
-      const page = await context.newPage();
-      await page.goto(`/assessments/self-report#t=${encodeURIComponent(token)}`);
-      await expect(page).toHaveURL(new RegExp(`${reportPath(style)}$`));
-      await expect.poll(() => new URL(page.url()).hash).toBe("");
-      const picker = page.getByLabel("Compare to previous assessment");
-      await expect(picker.locator(`option[value="${style.nativeSubmissionId}"]`)).toBeVisible();
-      await expect(picker.locator(`option[value="${style.otherOrganizationSubmissionId}"]`)).toHaveCount(0);
-      for (const denied of [
-        `/assessments/${style.currentCampaignId}/respondents/${style.nonCeoRespondentId}/report`,
-        `/assessments/${style.currentCampaignId}/report`, "/portal/assessments/trends",
-        `/admin/assessments/campaigns/${style.currentCampaignId}`,
-        `/assessments/${style.currentCampaignId}/respondents/${style.currentRespondentId}-altered/report`,
-      ]) await expectDenied(page, denied);
-      await database.assessmentCampaign.update({ where: { id: style.currentCampaignId }, data: { showResultsOnScreen: false, sendResultsToRespondent: false } });
-      await expectDenied(page, reportPath(style));
-      await database.assessmentCampaignParticipant.updateMany({ where: { campaignId: style.currentCampaignId, respondentId: style.currentRespondentId }, data: { isCEO: false } });
-      await expectDenied(page, reportPath(style));
-      const nonCeoToken = createCeoReportAccessToken({ focusCampaignId: style.currentCampaignId, invitationId: style.nonCeoInvitationId, respondentId: style.nonCeoRespondentId });
-      nonCeoContext = await browser.newContext();
-      const nonCeoPage = await nonCeoContext.newPage();
-      await nonCeoPage.goto(`/assessments/self-report#t=${encodeURIComponent(nonCeoToken)}`);
-      await expect(nonCeoPage.getByText("This report link is no longer available.")).toBeVisible();
-      completed = true;
-    } finally {
-      const restore = async () => {
-        await database.assessmentCampaign.update({ where: { id: style.currentCampaignId }, data: { showResultsOnScreen: campaign.showResultsOnScreen, sendResultsToRespondent: campaign.sendResultsToRespondent } });
-        await database.assessmentCampaignParticipant.updateMany({ where: { campaignId: style.currentCampaignId, respondentId: style.currentRespondentId }, data: { isCEO: participant.isCEO } });
-      };
-      try { await restore(); } catch (error) {
-        if (completed) throw error;
-        console.error("Report-comparison fixture cleanup failed after a test failure.", error);
-      }
-      await nonCeoContext?.close().catch(() => undefined);
-      await context.close().catch(() => undefined);
-    }
+    await runWithReportComparisonCleanup({
+      run: async () => {
+        const page = await context.newPage();
+        await page.goto(`/assessments/self-report#t=${encodeURIComponent(token)}`);
+        await expect(page).toHaveURL(new RegExp(`${reportPath(style)}$`));
+        await expect.poll(() => new URL(page.url()).hash).toBe("");
+        const picker = page.getByLabel("Compare to previous assessment");
+        await expect(picker.locator(`option[value="${style.nativeSubmissionId}"]`)).toBeVisible();
+        await expect(picker.locator(`option[value="${style.otherOrganizationSubmissionId}"]`)).toHaveCount(0);
+        for (const denied of [
+          `/assessments/${style.currentCampaignId}/respondents/${style.nonCeoRespondentId}/report`,
+          `/assessments/${style.currentCampaignId}/report`, "/portal/assessments/trends",
+          `/admin/assessments/campaigns/${style.currentCampaignId}`,
+          `/assessments/${style.currentCampaignId}/respondents/${style.currentRespondentId}-altered/report`,
+        ]) await expectDenied(page, denied);
+        await database.assessmentCampaign.update({ where: { id: style.currentCampaignId }, data: { showResultsOnScreen: false, sendResultsToRespondent: false } });
+        await expectDenied(page, reportPath(style));
+        await database.assessmentCampaignParticipant.updateMany({ where: { campaignId: style.currentCampaignId, respondentId: style.currentRespondentId }, data: { isCEO: false } });
+        await expectDenied(page, reportPath(style));
+        const nonCeoToken = createCeoReportAccessToken({ focusCampaignId: style.currentCampaignId, invitationId: style.nonCeoInvitationId, respondentId: style.nonCeoRespondentId });
+        nonCeoContext = await browser.newContext();
+        const nonCeoPage = await nonCeoContext.newPage();
+        await nonCeoPage.goto(`/assessments/self-report#t=${encodeURIComponent(nonCeoToken)}`);
+        await expect(nonCeoPage.getByText("This report link is no longer available.")).toBeVisible();
+      },
+      cleanup: [
+        { name: "restore campaign disclosure", run: async () => { await database.assessmentCampaign.update({ where: { id: style.currentCampaignId }, data: { showResultsOnScreen: campaign.showResultsOnScreen, sendResultsToRespondent: campaign.sendResultsToRespondent } }); } },
+        { name: "restore CEO designation", run: async () => { await database.assessmentCampaignParticipant.updateMany({ where: { campaignId: style.currentCampaignId, respondentId: style.currentRespondentId }, data: { isCEO: participant.isCEO } }); } },
+        { name: "close non-CEO context", run: async () => { await nonCeoContext?.close(); } },
+        { name: "close CEO context", run: async () => { await context.close(); } },
+      ],
+      onCleanupFailure: (failure) => {
+        console.error("Report-comparison fixture cleanup failed after a test failure.", failure);
+      },
+    });
   });
 });
