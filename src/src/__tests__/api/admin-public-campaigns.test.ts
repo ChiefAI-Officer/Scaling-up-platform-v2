@@ -31,6 +31,9 @@ jest.mock("@/lib/db", () => ({
     assessmentTemplate: {
       findUnique: jest.fn(),
     },
+    assessmentTemplateVersion: {
+      findMany: jest.fn(),
+    },
     organization: {
       findUnique: jest.fn(),
     },
@@ -173,6 +176,7 @@ beforeEach(() => {
   );
   (db.organization.findUnique as jest.Mock).mockResolvedValue(mockOrg);
   (db.assessmentCampaign.create as jest.Mock).mockResolvedValue(mockCampaign);
+  (db.assessmentTemplateVersion.findMany as jest.Mock).mockResolvedValue([]);
 });
 
 // ─── GET /api/admin/public-campaigns ─────────────────────────────────────────
@@ -228,6 +232,85 @@ describe("GET /api/admin/public-campaigns — LIST", () => {
         ],
       }),
     );
+  });
+
+  it("keeps flag-off queries and bytes free of version questions and capabilities", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    (db.assessmentCampaign.findMany as jest.Mock).mockResolvedValue([
+      {
+        ...mockCampaign,
+        reportStyle: "CLASSIC",
+        reportStyleSource: "TEMPLATE_DEFAULT",
+        reportStyleLockedAt: null,
+        template: {
+          id: "tpl-1",
+          name: "Rockefeller",
+          alias: "rockefeller",
+        },
+        version: {
+          questions: [
+            { type: "TEXT", answer: "private respondent material" },
+          ],
+        },
+      },
+    ]);
+
+    const res = await listGet();
+    const query = (db.assessmentCampaign.findMany as jest.Mock).mock.calls[0][0];
+    expect(query.include).not.toHaveProperty("version");
+    expect(db.assessmentTemplateVersion.findMany).not.toHaveBeenCalled();
+    const body = await res.json();
+    expect(body.data[0]).not.toHaveProperty("version");
+    expect(body.data[0]).not.toHaveProperty(
+      "reportStylePreviewCapabilities",
+    );
+    expect(JSON.stringify(body)).not.toContain("private respondent material");
+  });
+
+  it("returns only minimal computed capabilities for an available campaign", async () => {
+    process.env.WAVE_REPORT_STYLES_CANARY = "camp-1";
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    (db.assessmentCampaign.findMany as jest.Mock).mockResolvedValue([
+      {
+        ...mockCampaign,
+        reportStyle: "CLASSIC",
+        reportStyleSource: "TEMPLATE_DEFAULT",
+        reportStyleLockedAt: null,
+        template: {
+          id: "tpl-1",
+          name: "Rockefeller",
+          alias: "rockefeller",
+        },
+      },
+    ]);
+    (db.assessmentTemplateVersion.findMany as jest.Mock).mockResolvedValue([
+      {
+        id: "ver-1",
+        questions: [
+          { type: "NUMBER", answer: "private respondent material" },
+        ],
+      },
+    ]);
+
+    const res = await listGet();
+
+    expect(db.assessmentTemplateVersion.findMany).toHaveBeenCalledWith({
+      where: { id: { in: ["ver-1"] } },
+      select: { id: true, questions: true },
+    });
+    const body = await res.json();
+    expect(body.data[0]).toEqual(
+      expect.objectContaining({
+        reportStylesAvailable: true,
+        reportStylePreviewCapabilities: {
+          reportType: "scored",
+          hasMetrics: true,
+          hasNarrativeResponses: false,
+        },
+      }),
+    );
+    expect(body.data[0]).not.toHaveProperty("version");
+    expect(JSON.stringify(body)).not.toContain("private respondent material");
   });
 });
 

@@ -31,11 +31,7 @@ export type ReportStylePreviewCapabilities = Readonly<{
   hasNarrativeResponses: boolean;
 }>;
 
-const METRIC_QUESTION_TYPES = new Set([
-  "SLIDER_LIKERT",
-  "NUMBER",
-  "MULTI_CHOICE",
-]);
+const METRIC_QUESTION_TYPES = new Set(["SLIDER_LIKERT", "NUMBER"]);
 const NARRATIVE_QUESTION_TYPES = new Set([
   "TEXT",
   "TEXTAREA",

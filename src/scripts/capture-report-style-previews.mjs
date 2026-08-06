@@ -23,6 +23,7 @@ const require = createRequire(import.meta.url);
 const { loadReportStyleFontSeam } = require("./report-style-font-seam.cjs");
 const {
   assertMeaningfulImage,
+  assertNoAncestorClipping,
   assertSinglePagePdf,
   assertWebpContainer,
 } = require("./report-style-capture-integrity.cjs");
@@ -182,6 +183,13 @@ async function assertCaptureDom(page, root, entry) {
     geometry.violations.length === 0,
     `Visible renderer content is clipped for ${entry.anatomy}/${entry.style}/${entry.page}: ${JSON.stringify(geometry.violations)}`,
   );
+  try {
+    await assertNoAncestorClipping(root);
+  } catch (error) {
+    throw new Error(
+      `Visible renderer content is clipped for ${entry.anatomy}/${entry.style}/${entry.page}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
 
   return marker;
 }

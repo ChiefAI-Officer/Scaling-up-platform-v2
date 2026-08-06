@@ -11,6 +11,81 @@ function invariant(value, message) {
   if (!value) throw new Error(message);
 }
 
+async function assertNoAncestorClipping(root) {
+  const result = await root.evaluate((rootElement) => {
+    const violations = [];
+    const clippingValues = new Set(["auto", "clip", "hidden", "scroll"]);
+
+    for (const node of rootElement.querySelectorAll("*")) {
+      const element = node;
+      const style = window.getComputedStyle(element);
+      if (
+        style.display === "none" ||
+        style.visibility === "hidden" ||
+        Number(style.opacity) === 0
+      ) {
+        continue;
+      }
+
+      const rect = element.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) continue;
+
+      for (
+        let ancestor = element.parentElement;
+        ancestor && rootElement.contains(ancestor);
+        ancestor = ancestor.parentElement
+      ) {
+        const ancestorStyle = window.getComputedStyle(ancestor);
+        const clipsX = clippingValues.has(ancestorStyle.overflowX);
+        const clipsY = clippingValues.has(ancestorStyle.overflowY);
+        if (!clipsX && !clipsY) {
+          if (ancestor === rootElement) break;
+          continue;
+        }
+
+        const ancestorRect = ancestor.getBoundingClientRect();
+        const clipLeft = ancestorRect.left + ancestor.clientLeft;
+        const clipTop = ancestorRect.top + ancestor.clientTop;
+        const clipRight = clipLeft + ancestor.clientWidth;
+        const clipBottom = clipTop + ancestor.clientHeight;
+        const horizontal =
+          clipsX && (rect.left < clipLeft - 1 || rect.right > clipRight + 1);
+        const vertical =
+          clipsY && (rect.top < clipTop - 1 || rect.bottom > clipBottom + 1);
+
+        if (horizontal || vertical) {
+          violations.push({
+            descendant:
+              element.getAttribute("data-testid") ||
+              element.id ||
+              element.tagName.toLocaleLowerCase(),
+            ancestor:
+              ancestor.getAttribute("data-testid") ||
+              ancestor.id ||
+              ancestor.tagName.toLocaleLowerCase(),
+            axes: [horizontal ? "x" : null, vertical ? "y" : null].filter(
+              Boolean,
+            ),
+            overflowX: ancestorStyle.overflowX,
+            overflowY: ancestorStyle.overflowY,
+          });
+          break;
+        }
+
+        if (ancestor === rootElement) break;
+      }
+    }
+
+    return Object.freeze({ violations: violations.slice(0, 12) });
+  });
+
+  invariant(
+    result.violations.length === 0,
+    `${result.violations[0]?.descendant || "Renderer content"} is clipped by ancestor: ${JSON.stringify(result.violations)}`,
+  );
+  return result;
+}
+
 async function assertMeaningfulImage(path, expected = {}) {
   const info = statSync(path);
   invariant(info.size > 0, `Generated image is empty: ${path}`);
@@ -133,6 +208,7 @@ function assertWebpContainer(path) {
 
 module.exports = {
   assertMeaningfulImage,
+  assertNoAncestorClipping,
   assertSinglePagePdf,
   assertWebpContainer,
 };

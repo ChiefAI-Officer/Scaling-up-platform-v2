@@ -98,24 +98,59 @@ export async function GET() {
       include: {
         organization: { select: { id: true, name: true } },
         template: { select: { id: true, name: true, alias: true } },
-        version: { select: { questions: true } },
       },
       orderBy: { createdAt: "desc" },
     });
-
-    return NextResponse.json({
-      success: true,
-      data: campaigns.map((campaign) => ({
-        ...campaign,
-        reportStylesAvailable: isReportStylesEnabled({
+    const availability = new Map(
+      campaigns.map((campaign) => [
+        campaign.id,
+        isReportStylesEnabled({
           templateId: campaign.templateId,
           campaignId: campaign.id,
         }),
-        reportStylePreviewCapabilities: deriveReportStylePreviewCapabilities({
-          templateAlias: campaign.template?.alias,
-          questions: campaign.version?.questions ?? [],
-        }),
-      })),
+      ]),
+    );
+    const availableVersionIds = Array.from(
+      new Set(
+        campaigns
+          .filter((campaign) => availability.get(campaign.id))
+          .map((campaign) => campaign.versionId),
+      ),
+    );
+    const capabilityRows =
+      availableVersionIds.length > 0
+        ? await db.assessmentTemplateVersion.findMany({
+            where: { id: { in: availableVersionIds } },
+            select: { id: true, questions: true },
+          })
+        : [];
+    const questionsByVersionId = new Map(
+      capabilityRows.map((version) => [version.id, version.questions]),
+    );
+
+    return NextResponse.json({
+      success: true,
+      data: campaigns.map((campaign) => {
+        const reportStylesAvailable = availability.get(campaign.id) === true;
+        const campaignPayload = {
+          ...campaign,
+        } as typeof campaign & { version?: unknown };
+        delete campaignPayload.version;
+        return {
+          ...campaignPayload,
+          reportStylesAvailable,
+          ...(reportStylesAvailable
+            ? {
+                reportStylePreviewCapabilities:
+                  deriveReportStylePreviewCapabilities({
+                    templateAlias: campaign.template?.alias,
+                    questions:
+                      questionsByVersionId.get(campaign.versionId) ?? [],
+                  }),
+              }
+            : {}),
+        };
+      }),
     });
   } catch (error) {
     console.error("Error listing public campaigns:", error);

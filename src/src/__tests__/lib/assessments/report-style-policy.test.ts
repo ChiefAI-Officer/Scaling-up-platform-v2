@@ -11,6 +11,7 @@ import {
   isReportStyleEligible,
   resolveCampaignReportStyle,
 } from "@/lib/assessments/report-style-policy";
+import { classifyPresentationByTypes } from "@/lib/assessments/qualitative-report-model";
 
 describe("report style registry", () => {
   it("exposes the three closed report styles with their presentation metadata", () => {
@@ -108,6 +109,30 @@ describe("report style registry", () => {
     expect(getReportStylePreviewPath("CLASSIC", "scored", "cover")).toBe(
       "/report-style-previews/classic/cover.webp",
     );
+  });
+
+  it("does not invent metric eligibility for categorical multi-choice answers", () => {
+    expect(classifyPresentationByTypes(["MULTI_CHOICE"])).toBe("choices");
+    expect(
+      deriveReportStylePreviewCapabilities({
+        templateAlias: "custom-categorical",
+        questions: [{ stableKey: "priorities", type: "MULTI_CHOICE" }],
+      }),
+    ).toEqual({
+      reportType: "scored",
+      hasMetrics: false,
+      hasNarrativeResponses: false,
+    });
+    expect(
+      deriveReportStylePreviewCapabilities({
+        templateAlias: "custom-numeric",
+        questions: [{ stableKey: "revenue", type: "NUMBER" }],
+      }),
+    ).toEqual({
+      reportType: "scored",
+      hasMetrics: true,
+      hasNarrativeResponses: false,
+    });
   });
 });
 

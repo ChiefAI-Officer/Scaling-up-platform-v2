@@ -220,9 +220,13 @@
   font-size: 11px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: #006b9f;
+  color: #008bd2;
   font-weight: 700;
   margin-bottom: 4px;
+}
+
+[data-preview-style="CLASSIC"] .su-public-brand .su-report-eyebrow {
+  color: #006b9f;
 }
 
 /* Light overall card: a purple score "ring" on the left, band + message right.
@@ -466,11 +470,17 @@
   padding: 14px 16px;
 }
 
-/* Bright canonical domain backgrounds need dark ink. Attribute matching keeps
-   the historical Classic DOM byte-identical while correcting its contrast. */
-.su-public-brand .su-report-card-head[style*="background-color:#f7a600"],
-.su-public-brand .su-report-card-head[style*="background-color:#008bd2"],
-.su-public-brand .su-report-card-head[style*="background-color:#95c11f"] {
+/* Preview evidence may improve contrast without changing the flag-off Classic
+   computed-style contract. Attribute matching targets canonical bright domains. */
+[data-preview-style="CLASSIC"]
+  .su-public-brand
+  .su-report-card-head[style*="background-color:#f7a600"],
+[data-preview-style="CLASSIC"]
+  .su-public-brand
+  .su-report-card-head[style*="background-color:#008bd2"],
+[data-preview-style="CLASSIC"]
+  .su-public-brand
+  .su-report-card-head[style*="background-color:#95c11f"] {
   color: #1a1322;
 }
 
@@ -495,25 +505,31 @@
   flex-shrink: 0;
 }
 
-.su-public-brand
+[data-preview-style="CLASSIC"]
+  .su-public-brand
   .su-report-card-head[style*="background-color:#f7a600"]
   .su-report-card-title,
-.su-public-brand
+[data-preview-style="CLASSIC"]
+  .su-public-brand
   .su-report-card-head[style*="background-color:#008bd2"]
   .su-report-card-title,
-.su-public-brand
+[data-preview-style="CLASSIC"]
+  .su-public-brand
   .su-report-card-head[style*="background-color:#95c11f"]
   .su-report-card-title {
   color: #1a1322;
 }
 
-.su-public-brand
+[data-preview-style="CLASSIC"]
+  .su-public-brand
   .su-report-card-head[style*="background-color:#f7a600"]
   .su-report-card-chip,
-.su-public-brand
+[data-preview-style="CLASSIC"]
+  .su-public-brand
   .su-report-card-head[style*="background-color:#008bd2"]
   .su-report-card-chip,
-.su-public-brand
+[data-preview-style="CLASSIC"]
+  .su-public-brand
   .su-report-card-head[style*="background-color:#95c11f"]
   .su-report-card-chip {
   background: rgba(255, 255, 255, 0.5);
@@ -896,9 +912,7 @@
 .su-public-brand .su-report-coach {
   display: inline-flex;
   align-items: center;
-  flex-wrap: wrap;
   gap: 10px;
-  max-width: 100%;
 }
 
 .su-public-brand .su-report-coach-name {
@@ -906,8 +920,7 @@
   font-size: 13px;
   font-weight: 600;
   color: #ffffff;
-  overflow-wrap: anywhere;
-  white-space: normal;
+  white-space: nowrap;
 }
 
 .su-public-brand .su-report-provenance {
@@ -919,9 +932,23 @@
 
 .su-public-brand .su-report-confidential {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.78);
+  color: rgba(255, 255, 255, 0.55);
   font-style: italic;
   margin-left: auto;
+}
+
+[data-preview-style="CLASSIC"] .su-public-brand .su-report-coach {
+  flex-wrap: wrap;
+  max-width: 100%;
+}
+
+[data-preview-style="CLASSIC"] .su-public-brand .su-report-coach-name {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+[data-preview-style="CLASSIC"] .su-public-brand .su-report-confidential {
+  color: rgba(255, 255, 255, 0.78);
 }
 
 /* ── Responsive (screen) ─────────────────────────────────────────────────── */
@@ -1077,9 +1104,13 @@
   font-size: 11px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: #006b9f;
+  color: #008bd2;
   font-weight: 800;
   margin: 0 0 6px;
+}
+
+[data-preview-style="CLASSIC"] .su-public-brand .su-section-eyebrow {
+  color: #006b9f;
 }
 .su-public-brand .su-section-title {
   font-weight: 800;
@@ -1161,7 +1192,7 @@
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
   font-weight: 600;
   font-size: 18px;
-  color: #006b9f;
+  color: #008bd2;
   line-height: 1.25;
   padding-bottom: 8px;
   border-bottom: 2px solid #cfe9f6;
@@ -1169,8 +1200,16 @@
 }
 /* Amber heading variant — flagged obstacle factors (Esperto orange) */
 .su-public-brand .su-qa.amber .su-qa-q {
-  color: #855400;
+  color: #b87400;
   border-bottom-color: #fbe6b8;
+}
+
+[data-preview-style="CLASSIC"] .su-public-brand .su-qa-q {
+  color: #006b9f;
+}
+
+[data-preview-style="CLASSIC"] .su-public-brand .su-qa.amber .su-qa-q {
+  color: #855400;
 }
 .su-public-brand .su-qa-a {
   display: grid;
@@ -1231,10 +1270,14 @@
 }
 .su-public-brand .su-matrix-cell.rating {
   justify-content: center;
-  color: #6b6480;
+  color: #b8b2c4;
   font-size: 12px;
   letter-spacing: 0.02em;
   border-left: 1px solid #f4f2f8;
+}
+
+[data-preview-style="CLASSIC"] .su-public-brand .su-matrix-cell.rating {
+  color: #6b6480;
 }
 .su-public-brand .su-matrix-row:nth-child(even of :not(.su-matrix-head)) {
   background: #fbfafd;

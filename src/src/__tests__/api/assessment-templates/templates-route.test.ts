@@ -43,7 +43,12 @@ const adminActor = {
   coachId: null,
 };
 
-beforeEach(() => jest.clearAllMocks());
+beforeEach(() => {
+  jest.clearAllMocks();
+  delete process.env.WAVE_REPORT_STYLES_ENABLED;
+  delete process.env.WAVE_REPORT_STYLES_CANARY;
+  delete process.env.WAVE_REPORT_STYLES_KILL;
+});
 
 describe("GET /api/assessment-templates", () => {
   it("401 unauthenticated", async () => {
@@ -67,6 +72,107 @@ describe("GET /api/assessment-templates", () => {
     // flag-gated) while keeping the deletedAt filter (regression).
     expect(db.assessmentTemplate.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { deletedAt: null, disabledAt: null } }),
+    );
+  });
+
+  it("keeps the flag-off query and response byte shape free of preview capabilities", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    (db.assessmentTemplate.findMany as jest.Mock).mockResolvedValue([
+      {
+        id: "t1",
+        name: "Rockefeller",
+        alias: "rockefeller",
+        description: null,
+        aggregationMode: "FULL_VISIBILITY",
+        defaultReportStyle: "CLASSIC",
+        sendResultsDefault: false,
+        resultsEmailContentApproved: false,
+        resultsEmailContentApprovedHash: null,
+        resultsEmailSubject: null,
+        resultsEmailBodyMarkdown: null,
+      },
+    ]);
+
+    const res = await GET(
+      new Request("http://localhost/api/assessment-templates") as never,
+    );
+
+    expect(db.assessmentTemplate.findMany).toHaveBeenCalledTimes(1);
+    const query = (db.assessmentTemplate.findMany as jest.Mock).mock.calls[0][0];
+    expect(query.select).not.toHaveProperty("versions");
+    await expect(res.json()).resolves.toEqual({
+      success: true,
+      data: [
+        {
+          id: "t1",
+          name: "Rockefeller",
+          alias: "rockefeller",
+          description: null,
+          aggregationMode: "FULL_VISIBILITY",
+          defaultReportStyle: "CLASSIC",
+          reportStylesEnabled: false,
+          resultsEmailApproved: false,
+          sendResultsDefault: false,
+        },
+      ],
+    });
+  });
+
+  it("queries capability inputs only for an available template", async () => {
+    process.env.WAVE_REPORT_STYLES_CANARY = "t1";
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    (db.assessmentTemplate.findMany as jest.Mock)
+      .mockResolvedValueOnce([
+        {
+          id: "t1",
+          name: "Rockefeller",
+          alias: "rockefeller",
+          description: null,
+          aggregationMode: "FULL_VISIBILITY",
+          defaultReportStyle: "CLASSIC",
+          sendResultsDefault: false,
+          resultsEmailContentApproved: false,
+          resultsEmailContentApprovedHash: null,
+          resultsEmailSubject: null,
+          resultsEmailBodyMarkdown: null,
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: "t1",
+          alias: "rockefeller",
+          versions: [{ questions: [{ type: "NUMBER" }] }],
+        },
+      ]);
+
+    const res = await GET(
+      new Request("http://localhost/api/assessment-templates") as never,
+    );
+
+    expect(db.assessmentTemplate.findMany).toHaveBeenCalledTimes(2);
+    expect(db.assessmentTemplate.findMany).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        where: { id: { in: ["t1"] } },
+        select: expect.objectContaining({
+          id: true,
+          versions: expect.any(Object),
+        }),
+      }),
+    );
+    await expect(res.json()).resolves.toEqual(
+      expect.objectContaining({
+        data: [
+          expect.objectContaining({
+            reportStylesEnabled: true,
+            reportStylePreviewCapabilities: {
+              reportType: "scored",
+              hasMetrics: true,
+              hasNarrativeResponses: false,
+            },
+          }),
+        ],
+      }),
     );
   });
 

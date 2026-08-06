@@ -253,7 +253,9 @@ async function setSupplementalRendererContent(
     "/brand/su-logo-white.svg",
     `data:image/svg+xml;base64,${logo.toString("base64")}`,
   );
-  await page.setContent(`<!doctype html><html><head><style>${await rendererCss()}</style></head><body>${markupWithAssets}</body></html>`);
+  await page.setContent(
+    `<!doctype html><html><head><style>${await rendererCss()}</style></head><body><main data-preview-style="${style}" data-preview-anatomy="${anatomy}">${markupWithAssets}</main></body></html>`,
+  );
 }
 
 function rendererTestId(

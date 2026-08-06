@@ -172,6 +172,9 @@ describe("capture-report-style-previews credentials gate", () => {
           format: "A4" | "Letter",
           options?: { markers?: string[]; rasterDirectory?: string },
         ) => Promise<unknown>;
+        assertNoAncestorClipping: (
+          root: import("playwright").Locator,
+        ) => Promise<unknown>;
       };
 
       const temporaryRoot = mkdtempSync(
@@ -243,10 +246,174 @@ describe("capture-report-style-previews credentials gate", () => {
             markers: ["missing renderer marker"],
           }),
         ).rejects.toThrow(/missing expected content/i);
+
+        await page.setContent(`
+          <main data-testid="capture-root">
+            <section style="height: 32px; overflow: hidden">
+              <p data-testid="representative-content" style="height: 80px; margin: 0">
+                Representative renderer content
+              </p>
+            </section>
+          </main>
+        `);
+        await expect(
+          integrity.assertNoAncestorClipping(
+            page.getByTestId("capture-root"),
+          ),
+        ).rejects.toThrow(/representative-content.*clipped by ancestor/i);
+
+        await page.setContent(`
+          <main data-testid="capture-root">
+            <section style="height: 80px; overflow: hidden">
+              <p data-testid="representative-content" style="height: 80px; margin: 0">
+                Representative renderer content
+              </p>
+            </section>
+          </main>
+        `);
+        await expect(
+          integrity.assertNoAncestorClipping(
+            page.getByTestId("capture-root"),
+          ),
+        ).resolves.toEqual(expect.objectContaining({ violations: [] }));
+
+        const chunks = join(temporaryRoot, ".next", "static", "chunks");
+        mkdirSync(chunks, { recursive: true });
+        writeFileSync(join(chunks, "assessment.woff2"), Buffer.from("font-bytes"));
+        writeFileSync(
+          join(chunks, "assessment.css"),
+          [
+            '@font-face{font-family:"Assessment";src:url(./assessment.woff2)}',
+            ".inter_test__variable{--font-assessment-inter:\"Assessment\"}",
+            ".playfair_display_test__variable{--font-assessment-display:\"Assessment\"}",
+            ".roboto_test__variable{--font-assessment-body:\"Assessment\"}",
+          ].join("\n"),
+        );
+        const renderer = spawnSync(
+          process.execPath,
+          [
+            join(process.cwd(), "scripts", "render-report-style-qa.cjs"),
+            "CLASSIC",
+            "scored",
+            "normal",
+          ],
+          {
+            cwd: process.cwd(),
+            encoding: "utf8",
+            env: {
+              ...process.env,
+              REPORT_STYLE_FONT_ASSET_ROOT: temporaryRoot,
+            },
+            timeout: 10_000,
+          },
+        );
+        expect(renderer.status).toBe(0);
+        await page.setContent(`
+          <style>${readFileSync(
+            join(process.cwd(), "src", "styles", "su-report.css"),
+            "utf8",
+          )}</style>
+          <main data-testid="capture-root" data-preview-style="CLASSIC">
+            ${renderer.stdout}
+          </main>
+        `);
+        await expect(
+          integrity.assertNoAncestorClipping(
+            page.getByTestId("capture-root"),
+          ),
+        ).resolves.toEqual(expect.objectContaining({ violations: [] }));
       } finally {
         await browser.close();
         global.setImmediate = originalSetImmediate;
         rmSync(temporaryRoot, { recursive: true, force: true });
+      }
+    },
+    30_000,
+  );
+
+  it(
+    "preserves the flag-off Classic computed-style contract outside the preview harness",
+    async () => {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { chromium } = require("playwright") as typeof import("playwright");
+      const reportCss = readFileSync(
+        join(process.cwd(), "src", "styles", "su-report.css"),
+        "utf8",
+      );
+      const originalSetImmediate = global.setImmediate;
+      if (typeof global.setImmediate !== "function") {
+        global.setImmediate = ((
+          callback: (...args: unknown[]) => void,
+          ...args: unknown[]
+        ) => setTimeout(callback, 0, ...args)) as unknown as typeof setImmediate;
+      }
+      const browser = await chromium.launch({ headless: true });
+
+      try {
+        const page = await browser.newPage();
+        await page.setContent(`
+          <style>${reportCss}</style>
+          <main class="su-public-brand">
+            <p class="su-report-eyebrow">Individual assessment</p>
+            <section class="su-report-card">
+              <header class="su-report-card-head" style="background-color:#f7a600">
+                <h2 class="su-report-card-title">Performance</h2>
+                <span class="su-report-card-chip">Domain</span>
+              </header>
+            </section>
+            <div class="su-report-coach">
+              <span class="su-report-coach-name">A very long coach name</span>
+            </div>
+            <p class="su-report-confidential">Confidential</p>
+            <p class="su-section-eyebrow">Summary</p>
+            <p class="su-qa-q">Question</p>
+            <section class="su-qa amber">
+              <p class="su-qa-q">Amber question</p>
+            </section>
+            <span class="su-matrix-cell rating">Not selected</span>
+          </main>
+        `);
+
+        const computed = await page.locator(".su-public-brand").evaluate((root) => {
+          const style = (selector: string) => {
+            const element = root.querySelector(selector);
+            if (!(element instanceof HTMLElement)) {
+              throw new Error(`Missing computed-style fixture: ${selector}`);
+            }
+            return getComputedStyle(element);
+          };
+
+          return {
+            eyebrow: style(".su-report-eyebrow").color,
+            cardTitle: style(".su-report-card-title").color,
+            cardChipColor: style(".su-report-card-chip").color,
+            cardChipBackground: style(".su-report-card-chip").backgroundColor,
+            coachFlexWrap: style(".su-report-coach").flexWrap,
+            coachNameWhiteSpace: style(".su-report-coach-name").whiteSpace,
+            confidential: style(".su-report-confidential").color,
+            sectionEyebrow: style(".su-section-eyebrow").color,
+            question: style(":scope > .su-qa-q").color,
+            amberQuestion: style(".su-qa.amber .su-qa-q").color,
+            inactiveRating: style(".su-matrix-cell.rating").color,
+          };
+        });
+
+        expect(computed).toEqual({
+          eyebrow: "rgb(0, 139, 210)",
+          cardTitle: "rgb(255, 255, 255)",
+          cardChipColor: "rgb(255, 255, 255)",
+          cardChipBackground: "rgba(0, 0, 0, 0.18)",
+          coachFlexWrap: "nowrap",
+          coachNameWhiteSpace: "nowrap",
+          confidential: "rgba(255, 255, 255, 0.55)",
+          sectionEyebrow: "rgb(0, 139, 210)",
+          question: "rgb(0, 139, 210)",
+          amberQuestion: "rgb(184, 116, 0)",
+          inactiveRating: "rgb(184, 178, 196)",
+        });
+      } finally {
+        await browser.close();
+        global.setImmediate = originalSetImmediate;
       }
     },
     30_000,
