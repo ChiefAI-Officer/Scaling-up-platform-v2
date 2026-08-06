@@ -132,7 +132,7 @@ export function ReportStylePicker({
       className={compact ? "space-y-3" : "space-y-5"}
     >
       <fieldset className="space-y-3">
-        <legend className="text-sm font-semibold text-slate-900">Report style</legend>
+        <legend className="text-sm font-semibold text-foreground">Report style</legend>
         <div className="grid gap-3 md:grid-cols-3">
           {REPORT_STYLE_KEYS.map((style) => {
             const metadata = REPORT_STYLE_REGISTRY[style];
@@ -141,7 +141,7 @@ export function ReportStylePicker({
             return (
               <label
                 key={style}
-                className={`block cursor-pointer rounded-lg border border-slate-300 bg-white text-slate-900 shadow-sm transition focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-blue-700 has-[:checked]:border-slate-900 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-75 ${
+                className={`block cursor-pointer rounded-lg border border-border bg-background text-foreground shadow-sm transition focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring has-[:checked]:border-primary has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-75 ${
                   compact ? "p-2" : "p-4"
                 }`}
               >
@@ -164,8 +164,8 @@ export function ReportStylePicker({
                     </span>
                   )}
                 </span>
-                <span className="mt-2 block text-sm text-slate-700">{metadata.description}</span>
-                <span className="mt-2 block text-sm text-slate-700">
+                <span className="mt-2 block text-sm text-muted-foreground">{metadata.description}</span>
+                <span className="mt-2 block text-sm text-muted-foreground">
                   Paper format: {metadata.paperFormat}
                 </span>
               </label>
@@ -175,7 +175,7 @@ export function ReportStylePicker({
       </fieldset>
 
       {disabled && (
-        <div className="space-y-1 text-sm text-slate-700" aria-live="polite">
+        <div className="space-y-1 text-sm text-muted-foreground" aria-live="polite">
           {sourceLabel && <p>Source: {sourceLabel}</p>}
           <p>
             {lockedAt != null &&
@@ -194,13 +194,13 @@ export function ReportStylePicker({
       {compact &&
         (selectedThumbnailFailed ? (
           <div
-            className="space-y-2 rounded-lg border border-slate-300 p-4"
+            className="space-y-2 rounded-lg border border-border bg-muted/20 p-4 text-foreground"
             role="status"
           >
             <p>Preview unavailable</p>
             <button
               type="button"
-              className="rounded-md border border-slate-500 px-3 py-1.5 text-sm font-medium text-slate-900 focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-blue-700"
+              className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-ring"
               onClick={() => retryPreview("cover")}
             >
               Retry
@@ -214,7 +214,7 @@ export function ReportStylePicker({
             key={`${selectedThumbnailId}-${retryVersions[selectedThumbnailId] ?? 0}`}
             src={getReportStylePreviewPath(value, previewAnatomy, "cover")}
             alt={`${selectedMetadata.label} selected thumbnail`}
-            className="h-28 w-full rounded-lg border border-slate-300 object-cover object-top"
+            className="h-28 w-full rounded-lg border border-border object-cover object-top"
             onError={() =>
               setFailedPreviews((current) =>
                 new Set(current).add(selectedThumbnailId),
@@ -227,7 +227,7 @@ export function ReportStylePicker({
         <button
           type="button"
           aria-expanded={previewExpanded}
-          className="text-sm font-medium text-slate-900 underline underline-offset-2"
+          className="text-sm font-medium text-foreground underline underline-offset-2"
           onClick={() => setPreviewExpanded((expanded) => !expanded)}
         >
           Preview selected appearance
@@ -248,7 +248,7 @@ export function ReportStylePicker({
                 aria-selected={isActive}
                 aria-controls={`${radioName}-${tab.key}-panel`}
                 tabIndex={isActive ? 0 : -1}
-                className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-900 focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-blue-700"
+                className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-ring"
                 onClick={() => setPreviewPage(tab.key)}
                 onKeyDown={(event) => handlePreviewTabKeyDown(event, tab.key)}
               >
@@ -273,11 +273,11 @@ export function ReportStylePicker({
               hidden={!isActive}
             >
               {failedPreview ? (
-                <div className="space-y-2 rounded-lg border border-slate-300 p-4" role="status">
+                <div className="space-y-2 rounded-lg border border-border bg-muted/20 p-4 text-foreground" role="status">
                   <p>Preview unavailable</p>
                   <button
                     type="button"
-                    className="rounded-md border border-slate-500 px-3 py-1.5 text-sm font-medium text-slate-900 focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-blue-700"
+                    className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-ring"
                     onClick={() => retryPreview(tab.key)}
                   >
                     Retry
@@ -295,7 +295,7 @@ export function ReportStylePicker({
                     tab.key,
                   )}
                   alt={`${selectedMetadata.label} ${tab.label} preview`}
-                  className="w-full rounded-lg border border-slate-300"
+                  className="w-full rounded-lg border border-border"
                   onError={() =>
                     setFailedPreviews((current) => new Set(current).add(currentPreviewId))
                   }

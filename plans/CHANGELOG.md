@@ -6,6 +6,21 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="universal-individual-report-appearance-final-review-corrections"></a>
+### 2026-08-07 — Universal individual-report appearance final-review corrections <!-- ENTRY_ISO:2026-08-07 ENTRY_SLUG:universal-individual-report-appearance-final-review-corrections -->
+
+**Status.** **LOCALLY IMPLEMENTED; not pushed, merged, deployed, activated, or written to Production.** The fixed-point Standards and Specification reviews of the universal individual-report appearance branch found two important rollout/privacy gaps and four minor maintainability/design-system issues. Each actionable local finding was corrected test-first. Hosted PostgreSQL concurrency and authenticated end-to-end acceptance remain explicit pending gates because their required isolated credentials are unavailable locally; no mock is presented as hosted evidence.
+
+**Dark-path identity and stored-state preservation.** `CampaignDetail` now omits the complete report-appearance card whenever the server capability is false/killed. `PublicCampaignsManager` likewise omits the row action, expansion panel, picker, and save path for unavailable campaigns. Server list projections retain the exact stored style, source, and lock timestamp so a later enablement restores state without rewriting it. Mutation-sensitive component and API tests prove the dark DOM and preserved response data.
+
+**Visible privacy and route parity.** Executive Boardroom and Modern Dashboard no longer render submission IDs, template-version IDs, content hashes, imported/debug codes, or “unavailable” placeholders. Their repeating safe footer contains only `Confidential assessment report` plus a non-empty authored template name. Identity metadata joins only present values, eliminating blank-company orphan separators. Equivalent renderer tests prove immediate public and later loaded reports have identical visible alternate markup despite different internal provenance; public and invited entry-point tests cover the same omission.
+
+**Production-shaped sparse semantics.** An ordinary unmapped custom alias with narrative-only stored questions now selects the neutral qualitative-content adapter from actual content capabilities, not alias prefixes. It preserves authored section/question/answer classification and emits no score summary, metric group, finding filler, recommendation, Coach CTA, or closing block. Public and invited entry-point fixtures now use the same production-shaped alias instead of the reserved `walk-qual-*` test namespace.
+
+**Cleanup and evidence.** `ReportStylePicker` uses `foreground`, `muted-foreground`, `background`, `border`, `primary`, and `ring` semantic tokens for selection, focus, surface, and failure states. The unused outbox enqueue classifier and its test-only suite were deleted after repository-wide import verification found no production caller. The always-true eligibility middleman and discarded alias parameters were removed; catalog-wide policy now flows directly through server availability, while `effectiveReportStyle` only validates stored style plus availability. Alternate preview assets were regenerated after the visible-footer change and passed image/PDF integrity checks. The pre-existing disposable Production canary was not inspected or changed in this pass.
+
+**Remaining gates.** Protected review, the isolated PostgreSQL race suite, authenticated E2E, merge/deploy, separately authorized synthetic completion/report acceptance, and any global activation remain pending. Production rollout statements from the preceding closeout are unchanged; this entry makes no new live-state claim.
+
 <a id="universal-individual-report-appearances-closed"></a>
 ### 2026-08-06 — Universal individual-report appearance implementation closed <!-- ENTRY_ISO:2026-08-06 ENTRY_SLUG:universal-individual-report-appearances-closed -->
 

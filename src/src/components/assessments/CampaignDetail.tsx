@@ -1528,13 +1528,13 @@ export function CampaignDetail({
         </div>
       </div>
 
-      {/* The stored selection is a durable campaign record and is visible to
-          every authorized campaign-detail viewer. Only the server-computed
-          exact-owner capability exposes the picker and save request path. */}
-      <div
-        className="bg-card border border-border rounded-xl p-4"
-        data-testid="campaign-report-style-card"
-      >
+      {/* Dark/kill paths omit the entire appearance surface. Stored values
+          remain in the server projection and reappear unchanged when enabled. */}
+      {reportStylesAvailable && (
+        <div
+          className="bg-card border border-border rounded-xl p-4"
+          data-testid="campaign-report-style-card"
+        >
         <div className="mb-4">
           <h2 className="text-sm font-semibold text-foreground">Report appearance</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
@@ -1609,7 +1609,8 @@ export function CampaignDetail({
             )}
           </div>
         )}
-      </div>
+        </div>
+      )}
 
       {/* Wave OSR (#71) — "Results on screen" for an EXISTING campaign.
           Hidden when CLOSED (the PATCH route 409s a closed campaign, so offering

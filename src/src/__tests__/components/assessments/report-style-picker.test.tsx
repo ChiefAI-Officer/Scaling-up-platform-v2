@@ -29,6 +29,25 @@ describe("ReportStylePicker", () => {
     expect(screen.getAllByText(/Paper format:/)).toHaveLength(3);
   });
 
+  it("uses project semantic tokens for selection, focus, surfaces, and preview failure states", () => {
+    const { container } = render(<PickerHarness />);
+    const classic = screen.getByRole("radio", { name: /classic/i });
+    const option = classic.closest("label");
+
+    expect(option).toHaveClass("border-border bg-background text-foreground");
+    expect(option?.className).toContain("focus-within:outline-ring");
+    expect(option?.className).toContain("has-[:checked]:border-primary");
+
+    fireEvent.error(screen.getByRole("img", { name: "Classic Cover preview" }));
+    const failure = screen.getByRole("status");
+    expect(failure).toHaveClass("border-border bg-muted/20 text-foreground");
+    expect(screen.getByRole("button", { name: "Retry" })).toHaveClass(
+      "border-border text-foreground focus:outline-ring",
+    );
+
+    expect(container.innerHTML).not.toMatch(/(?:slate-|blue-700|bg-white)/);
+  });
+
   it("changes the selected native radio with click and arrow-key interaction", () => {
     render(<PickerHarness />);
 

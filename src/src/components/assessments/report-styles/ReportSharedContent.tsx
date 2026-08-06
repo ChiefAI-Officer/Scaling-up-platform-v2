@@ -23,16 +23,22 @@ export function ReportIdentityHeader({
   eyebrow: string;
 }) {
   const { identity } = presentation;
+  const identityMetadata = [
+    identity.respondentName,
+    identity.jobTitle,
+    identity.companyName,
+    identity.submittedAtLabel,
+  ].filter(
+    (value): value is string =>
+      typeof value === "string" && value.trim().length > 0,
+  );
+
   return (
     <header>
       <p>{eyebrow}</p>
       <h1>{identity.assessmentName}</h1>
       {identity.campaignSubtitle ? <p>{identity.campaignSubtitle}</p> : null}
-      <p>
-        {identity.respondentName}
-        {identity.jobTitle ? ` · ${identity.jobTitle}` : ""}
-        {` · ${identity.companyName} · ${identity.submittedAtLabel}`}
-      </p>
+      {identityMetadata.length > 0 ? <p>{identityMetadata.join(" · ")}</p> : null}
       {identity.respondentEmail && !identity.respondentNameIsEmail ? (
         <p>{identity.respondentEmail}</p>
       ) : null}
@@ -45,13 +51,12 @@ export function ReportProvenance({
 }: {
   presentation: IndividualReportPresentation;
 }) {
+  const templateName = presentation.provenance.templateName.trim();
+
   return (
     <p className="report-provenance" data-testid="report-style-provenance">
-      Confidential assessment report · {presentation.provenance.templateName} ·
-      submission {presentation.provenance.submissionId ?? "unavailable"} ·
-      version {presentation.provenance.versionId ?? "unavailable"} · hash{" "}
-      {presentation.provenance.contentHash ?? "unavailable"}
-      {presentation.provenance.imported ? " · imported" : ""}
+      Confidential assessment report
+      {templateName ? ` · ${templateName}` : ""}
     </p>
   );
 }

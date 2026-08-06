@@ -207,7 +207,6 @@ export function BrandedReport({
   const rawStyle = report.reportStyle as unknown;
   const runtimeStyle = typeof rawStyle === "string" ? rawStyle : undefined;
   const resolvedStyle = effectiveReportStyle({
-    alias: report.templateAlias,
     storedStyle: runtimeStyle,
     available: reportStylesAvailable === true,
   });

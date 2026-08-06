@@ -35,7 +35,6 @@ import {
 import { isCustomSlidesEnabled } from "@/lib/assessments/wave-m-flags";
 import { isOnScreenResultsEnabled } from "@/lib/assessments/wave-osr-flags";
 import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
-import { isReportStyleEligible } from "@/lib/assessments/report-style-policy";
 import { deriveReportStylePreviewCapabilities } from "@/lib/assessments/report-style-registry";
 import {
   hasComparableLongitudinal,
@@ -145,7 +144,6 @@ export default async function CampaignDetailPage({ params }: PageProps) {
   // eligibility, or flag/canary status itself.
   const reportStylesAvailable =
     campaignForFlag !== null &&
-    isReportStyleEligible(overview.campaign.templateAlias) &&
     isReportStylesEnabled({ templateId: overview.campaign.templateId, campaignId: id });
   const hasCurrentWriteAccess =
     campaignForFlag !== null &&

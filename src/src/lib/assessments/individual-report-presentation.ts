@@ -17,6 +17,7 @@ import {
   type FindingsSection,
 } from "@/lib/assessments/findings-section-model";
 import { reportConfigFor } from "@/lib/assessments/report-config";
+import { deriveReportStylePreviewCapabilities } from "@/lib/assessments/report-style-registry";
 
 export type ReportIdentity = Readonly<{
   assessmentName: string;
@@ -211,9 +212,16 @@ export function buildIndividualReportPresentation(
   options: BuildIndividualReportPresentationOptions = {},
 ): IndividualReportPresentation {
   const config = reportConfigFor(report.templateAlias);
+  const contentCapabilities = deriveReportStylePreviewCapabilities({
+    templateAlias: report.templateAlias,
+    questions: Object.values(report.questionsByKey),
+  });
+  const useNeutralNarrativeAdapter =
+    contentCapabilities.hasNarrativeResponses &&
+    !contentCapabilities.hasMetrics;
   let blocks: IndividualReportBlock[];
 
-  if (config.reportType === "qualitative") {
+  if (config.reportType === "qualitative" || useNeutralNarrativeAdapter) {
     const qualitative = buildQualitativeModel({
       templateAlias: report.templateAlias,
       sections: report.sections,

@@ -268,7 +268,7 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
     },
     {
       anatomy: "sparse custom",
-      templateAlias: "walk-qual-sparse-custom",
+      templateAlias: "founder-reflection-2026",
       matrixQuestions: [
         {
           stableKey: "custom_prompt",
@@ -324,6 +324,9 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
           renderer.querySelector(`[data-report-block="${expectedBlock}"]`),
         ).not.toBeNull();
       }
+      expect(renderer).not.toHaveTextContent("sub_matrix");
+      expect(renderer).not.toHaveTextContent(/version unavailable|hash unavailable/i);
+      expect(renderer.textContent).not.toContain(" ·  · ");
     },
   );
 

@@ -405,9 +405,9 @@ describe("buildIndividualReportPresentation", () => {
     ]);
   });
 
-  it("emits only authored narrative content for a sparse custom qualitative report", () => {
+  it("emits only authored narrative content for an ordinary unmapped sparse custom report", () => {
     const report = qualitativeReport({
-      templateAlias: "walk-qual-sparse-custom",
+      templateAlias: "founder-reflection-2026",
       assessmentName: "Custom founder prompts",
       campaignLabel: null,
       result: {

@@ -468,69 +468,56 @@ export function PublicCampaignsManager() {
                       >
                         {expandedId === c.id ? "Hide" : "View submissions"}
                       </button>
-                      <button
-                        type="button"
-                        className="wf-btn wf-btn-sm"
-                        onClick={() => toggleAppearance(c)}
-                        aria-expanded={expandedAppearanceId === c.id}
-                      >
-                        {expandedAppearanceId === c.id
-                          ? "Hide report appearance"
-                          : c.reportStyleLockedAt === null &&
-                              c.reportStylesAvailable
-                            ? "Manage report appearance"
-                            : "View report appearance"}
-                      </button>
+                      {c.reportStylesAvailable && (
+                        <button
+                          type="button"
+                          className="wf-btn wf-btn-sm"
+                          onClick={() => toggleAppearance(c)}
+                          aria-expanded={expandedAppearanceId === c.id}
+                        >
+                          {expandedAppearanceId === c.id
+                            ? "Hide report appearance"
+                            : c.reportStyleLockedAt === null
+                              ? "Manage report appearance"
+                              : "View report appearance"}
+                        </button>
+                      )}
                     </td>
                   </tr>
-                  {expandedAppearanceId === c.id && (
+                  {c.reportStylesAvailable && expandedAppearanceId === c.id && (
                     <tr className="wf-tr">
                       <td className="wf-td" colSpan={5}>
                         <section
                           aria-label={`${c.name} report appearance`}
                           style={{ maxWidth: "64rem" }}
                         >
-                          {c.reportStylesAvailable ||
-                          c.reportStyleLockedAt !== null ? (
-                            <ReportStylePicker
-                              value={
-                                c.reportStyleLockedAt !== null
-                                  ? c.reportStyle
-                                  : c.reportStylesAvailable
-                                    ? (appearanceDrafts[c.id] ?? c.reportStyle)
-                                    : "CLASSIC"
-                              }
-                              onChange={(value) =>
-                                setAppearanceDrafts((current) => ({
-                                  ...current,
-                                  [c.id]: value,
-                                }))
-                              }
-                              disabled={
-                                c.reportStyleLockedAt !== null ||
-                                appearanceSavingId === c.id
-                              }
-                              sourceLabel={
-                                c.reportStyleSource === "CAMPAIGN_OVERRIDE"
-                                  ? "Campaign choice"
-                                  : "Template default"
-                              }
-                              lockedAt={c.reportStyleLockedAt}
-                              previewAnatomy={resolveReportStylePreviewAnatomy({
-                                templateAlias: c.template?.alias,
-                                capabilities: c.reportStylePreviewCapabilities,
-                              })}
-                            />
-                          ) : (
-                            <div className="rounded-lg border border-slate-300 bg-white p-4">
-                              <h4 className="font-semibold">
-                                {REPORT_STYLE_REGISTRY.CLASSIC.label}
-                              </h4>
-                              <p className="wf-field-hint">
-                                {REPORT_STYLE_REGISTRY.CLASSIC.description}
-                              </p>
-                            </div>
-                          )}
+                          <ReportStylePicker
+                            value={
+                              c.reportStyleLockedAt !== null
+                                ? c.reportStyle
+                                : (appearanceDrafts[c.id] ?? c.reportStyle)
+                            }
+                            onChange={(value) =>
+                              setAppearanceDrafts((current) => ({
+                                ...current,
+                                [c.id]: value,
+                              }))
+                            }
+                            disabled={
+                              c.reportStyleLockedAt !== null ||
+                              appearanceSavingId === c.id
+                            }
+                            sourceLabel={
+                              c.reportStyleSource === "CAMPAIGN_OVERRIDE"
+                                ? "Campaign choice"
+                                : "Template default"
+                            }
+                            lockedAt={c.reportStyleLockedAt}
+                            previewAnatomy={resolveReportStylePreviewAnatomy({
+                              templateAlias: c.template?.alias,
+                              capabilities: c.reportStylePreviewCapabilities,
+                            })}
+                          />
                           {c.reportStyleLockedAt === null &&
                             c.reportStylesAvailable && (
                               <div style={{ marginTop: "1rem" }}>
@@ -550,12 +537,6 @@ export function PublicCampaignsManager() {
                                 </button>
                               </div>
                             )}
-                          {!c.reportStylesAvailable && (
-                            <p className="wf-field-hint">
-                              Classic is used while report appearances are
-                              unavailable; the stored selection is unchanged.
-                            </p>
-                          )}
                         </section>
                       </td>
                     </tr>

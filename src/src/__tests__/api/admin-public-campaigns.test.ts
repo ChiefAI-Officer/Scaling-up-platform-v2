@@ -210,7 +210,13 @@ describe("GET /api/admin/public-campaigns — LIST", () => {
   it("returns the exact campaign-canary availability and lets kill override it", async () => {
     (getApiActor as jest.Mock).mockResolvedValue(adminActor);
     (db.assessmentCampaign.findMany as jest.Mock).mockResolvedValue([
-      { ...mockCampaign, templateId: "tpl-not-canary" },
+      {
+        ...mockCampaign,
+        templateId: "tpl-not-canary",
+        reportStyle: "EXECUTIVE_BOARDROOM",
+        reportStyleSource: "CAMPAIGN_OVERRIDE",
+        reportStyleLockedAt: new Date("2026-08-06T04:00:00.000Z"),
+      },
     ]);
     process.env.WAVE_REPORT_STYLES_CANARY = "camp-1";
 
@@ -228,7 +234,12 @@ describe("GET /api/admin/public-campaigns — LIST", () => {
     await expect(killedRes.json()).resolves.toEqual(
       expect.objectContaining({
         data: [
-          expect.objectContaining({ reportStylesAvailable: false }),
+          expect.objectContaining({
+            reportStylesAvailable: false,
+            reportStyle: "EXECUTIVE_BOARDROOM",
+            reportStyleSource: "CAMPAIGN_OVERRIDE",
+            reportStyleLockedAt: "2026-08-06T04:00:00.000Z",
+          }),
         ],
       }),
     );

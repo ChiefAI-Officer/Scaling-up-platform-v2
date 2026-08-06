@@ -26,7 +26,6 @@ export function ReportStyleScope({
   const storedStyle =
     typeof report.reportStyle === "string" ? report.reportStyle : undefined;
   const enabledStyle = effectiveReportStyle({
-    alias: report.templateAlias,
     storedStyle,
     available: true,
   });

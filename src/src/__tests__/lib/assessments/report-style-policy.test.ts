@@ -8,7 +8,6 @@ import {
 } from "@/lib/assessments/report-style-registry";
 import {
   effectiveReportStyle,
-  isReportStyleEligible,
   resolveCampaignReportStyle,
 } from "@/lib/assessments/report-style-policy";
 import { classifyPresentationByTypes } from "@/lib/assessments/qualitative-report-model";
@@ -137,40 +136,27 @@ describe("report style registry", () => {
 });
 
 describe("report style policy", () => {
-  it("makes every template alias eligible for catalog report styles", () => {
-    expect(isReportStyleEligible("scaling-up-full")).toBe(true);
-    expect(isReportStyleEligible("scored-instrument")).toBe(true);
-    expect(isReportStyleEligible("qualitative-instrument")).toBe(true);
-    expect(isReportStyleEligible("custom-instrument")).toBe(true);
-    expect(isReportStyleEligible(null)).toBe(true);
-    expect(isReportStyleEligible(undefined)).toBe(true);
-  });
-
   it("falls back to Classic for unknown, missing, or unavailable rendering styles", () => {
     expect(
       effectiveReportStyle({
-        alias: "scaling-up-full",
         storedStyle: "NOT_A_STYLE",
         available: true,
       }),
     ).toBe("CLASSIC");
     expect(
       effectiveReportStyle({
-        alias: "another-template",
         storedStyle: "MODERN_DASHBOARD",
         available: true,
       }),
     ).toBe("MODERN_DASHBOARD");
     expect(
       effectiveReportStyle({
-        alias: "scaling-up-full",
         storedStyle: undefined,
         available: true,
       }),
     ).toBe("CLASSIC");
     expect(
       effectiveReportStyle({
-        alias: "scaling-up-full",
         storedStyle: "MODERN_DASHBOARD",
         available: false,
       }),
@@ -180,14 +166,12 @@ describe("report style policy", () => {
   it("uses a valid available stored style for every template", () => {
     expect(
       effectiveReportStyle({
-        alias: "scaling-up-full",
         storedStyle: "MODERN_DASHBOARD",
         available: true,
       }),
     ).toBe("MODERN_DASHBOARD");
     expect(
       effectiveReportStyle({
-        alias: null,
         storedStyle: "EXECUTIVE_BOARDROOM",
         available: true,
       }),

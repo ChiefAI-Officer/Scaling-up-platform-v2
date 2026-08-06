@@ -212,20 +212,27 @@ describe("CampaignDetail report appearance", () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
-  it("keeps the selected appearance visible when write availability is off", () => {
+  it("removes the entire appearance surface when rollout availability is off without mutating the stored selection", () => {
+    const stored = overview();
+    stored.campaign.reportStyle = "EXECUTIVE_BOARDROOM";
+    stored.campaign.reportStyleSource = "CAMPAIGN_OVERRIDE";
+
     render(
       <CampaignDetail
-        initialOverview={overview()}
+        initialOverview={stored}
         initialRespondents={[]}
         reportStylesAvailable={false}
         canEditReportAppearance={false}
       />,
     );
 
-    expect(screen.getByTestId("campaign-report-style-card")).toBeInTheDocument();
-    expect(screen.getByText("Classic")).toBeInTheDocument();
-    expect(screen.getByText("Template default")).toBeInTheDocument();
+    expect(screen.queryByTestId("campaign-report-style-card")).not.toBeInTheDocument();
+    expect(screen.queryByText("Report appearance")).not.toBeInTheDocument();
+    expect(screen.queryByText("Executive Boardroom")).not.toBeInTheDocument();
     expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(stored.campaign.reportStyle).toBe("EXECUTIVE_BOARDROOM");
+    expect(stored.campaign.reportStyleSource).toBe("CAMPAIGN_OVERRIDE");
   });
 
   it("refreshes and surfaces the exact race explanation on a locked response", async () => {

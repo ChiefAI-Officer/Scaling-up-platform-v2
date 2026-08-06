@@ -240,7 +240,7 @@ describe("the rendered report", () => {
       {
         ...(REPORT as unknown as Record<string, unknown>),
         assessmentName: "Founder prompts",
-        templateAlias: "walk-qual-sparse-custom",
+        templateAlias: "founder-reflection-2026",
         reportStyle: "MODERN_DASHBOARD",
         result: EMPTY_CANONICAL_RESULT,
         sections: [{ stableKey: "custom", name: "Founder reflections" }],

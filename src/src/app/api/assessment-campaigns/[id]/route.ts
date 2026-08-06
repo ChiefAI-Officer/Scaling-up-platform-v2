@@ -35,7 +35,6 @@ import {
 import { isCustomSlidesEnabled } from "@/lib/assessments/wave-m-flags";
 import { isOnScreenResultsEnabled } from "@/lib/assessments/wave-osr-flags";
 import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
-import { isReportStyleEligible } from "@/lib/assessments/report-style-policy";
 import type { ReportStyleKey } from "@/lib/assessments/report-style-registry";
 import { isExactCoachReportAppearanceOwner } from "@/lib/assessments/campaign-detail";
 import {
@@ -195,7 +194,6 @@ async function patchReportAppearance(
   }
 
   const reportStylesAvailable =
-    isReportStyleEligible(campaign.template?.alias) &&
     isReportStylesEnabled({ templateId: campaign.templateId, campaignId: id });
   if (!reportStylesAvailable) {
     return NextResponse.json(

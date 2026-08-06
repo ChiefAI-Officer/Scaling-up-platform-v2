@@ -1,29 +1,16 @@
 import { isReportStyleKey, type ReportStyleKey } from "@/lib/assessments/report-style-registry";
 
 /**
- * Kept as a compatibility seam for existing callers. Report-style eligibility
- * is catalog-wide; launch availability is decided separately by
- * isReportStylesEnabled.
- */
-export function isReportStyleEligible(_alias: string | null | undefined): boolean {
-  void _alias;
-  return true;
-}
-
-/**
  * Applies the defensive rendering fallback. Stored values can originate from
  * persisted data, so this function validates them rather than trusting a cast.
  */
 export function effectiveReportStyle({
-  alias: _alias,
   storedStyle,
   available,
 }: {
-  alias: string | null | undefined;
   storedStyle: string | null | undefined;
   available: boolean;
 }): ReportStyleKey {
-  void _alias;
   if (!available || !isReportStyleKey(storedStyle)) {
     return "CLASSIC";
   }

@@ -36,9 +36,6 @@ import React, { useEffect, useState } from "react";
 import { LANGUAGE_LABELS } from "./enum-labels";
 import { ReportStylePicker } from "@/components/assessments/ReportStylePicker";
 import {
-  isReportStyleEligible,
-} from "@/lib/assessments/report-style-policy";
-import {
   resolveReportStylePreviewAnatomy,
   type ReportStyleKey,
   type ReportStylePreviewCapabilities,
@@ -171,7 +168,7 @@ export function SettingsTab({
         templateRowSaving={templateRowSaving}
         templateRowError={templateRowError}
       />
-      {reportStylesEnabled && isReportStyleEligible(templateValues.alias) && (
+      {reportStylesEnabled && (
         <DefaultReportAppearanceCard
           templateAlias={templateValues.alias}
           previewCapabilities={reportStylePreviewCapabilities}

@@ -192,7 +192,7 @@ describe("PublicCampaignsManager — orphaned-page render smoke (Z-1)", () => {
     });
   });
 
-  it("keeps the selected appearance, provenance, lock time, explanation, and previews visible read-only", async () => {
+  it("removes every existing-campaign appearance affordance when rollout availability is off while retaining server data", async () => {
     const lockedCampaign = {
       ...PUBLIC_CAMPAIGN,
       reportStyleLockedAt: "2026-08-06T04:00:00.000Z",
@@ -216,40 +216,18 @@ describe("PublicCampaignsManager — orphaned-page render smoke (Z-1)", () => {
 
     render(<PublicCampaignsManager />);
     await screen.findByText("Quick Scaling Up Check");
-    fireEvent.click(
-      screen.getByRole("button", { name: "View report appearance" }),
-    );
-
-    const panel = screen.getByRole("region", {
-      name: "Quick Scaling Up Check report appearance",
-    });
-    expect(within(panel).getByText("Source: Campaign choice")).toBeInTheDocument();
     expect(
-      within(panel).getByText(
-        /Report appearance was fixed when the first response was completed\./,
-      ),
-    ).toBeInTheDocument();
-    expect(within(panel).getByRole("time")).toHaveAttribute(
-      "datetime",
-      "2026-08-06T04:00:00.000Z",
-    );
-    expect(
-      within(panel).getByRole("radio", { name: /Executive Boardroom/i }),
-    ).toBeDisabled();
-    expect(
-      within(panel).getByText(
-        "Classic is used while report appearances are unavailable; the stored selection is unchanged.",
-      ),
-    ).toBeInTheDocument();
-    fireEvent.click(within(panel).getByRole("tab", { name: "Summary" }));
-    expect(
-      within(panel).getByRole("img", {
-        name: "Executive Boardroom Summary preview",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      within(panel).queryByRole("button", { name: "Save report appearance" }),
+      screen.queryByRole("button", { name: /report appearance/i }),
     ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("region", {
+        name: "Quick Scaling Up Check report appearance",
+      }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("radio", { name: /Executive Boardroom/i })).not.toBeInTheDocument();
+    expect(lockedCampaign.reportStyle).toBe("EXECUTIVE_BOARDROOM");
+    expect(lockedCampaign.reportStyleSource).toBe("CAMPAIGN_OVERRIDE");
+    expect(lockedCampaign.reportStyleLockedAt).toBe("2026-08-06T04:00:00.000Z");
   });
 
   it("reconciles a 409 immediately from authoritative response data without reloading the list", async () => {

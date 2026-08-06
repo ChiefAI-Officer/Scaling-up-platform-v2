@@ -312,6 +312,67 @@ function scalingUpFullReport(reportStyle: string): RespondentReport {
 
 describe("adaptive alternate report renderers", () => {
   it.each(renderers)(
+    "%s keeps internal provenance out of visible output and renders optional identity metadata without orphan separators",
+    (_, Renderer) => {
+      const immediate: IndividualReportPresentation = {
+        ...sparsePresentation,
+        identity: {
+          ...sparsePresentation.identity,
+          jobTitle: null,
+          companyName: "",
+        },
+        provenance: {
+          submissionId: "public-submission-secret",
+          versionId: "",
+          contentHash: "",
+          templateName: "Custom founder prompts",
+          imported: false,
+        },
+      };
+      const later: IndividualReportPresentation = {
+        ...immediate,
+        provenance: {
+          ...immediate.provenance,
+          versionId: "version-secret",
+          contentHash: "content-hash-secret",
+        },
+      };
+
+      const immediateHtml = renderToStaticMarkup(
+        <Renderer presentation={immediate} />,
+      );
+      const laterHtml = renderToStaticMarkup(
+        <Renderer presentation={later} />,
+      );
+
+      expect(immediateHtml).toBe(laterHtml);
+      expect(immediateHtml).toContain(
+        "Confidential assessment report · Custom founder prompts",
+      );
+      for (const internalValue of [
+        "public-submission-secret",
+        "version-secret",
+        "content-hash-secret",
+        "submission unavailable",
+        "version unavailable",
+        "hash unavailable",
+      ]) {
+        expect(immediateHtml).not.toContain(internalValue);
+        expect(laterHtml).not.toContain(internalValue);
+      }
+
+      const { container } = render(<Renderer presentation={immediate} />);
+      const identityHeader = container.querySelector(".report-page header");
+      expect(identityHeader).not.toBeNull();
+      expect(identityHeader?.textContent).toContain(
+        "Safe Test Name · January 15, 2026",
+      );
+      expect(identityHeader?.textContent).not.toContain(" ·  · ");
+      expect(identityHeader?.textContent).not.toMatch(/ ·\s*$/);
+    },
+  );
+
+  it.each(renderers)(
     "%s renders every scored semantic block exactly once without renderer-authored score bands",
     (_, Renderer) => {
       const { container } = render(<Renderer presentation={scoredPresentation} />);
