@@ -23,7 +23,7 @@ describe("ReportStylePicker", () => {
     expect(screen.getByRole("radio", { name: /classic/i })).not.toBeChecked();
     expect(screen.getByRole("radio", { name: /executive boardroom/i })).toBeChecked();
     expect(screen.getByText("Selected")).toBeInTheDocument();
-    expect(screen.getByText("The current Scaling Up report presentation.")).toBeInTheDocument();
+    expect(screen.getByText("A clear, familiar report presentation.")).toBeInTheDocument();
     expect(screen.getByText("Editorial, restrained, and board-ready.")).toBeInTheDocument();
     expect(screen.getByText("Compact, visual, and data-forward.")).toBeInTheDocument();
     expect(screen.getAllByText(/Paper format:/)).toHaveLength(3);
@@ -106,6 +106,29 @@ describe("ReportStylePicker", () => {
     expect(screen.getByRole("radio", { name: /classic/i })).toBeChecked();
   });
 
+  it("keeps compact selection usable and exposes retry when its thumbnail fails", () => {
+    render(<PickerHarness initialValue="MODERN_DASHBOARD" compact />);
+
+    const thumbnail = screen.getByRole("img", {
+      name: "Modern Dashboard selected thumbnail",
+    });
+    fireEvent.error(thumbnail);
+
+    expect(screen.getByText("Preview unavailable")).toBeInTheDocument();
+    const classic = screen.getByRole("radio", { name: /classic/i });
+    expect(classic).not.toBeDisabled();
+    fireEvent.click(classic);
+    expect(classic).toBeChecked();
+
+    fireEvent.click(screen.getByRole("radio", { name: /modern dashboard/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(
+      screen.getByRole("img", {
+        name: "Modern Dashboard selected thumbnail",
+      }),
+    ).toBeInTheDocument();
+  });
+
   it("keeps the selected option and previews readable while immutable", () => {
     render(
       <PickerHarness
@@ -119,7 +142,11 @@ describe("ReportStylePicker", () => {
     expect(screen.getByRole("radio", { name: /executive boardroom/i })).toBeChecked();
     screen.getAllByRole("radio").forEach((radio) => expect(radio).toBeDisabled());
     expect(screen.getByText(/Campaign default/)).toBeInTheDocument();
-    expect(screen.getByText(/changes are unavailable after the first completed response/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /report appearance was fixed when the first response was completed/i,
+      ),
+    ).toBeInTheDocument();
     expect(screen.getByText(/^Locked on/).querySelector("time")).toHaveAttribute(
       "dateTime",
       "2026-08-05T06:30:00.000Z",
@@ -130,7 +157,11 @@ describe("ReportStylePicker", () => {
   it("explains immutable selection when optional lock context is absent", () => {
     render(<PickerHarness initialValue="MODERN_DASHBOARD" disabled />);
 
-    expect(screen.getByText("Changes are unavailable after the first completed response.")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Report appearance was fixed when the first response was completed.",
+      ),
+    ).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: /modern dashboard/i })).toBeChecked();
     expect(screen.getByRole("img", { name: "Modern Dashboard Cover preview" })).toBeInTheDocument();
   });

@@ -22,6 +22,12 @@ import {
   resolvePublishedTemplateVersion,
 } from "@/lib/assessments/campaign-create-service";
 import { DEFAULT_TEMPLATE_LANGUAGE } from "@/lib/assessments/active-version";
+import {
+  REPORT_STYLE_KEYS,
+  type ReportStyleKey,
+} from "@/lib/assessments/report-style-registry";
+import { resolveCampaignReportStyle } from "@/lib/assessments/report-style-policy";
+import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
 
 // ─── alias helpers (copied from assessment-campaigns/route.ts) ───────────────
 
@@ -61,7 +67,58 @@ const createPublicCampaignSchema = z.object({
   openAt: z.string().min(1),
   closeAt: z.string().optional().nullable(),
   publicConfig: z.record(z.string(), z.unknown()).optional().nullable(),
+  reportStyle: z.enum(REPORT_STYLE_KEYS).optional(),
 });
+
+// ─── GET ─────────────────────────────────────────────────────────────────────
+
+export async function GET() {
+  try {
+    const actor = await getApiActor();
+    if (!actor) {
+      return NextResponse.json(
+        { success: false, error: "Authentication required" },
+        { status: 401 },
+      );
+    }
+    if (!isPrivilegedRole(actor.role)) {
+      return NextResponse.json(
+        { success: false, error: "Forbidden: admin or staff required" },
+        { status: 403 },
+      );
+    }
+
+    const campaigns = await db.assessmentCampaign.findMany({
+      where: {
+        accessMode: "PUBLIC",
+        createdByCoachId: null,
+        deletedAt: null,
+      },
+      include: {
+        organization: { select: { id: true, name: true } },
+        template: { select: { id: true, name: true, alias: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return NextResponse.json({
+      success: true,
+      data: campaigns.map((campaign) => ({
+        ...campaign,
+        reportStylesAvailable: isReportStylesEnabled({
+          templateId: campaign.templateId,
+          campaignId: campaign.id,
+        }),
+      })),
+    });
+  } catch (error) {
+    console.error("Error listing public campaigns:", error);
+    return NextResponse.json(
+      { success: false, error: "Internal server error" },
+      { status: 500 },
+    );
+  }
+}
 
 // ─── POST ─────────────────────────────────────────────────────────────────────
 
@@ -110,8 +167,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { templateId, organizationId, name, openAt, closeAt, publicConfig } =
-      validation.data;
+    const {
+      templateId,
+      organizationId,
+      name,
+      openAt,
+      closeAt,
+      publicConfig,
+      reportStyle: explicitReportStyle,
+    } = validation.data;
     const publicConfigJson: Prisma.InputJsonValue | undefined = publicConfig
       ? (publicConfig as Prisma.InputJsonValue)
       : undefined;
@@ -170,7 +234,12 @@ export async function POST(request: NextRequest) {
     // 5. Fetch template row (alias for slug generation)
     const template = await db.assessmentTemplate.findUnique({
       where: { id: templateId },
-      select: { id: true, alias: true, disabledAt: true },
+      select: {
+        id: true,
+        alias: true,
+        disabledAt: true,
+        defaultReportStyle: true,
+      },
     });
     if (!template) {
       return NextResponse.json(
@@ -193,6 +262,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const reportStylesAvailable = isReportStylesEnabled({
+      templateId: template.id,
+    });
+    if (
+      !reportStylesAvailable &&
+      explicitReportStyle !== undefined
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Report appearance is not available for this campaign",
+        },
+        { status: 400 },
+      );
+    }
+    const reportStylePolicy = resolveCampaignReportStyle(
+      reportStylesAvailable ? explicitReportStyle : undefined,
+      reportStylesAvailable
+        ? (template.defaultReportStyle as ReportStyleKey)
+        : "CLASSIC",
+    );
+
     // 5b. Verify org exists
     const org = await db.organization.findUnique({
       where: { id: organizationId },
@@ -211,27 +302,35 @@ export async function POST(request: NextRequest) {
       (template as { alias?: string | null }).alias ?? template.id
     );
     const aliasBase = `${tmplSlug}_pub_${ts}`;
+    const createdByUserId = actor.userId;
+
+    function campaignCreateData(alias: string) {
+      return {
+        name,
+        templateId,
+        versionId: version.id,
+        organizationId,
+        language: version.language,
+        alias,
+        status: "DRAFT" as const,
+        accessMode: "PUBLIC" as const,
+        publicConfig: publicConfigJson,
+        openAt: openAtDate,
+        endMode,
+        closeAt: closeAtDate,
+        reportStyle: reportStylePolicy.reportStyle,
+        reportStyleSource: reportStylePolicy.reportStyleSource,
+        reportStyleLockedAt: null,
+        createdBy: createdByUserId,
+        createdByCoachId: null,
+      };
+    }
 
     // 7. Create campaign with P2002 alias-collision fallback
     let campaign;
     try {
       campaign = await db.assessmentCampaign.create({
-        data: {
-          name,
-          templateId,
-          versionId: version.id,
-          organizationId,
-          language: version.language,
-          alias: aliasBase,
-          status: "DRAFT",
-          accessMode: "PUBLIC",
-          publicConfig: publicConfigJson,
-          openAt: openAtDate,
-          endMode,
-          closeAt: closeAtDate,
-          createdBy: actor.userId,
-          createdByCoachId: null,
-        },
+        data: campaignCreateData(aliasBase),
       });
     } catch (err) {
       if (
@@ -244,22 +343,7 @@ export async function POST(request: NextRequest) {
           .toString(36)
           .slice(2, 8)}`;
         campaign = await db.assessmentCampaign.create({
-          data: {
-            name,
-            templateId,
-            versionId: version.id,
-            organizationId,
-            language: version.language,
-            alias: aliasFallback,
-            status: "DRAFT",
-            accessMode: "PUBLIC",
-            publicConfig: publicConfigJson,
-            openAt: openAtDate,
-            endMode,
-            closeAt: closeAtDate,
-            createdBy: actor.userId,
-            createdByCoachId: null,
-          },
+          data: campaignCreateData(aliasFallback),
         });
       } else {
         throw err;
@@ -278,6 +362,8 @@ export async function POST(request: NextRequest) {
         organizationId,
         versionId: version.id,
         alias: campaign.alias,
+        reportStyle: reportStylePolicy.reportStyle,
+        reportStyleSource: reportStylePolicy.reportStyleSource,
       },
     });
 

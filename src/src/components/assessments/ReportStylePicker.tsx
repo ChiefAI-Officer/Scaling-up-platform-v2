@@ -21,6 +21,7 @@ export interface ReportStylePickerProps {
   disabled?: boolean;
   sourceLabel?: string;
   lockedAt?: Date | string | null;
+  compact?: boolean;
 }
 
 function previewId(style: ReportStyleKey, page: PreviewPage) {
@@ -48,13 +49,17 @@ export function ReportStylePicker({
   disabled = false,
   sourceLabel,
   lockedAt,
+  compact = false,
 }: ReportStylePickerProps) {
   const radioName = useId();
   const [previewPage, setPreviewPage] = useState<PreviewPage>("cover");
+  const [previewExpanded, setPreviewExpanded] = useState(false);
   const [failedPreviews, setFailedPreviews] = useState<ReadonlySet<string>>(() => new Set());
   const [retryVersions, setRetryVersions] = useState<Readonly<Record<string, number>>>({});
 
   const selectedMetadata = REPORT_STYLE_REGISTRY[value];
+  const selectedThumbnailId = previewId(value, "cover");
+  const selectedThumbnailFailed = failedPreviews.has(selectedThumbnailId);
   const lockedTimestamp = useMemo(
     () => (lockedAt == null ? null : formatLockTimestamp(lockedAt)),
     [lockedAt],
@@ -114,7 +119,10 @@ export function ReportStylePicker({
   }
 
   return (
-    <section aria-label="Report style selection" className="space-y-5">
+    <section
+      aria-label="Report style selection"
+      className={compact ? "space-y-3" : "space-y-5"}
+    >
       <fieldset className="space-y-3">
         <legend className="text-sm font-semibold text-slate-900">Report style</legend>
         <div className="grid gap-3 md:grid-cols-3">
@@ -125,7 +133,9 @@ export function ReportStylePicker({
             return (
               <label
                 key={style}
-                className="block cursor-pointer rounded-lg border border-slate-300 bg-white p-4 text-slate-900 shadow-sm transition focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-blue-700 has-[:checked]:border-slate-900 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-75"
+                className={`block cursor-pointer rounded-lg border border-slate-300 bg-white text-slate-900 shadow-sm transition focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-blue-700 has-[:checked]:border-slate-900 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-75 ${
+                  compact ? "p-2" : "p-4"
+                }`}
               >
                 <input
                   type="radio"
@@ -168,12 +178,55 @@ export function ReportStylePicker({
               ) : (
                 "Lock timestamp could not be read. "
               ))}
-            Changes are unavailable after the first completed response.
+            Report appearance was fixed when the first response was completed.
           </p>
         </div>
       )}
 
-      <div className="space-y-3">
+      {compact &&
+        (selectedThumbnailFailed ? (
+          <div
+            className="space-y-2 rounded-lg border border-slate-300 p-4"
+            role="status"
+          >
+            <p>Preview unavailable</p>
+            <button
+              type="button"
+              className="rounded-md border border-slate-500 px-3 py-1.5 text-sm font-medium text-slate-900 focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-blue-700"
+              onClick={() => retryPreview("cover")}
+            >
+              Retry
+            </button>
+          </div>
+        ) : (
+          // Compact creation surfaces keep one selected thumbnail visible while
+          // the full anatomy preview remains available on demand below.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            key={`${selectedThumbnailId}-${retryVersions[selectedThumbnailId] ?? 0}`}
+            src={selectedMetadata.previews.cover}
+            alt={`${selectedMetadata.label} selected thumbnail`}
+            className="h-28 w-full rounded-lg border border-slate-300 object-cover object-top"
+            onError={() =>
+              setFailedPreviews((current) =>
+                new Set(current).add(selectedThumbnailId),
+              )
+            }
+          />
+        ))}
+
+      {compact && (
+        <button
+          type="button"
+          aria-expanded={previewExpanded}
+          className="text-sm font-medium text-slate-900 underline underline-offset-2"
+          onClick={() => setPreviewExpanded((expanded) => !expanded)}
+        >
+          Preview selected appearance
+        </button>
+      )}
+      {(!compact || previewExpanded) && (
+        <div className="mt-3 space-y-3">
         <div role="tablist" aria-label="Report style preview pages" className="flex gap-2">
           {PREVIEW_TABS.map((tab) => {
             const isActive = tab.key === previewPage;
@@ -239,7 +292,8 @@ export function ReportStylePicker({
             </div>
           );
         })}
-      </div>
+        </div>
+      )}
     </section>
   );
 }

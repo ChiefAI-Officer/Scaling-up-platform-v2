@@ -23,6 +23,10 @@ const PUBLIC_CAMPAIGN = {
   accessMode: "PUBLIC",
   openAt: "2026-06-01T00:00:00.000Z",
   closeAt: null,
+  reportStyle: "EXECUTIVE_BOARDROOM",
+  reportStyleSource: "CAMPAIGN_OVERRIDE",
+  reportStyleLockedAt: null,
+  reportStylesAvailable: true,
   template: { id: "t1", name: "Scaling Up Quick", alias: "scaling-up-quick" },
   organization: { id: "o1", name: "Acme Corp" },
 };
@@ -31,10 +35,20 @@ beforeEach(() => {
   global.fetch = jest.fn(async (input: RequestInfo | URL) => {
     const url = typeof input === "string" ? input : String(input);
     const json =
-      url.endsWith("/api/assessment-campaigns")
+      url.endsWith("/api/admin/public-campaigns")
         ? { success: true, data: [PUBLIC_CAMPAIGN] }
-        : url.endsWith("/api/admin/assessment-templates")
-          ? { success: true, data: [{ id: "t1", name: "Scaling Up Quick", alias: "scaling-up-quick", disabledAt: null }] }
+        : url.endsWith("/api/assessment-templates")
+          ? {
+              success: true,
+              data: [{
+                id: "t1",
+                name: "Scaling Up Quick",
+                alias: "scaling-up-quick",
+                disabledAt: null,
+                defaultReportStyle: "MODERN_DASHBOARD",
+                reportStylesEnabled: true,
+              }],
+            }
           : url.endsWith("/api/organizations")
             ? { success: true, data: [{ id: "o1", name: "Acme Corp" }] }
             : { success: true, data: [] };
@@ -56,6 +70,235 @@ describe("PublicCampaignsManager — orphaned-page render smoke (Z-1)", () => {
       expect(screen.getByText("Quick Scaling Up Check")).toBeInTheDocument(),
     );
     expect(screen.getByText("Existing PUBLIC Campaigns")).toBeInTheDocument();
+  });
+
+  it("shows template inheritance during creation and submits an explicit campaign choice", async () => {
+    render(<PublicCampaignsManager />);
+
+    const createSection = await screen.findByRole("region", {
+      name: "Create public campaign",
+    });
+    fireEvent.change(within(createSection).getByLabelText(/template/i), {
+      target: { value: "t1" },
+    });
+    expect(
+      within(createSection).getByText(
+        "Report appearance: Modern Dashboard · Template default",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(createSection).getByRole("img", {
+        name: "Modern Dashboard selected thumbnail",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(createSection).queryByRole("img", {
+        name: "Modern Dashboard Cover preview",
+      }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(
+      within(createSection).getByText("Preview selected appearance"),
+    );
+    expect(
+      within(createSection).getByRole("img", {
+        name: "Modern Dashboard Cover preview",
+      }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      within(createSection).getByRole("radio", {
+        name: /Executive Boardroom/i,
+      }),
+    );
+    expect(
+      within(createSection).getByText(
+        "Report appearance: Executive Boardroom · Campaign choice",
+      ),
+    ).toBeInTheDocument();
+
+    fireEvent.change(within(createSection).getByLabelText(/organization/i), {
+      target: { value: "o1" },
+    });
+    fireEvent.change(within(createSection).getByLabelText(/campaign name/i), {
+      target: { value: "Public report test" },
+    });
+    fireEvent.change(within(createSection).getByLabelText(/open at/i), {
+      target: { value: "2026-08-06T09:00" },
+    });
+    fireEvent.click(
+      within(createSection).getByRole("button", {
+        name: "Create PUBLIC Campaign",
+      }),
+    );
+
+    await waitFor(() => {
+      const createCall = (global.fetch as jest.Mock).mock.calls.find(
+        ([url, init]) =>
+          String(url).endsWith("/api/admin/public-campaigns") &&
+          init?.method === "POST",
+      );
+      expect(JSON.parse(createCall?.[1]?.body as string)).toEqual(
+        expect.objectContaining({ reportStyle: "EXECUTIVE_BOARDROOM" }),
+      );
+    });
+  });
+
+  it("lets privileged users preview and save an unlocked public campaign appearance", async () => {
+    render(<PublicCampaignsManager />);
+    await screen.findByText("Quick Scaling Up Check");
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Manage report appearance" }),
+    );
+    const editor = screen.getByRole("region", {
+      name: "Quick Scaling Up Check report appearance",
+    });
+    expect(
+      within(editor).getByRole("img", {
+        name: "Executive Boardroom Cover preview",
+      }),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      within(editor).getByRole("radio", { name: /Modern Dashboard/i }),
+    );
+    fireEvent.click(
+      within(editor).getByRole("button", { name: "Save report appearance" }),
+    );
+
+    await waitFor(() => {
+      const updateCall = (global.fetch as jest.Mock).mock.calls.find(
+        ([url, init]) =>
+          String(url).endsWith("/pc-1/report-style") && init?.method === "PATCH",
+      );
+      expect(JSON.parse(updateCall?.[1]?.body as string)).toEqual({
+        reportStyle: "MODERN_DASHBOARD",
+      });
+    });
+  });
+
+  it("keeps the selected appearance, provenance, lock time, explanation, and previews visible read-only", async () => {
+    const lockedCampaign = {
+      ...PUBLIC_CAMPAIGN,
+      reportStyleLockedAt: "2026-08-06T04:00:00.000Z",
+      // Kill/rollback renders Classic without erasing the stored provenance or
+      // hiding the durable lock metadata.
+      reportStylesAvailable: false,
+    };
+    (global.fetch as jest.Mock).mockImplementation(
+      async (input: RequestInfo | URL) => {
+        const url = typeof input === "string" ? input : String(input);
+        const json = url.endsWith("/api/admin/public-campaigns")
+          ? { success: true, data: [lockedCampaign] }
+          : { success: true, data: [] };
+        return {
+          ok: true,
+          status: 200,
+          json: async () => json,
+        } as unknown as Response;
+      },
+    );
+
+    render(<PublicCampaignsManager />);
+    await screen.findByText("Quick Scaling Up Check");
+    fireEvent.click(
+      screen.getByRole("button", { name: "View report appearance" }),
+    );
+
+    const panel = screen.getByRole("region", {
+      name: "Quick Scaling Up Check report appearance",
+    });
+    expect(within(panel).getByText("Source: Campaign choice")).toBeInTheDocument();
+    expect(
+      within(panel).getByText(
+        /Report appearance was fixed when the first response was completed\./,
+      ),
+    ).toBeInTheDocument();
+    expect(within(panel).getByRole("time")).toHaveAttribute(
+      "datetime",
+      "2026-08-06T04:00:00.000Z",
+    );
+    expect(
+      within(panel).getByRole("radio", { name: /Executive Boardroom/i }),
+    ).toBeDisabled();
+    expect(
+      within(panel).getByText(
+        "Classic is used while report appearances are unavailable; the stored selection is unchanged.",
+      ),
+    ).toBeInTheDocument();
+    fireEvent.click(within(panel).getByRole("tab", { name: "Summary" }));
+    expect(
+      within(panel).getByRole("img", {
+        name: "Executive Boardroom Summary preview",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(panel).queryByRole("button", { name: "Save report appearance" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("replaces a losing client draft with the final locked appearance after a 409", async () => {
+    let completionWon = false;
+    (global.fetch as jest.Mock).mockImplementation(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === "string" ? input : String(input);
+        if (url.endsWith("/pc-1/report-style") && init?.method === "PATCH") {
+          completionWon = true;
+          return {
+            ok: false,
+            status: 409,
+            json: async () => ({
+              error: "REPORT_STYLE_LOCKED",
+              message:
+                "Report appearance was locked when the first response completed. Refresh to see the final style.",
+            }),
+          } as unknown as Response;
+        }
+        const json = url.endsWith("/api/admin/public-campaigns")
+          ? {
+              success: true,
+              data: [
+                completionWon
+                  ? {
+                      ...PUBLIC_CAMPAIGN,
+                      reportStyle: "CLASSIC",
+                      reportStyleSource: "TEMPLATE_DEFAULT",
+                      reportStyleLockedAt: "2026-08-06T05:00:00.000Z",
+                    }
+                  : PUBLIC_CAMPAIGN,
+              ],
+            }
+          : { success: true, data: [] };
+        return {
+          ok: true,
+          status: 200,
+          json: async () => json,
+        } as unknown as Response;
+      },
+    );
+
+    render(<PublicCampaignsManager />);
+    await screen.findByText("Quick Scaling Up Check");
+    fireEvent.click(
+      screen.getByRole("button", { name: "Manage report appearance" }),
+    );
+    const panel = screen.getByRole("region", {
+      name: "Quick Scaling Up Check report appearance",
+    });
+    fireEvent.click(
+      within(panel).getByRole("radio", { name: /Modern Dashboard/i }),
+    );
+    fireEvent.click(
+      within(panel).getByRole("button", { name: "Save report appearance" }),
+    );
+
+    await waitFor(() =>
+      expect(
+        within(panel).getByRole("radio", { name: /Classic/i }),
+      ).toBeChecked(),
+    );
+    expect(
+      within(panel).getByRole("radio", { name: /Classic/i }),
+    ).toBeDisabled();
   });
 });
 
@@ -110,9 +353,9 @@ describe("PublicCampaignsManager — public-quiz submissions (#83)", () => {
   beforeEach(() => {
     global.fetch = jest.fn(async (input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : String(input);
-      const json = url.endsWith("/api/assessment-campaigns")
+      const json = url.endsWith("/api/admin/public-campaigns")
         ? { success: true, data: [PUBLIC_CAMPAIGN] }
-        : url.endsWith("/api/admin/assessment-templates")
+        : url.endsWith("/api/assessment-templates")
           ? { success: true, data: [] }
           : url.endsWith("/api/organizations")
             ? { success: true, data: [] }
@@ -175,7 +418,7 @@ describe("PublicCampaignsManager — public-quiz submissions (#83)", () => {
     (global.fetch as jest.Mock).mockImplementation(
       async (input: RequestInfo | URL) => {
         const url = typeof input === "string" ? input : String(input);
-        const json = url.endsWith("/api/assessment-campaigns")
+        const json = url.endsWith("/api/admin/public-campaigns")
           ? { success: true, data: [PUBLIC_CAMPAIGN] }
           : url.endsWith("/api/admin/public-campaigns/pc-1/submissions")
             ? { success: true, data: legacyRows }

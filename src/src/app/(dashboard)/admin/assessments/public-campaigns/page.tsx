@@ -47,7 +47,8 @@ export default async function AdminPublicCampaignsPage() {
             Create and publish{" "}
             <code>accessMode=&quot;PUBLIC&quot;</code> assessment campaigns.
             Respondents self-enroll — no invitation required.
-            Admin and STAFF only; coaches cannot access this page.
+            When report appearances are available, Admin and STAFF can choose
+            one until the first response is completed.
           </p>
         </div>
       </div>
@@ -58,7 +59,8 @@ export default async function AdminPublicCampaignsPage() {
         <code>organizationId</code> is required (NOT NULL FK — no synthetic
         rows). Each PUBLIC campaign attaches to a real organization supplied
         by the admin. <code>createdByCoachId</code> is null for all PUBLIC
-        campaigns.
+        campaigns. Report appearance is then fixed by the first completed
+        response.
       </div>
 
       <PublicCampaignsManager />
