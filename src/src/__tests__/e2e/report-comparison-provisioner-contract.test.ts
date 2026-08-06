@@ -1,4 +1,6 @@
 import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 const sentinelId = "report-comparison-e2e-sentinel-0123456789abcdefghijkl";
 
@@ -43,15 +45,51 @@ describe("report-comparison fixture provisioner contract", () => {
       ["MODERN_DASHBOARD", "Modern Dashboard"],
     ]);
     expect(fixture.roles).toEqual(expect.arrayContaining([
-      "current-ceo", "prior-native-ceo", "prior-imported-ceo", "non-ceo", "other-org-same-email",
+      "current-ceo", "prior-native-ceo", "prior-imported-ceo", "non-ceo",
+      "pending-submit-ceo", "pending-submit-non-ceo", "other-org-same-email",
     ]));
     expect(fixture.invitationRoles).toEqual(expect.arrayContaining([
-      "current-ceo", "non-ceo", "native-prior", "imported-prior", "other-org",
+      "current-ceo", "non-ceo", "native-prior", "imported-prior",
+      "pending-submit-ceo", "pending-submit-non-ceo", "other-org",
     ]));
     expect(fixture.relationshipContract).toEqual({
       everySubmissionHasInvitation: true,
       otherOrganizationHasEligibleHistory: true,
       currentCeoDisclosureEnabled: true,
+      actualSubmissionInvitationsStartPending: true,
     });
+  });
+
+  it("launches the isolated production server with comparison, report-style, and on-screen-result gates enabled", () => {
+    const source = readFileSync(
+      join(process.cwd(), "scripts/start-report-style-e2e.mjs"),
+      "utf8",
+    );
+
+    expect(source).toContain('process.env.WAVE_RC_REPORT_COMPARISON_ENABLED = "1"');
+    expect(source).toContain('process.env.WAVE_REPORT_STYLES_ENABLED = "1"');
+    expect(source).toContain('process.env.WAVE_OSR_RESPONDENT_RESULTS_ENABLED = "1"');
+    expect(source).toContain('process.env.APP_URL = "http://localhost:3000"');
+  });
+
+  it("keeps the guarded browser contract explicit and derived from provisioned rows", () => {
+    const source = readFileSync(
+      join(process.cwd(), "e2e/report-comparison.spec.ts"),
+      "utf8",
+    );
+
+    expect(source).toContain("/portal/assessments/");
+    expect(source).toContain("/admin/assessments/campaigns/");
+    expect(source).toContain("reportComparisonInvitationToken");
+    expect(source).toContain("completeInvitedSurvey");
+    expect(source).toContain("pending and unsubmitted");
+    expect(source).toContain("Compare with a previous assessment");
+    expect(source).toContain("otherOrganizationSubmissionId");
+    expect(source).toContain('setViewportSize({ width: 1440');
+    expect(source).toContain('setViewportSize({ width: 390');
+    expect(source).toContain(".pdf({");
+    expect(source).toContain('showResultsOnScreen: false');
+    expect(source).toContain('data: { isCEO: false }');
+    expect(source).toContain('status: "SENT"');
   });
 });

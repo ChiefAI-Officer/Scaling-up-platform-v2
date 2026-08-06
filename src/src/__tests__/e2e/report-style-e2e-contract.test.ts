@@ -207,6 +207,36 @@ describe("report-style isolated Playwright database contract", () => {
     expect(disconnect).toHaveBeenCalledTimes(1);
   });
 
+  it("uses the comparison lane name when its sentinel query cannot be verified", async () => {
+    const { assertDisposableReportComparisonDatabase } = loadGuard();
+    const disconnect = jest.fn().mockResolvedValue(undefined);
+    const createClient = jest.fn().mockReturnValue({
+      organization: {
+        findUnique: jest.fn().mockRejectedValue(new Error("database unavailable")),
+      },
+      $disconnect: disconnect,
+    });
+
+    let thrown: Error | undefined;
+    try {
+      await assertDisposableReportComparisonDatabase({
+        env: comparisonFixtureEnvironment,
+        createClient,
+      });
+    } catch (error) {
+      thrown = error as Error;
+    }
+
+    expect(thrown?.message).toBe(
+      "Disposable report-comparison E2E database sentinel could not be verified.",
+    );
+    expect(thrown?.message).not.toContain(comparisonFixtureEnvironment.DATABASE_URL!);
+    expect(thrown?.message).not.toContain(
+      comparisonFixtureEnvironment.E2E_REPORT_COMPARISON_DISPOSABLE_SENTINEL_VALUE!,
+    );
+    expect(disconnect).toHaveBeenCalledTimes(1);
+  });
+
   it("checks the sentinel before building and starting the production server", async () => {
     const { runReportStyleE2eServer } = loadGuard();
     const events: string[] = [];

@@ -101,6 +101,57 @@ describe("ReportComparisonControls", () => {
     );
   });
 
+  it("synchronizes picker and changing state after same-route server props update", () => {
+    const canonicalHref =
+      "/assessments/campaign-current/respondents/respondent-1/report";
+    const { rerender } = render(
+      <ReportComparisonControls
+        candidates={candidates}
+        selectedSubmissionId={null}
+        bounded={false}
+        canonicalHref={canonicalHref}
+      />,
+    );
+
+    fireEvent.change(
+      screen.getByLabelText("Compare to previous assessment"),
+      { target: { value: "prior-older" } },
+    );
+    rerender(
+      <ReportComparisonControls
+        candidates={candidates}
+        selectedSubmissionId="prior/newest"
+        bounded={false}
+        canonicalHref={canonicalHref}
+      />,
+    );
+
+    expect(
+      screen.queryByLabelText("Compare to previous assessment"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText(/Comparing with Q4 2025 Assessment/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Change comparison" }));
+    expect(screen.getByLabelText("Compare to previous assessment")).toHaveValue(
+      "prior/newest",
+    );
+
+    rerender(
+      <ReportComparisonControls
+        candidates={candidates}
+        selectedSubmissionId="prior-older"
+        bounded={false}
+        canonicalHref={canonicalHref}
+      />,
+    );
+    expect(
+      screen.queryByLabelText("Compare to previous assessment"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/Comparing with Scaling Up Assessment · Sep 30, 2025/),
+    ).toBeInTheDocument();
+  });
+
   it("keeps controls off the printed report and discloses a bounded history", () => {
     const { container } = render(
       <ReportComparisonControls

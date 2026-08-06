@@ -43,6 +43,12 @@ try {
     });
     process.env.ADMIN_EMAIL = fixture.adminEmail;
     process.env.WAVE_RC_REPORT_COMPARISON_ENABLED = "1";
+    process.env.WAVE_RC_REPORT_COMPARISON_KILL = "0";
+    process.env.WAVE_REPORT_STYLES_ENABLED = "1";
+    process.env.WAVE_REPORT_STYLES_KILL = "0";
+    process.env.WAVE_OSR_RESPONDENT_RESULTS_ENABLED = "1";
+    process.env.WAVE_OSR_RESPONDENT_RESULTS_KILL = "0";
+    process.env.APP_URL = "http://localhost:3000";
   }
   await runAssessmentReportE2eServer({
     env: process.env,

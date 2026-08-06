@@ -35,9 +35,31 @@ export function ReportComparisonControls({
   bounded,
   canonicalHref,
 }: ReportComparisonControlsProps) {
+  const stateKey = [
+    selectedSubmissionId ?? "",
+    ...candidates.map((candidate) => candidate.submissionId),
+  ].join(":");
+  return (
+    <ReportComparisonControlsState
+      key={stateKey}
+      candidates={candidates}
+      selectedSubmissionId={selectedSubmissionId}
+      bounded={bounded}
+      canonicalHref={canonicalHref}
+    />
+  );
+}
+
+function ReportComparisonControlsState({
+  candidates,
+  selectedSubmissionId,
+  bounded,
+  canonicalHref,
+}: ReportComparisonControlsProps) {
   const router = useRouter();
+  const newestCandidateId = candidates[0]?.submissionId ?? "";
   const [candidateId, setCandidateId] = useState(
-    selectedSubmissionId ?? candidates[0]?.submissionId ?? "",
+    selectedSubmissionId ?? newestCandidateId,
   );
   const [changing, setChanging] = useState(selectedSubmissionId === null);
   const selected = candidates.find((candidate) => candidate.submissionId === selectedSubmissionId) ?? null;

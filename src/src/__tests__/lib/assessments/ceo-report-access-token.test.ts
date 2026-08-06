@@ -77,6 +77,27 @@ describe("CEO report access token", () => {
     expect(verifyCeoReportAccessToken(token, now)).toBeNull();
   });
 
+  test("caps issued capabilities at thirty days while allowing shorter lifetimes", () => {
+    const now = 1_800_000_000;
+    const thirtyDays = 30 * 24 * 60 * 60;
+
+    expect(() =>
+      createCeoReportAccessToken(claims(), thirtyDays + 1, now),
+    ).toThrow("at most 30 days");
+    expect(
+      verifyCeoReportAccessToken(
+        createCeoReportAccessToken(claims(), thirtyDays, now),
+        now,
+      )?.expiresAt,
+    ).toBe(now + thirtyDays);
+    expect(
+      verifyCeoReportAccessToken(
+        createCeoReportAccessToken(claims(), 60, now),
+        now,
+      )?.expiresAt,
+    ).toBe(now + 60);
+  });
+
   test("refuses missing or short production secrets rather than issuing or accepting a capability", () => {
     delete process.env.ASSESSMENT_REPORT_ACCESS_SECRET;
     expect(() => createCeoReportAccessToken(claims())).toThrow("ASSESSMENT_REPORT_ACCESS_SECRET");

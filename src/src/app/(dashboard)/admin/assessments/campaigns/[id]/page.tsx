@@ -10,8 +10,8 @@
  * Deliberately a reduced-nav variant of the coach detail:
  *   - basePath / hidePortalOnlyLinks retarget the Back link + suppress the
  *     portal-only "View Trends" and "Add members" dead-ends;
- *   - longitudinalRespondentIds is OMITTED (defaults []) — the per-row "over
- *     time" link targets a `requireCoach()` route with no admin equivalent;
+ *   - the coach-only legacy "Over time" eligibility prop is omitted — that
+ *     route uses `requireCoach()` and has no admin equivalent;
  *   - custom-slides AUTHORING is omitted (coach-authoring, not oversight);
  *   - the group-report link IS kept (verified admin-safe) and the full
  *     management surface (close/delete/remove/reminders/resend) rides along.

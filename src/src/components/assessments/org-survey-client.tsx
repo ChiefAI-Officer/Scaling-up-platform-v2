@@ -64,6 +64,7 @@ import {
   clearOnScreenResult,
   reviveOnScreenReport,
 } from "@/lib/assessments/onscreen-result-store";
+import { exchangeCeoReportAccessUrl } from "@/lib/assessments/ceo-report-access-client";
 
 // Wave OSR (#71) — the in-place report needs the report stylesheets. This route
 // group has no (report) layout to supply them, so the client imports them the
@@ -149,35 +150,12 @@ type Phase =
   | {
       kind: "results";
       report: RespondentReport;
-      /** Server-issued only; intentionally excluded from the report envelope. */
-      ceoSelfAccessUrl?: string;
+      /** Clean exact report href only; intentionally excluded from the report envelope. */
+      ceoSelfReportHref?: string;
       reportStylesAvailable?: boolean;
       reportFindingsAvailable?: boolean;
     }
   | { kind: "error"; message: string };
-
-function safeCeoSelfAccessUrl(value: unknown): string | undefined {
-  if (typeof value !== "string") return undefined;
-  try {
-    const url = new URL(value);
-    const localHost =
-      url.hostname === "localhost" ||
-      url.hostname === "127.0.0.1" ||
-      url.hostname === "[::1]" ||
-      url.hostname.endsWith(".test");
-    if (
-      url.username ||
-      url.password ||
-      (url.protocol !== "https:" &&
-        !(url.protocol === "http:" && localHost))
-    ) {
-      return undefined;
-    }
-    return url.href;
-  } catch {
-    return undefined;
-  }
-}
 
 export function OrgSurveyClient({
   campaignAlias,
@@ -536,7 +514,7 @@ export function OrgSurveyClient({
       // report shows two different date formats before vs after a refresh.
       const onScreenReport = reviveOnScreenReport(submitBody?.data?.report);
       if (onScreenReport) {
-        const ceoSelfAccessUrl = safeCeoSelfAccessUrl(
+        const ceoSelfReportHref = await exchangeCeoReportAccessUrl(
           submitBody?.data?.ceoSelfAccessUrl,
         );
         // Stamp the slot with THIS respondent's invitation key (from the /me 200
@@ -552,7 +530,7 @@ export function OrgSurveyClient({
         setPhase({
           kind: "results",
           report: onScreenReport,
-          ...(ceoSelfAccessUrl ? { ceoSelfAccessUrl } : {}),
+          ...(ceoSelfReportHref ? { ceoSelfReportHref } : {}),
           reportStylesAvailable: submitBody?.data?.reportStylesAvailable === true,
           reportFindingsAvailable: submitBody?.data?.reportFindingsAvailable === true,
         });
@@ -626,10 +604,10 @@ export function OrgSurveyClient({
               reportStylesAvailable={phase.reportStylesAvailable === true}
               reportFindingsAvailable={phase.reportFindingsAvailable === true}
             />
-            {phase.ceoSelfAccessUrl ? (
+            {phase.ceoSelfReportHref ? (
               <a
                 className="no-print su-cta"
-                href={phase.ceoSelfAccessUrl}
+                href={phase.ceoSelfReportHref}
               >
                 Compare with a previous assessment
               </a>

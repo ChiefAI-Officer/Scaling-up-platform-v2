@@ -220,16 +220,12 @@ describe("CampaignDetail — View report is the primary results action (Task 5, 
     ).toBeInTheDocument();
   });
 
-  it("keeps the canonical View report action when a legacy longitudinal allowlist is supplied, without rendering Over time", () => {
-    const legacyProps = {
-      longitudinalRespondentIds: [SUBMITTED_ROW.respondent.id],
-    };
-
+  it("keeps the canonical View report action and restores Over time when the server supplies legacy eligibility", () => {
     render(
       <CampaignDetail
         initialOverview={makeOverview()}
         initialRespondents={[SUBMITTED_ROW]}
-        {...(legacyProps as React.ComponentProps<typeof CampaignDetail>)}
+        legacyOverTimeRespondentIds={[SUBMITTED_ROW.respondent.id]}
       />,
     );
 
@@ -240,7 +236,10 @@ describe("CampaignDetail — View report is the primary results action (Task 5, 
       `/assessments/${CAMPAIGN_ID}/respondents/${SUBMITTED_ROW.respondent.id}/report`,
     );
     expect(
-      screen.queryByTestId(`view-over-time-link-${SUBMITTED_ROW.respondent.id}`),
-    ).not.toBeInTheDocument();
+      screen.getByTestId(`view-over-time-link-${SUBMITTED_ROW.respondent.id}`),
+    ).toHaveAttribute(
+      "href",
+      `/portal/assessments/respondents/${SUBMITTED_ROW.respondent.id}/longitudinal?templateId=tpl-1&organizationId=org-1`,
+    );
   });
 });

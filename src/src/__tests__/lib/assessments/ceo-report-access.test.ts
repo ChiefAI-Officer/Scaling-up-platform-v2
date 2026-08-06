@@ -177,6 +177,8 @@ describe("CEO self report access", () => {
       focusCampaignId: "campaign-1",
       focusSubmissionId: "submission-1",
       respondentId: "respondent-1",
+      invitationId: "invite-1",
+      expiresAt: 1_900_000_000,
     });
 
     mockGetCeoReportAccessSession.mockResolvedValue({

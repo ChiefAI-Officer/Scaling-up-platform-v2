@@ -321,7 +321,7 @@ describe("adaptive alternate report renderers", () => {
         submittedAt: new Date("2025-03-31T12:00:00.000Z"),
         versionId: "previous-version",
         versionNumber: 1,
-        isImported: false,
+        isImported: true,
       },
       sameVersion: false,
       overall: { current: 72, previous: 64, delta: null, status: "different-version" },
@@ -350,8 +350,7 @@ describe("adaptive alternate report renderers", () => {
       const report = within(container);
       const content = report.getByTestId("report-comparison-content");
       const compared = within(content);
-
-      expect(report.getByText("Compared with Q1 2025 · submitted Mar 31, 2025")).toBeInTheDocument();
+      expect(report.getByText("Compared with Q1 2025 · Imported · submitted Mar 31, 2025")).toBeInTheDocument();
       expect(compared.getByText("ScaleUp score")).toBeInTheDocument();
       expect(compared.getAllByText(/people/i).length).toBeGreaterThan(0);
       expect(compared.getByText("q1")).toBeInTheDocument();
@@ -360,6 +359,11 @@ describe("adaptive alternate report renderers", () => {
       expect(compared.getAllByText("Different version").length).toBeGreaterThan(0);
       expect(compared.getAllByLabelText("Not comparable").length).toBeGreaterThan(0);
       expect(compared.getAllByText("Not comparable").length).toBeGreaterThan(0);
+      const incompatibleQuestionRow = compared.getByText("q2").closest("tr");
+      expect(incompatibleQuestionRow).not.toBeNull();
+      const incompatibleCells = within(incompatibleQuestionRow!).getAllByRole("cell");
+      expect(incompatibleCells[1]).toHaveTextContent("—");
+      expect(incompatibleCells[2]).toHaveTextContent("—");
       expect(compared.getAllByText("Different version")[0].closest(".no-print")).toBeNull();
       expect(compared.getByText("Not comparable").closest(".no-print")).toBeNull();
       expect(compared.getByText("1 of 2 current questions matched the earlier version. 1 new or changed question has no comparison.")).toBeInTheDocument();

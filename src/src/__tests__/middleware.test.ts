@@ -29,6 +29,10 @@ jest.mock("@/lib/global-rate-limit", () => ({
   enforceGlobalApiRateLimit: () => ({ enforced: false }),
   getRequestIdentifierFromHeaders: () => "test",
 }));
+const mockReportComparisonRolloutActive = jest.fn(() => true);
+jest.mock("@/lib/assessments/wave-report-comparison-flags", () => ({
+  isReportComparisonRolloutActive: () => mockReportComparisonRolloutActive(),
+}));
 
 import middleware from "@/middleware";
 
@@ -47,6 +51,10 @@ function runMiddleware(pathname: string, token: unknown = null): ReturnType<type
 }
 
 describe("CEO self-report middleware policy", () => {
+  beforeEach(() => {
+    mockReportComparisonRolloutActive.mockReturnValue(true);
+  });
+
   it("allows only the exact public exchange shell and individual report path without an account", () => {
     expect(mockAuthOptions?.callbacks.authorized({ token: null, req: request("/assessments/self-report") })).toBe(true);
     expect(mockAuthOptions?.callbacks.authorized({ token: null, req: request("/assessments/self-report/exchange") })).toBe(true);
@@ -60,10 +68,21 @@ describe("CEO self-report middleware policy", () => {
     expect(mockAuthOptions?.callbacks.authorized({ token: { sub: "user-1" }, req: request("/assessments/campaign-1/report", { sub: "user-1" }) })).toBe(true);
   });
 
-  it("sets no-store and no-referrer headers on the exchange and individual report responses", () => {
+  it("requires authentication for all capability surfaces while rollout is globally inactive", () => {
+    mockReportComparisonRolloutActive.mockReturnValue(false);
+
+    expect(mockAuthOptions?.callbacks.authorized({ token: null, req: request("/assessments/self-report") })).toBe(false);
+    expect(mockAuthOptions?.callbacks.authorized({ token: null, req: request("/assessments/self-report/exchange") })).toBe(false);
+    expect(mockAuthOptions?.callbacks.authorized({ token: null, req: request("/assessments/campaign-1/respondents/respondent-1/report") })).toBe(false);
+  });
+
+  it("sets no-store and no-referrer headers on the shell, exchange, and individual report responses", () => {
+    const shell = runMiddleware("/assessments/self-report");
     const exchange = runMiddleware("/assessments/self-report/exchange");
     const individual = runMiddleware("/assessments/campaign-1/respondents/respondent-1/report");
 
+    expect(shell.headers.get("Cache-Control")).toBe("no-store, private");
+    expect(shell.headers.get("Referrer-Policy")).toBe("no-referrer");
     expect(exchange.headers.get("Cache-Control")).toBe("no-store, private");
     expect(exchange.headers.get("Referrer-Policy")).toBe("no-referrer");
     expect(individual.headers.get("Cache-Control")).toBe("no-store, private");

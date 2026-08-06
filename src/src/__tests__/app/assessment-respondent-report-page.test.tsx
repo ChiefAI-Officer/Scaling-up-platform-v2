@@ -63,10 +63,16 @@ jest.mock("next/headers", () => ({
 // Fail-closed audit write goes directly through db.auditLog.create (the gate),
 // NOT the fail-open logAudit wrapper the pre-gate page used.
 const mockAuditCreate = jest.fn().mockResolvedValue({ id: "audit-1" });
+const mockAssessmentCampaignFindFirst = jest.fn().mockResolvedValue({
+  id: "camp-1",
+  organizationId: "org-1",
+  templateId: "tpl-1",
+  template: { alias: "scaling-up-full" },
+});
 jest.mock("@/lib/db", () => ({
   db: {
     auditLog: { create: (...args: unknown[]) => mockAuditCreate(...args) },
-    assessmentCampaign: { findFirst: jest.fn().mockResolvedValue({ id: "camp-1", organizationId: "org-1", templateId: "tpl-1", template: { alias: "scaling-up-full" } }) },
+    assessmentCampaign: { findFirst: (...args: unknown[]) => mockAssessmentCampaignFindFirst(...args) },
   },
 }));
 
@@ -79,6 +85,7 @@ jest.mock("@/lib/assessments/wave-u-flags", () => ({
 jest.mock("@/lib/assessments/wave-report-comparison-flags", () => ({
   REPORT_COMPARISON_ALIAS: "scaling-up-full",
   isReportComparisonEnabled: jest.fn(() => false),
+  isReportComparisonRolloutActive: jest.fn(() => true),
 }));
 jest.mock("@/lib/assessments/ceo-report-access", () => ({
   resolveCeoViewerFromExactPathSession: jest.fn(),
@@ -139,7 +146,10 @@ import { getApiActor } from "@/lib/auth/authorization";
 import { getRespondentReport } from "@/lib/assessments/respondent-report";
 import { checkRateLimitAsync } from "@/lib/rate-limit";
 import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
-import { isReportComparisonEnabled } from "@/lib/assessments/wave-report-comparison-flags";
+import {
+  isReportComparisonEnabled,
+  isReportComparisonRolloutActive,
+} from "@/lib/assessments/wave-report-comparison-flags";
 import { resolveCeoViewerFromExactPathSession } from "@/lib/assessments/ceo-report-access";
 import { getCeoReportAccessSession } from "@/lib/assessments/ceo-report-access-cookie";
 import { listReportComparisonCandidates, loadReportComparison } from "@/lib/assessments/report-comparison";
@@ -155,6 +165,7 @@ const mockNotFound = notFound as unknown as jest.Mock;
 const mockRateLimit = checkRateLimitAsync as unknown as jest.Mock;
 const mockReportStylesEnabled = isReportStylesEnabled as jest.Mock;
 const mockReportComparisonEnabled = isReportComparisonEnabled as jest.Mock;
+const mockReportComparisonRolloutActive = isReportComparisonRolloutActive as jest.Mock;
 const mockResolveCeoViewer = resolveCeoViewerFromExactPathSession as jest.Mock;
 const mockGetCeoSession = getCeoReportAccessSession as jest.Mock;
 const mockListCandidates = listReportComparisonCandidates as jest.Mock;
@@ -246,6 +257,7 @@ beforeEach(() => {
   mockRateLimit.mockResolvedValue({ success: true, remaining: 99, resetAt: 0 });
   mockAuditCreate.mockResolvedValue({ id: "audit-1" });
   mockReportStylesEnabled.mockReturnValue(true);
+  mockReportComparisonRolloutActive.mockReturnValue(true);
   mockReportComparisonEnabled.mockReturnValue(false);
   mockResolveCeoViewer.mockResolvedValue(null);
   mockGetCeoSession.mockResolvedValue(null);
@@ -515,6 +527,40 @@ describe("(report) respondent report page — report-native comparison", () => {
     expect(mockLoadComparison).not.toHaveBeenCalled();
   });
 
+  it("performs no comparison campaign pre-read while the rollout is globally inactive", async () => {
+    mockGetApiActor.mockResolvedValue(adminActor());
+    mockGetRespondentReport.mockResolvedValue(scalingUpReport());
+    mockReportComparisonRolloutActive.mockReturnValue(false);
+
+    await Page(makeProps("camp-1", "resp-1", "sub-prior"));
+
+    expect(mockReportComparisonEnabled).not.toHaveBeenCalled();
+    expect(mockListCandidates).not.toHaveBeenCalled();
+    expect(mockLoadComparison).not.toHaveBeenCalled();
+    expect(mockAssessmentCampaignFindFirst.mock.calls).not.toContainEqual([
+      expect.objectContaining({
+        select: expect.objectContaining({ organizationId: true }),
+      }),
+    ]);
+  });
+
+  it("treats an explicitly empty compareTo value as a malformed selection", async () => {
+    mockGetApiActor.mockResolvedValue(adminActor());
+    mockGetRespondentReport.mockResolvedValue(scalingUpReport());
+    mockReportComparisonEnabled.mockReturnValue(true);
+    mockListCandidates.mockResolvedValue({
+      kind: "ok",
+      candidates: [comparisonCandidate],
+      bounded: false,
+    });
+
+    const node = await Page(makeProps("camp-1", "resp-1", ""));
+    const markup = renderToStaticMarkup(node as React.ReactElement);
+
+    expect(markup).toContain("That earlier assessment cannot be compared with this report.");
+    expect(mockLoadComparison).not.toHaveBeenCalled();
+  });
+
   it("leaves the current report actions unchanged when there is no eligible baseline", async () => {
     mockGetApiActor.mockResolvedValue(adminActor());
     mockGetRespondentReport.mockResolvedValue(scalingUpReport());
@@ -588,6 +634,48 @@ describe("(report) respondent report page — report-native comparison", () => {
     expect(markup).toContain('data-comparison-submission-id="sub-prior"');
     expect(markup).toContain('data-selected-submission-id="sub-prior"');
     expect(markup).toContain('data-file-name="Jane Respondent - Scaling Up Assessment - Q1 2026 vs Q1 2025"');
+  });
+
+  it("uses the canonical CEO_SELF actor for a CEO comparison audit", async () => {
+    mockGetApiActor.mockResolvedValue(null);
+    mockResolveCeoViewer.mockResolvedValue({
+      kind: "ceo-self",
+      focusCampaignId: "camp-1",
+      focusSubmissionId: "sub-99",
+      respondentId: "resp-1",
+      invitationId: "invite-1",
+      expiresAt: 1_900_000_000,
+    });
+    mockGetCeoSession.mockResolvedValue({
+      focusCampaignId: "camp-1",
+      focusSubmissionId: "sub-99",
+      invitationId: "invite-1",
+      respondentId: "resp-1",
+      expiresAt: "2030-03-17T17:46:40.000Z",
+    });
+    mockViewCeoSelfReport.mockResolvedValue({
+      outcome: scalingUpReport(),
+      metricRole: "CEO_SELF",
+    });
+    mockReportComparisonEnabled.mockReturnValue(true);
+    mockListCandidates.mockResolvedValue({
+      kind: "ok",
+      candidates: [comparisonCandidate],
+      bounded: false,
+    });
+    mockLoadComparison.mockResolvedValue({
+      kind: "ok",
+      model: comparisonModel,
+    });
+
+    await Page(makeProps("camp-1", "resp-1", "sub-prior"));
+
+    expect(mockLogAuditStrict).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "VIEW_REPORT_COMPARISON",
+        performedBy: "CEO_SELF",
+      }),
+    );
   });
 
   it("date-qualifies blank focus and baseline campaign labels in the export filename", async () => {

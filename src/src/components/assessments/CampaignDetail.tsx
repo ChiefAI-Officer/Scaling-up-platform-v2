@@ -140,6 +140,11 @@ export interface CampaignDetailProps {
    */
   canEditReportAppearance?: boolean;
   /**
+   * Coach-only rollback path for the Wave N "Over time" entry. The server
+   * supplies eligible respondents only while report-native comparison is off.
+   */
+  legacyOverTimeRespondentIds?: string[];
+  /**
    * Wave M (#19) — the campaign's stored (already-sanitized) slides. Both the
    * editor's initial value AND the PATCH CAS sentinel `expectedCustomSlides`
    * derive from this exact value, so it must be the faithful stored value.
@@ -256,6 +261,7 @@ export function CampaignDetail({
   reportStylesAvailable = false,
   reportStylePreviewCapabilities,
   canEditReportAppearance = false,
+  legacyOverTimeRespondentIds = [],
   initialCustomSlides = [],
   customSlidesSections = [],
   basePath = "/portal/assessments",
@@ -273,6 +279,10 @@ export function CampaignDetail({
   >({});
   const [loadingRespondentId, setLoadingRespondentId] = useState<string | null>(
     null,
+  );
+  const legacyOverTimeEligible = useMemo(
+    () => new Set(legacyOverTimeRespondentIds),
+    [legacyOverTimeRespondentIds],
   );
   const [resendingInvitationId, setResendingInvitationId] = useState<
     string | null
@@ -2177,6 +2187,19 @@ export function CampaignDetail({
                             >
                               <FileText className="w-3.5 h-3.5" />
                               View report
+                            </a>
+                          )}
+                          {legacyOverTimeEligible.has(row.respondent.id) && (
+                            <a
+                              href={`/portal/assessments/respondents/${encodeURIComponent(row.respondent.id)}/longitudinal?templateId=${encodeURIComponent(campaign.templateId)}&organizationId=${encodeURIComponent(campaign.organizationId)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded border border-border text-foreground hover:bg-muted"
+                              data-testid={`view-over-time-link-${row.respondent.id}`}
+                              title="View this person's results across campaigns over time"
+                            >
+                              <LineChart className="w-3.5 h-3.5" />
+                              Over time
                             </a>
                           )}
                           {row.hasSubmission && (

@@ -8,6 +8,7 @@ import {
   type CeoReportSessionPayload,
 } from "@/lib/assessments/ceo-report-access-cookie";
 import { verifyCeoReportAccessToken } from "@/lib/assessments/ceo-report-access-token";
+import { RateLimits, withRateLimit } from "@/lib/rate-limit";
 
 const exchangeRequest = z.object({ token: z.string().min(1).max(4096) });
 
@@ -16,10 +17,13 @@ const NO_STORE = {
   "Referrer-Policy": "no-referrer",
 } as const;
 
-function unavailable(): NextResponse {
+function unavailable(
+  status = 410,
+  headers: Record<string, string> = {},
+): NextResponse {
   return NextResponse.json(
     { error: "This report link is no longer available." },
-    { status: 410, headers: NO_STORE },
+    { status, headers: { ...headers, ...NO_STORE } },
   );
 }
 
@@ -29,6 +33,14 @@ function reportHref(payload: CeoReportSessionPayload): string {
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
+  let rateLimit: Awaited<ReturnType<typeof withRateLimit>>;
+  try {
+    rateLimit = await withRateLimit(request, RateLimits.standard);
+  } catch {
+    return unavailable();
+  }
+  if (!rateLimit.allowed) return unavailable(429, rateLimit.headers);
+
   let parsed: z.ZodSafeParseResult<{ token: string }>;
   try {
     parsed = exchangeRequest.safeParse(await request.json());
@@ -56,7 +68,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       entityType: "AssessmentSubmission",
       entityId: payload.focusSubmissionId,
       action: "CEO_REPORT_ACCESS_EXCHANGED",
-      performedBy: "ceo-self-access",
+      performedBy: "CEO_SELF",
       changes: {
         kind: "ceo-report-access-exchange",
         focusCampaignId: payload.focusCampaignId,
@@ -69,5 +81,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     return unavailable();
   }
 
-  return NextResponse.json({ href: reportHref(payload) }, { headers: NO_STORE });
+  return NextResponse.json(
+    { href: reportHref(payload) },
+    { headers: { ...rateLimit.headers, ...NO_STORE } },
+  );
 }

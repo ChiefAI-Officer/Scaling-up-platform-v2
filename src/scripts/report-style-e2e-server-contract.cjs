@@ -14,6 +14,7 @@ const REPORT_STYLE_LANE = {
   sentinelValuePattern: DISPOSABLE_SENTINEL_VALUE,
   invalidMessage: "Report-style E2E database contract is invalid.",
   missingMessage: "Disposable report-style E2E database sentinel was not found.",
+  verifyMessage: "Disposable report-style E2E database sentinel could not be verified.",
 };
 
 const REPORT_COMPARISON_LANE = {
@@ -24,6 +25,7 @@ const REPORT_COMPARISON_LANE = {
   sentinelValuePattern: REPORT_COMPARISON_SENTINEL_VALUE,
   invalidMessage: "Report-comparison E2E database contract is invalid.",
   missingMessage: "Disposable report-comparison E2E database sentinel was not found.",
+  verifyMessage: "Disposable report-comparison E2E database sentinel could not be verified.",
 };
 
 function invalidDatabaseContract() {
@@ -77,7 +79,7 @@ async function assertDisposableFixtureDatabase({ env, createClient, lane }) {
       select: { id: true, name: true, deletedAt: true },
     });
   } catch {
-    throw new Error("Disposable report-style E2E database sentinel could not be verified.");
+    throw new Error(lane.verifyMessage);
   } finally {
     await client.$disconnect().catch(() => undefined);
   }

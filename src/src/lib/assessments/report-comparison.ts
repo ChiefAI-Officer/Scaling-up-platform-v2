@@ -9,8 +9,16 @@ import {
   type ReportComparisonModel,
 } from "@/lib/assessments/report-comparison-model";
 import { isScoreResult } from "@/lib/assessments/respondent-report";
-import { REPORT_COMPARISON_ALIAS, isReportComparisonEnabled } from "@/lib/assessments/wave-report-comparison-flags";
+import {
+  REPORT_COMPARISON_ALIAS,
+  isReportComparisonEnabled,
+  isReportComparisonRolloutActive,
+} from "@/lib/assessments/wave-report-comparison-flags";
 import { emitReportComparisonMetric } from "@/lib/assessments/report-comparison-metrics";
+import {
+  revalidateCeoReportAccessInTransaction,
+  type CeoReportAccessTransaction,
+} from "@/lib/assessments/ceo-report-access";
 
 export const MAX_REPORT_COMPARISON_IDENTITIES = 50;
 export const MAX_REPORT_COMPARISON_INSPECTED = 200;
@@ -23,6 +31,8 @@ export type ReportComparisonViewer =
       focusCampaignId: string;
       focusSubmissionId: string;
       respondentId: string;
+      invitationId: string;
+      expiresAt: number;
     };
 
 export interface ReportComparisonFocus {
@@ -76,7 +86,7 @@ interface SubmissionQuery {
   take?: number;
 }
 
-export interface ReportComparisonDb {
+export interface ReportComparisonDb extends CeoReportAccessTransaction {
   orgRespondent: {
     findMany: (args: {
       where: Record<string, unknown>;
@@ -88,7 +98,10 @@ export interface ReportComparisonDb {
     findFirst: (args: SubmissionQuery) => Promise<ComparisonSubmission | null>;
     findMany: (args: SubmissionQuery) => Promise<ComparisonSubmission[]>;
   };
-  $transaction: <T>(callback: (tx: ReportComparisonDb) => Promise<T>) => Promise<T>;
+  $transaction: <T>(
+    callback: (tx: ReportComparisonDb) => Promise<T>,
+    options?: { isolationLevel: "Serializable" },
+  ) => Promise<T>;
 }
 
 const submissionInclude = {
@@ -218,6 +231,7 @@ export async function listReportComparisonCandidates(
   viewer: ReportComparisonViewer,
   focus: ReportComparisonFocus,
 ): Promise<CandidateOutcome> {
+  if (!isReportComparisonRolloutActive()) return { kind: "not-applicable" };
   const startedAt = Date.now();
   try {
     const focusSubmission = await loadFocus(db, focus);
@@ -259,7 +273,9 @@ export async function listReportComparisonCandidates(
     for (const row of winners.values()) {
       if (await operatorCanRead(db, viewer, row.campaignId)) authorized.push(row);
     }
-    const bounded = authorized.length > MAX_REPORT_COMPARISON_CANDIDATES;
+    const bounded =
+      rows.length >= MAX_REPORT_COMPARISON_INSPECTED ||
+      authorized.length > MAX_REPORT_COMPARISON_CANDIDATES;
     const candidates = authorized.slice(0, MAX_REPORT_COMPARISON_CANDIDATES).map(candidateFor);
     emitReportComparisonMetric(candidates.length ? "candidate_ok" : "candidate_empty", {
       viewer: viewerMetric(viewer), count: candidates.length, bounded, latencyMs: Date.now() - startedAt,
@@ -291,9 +307,28 @@ export async function loadReportComparison(
   focus: ReportComparisonFocus,
   baselineSubmissionId: string,
 ): Promise<ComparisonOutcome> {
+  if (!isReportComparisonRolloutActive()) return { kind: "invalid" };
   const startedAt = Date.now();
   try {
     const outcome = await db.$transaction(async (tx) => {
+      if (viewer.kind === "ceo-self") {
+        const liveGrant = await revalidateCeoReportAccessInTransaction(tx, {
+          version: 1,
+          purpose: "assessment-report-comparison-self",
+          focusCampaignId: viewer.focusCampaignId,
+          invitationId: viewer.invitationId,
+          respondentId: viewer.respondentId,
+          expiresAt: viewer.expiresAt,
+        });
+        if (
+          !liveGrant ||
+          liveGrant.focusCampaignId !== focus.campaignId ||
+          liveGrant.focusSubmissionId !== focus.submissionId ||
+          liveGrant.respondentId !== focus.respondentId
+        ) {
+          return { kind: "invalid" } as const;
+        }
+      }
       const [focusSubmission, baseline] = await Promise.all([
         loadFocus(tx, focus),
         tx.assessmentSubmission.findFirst({ where: { id: baselineSubmissionId }, include: submissionInclude }),
@@ -309,7 +344,7 @@ export async function loadReportComparison(
       const ids = new Set(await identityIds(tx, focusSubmission));
       if (!isEarlierSamePerson(baseline, focusSubmission, ids)) return { kind: "invalid" } as const;
       return { kind: "ok", model: buildReportComparisonModel({ focus: snapshot(focusSubmission), baseline: snapshot(baseline) }) } as const;
-    });
+    }, { isolationLevel: "Serializable" });
     if (outcome.kind === "ok") {
       emitReportComparisonMetric("comparison_ok", {
         viewer: viewerMetric(viewer), sameVersion: outcome.model.sameVersion,

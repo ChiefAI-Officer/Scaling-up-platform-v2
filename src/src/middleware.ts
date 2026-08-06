@@ -4,6 +4,7 @@ import {
   enforceGlobalApiRateLimit,
   getRequestIdentifierFromHeaders,
 } from "@/lib/global-rate-limit";
+import { isReportComparisonRolloutActive } from "@/lib/assessments/wave-report-comparison-flags";
 
 // R2-LOW-1: the branded results report pages render named PII (scores, answers).
 // Report routes render named PII and must never be cached. Keep the group and
@@ -119,6 +120,7 @@ export default withAuth(
     // unchanged because only the exact respondent-report regex is public.
     const passthrough = NextResponse.next();
     if (
+      pathname === CEO_SELF_REPORT_PATH ||
       pathname === CEO_SELF_REPORT_EXCHANGE_PATH ||
       RESPONDENT_REPORT_REGEX.test(pathname)
     ) {
@@ -162,9 +164,14 @@ export default withAuth(
           pathname.startsWith("/org-survey/") ||
           pathname.startsWith("/quiz/") ||
           pathname.startsWith("/api/quiz/") ||
-          pathname === CEO_SELF_REPORT_PATH ||
-          pathname === CEO_SELF_REPORT_EXCHANGE_PATH ||
-          RESPONDENT_REPORT_REGEX.test(pathname) ||
+          (
+            isReportComparisonRolloutActive() &&
+            (
+              pathname === CEO_SELF_REPORT_PATH ||
+              pathname === CEO_SELF_REPORT_EXCHANGE_PATH ||
+              RESPONDENT_REPORT_REGEX.test(pathname)
+            )
+          ) ||
           pathname.startsWith("/wireframes") ||
           pathname.startsWith("/_next") ||
           pathname.includes(".")

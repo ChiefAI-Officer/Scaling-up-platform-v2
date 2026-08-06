@@ -39,12 +39,29 @@ export function buildReportComparisonFixturePlan(env = process.env) {
       ["EXECUTIVE_BOARDROOM", "Executive Boardroom"],
       ["MODERN_DASHBOARD", "Modern Dashboard"],
     ],
-    roles: ["current-ceo", "prior-native-ceo", "prior-imported-ceo", "non-ceo", "other-org-same-email"],
-    invitationRoles: ["current-ceo", "non-ceo", "native-prior", "imported-prior", "other-org"],
+    roles: [
+      "current-ceo",
+      "prior-native-ceo",
+      "prior-imported-ceo",
+      "non-ceo",
+      "pending-submit-ceo",
+      "pending-submit-non-ceo",
+      "other-org-same-email",
+    ],
+    invitationRoles: [
+      "current-ceo",
+      "non-ceo",
+      "native-prior",
+      "imported-prior",
+      "pending-submit-ceo",
+      "pending-submit-non-ceo",
+      "other-org",
+    ],
     relationshipContract: {
       everySubmissionHasInvitation: true,
       otherOrganizationHasEligibleHistory: true,
       currentCeoDisclosureEnabled: true,
+      actualSubmissionInvitationsStartPending: true,
     },
   };
 }
@@ -121,11 +138,13 @@ export async function provisionReportComparisonFixture({ env = process.env, crea
         tx.organization.create({ data: { externalId: plan.otherOrganizationExternalId, name: "Report comparison E2E other organization", ownerCoachId: coach.id } }),
       ]);
       const team = await tx.orgTeam.create({ data: { organizationId: organization.id, name: "Leadership" } });
-      const [current, nativePrior, importedPrior, nonCeo] = await Promise.all([
+      const [current, nativePrior, importedPrior, nonCeo, pendingSubmitCeo, pendingSubmitNonCeo] = await Promise.all([
         tx.orgRespondent.create({ data: { organizationId: organization.id, teamId: team.id, email: plan.ceoEmail, normalizedEmail: plan.ceoEmail, firstName: "Current", lastName: "CEO", dedupeSource: "external", dedupeValue: `${plan.key}:current`, externalId: `${plan.key}:current` } }),
         tx.orgRespondent.create({ data: { organizationId: organization.id, teamId: team.id, email: plan.ceoEmail, normalizedEmail: plan.ceoEmail, firstName: "Native", lastName: "CEO", dedupeSource: "external", dedupeValue: `${plan.key}:native`, externalId: `${plan.key}:native` } }),
         tx.orgRespondent.create({ data: { organizationId: organization.id, teamId: team.id, email: plan.ceoEmail, normalizedEmail: plan.ceoEmail, firstName: "Imported", lastName: "CEO", dedupeSource: "external", dedupeValue: `${plan.key}:imported`, externalId: `${plan.key}:imported` } }),
         tx.orgRespondent.create({ data: { organizationId: organization.id, teamId: team.id, email: `non-ceo-${plan.ceoEmail}`, normalizedEmail: `non-ceo-${plan.ceoEmail}`, firstName: "Non", lastName: "CEO", dedupeSource: "external", dedupeValue: `${plan.key}:non-ceo`, externalId: `${plan.key}:non-ceo` } }),
+        tx.orgRespondent.create({ data: { organizationId: organization.id, teamId: team.id, email: plan.ceoEmail, normalizedEmail: plan.ceoEmail, firstName: "Pending", lastName: "CEO", dedupeSource: "external", dedupeValue: `${plan.key}:pending-submit-ceo`, externalId: `${plan.key}:pending-submit-ceo` } }),
+        tx.orgRespondent.create({ data: { organizationId: organization.id, teamId: team.id, email: `pending-non-ceo-${plan.ceoEmail}`, normalizedEmail: `pending-non-ceo-${plan.ceoEmail}`, firstName: "Pending", lastName: "Participant", dedupeSource: "external", dedupeValue: `${plan.key}:pending-submit-non-ceo`, externalId: `${plan.key}:pending-submit-non-ceo` } }),
       ]);
       const otherOrgSameEmail = await tx.orgRespondent.create({ data: { organizationId: otherOrganization.id, email: plan.ceoEmail, normalizedEmail: plan.ceoEmail, firstName: "Other", lastName: "Organization", dedupeSource: "external", dedupeValue: `${plan.key}:other`, externalId: `${plan.key}:other` } });
       const template = await tx.assessmentTemplate.upsert({
@@ -139,14 +158,21 @@ export async function provisionReportComparisonFixture({ env = process.env, crea
       });
       const version = await tx.assessmentTemplateVersion.create({ data: {
         templateId: template.id, versionNumber: Math.max(9000, (latestVersion._max.versionNumber ?? 0) + 1),
-        language: "enUS", questions: [{ stableKey: "Q_E2E", label: "Fixture question", type: "SLIDER_LIKERT", sectionStableKey: "S_E2E", scale: { min: 0, max: 10 } }],
-        sections: [{ stableKey: "S_E2E", name: "Fixture section", domain: "people" }], scoringConfig: {}, contentHash: createHash("sha256").update(plan.key).digest("hex"), publishedAt: new Date(), publishedBy: admin.id,
+        language: "enUS", questions: [{ stableKey: "Q_E2E", label: "Fixture question", type: "SLIDER_LIKERT", sectionStableKey: "S_E2E", sortOrder: 1, isRequired: true, scale: { min: 0, max: 10, step: 1, anchorMin: "Not true", anchorMax: "Completely true" } }],
+        sections: [{ stableKey: "S_E2E", name: "Fixture section", domain: "people", sortOrder: 1 }], scoringConfig: {
+          tierMetric: "overallAverage",
+          passThreshold: 6,
+          tiers: [
+            { minMetric: 0, maxMetric: 5.99, label: "Priority", message: "Priority" },
+            { minMetric: 6, label: "On track", message: "On track" },
+          ],
+        }, contentHash: createHash("sha256").update(plan.key).digest("hex"), publishedAt: new Date(), publishedBy: admin.id,
       } });
       const group = await tx.accessGroup.create({ data: { name: `${plan.key}:access`, createdBy: admin.id } });
       await tx.accessGroupTemplate.create({ data: { accessGroupId: group.id, templateId: template.id, addedBy: admin.id } });
       await tx.accessGroupCoach.create({ data: { accessGroupId: group.id, coachId: coach.id, addedBy: admin.id } });
       for (const [style, label] of plan.styles) {
-        const currentCampaign = await tx.assessmentCampaign.create({ data: { templateId: template.id, versionId: version.id, organizationId: organization.id, language: "enUS", alias: `${plan.key}:${style}:current`, externalId: `${plan.key}:${style}:current`, name: `${label} current`, status: "CLOSED", accessMode: "INVITED", openAt: new Date("2026-01-01T00:00:00.000Z"), endMode: "OPEN_END", createdBy: admin.id, createdByCoachId: coach.id, reportStyle: style, reportStyleSource: "CAMPAIGN_OVERRIDE", showResultsOnScreen: true, sendResultsToRespondent: true } });
+        const currentCampaign = await tx.assessmentCampaign.create({ data: { templateId: template.id, versionId: version.id, organizationId: organization.id, language: "enUS", alias: `${plan.key}:${style}:current`, externalId: `${plan.key}:${style}:current`, name: `${label} current`, status: "ACTIVE", accessMode: "INVITED", openAt: new Date("2026-01-01T00:00:00.000Z"), endMode: "OPEN_END", createdBy: admin.id, createdByCoachId: coach.id, reportStyle: style, reportStyleSource: "CAMPAIGN_OVERRIDE", showResultsOnScreen: true, sendResultsToRespondent: true } });
         const nativeCampaign = await tx.assessmentCampaign.create({ data: { templateId: template.id, versionId: version.id, organizationId: organization.id, language: "enUS", alias: `${plan.key}:${style}:native`, externalId: `${plan.key}:${style}:native`, name: `${label} native baseline`, status: "CLOSED", accessMode: "INVITED", openAt: new Date("2025-01-01T00:00:00.000Z"), endMode: "OPEN_END", createdBy: admin.id, createdByCoachId: coach.id, reportStyle: style, reportStyleSource: "CAMPAIGN_OVERRIDE" } });
         const importedCampaign = await tx.assessmentCampaign.create({ data: { templateId: template.id, versionId: version.id, organizationId: organization.id, language: "enUS", alias: `${plan.key}:${style}:imported`, externalId: `${plan.key}:${style}:imported`, name: `${label} imported baseline`, status: "CLOSED", accessMode: "INVITED", openAt: new Date("2024-01-01T00:00:00.000Z"), endMode: "OPEN_END", createdBy: admin.id, createdByCoachId: coach.id, reportStyle: style, reportStyleSource: "CAMPAIGN_OVERRIDE", importManifest: { fixture: true } } });
         const otherOrgCampaign = await tx.assessmentCampaign.create({ data: { templateId: template.id, versionId: version.id, organizationId: otherOrganization.id, language: "enUS", alias: `${plan.key}:${style}:other-org`, externalId: `${plan.key}:${style}:other-org`, name: `${label} other organization baseline`, status: "CLOSED", accessMode: "INVITED", openAt: new Date("2025-06-01T00:00:00.000Z"), endMode: "OPEN_END", createdBy: admin.id, createdByCoachId: coach.id, reportStyle: style, reportStyleSource: "CAMPAIGN_OVERRIDE" } });
@@ -171,6 +197,30 @@ export async function provisionReportComparisonFixture({ env = process.env, crea
           { campaignId: importedCampaign.id, respondentId: importedPrior.id, invitationId: importedInvitation.id, submittedAt: new Date("2024-02-01T00:00:00.000Z"), answers: [], result: result(60) },
           { campaignId: otherOrgCampaign.id, respondentId: otherOrgSameEmail.id, invitationId: otherOrgInvitation.id, submittedAt: new Date("2025-06-01T00:00:00.000Z"), answers: [], result: result(75) },
         ] });
+        if (style === "CLASSIC") {
+          await tx.assessmentCampaignParticipant.createMany({ data: [
+            { campaignId: currentCampaign.id, respondentId: pendingSubmitCeo.id, isCEO: true, teamPathAtAdd: [team.id], teamLabelsAtAdd: [team.name] },
+            { campaignId: currentCampaign.id, respondentId: pendingSubmitNonCeo.id, isCEO: false, teamPathAtAdd: [team.id], teamLabelsAtAdd: [team.name] },
+          ] });
+          await Promise.all([
+            tx.assessmentInvitation.create({ data: {
+              campaignId: currentCampaign.id,
+              respondentId: pendingSubmitCeo.id,
+              tokenHash: tokenHash(reportComparisonInvitationToken(plan, style, "pending-submit-ceo")),
+              status: "SENT",
+              sentAt: new Date("2026-01-02T00:00:00.000Z"),
+              expiresAt,
+            } }),
+            tx.assessmentInvitation.create({ data: {
+              campaignId: currentCampaign.id,
+              respondentId: pendingSubmitNonCeo.id,
+              tokenHash: tokenHash(reportComparisonInvitationToken(plan, style, "pending-submit-non-ceo")),
+              status: "SENT",
+              sentAt: new Date("2026-01-02T00:00:00.000Z"),
+              expiresAt,
+            } }),
+          ]);
+        }
       }
     });
     return plan;

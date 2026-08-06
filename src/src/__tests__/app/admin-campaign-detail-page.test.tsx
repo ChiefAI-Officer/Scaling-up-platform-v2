@@ -135,7 +135,7 @@ describe("Admin campaign detail — production chrome and report-native placemen
       "groupReportHref",
       "/assessments/camp-1/report",
     );
-    // The retired affordance is not promoted into the shared campaign surface.
-    expect(detailProps).not.toHaveProperty("longitudinalRespondentIds");
+    // The coach-only rollback affordance is not promoted into admin chrome.
+    expect(detailProps).not.toHaveProperty("legacyOverTimeRespondentIds");
   });
 });

@@ -18,12 +18,14 @@ const operatorViewer: ReportComparisonViewer = {
   kind: "operator",
   actor: { userId: "user-1", email: "coach@example.com", role: "COACH", coachId: "coach-1" },
 };
-const ceoViewer: ReportComparisonViewer = {
+const ceoViewer = {
   kind: "ceo-self",
   focusCampaignId: "focus-campaign",
   focusSubmissionId: "focus-submission",
   respondentId: "focus-respondent",
-};
+  invitationId: "focus-invitation",
+  expiresAt: 2_000_000_000,
+} as ReportComparisonViewer;
 const focus: ReportComparisonFocus = {
   campaignId: "focus-campaign",
   respondentId: "focus-respondent",
@@ -93,6 +95,45 @@ function makeReportComparisonDbFixture(options: {
   submissionQueries: Array<{ where: Record<string, unknown>; take?: number }>;
   transactions: number;
   rows: ReturnType<typeof row>[];
+  ceoAccess: {
+    invitation: {
+      id: string;
+      campaignId: string;
+      respondentId: string;
+      status: "SUBMITTED";
+      revokedAt: Date | null;
+      submission: {
+        id: string;
+        campaignId: string;
+        respondentId: string;
+        invitationId: string;
+        submittedAt: Date;
+      };
+      campaign: {
+        id: string;
+        organizationId: string;
+        templateId: string;
+        deletedAt: Date | null;
+        accessMode: "INVITED" | "PUBLIC";
+        showResultsOnScreen: boolean;
+        sendResultsToRespondent: boolean;
+        template: { alias: string };
+        organization: { id: string; deletedAt: Date | null };
+      };
+      respondent: {
+        id: string;
+        organizationId: string;
+        deletedAt: Date | null;
+      };
+    };
+    participant: {
+      campaignId: string;
+      respondentId: string;
+      isCEO: boolean;
+    } | null;
+  };
+  ceoInvitationQuery: jest.Mock;
+  ceoParticipantQuery: jest.Mock;
 } {
   const actualFocus = options.focus ?? focus;
   const focusRow = row({
@@ -108,11 +149,60 @@ function makeReportComparisonDbFixture(options: {
   ];
   const limits: number[] = [];
   const submissionQueries: Array<{ where: Record<string, unknown>; take?: number }> = [];
+  const ceoAccess = {
+    invitation: {
+      id: "focus-invitation",
+      campaignId: actualFocus.campaignId,
+      respondentId: actualFocus.respondentId,
+      status: "SUBMITTED" as const,
+      revokedAt: null,
+      submission: {
+        id: actualFocus.submissionId,
+        campaignId: actualFocus.campaignId,
+        respondentId: actualFocus.respondentId,
+        invitationId: "focus-invitation",
+        submittedAt: focusRow.submittedAt,
+      },
+      campaign: {
+        id: actualFocus.campaignId,
+        organizationId: focusRow.campaign.organizationId,
+        templateId: focusRow.campaign.templateId,
+        deletedAt: null,
+        accessMode: "INVITED" as const,
+        showResultsOnScreen: true,
+        sendResultsToRespondent: true,
+        template: { alias: "scaling-up-full" },
+        organization: {
+          id: focusRow.campaign.organizationId,
+          deletedAt: null,
+        },
+      },
+      respondent: {
+        id: actualFocus.respondentId,
+        organizationId: focusRow.campaign.organizationId,
+        deletedAt: null,
+      },
+    },
+    participant: {
+      campaignId: actualFocus.campaignId,
+      respondentId: actualFocus.respondentId,
+      isCEO: true,
+    } as {
+      campaignId: string;
+      respondentId: string;
+      isCEO: boolean;
+    } | null,
+  };
+  const ceoInvitationQuery = jest.fn(async () => ceoAccess.invitation);
+  const ceoParticipantQuery = jest.fn(async () => ceoAccess.participant);
   type Fixture = ReportComparisonDb & {
     limits: number[];
     submissionQueries: Array<{ where: Record<string, unknown>; take?: number }>;
     transactions: number;
     rows: ReturnType<typeof row>[];
+    ceoAccess: typeof ceoAccess;
+    ceoInvitationQuery: jest.Mock;
+    ceoParticipantQuery: jest.Mock;
   };
   const fixture = {} as Fixture;
   Object.assign(fixture, {
@@ -120,6 +210,9 @@ function makeReportComparisonDbFixture(options: {
     submissionQueries,
     transactions: 0,
     rows,
+    ceoAccess,
+    ceoInvitationQuery,
+    ceoParticipantQuery,
     orgRespondent: {
       findMany: jest.fn(async (args: { take?: number }) => {
         limits.push(args.take ?? -1);
@@ -145,6 +238,12 @@ function makeReportComparisonDbFixture(options: {
         }
         return selected.slice(0, args.take);
       }),
+    },
+    assessmentInvitation: {
+      findFirst: ceoInvitationQuery,
+    },
+    assessmentCampaignParticipant: {
+      findFirst: ceoParticipantQuery,
     },
     $transaction: jest.fn(async <T>(callback: (tx: ReportComparisonDb) => Promise<T>): Promise<T> => {
       fixture.transactions += 1;
@@ -234,6 +333,41 @@ describe("listReportComparisonCandidates", () => {
     }
   });
 
+  it("marks the result bounded when the 200-row inspection cap is reached before campaign collapse", async () => {
+    const cappedRows = Array.from({ length: 200 }, (_, index) => row({
+      id: `same-campaign-${index}`,
+      campaignId: "one-prior-campaign",
+      submittedAt: new Date(2025, 0, 1, 0, index),
+    }));
+    const db = makeReportComparisonDbFixture({ priorRows: cappedRows });
+
+    await expect(
+      listReportComparisonCandidates(db, operatorViewer, focus),
+    ).resolves.toMatchObject({
+      kind: "ok",
+      candidates: [expect.objectContaining({ campaignId: "one-prior-campaign" })],
+      bounded: true,
+    });
+  });
+
+  it.each([
+    ["globally off", { enabled: "0", kill: undefined }],
+    ["killed", { enabled: "1", kill: "1" }],
+  ])("performs zero reads when the rollout is %s", async (_label, flags) => {
+    process.env.WAVE_RC_REPORT_COMPARISON_ENABLED = flags.enabled;
+    if (flags.kill) process.env.WAVE_RC_REPORT_COMPARISON_KILL = flags.kill;
+    else delete process.env.WAVE_RC_REPORT_COMPARISON_KILL;
+    const db = makeReportComparisonDbFixture();
+
+    await expect(
+      listReportComparisonCandidates(db, operatorViewer, focus),
+    ).resolves.toEqual({ kind: "not-applicable" });
+
+    expect(db.assessmentSubmission.findFirst).not.toHaveBeenCalled();
+    expect(db.assessmentSubmission.findMany).not.toHaveBeenCalled();
+    expect(db.orgRespondent.findMany).not.toHaveBeenCalled();
+  });
+
   it("applies chronology and focus-campaign eligibility before the 200-row inspection cap", async () => {
     const laterRows = Array.from({ length: 200 }, (_, index) => row({
       id: `later-${index}`,
@@ -301,6 +435,25 @@ describe("listReportComparisonCandidates", () => {
 });
 
 describe("loadReportComparison", () => {
+  it.each([
+    ["globally off", { enabled: "0", kill: undefined }],
+    ["killed", { enabled: "1", kill: "1" }],
+  ])("performs zero reads when the rollout is %s", async (_label, flags) => {
+    process.env.WAVE_RC_REPORT_COMPARISON_ENABLED = flags.enabled;
+    if (flags.kill) process.env.WAVE_RC_REPORT_COMPARISON_KILL = flags.kill;
+    else delete process.env.WAVE_RC_REPORT_COMPARISON_KILL;
+    const db = makeReportComparisonDbFixture();
+
+    await expect(
+      loadReportComparison(db, operatorViewer, focus, "prior-native"),
+    ).resolves.toEqual({ kind: "invalid" });
+
+    expect(db.$transaction).not.toHaveBeenCalled();
+    expect(db.assessmentSubmission.findFirst).not.toHaveBeenCalled();
+    expect(db.assessmentSubmission.findMany).not.toHaveBeenCalled();
+    expect(db.orgRespondent.findMany).not.toHaveBeenCalled();
+  });
+
   it("authorizes and reloads the selected baseline inside one transaction", async () => {
     const db = makeReportComparisonDbFixture();
 
@@ -334,5 +487,107 @@ describe("loadReportComparison", () => {
     await expect(loadReportComparison(db, { ...ceoViewer, focusSubmissionId: "other" }, focus, "prior-native")).resolves.toEqual({ kind: "invalid" });
     await expect(loadReportComparison(db, ceoViewer, focus, "prior-native")).resolves.toMatchObject({ kind: "ok" });
     expect(mockCanManageCampaign).not.toHaveBeenCalled();
+  });
+
+  it("revalidates the live CEO capability inside the selected-baseline transaction", async () => {
+    const db = makeReportComparisonDbFixture();
+
+    await expect(
+      loadReportComparison(db, ceoViewer, focus, "prior-native"),
+    ).resolves.toMatchObject({ kind: "ok" });
+
+    expect(db.transactions).toBe(1);
+    expect(db.ceoInvitationQuery).toHaveBeenCalledTimes(1);
+    expect(db.ceoParticipantQuery).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns one generic invalid outcome for every revoked CEO capability fact", async () => {
+    const cases: Array<{
+      name: string;
+      mutate: (
+        db: ReturnType<typeof makeReportComparisonDbFixture>,
+      ) => ReportComparisonViewer;
+    }> = [
+      {
+        name: "invitation binding",
+        mutate: () => ({ ...ceoViewer, invitationId: "other-invitation" } as ReportComparisonViewer),
+      },
+      {
+        name: "expiry",
+        mutate: () => ({ ...ceoViewer, expiresAt: 1 } as ReportComparisonViewer),
+      },
+      {
+        name: "CEO designation",
+        mutate: (db) => {
+          if (db.ceoAccess.participant) db.ceoAccess.participant.isCEO = false;
+          return ceoViewer;
+        },
+      },
+      {
+        name: "campaign liveness",
+        mutate: (db) => {
+          db.ceoAccess.invitation.campaign.deletedAt = new Date();
+          return ceoViewer;
+        },
+      },
+      {
+        name: "respondent liveness",
+        mutate: (db) => {
+          db.ceoAccess.invitation.respondent.deletedAt = new Date();
+          return ceoViewer;
+        },
+      },
+      {
+        name: "organization tenant liveness",
+        mutate: (db) => {
+          db.ceoAccess.invitation.campaign.organization.deletedAt = new Date();
+          return ceoViewer;
+        },
+      },
+      {
+        name: "tenant binding",
+        mutate: (db) => {
+          db.ceoAccess.invitation.respondent.organizationId = "other-org";
+          return ceoViewer;
+        },
+      },
+      {
+        name: "disclosure",
+        mutate: (db) => {
+          db.ceoAccess.invitation.campaign.showResultsOnScreen = false;
+          db.ceoAccess.invitation.campaign.sendResultsToRespondent = false;
+          return ceoViewer;
+        },
+      },
+      {
+        name: "invited mode",
+        mutate: (db) => {
+          db.ceoAccess.invitation.campaign.accessMode = "PUBLIC";
+          return ceoViewer;
+        },
+      },
+      {
+        name: "Scaling Up Full alias",
+        mutate: (db) => {
+          db.ceoAccess.invitation.campaign.template.alias = "rockefeller";
+          return ceoViewer;
+        },
+      },
+    ];
+
+    for (const scenario of cases) {
+      const db = makeReportComparisonDbFixture();
+      const viewer = scenario.mutate(db);
+      await expect(
+        loadReportComparison(db, viewer, focus, "prior-native"),
+      ).resolves.toEqual({ kind: "invalid" });
+    }
+
+    const killedDb = makeReportComparisonDbFixture();
+    process.env.WAVE_RC_REPORT_COMPARISON_KILL = "1";
+    await expect(
+      loadReportComparison(killedDb, ceoViewer, focus, "prior-native"),
+    ).resolves.toEqual({ kind: "invalid" });
+    delete process.env.WAVE_RC_REPORT_COMPARISON_KILL;
   });
 });

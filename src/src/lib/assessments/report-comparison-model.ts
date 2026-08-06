@@ -102,8 +102,10 @@ function questionCompatible(
 ): boolean {
   return current?.type === "SLIDER_LIKERT" &&
     previous?.type === "SLIDER_LIKERT" &&
-    current.min !== null &&
-    current.max !== null &&
+    Number.isFinite(current.min) &&
+    Number.isFinite(current.max) &&
+    Number.isFinite(previous.min) &&
+    Number.isFinite(previous.max) &&
     current.min === previous.min &&
     current.max === previous.max;
 }
@@ -138,11 +140,14 @@ export function buildReportComparisonModel({ focus, baseline }: ReportComparison
   const previousSections = indexedValues(baseline.result, "perSection", "stableKey", "averagePoints");
   const currentQuestions = indexedValues(focus.result, "perQuestion", "stableKey", "value");
   const previousQuestions = indexedValues(baseline.result, "perQuestion", "stableKey", "value");
-  const questions = comparisonRows(currentQuestions, previousQuestions, (current, previous, key) =>
-    questionCompatible(focus.questionMetaByKey[key], baseline.questionMetaByKey[key])
+  const questions = comparisonRows(currentQuestions, previousQuestions, (current, previous, key) => {
+    if (!Object.hasOwn(currentQuestions, key)) {
+      return { current, previous, delta: null, status: "unmatched" };
+    }
+    return questionCompatible(focus.questionMetaByKey[key], baseline.questionMetaByKey[key])
       ? comparable(current, previous)
-      : { current, previous, delta: null, status: "unmatched" },
-  );
+      : { current, previous: null, delta: null, status: "unmatched" };
+  });
   const matchedQuestionCount = Object.entries(questions).filter(
     ([key, value]) => Object.hasOwn(currentQuestions, key) && value.status === "comparable",
   ).length;

@@ -36,6 +36,14 @@ import { isCustomSlidesEnabled } from "@/lib/assessments/wave-m-flags";
 import { isOnScreenResultsEnabled } from "@/lib/assessments/wave-osr-flags";
 import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
 import { deriveReportStylePreviewCapabilities } from "@/lib/assessments/report-style-registry";
+import {
+  REPORT_COMPARISON_ALIAS,
+  isReportComparisonEnabled,
+} from "@/lib/assessments/wave-report-comparison-flags";
+import {
+  asLongitudinalEligibilityDb,
+  hasComparableLongitudinal,
+} from "@/lib/assessments/longitudinal-eligibility";
 import type { CustomSlide } from "@/lib/assessments/custom-slides";
 import type { CustomSlidesPanelSection } from "@/components/assessments/CustomSlidesPanel";
 
@@ -155,6 +163,38 @@ export default async function CampaignDetailPage({ params }: PageProps) {
       hasCurrentWriteAccess,
     });
 
+  const reportNativeComparisonEnabled =
+    campaignForFlag?.template?.alias === REPORT_COMPARISON_ALIAS &&
+    isReportComparisonEnabled({
+      organizationId: overview.campaign.organizationId,
+      templateId: overview.campaign.templateId,
+    });
+  const legacyOverTimeRespondentIds: string[] = [];
+  if (!reportNativeComparisonEnabled) {
+    const eligibilityDb = asLongitudinalEligibilityDb(db);
+    for (const row of respondents) {
+      if (!row.hasSubmission) continue;
+      try {
+        const eligible = await hasComparableLongitudinal(
+          eligibilityDb,
+          actor,
+          {
+            organizationId: overview.campaign.organizationId,
+            respondentId: row.respondent.id,
+            templateId: overview.campaign.templateId,
+            templateAlias: campaignForFlag?.template?.alias,
+          },
+        );
+        if (eligible) legacyOverTimeRespondentIds.push(row.respondent.id);
+      } catch (error) {
+        console.error(
+          `[campaign-detail] longitudinal eligibility check failed (campaign=${id}, respondent=${row.respondent.id}):`,
+          error,
+        );
+      }
+    }
+  }
+
   return (
     <CampaignDetail
       initialOverview={overview}
@@ -176,6 +216,7 @@ export default async function CampaignDetailPage({ params }: PageProps) {
         questions: campaignForFlag?.version?.questions ?? [],
       })}
       canEditReportAppearance={canEditReportAppearance}
+      legacyOverTimeRespondentIds={legacyOverTimeRespondentIds}
     />
   );
 }

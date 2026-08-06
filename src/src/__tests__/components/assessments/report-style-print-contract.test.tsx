@@ -259,7 +259,7 @@ describe("adaptive report print and responsive contracts", () => {
         submittedAt: new Date("2025-03-31T12:00:00.000Z"),
         versionId: "version-1",
         versionNumber: 1,
-        isImported: false,
+        isImported: true,
       },
       sameVersion: true,
       overall: { current: 72, previous: 64, delta: 8, status: "comparable" },
@@ -279,6 +279,9 @@ describe("adaptive report print and responsive contracts", () => {
     const css = source(`styles/su-report-${style}.css`);
 
     expect(within(container).getByTestId("report-comparison-content")).toHaveTextContent("ScaleUp score");
+    expect(within(container).getByTestId("report-comparison-cover-subtitle")).toHaveTextContent(
+      "Compared with Q1 2025 · Imported · submitted Mar 31, 2025",
+    );
     expect(container.querySelector(`.report-page--${style}-comparison .su-report-comparison`)).toBeInTheDocument();
     expect(container.querySelectorAll(".report-page")).toHaveLength(4);
     expect(css).toContain(`.su-report--${style} .report-page--${style}-comparison`);

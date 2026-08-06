@@ -117,6 +117,7 @@ describe("buildReportComparisonModel", () => {
       questions: [
         { stableKey: "type-changed", value: 8 },
         { stableKey: "scale-changed", value: 8, min: 0, max: 10 },
+        { stableKey: "non-finite-scale", value: 8, min: 0, max: Number.POSITIVE_INFINITY },
         { stableKey: "missing-baseline", value: 8 },
         { stableKey: "non-finite", value: Number.POSITIVE_INFINITY },
       ],
@@ -127,6 +128,7 @@ describe("buildReportComparisonModel", () => {
       questions: [
         { stableKey: "type-changed", value: 5, type: "TEXT" },
         { stableKey: "scale-changed", value: 5, min: 1, max: 10 },
+        { stableKey: "non-finite-scale", value: 5, min: 0, max: Number.POSITIVE_INFINITY },
         { stableKey: "removed", value: 5 },
         { stableKey: "non-finite", value: 5 },
       ],
@@ -134,8 +136,9 @@ describe("buildReportComparisonModel", () => {
 
     const model = buildReportComparisonModel({ focus, baseline });
 
-    expect(model.questions["type-changed"]).toEqual({ current: 8, previous: 5, delta: null, status: "unmatched" });
-    expect(model.questions["scale-changed"]).toEqual({ current: 8, previous: 5, delta: null, status: "unmatched" });
+    expect(model.questions["type-changed"]).toEqual({ current: 8, previous: null, delta: null, status: "unmatched" });
+    expect(model.questions["scale-changed"]).toEqual({ current: 8, previous: null, delta: null, status: "unmatched" });
+    expect(model.questions["non-finite-scale"]).toEqual({ current: 8, previous: null, delta: null, status: "unmatched" });
     expect(model.questions["missing-baseline"]).toEqual({ current: 8, previous: null, delta: null, status: "unmatched" });
     expect(model.questions.removed).toEqual({ current: null, previous: 5, delta: null, status: "unmatched" });
     expect(model.questions["non-finite"]).toEqual({ current: null, previous: 5, delta: null, status: "unmatched" });

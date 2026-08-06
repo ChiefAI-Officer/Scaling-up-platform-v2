@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 
 import {
   ComparisonCoverSubtitle,
@@ -64,6 +64,11 @@ describe("ReportComparisonContent", () => {
     expect(screen.getAllByText("Different version")).toHaveLength(3);
     expect(screen.getByLabelText("increase 3")).toHaveTextContent("▲ +3");
     expect(screen.getByText("New or changed question")).toBeInTheDocument();
+    const incompatibleQuestionRow = screen.getByText("New leadership prompt").closest("tr");
+    expect(incompatibleQuestionRow).not.toBeNull();
+    const incompatibleCells = within(incompatibleQuestionRow!).getAllByRole("cell");
+    expect(incompatibleCells[1]).toHaveTextContent("—");
+    expect(incompatibleCells[2]).toHaveTextContent("—");
     expect(screen.getByText(/1 of 2 current questions matched the earlier version/i)).toBeInTheDocument();
     expect(screen.getByText(/1 baseline-only question was omitted/i)).toBeInTheDocument();
     expect(screen.queryByText(/recommendation|contact|peer|free text/i)).not.toBeInTheDocument();
@@ -86,7 +91,9 @@ describe("ReportComparisonContent", () => {
 
   it("adds the dated baseline subtitle and returns nothing when no comparison exists", () => {
     const { rerender } = render(<ComparisonCoverSubtitle comparison={comparison} />);
-    expect(screen.getByText("Compared with Q1 2025 · submitted Mar 31, 2025")).toBeInTheDocument();
+    expect(
+      screen.getByText("Compared with Q1 2025 · Imported · submitted Mar 31, 2025"),
+    ).toBeInTheDocument();
 
     rerender(<ComparisonCoverSubtitle comparison={null} />);
     expect(screen.queryByText(/Compared with/)).not.toBeInTheDocument();

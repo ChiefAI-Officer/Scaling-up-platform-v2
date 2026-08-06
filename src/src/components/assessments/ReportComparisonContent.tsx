@@ -107,7 +107,10 @@ export function ComparisonCoverSubtitle({ comparison }: { comparison?: ReportCom
   const campaign = comparison.baseline.campaignLabel?.trim() || "Scaling Up Assessment";
   return (
     <p className="su-report-comparison-cover-subtitle" data-testid="report-comparison-cover-subtitle">
-      Compared with {campaign} · submitted {submittedDate(comparison.baseline.submittedAt)}
+      Compared with {campaign}
+      {comparison.baseline.isImported ? " · Imported" : ""}
+      {" · submitted "}
+      {submittedDate(comparison.baseline.submittedAt)}
     </p>
   );
 }

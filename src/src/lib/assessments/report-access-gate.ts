@@ -125,6 +125,7 @@ export async function viewCeoSelfRespondentReport(
     surface: "respondent",
     actor: null,
     noActorPolicy: "tolerate",
+    auditActor: "CEO_SELF",
     flagGate: undefined,
     ip,
     userAgent,

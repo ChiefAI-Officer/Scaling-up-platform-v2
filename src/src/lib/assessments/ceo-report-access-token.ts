@@ -66,7 +66,15 @@ export function createCeoReportAccessToken(
   if (!isNonEmptyString(input.focusCampaignId) || !isNonEmptyString(input.invitationId) || !isNonEmptyString(input.respondentId)) {
     throw new Error("CEO report access claims must contain non-empty identifiers.");
   }
-  if (!Number.isFinite(ttlSeconds) || ttlSeconds <= 0 || !Number.isFinite(nowSeconds)) {
+  if (
+    !Number.isFinite(ttlSeconds) ||
+    ttlSeconds <= 0 ||
+    ttlSeconds > DEFAULT_TTL_SECONDS ||
+    !Number.isFinite(nowSeconds)
+  ) {
+    if (ttlSeconds > DEFAULT_TTL_SECONDS) {
+      throw new Error("CEO report access token lifetime must be at most 30 days.");
+    }
     throw new Error("CEO report access token expiry must be finite and in the future.");
   }
   const claims: CeoReportAccessClaims = {

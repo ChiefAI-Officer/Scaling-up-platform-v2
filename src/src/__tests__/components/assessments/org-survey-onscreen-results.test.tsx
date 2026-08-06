@@ -393,7 +393,7 @@ describe("the rendered report", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders the server-issued CEO comparison link beside Print without persisting it", async () => {
+  it("immediately exchanges the server-issued CEO capability and stores only the clean report href", async () => {
     global.fetch = jest.fn(async (input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : String(input);
       if (url.includes("/me")) {
@@ -437,6 +437,15 @@ describe("the rendered report", () => {
           }),
         } as unknown as Response;
       }
+      if (url === "/assessments/self-report/exchange") {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            href: "/assessments/campaign-1/respondents/respondent-1/report",
+          }),
+        } as unknown as Response;
+      }
       return { ok: false, status: 404, json: async () => ({}) } as unknown as Response;
     }) as unknown as typeof fetch;
 
@@ -451,12 +460,24 @@ describe("the rendered report", () => {
     });
     expect(link).toHaveAttribute(
       "href",
-      "https://app.example.com/assessments/self-report#t=signed-token",
+      "/assessments/campaign-1/respondents/respondent-1/report",
     );
     expect(screen.getByTestId("org-survey-results")).toContainElement(link);
+    expect(screen.getByTestId("org-survey-results")).not.toHaveTextContent(
+      "signed-token",
+    );
     expect(
       window.sessionStorage.getItem(`su-onscreen-result:${ALIAS}`),
     ).not.toContain("signed-token");
+    expect(global.fetch).toHaveBeenCalledWith(
+      "/assessments/self-report/exchange",
+      expect.objectContaining({
+        method: "POST",
+        credentials: "include",
+        cache: "no-store",
+        body: JSON.stringify({ token: "signed-token" }),
+      }),
+    );
   });
 });
 

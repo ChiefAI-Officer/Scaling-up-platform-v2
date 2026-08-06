@@ -316,6 +316,7 @@ describe("viewCeoSelfRespondentReport adapter", () => {
     expect(opts.surface).toBe("respondent");
     expect(opts.noActorPolicy).toBe("tolerate");
     expect(opts.actor).toBeNull();
+    expect(opts.auditActor).toBe("CEO_SELF");
     expect(opts.metricRole).toBe("CEO_SELF");
     expect(opts.rateLimitConfig).toEqual({ interval: 60000, maxRequests: 100 });
     expect(opts.rateLimitKey).toBe("report:ceo-self:campaign-1:respondent-1:9.9.9.9");

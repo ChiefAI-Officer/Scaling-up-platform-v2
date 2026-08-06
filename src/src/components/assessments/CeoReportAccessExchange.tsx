@@ -2,25 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-
-async function exchange(token: string): Promise<string | null> {
-  try {
-    const response = await fetch("/assessments/self-report/exchange", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      cache: "no-store",
-      body: JSON.stringify({ token }),
-    });
-    if (!response.ok) return null;
-    const body = await response.json() as { href?: unknown };
-    return typeof body.href === "string" && body.href.startsWith("/assessments/")
-      ? body.href
-      : null;
-  } catch {
-    return null;
-  }
-}
+import { exchangeCeoReportAccessToken } from "@/lib/assessments/ceo-report-access-client";
 
 export function CeoReportAccessExchange() {
   const router = useRouter();
@@ -37,7 +19,7 @@ export function CeoReportAccessExchange() {
       void Promise.resolve().then(() => setStatus("unavailable"));
       return;
     }
-    void exchange(token).then((href) => {
+    void exchangeCeoReportAccessToken(token).then((href) => {
       if (href) router.replace(href);
       else setStatus("unavailable");
     });

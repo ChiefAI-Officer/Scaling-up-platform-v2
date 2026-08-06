@@ -197,6 +197,8 @@ export async function resolveCeoViewerFromExactPathSession(
       focusCampaignId: authorized.focusCampaignId,
       focusSubmissionId: authorized.focusSubmissionId,
       respondentId: authorized.respondentId,
+      invitationId: authorized.invitationId,
+      expiresAt: new Date(authorized.expiresAt).getTime() / 1000,
     };
   } catch {
     return null;

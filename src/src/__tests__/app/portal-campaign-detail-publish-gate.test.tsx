@@ -46,8 +46,6 @@ jest.mock("@/lib/assessments/campaign-detail", () => {
   };
 });
 
-// The retired promoted Wave N helper remains mockable so this placement test
-// proves campaign-detail loading no longer invokes its N+1 eligibility loop.
 const mockHasComparableLongitudinal = jest.fn();
 jest.mock("@/lib/assessments/longitudinal-eligibility", () => ({
   asLongitudinalEligibilityDb: (x: unknown) => x,
@@ -58,6 +56,13 @@ jest.mock("@/lib/assessments/longitudinal-eligibility", () => ({
 jest.mock("@/lib/assessments/wave-d-feature-flags", () => ({
   waveDCustomHtmlEmailEnabled: () => false,
   assessmentInviteBrandedCustomHtmlEnabled: jest.fn(() => true),
+}));
+
+const mockReportComparisonEnabled = jest.fn();
+jest.mock("@/lib/assessments/wave-report-comparison-flags", () => ({
+  REPORT_COMPARISON_ALIAS: "scaling-up-full",
+  isReportComparisonEnabled: (...args: unknown[]) =>
+    mockReportComparisonEnabled(...args),
 }));
 
 // NOTE: @/lib/assessments/wave-f-flags is intentionally NOT mocked — the page
@@ -75,14 +80,18 @@ jest.mock("@/lib/db", () => ({
 const captured: {
   canViewGroupReport?: boolean;
   canEditReportAppearance?: boolean;
+  legacyOverTimeRespondentIds?: string[];
 } = {};
 jest.mock("@/components/assessments/CampaignDetail", () => ({
   CampaignDetail: (props: {
     canViewGroupReport?: boolean;
     canEditReportAppearance?: boolean;
+    legacyOverTimeRespondentIds?: string[];
   }) => {
     captured.canViewGroupReport = props.canViewGroupReport;
     captured.canEditReportAppearance = props.canEditReportAppearance;
+    captured.legacyOverTimeRespondentIds =
+      props.legacyOverTimeRespondentIds;
     return null;
   },
 }));
@@ -119,6 +128,7 @@ function makeCampaign(overrides: Record<string, unknown> = {}) {
 async function runPage() {
   captured.canViewGroupReport = undefined;
   captured.canEditReportAppearance = undefined;
+  captured.legacyOverTimeRespondentIds = undefined;
   const node = await Page({ params: Promise.resolve({ id: CAMPAIGN_ID }) });
   // Render the returned tree so the (mocked) CampaignDetail is invoked and
   // captures the canViewGroupReport boolean the page computed.
@@ -144,6 +154,7 @@ beforeEach(() => {
   });
   mockGetCampaignRespondents.mockResolvedValue([]);
   mockHasComparableLongitudinal.mockResolvedValue(false);
+  mockReportComparisonEnabled.mockReturnValue(false);
   delete process.env.WAVE_F_GROUP_REPORT_ENABLED;
   delete process.env.WAVE_J_SUFULL_GROUP_ENABLED;
   delete process.env.WAVE_J_SUFULL_GROUP_CANARY;
@@ -246,10 +257,23 @@ describe("CampaignDetail report-native placement", () => {
     { hasSubmission: false, respondent: { id: "resp-3" } }, // skipped (no submission)
   ];
 
-  it("does not invoke the retired N+1 longitudinal eligibility helper for submitted respondents", async () => {
+  it("restores the Wave N eligibility loop and promoted links while report-native comparison is off", async () => {
     mockFindFirst.mockResolvedValue(makeCampaign());
     mockGetCampaignRespondents.mockResolvedValue(respondentRows);
+    mockHasComparableLongitudinal.mockResolvedValue(true);
     await runPage();
+
+    expect(mockHasComparableLongitudinal).toHaveBeenCalledTimes(2);
+    expect(captured.legacyOverTimeRespondentIds).toEqual(["resp-1", "resp-2"]);
+  });
+
+  it("suppresses the Wave N N+1 loop and promoted links while report-native comparison is enabled", async () => {
+    mockFindFirst.mockResolvedValue(makeCampaign());
+    mockGetCampaignRespondents.mockResolvedValue(respondentRows);
+    mockReportComparisonEnabled.mockReturnValue(true);
+    await runPage();
+
     expect(mockHasComparableLongitudinal).not.toHaveBeenCalled();
+    expect(captured.legacyOverTimeRespondentIds).toEqual([]);
   });
 });

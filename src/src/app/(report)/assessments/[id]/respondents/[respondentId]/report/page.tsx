@@ -38,7 +38,11 @@ import {
   loadReportComparison,
   type ReportComparisonViewer,
 } from "@/lib/assessments/report-comparison";
-import { REPORT_COMPARISON_ALIAS, isReportComparisonEnabled } from "@/lib/assessments/wave-report-comparison-flags";
+import {
+  REPORT_COMPARISON_ALIAS,
+  isReportComparisonEnabled,
+  isReportComparisonRolloutActive,
+} from "@/lib/assessments/wave-report-comparison-flags";
 import { resolveCeoViewerFromExactPathSession } from "@/lib/assessments/ceo-report-access";
 import { getCeoReportAccessSession } from "@/lib/assessments/ceo-report-access-cookie";
 import { logAuditStrict } from "@/lib/audit";
@@ -168,6 +172,7 @@ async function resolveReportComparison(input: {
 }) {
   const empty = { candidates: [], bounded: false, model: null, error: false };
   if (input.templateAlias !== REPORT_COMPARISON_ALIAS) return empty;
+  if (!isReportComparisonRolloutActive()) return empty;
 
   try {
     const campaign = await db.assessmentCampaign.findFirst({
@@ -187,7 +192,9 @@ async function resolveReportComparison(input: {
     };
     const candidates = await listReportComparisonCandidates(asReportComparisonDb(db), input.viewer, focus);
     if (candidates.kind !== "ok") return empty;
-    if (!input.compareTo) return { ...empty, candidates: candidates.candidates, bounded: candidates.bounded };
+    if (input.compareTo === undefined) {
+      return { ...empty, candidates: candidates.candidates, bounded: candidates.bounded };
+    }
     if (!candidates.candidates.some((candidate) => candidate.submissionId === input.compareTo)) {
       return { candidates: candidates.candidates, bounded: candidates.bounded, model: null, error: true };
     }
@@ -206,7 +213,7 @@ async function resolveReportComparison(input: {
         entityType: "AssessmentSubmission",
         entityId: input.submissionId,
         action: "VIEW_REPORT_COMPARISON",
-        performedBy: input.viewer.kind === "operator" ? input.viewer.actor.userId : "ceo-self",
+        performedBy: input.viewer.kind === "operator" ? input.viewer.actor.userId : "CEO_SELF",
         changes: {
           kind: "report-native-comparison",
           focusCampaignId: input.campaignId,
@@ -220,7 +227,7 @@ async function resolveReportComparison(input: {
     }
     return { candidates: candidates.candidates, bounded: candidates.bounded, model: selected.model, error: false };
   } catch {
-    return input.compareTo ? { ...empty, error: true } : empty;
+    return input.compareTo !== undefined ? { ...empty, error: true } : empty;
   }
 }
 

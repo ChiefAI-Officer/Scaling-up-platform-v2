@@ -18,6 +18,7 @@ const mockAuthorize = jest.fn();
 const mockSession = { save: jest.fn() };
 const mockGetSession = jest.fn();
 const mockAudit = jest.fn();
+const mockWithRateLimit = jest.fn();
 
 jest.mock("@/lib/assessments/ceo-report-access-token", () => ({
   verifyCeoReportAccessToken: (...args: unknown[]) => mockVerify(...args),
@@ -30,6 +31,10 @@ jest.mock("@/lib/assessments/ceo-report-access-cookie", () => ({
 }));
 jest.mock("@/lib/audit", () => ({
   logAuditStrict: (...args: unknown[]) => mockAudit(...args),
+}));
+jest.mock("@/lib/rate-limit", () => ({
+  RateLimits: { standard: { interval: 60_000, maxRequests: 100 } },
+  withRateLimit: (...args: unknown[]) => mockWithRateLimit(...args),
 }));
 jest.mock("@/lib/db", () => ({ db: { marker: "db" } }));
 
@@ -63,8 +68,8 @@ function request(body: string): Parameters<typeof POST>[0] {
   }) as Parameters<typeof POST>[0];
 }
 
-async function expectUnavailable(response: Response) {
-  expect(response.status).toBe(410);
+async function expectUnavailable(response: Response, status = 410) {
+  expect(response.status).toBe(status);
   expect(response.headers.get("Cache-Control")).toBe("no-store, private");
   expect(response.headers.get("Referrer-Policy")).toBe("no-referrer");
   await expect(response.json()).resolves.toEqual({ error: "This report link is no longer available." });
@@ -77,9 +82,58 @@ beforeEach(() => {
   mockGetSession.mockResolvedValue(mockSession);
   mockAudit.mockResolvedValue(undefined);
   mockSession.save.mockResolvedValue(undefined);
+  mockWithRateLimit.mockResolvedValue({
+    allowed: true,
+    headers: {
+      "X-RateLimit-Limit": "100",
+      "X-RateLimit-Remaining": "99",
+      "X-RateLimit-Reset": "2000000000",
+    },
+  });
 });
 
 describe("CEO report access exchange", () => {
+  it("applies the standard rate limit before parsing the capability request", async () => {
+    const malformedRequest = request("not json");
+
+    await POST(malformedRequest);
+
+    expect(mockWithRateLimit).toHaveBeenCalledWith(
+      malformedRequest,
+      { interval: 60_000, maxRequests: 100 },
+    );
+    expect(mockWithRateLimit.mock.invocationCallOrder[0]).toBeLessThan(
+      mockVerify.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
+    );
+  });
+
+  it("returns the generic token-safe response without examining the capability when rate limited", async () => {
+    mockWithRateLimit.mockResolvedValue({
+      allowed: false,
+      headers: {
+        "X-RateLimit-Limit": "100",
+        "X-RateLimit-Remaining": "0",
+        "X-RateLimit-Reset": "2000000000",
+        "Retry-After": "60",
+      },
+    });
+
+    const response = await POST(request(JSON.stringify({ token: rawToken })));
+
+    await expectUnavailable(response, 429);
+    expect(response.headers.get("Retry-After")).toBe("60");
+    expect(mockVerify).not.toHaveBeenCalled();
+    expect(mockAuthorize).not.toHaveBeenCalled();
+  });
+
+  it("fails closed with the generic response when the standard limiter is unavailable", async () => {
+    mockWithRateLimit.mockRejectedValue(new Error("limiter unavailable"));
+
+    await expectUnavailable(await POST(request(JSON.stringify({ token: rawToken }))));
+    expect(mockVerify).not.toHaveBeenCalled();
+    expect(mockAuthorize).not.toHaveBeenCalled();
+  });
+
   it("returns the generic no-store failure for malformed JSON without examining a token", async () => {
     const response = await POST(request("not json"));
 
@@ -138,7 +192,7 @@ describe("CEO report access exchange", () => {
       entityType: "AssessmentSubmission",
       entityId: "submission-1",
       action: "CEO_REPORT_ACCESS_EXCHANGED",
-      performedBy: "ceo-self-access",
+      performedBy: "CEO_SELF",
       changes: {
         kind: "ceo-report-access-exchange",
         focusCampaignId: "campaign / 1",
