@@ -1,10 +1,11 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { PrismaClient } from "@prisma/client";
 import { loginAs } from "./helpers/auth";
 import {
   REPORT_COMPARISON_FIXTURE_PASSWORD,
   reportComparisonFixtureIdentity,
 } from "../scripts/provision-report-comparison-e2e.mjs";
+import { createCeoReportAccessToken } from "../src/lib/assessments/ceo-report-access-token";
 
 const requiredEnvironment = [
   "DATABASE_URL",
@@ -20,10 +21,17 @@ type FixtureStyle = {
   style: "CLASSIC" | "EXECUTIVE_BOARDROOM" | "MODERN_DASHBOARD";
   currentCampaignId: string;
   currentRespondentId: string;
+  currentSubmissionId: string;
+  currentInvitationId: string;
+  nonCeoRespondentId: string;
+  nonCeoSubmissionId: string;
+  nonCeoInvitationId: string;
   nativeSubmissionId: string;
   importedSubmissionId: string;
   nativeCampaignName: string;
   importedCampaignName: string;
+  otherOrganizationSubmissionId: string;
+  expectedCoverage: string;
 };
 
 let fixtureDatabase: PrismaClient | null = null;
@@ -37,6 +45,11 @@ function expectedRenderer(style: FixtureStyle) {
   if (style.style === "CLASSIC") return "branded-report";
   if (style.style === "EXECUTIVE_BOARDROOM") return "executive-boardroom-report";
   return "modern-dashboard-report";
+}
+
+async function expectDenied(page: Page, path: string) {
+  const response = await page.goto(path);
+  expect(response?.status() === 404 || response?.status() === 401 || response?.status() === 403 || /\/login/.test(page.url())).toBe(true);
 }
 
 test.describe("Report comparison — sentinel-provisioned acceptance", () => {
@@ -66,14 +79,23 @@ test.describe("Report comparison — sentinel-provisioned acceptance", () => {
       const style = campaign.reportStyle as FixtureStyle["style"];
       const native = campaigns.find((candidate) => candidate.externalId === `${fixture.key}:${style}:native`);
       const imported = campaigns.find((candidate) => candidate.externalId === `${fixture.key}:${style}:imported`);
+      const otherOrganization = campaigns.find((candidate) => candidate.externalId === `${fixture.key}:${style}:other-org`);
       const ceo = campaign.participants.find((participant) => participant.isCEO);
-      if (!native || !imported || !ceo || native.importManifest !== null || imported.importManifest === null) {
+      const nonCeo = campaign.participants.find((participant) => !participant.isCEO);
+      if (!native || !imported || !otherOrganization || !ceo || !nonCeo || native.importManifest !== null || imported.importManifest === null) {
         throw new Error("Provisioned report-comparison topology is incomplete.");
       }
+      const currentSubmission = campaign.submissions.find((submission) => submission.respondentId === ceo.respondentId);
+      const nonCeoSubmission = campaign.submissions.find((submission) => submission.respondentId === nonCeo.respondentId);
       const nativeSubmission = native.submissions[0];
       const importedSubmission = imported.submissions[0];
-      if (!nativeSubmission || !importedSubmission) throw new Error("Provisioned comparison baselines are missing submissions.");
-      return { style, currentCampaignId: campaign.id, currentRespondentId: ceo.respondentId, nativeSubmissionId: nativeSubmission.id, importedSubmissionId: importedSubmission.id, nativeCampaignName: native.name, importedCampaignName: imported.name };
+      const otherOrganizationSubmission = otherOrganization.submissions[0];
+      if (!currentSubmission?.invitationId || !nonCeoSubmission?.invitationId || !nativeSubmission?.invitationId || !importedSubmission?.invitationId || !otherOrganizationSubmission?.invitationId) {
+        throw new Error("Provisioned invited submissions must be bound to invitations.");
+      }
+      const currentQuestions = (currentSubmission.result as { perQuestion?: unknown[] }).perQuestion?.length ?? 0;
+      const baselineQuestions = (nativeSubmission.result as { perQuestion?: unknown[] }).perQuestion?.length ?? 0;
+      return { style, currentCampaignId: campaign.id, currentRespondentId: ceo.respondentId, currentSubmissionId: currentSubmission.id, currentInvitationId: currentSubmission.invitationId, nonCeoRespondentId: nonCeo.respondentId, nonCeoSubmissionId: nonCeoSubmission.id, nonCeoInvitationId: nonCeoSubmission.invitationId, nativeSubmissionId: nativeSubmission.id, importedSubmissionId: importedSubmission.id, nativeCampaignName: native.name, importedCampaignName: imported.name, otherOrganizationSubmissionId: otherOrganizationSubmission.id, expectedCoverage: `${Math.min(currentQuestions, baselineQuestions)} of ${currentQuestions} current question${currentQuestions === 1 ? "" : "s"} matched the earlier version.` };
     });
     const sameEmailOtherOrganization = await fixtureDatabase.orgRespondent.findFirst({
       where: { externalId: `${fixture.key}:other`, normalizedEmail: fixture.ceoEmail },
@@ -93,15 +115,54 @@ test.describe("Report comparison — sentinel-provisioned acceptance", () => {
       await page.goto(reportPath(style));
       await expect(page.getByTestId(expectedRenderer(style))).toBeVisible();
       const picker = page.getByLabel("Compare to previous assessment");
+      await expect(picker).toHaveValue(style.nativeSubmissionId);
       await expect(picker.locator(`option[value="${style.nativeSubmissionId}"]`)).toContainText(style.nativeCampaignName);
       await expect(picker.locator(`option[value="${style.importedSubmissionId}"]`)).toContainText(style.importedCampaignName);
       await expect(picker.locator(`option[value="${style.importedSubmissionId}"]`)).toContainText("Imported");
+      await expect(picker.locator(`option[value="${style.otherOrganizationSubmissionId}"]`)).toHaveCount(0);
       await picker.selectOption(style.nativeSubmissionId);
       await page.getByRole("button", { name: "Compare", exact: true }).click();
       await expect(page).toHaveURL(new RegExp(`compareTo=${style.nativeSubmissionId}`));
       const comparison = page.getByTestId("report-comparison-content");
-      await expect(comparison).toContainText("1 of 1 current question matched the earlier version.");
+      await expect(comparison).toContainText(style.expectedCoverage);
       await expect(comparison.getByLabel("increase 10")).toBeVisible();
     }
+  });
+
+  test("CEO self access exchanges a real invited submission capability and revokes immediately", async ({ browser }) => {
+    test.skip(test.info().project.name !== "chromium", "Run the fixture workflow once through Chromium.");
+    const style = styles[0];
+    if (!style || !fixtureDatabase) throw new Error("Missing provisioned CEO fixture.");
+    const token = createCeoReportAccessToken({ focusCampaignId: style.currentCampaignId, invitationId: style.currentInvitationId, respondentId: style.currentRespondentId });
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await page.goto(`/assessments/self-report#t=${encodeURIComponent(token)}`);
+    await expect(page).toHaveURL(new RegExp(`${reportPath(style)}$`));
+    await expect.poll(() => new URL(page.url()).hash).toBe("");
+    const picker = page.getByLabel("Compare to previous assessment");
+    await expect(picker.locator(`option[value="${style.nativeSubmissionId}"]`)).toBeVisible();
+    await expect(picker.locator(`option[value="${style.otherOrganizationSubmissionId}"]`)).toHaveCount(0);
+    for (const denied of [
+      `/assessments/${style.currentCampaignId}/respondents/${style.nonCeoRespondentId}/report`,
+      `/assessments/${style.currentCampaignId}/report`,
+      "/portal/assessments/trends",
+      `/admin/assessments/campaigns/${style.currentCampaignId}`,
+      `/assessments/${style.currentCampaignId}/respondents/${style.currentRespondentId}-altered/report`,
+    ]) {
+      await expectDenied(page, denied);
+    }
+    await fixtureDatabase.assessmentCampaign.update({ where: { id: style.currentCampaignId }, data: { showResultsOnScreen: false, sendResultsToRespondent: false } });
+    await expectDenied(page, reportPath(style));
+    await fixtureDatabase.assessmentCampaign.update({ where: { id: style.currentCampaignId }, data: { showResultsOnScreen: true, sendResultsToRespondent: true } });
+    await fixtureDatabase.assessmentCampaignParticipant.updateMany({ where: { campaignId: style.currentCampaignId, respondentId: style.currentRespondentId }, data: { isCEO: false } });
+    await expectDenied(page, reportPath(style));
+    await fixtureDatabase.assessmentCampaignParticipant.updateMany({ where: { campaignId: style.currentCampaignId, respondentId: style.currentRespondentId }, data: { isCEO: true } });
+    await context.close();
+    const nonCeoToken = createCeoReportAccessToken({ focusCampaignId: style.currentCampaignId, invitationId: style.nonCeoInvitationId, respondentId: style.nonCeoRespondentId });
+    const nonCeoContext = await browser.newContext();
+    const nonCeoPage = await nonCeoContext.newPage();
+    await nonCeoPage.goto(`/assessments/self-report#t=${encodeURIComponent(nonCeoToken)}`);
+    await expect(nonCeoPage.getByText("This report link is no longer available.")).toBeVisible();
+    await nonCeoContext.close();
   });
 });

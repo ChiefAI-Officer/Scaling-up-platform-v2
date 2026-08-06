@@ -40,7 +40,22 @@ export function buildReportComparisonFixturePlan(env = process.env) {
       ["MODERN_DASHBOARD", "Modern Dashboard"],
     ],
     roles: ["current-ceo", "prior-native-ceo", "prior-imported-ceo", "non-ceo", "other-org-same-email"],
+    invitationRoles: ["current-ceo", "non-ceo", "native-prior", "imported-prior", "other-org"],
+    relationshipContract: {
+      everySubmissionHasInvitation: true,
+      otherOrganizationHasEligibleHistory: true,
+      currentCeoDisclosureEnabled: true,
+    },
   };
+}
+
+/** Raw tokens exist only in the disposable runner process; the database keeps SHA-256 hashes. */
+export function reportComparisonInvitationToken(identity, style, role) {
+  return `${identity.key}:${style}:${role}:invitation-token`;
+}
+
+function tokenHash(rawToken) {
+  return createHash("sha256").update(rawToken, "utf8").digest("hex");
 }
 
 function result(score) {
@@ -112,7 +127,7 @@ export async function provisionReportComparisonFixture({ env = process.env, crea
         tx.orgRespondent.create({ data: { organizationId: organization.id, teamId: team.id, email: plan.ceoEmail, normalizedEmail: plan.ceoEmail, firstName: "Imported", lastName: "CEO", dedupeSource: "external", dedupeValue: `${plan.key}:imported`, externalId: `${plan.key}:imported` } }),
         tx.orgRespondent.create({ data: { organizationId: organization.id, teamId: team.id, email: `non-ceo-${plan.ceoEmail}`, normalizedEmail: `non-ceo-${plan.ceoEmail}`, firstName: "Non", lastName: "CEO", dedupeSource: "external", dedupeValue: `${plan.key}:non-ceo`, externalId: `${plan.key}:non-ceo` } }),
       ]);
-      await tx.orgRespondent.create({ data: { organizationId: otherOrganization.id, email: plan.ceoEmail, normalizedEmail: plan.ceoEmail, firstName: "Other", lastName: "Organization", dedupeSource: "external", dedupeValue: `${plan.key}:other`, externalId: `${plan.key}:other` } });
+      const otherOrgSameEmail = await tx.orgRespondent.create({ data: { organizationId: otherOrganization.id, email: plan.ceoEmail, normalizedEmail: plan.ceoEmail, firstName: "Other", lastName: "Organization", dedupeSource: "external", dedupeValue: `${plan.key}:other`, externalId: `${plan.key}:other` } });
       const template = await tx.assessmentTemplate.upsert({
         where: { alias: plan.templateAlias },
         update: {},
@@ -134,20 +149,27 @@ export async function provisionReportComparisonFixture({ env = process.env, crea
         const currentCampaign = await tx.assessmentCampaign.create({ data: { templateId: template.id, versionId: version.id, organizationId: organization.id, language: "enUS", alias: `${plan.key}:${style}:current`, externalId: `${plan.key}:${style}:current`, name: `${label} current`, status: "CLOSED", accessMode: "INVITED", openAt: new Date("2026-01-01T00:00:00.000Z"), endMode: "OPEN_END", createdBy: admin.id, createdByCoachId: coach.id, reportStyle: style, reportStyleSource: "CAMPAIGN_OVERRIDE", showResultsOnScreen: true, sendResultsToRespondent: true } });
         const nativeCampaign = await tx.assessmentCampaign.create({ data: { templateId: template.id, versionId: version.id, organizationId: organization.id, language: "enUS", alias: `${plan.key}:${style}:native`, externalId: `${plan.key}:${style}:native`, name: `${label} native baseline`, status: "CLOSED", accessMode: "INVITED", openAt: new Date("2025-01-01T00:00:00.000Z"), endMode: "OPEN_END", createdBy: admin.id, createdByCoachId: coach.id, reportStyle: style, reportStyleSource: "CAMPAIGN_OVERRIDE" } });
         const importedCampaign = await tx.assessmentCampaign.create({ data: { templateId: template.id, versionId: version.id, organizationId: organization.id, language: "enUS", alias: `${plan.key}:${style}:imported`, externalId: `${plan.key}:${style}:imported`, name: `${label} imported baseline`, status: "CLOSED", accessMode: "INVITED", openAt: new Date("2024-01-01T00:00:00.000Z"), endMode: "OPEN_END", createdBy: admin.id, createdByCoachId: coach.id, reportStyle: style, reportStyleSource: "CAMPAIGN_OVERRIDE", importManifest: { fixture: true } } });
+        const otherOrgCampaign = await tx.assessmentCampaign.create({ data: { templateId: template.id, versionId: version.id, organizationId: otherOrganization.id, language: "enUS", alias: `${plan.key}:${style}:other-org`, externalId: `${plan.key}:${style}:other-org`, name: `${label} other organization baseline`, status: "CLOSED", accessMode: "INVITED", openAt: new Date("2025-06-01T00:00:00.000Z"), endMode: "OPEN_END", createdBy: admin.id, createdByCoachId: coach.id, reportStyle: style, reportStyleSource: "CAMPAIGN_OVERRIDE" } });
         await tx.assessmentCampaignParticipant.createMany({ data: [
           { campaignId: currentCampaign.id, respondentId: current.id, isCEO: true, teamPathAtAdd: [team.id], teamLabelsAtAdd: [team.name] },
           { campaignId: currentCampaign.id, respondentId: nonCeo.id, isCEO: false, teamPathAtAdd: [team.id], teamLabelsAtAdd: [team.name] },
           { campaignId: nativeCampaign.id, respondentId: nativePrior.id, isCEO: true, teamPathAtAdd: [team.id], teamLabelsAtAdd: [team.name] },
           { campaignId: importedCampaign.id, respondentId: importedPrior.id, isCEO: true, teamPathAtAdd: [team.id], teamLabelsAtAdd: [team.name] },
+          { campaignId: otherOrgCampaign.id, respondentId: otherOrgSameEmail.id, isCEO: true, teamPathAtAdd: [], teamLabelsAtAdd: [] },
         ] });
-        await tx.assessmentInvitation.createMany({ data: [
-          { campaignId: currentCampaign.id, respondentId: current.id, tokenHash: createHash("sha256").update(`${plan.key}:${style}:ceo`).digest("hex"), expiresAt: new Date("2030-01-01T00:00:00.000Z") },
-          { campaignId: currentCampaign.id, respondentId: nonCeo.id, tokenHash: createHash("sha256").update(`${plan.key}:${style}:non-ceo`).digest("hex"), expiresAt: new Date("2030-01-01T00:00:00.000Z") },
-        ] });
+        const expiresAt = new Date("2030-01-01T00:00:00.000Z");
+        const invitation = async (campaignId, respondentId, role) => tx.assessmentInvitation.create({ data: {
+          campaignId, respondentId, tokenHash: tokenHash(reportComparisonInvitationToken(plan, style, role)), status: "SUBMITTED", expiresAt, submittedAt: new Date("2026-02-01T00:00:00.000Z"),
+        } });
+        const [currentInvitation, nonCeoInvitation, nativeInvitation, importedInvitation, otherOrgInvitation] = await Promise.all([
+          invitation(currentCampaign.id, current.id, "current-ceo"), invitation(currentCampaign.id, nonCeo.id, "non-ceo"), invitation(nativeCampaign.id, nativePrior.id, "native-prior"), invitation(importedCampaign.id, importedPrior.id, "imported-prior"), invitation(otherOrgCampaign.id, otherOrgSameEmail.id, "other-org"),
+        ]);
         await tx.assessmentSubmission.createMany({ data: [
-          { campaignId: currentCampaign.id, respondentId: current.id, submittedAt: new Date("2026-02-01T00:00:00.000Z"), answers: [], result: result(80) },
-          { campaignId: nativeCampaign.id, respondentId: nativePrior.id, submittedAt: new Date("2025-02-01T00:00:00.000Z"), answers: [], result: result(70) },
-          { campaignId: importedCampaign.id, respondentId: importedPrior.id, submittedAt: new Date("2024-02-01T00:00:00.000Z"), answers: [], result: result(60) },
+          { campaignId: currentCampaign.id, respondentId: current.id, invitationId: currentInvitation.id, submittedAt: new Date("2026-02-01T00:00:00.000Z"), answers: [], result: result(80) },
+          { campaignId: currentCampaign.id, respondentId: nonCeo.id, invitationId: nonCeoInvitation.id, submittedAt: new Date("2026-02-01T00:00:00.000Z"), answers: [], result: result(65) },
+          { campaignId: nativeCampaign.id, respondentId: nativePrior.id, invitationId: nativeInvitation.id, submittedAt: new Date("2025-02-01T00:00:00.000Z"), answers: [], result: result(70) },
+          { campaignId: importedCampaign.id, respondentId: importedPrior.id, invitationId: importedInvitation.id, submittedAt: new Date("2024-02-01T00:00:00.000Z"), answers: [], result: result(60) },
+          { campaignId: otherOrgCampaign.id, respondentId: otherOrgSameEmail.id, invitationId: otherOrgInvitation.id, submittedAt: new Date("2025-06-01T00:00:00.000Z"), answers: [], result: result(75) },
         ] });
       }
     });

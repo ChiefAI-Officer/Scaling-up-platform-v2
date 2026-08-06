@@ -21,6 +21,8 @@ function plan() {
     templateAlias: string;
     styles: Array<[string, string]>;
     roles: string[];
+    invitationRoles: string[];
+    relationshipContract: Record<string, boolean>;
   };
 }
 
@@ -43,5 +45,13 @@ describe("report-comparison fixture provisioner contract", () => {
     expect(fixture.roles).toEqual(expect.arrayContaining([
       "current-ceo", "prior-native-ceo", "prior-imported-ceo", "non-ceo", "other-org-same-email",
     ]));
+    expect(fixture.invitationRoles).toEqual(expect.arrayContaining([
+      "current-ceo", "non-ceo", "native-prior", "imported-prior", "other-org",
+    ]));
+    expect(fixture.relationshipContract).toEqual({
+      everySubmissionHasInvitation: true,
+      otherOrganizationHasEligibleHistory: true,
+      currentCeoDisclosureEnabled: true,
+    });
   });
 });
