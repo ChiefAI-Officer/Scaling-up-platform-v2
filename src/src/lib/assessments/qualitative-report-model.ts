@@ -36,6 +36,8 @@
  */
 
 import { stripLegacyDecimalSuffix } from "@/lib/assessments/question-label";
+import type { FindingsSection } from "@/lib/assessments/findings-section-model";
+import type { IndividualReportBlock } from "@/lib/assessments/individual-report-presentation";
 
 // ─── Public types ──────────────────────────────────────────────────────────
 
@@ -539,4 +541,144 @@ export function buildQualitativeModel(
   }
 
   return model;
+}
+
+function copyPresentationValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(copyPresentationValue);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, child]) => [
+        key,
+        copyPresentationValue(child),
+      ]),
+    );
+  }
+  return value;
+}
+
+function presentationMetricFor(item: QualItem) {
+  return {
+    stableKey: item.stableKey,
+    label: item.label,
+    type: item.type,
+    value: copyPresentationValue(item.value),
+    valueLabel: qualitativeAnswer(item),
+    ...(typeof item.min === "number" ? { min: item.min } : {}),
+    ...(typeof item.max === "number" ? { max: item.max } : {}),
+  };
+}
+
+function qualitativeAnswer(item: QualItem): string {
+  if (item.displayValues) return item.displayValues.join(", ");
+  if (Array.isArray(item.value)) return item.value.map(String).join(", ");
+  if (item.value === null || item.value === undefined) return "";
+  return String(item.value);
+}
+
+/**
+ * Lossless semantic adapter over the canonical qualitative model. Section and
+ * item classification has already happened in buildQualitativeModel.
+ */
+export function buildQualitativeReportPresentationBlocks(
+  model: QualitativeModel,
+  findings: FindingsSection | null = null,
+): IndividualReportBlock[] {
+  const blocks: IndividualReportBlock[] = [];
+
+  for (const section of model.sections) {
+    const description = section.description?.trim()
+      ? { description: section.description }
+      : {};
+
+    if (section.stableKey === "__additional_responses__") {
+      const responses = section.items.map((item) => ({
+        label: item.label,
+        answer: qualitativeAnswer(item),
+      }));
+      if (responses.length > 0) {
+        blocks.push({ kind: "additional-response", responses });
+      }
+      continue;
+    }
+
+    const themeItems = section.items.filter(
+      (item) => item.type === "MULTI_CHOICE" && Array.isArray(item.value),
+    );
+    if (themeItems.length > 0) {
+      blocks.push({
+        kind: "theme",
+        stableKey: section.stableKey,
+        label: section.name,
+        ...description,
+        items: themeItems.map((item) => ({
+          stableKey: item.stableKey,
+          label: item.label,
+          values: (item.value as unknown[]).map(copyPresentationValue),
+          chosenLabels: [...(item.displayValues ?? (item.value as unknown[]).map(String))],
+        })),
+      });
+    }
+
+    const scaleItems = section.items.filter(
+      (item) =>
+        item.type === "SLIDER_LIKERT" ||
+        (section.kind === "rating" && typeof item.value === "number"),
+    );
+    if (scaleItems.length > 0) {
+      blocks.push({
+        kind: "qualitative-scale",
+        stableKey: section.stableKey,
+        label: section.name,
+        ...description,
+        items: scaleItems.map(presentationMetricFor),
+      });
+    }
+
+    const metricItems = section.items.filter(
+      (item) =>
+        !themeItems.includes(item) &&
+        !scaleItems.includes(item) &&
+        (section.kind === "metric-table" || typeof item.value === "number"),
+    );
+    if (metricItems.length > 0) {
+      blocks.push({
+        kind: "metric-group",
+        stableKey: section.stableKey,
+        label: section.name,
+        role: "qualitative",
+        ...description,
+        metrics: metricItems.map(presentationMetricFor),
+      });
+    }
+
+    const semanticItems = new Set([...themeItems, ...scaleItems, ...metricItems]);
+    const narrativeItems = section.items.filter((item) => !semanticItems.has(item));
+    if (narrativeItems.length > 0) {
+      blocks.push({
+        kind: "narrative-response",
+        stableKey: section.stableKey,
+        label: section.name,
+        ...description,
+        responses: narrativeItems.map((item) => ({
+          stableKey: item.stableKey,
+          label: item.label,
+          answer: qualitativeAnswer(item),
+        })),
+      });
+    }
+  }
+
+  if (findings && findings.groups.length > 0) {
+    blocks.push({
+      kind: "finding",
+      eyebrow: findings.eyebrow,
+      label: findings.title,
+      groups: findings.groups.map((group) => ({
+        sectionName: group.sectionName,
+        items: group.items.map((item) => ({ ...item })),
+      })),
+    });
+  }
+
+  return blocks;
 }
