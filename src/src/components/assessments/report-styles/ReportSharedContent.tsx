@@ -114,21 +114,19 @@ export function DecisionLedger({ view }: { view: ScoredReportViewModel }) {
 export function ScoreMatrix({ view }: { view: ScoredReportViewModel }) {
   return (
     <section aria-labelledby="report-style-scorecard-title">
-      <h2 id="report-style-scorecard-title">Score and action matrix</h2>
+      <h2 id="report-style-scorecard-title">Decision score matrix</h2>
       <table>
         <thead>
-          <tr><th>Decision</th><th>Score</th><th>Status</th><th>Action</th></tr>
+          <tr><th>Decision</th><th>Score</th><th>Status</th></tr>
         </thead>
         <tbody>
           {view.decisions.map((decision) => {
             const status = performanceStatus(decision.averageAcrossSections);
-            const actionPriority = view.insights.priorities.some((item) => item.stableKey === decision.stableKey);
             return (
-              <tr className="report-score-row" data-action-priority={actionPriority ? "priority" : "maintain"} data-decision={decision.stableKey} data-performance-status={status.key} data-testid={`report-style-matrix-${decision.stableKey}`} key={decision.stableKey}>
+              <tr className="report-score-row" data-decision={decision.stableKey} data-performance-status={status.key} data-testid={`report-style-matrix-${decision.stableKey}`} key={decision.stableKey}>
                 <th scope="row">{decision.label}</th>
                 <td>{decision.averageAcrossSectionsLabel}</td>
                 <td><span className={`report-status report-status--${status.key}`}>{status.label}</span></td>
-                <td>{actionPriority ? "Priority action" : "Maintain momentum"}</td>
               </tr>
             );
           })}

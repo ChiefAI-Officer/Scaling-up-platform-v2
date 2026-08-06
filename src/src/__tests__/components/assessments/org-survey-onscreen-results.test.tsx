@@ -59,8 +59,14 @@ const REPORT = {
   degraded: false,
 } as never;
 
-/** Install a fetch that answers /me with the given status. */
-function installFetch(meStatus: number) {
+/** Install a fetch that answers /me with the given status and server decisions. */
+function installFetch(
+  meStatus: number,
+  decisions: {
+    reportStylesAvailable?: boolean;
+    reportFindingsAvailable?: boolean;
+  } = {},
+) {
   global.fetch = jest.fn(async (input: RequestInfo | URL) => {
     const url = typeof input === "string" ? input : String(input);
     if (url.includes("/me")) {
@@ -88,7 +94,7 @@ function installFetch(meStatus: number) {
           error: "gate",
           // The real route echoes the owning invitation on its 410 so the client
           // can prove the stored slot belongs to the cookie holder.
-          ...(meStatus === 410 ? { respondentKey: KEY } : {}),
+          ...(meStatus === 410 ? { respondentKey: KEY, ...decisions } : {}),
         }),
       } as unknown as Response;
     }
@@ -186,6 +192,60 @@ describe("rehydrate authorization (the /me 410 gate)", () => {
 });
 
 describe("the rendered report", () => {
+  it.each([
+    ["EXECUTIVE_BOARDROOM", "executive-boardroom-report"],
+    ["MODERN_DASHBOARD", "modern-dashboard-report"],
+  ] as const)(
+    "refresh restores the %s renderer from the current /me availability decision",
+    async (reportStyle, rendererTestId) => {
+      writeOnScreenResult(
+        ALIAS,
+        {
+          ...(REPORT as unknown as Record<string, unknown>),
+          templateAlias: "scaling-up-full",
+          reportStyle,
+        } as never,
+        KEY,
+      );
+      installFetch(410, {
+        reportStylesAvailable: true,
+        reportFindingsAvailable: true,
+      });
+
+      render(<OrgSurveyClient campaignAlias={ALIAS} />);
+
+      await waitFor(() =>
+        expect(screen.getByTestId(rendererTestId)).toBeInTheDocument(),
+      );
+    },
+  );
+
+  it.each([
+    ["unavailable", {}],
+    ["killed", { reportStylesAvailable: false }],
+  ] as const)(
+    "refresh fails closed to Classic when report styles are %s",
+    async (_availability, decisions) => {
+      writeOnScreenResult(
+        ALIAS,
+        {
+          ...(REPORT as unknown as Record<string, unknown>),
+          templateAlias: "scaling-up-full",
+          reportStyle: "MODERN_DASHBOARD",
+        } as never,
+        KEY,
+      );
+      installFetch(410, decisions);
+
+      render(<OrgSurveyClient campaignAlias={ALIAS} />);
+
+      await waitFor(() =>
+        expect(screen.getByTestId("report-cover")).toBeInTheDocument(),
+      );
+      expect(screen.queryByTestId("modern-dashboard-report")).toBeNull();
+    },
+  );
+
   it("fails closed to Classic for a revived report with no server availability decision", async () => {
     writeOnScreenResult(
       ALIAS,

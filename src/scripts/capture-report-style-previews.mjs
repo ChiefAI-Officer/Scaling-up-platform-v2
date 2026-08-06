@@ -5,9 +5,8 @@
  *
  * Run against a local application with WAVE_REPORT_STYLES_ENABLED=1. The
  * route remains admin-protected, so this signs in through the normal login
- * form using E2E_ADMIN_EMAIL/E2E_ADMIN_PASSWORD (or the local demo defaults).
+ * form using explicit E2E_ADMIN_EMAIL/E2E_ADMIN_PASSWORD values.
  */
-import { chromium } from "playwright";
 import { execFileSync } from "node:child_process";
 import { mkdtemp, mkdir, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -17,8 +16,6 @@ const appRoot = resolve(import.meta.dirname, "..");
 const previewRoot = join(appRoot, "public", "report-style-previews");
 const registryPath = join(appRoot, "src", "lib", "assessments", "report-style-registry.ts");
 const baseUrl = (process.env.REPORT_STYLE_PREVIEW_BASE_URL || "http://127.0.0.1:3000").replace(/\/$/, "");
-const email = process.env.E2E_ADMIN_EMAIL || "jverdun@scalingup.com";
-const password = process.env.E2E_ADMIN_PASSWORD || "demo123";
 
 const manifest = Object.freeze([
   { style: "CLASSIC", rendererKey: "classic", page: "cover", width: 794 },
@@ -73,15 +70,26 @@ function assertSinglePagePdf(path, format) {
   );
 }
 
-async function login(page) {
+async function login(page, credentials) {
   await page.goto(`${baseUrl}/login`, { waitUntil: "networkidle" });
-  await page.getByLabel(/email/i).fill(email);
-  await page.getByLabel(/password/i).fill(password);
+  await page.getByLabel(/email/i).fill(credentials.email);
+  await page.getByLabel(/password/i).fill(credentials.password);
   await page.getByRole("button", { name: /sign in/i }).click();
   await page.waitForURL((url) => !url.pathname.startsWith("/login"), { timeout: 15_000 });
 }
 
 async function main() {
+  const email = process.env.E2E_ADMIN_EMAIL?.trim();
+  const password = process.env.E2E_ADMIN_PASSWORD;
+  if (!email || !password) {
+    process.stderr.write(
+      "Report style preview capture requires explicit admin credentials.\n",
+    );
+    process.exitCode = 1;
+    return;
+  }
+
+  const { chromium } = await import("playwright");
   await assertRegistryManifest();
   const temporaryRoot = await mkdtemp(join(tmpdir(), "report-style-preview-"));
   const browser = await chromium.launch({ headless: true });
@@ -89,7 +97,7 @@ async function main() {
   try {
     const context = await browser.newContext({ deviceScaleFactor: 1, viewport: { width: 1000, height: 1300 } });
     const page = await context.newPage();
-    await login(page);
+    await login(page, { email, password });
 
     for (const entry of manifest) {
       const params = new URLSearchParams({ style: entry.style, page: entry.page, capture: "1" });

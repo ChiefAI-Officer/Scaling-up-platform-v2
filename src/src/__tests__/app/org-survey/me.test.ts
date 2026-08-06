@@ -49,6 +49,17 @@ jest.mock("@/lib/db", () => ({
 import { GET } from "@/app/(public)/org-survey/[campaignAlias]/me/route";
 import { db } from "@/lib/db";
 
+const originalReportStylesCanary = process.env.WAVE_REPORT_STYLES_CANARY;
+const originalReportStylesEnabled = process.env.WAVE_REPORT_STYLES_ENABLED;
+const originalReportStylesKill = process.env.WAVE_REPORT_STYLES_KILL;
+const originalFindingsEnabled = process.env.WAVE_U_FINDINGS_ENABLED;
+const originalFindingsKill = process.env.WAVE_U_FINDINGS_KILL;
+
+function restoreEnv(name: string, value: string | undefined) {
+  if (value === undefined) delete process.env[name];
+  else process.env[name] = value;
+}
+
 function req(): Request {
   return new Request("http://localhost/org-survey/demo/me", { method: "GET" });
 }
@@ -61,6 +72,19 @@ beforeEach(() => {
   sessionState.invitationId = undefined;
   sessionState.campaignAlias = undefined;
   sessionState.expiresAt = undefined;
+  delete process.env.WAVE_REPORT_STYLES_CANARY;
+  delete process.env.WAVE_REPORT_STYLES_ENABLED;
+  delete process.env.WAVE_REPORT_STYLES_KILL;
+  delete process.env.WAVE_U_FINDINGS_ENABLED;
+  delete process.env.WAVE_U_FINDINGS_KILL;
+});
+
+afterAll(() => {
+  restoreEnv("WAVE_REPORT_STYLES_CANARY", originalReportStylesCanary);
+  restoreEnv("WAVE_REPORT_STYLES_ENABLED", originalReportStylesEnabled);
+  restoreEnv("WAVE_REPORT_STYLES_KILL", originalReportStylesKill);
+  restoreEnv("WAVE_U_FINDINGS_ENABLED", originalFindingsEnabled);
+  restoreEnv("WAVE_U_FINDINGS_KILL", originalFindingsKill);
 });
 
 describe("GET me", () => {
@@ -135,6 +159,42 @@ describe("GET me", () => {
     expect(res.status).toBe(410);
     const body = await res.json();
     expect(body.respondentKey).toBe("inv-1");
+  });
+
+  it("410 returns current server-authoritative report decisions after ownership is proven", async () => {
+    process.env.WAVE_REPORT_STYLES_CANARY = "campaign-1";
+    process.env.WAVE_U_FINDINGS_ENABLED = "1";
+    sessionState.invitationId = "inv-1";
+    sessionState.campaignAlias = "demo";
+    (db.assessmentInvitation.findUnique as jest.Mock).mockResolvedValue({
+      id: "inv-1",
+      status: "SUBMITTED",
+      revokedAt: null,
+      expiresAt: new Date(Date.now() + 86_400_000),
+      campaign: {
+        id: "campaign-1",
+        templateId: "template-1",
+        alias: "demo",
+        deletedAt: null,
+        status: "ACTIVE",
+        openAt: new Date(Date.now() - 86_400_000),
+        closeAt: null,
+        template: { alias: "scaling-up-full" },
+        organization: { name: "Acme" },
+        version: { questions: [], sections: [] },
+      },
+    });
+
+    const res = await GET(req() as never, aliasParams("demo"));
+
+    expect(res.status).toBe(410);
+    await expect(res.json()).resolves.toEqual({
+      success: false,
+      error: "This survey is no longer available.",
+      respondentKey: "inv-1",
+      reportStylesAvailable: true,
+      reportFindingsAvailable: true,
+    });
   });
 
   it("returns sections + questions when lifecycle passes", async () => {

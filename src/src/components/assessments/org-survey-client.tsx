@@ -275,6 +275,8 @@ export function OrgSurveyClient({
             // Safe to consume: readError returns a constant for 410.
             const gateBody = (await meRes.json().catch(() => null)) as {
               respondentKey?: unknown;
+              reportStylesAvailable?: unknown;
+              reportFindingsAvailable?: unknown;
             } | null;
             const ownerKey =
               typeof gateBody?.respondentKey === "string"
@@ -282,7 +284,16 @@ export function OrgSurveyClient({
                 : "";
             const stored = readOnScreenResult(campaignAlias, ownerKey);
             if (stored) {
-              if (!cancelled) setPhase({ kind: "results", report: stored });
+              if (!cancelled) {
+                setPhase({
+                  kind: "results",
+                  report: stored,
+                  reportStylesAvailable:
+                    gateBody?.reportStylesAvailable === true,
+                  reportFindingsAvailable:
+                    gateBody?.reportFindingsAvailable === true,
+                });
+              }
               return;
             }
           } else if (meRes.status === 401 || meRes.status === 404) {

@@ -60,13 +60,13 @@ read-only connection or the disposable fixture database) are:
 ```sql
 -- The migration/default inventory. No respondent data is selected.
 SELECT "defaultReportStyle", count(*)
-FROM "AssessmentTemplate"
+FROM "assessment_templates"
 WHERE "deletedAt" IS NULL
 GROUP BY "defaultReportStyle"
 ORDER BY "defaultReportStyle";
 
 SELECT "reportStyle", "reportStyleSource", count(*)
-FROM "AssessmentCampaign"
+FROM "assessment_campaigns"
 WHERE "deletedAt" IS NULL
 GROUP BY "reportStyle", "reportStyleSource"
 ORDER BY "reportStyle", "reportStyleSource";
@@ -84,18 +84,24 @@ SELECT
   ) AS unexpected_locks_without_submissions
 FROM (
   SELECT
-    c.id,
+    c."id",
     c."reportStyleLockedAt",
     MIN(s."submittedAt") AS "firstSubmittedAt"
-  FROM "AssessmentCampaign" c
-  LEFT JOIN "AssessmentSubmission" s ON s."campaignId" = c.id
+  FROM "assessment_campaigns" c
+  LEFT JOIN "assessment_submissions" s ON s."campaignId" = c."id"
   WHERE c."deletedAt" IS NULL
-  GROUP BY c.id, c."reportStyleLockedAt"
+  GROUP BY c."id", c."reportStyleLockedAt"
 ) campaign_lock_state;
 ```
 
 Both lock counts must be zero before claiming a clean rollout. If either is
 nonzero, stop and investigate; do not repair style data ad hoc.
+
+These identifiers were mechanically checked against the Prisma `@@map`
+definitions and the assessment/report-style migration SQL. The queries were
+not executed while preparing this runbook because no disposable PostgreSQL
+fixture was available; execution remains required during the guarded
+authoritative acceptance workflow below.
 
 ## Canary sequence
 

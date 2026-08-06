@@ -250,9 +250,9 @@ describe("curated report renderers", () => {
         const cashMatrix = report.getByTestId("report-style-matrix-cash");
         expect(cashMatrix).toHaveAttribute("data-decision", "cash");
         expect(cashMatrix).toHaveAttribute("data-performance-status", "watch-area");
-        expect(cashMatrix).toHaveAttribute("data-action-priority", "priority");
         expect(cashMatrix).toHaveTextContent("Watch area");
-        expect(cashMatrix).toHaveTextContent("Priority action");
+        expect(cashMatrix).not.toHaveAttribute("data-action-priority");
+        expect(cashMatrix).not.toHaveTextContent(/Priority action|Maintain momentum/);
       }
       for (const section of completeView.sections) {
         const sectionNode = report.getByTestId(`report-style-section-${section.stableKey}`);
@@ -271,6 +271,40 @@ describe("curated report renderers", () => {
       expect(report.getByTestId("report-style-scorecard-you")).toHaveAttribute("data-performance-status", "strength");
       expect(report.getByTestId("report-style-scorecard-cash")).toHaveAttribute("data-performance-status", "watch-area");
       expect(report.getByText("Resolve the frozen People finding.").closest(".report-action-group")).toHaveAttribute("data-action-priority", "priority");
+    }
+  });
+
+  it("renders only canonical recommendation copy and never renderer-authored action advice", () => {
+    const canonicalAdvice = "Use the frozen recommendation exactly as written.";
+    const view: ScoredReportViewModel = {
+      ...REPORT_STYLE_PREVIEW_FIXTURE,
+      recommendations: [
+        {
+          sectionStableKey: "cash",
+          label: "Cash",
+          items: [{ stableKey: "cash-advice", text: canonicalAdvice }],
+        },
+      ],
+    };
+
+    for (const Renderer of [
+      ExecutiveBoardroomReport,
+      ModernDashboardReport,
+    ]) {
+      const { container, unmount } = render(<Renderer view={view} />);
+      const report = within(container);
+      expect(report.getByText(canonicalAdvice)).toBeInTheDocument();
+      expect(report.queryAllByText("Maintain momentum")).toHaveLength(0);
+
+      for (const decision of view.decisions) {
+        const matrixRow = report.queryByTestId(
+          `report-style-matrix-${decision.stableKey}`,
+        );
+        if (matrixRow) {
+          expect(matrixRow).not.toHaveTextContent(/Priority action|Maintain momentum/);
+        }
+      }
+      unmount();
     }
   });
 
