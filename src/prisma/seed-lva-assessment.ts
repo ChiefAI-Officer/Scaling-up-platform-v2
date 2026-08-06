@@ -113,8 +113,12 @@ const SCORING_CONFIG = {
 // index 34). Both are intentional — they reference the same factor but the
 // xlsx stores distinct strings in the two locations. We mirror the source.
 //
-// Deliberate departure: "Leadership team" is sentence-cased in BOTH lists
-// (xlsx has "Leadership Team") per Jeff item #14, 2026-07-02. Not drift.
+// Deliberate departures:
+// - "Leadership team" is sentence-cased in BOTH lists (xlsx has
+//   "Leadership Team") per Jeff item #14, 2026-07-02.
+// - "Growth Financing" is clarified as "Access to financing for growth" in
+//   BOTH lists per Jeff July 10 row #42, 2026-08-05.
+// Stable keys and factor order remain source-compatible.
 
 const FACTORS_FOR_MATRIX = [
   "Recruitment of new employees",
@@ -132,7 +136,7 @@ const FACTORS_FOR_MATRIX = [
   "Innovation",
   "Financial processes",
   "Cash",
-  "Growth Financing",
+  "Access to financing for growth",
 ] as const;
 
 const FACTORS_FOR_CHECKBOX = [
@@ -151,7 +155,7 @@ const FACTORS_FOR_CHECKBOX = [
   "Innovation",
   "Financial processes",
   "Cash",
-  "Growth Financing",
+  "Access to financing for growth",
 ] as const;
 
 // Stable-key slugs for the 16 factors (used in S5 "why" optional questions).
