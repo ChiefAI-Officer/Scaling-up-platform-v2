@@ -170,6 +170,47 @@ describe("SimplifiedAssessmentTemplateForm", () => {
     );
   });
 
+  it("clears an automatic Internal ID validation error when a new name generates an ID", async () => {
+    render(<SimplifiedAssessmentTemplateForm />);
+
+    enterName("!!!");
+    fireEvent.click(screen.getByRole("button", { name: "Create and start building" }));
+
+    const internalId = await screen.findByLabelText("Internal ID");
+    expect(internalId).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByText("Enter an Internal ID.")).toBeInTheDocument();
+
+    enterName("Team Health");
+
+    expect(internalId).toHaveValue("team-health");
+    expect(internalId).toHaveAttribute("aria-invalid", "false");
+    expect(screen.queryByText("Enter an Internal ID.")).not.toBeInTheDocument();
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("clears an automatic collision error when a renamed assessment generates a new ID", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse(409, {}));
+    render(<SimplifiedAssessmentTemplateForm />);
+
+    enterName("Team Health");
+    fireEvent.click(screen.getByRole("button", { name: "Create and start building" }));
+
+    const internalId = await screen.findByLabelText("Internal ID");
+    expect(internalId).toHaveAttribute("aria-invalid", "true");
+    expect(
+      screen.getByText("That Internal ID is already in use. Choose another one."),
+    ).toBeInTheDocument();
+
+    enterName("Leadership Health");
+
+    expect(internalId).toHaveValue("leadership-health");
+    expect(internalId).toHaveAttribute("aria-invalid", "false");
+    expect(
+      screen.queryByText("That Internal ID is already in use. Choose another one."),
+    ).not.toBeInTheDocument();
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
   it("rejects a blank name locally and associates the error with the field", () => {
     render(<SimplifiedAssessmentTemplateForm />);
 

@@ -133,6 +133,7 @@ export function SimplifiedAssessmentTemplateForm() {
           onChange={(event) => {
             setName(event.target.value);
             setNameError("");
+            if (!internalIdEdited) setInternalIdError("");
           }}
           required
           maxLength={200}

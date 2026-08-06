@@ -337,7 +337,7 @@ function TierTable({
                     aria-label={
                       plainLanguageEnabled
                         ? `${FRIENDLY_SCORING_COPY.startsAt} for ${
-                            tier.label || `tier ${idx + 1}`
+                            tier.label.trim() || `tier ${idx + 1}`
                           }`
                         : undefined
                     }
@@ -361,7 +361,7 @@ function TierTable({
                     aria-label={
                       plainLanguageEnabled
                         ? `${FRIENDLY_SCORING_COPY.endsAt} for ${
-                            tier.label || `tier ${idx + 1}`
+                            tier.label.trim() || `tier ${idx + 1}`
                           }`
                         : undefined
                     }
@@ -404,7 +404,7 @@ function TierTable({
                     aria-label={
                       plainLanguageEnabled
                         ? `${FRIENDLY_SCORING_COPY.messageShown} for ${
-                            tier.label || `tier ${idx + 1}`
+                            tier.label.trim() || `tier ${idx + 1}`
                           }`
                         : undefined
                     }

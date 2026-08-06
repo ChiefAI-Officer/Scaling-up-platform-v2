@@ -174,6 +174,35 @@ describe("ScoringTiersTab — F4 (Checkpoint 3)", () => {
       expect(screen.getAllByLabelText("Message shown for Critical")).not.toHaveLength(0);
     });
 
+    it("falls back to the tier number for whitespace-only result names without trimming the stored label", () => {
+      function StatefulScoringTiersTab() {
+        const [scoringConfig, setScoringConfig] = React.useState(
+          rockefellerScoringConfig,
+        );
+
+        return (
+          <ScoringTiersTab
+            {...makeProps({
+              scoringConfig,
+              onScoringConfigChange: setScoringConfig,
+            })}
+            plainLanguageEnabled
+          />
+        );
+      }
+
+      render(<StatefulScoringTiersTab />);
+
+      fireEvent.change(screen.getByLabelText("Result name for tier 1"), {
+        target: { value: "   " },
+      });
+
+      expect(screen.getByLabelText("Result name for tier 1")).toHaveValue("   ");
+      expect(screen.getByLabelText("Starts at for tier 1")).toBeInTheDocument();
+      expect(screen.getByLabelText("Ends at for tier 1")).toBeInTheDocument();
+      expect(screen.getByLabelText("Message shown for tier 1")).toBeInTheDocument();
+    });
+
     it("formats local range validation without exposing stored field names", () => {
       const broken = {
         ...rockefellerScoringConfig,
