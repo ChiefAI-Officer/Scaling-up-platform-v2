@@ -2214,3 +2214,84 @@
   margin: .35rem 0 0 .45rem;
   padding: .15rem .45rem;
 }
+
+/* ── Report-native comparison facts (Wave RC) ───────────────────────────── */
+/* The shared semantic table deliberately follows the Classic report's quiet
+   purple-and-ink language; Executive and Dashboard reinterpret only its
+   materials below, never the frozen facts or table semantics. */
+.su-public-brand .su-report-comparison-cover-subtitle {
+  margin: 10px 0 0;
+  color: #f4eafb;
+  font-size: 14px;
+  font-weight: 700;
+}
+.su-public-brand .su-report-comparison {
+  margin: 36px 60px;
+  padding: 26px 28px;
+  border: 1px solid #e4dcf0;
+  border-top: 5px solid #522583;
+  background: #fcfbfe;
+}
+.su-public-brand .su-report-comparison-eyebrow {
+  color: #6b6480;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+.su-public-brand .su-report-comparison h2 { margin: 4px 0 8px; }
+.su-public-brand .su-report-comparison h3 {
+  color: #522583;
+  font-size: 13px;
+  letter-spacing: .06em;
+  margin: 24px 0 7px;
+  text-transform: uppercase;
+}
+.su-public-brand .su-report-comparison-coverage {
+  max-width: 66ch;
+  margin: 0;
+  color: #4b4359;
+  font-size: 13px;
+}
+.su-public-brand .su-report-comparison table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.su-public-brand .su-report-comparison th,
+.su-public-brand .su-report-comparison td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #e8e4f0;
+  text-align: left;
+  vertical-align: top;
+}
+.su-public-brand .su-report-comparison thead th {
+  color: #6b6480;
+  font-size: 10px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.su-public-brand .su-report-comparison tbody th { color: #1a1322; }
+.su-public-brand .su-report-comparison-status {
+  display: block;
+  margin-top: 3px;
+  color: #6b6480;
+  font-size: 11px;
+  font-weight: 400;
+}
+
+@media (max-width: 640px) {
+  .su-public-brand .su-report-comparison { margin: 24px 16px; padding: 20px 16px; overflow-x: auto; }
+  .su-public-brand .su-report-comparison table { min-width: 32rem; }
+}
+
+@media print {
+  .su-report-comparison-controls { display: none !important; }
+  .su-report-comparison,
+  .su-report-comparison-row,
+  .su-report-comparison-section {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .su-report-comparison thead { display: table-header-group; }
+}

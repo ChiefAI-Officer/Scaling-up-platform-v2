@@ -13,6 +13,7 @@ import { ModernDashboardReport } from "@/components/assessments/report-styles/Mo
 import type { IndividualReportPresentation } from "@/lib/assessments/individual-report-presentation";
 import { buildReportStylePreviewReport } from "@/lib/assessments/report-style-preview-fixture";
 import type { RespondentReport } from "@/lib/assessments/respondent-report";
+import type { ReportComparisonModel } from "@/lib/assessments/report-comparison-model";
 import type { ScoreResult } from "@/lib/assessments/scoring";
 
 const identity = {
@@ -311,6 +312,54 @@ function scalingUpFullReport(reportStyle: string): RespondentReport {
 }
 
 describe("adaptive alternate report renderers", () => {
+  it("renders the same frozen comparison facts in every launched report style without screen controls", () => {
+    const comparison: ReportComparisonModel = {
+      baseline: {
+        submissionId: "prior-submission",
+        campaignId: "prior-campaign",
+        campaignLabel: "Q1 2025",
+        submittedAt: new Date("2025-03-31T12:00:00.000Z"),
+        versionId: "previous-version",
+        versionNumber: 1,
+        isImported: false,
+      },
+      sameVersion: false,
+      overall: { current: 72, previous: 64, delta: null, status: "different-version" },
+      domains: { people: { current: 7, previous: 6, delta: null, status: "different-version" } },
+      sections: { people: { current: 7, previous: 6, delta: null, status: "different-version" } },
+      questions: { q1: { current: 8, previous: 5, delta: 3, status: "comparable" } },
+      coverage: {
+        currentQuestionCount: 1,
+        matchedQuestionCount: 1,
+        unmatchedCurrentCount: 0,
+        baselineOnlyCount: 0,
+      },
+    };
+
+    for (const style of ["CLASSIC", "EXECUTIVE_BOARDROOM", "MODERN_DASHBOARD"] as const) {
+      const { container, unmount } = render(
+        <BrandedReport
+          report={scalingUpFullReport(style)}
+          reportStylesAvailable
+          comparison={comparison}
+        />,
+      );
+      const report = within(container);
+      const content = report.getByTestId("report-comparison-content");
+      const compared = within(content);
+
+      expect(report.getByText("Compared with Q1 2025 · submitted Mar 31, 2025")).toBeInTheDocument();
+      expect(compared.getByText("ScaleUp score")).toBeInTheDocument();
+      expect(compared.getAllByText(/people/i).length).toBeGreaterThan(0);
+      expect(compared.getByText("q1")).toBeInTheDocument();
+      expect(compared.getByLabelText("increase 3")).toHaveTextContent("▲ +3");
+      expect(compared.getAllByLabelText("Different version").length).toBeGreaterThan(0);
+      expect(compared.getByText("1 of 1 current question matched the earlier version.")).toBeInTheDocument();
+      expect(container.querySelector(".su-report-comparison-controls")).not.toBeInTheDocument();
+      unmount();
+    }
+  });
+
   it.each(renderers)(
     "%s keeps internal provenance out of visible output and renders optional identity metadata without orphan separators",
     (_, Renderer) => {

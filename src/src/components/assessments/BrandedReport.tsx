@@ -58,6 +58,10 @@ import {
 import { isReportStyleKey } from "@/lib/assessments/report-style-registry";
 import { ExecutiveBoardroomReport } from "@/components/assessments/report-styles/ExecutiveBoardroomReport";
 import { ModernDashboardReport } from "@/components/assessments/report-styles/ModernDashboardReport";
+import {
+  ComparisonCoverSubtitle,
+  ReportComparisonContent,
+} from "@/components/assessments/ReportComparisonContent";
 
 const LOGO_SRC = "/brand/su-logo-white.svg";
 
@@ -204,6 +208,7 @@ export function BrandedReport({
   contactEmail,
   reportStylesAvailable,
   reportFindingsAvailable,
+  comparison,
 }: BrandedReportProps) {
   // This component is imported by client result flows. Availability must arrive
   // from their server response; WAVE_REPORT_STYLES_* is never read here.
@@ -229,6 +234,7 @@ export function BrandedReport({
         campaignLabel={campaignLabel}
         contactEmail={contactEmail}
         reportFindingsAvailable={reportFindingsAvailable}
+        comparison={comparison}
       />
     );
 
@@ -272,9 +278,19 @@ export function BrandedReport({
       return classic();
     }
     case "EXECUTIVE_BOARDROOM":
-      return <ExecutiveBoardroomReport presentation={presentation()} />;
+      return (
+        <ExecutiveBoardroomReport
+          presentation={presentation()}
+          comparison={comparison}
+        />
+      );
     case "MODERN_DASHBOARD":
-      return <ModernDashboardReport presentation={presentation()} />;
+      return (
+        <ModernDashboardReport
+          presentation={presentation()}
+          comparison={comparison}
+        />
+      );
     default: {
       const unreachableStyle: never = resolvedStyle;
       void unreachableStyle;
@@ -290,6 +306,7 @@ export function LegacyClassicReport({
   campaignLabel,
   contactEmail,
   reportFindingsAvailable,
+  comparison,
 }: Omit<BrandedReportProps, "reportStylesAvailable" | "peerComparison">) {
 
   const result: ScoreResult = report.result ?? ({} as ScoreResult);
@@ -522,6 +539,7 @@ export function LegacyClassicReport({
               {resolvedCampaignLabel}
             </p>
           )}
+          <ComparisonCoverSubtitle comparison={comparison} />
           <div className="su-report-cover-meta">
             {!respondentNameIsEmail ? (
               <div className="su-report-for">
@@ -646,6 +664,18 @@ export function LegacyClassicReport({
           </div>
         </section>
       )}
+
+      <ReportComparisonContent
+        comparison={comparison}
+        labels={{
+          domains: Object.fromEntries(domainCards.map((domain) => [domain.key, domain.label])),
+          sections: Object.fromEntries(perSection.map((section) => [
+            section.stableKey,
+            sectionByKey.get(section.stableKey)?.name ?? section.name ?? section.stableKey,
+          ])),
+          questions: report.questionByKey,
+        }}
+      />
 
       {/* ── 3. Section breakdown ────────────────────────────────────────── */}
       <section className="su-report-sections" data-testid="report-sections">

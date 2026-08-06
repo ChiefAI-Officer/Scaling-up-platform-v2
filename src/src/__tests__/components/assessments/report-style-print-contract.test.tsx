@@ -5,6 +5,7 @@ import { render, within } from "@testing-library/react";
 import { ExecutiveBoardroomReport } from "@/components/assessments/report-styles/ExecutiveBoardroomReport";
 import { ModernDashboardReport } from "@/components/assessments/report-styles/ModernDashboardReport";
 import type { IndividualReportPresentation } from "@/lib/assessments/individual-report-presentation";
+import type { ReportComparisonModel } from "@/lib/assessments/report-comparison-model";
 
 const source = (path: string) =>
   readFileSync(join(process.cwd(), "src", path), "utf8");
@@ -246,6 +247,51 @@ const renderers = [
 ] as const;
 
 describe("adaptive report print and responsive contracts", () => {
+  it.each([
+    ["executive", ExecutiveBoardroomReport],
+    ["dashboard", ModernDashboardReport],
+  ] as const)("keeps %s comparison facts in a dedicated printable report page", (style, Renderer) => {
+    const comparison: ReportComparisonModel = {
+      baseline: {
+        submissionId: "previous-submission",
+        campaignId: "previous-campaign",
+        campaignLabel: "Q1 2025",
+        submittedAt: new Date("2025-03-31T12:00:00.000Z"),
+        versionId: "version-1",
+        versionNumber: 1,
+        isImported: false,
+      },
+      sameVersion: true,
+      overall: { current: 72, previous: 64, delta: 8, status: "comparable" },
+      domains: { people: { current: 7, previous: 6, delta: 1, status: "comparable" } },
+      sections: { people: { current: 7, previous: 6, delta: 1, status: "comparable" } },
+      questions: { q1: { current: 8, previous: 5, delta: 3, status: "comparable" } },
+      coverage: {
+        currentQuestionCount: 1,
+        matchedQuestionCount: 1,
+        unmatchedCurrentCount: 0,
+        baselineOnlyCount: 0,
+      },
+    };
+    const { container } = render(
+      <Renderer presentation={completePresentation} comparison={comparison} />,
+    );
+    const css = source(`styles/su-report-${style}.css`);
+
+    expect(within(container).getByTestId("report-comparison-content")).toHaveTextContent("ScaleUp score");
+    expect(container.querySelector(`.report-page--${style}-comparison .su-report-comparison`)).toBeInTheDocument();
+    expect(container.querySelectorAll(".report-page")).toHaveLength(4);
+    expect(css).toContain(`.su-report--${style} .report-page--${style}-comparison`);
+  });
+
+  it("keeps Classic comparison rows and sections together while hiding only controls in print", () => {
+    const css = source("styles/su-report.css");
+
+    expect(css).toMatch(/\.su-report-comparison-controls\s*\{\s*display:\s*none !important;/);
+    expect(css).toMatch(/\.su-report-comparison-row,[\s\S]*break-inside:\s*avoid;/);
+    expect(css).toMatch(/\.su-report-comparison-section\s*\{[\s\S]*page-break-inside:\s*avoid;/);
+  });
+
   it("parses exact color properties without matching declaration suffixes", () => {
     const css = `
       .tokens { --expected: #112233; --bad: #445566; }
