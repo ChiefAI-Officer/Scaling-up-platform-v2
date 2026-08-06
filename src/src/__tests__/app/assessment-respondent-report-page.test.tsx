@@ -261,6 +261,7 @@ describe("(report) respondent report page", () => {
 
     expect(markup).toContain('data-campaign-label="Q1 Pulse"');
     expect(markup).toContain('data-report-styles-available="true"');
+    expect(markup).toContain('data-enabled-report-style="CLASSIC"');
     expect(markup).toContain('data-report-findings-available="true"');
   });
 
@@ -276,6 +277,7 @@ describe("(report) respondent report page", () => {
 
     expect(markup).toContain('data-testid="branded-report"');
     expect(markup).toContain('data-report-styles-available="false"');
+    expect(markup).not.toContain("data-enabled-report-style");
     expect(markup).toContain('data-report-findings-available="true"');
     expect(mockReportStylesEnabled).not.toHaveBeenCalled();
   });

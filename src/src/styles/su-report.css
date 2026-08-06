@@ -225,7 +225,7 @@
   margin-bottom: 4px;
 }
 
-[data-preview-style="CLASSIC"] .su-public-brand .su-report-eyebrow {
+[data-enabled-report-style="CLASSIC"] .su-public-brand .su-report-eyebrow {
   color: #006b9f;
 }
 
@@ -470,15 +470,15 @@
   padding: 14px 16px;
 }
 
-/* Preview evidence may improve contrast without changing the flag-off Classic
-   computed-style contract. Attribute matching targets canonical bright domains. */
-[data-preview-style="CLASSIC"]
+/* Enabled report surfaces may improve contrast without changing the flag-off
+   Classic computed-style contract. Attribute matching targets canonical bright domains. */
+[data-enabled-report-style="CLASSIC"]
   .su-public-brand
   .su-report-card-head[style*="background-color:#f7a600"],
-[data-preview-style="CLASSIC"]
+[data-enabled-report-style="CLASSIC"]
   .su-public-brand
   .su-report-card-head[style*="background-color:#008bd2"],
-[data-preview-style="CLASSIC"]
+[data-enabled-report-style="CLASSIC"]
   .su-public-brand
   .su-report-card-head[style*="background-color:#95c11f"] {
   color: #1a1322;
@@ -505,30 +505,30 @@
   flex-shrink: 0;
 }
 
-[data-preview-style="CLASSIC"]
+[data-enabled-report-style="CLASSIC"]
   .su-public-brand
   .su-report-card-head[style*="background-color:#f7a600"]
   .su-report-card-title,
-[data-preview-style="CLASSIC"]
+[data-enabled-report-style="CLASSIC"]
   .su-public-brand
   .su-report-card-head[style*="background-color:#008bd2"]
   .su-report-card-title,
-[data-preview-style="CLASSIC"]
+[data-enabled-report-style="CLASSIC"]
   .su-public-brand
   .su-report-card-head[style*="background-color:#95c11f"]
   .su-report-card-title {
   color: #1a1322;
 }
 
-[data-preview-style="CLASSIC"]
+[data-enabled-report-style="CLASSIC"]
   .su-public-brand
   .su-report-card-head[style*="background-color:#f7a600"]
   .su-report-card-chip,
-[data-preview-style="CLASSIC"]
+[data-enabled-report-style="CLASSIC"]
   .su-public-brand
   .su-report-card-head[style*="background-color:#008bd2"]
   .su-report-card-chip,
-[data-preview-style="CLASSIC"]
+[data-enabled-report-style="CLASSIC"]
   .su-public-brand
   .su-report-card-head[style*="background-color:#95c11f"]
   .su-report-card-chip {
@@ -937,17 +937,17 @@
   margin-left: auto;
 }
 
-[data-preview-style="CLASSIC"] .su-public-brand .su-report-coach {
+[data-enabled-report-style="CLASSIC"] .su-public-brand .su-report-coach {
   flex-wrap: wrap;
   max-width: 100%;
 }
 
-[data-preview-style="CLASSIC"] .su-public-brand .su-report-coach-name {
+[data-enabled-report-style="CLASSIC"] .su-public-brand .su-report-coach-name {
   overflow-wrap: anywhere;
   white-space: normal;
 }
 
-[data-preview-style="CLASSIC"] .su-public-brand .su-report-confidential {
+[data-enabled-report-style="CLASSIC"] .su-public-brand .su-report-confidential {
   color: rgba(255, 255, 255, 0.78);
 }
 
@@ -1109,7 +1109,7 @@
   margin: 0 0 6px;
 }
 
-[data-preview-style="CLASSIC"] .su-public-brand .su-section-eyebrow {
+[data-enabled-report-style="CLASSIC"] .su-public-brand .su-section-eyebrow {
   color: #006b9f;
 }
 .su-public-brand .su-section-title {
@@ -1204,11 +1204,11 @@
   border-bottom-color: #fbe6b8;
 }
 
-[data-preview-style="CLASSIC"] .su-public-brand .su-qa-q {
+[data-enabled-report-style="CLASSIC"] .su-public-brand .su-qa-q {
   color: #006b9f;
 }
 
-[data-preview-style="CLASSIC"] .su-public-brand .su-qa.amber .su-qa-q {
+[data-enabled-report-style="CLASSIC"] .su-public-brand .su-qa.amber .su-qa-q {
   color: #855400;
 }
 .su-public-brand .su-qa-a {
@@ -1276,7 +1276,7 @@
   border-left: 1px solid #f4f2f8;
 }
 
-[data-preview-style="CLASSIC"] .su-public-brand .su-matrix-cell.rating {
+[data-enabled-report-style="CLASSIC"] .su-public-brand .su-matrix-cell.rating {
   color: #6b6480;
 }
 .su-public-brand .su-matrix-row:nth-child(even of :not(.su-matrix-head)) {

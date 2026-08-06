@@ -301,6 +301,10 @@ describe("the rendered report", () => {
       await waitFor(() =>
         expect(screen.getByTestId(rendererTestId)).toBeInTheDocument(),
       );
+      expect(screen.getByTestId("org-survey-results")).toHaveAttribute(
+        "data-enabled-report-style",
+        reportStyle,
+      );
     },
   );
 
@@ -325,6 +329,9 @@ describe("the rendered report", () => {
 
       await waitFor(() =>
         expect(screen.getByTestId("report-cover")).toBeInTheDocument(),
+      );
+      expect(screen.getByTestId("org-survey-results")).not.toHaveAttribute(
+        "data-enabled-report-style",
       );
       expect(screen.queryByTestId("modern-dashboard-report")).toBeNull();
     },

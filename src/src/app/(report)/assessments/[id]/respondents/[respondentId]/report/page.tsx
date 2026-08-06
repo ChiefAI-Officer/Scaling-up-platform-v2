@@ -26,6 +26,7 @@ import {
 import { reportConfigFor } from "@/lib/assessments/report-config";
 import { emitReportMetric } from "@/lib/assessments/report-metrics";
 import { BrandedReport } from "@/components/assessments/BrandedReport";
+import { ReportStyleScope } from "@/components/assessments/ReportStyleScope";
 import { PrintReportButton } from "@/components/assessments/PrintReportButton";
 import { db } from "@/lib/db";
 import { getApiActor } from "@/lib/auth/authorization";
@@ -88,32 +89,37 @@ export default async function RespondentReportPage({ params }: PageProps) {
   // longitudinal entry: any error ⇒ no section, never a broken report.
   const peerComparison = await resolvePeerComparison(id, report);
   return (
-    <div className="su-report-page">
-      <div className="su-report-actions no-print">
-        <PrintReportButton
-          fileName={`${report.respondentName} - ${report.assessmentName} - Report`}
+    <ReportStyleScope
+      report={report}
+      reportStylesAvailable={reportStylesAvailable}
+    >
+      <div className="su-report-page">
+        <div className="su-report-actions no-print">
+          <PrintReportButton
+            fileName={`${report.respondentName} - ${report.assessmentName} - Report`}
+          />
+          {longitudinal && (
+            // prefetch is irrelevant for a plain <a>, but per spec the
+            // longitudinal surface is NEVER prefetched: a plain anchor (not a
+            // Next <Link>) guarantees no prefetch of the named-PII view.
+            <a
+              href={longitudinal.href}
+              className="su-cta su-report-longitudinal-link"
+              data-testid="respondent-report-longitudinal-link"
+            >
+              View across campaigns
+            </a>
+          )}
+        </div>
+        <BrandedReport
+          report={report}
+          campaignLabel={report.campaignLabel}
+          peerComparison={peerComparison}
+          reportStylesAvailable={reportStylesAvailable}
+          reportFindingsAvailable={isFindingsLogicEnabled()}
         />
-        {longitudinal && (
-          // prefetch is irrelevant for a plain <a>, but per spec the
-          // longitudinal surface is NEVER prefetched: a plain anchor (not a
-          // Next <Link>) guarantees no prefetch of the named-PII view.
-          <a
-            href={longitudinal.href}
-            className="su-cta su-report-longitudinal-link"
-            data-testid="respondent-report-longitudinal-link"
-          >
-            View across campaigns
-          </a>
-        )}
       </div>
-      <BrandedReport
-        report={report}
-        campaignLabel={report.campaignLabel}
-        peerComparison={peerComparison}
-        reportStylesAvailable={reportStylesAvailable}
-        reportFindingsAvailable={isFindingsLogicEnabled()}
-      />
-    </div>
+    </ReportStyleScope>
   );
 }
 

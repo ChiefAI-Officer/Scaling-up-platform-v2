@@ -11,6 +11,7 @@ import { notFound } from "next/navigation";
 
 import { BrandedReport } from "@/components/assessments/BrandedReport";
 import { PrintReportButton } from "@/components/assessments/PrintReportButton";
+import { ReportStyleScope } from "@/components/assessments/ReportStyleScope";
 import {
   defaultReportGateDeps,
   viewPublicReferralReport,
@@ -42,20 +43,25 @@ export default async function PublicSubmissionReportPage({
   const { report, reportStylesAvailable } = outcome;
 
   return (
-    <div className="su-report-page">
-      <div className="su-report-actions no-print">
-        <PrintReportButton
-          fileName={
-            `${report.respondentName} - ${report.assessmentName} - Report`
-          }
+    <ReportStyleScope
+      report={report}
+      reportStylesAvailable={reportStylesAvailable}
+    >
+      <div className="su-report-page">
+        <div className="su-report-actions no-print">
+          <PrintReportButton
+            fileName={
+              `${report.respondentName} - ${report.assessmentName} - Report`
+            }
+          />
+        </div>
+        <BrandedReport
+          report={report}
+          campaignLabel={report.campaignLabel}
+          reportStylesAvailable={reportStylesAvailable}
+          reportFindingsAvailable={isFindingsLogicEnabled()}
         />
       </div>
-      <BrandedReport
-        report={report}
-        campaignLabel={report.campaignLabel}
-        reportStylesAvailable={reportStylesAvailable}
-        reportFindingsAvailable={isFindingsLogicEnabled()}
-      />
-    </div>
+    </ReportStyleScope>
   );
 }

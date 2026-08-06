@@ -28,6 +28,7 @@ import {
   deriveTimeEstimate,
 } from "@/components/assessments/assessment-welcome";
 import { BrandedReport } from "@/components/assessments/BrandedReport";
+import { ReportStyleScope } from "@/components/assessments/ReportStyleScope";
 import { PrintReportButton } from "@/components/assessments/PrintReportButton";
 import { formatTimestamp } from "@/lib/utils";
 // The detailed report styling lives in su-report.css (scoped to .su-public-brand
@@ -452,23 +453,28 @@ export function PublicQuizClient({
       degraded: false,
     };
     return (
-      <main className="survey-body" data-testid="quiz-results">
-        {/* Scope wrapper so su-report.css applies (ADR-0005) — same wrapper the
-            invited (report) route layout provides. */}
-        <div className="su-public-brand su-report">
-          <PrintReportButton
-            fileName={`${templateName} — ${report.respondentName}`}
-          />
-          <BrandedReport
-            report={report}
-            assessmentName={templateName}
-            campaignLabel={campaignName}
-            contactEmail={verifiedCoachEmail}
-            reportStylesAvailable={reportStylesAvailable}
-            reportFindingsAvailable={reportFindingsAvailable}
-          />
-        </div>
-      </main>
+      <ReportStyleScope
+        report={report}
+        reportStylesAvailable={reportStylesAvailable}
+      >
+        <main className="survey-body" data-testid="quiz-results">
+          {/* Scope wrapper so su-report.css applies (ADR-0005) — same wrapper the
+              invited (report) route layout provides. */}
+          <div className="su-public-brand su-report">
+            <PrintReportButton
+              fileName={`${templateName} — ${report.respondentName}`}
+            />
+            <BrandedReport
+              report={report}
+              assessmentName={templateName}
+              campaignLabel={campaignName}
+              contactEmail={verifiedCoachEmail}
+              reportStylesAvailable={reportStylesAvailable}
+              reportFindingsAvailable={reportFindingsAvailable}
+            />
+          </div>
+        </main>
+      </ReportStyleScope>
     );
   }
 

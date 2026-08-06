@@ -244,6 +244,10 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
     await waitFor(() =>
       expect(screen.getByTestId("modern-dashboard-report")).toBeInTheDocument(),
     );
+    expect(screen.getByTestId("quiz-results")).toHaveAttribute(
+      "data-enabled-report-style",
+      "MODERN_DASHBOARD",
+    );
     expect(screen.getByText("Fresh server-authorized finding")).toBeInTheDocument();
   });
 

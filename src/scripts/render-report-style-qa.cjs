@@ -38,12 +38,23 @@ const {
 if (!isReportStylePreviewAnatomy(anatomy)) throw new Error("Unknown report-style preview anatomy");
 if (!isReportStylePreviewVariant(variant)) throw new Error("Unknown report-style preview variant");
 const { BrandedReport } = require("../src/components/assessments/BrandedReport");
+const { ReportStyleScope } = require("../src/components/assessments/ReportStyleScope");
 const report = {
   ...buildReportStylePreviewReport(anatomy, variant),
   reportStyle: style,
 };
-process.stdout.write(renderToStaticMarkup(React.createElement(BrandedReport, {
-  report,
-  reportStylesAvailable: true,
-  reportFindingsAvailable: true,
-})));
+process.stdout.write(renderToStaticMarkup(
+  React.createElement(
+    ReportStyleScope,
+    { report, reportStylesAvailable: true },
+    React.createElement(
+      "div",
+      { style: { display: "contents" } },
+      React.createElement(BrandedReport, {
+        report,
+        reportStylesAvailable: true,
+        reportFindingsAvailable: true,
+      }),
+    ),
+  ),
+));

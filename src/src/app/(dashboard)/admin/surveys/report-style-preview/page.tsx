@@ -13,6 +13,7 @@ import {
   type ReportStylePreviewPage,
 } from "@/lib/assessments/report-style-registry";
 import { BrandedReport } from "@/components/assessments/BrandedReport";
+import { ReportStyleScope } from "@/components/assessments/ReportStyleScope";
 import "@/styles/su-public-brand.css";
 import "@/styles/su-report.css";
 import "@/styles/su-report-executive.css";
@@ -105,21 +106,26 @@ function PreviewRenderer({
   };
 
   return (
-    <article
-      className={`report-style-preview--${style.toLowerCase().replaceAll("_", "-")}`}
-      data-preview-anatomy={anatomy}
-      data-preview-page={page}
-      data-preview-style={style}
-      data-testid={`report-style-preview-page-${page}`}
+    <ReportStyleScope
+      report={report}
+      reportStylesAvailable
     >
-      <PreviewSelectionStyles />
-      <BrandedReport
-        report={report}
-        reportStylesAvailable
-        reportFindingsAvailable
-      />
-      <PreviewEndMarker />
-    </article>
+      <article
+        className={`report-style-preview--${style.toLowerCase().replaceAll("_", "-")}`}
+        data-preview-anatomy={anatomy}
+        data-preview-page={page}
+        data-preview-style={style}
+        data-testid={`report-style-preview-page-${page}`}
+      >
+        <PreviewSelectionStyles />
+        <BrandedReport
+          report={report}
+          reportStylesAvailable
+          reportFindingsAvailable
+        />
+        <PreviewEndMarker />
+      </article>
+    </ReportStyleScope>
   );
 }
 

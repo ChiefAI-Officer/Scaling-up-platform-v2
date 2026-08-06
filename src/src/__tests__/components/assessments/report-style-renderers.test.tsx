@@ -1,12 +1,17 @@
 import { render, screen, within } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { renderToStaticMarkup } from "react-dom/server";
 
 import {
   BrandedReport,
   LegacyClassicReport,
 } from "@/components/assessments/BrandedReport";
+import { ReportStyleScope } from "@/components/assessments/ReportStyleScope";
 import { ExecutiveBoardroomReport } from "@/components/assessments/report-styles/ExecutiveBoardroomReport";
 import { ModernDashboardReport } from "@/components/assessments/report-styles/ModernDashboardReport";
 import type { IndividualReportPresentation } from "@/lib/assessments/individual-report-presentation";
+import { buildReportStylePreviewReport } from "@/lib/assessments/report-style-preview-fixture";
 import type { RespondentReport } from "@/lib/assessments/respondent-report";
 import type { ScoreResult } from "@/lib/assessments/scoring";
 
@@ -543,4 +548,237 @@ describe("BrandedReport explicit appearance dispatch", () => {
     expect(unavailable).toBe(direct);
     expect(available).toBe(direct);
   });
+});
+
+describe("enabled Classic surface fidelity", () => {
+  it(
+    "matches the real enabled surface to the preview harness at 393px",
+    async () => {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { chromium } = require("playwright") as typeof import("playwright");
+      const report = {
+        ...buildReportStylePreviewReport("scored", "long-branding"),
+        reportStyle: "CLASSIC" as const,
+      };
+      const realMarkup = renderToStaticMarkup(
+        <ReportStyleScope report={report} reportStylesAvailable>
+          <div className="su-report-page" data-testid="report-surface">
+            <BrandedReport report={report} reportStylesAvailable />
+          </div>
+        </ReportStyleScope>,
+      );
+      const previewMarkup = renderToStaticMarkup(
+        <ReportStyleScope report={report} reportStylesAvailable>
+          <article
+            className="su-report-page"
+            data-preview-style="CLASSIC"
+            data-testid="report-surface"
+          >
+            <BrandedReport report={report} reportStylesAvailable />
+          </article>
+        </ReportStyleScope>,
+      );
+      const css = [
+        readFileSync(
+          join(process.cwd(), "src", "styles", "su-public-brand.css"),
+          "utf8",
+        ),
+        readFileSync(
+          join(process.cwd(), "src", "styles", "su-report.css"),
+          "utf8",
+        ),
+      ].join("\n");
+      const originalSetImmediate = global.setImmediate;
+      if (typeof global.setImmediate !== "function") {
+        global.setImmediate = ((
+          callback: (...args: unknown[]) => void,
+          ...args: unknown[]
+        ) => setTimeout(callback, 0, ...args)) as unknown as typeof setImmediate;
+      }
+      const browser = await chromium.launch({ headless: true });
+
+      const inspect = async (markup: string) => {
+        const page = await browser.newPage({
+          viewport: { width: 393, height: 852 },
+        });
+        try {
+          await page.setContent(`<style>${css}</style>${markup}`);
+          return await page.getByTestId("report-surface").evaluate((surface) => {
+            const parseRgb = (value: string) =>
+              (value.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
+            const luminance = (value: string) => {
+              const [red, green, blue] = parseRgb(value).map((channel) => {
+                const normalized = channel / 255;
+                return normalized <= 0.04045
+                  ? normalized / 12.92
+                  : ((normalized + 0.055) / 1.055) ** 2.4;
+              });
+              return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+            };
+            const contrast = (foreground: string, background: string) => {
+              const light = Math.max(
+                luminance(foreground),
+                luminance(background),
+              );
+              const dark = Math.min(
+                luminance(foreground),
+                luminance(background),
+              );
+              return (light + 0.05) / (dark + 0.05);
+            };
+            const coach = surface.querySelector(".su-report-coach");
+            const coachName = surface.querySelector(".su-report-coach-name");
+            const eyebrow = surface.querySelector(".su-report-eyebrow");
+            const orangeHeader = surface.querySelector(
+              '.su-report-card-head[style*="background-color:#f7a600"]',
+            );
+            const orangeTitle =
+              orangeHeader?.querySelector(".su-report-card-title");
+            if (
+              !(coach instanceof HTMLElement) ||
+              !(coachName instanceof HTMLElement) ||
+              !(eyebrow instanceof HTMLElement) ||
+              !(orangeHeader instanceof HTMLElement) ||
+              !(orangeTitle instanceof HTMLElement)
+            ) {
+              throw new Error("Enabled Classic fidelity fixture is incomplete");
+            }
+            const orangeTitleStyle = getComputedStyle(orangeTitle);
+            const orangeHeaderStyle = getComputedStyle(orangeHeader);
+
+            return {
+              marker: surface.getAttribute("data-enabled-report-style"),
+              documentScrollWidth: document.documentElement.scrollWidth,
+              viewportWidth: window.innerWidth,
+              coachFlexWrap: getComputedStyle(coach).flexWrap,
+              coachNameWhiteSpace: getComputedStyle(coachName).whiteSpace,
+              eyebrowColor: getComputedStyle(eyebrow).color,
+              orangeTitleColor: orangeTitleStyle.color,
+              orangeTitleContrast: contrast(
+                orangeTitleStyle.color,
+                orangeHeaderStyle.backgroundColor,
+              ),
+            };
+          });
+        } finally {
+          await page.close();
+        }
+      };
+
+      try {
+        const real = await inspect(realMarkup);
+        const preview = await inspect(previewMarkup);
+
+        expect(real).toEqual(preview);
+        expect(real).toEqual(
+          expect.objectContaining({
+            marker: "CLASSIC",
+            documentScrollWidth: 393,
+            viewportWidth: 393,
+            coachFlexWrap: "wrap",
+            coachNameWhiteSpace: "normal",
+            eyebrowColor: "rgb(0, 107, 159)",
+            orangeTitleColor: "rgb(26, 19, 34)",
+          }),
+        );
+        expect(real.orangeTitleContrast).toBeGreaterThanOrEqual(4.5);
+      } finally {
+        await browser.close();
+        global.setImmediate = originalSetImmediate;
+      }
+    },
+    30_000,
+  );
+
+  it(
+    "keeps the flag-off outer surface and Classic computed styles legacy-exact",
+    async () => {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { chromium } = require("playwright") as typeof import("playwright");
+      const report = {
+        ...buildReportStylePreviewReport("scored", "long-branding"),
+        reportStyle: "CLASSIC" as const,
+      };
+      const flagOffMarkup = renderToStaticMarkup(
+        <ReportStyleScope report={report}>
+          <div className="su-report-page" data-testid="report-surface">
+            <BrandedReport report={report} />
+          </div>
+        </ReportStyleScope>,
+      );
+      const legacyMarkup = renderToStaticMarkup(
+        <div className="su-report-page" data-testid="report-surface">
+          <LegacyClassicReport report={report} />
+        </div>,
+      );
+      expect(flagOffMarkup).toBe(legacyMarkup);
+
+      const css = [
+        readFileSync(
+          join(process.cwd(), "src", "styles", "su-public-brand.css"),
+          "utf8",
+        ),
+        readFileSync(
+          join(process.cwd(), "src", "styles", "su-report.css"),
+          "utf8",
+        ),
+      ].join("\n");
+      const originalSetImmediate = global.setImmediate;
+      if (typeof global.setImmediate !== "function") {
+        global.setImmediate = ((
+          callback: (...args: unknown[]) => void,
+          ...args: unknown[]
+        ) => setTimeout(callback, 0, ...args)) as unknown as typeof setImmediate;
+      }
+      const browser = await chromium.launch({ headless: true });
+
+      try {
+        const page = await browser.newPage({
+          viewport: { width: 393, height: 852 },
+        });
+        await page.setContent(`<style>${css}</style>${flagOffMarkup}`);
+        const computed = await page
+          .getByTestId("report-surface")
+          .evaluate((surface) => {
+            const coach = surface.querySelector(".su-report-coach");
+            const coachName = surface.querySelector(".su-report-coach-name");
+            const eyebrow = surface.querySelector(".su-report-eyebrow");
+            const orangeTitle = surface.querySelector(
+              '.su-report-card-head[style*="background-color:#f7a600"] .su-report-card-title',
+            );
+            if (
+              !(coach instanceof HTMLElement) ||
+              !(coachName instanceof HTMLElement) ||
+              !(eyebrow instanceof HTMLElement) ||
+              !(orangeTitle instanceof HTMLElement)
+            ) {
+              throw new Error("Flag-off Classic fidelity fixture is incomplete");
+            }
+            return {
+              marker: surface.getAttribute("data-enabled-report-style"),
+              documentScrollWidth: document.documentElement.scrollWidth,
+              coachFlexWrap: getComputedStyle(coach).flexWrap,
+              coachNameWhiteSpace: getComputedStyle(coachName).whiteSpace,
+              eyebrowColor: getComputedStyle(eyebrow).color,
+              orangeTitleColor: getComputedStyle(orangeTitle).color,
+            };
+          });
+
+        expect(computed).toEqual(
+          expect.objectContaining({
+            marker: null,
+            coachFlexWrap: "nowrap",
+            coachNameWhiteSpace: "nowrap",
+            eyebrowColor: "rgb(0, 139, 210)",
+            orangeTitleColor: "rgb(255, 255, 255)",
+          }),
+        );
+        expect(computed.documentScrollWidth).toBeGreaterThan(393);
+      } finally {
+        await browser.close();
+        global.setImmediate = originalSetImmediate;
+      }
+    },
+    30_000,
+  );
 });
