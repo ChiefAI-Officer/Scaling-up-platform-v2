@@ -247,6 +247,82 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
     expect(screen.getByText("Fresh server-authorized finding")).toBeInTheDocument();
   });
 
+  it.each([
+    {
+      anatomy: "scored",
+      templateAlias: "RockHabits",
+      matrixQuestions: questions,
+      answerKind: "slider",
+      expectedBlock: null,
+    },
+    {
+      anatomy: "qualitative",
+      templateAlias: "qsp-v2",
+      matrixQuestions: questions,
+      answerKind: "slider",
+      expectedBlock: "qualitative-scale",
+    },
+    {
+      anatomy: "sparse custom",
+      templateAlias: "walk-qual-sparse-custom",
+      matrixQuestions: [
+        {
+          stableKey: "custom_prompt",
+          sortOrder: 1,
+          sectionStableKey: "S1",
+          type: "TEXT",
+          label: "What deserves attention?",
+          isRequired: true,
+        },
+      ],
+      answerKind: "text",
+      expectedBlock: "narrative-response",
+    },
+  ] as const)(
+    "public immediate result uses the frozen appearance for $anatomy reports",
+    async ({ templateAlias, matrixQuestions, answerKind, expectedBlock }) => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          success: true,
+          data: {
+            submissionId: "sub_matrix",
+            reportStyle: "MODERN_DASHBOARD",
+            reportStylesAvailable: true,
+            reportFindingsAvailable: true,
+            scoreResult: scoreResultFixture,
+            redirectUrl: `/quiz/${ALIAS}/thank-you`,
+          },
+        }),
+      });
+
+      render(
+        <PublicQuizClient
+          {...baseProps}
+          templateAlias={templateAlias}
+          questions={matrixQuestions as never}
+        />,
+      );
+      reachFormStep();
+      if (answerKind === "text") {
+        fireEvent.change(screen.getByRole("textbox"), {
+          target: { value: "Our onboarding handoff." },
+        });
+      } else {
+        fireEvent.change(screen.getByRole("slider"), { target: { value: "6" } });
+      }
+      fireEvent.click(screen.getByRole("button", { name: /submit/i }));
+
+      const renderer = await screen.findByTestId("modern-dashboard-report");
+      if (expectedBlock) {
+        expect(
+          renderer.querySelector(`[data-report-block="${expectedBlock}"]`),
+        ).not.toBeNull();
+      }
+    },
+  );
+
   // ── F4 (Wave OSR / Jeff #71 review): templateAlias must reach BrandedReport ─
   //
   // The hand-built RespondentReport here OMITTED templateAlias, so every public

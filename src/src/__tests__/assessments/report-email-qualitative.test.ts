@@ -73,6 +73,39 @@ function qualReport(args: QualFixtureArgs): RespondentReport {
 // ── Dispatch ─────────────────────────────────────────────────────────────────
 
 describe("buildReportEmailHtml — qualitative dispatch", () => {
+  it("keeps qualitative results-email bytes unchanged for non-Classic stored styles", () => {
+    const classicReport = qualReport({
+      templateAlias: "qsp-v2",
+      sections: [{ stableKey: "reflection", name: "Reflection" }],
+      questionsByKey: {
+        reflection: {
+          type: "TEXT",
+          label: "What changed?",
+          sectionStableKey: "reflection",
+        },
+      },
+      rawAnswers: [
+        { stableKey: "reflection", value: "We protected focus time." },
+      ],
+    });
+    const classic = buildReportEmailHtml({
+      report: classicReport,
+      recipientRole: "TAKER_COPY",
+    });
+
+    for (const reportStyle of [
+      "EXECUTIVE_BOARDROOM",
+      "MODERN_DASHBOARD",
+    ] as const) {
+      expect(
+        buildReportEmailHtml({
+          report: { ...classicReport, reportStyle },
+          recipientRole: "TAKER_COPY",
+        }),
+      ).toEqual(classic);
+    }
+  });
+
   it("freezes the exact legacy qualitative report email bytes", () => {
     const report = qualReport({
       templateAlias: "qsp-v2",

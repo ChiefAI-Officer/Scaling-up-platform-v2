@@ -25,6 +25,7 @@ import {
   type QuestionMeta,
 } from "@/lib/assessments/question-meta";
 import type { ReportStyleKey } from "@/lib/assessments/report-style-registry";
+import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
 
 // Re-export so existing `import { QuestionMeta } from "respondent-report"`
 // consumers keep working after the shared builder extraction.
@@ -179,7 +180,12 @@ export interface RespondentReport {
 }
 
 export type RespondentReportOutcome =
-  | { status: "ok"; report: RespondentReport }
+  | {
+      status: "ok";
+      report: RespondentReport;
+      /** Exact server-owned availability for this frozen campaign snapshot. */
+      reportStylesAvailable: boolean;
+    }
   | { status: "forbidden" }
   | { status: "not-found" };
 
@@ -394,7 +400,14 @@ export async function getRespondentReport(
       },
     });
 
-    return { status: "ok", report } as const;
+    return {
+      status: "ok",
+      report,
+      reportStylesAvailable: isReportStylesEnabled({
+        templateId: submission.campaign.template.id,
+        campaignId,
+      }),
+    } as const;
   },
   // V-4 (Wave V): explicit budget over Prisma's 5s interactive-transaction
   // default — a Neon cold start / high-latency client can P2028 a report

@@ -84,12 +84,12 @@ jest.mock("@/components/assessments/BrandedReport", () => ({
     reportStylesAvailable,
     reportFindingsAvailable,
   }: {
-    report: { respondentName: string };
+    report: { respondentName: string; templateAlias: string; reportStyle: string };
     campaignLabel: string | null;
     reportStylesAvailable?: boolean;
     reportFindingsAvailable?: boolean;
   }) => (
-    <div data-testid="branded-report" data-campaign-label={campaignLabel ?? ""} data-report-styles-available={String(reportStylesAvailable)} data-report-findings-available={String(reportFindingsAvailable)}>
+    <div data-testid="branded-report" data-campaign-label={campaignLabel ?? ""} data-template-alias={report.templateAlias} data-report-style={report.reportStyle} data-report-styles-available={String(reportStylesAvailable)} data-report-findings-available={String(reportFindingsAvailable)}>
       {report.respondentName}
     </div>
   ),
@@ -131,9 +131,10 @@ function coachActor(): ApiActor {
   return { userId: "u-coach", email: "coach@example.com", role: "COACH", coachId: "coach-1" };
 }
 
-function okReport() {
+function okReport(reportOverrides: Record<string, unknown> = {}) {
   return {
     status: "ok",
+    reportStylesAvailable: true,
     report: {
       respondentName: "Jane Respondent",
       jobTitle: "CEO",
@@ -155,6 +156,7 @@ function okReport() {
         contentHash: "abc12345",
       },
       degraded: false,
+      ...reportOverrides,
     },
   };
 }
@@ -263,9 +265,11 @@ describe("(report) respondent report page", () => {
   });
 
   it("keeps the legacy report renderer available when report styles are off", async () => {
-    mockReportStylesEnabled.mockReturnValue(false);
     mockGetApiActor.mockResolvedValue(adminActor());
-    mockGetRespondentReport.mockResolvedValue(okReport());
+    mockGetRespondentReport.mockResolvedValue({
+      ...okReport(),
+      reportStylesAvailable: false,
+    });
 
     const node = await Page(makeProps());
     const markup = renderToStaticMarkup(node as React.ReactElement);
@@ -273,6 +277,7 @@ describe("(report) respondent report page", () => {
     expect(markup).toContain('data-testid="branded-report"');
     expect(markup).toContain('data-report-styles-available="false"');
     expect(markup).toContain('data-report-findings-available="true"');
+    expect(mockReportStylesEnabled).not.toHaveBeenCalled();
   });
 
   it("renders for an owning COACH actor", async () => {
@@ -285,6 +290,30 @@ describe("(report) respondent report page", () => {
     expect(markup).toContain("Jane Respondent");
     expect(mockNotFound).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ["scored", "Admin", adminActor, "RockHabits", "EXECUTIVE_BOARDROOM"],
+    ["qualitative", "Admin", adminActor, "qsp-v2", "MODERN_DASHBOARD"],
+    ["sparse custom", "Admin", adminActor, "walk-qual-sparse-custom", "EXECUTIVE_BOARDROOM"],
+    ["scored", "Coach", coachActor, "RockHabits", "EXECUTIVE_BOARDROOM"],
+    ["qualitative", "Coach", coachActor, "qsp-v2", "MODERN_DASHBOARD"],
+    ["sparse custom", "Coach", coachActor, "walk-qual-sparse-custom", "EXECUTIVE_BOARDROOM"],
+  ] as const)(
+    "%s campaign snapshot reaches the authenticated %s individual view",
+    async (_anatomy, _role, actorFactory, templateAlias, reportStyle) => {
+      mockGetApiActor.mockResolvedValue(actorFactory());
+      mockGetRespondentReport.mockResolvedValue(
+        okReport({ templateAlias, reportStyle }),
+      );
+
+      const node = await Page(makeProps());
+      const markup = renderToStaticMarkup(node as React.ReactElement);
+
+      expect(markup).toContain(`data-template-alias="${templateAlias}"`);
+      expect(markup).toContain(`data-report-style="${reportStyle}"`);
+      expect(markup).toContain('data-report-styles-available="true"');
+    },
+  );
 
   it("returns 404 (notFound) when the report is forbidden — no audit row", async () => {
     mockGetApiActor.mockResolvedValue(coachActor());

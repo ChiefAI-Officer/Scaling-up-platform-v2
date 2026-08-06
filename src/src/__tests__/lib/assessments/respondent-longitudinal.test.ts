@@ -899,6 +899,28 @@ test("single submission ⇒ ok with comparableCount 0 (need ≥2 to compare)", a
   expect(out.data.points[0].overall.tier).toBe("Good");
 });
 
+test("longitudinal and cohort-trend families never import or dispatch individual appearance renderers", async () => {
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const excludedFamilyFiles = [
+    "src/lib/assessments/respondent-longitudinal.ts",
+    "src/lib/assessments/respondent-longitudinal-metrics.ts",
+    "src/components/assessments/RespondentLongitudinalView.tsx",
+    "src/app/(portal)/portal/assessments/respondents/[respondentId]/longitudinal/page.tsx",
+    "src/lib/assessments/trends.ts",
+    "src/components/assessments/CampaignTrendsView.tsx",
+    "src/app/(portal)/portal/assessments/trends/page.tsx",
+  ];
+
+  for (const file of excludedFamilyFiles) {
+    const source = fs.readFileSync(path.join(process.cwd(), file), "utf8");
+    expect(source).not.toMatch(
+      /from\s+["'][^"']*(?:BrandedReport|report-styles|individual-report-presentation|wave-report-styles-flags)[^"']*["']/,
+    );
+    expect(source).not.toMatch(/\breportStylesAvailable\b|\breportStyle\b/);
+  }
+});
+
 // ─── No raw emails anywhere in returned data (R2-Med-6) ─────────────────────
 
 test("returned data carries NO raw emails (only audit-safe counts)", async () => {

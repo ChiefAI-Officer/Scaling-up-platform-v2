@@ -15,8 +15,6 @@ import {
   defaultReportGateDeps,
   viewPublicReferralReport,
 } from "@/lib/assessments/report-access-gate";
-import { db } from "@/lib/db";
-import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
 import { isFindingsLogicEnabled } from "@/lib/assessments/wave-u-flags";
 
 export const dynamic = "force-dynamic";
@@ -41,8 +39,7 @@ export default async function PublicSubmissionReportPage({
     notFound();
   }
 
-  const { report } = outcome;
-  const reportStylesAvailable = await resolveReportStylesAvailable(submissionId);
+  const { report, reportStylesAvailable } = outcome;
 
   return (
     <div className="su-report-page">
@@ -61,19 +58,4 @@ export default async function PublicSubmissionReportPage({
       />
     </div>
   );
-}
-
-async function resolveReportStylesAvailable(submissionId: string): Promise<boolean> {
-  try {
-    const submission = await db.assessmentSubmission.findFirst({
-      where: { id: submissionId },
-      select: { campaign: { select: { id: true, templateId: true } } },
-    });
-    const campaign = submission?.campaign;
-    return campaign
-      ? isReportStylesEnabled({ templateId: campaign.templateId, campaignId: campaign.id })
-      : false;
-  } catch {
-    return false;
-  }
 }

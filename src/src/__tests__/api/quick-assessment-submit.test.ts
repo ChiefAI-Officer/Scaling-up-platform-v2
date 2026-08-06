@@ -687,6 +687,33 @@ describe("outbox enqueue", () => {
     );
   });
 
+  it("keeps frozen scoring and short-notification HTML identical across stored appearances", async () => {
+    process.env.QUICK_ASSESSMENT_TEAM_EMAIL = "team@scalingup.com";
+    reportStyleLockMock
+      .mockResolvedValueOnce("CLASSIC")
+      .mockResolvedValueOnce("MODERN_DASHBOARD");
+
+    const classicResponse = await POST(
+      makeRequest(VALID_BODY) as never,
+      makeParams() as never,
+    );
+    const classicBody = await classicResponse.json();
+    const classicShortHtml = rowFor("SU_TEAM").bodyHtml;
+
+    txMock.assessmentEmailOutbox.create.mockClear();
+    const modernResponse = await POST(
+      makeRequest(VALID_BODY) as never,
+      makeParams() as never,
+    );
+    const modernBody = await modernResponse.json();
+    const modernShortHtml = rowFor("SU_TEAM").bodyHtml;
+
+    expect(classicBody.data.reportStyle).toBe("CLASSIC");
+    expect(modernBody.data.reportStyle).toBe("MODERN_DASHBOARD");
+    expect(modernBody.data.scoreResult).toEqual(classicBody.data.scoreResult);
+    expect(modernShortHtml).toBe(classicShortHtml);
+  });
+
   it("keeps public report chrome legacy while the gate is default-off", async () => {
     mockActiveCoach();
 

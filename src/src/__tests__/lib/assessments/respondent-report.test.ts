@@ -16,6 +16,7 @@ import {
   buildStoredRespondentReport,
   getRespondentReport,
 } from "@/lib/assessments/respondent-report";
+import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
 
 // ── Mock access-control so canManageCampaign is fully controllable ───────
 const mockCanManageCampaign = jest.fn<Promise<boolean>, [unknown, unknown, string, string]>();
@@ -24,6 +25,12 @@ jest.mock("@/lib/assessments/access-control", () => ({
   canManageCampaign: (...args: unknown[]) => mockCanManageCampaign(...(args as [unknown, unknown, string, string])),
   asAccessDb: (prisma: unknown) => prisma,
 }));
+
+jest.mock("@/lib/assessments/wave-report-styles-flags", () => ({
+  isReportStylesEnabled: jest.fn(() => true),
+}));
+
+const mockReportStylesEnabled = isReportStylesEnabled as jest.Mock;
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -139,6 +146,7 @@ function makeMockDb(submission: typeof GOOD_SUBMISSION | null) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockReportStylesEnabled.mockReturnValue(true);
 });
 
 test("buildStoredRespondentReport exposes the shared pure frozen-report seam", () => {
@@ -202,6 +210,11 @@ test("1. owning coach + submission → status:ok, all fields populated, provenan
   // templateAlias is the stable instrument slug (template.alias)
   expect(report.templateAlias).toBe("leadership-vision-alignment");
   expect(Object.getOwnPropertyDescriptor(report, "reportStyle")?.value).toBe("MODERN_DASHBOARD");
+  expect(result.reportStylesAvailable).toBe(true);
+  expect(mockReportStylesEnabled).toHaveBeenCalledWith({
+    templateId: "tpl-1",
+    campaignId: "camp-1",
+  });
   // campaignLabel is the coach's label when present
   expect(report.campaignLabel).toBe("Acme Q1 Campaign");
 

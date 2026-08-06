@@ -66,13 +66,17 @@ jest.mock("@/components/assessments/BrandedReport", () => ({
   BrandedReport: ({
     report,
     peerComparison,
+    reportStylesAvailable,
   }: {
-    report: { respondentName: string };
+    report: { respondentName: string; reportStyle: string };
     peerComparison?: { items: unknown[] } | null;
+    reportStylesAvailable?: boolean;
   }) => (
     <div
       data-testid="branded-report"
       data-peer-items={peerComparison ? String(peerComparison.items.length) : "none"}
+      data-report-style={report.reportStyle}
+      data-report-styles-available={String(reportStylesAvailable)}
     >
       {report.respondentName}
     </div>
@@ -94,12 +98,14 @@ const mockGetRespondentReport = getRespondentReport as jest.Mock;
 function okLvaReport() {
   return {
     status: "ok",
+    reportStylesAvailable: true,
     report: {
       respondentName: "Jane Respondent",
       jobTitle: "CEO",
       companyName: "Acme Corp",
       assessmentName: "Leadership Vision Alignment",
       templateAlias: "leadership-vision-alignment",
+      reportStyle: "MODERN_DASHBOARD",
       campaignLabel: "LVA Q3",
       submittedAt: new Date("2026-06-15T00:00:00Z"),
       result: { perSection: [], perQuestion: [] },
@@ -165,6 +171,8 @@ test("flag ON + LVA ⇒ benchmarks fetched and the built section flows into the 
   });
   // One qualifying factor (Culture: own Strong=10 vs peers 6.3) → 1 item.
   expect(html).toContain('data-peer-items="1"');
+  expect(html).toContain('data-report-style="MODERN_DASHBOARD"');
+  expect(html).toContain('data-report-styles-available="true"');
 });
 
 test("flag ON + non-LVA alias ⇒ no benchmark query", async () => {

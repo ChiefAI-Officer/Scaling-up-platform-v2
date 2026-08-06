@@ -375,14 +375,22 @@ describe("(report) campaign group report page", () => {
   it("does not couple the non-goal group report route to report-style dispatch", async () => {
     const fs = await import("fs");
     const path = await import("path");
-    const source = fs.readFileSync(
-      path.join(process.cwd(), "src/app/(report)/assessments/[id]/report/page.tsx"),
-      "utf8",
-    );
+    const excludedFamilyFiles = [
+      "src/app/(report)/assessments/[id]/report/page.tsx",
+      "src/components/assessments/GroupReport.tsx",
+      "src/components/assessments/QualitativeGroupReport.tsx",
+      "src/components/assessments/ScoredGroupReport.tsx",
+      "src/lib/assessments/group-report.ts",
+      "src/lib/assessments/group-report-model.ts",
+    ];
 
-    expect(source).not.toContain("wave-report-styles-flags");
-    expect(source).not.toContain("ExecutiveBoardroomReport");
-    expect(source).not.toContain("ModernDashboardReport");
+    for (const file of excludedFamilyFiles) {
+      const source = fs.readFileSync(path.join(process.cwd(), file), "utf8");
+      expect(source).not.toMatch(
+        /from\s+["'][^"']*(?:BrandedReport|report-styles|individual-report-presentation|wave-report-styles-flags)[^"']*["']/,
+      );
+      expect(source).not.toMatch(/\breportStylesAvailable\b|\breportStyle\b/);
+    }
   });
 
   it("GROUP_REPORT_VIEW is a valid member of the AuditAction type", () => {

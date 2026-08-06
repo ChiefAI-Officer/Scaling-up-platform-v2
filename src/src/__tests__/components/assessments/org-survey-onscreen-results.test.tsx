@@ -59,6 +59,17 @@ const REPORT = {
   degraded: false,
 } as never;
 
+const EMPTY_CANONICAL_RESULT = {
+  perQuestion: [],
+  perSection: [],
+  overallTotal: 0,
+  overallAverage: 0,
+  countAchieved: 0,
+  tier: null,
+  tierMetricValue: 0,
+  unansweredKeys: [],
+};
+
 /** Install a fetch that answers /me with the given status and server decisions. */
 function installFetch(
   meStatus: number,
@@ -192,6 +203,79 @@ describe("rehydrate authorization (the /me 410 gate)", () => {
 });
 
 describe("the rendered report", () => {
+  it.each([
+    [
+      "scored",
+      {
+        ...(REPORT as unknown as Record<string, unknown>),
+        templateAlias: "RockHabits",
+        reportStyle: "MODERN_DASHBOARD",
+        result: EMPTY_CANONICAL_RESULT,
+      },
+      null,
+    ],
+    [
+      "qualitative",
+      {
+        ...(REPORT as unknown as Record<string, unknown>),
+        assessmentName: "Quarterly Session Prep",
+        templateAlias: "qsp-v2",
+        reportStyle: "MODERN_DASHBOARD",
+        result: EMPTY_CANONICAL_RESULT,
+        sections: [{ stableKey: "reflection", name: "Reflection" }],
+        questionByKey: { reflection: "What changed?" },
+        questionsByKey: {
+          reflection: {
+            type: "TEXT",
+            label: "What changed?",
+            sectionStableKey: "reflection",
+          },
+        },
+        rawAnswers: [{ stableKey: "reflection", value: "We protected focus time." }],
+      },
+      "narrative-response",
+    ],
+    [
+      "sparse custom",
+      {
+        ...(REPORT as unknown as Record<string, unknown>),
+        assessmentName: "Founder prompts",
+        templateAlias: "walk-qual-sparse-custom",
+        reportStyle: "MODERN_DASHBOARD",
+        result: EMPTY_CANONICAL_RESULT,
+        sections: [{ stableKey: "custom", name: "Founder reflections" }],
+        questionByKey: { custom_prompt: "What deserves attention?" },
+        questionsByKey: {
+          custom_prompt: {
+            type: "TEXT",
+            label: "What deserves attention?",
+            sectionStableKey: "custom",
+          },
+        },
+        rawAnswers: [{ stableKey: "custom_prompt", value: "Our onboarding handoff." }],
+      },
+      "narrative-response",
+    ],
+  ] as const)(
+    "invited on-screen restores the frozen %s campaign appearance",
+    async (_anatomy, report, expectedBlock) => {
+      writeOnScreenResult(ALIAS, report as never, KEY);
+      installFetch(410, {
+        reportStylesAvailable: true,
+        reportFindingsAvailable: true,
+      });
+
+      render(<OrgSurveyClient campaignAlias={ALIAS} />);
+
+      const renderer = await screen.findByTestId("modern-dashboard-report");
+      if (expectedBlock) {
+        expect(
+          renderer.querySelector(`[data-report-block="${expectedBlock}"]`),
+        ).not.toBeNull();
+      }
+    },
+  );
+
   it.each([
     ["EXECUTIVE_BOARDROOM", "executive-boardroom-report"],
     ["MODERN_DASHBOARD", "modern-dashboard-report"],

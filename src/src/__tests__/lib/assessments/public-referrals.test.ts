@@ -5,6 +5,13 @@ import {
   listPublicReferrals,
   summarizePublicResult,
 } from "@/lib/assessments/public-referrals";
+import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
+
+jest.mock("@/lib/assessments/wave-report-styles-flags", () => ({
+  isReportStylesEnabled: jest.fn(() => true),
+}));
+
+const mockReportStylesEnabled = isReportStylesEnabled as jest.Mock;
 
 describe("exportPublicReferrals", () => {
   it("returns only the five display scalars from one bounded query", async () => {
@@ -249,6 +256,7 @@ const PUBLIC_SUBMISSION = {
     certificationExpiry: new Date("2027-07-29T00:00:00.000Z"),
   },
   campaign: {
+    id: "campaign-public",
     name: "Quick Assessment",
     reportStyle: "MODERN_DASHBOARD",
     status: "ACTIVE",
@@ -308,6 +316,10 @@ function makeReportDb(submission: typeof PUBLIC_SUBMISSION | null) {
 }
 
 describe("getPublicReferralReport", () => {
+  beforeEach(() => {
+    mockReportStylesEnabled.mockReturnValue(true);
+  });
+
   it("returns the frozen public report to its immutable active Coach owner", async () => {
     const db = makeReportDb(PUBLIC_SUBMISSION);
 
@@ -334,6 +346,11 @@ describe("getPublicReferralReport", () => {
         versionId: "version-1",
         contentHash: "frozen-content-hash",
       },
+    });
+    expect(outcome.reportStylesAvailable).toBe(true);
+    expect(mockReportStylesEnabled).toHaveBeenCalledWith({
+      templateId: "template-four-decisions",
+      campaignId: "campaign-public",
     });
     expect(
       db.findFirst.mock.calls[0][0].select.campaign.select,
