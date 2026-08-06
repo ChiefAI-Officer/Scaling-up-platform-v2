@@ -60,7 +60,10 @@ import {
 } from "@/lib/assessments/campaign-status-metrics";
 import { resolveInvitationHtmlMode } from "@/lib/assessments/invitation-html-policy";
 import { ReportStylePicker } from "@/components/assessments/ReportStylePicker";
-import type { ReportStyleKey } from "@/lib/assessments/report-style-registry";
+import {
+  REPORT_STYLE_REGISTRY,
+  type ReportStyleKey,
+} from "@/lib/assessments/report-style-registry";
 import {
   invitationHtmlEditorCopy,
   invitationOverrideSummary,
@@ -68,6 +71,20 @@ import {
 } from "@/lib/assessments/invitation-html-editor-copy";
 
 const REASON_MAX_LENGTH = 500;
+
+function formatReportAppearanceLock(lockedAt: Date | string) {
+  const parsed = lockedAt instanceof Date ? lockedAt : new Date(lockedAt);
+  if (Number.isNaN(parsed.getTime())) return null;
+
+  return {
+    iso: parsed.toISOString(),
+    text: new Intl.DateTimeFormat("en-US", {
+      dateStyle: "medium",
+      timeStyle: "short",
+      timeZone: "UTC",
+    }).format(parsed),
+  };
+}
 
 interface ResultPayload {
   submissionId: string;
@@ -112,6 +129,12 @@ export interface CampaignDetailProps {
   onScreenResultsEnabled?: boolean;
   /** Server-computed campaign-level report appearance capability. */
   reportStylesAvailable?: boolean;
+  /**
+   * Exact server-authorized appearance write capability. Fail-closed: absent
+   * or false keeps the stored selection visible without rendering a picker or
+   * save request path.
+   */
+  canEditReportAppearance?: boolean;
   /**
    * Wave M (#19) — the campaign's stored (already-sanitized) slides. Both the
    * editor's initial value AND the PATCH CAS sentinel `expectedCustomSlides`
@@ -237,6 +260,7 @@ export function CampaignDetail({
   customSlidesEnabled = false,
   onScreenResultsEnabled = false,
   reportStylesAvailable = false,
+  canEditReportAppearance = false,
   initialCustomSlides = [],
   customSlidesSections = [],
   longitudinalRespondentIds = [],
@@ -396,6 +420,19 @@ export function CampaignDetail({
   );
   const isDraft = campaign.status === "DRAFT";
   const isClosed = campaign.status === "CLOSED";
+  const canShowReportAppearanceEditor =
+    canEditReportAppearance &&
+    reportStylesAvailable &&
+    campaign.reportStyleLockedAt === null;
+  const selectedReportStyle = REPORT_STYLE_REGISTRY[campaign.reportStyle];
+  const reportStyleProvenance =
+    campaign.reportStyleSource === "CAMPAIGN_OVERRIDE"
+      ? "Campaign choice"
+      : "Template default";
+  const reportAppearanceLock =
+    campaign.reportStyleLockedAt === null
+      ? null
+      : formatReportAppearanceLock(campaign.reportStyleLockedAt);
 
   // Derive header aggregate metrics from the current respondents list.
   // Recomputes automatically whenever respondents changes (add/remove/refresh).
@@ -850,7 +887,7 @@ export function CampaignDetail({
   }
 
   async function handleSaveReportStyle() {
-    if (reportStyleSaving || campaign.reportStyleLockedAt !== null || isClosed) return;
+    if (!canShowReportAppearanceEditor || reportStyleSaving) return;
     setReportStyleSaving(true);
     try {
       const res = await fetch(`/api/assessment-campaigns/${campaign.id}`, {
@@ -1483,39 +1520,29 @@ export function CampaignDetail({
         </div>
       </div>
 
-      {/* Report styles are server-authorized. Once a first completion locks the
-          campaign, keep the selected picker and previews visible as a durable
-          record rather than hiding the immutable choice. */}
-      {reportStylesAvailable && (
-        <div
-          className="bg-card border border-border rounded-xl p-4"
-          data-testid="campaign-report-style-card"
-        >
-          <div className="mb-4">
-            <h2 className="text-sm font-semibold text-foreground">Report appearance</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Choose how completed individual reports will look.
-            </p>
-          </div>
-          <fieldset disabled={isClosed} className="min-w-0 border-0 p-0">
+      {/* The stored selection is a durable campaign record and is visible to
+          every authorized campaign-detail viewer. Only the server-computed
+          exact-owner capability exposes the picker and save request path. */}
+      <div
+        className="bg-card border border-border rounded-xl p-4"
+        data-testid="campaign-report-style-card"
+      >
+        <div className="mb-4">
+          <h2 className="text-sm font-semibold text-foreground">Report appearance</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Appearance used by completed individual reports.
+          </p>
+        </div>
+        {canShowReportAppearanceEditor ? (
+          <>
             <ReportStylePicker
               value={reportStyle}
               onChange={setReportStyle}
-              disabled={campaign.reportStyleLockedAt !== null || reportStyleSaving}
-              sourceLabel={
-                campaign.reportStyleSource === "CAMPAIGN_OVERRIDE"
-                  ? "Campaign override"
-                  : "Template default"
-              }
-              lockedAt={campaign.reportStyleLockedAt}
+              disabled={reportStyleSaving}
             />
-          </fieldset>
-          {isClosed && campaign.reportStyleLockedAt === null && (
-            <p className="mt-4 border-t border-border pt-4 text-xs text-muted-foreground">
-              Closed campaigns cannot change report appearance.
+            <p className="mt-3 text-xs text-muted-foreground">
+              Provenance: {reportStyleProvenance}
             </p>
-          )}
-          {!isClosed && campaign.reportStyleLockedAt === null && (
             <div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-4">
               <p className="text-xs text-muted-foreground">
                 Changes are allowed until the first response is completed.
@@ -1530,9 +1557,47 @@ export function CampaignDetail({
                 Save report appearance
               </button>
             </div>
-          )}
-        </div>
-      )}
+          </>
+        ) : (
+          <div
+            className="rounded-lg border border-border bg-muted/20 p-4"
+            data-testid="campaign-report-style-read-only"
+          >
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">
+                  {selectedReportStyle.label}
+                </h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {selectedReportStyle.description}
+                </p>
+              </div>
+              <span className="rounded-full border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground">
+                {selectedReportStyle.paperFormat}
+              </span>
+            </div>
+            <p className="mt-3 text-xs font-medium text-muted-foreground">
+              {reportStyleProvenance}
+            </p>
+            {campaign.reportStyleLockedAt !== null && (
+              <div className="mt-3 space-y-1 border-t border-border pt-3 text-xs text-muted-foreground">
+                <p>Report appearance was fixed when the first response was completed.</p>
+                {reportAppearanceLock === null ? (
+                  <p>Lock time unavailable.</p>
+                ) : (
+                  <p>
+                    Locked on{" "}
+                    <time dateTime={reportAppearanceLock.iso}>
+                      {reportAppearanceLock.text}
+                    </time>
+                    .
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Wave OSR (#71) — "Results on screen" for an EXISTING campaign.
           Hidden when CLOSED (the PATCH route 409s a closed campaign, so offering

@@ -20,6 +20,7 @@ import {
   asCampaignDetailDb,
   getCampaignOverview,
   getCampaignRespondents,
+  resolveCanEditReportAppearance,
 } from "@/lib/assessments/campaign-detail";
 import { CampaignDetail } from "@/components/assessments/CampaignDetail";
 import {
@@ -138,6 +139,19 @@ export default async function CampaignDetailPage({ params }: PageProps) {
     campaignForFlag !== null &&
     isReportStyleEligible(overview.campaign.templateAlias) &&
     isReportStylesEnabled({ templateId: overview.campaign.templateId, campaignId: id });
+  const hasCurrentWriteAccess =
+    campaignForFlag !== null &&
+    (await canManageCampaign(asAccessDb(db), actor, id, "write"));
+  const canEditReportAppearance =
+    campaignForFlag !== null &&
+    resolveCanEditReportAppearance({
+      actorRole: actor.role,
+      actorCoachId: actor.coachId,
+      campaignOwnerCoachId: campaignForFlag.createdByCoachId,
+      reportStyleLockedAt: overview.campaign.reportStyleLockedAt,
+      reportStylesAvailable,
+      hasCurrentWriteAccess,
+    });
 
   // Wave N (#23) — per-row "over time" eligibility. Each submitted respondent
   // gets a longitudinal entry link ONLY when `hasComparableLongitudinal` is
@@ -202,6 +216,7 @@ export default async function CampaignDetailPage({ params }: PageProps) {
       initialCustomSlides={initialCustomSlides}
       customSlidesSections={customSlidesSections}
       reportStylesAvailable={reportStylesAvailable}
+      canEditReportAppearance={canEditReportAppearance}
       longitudinalRespondentIds={longitudinalRespondentIds}
     />
   );

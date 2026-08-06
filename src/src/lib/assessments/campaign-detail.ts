@@ -32,6 +32,7 @@ import {
   resolveEditionStanding,
   type EditionStanding,
 } from "./edition-standing";
+import type { ApiActor } from "@/lib/auth/access-control";
 import type { AssessmentInvitationStatus, PrismaClient } from "@prisma/client";
 import type { ReportStyleKey } from "./report-style-registry";
 
@@ -127,6 +128,55 @@ export interface CampaignOverview {
     submitted: number; // status = SUBMITTED
     completionPct: number;
   };
+}
+
+export interface ReportAppearanceCapabilityInput {
+  actorRole: ApiActor["role"];
+  actorCoachId: string | null;
+  campaignOwnerCoachId: string | null;
+  reportStyleLockedAt: Date | null;
+  reportStylesAvailable: boolean;
+  hasCurrentWriteAccess: boolean;
+}
+
+export function isExactCoachReportAppearanceOwner({
+  actorRole,
+  actorCoachId,
+  campaignOwnerCoachId,
+}: Pick<
+  ReportAppearanceCapabilityInput,
+  "actorRole" | "actorCoachId" | "campaignOwnerCoachId"
+>): boolean {
+  return (
+    actorRole === "COACH" &&
+    actorCoachId !== null &&
+    campaignOwnerCoachId !== null &&
+    actorCoachId === campaignOwnerCoachId
+  );
+}
+
+/**
+ * Server-only campaign-detail capability. The client receives the resolved
+ * boolean and never derives write authority from a role or ownership id.
+ */
+export function resolveCanEditReportAppearance({
+  actorRole,
+  actorCoachId,
+  campaignOwnerCoachId,
+  reportStyleLockedAt,
+  reportStylesAvailable,
+  hasCurrentWriteAccess,
+}: ReportAppearanceCapabilityInput): boolean {
+  return (
+    isExactCoachReportAppearanceOwner({
+      actorRole,
+      actorCoachId,
+      campaignOwnerCoachId,
+    }) &&
+    reportStyleLockedAt === null &&
+    reportStylesAvailable &&
+    hasCurrentWriteAccess
+  );
 }
 
 // ────────────────────────────────────────────────────────────────────────
