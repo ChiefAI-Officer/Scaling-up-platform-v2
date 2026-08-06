@@ -188,6 +188,9 @@ async function resolveReportComparison(input: {
     const candidates = await listReportComparisonCandidates(asReportComparisonDb(db), input.viewer, focus);
     if (candidates.kind !== "ok") return empty;
     if (!input.compareTo) return { ...empty, candidates: candidates.candidates, bounded: candidates.bounded };
+    if (!candidates.candidates.some((candidate) => candidate.submissionId === input.compareTo)) {
+      return { candidates: candidates.candidates, bounded: candidates.bounded, model: null, error: true };
+    }
 
     const selected = await loadReportComparison(
       asReportComparisonDb(db),
@@ -203,9 +206,11 @@ async function resolveReportComparison(input: {
         entityType: "AssessmentSubmission",
         entityId: input.submissionId,
         action: "VIEW_REPORT_COMPARISON",
-        performedBy: input.viewer.kind === "operator" ? input.viewer.actor.email : "ceo-self",
+        performedBy: input.viewer.kind === "operator" ? input.viewer.actor.userId : "ceo-self",
         changes: {
           kind: "report-native-comparison",
+          focusCampaignId: input.campaignId,
+          focusSubmissionId: input.submissionId,
           baselineSubmissionId: selected.model.baseline.submissionId,
           baselineCampaignId: selected.model.baseline.campaignId,
         },
@@ -224,9 +229,21 @@ function reportExportName(
   comparison: import("@/lib/assessments/report-comparison-model").ReportComparisonModel | null,
 ): string {
   if (!comparison) return `${report.respondentName} - ${report.assessmentName} - Report`;
-  const focus = report.campaignLabel?.trim() || report.assessmentName;
-  const baseline = comparison.baseline.campaignLabel?.trim() || "Scaling Up Assessment";
+  const focus = reportPeriodLabel(report.campaignLabel, report.submittedAt);
+  const baseline = reportPeriodLabel(comparison.baseline.campaignLabel, comparison.baseline.submittedAt);
   return `${report.respondentName} - ${report.assessmentName} - ${focus} vs ${baseline}`;
+}
+
+function reportPeriodLabel(label: string | null, submittedAt: Date): string {
+  const campaign = label?.trim();
+  if (campaign) return campaign;
+  const date = new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(submittedAt);
+  return `Scaling Up Assessment · ${date}`;
 }
 
 /**

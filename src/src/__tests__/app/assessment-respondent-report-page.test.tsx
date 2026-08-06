@@ -543,6 +543,26 @@ describe("(report) respondent report page — report-native comparison", () => {
     expect(markup).toContain("That earlier assessment cannot be compared with this report.");
   });
 
+  it("rejects a selected baseline that is outside the bounded candidate list", async () => {
+    const outsideCandidateModel = {
+      ...comparisonModel,
+      baseline: { ...comparisonCandidate, submissionId: "sub-13", campaignId: "camp-13" },
+    };
+    mockGetApiActor.mockResolvedValue(adminActor());
+    mockGetRespondentReport.mockResolvedValue(scalingUpReport());
+    mockReportComparisonEnabled.mockReturnValue(true);
+    mockListCandidates.mockResolvedValue({ kind: "ok", candidates: [comparisonCandidate], bounded: true });
+    mockLoadComparison.mockResolvedValue({ kind: "ok", model: outsideCandidateModel });
+
+    const node = await Page(makeProps("camp-1", "resp-1", "sub-13"));
+    const markup = renderToStaticMarkup(node as React.ReactElement);
+
+    expect(markup).toContain("That earlier assessment cannot be compared with this report.");
+    expect(markup).toContain('data-comparison-submission-id=""');
+    expect(mockLoadComparison).not.toHaveBeenCalled();
+    expect(mockLogAuditStrict).not.toHaveBeenCalled();
+  });
+
   it("audits before it passes a valid comparison to the branded report and names both periods in the export", async () => {
     mockGetApiActor.mockResolvedValue(adminActor());
     mockGetRespondentReport.mockResolvedValue(scalingUpReport());
@@ -556,10 +576,43 @@ describe("(report) respondent report page — report-native comparison", () => {
     expect(mockLogAuditStrict).toHaveBeenCalledWith(expect.objectContaining({
       action: "VIEW_REPORT_COMPARISON",
       entityId: "sub-99",
+      performedBy: "u-admin",
+      changes: {
+        kind: "report-native-comparison",
+        focusCampaignId: "camp-1",
+        focusSubmissionId: "sub-99",
+        baselineCampaignId: "camp-prior",
+        baselineSubmissionId: "sub-prior",
+      },
     }));
     expect(markup).toContain('data-comparison-submission-id="sub-prior"');
     expect(markup).toContain('data-selected-submission-id="sub-prior"');
     expect(markup).toContain('data-file-name="Jane Respondent - Scaling Up Assessment - Q1 2026 vs Q1 2025"');
+  });
+
+  it("date-qualifies blank focus and baseline campaign labels in the export filename", async () => {
+    const focus = scalingUpReport();
+    focus.report.campaignLabel = null;
+    const blankBaselineModel = {
+      ...comparisonModel,
+      baseline: { ...comparisonCandidate, campaignLabel: null },
+    };
+    mockGetApiActor.mockResolvedValue(adminActor());
+    mockGetRespondentReport.mockResolvedValue(focus);
+    mockReportComparisonEnabled.mockReturnValue(true);
+    mockListCandidates.mockResolvedValue({
+      kind: "ok",
+      candidates: [blankBaselineModel.baseline],
+      bounded: false,
+    });
+    mockLoadComparison.mockResolvedValue({ kind: "ok", model: blankBaselineModel });
+
+    const node = await Page(makeProps("camp-1", "resp-1", "sub-prior"));
+    const markup = renderToStaticMarkup(node as React.ReactElement);
+
+    expect(markup).toContain(
+      'data-file-name="Jane Respondent - Scaling Up Assessment - Scaling Up Assessment · Jan 15, 2026 vs Scaling Up Assessment · Mar 31, 2025"',
+    );
   });
 
   it("omits a comparison if its strict audit cannot be written", async () => {
