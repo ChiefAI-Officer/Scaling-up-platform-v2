@@ -175,6 +175,7 @@ jest.mock("@/lib/assessments/report-email", () => ({
 }));
 jest.mock("@/lib/assessments/results-email", () => ({
   buildResultsEmailHtml: jest.fn(() => "<p>BODY</p><table>REPORT</table>"),
+  renderResultsEmailSubject: jest.fn((subject: string) => subject),
   buildCoachNotifyEmail: jest.fn(() => ({
     subject: "coach-notify-subject",
     bodyHtml: "<a>report link</a>",
