@@ -104,6 +104,12 @@ export interface CampaignDetailProps {
   customHtmlEmailEnabled?: boolean;
   /** GH #220 — server-computed branded HTML-body mode; defaults fail-closed. */
   brandedCustomHtmlEnabled?: boolean;
+  /** Server-computed results-email capability; absent/false fails closed. */
+  resultsEmailEnabled?: boolean;
+  /** Server-computed results-email approval; absent/false fails closed. */
+  resultsEmailApproved?: boolean;
+  /** Server-computed coach-notification capability; absent/false fails closed. */
+  coachNotifyEnabled?: boolean;
   /**
    * Wave F #22 (T10) — gates the campaign-level "View group report" entry
    * point. Computed SERVER-side (accessMode==="INVITED" && flag/canary &&
