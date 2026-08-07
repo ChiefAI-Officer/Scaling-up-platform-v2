@@ -17,6 +17,20 @@
 import { escapeHtml } from "@/lib/templates/interpolate-content-html";
 
 const PURPLE = "#522583";
+const RESPONDENT_FIRST_NAME_TOKEN = "{{respondentFirstName}}";
+
+function stripSubjectControlCharacters(value: string): string {
+  return value.replace(/[\u0000-\u001f\u007f]/g, "");
+}
+
+export function renderResultsEmailSubject(
+  subject: string,
+  respondentFirstName: string,
+): string {
+  return subject
+    .split(RESPONDENT_FIRST_NAME_TOKEN)
+    .join(stripSubjectControlCharacters(respondentFirstName));
+}
 
 /** A CEO capability must never be delivered via an ambiguous or remote HTTP URL. */
 function safeCeoSelfAccessHref(raw: string | null | undefined): string | null {
@@ -66,15 +80,21 @@ function renderInline(escaped: string): string {
  * Renders the admin-authored results-email markdown body to escape-first HTML
  * paragraphs. Empty/whitespace input → "".
  */
-export function renderResultsEmailBodyHtml(markdown: string): string {
+export function renderResultsEmailBodyHtml(
+  markdown: string,
+  respondentFirstName: string,
+): string {
+  const escapedFirstName = escapeHtml(respondentFirstName);
   return markdown
     .split(/\n\s*\n/)
     .filter((p) => p.trim().length > 0)
     .map((p) => {
       const withBreaks = escapeHtml(p).replace(/\n/g, "<br/>");
-      return `<p style="margin:0 0 14px;color:#374151;font-size:15px;line-height:1.6;">${renderInline(
-        withBreaks,
-      )}</p>`;
+      const rendered = renderInline(withBreaks);
+      const personalized = rendered
+        .split(RESPONDENT_FIRST_NAME_TOKEN)
+        .join(escapedFirstName);
+      return `<p style="margin:0 0 14px;color:#374151;font-size:15px;line-height:1.6;">${personalized}</p>`;
     })
     .join("");
 }
@@ -84,6 +104,8 @@ export interface BuildResultsEmailArgs {
   bodyMarkdown: string;
   /** Pre-rendered Spec-16 report HTML (from buildReportEmailHtml). */
   reportHtml: string;
+  /** Invited respondent first name, substituted into the admin-authored copy. */
+  respondentFirstName: string;
   /** Purpose-bound CEO self-access URL, delivered only through approved #15 email. */
   ceoSelfAccessUrl?: string | null;
 }
@@ -96,9 +118,10 @@ export interface BuildResultsEmailArgs {
 export function buildResultsEmailHtml({
   bodyMarkdown,
   reportHtml,
+  respondentFirstName,
   ceoSelfAccessUrl,
 }: BuildResultsEmailArgs): string {
-  const intro = renderResultsEmailBodyHtml(bodyMarkdown);
+  const intro = renderResultsEmailBodyHtml(bodyMarkdown, respondentFirstName);
   const introBlock = intro
     ? `<div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;max-width:640px;margin:0 auto 16px;padding:0 8px;">${intro}</div>`
     : "";

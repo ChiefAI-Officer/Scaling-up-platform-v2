@@ -262,7 +262,7 @@ describe("MetadataTab — F2 (Checkpoint 1b)", () => {
   });
 
   describe("Results Email card (left column, card 3, NEW from F0)", () => {
-    it("renders subject + body + 5-var reference panel + content-approved toggle (WF16 lines 974-1050)", () => {
+    it("renders subject + body + respondent first-name token + coach-enablement toggle", () => {
       render(
         <TemplateEditorTabbed
           template={baseTemplate}
@@ -274,31 +274,34 @@ describe("MetadataTab — F2 (Checkpoint 1b)", () => {
       const resultsEmailHeading = screen.getByText("Results Email");
       const resultsCard = resultsEmailHeading.closest("section") as HTMLElement;
       expect(resultsCard).toBeTruthy();
-      // v7.5 badge from WF16 line 977 — scope to the Results Email card
-      // since "v7.5" also appears in the CEO_ONLY caption.
-      expect(within(resultsCard).getByText(/v7\.5/)).toBeInTheDocument();
-      // 5 results-only vars per WF16 lines 1020-1026
-      const vars = [
-        "{{tierLabel}}",
-        "{{tierMessage}}",
-        "{{perSectionList}}",
-      ];
       const resultsPanel = within(resultsCard)
         .getByText(/Available variables \(results email only\)/i)
         .closest("div") as HTMLElement;
       expect(resultsPanel).toBeTruthy();
-      for (const v of vars) {
-        expect(within(resultsPanel).getByText(v)).toBeInTheDocument();
+      expect(
+        within(resultsPanel).getByText("{{respondentFirstName}}"),
+      ).toBeInTheDocument();
+      for (const unsupportedToken of [
+        "{{templateName}}",
+        "{{tierLabel}}",
+        "{{tierMessage}}",
+        "{{perSectionList}}",
+      ]) {
+        expect(
+          within(resultsPanel).queryByText(unsupportedToken),
+        ).not.toBeInTheDocument();
       }
-      // Content-approved toggle
       const toggle = screen.getByRole("switch", {
-        name: /Content approved/i,
+        name: /Allow coaches to enable results emails for respondents/i,
       });
       expect(toggle).toBeInTheDocument();
       expect(toggle).toHaveAttribute("aria-checked", "false");
+      expect(
+        screen.getByText("Coaches decide separately for each campaign."),
+      ).toBeInTheDocument();
     });
 
-    it("clicking the content-approved toggle flips template-metadata dirty", () => {
+    it("clicking the coach-enablement toggle flips template-metadata dirty", () => {
       render(
         <TemplateEditorTabbed
           template={baseTemplate}
@@ -308,7 +311,7 @@ describe("MetadataTab — F2 (Checkpoint 1b)", () => {
       );
 
       const toggle = screen.getByRole("switch", {
-        name: /Content approved/i,
+        name: /Allow coaches to enable results emails for respondents/i,
       });
       act(() => {
         fireEvent.click(toggle);
@@ -498,7 +501,7 @@ describe("MetadataTab — F2 (Checkpoint 1b)", () => {
       expect(ceo).toBeDisabled();
       // Results Email toggle disabled
       const toggle = screen.getByRole("switch", {
-        name: /Content approved/i,
+        name: /Allow coaches to enable results emails for respondents/i,
       });
       expect(toggle).toBeDisabled();
       // + Add Section disabled

@@ -35,8 +35,11 @@ import {
 import { CampaignDetail } from "@/components/assessments/CampaignDetail";
 import {
   assessmentInviteBrandedCustomHtmlEnabled,
+  waveDCoachNotifyEnabled,
   waveDCustomHtmlEmailEnabled,
+  waveDResultsEmailEnabled,
 } from "@/lib/assessments/wave-d-feature-flags";
+import { isResultsEmailApproved } from "@/lib/assessments/results-email-approval";
 import { isOnScreenResultsEnabled } from "@/lib/assessments/wave-osr-flags";
 import {
   isGroupReportEnabled,
@@ -88,10 +91,24 @@ export default async function AdminCampaignDetailPage({ params }: PageProps) {
       accessMode: true,
       createdByCoachId: true,
       organizationId: true,
-      template: { select: { alias: true } },
+      template: {
+        select: {
+          alias: true,
+          resultsEmailContentApproved: true,
+          resultsEmailContentApprovedHash: true,
+          resultsEmailSubject: true,
+          resultsEmailBodyMarkdown: true,
+        },
+      },
       version: { select: { id: true, publishedAt: true, questions: true } },
     },
   });
+  const resultsEmailEnabled = waveDResultsEmailEnabled();
+  const resultsEmailApproved =
+    resultsEmailEnabled &&
+    campaignForFlag?.template != null &&
+    isResultsEmailApproved(campaignForFlag.template);
+  const coachNotifyEnabled = waveDCoachNotifyEnabled();
   const canShowGroupReport =
     campaignForFlag !== null &&
     campaignForFlag.accessMode === "INVITED" &&
@@ -127,6 +144,9 @@ export default async function AdminCampaignDetailPage({ params }: PageProps) {
         initialRespondents={respondents}
         customHtmlEmailEnabled={waveDCustomHtmlEmailEnabled()}
         brandedCustomHtmlEnabled={assessmentInviteBrandedCustomHtmlEnabled()}
+        resultsEmailEnabled={resultsEmailEnabled}
+        resultsEmailApproved={resultsEmailApproved}
+        coachNotifyEnabled={coachNotifyEnabled}
         canViewGroupReport={canShowGroupReport}
         groupReportHref={`/assessments/${id}/report`}
         // Wave OSR (#71) — gate computed here, server-side, from the same flag the

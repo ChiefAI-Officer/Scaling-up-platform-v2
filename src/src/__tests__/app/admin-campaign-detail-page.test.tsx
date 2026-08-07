@@ -43,9 +43,17 @@ jest.mock("@/lib/db", () => ({
   db: { assessmentCampaign: { findFirst: (...a: unknown[]) => mockFindFirst(...a) } },
 }));
 
+const mockResultsEmailFlag = jest.fn(() => true);
+const mockCoachNotifyFlag = jest.fn(() => true);
 jest.mock("@/lib/assessments/wave-d-feature-flags", () => ({
   waveDCustomHtmlEmailEnabled: () => false,
+  waveDResultsEmailEnabled: () => mockResultsEmailFlag(),
+  waveDCoachNotifyEnabled: () => mockCoachNotifyFlag(),
   assessmentInviteBrandedCustomHtmlEnabled: jest.fn(() => true),
+}));
+const mockIsResultsEmailApproved = jest.fn(() => true);
+jest.mock("@/lib/assessments/results-email-approval", () => ({
+  isResultsEmailApproved: (...a: unknown[]) => mockIsResultsEmailApproved(...a),
 }));
 jest.mock("@/lib/assessments/wave-f-flags", () => ({
   isGroupReportEnabled: () => false,
@@ -87,7 +95,13 @@ beforeEach(() => {
     accessMode: "INVITED",
     createdByCoachId: "coach-1",
     organizationId: "org-1",
-    template: { alias: "leadership-vision-alignment" },
+    template: {
+      alias: "leadership-vision-alignment",
+      resultsEmailContentApproved: true,
+      resultsEmailContentApprovedHash: "approved-hash",
+      resultsEmailSubject: "Your results",
+      resultsEmailBodyMarkdown: "Your report is ready.",
+    },
     version: { id: "v1", publishedAt: new Date("2026-01-01") },
   });
   mockCanViewGroup.mockResolvedValue(true);
@@ -130,7 +144,25 @@ describe("Admin campaign detail — production chrome and report-native placemen
       brandedCustomHtmlEnabled: true,
       reportStylesAvailable: true,
       canEditReportAppearance: false,
+      resultsEmailEnabled: true,
+      resultsEmailApproved: true,
+      coachNotifyEnabled: true,
     });
+    expect(mockFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({
+          template: {
+            select: expect.objectContaining({
+              resultsEmailContentApproved: true,
+              resultsEmailContentApprovedHash: true,
+              resultsEmailSubject: true,
+              resultsEmailBodyMarkdown: true,
+            }),
+          },
+        }),
+      }),
+    );
+    expect(detailProps).not.toHaveProperty("resultsEmailContentApprovedHash");
     expect(detailProps).toHaveProperty(
       "groupReportHref",
       "/assessments/camp-1/report",

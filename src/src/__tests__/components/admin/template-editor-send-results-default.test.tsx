@@ -1,5 +1,5 @@
 /**
- * Wave Q item #1 — "Send results to respondents by default" toggle in the
+ * Wave Q item #1 — "Pre-select for new campaigns" toggle in the
  * admin template editor (Metadata tab, Results Email card).
  *
  * - Renders ONLY when `waveQEnabled` (the write capability is flag-gated).
@@ -7,7 +7,7 @@
  *   (NOT the Save Draft flow — this is a TEMPLATE-ROW field like
  *   invitationSubject, so it must stay editable even when the viewed version
  *   is published and the rest of the metadata surface is read-only).
- * - Hint copy: "Takes effect once the results email content is approved."
+ * - Hint copy: "New campaigns start with respondent results emails enabled."
  * - A 403 from the PATCH (wave flag off server-side) surfaces as a toast.
  */
 
@@ -119,7 +119,7 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
-const TOGGLE_NAME = /send results to respondents by default/i;
+const TOGGLE_NAME = /pre-select for new campaigns/i;
 
 describe("TemplateEditorTabbed — sendResultsDefault toggle gating", () => {
   it("is ABSENT when waveQEnabled is false (default)", () => {
@@ -134,7 +134,9 @@ describe("TemplateEditorTabbed — sendResultsDefault toggle gating", () => {
       screen.queryByRole("switch", { name: TOGGLE_NAME }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByText(/takes effect once the results email content is approved/i),
+      screen.queryByText(
+        /new campaigns start with respondent results emails enabled/i,
+      ),
     ).not.toBeInTheDocument();
   });
 
@@ -152,7 +154,7 @@ describe("TemplateEditorTabbed — sendResultsDefault toggle gating", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByText(
-        /takes effect once the results email content is approved\./i,
+        /new campaigns start with respondent results emails enabled\./i,
       ),
     ).toBeInTheDocument();
   });

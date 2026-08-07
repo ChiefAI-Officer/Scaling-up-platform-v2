@@ -57,6 +57,7 @@ import {
 import {
   buildResultsEmailHtml,
   buildCoachNotifyEmail,
+  renderResultsEmailSubject,
 } from "@/lib/assessments/results-email";
 import { respondentDisplayName } from "@/lib/assessments/respondent-display-name";
 import { normalizeMailbox } from "@/lib/assessments/quick-assessment-lead";
@@ -261,6 +262,7 @@ function buildWaveDOutboxRows({
     waveDResultsEmailEnabled() &&
     template !== null &&
     isResultsEmailApproved(template) &&
+    respondent !== null &&
     respondentEmail &&
     // Wave OSR: the model is now built once by the caller. A failed build
     // drops this email exactly as the old in-place try/catch did.
@@ -298,6 +300,7 @@ function buildWaveDOutboxRows({
                 bodyHtml: buildResultsEmailHtml({
                   bodyMarkdown: template.resultsEmailBodyMarkdown ?? "",
                   reportHtml,
+                  respondentFirstName: respondent.firstName,
                   ceoSelfAccessUrl,
                 }),
               }
@@ -345,7 +348,10 @@ function buildWaveDOutboxRows({
           : "",
         recipientRole: "RESPONDENT",
         emailType: "ASSESSMENT_RESULTS",
-        subject: template.resultsEmailSubject ?? "Your assessment results",
+        subject: renderResultsEmailSubject(
+          template.resultsEmailSubject ?? "Your assessment results",
+          respondent.firstName,
+        ),
         bodyHtml: renderCache.results.bodyHtml,
         renderInputHash: prepareIntentMetadata ? reportRenderInputHash : "",
         contentProvenance,
@@ -491,7 +497,7 @@ function emailRenderFingerprint(campaign: {
     alias: string;
     resultsEmailContentApprovedHash: string | null;
   } | null;
-}): EmailRenderFingerprint {
+}, respondentFirstName: string | null): EmailRenderFingerprint {
   const chrome = reportEmailChromeForCampaign(campaign.id);
   const brandedCoach =
     chrome === "gh228"
@@ -508,6 +514,7 @@ function emailRenderFingerprint(campaign: {
       campaign.template?.resultsEmailContentApprovedHash ?? null,
       campaign.template?.alias ?? null,
       campaign.version.id,
+      respondentFirstName,
       chrome,
       brandedCoach,
     ]),
@@ -530,7 +537,7 @@ interface LockedInvitationForIntent {
   expiresAt: Date;
   campaignId: string;
   respondentId: string;
-  respondent: { email: string } | null;
+  respondent: { email: string; firstName: string } | null;
   campaign: {
     templateId: string;
     accessMode: string;
@@ -1009,7 +1016,10 @@ export async function POST(
       // window (approval revoked/edited, toggle flipped, pinned version
       // swapped). The submission still commits — only the stale email row is
       // skipped.
-      const phase1Fingerprint = emailRenderFingerprint(invitation.campaign);
+      const phase1Fingerprint = emailRenderFingerprint(
+        invitation.campaign,
+        invitation.respondent?.firstName ?? null,
+      );
 
       // ── Phase 2 (locked tx): re-validate → freeze → create submission ─────
       const result = await db.$transaction(async (tx) => {
@@ -1037,7 +1047,7 @@ export async function POST(
             expiresAt: true,
             campaignId: true,
             respondentId: true,
-            respondent: { select: { email: true } },
+            respondent: { select: { email: true, firstName: true } },
             campaign: {
               select: {
                 id: true,
@@ -1161,7 +1171,10 @@ export async function POST(
         // Capture the final gate/render fingerprint while the invitation and
         // campaign state are locked. Post-commit rendering uses this immutable
         // decision snapshot without extending the row-lock duration.
-        const phase2Fingerprint = emailRenderFingerprint(locked.campaign);
+        const phase2Fingerprint = emailRenderFingerprint(
+          locked.campaign,
+          locked.respondent?.firstName ?? null,
+        );
         const rowsToPersist = preparedRows.filter((row) => {
           if (row.hasCeoSelfAccessUrl && !ceoSelfAccessAuthorized) {
             console.warn(

@@ -104,6 +104,12 @@ export interface CampaignDetailProps {
   customHtmlEmailEnabled?: boolean;
   /** GH #220 — server-computed branded HTML-body mode; defaults fail-closed. */
   brandedCustomHtmlEnabled?: boolean;
+  /** Server-computed results-email capability; absent/false fails closed. */
+  resultsEmailEnabled?: boolean;
+  /** Server-computed results-email approval; absent/false fails closed. */
+  resultsEmailApproved?: boolean;
+  /** Server-computed coach-notification capability; absent/false fails closed. */
+  coachNotifyEnabled?: boolean;
   /**
    * Wave F #22 (T10) — gates the campaign-level "View group report" entry
    * point. Computed SERVER-side (accessMode==="INVITED" && flag/canary &&
@@ -254,6 +260,9 @@ export function CampaignDetail({
   initialRespondents,
   customHtmlEmailEnabled = false,
   brandedCustomHtmlEnabled = false,
+  resultsEmailEnabled = false,
+  resultsEmailApproved = false,
+  coachNotifyEnabled = false,
   canViewGroupReport = false,
   groupReportHref,
   customSlidesEnabled = false,
@@ -328,6 +337,14 @@ export function CampaignDetail({
     initialOverview.campaign.showResultsOnScreen === true,
   );
   const [onScreenSaving, setOnScreenSaving] = useState(false);
+  const [sendResultsToRespondent, setSendResultsToRespondent] = useState(
+    initialOverview.campaign.sendResultsToRespondent === true,
+  );
+  const [sendResultsSaving, setSendResultsSaving] = useState(false);
+  const [notifyCoachOnCompletion, setNotifyCoachOnCompletion] = useState(
+    initialOverview.campaign.notifyCoachOnCompletion === true,
+  );
+  const [notifyCoachSaving, setNotifyCoachSaving] = useState(false);
   const [emailSubject, setEmailSubject] = useState<string>(
     overview.campaign.invitationSubject ?? "",
   );
@@ -883,6 +900,90 @@ export function CampaignDetail({
       });
     } finally {
       setOnScreenSaving(false);
+    }
+  }
+
+  async function handleToggleSendResults(next: boolean) {
+    if (sendResultsSaving) return;
+    const previous = sendResultsToRespondent;
+    setSendResultsToRespondent(next);
+    setSendResultsSaving(true);
+    try {
+      const res = await fetch(`/api/assessment-campaigns/${campaign.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sendResultsToRespondent: next }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || body.success === false) {
+        throw new Error(
+          typeof body.error === "string"
+            ? body.error
+            : "The change was not saved.",
+        );
+      }
+      const echoed = body?.data?.sendResultsToRespondent;
+      if (echoed !== next) {
+        throw new Error("This setting is not currently available.");
+      }
+      toast({
+        title: next
+          ? "Respondent results emails enabled"
+          : "Respondent results emails disabled",
+      });
+      router.refresh();
+    } catch (err) {
+      setSendResultsToRespondent(previous);
+      toast({
+        title: "Could not change respondent results email",
+        description:
+          err instanceof Error ? err.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSendResultsSaving(false);
+    }
+  }
+
+  async function handleToggleNotifyCoach(next: boolean) {
+    if (notifyCoachSaving) return;
+    const previous = notifyCoachOnCompletion;
+    setNotifyCoachOnCompletion(next);
+    setNotifyCoachSaving(true);
+    try {
+      const res = await fetch(`/api/assessment-campaigns/${campaign.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notifyCoachOnCompletion: next }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || body.success === false) {
+        throw new Error(
+          typeof body.error === "string"
+            ? body.error
+            : "The change was not saved.",
+        );
+      }
+      const echoed = body?.data?.notifyCoachOnCompletion;
+      if (echoed !== next) {
+        throw new Error("This setting is not currently available.");
+      }
+      toast({
+        title: next
+          ? "Completion emails enabled"
+          : "Completion emails disabled",
+      });
+      router.refresh();
+    } catch (err) {
+      setNotifyCoachOnCompletion(previous);
+      toast({
+        title: "Could not change completion notifications",
+        description:
+          err instanceof Error ? err.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setNotifyCoachSaving(false);
     }
   }
 
@@ -1640,6 +1741,80 @@ export function CampaignDetail({
               </span>
             </span>
           </label>
+        </div>
+      )}
+
+      {(resultsEmailEnabled || coachNotifyEnabled) && !isClosed && (
+        <div
+          className="bg-card border border-border rounded-xl p-4"
+          data-testid="campaign-email-notifications-card"
+        >
+          <h2 className="text-sm font-semibold text-foreground">
+            Email notifications
+          </h2>
+
+          {resultsEmailEnabled && (
+            <label
+              className={`mt-3 flex items-start gap-3 ${
+                sendResultsSaving || !resultsEmailApproved
+                  ? "cursor-not-allowed"
+                  : "cursor-pointer"
+              }`}
+            >
+              <input
+                type="checkbox"
+                className="accent-primary w-4 h-4 mt-0.5"
+                checked={sendResultsToRespondent}
+                disabled={sendResultsSaving || !resultsEmailApproved}
+                onChange={(event) =>
+                  handleToggleSendResults(event.target.checked)
+                }
+                aria-label="Email each respondent their results"
+              />
+              <span
+                className={`text-sm ${
+                  resultsEmailApproved
+                    ? "text-foreground"
+                    : "text-muted-foreground"
+                }`}
+              >
+                Email each respondent their results
+                <span className="block text-xs text-muted-foreground mt-1">
+                  {resultsEmailApproved
+                    ? "Applies to future submissions."
+                    : "Not available for this assessment. Ask an admin to enable respondent results email."}
+                </span>
+              </span>
+            </label>
+          )}
+
+          {coachNotifyEnabled && (
+            <label
+              className={`mt-3 flex items-start gap-3 ${
+                notifyCoachSaving ? "cursor-not-allowed" : "cursor-pointer"
+              }`}
+            >
+              <input
+                type="checkbox"
+                className="accent-primary w-4 h-4 mt-0.5"
+                checked={notifyCoachOnCompletion}
+                disabled={notifyCoachSaving}
+                onChange={(event) =>
+                  handleToggleNotifyCoach(event.target.checked)
+                }
+                aria-label="Email me when someone completes the assessment"
+              />
+              <span
+                className={`text-sm ${
+                  notifyCoachSaving
+                    ? "text-muted-foreground"
+                    : "text-foreground"
+                }`}
+              >
+                Email me when someone completes the assessment
+              </span>
+            </label>
+          )}
         </div>
       )}
 

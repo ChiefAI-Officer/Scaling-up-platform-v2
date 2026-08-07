@@ -25,8 +25,11 @@ import {
 import { CampaignDetail } from "@/components/assessments/CampaignDetail";
 import {
   assessmentInviteBrandedCustomHtmlEnabled,
+  waveDCoachNotifyEnabled,
   waveDCustomHtmlEmailEnabled,
+  waveDResultsEmailEnabled,
 } from "@/lib/assessments/wave-d-feature-flags";
+import { isResultsEmailApproved } from "@/lib/assessments/results-email-approval";
 import {
   isGroupReportEnabled,
   isGroupReportAlias,
@@ -98,7 +101,15 @@ export default async function CampaignDetailPage({ params }: PageProps) {
       // initial value AND its CAS sentinel; versionId resolves the section
       // anchors for the "Before section" picker.
       customSlides: true,
-      template: { select: { alias: true } },
+      template: {
+        select: {
+          alias: true,
+          resultsEmailContentApproved: true,
+          resultsEmailContentApprovedHash: true,
+          resultsEmailSubject: true,
+          resultsEmailBodyMarkdown: true,
+        },
+      },
       // Wave J (J-3): the SU-Full-scoped publish guard reads publishedAt so the
       // entry-point link is gated lock-step with the loader (never show a link
       // that would land on the loader's `notApplicable(unpublished)` panel).
@@ -113,6 +124,12 @@ export default async function CampaignDetailPage({ params }: PageProps) {
       },
     },
   });
+  const resultsEmailEnabled = waveDResultsEmailEnabled();
+  const resultsEmailApproved =
+    resultsEmailEnabled &&
+    campaignForFlag?.template != null &&
+    isResultsEmailApproved(campaignForFlag.template);
+  const coachNotifyEnabled = waveDCoachNotifyEnabled();
   const canShowGroupReport =
     campaignForFlag !== null &&
     campaignForFlag.accessMode === "INVITED" &&
@@ -201,6 +218,9 @@ export default async function CampaignDetailPage({ params }: PageProps) {
       initialRespondents={respondents}
       customHtmlEmailEnabled={waveDCustomHtmlEmailEnabled()}
       brandedCustomHtmlEnabled={assessmentInviteBrandedCustomHtmlEnabled()}
+      resultsEmailEnabled={resultsEmailEnabled}
+      resultsEmailApproved={resultsEmailApproved}
+      coachNotifyEnabled={coachNotifyEnabled}
       canViewGroupReport={canShowGroupReport}
       groupReportHref={`/assessments/${id}/report`}
       customSlidesEnabled={customSlidesEnabled}

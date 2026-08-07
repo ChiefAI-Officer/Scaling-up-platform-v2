@@ -914,7 +914,7 @@ describe("editor byte-equivalence guard", () => {
 
     // The toggle is on the Metadata tab (active by default); Wave-Q flag on.
     const toggle = screen.getByRole("switch", {
-      name: /Send results to respondents by default/,
+      name: /Pre-select for new campaigns/,
     });
     expect(toggle).toHaveAttribute("aria-checked", "false");
     await act(async () => {

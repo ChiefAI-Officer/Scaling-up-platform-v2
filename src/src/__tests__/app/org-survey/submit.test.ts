@@ -775,7 +775,11 @@ describe("Wave D — outbox enqueue", () => {
   });
 
   it("#15 RESPONDENT row carries the respondent email + ASSESSMENT_RESULTS type + submission id", async () => {
-    mockHappyInvitation();
+    const invitation = mockHappyInvitation();
+    invitation.campaign.template.resultsEmailSubject =
+      "{{respondentFirstName}} — your results";
+    invitation.campaign.template.resultsEmailBodyMarkdown =
+      "Hi {{respondentFirstName}}, your results are ready.";
     await submit();
     const row = txMock.assessmentEmailOutbox.create.mock.calls
       .map((c: Array<{ data: Record<string, unknown> }>) => c[0].data)
@@ -784,7 +788,8 @@ describe("Wave D — outbox enqueue", () => {
     expect(row!.recipientEmail).toBe("respondent@example.com");
     expect(row!.emailType).toBe("ASSESSMENT_RESULTS");
     expect(row!.submissionId).toBe("sub-1");
-    expect(row!.subject).toBe("Your results");
+    expect(row!.subject).toBe("Resp — your results");
+    expect(row!.bodyHtml).toContain("Hi Resp, your results are ready.");
   });
 
   it("#16 OWNING_COACH row carries the coach email + COACH_COMPLETION type", async () => {
@@ -922,6 +927,10 @@ describe("Wave D C-M2 — stale email render-input re-check under the lock", () 
       expiresAt: new Date(Date.now() + 86_400_000),
       respondentId: "r1",
       campaignId: "c1",
+      respondent: {
+        email: "respondent@example.com",
+        firstName: "Resp",
+      },
       campaign: {
         id: "c1",
         alias: "demo",
@@ -954,6 +963,23 @@ describe("Wave D C-M2 — stale email render-input re-check under the lock", () 
     // #15 dropped — its render inputs went stale under the lock…
     expect(enqueuedRoles()).not.toContain("RESPONDENT");
     // …but #16 is unaffected (its inputs did not change).
+    expect(enqueuedRoles()).toContain("OWNING_COACH");
+  });
+
+  it("SKIPS the #15 row when the respondent first name changed between Phase 1 and Phase 2", async () => {
+    const phase1 = mockHappyInvitation();
+    const locked = {
+      ...phase1,
+      respondent: {
+        ...phase1.respondent,
+        firstName: "Renamed",
+      },
+    };
+    txMock.assessmentInvitation.findUnique.mockResolvedValue(locked);
+
+    const res = await submit();
+    expect(res.status).toBe(200);
+    expect(enqueuedRoles()).not.toContain("RESPONDENT");
     expect(enqueuedRoles()).toContain("OWNING_COACH");
   });
 
@@ -1006,6 +1032,10 @@ describe("Wave D C-M2 — stale email render-input re-check under the lock", () 
       expiresAt: new Date(Date.now() + 86_400_000),
       respondentId: "r1",
       campaignId: "c1",
+      respondent: {
+        email: "respondent@example.com",
+        firstName: "Resp",
+      },
       campaign: {
         id: "c1",
         alias: "demo",
