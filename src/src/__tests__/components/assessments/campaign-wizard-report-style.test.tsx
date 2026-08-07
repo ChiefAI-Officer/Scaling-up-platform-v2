@@ -32,6 +32,17 @@ const NON_CANARY_TEMPLATE = {
   id: "tpl-non-canary",
   reportStylesEnabled: false,
 };
+const NARRATIVE_CUSTOM_TEMPLATE = {
+  ...TEMPLATE,
+  id: "tpl-narrative-custom",
+  name: "Founder Prompts",
+  alias: "founder-prompts-custom",
+  reportStylePreviewCapabilities: {
+    reportType: "scored" as const,
+    hasMetrics: false,
+    hasNarrativeResponses: true,
+  },
+};
 const RESPONDENT = {
   id: "resp-1",
   firstName: "Alice",
@@ -121,10 +132,21 @@ describe("CampaignWizard — report appearance", () => {
     expect(screen.getByRole("heading", { name: "Report appearance" })).toBeInTheDocument();
   });
 
-  it("does not render report appearance for an ineligible template", async () => {
-    await advanceToSchedule(OTHER_TEMPLATE, true);
+  it("renders report appearance for a template with an arbitrary alias", async () => {
+    await advanceToSchedule(OTHER_TEMPLATE);
 
-    expect(screen.queryByRole("heading", { name: "Report appearance" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Report appearance" })).toBeInTheDocument();
+  });
+
+  it("uses sparse custom preview assets for a narrative-only custom template", async () => {
+    await advanceToSchedule(NARRATIVE_CUSTOM_TEMPLATE);
+
+    expect(
+      screen.getByRole("img", { name: "Modern Dashboard Cover preview" }),
+    ).toHaveAttribute(
+      "src",
+      "/report-style-previews/sparse-custom/modern-dashboard/cover.webp",
+    );
   });
 
   it("does not render report appearance for an eligible template outside the canary", async () => {
@@ -208,7 +230,7 @@ describe("CampaignWizard — report appearance", () => {
     });
   });
 
-  it("clears explicit intent when the coach switches to an ineligible template", async () => {
+  it("keeps report appearance available when the coach switches to another template", async () => {
     installFetch(null, [TEMPLATE, OTHER_TEMPLATE]);
     render(<CampaignWizard />);
 
@@ -226,7 +248,7 @@ describe("CampaignWizard — report appearance", () => {
     fireEvent.click(screen.getByRole("button", { name: /^next/i }));
     fireEvent.click(screen.getByRole("button", { name: /^next/i }));
 
-    expect(screen.queryByRole("heading", { name: "Report appearance" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Report appearance" })).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Campaign name"), {
       target: { value: "Q3" },
     });

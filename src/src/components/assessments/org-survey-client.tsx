@@ -55,6 +55,7 @@ import {
 } from "@/components/assessments/assessment-welcome";
 import { formatTimestampDateTime } from "@/lib/utils";
 import { BrandedReport } from "@/components/assessments/BrandedReport";
+import { ReportStyleScope } from "@/components/assessments/ReportStyleScope";
 import { PrintReportButton } from "@/components/assessments/PrintReportButton";
 import type { RespondentReport } from "@/lib/assessments/respondent-report";
 import {
@@ -556,32 +557,37 @@ export function OrgSurveyClient({
   // populated, so there is no branch to make here.
   if (phase.kind === "results") {
     return (
-      <main className="survey-body" data-testid="org-survey-results">
-        {/* Scope wrapper so su-report.css applies (ADR-0005) — the same wrapper
-            the invited (report) route layout provides. */}
-        <div className="su-public-brand su-report">
-          <div className="no-print" style={{ textAlign: "center" }}>
-            <PrintReportButton
-              fileName={`${phase.report.assessmentName} — ${phase.report.respondentName}`}
+      <ReportStyleScope
+        report={phase.report}
+        reportStylesAvailable={phase.reportStylesAvailable === true}
+      >
+        <main className="survey-body" data-testid="org-survey-results">
+          {/* Scope wrapper so su-report.css applies (ADR-0005) — the same wrapper
+              the invited (report) route layout provides. */}
+          <div className="su-public-brand su-report">
+            <div className="no-print" style={{ textAlign: "center" }}>
+              <PrintReportButton
+                fileName={`${phase.report.assessmentName} — ${phase.report.respondentName}`}
+              />
+              {/* The copy that used to live on the thank-you page: with the report
+                  shown in place that page is bypassed entirely, so the "your coach
+                  will review this with you" framing needs a home here. Print /
+                  Download is the ONLY way to keep the report, so say so. */}
+              <p className="su-report-onscreen-note">
+                Your coach will review these results with you. Use Print or
+                Download PDF above if you would like to keep a copy.
+              </p>
+            </div>
+            <BrandedReport
+              report={phase.report}
+              assessmentName={phase.report.assessmentName}
+              campaignLabel={phase.report.campaignLabel ?? null}
+              reportStylesAvailable={phase.reportStylesAvailable === true}
+              reportFindingsAvailable={phase.reportFindingsAvailable === true}
             />
-            {/* The copy that used to live on the thank-you page: with the report
-                shown in place that page is bypassed entirely, so the "your coach
-                will review this with you" framing needs a home here. Print /
-                Download is the ONLY way to keep the report, so say so. */}
-            <p className="su-report-onscreen-note">
-              Your coach will review these results with you. Use Print or
-              Download PDF above if you would like to keep a copy.
-            </p>
           </div>
-          <BrandedReport
-            report={phase.report}
-            assessmentName={phase.report.assessmentName}
-            campaignLabel={phase.report.campaignLabel ?? null}
-            reportStylesAvailable={phase.reportStylesAvailable === true}
-            reportFindingsAvailable={phase.reportFindingsAvailable === true}
-          />
-        </div>
-      </main>
+        </main>
+      </ReportStyleScope>
     );
   }
 

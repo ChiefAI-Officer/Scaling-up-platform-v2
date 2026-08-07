@@ -23,6 +23,7 @@ function shellProps(overrides: {
   previewSettingsEnabled?: boolean;
   reportStylesEnabled?: boolean;
   defaultReportStyle?: "CLASSIC" | "EXECUTIVE_BOARDROOM" | "MODERN_DASHBOARD";
+  questions?: unknown[];
 } = {}) {
   return {
     template: {
@@ -40,7 +41,7 @@ function shellProps(overrides: {
       publishedAt: "2026-08-05T00:00:00.000Z",
       contentHash: "abcdef012345",
       sections: [{ stableKey: "S1", name: "Section One" }],
-      questions: [],
+      questions: overrides.questions ?? [],
       scoringConfig: {},
       reportConfig: null,
     },
@@ -69,7 +70,7 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe("admin default report appearance", () => {
-  it("appears after Audience only for Scaling Up Full when ED10 and report styles are available", () => {
+  it("appears after Audience for every template when ED10 and report styles are available", () => {
     render(<TemplateEditorTabbed {...shellProps()} />);
 
     const audience = screen.getByTestId("settings-audience-card");
@@ -90,12 +91,45 @@ describe("admin default report appearance", () => {
 
   it.each([
     ["report styles unavailable", { reportStylesEnabled: false }],
-    ["a non-eligible alias", { alias: "scaling-up-full-v2" }],
     ["ED10 unavailable", { previewSettingsEnabled: false }],
   ])("is absent for %s", (_label, overrides) => {
     render(<TemplateEditorTabbed {...shellProps(overrides)} />);
 
     expect(screen.queryByTestId("settings-default-report-style-card")).toBeNull();
+  });
+
+  it("uses the canonical qualitative preview anatomy for qualitative aliases", () => {
+    render(<TemplateEditorTabbed {...shellProps({
+      alias: "qsp-v2",
+      questions: [{ stableKey: "confidence", type: "SLIDER_LIKERT" }],
+    })} />);
+
+    expect(
+      within(screen.getByTestId("settings-default-report-style-card")).getByRole(
+        "img",
+        { name: "Classic Cover preview" },
+      ),
+    ).toHaveAttribute(
+      "src",
+      "/report-style-previews/qualitative/classic/cover.webp",
+    );
+  });
+
+  it("uses sparse custom evidence for a narrative-only custom instrument", () => {
+    render(<TemplateEditorTabbed {...shellProps({
+      alias: "founder-prompts-custom",
+      questions: [{ stableKey: "reflection", type: "TEXT" }],
+    })} />);
+
+    expect(
+      within(screen.getByTestId("settings-default-report-style-card")).getByRole(
+        "img",
+        { name: "Classic Cover preview" },
+      ),
+    ).toHaveAttribute(
+      "src",
+      "/report-style-previews/sparse-custom/classic/cover.webp",
+    );
   });
 
   it("disables style changes while the template-row PATCH is pending", async () => {

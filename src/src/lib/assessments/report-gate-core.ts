@@ -19,7 +19,8 @@
  * This file is intentionally PURE: its only runtime import is next/navigation.
  * Everything else (db, headers, the loaders, the flags, the rate limiter, the
  * metric emitter) is supplied via `deps`/`opts` so the protocol is a unit under
- * test against fakes. The two adapters live in report-access-gate.ts.
+ * test against fakes. Surface-specific adapters live in
+ * report-access-gate.ts and group-report-access-gate.ts.
  */
 
 import { notFound, redirect } from "next/navigation";

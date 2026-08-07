@@ -36,11 +36,15 @@ jest.mock("@/lib/assessments/access-control", () => ({
 
 const mockGetCampaignOverview = jest.fn();
 const mockGetCampaignRespondents = jest.fn();
-jest.mock("@/lib/assessments/campaign-detail", () => ({
-  asCampaignDetailDb: (x: unknown) => x,
-  getCampaignOverview: (...a: unknown[]) => mockGetCampaignOverview(...a),
-  getCampaignRespondents: (...a: unknown[]) => mockGetCampaignRespondents(...a),
-}));
+jest.mock("@/lib/assessments/campaign-detail", () => {
+  const actual = jest.requireActual("@/lib/assessments/campaign-detail");
+  return {
+    ...actual,
+    asCampaignDetailDb: (x: unknown) => x,
+    getCampaignOverview: (...a: unknown[]) => mockGetCampaignOverview(...a),
+    getCampaignRespondents: (...a: unknown[]) => mockGetCampaignRespondents(...a),
+  };
+});
 
 // Wave N — the per-row longitudinal eligibility predicate. Controllable so we
 // can drive the throwing path (the page's loop must SWALLOW a throw, never 500).
@@ -70,14 +74,17 @@ jest.mock("@/lib/db", () => ({
 // Capture the props handed to CampaignDetail.
 const captured: {
   canViewGroupReport?: boolean;
+  canEditReportAppearance?: boolean;
   longitudinalRespondentIds?: string[];
 } = {};
 jest.mock("@/components/assessments/CampaignDetail", () => ({
   CampaignDetail: (props: {
     canViewGroupReport?: boolean;
+    canEditReportAppearance?: boolean;
     longitudinalRespondentIds?: string[];
   }) => {
     captured.canViewGroupReport = props.canViewGroupReport;
+    captured.canEditReportAppearance = props.canEditReportAppearance;
     captured.longitudinalRespondentIds = props.longitudinalRespondentIds;
     return null;
   },
@@ -102,6 +109,7 @@ function coachSession() {
 function makeCampaign(overrides: Record<string, unknown> = {}) {
   return {
     id: CAMPAIGN_ID,
+    status: "ACTIVE",
     accessMode: "INVITED",
     createdByCoachId: "coach-1",
     organizationId: "org-1",
@@ -113,6 +121,7 @@ function makeCampaign(overrides: Record<string, unknown> = {}) {
 
 async function runPage() {
   captured.canViewGroupReport = undefined;
+  captured.canEditReportAppearance = undefined;
   captured.longitudinalRespondentIds = undefined;
   const node = await Page({ params: Promise.resolve({ id: CAMPAIGN_ID }) });
   // Render the returned tree so the (mocked) CampaignDetail is invoked and
@@ -131,6 +140,9 @@ beforeEach(() => {
     campaign: {
       organizationId: "org-1",
       templateId: TEMPLATE_ID,
+      templateAlias: "scaling-up-full",
+      status: "ACTIVE",
+      reportStyleLockedAt: null,
       alias: "su-full-campaign-slug", // CAMPAIGN slug, deliberately NOT the template alias
     },
   });
@@ -140,11 +152,45 @@ beforeEach(() => {
   delete process.env.WAVE_J_SUFULL_GROUP_ENABLED;
   delete process.env.WAVE_J_SUFULL_GROUP_CANARY;
   delete process.env.WAVE_J_SUFULL_GROUP_KILL;
+  delete process.env.WAVE_REPORT_STYLES_ENABLED;
+  delete process.env.WAVE_REPORT_STYLES_KILL;
+  delete process.env.WAVE_REPORT_STYLES_CANARY;
 });
 
 afterEach(() => {
   delete process.env.WAVE_J_SUFULL_GROUP_ENABLED;
   delete process.env.WAVE_F_GROUP_REPORT_ENABLED;
+  delete process.env.WAVE_REPORT_STYLES_ENABLED;
+});
+
+describe("CampaignDetail report appearance capability", () => {
+  it("passes edit authority for the owning coach while available and unlocked", async () => {
+    process.env.WAVE_REPORT_STYLES_ENABLED = "1";
+    mockFindFirst.mockResolvedValue(makeCampaign());
+
+    await runPage();
+
+    expect(captured.canEditReportAppearance).toBe(true);
+  });
+
+  it("fails closed after the campaign appearance is locked", async () => {
+    process.env.WAVE_REPORT_STYLES_ENABLED = "1";
+    mockFindFirst.mockResolvedValue(makeCampaign());
+    mockGetCampaignOverview.mockResolvedValue({
+      campaign: {
+        organizationId: "org-1",
+        templateId: TEMPLATE_ID,
+        templateAlias: "scaling-up-full",
+        status: "ACTIVE",
+        reportStyleLockedAt: new Date("2026-08-06T04:00:00.000Z"),
+        alias: "su-full-campaign-slug",
+      },
+    });
+
+    await runPage();
+
+    expect(captured.canEditReportAppearance).toBe(false);
+  });
 });
 
 describe("CampaignDetail entry-point publish gate (Wave J J-3)", () => {

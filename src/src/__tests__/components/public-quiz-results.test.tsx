@@ -244,8 +244,94 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
     await waitFor(() =>
       expect(screen.getByTestId("modern-dashboard-report")).toBeInTheDocument(),
     );
+    expect(screen.getByTestId("quiz-results")).toHaveAttribute(
+      "data-enabled-report-style",
+      "MODERN_DASHBOARD",
+    );
     expect(screen.getByText("Fresh server-authorized finding")).toBeInTheDocument();
   });
+
+  it.each([
+    {
+      anatomy: "scored",
+      templateAlias: "RockHabits",
+      matrixQuestions: questions,
+      answerKind: "slider",
+      expectedBlock: null,
+    },
+    {
+      anatomy: "qualitative",
+      templateAlias: "qsp-v2",
+      matrixQuestions: questions,
+      answerKind: "slider",
+      expectedBlock: "qualitative-scale",
+    },
+    {
+      anatomy: "sparse custom",
+      templateAlias: "founder-reflection-2026",
+      matrixQuestions: [
+        {
+          stableKey: "custom_prompt",
+          sortOrder: 1,
+          sectionStableKey: "S1",
+          type: "TEXT",
+          label: "What deserves attention?",
+          isRequired: true,
+        },
+      ],
+      answerKind: "text",
+      expectedBlock: "narrative-response",
+    },
+  ] as const)(
+    "public immediate result uses the frozen appearance for $anatomy reports",
+    async ({ templateAlias, matrixQuestions, answerKind, expectedBlock }) => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          success: true,
+          data: {
+            submissionId: "sub_matrix",
+            reportStyle: "MODERN_DASHBOARD",
+            reportStylesAvailable: true,
+            reportFindingsAvailable: true,
+            scoreResult: scoreResultFixture,
+            redirectUrl: `/quiz/${ALIAS}/thank-you`,
+          },
+        }),
+      });
+
+      render(
+        <PublicQuizClient
+          {...baseProps}
+          templateAlias={templateAlias}
+          questions={matrixQuestions as never}
+        />,
+      );
+      reachFormStep();
+      if (answerKind === "text") {
+        fireEvent.change(screen.getByRole("textbox"), {
+          target: { value: "Our onboarding handoff." },
+        });
+      } else {
+        fireEvent.change(screen.getByRole("slider"), { target: { value: "6" } });
+      }
+      fireEvent.click(screen.getByRole("button", { name: /submit/i }));
+
+      const renderer = await screen.findByTestId("modern-dashboard-report");
+      if (expectedBlock) {
+        expect(
+          renderer.querySelector(`[data-report-block="${expectedBlock}"]`),
+        ).not.toBeNull();
+      }
+      expect(renderer).not.toHaveTextContent("sub_matrix");
+      expect(renderer).not.toHaveTextContent(/version unavailable|hash unavailable/i);
+      expect(renderer.textContent).not.toContain(" ·  · ");
+      expect(
+        renderer.querySelector('[data-testid="imported-badge"]'),
+      ).toBeNull();
+    },
+  );
 
   // ── F4 (Wave OSR / Jeff #71 review): templateAlias must reach BrandedReport ─
   //

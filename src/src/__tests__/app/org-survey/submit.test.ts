@@ -37,7 +37,7 @@ jest.mock("@/lib/assessments/invitation-cookie", () => ({
 // eslint-disable-next-line no-var
 var reportStyleLockMock: jest.Mock;
 jest.mock("@/lib/assessments/report-style-lock", () => {
-  reportStyleLockMock = jest.fn().mockResolvedValue(undefined);
+  reportStyleLockMock = jest.fn().mockResolvedValue("MODERN_DASHBOARD");
   return { lockReportStyleForFirstCompletion: reportStyleLockMock };
 });
 
@@ -58,10 +58,9 @@ const txMock = {
   },
 };
 
-// R3-M3: the route now does a Phase-1 read (full include) on the top-level `db`
-// client BEFORE opening the tx (rendering runs lock-free), then a Phase-2
-// re-read on the tx client UNDER the FOR UPDATE lock. Both findUnique mocks are
-// driven by mockHappyInvitation so the two phases agree.
+// The route does a Phase-1 read (full include) on the top-level `db` client,
+// then a Phase-2 re-read on the tx client UNDER the FOR UPDATE lock. Both
+// findUnique mocks are driven by mockHappyInvitation so the two phases agree.
 //
 // The `db` mock is built INSIDE the jest.mock factory (so it is self-contained
 // at hoist time) and the handles are surfaced through `dbMock` for assertions.
@@ -269,7 +268,25 @@ const originalWave228Env = {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  reportStyleLockMock.mockReset().mockResolvedValue(undefined);
+  const reportEmail = jest.requireMock(
+    "@/lib/assessments/report-email",
+  ) as { buildReportEmailHtml: jest.Mock };
+  const actualReportEmail = jest.requireActual(
+    "@/lib/assessments/report-email",
+  ) as { buildReportEmailHtml: (...args: unknown[]) => unknown };
+  reportEmail.buildReportEmailHtml.mockImplementation(
+    actualReportEmail.buildReportEmailHtml,
+  );
+  const resultsEmail = jest.requireMock(
+    "@/lib/assessments/results-email",
+  ) as { buildResultsEmailHtml: jest.Mock };
+  const actualResultsEmail = jest.requireActual(
+    "@/lib/assessments/results-email",
+  ) as { buildResultsEmailHtml: (...args: unknown[]) => unknown };
+  resultsEmail.buildResultsEmailHtml.mockImplementation(
+    actualResultsEmail.buildResultsEmailHtml,
+  );
+  reportStyleLockMock.mockReset().mockResolvedValue("MODERN_DASHBOARD");
   transactionActive = false;
   sessionState.invitationId = "inv-1";
   sessionState.campaignAlias = "demo";
@@ -505,7 +522,7 @@ describe("POST submit — strict v6.6 validation", () => {
     const lockTransactionStates: boolean[] = [];
     reportStyleLockMock.mockImplementation(() => {
       lockTransactionStates.push(transactionActive);
-      return Promise.resolve();
+      return Promise.resolve("MODERN_DASHBOARD");
     });
 
     const res = await POST(
@@ -543,8 +560,8 @@ describe("report style first-completion freeze", () => {
     const lockStarted = new Promise<void>((resolve) => {
       reportStyleLockMock.mockImplementationOnce(() => {
         resolve();
-        return new Promise<void>((release) => {
-          releaseLock = release;
+        return new Promise<string>((release) => {
+          releaseLock = () => release("CLASSIC");
         });
       });
     });
@@ -580,7 +597,7 @@ describe("report style first-completion freeze", () => {
     const lockTransactionStates: boolean[] = [];
     reportStyleLockMock.mockImplementation(() => {
       lockTransactionStates.push(transactionActive);
-      return Promise.resolve();
+      return Promise.resolve("MODERN_DASHBOARD");
     });
     txMock.assessmentSubmission.create.mockRejectedValueOnce(
       new Error("later transaction write failed"),
@@ -731,6 +748,32 @@ describe("Wave D — outbox enqueue", () => {
     expect(roles).toHaveLength(2);
   });
 
+  it("builds three style-specific report models but renders style-independent email HTML once", async () => {
+    mockHappyInvitation();
+    const reportEmail = jest.requireMock(
+      "@/lib/assessments/report-email",
+    ) as {
+      buildRespondentReportFromSubmission: jest.Mock;
+      buildReportEmailHtml: jest.Mock;
+    };
+    const resultsEmail = jest.requireMock(
+      "@/lib/assessments/results-email",
+    ) as {
+      buildResultsEmailHtml: jest.Mock;
+      buildCoachNotifyEmail: jest.Mock;
+    };
+
+    const res = await submit();
+
+    expect(res.status).toBe(200);
+    expect(
+      reportEmail.buildRespondentReportFromSubmission,
+    ).toHaveBeenCalledTimes(3);
+    expect(reportEmail.buildReportEmailHtml).toHaveBeenCalledTimes(1);
+    expect(resultsEmail.buildResultsEmailHtml).toHaveBeenCalledTimes(1);
+    expect(resultsEmail.buildCoachNotifyEmail).toHaveBeenCalledTimes(1);
+  });
+
   it("#15 RESPONDENT row carries the respondent email + ASSESSMENT_RESULTS type + submission id", async () => {
     mockHappyInvitation();
     await submit();
@@ -817,7 +860,7 @@ describe("Wave D — outbox enqueue", () => {
     const { buildResultsEmailHtml } = jest.requireMock(
       "@/lib/assessments/results-email"
     );
-    (buildResultsEmailHtml as jest.Mock).mockImplementationOnce(() => {
+    (buildResultsEmailHtml as jest.Mock).mockImplementation(() => {
       throw new Error("render boom");
     });
     const res = await submit();
@@ -827,6 +870,21 @@ describe("Wave D — outbox enqueue", () => {
     // #15 skipped (render threw); #16 still enqueued.
     expect(enqueuedRoles()).not.toContain("RESPONDENT");
     expect(enqueuedRoles()).toContain("OWNING_COACH");
+  });
+
+  it("aborts completion when a prepared legacy outbox row fails Prisma validation", async () => {
+    mockHappyInvitation();
+    const validationError = new Error("prepared outbox row rejected");
+    validationError.name = "PrismaClientValidationError";
+    txMock.assessmentEmailOutbox.create.mockRejectedValueOnce(validationError);
+
+    const res = await submit();
+
+    expect(res.status).toBe(500);
+    expect(txMock.assessmentSubmission.create).toHaveBeenCalledTimes(1);
+    expect(txMock.assessmentInvitation.update).not.toHaveBeenCalled();
+    expect(transactionCommitMarker).not.toHaveBeenCalled();
+    expect(transactionRollbackMarker).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -1186,7 +1244,7 @@ describe("GH #257 — assessment email delivery intents", () => {
     const { buildReportEmailHtml } = jest.requireMock(
       "@/lib/assessments/report-email",
     );
-    (buildReportEmailHtml as jest.Mock).mockReturnValueOnce({
+    (buildReportEmailHtml as jest.Mock).mockReturnValue({
       subject: "unused-report-subject",
       bodyHtml: "<p>degraded fallback</p>",
       renderError:
@@ -1211,7 +1269,7 @@ describe("GH #257 — assessment email delivery intents", () => {
     const { buildReportEmailHtml } = jest.requireMock(
       "@/lib/assessments/report-email",
     );
-    (buildReportEmailHtml as jest.Mock).mockReturnValueOnce({
+    (buildReportEmailHtml as jest.Mock).mockReturnValue({
       subject: "unused-report-subject",
       bodyHtml: "<p>degraded fallback</p>",
       renderError: "qualitative render failed",
@@ -1248,7 +1306,7 @@ describe("GH #257 — assessment email delivery intents", () => {
       },
     );
     renderFailure.name = "ResultsRenderError";
-    (buildResultsEmailHtml as jest.Mock).mockImplementationOnce(() => {
+    (buildResultsEmailHtml as jest.Mock).mockImplementation(() => {
       throw renderFailure;
     });
     const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
@@ -1325,6 +1383,7 @@ describe("GH #257 — assessment email delivery intents", () => {
     expect(retry.status).toBe(200);
     expect(txMock.assessmentInvitation.update).toHaveBeenCalledTimes(1);
     expect(inngestMock.send).toHaveBeenCalledTimes(1);
+
     errorSpy.mockRestore();
   });
 

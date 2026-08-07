@@ -557,7 +557,7 @@ describe("PATCH /api/admin/assessment-templates/[id]", () => {
       },
     );
 
-    it("rejects a non-Classic report style for an ineligible template alias", async () => {
+    it("allows every valid report style for a template with an arbitrary alias", async () => {
       process.env.WAVE_REPORT_STYLES_ENABLED = "1";
       (db.assessmentTemplate.findFirst as jest.Mock).mockResolvedValue(
         existingReportStyleTemplate({ alias: "another-template" }),
@@ -568,10 +568,12 @@ describe("PATCH /api/admin/assessment-templates/[id]", () => {
         detailParams,
       );
 
-      expect(res.status).toBe(400);
-      await expect(res.json()).resolves.toEqual({ error: "REPORT_STYLE_NOT_ELIGIBLE" });
-      expect(db.assessmentTemplate.update).not.toHaveBeenCalled();
-      expect(db.auditLog.create).not.toHaveBeenCalled();
+      expect(res.status).toBe(200);
+      expect(db.assessmentTemplate.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ defaultReportStyle: "EXECUTIVE_BOARDROOM" }),
+        }),
+      );
     });
 
     it("allows Classic reset for any template when report styles are available", async () => {
@@ -608,7 +610,7 @@ describe("PATCH /api/admin/assessment-templates/[id]", () => {
     });
 
     it.each(["EXECUTIVE_BOARDROOM", "MODERN_DASHBOARD"] as const)(
-      "allows a privileged Scaling Up template update to %s and audits only the enum key",
+      "allows a privileged template update to %s and audits only the enum key",
       async (defaultReportStyle) => {
         process.env.WAVE_REPORT_STYLES_ENABLED = "1";
         (db.assessmentTemplate.update as jest.Mock).mockResolvedValue(

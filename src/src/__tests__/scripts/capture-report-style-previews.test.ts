@@ -1,5 +1,18 @@
 import { spawnSync } from "node:child_process";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
+
+type FontSeam = {
+  css: string;
+  variables: Record<string, { variable: string }>;
+};
 
 describe("capture-report-style-previews credentials gate", () => {
   it("refuses generically before any browser or authentication attempt", () => {
@@ -27,4 +40,382 @@ describe("capture-report-style-previews credentials gate", () => {
     expect(result.stdout).toBe("");
     expect(result.stderr).not.toMatch(/chromium|playwright|login|email|password/i);
   });
+
+  it("publishes a deterministic 27-entry anatomy/style/page capture contract", () => {
+    const result = spawnSync(
+      process.execPath,
+      [
+        join(process.cwd(), "scripts", "capture-report-style-previews.mjs"),
+        "--print-manifest",
+      ],
+      {
+        cwd: process.cwd(),
+        env: { ...process.env },
+        encoding: "utf8",
+        timeout: 10_000,
+      },
+    );
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).toBe("");
+    const manifest = JSON.parse(result.stdout) as Array<{
+      anatomy: string;
+      style: string;
+      page: string;
+      format: string;
+      output: string;
+    }>;
+    expect(manifest).toHaveLength(27);
+    expect(new Set(manifest.map((entry) => entry.anatomy))).toEqual(
+      new Set(["scored", "qualitative", "sparse-custom"]),
+    );
+    expect(
+      manifest.filter((entry) => entry.style === "CLASSIC").every(
+        (entry) => entry.format === "A4",
+      ),
+    ).toBe(true);
+    expect(
+      manifest.filter((entry) => entry.style !== "CLASSIC").every(
+        (entry) => entry.format === "Letter",
+      ),
+    ).toBe(true);
+    expect(new Set(manifest.map((entry) => entry.output)).size).toBe(27);
+  });
+
+  it("keeps the authenticated route as the default and exposes an explicit DB-free renderer mode", () => {
+    const captureSource = readFileSync(
+      join(process.cwd(), "scripts", "capture-report-style-previews.mjs"),
+      "utf8",
+    );
+    const rendererSource = readFileSync(
+      join(process.cwd(), "scripts", "render-report-style-qa.cjs"),
+      "utf8",
+    );
+
+    expect(captureSource).toContain('process.argv.includes("--db-free")');
+    expect(captureSource).toContain("render-report-style-qa.cjs");
+    expect(rendererSource).toContain("buildReportStylePreviewReport");
+    expect(rendererSource).toContain("BrandedReport");
+  });
+
+  it("uses generated production font variables and self-hosted font bytes in DB-free rendering", () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { loadReportStyleFontSeam } = require(
+      join(process.cwd(), "scripts", "report-style-font-seam.cjs"),
+    ) as { loadReportStyleFontSeam: (root: string) => FontSeam };
+    const temporaryRoot = mkdtempSync(join(tmpdir(), "report-style-font-seam-"));
+    const chunks = join(temporaryRoot, ".next", "static", "chunks");
+    mkdirSync(chunks, { recursive: true });
+    writeFileSync(join(chunks, "assessment.woff2"), Buffer.from("font-bytes"));
+    writeFileSync(
+      join(chunks, "assessment.css"),
+      [
+        '@font-face{font-family:"Assessment";src:url(./assessment.woff2)}',
+        ".inter_test__variable{--font-assessment-inter:\"Assessment\"}",
+        ".playfair_display_test__variable{--font-assessment-display:\"Assessment\"}",
+        ".roboto_test__variable{--font-assessment-body:\"Assessment\"}",
+      ].join("\n"),
+    );
+
+    try {
+      const seam = loadReportStyleFontSeam(temporaryRoot);
+      expect(seam.variables.Inter.variable).toBe("inter_test__variable");
+      expect(seam.variables.Playfair_Display.variable).toBe(
+        "playfair_display_test__variable",
+      );
+      expect(seam.variables.Roboto.variable).toBe("roboto_test__variable");
+      expect(seam.css).toContain("data:font/woff2;base64,");
+
+      const markup = spawnSync(
+        process.execPath,
+        [
+          join(process.cwd(), "scripts", "render-report-style-qa.cjs"),
+          "EXECUTIVE_BOARDROOM",
+          "scored",
+          "normal",
+        ],
+        {
+          cwd: process.cwd(),
+          encoding: "utf8",
+          env: {
+            ...process.env,
+            REPORT_STYLE_FONT_ASSET_ROOT: temporaryRoot,
+          },
+          timeout: 10_000,
+        },
+      );
+      expect(markup.status).toBe(0);
+      expect(markup.stdout).toContain(seam.variables.Inter.variable);
+      expect(markup.stdout).toContain(seam.variables.Playfair_Display.variable);
+    } finally {
+      rmSync(temporaryRoot, { recursive: true, force: true });
+    }
+  });
+
+  it(
+    "executes nonblank image and PDF content checks against real artifacts",
+    async () => {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const sharp = require("sharp") as (typeof import("sharp"))["default"];
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { chromium } = require("playwright") as typeof import("playwright");
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const integrity = require(
+        join(process.cwd(), "scripts", "report-style-capture-integrity.cjs"),
+      ) as {
+        assertMeaningfulImage: (
+          path: string,
+          expected?: { width?: number; height?: number },
+        ) => Promise<unknown>;
+        assertSinglePagePdf: (
+          path: string,
+          format: "A4" | "Letter",
+          options?: { markers?: string[]; rasterDirectory?: string },
+        ) => Promise<unknown>;
+        assertNoAncestorClipping: (
+          root: import("playwright").Locator,
+        ) => Promise<unknown>;
+      };
+
+      const temporaryRoot = mkdtempSync(
+        join(tmpdir(), "report-style-integrity-test-"),
+      );
+      const meaningful = join(temporaryRoot, "meaningful.png");
+      const blank = join(temporaryRoot, "blank.png");
+      const pdf = join(temporaryRoot, "meaningful.pdf");
+      const originalSetImmediate = global.setImmediate;
+      if (typeof global.setImmediate !== "function") {
+        global.setImmediate = ((
+          callback: (...args: unknown[]) => void,
+          ...args: unknown[]
+        ) => setTimeout(callback, 0, ...args)) as unknown as typeof setImmediate;
+      }
+      const browser = await chromium.launch({ headless: true });
+      try {
+        await sharp({
+          create: {
+            width: 320,
+            height: 180,
+            channels: 3,
+            background: "#ffffff",
+          },
+        })
+          .composite([
+            {
+              input: Buffer.from(
+                '<svg width="320" height="180"><rect x="20" y="20" width="280" height="100" fill="#522583"/><text x="35" y="80" fill="white" font-size="28">ABC Corp</text></svg>',
+              ),
+            },
+          ])
+          .png()
+          .toFile(meaningful);
+        await sharp({
+          create: {
+            width: 320,
+            height: 180,
+            channels: 3,
+            background: "#ffffff",
+          },
+        })
+          .png()
+          .toFile(blank);
+
+        await expect(
+          integrity.assertMeaningfulImage(meaningful, {
+            width: 320,
+            height: 180,
+          }),
+        ).resolves.toEqual(expect.objectContaining({ width: 320, height: 180 }));
+        await expect(
+          integrity.assertMeaningfulImage(blank),
+        ).rejects.toThrow(/foreground coverage|blank or flat/i);
+
+        const page = await browser.newPage();
+        await page.setContent(
+          '<main style="border-top:80px solid #522583;padding:48px;background:#f7f3fb;min-height:700px"><h1>Confidential assessment report</h1><p>ABC Corp renderer evidence</p></main>',
+        );
+        await page.pdf({ path: pdf, format: "A4", printBackground: true });
+        await expect(
+          integrity.assertSinglePagePdf(pdf, "A4", {
+            markers: ["Confidential assessment report", "ABC Corp"],
+            rasterDirectory: temporaryRoot,
+          }),
+        ).resolves.toEqual(expect.objectContaining({ pages: 1 }));
+        await expect(
+          integrity.assertSinglePagePdf(pdf, "A4", {
+            markers: ["missing renderer marker"],
+          }),
+        ).rejects.toThrow(/missing expected content/i);
+
+        await page.setContent(`
+          <main data-testid="capture-root">
+            <section style="height: 32px; overflow: hidden">
+              <p data-testid="representative-content" style="height: 80px; margin: 0">
+                Representative renderer content
+              </p>
+            </section>
+          </main>
+        `);
+        await expect(
+          integrity.assertNoAncestorClipping(
+            page.getByTestId("capture-root"),
+          ),
+        ).rejects.toThrow(/representative-content.*clipped by ancestor/i);
+
+        await page.setContent(`
+          <main data-testid="capture-root">
+            <section style="height: 80px; overflow: hidden">
+              <p data-testid="representative-content" style="height: 80px; margin: 0">
+                Representative renderer content
+              </p>
+            </section>
+          </main>
+        `);
+        await expect(
+          integrity.assertNoAncestorClipping(
+            page.getByTestId("capture-root"),
+          ),
+        ).resolves.toEqual(expect.objectContaining({ violations: [] }));
+
+        const chunks = join(temporaryRoot, ".next", "static", "chunks");
+        mkdirSync(chunks, { recursive: true });
+        writeFileSync(join(chunks, "assessment.woff2"), Buffer.from("font-bytes"));
+        writeFileSync(
+          join(chunks, "assessment.css"),
+          [
+            '@font-face{font-family:"Assessment";src:url(./assessment.woff2)}',
+            ".inter_test__variable{--font-assessment-inter:\"Assessment\"}",
+            ".playfair_display_test__variable{--font-assessment-display:\"Assessment\"}",
+            ".roboto_test__variable{--font-assessment-body:\"Assessment\"}",
+          ].join("\n"),
+        );
+        const renderer = spawnSync(
+          process.execPath,
+          [
+            join(process.cwd(), "scripts", "render-report-style-qa.cjs"),
+            "CLASSIC",
+            "scored",
+            "normal",
+          ],
+          {
+            cwd: process.cwd(),
+            encoding: "utf8",
+            env: {
+              ...process.env,
+              REPORT_STYLE_FONT_ASSET_ROOT: temporaryRoot,
+            },
+            timeout: 10_000,
+          },
+        );
+        expect(renderer.status).toBe(0);
+        await page.setContent(`
+          <style>${readFileSync(
+            join(process.cwd(), "src", "styles", "su-report.css"),
+            "utf8",
+          )}</style>
+          <main data-testid="capture-root" data-preview-style="CLASSIC">
+            ${renderer.stdout}
+          </main>
+        `);
+        await expect(
+          integrity.assertNoAncestorClipping(
+            page.getByTestId("capture-root"),
+          ),
+        ).resolves.toEqual(expect.objectContaining({ violations: [] }));
+      } finally {
+        await browser.close();
+        global.setImmediate = originalSetImmediate;
+        rmSync(temporaryRoot, { recursive: true, force: true });
+      }
+    },
+    30_000,
+  );
+
+  it(
+    "preserves the flag-off Classic computed-style contract outside the preview harness",
+    async () => {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { chromium } = require("playwright") as typeof import("playwright");
+      const reportCss = readFileSync(
+        join(process.cwd(), "src", "styles", "su-report.css"),
+        "utf8",
+      );
+      const originalSetImmediate = global.setImmediate;
+      if (typeof global.setImmediate !== "function") {
+        global.setImmediate = ((
+          callback: (...args: unknown[]) => void,
+          ...args: unknown[]
+        ) => setTimeout(callback, 0, ...args)) as unknown as typeof setImmediate;
+      }
+      const browser = await chromium.launch({ headless: true });
+
+      try {
+        const page = await browser.newPage();
+        await page.setContent(`
+          <style>${reportCss}</style>
+          <main class="su-public-brand">
+            <p class="su-report-eyebrow">Individual assessment</p>
+            <section class="su-report-card">
+              <header class="su-report-card-head" style="background-color:#f7a600">
+                <h2 class="su-report-card-title">Performance</h2>
+                <span class="su-report-card-chip">Domain</span>
+              </header>
+            </section>
+            <div class="su-report-coach">
+              <span class="su-report-coach-name">A very long coach name</span>
+            </div>
+            <p class="su-report-confidential">Confidential</p>
+            <p class="su-section-eyebrow">Summary</p>
+            <p class="su-qa-q">Question</p>
+            <section class="su-qa amber">
+              <p class="su-qa-q">Amber question</p>
+            </section>
+            <span class="su-matrix-cell rating">Not selected</span>
+          </main>
+        `);
+
+        const computed = await page.locator(".su-public-brand").evaluate((root) => {
+          const style = (selector: string) => {
+            const element = root.querySelector(selector);
+            if (!(element instanceof HTMLElement)) {
+              throw new Error(`Missing computed-style fixture: ${selector}`);
+            }
+            return getComputedStyle(element);
+          };
+
+          return {
+            eyebrow: style(".su-report-eyebrow").color,
+            cardTitle: style(".su-report-card-title").color,
+            cardChipColor: style(".su-report-card-chip").color,
+            cardChipBackground: style(".su-report-card-chip").backgroundColor,
+            coachFlexWrap: style(".su-report-coach").flexWrap,
+            coachNameWhiteSpace: style(".su-report-coach-name").whiteSpace,
+            confidential: style(".su-report-confidential").color,
+            sectionEyebrow: style(".su-section-eyebrow").color,
+            question: style(":scope > .su-qa-q").color,
+            amberQuestion: style(".su-qa.amber .su-qa-q").color,
+            inactiveRating: style(".su-matrix-cell.rating").color,
+          };
+        });
+
+        expect(computed).toEqual({
+          eyebrow: "rgb(0, 139, 210)",
+          cardTitle: "rgb(255, 255, 255)",
+          cardChipColor: "rgb(255, 255, 255)",
+          cardChipBackground: "rgba(0, 0, 0, 0.18)",
+          coachFlexWrap: "nowrap",
+          coachNameWhiteSpace: "nowrap",
+          confidential: "rgba(255, 255, 255, 0.55)",
+          sectionEyebrow: "rgb(0, 139, 210)",
+          question: "rgb(0, 139, 210)",
+          amberQuestion: "rgb(184, 116, 0)",
+          inactiveRating: "rgb(184, 178, 196)",
+        });
+      } finally {
+        await browser.close();
+        global.setImmediate = originalSetImmediate;
+      }
+    },
+    30_000,
+  );
 });

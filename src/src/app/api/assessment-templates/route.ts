@@ -27,8 +27,15 @@ import { db } from "@/lib/db";
 import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import { isResultsEmailApproved } from "@/lib/assessments/results-email-approval";
 import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
-import { isReportStyleEligible } from "@/lib/assessments/report-style-policy";
-import type { ReportStyleKey } from "@/lib/assessments/report-style-registry";
+import {
+  deriveReportStylePreviewCapabilities,
+  type ReportStyleKey,
+  type ReportStylePreviewCapabilities,
+} from "@/lib/assessments/report-style-registry";
+import {
+  activePublishedWhere,
+  DEFAULT_TEMPLATE_LANGUAGE,
+} from "@/lib/assessments/active-version";
 
 interface TemplateSummary {
   id: string;
@@ -42,7 +49,18 @@ interface TemplateSummary {
   sendResultsDefault: boolean;
   defaultReportStyle: ReportStyleKey;
   reportStylesEnabled: boolean;
+  reportStylePreviewCapabilities?: ReportStylePreviewCapabilities;
 }
+
+const previewVersionSelection = {
+  where: {
+    language: DEFAULT_TEMPLATE_LANGUAGE,
+    ...activePublishedWhere,
+  },
+  orderBy: { versionNumber: "desc" as const },
+  take: 1,
+  select: { questions: true },
+};
 
 export async function GET(request: NextRequest) {
   try {
@@ -76,21 +94,62 @@ export async function GET(request: NextRequest) {
         },
         orderBy: { name: "asc" },
       });
+      const availability = new Map(
+        templates.map((template) => [
+          template.id,
+          isReportStylesEnabled({ templateId: template.id }),
+        ]),
+      );
+      const availableTemplateIds = templates
+        .filter((template) => availability.get(template.id))
+        .map((template) => template.id);
+      const capabilityRows =
+        availableTemplateIds.length > 0
+          ? await db.assessmentTemplate.findMany({
+              where: { id: { in: availableTemplateIds } },
+              select: {
+                id: true,
+                versions: previewVersionSelection,
+              },
+            })
+          : [];
+      const capabilitiesByTemplateId = new Map(
+        capabilityRows.map((row) => [
+          row.id,
+          deriveReportStylePreviewCapabilities({
+            templateAlias: templates.find(
+              (template) => template.id === row.id,
+            )?.alias,
+            questions: row.versions?.[0]?.questions ?? [],
+          }),
+        ]),
+      );
       return NextResponse.json({
         success: true,
-        data: templates.map((t) => ({
-          id: t.id,
-          name: t.name,
-          alias: t.alias,
-          description: t.description,
-          aggregationMode: t.aggregationMode,
-          defaultReportStyle: t.defaultReportStyle,
-          reportStylesEnabled:
-            isReportStyleEligible(t.alias) &&
-            isReportStylesEnabled({ templateId: t.id }),
-          resultsEmailApproved: isResultsEmailApproved(t),
-          sendResultsDefault: t.sendResultsDefault,
-        })) satisfies TemplateSummary[],
+        data: templates.map((t) => {
+          const reportStylesEnabled = availability.get(t.id) === true;
+          return {
+            id: t.id,
+            name: t.name,
+            alias: t.alias,
+            description: t.description,
+            aggregationMode: t.aggregationMode,
+            defaultReportStyle: t.defaultReportStyle,
+            reportStylesEnabled,
+            resultsEmailApproved: isResultsEmailApproved(t),
+            sendResultsDefault: t.sendResultsDefault,
+            ...(reportStylesEnabled
+              ? {
+                  reportStylePreviewCapabilities:
+                    capabilitiesByTemplateId.get(t.id) ??
+                    deriveReportStylePreviewCapabilities({
+                      templateAlias: t.alias,
+                      questions: [],
+                    }),
+                }
+              : {}),
+          };
+        }) satisfies TemplateSummary[],
       });
     }
 
@@ -157,22 +216,63 @@ export async function GET(request: NextRequest) {
       },
       orderBy: { name: "asc" },
     });
+    const availability = new Map(
+      templates.map((template) => [
+        template.id,
+        isReportStylesEnabled({ templateId: template.id }),
+      ]),
+    );
+    const availableTemplateIds = templates
+      .filter((template) => availability.get(template.id))
+      .map((template) => template.id);
+    const capabilityRows =
+      availableTemplateIds.length > 0
+        ? await db.assessmentTemplate.findMany({
+            where: { id: { in: availableTemplateIds } },
+            select: {
+              id: true,
+              versions: previewVersionSelection,
+            },
+          })
+        : [];
+    const capabilitiesByTemplateId = new Map(
+      capabilityRows.map((row) => [
+        row.id,
+        deriveReportStylePreviewCapabilities({
+          templateAlias: templates.find(
+            (template) => template.id === row.id,
+          )?.alias,
+          questions: row.versions?.[0]?.questions ?? [],
+        }),
+      ]),
+    );
 
     return NextResponse.json({
       success: true,
-      data: templates.map((t) => ({
-        id: t.id,
-        name: t.name,
-        alias: t.alias,
-        description: t.description,
-        aggregationMode: t.aggregationMode,
-        defaultReportStyle: t.defaultReportStyle,
-        reportStylesEnabled:
-          isReportStyleEligible(t.alias) &&
-          isReportStylesEnabled({ templateId: t.id }),
-        resultsEmailApproved: isResultsEmailApproved(t),
-        sendResultsDefault: t.sendResultsDefault,
-      })) satisfies TemplateSummary[],
+      data: templates.map((t) => {
+        const reportStylesEnabled = availability.get(t.id) === true;
+        return {
+          id: t.id,
+          name: t.name,
+          alias: t.alias,
+          description: t.description,
+          aggregationMode: t.aggregationMode,
+          defaultReportStyle: t.defaultReportStyle,
+          reportStylesEnabled,
+          resultsEmailApproved: isResultsEmailApproved(t),
+          sendResultsDefault: t.sendResultsDefault,
+          ...(reportStylesEnabled
+            ? {
+                reportStylePreviewCapabilities:
+                  capabilitiesByTemplateId.get(t.id) ??
+                  deriveReportStylePreviewCapabilities({
+                    templateAlias: t.alias,
+                    questions: [],
+                  }),
+              }
+            : {}),
+        };
+      }) satisfies TemplateSummary[],
     });
   } catch (error) {
     console.error("Error listing assessment templates:", error);

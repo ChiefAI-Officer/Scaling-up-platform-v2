@@ -70,6 +70,8 @@
 .su-report--executive .report-page h3 + p { max-width: 68ch; }
 .su-report--executive .report-page section { margin: 0 0 2.5rem; }
 .su-report--executive .report-page dl { display: grid; gap: 1px; grid-template-columns: repeat(2, minmax(0, 1fr)); background: var(--executive-line); border: 1px solid var(--executive-line); }
+.su-report--executive .report-page .report-metrics,
+.su-report--executive .report-page .report-responses { grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); }
 .su-report--executive .report-page dl > div { background: var(--executive-cream); padding: 1rem; min-width: 0; }
 .su-report--executive .report-page dt { color: var(--executive-muted); font-size: .7rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 .su-report--executive .report-page dd { color: var(--executive-purple-700); font-family: var(--font-assessment-display), Georgia, serif; font-size: 1.65rem; margin: .25rem 0 0; overflow-wrap: anywhere; }
@@ -78,11 +80,12 @@
 .su-report--executive .report-page li { margin: .65rem 0; overflow-wrap: anywhere; }
 .su-report--executive .report-page ol > li { border-bottom: 1px solid var(--executive-line); padding: .8rem .85rem; }
 .su-report--executive .report-decision { border-left: 4px solid var(--executive-purple-500); display: grid; gap: .2rem; grid-template-columns: minmax(0, 1fr) auto; }
-.su-report--executive .report-decision[data-decision="people"] { border-left-color: var(--executive-decision-people); }
-.su-report--executive .report-decision[data-decision="strategy"] { border-left-color: var(--executive-decision-strategy); }
-.su-report--executive .report-decision[data-decision="execution"] { border-left-color: var(--executive-decision-execution); }
-.su-report--executive .report-decision[data-decision="cash"] { border-left-color: var(--executive-decision-cash); }
-.su-report--executive .report-decision[data-decision="you"] { border-left-color: var(--executive-decision-you); }
+.su-report--executive [data-report-role="domain"] { border-left: 4px solid var(--executive-purple-500); padding-left: 1rem; }
+.su-report--executive [data-report-role="domain"][data-decision="people"] { border-left-color: var(--executive-decision-people); }
+.su-report--executive [data-report-role="domain"][data-decision="strategy"] { border-left-color: var(--executive-decision-strategy); }
+.su-report--executive [data-report-role="domain"][data-decision="execution"] { border-left-color: var(--executive-decision-execution); }
+.su-report--executive [data-report-role="domain"][data-decision="cash"] { border-left-color: var(--executive-decision-cash); }
+.su-report--executive [data-report-role="domain"][data-decision="you"] { border-left-color: var(--executive-decision-you); }
 .su-report--executive .report-decision .report-status { align-self: center; }
 .su-report--executive .report-status { border: 1px solid currentColor; border-radius: 999px; display: inline-block; font-family: var(--font-assessment-inter), Arial, sans-serif; font-size: .64rem; font-weight: 700; letter-spacing: .055em; padding: .18rem .48rem; text-transform: uppercase; white-space: nowrap; }
 .su-report--executive .report-status--strength { background: var(--executive-status-strength-surface); border-color: var(--executive-status-strength-accent); color: var(--executive-status-strength-ink); }

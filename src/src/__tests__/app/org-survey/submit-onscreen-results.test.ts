@@ -43,7 +43,7 @@ jest.mock("@/lib/assessments/invitation-cookie", () => ({
 // eslint-disable-next-line no-var
 var reportStyleLockMock: jest.Mock;
 jest.mock("@/lib/assessments/report-style-lock", () => {
-  reportStyleLockMock = jest.fn().mockResolvedValue(undefined);
+  reportStyleLockMock = jest.fn().mockResolvedValue("MODERN_DASHBOARD");
   return { lockReportStyleForFirstCompletion: reportStyleLockMock };
 });
 
@@ -62,6 +62,9 @@ const txMock = {
 };
 
 // eslint-disable-next-line no-var
+var mockOnscreenTransactionActive = false;
+
+// eslint-disable-next-line no-var
 var dbMock: {
   $transaction: jest.Mock;
   assessmentInvitation: { findUnique: jest.Mock };
@@ -71,7 +74,14 @@ var dbMock: {
 
 jest.mock("@/lib/db", () => {
   dbMock = {
-    $transaction: jest.fn((fn: (tx: typeof txMock) => unknown) => fn(txMock)),
+    $transaction: jest.fn(async (fn: (tx: typeof txMock) => unknown) => {
+      mockOnscreenTransactionActive = true;
+      try {
+        return await fn(txMock);
+      } finally {
+        mockOnscreenTransactionActive = false;
+      }
+    }),
     assessmentInvitation: { findUnique: jest.fn() },
     assessmentCampaignParticipant: { findUnique: jest.fn() },
     auditLog: { create: jest.fn().mockResolvedValue(undefined) },
@@ -110,9 +120,14 @@ jest.mock("@/lib/assessments/results-email-approval", () => ({
 
 // The report-model builder. `buildState.throws` drives the build-failure case.
 // eslint-disable-next-line no-var
-var buildState: { throws: boolean; calls: Array<Record<string, unknown>> } = {
+var buildState: {
+  throws: boolean;
+  calls: Array<Record<string, unknown>>;
+  transactionStates: boolean[];
+} = {
   throws: false,
   calls: [],
+  transactionStates: [],
 };
 const BUILT_REPORT = {
   respondentName: "Resp Ondent",
@@ -125,8 +140,9 @@ jest.mock("@/lib/assessments/report-email", () => ({
   buildRespondentReportFromSubmission: jest.fn(
     (args: Record<string, unknown>) => {
       buildState.calls.push(args);
+      buildState.transactionStates.push(mockOnscreenTransactionActive);
       if (buildState.throws) throw new Error("report model build failed");
-      return BUILT_REPORT;
+      return { ...BUILT_REPORT, reportStyle: args.reportStyle };
     },
   ),
   buildReportEmailHtml: jest.fn(() => ({
@@ -177,6 +193,7 @@ function invitationFixture(overrides?: {
   showResultsOnScreen?: boolean;
   sendResultsToRespondent?: boolean;
   notifyCoachOnCompletion?: boolean;
+  reportStyle?: "CLASSIC" | "EXECUTIVE_BOARDROOM" | "MODERN_DASHBOARD";
 }) {
   return {
     id: "inv-1",
@@ -193,7 +210,7 @@ function invitationFixture(overrides?: {
     campaign: {
       id: "c1",
       templateId: "tpl-1",
-      reportStyle: "MODERN_DASHBOARD",
+      reportStyle: overrides?.reportStyle ?? "MODERN_DASHBOARD",
       alias: "demo",
       deletedAt: null,
       status: "ACTIVE",
@@ -259,6 +276,7 @@ type SubmitBody = {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  reportStyleLockMock.mockReset().mockResolvedValue("MODERN_DASHBOARD");
   sessionState.invitationId = "inv-1";
   sessionState.campaignAlias = "demo";
   flagState.results = true;
@@ -271,6 +289,8 @@ beforeEach(() => {
   findingsEnabledMock.mockReturnValue(false);
   buildState.throws = false;
   buildState.calls = [];
+  buildState.transactionStates = [];
+  mockOnscreenTransactionActive = false;
   process.env.APP_URL = "https://app.example.com";
   txMock.assessmentSubmission.create.mockResolvedValue({ id: "sub-1" });
   txMock.assessmentEmailOutbox.create.mockResolvedValue({});
@@ -304,7 +324,10 @@ describe("Wave OSR — disclosure decision", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as SubmitBody;
     expect(body.data?.submissionId).toBe("sub-1");
-    expect(body.data?.report).toEqual(BUILT_REPORT);
+    expect(body.data?.report).toEqual({
+      ...BUILT_REPORT,
+      reportStyle: "MODERN_DASHBOARD",
+    });
     expect(body.data?.reportStylesAvailable).toBe(false);
     expect(body.data?.reportFindingsAvailable).toBe(false);
   });
@@ -427,16 +450,20 @@ describe("Wave OSR — a report-model failure never fails the submission", () =>
   });
 });
 
-// ─── build-once (co-validate "safely prepared report DTO") ─────────────────
+// ─── prebuilt closed catalog + selected-candidate reuse ─────────────────────
 
-describe("Wave OSR — the report model is built once and reused", () => {
-  it("builds exactly one model when both on-screen and the results email are on", async () => {
+describe("Wave OSR — the selected report candidate is reused", () => {
+  it("prebuilds the three-style catalog when a report consumer is on", async () => {
     mockInvitation({
       showResultsOnScreen: true,
       sendResultsToRespondent: true,
     });
     await POST(jsonReq(goodAnswers) as never, aliasParams("demo"));
-    expect(buildState.calls).toHaveLength(1);
+    expect(buildState.calls.map((call) => call.reportStyle)).toEqual([
+      "CLASSIC",
+      "EXECUTIVE_BOARDROOM",
+      "MODERN_DASHBOARD",
+    ]);
   });
 
   it("populates templateAlias from the server build, so the qualitative dispatch is correct", async () => {
@@ -454,7 +481,33 @@ describe("Wave OSR — the report model is built once and reused", () => {
 
     await POST(jsonReq(goodAnswers) as never, aliasParams("demo"));
 
-    expect(buildState.calls[0]?.reportStyle).toBe("MODERN_DASHBOARD");
+    expect(
+      buildState.calls.some(
+        (call) => call.reportStyle === "MODERN_DASHBOARD",
+      ),
+    ).toBe(true);
+  });
+
+  it("uses the style saved before completion wins the lock, not the stale invitation pre-read", async () => {
+    mockInvitation({ showResultsOnScreen: true, reportStyle: "CLASSIC" });
+    reportStyleLockMock.mockResolvedValueOnce("EXECUTIVE_BOARDROOM");
+
+    const response = await POST(
+      jsonReq(goodAnswers) as never,
+      aliasParams("demo"),
+    );
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as SubmitBody;
+    expect(
+      (body.data?.report as { reportStyle?: string })?.reportStyle,
+    ).toBe("EXECUTIVE_BOARDROOM");
+    expect(
+      buildState.calls.some(
+        (call) => call.reportStyle === "EXECUTIVE_BOARDROOM",
+      ),
+    ).toBe(true);
+    expect(buildState.transactionStates).toEqual([false, false, false]);
   });
 });
 
@@ -522,7 +575,7 @@ describe("Wave OSR — the report model is built only when a consumer wants it",
   it("DOES build when the on-screen toggle is on", async () => {
     mockInvitation({ showResultsOnScreen: true });
     await POST(jsonReq(goodAnswers) as never, aliasParams("demo"));
-    expect(buildState.calls).toHaveLength(1);
+    expect(buildState.calls).toHaveLength(3);
   });
 
   it("DOES build when only the #15 results email wants it", async () => {
@@ -531,6 +584,6 @@ describe("Wave OSR — the report model is built only when a consumer wants it",
       sendResultsToRespondent: true,
     });
     await POST(jsonReq(goodAnswers) as never, aliasParams("demo"));
-    expect(buildState.calls).toHaveLength(1);
+    expect(buildState.calls).toHaveLength(3);
   });
 });

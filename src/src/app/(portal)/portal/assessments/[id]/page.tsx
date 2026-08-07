@@ -20,6 +20,7 @@ import {
   asCampaignDetailDb,
   getCampaignOverview,
   getCampaignRespondents,
+  resolveCanEditReportAppearance,
 } from "@/lib/assessments/campaign-detail";
 import { CampaignDetail } from "@/components/assessments/CampaignDetail";
 import {
@@ -34,7 +35,7 @@ import {
 import { isCustomSlidesEnabled } from "@/lib/assessments/wave-m-flags";
 import { isOnScreenResultsEnabled } from "@/lib/assessments/wave-osr-flags";
 import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
-import { isReportStyleEligible } from "@/lib/assessments/report-style-policy";
+import { deriveReportStylePreviewCapabilities } from "@/lib/assessments/report-style-registry";
 import {
   hasComparableLongitudinal,
   asLongitudinalEligibilityDb,
@@ -98,7 +99,14 @@ export default async function CampaignDetailPage({ params }: PageProps) {
       // entry-point link is gated lock-step with the loader (never show a link
       // that would land on the loader's `notApplicable(unpublished)` panel).
       // Wave M: also read the version's sections for the slide-position picker.
-      version: { select: { id: true, publishedAt: true, sections: true } },
+      version: {
+        select: {
+          id: true,
+          publishedAt: true,
+          sections: true,
+          questions: true,
+        },
+      },
     },
   });
   const canShowGroupReport =
@@ -136,8 +144,20 @@ export default async function CampaignDetailPage({ params }: PageProps) {
   // eligibility, or flag/canary status itself.
   const reportStylesAvailable =
     campaignForFlag !== null &&
-    isReportStyleEligible(overview.campaign.templateAlias) &&
     isReportStylesEnabled({ templateId: overview.campaign.templateId, campaignId: id });
+  const hasCurrentWriteAccess =
+    campaignForFlag !== null &&
+    (await canManageCampaign(asAccessDb(db), actor, id, "write"));
+  const canEditReportAppearance =
+    campaignForFlag !== null &&
+    resolveCanEditReportAppearance({
+      actorRole: actor.role,
+      actorCoachId: actor.coachId,
+      campaignOwnerCoachId: campaignForFlag.createdByCoachId,
+      reportStyleLockedAt: overview.campaign.reportStyleLockedAt,
+      reportStylesAvailable,
+      hasCurrentWriteAccess,
+    });
 
   // Wave N (#23) — per-row "over time" eligibility. Each submitted respondent
   // gets a longitudinal entry link ONLY when `hasComparableLongitudinal` is
@@ -202,6 +222,11 @@ export default async function CampaignDetailPage({ params }: PageProps) {
       initialCustomSlides={initialCustomSlides}
       customSlidesSections={customSlidesSections}
       reportStylesAvailable={reportStylesAvailable}
+      reportStylePreviewCapabilities={deriveReportStylePreviewCapabilities({
+        templateAlias: overview.campaign.templateAlias,
+        questions: campaignForFlag?.version?.questions ?? [],
+      })}
+      canEditReportAppearance={canEditReportAppearance}
       longitudinalRespondentIds={longitudinalRespondentIds}
     />
   );

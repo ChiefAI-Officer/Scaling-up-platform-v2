@@ -36,6 +36,8 @@
  */
 
 import { stripLegacyDecimalSuffix } from "@/lib/assessments/question-label";
+import type { FindingsSection } from "@/lib/assessments/findings-section-model";
+import type { IndividualReportBlock } from "@/lib/assessments/individual-report-presentation";
 
 // ─── Public types ──────────────────────────────────────────────────────────
 
@@ -539,4 +541,136 @@ export function buildQualitativeModel(
   }
 
   return model;
+}
+
+function copyPresentationValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(copyPresentationValue);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, child]) => [
+        key,
+        copyPresentationValue(child),
+      ]),
+    );
+  }
+  return value;
+}
+
+function presentationMetricFor(item: QualItem) {
+  return {
+    stableKey: item.stableKey,
+    label: item.label,
+    type: item.type,
+    value: copyPresentationValue(item.value),
+    valueLabel: qualitativeAnswer(item),
+    ...(typeof item.min === "number" ? { min: item.min } : {}),
+    ...(typeof item.max === "number" ? { max: item.max } : {}),
+    ...(item.displayValues ? { chosenLabels: [...item.displayValues] } : {}),
+  };
+}
+
+function qualitativeAnswer(item: QualItem): string {
+  if (item.displayValues) return item.displayValues.join(", ");
+  if (Array.isArray(item.value)) return item.value.map(String).join(", ");
+  if (item.value === null || item.value === undefined) return "";
+  return String(item.value);
+}
+
+function presentationResponseFor(item: QualItem) {
+  return {
+    stableKey: item.stableKey,
+    label: item.label,
+    answer: qualitativeAnswer(item),
+    type: item.type,
+    value: copyPresentationValue(item.value),
+    valueLabel: qualitativeAnswer(item),
+    ...(typeof item.min === "number" ? { min: item.min } : {}),
+    ...(typeof item.max === "number" ? { max: item.max } : {}),
+  };
+}
+
+/**
+ * Lossless semantic adapter over the canonical qualitative model. Section and
+ * item classification has already happened in buildQualitativeModel.
+ */
+export function buildQualitativeReportPresentationBlocks(
+  model: QualitativeModel,
+  findings: FindingsSection | null = null,
+): IndividualReportBlock[] {
+  const blocks: IndividualReportBlock[] = [];
+
+  for (const section of model.sections) {
+    const description = section.description?.trim()
+      ? { description: section.description }
+      : {};
+
+    if (section.stableKey === "__additional_responses__") {
+      const responses = section.items.map((item) => ({
+        stableKey: item.stableKey,
+        label: item.label,
+        answer: qualitativeAnswer(item),
+      }));
+      if (responses.length > 0) {
+        blocks.push({ kind: "additional-response", responses });
+      }
+      continue;
+    }
+
+    if (section.items.length === 0) continue;
+
+    switch (section.kind) {
+      case "metric-table":
+      case "percent-bar":
+        blocks.push({
+          kind: "metric-group",
+          stableKey: section.stableKey,
+          label: section.name,
+          role: "qualitative",
+          ...description,
+          metrics: section.items.map(presentationMetricFor),
+        });
+        break;
+      case "rating":
+        blocks.push({
+          kind: "qualitative-scale",
+          stableKey: section.stableKey,
+          label: section.name,
+          ...description,
+          items: section.items.map(presentationMetricFor),
+        });
+        break;
+      case "choices":
+        blocks.push({
+          kind: "theme",
+          stableKey: section.stableKey,
+          label: section.name,
+          ...description,
+          items: section.items.map(presentationMetricFor),
+        });
+        break;
+      case "qa":
+        blocks.push({
+          kind: "narrative-response",
+          stableKey: section.stableKey,
+          label: section.name,
+          ...description,
+          responses: section.items.map(presentationResponseFor),
+        });
+        break;
+    }
+  }
+
+  if (findings && findings.groups.length > 0) {
+    blocks.push({
+      kind: "finding",
+      eyebrow: findings.eyebrow,
+      label: findings.title,
+      groups: findings.groups.map((group) => ({
+        sectionName: group.sectionName,
+        items: group.items.map((item) => ({ ...item })),
+      })),
+    });
+  }
+
+  return blocks;
 }

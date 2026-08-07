@@ -76,7 +76,7 @@ const mockBrandedReport = jest.fn(
     reportStylesAvailable,
     reportFindingsAvailable,
   }: {
-    report: { respondentName: string };
+    report: { respondentName: string; templateAlias: string; reportStyle: string };
     campaignLabel: string | null;
     reportStylesAvailable?: boolean;
     reportFindingsAvailable?: boolean;
@@ -84,6 +84,8 @@ const mockBrandedReport = jest.fn(
     <div
       data-testid="branded-report"
       data-campaign-label={campaignLabel ?? ""}
+      data-template-alias={report.templateAlias}
+      data-report-style={report.reportStyle}
       data-report-styles-available={String(reportStylesAvailable)}
       data-report-findings-available={String(reportFindingsAvailable)}
     >
@@ -135,15 +137,17 @@ function ownerActor(): ApiActor {
   };
 }
 
-function okOutcome() {
+function okOutcome(reportOverrides: Record<string, unknown> = {}) {
   return {
     status: "ok",
+    reportStylesAvailable: true,
     report: {
       respondentName: "Taylor Taker",
       jobTitle: "CEO",
       companyName: "Acme",
       assessmentName: "Rockefeller Habits Checklist",
       templateAlias: "RockHabits",
+      reportStyle: "CLASSIC",
       campaignLabel: "Quick Assessment",
       submittedAt: new Date("2026-07-29T12:00:00Z"),
       result: { perSection: [], perQuestion: [] },
@@ -158,6 +162,7 @@ function okOutcome() {
         contentHash: "hash-83",
       },
       degraded: false,
+      ...reportOverrides,
     },
   };
 }
@@ -216,6 +221,7 @@ describe("public referral report page", () => {
     expect(markup).toContain("Taylor Taker");
     expect(markup).toContain('data-campaign-label="Quick Assessment"');
     expect(markup).toContain('data-report-styles-available="true"');
+    expect(markup).toContain('data-enabled-report-style="CLASSIC"');
     expect(markup).toContain('data-report-findings-available="true"');
     expect(markup).toContain('data-testid="print-report-button"');
     expect(markup).toContain(
@@ -252,15 +258,40 @@ describe("public referral report page", () => {
   });
 
   it("retains the existing public-referral report surface when report styles are killed", async () => {
-    mockReportStylesEnabled.mockReturnValue(false);
+    mockGetPublicReferralReport.mockResolvedValue({
+      ...okOutcome(),
+      reportStylesAvailable: false,
+    });
 
     const node = await Page(makeProps());
     const markup = renderToStaticMarkup(node as React.ReactElement);
 
     expect(markup).toContain('data-testid="branded-report"');
     expect(markup).toContain('data-report-styles-available="false"');
+    expect(markup).not.toContain("data-enabled-report-style");
     expect(markup).toContain('data-testid="print-report-button"');
+    expect(mockReportStylesEnabled).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ["scored", "RockHabits", "EXECUTIVE_BOARDROOM"],
+    ["qualitative", "qsp-v2", "MODERN_DASHBOARD"],
+    ["sparse custom", "walk-qual-sparse-custom", "EXECUTIVE_BOARDROOM"],
+  ] as const)(
+    "%s campaign snapshot reaches the authenticated public/referral view",
+    async (_anatomy, templateAlias, reportStyle) => {
+      mockGetPublicReferralReport.mockResolvedValue(
+        okOutcome({ templateAlias, reportStyle }),
+      );
+
+      const node = await Page(makeProps());
+      const markup = renderToStaticMarkup(node as React.ReactElement);
+
+      expect(markup).toContain(`data-template-alias="${templateAlias}"`);
+      expect(markup).toContain(`data-report-style="${reportStyle}"`);
+      expect(markup).toContain('data-report-styles-available="true"');
+    },
+  );
 
   it.each(["forbidden", "not-found"] as const)(
     "maps %s to the same enumeration-safe 404 without rendering",

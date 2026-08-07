@@ -4,11 +4,12 @@
  * Pre-binds the per-surface policy for the pure `viewReport` core
  * (report-gate-core.ts) and owns the Next/Prisma-coupled wiring (getApiActor,
  * headers, the narrow-Db bridge cast, the loaders, the flags). The pages call an
- * adapter with only ids (+ generatedAt for group) + `defaultReportGateDeps()`;
+ * adapter with only ids + `defaultReportGateDeps()`;
  * they never see `ReportDb`/casts or the rate-limit/audit protocol.
  *
- * PR1 shipped the GROUP adapter (a no-op migration — group already matched the
- * gate's target shape). PR2 adds the RESPONDENT adapter, which carries the
+ * The GROUP adapter now lives in `group-report-access-gate.ts` so its runtime
+ * graph stays isolated from individual appearance dependencies. PR2 adds the
+ * RESPONDENT adapter, which carries the
  * always-on surface's intentional fold-ins: fail-closed audit + IP/UA, the
  * strengthened rate-limit key, and structured `assessment.respondent_report.*`
  * metrics (retiring the ad-hoc console.info).
@@ -17,16 +18,11 @@
 import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { getApiActor } from "@/lib/auth/authorization";
-import { checkRateLimitAsync, RateLimits } from "@/lib/rate-limit";
+import { RateLimits } from "@/lib/rate-limit";
 import {
   viewReport,
   type ReportGateDeps,
 } from "@/lib/assessments/report-gate-core";
-import { emitReportMetric } from "@/lib/assessments/report-metrics";
-import {
-  getCampaignGroupReport,
-  type GroupReportResult,
-} from "@/lib/assessments/group-report";
 import {
   getRespondentReport,
   type RespondentReportOutcome,
@@ -41,123 +37,13 @@ import {
   REPORT_FILTER_VERSION,
 } from "@/lib/assessments/qualitative-report-model";
 import { isReferredResultsEnabled } from "@/lib/assessments/wave-83-flags";
+import { ipFromHeaders } from "@/lib/assessments/report-access-gate-deps";
 
-/** First-hop client IP, mirroring the current report routes' extraction byte-for-byte. */
-export function ipFromHeaders(h: Headers): string {
-  return (
-    h.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    h.get("x-real-ip") ||
-    "localhost"
-  );
-}
-
-/**
- * Production deps for the gate. The single point where `db.auditLog` is bridged
- * to the core's structural `auditSink` (the read-db / write-db split is
- * intentional — see ADR-0012). `checkRateLimitAsync` / `emitReportMetric` are
- * standalone functions (no `this` binding concern).
- */
-export function defaultReportGateDeps(): ReportGateDeps {
-  return {
-    auditSink: db.auditLog as unknown as ReportGateDeps["auditSink"],
-    rateLimiter: checkRateLimitAsync,
-    emitMetric: emitReportMetric,
-  };
-}
-
-/**
- * Campaign group (Aggregate) report adapter. Tolerates a null actor (the flag
- * gate + the loader's `canViewGroupReport` handle authorization). Rate-limit key
- * preserved verbatim from the current route. Audit = fail-closed
- * `GROUP_REPORT_VIEW`.
- */
-export async function viewGroupReport(
-  deps: ReportGateDeps,
-  args: { campaignId: string; generatedAt: Date },
-): Promise<{ outcome: GroupReportResult; metricRole: string | null }> {
-  const actor = await getApiActor();
-  const h = await headers();
-  const ip = ipFromHeaders(h);
-  const userAgent = h.get("user-agent");
-  const actorKey = actor?.coachId ?? actor?.userId ?? "anon";
-  const metricRole = actor?.role ?? null;
-  const reportDb = db as unknown as Parameters<typeof getCampaignGroupReport>[0];
-
-  // The gate may throw Next control-flow (notFound for forbidden/rate-limit, the
-  // disposition 404s) — which propagates straight through to the page's frame.
-  // For ok / empty / notApplicable it returns the outcome, which we surface
-  // alongside metricRole so the PAGE can attribute its success-render metrics
-  // (view / empty / degraded / orphan_submission) without re-resolving the actor.
-  const outcome = await viewReport<GroupReportResult>(deps, {
-    surface: "group",
-    actor,
-    noActorPolicy: "tolerate",
-    // Wave J (J-3): NO pre-rate-limit flagGate. The enablement decision moved
-    // INTO the loader (the single source of truth) so the rate limiter runs
-    // FIRST and the alias-aware flag check can see template.alias without an
-    // unauthenticated pre-rate-limit DB lookup. The loader returns `notEnabled`
-    // when off, which classify → "not-found" → a SILENT dark 404 (identical
-    // observable semantics to the old flagGate, enumeration-safe, no audit).
-    flagGate: undefined,
-    ip,
-    userAgent,
-    rateLimitKey: `group-report:${actorKey}:${args.campaignId}:${ip}`,
-    rateLimitConfig: RateLimits.standard,
-    load: () => getCampaignGroupReport(reportDb, actor, args.campaignId, args.generatedAt),
-    classify: (o) =>
-      o.kind === "ok"
-        ? "ok"
-        : o.kind === "forbidden"
-          ? "forbidden"
-          : o.kind === "notEnabled"
-            ? "not-found"
-            : "passthrough",
-    auditOf: (o) => {
-      if (o.kind !== "ok") throw new Error("unreachable: auditOf on non-ok group outcome");
-      return {
-        entityType: "AssessmentCampaign",
-        action: "GROUP_REPORT_VIEW",
-        entityId: args.campaignId,
-        changes: {
-          kind: "group-report",
-          generatedAt: args.generatedAt.toISOString(),
-          versionId: o.provenance.versionId,
-          templateAlias: o.provenance.templateAlias,
-          contentHash: o.provenance.contentHash,
-          ceoParticipantId: o.provenance.ceoParticipantId,
-          completedCount: o.provenance.completedCount,
-          invitedCount: o.provenance.invitedCount,
-          submissionIds: o.provenance.submissionIds,
-          // Task 7 (Wave J): benchmark provenance for SU-Full audit trail.
-          benchmarkVersion: o.provenance.benchmarkVersion ?? null,
-          benchmarkKeyMismatch: o.provenance.benchmarkKeyMismatch ?? false,
-          // Wave L (R2-M1): the code-only render ruleset (scale + labels +
-          // intros) carries no contentHash bump, so record its version + the
-          // S3 scale-degraded signal to keep a viewed report attributable.
-          groupRenderVersion: o.report.provenance.groupRenderVersion,
-          scaleDegraded: o.report.provenance.scaleDegraded,
-          // Wave S (Jeff #12/#13): LVA peer-benchmark application — recorded
-          // ONLY when ≥1 factor actually joined (the loader sets provenance
-          // .peerBenchmarks under that exact condition; mirrors how the
-          // SU-Full benchmarkVersion string is recorded above).
-          ...(o.provenance.peerBenchmarks
-            ? {
-                peerBenchmarks: {
-                  applied: o.provenance.peerBenchmarks.applied,
-                  updatedAt:
-                    o.provenance.peerBenchmarks.updatedAt.toISOString(),
-                },
-              }
-            : {}),
-        },
-      };
-    },
-    auditFailureFields: (o) => (o.kind === "ok" ? { template: o.provenance.templateAlias } : {}),
-    metricRole,
-  });
-
-  return { outcome, metricRole };
-}
+export {
+  defaultReportGateDeps,
+  ipFromHeaders,
+} from "@/lib/assessments/report-access-gate-deps";
+export { viewGroupReport } from "@/lib/assessments/group-report-access-gate";
 
 /**
  * Per-respondent Results report adapter (PR2). Requires a signed-in actor

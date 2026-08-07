@@ -8,7 +8,7 @@
  * The cross-cutting request protocol — actor resolution, the default-OFF flag
  * gate, the fail-closed rate-limit guard, the authorized load, forbidden→404
  * (+ authz_deny), and the fail-closed GROUP_REPORT_VIEW audit — now lives in the
- * Report access gate (lib/assessments/report-access-gate.ts → viewGroupReport,
+ * Report access gate (group-report-access-gate.ts → viewGroupReport,
  * over the pure report-gate-core). See ADR-0012. This page keeps only what it
  * RENDERS — the notApplicable / empty panels and the OK group report — plus the
  * success-render metrics (not_applicable / empty / degraded / orphan_submission /
@@ -21,10 +21,8 @@
  */
 
 import { notFound } from "next/navigation";
-import {
-  viewGroupReport,
-  defaultReportGateDeps,
-} from "@/lib/assessments/report-access-gate";
+import { viewGroupReport } from "@/lib/assessments/group-report-access-gate";
+import { defaultReportGateDeps } from "@/lib/assessments/report-access-gate-deps";
 import { emitGroupReportMetric } from "@/lib/assessments/group-report-metrics";
 import {
   GroupReport,

@@ -55,10 +55,7 @@ import { inngest } from "@/inngest/client";
 // fan-out function module) so the route never evaluates inngest.createFunction.
 import { ASSESSMENT_SEND_INVITES_EVENT } from "@/inngest/functions/assessment-invite-fanout-event";
 import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
-import {
-  isReportStyleEligible,
-  resolveCampaignReportStyle,
-} from "@/lib/assessments/report-style-policy";
+import { resolveCampaignReportStyle } from "@/lib/assessments/report-style-policy";
 
 // C4 (Wave ED8) — the local `CAMPAIGN_LANGUAGE_DEFAULT = "enUS"` constant was
 // replaced by the shared DEFAULT_TEMPLATE_LANGUAGE (value-identical) so
@@ -302,23 +299,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // The browser may only opt into a non-Classic style for the exact eligible
-    // instrument. A flag-off eligible request is deliberately harmless: it
-    // falls back to Classic below rather than persisting a hidden opt-in.
-    if (
-      data.reportStyle !== undefined &&
-      data.reportStyle !== "CLASSIC" &&
-      !isReportStyleEligible(template.alias)
-    ) {
-      return NextResponse.json(
-        { success: false, error: "Report appearance is only available for Scaling Up Full." },
-        { status: 400 },
-      );
-    }
-
-    const reportStylesAvailable =
-      isReportStylesEnabled({ templateId: template.id }) &&
-      isReportStyleEligible(template.alias);
+    // A flag-off request is deliberately harmless: it falls back to Classic
+    // below rather than persisting a hidden opt-in.
+    const reportStylesAvailable = isReportStylesEnabled({ templateId: template.id });
     const reportStylePolicy = resolveCampaignReportStyle(
       reportStylesAvailable ? data.reportStyle : undefined,
       reportStylesAvailable ? template.defaultReportStyle : "CLASSIC",

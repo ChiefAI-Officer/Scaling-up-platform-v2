@@ -4,6 +4,8 @@ import { useId, useMemo, useState } from "react";
 import {
   REPORT_STYLE_KEYS,
   REPORT_STYLE_REGISTRY,
+  getReportStylePreviewPath,
+  type ReportStylePreviewAnatomy,
   type ReportStyleKey,
 } from "@/lib/assessments/report-style-registry";
 
@@ -21,10 +23,16 @@ export interface ReportStylePickerProps {
   disabled?: boolean;
   sourceLabel?: string;
   lockedAt?: Date | string | null;
+  compact?: boolean;
+  previewAnatomy?: ReportStylePreviewAnatomy;
 }
 
-function previewId(style: ReportStyleKey, page: PreviewPage) {
-  return `${style}:${page}`;
+function previewId(
+  anatomy: ReportStylePreviewAnatomy,
+  style: ReportStyleKey,
+  page: PreviewPage,
+) {
+  return `${anatomy}:${style}:${page}`;
 }
 
 function formatLockTimestamp(lockedAt: Date | string) {
@@ -48,13 +56,18 @@ export function ReportStylePicker({
   disabled = false,
   sourceLabel,
   lockedAt,
+  compact = false,
+  previewAnatomy = "scored",
 }: ReportStylePickerProps) {
   const radioName = useId();
   const [previewPage, setPreviewPage] = useState<PreviewPage>("cover");
+  const [previewExpanded, setPreviewExpanded] = useState(false);
   const [failedPreviews, setFailedPreviews] = useState<ReadonlySet<string>>(() => new Set());
   const [retryVersions, setRetryVersions] = useState<Readonly<Record<string, number>>>({});
 
   const selectedMetadata = REPORT_STYLE_REGISTRY[value];
+  const selectedThumbnailId = previewId(previewAnatomy, value, "cover");
+  const selectedThumbnailFailed = failedPreviews.has(selectedThumbnailId);
   const lockedTimestamp = useMemo(
     () => (lockedAt == null ? null : formatLockTimestamp(lockedAt)),
     [lockedAt],
@@ -100,7 +113,7 @@ export function ReportStylePicker({
   }
 
   function retryPreview(page: PreviewPage) {
-    const currentPreviewId = previewId(value, page);
+    const currentPreviewId = previewId(previewAnatomy, value, page);
 
     setFailedPreviews((current) => {
       const next = new Set(current);
@@ -114,9 +127,12 @@ export function ReportStylePicker({
   }
 
   return (
-    <section aria-label="Report style selection" className="space-y-5">
+    <section
+      aria-label="Report style selection"
+      className={compact ? "space-y-3" : "space-y-5"}
+    >
       <fieldset className="space-y-3">
-        <legend className="text-sm font-semibold text-slate-900">Report style</legend>
+        <legend className="text-sm font-semibold text-foreground">Report style</legend>
         <div className="grid gap-3 md:grid-cols-3">
           {REPORT_STYLE_KEYS.map((style) => {
             const metadata = REPORT_STYLE_REGISTRY[style];
@@ -125,7 +141,9 @@ export function ReportStylePicker({
             return (
               <label
                 key={style}
-                className="block cursor-pointer rounded-lg border border-slate-300 bg-white p-4 text-slate-900 shadow-sm transition focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-blue-700 has-[:checked]:border-slate-900 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-75"
+                className={`block cursor-pointer rounded-lg border border-border bg-background text-foreground shadow-sm transition focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring has-[:checked]:border-primary has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-75 ${
+                  compact ? "p-2" : "p-4"
+                }`}
               >
                 <input
                   type="radio"
@@ -146,8 +164,8 @@ export function ReportStylePicker({
                     </span>
                   )}
                 </span>
-                <span className="mt-2 block text-sm text-slate-700">{metadata.description}</span>
-                <span className="mt-2 block text-sm text-slate-700">
+                <span className="mt-2 block text-sm text-muted-foreground">{metadata.description}</span>
+                <span className="mt-2 block text-sm text-muted-foreground">
                   Paper format: {metadata.paperFormat}
                 </span>
               </label>
@@ -157,7 +175,7 @@ export function ReportStylePicker({
       </fieldset>
 
       {disabled && (
-        <div className="space-y-1 text-sm text-slate-700" aria-live="polite">
+        <div className="space-y-1 text-sm text-muted-foreground" aria-live="polite">
           {sourceLabel && <p>Source: {sourceLabel}</p>}
           <p>
             {lockedAt != null &&
@@ -168,12 +186,55 @@ export function ReportStylePicker({
               ) : (
                 "Lock timestamp could not be read. "
               ))}
-            Changes are unavailable after the first completed response.
+            Report appearance was fixed when the first response was completed.
           </p>
         </div>
       )}
 
-      <div className="space-y-3">
+      {compact &&
+        (selectedThumbnailFailed ? (
+          <div
+            className="space-y-2 rounded-lg border border-border bg-muted/20 p-4 text-foreground"
+            role="status"
+          >
+            <p>Preview unavailable</p>
+            <button
+              type="button"
+              className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-ring"
+              onClick={() => retryPreview("cover")}
+            >
+              Retry
+            </button>
+          </div>
+        ) : (
+          // Compact creation surfaces keep one selected thumbnail visible while
+          // the full anatomy preview remains available on demand below.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            key={`${selectedThumbnailId}-${retryVersions[selectedThumbnailId] ?? 0}`}
+            src={getReportStylePreviewPath(value, previewAnatomy, "cover")}
+            alt={`${selectedMetadata.label} selected thumbnail`}
+            className="h-28 w-full rounded-lg border border-border object-cover object-top"
+            onError={() =>
+              setFailedPreviews((current) =>
+                new Set(current).add(selectedThumbnailId),
+              )
+            }
+          />
+        ))}
+
+      {compact && (
+        <button
+          type="button"
+          aria-expanded={previewExpanded}
+          className="text-sm font-medium text-foreground underline underline-offset-2"
+          onClick={() => setPreviewExpanded((expanded) => !expanded)}
+        >
+          Preview selected appearance
+        </button>
+      )}
+      {(!compact || previewExpanded) && (
+        <div className="mt-3 space-y-3">
         <div role="tablist" aria-label="Report style preview pages" className="flex gap-2">
           {PREVIEW_TABS.map((tab) => {
             const isActive = tab.key === previewPage;
@@ -187,7 +248,7 @@ export function ReportStylePicker({
                 aria-selected={isActive}
                 aria-controls={`${radioName}-${tab.key}-panel`}
                 tabIndex={isActive ? 0 : -1}
-                className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-900 focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-blue-700"
+                className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-ring"
                 onClick={() => setPreviewPage(tab.key)}
                 onKeyDown={(event) => handlePreviewTabKeyDown(event, tab.key)}
               >
@@ -198,7 +259,7 @@ export function ReportStylePicker({
         </div>
 
         {PREVIEW_TABS.map((tab) => {
-          const currentPreviewId = previewId(value, tab.key);
+          const currentPreviewId = previewId(previewAnatomy, value, tab.key);
           const isActive = tab.key === previewPage;
           const failedPreview = failedPreviews.has(currentPreviewId);
 
@@ -212,11 +273,11 @@ export function ReportStylePicker({
               hidden={!isActive}
             >
               {failedPreview ? (
-                <div className="space-y-2 rounded-lg border border-slate-300 p-4" role="status">
+                <div className="space-y-2 rounded-lg border border-border bg-muted/20 p-4 text-foreground" role="status">
                   <p>Preview unavailable</p>
                   <button
                     type="button"
-                    className="rounded-md border border-slate-500 px-3 py-1.5 text-sm font-medium text-slate-900 focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-blue-700"
+                    className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-ring"
                     onClick={() => retryPreview(tab.key)}
                   >
                     Retry
@@ -228,9 +289,13 @@ export function ReportStylePicker({
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   key={`${currentPreviewId}-${retryVersions[currentPreviewId] ?? 0}`}
-                  src={selectedMetadata.previews[tab.key]}
+                  src={getReportStylePreviewPath(
+                    value,
+                    previewAnatomy,
+                    tab.key,
+                  )}
                   alt={`${selectedMetadata.label} ${tab.label} preview`}
-                  className="w-full rounded-lg border border-slate-300"
+                  className="w-full rounded-lg border border-border"
                   onError={() =>
                     setFailedPreviews((current) => new Set(current).add(currentPreviewId))
                   }
@@ -239,7 +304,8 @@ export function ReportStylePicker({
             </div>
           );
         })}
-      </div>
+        </div>
+      )}
     </section>
   );
 }

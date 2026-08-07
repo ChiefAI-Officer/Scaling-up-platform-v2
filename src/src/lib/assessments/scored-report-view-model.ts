@@ -14,6 +14,11 @@ import {
   greetingName,
   respondentNameMatchesEmail,
 } from "@/lib/assessments/respondent-display-name";
+import type {
+  IndividualReportBlock,
+  ReportIdentity,
+  ReportProvenance,
+} from "@/lib/assessments/individual-report-presentation";
 
 interface ParsedSection {
   stableKey: string;
@@ -114,7 +119,11 @@ export interface ScoredReportViewModel {
   recommendations: ScoredReportRecommendationGroup[];
   /** Frozen non-slider findings, selected only by applyScoredReportFindingsPolicy. */
   findingRecommendations: ScoredReportRecommendationGroup[];
-  additionalResponses: Array<{ label: string; answer: string }>;
+  additionalResponses: Array<{
+    stableKey: string;
+    label: string;
+    answer: string;
+  }>;
   cta: {
     eligible: boolean;
     contactEmail: string | null;
@@ -238,6 +247,34 @@ function ctaFor(contactEmail: string | null, eligible: boolean): ScoredReportVie
       ? "https://scalingup.com/coaches"
       : `mailto:${encodeURIComponent(contactEmail)}`,
     learnMoreHref: "https://scalingup.com",
+  };
+}
+
+/** Shared identity adapter used by scored and qualitative presentations. */
+export function buildReportIdentity(report: RespondentReport): ReportIdentity {
+  return {
+    assessmentName: report.assessmentName,
+    campaignLabel: report.campaignLabel ?? null,
+    campaignSubtitle: report.campaignLabel && report.campaignLabel !== report.assessmentName
+      ? report.campaignLabel
+      : null,
+    respondentName: report.respondentName,
+    respondentEmail: report.respondentEmail ?? null,
+    respondentNameIsEmail: respondentNameMatchesEmail(report.respondentName, report.respondentEmail),
+    jobTitle: report.jobTitle ?? null,
+    companyName: report.companyName,
+    submittedAtLabel: formatReportDate(report.submittedAt),
+  };
+}
+
+/** Shared non-PII provenance adapter used by every individual appearance. */
+export function buildReportProvenance(report: RespondentReport): ReportProvenance {
+  return {
+    submissionId: report.provenance?.submissionId ?? null,
+    versionId: report.provenance?.versionId ?? null,
+    contentHash: report.provenance?.contentHash ?? null,
+    templateName: report.provenance?.templateName ?? report.assessmentName,
+    imported: report.isImported === true,
   };
 }
 
@@ -374,7 +411,11 @@ export function buildScoredReportViewModel(report: RespondentReport): ScoredRepo
       if (typeof answer.stableKey !== "string") return [];
       const meta = report.questionsByKey?.[answer.stableKey];
       if (!meta || meta.type === "SLIDER_LIKERT") return [];
-      return [{ label: meta.label || answer.stableKey, answer: displayAnswer(answer.value, meta) }];
+      return [{
+        stableKey: answer.stableKey,
+        label: meta.label || answer.stableKey,
+        answer: displayAnswer(answer.value, meta),
+      }];
     })
     : [];
   const config = reportConfigFor(report.templateAlias);
@@ -384,19 +425,7 @@ export function buildScoredReportViewModel(report: RespondentReport): ScoredRepo
   const neutral = isNeutralTier(report.scoringConfig) && typeof result.scaleUpScore !== "number";
 
   return {
-    identity: {
-      assessmentName: report.assessmentName,
-      campaignLabel: report.campaignLabel ?? null,
-      campaignSubtitle: report.campaignLabel && report.campaignLabel !== report.assessmentName
-        ? report.campaignLabel
-        : null,
-      respondentName: report.respondentName,
-      respondentEmail: report.respondentEmail ?? null,
-      respondentNameIsEmail: respondentNameMatchesEmail(report.respondentName, report.respondentEmail),
-      jobTitle: report.jobTitle ?? null,
-      companyName: report.companyName,
-      submittedAtLabel: formatReportDate(report.submittedAt),
-    },
+    identity: buildReportIdentity(report),
     summary: {
       headline: headline.primary,
       headlineLabel: headline.label,
@@ -433,13 +462,7 @@ export function buildScoredReportViewModel(report: RespondentReport): ScoredRepo
     additionalResponses,
     cta: ctaFor(normalizeContactEmail(report.referringCoachEmail), config.showCoachCta !== false),
     coach: { name: report.coachName ?? null, logoUrl: report.coachLogoUrl ?? null },
-    provenance: {
-      submissionId: report.provenance?.submissionId ?? null,
-      versionId: report.provenance?.versionId ?? null,
-      contentHash: report.provenance?.contentHash ?? null,
-      templateName: report.provenance?.templateName ?? report.assessmentName,
-      imported: report.isImported === true,
-    },
+    provenance: buildReportProvenance(report),
     closingGreeting: greetingName(report.respondentName),
     degraded: report.degraded === true,
   };
@@ -490,4 +513,123 @@ export function applyScoredReportContactEmailOverride(
 ): ScoredReportViewModel {
   const resolvedContact = normalizeContactEmail(contactEmail) ?? model.cta.contactEmail;
   return { ...model, cta: ctaFor(resolvedContact, model.cta.eligible) };
+}
+
+/**
+ * Lossless semantic adapter over the canonical scored model. It deliberately
+ * contains no score, tier, findings, recommendation, or CTA policy.
+ */
+export function buildScoredReportPresentationBlocks(
+  model: ScoredReportViewModel,
+): IndividualReportBlock[] {
+  const blocks: IndividualReportBlock[] = [];
+  const metricFor = (question: ScoredReportQuestionView) => ({
+    stableKey: question.stableKey,
+    label: question.label,
+    value: question.value,
+    valueLabel: question.scoreLabel,
+    maximum: question.maximum,
+    achieved: question.achieved,
+    achievementMarker: question.achievementMarker
+      ? { ...question.achievementMarker }
+      : null,
+    unmapped: question.unmapped,
+  });
+
+  if (model.summary.answeredItems > 0 || model.summary.sectionCount > 0) {
+    blocks.push({ kind: "score-summary", ...model.summary });
+  }
+
+  for (const decision of model.decisions) {
+    if (
+      decision.averageAcrossSections === null &&
+      decision.totalPoints === 0
+    ) continue;
+    blocks.push({
+      kind: "metric-group",
+      stableKey: decision.stableKey,
+      label: decision.label,
+      role: "domain",
+      color: decision.color,
+      summary: {
+        average: decision.averageAcrossSections,
+        averageLabel: decision.averageAcrossSectionsLabel,
+        total: decision.totalPoints,
+        totalLabel: decision.totalPointsLabel,
+      },
+      metrics: [],
+    });
+  }
+
+  for (const section of model.sections) {
+    const hasMeaningfulMetric =
+      section.questions.length > 0 ||
+      section.totalCount > 0 ||
+      section.achievedCount > 0 ||
+      section.totalPoints !== 0 ||
+      section.averagePoints !== 0;
+    if (!hasMeaningfulMetric) continue;
+    blocks.push({
+      kind: "metric-group",
+      stableKey: section.stableKey,
+      label: section.label,
+      role: "section",
+      domain: section.domain,
+      color: section.color,
+      summary: {
+        average: section.averagePoints,
+        averageLabel: section.averagePointsLabel,
+        total: section.totalPoints,
+        totalLabel: section.totalPointsLabel,
+        achievedCount: section.achievedCount,
+        totalCount: section.totalCount,
+      },
+      metrics: section.questions.map(metricFor),
+      scorecardVisible: model.scorecard.visible,
+    });
+  }
+
+  if (model.orphanQuestions.length > 0) {
+    blocks.push({
+      kind: "metric-group",
+      stableKey: "__other_questions__",
+      label: "Other questions",
+      role: "other",
+      metrics: model.orphanQuestions.map(metricFor),
+    });
+  }
+
+  if (model.recommendations.length > 0) {
+    blocks.push({
+      kind: "recommendation",
+      groups: model.recommendations.map((group) => ({
+        ...group,
+        items: group.items.map((item) => ({ ...item })),
+      })),
+    });
+  }
+
+  const meaningfulResponses = model.additionalResponses.filter(
+    (response) => response.answer.trim() !== "",
+  );
+  if (meaningfulResponses.length > 0) {
+    blocks.push({
+      kind: "additional-response",
+      responses: meaningfulResponses.map((response) => ({ ...response })),
+    });
+  }
+
+  if (model.cta.eligible) {
+    blocks.push({ kind: "coach-cta", ...model.cta, eligible: true });
+  }
+
+  if (model.closingGreeting.trim() !== "") {
+    blocks.push({
+      kind: "closing",
+      greeting: model.closingGreeting,
+      coach: { ...model.coach },
+    });
+  }
+
+  return blocks;
 }

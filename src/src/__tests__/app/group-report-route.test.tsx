@@ -146,6 +146,12 @@ import { checkRateLimitAsync } from "@/lib/rate-limit";
 import Page from "@/app/(report)/assessments/[id]/report/page";
 import type { ApiActor } from "@/lib/auth/access-control";
 import type { AuditAction } from "@/lib/audit";
+import {
+  collectRepoLocalModuleGraph,
+  extractModuleSpecifiers,
+  findIndividualAppearanceModules,
+  findIndividualAppearanceSourceCouplings,
+} from "@/__tests__/helpers/module-dependency-boundary";
 
 const mockGetApiActor = getApiActor as jest.Mock;
 const mockIsEnabled = isGroupReportEnabled as jest.Mock;
@@ -372,17 +378,94 @@ describe("(report) campaign group report page", () => {
     expect((mod as { revalidate?: number }).revalidate).toBe(0);
   });
 
-  it("does not couple the non-goal group report route to report-style dispatch", async () => {
-    const fs = await import("fs");
-    const path = await import("path");
-    const source = fs.readFileSync(
-      path.join(process.cwd(), "src/app/(report)/assessments/[id]/report/page.tsx"),
-      "utf8",
-    );
+  it("resolves every supported repo-local dependency syntax used by the boundary graph", () => {
+    expect(
+      extractModuleSpecifiers(`
+        import "./static-import";
+        export { value } from "./barrel-re-export";
+        const dynamicModule = import("./dynamic-import");
+        const requiredModule = require("./commonjs-require");
+        void dynamicModule;
+        void requiredModule;
+      `),
+    ).toEqual([
+      "./barrel-re-export",
+      "./commonjs-require",
+      "./dynamic-import",
+      "./static-import",
+    ]);
+  });
 
-    expect(source).not.toContain("wave-report-styles-flags");
-    expect(source).not.toContain("ExecutiveBoardroomReport");
-    expect(source).not.toContain("ModernDashboardReport");
+  it("recursively resolves static, dynamic, require, and barrel dependencies to concrete appearance modules", () => {
+    const reachableModules = collectRepoLocalModuleGraph([
+      "src/__tests__/fixtures/module-dependency-boundary/entry.ts",
+    ]);
+
+    expect(reachableModules).toEqual(
+      expect.arrayContaining([
+        "src/__tests__/fixtures/module-dependency-boundary/appearance.server.ts",
+        "src/__tests__/fixtures/module-dependency-boundary/barrel.ts",
+        "src/__tests__/fixtures/module-dependency-boundary/dynamic-leaf.ts",
+        "src/__tests__/fixtures/module-dependency-boundary/entry.ts",
+        "src/__tests__/fixtures/module-dependency-boundary/require-leaf.ts",
+        "src/__tests__/fixtures/module-dependency-boundary/static-leaf.ts",
+        "src/lib/assessments/report-style-registry.ts",
+        "src/lib/assessments/wave-report-styles-flags.ts",
+      ]),
+    );
+    expect(findIndividualAppearanceModules(reachableModules)).toEqual([
+      "src/lib/assessments/report-style-registry.ts",
+      "src/lib/assessments/wave-report-styles-flags.ts",
+    ]);
+  });
+
+  it.each([
+    [
+      "src/__tests__/fixtures/module-dependency-boundary/unresolved-relative.fixture",
+      "./missing.relative",
+    ],
+    [
+      "src/__tests__/fixtures/module-dependency-boundary/unresolved-alias.fixture",
+      "@/__tests__/fixtures/module-dependency-boundary/missing-alias",
+    ],
+  ])(
+    "fails closed when %s contains unresolved repo-local dependency %s",
+    (importer, moduleSpecifier) => {
+      expect(() => collectRepoLocalModuleGraph([importer])).toThrow(
+        `Unresolved repo-local dependency "${moduleSpecifier}" imported by "${importer}"`,
+      );
+    },
+  );
+
+  it("detects direct appearance-state identifiers in reachable source", () => {
+    const reachableModules = collectRepoLocalModuleGraph([
+      "src/__tests__/fixtures/module-dependency-boundary/appearance-source-coupling.ts",
+    ]);
+
+    expect(
+      findIndividualAppearanceSourceCouplings(reachableModules),
+    ).toEqual([
+      {
+        modulePath:
+          "src/__tests__/fixtures/module-dependency-boundary/appearance-source-coupling.ts",
+        identifiers: ["reportStyle", "reportStylesAvailable"],
+      },
+    ]);
+  });
+
+  it("keeps individual appearance modules unreachable from the complete group report dependency graph", () => {
+    const entryPoints = [
+      "src/app/(report)/assessments/[id]/report/page.tsx",
+      "src/lib/assessments/group-report.ts",
+      "src/lib/assessments/group-report-model.ts",
+    ];
+
+    const reachableModules = collectRepoLocalModuleGraph(entryPoints);
+
+    expect(findIndividualAppearanceModules(reachableModules)).toEqual([]);
+    expect(
+      findIndividualAppearanceSourceCouplings(reachableModules),
+    ).toEqual([]);
   });
 
   it("GROUP_REPORT_VIEW is a valid member of the AuditAction type", () => {

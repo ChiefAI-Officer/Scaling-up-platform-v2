@@ -1,49 +1,44 @@
-import type { ScoredReportViewModel } from "@/lib/assessments/scored-report-view-model";
 import { assessmentInter, assessmentPlayfairDisplay } from "@/lib/assessments/assessment-fonts";
+import type { IndividualReportPresentation } from "@/lib/assessments/individual-report-presentation";
 import "@/styles/su-report-executive.css";
 import {
-  AdditionalResponses,
-  DegradedNotice,
-  DecisionLedger,
-  Recommendations,
-  ReportCta,
+  partitionReportBlocks,
+  ReportBlocks,
   ReportIdentityHeader,
-  SectionEvidence,
-  SectionScorecard,
-  StrengthsAndPriorities,
-  SummaryFacts,
+  ReportProvenance,
 } from "@/components/assessments/report-styles/ReportSharedContent";
 
-function ReportProvenance({ view }: { view: ScoredReportViewModel }) {
-  return (
-    <p className="report-provenance" data-testid="report-style-provenance">
-      Confidential assessment report · prepared for {view.identity.companyName}
-    </p>
-  );
-}
+export function ExecutiveBoardroomReport({
+  presentation,
+}: {
+  presentation: IndividualReportPresentation;
+}) {
+  const { summary, detail } = partitionReportBlocks(presentation.blocks);
 
-export function ExecutiveBoardroomReport({ view }: { view: ScoredReportViewModel }) {
   return (
-    <article className={`su-report--executive ${assessmentInter.variable} ${assessmentPlayfairDisplay.variable}`} data-testid="executive-boardroom-report">
+    <article
+      className={`su-report--executive ${assessmentInter.variable} ${assessmentPlayfairDisplay.variable}`}
+      data-testid="executive-boardroom-report"
+    >
       <section className="report-page report-page--executive-cover">
-        <DegradedNotice view={view} />
-        <ReportIdentityHeader view={view} eyebrow="Executive decision brief" />
-        <ReportProvenance view={view} />
+        <ReportIdentityHeader
+          presentation={presentation}
+          eyebrow="Executive decision brief"
+        />
+        <ReportProvenance presentation={presentation} />
       </section>
-      <section className="report-page report-page--executive-summary report-page-break">
-        <SummaryFacts view={view} />
-        <DecisionLedger view={view} />
-        <StrengthsAndPriorities view={view} />
-        <ReportProvenance view={view} />
-      </section>
-      <section className="report-page report-page--executive-detail report-page-break">
-        <SectionScorecard view={view} />
-        <SectionEvidence view={view} />
-        <Recommendations view={view} />
-        <AdditionalResponses view={view} />
-        <ReportCta view={view} />
-        <ReportProvenance view={view} />
-      </section>
+      {summary.length > 0 ? (
+        <section className="report-page report-page--executive-summary report-page-break">
+          <ReportBlocks blocks={summary} />
+          <ReportProvenance presentation={presentation} />
+        </section>
+      ) : null}
+      {detail.length > 0 ? (
+        <section className="report-page report-page--executive-detail report-page-break">
+          <ReportBlocks blocks={detail} />
+          <ReportProvenance presentation={presentation} />
+        </section>
+      ) : null}
     </article>
   );
 }

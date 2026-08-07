@@ -225,6 +225,10 @@
   margin-bottom: 4px;
 }
 
+[data-enabled-report-style="CLASSIC"] .su-public-brand .su-report-eyebrow {
+  color: #006b9f;
+}
+
 /* Light overall card: a purple score "ring" on the left, band + message right.
    (Mockup anatomy — replaces the old purple gradient banner.) */
 .su-public-brand .su-report-overall-main {
@@ -466,6 +470,20 @@
   padding: 14px 16px;
 }
 
+/* Enabled report surfaces may improve contrast without changing the flag-off
+   Classic computed-style contract. Attribute matching targets canonical bright domains. */
+[data-enabled-report-style="CLASSIC"]
+  .su-public-brand
+  .su-report-card-head[style*="background-color:#f7a600"],
+[data-enabled-report-style="CLASSIC"]
+  .su-public-brand
+  .su-report-card-head[style*="background-color:#008bd2"],
+[data-enabled-report-style="CLASSIC"]
+  .su-public-brand
+  .su-report-card-head[style*="background-color:#95c11f"] {
+  color: #1a1322;
+}
+
 .su-public-brand .su-report-card-title {
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
   font-weight: 700;
@@ -485,6 +503,37 @@
   border-radius: 999px;
   white-space: nowrap;
   flex-shrink: 0;
+}
+
+[data-enabled-report-style="CLASSIC"]
+  .su-public-brand
+  .su-report-card-head[style*="background-color:#f7a600"]
+  .su-report-card-title,
+[data-enabled-report-style="CLASSIC"]
+  .su-public-brand
+  .su-report-card-head[style*="background-color:#008bd2"]
+  .su-report-card-title,
+[data-enabled-report-style="CLASSIC"]
+  .su-public-brand
+  .su-report-card-head[style*="background-color:#95c11f"]
+  .su-report-card-title {
+  color: #1a1322;
+}
+
+[data-enabled-report-style="CLASSIC"]
+  .su-public-brand
+  .su-report-card-head[style*="background-color:#f7a600"]
+  .su-report-card-chip,
+[data-enabled-report-style="CLASSIC"]
+  .su-public-brand
+  .su-report-card-head[style*="background-color:#008bd2"]
+  .su-report-card-chip,
+[data-enabled-report-style="CLASSIC"]
+  .su-public-brand
+  .su-report-card-head[style*="background-color:#95c11f"]
+  .su-report-card-chip {
+  background: rgba(255, 255, 255, 0.5);
+  color: #1a1322;
 }
 
 /* Question list inside a card */
@@ -888,6 +937,20 @@
   margin-left: auto;
 }
 
+[data-enabled-report-style="CLASSIC"] .su-public-brand .su-report-coach {
+  flex-wrap: wrap;
+  max-width: 100%;
+}
+
+[data-enabled-report-style="CLASSIC"] .su-public-brand .su-report-coach-name {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+[data-enabled-report-style="CLASSIC"] .su-public-brand .su-report-confidential {
+  color: rgba(255, 255, 255, 0.78);
+}
+
 /* ── Responsive (screen) ─────────────────────────────────────────────────── */
 @media (max-width: 720px) {
   .su-public-brand .su-report-cover-inner { padding: 36px 24px 0; }
@@ -1045,6 +1108,10 @@
   font-weight: 800;
   margin: 0 0 6px;
 }
+
+[data-enabled-report-style="CLASSIC"] .su-public-brand .su-section-eyebrow {
+  color: #006b9f;
+}
 .su-public-brand .su-section-title {
   font-weight: 800;
   font-size: 26px;
@@ -1136,6 +1203,14 @@
   color: #b87400;
   border-bottom-color: #fbe6b8;
 }
+
+[data-enabled-report-style="CLASSIC"] .su-public-brand .su-qa-q {
+  color: #006b9f;
+}
+
+[data-enabled-report-style="CLASSIC"] .su-public-brand .su-qa.amber .su-qa-q {
+  color: #855400;
+}
 .su-public-brand .su-qa-a {
   display: grid;
   grid-template-columns: 200px 1fr;
@@ -1199,6 +1274,10 @@
   font-size: 12px;
   letter-spacing: 0.02em;
   border-left: 1px solid #f4f2f8;
+}
+
+[data-enabled-report-style="CLASSIC"] .su-public-brand .su-matrix-cell.rating {
+  color: #6b6480;
 }
 .su-public-brand .su-matrix-row:nth-child(even of :not(.su-matrix-head)) {
   background: #fbfafd;
@@ -2041,4 +2120,17 @@
   font-size: 12px;
   letter-spacing: 0.02em;
   margin-top: 6px;
+}
+
+/* Alternate reports reuse the canonical imported marker in their repeating
+   provenance line. Keep the print-safe treatment shared so both appearances
+   cannot drift while allowing the provenance ink to follow each theme. */
+.su-public-brand :where(.su-report--executive, .su-report--dashboard) .report-provenance .su-imported-badge {
+  background: transparent;
+  border-color: currentColor;
+  border-radius: 999px;
+  color: inherit;
+  font-size: .62rem;
+  margin: .35rem 0 0 .45rem;
+  padding: .15rem .45rem;
 }

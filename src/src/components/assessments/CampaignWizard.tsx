@@ -61,9 +61,10 @@ import type { MemberCreatedResult } from "@/components/organizations/add-member-
 import { ReportStylePicker } from "@/components/assessments/ReportStylePicker";
 import {
   isReportStyleKey,
+  resolveReportStylePreviewAnatomy,
   type ReportStyleKey,
+  type ReportStylePreviewCapabilities,
 } from "@/lib/assessments/report-style-registry";
-import { isReportStyleEligible } from "@/lib/assessments/report-style-policy";
 
 const DRAFT_ENDPOINT = "/api/assessment-campaign-drafts";
 const DRAFT_DEBOUNCE_MS = 800;
@@ -130,6 +131,7 @@ interface TemplateSummary {
   defaultReportStyle?: ReportStyleKey;
   /** Server-computed per-template availability, including template canaries. */
   reportStylesEnabled?: boolean;
+  reportStylePreviewCapabilities?: ReportStylePreviewCapabilities;
 }
 
 interface Respondent {
@@ -170,6 +172,7 @@ interface WizardState {
   reportStyle: ReportStyleKey;
   reportStyleIntent: ReportStyleIntent;
   templateReportStylesEnabled: boolean;
+  templatePreviewCapabilities?: ReportStylePreviewCapabilities;
   respondentIds: string[];
   ceoRespondentId: string | null;
   name: string;
@@ -360,6 +363,7 @@ export function CampaignWizard({
       reportStyle: "CLASSIC",
       reportStyleIntent: "INHERITED",
       templateReportStylesEnabled: false,
+      templatePreviewCapabilities: undefined,
       respondentIds: [],
       ceoRespondentId: null,
       name: "",
@@ -449,8 +453,7 @@ export function CampaignWizard({
             ? parsed.templateDefaultReportStyle
             : "CLASSIC";
         const inheritedReportStyle =
-          selectedTemplate?.reportStylesEnabled === true &&
-          isReportStyleEligible(templateAlias)
+          selectedTemplate?.reportStylesEnabled === true
             ? templateDefaultReportStyle
             : "CLASSIC";
         const merged: WizardState = {
@@ -470,8 +473,9 @@ export function CampaignWizard({
               : inheritedReportStyle,
           reportStyleIntent,
           templateReportStylesEnabled:
-            selectedTemplate?.reportStylesEnabled === true &&
-            isReportStyleEligible(templateAlias),
+            selectedTemplate?.reportStylesEnabled === true,
+          templatePreviewCapabilities:
+            selectedTemplate?.reportStylePreviewCapabilities,
           respondentIds: Array.isArray(parsed.respondentIds)
             ? parsed.respondentIds
             : [],
@@ -983,6 +987,7 @@ export function CampaignWizard({
               alias,
               defaultReportStyle,
               templateReportStylesEnabled,
+              templatePreviewCapabilities,
               resultsEmailApproved,
               sendResultsDefault,
             ) =>
@@ -993,11 +998,12 @@ export function CampaignWizard({
                 templateAlias: alias,
                 templateDefaultReportStyle: defaultReportStyle,
                 reportStyle:
-                  templateReportStylesEnabled && isReportStyleEligible(alias)
+                  templateReportStylesEnabled
                     ? defaultReportStyle
                     : "CLASSIC",
                 reportStyleIntent: "INHERITED",
                 templateReportStylesEnabled,
+                templatePreviewCapabilities,
                 templateResultsEmailApproved: resultsEmailApproved,
                 // Wave Q (#1): with the flag on, template selection/switch
                 // re-derives #15 from the picked template's admin default —
@@ -1041,12 +1047,13 @@ export function CampaignWizard({
             endMode={state.endMode}
             closeAt={state.closeAt}
             templateName={state.templateName}
+            templateAlias={state.templateAlias}
+            previewCapabilities={state.templatePreviewCapabilities}
             resultsEmailApproved={state.templateResultsEmailApproved}
             sendResultsToRespondent={state.sendResultsToRespondent}
             notifyCoachOnCompletion={state.notifyCoachOnCompletion}
             showResultsOnScreen={state.showResultsOnScreen}
             reportStylesEnabled={state.templateReportStylesEnabled}
-            reportStyleEligible={isReportStyleEligible(state.templateAlias)}
             reportStyle={state.reportStyle}
             reportStyleIntent={state.reportStyleIntent}
             inviteTiming={state.inviteTiming}
@@ -1207,6 +1214,7 @@ function TemplateStep({
     alias: string,
     defaultReportStyle: ReportStyleKey,
     reportStylesEnabled: boolean,
+    previewCapabilities: ReportStylePreviewCapabilities | undefined,
     resultsEmailApproved: boolean,
     sendResultsDefault: boolean,
   ) => void;
@@ -1285,8 +1293,8 @@ function TemplateStep({
                     isReportStyleKey(t.defaultReportStyle)
                       ? t.defaultReportStyle
                       : "CLASSIC",
-                    t.reportStylesEnabled === true &&
-                      isReportStyleEligible(t.alias),
+                    t.reportStylesEnabled === true,
+                    t.reportStylePreviewCapabilities,
                     t.resultsEmailApproved,
                     t.sendResultsDefault === true,
                   )
@@ -1780,12 +1788,13 @@ function ScheduleStep({
   endMode,
   closeAt,
   templateName,
+  templateAlias,
+  previewCapabilities,
   resultsEmailApproved,
   sendResultsToRespondent,
   notifyCoachOnCompletion,
   showResultsOnScreen,
   reportStylesEnabled,
-  reportStyleEligible,
   reportStyle,
   reportStyleIntent,
   inviteTiming,
@@ -1802,12 +1811,13 @@ function ScheduleStep({
   endMode: EndMode;
   closeAt: string;
   templateName: string;
+  templateAlias: string;
+  previewCapabilities?: ReportStylePreviewCapabilities;
   resultsEmailApproved: boolean;
   sendResultsToRespondent: boolean;
   notifyCoachOnCompletion: boolean;
   showResultsOnScreen: boolean;
   reportStylesEnabled: boolean;
-  reportStyleEligible: boolean;
   reportStyle: ReportStyleKey;
   reportStyleIntent: ReportStyleIntent;
   inviteTiming: "IMMEDIATELY" | "ON_OPEN";
@@ -2051,7 +2061,7 @@ function ScheduleStep({
         </div>
       )}
 
-      {reportStylesEnabled && reportStyleEligible && (
+      {reportStylesEnabled && (
         <div className="space-y-3 border border-border rounded-lg p-4">
           <div>
             <h3 className="text-sm font-semibold text-foreground">Report appearance</h3>
@@ -2063,6 +2073,10 @@ function ScheduleStep({
           </div>
           <ReportStylePicker
             value={reportStyle}
+            previewAnatomy={resolveReportStylePreviewAnatomy({
+              templateAlias,
+              capabilities: previewCapabilities,
+            })}
             onChange={(value) =>
               onChange({ reportStyle: value, reportStyleIntent: "EXPLICIT" })
             }
@@ -2281,7 +2295,7 @@ function ReviewStep({
           <span className="text-muted-foreground">Template</span>
           <span className="font-medium text-foreground text-right">{templateName}</span>
         </div>
-        {reportStylesEnabled && isReportStyleEligible(state.templateAlias) && (
+        {reportStylesEnabled && (
           <div className="flex justify-between gap-4">
             <span className="text-muted-foreground">Report appearance</span>
             <span className="font-medium text-foreground text-right">

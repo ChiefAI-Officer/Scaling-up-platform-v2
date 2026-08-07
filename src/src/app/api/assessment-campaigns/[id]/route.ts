@@ -1,8 +1,10 @@
 /**
  * Assessment v7.6 — Campaign detail routes.
  * GET: canManageCampaign mode="read" (creator coach OR admin).
- * PATCH: canManageCampaign mode="write" (creator coach with current
- * template+org access OR admin) AND status === DRAFT.
+ * PATCH: generic fields retain canManageCampaign mode="write" (creator coach
+ * with current template+org access OR admin). The isolated report-appearance
+ * lane is exact-owner COACH only; privileged public-campaign writes use their
+ * dedicated admin route.
  * DELETE (Wave D, #1): soft-delete (sets deletedAt). Authorization is a
  * DISTINCT ownership predicate — admin/privileged OR the campaign creator
  * coach (createdByCoachId === actor.coachId) — NOT canManageCampaign,
@@ -14,6 +16,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { updateAssessmentCampaignSchema } from "@/lib/validations";
 import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
+import type { ApiActor } from "@/lib/auth/access-control";
 import {
   asAccessDb,
   canManageCampaign,
@@ -32,7 +35,8 @@ import {
 import { isCustomSlidesEnabled } from "@/lib/assessments/wave-m-flags";
 import { isOnScreenResultsEnabled } from "@/lib/assessments/wave-osr-flags";
 import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
-import { isReportStyleEligible } from "@/lib/assessments/report-style-policy";
+import type { ReportStyleKey } from "@/lib/assessments/report-style-registry";
+import { isExactCoachReportAppearanceOwner } from "@/lib/assessments/campaign-detail";
 import {
   prepareCustomSlidesForSave,
   sectionStableKeysOf,
@@ -71,6 +75,184 @@ function jsonDeepEqual(a: unknown, b: unknown): boolean {
   return ak.every((k) => jsonDeepEqual(ao[k], bo[k]));
 }
 
+interface ReportAppearanceCampaign {
+  id: string;
+  status: "DRAFT" | "ACTIVE" | "CLOSED";
+  templateId: string;
+  organizationId: string;
+  createdByCoachId: string | null;
+  deletedAt: Date | null;
+  reportStyle: ReportStyleKey;
+  reportStyleSource: "TEMPLATE_DEFAULT" | "CAMPAIGN_OVERRIDE";
+  reportStyleLockedAt: Date | null;
+  template: { alias: string } | null;
+}
+
+const REPORT_APPEARANCE_CAMPAIGN_SELECT = {
+  id: true,
+  status: true,
+  templateId: true,
+  organizationId: true,
+  createdByCoachId: true,
+  deletedAt: true,
+  reportStyle: true,
+  reportStyleSource: true,
+  reportStyleLockedAt: true,
+  template: { select: { alias: true } },
+} satisfies Prisma.AssessmentCampaignSelect;
+
+function lockedReportAppearanceResponse(campaign: ReportAppearanceCampaign) {
+  return NextResponse.json(
+    {
+      error: "REPORT_STYLE_LOCKED",
+      message: REPORT_STYLE_LOCKED_MESSAGE,
+      data: {
+        id: campaign.id,
+        reportStyle: campaign.reportStyle,
+        reportStyleSource: campaign.reportStyleSource,
+        reportStyleLockedAt: campaign.reportStyleLockedAt,
+      },
+    },
+    { status: 409 },
+  );
+}
+
+async function patchReportAppearance(
+  body: unknown,
+  actor: ApiActor,
+  id: string,
+) {
+  const validation = updateAssessmentCampaignSchema.safeParse(body);
+  if (!validation.success) {
+    return NextResponse.json(
+      { success: false, error: validation.error.issues },
+      { status: 400 },
+    );
+  }
+
+  const bodyFields = Object.keys(body as Record<string, unknown>);
+  if (
+    validation.data.reportStyle === undefined ||
+    bodyFields.some((field) => field !== "reportStyle")
+  ) {
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          "Report appearance must be updated separately from other campaign fields",
+      },
+      { status: 400 },
+    );
+  }
+
+  const campaign = (await db.assessmentCampaign.findUnique({
+    where: { id },
+    select: REPORT_APPEARANCE_CAMPAIGN_SELECT,
+  })) as ReportAppearanceCampaign | null;
+  if (!campaign || campaign.deletedAt !== null) {
+    return NextResponse.json(
+      { success: false, error: "Campaign not found" },
+      { status: 404 },
+    );
+  }
+
+  // This endpoint owns coach-campaign appearance changes only. Privileged
+  // public-campaign writes use the dedicated Task 5 route; they cannot pass
+  // through this coach-owned lane.
+  const isExactCoachOwner = isExactCoachReportAppearanceOwner({
+    actorRole: actor.role,
+    actorCoachId: actor.coachId,
+    campaignOwnerCoachId: campaign.createdByCoachId,
+  });
+  if (!isExactCoachOwner) {
+    return NextResponse.json(
+      { success: false, error: "Forbidden" },
+      { status: 403 },
+    );
+  }
+
+  // Exact ownership is necessary but not sufficient: preserve the existing
+  // write-level organization and template currency checks.
+  const hasCurrentWriteAccess = await canManageCampaign(
+    asAccessDb(db),
+    actor,
+    id,
+    "write",
+  );
+  if (!hasCurrentWriteAccess) {
+    return NextResponse.json(
+      { success: false, error: "Forbidden" },
+      { status: 403 },
+    );
+  }
+
+  // Only an authorized campaign owner receives stored appearance metadata.
+  // Once authorized, a pre-existing lock and a completion race share the same
+  // deterministic final-appearance contract.
+  if (campaign.reportStyleLockedAt !== null) {
+    return lockedReportAppearanceResponse(campaign);
+  }
+
+  const reportStylesAvailable =
+    isReportStylesEnabled({ templateId: campaign.templateId, campaignId: id });
+  if (!reportStylesAvailable) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Report appearance is not available for this campaign",
+      },
+      { status: 400 },
+    );
+  }
+
+  const reportStyle = validation.data.reportStyle;
+  const changed = await db.assessmentCampaign.updateMany({
+    where: { id, reportStyleLockedAt: null },
+    data: {
+      reportStyle,
+      reportStyleSource: "CAMPAIGN_OVERRIDE",
+    },
+  });
+  if (changed.count === 0) {
+    const finalCampaign = (await db.assessmentCampaign.findUnique({
+      where: { id },
+      select: REPORT_APPEARANCE_CAMPAIGN_SELECT,
+    })) as ReportAppearanceCampaign | null;
+
+    if (
+      finalCampaign !== null &&
+      finalCampaign.reportStyleLockedAt !== null
+    ) {
+      return lockedReportAppearanceResponse(finalCampaign);
+    }
+
+    return NextResponse.json(
+      { error: "REPORT_STYLE_LOCKED", message: REPORT_STYLE_LOCKED_MESSAGE },
+      { status: 409 },
+    );
+  }
+
+  await logAudit({
+    entityType: "AssessmentCampaign",
+    entityId: id,
+    action: "UPDATE",
+    performedBy: actor.email,
+    changes: {
+      reportStyle,
+      reportStyleSource: "CAMPAIGN_OVERRIDE",
+    },
+  });
+
+  return NextResponse.json({
+    success: true,
+    data: {
+      id,
+      reportStyle,
+      reportStyleSource: "CAMPAIGN_OVERRIDE",
+    },
+  });
+}
+
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -85,6 +267,7 @@ export async function GET(
     }
 
     const { id } = await params;
+
     const allowed = await canManageCampaign(
       asAccessDb(db),
       actor,
@@ -159,6 +342,25 @@ export async function PATCH(
     }
 
     const { id } = await params;
+
+    // Detect the isolated appearance lane without changing authorization or
+    // error precedence for every other campaign-management PATCH.
+    let parsedBody: unknown;
+    let invalidJsonBody = false;
+    try {
+      parsedBody = await request.json();
+    } catch {
+      invalidJsonBody = true;
+    }
+    const isReportAppearanceRequest =
+      parsedBody !== null &&
+      typeof parsedBody === "object" &&
+      !Array.isArray(parsedBody) &&
+      Object.prototype.hasOwnProperty.call(parsedBody, "reportStyle");
+    if (isReportAppearanceRequest) {
+      return patchReportAppearance(parsedBody, actor, id);
+    }
+
     const allowed = await canManageCampaign(
       asAccessDb(db),
       actor,
@@ -200,15 +402,13 @@ export async function PATCH(
       );
     }
 
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
+    if (invalidJsonBody) {
       return NextResponse.json(
         { success: false, error: "Invalid JSON body" },
         { status: 400 }
       );
     }
+    const body = parsedBody;
 
     const validation = updateAssessmentCampaignSchema.safeParse(body);
     if (!validation.success) {
@@ -218,69 +418,6 @@ export async function PATCH(
       );
     }
     const data = validation.data;
-
-    // Report appearance is a deliberately isolated mutation lane. The server
-    // owns its availability decision (template allowlist + feature flag), and
-    // the conditional update is the synchronization point with first completion.
-    // Do not fold this into the generic PATCH below: that branch uses an ordinary
-    // update and must never become a read-then-write escape hatch around the lock.
-    if (data.reportStyle !== undefined) {
-      const bodyFields = Object.keys(body as Record<string, unknown>);
-      if (bodyFields.some((field) => field !== "reportStyle")) {
-        return NextResponse.json(
-          {
-            success: false,
-            error:
-              "Report appearance must be updated separately from other campaign fields",
-          },
-          { status: 400 },
-        );
-      }
-
-      const reportStylesAvailable =
-        isReportStyleEligible(campaign.template?.alias) &&
-        isReportStylesEnabled({ templateId: campaign.templateId, campaignId: id });
-      if (!reportStylesAvailable) {
-        return NextResponse.json(
-          { success: false, error: "Report appearance is not available for this campaign" },
-          { status: 400 },
-        );
-      }
-
-      const changed = await db.assessmentCampaign.updateMany({
-        where: { id, reportStyleLockedAt: null },
-        data: {
-          reportStyle: data.reportStyle,
-          reportStyleSource: "CAMPAIGN_OVERRIDE",
-        },
-      });
-      if (changed.count === 0) {
-        return NextResponse.json(
-          { error: "REPORT_STYLE_LOCKED", message: REPORT_STYLE_LOCKED_MESSAGE },
-          { status: 409 },
-        );
-      }
-
-      await logAudit({
-        entityType: "AssessmentCampaign",
-        entityId: id,
-        action: "UPDATE",
-        performedBy: actor.email,
-        changes: {
-          reportStyle: data.reportStyle,
-          reportStyleSource: "CAMPAIGN_OVERRIDE",
-        },
-      });
-
-      return NextResponse.json({
-        success: true,
-        data: {
-          id,
-          reportStyle: data.reportStyle,
-          reportStyleSource: "CAMPAIGN_OVERRIDE",
-        },
-      });
-    }
 
     const updateData: {
       name?: string;

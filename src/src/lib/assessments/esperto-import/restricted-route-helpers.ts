@@ -295,9 +295,23 @@ export interface RestrictedCommitPrismaLike {
       templateId: string;
       versionId: string;
       importManifest: unknown;
+      reportStyleLockedAt: Date | null;
     } | null>;
     create: (args: { data: object }) => Promise<{ id: string }>;
-    update: (args: { where: { id: string }; data: object }) => Promise<unknown>;
+    update: (args: {
+      where: { id: string; reportStyleLockedAt?: null };
+      data: object;
+    }) => Promise<unknown>;
+    updateMany: (args: {
+      where: {
+        id: string;
+        OR: Array<
+          | { reportStyleLockedAt: null }
+          | { reportStyleLockedAt: { gt: Date } }
+        >;
+      };
+      data: { reportStyleLockedAt: Date };
+    }) => Promise<{ count: number }>;
   };
   assessmentTemplateVersion: {
     findUnique: (args: { where: { id: string }; select?: object }) => Promise<{
@@ -378,6 +392,7 @@ export function buildRealRestrictedCommitDb(
         }),
       create: (args) => client.assessmentCampaign.create(args),
       update: (args) => client.assessmentCampaign.update(args),
+      updateMany: (args) => client.assessmentCampaign.updateMany(args),
     },
     assessmentTemplateVersion: {
       findUnique: (args) => client.assessmentTemplateVersion.findUnique(args),

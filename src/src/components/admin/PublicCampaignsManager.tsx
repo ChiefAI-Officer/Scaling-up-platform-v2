@@ -16,12 +16,22 @@ import {
   FOUR_DECISION_STYLES,
   fourDecisionDomains,
 } from "@/lib/assessments/public-result-summary";
+import { ReportStylePicker } from "@/components/assessments/ReportStylePicker";
+import {
+  REPORT_STYLE_REGISTRY,
+  resolveReportStylePreviewAnatomy,
+  type ReportStyleKey,
+  type ReportStylePreviewCapabilities,
+} from "@/lib/assessments/report-style-registry";
 
 interface TemplateSummary {
   id: string;
   name: string;
   alias: string;
   disabledAt?: string | null;
+  defaultReportStyle: ReportStyleKey;
+  reportStylesEnabled: boolean;
+  reportStylePreviewCapabilities: ReportStylePreviewCapabilities;
 }
 
 interface OrgSummary {
@@ -37,6 +47,11 @@ interface PublicCampaignRow {
   accessMode: string;
   openAt: string;
   closeAt?: string | null;
+  reportStyle: ReportStyleKey;
+  reportStyleSource: "TEMPLATE_DEFAULT" | "CAMPAIGN_OVERRIDE";
+  reportStyleLockedAt: string | null;
+  reportStylesAvailable: boolean;
+  reportStylePreviewCapabilities: ReportStylePreviewCapabilities;
   template?: { id: string; name: string; alias: string } | null;
   organization?: { id: string; name: string } | null;
 }
@@ -112,6 +127,15 @@ export function PublicCampaignsManager() {
   const [expandedSubmissionId, setExpandedSubmissionId] = useState<string | null>(
     null,
   );
+  const [expandedAppearanceId, setExpandedAppearanceId] = useState<string | null>(
+    null,
+  );
+  const [appearanceDrafts, setAppearanceDrafts] = useState<
+    Record<string, ReportStyleKey>
+  >({});
+  const [appearanceSavingId, setAppearanceSavingId] = useState<string | null>(
+    null,
+  );
 
   async function toggleSubmissions(id: string) {
     // Collapse if already open.
@@ -149,6 +173,12 @@ export function PublicCampaignsManager() {
   const [name, setName] = useState("");
   const [openAt, setOpenAt] = useState("");
   const [closeAt, setCloseAt] = useState("");
+  const [reportStyle, setReportStyle] = useState<ReportStyleKey>("CLASSIC");
+  const [reportStyleIntent, setReportStyleIntent] = useState<
+    "INHERITED" | "EXPLICIT"
+  >("INHERITED");
+
+  const selectedTemplate = templates.find((template) => template.id === templateId);
 
   async function loadData() {
     setLoading(true);
@@ -156,8 +186,8 @@ export function PublicCampaignsManager() {
     try {
       // Load campaigns filtered to PUBLIC
       const [campsRes, tmplRes, orgsRes] = await Promise.all([
-        fetch("/api/assessment-campaigns"),
-        fetch("/api/admin/assessment-templates"),
+        fetch("/api/admin/public-campaigns"),
+        fetch("/api/assessment-templates"),
         fetch("/api/organizations"),
       ]);
 
@@ -165,8 +195,22 @@ export function PublicCampaignsManager() {
         const body = (await campsRes.json()) as {
           data: PublicCampaignRow[];
         };
-        setCampaigns(
-          (body.data ?? []).filter((c) => c.accessMode === "PUBLIC")
+        const publicCampaigns = (body.data ?? []).filter(
+          (c) => c.accessMode === "PUBLIC",
+        );
+        setCampaigns(publicCampaigns);
+        // A completion-race 409 reload must replace the losing client draft
+        // with the final server-frozen selection.
+        setAppearanceDrafts(
+          Object.fromEntries(
+            publicCampaigns.map((campaign) => [
+              campaign.id,
+              campaign.reportStyleLockedAt !== null ||
+              campaign.reportStylesAvailable
+                ? campaign.reportStyle
+                : "CLASSIC",
+            ]),
+          ) as Record<string, ReportStyleKey>,
         );
       }
 
@@ -212,6 +256,7 @@ export function PublicCampaignsManager() {
           name,
           openAt: new Date(openAt).toISOString(),
           closeAt: closeAt ? new Date(closeAt).toISOString() : null,
+          ...(reportStyleIntent === "EXPLICIT" ? { reportStyle } : {}),
         }),
       });
       const body = (await res.json()) as { success: boolean; error?: unknown };
@@ -229,11 +274,104 @@ export function PublicCampaignsManager() {
       setName("");
       setOpenAt("");
       setCloseAt("");
+      setReportStyle("CLASSIC");
+      setReportStyleIntent("INHERITED");
       await loadData();
     } catch (e) {
       setFormError(e instanceof Error ? e.message : "Unexpected error");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  function toggleAppearance(campaign: PublicCampaignRow) {
+    if (expandedAppearanceId === campaign.id) {
+      setExpandedAppearanceId(null);
+      return;
+    }
+    setExpandedAppearanceId(campaign.id);
+    setAppearanceDrafts((current) => ({
+      ...current,
+      [campaign.id]:
+        campaign.reportStyleLockedAt !== null ||
+        campaign.reportStylesAvailable
+          ? campaign.reportStyle
+          : "CLASSIC",
+    }));
+  }
+
+  async function handleSaveReportStyle(campaign: PublicCampaignRow) {
+    if (
+      campaign.reportStyleLockedAt !== null ||
+      !campaign.reportStylesAvailable ||
+      appearanceSavingId !== null
+    ) {
+      return;
+    }
+
+    const nextStyle = appearanceDrafts[campaign.id] ?? campaign.reportStyle;
+    setFormError(null);
+    setSuccess(null);
+    setAppearanceSavingId(campaign.id);
+    try {
+      const res = await fetch(
+        `/api/admin/public-campaigns/${campaign.id}/report-style`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reportStyle: nextStyle }),
+        },
+      );
+      const body = (await res.json()) as {
+        success?: boolean;
+        error?: string;
+        message?: string;
+        data?: {
+          id: string;
+          reportStyle: ReportStyleKey;
+          reportStyleSource: "TEMPLATE_DEFAULT" | "CAMPAIGN_OVERRIDE";
+          reportStyleLockedAt: string | null;
+        };
+      };
+      if (!res.ok || body.success === false) {
+        setFormError(
+          body.message ??
+            body.error ??
+            `Could not save report appearance (${res.status}).`,
+        );
+        if (
+          res.status === 409 &&
+          body.data?.id === campaign.id &&
+          body.data.reportStyleLockedAt !== null
+        ) {
+          const finalAppearance = body.data;
+          setCampaigns((current) =>
+            current.map((item) =>
+              item.id === campaign.id
+                ? {
+                    ...item,
+                    reportStyle: finalAppearance.reportStyle,
+                    reportStyleSource: finalAppearance.reportStyleSource,
+                    reportStyleLockedAt: finalAppearance.reportStyleLockedAt,
+                  }
+                : item,
+            ),
+          );
+          setAppearanceDrafts((current) => ({
+            ...current,
+            [campaign.id]: finalAppearance.reportStyle,
+          }));
+          return;
+        }
+        if (res.status === 409) await loadData();
+        return;
+      }
+      setSuccess("Report appearance saved.");
+      await loadData();
+    } catch (e) {
+      setFormError(e instanceof Error ? e.message : "Unexpected error");
+    } finally {
+      setAppearanceSavingId(null);
     }
   }
 
@@ -330,8 +468,79 @@ export function PublicCampaignsManager() {
                       >
                         {expandedId === c.id ? "Hide" : "View submissions"}
                       </button>
+                      {c.reportStylesAvailable && (
+                        <button
+                          type="button"
+                          className="wf-btn wf-btn-sm"
+                          onClick={() => toggleAppearance(c)}
+                          aria-expanded={expandedAppearanceId === c.id}
+                        >
+                          {expandedAppearanceId === c.id
+                            ? "Hide report appearance"
+                            : c.reportStyleLockedAt === null
+                              ? "Manage report appearance"
+                              : "View report appearance"}
+                        </button>
+                      )}
                     </td>
                   </tr>
+                  {c.reportStylesAvailable && expandedAppearanceId === c.id && (
+                    <tr className="wf-tr">
+                      <td className="wf-td" colSpan={5}>
+                        <section
+                          aria-label={`${c.name} report appearance`}
+                          style={{ maxWidth: "64rem" }}
+                        >
+                          <ReportStylePicker
+                            value={
+                              c.reportStyleLockedAt !== null
+                                ? c.reportStyle
+                                : (appearanceDrafts[c.id] ?? c.reportStyle)
+                            }
+                            onChange={(value) =>
+                              setAppearanceDrafts((current) => ({
+                                ...current,
+                                [c.id]: value,
+                              }))
+                            }
+                            disabled={
+                              c.reportStyleLockedAt !== null ||
+                              appearanceSavingId === c.id
+                            }
+                            sourceLabel={
+                              c.reportStyleSource === "CAMPAIGN_OVERRIDE"
+                                ? "Campaign choice"
+                                : "Template default"
+                            }
+                            lockedAt={c.reportStyleLockedAt}
+                            previewAnatomy={resolveReportStylePreviewAnatomy({
+                              templateAlias: c.template?.alias,
+                              capabilities: c.reportStylePreviewCapabilities,
+                            })}
+                          />
+                          {c.reportStyleLockedAt === null &&
+                            c.reportStylesAvailable && (
+                              <div style={{ marginTop: "1rem" }}>
+                                <button
+                                  type="button"
+                                  className="wf-btn wf-btn-primary wf-btn-sm"
+                                  disabled={
+                                    appearanceSavingId === c.id ||
+                                    (appearanceDrafts[c.id] ?? c.reportStyle) ===
+                                      c.reportStyle
+                                  }
+                                  onClick={() => handleSaveReportStyle(c)}
+                                >
+                                  {appearanceSavingId === c.id
+                                    ? "Saving…"
+                                    : "Save report appearance"}
+                                </button>
+                              </div>
+                            )}
+                        </section>
+                      </td>
+                    </tr>
+                  )}
                   {expandedId === c.id && (
                     <tr className="wf-tr">
                       <td className="wf-td" colSpan={5}>
@@ -512,7 +721,19 @@ export function PublicCampaignsManager() {
               id="pc-template"
               className="wf-select"
               value={templateId}
-              onChange={(e) => setTemplateId(e.target.value)}
+              onChange={(e) => {
+                const nextTemplateId = e.target.value;
+                const nextTemplate = templates.find(
+                  (template) => template.id === nextTemplateId,
+                );
+                setTemplateId(nextTemplateId);
+                setReportStyle(
+                  nextTemplate?.reportStylesEnabled
+                    ? nextTemplate.defaultReportStyle
+                    : "CLASSIC",
+                );
+                setReportStyleIntent("INHERITED");
+              }}
               required
             >
               <option value="">— select a template —</option>
@@ -527,6 +748,57 @@ export function PublicCampaignsManager() {
               version.
             </p>
           </div>
+
+          {selectedTemplate?.reportStylesEnabled && (
+            <div className="wf-field">
+              <div>
+                <h4 className="wf-label">Report appearance</h4>
+                <p className="wf-field-hint">
+                  Future template-default changes will not affect this campaign.
+                </p>
+              </div>
+              <div style={{ maxWidth: "42rem" }}>
+                <ReportStylePicker
+                  value={reportStyle}
+                  compact
+                  previewAnatomy={resolveReportStylePreviewAnatomy({
+                    templateAlias: selectedTemplate.alias,
+                    capabilities:
+                      selectedTemplate.reportStylePreviewCapabilities,
+                  })}
+                  onChange={(value) => {
+                    setReportStyle(value);
+                    setReportStyleIntent("EXPLICIT");
+                  }}
+                />
+              </div>
+              <div
+                className="wf-callout"
+                aria-label="Public campaign review"
+                aria-live="polite"
+              >
+                <strong>Review</strong>
+                <p className="wf-field-hint">
+                  Report appearance: {REPORT_STYLE_REGISTRY[reportStyle].label} ·{" "}
+                  {reportStyleIntent === "INHERITED"
+                    ? "Template default"
+                    : "Campaign choice"}
+                </p>
+              </div>
+              {reportStyleIntent === "EXPLICIT" && (
+                <button
+                  type="button"
+                  className="wf-btn wf-btn-sm"
+                  onClick={() => {
+                    setReportStyle(selectedTemplate.defaultReportStyle);
+                    setReportStyleIntent("INHERITED");
+                  }}
+                >
+                  Use template default
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Organization */}
           <div className="wf-field">

@@ -50,15 +50,11 @@ import type { PeerComparisonSection } from "@/lib/assessments/peer-benchmarks";
 import { CoachLogo } from "@/components/assessments/CoachLogo";
 import { ReportFooter } from "@/components/assessments/ReportFooter";
 import { ReportNextSteps } from "@/components/assessments/ReportNextSteps";
-import {
-  applyScoredReportContactEmailOverride,
-  applyScoredReportFindingsPolicy,
-  buildScoredReportViewModel,
-} from "@/lib/assessments/scored-report-view-model";
+import { buildIndividualReportPresentation } from "@/lib/assessments/individual-report-presentation";
 import {
   effectiveReportStyle,
-  isReportStyleEligible,
 } from "@/lib/assessments/report-style-policy";
+import { isReportStyleKey } from "@/lib/assessments/report-style-registry";
 import { ExecutiveBoardroomReport } from "@/components/assessments/report-styles/ExecutiveBoardroomReport";
 import { ModernDashboardReport } from "@/components/assessments/report-styles/ModernDashboardReport";
 
@@ -206,72 +202,82 @@ export function BrandedReport({
   reportStylesAvailable,
   reportFindingsAvailable,
 }: BrandedReportProps) {
-  // Qualitative templates (LVA / QSP) get a wholly different per-respondent
-  // renderer — their answers are mostly free-text/metrics, not scored items.
-  // The scored anatomy below is unchanged for default/scored templates.
-  if (reportConfigFor(report.templateAlias).reportType === "qualitative") {
-    return (
+  // This component is imported by client result flows. Availability must arrive
+  // from their server response; WAVE_REPORT_STYLES_* is never read here.
+  const rawStyle = report.reportStyle as unknown;
+  const runtimeStyle = typeof rawStyle === "string" ? rawStyle : undefined;
+  const resolvedStyle = effectiveReportStyle({
+    storedStyle: runtimeStyle,
+    available: reportStylesAvailable === true,
+  });
+  const config = reportConfigFor(report.templateAlias);
+  const classic = () =>
+    config.reportType === "qualitative" ? (
       <QualitativeReport
         report={report}
         peerComparison={peerComparison}
         contactEmail={contactEmail}
         reportFindingsAvailable={reportFindingsAvailable === true}
       />
+    ) : (
+      <LegacyClassicReport
+        report={report}
+        assessmentName={assessmentName}
+        campaignLabel={campaignLabel}
+        contactEmail={contactEmail}
+        reportFindingsAvailable={reportFindingsAvailable}
+      />
     );
-  }
 
-  // This component is imported by client result flows. Availability must arrive
-  // from their server response; WAVE_REPORT_STYLES_* is never read here.
-  const runtimeStyle = typeof report.reportStyle === "string" ? report.reportStyle : undefined;
-  const resolvedStyle = effectiveReportStyle({
-    alias: report.templateAlias,
-    storedStyle: runtimeStyle,
-    available: reportStylesAvailable === true,
-  });
-  if (resolvedStyle === "CLASSIC") {
-    if (
-      reportStylesAvailable === true &&
-      isReportStyleEligible(report.templateAlias) &&
-      runtimeStyle !== undefined &&
-      runtimeStyle !== "CLASSIC"
-    ) {
-      console.warn("assessment.report_style.invalid", {
-        provenanceId: report.provenance?.submissionId ?? null,
-        templateAlias: report.templateAlias ?? null,
-        invalidStyle: runtimeStyle,
-      });
+  const reportForPresentation =
+    assessmentName === undefined && campaignLabel === undefined
+      ? report
+      : {
+          ...report,
+          assessmentName: assessmentName ?? report.assessmentName,
+          campaignLabel:
+            campaignLabel !== undefined ? campaignLabel : report.campaignLabel,
+        };
+  const presentation = () =>
+    buildIndividualReportPresentation(reportForPresentation, {
+      findingsEnabled: reportFindingsAvailable === true,
+      contactEmail,
+    });
+
+  switch (resolvedStyle) {
+    case "CLASSIC": {
+      const fallbackReason =
+        rawStyle !== null &&
+        rawStyle !== undefined &&
+        !isReportStyleKey(rawStyle)
+          ? "INVALID"
+          : isReportStyleKey(rawStyle) && rawStyle !== "CLASSIC"
+            ? "UNAVAILABLE"
+            : null;
+      if (fallbackReason) {
+        console.warn("assessment.report_style.fallback", {
+          submissionId: report.provenance?.submissionId ?? null,
+          versionId: report.provenance?.versionId ?? null,
+          templateAlias: report.templateAlias ?? null,
+          archetype: config.reportType,
+          requestedStyle:
+            fallbackReason === "INVALID" ? "INVALID" : rawStyle,
+          resolvedStyle: "CLASSIC",
+          fallbackReason,
+        });
+      }
+      return classic();
     }
-  } else {
-    // Preserve BrandedReport's existing title/subtitle override contract
-    // before deriving the renderer-only view model.
-    const reportForView =
-      assessmentName === undefined && campaignLabel === undefined
-        ? report
-        : {
-            ...report,
-            assessmentName: assessmentName ?? report.assessmentName,
-            campaignLabel:
-              campaignLabel !== undefined ? campaignLabel : report.campaignLabel,
-          };
-    const withFindings = applyScoredReportFindingsPolicy(
-      buildScoredReportViewModel(reportForView),
-      reportFindingsAvailable === true,
-    );
-    const view = applyScoredReportContactEmailOverride(withFindings, contactEmail);
-    return resolvedStyle === "EXECUTIVE_BOARDROOM"
-      ? <ExecutiveBoardroomReport view={view} />
-      : <ModernDashboardReport view={view} />;
+    case "EXECUTIVE_BOARDROOM":
+      return <ExecutiveBoardroomReport presentation={presentation()} />;
+    case "MODERN_DASHBOARD":
+      return <ModernDashboardReport presentation={presentation()} />;
+    default: {
+      const unreachableStyle: never = resolvedStyle;
+      void unreachableStyle;
+      return classic();
+    }
   }
-
-  return (
-    <LegacyClassicReport
-      report={report}
-      assessmentName={assessmentName}
-      campaignLabel={campaignLabel}
-      contactEmail={contactEmail}
-      reportFindingsAvailable={reportFindingsAvailable}
-    />
-  );
 }
 
 /** Captured byte-compatible Classic branch. Keep its markup below unchanged. */

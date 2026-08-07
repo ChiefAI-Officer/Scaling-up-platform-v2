@@ -204,6 +204,48 @@ describe("BrandedReport — qualitative dispatch", () => {
     expect(screen.queryByTestId("qualitative-report")).not.toBeInTheDocument();
     expect(screen.getByTestId("report-overall")).toBeInTheDocument();
   });
+
+  it.each([
+    ["EXECUTIVE_BOARDROOM", "executive-boardroom-report"],
+    ["MODERN_DASHBOARD", "modern-dashboard-report"],
+  ] as const)(
+    "routes qualitative %s through the adaptive presentation after style resolution",
+    (reportStyle, rendererTestId) => {
+      const report = lvaReport({ reportStyle });
+      const { unmount } = render(
+        <BrandedReport report={report} reportStylesAvailable />,
+      );
+
+      expect(screen.getByTestId(rendererTestId)).toBeInTheDocument();
+      expect(screen.queryByTestId("qualitative-report")).not.toBeInTheDocument();
+      expect(screen.getByText("The vision on the future")).toBeInTheDocument();
+      expect(screen.getByText("Company's revenue in three years (in million)"))
+        .toBeInTheDocument();
+      expect(screen.getByText("10")).toBeInTheDocument();
+      expect(screen.getByText("Important focus areas")).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          "Which percentage of the employees would you enthusiastically rehire?",
+        ),
+      ).toBeInTheDocument();
+      expect(screen.getByText("100")).toBeInTheDocument();
+      expect(screen.queryByText("Five Decisions")).not.toBeInTheDocument();
+      expect(screen.queryByText(/scorecard/i)).not.toBeInTheDocument();
+      unmount();
+    },
+  );
+
+  it("keeps qualitative Classic byte-identical to the existing QualitativeReport", () => {
+    const report = lvaReport({ reportStyle: "CLASSIC" });
+    const direct = render(<QualitativeReport report={report} />).container.innerHTML;
+    const unavailable = render(<BrandedReport report={report} />).container.innerHTML;
+    const available = render(
+      <BrandedReport report={report} reportStylesAvailable />,
+    ).container.innerHTML;
+
+    expect(unavailable).toBe(direct);
+    expect(available).toBe(direct);
+  });
 });
 
 // ════════════════════════════════════════════════════════════════════════════

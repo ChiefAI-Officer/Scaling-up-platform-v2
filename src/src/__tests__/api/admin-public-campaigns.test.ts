@@ -23,12 +23,16 @@ jest.mock("@/lib/db", () => ({
   db: {
     assessmentCampaign: {
       create: jest.fn(),
+      findMany: jest.fn(),
       findUnique: jest.fn(),
       findFirst: jest.fn(),
       update: jest.fn(),
     },
     assessmentTemplate: {
       findUnique: jest.fn(),
+    },
+    assessmentTemplateVersion: {
+      findMany: jest.fn(),
     },
     organization: {
       findUnique: jest.fn(),
@@ -69,7 +73,10 @@ jest.mock("@/lib/rate-limit", () => ({
 }));
 
 // ─── imports (after mocks) ───────────────────────────────────────────────────
-import { POST as createPost } from "@/app/api/admin/public-campaigns/route";
+import {
+  GET as listGet,
+  POST as createPost,
+} from "@/app/api/admin/public-campaigns/route";
 import { POST as publishPost } from "@/app/api/admin/public-campaigns/[id]/publish/route";
 import { db } from "@/lib/db";
 import { getApiActor } from "@/lib/auth/authorization";
@@ -160,12 +167,162 @@ const mockCampaign = {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  delete process.env.WAVE_REPORT_STYLES_ENABLED;
+  delete process.env.WAVE_REPORT_STYLES_CANARY;
+  delete process.env.WAVE_REPORT_STYLES_KILL;
   (resolvePublishedTemplateVersion as jest.Mock).mockResolvedValue(mockVersion);
   (db.assessmentTemplate.findUnique as jest.Mock).mockResolvedValue(
-    mockTemplate
+    { ...mockTemplate, disabledAt: null, defaultReportStyle: "MODERN_DASHBOARD" }
   );
   (db.organization.findUnique as jest.Mock).mockResolvedValue(mockOrg);
   (db.assessmentCampaign.create as jest.Mock).mockResolvedValue(mockCampaign);
+  (db.assessmentTemplateVersion.findMany as jest.Mock).mockResolvedValue([]);
+});
+
+// ─── GET /api/admin/public-campaigns ─────────────────────────────────────────
+
+describe("GET /api/admin/public-campaigns — LIST", () => {
+  it("returns only the server-filtered admin-owned PUBLIC campaign rows", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    (db.assessmentCampaign.findMany as jest.Mock).mockResolvedValue([
+      {
+        ...mockCampaign,
+        reportStyle: "CLASSIC",
+        reportStyleSource: "TEMPLATE_DEFAULT",
+        reportStyleLockedAt: null,
+      },
+    ]);
+
+    const res = await listGet();
+
+    expect(res.status).toBe(200);
+    expect(db.assessmentCampaign.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          accessMode: "PUBLIC",
+          createdByCoachId: null,
+          deletedAt: null,
+        },
+      }),
+    );
+  });
+
+  it("returns the exact campaign-canary availability and lets kill override it", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    (db.assessmentCampaign.findMany as jest.Mock).mockResolvedValue([
+      {
+        ...mockCampaign,
+        templateId: "tpl-not-canary",
+        reportStyle: "EXECUTIVE_BOARDROOM",
+        reportStyleSource: "CAMPAIGN_OVERRIDE",
+        reportStyleLockedAt: new Date("2026-08-06T04:00:00.000Z"),
+      },
+    ]);
+    process.env.WAVE_REPORT_STYLES_CANARY = "camp-1";
+
+    const enabledRes = await listGet();
+    await expect(enabledRes.json()).resolves.toEqual(
+      expect.objectContaining({
+        data: [
+          expect.objectContaining({ reportStylesAvailable: true }),
+        ],
+      }),
+    );
+
+    process.env.WAVE_REPORT_STYLES_KILL = "1";
+    const killedRes = await listGet();
+    await expect(killedRes.json()).resolves.toEqual(
+      expect.objectContaining({
+        data: [
+          expect.objectContaining({
+            reportStylesAvailable: false,
+            reportStyle: "EXECUTIVE_BOARDROOM",
+            reportStyleSource: "CAMPAIGN_OVERRIDE",
+            reportStyleLockedAt: "2026-08-06T04:00:00.000Z",
+          }),
+        ],
+      }),
+    );
+  });
+
+  it("keeps flag-off queries and bytes free of version questions and capabilities", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    (db.assessmentCampaign.findMany as jest.Mock).mockResolvedValue([
+      {
+        ...mockCampaign,
+        reportStyle: "CLASSIC",
+        reportStyleSource: "TEMPLATE_DEFAULT",
+        reportStyleLockedAt: null,
+        template: {
+          id: "tpl-1",
+          name: "Rockefeller",
+          alias: "rockefeller",
+        },
+        version: {
+          questions: [
+            { type: "TEXT", answer: "private respondent material" },
+          ],
+        },
+      },
+    ]);
+
+    const res = await listGet();
+    const query = (db.assessmentCampaign.findMany as jest.Mock).mock.calls[0][0];
+    expect(query.include).not.toHaveProperty("version");
+    expect(db.assessmentTemplateVersion.findMany).not.toHaveBeenCalled();
+    const body = await res.json();
+    expect(body.data[0]).not.toHaveProperty("version");
+    expect(body.data[0]).not.toHaveProperty(
+      "reportStylePreviewCapabilities",
+    );
+    expect(JSON.stringify(body)).not.toContain("private respondent material");
+  });
+
+  it("returns only minimal computed capabilities for an available campaign", async () => {
+    process.env.WAVE_REPORT_STYLES_CANARY = "camp-1";
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    (db.assessmentCampaign.findMany as jest.Mock).mockResolvedValue([
+      {
+        ...mockCampaign,
+        reportStyle: "CLASSIC",
+        reportStyleSource: "TEMPLATE_DEFAULT",
+        reportStyleLockedAt: null,
+        template: {
+          id: "tpl-1",
+          name: "Rockefeller",
+          alias: "rockefeller",
+        },
+      },
+    ]);
+    (db.assessmentTemplateVersion.findMany as jest.Mock).mockResolvedValue([
+      {
+        id: "ver-1",
+        questions: [
+          { type: "NUMBER", answer: "private respondent material" },
+        ],
+      },
+    ]);
+
+    const res = await listGet();
+
+    expect(db.assessmentTemplateVersion.findMany).toHaveBeenCalledWith({
+      where: { id: { in: ["ver-1"] } },
+      select: { id: true, questions: true },
+    });
+    const body = await res.json();
+    expect(body.data[0]).toEqual(
+      expect.objectContaining({
+        reportStylesAvailable: true,
+        reportStylePreviewCapabilities: {
+          reportType: "scored",
+          hasMetrics: true,
+          hasNarrativeResponses: false,
+        },
+      }),
+    );
+    expect(body.data[0]).not.toHaveProperty("version");
+    expect(JSON.stringify(body)).not.toContain("private respondent material");
+  });
 });
 
 // ─── POST /api/admin/public-campaigns ────────────────────────────────────────
@@ -315,6 +472,104 @@ describe("POST /api/admin/public-campaigns — CREATE", () => {
       expect(createCall.data.versionId).toBe("ver-1");
     });
 
+    it("snapshots Classic with template-default provenance when appearance writes are unavailable", async () => {
+      await createPost(makeCreateRequest(validBody) as never);
+
+      expect(db.assessmentCampaign.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            reportStyle: "CLASSIC",
+            reportStyleSource: "TEMPLATE_DEFAULT",
+            reportStyleLockedAt: null,
+          }),
+        }),
+      );
+    });
+
+    it("snapshots the current template default when no explicit choice is supplied", async () => {
+      process.env.WAVE_REPORT_STYLES_ENABLED = "1";
+
+      await createPost(makeCreateRequest(validBody) as never);
+
+      expect(db.assessmentCampaign.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            reportStyle: "MODERN_DASHBOARD",
+            reportStyleSource: "TEMPLATE_DEFAULT",
+            reportStyleLockedAt: null,
+          }),
+        }),
+      );
+    });
+
+    it("preserves explicit intent when the choice equals the template default", async () => {
+      process.env.WAVE_REPORT_STYLES_ENABLED = "1";
+
+      await createPost(
+        makeCreateRequest({ ...validBody, reportStyle: "MODERN_DASHBOARD" }) as never,
+      );
+
+      expect(db.assessmentCampaign.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            reportStyle: "MODERN_DASHBOARD",
+            reportStyleSource: "CAMPAIGN_OVERRIDE",
+            reportStyleLockedAt: null,
+          }),
+        }),
+      );
+    });
+
+    it("honors an exact template canary for an explicit choice", async () => {
+      process.env.WAVE_REPORT_STYLES_CANARY = "tpl-1";
+
+      const res = await createPost(
+        makeCreateRequest({ ...validBody, reportStyle: "EXECUTIVE_BOARDROOM" }) as never,
+      );
+
+      expect(res.status).toBe(201);
+      expect(db.assessmentCampaign.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            reportStyle: "EXECUTIVE_BOARDROOM",
+            reportStyleSource: "CAMPAIGN_OVERRIDE",
+          }),
+        }),
+      );
+    });
+
+    it("rejects a crafted non-Classic choice while the server flag is off", async () => {
+      const res = await createPost(
+        makeCreateRequest({ ...validBody, reportStyle: "EXECUTIVE_BOARDROOM" }) as never,
+      );
+
+      expect(res.status).toBe(400);
+      expect(db.assessmentCampaign.create).not.toHaveBeenCalled();
+    });
+
+    it("rejects a crafted non-Classic choice while the kill switch overrides the flag", async () => {
+      process.env.WAVE_REPORT_STYLES_ENABLED = "1";
+      process.env.WAVE_REPORT_STYLES_KILL = "1";
+
+      const res = await createPost(
+        makeCreateRequest({ ...validBody, reportStyle: "MODERN_DASHBOARD" }) as never,
+      );
+
+      expect(res.status).toBe(400);
+      expect(db.assessmentCampaign.create).not.toHaveBeenCalled();
+    });
+
+    it("rejects a report style outside the closed catalog before campaign creation", async () => {
+      process.env.WAVE_REPORT_STYLES_ENABLED = "1";
+
+      const res = await createPost(
+        makeCreateRequest({ ...validBody, reportStyle: "NOT_A_STYLE" }) as never,
+      );
+
+      expect(res.status).toBe(400);
+      expect(db.assessmentCampaign.create).not.toHaveBeenCalled();
+    });
+
     it("calls logAudit with CREATE action and PUBLIC accessMode", async () => {
       await createPost(makeCreateRequest(validBody) as never);
 
@@ -355,6 +610,7 @@ describe("POST /api/admin/public-campaigns — CREATE", () => {
     });
 
     it("retries with a random suffix on P2002 error", async () => {
+      process.env.WAVE_REPORT_STYLES_ENABLED = "1";
       const p2002 = Object.assign(new Error("Unique constraint"), {
         code: "P2002",
       });
@@ -362,12 +618,30 @@ describe("POST /api/admin/public-campaigns — CREATE", () => {
         .mockRejectedValueOnce(p2002)
         .mockResolvedValueOnce({ ...mockCampaign, alias: "rockefeller_pub_260701000000_abc123" });
 
-      const res = await createPost(makeCreateRequest(validBody) as never);
+      const res = await createPost(
+        makeCreateRequest({ ...validBody, reportStyle: "EXECUTIVE_BOARDROOM" }) as never,
+      );
       expect(res.status).toBe(201);
       expect(db.assessmentCampaign.create).toHaveBeenCalledTimes(2);
       // Second call alias has a suffix
       const secondAlias = (db.assessmentCampaign.create as jest.Mock).mock.calls[1][0].data.alias;
       expect(secondAlias).toMatch(/rockefeller_pub_\d{12}_[a-z0-9]+/);
+      expect(
+        (db.assessmentCampaign.create as jest.Mock).mock.calls.map(
+          ([call]) => call.data,
+        ),
+      ).toEqual([
+        expect.objectContaining({
+          reportStyle: "EXECUTIVE_BOARDROOM",
+          reportStyleSource: "CAMPAIGN_OVERRIDE",
+          reportStyleLockedAt: null,
+        }),
+        expect.objectContaining({
+          reportStyle: "EXECUTIVE_BOARDROOM",
+          reportStyleSource: "CAMPAIGN_OVERRIDE",
+          reportStyleLockedAt: null,
+        }),
+      ]);
     });
   });
 });

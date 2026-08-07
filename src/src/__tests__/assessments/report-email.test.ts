@@ -19,7 +19,10 @@ import {
   buildReportEmailHtml,
   buildRespondentReportFromSubmission,
 } from "@/lib/assessments/report-email";
-import type { RespondentReport } from "@/lib/assessments/respondent-report";
+import {
+  buildStoredRespondentReport,
+  type RespondentReport,
+} from "@/lib/assessments/respondent-report";
 import type { ScoreResult } from "@/lib/assessments/scoring";
 
 // ── Fixture builders ─────────────────────────────────────────────────────────
@@ -572,6 +575,49 @@ describe("buildRespondentReportFromSubmission — templateAlias", () => {
     const report = buildRespondentReportFromSubmission(submissionArgs());
     expect(Object.getOwnPropertyDescriptor(report, "reportStyle")?.value).toBe("MODERN_DASHBOARD");
   });
+
+  it.each(["EXECUTIVE_BOARDROOM", "MODERN_DASHBOARD"] as const)(
+    "keeps the %s snapshot identical between immediate and later report models",
+    (reportStyle) => {
+      const immediate = buildRespondentReportFromSubmission(
+        submissionArgs({ reportStyle }),
+      );
+      const later = buildStoredRespondentReport({
+        submission: {
+          id: "sub-1",
+          submittedAt: new Date("2026-06-17T10:00:00Z"),
+          answers: [],
+          result: {} as ScoreResult,
+        },
+        respondent: {
+          firstName: "Jane",
+          lastName: "Doe",
+          email: "jane@example.com",
+        },
+        campaign: {
+          name: null,
+          reportStyle,
+          organizationName: "",
+          template: {
+            id: "template-1",
+            name: "Rockefeller Habits Checklist",
+            alias: "RockHabits",
+          },
+          creatorCoach: null,
+          version: {
+            id: "version-1",
+            contentHash: "hash-1",
+            sections: [],
+            questions: [],
+            scoringConfig: {},
+          },
+        },
+      });
+
+      expect(immediate.reportStyle).toBe(reportStyle);
+      expect(later.reportStyle).toBe(immediate.reportStyle);
+    },
+  );
 
   // ── Wave E Task 9 — thread real answers + submittedAt + submissionId ───────
   it("threads the submitted rawAnswers onto the returned RespondentReport (qualitative path renders answers)", () => {

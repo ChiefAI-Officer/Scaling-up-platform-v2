@@ -46,7 +46,7 @@ const txMock = {
 // eslint-disable-next-line no-var
 var reportStyleLockMock: jest.Mock;
 jest.mock("@/lib/assessments/report-style-lock", () => {
-  reportStyleLockMock = jest.fn().mockResolvedValue(undefined);
+  reportStyleLockMock = jest.fn().mockResolvedValue("MODERN_DASHBOARD");
   return { lockReportStyleForFirstCompletion: reportStyleLockMock };
 });
 
@@ -127,6 +127,25 @@ jest.mock("@/lib/assessments/scoring", () => {
   };
 });
 
+jest.mock("@/lib/assessments/report-email", () => {
+  const actual = jest.requireActual("@/lib/assessments/report-email");
+  return {
+    ...actual,
+    buildRespondentReportFromSubmission: jest.fn(
+      actual.buildRespondentReportFromSubmission,
+    ),
+    buildReportEmailHtml: jest.fn(actual.buildReportEmailHtml),
+  };
+});
+
+jest.mock("@/lib/assessments/quick-assessment-lead", () => {
+  const actual = jest.requireActual("@/lib/assessments/quick-assessment-lead");
+  return {
+    ...actual,
+    buildLeadEmail: jest.fn(actual.buildLeadEmail),
+  };
+});
+
 /* -------------------------------------------------------------------------- */
 /*  Imports (after mocks)                                                     */
 /* -------------------------------------------------------------------------- */
@@ -156,6 +175,7 @@ const CAMPAIGN = {
   templateId: "tmpl-1",
   versionId: "ver-1",
   reportStyle: "MODERN_DASHBOARD",
+  reportStyleLockedAt: new Date("2026-01-02T00:00:00.000Z"),
   template: { name: "Scaling Up Quick Assessment" },
 };
 
@@ -248,7 +268,7 @@ let transactionActive = false;
 
 beforeEach(() => {
   jest.clearAllMocks();
-  reportStyleLockMock.mockReset().mockResolvedValue(undefined);
+  reportStyleLockMock.mockReset().mockResolvedValue("MODERN_DASHBOARD");
   reportStylesEnabledMock.mockReturnValue(false);
   findingsEnabledMock.mockReturnValue(false);
   transactionActive = false;
@@ -453,8 +473,8 @@ describe("report style first-completion freeze", () => {
     const lockStarted = new Promise<void>((resolve) => {
       reportStyleLockMock.mockImplementationOnce(() => {
         resolve();
-        return new Promise<void>((release) => {
-          releaseLock = release;
+        return new Promise<string>((release) => {
+          releaseLock = () => release("MODERN_DASHBOARD");
         });
       });
     });
@@ -531,6 +551,48 @@ describe("report style first-completion freeze", () => {
     const body = await response.json();
     expect(body.data.reportStylesAvailable).toBe(false);
     expect(body.data.reportFindingsAvailable).toBe(false);
+  });
+
+  it("re-reads the frozen campaign style for an early lost-response replay", async () => {
+    (db.assessmentCampaign.findUnique as jest.Mock)
+      .mockResolvedValueOnce({
+        ...CAMPAIGN,
+        reportStyle: "CLASSIC",
+      })
+      .mockResolvedValueOnce({
+        reportStyle: "EXECUTIVE_BOARDROOM",
+        reportStyleLockedAt: new Date("2026-08-06T04:00:00.000Z"),
+      });
+    (db.assessmentSubmission.findFirst as jest.Mock).mockResolvedValue({
+      id: "sub-existing",
+      campaignId: "camp-1",
+      publicTaker: VALID_BODY.publicTaker,
+      answers: VALID_BODY.answers,
+      referringCoach: null,
+      result: { overallScore: 7, perDomain: [] },
+    });
+
+    const response = await POST(
+      makeRequest({ ...VALID_BODY, idempotencyKey: "existing-key" }) as never,
+      makeParams() as never,
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      data: {
+        submissionId: "sub-existing",
+        reportStyle: "EXECUTIVE_BOARDROOM",
+      },
+    });
+    expect(db.assessmentCampaign.findUnique).toHaveBeenNthCalledWith(2, {
+      where: { id: "camp-1" },
+      select: {
+        reportStyle: true,
+        reportStyleLockedAt: true,
+      },
+    });
+    expect(reportStyleLockMock).not.toHaveBeenCalled();
+    expect(db.$transaction).not.toHaveBeenCalled();
   });
 });
 
@@ -624,6 +686,38 @@ describe("outbox enqueue", () => {
       "cid:su-report-logo-v1",
     );
   });
+
+  it.each(["EXECUTIVE_BOARDROOM", "MODERN_DASHBOARD"] as const)(
+    "keeps frozen scoring and short-notification HTML identical for %s versus Classic",
+    async (alternateStyle) => {
+      process.env.QUICK_ASSESSMENT_TEAM_EMAIL = "team@scalingup.com";
+      reportStyleLockMock
+        .mockResolvedValueOnce("CLASSIC")
+        .mockResolvedValueOnce(alternateStyle);
+
+      const classicResponse = await POST(
+        makeRequest(VALID_BODY) as never,
+        makeParams() as never,
+      );
+      const classicBody = await classicResponse.json();
+      const classicShortHtml = rowFor("SU_TEAM").bodyHtml;
+
+      txMock.assessmentEmailOutbox.create.mockClear();
+      const alternateResponse = await POST(
+        makeRequest(VALID_BODY) as never,
+        makeParams() as never,
+      );
+      const alternateBody = await alternateResponse.json();
+      const alternateShortHtml = rowFor("SU_TEAM").bodyHtml;
+
+      expect(classicBody.data.reportStyle).toBe("CLASSIC");
+      expect(alternateBody.data.reportStyle).toBe(alternateStyle);
+      expect(alternateBody.data.scoreResult).toEqual(
+        classicBody.data.scoreResult,
+      );
+      expect(alternateShortHtml).toBe(classicShortHtml);
+    },
+  );
 
   it("keeps public report chrome legacy while the gate is default-off", async () => {
     mockActiveCoach();
@@ -740,6 +834,29 @@ describe("outbox enqueue", () => {
     expect(coachRow!.bodyHtml).toContain("<table");
   });
 
+  it("renders each style-independent public email variant only once", async () => {
+    process.env.QUICK_ASSESSMENT_TEAM_EMAIL = "team@scalingup.com";
+    mockActiveCoach();
+    const reportEmail = jest.requireMock(
+      "@/lib/assessments/report-email",
+    ) as {
+      buildRespondentReportFromSubmission: jest.Mock;
+      buildReportEmailHtml: jest.Mock;
+    };
+    const leadEmail = jest.requireMock(
+      "@/lib/assessments/quick-assessment-lead",
+    ) as { buildLeadEmail: jest.Mock };
+
+    const response = await submitWithCoach();
+
+    expect(response.status).toBe(200);
+    expect(
+      reportEmail.buildRespondentReportFromSubmission,
+    ).toHaveBeenCalledTimes(6);
+    expect(reportEmail.buildReportEmailHtml).toHaveBeenCalledTimes(3);
+    expect(leadEmail.buildLeadEmail).toHaveBeenCalledTimes(1);
+  });
+
   it("REFERRING_COACH row is NOT enqueued when the coach is not active (guard returns null)", async () => {
     process.env.QUICK_ASSESSMENT_TEAM_EMAIL = "team@scalingup.com";
     // db.coach.findUnique default mock returns null → no active coach.
@@ -814,12 +931,17 @@ describe("outbox enqueue", () => {
     info.mockRestore();
   });
 
-  it("outbox rows are created inside the transaction (via txMock)", async () => {
+  it("persists the selected pre-rendered rows inside the completion transaction", async () => {
     process.env.QUICK_ASSESSMENT_TEAM_EMAIL = "team@scalingup.com";
-    // Verify it's txMock.assessmentEmailOutbox.create being called (not db.assessmentEmailOutbox)
+    const outboxTransactionStates: boolean[] = [];
+    txMock.assessmentEmailOutbox.create.mockImplementation(async () => {
+      outboxTransactionStates.push(transactionActive);
+      return {};
+    });
+
     await POST(makeRequest(VALID_BODY) as never, makeParams() as never);
-    // txMock.assessmentEmailOutbox.create was called → confirms it's inside $transaction
-    expect(txMock.assessmentEmailOutbox.create).toHaveBeenCalled();
+
+    expect(outboxTransactionStates).toEqual([true, true]);
   });
 
   // Wave D regression: the PUBLIC quiz path must NOT read the INVITED-only
@@ -1175,10 +1297,19 @@ describe("idempotency — duplicate idempotencyKey (P2002)", () => {
     );
     const lockTransactions: unknown[] = [];
     const lockTransactionStates: boolean[] = [];
+    (db.assessmentCampaign.findUnique as jest.Mock)
+      .mockResolvedValueOnce({
+        ...CAMPAIGN,
+        reportStyle: "CLASSIC",
+      })
+      .mockResolvedValue({
+        reportStyle: "EXECUTIVE_BOARDROOM",
+        reportStyleLockedAt: new Date("2026-08-06T04:00:00.000Z"),
+      });
     reportStyleLockMock.mockImplementation((tx) => {
       lockTransactions.push(tx);
       lockTransactionStates.push(transactionActive);
-      return Promise.resolve();
+      return Promise.resolve("EXECUTIVE_BOARDROOM");
     });
 
     const response = await POST(
@@ -1192,6 +1323,7 @@ describe("idempotency — duplicate idempotencyKey (P2002)", () => {
       data: {
         submissionId: "sub-existing",
         scoreResult: EXISTING_SUB.result,
+        reportStyle: "EXECUTIVE_BOARDROOM",
       },
     });
     expect(db.assessmentSubmission.findFirst).toHaveBeenCalledTimes(2);

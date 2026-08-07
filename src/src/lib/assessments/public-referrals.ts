@@ -13,6 +13,7 @@ import {
   type StoredReportVersion,
 } from "@/lib/assessments/respondent-report";
 import type { ReportStyleKey } from "@/lib/assessments/report-style-registry";
+import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
 
 interface PublicSubmissionFindFirst {
   findFirst: (args: {
@@ -95,6 +96,7 @@ interface RawPublicSubmission {
     certificationExpiry: Date | null;
   } | null;
   campaign: {
+    id: string;
     name: string | null;
     reportStyle: ReportStyleKey;
     importManifest?: unknown;
@@ -115,7 +117,12 @@ interface RawPublicSubmission {
 }
 
 export type PublicReferralReportOutcome =
-  | { status: "ok"; report: RespondentReport }
+  | {
+      status: "ok";
+      report: RespondentReport;
+      /** Exact server-owned availability for this frozen campaign snapshot. */
+      reportStylesAvailable: boolean;
+    }
   | { status: "forbidden" }
   | { status: "not-found" };
 
@@ -825,6 +832,7 @@ export async function getPublicReferralReport(
           },
           campaign: {
             select: {
+              id: true,
               name: true,
               reportStyle: true,
               importManifest: true,
@@ -896,7 +904,14 @@ export async function getPublicReferralReport(
       report.referringCoachEmail =
         submission.referringCoach?.email.trim().toLowerCase() || null;
 
-      return { status: "ok", report } as const;
+      return {
+        status: "ok",
+        report,
+        reportStylesAvailable: isReportStylesEnabled({
+          templateId: submission.campaign.template.id,
+          campaignId: submission.campaign.id,
+        }),
+      } as const;
     },
     { maxWait: 10_000, timeout: 15_000 },
   );

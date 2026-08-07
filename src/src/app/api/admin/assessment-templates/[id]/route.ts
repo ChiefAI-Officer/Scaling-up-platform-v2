@@ -185,7 +185,6 @@ export async function PATCH(
       where: { id, deletedAt: null },
       select: {
         id: true,
-        alias: true,
         resultsEmailSubject: true,
         resultsEmailBodyMarkdown: true,
         sendResultsDefault: true,
@@ -223,17 +222,6 @@ export async function PATCH(
     if (data.aggregationMode !== undefined)
       updateData.aggregationMode = data.aggregationMode;
     if (data.defaultReportStyle !== undefined) {
-      // Only the canonical Scaling Up template may opt into a non-Classic
-      // renderer. CLASSIC remains a valid reset for every template.
-      if (
-        data.defaultReportStyle !== "CLASSIC" &&
-        existing.alias !== "scaling-up-full"
-      ) {
-        return NextResponse.json(
-          { error: "REPORT_STYLE_NOT_ELIGIBLE" },
-          { status: 400 },
-        );
-      }
       updateData.defaultReportStyle = data.defaultReportStyle;
     }
     if (data.resultsEmailSubject !== undefined)

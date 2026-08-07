@@ -387,7 +387,7 @@ describe("POST /api/assessment-campaigns", () => {
     );
   });
 
-  it("copies the freshly loaded Scaling Up Full template default when no report style is chosen", async () => {
+  it("copies the freshly loaded template default when no report style is chosen", async () => {
     process.env.WAVE_REPORT_STYLES_ENABLED = "1";
     (getApiActor as jest.Mock).mockResolvedValue(coachActor);
     (db.assessmentTemplate.findUnique as jest.Mock).mockResolvedValue({
@@ -414,7 +414,7 @@ describe("POST /api/assessment-campaigns", () => {
     );
   });
 
-  it("records TEMPLATE_DEFAULT when the explicit style equals the current template default", async () => {
+  it("records CAMPAIGN_OVERRIDE when the explicit style equals the current template default", async () => {
     process.env.WAVE_REPORT_STYLES_ENABLED = "1";
     (getApiActor as jest.Mock).mockResolvedValue(coachActor);
     (db.assessmentTemplate.findUnique as jest.Mock).mockResolvedValue({
@@ -434,7 +434,7 @@ describe("POST /api/assessment-campaigns", () => {
       expect.objectContaining({
         data: expect.objectContaining({
           reportStyle: "MODERN_DASHBOARD",
-          reportStyleSource: "TEMPLATE_DEFAULT",
+          reportStyleSource: "CAMPAIGN_OVERRIDE",
         }),
       }),
     );
@@ -477,16 +477,30 @@ describe("POST /api/assessment-campaigns", () => {
     expect(db.assessmentCampaign.create).not.toHaveBeenCalled();
   });
 
-  it("400 rejects a non-Classic report style for an ineligible template", async () => {
+  it("accepts a valid report style for a template with an arbitrary alias", async () => {
     process.env.WAVE_REPORT_STYLES_ENABLED = "1";
     (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    (db.assessmentTemplate.findUnique as jest.Mock).mockResolvedValue({
+      id: "tpl-1",
+      alias: "custom-instrument",
+      disabledAt: null,
+      defaultReportStyle: "MODERN_DASHBOARD",
+    });
+    (db.assessmentCampaign.create as jest.Mock).mockResolvedValue({ id: "c1" });
 
     const res = await POST(
       jsonReq({ ...validBody, reportStyle: "EXECUTIVE_BOARDROOM" }) as never,
     );
 
-    expect(res.status).toBe(400);
-    expect(db.assessmentCampaign.create).not.toHaveBeenCalled();
+    expect(res.status).toBe(201);
+    expect(db.assessmentCampaign.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          reportStyle: "EXECUTIVE_BOARDROOM",
+          reportStyleSource: "CAMPAIGN_OVERRIDE",
+        }),
+      }),
+    );
   });
 
   it("forces Classic in the legacy lane while report styles are unavailable", async () => {

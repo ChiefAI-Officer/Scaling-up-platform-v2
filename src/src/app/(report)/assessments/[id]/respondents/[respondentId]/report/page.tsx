@@ -26,6 +26,7 @@ import {
 import { reportConfigFor } from "@/lib/assessments/report-config";
 import { emitReportMetric } from "@/lib/assessments/report-metrics";
 import { BrandedReport } from "@/components/assessments/BrandedReport";
+import { ReportStyleScope } from "@/components/assessments/ReportStyleScope";
 import { PrintReportButton } from "@/components/assessments/PrintReportButton";
 import { db } from "@/lib/db";
 import { getApiActor } from "@/lib/auth/authorization";
@@ -40,7 +41,6 @@ import {
   type PeerComparisonSection,
 } from "@/lib/assessments/peer-benchmarks";
 import type { RespondentReport } from "@/lib/assessments/respondent-report";
-import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
 import { isFindingsLogicEnabled } from "@/lib/assessments/wave-u-flags";
 
 // H15: never statically render or cache the report (PII).
@@ -64,7 +64,7 @@ export default async function RespondentReportPage({ params }: PageProps) {
     notFound();
   }
 
-  const { report } = outcome;
+  const { report, reportStylesAvailable } = outcome;
 
   // Page-owned success marker (the gate emits only the request-ending events).
   emitReportMetric("respondent", "view", {
@@ -88,50 +88,39 @@ export default async function RespondentReportPage({ params }: PageProps) {
   // benchmark queries, byte-identical page — spec 19s S-2). Fail-soft like the
   // longitudinal entry: any error ⇒ no section, never a broken report.
   const peerComparison = await resolvePeerComparison(id, report);
-  const reportStylesAvailable = await resolveReportStylesAvailable(id);
-
   return (
-    <div className="su-report-page">
-      <div className="su-report-actions no-print">
-        <PrintReportButton
-          fileName={`${report.respondentName} - ${report.assessmentName} - Report`}
+    <ReportStyleScope
+      report={report}
+      reportStylesAvailable={reportStylesAvailable}
+    >
+      <div className="su-report-page">
+        <div className="su-report-actions no-print">
+          <PrintReportButton
+            fileName={`${report.respondentName} - ${report.assessmentName} - Report`}
+          />
+          {longitudinal && (
+            // prefetch is irrelevant for a plain <a>, but per spec the
+            // longitudinal surface is NEVER prefetched: a plain anchor (not a
+            // Next <Link>) guarantees no prefetch of the named-PII view.
+            <a
+              href={longitudinal.href}
+              className="su-cta su-report-longitudinal-link"
+              data-testid="respondent-report-longitudinal-link"
+            >
+              View across campaigns
+            </a>
+          )}
+        </div>
+        <BrandedReport
+          report={report}
+          campaignLabel={report.campaignLabel}
+          peerComparison={peerComparison}
+          reportStylesAvailable={reportStylesAvailable}
+          reportFindingsAvailable={isFindingsLogicEnabled()}
         />
-        {longitudinal && (
-          // prefetch is irrelevant for a plain <a>, but per spec the
-          // longitudinal surface is NEVER prefetched: a plain anchor (not a
-          // Next <Link>) guarantees no prefetch of the named-PII view.
-          <a
-            href={longitudinal.href}
-            className="su-cta su-report-longitudinal-link"
-            data-testid="respondent-report-longitudinal-link"
-          >
-            View across campaigns
-          </a>
-        )}
       </div>
-      <BrandedReport
-        report={report}
-        campaignLabel={report.campaignLabel}
-        peerComparison={peerComparison}
-        reportStylesAvailable={reportStylesAvailable}
-        reportFindingsAvailable={isFindingsLogicEnabled()}
-      />
-    </div>
+    </ReportStyleScope>
   );
-}
-
-async function resolveReportStylesAvailable(campaignId: string): Promise<boolean> {
-  try {
-    const campaign = await db.assessmentCampaign.findFirst({
-      where: { id: campaignId, deletedAt: null },
-      select: { id: true, templateId: true },
-    });
-    return campaign
-      ? isReportStylesEnabled({ templateId: campaign.templateId, campaignId: campaign.id })
-      : false;
-  } catch {
-    return false;
-  }
 }
 
 /**

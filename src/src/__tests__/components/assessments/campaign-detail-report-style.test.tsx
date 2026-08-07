@@ -41,16 +41,53 @@ beforeEach(() => {
 
 describe("CampaignDetail report appearance", () => {
   it("renders the server-authorized editable picker and saves an override", async () => {
-    render(<CampaignDetail initialOverview={overview()} initialRespondents={[]} reportStylesAvailable />);
+    render(
+      <CampaignDetail
+        initialOverview={overview()}
+        initialRespondents={[]}
+        reportStylesAvailable
+        canEditReportAppearance
+      />,
+    );
     fireEvent.click(screen.getByRole("radio", { name: /Modern Dashboard/i }));
     fireEvent.click(screen.getByRole("button", { name: /Save report appearance/i }));
     await waitFor(() => expect(global.fetch).toHaveBeenCalled());
     expect(JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body)).toEqual({ reportStyle: "MODERN_DASHBOARD" });
   });
 
+  it("uses sparse custom preview assets from pinned narrative-only capabilities", () => {
+    const custom = overview();
+    custom.campaign.templateAlias = "founder-prompts-custom";
+    render(
+      <CampaignDetail
+        initialOverview={custom}
+        initialRespondents={[]}
+        reportStylesAvailable
+        canEditReportAppearance
+        reportStylePreviewCapabilities={{
+          reportType: "scored",
+          hasMetrics: false,
+          hasNarrativeResponses: true,
+        }}
+      />,
+    );
+
+    expect(
+      screen.getByRole("img", { name: "Classic Cover preview" }),
+    ).toHaveAttribute(
+      "src",
+      "/report-style-previews/sparse-custom/classic/cover.webp",
+    );
+  });
+
   it("preserves an unsaved style when an equivalent server projection gets a new object identity", () => {
     const { rerender } = render(
-      <CampaignDetail initialOverview={overview()} initialRespondents={[]} reportStylesAvailable />,
+      <CampaignDetail
+        initialOverview={overview()}
+        initialRespondents={[]}
+        reportStylesAvailable
+        canEditReportAppearance
+      />,
     );
 
     fireEvent.click(screen.getByRole("radio", { name: /Executive Boardroom/i }));
@@ -58,7 +95,12 @@ describe("CampaignDetail report appearance", () => {
     expect(screen.getByRole("button", { name: /Save report appearance/i })).toBeEnabled();
 
     rerender(
-      <CampaignDetail initialOverview={overview()} initialRespondents={[]} reportStylesAvailable />,
+      <CampaignDetail
+        initialOverview={overview()}
+        initialRespondents={[]}
+        reportStylesAvailable
+        canEditReportAppearance
+      />,
     );
 
     expect(screen.getByRole("radio", { name: /Executive Boardroom/i })).toBeChecked();
@@ -67,7 +109,12 @@ describe("CampaignDetail report appearance", () => {
 
   it("adopts an authoritative style and lock delivered by a refreshed server projection", () => {
     const { rerender } = render(
-      <CampaignDetail initialOverview={overview()} initialRespondents={[]} reportStylesAvailable />,
+      <CampaignDetail
+        initialOverview={overview()}
+        initialRespondents={[]}
+        reportStylesAvailable
+        canEditReportAppearance
+      />,
     );
     fireEvent.click(screen.getByRole("radio", { name: /Executive Boardroom/i }));
 
@@ -75,15 +122,29 @@ describe("CampaignDetail report appearance", () => {
     refreshed.campaign.reportStyle = "MODERN_DASHBOARD";
     refreshed.campaign.reportStyleSource = "CAMPAIGN_OVERRIDE";
     rerender(
-      <CampaignDetail initialOverview={refreshed} initialRespondents={[]} reportStylesAvailable />,
+      <CampaignDetail
+        initialOverview={refreshed}
+        initialRespondents={[]}
+        reportStylesAvailable
+        canEditReportAppearance={false}
+      />,
     );
 
-    expect(screen.getByRole("radio", { name: /Modern Dashboard/i })).toBeChecked();
-    expect(screen.getByRole("radio", { name: /Modern Dashboard/i })).toBeDisabled();
+    expect(screen.getByText("Modern Dashboard")).toBeInTheDocument();
+    expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+    expect(screen.getByText("Campaign choice")).toBeInTheDocument();
+    expect(screen.getByText(/Locked on/i)).toBeInTheDocument();
   });
 
   it("supports keyboard selection before the first completion", () => {
-    render(<CampaignDetail initialOverview={overview()} initialRespondents={[]} reportStylesAvailable />);
+    render(
+      <CampaignDetail
+        initialOverview={overview()}
+        initialRespondents={[]}
+        reportStylesAvailable
+        canEditReportAppearance
+      />,
+    );
 
     const classic = screen.getByRole("radio", { name: /Classic/i });
     const boardroom = screen.getByRole("radio", { name: /Executive Boardroom/i });
@@ -94,30 +155,96 @@ describe("CampaignDetail report appearance", () => {
     expect(boardroom).toBeChecked();
   });
 
-  it("keeps the chosen style and previews visible but read-only after the first completion", () => {
-    render(<CampaignDetail initialOverview={overview(new Date("2026-08-03T12:00:00Z"))} initialRespondents={[]} reportStylesAvailable />);
-    expect(screen.getByText(/Changes are unavailable after the first completed response/i)).toBeInTheDocument();
+  it("keeps the chosen style, provenance, and lock time visible after the first completion", () => {
+    render(
+      <CampaignDetail
+        initialOverview={overview(new Date("2026-08-03T12:00:00Z"))}
+        initialRespondents={[]}
+        reportStylesAvailable
+        canEditReportAppearance={false}
+      />,
+    );
+    expect(
+      screen.getByText(/Report appearance was fixed when the first response was completed/i),
+    ).toBeInTheDocument();
     expect(screen.getByText(/Locked on/i)).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: /Classic/i })).toBeDisabled();
-    expect(screen.getByRole("radio", { name: /Executive Boardroom/i })).toBeDisabled();
-    expect(screen.getByRole("radio", { name: /Modern Dashboard/i })).toBeDisabled();
-    expect(screen.getByRole("tab", { name: "Cover" })).toBeInTheDocument();
+    expect(screen.getByText("Classic")).toBeInTheDocument();
+    expect(screen.getByText("Template default")).toBeInTheDocument();
+    expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Save report appearance/i })).not.toBeInTheDocument();
   });
 
-  it("keeps report appearance visible but read-only for a closed unlocked campaign", () => {
-    render(<CampaignDetail initialOverview={closedOverview()} initialRespondents={[]} reportStylesAvailable />);
+  it("keeps a closed campaign editable for its owner until the first completion", () => {
+    render(
+      <CampaignDetail
+        initialOverview={closedOverview()}
+        initialRespondents={[]}
+        reportStylesAvailable
+        canEditReportAppearance
+      />,
+    );
 
     expect(screen.getByTestId("campaign-report-style-card")).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: /Classic/i })).toBeDisabled();
-    expect(screen.getByRole("tab", { name: "Cover" })).toBeInTheDocument();
-    expect(screen.getByText("Closed campaigns cannot change report appearance.")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Save report appearance/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /Classic/i })).toBeChecked();
+    expect(screen.getByRole("button", { name: /Save report appearance/i })).toBeInTheDocument();
     expect(screen.queryByText(/first completed response/i)).not.toBeInTheDocument();
+  });
+
+  it("shows the stored selection and provenance without exposing a save path to a read-only viewer", () => {
+    const readOnlyOverview = overview();
+    readOnlyOverview.campaign.reportStyle = "EXECUTIVE_BOARDROOM";
+    readOnlyOverview.campaign.reportStyleSource = "CAMPAIGN_OVERRIDE";
+
+    render(
+      <CampaignDetail
+        initialOverview={readOnlyOverview}
+        initialRespondents={[]}
+        reportStylesAvailable
+        canEditReportAppearance={false}
+      />,
+    );
+
+    expect(screen.getByTestId("campaign-report-style-card")).toBeInTheDocument();
+    expect(screen.getByText("Executive Boardroom")).toBeInTheDocument();
+    expect(screen.getByText("Campaign choice")).toBeInTheDocument();
+    expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Save report appearance/i })).not.toBeInTheDocument();
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("removes the entire appearance surface when rollout availability is off without mutating the stored selection", () => {
+    const stored = overview();
+    stored.campaign.reportStyle = "EXECUTIVE_BOARDROOM";
+    stored.campaign.reportStyleSource = "CAMPAIGN_OVERRIDE";
+
+    render(
+      <CampaignDetail
+        initialOverview={stored}
+        initialRespondents={[]}
+        reportStylesAvailable={false}
+        canEditReportAppearance={false}
+      />,
+    );
+
+    expect(screen.queryByTestId("campaign-report-style-card")).not.toBeInTheDocument();
+    expect(screen.queryByText("Report appearance")).not.toBeInTheDocument();
+    expect(screen.queryByText("Executive Boardroom")).not.toBeInTheDocument();
+    expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(stored.campaign.reportStyle).toBe("EXECUTIVE_BOARDROOM");
+    expect(stored.campaign.reportStyleSource).toBe("CAMPAIGN_OVERRIDE");
   });
 
   it("refreshes and surfaces the exact race explanation on a locked response", async () => {
     global.fetch = jest.fn(async () => ({ ok: false, status: 409, json: async () => ({ error: "REPORT_STYLE_LOCKED", message: LOCKED_MESSAGE }) })) as unknown as typeof fetch;
-    render(<CampaignDetail initialOverview={overview()} initialRespondents={[]} reportStylesAvailable />);
+    render(
+      <CampaignDetail
+        initialOverview={overview()}
+        initialRespondents={[]}
+        reportStylesAvailable
+        canEditReportAppearance
+      />,
+    );
     fireEvent.click(screen.getByRole("radio", { name: /Modern Dashboard/i }));
     fireEvent.click(screen.getByRole("button", { name: /Save report appearance/i }));
     await waitFor(() => expect(refresh).toHaveBeenCalled());

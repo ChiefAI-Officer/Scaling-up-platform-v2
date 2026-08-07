@@ -61,6 +61,10 @@ import { inngest } from "@/inngest/client";
 import { isCoachCurrentlyCertified } from "@/lib/auth/coach-status";
 import { reportEmailChromeForCampaign } from "@/lib/assessments/wave-228-flags";
 import { lockReportStyleForFirstCompletion } from "@/lib/assessments/report-style-lock";
+import {
+  REPORT_STYLE_KEYS,
+  type ReportStyleKey,
+} from "@/lib/assessments/report-style-registry";
 import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
 import { isFindingsLogicEnabled } from "@/lib/assessments/wave-u-flags";
 
@@ -237,6 +241,7 @@ export async function POST(
         Awaited<ReturnType<typeof findExistingIdempotentSubmission>>
       >,
       answersForIdentity: Array<{ stableKey: string; value: unknown }>,
+      resolvedReportStyle: ReportStyleKey = campaign.reportStyle,
     ) => {
       const existingIdentity = normalizedSubmissionIdentity({
         publicTaker: existing.publicTaker as {
@@ -271,7 +276,7 @@ export async function POST(
           data: {
             submissionId: existing.id,
             scoreResult: existing.result,
-            reportStyle: campaign.reportStyle,
+            reportStyle: resolvedReportStyle,
             reportStylesAvailable,
             reportFindingsAvailable,
             referringCoachEmail: replayCoachEmail,
@@ -280,6 +285,22 @@ export async function POST(
         },
         { headers: { "Cache-Control": "no-store" } },
       );
+    };
+
+    const readFrozenReportStyleForReplay = async (): Promise<ReportStyleKey> => {
+      const frozenCampaign = await db.assessmentCampaign.findUnique({
+        where: { id: campaign.id },
+        select: {
+          reportStyle: true,
+          reportStyleLockedAt: true,
+        },
+      });
+      if (!frozenCampaign || frozenCampaign.reportStyleLockedAt === null) {
+        throw new Error(
+          "Idempotent submission replay found no frozen campaign appearance",
+        );
+      }
+      return frozenCampaign.reportStyle;
     };
 
     const existingIdempotentSubmission =
@@ -373,6 +394,7 @@ export async function POST(
       return resolveIdempotentReplay(
         existingIdempotentSubmission,
         submittedAnswers,
+        await readFrozenReportStyleForReplay(),
       );
     }
 
@@ -410,13 +432,16 @@ export async function POST(
     // Build the report from data already held by this request (no DB round-trip).
     // Keeping referral identity as an argument lets a concurrent Coach deletion
     // retry produce a genuinely Scaling Up-only taker copy.
-    const buildRespondentReport = (verifiedCoach: typeof coach | null) =>
+    const buildRespondentReport = (
+      reportStyle: ReportStyleKey,
+      verifiedCoach: typeof coach | null,
+    ) =>
       buildRespondentReportFromSubmission({
         result,
         publicTaker: data.publicTaker,
         assessmentName,
         templateAlias,
-        reportStyle: campaign.reportStyle,
+        reportStyle,
         campaignLabel: null, // campaignLabel is not rendered in the email body
         sections: version.sections,
         questions: allQuestions,
@@ -434,7 +459,6 @@ export async function POST(
           : null,
         coachLogoUrl: verifiedCoach?.profileImage ?? null,
       });
-    const respondentReport = buildRespondentReport(coach);
 
     // Assemble the outbox payloads. Each entry carries the rendered subject +
     // bodyHtml so the worker (role-agnostic) can send it verbatim.
@@ -445,7 +469,7 @@ export async function POST(
     type PublicQuizOutboxRecipientRole =
       | RecipientRole
       | ReportEmailRecipientRole;
-    const outboxPayloads: Array<{
+    type PublicQuizOutboxPayload = {
       recipient: {
         role: PublicQuizOutboxRecipientRole;
         email: string;
@@ -455,21 +479,7 @@ export async function POST(
       status?: "CANCELLED";
       cancelledAt?: Date;
       cancelReason?: "SAME_MAILBOX_AS_TAKER";
-    }> = [];
-
-    // TAKER_COPY — always (the taker submitted their own email + consented).
-    {
-      const { subject, bodyHtml } = buildReportEmailHtml({
-        report: respondentReport,
-        recipientRole: "TAKER_COPY",
-        chrome,
-      });
-      outboxPayloads.push({
-        recipient: { role: "TAKER_COPY", email: data.publicTaker.email },
-        subject,
-        bodyHtml,
-      });
-    }
+    };
 
     // When the taker is the referring Coach (common during self-tests), their
     // taker copy already contains the full report. Avoid a redundant second
@@ -485,77 +495,134 @@ export async function POST(
       });
     }
 
-    // REFERRING_COACH — keep an explicit role row whenever an active coach
-    // resolved. Same-mailbox self-tests are retained as CANCELLED evidence
-    // instead of silently erasing the coach recipient role.
-    if (activeCoachEmail.length > 0) {
-      if (suppressCoachSelfNotification) {
-        outboxPayloads.push({
-          recipient: { role: "REFERRING_COACH", email: activeCoachEmail },
-          subject: "",
-          bodyHtml: "",
-          status: "CANCELLED",
-          cancelledAt: now,
-          cancelReason: "SAME_MAILBOX_AS_TAKER",
-        });
-      } else {
-        const { subject, bodyHtml } = buildReportEmailHtml({
+    const suEmail = suTeamAddress.trim().toLowerCase();
+    const suTeamPayload: PublicQuizOutboxPayload | null =
+      suEmail.length > 0
+        ? {
+            recipient: { role: "SU_TEAM", email: suEmail },
+            ...buildLeadEmail({
+              taker: data.publicTaker,
+              assessmentName,
+              perDomain: domainInputs,
+              lowestLabel: lowest?.label ?? null,
+              recipientRole: "SU_TEAM",
+            }),
+          }
+        : null;
+    type PublicReportEmailRenderCache = {
+      takerCopy?: { subject: string; bodyHtml: string };
+      coachCopy?: { subject: string; bodyHtml: string };
+    };
+    const buildOutboxPayloads = (
+      reportStyle: ReportStyleKey,
+      verifiedCoach: typeof coach | null,
+      renderCache: PublicReportEmailRenderCache,
+    ): PublicQuizOutboxPayload[] => {
+      const payloads: PublicQuizOutboxPayload[] = [];
+      const respondentReport = buildRespondentReport(
+        reportStyle,
+        verifiedCoach,
+      );
+
+      // TAKER_COPY — always (the taker submitted their own email + consented).
+      const takerCopy =
+        renderCache.takerCopy ??
+        buildReportEmailHtml({
           report: respondentReport,
-          recipientRole: "REFERRING_COACH",
+          recipientRole: "TAKER_COPY",
           chrome,
         });
-        outboxPayloads.push({
-          recipient: { role: "REFERRING_COACH", email: activeCoachEmail },
-          subject,
-          bodyHtml,
-        });
+      renderCache.takerCopy = takerCopy;
+      payloads.push({
+        recipient: { role: "TAKER_COPY", email: data.publicTaker.email },
+        ...takerCopy,
+      });
+
+      // REFERRING_COACH — keep an explicit role row whenever the transaction
+      // revalidated the pre-read Coach. Same-mailbox self-tests remain as
+      // CANCELLED evidence instead of silently erasing the recipient role.
+      if (verifiedCoach && activeCoachEmail.length > 0) {
+        if (suppressCoachSelfNotification) {
+          payloads.push({
+            recipient: { role: "REFERRING_COACH", email: activeCoachEmail },
+            subject: "",
+            bodyHtml: "",
+            status: "CANCELLED",
+            cancelledAt: now,
+            cancelReason: "SAME_MAILBOX_AS_TAKER",
+          });
+        } else {
+          const coachCopy =
+            renderCache.coachCopy ??
+            buildReportEmailHtml({
+              report: respondentReport,
+              recipientRole: "REFERRING_COACH",
+              chrome,
+            });
+          renderCache.coachCopy = coachCopy;
+          payloads.push({
+            recipient: { role: "REFERRING_COACH", email: activeCoachEmail },
+            ...coachCopy,
+          });
+        }
       }
-    }
 
-    // SU_TEAM — unchanged lead-alert summary, only when an SU address is set.
-    const suEmail = suTeamAddress.trim().toLowerCase();
-    if (suEmail.length > 0) {
-      const { subject, bodyHtml } = buildLeadEmail({
-        taker: data.publicTaker,
-        assessmentName,
-        perDomain: domainInputs,
-        lowestLabel: lowest?.label ?? null,
-        recipientRole: "SU_TEAM",
-      });
-      outboxPayloads.push({
-        recipient: { role: "SU_TEAM", email: suEmail },
-        subject,
-        bodyHtml,
-      });
-    }
+      // SU_TEAM — unchanged lead-alert summary, only when an SU address is set.
+      if (suTeamPayload) payloads.push(suTeamPayload);
 
-    // -----------------------------------------------------------------------
-    // Transactional write: submission + outbox rows in a single DB transaction
-    // -----------------------------------------------------------------------
-    const scalingUpOnlyPayloads = () => {
-      const takerCopyContent = buildReportEmailHtml({
-        report: buildRespondentReport(null),
-        recipientRole: "TAKER_COPY",
-        chrome,
-      });
-      return outboxPayloads
-        .filter((payload) => payload.recipient.role !== "REFERRING_COACH")
-        .map((payload) =>
-          payload.recipient.role === "TAKER_COPY"
-            ? { ...payload, ...takerCopyContent }
-            : payload,
-        );
+      return payloads;
     };
 
+    // Rendering is CPU-heavy and must not extend the campaign row lock. Build
+    // the closed style catalog (and the referral-loss fallback) before opening
+    // the transaction; once the lock returns the ordered final style, the tx
+    // only selects and persists the matching immutable candidate.
+    const outboxCandidates = new Map<
+      ReportStyleKey,
+      {
+        withVerifiedReferral: PublicQuizOutboxPayload[];
+        withoutReferral: PublicQuizOutboxPayload[];
+      }
+    >();
+    // Build every style-specific canonical model outside the lock. The email
+    // renderer itself does not read `reportStyle`, so cache only its
+    // byte-identical output per referral/recipient variant.
+    const withoutReferralRenderCache: PublicReportEmailRenderCache = {};
+    const withVerifiedReferralRenderCache: PublicReportEmailRenderCache = {};
+    for (const style of REPORT_STYLE_KEYS) {
+      const withoutReferral = buildOutboxPayloads(
+        style,
+        null,
+        withoutReferralRenderCache,
+      );
+      outboxCandidates.set(style, {
+        withoutReferral,
+        withVerifiedReferral: coach
+          ? buildOutboxPayloads(
+              style,
+              coach,
+              withVerifiedReferralRenderCache,
+            )
+          : withoutReferral,
+      });
+    }
+
+    // -----------------------------------------------------------------------
+    // Transactional write: freeze appearance + submission + selected outbox.
+    // All heavy candidates above were built before this row-locking section.
+    // -----------------------------------------------------------------------
     const persistSubmission = (
       referral: { id: string; email: string } | null,
-      payloads: typeof outboxPayloads,
     ) =>
       db.$transaction(async (tx) => {
         // The first operation under this transaction locks the campaign style
         // with the same completion instant persisted on the submission. Any
         // later error rejects this callback, so Prisma rolls the freeze back.
-        await lockReportStyleForFirstCompletion(tx, campaign.id, now);
+        const reportStyle = await lockReportStyleForFirstCompletion(
+          tx,
+          campaign.id,
+          now,
+        );
 
         // The Coach may be deactivated/expired between the public pre-read and
         // this write. Re-read eligibility in the write transaction; this is
@@ -580,9 +647,17 @@ export async function POST(
               email: currentReferral.email.trim().toLowerCase(),
             }
           : null;
-        const effectivePayloads =
-          referral && !verifiedReferral ? scalingUpOnlyPayloads() : payloads;
-
+        const candidates = outboxCandidates.get(reportStyle);
+        if (!candidates) {
+          const candidateError = new Error(
+            `Missing outbox candidate for ${reportStyle}`,
+          );
+          candidateError.name = "MissingReportCandidateError";
+          throw candidateError;
+        }
+        const effectivePayloads = verifiedReferral
+          ? candidates.withVerifiedReferral
+          : candidates.withoutReferral;
         const sub = await tx.assessmentSubmission.create({
           data: {
             campaignId: campaign.id,
@@ -622,21 +697,23 @@ export async function POST(
         return {
           submissionId: sub.id,
           referringCoachEmail: verifiedReferral?.email ?? null,
+          reportStyle,
         };
       });
 
     let submissionId: string;
     let persistedReferringCoachEmail: string | null;
+    let reportStyle: ReportStyleKey;
     try {
       try {
         const persisted = await persistSubmission(
           coach && canonicalCoachEmail
             ? { id: coach.id, email: canonicalCoachEmail }
             : null,
-          outboxPayloads,
         );
         submissionId = persisted.submissionId;
         persistedReferringCoachEmail = persisted.referringCoachEmail;
+        reportStyle = persisted.reportStyle;
       } catch (initialError) {
         if (
           !coach ||
@@ -646,12 +723,10 @@ export async function POST(
           throw initialError;
         }
 
-        const persisted = await persistSubmission(
-          null,
-          scalingUpOnlyPayloads(),
-        );
+        const persisted = await persistSubmission(null);
         submissionId = persisted.submissionId;
         persistedReferringCoachEmail = persisted.referringCoachEmail;
+        reportStyle = persisted.reportStyle;
       }
     } catch (txErr) {
       // Task 6(b): idempotency — duplicate key (P2002 on idempotencyKey partial-unique index)
@@ -666,6 +741,7 @@ export async function POST(
           return resolveIdempotentReplay(
             concurrentExisting,
             submittedAnswers,
+            await readFrozenReportStyleForReplay(),
           );
         }
         // Race condition: P2002 but row not found → rethrow as 500.
@@ -712,7 +788,7 @@ export async function POST(
         data: {
           submissionId,
           scoreResult: result,
-          reportStyle: campaign.reportStyle,
+          reportStyle,
           reportStylesAvailable,
           reportFindingsAvailable,
           // Only the canonical address returned by the active-Coach lookup is

@@ -248,3 +248,61 @@ html {
   outline: 2px solid hsl(var(--ring));
   outline-offset: 2px;
 }
+
+/* Adaptive individual-report appearances: long authored content stays inside
+   the US Letter canvas and the mobile viewport. Classic remains governed by
+   the existing, isolated A4 report stylesheet. */
+.su-report--executive {
+  box-sizing: border-box;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  width: 100%;
+}
+
+.su-report--dashboard {
+  box-sizing: border-box;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  width: 100%;
+}
+
+.su-report--executive [data-report-block] {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.su-report--dashboard [data-report-block] {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.su-report--executive .report-page > *,
+.su-report--dashboard .report-page > * {
+  min-width: 0;
+}
+
+@media screen and (max-width: 640px) {
+  .su-report--executive .report-page {
+    grid-template-columns: minmax(0, 1fr);
+    overflow-x: clip;
+  }
+
+  .su-report--dashboard .report-page {
+    grid-template-columns: minmax(0, 1fr);
+    overflow-x: clip;
+  }
+
+  .su-report--executive .report-page table {
+    display: table !important;
+    overflow-x: visible !important;
+    table-layout: fixed;
+    width: 100% !important;
+  }
+
+  .su-report--dashboard .report-page table {
+    display: table !important;
+    overflow-x: visible !important;
+    table-layout: fixed;
+    width: 100% !important;
+  }
+}
