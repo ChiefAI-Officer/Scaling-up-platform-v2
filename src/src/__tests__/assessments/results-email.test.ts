@@ -9,14 +9,47 @@
  */
 
 import {
+  renderResultsEmailSubject,
   renderResultsEmailBodyHtml,
   buildResultsEmailHtml,
   buildCoachNotifyEmail,
 } from "@/lib/assessments/results-email";
 
+describe("respondent first-name personalization", () => {
+  it("replaces every exact subject token and strips subject control characters", () => {
+    expect(
+      renderResultsEmailSubject(
+        "{{respondentFirstName}} — results for {{respondentFirstName}}",
+        "Ja\r\nne",
+      ),
+    ).toBe("Jane — results for Jane");
+  });
+
+  it("replaces the body token after markdown parsing and HTML-escapes the name", () => {
+    const html = renderResultsEmailBodyHtml(
+      "Hi {{respondentFirstName}},\n\nYour results are ready.",
+      "**<Jane>**",
+    );
+    expect(html).toContain("Hi **&lt;Jane&gt;**,");
+    expect(html).not.toContain("<Jane>");
+    expect(html).not.toContain("<strong>&lt;Jane&gt;</strong>");
+  });
+
+  it("leaves unsupported token-like text literal", () => {
+    const html = renderResultsEmailBodyHtml(
+      "{{templateName}} {{tierLabel}} {{tierMessage}} {{perSectionList}}",
+      "Jane",
+    );
+    expect(html).toContain("{{templateName}}");
+    expect(html).toContain("{{tierLabel}}");
+    expect(html).toContain("{{tierMessage}}");
+    expect(html).toContain("{{perSectionList}}");
+  });
+});
+
 describe("renderResultsEmailBodyHtml", () => {
   it("renders paragraphs from blank-line-separated markdown", () => {
-    const html = renderResultsEmailBodyHtml("First para.\n\nSecond para.");
+    const html = renderResultsEmailBodyHtml("First para.\n\nSecond para.", "Jane");
     expect(html).toContain("First para.");
     expect(html).toContain("Second para.");
     // Two paragraphs.
@@ -24,7 +57,7 @@ describe("renderResultsEmailBodyHtml", () => {
   });
 
   it("escapes HTML in the body (no raw tags survive)", () => {
-    const html = renderResultsEmailBodyHtml("Hello <script>alert(1)</script>");
+    const html = renderResultsEmailBodyHtml("Hello <script>alert(1)</script>", "Jane");
     expect(html).not.toContain("<script>");
     expect(html).toContain("&lt;script&gt;");
   });
@@ -32,6 +65,7 @@ describe("renderResultsEmailBodyHtml", () => {
   it("supports **bold** and [text](https://x) links, rejecting non-http schemes", () => {
     const html = renderResultsEmailBodyHtml(
       "**bold** and [ok](https://example.com) and [bad](javascript:alert(1))",
+      "Jane",
     );
     expect(html).toContain("<strong>bold</strong>");
     expect(html).toContain('href="https://example.com"');
@@ -39,8 +73,8 @@ describe("renderResultsEmailBodyHtml", () => {
   });
 
   it("empty/whitespace body renders nothing", () => {
-    expect(renderResultsEmailBodyHtml("")).toBe("");
-    expect(renderResultsEmailBodyHtml("   \n  ")).toBe("");
+    expect(renderResultsEmailBodyHtml("", "Jane")).toBe("");
+    expect(renderResultsEmailBodyHtml("   \n  ", "Jane")).toBe("");
   });
 });
 
@@ -49,6 +83,7 @@ describe("buildResultsEmailHtml", () => {
     const out = buildResultsEmailHtml({
       bodyMarkdown: "Your results are ready.",
       reportHtml: "<table>REPORT</table>",
+      respondentFirstName: "Jane",
     });
     expect(out).toContain("Your results are ready.");
     expect(out).toContain("<table>REPORT</table>");
@@ -62,6 +97,7 @@ describe("buildResultsEmailHtml", () => {
     const out = buildResultsEmailHtml({
       bodyMarkdown: "",
       reportHtml: "<table>REPORT</table>",
+      respondentFirstName: "Jane",
     });
     expect(out).toContain("REPORT");
   });
@@ -70,6 +106,7 @@ describe("buildResultsEmailHtml", () => {
     const out = buildResultsEmailHtml({
       bodyMarkdown: "Your results are ready.",
       reportHtml: "<table>REPORT</table>",
+      respondentFirstName: "Jane",
       ceoSelfAccessUrl: "https://app.example.com/ceo-report-access#t=token&next=report",
     });
 
@@ -88,10 +125,12 @@ describe("buildResultsEmailHtml", () => {
     const withoutOption = buildResultsEmailHtml({
       bodyMarkdown: "Your results are ready.",
       reportHtml: "<table>REPORT</table>",
+      respondentFirstName: "Jane",
     });
     const nullOption = buildResultsEmailHtml({
       bodyMarkdown: "Your results are ready.",
       reportHtml: "<table>REPORT</table>",
+      respondentFirstName: "Jane",
       ceoSelfAccessUrl: null,
     });
 
@@ -109,6 +148,7 @@ describe("buildResultsEmailHtml", () => {
     const out = buildResultsEmailHtml({
       bodyMarkdown: "",
       reportHtml: "<table>REPORT</table>",
+      respondentFirstName: "Jane",
       ceoSelfAccessUrl,
     });
 
@@ -119,11 +159,13 @@ describe("buildResultsEmailHtml", () => {
     const local = buildResultsEmailHtml({
       bodyMarkdown: "",
       reportHtml: "<table>REPORT</table>",
+      respondentFirstName: "Jane",
       ceoSelfAccessUrl: "http://localhost:3000/ceo-report-access#t=token",
     });
     const remote = buildResultsEmailHtml({
       bodyMarkdown: "",
       reportHtml: "<table>REPORT</table>",
+      respondentFirstName: "Jane",
       ceoSelfAccessUrl: "http://app.example.com/ceo-report-access#t=token",
     });
 
