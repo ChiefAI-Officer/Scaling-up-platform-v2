@@ -26,8 +26,11 @@ import { logAudit } from "@/lib/audit";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
 import {
   assessmentInviteBrandedCustomHtmlEnabled,
+  waveDCoachNotifyEnabled,
   waveDCustomHtmlEmailEnabled,
+  waveDResultsEmailEnabled,
 } from "@/lib/assessments/wave-d-feature-flags";
+import { isResultsEmailApproved } from "@/lib/assessments/results-email-approval";
 import {
   validateInvitationHtml,
   MAX_INVITATION_HTML_LENGTH,
@@ -384,7 +387,15 @@ export async function PATCH(
         reportStyleLockedAt: true,
         versionId: true,
         customSlides: true,
-        template: { select: { alias: true } },
+        template: {
+          select: {
+            alias: true,
+            resultsEmailSubject: true,
+            resultsEmailBodyMarkdown: true,
+            resultsEmailContentApproved: true,
+            resultsEmailContentApprovedHash: true,
+          },
+        },
       },
     });
     if (!campaign) {
@@ -429,6 +440,8 @@ export async function PATCH(
       invitationBodyMarkdown?: string | null;
       invitationBodyHtml?: string | null;
       showResultsOnScreen?: boolean;
+      sendResultsToRespondent?: boolean;
+      notifyCoachOnCompletion?: boolean;
     } = {};
 
     if (data.name !== undefined) updateData.name = data.name;
@@ -497,6 +510,23 @@ export async function PATCH(
     // ─────────────────────────────────────────────────────────────────────
     if (data.showResultsOnScreen !== undefined && isOnScreenResultsEnabled()) {
       updateData.showResultsOnScreen = data.showResultsOnScreen;
+    }
+
+    if (
+      data.sendResultsToRespondent !== undefined &&
+      waveDResultsEmailEnabled() &&
+      (data.sendResultsToRespondent === false ||
+        (campaign.template !== null &&
+          isResultsEmailApproved(campaign.template)))
+    ) {
+      updateData.sendResultsToRespondent = data.sendResultsToRespondent;
+    }
+
+    if (
+      data.notifyCoachOnCompletion !== undefined &&
+      waveDCoachNotifyEnabled()
+    ) {
+      updateData.notifyCoachOnCompletion = data.notifyCoachOnCompletion;
     }
 
     if (data.openAt !== undefined) {
