@@ -1215,7 +1215,10 @@ git commit -m "feat(assessments): render comparison in every report style"
 
 **Interfaces:**
 - Keeps: canonical plain-anchor report URL for coach and admin.
-- Removes: promoted `longitudinalRespondentIds` prop and per-row `Over time` link.
+- Rollout amendment: retains the coach-only `longitudinalRespondentIds` /
+  per-row `Over time` fallback while report-native comparison is dark or
+  killed, and suppresses it only while report-native comparison is active.
+  Admin never receives the legacy entry.
 
 - [ ] **Step 1: Update tests to describe the intended placement**
 
@@ -1224,24 +1227,21 @@ Assert:
 - submitted respondents retain the plain-anchor `View report` action;
 - the action targets
   `/assessments/{campaignId}/respondents/{respondentId}/report`;
-- no `Over time` link renders on coach or admin;
-- no N+1 longitudinal eligibility helper runs on campaign-detail load;
+- no `Over time` link renders on admin;
+- the coach `Over time` link and its eligibility lookup render only while
+  report-native comparison is dark or killed;
 - admin continues to use production admin chrome and the same canonical report
   destination;
 - group-report link behavior is unchanged.
 
 - [ ] **Step 2: Remove only the promoted Wave N affordance**
 
-Delete from `CampaignDetail`:
-
-- `longitudinalRespondentIds` prop;
-- local eligible-id set;
-- `LineChart` import used only by the old action;
-- the per-row `Over time` anchor.
-
-Delete from the coach page the per-respondent
-`hasComparableLongitudinal` loop and its imports. Keep the primary report
-anchor. Do not touch the Wave N route or service files.
+Gate the existing `CampaignDetail` `longitudinalRespondentIds` prop, eligible-id
+set, `LineChart`, and per-row `Over time` anchor behind report-native comparison
+being inactive. Gate the coach page's per-respondent
+`hasComparableLongitudinal` loop the same way. Keep the primary report anchor,
+and do not expose the fallback on Admin. Do not touch the Wave N route or
+service files.
 
 - [ ] **Step 3: Run coach/admin placement tests**
 

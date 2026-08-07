@@ -124,6 +124,9 @@ describe("report-comparison fixture provisioner contract", () => {
     expect(source).toContain("exerciseOperatorComparison");
     expect(source).not.toContain("captureArtifacts: false");
     expect(source.match(/captureReportArtifacts\(/g)?.length).toBeGreaterThanOrEqual(3);
+    expect(source).toContain('viewer: "coach" | "admin";');
+    expect(source).toContain('viewer: "coach" | "admin" | "ceo"');
+    expect(source).toContain('style.style === "CLASSIC" ? "A4" : "Letter"');
     expect(source).toContain("submittedCampaign.reportStyleLockedAt");
     expect(source).toContain("assessmentEmailOutbox.count");
     expect(source).toContain("assessmentEmailDeliveryIntent.count");

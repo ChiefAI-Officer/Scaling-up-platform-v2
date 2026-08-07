@@ -233,6 +233,85 @@ function ceoFocusMatches(viewer: ReportComparisonViewer, focus: ReportComparison
       viewer.respondentId === focus.respondentId);
 }
 
+async function liveCeoGrantMatchesFocus(
+  db: CeoReportAccessTransaction,
+  viewer: ReportComparisonViewer,
+  focus: ReportComparisonFocus,
+): Promise<boolean> {
+  if (viewer.kind !== "ceo-self") return true;
+  const liveGrant = await revalidateCeoReportAccessInTransaction(db, {
+    version: 1,
+    purpose: "assessment-report-comparison-self",
+    focusCampaignId: viewer.focusCampaignId,
+    invitationId: viewer.invitationId,
+    respondentId: viewer.respondentId,
+    expiresAt: viewer.expiresAt,
+  });
+  return liveGrant !== null &&
+    liveGrant.focusCampaignId === focus.campaignId &&
+    liveGrant.focusSubmissionId === focus.submissionId &&
+    liveGrant.respondentId === focus.respondentId;
+}
+
+async function discoverReportComparisonCandidates(
+  db: ReportComparisonDb,
+  viewer: ReportComparisonViewer,
+  focus: ReportComparisonFocus,
+): Promise<CandidateOutcome> {
+  if (!await liveCeoGrantMatchesFocus(db, viewer, focus)) {
+    return { kind: "unavailable" };
+  }
+  const focusSubmission = await loadFocus(db, focus);
+  if (!isApplicableFocus(focusSubmission, focus) || !ceoFocusMatches(viewer, focus)) {
+    return { kind: "not-applicable" };
+  }
+  if (!await operatorCanRead(db, viewer, focus.campaignId)) {
+    return { kind: "unavailable" };
+  }
+  const identity = await identityIds(db, focusSubmission);
+  const ids = identity.ids;
+  const rows = await db.assessmentSubmission.findMany({
+    where: {
+      campaignId: { not: focusSubmission.campaignId },
+      submittedAt: { lt: focusSubmission.submittedAt },
+      respondentId: { in: ids },
+      campaign: {
+        organizationId: focusSubmission.campaign.organizationId,
+        templateId: focusSubmission.campaign.templateId,
+        accessMode: "INVITED",
+        deletedAt: null,
+      },
+    },
+    include: submissionInclude,
+    orderBy: [
+      { submittedAt: "desc" },
+      { campaign: { openAt: "desc" } },
+      { campaignId: "desc" },
+      { id: "desc" },
+    ],
+    take: MAX_REPORT_COMPARISON_INSPECTED,
+  });
+  const winners = new Map<string, ComparisonSubmission>();
+  for (const row of [...rows].sort(compareNewest)) {
+    if (isEarlierSamePerson(row, focusSubmission, new Set(ids)) && !winners.has(row.campaignId)) {
+      winners.set(row.campaignId, row);
+    }
+  }
+  const authorized: ComparisonSubmission[] = [];
+  for (const row of winners.values()) {
+    if (await operatorCanRead(db, viewer, row.campaignId)) authorized.push(row);
+  }
+  const bounded =
+    identity.bounded ||
+    rows.length >= MAX_REPORT_COMPARISON_INSPECTED ||
+    authorized.length > MAX_REPORT_COMPARISON_CANDIDATES;
+  return {
+    kind: "ok",
+    candidates: authorized.slice(0, MAX_REPORT_COMPARISON_CANDIDATES).map(candidateFor),
+    bounded,
+  };
+}
+
 /** Lists presentation-safe candidates only; it never grants access to a report. */
 export async function listReportComparisonCandidates(
   db: ReportComparisonDb,
@@ -242,55 +321,21 @@ export async function listReportComparisonCandidates(
   if (!isReportComparisonRolloutActive()) return { kind: "not-applicable" };
   const startedAt = Date.now();
   try {
-    const focusSubmission = await loadFocus(db, focus);
-    if (!isApplicableFocus(focusSubmission, focus) || !ceoFocusMatches(viewer, focus)) {
-      return { kind: "not-applicable" };
+    const outcome = viewer.kind === "ceo-self"
+      ? await db.$transaction(
+        (tx) => discoverReportComparisonCandidates(tx, viewer, focus),
+        { isolationLevel: "Serializable" },
+      )
+      : await discoverReportComparisonCandidates(db, viewer, focus);
+    if (outcome.kind === "ok") {
+      emitReportComparisonMetric(outcome.candidates.length ? "candidate_ok" : "candidate_empty", {
+        viewer: viewerMetric(viewer),
+        count: outcome.candidates.length,
+        bounded: outcome.bounded,
+        latencyMs: Date.now() - startedAt,
+      });
     }
-    if (!await operatorCanRead(db, viewer, focus.campaignId)) {
-      return { kind: "unavailable" };
-    }
-    const identity = await identityIds(db, focusSubmission);
-    const ids = identity.ids;
-    const rows = await db.assessmentSubmission.findMany({
-      where: {
-        campaignId: { not: focusSubmission.campaignId },
-        submittedAt: { lt: focusSubmission.submittedAt },
-        respondentId: { in: ids },
-        campaign: {
-          organizationId: focusSubmission.campaign.organizationId,
-          templateId: focusSubmission.campaign.templateId,
-          accessMode: "INVITED",
-          deletedAt: null,
-        },
-      },
-      include: submissionInclude,
-      orderBy: [
-        { submittedAt: "desc" },
-        { campaign: { openAt: "desc" } },
-        { campaignId: "desc" },
-        { id: "desc" },
-      ],
-      take: MAX_REPORT_COMPARISON_INSPECTED,
-    });
-    const winners = new Map<string, ComparisonSubmission>();
-    for (const row of [...rows].sort(compareNewest)) {
-      if (isEarlierSamePerson(row, focusSubmission, new Set(ids)) && !winners.has(row.campaignId)) {
-        winners.set(row.campaignId, row);
-      }
-    }
-    const authorized: ComparisonSubmission[] = [];
-    for (const row of winners.values()) {
-      if (await operatorCanRead(db, viewer, row.campaignId)) authorized.push(row);
-    }
-    const bounded =
-      identity.bounded ||
-      rows.length >= MAX_REPORT_COMPARISON_INSPECTED ||
-      authorized.length > MAX_REPORT_COMPARISON_CANDIDATES;
-    const candidates = authorized.slice(0, MAX_REPORT_COMPARISON_CANDIDATES).map(candidateFor);
-    emitReportComparisonMetric(candidates.length ? "candidate_ok" : "candidate_empty", {
-      viewer: viewerMetric(viewer), count: candidates.length, bounded, latencyMs: Date.now() - startedAt,
-    });
-    return { kind: "ok", candidates, bounded };
+    return outcome;
   } catch {
     emitReportComparisonMetric("candidate_failed", { viewer: viewerMetric(viewer), reason: "error", latencyMs: Date.now() - startedAt });
     return { kind: "unavailable" };
@@ -321,23 +366,8 @@ export async function loadReportComparison(
   const startedAt = Date.now();
   try {
     const outcome = await db.$transaction(async (tx) => {
-      if (viewer.kind === "ceo-self") {
-        const liveGrant = await revalidateCeoReportAccessInTransaction(tx, {
-          version: 1,
-          purpose: "assessment-report-comparison-self",
-          focusCampaignId: viewer.focusCampaignId,
-          invitationId: viewer.invitationId,
-          respondentId: viewer.respondentId,
-          expiresAt: viewer.expiresAt,
-        });
-        if (
-          !liveGrant ||
-          liveGrant.focusCampaignId !== focus.campaignId ||
-          liveGrant.focusSubmissionId !== focus.submissionId ||
-          liveGrant.respondentId !== focus.respondentId
-        ) {
-          return { kind: "invalid" } as const;
-        }
+      if (!await liveCeoGrantMatchesFocus(tx, viewer, focus)) {
+        return { kind: "invalid" } as const;
       }
       const [focusSubmission, baseline] = await Promise.all([
         loadFocus(tx, focus),

@@ -442,6 +442,19 @@ describe("listReportComparisonCandidates", () => {
     expect(mockCanManageCampaign).not.toHaveBeenCalled();
   });
 
+  it("revalidates the live CEO grant before reading candidate history", async () => {
+    const db = makeReportComparisonDbFixture();
+    db.ceoAccess.invitation.revokedAt = new Date("2026-01-02T00:00:00.000Z");
+
+    await expect(listReportComparisonCandidates(db, ceoViewer, focus)).resolves.toEqual({
+      kind: "unavailable",
+    });
+    expect(db.transactions).toBe(1);
+    expect(db.ceoInvitationQuery).toHaveBeenCalledTimes(1);
+    expect(db.submissionQueries).toHaveLength(0);
+    expect(mockCanManageCampaign).not.toHaveBeenCalled();
+  });
+
   it("checks every operator candidate independently and never gives the CEO an operator bypass", async () => {
     const db = makeReportComparisonDbFixture({ canRead: (campaignId) => campaignId !== "prior-imported-campaign" });
 

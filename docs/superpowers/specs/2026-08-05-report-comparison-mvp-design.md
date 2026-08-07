@@ -629,17 +629,21 @@ deltas or silently omit comparison data.
 
 ### Campaign detail
 
-For eligible Scaling Up Full respondents, replace **View across campaigns**
-with a link to their current branded report. The report itself exposes
-**Compare to previous assessment**. Admin and coach campaign surfaces use the
-same destination.
+For eligible Scaling Up Full respondents, the current branded report is the
+report-native destination. The report itself exposes **Compare to previous
+assessment**. Admin and coach campaign surfaces use the same destination once
+the report-native rollout is active. While that rollout is dark, the existing
+coach-only **Over time** entry remains as the non-regressing rollback path;
+Admin never receives that legacy entry.
 
 ### Wave N longitudinal
 
 Keep the current coach-only route, API/service, flag helper, component, and
-tests during the MVP rollback window. Remove promoted entry points only; do not
-delete the implementation in this change. Retiring it is a separate follow-up
-after the report-native path is stable.
+tests during the MVP rollback window. Suppress its promoted entry point only
+while report-native comparison is active, and restore it automatically while
+report-native comparison is dark or killed. Do not delete the implementation
+in this change. Retiring it is a separate follow-up after the report-native
+path is stable.
 
 ### CEO participant surface
 
@@ -778,8 +782,9 @@ The MVP is ready to launch when all of the following are true:
 9. Invalid baseline ids reveal nothing and never break the authorized focus
    report.
 10. Flag off produces the current report with no comparison reads or markup.
-11. The old Wave N path remains available for rollback while its promoted entry
-    points are removed.
+11. The old Wave N path remains available for rollback; its coach-only promoted
+    entry is hidden while report-native comparison is active and remains
+    available while the new capability is dark or killed.
 
 ## 16. Deferred follow-ups
 

@@ -124,10 +124,12 @@ async function exerciseOperatorComparison({
   reportPage,
   style,
   testInfo,
+  viewer,
 }: {
   reportPage: Page;
   style: FixtureStyle;
   testInfo: TestInfo;
+  viewer: "coach" | "admin";
 }) {
   await expect(reportPage.getByTestId(expectedRenderer(style))).toBeVisible();
   const picker = reportPage.getByLabel("Compare to previous assessment");
@@ -166,7 +168,7 @@ async function exerciseOperatorComparison({
     reportPage.getByTestId("report-comparison-cover-subtitle"),
   ).toContainText("Imported");
 
-  await captureReportArtifacts(reportPage, style, testInfo, "operator");
+  await captureReportArtifacts(reportPage, style, testInfo, viewer);
 
   await reportPage.getByRole("button", { name: "Remove comparison" }).click();
   await expect(reportPage).not.toHaveURL(/compareTo=/);
@@ -179,7 +181,7 @@ async function captureReportArtifacts(
   reportPage: Page,
   style: FixtureStyle,
   testInfo: TestInfo,
-  viewer: "operator" | "ceo",
+  viewer: "coach" | "admin" | "ceo",
 ) {
   const artifactPrefix = `${viewer}-${style.style}`;
   await reportPage.setViewportSize({ width: 1440, height: 1000 });
@@ -199,7 +201,7 @@ async function captureReportArtifacts(
   ).toBeVisible();
   const pdf = await reportPage.pdf({
     path: testInfo.outputPath(`${artifactPrefix}.pdf`),
-    format: "Letter",
+    format: style.style === "CLASSIC" ? "A4" : "Letter",
     printBackground: true,
   });
   expect(pdf.subarray(0, 4).toString()).toBe("%PDF");
@@ -498,6 +500,7 @@ test.describe("Report comparison — sentinel-provisioned acceptance", () => {
                 reportPage,
                 style,
                 testInfo,
+                viewer: "coach",
               });
           await reportPage.close();
         }
@@ -519,6 +522,7 @@ test.describe("Report comparison — sentinel-provisioned acceptance", () => {
                 reportPage: adminReport,
                 style,
                 testInfo,
+                viewer: "admin",
               });
           await adminReport.close();
         }
