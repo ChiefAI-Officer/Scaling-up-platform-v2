@@ -142,25 +142,34 @@ describe("SettingsTab — C-2 copy (verbatim)", () => {
     renderTab();
     const card = screen.getByTestId("settings-results-card");
     expect(
-      within(card).getByText(/Sends each respondent their own result/),
+      within(card).getByText("The email respondents receive with their results."),
     ).toBeInTheDocument();
     expect(
-      within(card).getByText(/it never includes anyone else's data/),
+      within(card).getByRole("switch", {
+        name: "Allow coaches to enable results emails for respondents",
+      }),
     ).toBeInTheDocument();
     expect(within(card).getByLabelText("Subject")).toBeInTheDocument();
     expect(within(card).getByLabelText("Message")).toBeInTheDocument();
     expect(within(card).getByText("Insert")).toBeInTheDocument();
-    // Toggle copy.
-    expect(within(card).getByText("Approved to send")).toBeInTheDocument();
     expect(
-      within(card).getByText("Turn on once the copy is reviewed."),
+      within(card).getByText("Coaches decide separately for each campaign."),
     ).toBeInTheDocument();
     expect(
-      within(card).getByText("Send results to respondents by default"),
+      within(card).getByRole("switch", { name: "Pre-select for new campaigns" }),
     ).toBeInTheDocument();
     expect(
-      within(card).getByText("Applies once the results email is approved."),
+      within(card).getByText(
+        "New campaigns start with respondent results emails enabled.",
+      ),
     ).toBeInTheDocument();
+    expect(
+      within(card).getByRole("button", { name: "{{respondentFirstName}}" }),
+    ).toBeInTheDocument();
+    expect(within(card).queryByText("{{templateName}}")).not.toBeInTheDocument();
+    expect(within(card).queryByText("{{tierLabel}}")).not.toBeInTheDocument();
+    expect(within(card).queryByText("{{tierMessage}}")).not.toBeInTheDocument();
+    expect(within(card).queryByText("{{perSectionList}}")).not.toBeInTheDocument();
   });
 
   it("renders the Access groups link row → /admin/assessments/access-groups", () => {
@@ -295,7 +304,9 @@ describe("SettingsTab — results-email approval interlock (SEC-H2)", () => {
   it("approve toggle is ENABLED when the card is clean", () => {
     renderTab();
     expect(
-      screen.getByRole("switch", { name: "Approved to send" }),
+      screen.getByRole("switch", {
+        name: "Allow coaches to enable results emails for respondents",
+      }),
     ).not.toBeDisabled();
   });
 
@@ -306,13 +317,19 @@ describe("SettingsTab — results-email approval interlock (SEC-H2)", () => {
       target: { value: "Changed subject" },
     });
     expect(
-      screen.getByRole("switch", { name: "Approved to send" }),
+      screen.getByRole("switch", {
+        name: "Allow coaches to enable results emails for respondents",
+      }),
     ).toBeDisabled();
   });
 
   it("toggling approve (clean) sends content + approved together", () => {
     const props = renderTab();
-    fireEvent.click(screen.getByRole("switch", { name: "Approved to send" }));
+    fireEvent.click(
+      screen.getByRole("switch", {
+        name: "Allow coaches to enable results emails for respondents",
+      }),
+    );
     expect(props.handleTemplateRowSave).toHaveBeenCalledWith({
       resultsEmailContentApproved: true,
       resultsEmailSubject: "Your results",
@@ -356,7 +373,9 @@ describe("SettingsTab — results-email approval interlock (SEC-H2)", () => {
       },
     });
     expect(
-      screen.getByRole("switch", { name: "Approved to send" }),
+      screen.getByRole("switch", {
+        name: "Allow coaches to enable results emails for respondents",
+      }),
     ).toBeChecked();
   });
 
@@ -364,7 +383,7 @@ describe("SettingsTab — results-email approval interlock (SEC-H2)", () => {
     const props = renderTab({ sendResultsDefault: false });
     fireEvent.click(
       screen.getByRole("switch", {
-        name: "Send results to respondents by default",
+        name: "Pre-select for new campaigns",
       }),
     );
     expect(props.onSendResultsDefaultChange).toHaveBeenCalledWith(true);
@@ -374,12 +393,14 @@ describe("SettingsTab — results-email approval interlock (SEC-H2)", () => {
     renderTab({ waveQEnabled: false });
     expect(
       screen.queryByRole("switch", {
-        name: "Send results to respondents by default",
+        name: "Pre-select for new campaigns",
       }),
     ).not.toBeInTheDocument();
     // The approval toggle still renders.
     expect(
-      screen.getByRole("switch", { name: "Approved to send" }),
+      screen.getByRole("switch", {
+        name: "Allow coaches to enable results emails for respondents",
+      }),
     ).toBeInTheDocument();
   });
 });

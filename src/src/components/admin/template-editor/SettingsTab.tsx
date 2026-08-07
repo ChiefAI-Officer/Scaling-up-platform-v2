@@ -121,13 +121,7 @@ const INVITATION_VARS = [
   "{{orgName}}",
 ];
 
-const RESULTS_VARS = [
-  "{{respondentFirstName}}",
-  "{{templateName}}",
-  "{{tierLabel}}",
-  "{{tierMessage}}",
-  "{{perSectionList}}",
-];
+const RESULTS_VARS = ["{{respondentFirstName}}"];
 
 /** Real stored language values (NOT the hyphenated `en-US…`, C6). */
 const LANGUAGE_OPTIONS = ["enUS", "enGB", "esES", "frFR"];
@@ -568,8 +562,7 @@ function ResultsEmailCard({
         Results email
       </h3>
       <p className="text-[0.6875rem] text-muted-foreground" style={{ marginBottom: "1rem" }}>
-        Sends each respondent their own result. Needs approval before it can go
-        out — <strong>it never includes anyone else&apos;s data.</strong>
+        The email respondents receive with their results.
       </p>
 
       <div className="space-y-1.5">
@@ -581,7 +574,7 @@ function ResultsEmailCard({
           type="text"
           value={subject}
           onChange={(e) => setSubject(e.target.value)}
-          placeholder="Your {{templateName}} results"
+          placeholder="Your results are ready"
           className={inputCls}
         />
       </div>
@@ -595,8 +588,8 @@ function ResultsEmailCard({
           rows={5}
           value={body}
           onChange={(e) => setBody(e.target.value)}
-          placeholder="Hi {{respondentFirstName}}, your results are ready."
-          className={textareaCls + " font-mono text-xs"}
+          placeholder={"Hi {{respondentFirstName}},\n\nYour results are ready to view."}
+          className={textareaCls}
         />
         <InsertChips
           vars={RESULTS_VARS}
@@ -626,8 +619,8 @@ function ResultsEmailCard({
 
       {/* Approved to send — disabled while dirty (can't approve unsaved copy). */}
       <ToggleRow
-        label="Approved to send"
-        helper="Turn on once the copy is reviewed."
+        label="Allow coaches to enable results emails for respondents"
+        helper="Coaches decide separately for each campaign."
         checked={approved}
         disabled={cardDirty || templateRowSaving}
         onToggle={toggleApprove}
@@ -635,13 +628,15 @@ function ResultsEmailCard({
 
       {/* Send results by default — Wave Q immediate PATCH. */}
       {waveQEnabled && (
-        <ToggleRow
-          label="Send results to respondents by default"
-          helper="Applies once the results email is approved."
-          checked={sendResultsDefault}
-          disabled={savingSendResultsDefault}
-          onToggle={() => onSendResultsDefaultChange(!sendResultsDefault)}
-        />
+        <div className="ml-4">
+          <ToggleRow
+            label="Pre-select for new campaigns"
+            helper="New campaigns start with respondent results emails enabled."
+            checked={sendResultsDefault}
+            disabled={savingSendResultsDefault}
+            onToggle={() => onSendResultsDefaultChange(!sendResultsDefault)}
+          />
+        </div>
       )}
     </section>
   );

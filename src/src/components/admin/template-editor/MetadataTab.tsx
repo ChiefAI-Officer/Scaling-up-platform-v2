@@ -534,13 +534,7 @@ function InvitationEmailCard({
 }
 
 // ─── Results Email card (F0 fields) ──────────────────────────────────────
-const RESULTS_VARS = [
-  "{{respondentFirstName}}",
-  "{{templateName}}",
-  "{{tierLabel}}",
-  "{{tierMessage}}",
-  "{{perSectionList}}",
-];
+const RESULTS_VARS = ["{{respondentFirstName}}"];
 
 function ResultsEmailCard({
   subject,
@@ -569,21 +563,11 @@ function ResultsEmailCard({
 }) {
   return (
     <section className="wf-card" style={{ padding: "1.5rem" }}>
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="wf-card-title" style={{ marginBottom: "1rem" }}>
-          Results Email
-        </h3>
-        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[0.625rem] font-bold uppercase tracking-wider bg-warning/20 text-warning">
-          v7.5
-        </span>
-      </div>
+      <h3 className="wf-card-title" style={{ marginBottom: "1rem" }}>
+        Results Email
+      </h3>
       <p className="text-[0.6875rem] text-muted-foreground">
-        Content-flagged behind{" "}
-        <code className="font-mono px-1 py-0.5 rounded bg-muted">
-          INVITED_RESULTS_EMAIL_COPY_APPROVED
-        </code>
-        . Email contains respondent&apos;s own individual result only — never
-        team aggregate or others&apos; data (anonymity constraint).
+        The email respondents receive with their results.
       </p>
 
       <div className="space-y-1.5">
@@ -598,7 +582,7 @@ function ResultsEmailCard({
           type="text"
           value={subject}
           onChange={(e) => onSubjectChange(e.target.value)}
-          placeholder="Your {{templateName}} results"
+          placeholder="Your results are ready"
           disabled={isReadOnly}
           className={inputCls}
         />
@@ -615,9 +599,9 @@ function ResultsEmailCard({
           rows={5}
           value={body}
           onChange={(e) => onBodyChange(e.target.value)}
-          placeholder="Hi {{respondentFirstName}}, your results are ready."
+          placeholder={"Hi {{respondentFirstName}},\n\nYour results are ready to view."}
           disabled={isReadOnly}
-          className={textareaCls + " font-mono text-xs"}
+          className={textareaCls}
         />
         <div className="flex flex-wrap items-center gap-1 mt-2 p-2 rounded bg-muted/40 border border-border">
           <strong className="text-[0.6875rem] uppercase tracking-wide text-muted-foreground mr-1">
@@ -634,38 +618,39 @@ function ResultsEmailCard({
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-2 p-3 rounded border border-border bg-muted/30">
-        <span className="text-xs text-foreground">
-          Content approved (flips{" "}
-          <code className="font-mono px-1 py-0.5 rounded bg-muted">
-            INVITED_RESULTS_EMAIL_COPY_APPROVED
-          </code>
-          )
-        </span>
-        <div className="flex items-center gap-2">
-          <span className="text-[0.6875rem] uppercase tracking-wide text-muted-foreground">
-            {contentApproved ? "On" : "Off"}
+      <div className="space-y-1" style={{ marginTop: "1rem" }}>
+        <div className="flex items-center justify-between gap-2 p-3 rounded border border-border bg-muted/30">
+          <span className="text-xs text-foreground">
+            Allow coaches to enable results emails for respondents
           </span>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={contentApproved}
-            aria-label="Content approved"
-            disabled={isReadOnly}
-            onClick={() => onContentApprovedChange(!contentApproved)}
-            className={`relative inline-flex h-5 w-9 items-center rounded-full border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-              contentApproved
-                ? "bg-primary border-primary"
-                : "bg-muted border-border"
-            }`}
-          >
-            <span
-              className={`inline-block h-3.5 w-3.5 rounded-full bg-background shadow transition-transform ${
-                contentApproved ? "translate-x-4" : "translate-x-0.5"
+          <div className="flex items-center gap-2">
+            <span className="text-[0.6875rem] uppercase tracking-wide text-muted-foreground">
+              {contentApproved ? "On" : "Off"}
+            </span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={contentApproved}
+              aria-label="Allow coaches to enable results emails for respondents"
+              disabled={isReadOnly}
+              onClick={() => onContentApprovedChange(!contentApproved)}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                contentApproved
+                  ? "bg-primary border-primary"
+                  : "bg-muted border-border"
               }`}
-            />
-          </button>
+            >
+              <span
+                className={`inline-block h-3.5 w-3.5 rounded-full bg-background shadow transition-transform ${
+                  contentApproved ? "translate-x-4" : "translate-x-0.5"
+                }`}
+              />
+            </button>
+          </div>
         </div>
+        <p className="text-[0.6875rem] text-muted-foreground">
+          Coaches decide separately for each campaign.
+        </p>
       </div>
 
       {/* Wave Q (#1) — flag-gated results-email DEFAULT toggle. This is a
@@ -675,10 +660,10 @@ function ResultsEmailCard({
           version is being viewed. Stored while unapproved; inert until the
           results email content is approved. */}
       {waveQEnabled && (
-        <div className="space-y-1.5">
+        <div className="ml-4 space-y-1">
           <div className="flex items-center justify-between gap-2 p-3 rounded border border-border bg-muted/30">
             <span className="text-xs text-foreground">
-              Send results to respondents by default
+              Pre-select for new campaigns
             </span>
             <div className="flex items-center gap-2">
               <span className="text-[0.6875rem] uppercase tracking-wide text-muted-foreground">
@@ -688,7 +673,7 @@ function ResultsEmailCard({
                 type="button"
                 role="switch"
                 aria-checked={sendResultsDefault}
-                aria-label="Send results to respondents by default"
+                aria-label="Pre-select for new campaigns"
                 disabled={sendResultsDefaultSaving}
                 onClick={() =>
                   onSendResultsDefaultChange?.(!sendResultsDefault)
@@ -708,7 +693,7 @@ function ResultsEmailCard({
             </div>
           </div>
           <p className="text-[0.6875rem] text-muted-foreground">
-            Takes effect once the results email content is approved.
+            New campaigns start with respondent results emails enabled.
           </p>
         </div>
       )}

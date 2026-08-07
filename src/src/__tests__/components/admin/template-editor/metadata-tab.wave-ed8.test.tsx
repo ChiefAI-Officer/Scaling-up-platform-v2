@@ -13,7 +13,7 @@
  */
 
 import React from "react";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, cleanup, within } from "@testing-library/react";
 
 import { TemplateEditorTabbed } from "@/components/admin/TemplateEditorTabbed";
 
@@ -172,5 +172,47 @@ describe("MetadataTab — Wave ED8 Version History strip gating", () => {
     expect(
       screen.getByTestId("version-history-card-ver_2"),
     ).toBeInTheDocument();
+  });
+
+  it("renders the simplified Results email contract", () => {
+    render(
+      <TemplateEditorTabbed
+        template={baseTemplate}
+        version={draftVersion}
+        allVersions={allVersions}
+        waveQEnabled
+      />,
+    );
+
+    expect(
+      screen.getByText("The email respondents receive with their results."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("switch", {
+        name: "Allow coaches to enable results emails for respondents",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Coaches decide separately for each campaign."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("switch", { name: "Pre-select for new campaigns" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "New campaigns start with respondent results emails enabled.",
+      ),
+    ).toBeInTheDocument();
+    const card = screen
+      .getByRole("heading", { name: "Results Email" })
+      .closest("section");
+    expect(card).not.toBeNull();
+    expect(
+      within(card!).getByText("{{respondentFirstName}}"),
+    ).toBeInTheDocument();
+    expect(within(card!).queryByText("{{templateName}}")).not.toBeInTheDocument();
+    expect(within(card!).queryByText("{{tierLabel}}")).not.toBeInTheDocument();
+    expect(within(card!).queryByText("{{tierMessage}}")).not.toBeInTheDocument();
+    expect(within(card!).queryByText("{{perSectionList}}")).not.toBeInTheDocument();
   });
 });
