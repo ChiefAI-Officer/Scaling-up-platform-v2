@@ -6,6 +6,19 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="report-comparison-deployed-dark"></a>
+### 2026-08-07 — Individual report comparison deployed dark <!-- ENTRY_ISO:2026-08-07 ENTRY_SLUG:report-comparison-deployed-dark -->
+
+**Status: MERGED + PRODUCTION-DEPLOYED + DEFAULT-OFF; not activated.** PR [#314](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/314) passed Build, Migration Safety Gate, Assessment Email Lease (PostgreSQL), Vercel, and Vercel Preview Comments. GitHub squash-merged the exact independently approved head `fa840cdce32e6707b77f599d82964c2979dd498f` as `73ff4fab85d1957eff79ab136d24619002bab51e` on `main`. The existing one-campaign group report and all group/aggregate access rules remain unchanged.
+
+**Production receipt and dark posture.** Exact deployment `dpl_UsFiaQSBMjrph7sr94F3BXGWbgSE` reached Ready at `https://scaling-up-platform-v2-k5ipk0h39-scaling-up.vercel.app` and owns both canonical aliases, `https://scaling-up-platform-v2.vercel.app` and `https://platformtest.scalingup.com`. Production environment-name inspection confirmed `WAVE_RC_REPORT_COMPARISON_ENABLED`, `WAVE_RC_REPORT_COMPARISON_CANARY`, `WAVE_RC_REPORT_COMPARISON_KILL`, and `ASSESSMENT_REPORT_ACCESS_SECRET` are all absent. Therefore no Coach/Admin/STAFF selector, CEO capability exchange, comparison read, or replacement of the Coach-only Wave N fallback can activate from this deployment.
+
+**Read-only live verification.** Both canonical `/api/health` endpoints returned HTTP `200` with database `healthy` and auth posture `safe`. Unauthenticated requests to the CEO self-report entry, a synthetic individual report, Admin campaigns, and Coach assessments each returned the expected `307` sign-in redirect without protected report data. No authenticated Production session, assessment submission, screenshot/PDF, customer-data mutation, email, or flag/secret write was performed. The sentinel-guarded browser workflow and CEO all-three-style visual/print/PDF matrix remain required before any later canary or activation; no such acceptance is claimed here.
+
+**Tracking and rollback boundary.** The single [AI Solutions Team task](https://app.notion.com/p/3b58c45dd829819aa509f8840dab03a4) records the delivery and will be closed with this receipt. Because the capability is dark, rollback is currently an environment no-op; after any future activation, `WAVE_RC_REPORT_COMPARISON_KILL=1` remains the immediate containment control.
+
+---
+
 <a id="report-comparison-ready-for-production-review"></a>
 ### 2026-08-07 — Individual report comparison ready for Production review <!-- ENTRY_ISO:2026-08-07 ENTRY_SLUG:report-comparison-ready-for-production-review -->
 
