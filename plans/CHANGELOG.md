@@ -6,6 +6,17 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="p1-results-email-simplification-implemented"></a>
+### 2026-08-07 — P1 respondent results email simplification implemented <!-- ENTRY_ISO:2026-08-07 ENTRY_SLUG:p1-results-email-simplification-implemented -->
+
+**Status: LOCALLY IMPLEMENTED AND VERIFIED; not pushed, merged, deployed, activated, or written to Production.** The existing Results email editor now presents one working respondent-first-name token and clear availability/default wording. Existing DRAFT and ACTIVE campaigns can change the stored respondent-results and coach-completion email choices through the shared Coach/Admin campaign detail component, while CLOSED campaigns remain read-only.
+
+**Security and scope.** No schema, migration, new endpoint, feature flag, email type, delivery workflow, report behavior, or public-quiz behavior changed. The existing campaign PATCH endpoint now persists these two existing settings only under their existing gates. Respondent-results enablement still requires the Wave D flag plus current hash-valid admin approval, and locked submit-time/outbox/delivery-intent authorization remains unchanged.
+
+**Verification.** From `src/`, the prescribed targeted Jest matrix passed **15 suites / 310 tests / 0 snapshots** in **3.029 s**. ESLint exited **0** for all **19** branch-changed TypeScript/TSX source and test files. The task-brief lint paths without the nested `src/` prefix were not present in this checkout; the complete equivalent actual-path invocation was used and passed. Migration safety checked **45 migrations** with no unapproved destructive operations. `CI=true npx next build --turbopack` compiled successfully in **29.9 s**, completed TypeScript, and generated **94/94** static pages (the environment emitted expected missing `DATABASE_URL` and Inngest-key messages during static generation without failing the build). The post-receipt changelog-freshness suite, diff check, and final scope inspection are recorded with this documentation commit.
+
+---
+
 <a id="report-comparison-deployed-dark"></a>
 ### 2026-08-07 — Individual report comparison deployed dark <!-- ENTRY_ISO:2026-08-07 ENTRY_SLUG:report-comparison-deployed-dark -->
 
