@@ -6,6 +6,17 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="universal-individual-report-appearances-launched"></a>
+### 2026-08-07 — Universal individual-report appearances launched <!-- ENTRY_ISO:2026-08-07 ENTRY_SLUG:universal-individual-report-appearances-launched -->
+
+**Protected delivery.** PR [#311](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/311) carried the complete universal individual-report appearance branch plus the latest `main`. Build, Migration Safety Gate, Assessment Email Lease (PostgreSQL), Vercel, and Vercel Preview Comments all passed, and GitHub squash-merged the exact reviewed head `7fe12f30058691b78f7f0f26a1e3b48b4ccdfd64` as `ab7dacca744cb4d25c4bffe2e2fba78c9ec7f22c`.
+
+**Production deployment and activation.** Dark deployment `dpl_33eK4zWDiV2wDS3m3gzKWZxLkh5f` reached Ready before activation. Gabriel then explicitly authorized the global rollout. `WAVE_REPORT_STYLES_ENABLED=1` is present in Production, the pre-existing exact-campaign `WAVE_REPORT_STYLES_CANARY` remains present, and `WAVE_REPORT_STYLES_KILL` remains absent so it can be introduced as the immediate containment control. Vercel rebuilt the exact merged deployment with the enabled environment as `dpl_D7WnRzpiuY1PGMukp9LAjVqsANyV`; it reached Ready and was promoted to `platformtest.scalingup.com`.
+
+**Live read-only acceptance.** The enabled deployment's public health endpoint returned HTTP `200` with a healthy database and safe auth posture. Representative scored Classic, scored Executive Boardroom, scored Modern Dashboard, qualitative Executive Boardroom, and sparse-custom Modern Dashboard preview assets each returned HTTP `200` with `image/webp`. Unauthenticated requests to the Admin preview, Admin template, and Coach assessment routes returned the expected authentication redirects, disclosing no protected data. Both available browser surfaces reached the production sign-in page; no authenticated session or credentials were available, so the final read-only Admin/Coach picker visual check remains pending. No Production template default, campaign style, participant, invitation, response, submission, report, customer data, or email was created or changed during this verification.
+
+**Scope and evidence.** Classic, Executive Boardroom, and Modern Dashboard are globally available for every individual report family—scored, qualitative, custom, and public—on screen and in browser print/PDF. Group/aggregate reports, longitudinal trends, CSV, and report-email HTML remain distinct output families. Before push, the merged branch passed changed-file ESLint across 104 files, the targeted integration matrix at **10 suites / 137 tests**, the full repository at **647 suites / 8,075 tests / 16 snapshots**, migration safety across **45 migrations**, the Production-matching Turbopack build with TypeScript and **93/93** static pages, and the strict DB-free browser matrix across all **54** anatomy/style/variant combinations. The hosted PostgreSQL lease check then passed in protected CI. The hardened authenticated disposable-database completion/atomic-lock/report workflow remains a separate acceptance lane and must not be described as run.
+
 <a id="universal-individual-report-imported-provenance-correction"></a>
 ### 2026-08-07 — Universal individual-report imported provenance correction <!-- ENTRY_ISO:2026-08-07 ENTRY_SLUG:universal-individual-report-imported-provenance-correction -->
 
