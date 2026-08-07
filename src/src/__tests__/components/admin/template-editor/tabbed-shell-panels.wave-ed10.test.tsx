@@ -55,7 +55,10 @@ afterEach(() => cleanup());
 // Fixture — the ED9 production shell config (singleColumn + formsBuild),
 // mirroring ed10-golden-snapshots.formsModeProps(). ED10 flag toggled per test.
 // ────────────────────────────────────────────────────────────────────────
-function shellProps(previewSettingsEnabled: boolean) {
+function shellProps(
+  previewSettingsEnabled: boolean,
+  plainLanguageScoringEnabled?: boolean,
+) {
   return {
     template: {
       id: "tpl_1",
@@ -106,6 +109,7 @@ function shellProps(previewSettingsEnabled: boolean) {
     singleColumnEnabled: true,
     formsBuildEnabled: true,
     previewSettingsEnabled,
+    plainLanguageScoringEnabled,
   };
 }
 
@@ -198,6 +202,27 @@ describe("TabbedShell seam — ed10Active (Preview + Settings)", () => {
       "active",
     );
     expect(screen.getByTestId("tab-panel-settings")).toBeInTheDocument();
+  });
+});
+
+describe("TabbedShell seam — simplified scoring copy", () => {
+  it("forwards the simplified-creation flag to the scoring tab", () => {
+    mockSearchParams = new URLSearchParams("tab=scoring");
+    render(
+      <TemplateEditorTabbed
+        {...shellProps(true)}
+        plainLanguageScoringEnabled
+      />,
+    );
+
+    expect(screen.getByText("How results are calculated")).toBeInTheDocument();
+    expect(screen.queryByText("Scoring Configuration")).toBeNull();
+
+    cleanup();
+    render(<TemplateEditorTabbed {...shellProps(true)} />);
+
+    expect(screen.getByText("Scoring Configuration")).toBeInTheDocument();
+    expect(screen.queryByText("How results are calculated")).toBeNull();
   });
 });
 

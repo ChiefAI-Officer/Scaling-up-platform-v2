@@ -324,6 +324,11 @@ export interface TabbedShellProps {
    * inert today (accepted + defaulted, not yet read). Presentation-only.
    */
   previewSettingsEnabled?: boolean;
+  /**
+   * Template-creation simplification — server-computed and forwarded only to
+   * the existing Scoring & Tiers tab. Default false preserves legacy copy.
+   */
+  plainLanguageScoringEnabled?: boolean;
   /** Server-computed availability for the report-style release. */
   reportStylesEnabled?: boolean;
   /**
@@ -442,6 +447,7 @@ export function TabbedShell({
   // it feeds `ed10Active` (below), which humanizes the header pills; Task 10
   // mounts the Preview + Settings tabs when `ed10Active`.
   previewSettingsEnabled = false,
+  plainLanguageScoringEnabled = false,
   reportStylesEnabled = false,
   qspStoryGroupEnabled = false,
   // ED10 (spec 19am-plan, Task 5/10) — Active published-version snapshot for
@@ -1077,6 +1083,7 @@ export function TabbedShell({
               }))}
               scoringConfig={scoringConfigState as ScoringConfigShape}
               isReadOnly={isPublished}
+              plainLanguageEnabled={plainLanguageScoringEnabled}
               onScoringConfigChange={(next) =>
                 handleScoringConfigChange(next as Record<string, unknown>)
               }

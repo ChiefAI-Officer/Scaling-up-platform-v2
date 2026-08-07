@@ -14,6 +14,7 @@ import {
   ScoringValidationError,
   TemplateVersionForScoringSchema,
   TemplateVersionForPublishSchema,
+  validateTierTiling,
   type TemplateVersionForScoring,
   type Answer,
 } from "@/lib/assessments/scoring";
@@ -290,6 +291,132 @@ describe("scoreSubmission — dynamic tier-domain validation", () => {
         reason: expect.stringContaining("overallAvg"),
       });
     }
+  });
+});
+
+describe("validateTierTiling — stable issue codes", () => {
+  const domain = { min: 0, max: 10, isInteger: true };
+
+  it("adds stable codes without changing legacy empty-tier output", () => {
+    expect(validateTierTiling([], domain, ["tiers"])).toEqual([
+      {
+        code: "EMPTY_TIERS",
+        path: ["tiers"],
+        message: "tiers must contain at least one entry",
+        details: { reason: "empty tiers" },
+      },
+    ]);
+  });
+
+  it("adds a stable code without changing the first-range output", () => {
+    expect(
+      validateTierTiling([
+        { minMetric: 1, maxMetric: 10, label: "High", message: "high" },
+      ], domain),
+    ).toEqual([
+      {
+        code: "FIRST_RANGE_START",
+        path: [0, "minMetric"],
+        message: "first tier minMetric must equal domain min (0); got 1",
+        details: {
+          reason: "first tier minMetric must equal domain min",
+          domainMin: 0,
+          firstTierMin: 1,
+        },
+      },
+    ]);
+  });
+
+  it("adds a stable code without changing the early-open-range output", () => {
+    expect(
+      validateTierTiling([
+        { minMetric: 0, label: "Low", message: "low" },
+        { minMetric: 1, maxMetric: 10, label: "High", message: "high" },
+      ], domain),
+    ).toEqual([
+      {
+        code: "EARLY_NO_MAXIMUM",
+        path: [0, "maxMetric"],
+        message: "only the highest tier may omit maxMetric (open-ended above)",
+        details: {
+          reason: "only the highest tier may omit maxMetric (open-ended above)",
+          tierLabel: "Low",
+          tierIndex: 0,
+        },
+      },
+    ]);
+  });
+
+  it("adds a stable code without changing the gap output", () => {
+    expect(
+      validateTierTiling([
+        { minMetric: 0, maxMetric: 4, label: "Low", message: "low" },
+        { minMetric: 6, maxMetric: 10, label: "High", message: "high" },
+      ], domain),
+    ).toEqual([
+      {
+        code: "RANGE_GAP",
+        path: [1, "minMetric"],
+        message:
+          'gap between tiers: tier "Low" ends at 4; tier "High" must start at 5 (no gap)',
+        details: {
+          reason: "gap between tiers",
+          tierA: "Low",
+          tierB: "High",
+          aMax: 4,
+          bMin: 6,
+          expectedNextMin: 5,
+        },
+      },
+    ]);
+  });
+
+  it("adds a stable code without changing the overlap output", () => {
+    expect(
+      validateTierTiling([
+        { minMetric: 0, maxMetric: 6, label: "Low", message: "low" },
+        { minMetric: 5, maxMetric: 10, label: "High", message: "high" },
+      ], domain),
+    ).toEqual([
+      {
+        code: "RANGE_OVERLAP",
+        path: [1, "minMetric"],
+        message:
+          'overlap between tiers: tier "Low" ends at 6; tier "High" starts at 5 (overlap)',
+        details: {
+          reason: "overlap between tiers",
+          tierA: "Low",
+          tierB: "High",
+          aMax: 6,
+          bMin: 5,
+          expectedNextMin: 7,
+        },
+      },
+    ]);
+  });
+
+  it.each([
+    [9, "below"],
+    [11, "above"],
+  ])("adds a stable code without changing the last-range-%s-domain output", (maxMetric) => {
+    expect(
+      validateTierTiling([
+        { minMetric: 0, maxMetric, label: "Only", message: "only" },
+      ], domain),
+    ).toEqual([
+      {
+        code: "LAST_RANGE_END",
+        path: [0, "maxMetric"],
+        message: `last tier maxMetric must equal domain max (10) or be omitted (open-ended); got ${maxMetric}`,
+        details: {
+          reason:
+            "last tier maxMetric must equal domain max or be omitted (open-ended)",
+          lastTierLabel: "Only",
+          lastTierMax: maxMetric,
+          domainMax: 10,
+        },
+      },
+    ]);
   });
 });
 
