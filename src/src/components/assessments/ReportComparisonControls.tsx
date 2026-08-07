@@ -109,7 +109,11 @@ function ReportComparisonControlsState({
           </button>
         ) : null}
       </div>
-      {bounded ? <p className="su-report-comparison-limit">Showing 12 most recent</p> : null}
+      {bounded ? (
+        <p className="su-report-comparison-limit">
+          Showing {candidates.length} most recent
+        </p>
+      ) : null}
     </section>
   );
 }

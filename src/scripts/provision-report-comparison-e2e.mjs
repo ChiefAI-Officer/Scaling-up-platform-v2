@@ -6,7 +6,51 @@ import reportStyleE2eContract from "./report-style-e2e-server-contract.cjs";
 const { assertDisposableReportComparisonDatabase } = reportStyleE2eContract;
 
 export const REPORT_COMPARISON_FIXTURE_PASSWORD = "report-comparison-e2e-password";
+export const REPORT_COMPARISON_FIXTURE_SCHEMA_VERSION = 2;
 const FIXTURE_PREFIX = "e2e-report-comparison:";
+const FIXTURE_QUESTIONS = [
+  {
+    stableKey: "Q_E2E",
+    label: "Fixture question",
+    type: "SLIDER_LIKERT",
+    sectionStableKey: "S_E2E",
+    sortOrder: 1,
+    isRequired: true,
+    scale: {
+      min: 0,
+      max: 10,
+      step: 1,
+      anchorMin: "Not true",
+      anchorMax: "Completely true",
+    },
+  },
+];
+const FIXTURE_SECTIONS = [
+  {
+    stableKey: "S_E2E",
+    name: "Fixture section",
+    domain: "people",
+    sortOrder: 1,
+  },
+];
+const FIXTURE_SCORING_CONFIG = {
+  tierMetric: "overallAverage",
+  passThreshold: 6,
+  tiers: [
+    { minMetric: 0, maxMetric: 5.99, label: "Priority", message: "Priority" },
+    { minMetric: 6, label: "On track", message: "On track" },
+  ],
+};
+
+export function reportComparisonFixtureVersionHash(key) {
+  return createHash("sha256").update(JSON.stringify({
+    key,
+    schemaVersion: REPORT_COMPARISON_FIXTURE_SCHEMA_VERSION,
+    questions: FIXTURE_QUESTIONS,
+    sections: FIXTURE_SECTIONS,
+    scoringConfig: FIXTURE_SCORING_CONFIG,
+  })).digest("hex");
+}
 
 export function reportComparisonFixtureIdentity(env = process.env) {
   const sentinelId = env.E2E_REPORT_COMPARISON_DISPOSABLE_SENTINEL_ID;
@@ -165,7 +209,7 @@ export async function provisionReportComparisonFixture({ env = process.env, crea
         where: { templateId: template.id, language: "enUS" },
         _max: { versionNumber: true },
       });
-      const fixtureContentHash = createHash("sha256").update(plan.key).digest("hex");
+      const fixtureContentHash = reportComparisonFixtureVersionHash(plan.key);
       const existingFixtureVersion = await tx.assessmentTemplateVersion.findFirst({
         where: {
           templateId: template.id,
@@ -176,15 +220,13 @@ export async function provisionReportComparisonFixture({ env = process.env, crea
       });
       const version = existingFixtureVersion ?? await tx.assessmentTemplateVersion.create({ data: {
         templateId: template.id, versionNumber: Math.max(9000, (latestVersion._max.versionNumber ?? 0) + 1),
-        language: "enUS", questions: [{ stableKey: "Q_E2E", label: "Fixture question", type: "SLIDER_LIKERT", sectionStableKey: "S_E2E", sortOrder: 1, isRequired: true, scale: { min: 0, max: 10, step: 1, anchorMin: "Not true", anchorMax: "Completely true" } }],
-        sections: [{ stableKey: "S_E2E", name: "Fixture section", domain: "people", sortOrder: 1 }], scoringConfig: {
-          tierMetric: "overallAverage",
-          passThreshold: 6,
-          tiers: [
-            { minMetric: 0, maxMetric: 5.99, label: "Priority", message: "Priority" },
-            { minMetric: 6, label: "On track", message: "On track" },
-          ],
-        }, contentHash: fixtureContentHash, publishedAt: new Date(), publishedBy: admin.id,
+        language: "enUS",
+        questions: FIXTURE_QUESTIONS,
+        sections: FIXTURE_SECTIONS,
+        scoringConfig: FIXTURE_SCORING_CONFIG,
+        contentHash: fixtureContentHash,
+        publishedAt: new Date(),
+        publishedBy: admin.id,
       } });
       const group = await tx.accessGroup.create({ data: { name: `${plan.key}:access`, createdBy: admin.id } });
       await tx.accessGroupTemplate.create({ data: { accessGroupId: group.id, templateId: template.id, addedBy: admin.id } });

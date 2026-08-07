@@ -163,6 +163,6 @@ describe("ReportComparisonControls", () => {
     );
 
     expect(container.firstElementChild).toHaveClass("no-print");
-    expect(screen.getByText("Showing 12 most recent")).toBeInTheDocument();
+    expect(screen.getByText("Showing 2 most recent")).toBeInTheDocument();
   });
 });

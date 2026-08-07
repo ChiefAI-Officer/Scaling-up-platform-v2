@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -28,6 +29,18 @@ function plan() {
     invitationRoles: string[];
     relationshipContract: Record<string, boolean>;
   };
+}
+
+function fixtureVersionIdentity(key: string) {
+  const source = [
+    "import { REPORT_COMPARISON_FIXTURE_SCHEMA_VERSION, reportComparisonFixtureVersionHash } from './scripts/provision-report-comparison-e2e.mjs';",
+    `console.log(JSON.stringify({ schemaVersion: REPORT_COMPARISON_FIXTURE_SCHEMA_VERSION, hash: reportComparisonFixtureVersionHash(${JSON.stringify(key)}) }));`,
+  ].join(" ");
+  return JSON.parse(execFileSync(process.execPath, ["--input-type=module", "--eval", source], {
+    cwd: process.cwd(),
+    env: { ...process.env },
+    encoding: "utf8",
+  })) as { schemaVersion: number; hash: string };
 }
 
 describe("report-comparison fixture provisioner contract", () => {
@@ -109,10 +122,24 @@ describe("report-comparison fixture provisioner contract", () => {
     expect(source).toContain("submissionCampaignExternalId");
     expect(source).toContain("excludedDifferentIdentitySubmissionId");
     expect(source).toContain("exerciseOperatorComparison");
-    expect(source).toContain("captureArtifacts: false");
+    expect(source).not.toContain("captureArtifacts: false");
+    expect(source.match(/captureReportArtifacts\(/g)?.length).toBeGreaterThanOrEqual(3);
+    expect(source).toContain("submittedCampaign.reportStyleLockedAt");
+    expect(source).toContain("assessmentEmailOutbox.count");
+    expect(source).toContain("assessmentEmailDeliveryIntent.count");
+    expect(source).toContain("nonCeoProtectedReportPath");
   });
 
-  it("reuses its deterministic published fixture version on reprovision", () => {
+  it("reuses a deterministic published fixture version without colliding with the pre-fix payload hash", () => {
+    const fixture = plan();
+    const first = fixtureVersionIdentity(fixture.key);
+    const second = fixtureVersionIdentity(fixture.key);
+    const legacyHash = createHash("sha256").update(fixture.key).digest("hex");
+
+    expect(first.schemaVersion).toBeGreaterThan(1);
+    expect(first.hash).not.toBe(legacyHash);
+    expect(second).toEqual(first);
+
     const source = readFileSync(
       join(process.cwd(), "scripts/provision-report-comparison-e2e.mjs"),
       "utf8",

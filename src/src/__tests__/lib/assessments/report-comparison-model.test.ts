@@ -141,7 +141,7 @@ describe("buildReportComparisonModel", () => {
     expect(model.questions["non-finite-scale"]).toEqual({ current: 8, previous: null, delta: null, status: "unmatched" });
     expect(model.questions["missing-baseline"]).toEqual({ current: 8, previous: null, delta: null, status: "unmatched" });
     expect(model.questions.removed).toEqual({ current: null, previous: 5, delta: null, status: "unmatched" });
-    expect(model.questions["non-finite"]).toEqual({ current: null, previous: 5, delta: null, status: "unmatched" });
+    expect(model.questions["non-finite"]).toEqual({ current: null, previous: null, delta: null, status: "unmatched" });
   });
 
   it("reports coverage for current, matched, unmatched-current, and baseline-only questions", () => {

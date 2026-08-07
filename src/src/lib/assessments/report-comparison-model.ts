@@ -144,9 +144,13 @@ export function buildReportComparisonModel({ focus, baseline }: ReportComparison
     if (!Object.hasOwn(currentQuestions, key)) {
       return { current, previous, delta: null, status: "unmatched" };
     }
-    return questionCompatible(focus.questionMetaByKey[key], baseline.questionMetaByKey[key])
-      ? comparable(current, previous)
-      : { current, previous: null, delta: null, status: "unmatched" };
+    if (!questionCompatible(focus.questionMetaByKey[key], baseline.questionMetaByKey[key])) {
+      return { current, previous: null, delta: null, status: "unmatched" };
+    }
+    const value = comparable(current, previous);
+    return value.status === "comparable"
+      ? value
+      : { ...value, previous: null };
   });
   const matchedQuestionCount = Object.entries(questions).filter(
     ([key, value]) => Object.hasOwn(currentQuestions, key) && value.status === "comparable",

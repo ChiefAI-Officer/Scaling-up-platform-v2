@@ -8,6 +8,7 @@ import {
   type CeoReportSessionPayload,
 } from "@/lib/assessments/ceo-report-access-cookie";
 import { verifyCeoReportAccessToken } from "@/lib/assessments/ceo-report-access-token";
+import { isReportComparisonRolloutActive } from "@/lib/assessments/wave-report-comparison-flags";
 import { RateLimits, withRateLimitStrict } from "@/lib/rate-limit";
 
 const exchangeRequest = z.object({ token: z.string().min(1).max(4096) });
@@ -33,6 +34,8 @@ function reportHref(payload: CeoReportSessionPayload): string {
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
+  if (!isReportComparisonRolloutActive()) return unavailable();
+
   let rateLimit: Awaited<ReturnType<typeof withRateLimitStrict>>;
   try {
     rateLimit = await withRateLimitStrict(request, RateLimits.standard);

@@ -19,6 +19,7 @@ const mockSession = { save: jest.fn() };
 const mockGetSession = jest.fn();
 const mockAudit = jest.fn();
 const mockWithRateLimitStrict = jest.fn();
+const mockRolloutActive = jest.fn();
 
 jest.mock("@/lib/assessments/ceo-report-access-token", () => ({
   verifyCeoReportAccessToken: (...args: unknown[]) => mockVerify(...args),
@@ -35,6 +36,9 @@ jest.mock("@/lib/audit", () => ({
 jest.mock("@/lib/rate-limit", () => ({
   RateLimits: { standard: { interval: 60_000, maxRequests: 100 } },
   withRateLimitStrict: (...args: unknown[]) => mockWithRateLimitStrict(...args),
+}));
+jest.mock("@/lib/assessments/wave-report-comparison-flags", () => ({
+  isReportComparisonRolloutActive: () => mockRolloutActive(),
 }));
 jest.mock("@/lib/db", () => ({ db: { marker: "db" } }));
 
@@ -82,6 +86,7 @@ beforeEach(() => {
   mockGetSession.mockResolvedValue(mockSession);
   mockAudit.mockResolvedValue(undefined);
   mockSession.save.mockResolvedValue(undefined);
+  mockRolloutActive.mockReturnValue(true);
   mockWithRateLimitStrict.mockResolvedValue({
     allowed: true,
     headers: {
@@ -93,6 +98,19 @@ beforeEach(() => {
 });
 
 describe("CEO report access exchange", () => {
+  it("short-circuits globally inactive or killed rollout before rate limiting, token parsing, or database authorization", async () => {
+    mockRolloutActive.mockReturnValue(false);
+
+    const response = await POST(request(JSON.stringify({ token: rawToken })));
+
+    await expectUnavailable(response);
+    expect(mockWithRateLimitStrict).not.toHaveBeenCalled();
+    expect(mockVerify).not.toHaveBeenCalled();
+    expect(mockAuthorize).not.toHaveBeenCalled();
+    expect(mockGetSession).not.toHaveBeenCalled();
+    expect(mockAudit).not.toHaveBeenCalled();
+  });
+
   it("applies the standard rate limit before parsing the capability request", async () => {
     const malformedRequest = request("not json");
 

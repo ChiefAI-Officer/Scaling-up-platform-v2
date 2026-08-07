@@ -124,12 +124,10 @@ async function exerciseOperatorComparison({
   reportPage,
   style,
   testInfo,
-  captureArtifacts,
 }: {
   reportPage: Page;
   style: FixtureStyle;
   testInfo: TestInfo;
-  captureArtifacts: boolean;
 }) {
   await expect(reportPage.getByTestId(expectedRenderer(style))).toBeVisible();
   const picker = reportPage.getByLabel("Compare to previous assessment");
@@ -168,37 +166,45 @@ async function exerciseOperatorComparison({
     reportPage.getByTestId("report-comparison-cover-subtitle"),
   ).toContainText("Imported");
 
-  if (captureArtifacts) {
-    await reportPage.setViewportSize({ width: 1440, height: 1000 });
-    await reportPage.screenshot({
-      path: testInfo.outputPath(`${style.style}-1440.png`),
-      fullPage: true,
-    });
-    await reportPage.setViewportSize({ width: 390, height: 844 });
-    await reportPage.screenshot({
-      path: testInfo.outputPath(`${style.style}-390.png`),
-      fullPage: true,
-    });
-    await reportPage.emulateMedia({ media: "print" });
-    await expect(reportPage.getByLabel("Report comparison")).toBeHidden();
-    await expect(
-      reportPage.getByTestId("report-comparison-content"),
-    ).toBeVisible();
-    const pdf = await reportPage.pdf({
-      path: testInfo.outputPath(`${style.style}.pdf`),
-      format: "Letter",
-      printBackground: true,
-    });
-    expect(pdf.subarray(0, 4).toString()).toBe("%PDF");
-    expect(pdf.length).toBeGreaterThan(1_000);
-    await reportPage.emulateMedia({ media: "screen" });
-  }
+  await captureReportArtifacts(reportPage, style, testInfo, "operator");
 
   await reportPage.getByRole("button", { name: "Remove comparison" }).click();
   await expect(reportPage).not.toHaveURL(/compareTo=/);
   await expect(
     reportPage.getByTestId("report-comparison-content"),
   ).toHaveCount(0);
+}
+
+async function captureReportArtifacts(
+  reportPage: Page,
+  style: FixtureStyle,
+  testInfo: TestInfo,
+  viewer: "operator" | "ceo",
+) {
+  const artifactPrefix = `${viewer}-${style.style}`;
+  await reportPage.setViewportSize({ width: 1440, height: 1000 });
+  await reportPage.screenshot({
+    path: testInfo.outputPath(`${artifactPrefix}-1440.png`),
+    fullPage: true,
+  });
+  await reportPage.setViewportSize({ width: 390, height: 844 });
+  await reportPage.screenshot({
+    path: testInfo.outputPath(`${artifactPrefix}-390.png`),
+    fullPage: true,
+  });
+  await reportPage.emulateMedia({ media: "print" });
+  await expect(reportPage.getByLabel("Report comparison")).toBeHidden();
+  await expect(
+    reportPage.getByTestId("report-comparison-content"),
+  ).toBeVisible();
+  const pdf = await reportPage.pdf({
+    path: testInfo.outputPath(`${artifactPrefix}.pdf`),
+    format: "Letter",
+    printBackground: true,
+  });
+  expect(pdf.subarray(0, 4).toString()).toBe("%PDF");
+  expect(pdf.length).toBeGreaterThan(1_000);
+  await reportPage.emulateMedia({ media: "screen" });
 }
 
 test.describe("Report comparison — sentinel-provisioned acceptance", () => {
@@ -488,12 +494,11 @@ test.describe("Report comparison — sentinel-provisioned acceptance", () => {
             `/portal/assessments/${style.currentCampaignId}`,
             style.currentRespondentId,
           );
-          await exerciseOperatorComparison({
-            reportPage,
-            style,
-            testInfo,
-            captureArtifacts: true,
-          });
+              await exerciseOperatorComparison({
+                reportPage,
+                style,
+                testInfo,
+              });
           await reportPage.close();
         }
 
@@ -510,12 +515,11 @@ test.describe("Report comparison — sentinel-provisioned acceptance", () => {
             `/admin/assessments/campaigns/${style.currentCampaignId}`,
             style.currentRespondentId,
           );
-          await exerciseOperatorComparison({
-            reportPage: adminReport,
-            style,
-            testInfo,
-            captureArtifacts: false,
-          });
+              await exerciseOperatorComparison({
+                reportPage: adminReport,
+                style,
+                testInfo,
+              });
           await adminReport.close();
         }
       },
@@ -528,7 +532,7 @@ test.describe("Report comparison — sentinel-provisioned acceptance", () => {
 
   test("submits real CEO/non-CEO invitations, exposes only the CEO clean comparison link, denies lateral access, and revokes facts independently", async ({
     browser,
-  }) => {
+  }, testInfo) => {
     test.skip(
       test.info().project.name !== "chromium",
       "Run the fixture workflow once through Chromium.",
@@ -630,6 +634,19 @@ test.describe("Report comparison — sentinel-provisioned acceptance", () => {
         await expect(
           ceoPage.getByTestId("report-comparison-cover-subtitle"),
         ).toContainText("Imported");
+        await captureReportArtifacts(
+          ceoPage,
+          fixture.style,
+          testInfo,
+          "ceo",
+        );
+
+        const submittedCampaign =
+          await database.assessmentCampaign.findUniqueOrThrow({
+            where: { id: fixture.style.currentCampaignId },
+            select: { reportStyleLockedAt: true },
+          });
+        expect(submittedCampaign.reportStyleLockedAt).not.toBeNull();
 
         const nonCeoPage = await nonCeoContext.newPage();
         await completeInvitedSurvey(
@@ -642,6 +659,36 @@ test.describe("Report comparison — sentinel-provisioned acceptance", () => {
             name: "Compare with a previous assessment",
           }),
         ).toHaveCount(0);
+        const nonCeoProtectedReportPath = reportPath(
+          fixture.style,
+          fixture.nonCeoRespondentId,
+        );
+        await expectDenied(nonCeoPage, nonCeoProtectedReportPath);
+
+        const actualSubmissions =
+          await database.assessmentSubmission.findMany({
+            where: {
+              invitationId: {
+                in: [
+                  fixture.ceoInvitationId,
+                  fixture.nonCeoInvitationId,
+                ],
+              },
+            },
+            select: { id: true },
+          });
+        expect(actualSubmissions).toHaveLength(2);
+        const actualSubmissionIds = actualSubmissions.map(({ id }) => id);
+        const [outboxCount, deliveryIntentCount] = await Promise.all([
+          database.assessmentEmailOutbox.count({
+            where: { submissionId: { in: actualSubmissionIds } },
+          }),
+          database.assessmentEmailDeliveryIntent.count({
+            where: { submissionId: { in: actualSubmissionIds } },
+          }),
+        ]);
+        expect(outboxCount).toBe(0);
+        expect(deliveryIntentCount).toBe(0);
 
         for (const denied of [
           reportPath(fixture.style, fixture.nonCeoRespondentId),
