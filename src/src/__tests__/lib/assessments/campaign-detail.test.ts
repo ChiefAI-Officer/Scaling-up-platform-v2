@@ -160,6 +160,33 @@ describe("getCampaignOverview", () => {
     );
   });
 
+  it("projects stored respondent-results and coach-notification settings", async () => {
+    const { campaign } = await getCampaignOverview(
+      buildDb({
+        campaign: {
+          ...baseCampaign(),
+          sendResultsToRespondent: true,
+          notifyCoachOnCompletion: true,
+        },
+      }),
+      "c1",
+    );
+
+    expect(campaign).toMatchObject({
+      sendResultsToRespondent: true,
+      notifyCoachOnCompletion: true,
+    });
+  });
+
+  it("normalizes absent legacy email settings to false", async () => {
+    const { campaign } = await getCampaignOverview(buildDb({}), "c1");
+
+    expect(campaign).toMatchObject({
+      sendResultsToRespondent: false,
+      notifyCoachOnCompletion: false,
+    });
+  });
+
   it("all PENDING — invited/viewed/submitted = 0", async () => {
     const db = buildDb({
       participants: [

@@ -53,9 +53,17 @@ jest.mock("@/lib/assessments/longitudinal-eligibility", () => ({
     mockHasComparableLongitudinal(...a),
 }));
 
+const mockResultsEmailFlag = jest.fn(() => true);
+const mockCoachNotifyFlag = jest.fn(() => true);
 jest.mock("@/lib/assessments/wave-d-feature-flags", () => ({
   waveDCustomHtmlEmailEnabled: () => false,
+  waveDResultsEmailEnabled: () => mockResultsEmailFlag(),
+  waveDCoachNotifyEnabled: () => mockCoachNotifyFlag(),
   assessmentInviteBrandedCustomHtmlEnabled: jest.fn(() => true),
+}));
+const mockIsResultsEmailApproved = jest.fn(() => true);
+jest.mock("@/lib/assessments/results-email-approval", () => ({
+  isResultsEmailApproved: (...a: unknown[]) => mockIsResultsEmailApproved(...a),
 }));
 
 const mockReportComparisonEnabled = jest.fn();
@@ -77,21 +85,10 @@ jest.mock("@/lib/db", () => ({
 }));
 
 // Capture the props handed to CampaignDetail.
-const captured: {
-  canViewGroupReport?: boolean;
-  canEditReportAppearance?: boolean;
-  legacyOverTimeRespondentIds?: string[];
-} = {};
+let captured: Record<string, unknown> = {};
 jest.mock("@/components/assessments/CampaignDetail", () => ({
-  CampaignDetail: (props: {
-    canViewGroupReport?: boolean;
-    canEditReportAppearance?: boolean;
-    legacyOverTimeRespondentIds?: string[];
-  }) => {
-    captured.canViewGroupReport = props.canViewGroupReport;
-    captured.canEditReportAppearance = props.canEditReportAppearance;
-    captured.legacyOverTimeRespondentIds =
-      props.legacyOverTimeRespondentIds;
+  CampaignDetail: (props: Record<string, unknown>) => {
+    captured = props;
     return null;
   },
 }));
@@ -119,16 +116,20 @@ function makeCampaign(overrides: Record<string, unknown> = {}) {
     accessMode: "INVITED",
     createdByCoachId: "coach-1",
     organizationId: "org-1",
-    template: { alias: "scaling-up-full" },
+    template: {
+      alias: "scaling-up-full",
+      resultsEmailContentApproved: true,
+      resultsEmailContentApprovedHash: "approved-hash",
+      resultsEmailSubject: "Your results",
+      resultsEmailBodyMarkdown: "Your report is ready.",
+    },
     version: { publishedAt: new Date("2026-06-01T00:00:00Z") },
     ...overrides,
   };
 }
 
 async function runPage() {
-  captured.canViewGroupReport = undefined;
-  captured.canEditReportAppearance = undefined;
-  captured.legacyOverTimeRespondentIds = undefined;
+  captured = {};
   const node = await Page({ params: Promise.resolve({ id: CAMPAIGN_ID }) });
   // Render the returned tree so the (mocked) CampaignDetail is invoked and
   // captures the canViewGroupReport boolean the page computed.
@@ -197,6 +198,35 @@ describe("CampaignDetail report appearance capability", () => {
     await runPage();
 
     expect(captured.canEditReportAppearance).toBe(false);
+  });
+});
+
+describe("CampaignDetail email capabilities", () => {
+  it("passes server-computed email capabilities without exposing approval inputs", async () => {
+    mockFindFirst.mockResolvedValue(makeCampaign());
+
+    await runPage();
+
+    expect(captured).toMatchObject({
+      resultsEmailEnabled: true,
+      resultsEmailApproved: true,
+      coachNotifyEnabled: true,
+    });
+    expect(mockFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({
+          template: {
+            select: expect.objectContaining({
+              resultsEmailContentApproved: true,
+              resultsEmailContentApprovedHash: true,
+              resultsEmailSubject: true,
+              resultsEmailBodyMarkdown: true,
+            }),
+          },
+        }),
+      }),
+    );
+    expect(captured).not.toHaveProperty("resultsEmailContentApprovedHash");
   });
 });
 

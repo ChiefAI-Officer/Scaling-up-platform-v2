@@ -102,6 +102,10 @@ export interface CampaignOverview {
      * present — keep it that way if this ever becomes an explicit `select`.
      */
     showResultsOnScreen?: boolean;
+    /** Stored campaign-level respondent-results email preference. */
+    sendResultsToRespondent?: boolean;
+    /** Stored campaign-level coach completion notification preference. */
+    notifyCoachOnCompletion?: boolean;
     /**
      * Wave V (V-3) — true when this campaign is a Wave O historical Esperto
      * import (`importManifest != null`). Boolean ONLY (the manifest payload
@@ -255,6 +259,9 @@ interface CampaignWithRels {
    * as off (fail-closed).
    */
   showResultsOnScreen?: boolean;
+  /** Stored email preferences; optional so older fixtures remain valid. */
+  sendResultsToRespondent?: boolean;
+  notifyCoachOnCompletion?: boolean;
   /** Wave V (V-3): Wave O import-round manifest; non-null ⇒ historical import. */
   importManifest?: unknown;
   template: { id: string; name: string; alias: string };
@@ -488,6 +495,8 @@ export async function getCampaignOverview(
       reportStyleLockedAt: campaign.reportStyleLockedAt,
       // Wave OSR (#71) — absent ⇒ off (fail-closed), matching the column default.
       showResultsOnScreen: campaign.showResultsOnScreen === true,
+      sendResultsToRespondent: campaign.sendResultsToRespondent === true,
+      notifyCoachOnCompletion: campaign.notifyCoachOnCompletion === true,
       // Wave V (V-3): boolean only — the manifest payload stays server-side.
       isImported: campaign.importManifest != null,
       // Wave EV — null ⇒ nothing rendered (unpublished pin, or lookup degraded).
