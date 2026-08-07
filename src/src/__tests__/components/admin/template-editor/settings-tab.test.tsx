@@ -166,6 +166,12 @@ describe("SettingsTab — C-2 copy (verbatim)", () => {
     expect(
       within(card).getByRole("button", { name: "{{respondentFirstName}}" }),
     ).toBeInTheDocument();
+    fireEvent.click(
+      within(card).getByRole("button", { name: "{{respondentFirstName}}" }),
+    );
+    expect(within(card).getByLabelText("Message")).toHaveValue(
+      "Here are your results{{respondentFirstName}}",
+    );
     expect(within(card).queryByText("{{templateName}}")).not.toBeInTheDocument();
     expect(within(card).queryByText("{{tierLabel}}")).not.toBeInTheDocument();
     expect(within(card).queryByText("{{tierMessage}}")).not.toBeInTheDocument();
