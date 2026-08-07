@@ -267,6 +267,11 @@ No spaced alias or additional token is introduced.
 
 The invited respondent's `firstName` is required by the current respondent model, so this contract adds no fallback word.
 
+Because the first name becomes a rendered #15 email input, it participates in
+the route's existing Phase-1/Phase-2 render-input fingerprint. A concurrent
+first-name change therefore drops the stale prepared email row instead of
+persisting recipient copy rendered from an unlocked value.
+
 ### 10.2 Subject safety
 
 Before insertion into the plain-text subject, control characters are removed from the respondent first name. This follows the repository's existing email-subject safety pattern and prevents header injection.

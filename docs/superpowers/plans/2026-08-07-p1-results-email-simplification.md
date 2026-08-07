@@ -24,6 +24,7 @@
 - Enabling `sendResultsToRespondent` requires `waveDResultsEmailEnabled()` and current `isResultsEmailApproved(template)` truth.
 - `notifyCoachOnCompletion` remains independently gated by `waveDCoachNotifyEnabled()`.
 - Do not relax or restructure submit-time locked authorization, outbox creation, delivery-intent reauthorization, or report rendering.
+- Preserve the merged report-comparison MVP's CEO self-access CTA, URL validation, and locked authorization exactly; first-name personalization composes with that path and does not replace or bypass it.
 - CLOSED campaigns remain read-only.
 - Keep active Settings and ED10 flag-off Metadata behavior aligned.
 - Before any push, update `CLAUDE.md` and `plans/CHANGELOG.md`, run targeted tests, changed-file ESLint, migration safety, and `CI=true npx next build --turbopack`.
@@ -60,7 +61,9 @@ No production file is created. Existing responsibilities remain in place:
 - Changes: `renderResultsEmailBodyHtml(markdown: string, respondentFirstName: string): string`
 - Changes: `BuildResultsEmailArgs` gains required `respondentFirstName: string`
 - Consumes: the existing invited respondent `{ email, firstName, lastName }`
-- Preserves: `buildResultsEmailHtml(args): string` remains the body-plus-report builder
+- Extends: the existing Phase-1/Phase-2 #15 render-input fingerprint with the respondent first name
+- Preserves: `buildResultsEmailHtml(args): string` remains the body-plus-report-plus-optional-CEO-CTA builder
+- Preserves: existing `ceoSelfAccessUrl?: string | null`, safe URL validation, CTA markup, and locked Phase-2 authorization from PR #314
 
 - [ ] **Step 1: Add failing renderer tests for the exact token**
 
@@ -171,20 +174,28 @@ export interface BuildResultsEmailArgs {
   bodyMarkdown: string;
   reportHtml: string;
   respondentFirstName: string;
+  ceoSelfAccessUrl?: string | null;
 }
 
 export function buildResultsEmailHtml({
   bodyMarkdown,
   reportHtml,
   respondentFirstName,
+  ceoSelfAccessUrl,
 }: BuildResultsEmailArgs): string {
   const intro = renderResultsEmailBodyHtml(
     bodyMarkdown,
     respondentFirstName,
   );
-  // Preserve the existing introBlock and return expression unchanged.
+  // Preserve the existing introBlock, safeCeoSelfAccessHref call,
+  // ceoSelfAccessCta construction, and return expression unchanged.
 }
 ```
+
+Add `respondentFirstName: "Jane"` to every existing builder test, including
+the PR #314 CEO self-access CTA and URL-rejection cases. Those existing tests
+must remain green and must continue proving the CTA appears after the report
+only for a safe, authorized URL.
 
 - [ ] **Step 4: Wire the authoritative invited respondent into submit rendering**
 
@@ -195,6 +206,7 @@ bodyHtml: buildResultsEmailHtml({
   bodyMarkdown: template.resultsEmailBodyMarkdown ?? "",
   reportHtml,
   respondentFirstName: respondent.firstName,
+  ceoSelfAccessUrl,
 }),
 ```
 
@@ -207,9 +219,32 @@ subject: renderResultsEmailSubject(
 ),
 ```
 
-Do not change the branch's flags, approval check, report requirement, catch block, provenance, or delivery-intent logic.
+Do not change the branch's flags, approval check, report requirement, catch block, provenance, CEO capability metadata/authorization, or delivery-intent logic.
 
-- [ ] **Step 5: Add one submit-route integration assertion**
+- [ ] **Step 5: Extend the existing locked stale-render check with first name**
+
+Add one argument to the existing fingerprint helper rather than introducing a
+new guard:
+
+Keep the helper's existing inline `campaign` parameter type byte-for-byte and
+add `respondentFirstName: string | null` as its second parameter. Insert that
+value into only the existing `results` array, immediately after
+`campaign.version.id` and before `chrome`; preserve the `coach` and `onScreen`
+arrays unchanged.
+
+Pass `invitation.respondent?.firstName ?? null` in Phase 1. Extend the existing
+locked respondent projection from `{ email: true }` to
+`{ email: true, firstName: true }`, then pass
+`locked.respondent?.firstName ?? null` in Phase 2. Do not add another query,
+lock, hash helper, or transaction.
+
+In the existing C-M2 stale-input describe block, add a case where Phase 1 sees
+`firstName: "Resp"` and the locked respondent sees `firstName: "Renamed"`.
+Assert the submission still returns `200`, the respondent results row/intent is
+dropped, and the coach row remains unaffected. Keep existing locked fixtures'
+respondent first names aligned where their #15 row is expected to survive.
+
+- [ ] **Step 6: Add one submit-route integration assertion**
 
 In the existing `#15 RESPONDENT row` test, set the returned happy invitation's template copy before submitting:
 
@@ -227,7 +262,7 @@ expect(row!.bodyHtml).toContain("Hi Resp, your results are ready.");
 
 Keep the approval helper mocked true in this route suite; hash correctness remains covered by `results-email-approval.test.ts`.
 
-- [ ] **Step 6: Run the focused email suites**
+- [ ] **Step 7: Run the focused email suites**
 
 Run:
 
@@ -242,7 +277,7 @@ npx jest \
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit the renderer slice**
+- [ ] **Step 8: Commit the renderer slice**
 
 ```bash
 git add \
