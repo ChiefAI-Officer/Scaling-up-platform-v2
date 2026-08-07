@@ -37,8 +37,12 @@ import { isOnScreenResultsEnabled } from "@/lib/assessments/wave-osr-flags";
 import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
 import { deriveReportStylePreviewCapabilities } from "@/lib/assessments/report-style-registry";
 import {
-  hasComparableLongitudinal,
+  REPORT_COMPARISON_ALIAS,
+  isReportComparisonEnabled,
+} from "@/lib/assessments/wave-report-comparison-flags";
+import {
   asLongitudinalEligibilityDb,
+  hasComparableLongitudinal,
 } from "@/lib/assessments/longitudinal-eligibility";
 import type { CustomSlide } from "@/lib/assessments/custom-slides";
 import type { CustomSlidesPanelSection } from "@/components/assessments/CustomSlidesPanel";
@@ -159,51 +163,36 @@ export default async function CampaignDetailPage({ params }: PageProps) {
       hasCurrentWriteAccess,
     });
 
-  // Wave N (#23) — per-row "over time" eligibility. Each submitted respondent
-  // gets a longitudinal entry link ONLY when `hasComparableLongitudinal` is
-  // true (flag on, scored template, current template access, ≥2 scored
-  // submissions for that person on this template). Computed SERVER-side here;
-  // the client receives ONLY the eligible id set + the templateId/org for the
-  // URL, and never recomputes auth. The flag short-circuits cheaply (no DB)
-  // when off, so the common dark state costs nothing.
-  //
-  // N+1 NOTE (accepted for v1 per the 18mn plan item 14): when the flag is ON
-  // this issues up to 2 reads per SUBMITTED respondent (an org-bind findFirst +
-  // a count, plus one findMany when an email is present). v1 rosters are small;
-  // a batched eligibility query is the documented follow-up if rosters grow.
-  // Only rows that have a submission in THIS campaign are evaluated — a person
-  // with no submission here would resolve false anyway, so we skip the work.
-  const longitudinalEligibilityDb = asLongitudinalEligibilityDb(db);
-  const longitudinalRespondentIds: string[] = [];
-  for (const row of respondents) {
-    if (!row.hasSubmission) continue;
-    // hasComparableLongitudinal documents a "never throws → no link" contract,
-    // but guard the call site anyway: a throw here would otherwise kill the whole
-    // Server Component render (→ 500). On any throw, treat the row as ineligible.
-    let eligible = false;
-    try {
-      eligible = await hasComparableLongitudinal(
-        longitudinalEligibilityDb,
-        actor,
-        {
-          organizationId: overview.campaign.organizationId,
-          respondentId: row.respondent.id,
-          // overview.campaign.alias is the CAMPAIGN slug, not the template alias.
-          // Use the template alias selected on campaignForFlag so the scored-only
-          // scope gate evaluates correctly (a wrong alias → unknown → default
-          // "scored", letting qualitative templates wrongly hit the DB path).
-          templateId: overview.campaign.templateId,
-          templateAlias: campaignForFlag?.template?.alias,
-        },
-      );
-    } catch (err) {
-      // No PII — just the campaign + respondent ids for context.
-      console.error(
-        `[campaign-detail] longitudinal eligibility check failed (campaign=${id}, respondent=${row.respondent.id}):`,
-        err,
-      );
+  const reportNativeComparisonEnabled =
+    campaignForFlag?.template?.alias === REPORT_COMPARISON_ALIAS &&
+    isReportComparisonEnabled({
+      organizationId: overview.campaign.organizationId,
+      templateId: overview.campaign.templateId,
+    });
+  const legacyOverTimeRespondentIds: string[] = [];
+  if (!reportNativeComparisonEnabled) {
+    const eligibilityDb = asLongitudinalEligibilityDb(db);
+    for (const row of respondents) {
+      if (!row.hasSubmission) continue;
+      try {
+        const eligible = await hasComparableLongitudinal(
+          eligibilityDb,
+          actor,
+          {
+            organizationId: overview.campaign.organizationId,
+            respondentId: row.respondent.id,
+            templateId: overview.campaign.templateId,
+            templateAlias: campaignForFlag?.template?.alias,
+          },
+        );
+        if (eligible) legacyOverTimeRespondentIds.push(row.respondent.id);
+      } catch (error) {
+        console.error(
+          `[campaign-detail] longitudinal eligibility check failed (campaign=${id}, respondent=${row.respondent.id}):`,
+          error,
+        );
+      }
     }
-    if (eligible) longitudinalRespondentIds.push(row.respondent.id);
   }
 
   return (
@@ -227,7 +216,7 @@ export default async function CampaignDetailPage({ params }: PageProps) {
         questions: campaignForFlag?.version?.questions ?? [],
       })}
       canEditReportAppearance={canEditReportAppearance}
-      longitudinalRespondentIds={longitudinalRespondentIds}
+      legacyOverTimeRespondentIds={legacyOverTimeRespondentIds}
     />
   );
 }

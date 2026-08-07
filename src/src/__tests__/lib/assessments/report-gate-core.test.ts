@@ -174,6 +174,20 @@ describe("viewReport core protocol", () => {
     expect(events((deps as { emitMetric: jest.Mock }).emitMetric)).not.toContain("view");
   });
 
+  it("uses an explicit capability audit actor instead of the anonymous fallback", async () => {
+    const deps = makeDeps();
+    await viewReport(
+      deps,
+      makeOpts({ actor: null, noActorPolicy: "tolerate", auditActor: "CEO_SELF" }),
+    );
+
+    expect(
+      (deps as { auditSink: { create: jest.Mock } }).auditSink.create,
+    ).toHaveBeenCalledWith({
+      data: expect.objectContaining({ performedBy: "CEO_SELF" }),
+    });
+  });
+
   // Task 6 — passthrough (empty / notApplicable) NOT 404'd, returned by reference
   it("passthrough → returns outcome by reference; no notFound, no audit, no metric", async () => {
     for (const o of [{ kind: "empty", provenance: {} }, { kind: "notApplicable" }]) {

@@ -182,6 +182,14 @@ The coach-facing view that charts an **Organization**'s *aggregate* results for 
 The coach-facing view that tracks **one Respondent**'s results across the successive **Campaigns** they completed for the same scored **Template** — overall score, per-section deltas, and tier movement over time. It is the single-person counterpart to the **Cohort trend**. **Scored templates only** (LVA / QSP have no trendable metric — ADR-0016); deltas are computed only between submissions on the same **Template Version** (cross-version values are shown, but not deltaed). Authorized exactly like the Cohort trend (`canAccessOrganization`).
 _Avoid_: conflating it with the **Cohort trend** (aggregate, everyone at once) or the per-campaign **Aggregate report** (one campaign's whole cohort side by side) — this is *one person across campaigns*.
 
+**Report-native comparison**:
+The comparison embedded inside one canonical **Results report**. It keeps the selected current Scaling Up Full submission as the report and adds Current / Previous / Change facts from one eligible earlier frozen submission for the same person, Organization, and Template. Native and historical imported submissions share this path; imported provenance stays visible on screen and in print. A changed question type or slider bounds makes that question non-comparable, so Previous and Change are both shown as dashes. Coach/admin access continues through the normal report gate; an eligible CEO may reach only their own exact report through **CEO self-access**. The older **Per-respondent longitudinal comparison** route remains a rollback entry while this capability is dark and is suppressed on campaign detail only when report-native comparison is enabled.
+_Avoid_: “group comparison” (that is the one-campaign Aggregate report), “trend report” (the older multi-point longitudinal view), or treating an imported baseline as less authoritative than a native frozen submission.
+
+**CEO self-access**:
+A narrow capability path that lets the invited CEO who just submitted an eligible Scaling Up Full assessment open only their own canonical **Results report** and choose their own eligible earlier submissions. The raw signed bearer is carried in a fragment, exchanged immediately for an HTTP-only sealed session scoped to the exact report path, and never kept in rendered state or browser storage. Every report/comparison read revalidates the live invitation, submission binding, Organization, Campaign, Respondent, disclosure setting, CEO designation, expiry, and rollout gate. Capability audits use the stable actor `CEO_SELF`.
+_Avoid_: calling it an account login, emailing/storing the raw bearer as report state, widening it to group/portal/admin routes, or assuming a sealed session survives a live revocation.
+
 ### Viewing reports
 
 **Report access gate**:
@@ -205,7 +213,8 @@ _Avoid_: "delete admin" implying a hard row delete (FKs forbid it); assuming a k
 - A **Respondent**'s progress in a campaign is an **Invitation status band**; their answers, once submitted, may produce a **Scoring tier** result.
 - A **Results report email** carries the complete **Results report** inline to an invited respondent, public taker, or verified referring coach.
 - A **Results report** (per-respondent) and an **Aggregate report** (cohort) are both viewed through the **Report access gate**, which wraps each one's **loader**.
-- A **Cohort trend** aggregates one scored **Template**'s results across an **Organization**'s **Campaigns** over time; a **Per-respondent longitudinal comparison** does the same for a single **Respondent** (scored templates only — ADR-0016).
+- A **Cohort trend** aggregates one scored **Template**'s results across an **Organization**'s **Campaigns** over time; a **Per-respondent longitudinal comparison** does the same for a single **Respondent** (scored templates only — ADR-0016), while a **Report-native comparison** places one selected earlier submission directly inside the canonical Results report.
+- **CEO self-access** exchanges one raw fragment bearer for one exact-path sealed session and never grants portal, admin, aggregate, or another respondent's report access.
 - A **Campaign** may carry coach-authored **Custom slides** that its **Section pager** weaves in as non-question pages.
 
 ## Example dialogue

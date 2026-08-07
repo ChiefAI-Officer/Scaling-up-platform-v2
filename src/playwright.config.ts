@@ -3,8 +3,8 @@ import { defineConfig, devices } from "@playwright/test";
 // Kept in a plain Node module so its fail-closed behavior can be unit-tested
 // without importing Playwright's browser runtime into Jest.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { createReportStyleWebServer } = require("./scripts/report-style-e2e-server-contract.cjs") as {
-  createReportStyleWebServer: (env: NodeJS.ProcessEnv) => ReturnType<typeof defineConfig>["webServer"];
+const { createAssessmentReportE2eWebServer } = require("./scripts/report-style-e2e-server-contract.cjs") as {
+  createAssessmentReportE2eWebServer: (env: NodeJS.ProcessEnv) => ReturnType<typeof defineConfig>["webServer"];
 };
 
 /**
@@ -67,5 +67,5 @@ export default defineConfig({
   ],
 
   /* Build and run a production server only after the disposable DB guard. */
-  webServer: createReportStyleWebServer(process.env),
+  webServer: createAssessmentReportE2eWebServer(process.env),
 });

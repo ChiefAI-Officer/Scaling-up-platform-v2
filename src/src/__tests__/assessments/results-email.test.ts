@@ -65,6 +65,71 @@ describe("buildResultsEmailHtml", () => {
     });
     expect(out).toContain("REPORT");
   });
+
+  it("adds one escaped CEO self-access CTA after the report", () => {
+    const out = buildResultsEmailHtml({
+      bodyMarkdown: "Your results are ready.",
+      reportHtml: "<table>REPORT</table>",
+      ceoSelfAccessUrl: "https://app.example.com/ceo-report-access#t=token&next=report",
+    });
+
+    expect(out).toContain("<table>REPORT</table>");
+    expect(out).toContain("View and compare your reports");
+    expect(out).toContain(
+      'href="https://app.example.com/ceo-report-access#t=token&amp;next=report"',
+    );
+    expect((out.match(/View and compare your reports/g) ?? [])).toHaveLength(1);
+    expect(out.indexOf("REPORT")).toBeLessThan(
+      out.indexOf("View and compare your reports"),
+    );
+  });
+
+  it("keeps the existing HTML byte-compatible when CEO self-access is absent", () => {
+    const withoutOption = buildResultsEmailHtml({
+      bodyMarkdown: "Your results are ready.",
+      reportHtml: "<table>REPORT</table>",
+    });
+    const nullOption = buildResultsEmailHtml({
+      bodyMarkdown: "Your results are ready.",
+      reportHtml: "<table>REPORT</table>",
+      ceoSelfAccessUrl: null,
+    });
+
+    expect(nullOption).toBe(withoutOption);
+  });
+
+  it.each([
+    "javascript:alert(1)",
+    "//tracker.example/ceo-report-access",
+    "mailto:ceo@example.com",
+    "data:text/html,unsafe",
+    "/ceo-report-access#t=token",
+    "https://ceo:secret@app.example.com/ceo-report-access#t=token",
+  ])("rejects an unsafe CEO self-access URL: %s", (ceoSelfAccessUrl) => {
+    const out = buildResultsEmailHtml({
+      bodyMarkdown: "",
+      reportHtml: "<table>REPORT</table>",
+      ceoSelfAccessUrl,
+    });
+
+    expect(out).toBe("<table>REPORT</table>");
+  });
+
+  it("accepts HTTP only for a local self-access origin", () => {
+    const local = buildResultsEmailHtml({
+      bodyMarkdown: "",
+      reportHtml: "<table>REPORT</table>",
+      ceoSelfAccessUrl: "http://localhost:3000/ceo-report-access#t=token",
+    });
+    const remote = buildResultsEmailHtml({
+      bodyMarkdown: "",
+      reportHtml: "<table>REPORT</table>",
+      ceoSelfAccessUrl: "http://app.example.com/ceo-report-access#t=token",
+    });
+
+    expect(local).toContain("View and compare your reports");
+    expect(remote).toBe("<table>REPORT</table>");
+  });
 });
 
 describe("buildCoachNotifyEmail", () => {

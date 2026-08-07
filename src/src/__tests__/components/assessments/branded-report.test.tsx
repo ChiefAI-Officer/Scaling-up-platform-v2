@@ -13,6 +13,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { BrandedReport } from "@/components/assessments/BrandedReport";
 import type { RespondentReport } from "@/lib/assessments/respondent-report";
 import type { ScoreResult } from "@/lib/assessments/scoring";
+import type { ReportComparisonModel } from "@/lib/assessments/report-comparison-model";
 
 // ── Fixture builders ───────────────────────────────────────────────────────
 
@@ -301,6 +302,40 @@ function suFullReport(): RespondentReport {
 // ════════════════════════════════════════════════════════════════════════════
 
 describe("BrandedReport — cover", () => {
+  it("adds comparison facts to Classic only when a server-authorized model is supplied", () => {
+    const comparison: ReportComparisonModel = {
+      baseline: {
+        submissionId: "previous-submission",
+        campaignId: "previous-campaign",
+        campaignLabel: "Q1 2025",
+        submittedAt: new Date("2025-03-31T12:00:00.000Z"),
+        versionId: "version-1",
+        versionNumber: 1,
+        isImported: false,
+      },
+      sameVersion: true,
+      overall: { current: 72, previous: 64, delta: 8, status: "comparable" },
+      domains: { people: { current: 7, previous: 6, delta: 1, status: "comparable" } },
+      sections: { s_people: { current: 7, previous: 6, delta: 1, status: "comparable" } },
+      questions: { q1: { current: 7, previous: 5, delta: 2, status: "comparable" } },
+      coverage: {
+        currentQuestionCount: 1,
+        matchedQuestionCount: 1,
+        unmatchedCurrentCount: 0,
+        baselineOnlyCount: 0,
+      },
+    };
+
+    const { container } = render(<BrandedReport report={suFullReport()} comparison={comparison} />);
+    const comparisonContent = screen.getByTestId("report-comparison-content");
+
+    expect(within(screen.getByTestId("report-cover")).getByText("Compared with Q1 2025 · submitted Mar 31, 2025")).toBeInTheDocument();
+    expect(comparisonContent).toHaveTextContent("ScaleUp score");
+    expect(comparisonContent).toHaveTextContent("Weekly strategic thinking meeting");
+    expect(comparisonContent.compareDocumentPosition(screen.getByTestId("report-sections")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(container.querySelector(".su-report-comparison-controls")).not.toBeInTheDocument();
+  });
+
   it("keeps the representative Scaling Up Full Classic DOM unchanged when styles are unavailable", () => {
     expect(
       renderToStaticMarkup(

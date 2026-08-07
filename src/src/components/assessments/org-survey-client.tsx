@@ -64,6 +64,7 @@ import {
   clearOnScreenResult,
   reviveOnScreenReport,
 } from "@/lib/assessments/onscreen-result-store";
+import { exchangeCeoReportAccessUrl } from "@/lib/assessments/ceo-report-access-client";
 
 // Wave OSR (#71) — the in-place report needs the report stylesheets. This route
 // group has no (report) layout to supply them, so the client imports them the
@@ -146,7 +147,14 @@ type Phase =
    * submit whose response carried a report, or rehydrated from sessionStorage on
    * a refresh (spec 19an §4).
    */
-  | { kind: "results"; report: RespondentReport; reportStylesAvailable?: boolean; reportFindingsAvailable?: boolean }
+  | {
+      kind: "results";
+      report: RespondentReport;
+      /** Clean exact report href only; intentionally excluded from the report envelope. */
+      ceoSelfReportHref?: string;
+      reportStylesAvailable?: boolean;
+      reportFindingsAvailable?: boolean;
+    }
   | { kind: "error"; message: string };
 
 export function OrgSurveyClient({
@@ -491,7 +499,14 @@ export function OrgSurveyClient({
       // server to disagree (spec 19an §6).
       const submitBody = (await submitRes
         .json()
-        .catch(() => null)) as { data?: { report?: unknown; reportStylesAvailable?: unknown; reportFindingsAvailable?: unknown } } | null;
+        .catch(() => null)) as {
+        data?: {
+          report?: unknown;
+          ceoSelfAccessUrl?: unknown;
+          reportStylesAvailable?: unknown;
+          reportFindingsAvailable?: unknown;
+        };
+      } | null;
       // Revive across the JSON boundary: `submittedAt` is typed Date but arrives
       // as an ISO string, and the renderers hand it to Intl.DateTimeFormat,
       // which throws on a string and falls back to printing raw ISO text. The
@@ -499,6 +514,9 @@ export function OrgSurveyClient({
       // report shows two different date formats before vs after a refresh.
       const onScreenReport = reviveOnScreenReport(submitBody?.data?.report);
       if (onScreenReport) {
+        const ceoSelfReportHref = await exchangeCeoReportAccessUrl(
+          submitBody?.data?.ceoSelfAccessUrl,
+        );
         // Stamp the slot with THIS respondent's invitation key (from the /me 200
         // that started this session) so a later rehydrate can prove the stored
         // report belongs to whoever is asking. Storing is skipped when the key is
@@ -512,6 +530,7 @@ export function OrgSurveyClient({
         setPhase({
           kind: "results",
           report: onScreenReport,
+          ...(ceoSelfReportHref ? { ceoSelfReportHref } : {}),
           reportStylesAvailable: submitBody?.data?.reportStylesAvailable === true,
           reportFindingsAvailable: submitBody?.data?.reportFindingsAvailable === true,
         });
@@ -585,6 +604,14 @@ export function OrgSurveyClient({
               reportStylesAvailable={phase.reportStylesAvailable === true}
               reportFindingsAvailable={phase.reportFindingsAvailable === true}
             />
+            {phase.ceoSelfReportHref ? (
+              <a
+                className="no-print su-cta"
+                href={phase.ceoSelfReportHref}
+              >
+                Compare with a previous assessment
+              </a>
+            ) : null}
           </div>
         </main>
       </ReportStyleScope>

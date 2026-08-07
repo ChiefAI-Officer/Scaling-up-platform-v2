@@ -14,9 +14,17 @@ import type { ApiActor } from "@/lib/auth/access-control";
 import type { ScoreResult } from "@/lib/assessments/scoring";
 import {
   buildStoredRespondentReport,
+  getCeoSelfRespondentReport,
   getRespondentReport,
 } from "@/lib/assessments/respondent-report";
 import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
+
+const mockRevalidateCeoReportAccessInTransaction = jest.fn();
+
+jest.mock("@/lib/assessments/ceo-report-access", () => ({
+  revalidateCeoReportAccessInTransaction: (...args: unknown[]) =>
+    mockRevalidateCeoReportAccessInTransaction(...args),
+}));
 
 // ── Mock access-control so canManageCampaign is fully controllable ───────
 const mockCanManageCampaign = jest.fn<Promise<boolean>, [unknown, unknown, string, string]>();
@@ -336,6 +344,128 @@ test("4. no submission → status:not-found", async () => {
 
   expect(result.status).toBe("not-found");
   expect(mockReportStylesEnabled).not.toHaveBeenCalled();
+});
+
+test("CEO self report revalidates the sealed grant and loads only its bound submission inside one transaction", async () => {
+  const { $transaction, _txFindFirst } = makeMockDb(GOOD_SUBMISSION);
+  mockRevalidateCeoReportAccessInTransaction.mockResolvedValue({
+    focusCampaignId: "camp-1",
+    focusSubmissionId: "sub-1",
+    invitationId: "invite-1",
+    respondentId: "resp-1",
+    expiresAt: "2026-08-30T00:00:00.000Z",
+  });
+
+  const outcome = await getCeoSelfRespondentReport(
+    { $transaction } as unknown as Parameters<typeof getCeoSelfRespondentReport>[0],
+    {
+      focusCampaignId: "camp-1",
+      focusSubmissionId: "sub-1",
+      invitationId: "invite-1",
+      respondentId: "resp-1",
+      expiresAt: "2026-08-30T00:00:00.000Z",
+    },
+  );
+
+  expect(outcome.status).toBe("ok");
+  expect(_txFindFirst).toHaveBeenCalledWith(expect.objectContaining({
+    where: expect.objectContaining({
+      id: "sub-1",
+      campaignId: "camp-1",
+      respondentId: "resp-1",
+    }),
+  }));
+  expect(mockCanManageCampaign).not.toHaveBeenCalled();
+});
+
+test("CEO self report final fetch is bound to every revocable live eligibility relation", async () => {
+  const { $transaction, _txFindFirst } = makeMockDb(GOOD_SUBMISSION);
+  const expectedWhere = {
+    id: "sub-1",
+    campaignId: "camp-1",
+    respondentId: "resp-1",
+    invitationId: "invite-1",
+    invitation: {
+      is: {
+        id: "invite-1",
+        campaignId: "camp-1",
+        respondentId: "resp-1",
+        status: "SUBMITTED",
+        revokedAt: null,
+      },
+    },
+    respondent: {
+      is: {
+        id: "resp-1",
+        deletedAt: null,
+      },
+    },
+    campaign: {
+      is: {
+        id: "camp-1",
+        deletedAt: null,
+        accessMode: "INVITED",
+        template: { is: { alias: "scaling-up-full" } },
+        organization: {
+          is: {
+            deletedAt: null,
+            respondents: {
+              some: { id: "resp-1", deletedAt: null },
+            },
+          },
+        },
+        participants: {
+          some: { respondentId: "resp-1", isCEO: true },
+        },
+        OR: [
+          { showResultsOnScreen: true },
+          { sendResultsToRespondent: true },
+        ],
+      },
+    },
+  };
+  _txFindFirst.mockImplementation(async (args: { where?: unknown }) =>
+    JSON.stringify(args.where) === JSON.stringify(expectedWhere)
+      ? GOOD_SUBMISSION
+      : null,
+  );
+  mockRevalidateCeoReportAccessInTransaction.mockResolvedValue({
+    focusCampaignId: "camp-1",
+    focusSubmissionId: "sub-1",
+    invitationId: "invite-1",
+    respondentId: "resp-1",
+    expiresAt: "2026-08-30T00:00:00.000Z",
+  });
+
+  const outcome = await getCeoSelfRespondentReport(
+    { $transaction } as unknown as Parameters<typeof getCeoSelfRespondentReport>[0],
+    {
+      focusCampaignId: "camp-1",
+      focusSubmissionId: "sub-1",
+      invitationId: "invite-1",
+      respondentId: "resp-1",
+      expiresAt: "2026-08-30T00:00:00.000Z",
+    },
+  );
+
+  expect(outcome.status).toBe("ok");
+});
+
+test("CEO self report fails closed if current records no longer revalidate the session", async () => {
+  const { $transaction, _txFindFirst } = makeMockDb(GOOD_SUBMISSION);
+  mockRevalidateCeoReportAccessInTransaction.mockResolvedValue(null);
+
+  await expect(getCeoSelfRespondentReport(
+    { $transaction } as unknown as Parameters<typeof getCeoSelfRespondentReport>[0],
+    {
+      focusCampaignId: "camp-1",
+      focusSubmissionId: "sub-1",
+      invitationId: "invite-1",
+      respondentId: "resp-1",
+      expiresAt: "2026-08-30T00:00:00.000Z",
+    },
+  )).resolves.toEqual({ status: "forbidden" });
+  expect(_txFindFirst).not.toHaveBeenCalled();
 });
 
 test("5. duplicate stableKey in version.questions → first-wins, no throw", async () => {

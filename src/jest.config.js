@@ -11,6 +11,10 @@ const customJestConfig = {
   setupFilesAfterEnv: ["<rootDir>/jest.setup.js"],
   testEnvironment: "jest-environment-jsdom",
   moduleNameMapper: {
+    // iron-session is CommonJS and must use uncrypto's Node require export.
+    // jsdom advertises the browser condition, which otherwise resolves its ESM
+    // browser build and prevents real cookie-capability code from loading.
+    "^uncrypto$": "<rootDir>/node_modules/uncrypto/dist/crypto.node.cjs",
     "^@/(.*)$": "<rootDir>/src/$1",
   },
   testMatch: [

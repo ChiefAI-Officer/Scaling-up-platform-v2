@@ -1,8 +1,9 @@
 import { spawn } from "node:child_process";
 import { PrismaClient } from "@prisma/client";
 import reportStyleE2eContract from "./report-style-e2e-server-contract.cjs";
+import { provisionReportComparisonFixture } from "./provision-report-comparison-e2e.mjs";
 
-const { productionServerCommands, runReportStyleE2eServer } = reportStyleE2eContract;
+const { productionServerCommands, runAssessmentReportE2eServer } = reportStyleE2eContract;
 
 function runCommand(command, args, env, { inheritOutput = false, forwardSignals = false } = {}) {
   return new Promise((resolveCommand, rejectCommand) => {
@@ -35,7 +36,23 @@ const commands = productionServerCommands({
 });
 
 try {
-  await runReportStyleE2eServer({
+  if (process.env.E2E_REPORT_COMPARISON_DATABASE_URL) {
+    const fixture = await provisionReportComparisonFixture({
+      env: process.env,
+      createClient: (databaseUrl) => new PrismaClient({ datasourceUrl: databaseUrl, log: [] }),
+    });
+    process.env.ADMIN_EMAIL = fixture.adminEmail;
+    process.env.WAVE_RC_REPORT_COMPARISON_ENABLED = "1";
+    process.env.WAVE_RC_REPORT_COMPARISON_KILL = "0";
+    process.env.WAVE_REPORT_STYLES_ENABLED = "1";
+    process.env.WAVE_REPORT_STYLES_KILL = "0";
+    process.env.WAVE_OSR_RESPONDENT_RESULTS_ENABLED = "1";
+    process.env.WAVE_OSR_RESPONDENT_RESULTS_KILL = "0";
+    process.env.WAVE_D_RESULTS_EMAIL_ENABLED = "0";
+    process.env.ASSESSMENT_EMAIL_DELIVERY_INTENTS_ENABLED = "0";
+    process.env.APP_URL = "http://localhost:3000";
+  }
+  await runAssessmentReportE2eServer({
     env: process.env,
     createClient: (databaseUrl) => new PrismaClient({ datasourceUrl: databaseUrl, log: [] }),
     runBuild: (env) => runCommand(commands.build.command, commands.build.args, env),
@@ -47,6 +64,6 @@ try {
     ),
   });
 } catch {
-  console.error("Report-style E2E server startup was refused.");
+  console.error("Assessment report E2E server startup was refused.");
   process.exitCode = 1;
 }

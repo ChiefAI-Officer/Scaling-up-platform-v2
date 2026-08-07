@@ -219,4 +219,27 @@ describe("CampaignDetail — View report is the primary results action (Task 5, 
       within(row).getByTestId(`view-result-btn-${SUBMITTED_ROW.respondent.id}`),
     ).toBeInTheDocument();
   });
+
+  it("keeps the canonical View report action and restores Over time when the server supplies legacy eligibility", () => {
+    render(
+      <CampaignDetail
+        initialOverview={makeOverview()}
+        initialRespondents={[SUBMITTED_ROW]}
+        legacyOverTimeRespondentIds={[SUBMITTED_ROW.respondent.id]}
+      />,
+    );
+
+    expect(
+      screen.getByTestId(`view-report-link-${SUBMITTED_ROW.respondent.id}`),
+    ).toHaveAttribute(
+      "href",
+      `/assessments/${CAMPAIGN_ID}/respondents/${SUBMITTED_ROW.respondent.id}/report`,
+    );
+    expect(
+      screen.getByTestId(`view-over-time-link-${SUBMITTED_ROW.respondent.id}`),
+    ).toHaveAttribute(
+      "href",
+      `/portal/assessments/respondents/${SUBMITTED_ROW.respondent.id}/longitudinal?templateId=tpl-1&organizationId=org-1`,
+    );
+  });
 });

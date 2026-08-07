@@ -46,8 +46,6 @@ jest.mock("@/lib/assessments/campaign-detail", () => {
   };
 });
 
-// Wave N — the per-row longitudinal eligibility predicate. Controllable so we
-// can drive the throwing path (the page's loop must SWALLOW a throw, never 500).
 const mockHasComparableLongitudinal = jest.fn();
 jest.mock("@/lib/assessments/longitudinal-eligibility", () => ({
   asLongitudinalEligibilityDb: (x: unknown) => x,
@@ -58,6 +56,13 @@ jest.mock("@/lib/assessments/longitudinal-eligibility", () => ({
 jest.mock("@/lib/assessments/wave-d-feature-flags", () => ({
   waveDCustomHtmlEmailEnabled: () => false,
   assessmentInviteBrandedCustomHtmlEnabled: jest.fn(() => true),
+}));
+
+const mockReportComparisonEnabled = jest.fn();
+jest.mock("@/lib/assessments/wave-report-comparison-flags", () => ({
+  REPORT_COMPARISON_ALIAS: "scaling-up-full",
+  isReportComparisonEnabled: (...args: unknown[]) =>
+    mockReportComparisonEnabled(...args),
 }));
 
 // NOTE: @/lib/assessments/wave-f-flags is intentionally NOT mocked — the page
@@ -75,17 +80,18 @@ jest.mock("@/lib/db", () => ({
 const captured: {
   canViewGroupReport?: boolean;
   canEditReportAppearance?: boolean;
-  longitudinalRespondentIds?: string[];
+  legacyOverTimeRespondentIds?: string[];
 } = {};
 jest.mock("@/components/assessments/CampaignDetail", () => ({
   CampaignDetail: (props: {
     canViewGroupReport?: boolean;
     canEditReportAppearance?: boolean;
-    longitudinalRespondentIds?: string[];
+    legacyOverTimeRespondentIds?: string[];
   }) => {
     captured.canViewGroupReport = props.canViewGroupReport;
     captured.canEditReportAppearance = props.canEditReportAppearance;
-    captured.longitudinalRespondentIds = props.longitudinalRespondentIds;
+    captured.legacyOverTimeRespondentIds =
+      props.legacyOverTimeRespondentIds;
     return null;
   },
 }));
@@ -122,7 +128,7 @@ function makeCampaign(overrides: Record<string, unknown> = {}) {
 async function runPage() {
   captured.canViewGroupReport = undefined;
   captured.canEditReportAppearance = undefined;
-  captured.longitudinalRespondentIds = undefined;
+  captured.legacyOverTimeRespondentIds = undefined;
   const node = await Page({ params: Promise.resolve({ id: CAMPAIGN_ID }) });
   // Render the returned tree so the (mocked) CampaignDetail is invoked and
   // captures the canViewGroupReport boolean the page computed.
@@ -148,6 +154,7 @@ beforeEach(() => {
   });
   mockGetCampaignRespondents.mockResolvedValue([]);
   mockHasComparableLongitudinal.mockResolvedValue(false);
+  mockReportComparisonEnabled.mockReturnValue(false);
   delete process.env.WAVE_F_GROUP_REPORT_ENABLED;
   delete process.env.WAVE_J_SUFULL_GROUP_ENABLED;
   delete process.env.WAVE_J_SUFULL_GROUP_CANARY;
@@ -243,59 +250,30 @@ describe("CampaignDetail entry-point publish gate (Wave J J-3)", () => {
   });
 });
 
-describe("CampaignDetail Wave N per-row longitudinal eligibility (P0 hotfix)", () => {
+describe("CampaignDetail report-native placement", () => {
   const respondentRows = [
     { hasSubmission: true, respondent: { id: "resp-1" } },
     { hasSubmission: true, respondent: { id: "resp-2" } },
     { hasSubmission: false, respondent: { id: "resp-3" } }, // skipped (no submission)
   ];
 
-  it("a THROWING eligibility check does not break the page render (loop swallows it)", async () => {
-    mockFindFirst.mockResolvedValue(makeCampaign());
-    mockGetCampaignRespondents.mockResolvedValue(respondentRows);
-    // resp-1 throws (e.g. a DB error inside the predicate), resp-2 is eligible.
-    mockHasComparableLongitudinal.mockImplementation(
-      async (_db: unknown, _actor: unknown, args: { respondentId: string }) => {
-        if (args.respondentId === "resp-1") {
-          throw new Error("simulated eligibility failure");
-        }
-        return args.respondentId === "resp-2";
-      },
-    );
-
-    // Must NOT throw — the whole Server Component would 500 otherwise.
-    await expect(runPage()).resolves.not.toThrow();
-    // The throwing row is treated as ineligible; the eligible row survives.
-    expect(captured.longitudinalRespondentIds).toEqual(["resp-2"]);
-  });
-
-  it("passes the TEMPLATE alias (not the campaign slug) to the eligibility predicate", async () => {
-    mockFindFirst.mockResolvedValue(makeCampaign()); // template alias = "scaling-up-full"
-    mockGetCampaignRespondents.mockResolvedValue([
-      { hasSubmission: true, respondent: { id: "resp-1" } },
-    ]);
-    mockHasComparableLongitudinal.mockResolvedValue(false);
-
-    await runPage();
-
-    expect(mockHasComparableLongitudinal).toHaveBeenCalledTimes(1);
-    const args = mockHasComparableLongitudinal.mock.calls[0][2] as {
-      templateAlias: string;
-    };
-    // The bug passed overview.campaign.alias ("su-full-campaign-slug"); the fix
-    // passes campaignForFlag.template.alias ("scaling-up-full").
-    expect(args.templateAlias).toBe("scaling-up-full");
-  });
-
-  it("rows with no submission are skipped (never evaluated)", async () => {
+  it("restores the Wave N eligibility loop and promoted links while report-native comparison is off", async () => {
     mockFindFirst.mockResolvedValue(makeCampaign());
     mockGetCampaignRespondents.mockResolvedValue(respondentRows);
     mockHasComparableLongitudinal.mockResolvedValue(true);
-
     await runPage();
 
-    // resp-3 has hasSubmission:false → not evaluated; resp-1 + resp-2 are.
     expect(mockHasComparableLongitudinal).toHaveBeenCalledTimes(2);
-    expect(captured.longitudinalRespondentIds).toEqual(["resp-1", "resp-2"]);
+    expect(captured.legacyOverTimeRespondentIds).toEqual(["resp-1", "resp-2"]);
+  });
+
+  it("suppresses the Wave N N+1 loop and promoted links while report-native comparison is enabled", async () => {
+    mockFindFirst.mockResolvedValue(makeCampaign());
+    mockGetCampaignRespondents.mockResolvedValue(respondentRows);
+    mockReportComparisonEnabled.mockReturnValue(true);
+    await runPage();
+
+    expect(mockHasComparableLongitudinal).not.toHaveBeenCalled();
+    expect(captured.legacyOverTimeRespondentIds).toEqual([]);
   });
 });

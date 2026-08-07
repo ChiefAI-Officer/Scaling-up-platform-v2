@@ -21,7 +21,10 @@ jest.mock("@/lib/rate-limit", () => ({
   checkRateLimitAsync: jest.fn(),
   RateLimits: { standard: { interval: 60000, maxRequests: 100 } },
 }));
-jest.mock("@/lib/assessments/respondent-report", () => ({ getRespondentReport: jest.fn() }));
+jest.mock("@/lib/assessments/respondent-report", () => ({
+  getRespondentReport: jest.fn(),
+  getCeoSelfRespondentReport: jest.fn(),
+}));
 jest.mock("@/lib/assessments/public-referrals", () => ({
   getPublicReferralReport: jest.fn(),
 }));
@@ -38,9 +41,11 @@ import { headers } from "next/headers";
 import { isGroupReportEnabled } from "@/lib/assessments/wave-f-flags";
 import { getPublicReferralReport } from "@/lib/assessments/public-referrals";
 import { isReferredResultsEnabled } from "@/lib/assessments/wave-83-flags";
+import { getCeoSelfRespondentReport } from "@/lib/assessments/respondent-report";
 import {
   viewGroupReport,
   viewPublicReferralReport,
+  viewCeoSelfRespondentReport,
   viewRespondentReport,
   ipFromHeaders,
 } from "@/lib/assessments/report-access-gate";
@@ -50,6 +55,7 @@ const mockGetApiActor = getApiActor as jest.Mock;
 const mockHeaders = headers as jest.Mock;
 const mockIsEnabled = isGroupReportEnabled as jest.Mock;
 const mockGetPublicReferralReport = getPublicReferralReport as jest.Mock;
+const mockGetCeoSelfRespondentReport = getCeoSelfRespondentReport as jest.Mock;
 const mockIsReferredResultsEnabled = isReferredResultsEnabled as jest.Mock;
 
 function fakeHeaders(map: Record<string, string>) {
@@ -292,6 +298,55 @@ describe("viewRespondentReport adapter", () => {
     mockGetApiActor.mockResolvedValue({ userId: "u1", email: "a@x.com", role: "ADMIN", coachId: null });
     await viewRespondentReport({} as never, { campaignId: "c", respondentId: "r" });
     expect(lastOpts().auditFailureFields).toBeUndefined();
+  });
+});
+
+describe("viewCeoSelfRespondentReport adapter", () => {
+  const session = {
+    focusCampaignId: "campaign-1",
+    focusSubmissionId: "submission-1",
+    invitationId: "invite-1",
+    respondentId: "respondent-1",
+    expiresAt: "2026-09-01T00:00:00.000Z",
+  };
+
+  it("uses the standard report limit with a CEO_SELF metric identity and no login actor", async () => {
+    await viewCeoSelfRespondentReport({} as never, session);
+    const opts = lastOpts();
+    expect(opts.surface).toBe("respondent");
+    expect(opts.noActorPolicy).toBe("tolerate");
+    expect(opts.actor).toBeNull();
+    expect(opts.auditActor).toBe("CEO_SELF");
+    expect(opts.metricRole).toBe("CEO_SELF");
+    expect(opts.rateLimitConfig).toEqual({ interval: 60000, maxRequests: 100 });
+    expect(opts.rateLimitKey).toBe("report:ceo-self:campaign-1:respondent-1:9.9.9.9");
+    await opts.load();
+    expect(mockGetCeoSelfRespondentReport).toHaveBeenCalledWith(expect.anything(), session);
+  });
+
+  it("writes a fail-closed CEO self audit without email, raw token, or cookie material", async () => {
+    await viewCeoSelfRespondentReport({} as never, session);
+    const spec = lastOpts().auditOf({
+      status: "ok",
+      report: {
+        templateAlias: "scaling-up-full",
+        provenance: { submissionId: "submission-1", versionId: "version-1", contentHash: "hash-1" },
+      },
+    });
+    expect(spec).toEqual({
+      entityType: "AssessmentSubmission",
+      entityId: "submission-1",
+      action: "CEO_SELF_REPORT_VIEW",
+      changes: {
+        kind: "ceo-self-report",
+        focusCampaignId: "campaign-1",
+        focusSubmissionId: "submission-1",
+        respondentId: "respondent-1",
+        templateAlias: "scaling-up-full",
+        versionId: "version-1",
+        contentHash: "hash-1",
+      },
+    });
   });
 });
 

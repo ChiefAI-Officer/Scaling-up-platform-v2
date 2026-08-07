@@ -59,6 +59,9 @@ const txMock = {
   assessmentEmailOutbox: {
     create: jest.fn().mockResolvedValue({}),
   },
+  assessmentCampaignParticipant: {
+    findUnique: jest.fn(),
+  },
 };
 
 // eslint-disable-next-line no-var
@@ -110,6 +113,26 @@ jest.mock("@/lib/assessments/wave-report-styles-flags", () => {
 });
 jest.mock("@/lib/assessments/wave-u-flags", () => ({
   isFindingsLogicEnabled: jest.fn(),
+}));
+
+// eslint-disable-next-line no-var
+var comparisonState = { enabled: true };
+jest.mock("@/lib/assessments/wave-report-comparison-flags", () => ({
+  isReportComparisonEnabled: jest.fn(() => comparisonState.enabled),
+}));
+
+// eslint-disable-next-line no-var
+var ceoAccessTokenMock: jest.Mock;
+jest.mock("@/lib/assessments/ceo-report-access-token", () => {
+  ceoAccessTokenMock = jest.fn(() => "signed-ceo-access-token");
+  return { createCeoReportAccessToken: ceoAccessTokenMock };
+});
+
+// The submit route only needs RespondentReport's runtime helpers. Its exported
+// CEO report loader is covered at its own boundary and otherwise pulls the
+// browser-only iron-session dependency into this server-route unit test.
+jest.mock("@/lib/assessments/ceo-report-access", () => ({
+  revalidateCeoReportAccessInTransaction: jest.fn(),
 }));
 
 // eslint-disable-next-line no-var
@@ -194,6 +217,7 @@ function invitationFixture(overrides?: {
   sendResultsToRespondent?: boolean;
   notifyCoachOnCompletion?: boolean;
   reportStyle?: "CLASSIC" | "EXECUTIVE_BOARDROOM" | "MODERN_DASHBOARD";
+  templateAlias?: string;
 }) {
   return {
     id: "inv-1",
@@ -210,6 +234,7 @@ function invitationFixture(overrides?: {
     campaign: {
       id: "c1",
       templateId: "tpl-1",
+      organizationId: "org-1",
       reportStyle: overrides?.reportStyle ?? "MODERN_DASHBOARD",
       alias: "demo",
       deletedAt: null,
@@ -228,9 +253,11 @@ function invitationFixture(overrides?: {
         sections: goodVersion.sections,
         scoringConfig: goodVersion.scoringConfig,
       },
+      organization: { id: "org-1", name: "Example Organization" },
       template: {
+        id: "tpl-1",
         name: "Rockefeller Habits Checklist",
-        alias: "rockefeller",
+        alias: overrides?.templateAlias ?? "rockefeller",
         resultsEmailSubject: "Your results",
         resultsEmailBodyMarkdown: "Here are your results.",
         resultsEmailContentApproved: true,
@@ -271,7 +298,7 @@ const goodAnswers = { answers: [{ stableKey: "q1", value: 3 }] };
 
 type SubmitBody = {
   success: boolean;
-  data?: { submissionId?: string; report?: unknown; reportStylesAvailable?: boolean; reportFindingsAvailable?: boolean };
+  data?: { submissionId?: string; report?: unknown; ceoSelfAccessUrl?: string; reportStylesAvailable?: boolean; reportFindingsAvailable?: boolean };
 };
 
 beforeEach(() => {
@@ -285,6 +312,7 @@ beforeEach(() => {
   flagState.intents = false;
   osrState.enabled = true;
   approvedState.approved = true;
+  comparisonState.enabled = true;
   reportStylesEnabledMock.mockReturnValue(false);
   findingsEnabledMock.mockReturnValue(false);
   buildState.throws = false;
@@ -294,6 +322,8 @@ beforeEach(() => {
   process.env.APP_URL = "https://app.example.com";
   txMock.assessmentSubmission.create.mockResolvedValue({ id: "sub-1" });
   txMock.assessmentEmailOutbox.create.mockResolvedValue({});
+  dbMock.assessmentCampaignParticipant.findUnique.mockResolvedValue(null);
+  txMock.assessmentCampaignParticipant.findUnique.mockResolvedValue(null);
 });
 
 describe("report style first-completion freeze with on-screen results", () => {
@@ -585,5 +615,159 @@ describe("Wave OSR — the report model is built only when a consumer wants it",
     });
     await POST(jsonReq(goodAnswers) as never, aliasParams("demo"));
     expect(buildState.calls).toHaveLength(3);
+  });
+});
+
+// ─── Report-comparison CEO self-access delivery ───────────────────────────
+
+function mockCeoParticipant(phase1IsCeo: boolean, phase2IsCeo = phase1IsCeo) {
+  dbMock.assessmentCampaignParticipant.findUnique.mockResolvedValue({
+    isCEO: phase1IsCeo,
+  });
+  txMock.assessmentCampaignParticipant.findUnique.mockResolvedValue({
+    isCEO: phase2IsCeo,
+  });
+}
+
+describe("CEO self-access is delivered only through approved disclosures", () => {
+  it("returns a fragment-only self-access URL for a designated Scaling Up Full CEO on-screen", async () => {
+    mockInvitation({
+      templateAlias: "scaling-up-full",
+      showResultsOnScreen: true,
+      sendResultsToRespondent: false,
+    });
+    mockCeoParticipant(true);
+
+    const response = await POST(jsonReq(goodAnswers) as never, aliasParams("demo"));
+    const body = (await response.json()) as SubmitBody;
+
+    expect(body.data?.ceoSelfAccessUrl).toBe(
+      "https://app.example.com/assessments/self-report#t=signed-ceo-access-token",
+    );
+    expect(ceoAccessTokenMock).toHaveBeenCalledWith({
+      focusCampaignId: "c1",
+      invitationId: "inv-1",
+      respondentId: "r1",
+    });
+  });
+
+  it("puts the same CEO URL only in an approved respondent results email", async () => {
+    mockInvitation({
+      templateAlias: "scaling-up-full",
+      showResultsOnScreen: false,
+      sendResultsToRespondent: true,
+      notifyCoachOnCompletion: true,
+    });
+    mockCeoParticipant(true);
+    const { buildResultsEmailHtml } = jest.requireMock(
+      "@/lib/assessments/results-email",
+    ) as { buildResultsEmailHtml: jest.Mock };
+
+    const response = await POST(jsonReq(goodAnswers) as never, aliasParams("demo"));
+    const body = (await response.json()) as SubmitBody;
+
+    expect(body.data?.ceoSelfAccessUrl).toBeUndefined();
+    expect(buildResultsEmailHtml).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ceoSelfAccessUrl:
+          "https://app.example.com/assessments/self-report#t=signed-ceo-access-token",
+      }),
+    );
+  });
+
+  it.each([
+    ["non-CEO", "scaling-up-full", false, true, true],
+    ["other template", "rockefeller", true, true, true],
+    ["feature disabled", "scaling-up-full", true, true, true],
+    ["no approved disclosure", "scaling-up-full", true, false, false],
+  ])("does not issue a URL for %s", async (kind, templateAlias, isCEO, showResultsOnScreen, sendResultsToRespondent) => {
+    if (kind === "feature disabled") comparisonState.enabled = false;
+    mockInvitation({
+      templateAlias,
+      showResultsOnScreen,
+      sendResultsToRespondent,
+    });
+    mockCeoParticipant(isCEO);
+
+    const response = await POST(jsonReq(goodAnswers) as never, aliasParams("demo"));
+    const body = (await response.json()) as SubmitBody;
+
+    expect(body.data?.ceoSelfAccessUrl).toBeUndefined();
+  });
+
+  it("drops a link-bearing prepared results row when the locked CEO designation changed", async () => {
+    mockInvitation({
+      templateAlias: "scaling-up-full",
+      showResultsOnScreen: true,
+      sendResultsToRespondent: true,
+    });
+    mockCeoParticipant(true, false);
+
+    const response = await POST(jsonReq(goodAnswers) as never, aliasParams("demo"));
+    const body = (await response.json()) as SubmitBody;
+
+    expect(response.status).toBe(200);
+    expect(body.data?.submissionId).toBe("sub-1");
+    expect(body.data?.ceoSelfAccessUrl).toBeUndefined();
+    expect(txMock.assessmentSubmission.create).toHaveBeenCalledTimes(1);
+    expect(txMock.assessmentEmailOutbox.create).not.toHaveBeenCalled();
+  });
+
+  it("locks the exact CEO participant row before the Phase-2 authorization read", async () => {
+    mockInvitation({
+      templateAlias: "scaling-up-full",
+      showResultsOnScreen: true,
+    });
+    mockCeoParticipant(true);
+
+    await POST(jsonReq(goodAnswers) as never, aliasParams("demo"));
+
+    const participantLock = txMock.$executeRaw.mock.calls.find(([query]) =>
+      Array.from(query as TemplateStringsArray)
+        .join("")
+        .includes("assessment_campaign_participants"),
+    );
+    expect(participantLock).toBeDefined();
+    const participantLockSql = Array.from(
+      participantLock?.[0] as TemplateStringsArray,
+    ).join("");
+    expect(participantLockSql).toContain(
+      'FROM "assessment_campaign_participants"',
+    );
+    expect(participantLockSql).toContain('"campaignId" = ');
+    expect(participantLockSql).toContain('"respondentId" = ');
+    expect(participantLockSql).toContain("FOR UPDATE");
+    expect(
+      txMock.$executeRaw.mock.invocationCallOrder[
+        txMock.$executeRaw.mock.calls.indexOf(participantLock!)
+      ],
+    ).toBeLessThan(
+      txMock.assessmentCampaignParticipant.findUnique.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("keeps the submission and ordinary report when CEO-link generation fails", async () => {
+    mockInvitation({
+      templateAlias: "scaling-up-full",
+      showResultsOnScreen: true,
+      sendResultsToRespondent: true,
+    });
+    mockCeoParticipant(true);
+    ceoAccessTokenMock.mockImplementationOnce(() => {
+      throw new Error("access secret unavailable");
+    });
+
+    const response = await POST(jsonReq(goodAnswers) as never, aliasParams("demo"));
+    const body = (await response.json()) as SubmitBody;
+
+    expect(response.status).toBe(200);
+    expect(body.data?.submissionId).toBe("sub-1");
+    expect(body.data?.report).toEqual({
+      ...BUILT_REPORT,
+      reportStyle: "MODERN_DASHBOARD",
+    });
+    expect(body.data?.ceoSelfAccessUrl).toBeUndefined();
+    expect(ceoAccessTokenMock).toHaveBeenCalled();
+    expect(txMock.assessmentEmailOutbox.create).toHaveBeenCalledTimes(1);
   });
 });

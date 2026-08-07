@@ -93,6 +93,86 @@
   border-radius: 8px;
 }
 
+/* ── Report-native comparison controls (Wave RC) ────────────────────────── */
+/* A compact, screen-only report action. It deliberately uses the existing
+   report palette and utility typography: the period label is the signature,
+   while the selector and plain verbs stay subordinate to the report itself. */
+.su-public-brand .su-report-comparison-controls {
+  max-width: 920px;
+  margin: 18px auto 24px;
+  padding: 14px 20px 16px;
+  border-left: 4px solid #f7a600;
+  background: #fff8e1;
+  color: #3a2400;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+.su-public-brand .su-report-comparison-label,
+.su-public-brand .su-report-comparison-current {
+  display: block;
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.su-public-brand .su-report-comparison-picker,
+.su-public-brand .su-report-comparison-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.su-public-brand .su-report-comparison-picker select {
+  min-width: min(100%, 28rem);
+  flex: 1 1 18rem;
+  min-height: 44px;
+  padding: 9px 11px;
+  border: 1px solid #946b36;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #1a1322;
+  font: inherit;
+}
+.su-public-brand .su-report-comparison-picker select:focus-visible,
+.su-public-brand .su-report-comparison-remove:focus-visible {
+  outline: 3px solid #522583;
+  outline-offset: 3px;
+}
+.su-public-brand .su-report-comparison-controls .su-cta {
+  padding: 11px 18px;
+  font-size: 13px;
+}
+.su-public-brand .su-report-comparison-remove {
+  padding: 10px 2px;
+  border: 0;
+  background: transparent;
+  color: #522583;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.su-public-brand .su-report-comparison-limit {
+  margin: 9px 0 0;
+  font-size: 13px;
+}
+.su-public-brand .su-report-comparison-error {
+  max-width: 920px;
+  margin: 0 auto 18px;
+  padding: 12px 20px;
+  border-left: 4px solid #a32626;
+  background: #fff3f3;
+  color: #5e1717;
+  font: 14px/1.45 "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+@media (max-width: 640px) {
+  .su-public-brand .su-report-comparison-controls { margin: 14px 16px 20px; padding: 14px 16px; }
+  .su-public-brand .su-report-comparison-picker > * { width: 100%; }
+  .su-public-brand .su-report-comparison-picker select { min-width: 0; flex-basis: 100%; }
+}
+
 /* Wave OSR (#71) — the respondent-facing note above their own in-place report.
    Carries the "your coach will review this with you" framing that the bypassed
    thank-you page used to own, plus the keep-a-copy hint (Print/Download is the
@@ -2133,4 +2213,92 @@
   font-size: .62rem;
   margin: .35rem 0 0 .45rem;
   padding: .15rem .45rem;
+}
+
+/* ── Report-native comparison facts (Wave RC) ───────────────────────────── */
+/* The shared semantic table deliberately follows the Classic report's quiet
+   purple-and-ink language; Executive and Dashboard reinterpret only its
+   materials below, never the frozen facts or table semantics. */
+.su-public-brand .su-report-comparison-cover-subtitle {
+  margin: 10px 0 0;
+  color: #f4eafb;
+  font-size: 14px;
+  font-weight: 700;
+}
+.su-public-brand .su-report-comparison {
+  margin: 36px 60px;
+  padding: 26px 28px;
+  border: 1px solid #e4dcf0;
+  border-top: 5px solid #522583;
+  background: #fcfbfe;
+}
+.su-public-brand .su-report-comparison-eyebrow {
+  color: #6b6480;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+.su-public-brand .su-report-comparison h2 { margin: 4px 0 8px; }
+.su-public-brand .su-report-comparison h3 {
+  color: #522583;
+  font-size: 13px;
+  letter-spacing: .06em;
+  margin: 24px 0 7px;
+  text-transform: uppercase;
+}
+.su-public-brand .su-report-comparison-coverage {
+  max-width: 66ch;
+  margin: 0;
+  color: #4b4359;
+  font-size: 13px;
+}
+.su-public-brand .su-report-comparison table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.su-public-brand .su-report-comparison th,
+.su-public-brand .su-report-comparison td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #e8e4f0;
+  text-align: left;
+  vertical-align: top;
+}
+.su-public-brand .su-report-comparison thead th {
+  color: #6b6480;
+  font-size: 10px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.su-public-brand .su-report-comparison tbody th { color: #1a1322; }
+.su-public-brand .su-report-comparison-status {
+  display: block;
+  margin-top: 3px;
+  color: #6b6480;
+  font-size: 11px;
+  font-weight: 400;
+}
+.su-public-brand .su-report-comparison-delta-status {
+  display: inline-block;
+  margin-left: 3px;
+  color: #6b6480;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+@media (max-width: 640px) {
+  .su-public-brand .su-report-comparison { margin: 24px 16px; padding: 20px 16px; overflow-x: auto; }
+  .su-public-brand .su-report-comparison table { min-width: 32rem; }
+}
+
+@media print {
+  .su-report-comparison-controls { display: none !important; }
+  .su-report-comparison,
+  .su-report-comparison-row,
+  .su-report-comparison-section {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .su-report-comparison thead { display: table-header-group; }
 }

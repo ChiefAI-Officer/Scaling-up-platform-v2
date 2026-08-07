@@ -140,6 +140,11 @@ export interface CampaignDetailProps {
    */
   canEditReportAppearance?: boolean;
   /**
+   * Coach-only rollback path for the Wave N "Over time" entry. The server
+   * supplies eligible respondents only while report-native comparison is off.
+   */
+  legacyOverTimeRespondentIds?: string[];
+  /**
    * Wave M (#19) — the campaign's stored (already-sanitized) slides. Both the
    * editor's initial value AND the PATCH CAS sentinel `expectedCustomSlides`
    * derive from this exact value, so it must be the faithful stored value.
@@ -147,14 +152,6 @@ export interface CampaignDetailProps {
   initialCustomSlides?: CustomSlide[];
   /** Wave M (#19) — the pinned version's sections — the "Before section" picker. */
   customSlidesSections?: CustomSlidesPanelSection[];
-  /**
-   * Wave N (#23) — respondent ids (this campaign's roster) that pass the
-   * longitudinal eligibility predicate (flag on, scored template, current
-   * template access, ≥2 scored submissions). Computed SERVER-side; the client
-   * shows the per-row "over time" link ONLY for ids in this set and never
-   * recomputes auth. Fail-closed: absent/empty → no links.
-   */
-  longitudinalRespondentIds?: string[];
   /**
    * Wave Z (Z-2) — base path for the "Back to Assessments" link and the
    * post-delete redirect. Default is the coach portal; the admin campaigns
@@ -167,8 +164,6 @@ export interface CampaignDetailProps {
    * have no admin equivalent: "View Trends" (`/portal/assessments/trends`) and
    * the empty-state "Add members in the Members lane" (`/portal/members`).
    * Default false (coach portal shows them). The admin host sets this true.
-   * (The per-respondent "Over time" longitudinal link is suppressed separately
-   * by the admin page passing `longitudinalRespondentIds={[]}`.)
    */
   hidePortalOnlyLinks?: boolean;
 }
@@ -266,9 +261,9 @@ export function CampaignDetail({
   reportStylesAvailable = false,
   reportStylePreviewCapabilities,
   canEditReportAppearance = false,
+  legacyOverTimeRespondentIds = [],
   initialCustomSlides = [],
   customSlidesSections = [],
-  longitudinalRespondentIds = [],
   basePath = "/portal/assessments",
   hidePortalOnlyLinks = false,
 }: CampaignDetailProps) {
@@ -284,6 +279,10 @@ export function CampaignDetail({
   >({});
   const [loadingRespondentId, setLoadingRespondentId] = useState<string | null>(
     null,
+  );
+  const legacyOverTimeEligible = useMemo(
+    () => new Set(legacyOverTimeRespondentIds),
+    [legacyOverTimeRespondentIds],
   );
   const [resendingInvitationId, setResendingInvitationId] = useState<
     string | null
@@ -416,13 +415,6 @@ export function CampaignDetail({
     initialOverview.campaign.reportStyleLockedAt,
   ]);
 
-  // Wave N (#23) — O(1) lookup for the per-row "over time" affordance. The set
-  // is the server-computed eligible-id allowlist; the client never recomputes
-  // eligibility. Empty/absent ⇒ no links (the dark / flag-off state).
-  const longitudinalEligible = useMemo(
-    () => new Set(longitudinalRespondentIds),
-    [longitudinalRespondentIds],
-  );
   const isDraft = campaign.status === "DRAFT";
   const isClosed = campaign.status === "CLOSED";
   const canShowReportAppearanceEditor =
@@ -2197,14 +2189,7 @@ export function CampaignDetail({
                               View report
                             </a>
                           )}
-                          {longitudinalEligible.has(row.respondent.id) && (
-                            // Wave N (#23) — per-row "over time" affordance.
-                            // Shown ONLY for server-eligible respondents (flag
-                            // on, scored template, ≥2 scored submissions). A
-                            // PLAIN <a> (NOT a Next <Link>): NEVER prefetch the
-                            // named-PII longitudinal view (mirrors the report +
-                            // group-report links). target="_blank" opens its own
-                            // tab; rel guards the opener.
+                          {legacyOverTimeEligible.has(row.respondent.id) && (
                             <a
                               href={`/portal/assessments/respondents/${encodeURIComponent(row.respondent.id)}/longitudinal?templateId=${encodeURIComponent(campaign.templateId)}&organizationId=${encodeURIComponent(campaign.organizationId)}`}
                               target="_blank"

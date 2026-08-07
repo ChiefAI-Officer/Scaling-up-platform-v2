@@ -58,6 +58,15 @@
 .su-report--dashboard .report-page--dashboard-cover header > p:first-child { color: var(--dashboard-teal); font-size: .72rem; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
 .su-report--dashboard .report-page--dashboard-cover h1 { font-size: clamp(2.75rem, 8vw, 4.75rem); font-weight: 900; letter-spacing: -.06em; line-height: .96; margin: .6rem 0 1.2rem; overflow-wrap: anywhere; }
 .su-report--dashboard .report-page--dashboard-cover header p { color: var(--dashboard-slate); max-width: 48ch; overflow-wrap: anywhere; }
+.su-report--dashboard .su-report-comparison-cover-subtitle { color: var(--dashboard-indigo); font-size: .72rem; font-weight: 800; letter-spacing: .1em; margin: .75rem 0 0; text-transform: uppercase; }
+.su-report--dashboard .report-page--dashboard-comparison { background: var(--dashboard-soft); }
+.su-report--dashboard .su-report-comparison { margin: 0; padding: 0; border: 0; border-top: 4px solid var(--dashboard-teal); background: transparent; }
+.su-report--dashboard .su-report-comparison-eyebrow { color: var(--dashboard-teal); font-size: .68rem; font-weight: 800; letter-spacing: .14em; margin-top: 1rem; text-transform: uppercase; }
+.su-report--dashboard .su-report-comparison h2 { margin-top: .45rem; }
+.su-report--dashboard .su-report-comparison h3 { color: var(--dashboard-indigo); margin-top: 1.65rem; }
+.su-report--dashboard .su-report-comparison-coverage { color: var(--dashboard-slate); font-size: .88rem; }
+.su-report--dashboard .su-report-comparison-status { color: var(--dashboard-muted-ink); }
+.su-report--dashboard .su-report-comparison-delta-status { background: #ffffff; border: 1px solid var(--dashboard-line); border-radius: 999px; color: var(--dashboard-muted-ink); font-size: .64rem; font-weight: 800; letter-spacing: .025em; padding: .08rem .32rem; }
 .su-report--dashboard .report-page h2 { font-size: clamp(1.6rem, 3vw, 2.25rem); font-weight: 900; letter-spacing: -.04em; line-height: 1.05; margin: 0 0 .8rem; }
 .su-report--dashboard .report-page h3 { font-size: .78rem; font-weight: 800; letter-spacing: .1em; margin: 1.4rem 0 .55rem; text-transform: uppercase; }
 .su-report--dashboard .report-page section { margin: 0 0 1.65rem; }

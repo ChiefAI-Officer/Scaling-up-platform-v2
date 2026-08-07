@@ -4,17 +4,19 @@ import {
   enforceGlobalApiRateLimit,
   getRequestIdentifierFromHeaders,
 } from "@/lib/global-rate-limit";
+import { isReportComparisonRolloutActive } from "@/lib/assessments/wave-report-comparison-flags";
 
 // R2-LOW-1: the branded results report pages render named PII (scores, answers).
-// Both the per-respondent report (`/assessments/<id>/respondents/<rid>/report`)
-// and the campaign-level GROUP report (`/assessments/<id>/report`) must be served
-// `no-store, private` so they are never cached by the browser or proxies. The
-// optional `(respondents/<rid>/)?` group matches both shapes without matching the
-// bare campaign page, the respondents listing, or API routes.
-export const REPORT_NO_STORE_REGEX =
-  /^\/assessments\/[^/]+\/(respondents\/[^/]+\/)?report\/?$/;
+// Report routes render named PII and must never be cached. Keep the group and
+// individual patterns separate: CEO self-access intentionally opens only the
+// individual path, never the campaign-level group report.
+export const GROUP_REPORT_NO_STORE_REGEX = /^\/assessments\/[^/]+\/report\/?$/;
+export const RESPONDENT_REPORT_REGEX =
+  /^\/assessments\/[^/]+\/respondents\/[^/]+\/report\/?$/;
 export const PUBLIC_REFERRAL_REPORT_NO_STORE_REGEX =
   /^\/assessments\/public-submissions\/[^/]+\/report\/?$/;
+const CEO_SELF_REPORT_PATH = "/assessments/self-report";
+const CEO_SELF_REPORT_EXCHANGE_PATH = "/assessments/self-report/exchange";
 
 function withRateLimitHeaders(
   response: NextResponse,
@@ -113,13 +115,19 @@ export default withAuth(
       }
     }
 
-    // H15 / R2-LOW-1: the branded results report pages render named PII (scores,
-    // answers). Force no-store on per-respondent, campaign-level group, and
-    // authenticated public-referral reports so they aren't cached by the
-    // browser/proxies.
+    // CEO self exchange + individual report are capability-protected surfaces.
+    // Neither response may be cached or used as a referrer; group behavior stays
+    // unchanged because only the exact respondent-report regex is public.
     const passthrough = NextResponse.next();
     if (
-      REPORT_NO_STORE_REGEX.test(pathname) ||
+      pathname === CEO_SELF_REPORT_PATH ||
+      pathname === CEO_SELF_REPORT_EXCHANGE_PATH ||
+      RESPONDENT_REPORT_REGEX.test(pathname)
+    ) {
+      passthrough.headers.set("Cache-Control", "no-store, private");
+      passthrough.headers.set("Referrer-Policy", "no-referrer");
+    } else if (
+      GROUP_REPORT_NO_STORE_REGEX.test(pathname) ||
       PUBLIC_REFERRAL_REPORT_NO_STORE_REGEX.test(pathname)
     ) {
       passthrough.headers.set("Cache-Control", "no-store, private");
@@ -156,6 +164,14 @@ export default withAuth(
           pathname.startsWith("/org-survey/") ||
           pathname.startsWith("/quiz/") ||
           pathname.startsWith("/api/quiz/") ||
+          (
+            isReportComparisonRolloutActive() &&
+            (
+              pathname === CEO_SELF_REPORT_PATH ||
+              pathname === CEO_SELF_REPORT_EXCHANGE_PATH ||
+              RESPONDENT_REPORT_REGEX.test(pathname)
+            )
+          ) ||
           pathname.startsWith("/wireframes") ||
           pathname.startsWith("/_next") ||
           pathname.includes(".")

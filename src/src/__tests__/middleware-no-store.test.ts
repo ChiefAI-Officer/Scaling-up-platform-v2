@@ -22,8 +22,9 @@ import { readFileSync } from "fs";
 import { join } from "path";
 
 // Extracted verbatim from middleware.ts (REPORT_NO_STORE_REGEX) — keep in sync.
-const REPORT_NO_STORE_REGEX =
-  /^\/assessments\/[^/]+\/(respondents\/[^/]+\/)?report\/?$/;
+const GROUP_REPORT_NO_STORE_REGEX = /^\/assessments\/[^/]+\/report\/?$/;
+const RESPONDENT_REPORT_REGEX =
+  /^\/assessments\/[^/]+\/respondents\/[^/]+\/report\/?$/;
 const PUBLIC_REFERRAL_REPORT_NO_STORE_REGEX =
   /^\/assessments\/public-submissions\/[^/]+\/report\/?$/;
 
@@ -33,7 +34,8 @@ const NO_STORE_HEADER_VALUE = "no-store, private";
 
 /** Mirrors the middleware's no-store decision + header value for a given path. */
 function noStoreHeaderFor(pathname: string): string | undefined {
-  return REPORT_NO_STORE_REGEX.test(pathname) ||
+  return GROUP_REPORT_NO_STORE_REGEX.test(pathname) ||
+    RESPONDENT_REPORT_REGEX.test(pathname) ||
     PUBLIC_REFERRAL_REPORT_NO_STORE_REGEX.test(pathname)
     ? NO_STORE_HEADER_VALUE
     : undefined;

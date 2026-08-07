@@ -63,7 +63,16 @@
 .su-report--executive .report-page--executive-cover h1 { color: #ffffff; font-family: var(--font-assessment-display), Georgia, serif; font-size: clamp(3rem, 8vw, 5.25rem); font-weight: 700; letter-spacing: -.045em; line-height: .96; margin: .6rem 0 1.75rem; overflow-wrap: anywhere; }
 .su-report--executive .report-page--executive-cover header p { color: #efe9f8; margin: .35rem 0; overflow-wrap: anywhere; }
 .su-report--executive .report-page--executive-summary,
-.su-report--executive .report-page--executive-detail { background: #ffffff; }
+.su-report--executive .report-page--executive-detail,
+.su-report--executive .report-page--executive-comparison { background: #ffffff; }
+.su-report--executive .su-report-comparison-cover-subtitle { color: var(--executive-gold-light); font-size: .78rem; font-weight: 700; letter-spacing: .08em; margin: .8rem 0 0; text-transform: uppercase; }
+.su-report--executive .su-report-comparison { margin: 0; padding: 0; border: 0; border-top: 3px solid var(--executive-gold); background: transparent; }
+.su-report--executive .su-report-comparison-eyebrow { color: var(--executive-muted); font-size: .68rem; font-weight: 700; letter-spacing: .16em; margin-top: 1rem; text-transform: uppercase; }
+.su-report--executive .su-report-comparison h2 { margin-top: .45rem; }
+.su-report--executive .su-report-comparison h3 { margin-top: 1.9rem; }
+.su-report--executive .su-report-comparison-coverage { color: var(--executive-muted); font-size: .9rem; }
+.su-report--executive .su-report-comparison-status { color: var(--executive-muted); }
+.su-report--executive .su-report-comparison-delta-status { border-bottom: 1px solid var(--executive-gold); color: var(--executive-muted); font-size: .68rem; font-weight: 700; letter-spacing: .035em; }
 .su-report--executive .report-page h2 { color: var(--executive-purple-900); font-family: var(--font-assessment-display), Georgia, serif; font-size: clamp(1.7rem, 3vw, 2.5rem); letter-spacing: -.025em; line-height: 1.12; margin: 0 0 1rem; }
 .su-report--executive .report-page h3 { color: var(--executive-purple-700); font-size: .8rem; letter-spacing: .12em; margin: 1.75rem 0 .6rem; text-transform: uppercase; }
 .su-report--executive .report-page h2 + p,
