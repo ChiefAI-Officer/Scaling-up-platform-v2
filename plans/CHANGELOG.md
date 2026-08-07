@@ -6,6 +6,19 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="p1-results-email-simplification-launched"></a>
+### 2026-08-07 — P1 respondent results email simplification launched <!-- ENTRY_ISO:2026-08-07 ENTRY_SLUG:p1-results-email-simplification-launched -->
+
+**Status: MERGED + PRODUCTION-DEPLOYED under the existing results-email capability gates.** PR [#316](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/316) passed Build, Migration Safety Gate, Assessment Email Lease (PostgreSQL), Vercel, and Vercel Preview Comments, then squash-merged as `334263bb2c925f1d57456d8c810cc7466e5d3211`. Exact production deployment `dpl_6ZrVsEuGaYLVwREkaBrqfh3iuLUz` reached Ready at `https://scaling-up-platform-v2-hwinfyonl-scaling-up.vercel.app` and owns both canonical aliases.
+
+**Delivered MVP.** The Results email editor presents one working `{{respondentFirstName}}` token and the approved respondent-focused availability/default wording. Existing DRAFT and ACTIVE campaigns can change the stored respondent-results and Coach completion-notification choices through the shared Coach/Admin campaign detail surface; CLOSED campaigns remain read-only. Subject replacement removes control characters, body replacement remains escaped, and unsupported token-like text stays literal. No generic token engine, schema, migration, new route, feature flag, email type, settings framework, or unrelated refactor was added. The existing Wave D/Wave Q approval and capability gates, submit-time authorization, delivery-intent reauthorization, and CEO self-access disclosure checks remain in force; no rollout variable was read or changed.
+
+**Verification and live boundary.** Immediately before push, the exact branch head passed **661 suites / 8,249 tests / 16 snapshots**, changed-file ESLint, migration safety across **45 migrations**, changelog freshness, diff hygiene, and `CI=true npx next build --turbopack` with TypeScript complete and **94/94** static pages. Both canonical `/api/health` endpoints returned HTTP `200` with database `healthy` and auth posture `safe`. A read-only Production request to an invalid invited-survey alias rendered the expected expired-link shell without a 5xx. The PR preview accepted the seeded Coach login and rendered the existing campaign detail, but the relevant controls were hidden by that environment's existing capability gates; seeded Admin credentials were unavailable. Production auth-gated Admin/Coach surfaces were not opened with real credentials, and no Production campaign setting, participant, invitation, response, submission, report, customer data, or email was created or changed.
+
+**Tracking.** The shared issue claim is released with the PR, merge, deployment, health, and validation receipts. The matching AI Solutions Team task is Done.
+
+---
+
 <a id="p1-results-email-simplification-implemented"></a>
 ### 2026-08-07 — P1 respondent results email simplification implemented <!-- ENTRY_ISO:2026-08-07 ENTRY_SLUG:p1-results-email-simplification-implemented -->
 
