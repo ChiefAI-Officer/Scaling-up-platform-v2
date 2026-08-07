@@ -6,6 +6,17 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="consolidated-progress-through-report-appearances"></a>
+### 2026-08-07 — Consolidated progress ledger current through universal report appearances <!-- ENTRY_ISO:2026-08-07 ENTRY_SLUG:consolidated-progress-through-report-appearances -->
+
+**Status: REPORTING LEDGER UPDATED; no runtime change.** The hard cutoff remains the already-sent `output/pdf/Scaling-Up-Progress-Report-2026-07-27-to-2026-07-31.pdf`, which covers 33 merged pull requests through PR #267. The new tracked [August 1–7 progress delta](../docs/agents/jul10-progress-delta-2026-08-01-to-2026-08-07.md) preserves the prior ten outcomes and now records exactly **12** eligible product or reliability outcomes.
+
+**New outcomes after the ten-outcome snapshot.** Outcome 11 is **assessment-template creation simplification** from PR [#309](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/309): the globally enabled ADMIN/STAFF name-first flow creates one canonical empty v1 draft and continues in the existing Build editor. Outcome 12 is **universal individual-report appearances** from PR [#311](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/311): Classic, Executive Boardroom, and Modern Dashboard are globally available for every scored, qualitative, custom, and public individual on-screen/browser-print report, while template defaults remain Classic until deliberately selected. Group/aggregate reports, longitudinal trends, CSV, and report-email HTML remain separate output families.
+
+**Counting discipline.** PRs #306 and #307 are initial canary/repair evidence subsumed by outcome 12; they do not count separately. PRs #305, #308, #310, and #312 are documentation, launch-receipt, or closeout evidence and do not add outcomes. GH #233 remains excluded under the established observational-surface rule. The earlier August 1–5 ten-outcome source remains an unchanged historical snapshot, and work already included in the July 27–31 report remains excluded.
+
+**Reproducible source and tracking.** `src/scripts/build-jul10-closeout-artifacts.py` now validates exactly 12 ordered rows, reads the August 1–7 tracked source, and targets the correspondingly dated review-only delta PDF. The generated PDF remains a derivative and was not sent externally. The existing [Notion report-appearance task](https://app.notion.com/p/3b48c45dd82981889588ccd691f212fe) was updated in place—never duplicated—to universal scope, Production Done status, PR #311/#312 receipts, enabled deployment `dpl_D7WnRzpiuY1PGMukp9LAjVqsANyV`, and the remaining signed-in read-only Admin/Coach visual check. This reporting update performs no flag, deployment, schema, migration, customer-data, response, report, or email mutation.
+
 <a id="universal-individual-report-appearances-launched"></a>
 ### 2026-08-07 — Universal individual-report appearances launched <!-- ENTRY_ISO:2026-08-07 ENTRY_SLUG:universal-individual-report-appearances-launched -->
 

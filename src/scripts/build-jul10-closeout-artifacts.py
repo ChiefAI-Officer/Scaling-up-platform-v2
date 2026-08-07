@@ -123,8 +123,8 @@ def parse_delta(path: Path) -> list[DeltaRow]:
                 rollout=cells[3],
             )
         )
-    if [row.number for row in rows] != list(range(1, 11)):
-        raise ValueError("Progress delta must contain exactly ten ordered outcomes")
+    if [row.number for row in rows] != list(range(1, 13)):
+        raise ValueError("Progress delta must contain exactly twelve ordered outcomes")
     return rows
 
 
@@ -363,9 +363,9 @@ def build_progress_delta(output: Path, rows: list[DeltaRow]) -> None:
 
     story = [
         Paragraph("Scaling Up Platform Progress Delta", styles["DeltaTitle"]),
-        Paragraph("August 1-5, 2026 | Prepared for review only", styles["DeltaLead"]),
+        Paragraph("August 1-7, 2026 | Prepared for review only", styles["DeltaLead"]),
         Paragraph(
-            "<b>Ten outcomes after the July 31 reporting cutoff.</b> "
+            "<b>Twelve outcomes after the July 31 reporting cutoff.</b> "
             "Each outcome is merged and production-verified. Default-off and "
             "dormant capabilities are labelled explicitly and are not described "
             "as active customer-visible behavior.",
@@ -449,9 +449,9 @@ def build_progress_delta(output: Path, rows: list[DeltaRow]) -> None:
         leftMargin=0.55 * inch,
         topMargin=0.55 * inch,
         bottomMargin=0.62 * inch,
-        title="Scaling Up Platform Progress Delta - August 1-5, 2026",
+        title="Scaling Up Platform Progress Delta - August 1-7, 2026",
         author="Scaling Up Platform",
-        subject="Ten outcomes after the July 31 reporting cutoff",
+        subject="Twelve outcomes after the July 31 reporting cutoff",
         invariant=1,
     )
     document.build(story, onFirstPage=footer, onLaterPages=footer)
@@ -480,12 +480,12 @@ def main() -> None:
         root
         / "docs"
         / "agents"
-        / "jul10-progress-delta-2026-08-01-to-2026-08-05.md"
+        / "jul10-progress-delta-2026-08-01-to-2026-08-07.md"
     )
     ledger_rows = parse_ledger(ledger_path)
     delta_rows = parse_delta(delta_path)
     print("53 rows: 43 DONE / 4 PARTIAL / 6 NEEDS DECISION")
-    print("10 post-cutoff outcomes")
+    print("12 post-cutoff outcomes")
     if args.check:
         return
     if not args.source.is_file():
@@ -498,7 +498,7 @@ def main() -> None:
     )
     delta_output = (
         args.output_dir
-        / "Scaling-Up-Progress-Delta-2026-08-01-to-2026-08-05.pdf"
+        / "Scaling-Up-Progress-Delta-2026-08-01-to-2026-08-07.pdf"
     )
     build_status_overlay(args.source, status_output, ledger_rows)
     build_progress_delta(delta_output, delta_rows)
