@@ -1,23 +1,26 @@
-# Runbook — Scaling Up Full individual report styles
+# Runbook — Universal individual report appearances
 
 ## Purpose and boundary
 
-This runbook controls the dark rollout of the two opt-in individual report
-appearances for the `scaling-up-full` scored instrument:
+This runbook controls the rollout of the two opt-in alternate appearances for
+every individual report family:
 
 - `EXECUTIVE_BOARDROOM` (Executive Boardroom)
 - `MODERN_DASHBOARD` (Modern Dashboard)
 
-The only in-scope output is an individual scored on-screen report and its
-browser-print view. Qualitative reports, group reports, other instruments, and
-results-email HTML remain unchanged. The existing admin top navigation and
-coach sidebar are unchanged.
+In scope are scored, qualitative, custom, and public individual on-screen
+reports and their browser-print/PDF views. Each assessment's canonical content
+and semantics decide which sections render; an appearance never invents a
+score, tier, finding, recommendation, CTA, or metadata. Group/aggregate reports,
+longitudinal trends, CSV, and results-email HTML are separate output families
+and remain unchanged. The existing admin top navigation and coach sidebar are
+unchanged.
 
 `CLASSIC` is the persisted migration default, the flag-off result, the kill
 result, and the fail-closed fallback for an invalid, missing, ineligible, or
-otherwise unavailable style. Production must remain Classic until both new
-styles have authoritative visual acceptance under **Authoritative acceptance**
-below.
+otherwise unavailable style. A template default remains `CLASSIC` until an
+ADMIN deliberately changes it; global capability enablement alone never
+rewrites a template or campaign.
 
 ## Controls and identifiers
 
@@ -38,15 +41,27 @@ for new reads, but **does not erase or rewrite** stored
 remove the kill only after the incident is understood and the chosen stored
 styles have been reviewed.
 
+## Current Production state
+
+PR #311 squash-merged as `ab7dacca744cb4d25c4bffe2e2fba78c9ec7f22c`.
+Dark deployment `dpl_33eK4zWDiV2wDS3m3gzKWZxLkh5f` reached Ready before
+activation. `WAVE_REPORT_STYLES_ENABLED=1` is now present in Production, the
+pre-existing exact-campaign canary remains present, and
+`WAVE_REPORT_STYLES_KILL` is absent. Enabled deployment
+`dpl_D7WnRzpiuY1PGMukp9LAjVqsANyV` is Ready on
+`platformtest.scalingup.com`. Public health and preview-asset checks passed;
+authenticated Admin/Coach visual acceptance remains pending because no
+signed-in browser session was available.
+
 ## Preflight
 
 1. Confirm the additive migration
    `20260805090000_add_assessment_report_styles` is included in the release.
    Do not use a data migration to change existing campaigns: they are already
    `CLASSIC` by default.
-2. Deploy with all three variables absent/off. Verify an existing
-   `scaling-up-full` campaign still renders Classic, and that existing report
-   routes do not change.
+2. Deploy with all three variables absent/off. Verify representative existing
+   scored, qualitative, custom, and public results still render Classic and
+   that existing report routes do not change.
 3. Select the canary lane appropriate to the behavior under test. Record only
    exact IDs in the rollout ticket; do not put names, respondent emails, tokens,
    or report URLs in an environment value or this runbook.
@@ -114,16 +129,18 @@ authoritative acceptance workflow below.
      required to verify the ADMIN template-default write and new-campaign
      creation flow, so use it only with a disposable isolated template or
      after explicitly acknowledging that broader blast radius in the rollout
-     ticket. Do not label a production `scaling-up-full` template ID as
-     “synthetic canary campaigns only.”
-2. For the template-ID broad lane only, as ADMIN set the isolated Scaling Up
-   Full ED10 Settings default once to Executive Boardroom and once to Modern
+     ticket.
+2. For the template-ID broad lane only, as ADMIN set an isolated template's
+   ED10 Settings default once to Executive Boardroom and once to Modern
    Dashboard. It applies only to future campaigns; it does not rewrite existing
-   campaigns. Confirm no default control appears for another instrument.
-3. Create a fresh canary campaign for each style. As its owning coach, verify
-   the report-appearance picker at campaign creation and campaign detail.
-   Change the style before a completion to prove the campaign override path.
-4. Submit a synthetic response through each route in scope. Confirm the first
+   campaigns. Repeat with scored, qualitative, and custom fixtures; public
+   campaign appearance remains an ADMIN-owned campaign setting.
+3. Create a fresh invited canary campaign for each style. As its owning coach,
+   verify the report-appearance picker at campaign creation and campaign
+   detail. Change the style before a completion to prove the campaign override
+   path. Verify a disposable public campaign through the ADMIN surface.
+4. Submit a synthetic response through each invited/public route in scope.
+   Confirm the first
    successful completion atomically freezes the campaign choice. Attempt the
    same owner/admin style PATCH afterwards and require `409`; confirm the
    stored style remains unchanged.
@@ -132,20 +149,22 @@ authoritative acceptance workflow below.
    the exact same campaign snapshot is used on screen and in print; canonical
    values, wording, recommendations, and CTA eligibility must match Classic.
 6. Obtain recorded visual acceptance for both Executive Boardroom and Modern
-   Dashboard. A visual acceptance must cover normal, partial, degraded,
-   maximum-length, missing-optional, and long-branding synthetic variants with
-   no clipping, overlap, broken glyphs, blank pages, or lost provenance.
+   Dashboard across scored, qualitative, custom, and public individual reports.
+   Acceptance must cover normal, partial, degraded, maximum-length,
+   missing-optional, and long-branding synthetic variants with no clipping,
+   overlap, broken glyphs, blank pages, invented semantics, or lost provenance.
 7. Only then set `WAVE_REPORT_STYLES_ENABLED=1`, leave the template default
    `CLASSIC`, deploy, and verify a non-canary fresh campaign. General picker
    availability does not itself change a template default.
-8. Change a global default only through a deliberate ADMIN action in the
-   Scaling Up Full ED10 Settings tab, after the general rollout is accepted.
+8. Change a template default only through a deliberate ADMIN action in that
+   template's ED10 Settings tab, after the general rollout is accepted.
    The change affects future campaigns only. Record the decision, approver,
    timestamp, and exact setting in the rollout ticket.
 
 ## Authoritative acceptance
 
-The isolated production-route workflow is the authority:
+The isolated production-route workflow is the authority for every individual
+report anatomy:
 
 `admin default → campaign creation/inheritance → coach override → synthetic
 submission → atomic lock → authorized report route → desktop/mobile/Axe/Letter
@@ -160,12 +179,12 @@ into the child process, builds production output, then starts it. Do not source,
 copy, or use any canonical-checkout remote database environment file.
 
 The supplemental DB-free component-renderer evidence is useful but is not a
-substitute: it bypasses compiled CSS imports and stubs `next/font`. As of this
-runbook's preparation, the supplemental lane passed 2 styles × 6 variants, 12
-Axe scans, 24 responsive screenshots, and 12 Letter PDFs / 111 physical pages.
-The authoritative isolated production-route workflow was **not run** because
-no disposable fixture database and strong sentinel were available. It must not
-be described as passed until it has actually run with those safeguards.
+substitute for the authenticated route workflow. The final universal lane
+passed all 54 anatomy/style/variant combinations with desktop/mobile,
+accessibility, overflow, and complete-print checks. The authoritative isolated
+production-route workflow was **not run** because no disposable fixture
+database and strong sentinel were available. It must not be described as
+passed until it has actually run with those safeguards.
 
 ## Kill, containment, and rollback
 
