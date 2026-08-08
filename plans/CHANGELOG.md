@@ -6,6 +6,15 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="jul10-84-code-merged"></a>
+### 2026-08-08 — July 10 #84 SunHub code merged; activation separately gated <!-- ENTRY_ISO:2026-08-08 ENTRY_SLUG:jul10-84-code-merged -->
+
+**Status: CODE MERGED; Production activation and live acceptance remain pending.** PR [#320](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/320) passed Build, Migration Safety Gate, Assessment Email Lease (PostgreSQL), Vercel, and Vercel Preview Comments, then squash-merged to `main` as `e6ab1539`. Independent re-review confirmed the full-surface Classic correction with no remaining findings. The merged capability remains additive and dormant because the guarded seed was not run.
+
+**Closeout truth.** Row #84 remains PARTIAL at **44 DONE / 4 PARTIAL / 5 NEEDS DECISION**. The code gate is complete; the exact resume gate is separately authorized Production DRAFT creation and visual review, followed by publication, a PUBLIC campaign, one representative submission, and live screen/email verification. No template, version, publication, campaign, response, submission, report, email, environment value, customer record, or other Production state was created or changed in this merge cycle.
+
+---
+
 <a id="jul10-84-sunhub-build-ready"></a>
 ### 2026-08-08 — July 10 #84 SunHub quick quiz ready for protected review <!-- ENTRY_ISO:2026-08-08 ENTRY_SLUG:jul10-84-sunhub-build-ready -->
 
