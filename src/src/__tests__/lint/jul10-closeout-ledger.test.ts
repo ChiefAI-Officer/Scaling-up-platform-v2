@@ -58,7 +58,7 @@ describe("July 10 feedback closeout ledger", () => {
     expect(rows.some((row) => row.number === 57)).toBe(true);
   });
 
-  it("records the evidence-backed 43 done / 4 partial / 6 decision state", () => {
+  it("records the evidence-backed 44 done / 3 partial / 6 decision state", () => {
     const tally = rows.reduce<Record<LedgerStatus, number>>(
       (counts, row) => {
         counts[row.status] += 1;
@@ -67,7 +67,7 @@ describe("July 10 feedback closeout ledger", () => {
       { DONE: 0, PARTIAL: 0, "NEEDS DECISION": 0 },
     );
 
-    expect(tally).toEqual({ DONE: 43, PARTIAL: 4, "NEEDS DECISION": 6 });
+    expect(tally).toEqual({ DONE: 44, PARTIAL: 3, "NEEDS DECISION": 6 });
   });
 
   it("links evidence for every completed row", () => {
@@ -100,7 +100,7 @@ describe("July 10 feedback closeout ledger", () => {
 
     expect(result.status).toBe(0);
     expect(result.stdout).toContain(
-      "53 rows: 43 DONE / 4 PARTIAL / 6 NEEDS DECISION",
+      "53 rows: 44 DONE / 3 PARTIAL / 6 NEEDS DECISION",
     );
   });
 });

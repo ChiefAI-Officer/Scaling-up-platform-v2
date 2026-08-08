@@ -2,7 +2,7 @@
 
 **Source:** Jeff Verdun's 14-page *Scaling Up Assessment Platform - Feedback Report for Gabriel*, prepared 2026-07-10. Section 2 is canonical: 53 rows numbered #30-#87. Rows #31, #34, #36, #38, and #82 are intentionally absent because completed items were excluded.
 
-**Reconciled against:** `origin/main` at `f02d85f201cc1500381126c8f6f21f50a1e6f60f` on 2026-08-05 plus the Production LVA v4 publish receipt below. Current tally: **43 DONE / 4 PARTIAL / 6 NEEDS DECISION**.
+**Reconciled against:** `origin/main` at `e31abda95930cfc5fcb325bee1411edf706a1e06` on 2026-08-08 plus the Production LVA v4 publish receipt below. Current tally: **44 DONE / 3 PARTIAL / 6 NEEDS DECISION**.
 
 **Authority:** This tracked ledger is authoritative; generated PDFs and `tmp/` files are derivatives. Completion is judged against the exact Section 2 ask. Later-discovered scope remains visible as a separately named follow-on and does not silently widen a row.
 
@@ -59,7 +59,7 @@
 | #72 | Four group-report families | Provide group reports for QSP v2, LVA, Rockefeller, and Scaling Up Full. | DONE | [Group-report fork](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/blob/15ee442b124f43155ffd3dfdc1dc08fbfa37cd5e/plans/CHANGELOG.md#L1123) | PR #207 | None | Gabriel |
 | #73 | Rockefeller report header | Show coach name and place the byline below the Scaling Up mark. | DONE | [Report byline closeout](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/blob/15ee442b124f43155ffd3dfdc1dc08fbfa37cd5e/plans/CHANGELOG.md#L967) | PR #230 | None | Gabriel |
 | #74 | View Trends value | Compare the same assessment across time rather than blending unrelated assessment types. | DONE | [Waves M and N](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/blob/15ee442b124f43155ffd3dfdc1dc08fbfa37cd5e/plans/CHANGELOG.md#L1717) | Wave N | None | Gabriel |
-| #75 | Five Dysfunctions answer-driven output | Provide Five-Dysfunctions-specific answer-driven findings and verify their report behavior. | PARTIAL | [Five Dysfunctions audit](jul10-feedback-decision-packets.md#75-five-dysfunctions-answer-driven-output) | Generic Wave U only | Approve the Five-Dysfunctions finding content and outcome semantics, publish a new version, and verify a representative report. | Gabriel with content approval |
+| #75 | Five Dysfunctions answer-driven output | Confirm whether Five Dysfunctions generates findings/results from submitted answers. | DONE | [Five Dysfunctions verification](jul10-feedback-decision-packets.md#75-five-dysfunctions-answer-driven-output) | PR #48 / launched 2026-06-10 | None | Gabriel |
 | #76 | Scaling Up Full and QSP invitations | Use coach-forward copy and correctly positioned coach branding. | DONE | [Invitation family closeout](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/blob/15ee442b124f43155ffd3dfdc1dc08fbfa37cd5e/plans/CHANGELOG.md#L1051) | Invite family PR | None | Gabriel |
 | #77 | Scaling Up Full Welcome wording | Replace generic Welcome text with accurate Scaling Up Full purpose copy. | DONE | [Welcome copy family](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/blob/15ee442b124f43155ffd3dfdc1dc08fbfa37cd5e/plans/CHANGELOG.md#L1011) | PR #225 | None | Gabriel |
 | #78 | Scaling Up Full report header | Verify and correct the same coach-byline layout as the other report families. | DONE | [Report byline closeout](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/blob/15ee442b124f43155ffd3dfdc1dc08fbfa37cd5e/plans/CHANGELOG.md#L967) | PR #230 | None | Gabriel |
@@ -75,14 +75,13 @@
 
 ## Remaining decision queue
 
-The ten non-DONE rows reduce to six unresolved decisions and four implementation/acceptance resumes:
+The nine non-DONE rows reduce to six unresolved decisions and three implementation/acceptance resumes:
 
 1. **Benchmark contract:** #32 decides what may be called an industry benchmark; #57/#58 separately require approved LVA values and an authorized restore/live verification.
 2. **Report fidelity:** #33 needs sanitized, report-specific annotations rather than an umbrella preference.
 3. **LVA content:** #41, #44, and #45 still require content intent before editing. #42 is closed on the active Production v4 wording and compatibility receipt.
 4. **Invitation acceptance:** #47 can close on the standard renderer after Gabriel approves the current copy and a live smoke; full-HTML overrides remain separate.
-5. **Five Dysfunctions content:** #75 needs authored and approved result guidance, not merely the generic findings engine.
-6. **SunHub instrument:** #84 is a new eight-question PUBLIC template and must not overwrite `scaling-up-quick`.
+5. **SunHub instrument:** #84 is a new eight-question PUBLIC template and must not overwrite `scaling-up-quick`.
 
 ## Update protocol
 
@@ -99,5 +98,5 @@ python3 scripts/build-jul10-closeout-artifacts.py
 
 The supplied July 10 source has 83 status occurrences: 30 in Section 1 and all
 53 canonical rows in Section 2. The generator validates that count, the exact
-row set, the 43/4/6 tally, and the ten-outcome delta before writing
+row set, the 44/3/6 tally, and the twelve-outcome delta before writing
 deterministic PDFs under `output/pdf/`.

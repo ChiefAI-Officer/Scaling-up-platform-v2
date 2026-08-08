@@ -80,6 +80,17 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="jul10-75-five-dysfunctions-status-closeout"></a>
+### 2026-08-07 — July 10 #75 Five Dysfunctions status closeout <!-- ENTRY_ISO:2026-08-07 ENTRY_SLUG:jul10-75-five-dysfunctions-status-closeout -->
+
+**Status: EVIDENCE-VERIFIED DONE; no runtime or Production change.** A fresh reconciliation against the original July 10 report corrected the ledger boundary for row #75. Jeff asked for a direct status check on whether Five Dysfunctions generates findings/results from submitted answers; the row did not ask for separately authored Wave U rules. The Five Dysfunctions assessment launched on 2026-06-10 through PR #48 with five answer-driven domain averages—Trust, Conflict, Commitment, Accountability, and Results—and deterministic Low/Medium/High interpretation guidance.
+
+**Evidence and verification.** `prisma/seed-five-dysfunctions.ts` owns the 38-question-to-domain mapping, published tier boundaries, and substantive guidance messages. The shared scoring engine computes `perDomain` from submitted answers and resolves the matching tier; the scored screen and email report paths render that frozen result. After rebasing onto `e31abda9`, the focused scoring/report/ledger/freshness matrix passed **6 suites / 185 tests / 2 snapshots**; the complete repository passed **662 suites / 8,266 tests / 16 snapshots**. Changed-test ESLint, ledger generation checks, Python compilation, migration safety across **46 migrations**, and diff hygiene passed. After regenerating the Prisma client introduced by the rebased migration, `CI=true npx next build --turbopack` compiled successfully, completed TypeScript, and generated **94/94** static pages. The 14-page status overlay and one-page 12-outcome delta were regenerated and visually reviewed without clipping, overlap, or illegible status treatment. Bespoke Wave U findings beyond the existing domain interpretations remain a separately scoped enhancement and do not reopen the original status question.
+
+**Ledger effect and safety boundary.** Row #75 moves from PARTIAL to DONE, updating the canonical tally to **44 DONE / 3 PARTIAL / 6 NEEDS DECISION**. The August 1-7 progress delta remains twelve outcomes because this is a correction to evidence classification for functionality launched in June, not a new post-cutoff product outcome. No template version, publish state, response, email, flag, benchmark, database row, deployment, schema, migration, or customer data was changed.
+
+---
+
 <a id="universal-individual-report-appearances-launched"></a>
 ### 2026-08-07 — Universal individual-report appearances launched <!-- ENTRY_ISO:2026-08-07 ENTRY_SLUG:universal-individual-report-appearances-launched -->
 
