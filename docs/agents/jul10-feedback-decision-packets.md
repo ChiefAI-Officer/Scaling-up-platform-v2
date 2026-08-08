@@ -1,9 +1,9 @@
 # July 10 Assessment Feedback - Approval-Ready Decision Packets
 
-These packets translate the eleven unresolved rows in the
-[canonical closeout ledger](jul10-feedback-closeout.md) into bounded decisions.
+These packets preserve the bounded decisions and verification receipts behind
+the [canonical closeout ledger](jul10-feedback-closeout.md).
 They were reconciled against origin/main at
-987eb7d82f4735e9129186d64608424cfa68b1a6 on 2026-08-05. No production state,
+e31abda95930cfc5fcb325bee1411edf706a1e06 on 2026-08-08. No production state,
 template version, feature flag, benchmark value, customer data, or email was
 changed.
 
@@ -248,31 +248,28 @@ both report surfaces; future-template enablement remains a separate decision.
 <a id="75-five-dysfunctions-answer-driven-output"></a>
 ## #75 Five Dysfunctions answer-driven output
 
-**Exact ask.** Confirm and provide the reportedly missing answer-driven
-Five Dysfunctions findings/results logic.
+**Exact ask.** Confirm whether the Five Dysfunctions assessment generates
+findings/results from submitted answers. The original row is a direct status
+question; it does not require separately authored Wave U finding rules.
 
-**Current truth.** Five Dysfunctions already scores five domains and has
-High/Medium/Low tier guidance. Wave U provides a launched generic,
-snapshot-frozen findings engine. The Five Dysfunctions seed does not author
-instrument-specific finding rules, and no current production report receipt
-proves that experience. Generic capability does not close the instrument ask.
+**Verified answer.** Yes. The launched Five Dysfunctions assessment maps its 38
+submitted answers into five domain averages: Trust, Conflict, Commitment,
+Accountability, and Results. Each average deterministically selects Low,
+Medium, or High interpretation guidance, and the scored report renders those
+answer-driven domain results. The assessment was launched on 2026-06-10 through
+PR #48, before the July 10 report.
 
-**Recommendation.** Have Gabriel with Jeff/Suzanne approve the Five
-Dysfunctions-specific trigger conditions, finding messages, precedence, and
-empty-state behavior. Author them in a new template version using the existing
-Wave U machinery; do not create a second findings subsystem.
+**Evidence.** The source-owned scoring configuration defines the five domains,
+their question membership, exact tier boundaries, and non-placeholder guidance
+messages. The shared scoring engine computes `perDomain` averages from submitted
+answers and resolves the matching tier. The scored screen and email renderers
+consume that frozen result. Focused seed/schema tests guard the five-domain
+mapping and all Low/Medium/High boundaries; the generic scoring and report tests
+guard calculation and presentation.
 
-**Compatibility.** Preserve question/domain keys and historical results. Freeze
-resolved findings at score time under the existing ADR-0021 behavior.
-
-**Acceptance.** Boundary-answer fixtures resolve the approved findings and tier
-guidance deterministically; a representative new-version report is visually
-reviewed and then production-verified after separately authorized publishing.
-
-**Approval sentence.** I approve using the existing Wave U engine for the
-attached Five Dysfunctions-specific rules and messages in a new version;
-preserve stable keys, freeze findings at scoring, and verify a representative
-report after authorized publication.
+**Disposition.** DONE against the exact July 10 status question. Bespoke Wave U
+rules that emit additional findings beyond the existing domain interpretations
+remain a separately scoped enhancement; they do not reopen this row.
 
 <a id="84-sunhub-eight-question-quick-quiz"></a>
 ## #84 SunHub eight-question quick quiz
@@ -306,12 +303,9 @@ approved.
 
 ## Decision order
 
-1. Complete #42's protected merge, then separately authorize a new draft and
-   visual check; publishing remains separate.
-2. Approve the remaining bounded no-new-product-intent packet: #47.
-3. Answer the content questions: #41, #44, and #45.
-4. Approve data/rollout contracts: #32 and #57/#58.
-5. Supply authored outcome content for #75.
-6. Supply the complete source package and build authorization for #84.
-7. Handle #33 through its dedicated report-by-report matrix rather than this
+1. Approve the remaining bounded no-new-product-intent packet: #47.
+2. Answer the content questions: #41, #44, and #45.
+3. Approve data/rollout contracts: #32 and #57/#58.
+4. Supply the complete source package and build authorization for #84.
+5. Handle #33 through its dedicated report-by-report matrix rather than this
    copy/data queue.
