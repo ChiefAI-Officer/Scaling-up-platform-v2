@@ -6,6 +6,17 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="public-campaign-optional-organization-ready"></a>
+### 2026-08-08 — Organization-free PUBLIC campaigns ready for production review <!-- ENTRY_ISO:2026-08-08 ENTRY_SLUG:public-campaign-optional-organization-ready -->
+
+**Status: IMPLEMENTED + REBASED + LOCALLY VERIFIED; not yet pushed, merged, deployed, or written to Production.** The ADMIN/STAFF Public Campaigns form no longer loads or displays an Organization selector and omits `organizationId` from its create request. The dedicated create endpoint no longer accepts or resolves an organization and persists both normal and alias-collision PUBLIC campaign rows with `organizationId = NULL`; audit changes record the same explicit null ownership boundary.
+
+**Data and authorization boundary.** Migration `20260808120000_public_campaign_optional_organization` drops only the `assessment_campaigns.organizationId` NOT NULL constraint, preserving all existing campaign rows and foreign-key links. The Prisma relation is optional because PUBLIC campaigns have no organization roster or ownership. INVITED campaign validation remains organization-required. Coach management, group reporting, participant assignment, invitations, resends, reminders, respondent-report loaders, longitudinal/report-comparison readers, and both unlocked and under-lock invited submission reads fail closed when an invalid organization-free invited row is encountered. Organization-free PUBLIC rows are omitted from invited campaign lists and aggregate organization counts rather than being coerced into synthetic ownership.
+
+**Verification.** On the exact branch rebased onto `b2190848`, the focused post-rebase matrix passed **15 suites / 275 tests**, and the invited submission matrix passed **2 suites / 84 tests** including unlocked and under-lock null-organization regressions. The complete repository passed **662 suites / 8,266 tests / 16 snapshots**. Prisma schema validation and client generation passed; migration safety approved all **46 migrations**; changed-file ESLint reported zero errors (one pre-existing unused `no-console` suppression warning in `access-control.ts`); and `CI=true npx next build --turbopack` compiled successfully, completed TypeScript, and generated **94/94** static pages. No Production campaign, organization, participant, invitation, submission, response, report, email, environment value, or database row was read or changed during local verification.
+
+---
+
 <a id="p1-results-email-simplification-launched"></a>
 ### 2026-08-07 — P1 respondent results email simplification launched <!-- ENTRY_ISO:2026-08-07 ENTRY_SLUG:p1-results-email-simplification-launched -->
 

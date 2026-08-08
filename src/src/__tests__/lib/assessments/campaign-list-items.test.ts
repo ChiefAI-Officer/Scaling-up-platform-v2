@@ -99,4 +99,10 @@ describe("toCampaignListItems", () => {
     const [item] = toCampaignListItems([row()], new Map([["c1", null]]));
     expect(item.edition).toBeNull();
   });
+
+  it("omits a campaign whose list organization is absent", () => {
+    expect(
+      toCampaignListItems([row({ organization: null as never })]),
+    ).toEqual([]);
+  });
 });

@@ -1284,7 +1284,7 @@ model AssessmentCampaign {
   id                  String                       @id @default(cuid())
   templateId          String
   versionId           String
-  organizationId      String
+  organizationId      String?
   language            String
   alias               String                       @unique
   externalId          String?                      @unique // Esperto historical-import provenance + idempotency; stored namespaced "esperto:<campaignid>". Prisma full-unique replaced with partial WHERE NOT NULL via raw SQL (see migration add_external_id_to_campaign), mirroring Organization.externalId.
@@ -1322,7 +1322,7 @@ model AssessmentCampaign {
 
   template       AssessmentTemplate              @relation(fields: [templateId], references: [id])
   version        AssessmentTemplateVersion       @relation(fields: [versionId], references: [id])
-  organization   Organization                    @relation(fields: [organizationId], references: [id])
+  organization   Organization?                   @relation(fields: [organizationId], references: [id])
   creator        User                            @relation("AssessmentCampaignCreatedBy", fields: [createdBy], references: [id])
   creatorCoach   Coach?                          @relation("AssessmentCampaignCreatedByCoach", fields: [createdByCoachId], references: [id])
   participants   AssessmentCampaignParticipant[]

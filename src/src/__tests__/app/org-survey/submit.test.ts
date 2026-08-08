@@ -180,6 +180,7 @@ function mockHappyInvitation(
     creatorCoachFirstName: string;
     creatorCoachLastName: string;
     creatorCoachProfileImage: string | null;
+    organization: { id: string; name: string } | null;
   }>
 ) {
   const invitation = {
@@ -198,6 +199,7 @@ function mockHappyInvitation(
       id: "c1",
       reportStyle: "MODERN_DASHBOARD",
       templateId: "template-1",
+      organizationId: "org-1",
       versionId: "v1",
       alias: "demo",
       deletedAt: null,
@@ -222,6 +224,10 @@ function mockHappyInvitation(
               lastName: overrides?.creatorCoachLastName ?? "Coach",
               profileImage: overrides?.creatorCoachProfileImage ?? null,
             },
+      organization:
+        overrides?.organization === undefined
+          ? { id: "org-1", name: "Example Organization" }
+          : overrides.organization,
       version: {
         id: "v1",
         templateId: "template-1",
@@ -334,6 +340,22 @@ afterEach(() => {
 });
 
 describe("POST submit — strict v6.6 validation", () => {
+  it("404 when an invited campaign has no organization", async () => {
+    mockHappyInvitation({ organization: null });
+
+    const res = await POST(
+      jsonReq({ answers: [{ stableKey: "q1", value: 2 }] }) as never,
+      aliasParams("demo"),
+    );
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({
+      success: false,
+      error: "Invitation not found",
+    });
+    expect(dbMock.$transaction).not.toHaveBeenCalled();
+  });
+
   it("400 EMPTY_ANSWERS when answers array is empty", async () => {
     mockHappyInvitation();
     const res = await POST(jsonReq({ answers: [] }) as never, aliasParams("demo"));
@@ -509,6 +531,27 @@ describe("POST submit — strict v6.6 validation", () => {
     // Prove this exercised the locked path, NOT the Phase-1 early return: the tx
     // opened and the under-lock re-read actually ran.
     expect(txMock.assessmentInvitation.findUnique).toHaveBeenCalledTimes(1);
+    expect(transactionCommitMarker).not.toHaveBeenCalled();
+    expect(transactionRollbackMarker).toHaveBeenCalledTimes(1);
+  });
+
+  it("404 when the under-lock invited campaign has no organization", async () => {
+    const phase1Invitation = mockHappyInvitation();
+    txMock.assessmentInvitation.findUnique.mockResolvedValue({
+      ...phase1Invitation,
+      campaign: {
+        ...phase1Invitation.campaign,
+        organizationId: null,
+      },
+    });
+
+    const res = await POST(
+      jsonReq({ answers: [{ stableKey: "q1", value: 2 }] }) as never,
+      aliasParams("demo"),
+    );
+
+    expect(res.status).toBe(404);
+    expect(txMock.assessmentSubmission.create).not.toHaveBeenCalled();
     expect(transactionCommitMarker).not.toHaveBeenCalled();
     expect(transactionRollbackMarker).toHaveBeenCalledTimes(1);
   });

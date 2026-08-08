@@ -65,7 +65,7 @@ function buildResult(opts: {
 function buildDb(submissions: Array<{
   submittedAt: Date;
   result: ScoreResult;
-  organizationId: string;
+  organizationId: string | null;
 }>): AggregateReportDb {
   return {
     assessmentTemplateVersion: {
@@ -170,6 +170,26 @@ describe("getAggregateReport", () => {
     expect(report.submissionsOverTime).toEqual([
       { date: "2026-05-15", count: 1 },
     ]);
+  });
+
+  it("does not count an organization-free submission as an organization", async () => {
+    const db = buildDb([
+      {
+        submittedAt: new Date("2026-08-08T00:00:00Z"),
+        organizationId: null,
+        result: buildResult({
+          countAchieved: 1,
+          overallTotal: 1,
+          overallAverage: 1,
+          tierLabel: "Low",
+        }),
+      },
+    ]);
+
+    const report = await getAggregateReport(db, "tpl-1", "ver-1");
+
+    expect(report.totalSubmissions).toBe(1);
+    expect(report.distinctOrgs).toBe(0);
   });
 
   it("3 submissions across 2 orgs and different tiers → distinctOrgs=2, histogram correct", async () => {

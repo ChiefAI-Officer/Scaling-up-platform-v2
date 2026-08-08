@@ -124,7 +124,7 @@ interface RawRespondentProfile {
 interface RawCampaign {
   id: string;
   accessMode: "INVITED" | "PUBLIC";
-  organizationId: string;
+  organizationId: string | null;
   // Ownership pointer — read so the alias-aware enablement decision (LVA's
   // coach/org canary) can run INSIDE the loader after the rate limiter, with
   // NO pre-rate-limit DB lookup (Wave J J-3 single source of truth).
@@ -136,7 +136,7 @@ interface RawCampaign {
   importManifest?: unknown;
   // Display names threaded through provenance for the T8 renderer — read in
   // the SAME snapshot (no second un-snapshotted round-trip).
-  organization: { name: string };
+  organization: { name: string } | null;
   template: { alias: string; name: string };
   // Wave K: the creator coach's logo (Coach.profileImage) + name for the
   // <img alt>, read in the same snapshot. Null on admin PUBLIC campaigns.
@@ -410,6 +410,10 @@ export async function getCampaignGroupReport(
           reason: "public",
           templateAlias: campaign.template.alias,
         } as const;
+      }
+
+      if (campaign.organizationId === null || campaign.organization === null) {
+        return { kind: "forbidden" } as const;
       }
 
       // Allowlisted surface: LVA (Jeff 2026-06-18) + SU-Full (Wave J J-3). The

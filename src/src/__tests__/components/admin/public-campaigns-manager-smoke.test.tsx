@@ -2,7 +2,7 @@
  * Wave Z (Z-1) smoke-verify — the Public Campaigns admin page has been ORPHANED
  * (no nav entry) since Task 8; before the sidebar rewire surfaces it we confirm
  * `PublicCampaignsManager` renders its list + create form without crashing,
- * against the three GET endpoints it loads in-mount. No prod contact (fetch mocked).
+ * against the two GET endpoints it loads in-mount. No prod contact (fetch mocked).
  */
 
 import React from "react";
@@ -33,7 +33,7 @@ const PUBLIC_CAMPAIGN = {
     hasNarrativeResponses: true,
   },
   template: { id: "t1", name: "Founder Prompts", alias: "founder-prompts-custom" },
-  organization: { id: "o1", name: "Acme Corp" },
+  organization: null,
 };
 
 beforeEach(() => {
@@ -59,9 +59,7 @@ beforeEach(() => {
                 },
               }],
             }
-          : url.endsWith("/api/organizations")
-            ? { success: true, data: [{ id: "o1", name: "Acme Corp" }] }
-            : { success: true, data: [] };
+          : { success: true, data: [] };
     return { ok: true, status: 200, json: async () => json } as unknown as Response;
   }) as unknown as typeof fetch;
 });
@@ -129,9 +127,6 @@ describe("PublicCampaignsManager — orphaned-page render smoke (Z-1)", () => {
       ),
     ).toBeInTheDocument();
 
-    fireEvent.change(within(createSection).getByLabelText(/organization/i), {
-      target: { value: "o1" },
-    });
     fireEvent.change(within(createSection).getByLabelText(/campaign name/i), {
       target: { value: "Public report test" },
     });
@@ -305,6 +300,43 @@ describe("PublicCampaignsManager — orphaned-page render smoke (Z-1)", () => {
       "2026-08-06T05:00:00.000Z",
     );
     expect(campaignLoads).toBe(1);
+  });
+  it("does not load or display organization selection", async () => {
+    render(<PublicCampaignsManager />);
+    await screen.findByText("Create New PUBLIC Campaign");
+
+    expect(screen.queryByLabelText(/organization/i)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/organizationId is required by the schema/i),
+    ).not.toBeInTheDocument();
+    expect(global.fetch).not.toHaveBeenCalledWith("/api/organizations");
+  });
+
+  it("submits a public campaign without organizationId", async () => {
+    render(<PublicCampaignsManager />);
+    await screen.findByText("Create New PUBLIC Campaign");
+
+    fireEvent.change(screen.getByLabelText(/template/i), {
+      target: { value: "t1" },
+    });
+    fireEvent.change(screen.getByLabelText(/campaign name/i), {
+      target: { value: "Public Quiz" },
+    });
+    fireEvent.change(screen.getByLabelText(/open at/i), {
+      target: { value: "2026-08-08T12:00" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: /create public campaign/i }),
+    );
+
+    await waitFor(() => {
+      const call = (global.fetch as jest.Mock).mock.calls.find(
+        ([url, init]) =>
+          url === "/api/admin/public-campaigns" && init?.method === "POST",
+      );
+      expect(call).toBeDefined();
+      expect(JSON.parse(call[1].body)).not.toHaveProperty("organizationId");
+    });
   });
 });
 

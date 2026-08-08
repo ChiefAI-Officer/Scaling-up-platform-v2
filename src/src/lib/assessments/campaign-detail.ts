@@ -265,7 +265,7 @@ interface CampaignWithRels {
   /** Wave V (V-3): Wave O import-round manifest; non-null ⇒ historical import. */
   importManifest?: unknown;
   template: { id: string; name: string; alias: string };
-  organization: { id: string; name: string };
+  organization: { id: string; name: string } | null;
   /** Wave EV / GH #242 — the pinned version, including retirement state and the
    * sibling-currency inputs. Optional so older fixtures stay valid. */
   version?: {
@@ -396,7 +396,7 @@ export async function getCampaignOverview(
       },
     },
   });
-  if (!campaign) {
+  if (!campaign || !campaign.organization) {
     throw new Error(`Campaign ${campaignId} not found`);
   }
 

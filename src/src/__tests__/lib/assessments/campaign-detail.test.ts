@@ -129,6 +129,14 @@ describe("getCampaignOverview", () => {
     await expect(getCampaignOverview(db, "c1")).rejects.toThrow(/not found/);
   });
 
+  it("uses the not-found outcome when the required organization is absent", async () => {
+    const db = buildDb({
+      campaign: { ...baseCampaign(), organization: null } as never,
+    });
+
+    await expect(getCampaignOverview(db, "c1")).rejects.toThrow(/not found/);
+  });
+
   it("zero participants → all-zero stats", async () => {
     const db = buildDb({ participants: [], invitations: [] });
     const o = await getCampaignOverview(db, "c1");

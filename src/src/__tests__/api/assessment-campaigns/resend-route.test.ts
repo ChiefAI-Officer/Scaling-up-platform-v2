@@ -66,6 +66,7 @@ const coachActor = {
 type CampaignOverrides = {
   status?: "DRAFT" | "ACTIVE" | "CLOSED";
   externalId?: string | null;
+  organizationId?: string | null;
   invitationSubject?: string | null;
   invitationBodyMarkdown?: string | null;
 };
@@ -87,6 +88,11 @@ function buildInvitation(overrides: CampaignOverrides = {}) {
     },
     campaign: {
       id: "c1",
+      organizationId:
+        overrides.organizationId === undefined
+          ? "org-1"
+          : overrides.organizationId,
+      templateId: "tpl-1",
       name: "Demo",
       alias: "demo",
       closeAt: null as Date | null,
@@ -105,10 +111,13 @@ function buildInvitation(overrides: CampaignOverrides = {}) {
         invitationSubject: "Take the assessment",
         invitationBodyMarkdown: "Hi {{respondentFirstName}}",
       },
-      organization: {
-        name: "Acme Corp",
-        owner: { firstName: "Owner", lastName: "Coach" },
-      },
+      organization:
+        overrides.organizationId === null
+          ? null
+          : {
+              name: "Acme Corp",
+              owner: { firstName: "Owner", lastName: "Coach" },
+            },
       creatorCoach: { firstName: "Pat", lastName: "Coach" },
     },
   };
@@ -180,6 +189,28 @@ describe("POST /api/assessment-campaigns/[id]/invitations/[invitationId]/resend"
     expect(body.data.invitationId).toBe("inv-1");
     expect(sendAssessmentInvitationEmail).toHaveBeenCalledTimes(1);
     expect(db.assessmentInvitation.update).toHaveBeenCalledTimes(1);
+  });
+
+  it("409 when a campaign has no organization — no token rotation or email", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue({
+      userId: "u-admin",
+      email: "admin@example.com",
+      role: "ADMIN",
+      coachId: null,
+    });
+    (db.assessmentInvitation.findUnique as jest.Mock).mockResolvedValue(
+      buildInvitation({ organizationId: null })
+    );
+
+    const res = await POST(emptyReq() as never, detailParams("c1", "inv-1"));
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({
+      success: false,
+      error: "Campaign organization is required",
+    });
+    expect(sendAssessmentInvitationEmail).not.toHaveBeenCalled();
+    expect(db.assessmentInvitation.update).not.toHaveBeenCalled();
   });
 
   it("409 when campaign is CLOSED — no email sent (defense-in-depth)", async () => {
