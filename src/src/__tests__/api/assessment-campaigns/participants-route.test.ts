@@ -181,6 +181,32 @@ describe("POST /participants", () => {
     expect(res.status).toBe(409);
   });
 
+  it("409 when a campaign has no organization — no org respondents are queried", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue({
+      userId: "u-admin",
+      email: "admin@example.com",
+      role: "ADMIN",
+      coachId: null,
+    });
+    (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValue({
+      id: "c1",
+      organizationId: null,
+      status: "DRAFT",
+    });
+
+    const res = await POST(
+      jsonReq({ respondentIds: ["r1"] }) as never,
+      detailParams("c1"),
+    );
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({
+      success: false,
+      error: "Campaign organization is required",
+    });
+    expect(db.orgRespondent.findMany).not.toHaveBeenCalled();
+  });
+
   it("400 when respondentIds reference wrong org", async () => {
     (getApiActor as jest.Mock).mockResolvedValue(coachActor);
     (db.orgRespondent.findMany as jest.Mock).mockResolvedValue([]); // none match

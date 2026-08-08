@@ -389,7 +389,7 @@ export async function getRespondentReport(
       select: respondentReportSelect,
     });
 
-    if (!submission) {
+    if (!submission || !submission.campaign.organization) {
       return { status: "not-found" } as const;
     }
 

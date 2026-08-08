@@ -288,6 +288,23 @@ test("1b. gate false propagates exactly while preserving the frozen non-Classic 
   });
 });
 
+test("organization-free invited submission → status:not-found", async () => {
+  mockCanManageCampaign.mockResolvedValue(true);
+  const { $transaction } = makeMockDb({
+    ...GOOD_SUBMISSION,
+    campaign: { ...GOOD_SUBMISSION.campaign, organization: null },
+  } as never);
+
+  const result = await getRespondentReport(
+    { $transaction } as unknown as Parameters<typeof getRespondentReport>[0],
+    makeActor(),
+    "camp-1",
+    "resp-1",
+  );
+
+  expect(result).toEqual({ status: "not-found" });
+});
+
 test("2. ADMIN actor → status:ok (not blocked by canManageCampaign)", async () => {
   mockCanManageCampaign.mockResolvedValue(true);
   const { $transaction } = makeMockDb(GOOD_SUBMISSION);

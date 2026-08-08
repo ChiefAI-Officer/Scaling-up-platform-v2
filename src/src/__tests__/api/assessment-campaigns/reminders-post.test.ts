@@ -400,6 +400,31 @@ describe("POST /api/assessment-campaigns/[id]/reminders", () => {
     expect(db.assessmentInvitation.update).toHaveBeenCalledTimes(2);
   });
 
+  it("409 when a campaign has no organization — no reminder is sent", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue({
+      userId: "u-admin",
+      email: "admin@example.com",
+      role: "ADMIN",
+      coachId: null,
+    });
+    (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValue({
+      ...baseCampaign,
+      organizationId: null,
+      organization: null,
+      participants: ACTIVE_PARTICIPANTS,
+    });
+
+    const res = await POST(emptyReq() as never, detailParams("c1"));
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({
+      success: false,
+      error: "Campaign organization is required",
+    });
+    expect(sendAssessmentInvitationEmail).not.toHaveBeenCalled();
+    expect(db.assessmentInvitation.update).not.toHaveBeenCalled();
+  });
+
   it("single-participant path: only targets supplied IDs", async () => {
     (getApiActor as jest.Mock).mockResolvedValue(coachActor);
     const res = await POST(

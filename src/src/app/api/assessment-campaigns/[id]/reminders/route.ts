@@ -242,6 +242,12 @@ export async function POST(
         { status: 404 }
       );
     }
+    if (campaign.organizationId === null) {
+      return NextResponse.json(
+        { success: false, error: "Campaign organization is required" },
+        { status: 409 }
+      );
+    }
     // Defense-in-depth: a closed campaign or one historically imported from
     // Esperto (externalId set, namespaced "esperto:<id>" per ADR-0006) must
     // never send invitation email. Refuse BEFORE the loop / any send. This

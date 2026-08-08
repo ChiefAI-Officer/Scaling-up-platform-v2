@@ -101,6 +101,12 @@ export async function POST(
         { status: 404 }
       );
     }
+    if (campaign.organizationId === null) {
+      return NextResponse.json(
+        { success: false, error: "Campaign organization is required" },
+        { status: 409 }
+      );
+    }
     if (campaign.status !== "DRAFT") {
       return NextResponse.json(
         {

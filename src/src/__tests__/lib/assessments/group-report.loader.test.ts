@@ -212,7 +212,11 @@ afterEach(() => {
 
 test("PUBLIC campaign → notApplicable (no model built)", async () => {
   const mock = makeMockDb({
-    campaign: makeCampaign({ accessMode: "PUBLIC" }),
+    campaign: makeCampaign({
+      accessMode: "PUBLIC",
+      organizationId: null,
+      organization: null,
+    }),
   });
 
   const res = await callLoader(mock);
@@ -223,6 +227,21 @@ test("PUBLIC campaign → notApplicable (no model built)", async () => {
   // Wave J (J-3): notApplicable carries the alias for page copy + the metric.
   expect(res.templateAlias).toBe("leadership-vision-alignment");
   // No submissions / participants need to be loaded for a non-applicable report.
+  expect(mock._findManySubmissions).not.toHaveBeenCalled();
+});
+
+test("organization-free INVITED campaign → forbidden", async () => {
+  const mock = makeMockDb({
+    campaign: makeCampaign({
+      organizationId: null,
+      organization: null,
+    }),
+  });
+
+  const res = await callLoader(mock);
+
+  expect(res.kind).toBe("forbidden");
+  expect(mock._findManyParticipants).not.toHaveBeenCalled();
   expect(mock._findManySubmissions).not.toHaveBeenCalled();
 });
 

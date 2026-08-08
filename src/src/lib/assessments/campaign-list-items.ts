@@ -25,7 +25,7 @@ export interface CampaignListRow {
   openAt: Date;
   template: { name: string };
   version: PinnedVersion;
-  organization: { id: string; name: string };
+  organization: { id: string; name: string } | null;
   participants: { id: string; respondentId: string }[];
   invitations: {
     respondentId: string;
@@ -39,7 +39,9 @@ export function toCampaignListItems(
   campaigns: CampaignListRow[],
   editionsByCampaignId: CampaignEditionStandingMap,
 ): CampaignListItem[] {
-  return campaigns.map((c) => {
+  return campaigns.flatMap((c) => {
+    if (c.organization === null) return [];
+
     // respondentId → invitation (1-to-1 per campaign).
     const invByRespondentId = new Map(
       c.invitations.map((inv) => [inv.respondentId, inv]),
@@ -70,7 +72,7 @@ export function toCampaignListItems(
         }
       : null;
 
-    return {
+    return [{
       id: c.id,
       name: c.name,
       alias: c.alias,
@@ -81,6 +83,6 @@ export function toCampaignListItems(
       openAt: c.openAt.toISOString(),
       metrics: computeCampaignStatusMetrics(metricsInput),
       edition,
-    };
+    }];
   });
 }

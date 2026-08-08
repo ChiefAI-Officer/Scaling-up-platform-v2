@@ -506,7 +506,7 @@ export async function POST(request: NextRequest) {
     // html hash/length/position) — never the slide bodies.
     function buildCreateAuditChanges(created: {
       templateId: string;
-      organizationId: string;
+      organizationId: string | null;
       versionId: string;
       alias: string;
       status: string;
@@ -711,7 +711,7 @@ export async function POST(request: NextRequest) {
 
     if (data.bulkRespondents && data.bulkRespondents.length > 0) {
       bulkResult = await processBulkRespondentsForCreate(
-        campaign.organizationId,
+        data.organizationId,
         data.bulkRespondents,
       );
     }

@@ -67,7 +67,7 @@ interface VersionRow {
 interface SubmissionRow {
   submittedAt: Date;
   result: unknown;
-  campaign: { organizationId: string };
+  campaign: { organizationId: string | null };
 }
 
 export interface AggregateReportDb {
@@ -241,7 +241,9 @@ export async function getAggregateReport(
   const dateCounts = new Map<string, number>();
 
   for (const row of rows) {
-    orgIds.add(row.campaign.organizationId);
+    if (row.campaign.organizationId !== null) {
+      orgIds.add(row.campaign.organizationId);
+    }
 
     if (isScoreResult(row.result)) {
       const result = row.result;

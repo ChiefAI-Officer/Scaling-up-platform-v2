@@ -60,7 +60,7 @@ interface CoachRow {
 
 interface CampaignRow {
   id: string;
-  organizationId: string;
+  organizationId: string | null;
   templateId: string;
   createdByCoachId: string | null;
   status: "DRAFT" | "ACTIVE" | "CLOSED";
@@ -522,5 +522,24 @@ describe("canManageCampaign", () => {
     await expect(
       canManageCampaign(db, makeActor({ coachId: "coach-1" }), "camp-1", "read"),
     ).resolves.toBe(false);
+  });
+
+  it("organization-free campaign fails coach writes before an organization lookup", async () => {
+    const db = buildDb({
+      campaigns: [
+        {
+          id: "camp-1",
+          organizationId: null,
+          templateId: "T1",
+          createdByCoachId: "coach-1",
+          status: "ACTIVE",
+        },
+      ],
+    });
+
+    await expect(
+      canManageCampaign(db, makeActor({ coachId: "coach-1" }), "camp-1", "write"),
+    ).resolves.toBe(false);
+    expect(db.organization.findUnique).not.toHaveBeenCalled();
   });
 });

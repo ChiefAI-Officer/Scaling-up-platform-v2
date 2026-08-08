@@ -464,6 +464,31 @@ describe("POST /api/assessment-campaigns/[id]/invite", () => {
     expect(registerNewOriginalToken).not.toHaveBeenCalled();
   });
 
+  it("409 when a campaign has no organization — no invitation is created or sent", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue({
+      userId: "u-admin",
+      email: "admin@example.com",
+      role: "ADMIN",
+      coachId: null,
+    });
+    (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValue({
+      ...baseCampaign,
+      organizationId: null,
+      organization: null,
+      participants: PARTICIPANTS,
+    });
+
+    const res = await POST(emptyReq() as never, detailParams("c1"));
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({
+      success: false,
+      error: "Campaign organization is required",
+    });
+    expect(db.assessmentInvitation.create).not.toHaveBeenCalled();
+    expect(sendAssessmentInvitationEmail).not.toHaveBeenCalled();
+  });
+
   it("idempotent re-call: existing SENT row reports already-invited", async () => {
     (getApiActor as jest.Mock).mockResolvedValue(coachActor);
     (db.assessmentInvitation.findMany as jest.Mock).mockResolvedValue([

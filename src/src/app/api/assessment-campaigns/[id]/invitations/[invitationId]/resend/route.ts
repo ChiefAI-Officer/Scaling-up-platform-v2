@@ -149,6 +149,13 @@ export async function POST(
         { status: 409 }
       );
     }
+    const c = invitation.campaign;
+    if (c.organizationId === null) {
+      return NextResponse.json(
+        { success: false, error: "Campaign organization is required" },
+        { status: 409 }
+      );
+    }
     // Defense-in-depth: a closed campaign or one historically imported from
     // Esperto (externalId set, namespaced "esperto:<id>" per ADR-0006) must
     // never re-send invitation email. Refuse BEFORE the token is rotated or
@@ -169,7 +176,6 @@ export async function POST(
     const rawToken = generateRawToken();
     const tokenHash = hashToken(rawToken);
     const appUrl = process.env.APP_URL ?? "http://localhost:3000";
-    const c = invitation.campaign;
     const coachName = resolveCoachName(
       c.creatorCoach ?? null,
       c.organization?.owner ?? null

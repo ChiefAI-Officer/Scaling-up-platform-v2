@@ -181,6 +181,7 @@ async function resolveReportComparison(input: {
     });
     if (
       !campaign ||
+      campaign.organizationId === null ||
       campaign.template?.alias !== REPORT_COMPARISON_ALIAS ||
       !isReportComparisonEnabled({ organizationId: campaign.organizationId, templateId: campaign.templateId })
     ) return empty;

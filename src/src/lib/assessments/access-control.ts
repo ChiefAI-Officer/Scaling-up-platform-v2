@@ -82,7 +82,7 @@ export interface AccessControlDb {
       where: { id: string; deletedAt?: Date | null };
     }) => Promise<{
       id: string;
-      organizationId: string;
+      organizationId: string | null;
       templateId: string;
       createdByCoachId: string | null;
       status: "DRAFT" | "ACTIVE" | "CLOSED";
@@ -270,6 +270,7 @@ export async function canManageCampaign(
   // WRITE requires the coach to STILL own the org AND STILL have template
   // access. This is the H-8 revocation path: losing template access keeps
   // the campaign visible but drops write permissions.
+  if (campaign.organizationId === null) return false;
   const org = await db.organization.findUnique({
     where: { id: campaign.organizationId },
   });
@@ -318,6 +319,7 @@ export async function canViewGroupReport(
   if (!coach || !isCertified(coach)) return false;
 
   // Currency check 2: the coach must STILL own the campaign's org.
+  if (campaign.organizationId === null) return false;
   const org = await db.organization.findUnique({
     where: { id: campaign.organizationId },
   });

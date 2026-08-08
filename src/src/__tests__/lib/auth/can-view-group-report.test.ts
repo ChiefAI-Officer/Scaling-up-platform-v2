@@ -57,7 +57,7 @@ interface CoachRow {
 
 interface CampaignRow {
   id: string;
-  organizationId: string;
+  organizationId: string | null;
   templateId: string;
   createdByCoachId: string | null;
   status: "DRAFT" | "ACTIVE" | "CLOSED";
@@ -286,6 +286,26 @@ describe("canViewGroupReport", () => {
     await expect(
       canViewGroupReport(db, makeActor({ coachId: "coach-1" }), "camp-1"),
     ).resolves.toBe(false);
+  });
+
+  it("organization-free campaign fails before an organization lookup", async () => {
+    const db = buildDb({
+      campaigns: [
+        {
+          id: "camp-1",
+          organizationId: null,
+          templateId: "T1",
+          createdByCoachId: "coach-1",
+          status: "ACTIVE",
+        },
+      ],
+      coaches: [{ id: "coach-1", certificationStatus: "ACTIVE" }],
+    });
+
+    await expect(
+      canViewGroupReport(db, makeActor({ coachId: "coach-1" }), "camp-1"),
+    ).resolves.toBe(false);
+    expect(db.organization.findUnique).not.toHaveBeenCalled();
   });
 
   it("soft-deleted campaign → false (LIVE-only)", async () => {
