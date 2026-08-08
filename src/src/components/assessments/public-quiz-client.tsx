@@ -451,6 +451,7 @@ export function PublicQuizClient({
         templateName,
       },
       degraded: false,
+      publicLeadActions: true,
     };
     return (
       <ReportStyleScope

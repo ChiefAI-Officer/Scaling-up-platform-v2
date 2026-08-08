@@ -388,6 +388,24 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
     expect(screen.queryByText(/60\s*\/\s*100/)).toBeNull();
   });
 
+  it("renders the source actions automatically for the SunHub public result", async () => {
+    await submitAndRender({ templateAlias: "sunhub-quick-quiz" });
+
+    expect(
+      screen.getByRole("link", { name: "Take the 32-question assessment" }),
+    ).toHaveAttribute("href", "https://scalinguptoolkit.com/s/ScaleUpQA");
+    expect(
+      screen.getByRole("link", { name: "Request a complimentary follow-up" }),
+    ).toHaveAttribute(
+      "href",
+      "https://coaches.scalingup.com/coach-match-after-assessment-form",
+    );
+    expect(screen.getByRole("link", { name: "Buy the books" })).toHaveAttribute(
+      "href",
+      "https://scalingup.com/book/",
+    );
+  });
+
   // ── T7-3: POST body includes idempotencyKey ──────────────────────────────
   it("sends idempotencyKey in the POST body", async () => {
     global.fetch = jest.fn().mockResolvedValue({

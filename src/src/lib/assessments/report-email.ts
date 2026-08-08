@@ -137,6 +137,8 @@ export interface BuildRespondentReportArgs {
   submissionId: string;
   /** Optional: the coach who referred this taker. Wired into the CTA mailto link. */
   referringCoachEmail?: string | null;
+  /** True only when this model represents a PUBLIC lead result. */
+  publicLeadActions?: boolean;
   /**
    * Wave OSR (#71) — fields the INVITED path knows but a PUBLIC quiz taker does
    * not. All optional and all defaulting to the previous hardcoded values, so
@@ -209,6 +211,7 @@ export function buildRespondentReportFromSubmission(
     coachLogoUrl: args.coachLogoUrl ?? null,
     coachName: args.coachName ?? null,
     referringCoachEmail: args.referringCoachEmail ?? null,
+    ...(args.publicLeadActions === true ? { publicLeadActions: true } : {}),
   };
 }
 
@@ -228,6 +231,19 @@ function buildEmailNextSteps(
   recipientRole: ReportEmailRecipientRole,
   showCoachLink = true,
 ): string {
+  const publicResultActions = report.publicLeadActions
+    ? reportConfigFor(report.templateAlias).publicResultActions
+    : undefined;
+  if (publicResultActions && publicResultActions.length > 0) {
+    const links = publicResultActions
+      .map(
+        (action) =>
+          `<a href="${escapeHtml(action.href)}" style="display:inline-block;background:${PURPLE};color:#ffffff;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:11px;font-size:14px;margin:5px;">${escapeHtml(action.label)}</a>`,
+      )
+      .join("");
+    return `<tr><td align="center" style="padding:18px 32px 0;">${links}</td></tr>`;
+  }
+
   const takerEmail = report.respondentEmail?.trim() ?? "";
   const coachEmail = report.referringCoachEmail?.trim() ?? "";
   const contactHref =
@@ -870,7 +886,7 @@ export function buildReportEmailHtml({
           <td valign="middle">
             ${bandPill}
             ${escTierMessage ? `<div style="font-size:14px;color:${INK};margin-top:8px;line-height:1.5;">${escTierMessage}</div>` : ""}
-            <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:14px;"><tr>${metaCells.join("")}</tr></table>
+            ${reportConfigFor(report.templateAlias).showOverallMeta !== false ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:14px;"><tr>${metaCells.join("")}</tr></table>` : ""}
           </td>
         </tr>
       </table>
@@ -981,7 +997,11 @@ export function buildReportEmailHtml({
   // Mirrors the on-screen "Detailed breakdown" section. Groups per-question
   // rows under their section. Degrades gracefully when no per-question data.
   let breakdownBlock = "";
-  if (perQuestion.length > 0 && perSection.length > 0) {
+  if (
+    reportConfigFor(report.templateAlias).showDetailedBreakdown !== false &&
+    perQuestion.length > 0 &&
+    perSection.length > 0
+  ) {
     // Build sectionStableKey → perQuestion rows map using questionsByKey meta.
     const pqByKey = new Map<string, PerQuestionResult>();
     for (const pq of perQuestion) pqByKey.set(pq.stableKey, pq);

@@ -339,6 +339,7 @@ describe("getPublicReferralReport", () => {
       assessmentName: "Scaling Up Full",
       templateAlias: "scaling-up-full",
       reportStyle: "MODERN_DASHBOARD",
+      publicLeadActions: true,
       result: FROZEN_RESULT,
       rawAnswers: PUBLIC_SUBMISSION.answers,
       provenance: {

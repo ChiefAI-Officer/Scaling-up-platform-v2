@@ -212,13 +212,19 @@ export function BrandedReport({
 }: BrandedReportProps) {
   // This component is imported by client result flows. Availability must arrive
   // from their server response; WAVE_REPORT_STYLES_* is never read here.
+  const config = reportConfigFor(report.templateAlias);
   const rawStyle = report.reportStyle as unknown;
   const runtimeStyle = typeof rawStyle === "string" ? rawStyle : undefined;
-  const resolvedStyle = effectiveReportStyle({
-    storedStyle: runtimeStyle,
-    available: reportStylesAvailable === true,
-  });
-  const config = reportConfigFor(report.templateAlias);
+  const hasSourcePublicResult =
+    report.publicLeadActions === true &&
+    config.publicResultActions !== undefined &&
+    config.publicResultActions.length > 0;
+  const resolvedStyle = hasSourcePublicResult
+    ? "CLASSIC"
+    : effectiveReportStyle({
+        storedStyle: runtimeStyle,
+        available: reportStylesAvailable === true,
+      });
   const classic = () =>
     config.reportType === "qualitative" ? (
       <QualitativeReport
@@ -255,10 +261,11 @@ export function BrandedReport({
 
   switch (resolvedStyle) {
     case "CLASSIC": {
-      const fallbackReason =
-        rawStyle !== null &&
-        rawStyle !== undefined &&
-        !isReportStyleKey(rawStyle)
+      const fallbackReason = hasSourcePublicResult
+        ? null
+        : rawStyle !== null &&
+            rawStyle !== undefined &&
+            !isReportStyleKey(rawStyle)
           ? "INVALID"
           : isReportStyleKey(rawStyle) && rawStyle !== "CLASSIC"
             ? "UNAVAILABLE"
@@ -609,6 +616,7 @@ export function LegacyClassicReport({
           </div>
         </div>
         {/* small stats row */}
+        {reportConfigFor(report.templateAlias).showOverallMeta !== false && (
         <div className="su-report-stats">
           <div className="su-report-stat">
             <span className="su-report-stat-v">
@@ -627,6 +635,7 @@ export function LegacyClassicReport({
             <span className="su-report-stat-l">Sections</span>
           </div>
         </div>
+        )}
       </section>
 
       {/* ── 2b. Per-decision cards (domain templates only) ──────────────── */}
@@ -678,6 +687,7 @@ export function LegacyClassicReport({
       />
 
       {/* ── 3. Section breakdown ────────────────────────────────────────── */}
+      {reportConfigFor(report.templateAlias).showDetailedBreakdown !== false && (
       <section className="su-report-sections" data-testid="report-sections">
         <div className="su-report-eyebrow">Detailed breakdown</div>
         <h2 className="su-h2 su-report-sec-title">How you scored, section by section</h2>
@@ -794,6 +804,7 @@ export function LegacyClassicReport({
           </ul>
         )}
       </section>
+      )}
 
       {/* ── 4. Scores table (G3 — no team average; #24 — gated by report-config) ── */}
       {reportConfigFor(report.templateAlias).showScoreTable && (
@@ -904,6 +915,11 @@ export function LegacyClassicReport({
           contactEmail={contactEmail ?? report.referringCoachEmail}
           showCoachLink={
             reportConfigFor(report.templateAlias).showCoachCta !== false
+          }
+          publicResultActions={
+            report.publicLeadActions
+              ? reportConfigFor(report.templateAlias).publicResultActions
+              : undefined
           }
         />
       </section>

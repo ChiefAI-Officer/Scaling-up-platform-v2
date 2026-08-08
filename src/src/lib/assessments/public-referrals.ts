@@ -903,6 +903,7 @@ export async function getPublicReferralReport(
       });
       report.referringCoachEmail =
         submission.referringCoach?.email.trim().toLowerCase() || null;
+      report.publicLeadActions = true;
 
       return {
         status: "ok",

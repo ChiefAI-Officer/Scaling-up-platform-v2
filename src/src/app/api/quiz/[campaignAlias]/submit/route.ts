@@ -454,6 +454,7 @@ export async function POST(
         // on the INVITED route, where the real id IS threaded.
         submissionId: "",
         referringCoachEmail: verifiedCoach ? canonicalCoachEmail : null,
+        publicLeadActions: true,
         coachName: verifiedCoach
           ? `${verifiedCoach.firstName} ${verifiedCoach.lastName}`.trim() || null
           : null,
