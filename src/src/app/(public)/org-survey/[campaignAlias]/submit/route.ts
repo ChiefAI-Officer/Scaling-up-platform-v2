@@ -778,7 +778,11 @@ export async function POST(
         },
       });
 
-      if (!invitation || invitation.campaign.alias !== campaignAlias) {
+      if (
+        !invitation ||
+        invitation.campaign.alias !== campaignAlias ||
+        invitation.campaign.organization === null
+      ) {
         return NextResponse.json(
           { success: false, error: "Invitation not found" },
           { status: 404, headers: NO_STORE_HEADERS }
@@ -1092,7 +1096,11 @@ export async function POST(
           },
         });
 
-        if (!locked || locked.campaign.alias !== campaignAlias) {
+        if (
+          !locked ||
+          locked.campaign.alias !== campaignAlias ||
+          locked.campaign.organizationId === null
+        ) {
           throw new SubmissionTransactionAbort("not-found");
         }
         const now = new Date();
