@@ -34,11 +34,6 @@ interface TemplateSummary {
   reportStylePreviewCapabilities: ReportStylePreviewCapabilities;
 }
 
-interface OrgSummary {
-  id: string;
-  name: string;
-}
-
 interface PublicCampaignRow {
   id: string;
   name: string;
@@ -109,7 +104,6 @@ function SubmissionResult({ summary }: { summary: PublicResultSummary }) {
 export function PublicCampaignsManager() {
   const [campaigns, setCampaigns] = useState<PublicCampaignRow[]>([]);
   const [templates, setTemplates] = useState<TemplateSummary[]>([]);
-  const [orgs, setOrgs] = useState<OrgSummary[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -169,7 +163,6 @@ export function PublicCampaignsManager() {
 
   // Form state
   const [templateId, setTemplateId] = useState("");
-  const [organizationId, setOrganizationId] = useState("");
   const [name, setName] = useState("");
   const [openAt, setOpenAt] = useState("");
   const [closeAt, setCloseAt] = useState("");
@@ -185,10 +178,9 @@ export function PublicCampaignsManager() {
     setError(null);
     try {
       // Load campaigns filtered to PUBLIC
-      const [campsRes, tmplRes, orgsRes] = await Promise.all([
+      const [campsRes, tmplRes] = await Promise.all([
         fetch("/api/admin/public-campaigns"),
         fetch("/api/assessment-templates"),
-        fetch("/api/organizations"),
       ]);
 
       if (campsRes.ok) {
@@ -222,10 +214,6 @@ export function PublicCampaignsManager() {
         setTemplates((body.data ?? []).filter((t) => !t.disabledAt));
       }
 
-      if (orgsRes.ok) {
-        const body = (await orgsRes.json()) as { data: OrgSummary[] };
-        setOrgs(body.data ?? []);
-      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load data");
     } finally {
@@ -241,8 +229,8 @@ export function PublicCampaignsManager() {
     e.preventDefault();
     setFormError(null);
     setSuccess(null);
-    if (!templateId || !organizationId || !name || !openAt) {
-      setFormError("Template, Organization, Name, and Open Date are required.");
+    if (!templateId || !name || !openAt) {
+      setFormError("Template, Name, and Open Date are required.");
       return;
     }
     setSubmitting(true);
@@ -252,7 +240,6 @@ export function PublicCampaignsManager() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           templateId,
-          organizationId,
           name,
           openAt: new Date(openAt).toISOString(),
           closeAt: closeAt ? new Date(closeAt).toISOString() : null,
@@ -270,7 +257,6 @@ export function PublicCampaignsManager() {
       }
       setSuccess("Campaign created as DRAFT.");
       setTemplateId("");
-      setOrganizationId("");
       setName("");
       setOpenAt("");
       setCloseAt("");
@@ -799,32 +785,6 @@ export function PublicCampaignsManager() {
               )}
             </div>
           )}
-
-          {/* Organization */}
-          <div className="wf-field">
-            <label htmlFor="pc-org" className="wf-label">
-              Organization <span aria-hidden="true">*</span>
-            </label>
-            <select
-              id="pc-org"
-              className="wf-select"
-              value={organizationId}
-              onChange={(e) => setOrganizationId(e.target.value)}
-              required
-            >
-              <option value="">— select an organization —</option>
-              {orgs.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.name}
-                </option>
-              ))}
-            </select>
-            <p className="wf-field-hint">
-              organizationId is required by the schema (NOT NULL FK). The
-              campaign attaches to a real organization even for PUBLIC access.
-            </p>
-          </div>
-
           {/* Campaign name */}
           <div className="wf-field">
             <label htmlFor="pc-name" className="wf-label">
