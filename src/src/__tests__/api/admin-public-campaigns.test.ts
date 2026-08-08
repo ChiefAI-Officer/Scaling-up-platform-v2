@@ -130,7 +130,6 @@ function publishParams(id: string) {
 
 const validBody = {
   templateId: "tpl-1",
-  organizationId: "org-1",
   name: "Public Q2 Campaign",
   openAt: "2026-07-01T00:00:00.000Z",
 };
@@ -150,7 +149,7 @@ const mockCampaign = {
   name: "Public Q2 Campaign",
   templateId: "tpl-1",
   versionId: "ver-1",
-  organizationId: "org-1",
+  organizationId: null,
   language: "enUS",
   alias: "rockefeller_pub_260701000000",
   status: "DRAFT",
@@ -361,9 +360,16 @@ describe("POST /api/admin/public-campaigns — CREATE", () => {
       return copy;
     }
 
-    it("returns 400 when organizationId is missing", async () => {
-      const res = await createPost(makeCreateRequest(omitKey("organizationId")) as never);
-      expect(res.status).toBe(400);
+    it("creates a PUBLIC campaign without an organization", async () => {
+      const res = await createPost(makeCreateRequest(validBody) as never);
+
+      expect(res.status).toBe(201);
+      expect(db.organization.findUnique).not.toHaveBeenCalled();
+      expect(db.assessmentCampaign.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ organizationId: null }),
+        }),
+      );
     });
 
     it("returns 400 when name is missing", async () => {
@@ -382,7 +388,7 @@ describe("POST /api/admin/public-campaigns — CREATE", () => {
     });
   });
 
-  describe("template / org not found", () => {
+  describe("template state", () => {
     beforeEach(() => {
       (getApiActor as jest.Mock).mockResolvedValue(adminActor);
     });
@@ -401,12 +407,6 @@ describe("POST /api/admin/public-campaigns — CREATE", () => {
 
     it("returns 404 when template row does not exist", async () => {
       (db.assessmentTemplate.findUnique as jest.Mock).mockResolvedValue(null);
-      const res = await createPost(makeCreateRequest(validBody) as never);
-      expect(res.status).toBe(404);
-    });
-
-    it("returns 404 when organization does not exist", async () => {
-      (db.organization.findUnique as jest.Mock).mockResolvedValue(null);
       const res = await createPost(makeCreateRequest(validBody) as never);
       expect(res.status).toBe(404);
     });
@@ -577,7 +577,10 @@ describe("POST /api/admin/public-campaigns — CREATE", () => {
         expect.objectContaining({
           action: "CREATE",
           entityType: "AssessmentCampaign",
-          changes: expect.objectContaining({ accessMode: "PUBLIC" }),
+          changes: expect.objectContaining({
+            accessMode: "PUBLIC",
+            organizationId: null,
+          }),
         })
       );
     });
@@ -623,6 +626,11 @@ describe("POST /api/admin/public-campaigns — CREATE", () => {
       );
       expect(res.status).toBe(201);
       expect(db.assessmentCampaign.create).toHaveBeenCalledTimes(2);
+      expect(
+        (db.assessmentCampaign.create as jest.Mock).mock.calls.map(
+          ([args]) => args.data.organizationId,
+        ),
+      ).toEqual([null, null]);
       // Second call alias has a suffix
       const secondAlias = (db.assessmentCampaign.create as jest.Mock).mock.calls[1][0].data.alias;
       expect(secondAlias).toMatch(/rockefeller_pub_\d{12}_[a-z0-9]+/);

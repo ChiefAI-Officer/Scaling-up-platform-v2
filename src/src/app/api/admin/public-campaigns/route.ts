@@ -4,7 +4,7 @@
  * POST /api/admin/public-campaigns
  *   Create an accessMode="PUBLIC" campaign for a published template.
  *   Admin/STAFF-only. Coaches are forbidden.
- *   organizationId is REQUIRED (schema reality: NOT NULL FK — no synthetic rows).
+ *   PUBLIC campaigns have no organization roster or ownership.
  *
  * Spec ref: docs/specs/v7.6/13-assessment-brand-and-results-report.md
  * Designed for quick/public assessments where respondents self-enroll.
@@ -63,7 +63,6 @@ function slugifyForAlias(s: string): string {
 
 const createPublicCampaignSchema = z.object({
   templateId: z.string().min(1),
-  organizationId: z.string().min(1),
   name: z.string().min(1).max(200),
   openAt: z.string().min(1),
   closeAt: z.string().optional().nullable(),
@@ -210,7 +209,6 @@ export async function POST(request: NextRequest) {
 
     const {
       templateId,
-      organizationId,
       name,
       openAt,
       closeAt,
@@ -324,19 +322,6 @@ export async function POST(request: NextRequest) {
         ? (template.defaultReportStyle as ReportStyleKey)
         : "CLASSIC",
     );
-
-    // 5b. Verify org exists
-    const org = await db.organization.findUnique({
-      where: { id: organizationId },
-      select: { id: true, name: true },
-    });
-    if (!org) {
-      return NextResponse.json(
-        { success: false, error: "Organization not found" },
-        { status: 404 }
-      );
-    }
-
     // 6. Build alias
     const ts = buildAliasTimestamp(new Date());
     const tmplSlug = slugifyForAlias(
@@ -350,7 +335,7 @@ export async function POST(request: NextRequest) {
         name,
         templateId,
         versionId: version.id,
-        organizationId,
+        organizationId: null,
         language: version.language,
         alias,
         status: "DRAFT" as const,
@@ -400,7 +385,7 @@ export async function POST(request: NextRequest) {
       changes: {
         accessMode: "PUBLIC",
         templateId,
-        organizationId,
+        organizationId: null,
         versionId: version.id,
         alias: campaign.alias,
         reportStyle: reportStylePolicy.reportStyle,
