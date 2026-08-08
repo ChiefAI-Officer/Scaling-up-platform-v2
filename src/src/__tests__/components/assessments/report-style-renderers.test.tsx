@@ -752,6 +752,27 @@ describe("BrandedReport explicit appearance dispatch", () => {
 });
 
 describe("enabled Classic surface fidelity", () => {
+  it("marks a SunHub public result as Classic across the outer surface", () => {
+    const report = {
+      ...scalingUpFullReport("MODERN_DASHBOARD"),
+      templateAlias: "sunhub-quick-quiz",
+      publicLeadActions: true,
+    };
+
+    const markup = renderToStaticMarkup(
+      <ReportStyleScope report={report} reportStylesAvailable>
+        <div className="su-report-page" data-testid="report-surface">
+          <BrandedReport report={report} reportStylesAvailable />
+        </div>
+      </ReportStyleScope>,
+    );
+
+    expect(markup).toContain('data-enabled-report-style="CLASSIC"');
+    expect(markup).not.toContain(
+      'data-enabled-report-style="MODERN_DASHBOARD"',
+    );
+  });
+
   it(
     "matches the real enabled surface to the preview harness at 393px",
     async () => {

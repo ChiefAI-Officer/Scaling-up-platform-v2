@@ -60,4 +60,28 @@ describe("reportConfigFor", () => {
       showTier: false,
     });
   });
+
+  it("gives the SunHub public quiz its source-owned result actions", () => {
+    expect(reportConfigFor("sunhub-quick-quiz")).toEqual({
+      reportType: "scored",
+      showScoreTable: false,
+      showDetailedBreakdown: false,
+      showOverallMeta: false,
+      showTier: true,
+      publicResultActions: [
+        {
+          label: "Take the 32-question assessment",
+          href: "https://scalinguptoolkit.com/s/ScaleUpQA",
+        },
+        {
+          label: "Request a complimentary follow-up",
+          href: "https://coaches.scalingup.com/coach-match-after-assessment-form",
+        },
+        {
+          label: "Buy the books",
+          href: "https://scalingup.com/book/",
+        },
+      ],
+    });
+  });
 });

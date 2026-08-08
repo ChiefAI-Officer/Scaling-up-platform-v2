@@ -175,6 +175,12 @@ export interface RespondentReport {
    */
   referringCoachEmail?: string | null;
   /**
+   * True only for a PUBLIC lead result surface. Report configuration may use
+   * this marker to replace generic next steps with source-owned lead actions.
+   * Invited and operator-built reports omit it rather than inferring from alias.
+   */
+  publicLeadActions?: boolean;
+  /**
    * Wave K — the creator coach's logo URL (Coach.profileImage), shown on the
    * report cover + footer-left alongside the Scaling Up mark. Null when there
    * is no creator coach or the coach has no profileImage (admin PUBLIC

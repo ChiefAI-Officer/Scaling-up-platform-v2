@@ -1,10 +1,19 @@
 export type ReportType = "scored" | "qualitative";
 
+export interface PublicResultAction {
+  label: string;
+  href: string;
+}
+
 export interface ReportConfig {
   /** Which renderer drives the per-respondent report. */
   reportType: ReportType;
   /** Whether the scored renderer shows the "All sections" score/average table. */
   showScoreTable: boolean;
+  /** Whether the scored renderer lists every answered statement by section. */
+  showDetailedBreakdown?: boolean;
+  /** Whether the overall block shows total, average, and section-count facts. */
+  showOverallMeta?: boolean;
   /**
    * Whether to show the tier band (ADR-0015).
    *
@@ -22,6 +31,12 @@ export interface ReportConfig {
    * five-dysfunctions opts out (`false`). Read as `showCoachCta !== false`.
    */
   showCoachCta?: boolean;
+  /**
+   * Source-owned next steps for a PUBLIC lead result. These replace the generic
+   * Learn More / coach links only when `RespondentReport.publicLeadActions` is
+   * true; invited and operator renders retain their existing conclusion.
+   */
+  publicResultActions?: readonly PublicResultAction[];
 }
 
 /** Default = current behaviour (back-compatible): scored report with the table and tier shown, coach CTA shown. */
@@ -51,6 +66,27 @@ const REPORT_CONFIG: Readonly<Record<string, ReportConfig>> = {
    * standing is peer-deviation. The ScaleUp score + score table still render.
    */
   "scaling-up-full": { reportType: "scored", showScoreTable: true, showTier: false },
+  "sunhub-quick-quiz": {
+    reportType: "scored",
+    showScoreTable: false,
+    showDetailedBreakdown: false,
+    showOverallMeta: false,
+    showTier: true,
+    publicResultActions: [
+      {
+        label: "Take the 32-question assessment",
+        href: "https://scalinguptoolkit.com/s/ScaleUpQA",
+      },
+      {
+        label: "Request a complimentary follow-up",
+        href: "https://coaches.scalingup.com/coach-match-after-assessment-form",
+      },
+      {
+        label: "Buy the books",
+        href: "https://scalingup.com/book/",
+      },
+    ],
+  },
   /**
    * Five Dysfunctions: scored (DEFAULT presentation) but WITHOUT the
    * "Talk to your Scaling Up Certified Coach" CTA (#81). All other scored
@@ -84,4 +120,17 @@ export function reportConfigFor(alias: string | null | undefined): ReportConfig 
   if (!alias) return DEFAULT_REPORT_CONFIG;
   if (alias.startsWith(WALK_QUALITATIVE_PREFIX)) return WALK_QUALITATIVE_CONFIG;
   return REPORT_CONFIG[alias] ?? DEFAULT_REPORT_CONFIG;
+}
+
+/**
+ * Identifies a public result whose next-step presentation is owned by its
+ * tracked source package. Every report surface uses this same decision so the
+ * renderer and its outer style scope cannot disagree.
+ */
+export function hasSourcePublicResult(
+  templateAlias: string | null | undefined,
+  publicLeadActions: boolean | undefined,
+): boolean {
+  const actions = reportConfigFor(templateAlias).publicResultActions;
+  return publicLeadActions === true && actions !== undefined && actions.length > 0;
 }

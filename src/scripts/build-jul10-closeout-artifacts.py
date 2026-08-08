@@ -18,7 +18,7 @@ EXPECTED_ROWS = [
     66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81,
     83, 84, 85, 86, 87,
 ]
-EXPECTED_TALLY = {"DONE": 44, "PARTIAL": 3, "NEEDS DECISION": 6}
+EXPECTED_TALLY = {"DONE": 44, "PARTIAL": 4, "NEEDS DECISION": 5}
 PDF_DEPENDENCIES = ("pdfplumber", "pypdf", "reportlab")
 
 
@@ -484,7 +484,7 @@ def main() -> None:
     )
     ledger_rows = parse_ledger(ledger_path)
     delta_rows = parse_delta(delta_path)
-    print("53 rows: 44 DONE / 3 PARTIAL / 6 NEEDS DECISION")
+    print("53 rows: 44 DONE / 4 PARTIAL / 5 NEEDS DECISION")
     print("12 post-cutoff outcomes")
     if args.check:
         return

@@ -267,6 +267,9 @@ describe("POST /api/quiz/[campaignAlias]/submit", () => {
         (input) => input.reportStyle === "EXECUTIVE_BOARDROOM",
       ),
     ).toBe(true);
+    expect(
+      reportBuildInputs.every((input) => input.publicLeadActions === true),
+    ).toBe(true);
     expect(reportBuildTransactionStates).toEqual([false, false, false]);
   });
 });

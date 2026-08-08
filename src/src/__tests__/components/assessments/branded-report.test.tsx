@@ -74,6 +74,42 @@ describe("BrandedReport — respondent identity and next steps", () => {
       screen.getByRole("link", { name: /talk to a coach/i }),
     ).toHaveAttribute("href", "https://scalingup.com/coaches");
   });
+
+  it("renders the three source actions for a SunHub public result", () => {
+    render(
+      <BrandedReport
+        report={baseReport({
+          ...rockefellerReport(),
+          templateAlias: "sunhub-quick-quiz",
+          publicLeadActions: true,
+          reportStyle: "MODERN_DASHBOARD",
+        })}
+        reportStylesAvailable
+      />,
+    );
+
+    expect(
+      screen.getByRole("link", { name: "Take the 32-question assessment" }),
+    ).toHaveAttribute("href", "https://scalinguptoolkit.com/s/ScaleUpQA");
+    expect(
+      screen.getByRole("link", { name: "Request a complimentary follow-up" }),
+    ).toHaveAttribute(
+      "href",
+      "https://coaches.scalingup.com/coach-match-after-assessment-form",
+    );
+    expect(screen.getByRole("link", { name: "Buy the books" })).toHaveAttribute(
+      "href",
+      "https://scalingup.com/book/",
+    );
+    expect(screen.queryByRole("link", { name: /learn more/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /find a coach/i })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("report-sections")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("report-scores-table")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("modern-dashboard-report")).not.toBeInTheDocument();
+    expect(screen.queryByText("Total points")).not.toBeInTheDocument();
+    expect(screen.queryByText("Average per item")).not.toBeInTheDocument();
+    expect(screen.queryByText("Sections")).not.toBeInTheDocument();
+  });
 });
 
 // ── Rockefeller — countAchieved + real tiers + checkmarks, no domains/recs ──

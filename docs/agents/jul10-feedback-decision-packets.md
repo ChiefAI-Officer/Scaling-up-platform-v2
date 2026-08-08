@@ -3,7 +3,7 @@
 These packets preserve the bounded decisions and verification receipts behind
 the [canonical closeout ledger](jul10-feedback-closeout.md).
 They were reconciled against origin/main at
-e31abda95930cfc5fcb325bee1411edf706a1e06 on 2026-08-08. No production state,
+192eaa36e0b1d3cfd3c886728e538a7918db9963 on 2026-08-08. No production state,
 template version, feature flag, benchmark value, customer data, or email was
 changed.
 
@@ -277,35 +277,41 @@ remain a separately scoped enhancement; they do not reopen this row.
 **Exact ask.** Determine the build status of the SunHub “Scaling Up 4 Decisions
 Quick Quiz,” an eight-question lead-magnet assessment with end feedback.
 
-**Current truth.** The platform has a reusable PUBLIC assessment engine and a
-different 32-question, four-domain Scaling Up assessment in
-[seed-scaling-up-quick-assessment.ts](../../src/prisma/seed-scaling-up-quick-assessment.ts).
-No authoritative eight-question SunHub content package was found. Historical
-planning distinguishes the two instruments.
+**Current truth.** The authoritative source package is the tracked
+[SunHub workbook](../../From%20Jeff/APP_scaling%20up%20assessemnt/SunHub_ScalingUpQuiz/SU-Quiz.xlsx).
+It contains eight ordered 0-10 questions, four feedback bands, source result
+copy, source visuals, and three CTA destinations. The source-backed build now
+exists as a separate `sunhub-quick-quiz` PUBLIC template with one question per
+page and its own result presentation. The different 32-question, four-domain
+assessment in
+[seed-scaling-up-quick-assessment.ts](../../src/prisma/seed-scaling-up-quick-assessment.ts)
+is unchanged.
 
-**Recommendation.** Build a separate PUBLIC template named “Scaling Up 4
-Decisions Quick Quiz (SunHub).” Do not rename, reseed, or replace the existing
-32-question scaling-up-quick template. Resume only after receiving the
-authoritative eight questions, scale, scoring/tier feedback, CTA destinations,
-branding/embed requirements, and source-rights approval.
+**Recommendation.** Accept the separate-template implementation through
+protected review. After merge, authorize a guarded DRAFT creation and visual
+check first; publication, PUBLIC campaign creation, and a representative live
+screen/email verification remain explicit later Production actions.
 
 **Compatibility.** Use a new alias and fresh sunhub_* section/question keys.
 Any legacy-result import needs its own discovered and locked crosswalk.
 
-**Acceptance.** An owner-approved fixture exposes exactly eight questions,
-scores and renders the approved feedback and CTAs, accepts a PUBLIC submission,
-and leaves the 32-question campaign and results unchanged.
+**Acceptance.** The source fixture already locks exactly eight questions,
+source ordering, 0-10 scale, boundary scoring, four feedback bands, and three
+CTA destinations. Final closure still requires protected merge, separately
+authorized activation, one PUBLIC submission, screen/email verification, and
+confirmation that the 32-question campaign and results remain unchanged.
 
-**Approval sentence.** I approve treating #84 as a separate eight-question
-SunHub PUBLIC template; preserve scaling-up-quick unchanged and do not begin the
-build until the authoritative content, feedback, CTAs, branding, and rights are
-approved.
+**Approval status.** Gabriel approved treating #84 as a separate eight-question
+SunHub PUBLIC template and confirmed that the tracked source package is
+sufficient for the build. This approval does not authorize Production seed,
+publication, campaign creation, submission, or email delivery.
 
 ## Decision order
 
 1. Approve the remaining bounded no-new-product-intent packet: #47.
 2. Answer the content questions: #41, #44, and #45.
 3. Approve data/rollout contracts: #32 and #57/#58.
-4. Supply the complete source package and build authorization for #84.
+4. Resume #84 acceptance after protected merge through separately authorized
+   DRAFT creation, publication, PUBLIC campaign creation, and live verification.
 5. Handle #33 through its dedicated report-by-report matrix rather than this
    copy/data queue.

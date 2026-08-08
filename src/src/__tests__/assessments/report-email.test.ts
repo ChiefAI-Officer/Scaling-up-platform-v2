@@ -206,6 +206,30 @@ function neutralReport(): RespondentReport {
 // ── Tests ──────────────────────────────────────────────────────────────────
 
 describe("buildReportEmailHtml — overall score", () => {
+  it("renders the three source actions for the SunHub public result email", () => {
+    const { bodyHtml } = buildReportEmailHtml({
+      report: fourDecisionsReport({
+        templateAlias: "sunhub-quick-quiz",
+        publicLeadActions: true,
+      }),
+      recipientRole: "TAKER_COPY",
+    });
+
+    expect(bodyHtml).toContain("Take the 32-question assessment");
+    expect(bodyHtml).toContain("https://scalinguptoolkit.com/s/ScaleUpQA");
+    expect(bodyHtml).toContain("Request a complimentary follow-up");
+    expect(bodyHtml).toContain(
+      "https://coaches.scalingup.com/coach-match-after-assessment-form",
+    );
+    expect(bodyHtml).toContain("Buy the books");
+    expect(bodyHtml).toContain("https://scalingup.com/book/");
+    expect(bodyHtml).not.toContain("Detailed breakdown");
+    expect(bodyHtml).not.toContain("Score summary");
+    expect(bodyHtml).not.toContain("Total points");
+    expect(bodyHtml).not.toContain("Avg / item");
+    expect(bodyHtml).not.toContain("Sections");
+  });
+
   it("does not change rendered email bytes when the frozen report style changes", () => {
     const classic = buildReportEmailHtml({
       report: fourDecisionsReport(),
@@ -574,6 +598,16 @@ describe("buildRespondentReportFromSubmission — templateAlias", () => {
   it("threads the required frozen campaign reportStyle onto the report model", () => {
     const report = buildRespondentReportFromSubmission(submissionArgs());
     expect(Object.getOwnPropertyDescriptor(report, "reportStyle")?.value).toBe("MODERN_DASHBOARD");
+  });
+
+  it("threads the public-lead result marker without inferring it for invited reports", () => {
+    const publicReport = buildRespondentReportFromSubmission(
+      submissionArgs({ publicLeadActions: true }),
+    );
+    const invitedReport = buildRespondentReportFromSubmission(submissionArgs());
+
+    expect(publicReport.publicLeadActions).toBe(true);
+    expect(invitedReport.publicLeadActions).toBeUndefined();
   });
 
   it.each(["EXECUTIVE_BOARDROOM", "MODERN_DASHBOARD"] as const)(

@@ -1,6 +1,9 @@
+import type { PublicResultAction } from "@/lib/assessments/report-config";
+
 interface ReportNextStepsProps {
   contactEmail?: string | null;
   showCoachLink?: boolean;
+  publicResultActions?: readonly PublicResultAction[];
 }
 
 const COACH_DIRECTORY_URL = "https://scalingup.com/coaches";
@@ -8,6 +11,7 @@ const COACH_DIRECTORY_URL = "https://scalingup.com/coaches";
 export function ReportNextSteps({
   contactEmail,
   showCoachLink = true,
+  publicResultActions,
 }: ReportNextStepsProps) {
   const email = contactEmail?.trim() ?? "";
   const coachHref =
@@ -17,17 +21,31 @@ export function ReportNextSteps({
 
   return (
     <div className="su-report-next-steps" data-testid="report-next-steps">
-      <a
-        className="su-report-cta su-report-cta-secondary"
-        href="https://scalingup.com"
-      >
-        Learn More →
-      </a>
-      {showCoachLink ? (
-        <a className="su-report-cta" href={coachHref}>
-          Talk to a Coach →
-        </a>
-      ) : null}
+      {publicResultActions && publicResultActions.length > 0 ? (
+        publicResultActions.map((action, index) => (
+          <a
+            className={`su-report-cta${index === 0 ? " su-report-cta-secondary" : ""}`}
+            href={action.href}
+            key={action.href}
+          >
+            {action.label}
+          </a>
+        ))
+      ) : (
+        <>
+          <a
+            className="su-report-cta su-report-cta-secondary"
+            href="https://scalingup.com"
+          >
+            Learn More →
+          </a>
+          {showCoachLink ? (
+            <a className="su-report-cta" href={coachHref}>
+              Talk to a Coach →
+            </a>
+          ) : null}
+        </>
+      )}
     </div>
   );
 }
