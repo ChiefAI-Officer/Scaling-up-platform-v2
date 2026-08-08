@@ -287,19 +287,19 @@ assessment in
 [seed-scaling-up-quick-assessment.ts](../../src/prisma/seed-scaling-up-quick-assessment.ts)
 is unchanged.
 
-**Recommendation.** Accept the separate-template implementation through
-protected review. After merge, authorize a guarded DRAFT creation and visual
-check first; publication, PUBLIC campaign creation, and a representative live
-screen/email verification remain explicit later Production actions.
+**Recommendation.** The separate-template implementation is merged. Authorize
+a guarded DRAFT creation and visual check first; publication, PUBLIC campaign
+creation, and a representative live screen/email verification remain explicit
+later Production actions.
 
 **Compatibility.** Use a new alias and fresh sunhub_* section/question keys.
 Any legacy-result import needs its own discovered and locked crosswalk.
 
 **Acceptance.** The source fixture already locks exactly eight questions,
 source ordering, 0-10 scale, boundary scoring, four feedback bands, and three
-CTA destinations. Final closure still requires protected merge, separately
-authorized activation, one PUBLIC submission, screen/email verification, and
-confirmation that the 32-question campaign and results remain unchanged.
+CTA destinations. Final closure still requires separately authorized
+activation, one PUBLIC submission, screen/email verification, and confirmation
+that the 32-question campaign and results remain unchanged.
 
 **Approval status.** Gabriel approved treating #84 as a separate eight-question
 SunHub PUBLIC template and confirmed that the tracked source package is
@@ -311,7 +311,7 @@ publication, campaign creation, submission, or email delivery.
 1. Approve the remaining bounded no-new-product-intent packet: #47.
 2. Answer the content questions: #41, #44, and #45.
 3. Approve data/rollout contracts: #32 and #57/#58.
-4. Resume #84 acceptance after protected merge through separately authorized
-   DRAFT creation, publication, PUBLIC campaign creation, and live verification.
+4. Resume #84 acceptance through separately authorized DRAFT creation,
+   publication, PUBLIC campaign creation, and live verification.
 5. Handle #33 through its dedicated report-by-report matrix rather than this
    copy/data queue.
