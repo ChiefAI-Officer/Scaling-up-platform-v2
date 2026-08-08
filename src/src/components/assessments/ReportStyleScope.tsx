@@ -1,5 +1,6 @@
 import { cloneElement, type ReactElement } from "react";
 
+import { hasSourcePublicResult } from "@/lib/assessments/report-config";
 import { effectiveReportStyle } from "@/lib/assessments/report-style-policy";
 import type { RespondentReport } from "@/lib/assessments/respondent-report";
 
@@ -25,10 +26,15 @@ export function ReportStyleScope({
 
   const storedStyle =
     typeof report.reportStyle === "string" ? report.reportStyle : undefined;
-  const enabledStyle = effectiveReportStyle({
-    storedStyle,
-    available: true,
-  });
+  const enabledStyle = hasSourcePublicResult(
+    report.templateAlias,
+    report.publicLeadActions,
+  )
+    ? "CLASSIC"
+    : effectiveReportStyle({
+        storedStyle,
+        available: true,
+      });
 
   return cloneElement(children, {
     "data-enabled-report-style": enabledStyle,

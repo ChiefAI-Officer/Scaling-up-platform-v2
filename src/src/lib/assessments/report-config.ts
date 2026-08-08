@@ -121,3 +121,16 @@ export function reportConfigFor(alias: string | null | undefined): ReportConfig 
   if (alias.startsWith(WALK_QUALITATIVE_PREFIX)) return WALK_QUALITATIVE_CONFIG;
   return REPORT_CONFIG[alias] ?? DEFAULT_REPORT_CONFIG;
 }
+
+/**
+ * Identifies a public result whose next-step presentation is owned by its
+ * tracked source package. Every report surface uses this same decision so the
+ * renderer and its outer style scope cannot disagree.
+ */
+export function hasSourcePublicResult(
+  templateAlias: string | null | undefined,
+  publicLeadActions: boolean | undefined,
+): boolean {
+  const actions = reportConfigFor(templateAlias).publicResultActions;
+  return publicLeadActions === true && actions !== undefined && actions.length > 0;
+}

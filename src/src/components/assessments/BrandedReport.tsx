@@ -38,7 +38,10 @@ import {
   domainColor,
   headlineForTierMetric,
 } from "@/lib/assessments/report-presentation";
-import { reportConfigFor } from "@/lib/assessments/report-config";
+import {
+  hasSourcePublicResult,
+  reportConfigFor,
+} from "@/lib/assessments/report-config";
 import { parseResolvedFindings } from "@/lib/assessments/findings-section-model";
 import {
   greetingName,
@@ -215,11 +218,11 @@ export function BrandedReport({
   const config = reportConfigFor(report.templateAlias);
   const rawStyle = report.reportStyle as unknown;
   const runtimeStyle = typeof rawStyle === "string" ? rawStyle : undefined;
-  const hasSourcePublicResult =
-    report.publicLeadActions === true &&
-    config.publicResultActions !== undefined &&
-    config.publicResultActions.length > 0;
-  const resolvedStyle = hasSourcePublicResult
+  const sourcePublicResult = hasSourcePublicResult(
+    report.templateAlias,
+    report.publicLeadActions,
+  );
+  const resolvedStyle = sourcePublicResult
     ? "CLASSIC"
     : effectiveReportStyle({
         storedStyle: runtimeStyle,
@@ -261,7 +264,7 @@ export function BrandedReport({
 
   switch (resolvedStyle) {
     case "CLASSIC": {
-      const fallbackReason = hasSourcePublicResult
+      const fallbackReason = sourcePublicResult
         ? null
         : rawStyle !== null &&
             rawStyle !== undefined &&
