@@ -64,6 +64,9 @@ const ALLOWLIST: string[] = [
   // whose unconditional deletedAt check runs before this page can render.
   "app/(dashboard)/admin/assessments/organizations/page.tsx",
   "app/(dashboard)/admin/assessments/public-campaigns/page.tsx",
+  // [LAYOUT] dedicated public-campaign creation is nested under the dashboard
+  // layout, whose unconditional deletedAt check runs before this page renders.
+  "app/(dashboard)/admin/assessments/public-campaigns/new/page.tsx",
   "app/(dashboard)/admin/assessments/templates/[id]/page.tsx",
   "app/(dashboard)/admin/assessments/templates/[id]/versions/[versionId]/edit/page.tsx",
   "app/(dashboard)/admin/assessments/templates/new/page.tsx",

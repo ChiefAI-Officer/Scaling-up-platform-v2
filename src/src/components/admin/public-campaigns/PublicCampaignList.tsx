@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { PublicCampaignActions } from "@/components/admin/public-campaigns/PublicCampaignActions";
 import { PublicCampaignReportDesign } from "@/components/admin/public-campaigns/PublicCampaignReportDesign";
 import { PublicCampaignResponses } from "@/components/admin/public-campaigns/PublicCampaignResponses";
@@ -42,7 +42,11 @@ export function PublicCampaignList({
   const [visitedResponseIds, setVisitedResponseIds] = useState<ReadonlySet<string>>(
     () => new Set(),
   );
+  const createdStatusRef = useRef<HTMLDivElement>(null);
   const origin = typeof window === "undefined" ? "" : window.location.origin;
+  const createdCampaignExists = campaigns.some(
+    (campaign) => campaign.id === createdCampaignId,
+  );
 
   useEffect(() => {
     let active = true;
@@ -67,6 +71,12 @@ export function PublicCampaignList({
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!loading && createdCampaignExists) {
+      createdStatusRef.current?.focus();
+    }
+  }, [createdCampaignExists, loading]);
 
   function patchCampaign(
     campaignId: string,
@@ -110,9 +120,11 @@ export function PublicCampaignList({
 
   return (
     <section aria-label="Public campaigns">
-      {createdCampaignId && (
+      {createdCampaignExists && (
         <div
+          ref={createdStatusRef}
           role="status"
+          tabIndex={-1}
           className="mb-4 rounded-md border border-emerald-600/30 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800"
         >
           Campaign created as a draft.

@@ -147,6 +147,12 @@ describe("PublicCampaignList", () => {
     expect(screen.getByRole("status")).toHaveTextContent(
       "Campaign created as a draft.",
     );
+    await waitFor(() => expect(screen.getByRole("status")).toHaveFocus());
+
+    const highlightedRows = within(table)
+      .getAllByRole("row")
+      .filter((row) => row.getAttribute("data-created") === "true");
+    expect(highlightedRows).toHaveLength(1);
 
     const forbidden = [
       'accessMode="PUBLIC"',
@@ -164,6 +170,20 @@ describe("PublicCampaignList", () => {
     for (const text of forbidden) {
       expect(container).not.toHaveTextContent(text);
     }
+  });
+
+  it("does not announce success when the created id is absent from the loaded rows (catches stale query feedback)", async () => {
+    mockList({ success: true, data: campaigns });
+
+    render(<PublicCampaignList createdCampaignId="campaign-missing" />);
+
+    const table = await screen.findByRole("table");
+    expect(screen.queryByText("Campaign created as a draft.")).not.toBeInTheDocument();
+    expect(
+      within(table)
+        .getAllByRole("row")
+        .some((row) => row.hasAttribute("data-created")),
+    ).toBe(false);
   });
 
   it("replaces a published row locally without refetching the list (catches field loss and unnecessary reloads)", async () => {
