@@ -29,6 +29,7 @@ import {
 } from "@/lib/assessments/report-style-registry";
 import { resolveCampaignReportStyle } from "@/lib/assessments/report-style-policy";
 import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
+import { isPublicCampaignsSimpleUiEnabled } from "@/lib/assessments/wave-public-campaigns-simple-ui-flags";
 
 // ─── alias helpers (copied from assessment-campaigns/route.ts) ───────────────
 
@@ -88,6 +89,7 @@ export async function GET() {
       );
     }
 
+    const simpleUiEnabled = isPublicCampaignsSimpleUiEnabled();
     const campaigns = await db.assessmentCampaign.findMany({
       where: {
         accessMode: "PUBLIC",
@@ -97,6 +99,9 @@ export async function GET() {
       include: {
         organization: { select: { id: true, name: true } },
         template: { select: { id: true, name: true, alias: true } },
+        ...(simpleUiEnabled
+          ? { _count: { select: { submissions: true } } }
+          : {}),
       },
       orderBy: { createdAt: "desc" },
     });
@@ -133,10 +138,16 @@ export async function GET() {
         const reportStylesAvailable = availability.get(campaign.id) === true;
         const campaignPayload = {
           ...campaign,
-        } as typeof campaign & { version?: unknown };
+        } as typeof campaign & {
+          _count?: { submissions: number };
+          version?: unknown;
+        };
         delete campaignPayload.version;
+        const responseCount = campaignPayload._count?.submissions ?? 0;
+        if (simpleUiEnabled) delete campaignPayload._count;
         return {
           ...campaignPayload,
+          ...(simpleUiEnabled ? { responseCount } : {}),
           reportStylesAvailable,
           ...(reportStylesAvailable
             ? {
