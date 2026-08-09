@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { PublicCampaignActions } from "@/components/admin/public-campaigns/PublicCampaignActions";
+import { PublicCampaignReportDesign } from "@/components/admin/public-campaigns/PublicCampaignReportDesign";
+import { PublicCampaignResponses } from "@/components/admin/public-campaigns/PublicCampaignResponses";
 import {
   publicCampaignScheduleLabel,
   publicCampaignStatusLabel,
@@ -29,6 +31,9 @@ export function PublicCampaignList({
   const [responsesExpandedId, setResponsesExpandedId] = useState<string | null>(null);
   const [reportDesignExpandedId, setReportDesignExpandedId] = useState<string | null>(
     null,
+  );
+  const [visitedResponseIds, setVisitedResponseIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
   );
   const origin = typeof window === "undefined" ? "" : window.location.origin;
 
@@ -62,6 +67,16 @@ export function PublicCampaignList({
         campaign.id === updated.id ? updated : campaign,
       ),
     );
+  }
+
+  function toggleResponses(campaignId: string) {
+    if (responsesExpandedId === campaignId) {
+      setResponsesExpandedId(null);
+      return;
+    }
+
+    setVisitedResponseIds((current) => new Set(current).add(campaignId));
+    setResponsesExpandedId(campaignId);
   }
 
   if (loading) {
@@ -131,14 +146,18 @@ export function PublicCampaignList({
                   campaign.responseCount === 1 ? "response" : "responses"
                 }`;
 
+                const responsesExpanded = responsesExpandedId === campaign.id;
+                const reportDesignExpanded =
+                  reportDesignExpandedId === campaign.id;
+
                 return (
-                  <tr
-                    key={campaign.id}
-                    data-created={created ? "true" : undefined}
-                    className={`max-[1120px]:grid max-[1120px]:grid-cols-2 max-[1120px]:border-b max-[1120px]:border-border max-[760px]:grid-cols-1 ${
-                      created ? "bg-primary/5" : ""
-                    }`}
-                  >
+                  <Fragment key={campaign.id}>
+                    <tr
+                      data-created={created ? "true" : undefined}
+                      className={`max-[1120px]:grid max-[1120px]:grid-cols-2 max-[1120px]:border-b max-[1120px]:border-border max-[760px]:grid-cols-1 ${
+                        created ? "bg-primary/5" : ""
+                      }`}
+                    >
                     <td
                       data-label="Campaign"
                       className={`${cellClassName} ${
@@ -204,23 +223,43 @@ export function PublicCampaignList({
                         campaign={campaign}
                         origin={origin}
                         onCampaignUpdated={replaceCampaign}
-                        onToggleResponses={() =>
-                          setResponsesExpandedId((current) =>
-                            current === campaign.id ? null : campaign.id,
-                          )
-                        }
-                        responsesExpanded={responsesExpandedId === campaign.id}
+                        onToggleResponses={() => toggleResponses(campaign.id)}
+                        responsesExpanded={responsesExpanded}
                         onToggleReportDesign={() =>
                           setReportDesignExpandedId((current) =>
                             current === campaign.id ? null : campaign.id,
                           )
                         }
-                        reportDesignExpanded={
-                          reportDesignExpandedId === campaign.id
-                        }
+                        reportDesignExpanded={reportDesignExpanded}
                       />
                     </td>
-                  </tr>
+                    </tr>
+                    {visitedResponseIds.has(campaign.id) && (
+                      <tr
+                        className="wf-tr"
+                        hidden={!responsesExpanded}
+                        aria-hidden={!responsesExpanded}
+                      >
+                        <td className="wf-td" colSpan={6}>
+                          <PublicCampaignResponses
+                            campaignId={campaign.id}
+                            expanded={responsesExpanded}
+                          />
+                        </td>
+                      </tr>
+                    )}
+                    {reportDesignExpanded && (
+                      <tr className="wf-tr">
+                        <td className="wf-td" colSpan={6}>
+                          <PublicCampaignReportDesign
+                            campaign={campaign}
+                            expanded
+                            onCampaignUpdated={replaceCampaign}
+                          />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 );
               })}
             </tbody>
