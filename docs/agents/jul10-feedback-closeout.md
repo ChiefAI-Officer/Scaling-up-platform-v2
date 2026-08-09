@@ -2,7 +2,7 @@
 
 **Source:** Jeff Verdun's 14-page *Scaling Up Assessment Platform - Feedback Report for Gabriel*, prepared 2026-07-10. Section 2 is canonical: 53 rows numbered #30-#87. Rows #31, #34, #36, #38, and #82 are intentionally absent because completed items were excluded.
 
-**Reconciled against:** `origin/main` at `e6ab15391d573d281a98fc64924e659447842058` on 2026-08-08 plus the Production LVA v4 publish receipt below. Current tally: **44 DONE / 4 PARTIAL / 5 NEEDS DECISION**.
+**Reconciled against:** `origin/main` at `b8f44e70d7250d1a7df4d49c787c71997b509e01` on 2026-08-10 plus the Production receipts linked below. Current tally: **45 DONE / 3 PARTIAL / 5 NEEDS DECISION**.
 
 **Authority:** This tracked ledger is authoritative; generated PDFs and `tmp/` files are derivatives. Completion is judged against the exact Section 2 ask. Later-discovered scope remains visible as a separately named follow-on and does not silently widen a row.
 
@@ -67,7 +67,7 @@
 | #80 | Five Dysfunctions invitation | Correct coach branding and copy and remove redundant link treatment. | DONE | [Invitation family closeout](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/blob/15ee442b124f43155ffd3dfdc1dc08fbfa37cd5e/plans/CHANGELOG.md#L1051) | Invite family PR | None | Gabriel |
 | #81 | Five Dysfunctions report | Correct coach byline layout and remove the coach CTA. | DONE | [Report byline closeout](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/blob/15ee442b124f43155ffd3dfdc1dc08fbfa37cd5e/plans/CHANGELOG.md#L967) | PR #230 | None | Gabriel |
 | #83 | Public quiz coach results | Let the referring coach find, inspect, and export their referred public results. | DONE | [Coach Referred Results](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/blob/15ee442b124f43155ffd3dfdc1dc08fbfa37cd5e/plans/CHANGELOG.md#L731) | Referred Results PR | None | Gabriel |
-| #84 | SunHub eight-question quiz | Determine and build the distinct eight-question SunHub quiz without replacing the 32-question public assessment. | PARTIAL | [Source-backed implementation](../specs/v7.6/19aq-sunhub-quick-quiz-design.md) | PR #320 / `e6ab1539` | Separately authorize DRAFT creation, publication, a PUBLIC campaign, and representative live screen/email verification. | Gabriel |
+| #84 | SunHub eight-question quiz | Determine and build the distinct eight-question SunHub quiz without replacing the 32-question public assessment. | DONE | [Production acceptance](../../plans/CHANGELOG.md#jul10-84-production-accepted) | PR #320 / `e6ab1539`; Production accepted 2026-08-10 | None | Gabriel |
 | #85 | Import observability navigation | Link the existing import-health page from admin assessment navigation. | DONE | [July 10 batch](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/blob/15ee442b124f43155ffd3dfdc1dc08fbfa37cd5e/plans/CHANGELOG.md#L1132) | PR #200 | None | Gabriel |
 | #86 | Organizations by coach | Add a coach-grouped view alongside the company view. | DONE | [July 10 batch](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/blob/15ee442b124f43155ffd3dfdc1dc08fbfa37cd5e/plans/CHANGELOG.md#L1132) | PR #204 | None | Gabriel |
 | #87 | Wrong import file guidance | Explain which import option accepts the uploaded export kind. | DONE | [July 10 batch](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/blob/15ee442b124f43155ffd3dfdc1dc08fbfa37cd5e/plans/CHANGELOG.md#L1132) | PR #201 | None | Gabriel |
@@ -75,13 +75,12 @@
 
 ## Remaining decision queue
 
-The nine non-DONE rows reduce to five unresolved decisions and four implementation/acceptance resumes:
+The eight non-DONE rows reduce to five unresolved decisions and three implementation/acceptance resumes:
 
 1. **Benchmark contract:** #32 decides what may be called an industry benchmark; #57/#58 separately require approved LVA values and an authorized restore/live verification.
 2. **Report fidelity:** #33 needs sanitized, report-specific annotations rather than an umbrella preference.
 3. **LVA content:** #41, #44, and #45 still require content intent before editing. #42 is closed on the active Production v4 wording and compatibility receipt.
 4. **Invitation acceptance:** #47 can close on the standard renderer after Gabriel approves the current copy and a live smoke; full-HTML overrides remain separate.
-5. **SunHub acceptance:** #84's source-backed separate-template code is merged; separately authorized Production activation/live verification remain.
 
 ## Update protocol
 
@@ -98,5 +97,5 @@ python3 scripts/build-jul10-closeout-artifacts.py
 
 The supplied July 10 source has 83 status occurrences: 30 in Section 1 and all
 53 canonical rows in Section 2. The generator validates that count, the exact
-row set, the 44/4/5 tally, and the twelve-outcome delta before writing
+row set, the 45/3/5 tally, and the twelve-outcome delta before writing
 deterministic PDFs under `output/pdf/`.
