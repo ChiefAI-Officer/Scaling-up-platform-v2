@@ -18,7 +18,9 @@ EXPECTED_ROWS = [
     66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81,
     83, 84, 85, 86, 87,
 ]
-EXPECTED_TALLY = {"DONE": 44, "PARTIAL": 4, "NEEDS DECISION": 5}
+EXPECTED_TALLY = {"DONE": 45, "PARTIAL": 3, "NEEDS DECISION": 5}
+STATUS_DATE_LONG = "10 August 2026"
+STATUS_DATE_FOOTER = "10 AUG 2026"
 PDF_DEPENDENCIES = ("pdfplumber", "pypdf", "reportlab")
 
 
@@ -252,7 +254,7 @@ def draw_overlay(page_rows: list[dict], width: float, height: float, ledger: dic
     layer.drawString(
         48,
         13,
-        "STATUS 8 AUG 2026  |  GREEN: DONE  |  AMBER: PARTIAL  |  PURPLE: NEEDS DECISION  |  tracked ledger is authoritative",
+        f"STATUS {STATUS_DATE_FOOTER}  |  GREEN: DONE  |  AMBER: PARTIAL  |  PURPLE: NEEDS DECISION  |  tracked ledger is authoritative",
     )
     layer.save()
     return packet.getvalue()
@@ -287,7 +289,7 @@ def build_status_overlay(source: Path, output: Path, rows: list[LedgerRow]) -> N
         "Scaling Up Assessment Feedback - Canonical Closeout Status"
     )
     metadata[NameObject("/Subject")] = TextStringObject(
-        "Evidence-backed July 10 closeout status as of 5 August 2026"
+        f"Evidence-backed July 10 closeout status as of {STATUS_DATE_LONG}"
     )
     writer.add_metadata(metadata)
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -484,7 +486,8 @@ def main() -> None:
     )
     ledger_rows = parse_ledger(ledger_path)
     delta_rows = parse_delta(delta_path)
-    print("53 rows: 44 DONE / 4 PARTIAL / 5 NEEDS DECISION")
+    print("53 rows: 45 DONE / 3 PARTIAL / 5 NEEDS DECISION")
+    print(f"Status date: {STATUS_DATE_LONG}")
     print("12 post-cutoff outcomes")
     if args.check:
         return
@@ -494,7 +497,7 @@ def main() -> None:
 
     status_output = (
         args.output_dir
-        / "Scaling-Up-Assessment-Feedback-Report-2026-07-10-STATUS-2026-08-08.pdf"
+        / "Scaling-Up-Assessment-Feedback-Report-2026-07-10-STATUS-2026-08-10.pdf"
     )
     delta_output = (
         args.output_dir

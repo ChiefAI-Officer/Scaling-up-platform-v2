@@ -6,6 +6,17 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="jul10-84-production-accepted"></a>
+### 2026-08-10 — July 10 #84 SunHub quick quiz Production-accepted <!-- ENTRY_ISO:2026-08-10 ENTRY_SLUG:jul10-84-production-accepted -->
+
+**Status: LAUNCHED + PRODUCTION-VERIFIED + CLOSED.** After Gabriel explicitly authorized the bounded acceptance run, the guarded seed created only the separate `sunhub-quick-quiz` template (`cmsm0ef120003dlwf1zu1tfc7`) and DRAFT version 1 (`cmsm0efu30005dlwfucrosxdm`). Its Production content hash, `0ddf6b4352e524fc3e783499a6a026be4d9ec830cbff57fae5d608277e12c972`, exactly matched the source-locked build. The DRAFT gate was visually verified before publication. Version 1 was then published at `2026-08-09T16:23:30.744Z`, and the organization-free PUBLIC campaign `cmsm0jlxo0002lvi3lvb8u2gy` was created, verified while DRAFT, and activated at [the isolated public alias](https://scaling-up-platform-v2.vercel.app/quiz/sunhub-quick-quiz). The existing 32-question `scaling-up-quick` instrument was not selected or mutated by these exact-ID operations.
+
+**Live acceptance.** Production showed all eight source questions in the correct four-section order on the 0-10 scale. The authorized representative submission `cmsm0nfh20003py1awj5zbvil`, submitted at `2026-08-09T16:27:44.480Z`, stored exactly eight answers and produced **44/100**, the correct **25-49%** band and Theodore Roosevelt feedback, and all three source CTA destinations. Desktop and mobile result views displayed the real Scaling Up branding, Print and Download PDF actions, and no clipping or overlap. Acceptance captures are retained under `output/visuals/jul10-84/`, including `jul10-84-prod-live-result-44.png` and `jul10-84-prod-live-result-44-mobile.png`.
+
+**Delivery and closeout receipt.** The taker copy to the authorized acceptance mailbox recorded **SENT on attempt 1** at `2026-08-09T16:27:48.182Z`, subject `Your Scaling Up 4 Decisions results`. The Scaling Up team notification recorded **SENT on attempt 1** at `2026-08-09T16:27:49.823Z`, subject `New Scaling Up 4 Decisions Quick Quiz (SunHub) submission — Gabriel Acceptance`. The worker intentionally clears retained HTML after successful delivery, so content acceptance rests on the locked renderer tests, immutable template hash, and matching live result; the outbox rows prove delivery. The only browser-console noise was an unrelated Vercel Insights script 404/MIME error, with no #84 application failure. Row #84 moves from PARTIAL to DONE, producing **45 DONE / 3 PARTIAL / 5 NEEDS DECISION**. The August 1-7 delta remains exactly twelve outcomes because this closure occurred after that reporting window.
+
+---
+
 <a id="jul10-84-code-merged"></a>
 ### 2026-08-08 — July 10 #84 SunHub code merged; activation separately gated <!-- ENTRY_ISO:2026-08-08 ENTRY_SLUG:jul10-84-code-merged -->
 
