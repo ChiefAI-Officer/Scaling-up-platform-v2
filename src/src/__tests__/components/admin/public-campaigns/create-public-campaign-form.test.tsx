@@ -142,7 +142,8 @@ describe("CreatePublicCampaignForm", () => {
     expect(
       screen.getByRole("heading", { name: "Report design" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("group", { name: "Report style" })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Report design" })).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Report style" })).not.toBeInTheDocument();
     expect(
       screen.getByText("Uses the assessment's default design."),
     ).toBeInTheDocument();
@@ -429,7 +430,45 @@ describe("CreatePublicCampaignForm", () => {
     );
   });
 
-  it("disables duplicate submission while creation is pending", async () => {
+  it("keeps a successful creation latched while navigation completes", async () => {
+    render(<CreatePublicCampaignForm options={OPTIONS} />);
+    chooseAssessment();
+    enterName();
+
+    submit();
+
+    await waitFor(() => expect(mockPush).toHaveBeenCalledTimes(1));
+    const redirecting = screen.getByRole("button", { name: "Redirecting…" });
+    expect(redirecting).toBeDisabled();
+    fireEvent.click(redirecting);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+
+    const cancel = screen.getByRole("link", { name: "Cancel" });
+    expect(cancel).toHaveAttribute("aria-disabled", "true");
+    expect(cancel).toHaveAttribute("tabindex", "-1");
+    expect(fireEvent.click(cancel)).toBe(false);
+  });
+
+  it("re-enables creation controls when redirecting fails", async () => {
+    mockPush.mockImplementationOnce(() => {
+      throw new Error("navigation failed");
+    });
+    render(<CreatePublicCampaignForm options={OPTIONS} />);
+    chooseAssessment();
+    enterName();
+
+    submit();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "We couldn't create this campaign. Check the details and try again.",
+    );
+    expect(screen.getByRole("button", { name: "Create draft" })).toBeEnabled();
+    expect(screen.getByRole("link", { name: "Cancel" })).not.toHaveAttribute(
+      "aria-disabled",
+    );
+  });
+
+  it("disables duplicate submission and makes Cancel inert while creation is pending", async () => {
     let resolveRequest!: (response: Response) => void;
     (global.fetch as jest.Mock).mockImplementation(
       () => new Promise<Response>((resolve) => (resolveRequest = resolve)),
@@ -444,6 +483,12 @@ describe("CreatePublicCampaignForm", () => {
     expect(pending).toBeDisabled();
     fireEvent.click(pending);
     expect(global.fetch).toHaveBeenCalledTimes(1);
+
+    const cancel = screen.getByRole("link", { name: "Cancel" });
+    expect(cancel).toHaveAttribute("aria-disabled", "true");
+    expect(cancel).toHaveAttribute("tabindex", "-1");
+    expect(fireEvent.click(cancel)).toBe(false);
+
     resolveRequest(jsonResponse(201, { success: true, data: CREATED_CAMPAIGN }));
     await waitFor(() => expect(mockPush).toHaveBeenCalledTimes(1));
   });

@@ -114,6 +114,105 @@ describe("PublicCampaignList", () => {
     expect(alert).not.toHaveTextContent("internal validation failure");
   });
 
+  it("rejects a valid legacy flag-off row without rendering an undefined response count", async () => {
+    mockList({
+      success: true,
+      data: [
+        {
+          id: "campaign-new",
+          name: "August lead campaign",
+          alias: "august-lead-campaign-secret-alias",
+          status: "DRAFT",
+          accessMode: "PUBLIC",
+          openAt: "2020-08-01T12:00:00.000Z",
+          closeAt: null,
+          reportStyle: "CLASSIC",
+          reportStyleSource: "TEMPLATE_DEFAULT",
+          reportStyleLockedAt: null,
+          reportStylesAvailable: true,
+          template: {
+            id: "template-1",
+            name: "Scaling Up Assessment",
+            alias: "scaling-up-assessment",
+          },
+          organization: null,
+        },
+      ],
+    });
+
+    render(<PublicCampaignList />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "We couldn't load campaigns. Try again.",
+    );
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    expect(screen.queryByText("undefined responses")).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["id", { ...campaigns[0], id: undefined }],
+    ["name", { ...campaigns[0], name: null }],
+    ["alias", { ...campaigns[0], alias: 42 }],
+    ["status", { ...campaigns[0], status: "PAUSED" }],
+    ["open date", { ...campaigns[0], openAt: "not-a-date" }],
+    ["close date", { ...campaigns[0], closeAt: "not-a-date" }],
+    ["negative response count", { ...campaigns[0], responseCount: -1 }],
+    ["non-finite response count", { ...campaigns[0], responseCount: Infinity }],
+    ["report design key", { ...campaigns[0], reportStyle: "NEON" }],
+    ["report design source", { ...campaigns[0], reportStyleSource: "SERVER_DEFAULT" }],
+    ["report design lock date", { ...campaigns[0], reportStyleLockedAt: "not-a-date" }],
+    ["report design availability", { ...campaigns[0], reportStylesAvailable: "yes" }],
+    [
+      "template",
+      {
+        ...campaigns[0],
+        template: { id: "template-1", name: "Scaling Up Assessment" },
+      },
+    ],
+    [
+      "preview report type",
+      {
+        ...campaigns[0],
+        reportStylePreviewCapabilities: {
+          reportType: "unknown",
+          hasMetrics: true,
+          hasNarrativeResponses: false,
+        },
+      },
+    ],
+    [
+      "preview metric capability",
+      {
+        ...campaigns[0],
+        reportStylePreviewCapabilities: {
+          reportType: "scored",
+          hasMetrics: "yes",
+          hasNarrativeResponses: false,
+        },
+      },
+    ],
+    [
+      "preview narrative capability",
+      {
+        ...campaigns[0],
+        reportStylePreviewCapabilities: {
+          reportType: "scored",
+          hasMetrics: true,
+          hasNarrativeResponses: null,
+        },
+      },
+    ],
+  ])("rejects a row with an invalid %s instead of rendering partial data", async (_field, row) => {
+    mockList({ success: true, data: [row] });
+
+    render(<PublicCampaignList />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "We couldn't load campaigns. Try again.",
+    );
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+  });
+
   it("renders the approved list language and natural campaign details (catches technical-copy regressions)", async () => {
     mockList({ success: true, data: campaigns });
 
@@ -137,6 +236,14 @@ describe("PublicCampaignList", () => {
     expect(within(table).getByText("Draft")).toBeInTheDocument();
     expect(within(table).getByText("Live")).toBeInTheDocument();
     expect(within(table).getByText("Closed", { selector: "span" })).toBeInTheDocument();
+    expect(within(table).getByText("Draft")).toHaveClass(
+      "bg-warning/10",
+      "text-warning",
+    );
+    expect(within(table).getByText("Live")).toHaveClass(
+      "bg-success/10",
+      "text-success",
+    );
     expect(within(table).getByText("Opens when published · No end date")).toBeInTheDocument();
     expect(within(table).getByText("Open until Sep 30, 2030")).toBeInTheDocument();
     expect(within(table).getByText("24 responses")).toBeInTheDocument();
@@ -146,6 +253,11 @@ describe("PublicCampaignList", () => {
     expect(createdRow).toHaveAttribute("data-created", "true");
     expect(screen.getByRole("status")).toHaveTextContent(
       "Campaign created as a draft.",
+    );
+    expect(screen.getByRole("status")).toHaveClass(
+      "border-success/20",
+      "bg-success/10",
+      "text-success",
     );
     await waitFor(() => expect(screen.getByRole("status")).toHaveFocus());
 
@@ -170,6 +282,9 @@ describe("PublicCampaignList", () => {
     for (const text of forbidden) {
       expect(container).not.toHaveTextContent(text);
     }
+    expect(container.innerHTML).not.toMatch(
+      /(?:^|[\s"])(?:emerald|amber|slate)-/,
+    );
   });
 
   it("does not announce success when the created id is absent from the loaded rows (catches stale query feedback)", async () => {
@@ -292,5 +407,107 @@ describe("PublicCampaignList", () => {
     expect(screen.getByRole("radio", { name: /modern dashboard/i })).toBeChecked();
     screen.getAllByRole("radio").forEach((radio) => expect(radio).toBeDisabled());
     expect(screen.getByText("Customized for this campaign")).toBeInTheDocument();
+  });
+
+  it("keeps visited response panels mounted, makes responses exclusive, and manages report design independently", async () => {
+    const disclosureCampaigns: PublicCampaignViewModel[] = [
+      {
+        ...campaigns[0],
+        name: "First live campaign",
+        status: "ACTIVE",
+      },
+      {
+        ...campaigns[1],
+        name: "Second live campaign",
+        reportStylesAvailable: true,
+        reportStyleLockedAt: null,
+      },
+    ];
+    global.fetch = jest.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/api/admin/public-campaigns") {
+        return response({ success: true, data: disclosureCampaigns });
+      }
+      if (url.endsWith("/submissions")) {
+        return response({ success: true, data: [] });
+      }
+      return response({ success: false }, false, 500);
+    }) as jest.MockedFunction<typeof fetch>;
+
+    render(<PublicCampaignList />);
+
+    const firstRow = (await screen.findByText("First live campaign")).closest("tr");
+    const secondRow = screen.getByText("Second live campaign").closest("tr");
+    expect(firstRow).not.toBeNull();
+    expect(secondRow).not.toBeNull();
+
+    fireEvent.click(
+      within(firstRow!).getByRole("button", { name: "View responses" }),
+    );
+    const firstResponseRow = (await screen.findByText("No responses yet.")).closest(
+      "tr",
+    );
+    expect(firstResponseRow).not.toBeNull();
+    expect(firstResponseRow).not.toHaveAttribute("hidden");
+    expect(firstResponseRow!.querySelector("td")).toHaveAttribute("colspan", "6");
+
+    fireEvent.click(within(firstRow!).getByText("More"));
+    fireEvent.click(
+      within(firstRow!).getByRole("button", { name: "Report design" }),
+    );
+    expect(
+      await screen.findByRole("region", { name: "First live campaign report design" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      within(firstRow!).getByRole("button", { name: "Hide responses" }),
+    );
+    expect(firstResponseRow).toHaveAttribute("hidden");
+    fireEvent.click(
+      within(firstRow!).getByRole("button", { name: "View responses" }),
+    );
+    expect(firstResponseRow).not.toHaveAttribute("hidden");
+    expect(
+      (global.fetch as jest.Mock).mock.calls.filter(([input]) =>
+        String(input).endsWith("/campaign-new/submissions"),
+      ),
+    ).toHaveLength(1);
+
+    fireEvent.click(
+      within(secondRow!).getByRole("button", { name: "View responses" }),
+    );
+    await waitFor(() => {
+      expect(
+        (global.fetch as jest.Mock).mock.calls.filter(([input]) =>
+          String(input).endsWith("/campaign-live/submissions"),
+        ),
+      ).toHaveLength(1);
+    });
+    await waitFor(() =>
+      expect(screen.getByText("No responses yet.").closest("tr")).not.toBe(
+        firstResponseRow,
+      ),
+    );
+    const secondResponseRow = screen.getByText("No responses yet.").closest("tr");
+    expect(firstResponseRow).toBeInTheDocument();
+    expect(firstResponseRow).toHaveAttribute("hidden");
+    expect(firstResponseRow!.querySelector("td")).toHaveAttribute("colspan", "6");
+    expect(secondResponseRow).not.toBeNull();
+    expect(secondResponseRow).not.toHaveAttribute("hidden");
+    expect(
+      screen.getByRole("region", { name: "First live campaign report design" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(within(secondRow!).getByText("More"));
+    fireEvent.click(
+      within(secondRow!).getByRole("button", { name: "Report design" }),
+    );
+    expect(
+      screen.queryByRole("region", { name: "First live campaign report design" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: "Second live campaign report design" }),
+    ).toBeInTheDocument();
+    expect(secondResponseRow).not.toHaveAttribute("hidden");
   });
 });

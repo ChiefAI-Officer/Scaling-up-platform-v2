@@ -1,4 +1,4 @@
-import { render } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 
 jest.mock("next/navigation", () => ({
@@ -107,6 +107,17 @@ describe("NewPublicCampaignPage auth and release gates", () => {
 });
 
 describe("NewPublicCampaignPage active composition", () => {
+  it("moves focus to its page heading after navigation", async () => {
+    await renderPage();
+
+    const heading = screen.getByRole("heading", {
+      level: 1,
+      name: "Create a public campaign",
+    });
+    expect(heading).toHaveAttribute("tabindex", "-1");
+    await waitFor(() => expect(heading).toHaveFocus());
+  });
+
   it.each(["ADMIN", "STAFF"])(
     "renders the focused creation workflow for %s",
     async (role) => {

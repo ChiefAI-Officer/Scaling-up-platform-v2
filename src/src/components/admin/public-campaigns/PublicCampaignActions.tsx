@@ -4,11 +4,13 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   publicCampaignUrl,
@@ -95,7 +97,7 @@ export function PublicCampaignActions({
       setManualUrl(url);
       setNotice({
         kind: "alert",
-        message: "We couldn't copy the public link. Copy it manually below.",
+        message: "We couldn't copy the link. Select and copy it manually.",
       });
     }
   }
@@ -104,9 +106,31 @@ export function PublicCampaignActions({
     <div className="grid min-w-0 gap-2">
       <div className="flex flex-wrap items-center gap-1.5">
         {campaign.status === "DRAFT" && (
-          <Button size="sm" type="button" onClick={() => setPublishOpen(true)}>
-            Publish
-          </Button>
+          <Dialog open={publishOpen} onOpenChange={setPublishOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" type="button">
+                Publish
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Publish {campaign.name}?</DialogTitle>
+                <DialogDescription>
+                  Anyone with the link will be able to take it once the campaign opens.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <DialogClose asChild>
+                  <Button type="button" variant="outline" disabled={publishing}>
+                    Cancel
+                  </Button>
+                </DialogClose>
+                <Button type="button" disabled={publishing} onClick={publishCampaign}>
+                  {publishing ? "Publishing…" : "Publish"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         )}
 
         {campaign.status === "ACTIVE" && (
@@ -152,7 +176,7 @@ export function PublicCampaignActions({
           className={
             notice.kind === "alert"
               ? "text-sm font-medium text-destructive"
-              : "text-sm font-medium text-emerald-700"
+              : "text-sm font-medium text-success"
           }
         >
           {notice.message}
@@ -175,30 +199,6 @@ export function PublicCampaignActions({
           />
         </div>
       )}
-
-      <Dialog open={publishOpen} onOpenChange={setPublishOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Publish {campaign.name}?</DialogTitle>
-            <DialogDescription>
-              Anyone with the link will be able to take it once the campaign opens.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={publishing}
-              onClick={() => setPublishOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button type="button" disabled={publishing} onClick={publishCampaign}>
-              {publishing ? "Publishing…" : "Publish"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

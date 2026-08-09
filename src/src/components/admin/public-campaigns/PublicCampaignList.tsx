@@ -5,6 +5,7 @@ import { PublicCampaignActions } from "@/components/admin/public-campaigns/Publi
 import { PublicCampaignReportDesign } from "@/components/admin/public-campaigns/PublicCampaignReportDesign";
 import { PublicCampaignResponses } from "@/components/admin/public-campaigns/PublicCampaignResponses";
 import {
+  decodePublicCampaignList,
   publicCampaignScheduleLabel,
   publicCampaignStatusLabel,
   type PublicCampaignViewModel,
@@ -16,7 +17,7 @@ interface PublicCampaignListProps {
 
 interface ListResponse {
   success?: boolean;
-  data?: PublicCampaignViewModel[];
+  data?: unknown;
 }
 
 type PublicCampaignOwnedUpdates =
@@ -55,10 +56,11 @@ export function PublicCampaignList({
       try {
         const response = await fetch("/api/admin/public-campaigns");
         const body = (await response.json()) as ListResponse;
-        if (!response.ok || body.success !== true || !Array.isArray(body.data)) {
+        const decodedCampaigns = decodePublicCampaignList(body.data);
+        if (!response.ok || body.success !== true || decodedCampaigns === null) {
           throw new Error("Invalid campaign list response");
         }
-        if (active) setCampaigns(body.data);
+        if (active) setCampaigns(decodedCampaigns);
       } catch {
         if (active) setLoadError(true);
       } finally {
@@ -125,7 +127,7 @@ export function PublicCampaignList({
           ref={createdStatusRef}
           role="status"
           tabIndex={-1}
-          className="mb-4 rounded-md border border-emerald-600/30 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800"
+          className="mb-4 rounded-md border border-success/20 bg-success/10 px-4 py-3 text-sm font-semibold text-success"
         >
           Campaign created as a draft.
         </div>
@@ -206,9 +208,9 @@ export function PublicCampaignList({
                       <span
                         className={`inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${
                           campaign.status === "ACTIVE"
-                            ? "bg-emerald-50 text-emerald-800"
+                            ? "bg-success/10 text-success"
                             : campaign.status === "DRAFT"
-                              ? "bg-amber-50 text-amber-800"
+                              ? "bg-warning/10 text-warning"
                               : "bg-muted text-muted-foreground"
                         }`}
                       >
@@ -216,10 +218,10 @@ export function PublicCampaignList({
                           aria-hidden="true"
                           className={`h-1.5 w-1.5 rounded-full ${
                             campaign.status === "ACTIVE"
-                              ? "bg-emerald-600"
+                              ? "bg-success"
                               : campaign.status === "DRAFT"
-                                ? "bg-amber-500"
-                                : "bg-slate-400"
+                                ? "bg-warning"
+                                : "bg-muted-foreground"
                           }`}
                         />
                         {publicCampaignStatusLabel(campaign.status)}

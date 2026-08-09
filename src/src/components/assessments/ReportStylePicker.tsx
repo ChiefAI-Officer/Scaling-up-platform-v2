@@ -25,6 +25,8 @@ export interface ReportStylePickerProps {
   lockedAt?: Date | string | null;
   compact?: boolean;
   previewAnatomy?: ReportStylePreviewAnatomy;
+  heading?: string;
+  disabledExplanation?: string | null;
 }
 
 function previewId(
@@ -58,6 +60,8 @@ export function ReportStylePicker({
   lockedAt,
   compact = false,
   previewAnatomy = "scored",
+  heading = "Report style",
+  disabledExplanation,
 }: ReportStylePickerProps) {
   const radioName = useId();
   const [previewPage, setPreviewPage] = useState<PreviewPage>("cover");
@@ -128,11 +132,11 @@ export function ReportStylePicker({
 
   return (
     <section
-      aria-label="Report style selection"
+      aria-label={`${heading} selection`}
       className={compact ? "space-y-3" : "space-y-5"}
     >
       <fieldset className="space-y-3">
-        <legend className="text-sm font-semibold text-foreground">Report style</legend>
+        <legend className="text-sm font-semibold text-foreground">{heading}</legend>
         <div className="grid gap-3 md:grid-cols-3">
           {REPORT_STYLE_KEYS.map((style) => {
             const metadata = REPORT_STYLE_REGISTRY[style];
@@ -174,22 +178,27 @@ export function ReportStylePicker({
         </div>
       </fieldset>
 
-      {disabled && (
-        <div className="space-y-1 text-sm text-muted-foreground" aria-live="polite">
-          {sourceLabel && <p>Source: {sourceLabel}</p>}
-          <p>
-            {lockedAt != null &&
-              (lockedTimestamp ? (
-                <>
-                  Locked on <time dateTime={lockedTimestamp.iso}>{lockedTimestamp.text}</time>.{" "}
-                </>
-              ) : (
-                "Lock timestamp could not be read. "
-              ))}
-            Report appearance was fixed when the first response was completed.
-          </p>
-        </div>
-      )}
+      {disabled &&
+        (disabledExplanation !== null || sourceLabel) && (
+          <div className="space-y-1 text-sm text-muted-foreground" aria-live="polite">
+            {sourceLabel && <p>Source: {sourceLabel}</p>}
+            {disabledExplanation === undefined ? (
+              <p>
+                {lockedAt != null &&
+                  (lockedTimestamp ? (
+                    <>
+                      Locked on <time dateTime={lockedTimestamp.iso}>{lockedTimestamp.text}</time>.{" "}
+                    </>
+                  ) : (
+                    "Lock timestamp could not be read. "
+                  ))}
+                Report appearance was fixed when the first response was completed.
+              </p>
+            ) : (
+              disabledExplanation != null && <p>{disabledExplanation}</p>
+            )}
+          </div>
+        )}
 
       {compact &&
         (selectedThumbnailFailed ? (
@@ -235,75 +244,75 @@ export function ReportStylePicker({
       )}
       {(!compact || previewExpanded) && (
         <div className="mt-3 space-y-3">
-        <div role="tablist" aria-label="Report style preview pages" className="flex gap-2">
+          <div role="tablist" aria-label={`${heading} preview pages`} className="flex gap-2">
+            {PREVIEW_TABS.map((tab) => {
+              const isActive = tab.key === previewPage;
+
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  role="tab"
+                  id={`${radioName}-${tab.key}-tab`}
+                  aria-selected={isActive}
+                  aria-controls={`${radioName}-${tab.key}-panel`}
+                  tabIndex={isActive ? 0 : -1}
+                  className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-ring"
+                  onClick={() => setPreviewPage(tab.key)}
+                  onKeyDown={(event) => handlePreviewTabKeyDown(event, tab.key)}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+
           {PREVIEW_TABS.map((tab) => {
+            const currentPreviewId = previewId(previewAnatomy, value, tab.key);
             const isActive = tab.key === previewPage;
+            const failedPreview = failedPreviews.has(currentPreviewId);
 
             return (
-              <button
+              <div
                 key={tab.key}
-                type="button"
-                role="tab"
-                id={`${radioName}-${tab.key}-tab`}
-                aria-selected={isActive}
-                aria-controls={`${radioName}-${tab.key}-panel`}
-                tabIndex={isActive ? 0 : -1}
-                className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-ring"
-                onClick={() => setPreviewPage(tab.key)}
-                onKeyDown={(event) => handlePreviewTabKeyDown(event, tab.key)}
+                id={`${radioName}-${tab.key}-panel`}
+                role="tabpanel"
+                aria-labelledby={`${radioName}-${tab.key}-tab`}
+                aria-label={`${selectedMetadata.label} ${tab.key} preview`}
+                hidden={!isActive}
               >
-                {tab.label}
-              </button>
+                {failedPreview ? (
+                  <div className="space-y-2 rounded-lg border border-border bg-muted/20 p-4 text-foreground" role="status">
+                    <p>Preview unavailable</p>
+                    <button
+                      type="button"
+                      className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-ring"
+                      onClick={() => retryPreview(tab.key)}
+                    >
+                      Retry
+                    </button>
+                  </div>
+                ) : (
+                  // Preview URLs are chosen at runtime from the closed registry; native image events
+                  // let Retry remount only the failed preview without changing the selected style.
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    key={`${currentPreviewId}-${retryVersions[currentPreviewId] ?? 0}`}
+                    src={getReportStylePreviewPath(
+                      value,
+                      previewAnatomy,
+                      tab.key,
+                    )}
+                    alt={`${selectedMetadata.label} ${tab.label} preview`}
+                    className="w-full rounded-lg border border-border"
+                    onError={() =>
+                      setFailedPreviews((current) => new Set(current).add(currentPreviewId))
+                    }
+                  />
+                )}
+              </div>
             );
           })}
-        </div>
-
-        {PREVIEW_TABS.map((tab) => {
-          const currentPreviewId = previewId(previewAnatomy, value, tab.key);
-          const isActive = tab.key === previewPage;
-          const failedPreview = failedPreviews.has(currentPreviewId);
-
-          return (
-            <div
-              key={tab.key}
-              id={`${radioName}-${tab.key}-panel`}
-              role="tabpanel"
-              aria-labelledby={`${radioName}-${tab.key}-tab`}
-              aria-label={`${selectedMetadata.label} ${tab.key} preview`}
-              hidden={!isActive}
-            >
-              {failedPreview ? (
-                <div className="space-y-2 rounded-lg border border-border bg-muted/20 p-4 text-foreground" role="status">
-                  <p>Preview unavailable</p>
-                  <button
-                    type="button"
-                    className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-ring"
-                    onClick={() => retryPreview(tab.key)}
-                  >
-                    Retry
-                  </button>
-                </div>
-              ) : (
-                // Preview URLs are chosen at runtime from the closed registry; native image events
-                // let Retry remount only the failed preview without changing the selected style.
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  key={`${currentPreviewId}-${retryVersions[currentPreviewId] ?? 0}`}
-                  src={getReportStylePreviewPath(
-                    value,
-                    previewAnatomy,
-                    tab.key,
-                  )}
-                  alt={`${selectedMetadata.label} ${tab.label} preview`}
-                  className="w-full rounded-lg border border-border"
-                  onError={() =>
-                    setFailedPreviews((current) => new Set(current).add(currentPreviewId))
-                  }
-                />
-              )}
-            </div>
-          );
-        })}
         </div>
       )}
     </section>

@@ -666,6 +666,25 @@ describe("POST /api/admin/public-campaigns — CREATE", () => {
       expect(data.endMode).toBe("ENDS_AFTER");
       expect(data.closeAt).toBeInstanceOf(Date);
     });
+
+    it.each([
+      ["equal to", "2026-07-01T00:00:00.000Z"],
+      ["before", "2026-06-30T23:59:59.999Z"],
+    ])(
+      "rejects closeAt %s openAt before creating a campaign",
+      async (_relationship, closeAt) => {
+        const res = await createPost(
+          makeCreateRequest({ ...validBody, closeAt }) as never,
+        );
+
+        expect(res.status).toBe(400);
+        await expect(res.json()).resolves.toEqual({
+          success: false,
+          error: "closeAt must be after openAt",
+        });
+        expect(db.assessmentCampaign.create).not.toHaveBeenCalled();
+      },
+    );
   });
 
   describe("P2002 alias collision fallback", () => {

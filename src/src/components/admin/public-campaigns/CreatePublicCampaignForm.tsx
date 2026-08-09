@@ -61,6 +61,8 @@ export function CreatePublicCampaignForm({
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [pageError, setPageError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
+  const busy = submitting || redirecting;
 
   if (options.length === 0) {
     return (
@@ -148,7 +150,7 @@ export function CreatePublicCampaignForm({
 
   async function createCampaign(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (submitting) return;
+    if (busy) return;
 
     setPageError(null);
     const { errors, openAt, closeAt } = validate(new Date());
@@ -190,6 +192,7 @@ export function CreatePublicCampaignForm({
         typeof result.data?.id === "string" &&
         result.data.id.length > 0
       ) {
+        setRedirecting(true);
         router.push(`${LIST_PATH}?created=${encodeURIComponent(result.data.id)}`);
         return;
       }
@@ -198,6 +201,7 @@ export function CreatePublicCampaignForm({
         typeof result.error === "string" ? result.error : "";
       setPageError(publicCampaignCreateError(response.status, errorCode));
     } catch {
+      setRedirecting(false);
       setPageError(publicCampaignCreateError(0, ""));
     } finally {
       setSubmitting(false);
@@ -270,6 +274,8 @@ export function CreatePublicCampaignForm({
             </div>
             <ReportStylePicker
               value={reportStyle}
+              heading="Report design"
+              disabledExplanation={null}
               previewAnatomy={resolveReportStylePreviewAnatomy({
                 templateAlias: selectedOption.alias,
                 capabilities: selectedOption.reportStylePreviewCapabilities,
@@ -461,16 +467,23 @@ export function CreatePublicCampaignForm({
         <Link
           className="wf-btn border border-border bg-background text-foreground"
           href={LIST_PATH}
+          aria-disabled={busy ? "true" : undefined}
+          tabIndex={busy ? -1 : undefined}
+          onClick={busy ? (event) => event.preventDefault() : undefined}
         >
           Cancel
         </Link>
         <button
           type="submit"
           className="wf-btn wf-btn-primary"
-          disabled={submitting}
-          aria-busy={submitting}
+          disabled={busy}
+          aria-busy={busy}
         >
-          {submitting ? "Creating…" : "Create draft"}
+          {redirecting
+            ? "Redirecting…"
+            : submitting
+              ? "Creating…"
+              : "Create draft"}
         </button>
       </div>
     </form>

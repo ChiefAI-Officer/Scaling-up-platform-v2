@@ -108,7 +108,9 @@ describe("PublicCampaignActions", () => {
   it("opens and cancels the approved publish dialog (catches destructive publishing without confirmation)", async () => {
     renderActions(campaign());
 
-    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
+    const publishTrigger = screen.getByRole("button", { name: "Publish" });
+    publishTrigger.focus();
+    fireEvent.click(publishTrigger);
     expect(await screen.findByRole("dialog")).toHaveAccessibleName(
       "Publish August lead campaign?",
     );
@@ -118,6 +120,21 @@ describe("PublicCampaignActions", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(publishTrigger).toHaveFocus();
+  });
+
+  it("restores focus to Publish when Escape closes its dialog", async () => {
+    renderActions(campaign());
+
+    const publishTrigger = screen.getByRole("button", { name: "Publish" });
+    publishTrigger.focus();
+    fireEvent.click(publishTrigger);
+    await screen.findByRole("dialog");
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(publishTrigger).toHaveFocus();
   });
 
   it("publishes and emits only its owned status field (catches stale full-row replacement)", async () => {
@@ -197,17 +214,36 @@ describe("PublicCampaignActions", () => {
   });
 
   it("copies the complete encoded public link without exposing it (catches incomplete or visible links)", async () => {
-    renderActions(campaign({ status: "ACTIVE" }));
+    const canonicalUrl = "https://host.example/quiz/august%20lead%2Fcampaign";
+    const encodedAlias = "august%20lead%2Fcampaign";
+    const { container } = render(
+      <PublicCampaignActions
+        campaign={campaign({ status: "ACTIVE" })}
+        origin="https://host.example"
+        onCampaignUpdated={jest.fn()}
+        onToggleResponses={jest.fn()}
+        responsesExpanded={false}
+        onToggleReportDesign={jest.fn()}
+        reportDesignExpanded={false}
+      />,
+    );
+
+    expect(screen.queryByDisplayValue(canonicalUrl)).not.toBeInTheDocument();
+    expect(container).not.toHaveTextContent(canonicalUrl);
+    expect(container).not.toHaveTextContent(encodedAlias);
 
     fireEvent.click(screen.getByRole("button", { name: "Copy link" }));
 
     await waitFor(() => {
-      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
-        "https://host.example/quiz/august%20lead%2Fcampaign",
-      );
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(canonicalUrl);
     });
-    expect(await screen.findByRole("status")).toHaveTextContent("Public link copied.");
-    expect(screen.queryByDisplayValue(/host\.example/)).not.toBeInTheDocument();
+    const copiedStatus = await screen.findByRole("status");
+    expect(copiedStatus).toHaveTextContent("Public link copied.");
+    expect(copiedStatus).toHaveClass("text-success");
+    expect(copiedStatus.className).not.toMatch(/(?:emerald|amber|slate)-/);
+    expect(screen.queryByDisplayValue(canonicalUrl)).not.toBeInTheDocument();
+    expect(container).not.toHaveTextContent(canonicalUrl);
+    expect(container).not.toHaveTextContent(encodedAlias);
     expect(screen.queryByText("august lead/campaign")).not.toBeInTheDocument();
   });
 
@@ -226,7 +262,7 @@ describe("PublicCampaignActions", () => {
     );
     expect(input).toHaveAttribute("readonly");
     expect(screen.getByRole("alert")).toHaveTextContent(
-      "We couldn't copy the public link. Copy it manually below.",
+      "We couldn't copy the link. Select and copy it manually.",
     );
     expect(screen.getByRole("alert")).not.toHaveTextContent(
       "Clipboard permission denied",

@@ -7,6 +7,7 @@ export const dynamic = "force-dynamic";
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth/next";
 import { CreatePublicCampaignForm } from "@/components/admin/public-campaigns/CreatePublicCampaignForm";
+import { PublicCampaignCreationHeading } from "@/components/admin/public-campaigns/PublicCampaignCreationHeading";
 import { authOptions } from "@/lib/auth/auth";
 import { listPublicCampaignCreateOptions } from "@/lib/assessments/public-campaign-create-options";
 import { isPublicCampaignsSimpleUiEnabled } from "@/lib/assessments/wave-public-campaigns-simple-ui-flags";
@@ -42,7 +43,7 @@ export default async function NewPublicCampaignPage() {
 
       <div className="wf-page-header-row">
         <div>
-          <h2 className="wf-page-title">Create a public campaign</h2>
+          <PublicCampaignCreationHeading />
           <p className="wf-page-subtitle">
             Create a link anyone can use to take an assessment.
           </p>

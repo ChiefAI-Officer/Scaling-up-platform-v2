@@ -250,6 +250,12 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
+      if (d.getTime() <= openAtDate.getTime()) {
+        return NextResponse.json(
+          { success: false, error: "closeAt must be after openAt" },
+          { status: 400 },
+        );
+      }
       endMode = "ENDS_AFTER";
       closeAtDate = d;
     }

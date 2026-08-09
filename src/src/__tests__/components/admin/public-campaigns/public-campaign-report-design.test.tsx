@@ -61,6 +61,8 @@ describe("PublicCampaignReportDesign", () => {
       "src",
       "/report-style-previews/sparse-custom/executive-boardroom/cover.webp",
     );
+    expect(screen.getByRole("group", { name: "Report design" })).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Report style" })).not.toBeInTheDocument();
     expect(screen.getByText("Uses the assessment's default design")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save report design" })).toBeDisabled();
   });
@@ -104,9 +106,10 @@ describe("PublicCampaignReportDesign", () => {
       reportStyleSource: "CAMPAIGN_OVERRIDE",
       reportStyleLockedAt: null,
     });
-    expect(await screen.findByRole("status")).toHaveTextContent(
-      "Report design saved.",
-    );
+    const savedStatus = await screen.findByRole("status");
+    expect(savedStatus).toHaveTextContent("Report design saved.");
+    expect(savedStatus).toHaveClass("text-success");
+    expect(savedStatus.className).not.toMatch(/(?:emerald|amber|slate)-/);
   });
 
   it("disables a locked design and explains why it cannot change (catches mutable frozen reports)", () => {
@@ -126,7 +129,47 @@ describe("PublicCampaignReportDesign", () => {
     expect(
       screen.getByText("This report design cannot be changed after the first response."),
     ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/report appearance was fixed|locked on/i),
+    ).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Save report design" })).not.toBeInTheDocument();
+  });
+
+  it("disables controls while saving without announcing a false lock", async () => {
+    let resolveRequest!: (value: Response) => void;
+    global.fetch = jest.fn(
+      () => new Promise<Response>((resolve) => (resolveRequest = resolve)),
+    ) as jest.MockedFunction<typeof fetch>;
+    render(
+      <PublicCampaignReportDesign
+        campaign={campaign()}
+        expanded
+        onCampaignUpdated={jest.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("radio", { name: /modern dashboard/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Save report design" }));
+
+    screen.getAllByRole("radio").forEach((radio) => expect(radio).toBeDisabled());
+    expect(
+      screen.queryByText(/report appearance was fixed|locked on|cannot be changed/i),
+    ).not.toBeInTheDocument();
+
+    resolveRequest(
+      response({
+        success: true,
+        data: {
+          id: "campaign-1",
+          reportStyle: "MODERN_DASHBOARD",
+          reportStyleSource: "CAMPAIGN_OVERRIDE",
+          reportStyleLockedAt: null,
+        },
+      }),
+    );
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Report design saved.",
+    );
   });
 
   it("immediately reconciles an authoritative 409 without reloading the list (catches completion-race drift)", async () => {
