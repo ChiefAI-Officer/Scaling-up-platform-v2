@@ -167,7 +167,7 @@ export function PublicCampaignActions({
           </label>
           <input
             id={`public-link-${campaign.id}`}
-            className="h-9 min-w-0 rounded-md border border-input bg-muted/40 px-2 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="wf-input"
             readOnly
             value={manualUrl}
           />

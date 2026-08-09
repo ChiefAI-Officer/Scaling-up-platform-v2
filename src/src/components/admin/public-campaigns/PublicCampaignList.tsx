@@ -18,7 +18,7 @@ interface ListResponse {
 }
 
 const cellClassName =
-  "border-b border-border px-3.5 py-4 align-middle max-[1120px]:grid max-[1120px]:grid-cols-[7.5rem_minmax(0,1fr)] max-[1120px]:gap-2 max-[1120px]:border-0 max-[1120px]:py-2.5 max-[1120px]:before:text-[0.6875rem] max-[1120px]:before:font-bold max-[1120px]:before:uppercase max-[1120px]:before:tracking-[0.05em] max-[1120px]:before:text-muted-foreground max-[1120px]:before:content-[attr(data-label)]";
+  "max-[1120px]:grid max-[1120px]:grid-cols-[7.5rem_minmax(0,1fr)] max-[1120px]:gap-2 max-[1120px]:border-0 max-[1120px]:py-2.5 max-[1120px]:before:text-[0.6875rem] max-[1120px]:before:font-bold max-[1120px]:before:uppercase max-[1120px]:before:tracking-[0.05em] max-[1120px]:before:text-muted-foreground max-[1120px]:before:content-[attr(data-label)]";
 
 export function PublicCampaignList({
   createdCampaignId,
@@ -104,9 +104,9 @@ export function PublicCampaignList({
           </p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-md border bg-card shadow-sm">
-          <table className="w-full border-collapse text-sm">
-            <thead className="bg-muted max-[1120px]:hidden">
+        <div className="wf-table-wrap">
+          <table className="wf-table">
+            <thead className="max-[1120px]:hidden">
               <tr>
                 {[
                   "Campaign",
@@ -118,7 +118,6 @@ export function PublicCampaignList({
                 ].map((heading) => (
                   <th
                     key={heading}
-                    className="border-b border-border px-3.5 py-3 text-left text-[0.6875rem] font-bold uppercase tracking-[0.05em] text-muted-foreground"
                   >
                     {heading}
                   </th>
