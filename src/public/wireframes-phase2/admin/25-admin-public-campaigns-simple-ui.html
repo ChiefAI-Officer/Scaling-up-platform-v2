@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>25 — Admin Public Campaigns: plain-language management</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../_shared.css">
+  <style>
+    body { background: hsl(220 14% 96%); }
+
+    .page-head {
+      max-width: 1360px;
+      margin: 0 auto;
+      padding: 1.5rem 2rem 0.75rem;
+    }
+    .page-head h1 {
+      margin: 0 0 0.25rem;
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+    .page-head p {
+      margin: 0;
+      color: hsl(var(--muted-foreground));
+      font-size: 0.875rem;
+    }
+
+    .wf-frame {
+      max-width: 1360px;
+      margin: 0 auto 3rem;
+      padding: 0 2rem;
+    }
+    .wf-frame-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.625rem 0.875rem;
+      border: 1px solid hsl(var(--border));
+      border-bottom: 0;
+      border-radius: 12px 12px 0 0;
+      background: hsl(var(--muted));
+      color: hsl(var(--muted-foreground));
+      font-size: 0.6875rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .wf-frame-label span:last-child {
+      color: hsl(var(--primary));
+      letter-spacing: 0.02em;
+    }
+
+    .wf-shell {
+      display: flex;
+      min-height: 760px;
+      overflow: hidden;
+      border: 1px solid hsl(var(--border));
+      border-radius: 0 0 12px 12px;
+      background: hsl(var(--background));
+      box-shadow: var(--shadow-lg);
+    }
+    .wf-sidebar {
+      display: flex;
+      width: 232px;
+      flex-shrink: 0;
+      flex-direction: column;
+      background: hsl(var(--sidebar));
+      color: hsl(var(--sidebar-foreground));
+    }
+    .wf-sidebar-brand {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 1.25rem 1.25rem 1rem;
+      border-bottom: 1px solid hsl(var(--sidebar-border));
+      font-size: 0.9375rem;
+      font-weight: 700;
+    }
+    .wf-sidebar-brand-mark {
+      display: flex;
+      width: 28px;
+      height: 28px;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      background: hsl(var(--primary));
+      color: white;
+      font-size: 0.875rem;
+      font-weight: 800;
+    }
+    .wf-sidebar-brand-text { display: flex; flex-direction: column; line-height: 1.15; }
+    .wf-sidebar-brand-sub {
+      color: hsl(var(--sidebar-muted));
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .wf-sidebar-nav { flex: 1; padding: 0.5rem; }
+    .wf-sidebar-section-title {
+      padding: 0.75rem 0.75rem 0.5rem;
+      color: hsl(var(--sidebar-muted));
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .wf-sidebar-link {
+      display: flex;
+      align-items: center;
+      gap: 0.625rem;
+      padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      color: hsl(var(--sidebar-muted));
+      font-size: 0.875rem;
+      font-weight: 500;
+      text-decoration: none;
+    }
+    .wf-sidebar-link.is-active { background: hsl(var(--primary)); color: white; }
+    .wf-sidebar-link-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+      opacity: 0.65;
+    }
+
+    .wf-main { display: flex; min-width: 0; flex: 1; flex-direction: column; }
+    .wf-topbar {
+      display: flex;
+      min-height: 53px;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.875rem 2rem;
+      border-bottom: 1px solid hsl(var(--border));
+      background: hsl(var(--card));
+    }
+    .wf-breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+      color: hsl(var(--muted-foreground));
+      font-size: 0.875rem;
+    }
+    .wf-breadcrumb a { color: inherit; text-decoration: none; }
+    .wf-breadcrumb-current { color: hsl(var(--foreground)); font-weight: 500; }
+    .wf-breadcrumb-sep { opacity: 0.5; }
+    .wf-admin-user { color: hsl(var(--muted-foreground)); font-size: 0.8125rem; }
+
+    .wf-page { width: 100%; padding: 2rem; }
+    .wf-page-header-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .wf-heading-lockup { display: flex; align-items: flex-start; gap: 0.875rem; }
+    .wf-assessment-mark {
+      display: grid;
+      width: 34px;
+      height: 34px;
+      flex-shrink: 0;
+      align-content: center;
+      gap: 3px;
+      padding: 7px;
+      border: 1px solid hsl(var(--primary) / 0.3);
+      border-radius: 8px;
+      background: hsl(var(--primary) / 0.06);
+    }
+    .wf-assessment-mark span {
+      display: block;
+      height: 2px;
+      border-radius: 999px;
+      background: hsl(var(--primary));
+    }
+    .wf-assessment-mark span:nth-child(1) { width: 60%; }
+    .wf-assessment-mark span:nth-child(2) { width: 90%; }
+    .wf-assessment-mark span:nth-child(3) { width: 72%; }
+    .wf-assessment-mark span:nth-child(4) { width: 46%; }
+    .wf-page-title { font-size: 1.5rem; }
+    .wf-page-subtitle { max-width: 620px; line-height: 1.5; }
+
+    .wf-status-message {
+      margin-bottom: 1rem;
+      padding: 0.75rem 1rem;
+      border: 1px solid hsl(var(--success) / 0.32);
+      border-radius: var(--radius);
+      background: hsl(var(--success) / 0.08);
+      color: hsl(160 84% 23%);
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+
+    .wf-table-wrap {
+      overflow: hidden;
+      border: 1px solid hsl(var(--border));
+      border-radius: var(--radius);
+      background: hsl(var(--card));
+      box-shadow: var(--shadow-xs);
+    }
+    .wf-table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+    .wf-table thead { background: hsl(var(--muted)); }
+    .wf-table th {
+      padding: 0.75rem 0.875rem;
+      border-bottom: 1px solid hsl(var(--border));
+      color: hsl(var(--muted-foreground));
+      font-size: 0.6875rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-align: left;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .wf-table td {
+      padding: 1rem 0.875rem;
+      border-bottom: 1px solid hsl(var(--border));
+      vertical-align: middle;
+    }
+    .wf-table tbody:last-child tr:last-child td { border-bottom: 0; }
+    .wf-row-created { background: hsl(var(--primary) / 0.045); }
+    .wf-row-created td:first-child { box-shadow: inset 4px 0 0 hsl(var(--primary)); }
+    .wf-campaign-name { display: block; font-weight: 650; line-height: 1.35; }
+    .wf-created-label {
+      display: inline-flex;
+      margin-top: 0.375rem;
+      padding: 0.125rem 0.45rem;
+      border-radius: 999px;
+      background: hsl(var(--primary) / 0.1);
+      color: hsl(var(--primary));
+      font-size: 0.6875rem;
+      font-weight: 700;
+    }
+    .wf-availability { color: hsl(var(--muted-foreground)); line-height: 1.45; }
+    .wf-response-count { font-variant-numeric: tabular-nums; font-weight: 650; }
+    .wf-actions { display: flex; flex-wrap: wrap; gap: 0.375rem; }
+    .wf-btn-subtle {
+      border-color: hsl(var(--border));
+      background: hsl(var(--card));
+      color: hsl(var(--foreground));
+    }
+    .wf-btn-link {
+      border-color: transparent;
+      background: transparent;
+      color: hsl(var(--primary));
+    }
+
+    .wf-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.25rem 0.6rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 650;
+      white-space: nowrap;
+    }
+    .wf-status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; }
+    .wf-status-draft { background: hsl(38 92% 94%); color: hsl(26 83% 28%); }
+    .wf-status-draft::before { background: hsl(var(--warning)); }
+    .wf-status-live { background: hsl(160 84% 94%); color: hsl(160 84% 23%); }
+    .wf-status-live::before { background: hsl(var(--success)); }
+    .wf-status-closed { background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); }
+    .wf-status-closed::before { background: hsl(var(--status-pending)); }
+
+    .wf-response-row td { padding: 0; background: hsl(210 40% 99%); }
+    .wf-response-panel { padding: 1rem 1.25rem 1.25rem; border-left: 4px solid hsl(var(--primary) / 0.3); }
+    .wf-response-panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 0.75rem;
+    }
+    .wf-response-panel h3 { margin: 0; font-size: 0.875rem; }
+    .wf-mini-table { width: 100%; border-collapse: collapse; }
+    .wf-mini-table th,
+    .wf-mini-table td { padding: 0.625rem 0.75rem; border: 1px solid hsl(var(--border)); }
+    .wf-mini-table th { background: hsl(var(--muted) / 0.6); font-size: 0.6875rem; }
+    .wf-mini-table td { background: hsl(var(--card)); }
+
+    .wf-behavior-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(280px, 0.72fr);
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    .wf-note-card,
+    .wf-dialog-specimen {
+      padding: 1rem;
+      border: 1px solid hsl(var(--border));
+      border-radius: var(--radius);
+      background: hsl(var(--card));
+    }
+    .wf-note-card h3,
+    .wf-dialog-specimen h3 { margin: 0 0 0.375rem; font-size: 0.875rem; }
+    .wf-note-card p,
+    .wf-dialog-specimen p {
+      margin: 0;
+      color: hsl(var(--muted-foreground));
+      font-size: 0.8125rem;
+      line-height: 1.5;
+    }
+    .wf-dialog-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem; }
+
+    .wf-form-card { max-width: 920px; }
+    .wf-form-card .wf-card-body { display: grid; gap: 1.5rem; }
+    .wf-field { display: grid; gap: 0.5rem; }
+    .wf-label { font-size: 0.875rem; font-weight: 650; }
+    .wf-required { color: hsl(var(--destructive)); }
+    .wf-field-hint { margin: 0; color: hsl(var(--muted-foreground)); font-size: 0.8125rem; line-height: 1.45; }
+    .wf-input,
+    .wf-select {
+      width: 100%;
+      min-height: 42px;
+      padding: 0.625rem 0.75rem;
+      border: 1px solid hsl(var(--border));
+      border-radius: 0.375rem;
+      background: hsl(var(--card));
+      color: hsl(var(--foreground));
+      font: inherit;
+      font-size: 0.875rem;
+    }
+    .wf-date-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .wf-date-grid fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+    .wf-choice-stack { display: grid; gap: 0.625rem; }
+    .wf-choice {
+      display: flex;
+      align-items: center;
+      gap: 0.625rem;
+      min-height: 42px;
+      padding: 0.625rem 0.75rem;
+      border: 1px solid hsl(var(--border));
+      border-radius: 0.375rem;
+      background: hsl(var(--card));
+      font-size: 0.875rem;
+    }
+    .wf-choice.is-selected { border-color: hsl(var(--primary)); box-shadow: 0 0 0 1px hsl(var(--primary) / 0.12); }
+    .wf-choice input { accent-color: hsl(var(--primary)); }
+
+    .wf-report-design {
+      padding-top: 1.5rem;
+      border-top: 1px solid hsl(var(--border));
+    }
+    .wf-report-design-head { margin-bottom: 0.75rem; }
+    .wf-report-design-head h3 { margin: 0 0 0.25rem; font-size: 0.875rem; }
+    .wf-report-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; }
+    .wf-report-card {
+      display: grid;
+      position: relative;
+      min-width: 0;
+      gap: 0.5rem;
+      padding: 0.875rem;
+      border: 1px solid hsl(var(--border));
+      border-radius: var(--radius);
+      background: hsl(var(--background));
+    }
+    .wf-report-card > input {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+    .wf-report-card.is-selected { border-color: hsl(var(--primary)); box-shadow: 0 0 0 1px hsl(var(--primary) / 0.14); }
+    .wf-report-card-title { display: flex; justify-content: space-between; gap: 0.5rem; font-size: 0.8125rem; font-weight: 700; }
+    .wf-selected { color: hsl(var(--primary)); font-size: 0.6875rem; }
+    .wf-report-card p { margin: 0; color: hsl(var(--muted-foreground)); font-size: 0.75rem; line-height: 1.45; }
+    .wf-report-preview {
+      display: grid;
+      height: 78px;
+      align-content: start;
+      gap: 7px;
+      padding: 0.75rem;
+      overflow: hidden;
+      border: 1px solid hsl(var(--border));
+      border-radius: 5px;
+      background: hsl(var(--card));
+    }
+    .wf-report-preview span { display: block; height: 5px; border-radius: 999px; background: hsl(var(--muted)); }
+    .wf-report-preview span:first-child { width: 42%; height: 8px; background: hsl(var(--primary) / 0.8); }
+    .wf-report-preview span:nth-child(2) { width: 76%; }
+    .wf-report-preview span:nth-child(3) { width: 58%; }
+    .wf-report-preview span:nth-child(4) { width: 88%; }
+    .wf-report-summary {
+      padding: 0.75rem;
+      border-radius: 0.375rem;
+      background: hsl(var(--muted) / 0.7);
+      color: hsl(var(--muted-foreground));
+      font-size: 0.8125rem;
+    }
+
+    .wf-empty-specimen {
+      margin-top: 1.25rem;
+      padding: 1rem 1.25rem;
+      border: 1px dashed hsl(var(--border));
+      border-radius: var(--radius);
+      background: hsl(var(--card));
+    }
+    .wf-empty-specimen-label {
+      display: block;
+      margin-bottom: 0.625rem;
+      color: hsl(var(--muted-foreground));
+      font-size: 0.6875rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .wf-empty-state {
+      padding: 1.25rem;
+      border-radius: var(--radius);
+      background: hsl(var(--muted) / 0.55);
+    }
+    .wf-empty-state h3 { margin: 0 0 0.375rem; font-size: 0.9375rem; }
+    .wf-empty-state p { margin: 0 0 0.875rem; color: hsl(var(--muted-foreground)); font-size: 0.875rem; }
+
+    .wf-form-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 0.625rem;
+      padding: 1rem 1.5rem;
+      border-top: 1px solid hsl(var(--border));
+    }
+
+    @media (max-width: 1120px) {
+      .page-head,
+      .wf-frame { padding-left: 1rem; padding-right: 1rem; }
+      .wf-sidebar { width: 184px; }
+      .wf-sidebar-brand { padding-left: 0.875rem; padding-right: 0.875rem; }
+      .wf-sidebar-link { padding-left: 0.625rem; padding-right: 0.625rem; }
+      .wf-topbar,
+      .wf-page { padding-left: 1.25rem; padding-right: 1.25rem; }
+
+      .wf-table thead { display: none; }
+      .wf-table tbody { display: block; }
+      .wf-table tr { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid hsl(var(--border)); }
+      .wf-table td { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); gap: 0.625rem; padding: 0.625rem 0.875rem; border: 0; }
+      .wf-table td::before {
+        content: attr(data-label);
+        color: hsl(var(--muted-foreground));
+        font-size: 0.6875rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+      .wf-table .wf-col-actions { grid-column: 1 / -1; }
+      .wf-table .wf-col-actions .wf-actions { margin-top: -0.125rem; }
+      .wf-row-created td:first-child { box-shadow: inset 4px 0 0 hsl(var(--primary)); }
+      .wf-response-row { display: block; }
+      .wf-response-row td { display: block; }
+      .wf-response-row td::before { content: none; }
+      .wf-response-panel { overflow: auto; }
+      .wf-report-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 760px) {
+      .wf-sidebar { display: none; }
+      .wf-page-header-row,
+      .wf-behavior-grid,
+      .wf-date-grid { display: grid; grid-template-columns: 1fr; }
+      .wf-table tr { grid-template-columns: 1fr; }
+      .wf-table .wf-col-actions { grid-column: auto; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wf-banner">
+    <div><strong>WIREFRAME 25 — Current visual source of truth.</strong> Plain-language Public Campaigns management and creation.</div>
+    <a href="../index.html" class="wf-back-to-index">&larr; Back to Phase 2 index</a>
+  </div>
+
+  <div class="page-head">
+    <h1>25 — Admin Public Campaigns: plain-language management</h1>
+    <p>Two approved states: a returning admin's list-first workspace and a dedicated creation page.</p>
+  </div>
+
+  <section class="wf-frame" aria-labelledby="list-frame-label">
+    <div class="wf-frame-label" id="list-frame-label">
+      <span>Frame A · Default route</span>
+      <span>List first</span>
+    </div>
+    <div class="wf-shell">
+      <aside class="wf-sidebar" aria-label="Assessment administration">
+        <div class="wf-sidebar-brand">
+          <span class="wf-sidebar-brand-mark">S</span>
+          <span class="wf-sidebar-brand-text">
+            <span>Scaling Up</span>
+            <span class="wf-sidebar-brand-sub">Assessments · Admin</span>
+          </span>
+        </div>
+        <nav class="wf-sidebar-nav">
+          <div class="wf-sidebar-section-title">Manage</div>
+          <a class="wf-sidebar-link" href="#"><span class="wf-sidebar-link-dot"></span>Dashboard</a>
+          <a class="wf-sidebar-link" href="#"><span class="wf-sidebar-link-dot"></span>Users</a>
+          <a class="wf-sidebar-link" href="#"><span class="wf-sidebar-link-dot"></span>Organizations</a>
+          <a class="wf-sidebar-link" href="#"><span class="wf-sidebar-link-dot"></span>Assessments</a>
+          <a class="wf-sidebar-link" href="#"><span class="wf-sidebar-link-dot"></span>Campaigns</a>
+          <a class="wf-sidebar-link is-active" href="#" aria-current="page"><span class="wf-sidebar-link-dot"></span>Public campaigns</a>
+          <a class="wf-sidebar-link" href="#"><span class="wf-sidebar-link-dot"></span>Aggregate Report</a>
+        </nav>
+      </aside>
+
+      <main class="wf-main">
+        <div class="wf-topbar">
+          <div class="wf-breadcrumb">
+            <a href="#">Admin</a><span class="wf-breadcrumb-sep">/</span>
+            <span class="wf-breadcrumb-current">Public campaigns</span>
+          </div>
+          <span class="wf-admin-user">Staff admin</span>
+        </div>
+
+        <div class="wf-page">
+          <div class="wf-page-header-row">
+            <div class="wf-heading-lockup">
+              <span class="wf-assessment-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
+              <div>
+                <h2 class="wf-page-title">Public campaigns</h2>
+                <p class="wf-page-subtitle">Share an assessment with anyone using a public link.</p>
+              </div>
+            </div>
+            <a class="wf-btn wf-btn-primary" href="#create-frame">Create campaign</a>
+          </div>
+
+          <div class="wf-status-message" role="status">Campaign created as a draft.</div>
+
+          <div class="wf-table-wrap">
+            <table class="wf-table">
+              <thead>
+                <tr>
+                  <th>Campaign</th>
+                  <th>Assessment</th>
+                  <th>Status</th>
+                  <th>Availability</th>
+                  <th>Responses</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="wf-row-created">
+                  <td data-label="Campaign">
+                    <span><span class="wf-campaign-name">Leadership Momentum</span><span class="wf-created-label">Just created</span></span>
+                  </td>
+                  <td data-label="Assessment">Scaling Up Assessment</td>
+                  <td data-label="Status"><span><span class="wf-status wf-status-draft">Draft</span></span></td>
+                  <td data-label="Availability"><span class="wf-availability">Opens Aug 18, 2026<br>No end date</span></td>
+                  <td data-label="Responses"><span class="wf-response-count">0</span></td>
+                  <td class="wf-col-actions" data-label="Actions">
+                    <span class="wf-actions">
+                      <button type="button" class="wf-btn wf-btn-primary wf-btn-sm">Publish</button>
+                      <button type="button" class="wf-btn wf-btn-subtle wf-btn-sm">More</button>
+                    </span>
+                  </td>
+                </tr>
+                <tr>
+                  <td data-label="Campaign"><span class="wf-campaign-name">Quarterly Habits Check</span></td>
+                  <td data-label="Assessment">Rockefeller Habits Checklist</td>
+                  <td data-label="Status"><span><span class="wf-status wf-status-live">Live</span></span></td>
+                  <td data-label="Availability"><span class="wf-availability">Open now<br>Ends Sep 30, 2026</span></td>
+                  <td data-label="Responses"><span class="wf-response-count">24</span></td>
+                  <td class="wf-col-actions" data-label="Actions">
+                    <span class="wf-actions">
+                      <button type="button" class="wf-btn wf-btn-primary wf-btn-sm">Copy link</button>
+                      <button type="button" class="wf-btn wf-btn-subtle wf-btn-sm" aria-expanded="true">View responses</button>
+                      <button type="button" class="wf-btn wf-btn-subtle wf-btn-sm">More</button>
+                    </span>
+                  </td>
+                </tr>
+                <tr class="wf-response-row">
+                  <td colspan="6">
+                    <section class="wf-response-panel" aria-label="Quarterly Habits Check responses">
+                      <div class="wf-response-panel-head">
+                        <h3>Recent responses</h3>
+                        <button type="button" class="wf-btn wf-btn-link wf-btn-sm">Hide responses</button>
+                      </div>
+                      <table class="wf-mini-table">
+                        <thead><tr><th>Respondent</th><th>Result</th><th>Submitted</th><th>Action</th></tr></thead>
+                        <tbody>
+                          <tr><td>Maya Santos</td><td>Strong foundation</td><td>Aug 9, 2026</td><td><button type="button" class="wf-btn wf-btn-subtle wf-btn-sm">View report</button></td></tr>
+                          <tr><td>Daniel Cho</td><td>Building momentum</td><td>Aug 8, 2026</td><td><button type="button" class="wf-btn wf-btn-subtle wf-btn-sm">View report</button></td></tr>
+                        </tbody>
+                      </table>
+                    </section>
+                  </td>
+                </tr>
+                <tr>
+                  <td data-label="Campaign"><span class="wf-campaign-name">Annual Planning Readiness</span></td>
+                  <td data-label="Assessment">Growth Readiness Assessment</td>
+                  <td data-label="Status"><span><span class="wf-status wf-status-closed">Closed</span></span></td>
+                  <td data-label="Availability"><span class="wf-availability">Closed Jul 31, 2026</span></td>
+                  <td data-label="Responses"><span class="wf-response-count">86</span></td>
+                  <td class="wf-col-actions" data-label="Actions">
+                    <span class="wf-actions">
+                      <button type="button" class="wf-btn wf-btn-subtle wf-btn-sm">View responses</button>
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="wf-behavior-grid">
+            <aside class="wf-note-card">
+              <h3>Report design disclosure</h3>
+              <p><strong>More</strong> contains <strong>Report design</strong> only when that assessment supports it. The Closed sample has no available secondary action, so no empty control is shown.</p>
+            </aside>
+            <section class="wf-dialog-specimen" role="dialog" aria-labelledby="publish-title" aria-modal="true">
+              <h3 id="publish-title">Publish Leadership Momentum?</h3>
+              <p>Anyone with the link will be able to take it once the campaign opens.</p>
+              <div class="wf-dialog-actions">
+                <button type="button" class="wf-btn wf-btn-subtle wf-btn-sm">Cancel</button>
+                <button type="button" class="wf-btn wf-btn-primary wf-btn-sm">Publish</button>
+              </div>
+            </section>
+          </div>
+        </div>
+      </main>
+    </div>
+  </section>
+
+  <section class="wf-frame" id="create-frame" aria-labelledby="create-frame-label">
+    <div class="wf-frame-label" id="create-frame-label">
+      <span>Frame B · Dedicated route</span>
+      <span>Focused creation</span>
+    </div>
+    <div class="wf-shell">
+      <aside class="wf-sidebar" aria-label="Assessment administration">
+        <div class="wf-sidebar-brand">
+          <span class="wf-sidebar-brand-mark">S</span>
+          <span class="wf-sidebar-brand-text">
+            <span>Scaling Up</span>
+            <span class="wf-sidebar-brand-sub">Assessments · Admin</span>
+          </span>
+        </div>
+        <nav class="wf-sidebar-nav">
+          <div class="wf-sidebar-section-title">Manage</div>
+          <a class="wf-sidebar-link" href="#"><span class="wf-sidebar-link-dot"></span>Dashboard</a>
+          <a class="wf-sidebar-link" href="#"><span class="wf-sidebar-link-dot"></span>Users</a>
+          <a class="wf-sidebar-link" href="#"><span class="wf-sidebar-link-dot"></span>Organizations</a>
+          <a class="wf-sidebar-link" href="#"><span class="wf-sidebar-link-dot"></span>Assessments</a>
+          <a class="wf-sidebar-link" href="#"><span class="wf-sidebar-link-dot"></span>Campaigns</a>
+          <a class="wf-sidebar-link is-active" href="#" aria-current="page"><span class="wf-sidebar-link-dot"></span>Public campaigns</a>
+          <a class="wf-sidebar-link" href="#"><span class="wf-sidebar-link-dot"></span>Aggregate Report</a>
+        </nav>
+      </aside>
+
+      <main class="wf-main">
+        <div class="wf-topbar">
+          <div class="wf-breadcrumb">
+            <a href="#">Admin</a><span class="wf-breadcrumb-sep">/</span>
+            <a href="#">Public campaigns</a><span class="wf-breadcrumb-sep">/</span>
+            <span class="wf-breadcrumb-current">Create campaign</span>
+          </div>
+          <span class="wf-admin-user">Staff admin</span>
+        </div>
+
+        <div class="wf-page">
+          <div class="wf-page-header-row">
+            <div class="wf-heading-lockup">
+              <span class="wf-assessment-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
+              <div>
+                <h2 class="wf-page-title">Create a public campaign</h2>
+                <p class="wf-page-subtitle">Create a link anyone can use to take an assessment.</p>
+              </div>
+            </div>
+          </div>
+
+          <form class="wf-card wf-form-card">
+            <div class="wf-card-body">
+              <div class="wf-field">
+                <label class="wf-label" for="assessment">Assessment <span class="wf-required" aria-hidden="true">*</span></label>
+                <select class="wf-select" id="assessment">
+                  <option>Scaling Up Assessment</option>
+                  <option>Rockefeller Habits Checklist</option>
+                  <option>Leadership Values Assessment</option>
+                </select>
+                <p class="wf-field-hint">Only assessments that are ready to share are available.</p>
+              </div>
+
+              <section class="wf-report-design" aria-labelledby="report-design-heading">
+                <div class="wf-report-design-head">
+                  <h3 id="report-design-heading">Report design</h3>
+                  <p class="wf-field-hint">Choose how individual results will look.</p>
+                </div>
+                <div class="wf-report-grid" role="radiogroup" aria-label="Report design">
+                  <label class="wf-report-card is-selected">
+                    <input type="radio" name="report-design" checked>
+                    <span class="wf-report-card-title"><span>Classic</span><span class="wf-selected">Selected</span></span>
+                    <span class="wf-report-preview" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
+                    <p>A clear, familiar report presentation. A4.</p>
+                  </label>
+                  <label class="wf-report-card">
+                    <input type="radio" name="report-design">
+                    <span class="wf-report-card-title"><span>Executive Boardroom</span></span>
+                    <span class="wf-report-preview" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
+                    <p>Editorial, restrained, and board-ready. US Letter.</p>
+                  </label>
+                  <label class="wf-report-card">
+                    <input type="radio" name="report-design">
+                    <span class="wf-report-card-title"><span>Modern Dashboard</span></span>
+                    <span class="wf-report-preview" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
+                    <p>Compact, visual, and data-forward. US Letter.</p>
+                  </label>
+                </div>
+                <p class="wf-report-summary">Uses the assessment's default design.</p>
+              </section>
+
+              <div class="wf-field">
+                <label class="wf-label" for="campaign-name">Campaign name <span class="wf-required" aria-hidden="true">*</span></label>
+                <input class="wf-input" id="campaign-name" type="text" value="Leadership Momentum">
+              </div>
+
+              <div class="wf-date-grid">
+                <fieldset class="wf-field">
+                  <legend class="wf-label">Starts</legend>
+                  <div class="wf-choice-stack">
+                    <label class="wf-choice is-selected"><input type="radio" name="starts" checked> Open immediately</label>
+                    <label class="wf-choice"><input type="radio" name="starts"> Choose a date and time</label>
+                  </div>
+                </fieldset>
+                <fieldset class="wf-field">
+                  <legend class="wf-label">Ends</legend>
+                  <div class="wf-choice-stack">
+                    <label class="wf-choice is-selected"><input type="radio" name="ends" checked> No end date</label>
+                    <label class="wf-choice"><input type="radio" name="ends"> Choose an end date</label>
+                  </div>
+                </fieldset>
+              </div>
+            </div>
+            <div class="wf-form-actions">
+              <button type="button" class="wf-btn wf-btn-subtle">Cancel</button>
+              <button type="submit" class="wf-btn wf-btn-primary">Create draft</button>
+            </div>
+          </form>
+
+          <section class="wf-empty-specimen" aria-labelledby="empty-state-label">
+            <span class="wf-empty-specimen-label" id="empty-state-label">Alternate state · no eligible assessment</span>
+            <div class="wf-empty-state">
+              <h3>No published assessments are available.</h3>
+              <p>Publish an assessment before creating a public campaign.</p>
+              <a href="#" class="wf-btn wf-btn-subtle wf-btn-sm">Manage assessments</a>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+  </section>
+</body>
+</html>

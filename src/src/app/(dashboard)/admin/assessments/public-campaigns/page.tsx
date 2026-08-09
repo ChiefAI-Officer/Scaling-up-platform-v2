@@ -13,12 +13,21 @@
 
 export const dynamic = "force-dynamic";
 
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth/auth";
 import { PublicCampaignsManager } from "@/components/admin/PublicCampaignsManager";
+import { PublicCampaignList } from "@/components/admin/public-campaigns/PublicCampaignList";
+import { isPublicCampaignsSimpleUiEnabled } from "@/lib/assessments/wave-public-campaigns-simple-ui-flags";
 
-export default async function AdminPublicCampaignsPage() {
+interface PublicCampaignsPageProps {
+  searchParams: Promise<{ created?: string | string[] }>;
+}
+
+export default async function AdminPublicCampaignsPage({
+  searchParams,
+}: PublicCampaignsPageProps) {
   const session = await getServerSession(authOptions);
   if (!session) {
     redirect("/login");
@@ -26,6 +35,41 @@ export default async function AdminPublicCampaignsPage() {
   const role = (session.user as { role?: string } | undefined)?.role;
   if (role !== "ADMIN" && role !== "STAFF") {
     redirect("/unauthorized");
+  }
+
+  if (isPublicCampaignsSimpleUiEnabled()) {
+    const { created } = await searchParams;
+    const createdCampaignId =
+      typeof created === "string" ? created : undefined;
+
+    return (
+      <div>
+        <div className="wf-breadcrumb">
+          <a href="/admin/dashboard">Admin</a>
+          <span className="wf-breadcrumb-sep">/</span>
+          <a href="/admin/assessments">Assessments</a>
+          <span className="wf-breadcrumb-sep">/</span>
+          <span className="wf-breadcrumb-current">Public campaigns</span>
+        </div>
+
+        <div className="wf-page-header-row">
+          <div>
+            <h2 className="wf-page-title">Public campaigns</h2>
+            <p className="wf-page-subtitle">
+              Share an assessment with anyone using a public link.
+            </p>
+          </div>
+          <Link
+            className="wf-btn wf-btn-primary"
+            href="/admin/assessments/public-campaigns/new"
+          >
+            Create campaign
+          </Link>
+        </div>
+
+        <PublicCampaignList createdCampaignId={createdCampaignId} />
+      </div>
+    );
   }
 
   return (

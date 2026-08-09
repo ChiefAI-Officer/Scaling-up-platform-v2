@@ -201,4 +201,24 @@ describe("ReportStylePicker", () => {
     expect(screen.getByRole("radio", { name: /modern dashboard/i })).toBeChecked();
     expect(screen.getByRole("img", { name: "Modern Dashboard Cover preview" })).toBeInTheDocument();
   });
+
+  it("lets a surface opt into design terminology and its own disabled explanation", () => {
+    render(
+      <PickerHarness
+        initialValue="MODERN_DASHBOARD"
+        disabled
+        heading="Report design"
+        disabledExplanation={null}
+      />,
+    );
+
+    expect(screen.getByRole("group", { name: "Report design" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: "Report design selection" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Report style" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/report appearance was fixed|locked on/i),
+    ).not.toBeInTheDocument();
+  });
 });

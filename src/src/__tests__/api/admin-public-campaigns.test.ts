@@ -72,6 +72,10 @@ jest.mock("@/lib/rate-limit", () => ({
   withRateLimit: jest.fn().mockResolvedValue({ allowed: true, headers: {} }),
 }));
 
+jest.mock("@/lib/assessments/wave-public-campaigns-simple-ui-flags", () => ({
+  isPublicCampaignsSimpleUiEnabled: jest.fn(),
+}));
+
 // ─── imports (after mocks) ───────────────────────────────────────────────────
 import {
   GET as listGet,
@@ -85,6 +89,7 @@ import {
   CampaignCreateError,
 } from "@/lib/assessments/campaign-create-service";
 import { logAudit } from "@/lib/audit";
+import { isPublicCampaignsSimpleUiEnabled } from "@/lib/assessments/wave-public-campaigns-simple-ui-flags";
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -169,6 +174,7 @@ beforeEach(() => {
   delete process.env.WAVE_REPORT_STYLES_ENABLED;
   delete process.env.WAVE_REPORT_STYLES_CANARY;
   delete process.env.WAVE_REPORT_STYLES_KILL;
+  (isPublicCampaignsSimpleUiEnabled as jest.Mock).mockReturnValue(false);
   (resolvePublishedTemplateVersion as jest.Mock).mockResolvedValue(mockVersion);
   (db.assessmentTemplate.findUnique as jest.Mock).mockResolvedValue(
     { ...mockTemplate, disabledAt: null, defaultReportStyle: "MODERN_DASHBOARD" }
@@ -204,6 +210,61 @@ describe("GET /api/admin/public-campaigns — LIST", () => {
         },
       }),
     );
+  });
+
+  it("keeps list query and payload count-free when simple UI is disabled", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    (db.assessmentCampaign.findMany as jest.Mock).mockResolvedValue([
+      {
+        ...mockCampaign,
+        reportStyle: "CLASSIC",
+        reportStyleSource: "TEMPLATE_DEFAULT",
+        reportStyleLockedAt: null,
+      },
+    ]);
+
+    const res = await listGet();
+
+    expect(db.assessmentCampaign.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: {
+          organization: { select: { id: true, name: true } },
+          template: { select: { id: true, name: true, alias: true } },
+        },
+      }),
+    );
+    const body = await res.json();
+    expect(body.data[0]).not.toHaveProperty("_count");
+    expect(body.data[0]).not.toHaveProperty("responseCount");
+  });
+
+  it("adds a response count without exposing Prisma count data when simple UI is enabled", async () => {
+    (isPublicCampaignsSimpleUiEnabled as jest.Mock).mockReturnValue(true);
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    (db.assessmentCampaign.findMany as jest.Mock).mockResolvedValue([
+      {
+        ...mockCampaign,
+        reportStyle: "CLASSIC",
+        reportStyleSource: "TEMPLATE_DEFAULT",
+        reportStyleLockedAt: null,
+        _count: { submissions: 24 },
+      },
+    ]);
+
+    const res = await listGet();
+
+    expect(db.assessmentCampaign.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: {
+          organization: { select: { id: true, name: true } },
+          template: { select: { id: true, name: true, alias: true } },
+          _count: { select: { submissions: true } },
+        },
+      }),
+    );
+    const body = await res.json();
+    expect(body.data[0]).toHaveProperty("responseCount", 24);
+    expect(body.data[0]).not.toHaveProperty("_count");
   });
 
   it("returns the exact campaign-canary availability and lets kill override it", async () => {
@@ -605,6 +666,25 @@ describe("POST /api/admin/public-campaigns — CREATE", () => {
       expect(data.endMode).toBe("ENDS_AFTER");
       expect(data.closeAt).toBeInstanceOf(Date);
     });
+
+    it.each([
+      ["equal to", "2026-07-01T00:00:00.000Z"],
+      ["before", "2026-06-30T23:59:59.999Z"],
+    ])(
+      "rejects closeAt %s openAt before creating a campaign",
+      async (_relationship, closeAt) => {
+        const res = await createPost(
+          makeCreateRequest({ ...validBody, closeAt }) as never,
+        );
+
+        expect(res.status).toBe(400);
+        await expect(res.json()).resolves.toEqual({
+          success: false,
+          error: "closeAt must be after openAt",
+        });
+        expect(db.assessmentCampaign.create).not.toHaveBeenCalled();
+      },
+    );
   });
 
   describe("P2002 alias collision fallback", () => {
