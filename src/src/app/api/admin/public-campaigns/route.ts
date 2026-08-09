@@ -138,7 +138,7 @@ export async function GET() {
         const reportStylesAvailable = availability.get(campaign.id) === true;
         const campaignPayload = {
           ...campaign,
-        } as typeof campaign & {
+        } as Omit<typeof campaign, "_count"> & {
           _count?: { submissions: number };
           version?: unknown;
         };
