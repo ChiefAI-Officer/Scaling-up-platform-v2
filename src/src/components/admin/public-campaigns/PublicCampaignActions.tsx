@@ -18,7 +18,9 @@ import {
 interface PublicCampaignActionsProps {
   campaign: PublicCampaignViewModel;
   origin: string;
-  onCampaignUpdated: (campaign: PublicCampaignViewModel) => void;
+  onCampaignUpdated: (
+    updates: Pick<PublicCampaignViewModel, "status">,
+  ) => void;
   onToggleResponses: () => void;
   responsesExpanded: boolean;
   onToggleReportDesign: () => void;
@@ -64,7 +66,7 @@ export function PublicCampaignActions({
         throw new Error("Invalid publish response");
       }
 
-      onCampaignUpdated({ ...campaign, status: "ACTIVE" });
+      onCampaignUpdated({ status: "ACTIVE" });
       setNotice({
         kind: "status",
         message: "Campaign published. Its public link is ready to share.",

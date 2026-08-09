@@ -120,15 +120,14 @@ describe("PublicCampaignActions", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   });
 
-  it("publishes and merges the partial response into the full row (catches field loss after publish)", async () => {
-    const draft = campaign();
+  it("publishes and emits only its owned status field (catches stale full-row replacement)", async () => {
     (global.fetch as jest.Mock).mockResolvedValue(
       response({
         success: true,
         data: { id: "campaign-august", status: "ACTIVE" },
       }),
     );
-    const { onCampaignUpdated } = renderActions(draft);
+    const { onCampaignUpdated } = renderActions(campaign());
 
     fireEvent.click(screen.getByRole("button", { name: "Publish" }));
     fireEvent.click(
@@ -139,7 +138,6 @@ describe("PublicCampaignActions", () => {
 
     await waitFor(() => {
       expect(onCampaignUpdated).toHaveBeenCalledWith({
-        ...draft,
         status: "ACTIVE",
       });
     });

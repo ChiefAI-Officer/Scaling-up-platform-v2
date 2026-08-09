@@ -12,7 +12,7 @@ import {
 interface PublicCampaignReportDesignProps {
   campaign: PublicCampaignViewModel;
   expanded: boolean;
-  onCampaignUpdated: (campaign: PublicCampaignViewModel) => void;
+  onCampaignUpdated: (updates: Appearance) => void;
 }
 
 type Appearance = Pick<
@@ -120,7 +120,7 @@ export function PublicCampaignReportDesign({
       if (response.status === 409 && nextAppearance) {
         setAppearance(nextAppearance);
         setDraft(nextAppearance.reportStyle);
-        onCampaignUpdated({ ...campaign, ...nextAppearance });
+        onCampaignUpdated(nextAppearance);
         return;
       }
 
@@ -131,7 +131,7 @@ export function PublicCampaignReportDesign({
       setAppearance(nextAppearance);
       setDraft(nextAppearance.reportStyle);
       setSaved(true);
-      onCampaignUpdated({ ...campaign, ...nextAppearance });
+      onCampaignUpdated(nextAppearance);
     } catch {
       setSaveError(true);
     } finally {

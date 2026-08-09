@@ -19,6 +19,13 @@ interface ListResponse {
   data?: PublicCampaignViewModel[];
 }
 
+type PublicCampaignOwnedUpdates =
+  | Pick<PublicCampaignViewModel, "status">
+  | Pick<
+      PublicCampaignViewModel,
+      "reportStyle" | "reportStyleSource" | "reportStyleLockedAt"
+    >;
+
 const cellClassName =
   "max-[1120px]:grid max-[1120px]:grid-cols-[7.5rem_minmax(0,1fr)] max-[1120px]:gap-2 max-[1120px]:border-0 max-[1120px]:py-2.5 max-[1120px]:before:text-[0.6875rem] max-[1120px]:before:font-bold max-[1120px]:before:uppercase max-[1120px]:before:tracking-[0.05em] max-[1120px]:before:text-muted-foreground max-[1120px]:before:content-[attr(data-label)]";
 
@@ -61,10 +68,13 @@ export function PublicCampaignList({
     };
   }, []);
 
-  function replaceCampaign(updated: PublicCampaignViewModel) {
+  function patchCampaign(
+    campaignId: string,
+    updates: PublicCampaignOwnedUpdates,
+  ) {
     setCampaigns((current) =>
       current.map((campaign) =>
-        campaign.id === updated.id ? updated : campaign,
+        campaign.id === campaignId ? { ...campaign, ...updates } : campaign,
       ),
     );
   }
@@ -222,7 +232,9 @@ export function PublicCampaignList({
                       <PublicCampaignActions
                         campaign={campaign}
                         origin={origin}
-                        onCampaignUpdated={replaceCampaign}
+                        onCampaignUpdated={(updates) =>
+                          patchCampaign(campaign.id, updates)
+                        }
                         onToggleResponses={() => toggleResponses(campaign.id)}
                         responsesExpanded={responsesExpanded}
                         onToggleReportDesign={() =>
@@ -254,7 +266,9 @@ export function PublicCampaignList({
                           <PublicCampaignReportDesign
                             campaign={campaign}
                             expanded
-                            onCampaignUpdated={replaceCampaign}
+                            onCampaignUpdated={(updates) =>
+                              patchCampaign(campaign.id, updates)
+                            }
                           />
                         </td>
                       </tr>

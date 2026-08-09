@@ -65,8 +65,7 @@ describe("PublicCampaignReportDesign", () => {
     expect(screen.getByRole("button", { name: "Save report design" })).toBeDisabled();
   });
 
-  it("PATCHes a changed unlocked design and returns the merged campaign (catches wrong endpoint, payload, or field loss)", async () => {
-    const initialCampaign = campaign();
+  it("PATCHes a changed unlocked design and emits only owned report fields (catches stale full-row replacement)", async () => {
     global.fetch = jest.fn(async () =>
       response({
         success: true,
@@ -81,7 +80,7 @@ describe("PublicCampaignReportDesign", () => {
     const onCampaignUpdated = jest.fn();
     render(
       <PublicCampaignReportDesign
-        campaign={initialCampaign}
+        campaign={campaign()}
         expanded
         onCampaignUpdated={onCampaignUpdated}
       />,
@@ -101,7 +100,6 @@ describe("PublicCampaignReportDesign", () => {
       );
     });
     expect(onCampaignUpdated).toHaveBeenCalledWith({
-      ...initialCampaign,
       reportStyle: "MODERN_DASHBOARD",
       reportStyleSource: "CAMPAIGN_OVERRIDE",
       reportStyleLockedAt: null,
@@ -170,7 +168,6 @@ describe("PublicCampaignReportDesign", () => {
       screen.getByText("This report design cannot be changed after the first response."),
     ).toBeInTheDocument();
     expect(onCampaignUpdated).toHaveBeenCalledWith({
-      ...initialCampaign,
       reportStyle: "EXECUTIVE_BOARDROOM",
       reportStyleSource: "CAMPAIGN_OVERRIDE",
       reportStyleLockedAt: "2026-08-10T01:15:00.000Z",
