@@ -6,6 +6,19 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="public-campaigns-simple-ui-release-ready"></a>
+### 2026-08-10 — Simplified Public Campaigns UI independently approved for protected release <!-- ENTRY_ISO:2026-08-10 ENTRY_SLUG:public-campaigns-simple-ui-release-ready -->
+
+**Status: CODE COMPLETE + INDEPENDENTLY REVIEW-APPROVED + DEFAULT OFF; ready for protected PR, not yet merged, deployed, enabled, or browser-accepted.** The approved list-first Public Campaigns manager and dedicated creation page replace the combined jargon-heavy screen when `WAVE_PUBLIC_CAMPAIGNS_SIMPLE_UI_ENABLED` is active. Creation remains organization-free, and `WAVE_PUBLIC_CAMPAIGNS_SIMPLE_UI_KILL` continues to win and restore the untouched legacy manager.
+
+**Final review closeout.** The whole-branch review found and the fix round closed authoritative start/end chronology validation, duplicate-create redirect latching, inert Cancel behavior during writes, publish-dialog and creation-heading focus transfer, plain **Report design** terminology, strict flagged-list payload decoding, exact manual-copy guidance, semantic status colors, and cached/exclusive response disclosure coverage. The scoped independent re-review verdict was **Ready to merge**, with all eight findings addressed and no new breakage. The accepted temporary `SubmissionResult` duplication remains deliberate rollback debt until the feature flag is retired. A separate pre-existing observation about defensive decoding inside the response-detail fetch remains outside this UI release and was not worsened.
+
+**Fresh release gates on fix commit `5536615c`.** The complete repository passed **673 suites / 8,400 tests / 16 snapshots** (exit 0); the established console stream contained expected negative-path logging and React test warnings but no failed suite or test. Migration safety checked all **46 migrations** with no unapproved destructive operation (exit 0). `CI=true npx next build --turbopack` compiled in **12.2 s**, completed TypeScript, and generated **94/94** static pages (exit 0); only the established local warnings for the deprecated middleware convention, absent Inngest keys, and absent `DATABASE_URL` during static data fetches appeared. The immediately preceding fix verification also passed **127 focused tests**, **27 legacy/default-off tests**, changed-file ESLint, and diff hygiene.
+
+**Rollout boundary.** No environment variable, deployment, Production record, campaign, response, or email was changed while producing this receipt. The flag remains default OFF. A deployed, authenticated ADMIN/STAFF browser walk at desktop and 1024-pixel width—including keyboard focus, copy fallback, disclosures, creation validation, and kill-switch fallback—remains the final enablement gate.
+
+---
+
 <a id="public-campaigns-simple-ui-built"></a>
 ### 2026-08-10 — Simplified Public Campaigns UI built behind default-OFF flag <!-- ENTRY_ISO:2026-08-10 ENTRY_SLUG:public-campaigns-simple-ui-built -->
 
