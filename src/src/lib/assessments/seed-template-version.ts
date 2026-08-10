@@ -16,6 +16,7 @@
  */
 
 import { computeTemplateContentHash } from "./template-content-hash";
+import { resolveLegacyInvitedWelcomeConfig } from "./invited-welcome-config";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -202,6 +203,7 @@ export async function ensureTemplateVersionContent(
         invitationSubject: c.invitationSubject,
         invitationBodyMarkdown: c.invitationBodyMarkdown,
         aggregationMode: c.aggregationMode ?? "FULL_VISIBILITY",
+        invitedWelcomeDefault: resolveLegacyInvitedWelcomeConfig(c.alias),
         createdBy: systemUserId,
       },
     });

@@ -12,6 +12,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import { logAudit } from "@/lib/audit";
@@ -23,6 +24,13 @@ import {
   type ReportStyleKey,
 } from "@/lib/assessments/report-style-registry";
 import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
+import {
+  buildInvitedWelcomeConfig,
+  invitedWelcomeAuthoringInputSchema,
+  invitedWelcomeConfigSchema,
+  resolveLegacyInvitedWelcomeConfig,
+} from "@/lib/assessments/invited-welcome-config";
+import { isAdminOwnedAssessmentPresentationEnabled } from "@/lib/assessments/wave-admin-owned-assessment-presentation-flags";
 
 export async function GET(
   _request: NextRequest,
@@ -54,6 +62,7 @@ export async function GET(
         invitationSubject: true,
         invitationBodyMarkdown: true,
         aggregationMode: true,
+        invitedWelcomeDefault: true,
         createdAt: true,
         updatedAt: true,
         versions: {
@@ -109,7 +118,21 @@ const PatchTemplateBodySchema = z.object({
   sendResultsDefault: z.boolean().optional(),
   disabled: z.boolean().optional(),
   defaultReportStyle: z.enum(REPORT_STYLE_KEYS).optional(),
+  invitedWelcomeDefault: invitedWelcomeAuthoringInputSchema.optional(),
 });
+
+function hasForbiddenInvitedWelcomeServerField(body: unknown): boolean {
+  if (typeof body !== "object" || body === null || !("invitedWelcomeDefault" in body)) {
+    return false;
+  }
+  const welcome = (body as { invitedWelcomeDefault?: unknown }).invitedWelcomeDefault;
+  return (
+    typeof welcome === "object" &&
+    welcome !== null &&
+    (Object.prototype.hasOwnProperty.call(welcome, "schemaVersion") ||
+      Object.prototype.hasOwnProperty.call(welcome, "finePrint"))
+  );
+}
 
 export async function PATCH(
   request: NextRequest,
@@ -140,6 +163,12 @@ export async function PATCH(
 
     const { id } = await params;
     const body = await request.json().catch(() => ({}));
+    if (hasForbiddenInvitedWelcomeServerField(body)) {
+      return NextResponse.json(
+        { success: false, error: "INVITED_WELCOME_SERVER_FIELDS_FORBIDDEN" },
+        { status: 400 },
+      );
+    }
     const parsed = PatchTemplateBodySchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
@@ -149,6 +178,16 @@ export async function PATCH(
     }
 
     const data = parsed.data;
+
+    if (
+      data.invitedWelcomeDefault !== undefined &&
+      !isAdminOwnedAssessmentPresentationEnabled()
+    ) {
+      return NextResponse.json(
+        { success: false, error: "ADMIN_OWNED_PRESENTATION_DISABLED" },
+        { status: 403 },
+      );
+    }
 
     // Wave Q — the flag gates these WRITES (never the enforcement of already
     // persisted intent). Reject BEFORE any read/write when either field is
@@ -185,10 +224,12 @@ export async function PATCH(
       where: { id, deletedAt: null },
       select: {
         id: true,
+        alias: true,
         resultsEmailSubject: true,
         resultsEmailBodyMarkdown: true,
         sendResultsDefault: true,
         disabledAt: true,
+        invitedWelcomeDefault: true,
       },
     });
     if (!existing) {
@@ -212,6 +253,7 @@ export async function PATCH(
       sendResultsDefault?: boolean;
       disabledAt?: Date | null;
       defaultReportStyle?: ReportStyleKey;
+      invitedWelcomeDefault?: Prisma.InputJsonValue;
     } = {};
     if (data.name !== undefined) updateData.name = data.name;
     if (data.description !== undefined) updateData.description = data.description;
@@ -223,6 +265,18 @@ export async function PATCH(
       updateData.aggregationMode = data.aggregationMode;
     if (data.defaultReportStyle !== undefined) {
       updateData.defaultReportStyle = data.defaultReportStyle;
+    }
+    if (data.invitedWelcomeDefault !== undefined) {
+      const persisted = invitedWelcomeConfigSchema.safeParse(
+        existing.invitedWelcomeDefault,
+      );
+      const finePrint = persisted.success
+        ? persisted.data.finePrint
+        : resolveLegacyInvitedWelcomeConfig(existing.alias).finePrint;
+      updateData.invitedWelcomeDefault = buildInvitedWelcomeConfig(
+        data.invitedWelcomeDefault,
+        finePrint,
+      ) as unknown as Prisma.InputJsonValue;
     }
     if (data.resultsEmailSubject !== undefined)
       updateData.resultsEmailSubject = data.resultsEmailSubject;

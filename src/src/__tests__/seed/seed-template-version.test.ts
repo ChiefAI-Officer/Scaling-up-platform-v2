@@ -9,6 +9,7 @@ import {
   type SeedContent,
 } from "@/lib/assessments/seed-template-version";
 import { computeTemplateContentHash } from "@/lib/assessments/template-content-hash";
+import { resolveLegacyInvitedWelcomeConfig } from "@/lib/assessments/invited-welcome-config";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -215,10 +216,24 @@ describe("ensureTemplateVersionContent", () => {
     expect(result.contentHash).toBeTruthy();
     // Template must be created
     expect(tx.assessmentTemplate.create).toHaveBeenCalledTimes(1);
+    expect(tx.assessmentTemplate.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        invitedWelcomeDefault: resolveLegacyInvitedWelcomeConfig(c.alias),
+      }),
+    });
     // Version must be created with publishedAt = null (DRAFT)
     const versionCreateCall = tx.assessmentTemplateVersion.create.mock.calls[0][0] as { data: Record<string, unknown> };
     expect(versionCreateCall.data.publishedAt).toBeNull();
     expect(versionCreateCall.data.versionNumber).toBe(1);
+  });
+
+  it("does not overwrite an existing template Welcome default during reseed", async () => {
+    const c = makeContent();
+    const tx = makeTx();
+
+    await ensureTemplateVersionContent(tx as never, SYSTEM_USER, c);
+
+    expect(tx.assessmentTemplate.update).not.toHaveBeenCalled();
   });
 
   it("appends versionNumber 2 as DRAFT when latest version has a different hash", async () => {

@@ -64,6 +64,7 @@ import { POST as publishPOST } from "@/app/api/admin/assessment-templates/[id]/v
 import { db } from "@/lib/db";
 import { getApiActor } from "@/lib/auth/authorization";
 import { withRateLimit } from "@/lib/rate-limit";
+import { GENERIC_INVITED_WELCOME_CONFIG } from "@/lib/assessments/invited-welcome-config";
 
 const adminActor = {
   userId: "u1",
@@ -258,7 +259,13 @@ describe("POST /api/admin/assessment-templates (create)", () => {
           description: null,
           invitationSubject: "You're invited to take an assessment",
           aggregationMode: "FULL_VISIBILITY",
+          invitedWelcomeDefault: GENERIC_INVITED_WELCOME_CONFIG,
         }),
+      }),
+    );
+    expect(txMock.assessmentTemplateVersion.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.not.objectContaining({ invitedWelcomeDefault: expect.anything() }),
       }),
     );
   });
@@ -449,6 +456,14 @@ describe("POST /api/admin/assessment-templates (create)", () => {
     expect(versionArgs.data.publishedAt).toBeNull();
     expect(versionArgs.data.versionNumber).toBe(1);
     expect(versionArgs.data.contentHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(versionArgs.data).not.toHaveProperty("invitedWelcomeDefault");
+    expect(txMock.assessmentTemplate.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          invitedWelcomeDefault: GENERIC_INVITED_WELCOME_CONFIG,
+        }),
+      }),
+    );
     expect(db.auditLog.create).toHaveBeenCalled();
   });
 });
