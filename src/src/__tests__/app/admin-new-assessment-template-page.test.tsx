@@ -25,12 +25,24 @@ jest.mock("@/lib/assessments/wave-template-creation-flags", () => ({
   isTemplateCreationSimplifiedEnabled: () => mockIsEnabled(),
 }));
 
+const mockIsPresentationEnabled = jest.fn();
+jest.mock("@/lib/assessments/wave-admin-owned-assessment-presentation-flags", () => ({
+  isAdminOwnedAssessmentPresentationEnabled: () => mockIsPresentationEnabled(),
+}));
+
 jest.mock("@/components/admin/AssessmentTemplateForm", () => ({
   AssessmentTemplateForm: () => <div data-testid="legacy-template-form" />,
 }));
 jest.mock("@/components/admin/SimplifiedAssessmentTemplateForm", () => ({
-  SimplifiedAssessmentTemplateForm: () => (
-    <div data-testid="simplified-template-form" />
+  SimplifiedAssessmentTemplateForm: ({
+    welcomeAuthoringEnabled,
+  }: {
+    welcomeAuthoringEnabled?: boolean;
+  }) => (
+    <div
+      data-testid="simplified-template-form"
+      data-welcome-enabled={String(welcomeAuthoringEnabled)}
+    />
   ),
 }));
 
@@ -40,6 +52,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockGetServerSession.mockResolvedValue({ user: { role: "ADMIN" } });
   mockIsEnabled.mockReturnValue(false);
+  mockIsPresentationEnabled.mockReturnValue(false);
 });
 
 describe("NewAssessmentTemplatePage auth gate", () => {
@@ -93,4 +106,27 @@ describe("NewAssessmentTemplatePage release gate", () => {
     expect(simplified.getByTestId("simplified-template-form")).toBeInTheDocument();
     expect(simplified.queryByTestId("legacy-template-form")).toBeNull();
   });
+
+  it.each([
+    [true, true, "true"],
+    [true, false, "false"],
+    [false, true, "false"],
+  ])(
+    "enables welcome authoring only when simplified creation and presentation are active",
+    async (simplifiedEnabled, presentationEnabled, expectedWelcomeEnabled) => {
+      mockIsEnabled.mockReturnValue(simplifiedEnabled);
+      mockIsPresentationEnabled.mockReturnValue(presentationEnabled);
+
+      const view = render(await NewAssessmentTemplatePage());
+
+      if (simplifiedEnabled) {
+        expect(view.getByTestId("simplified-template-form")).toHaveAttribute(
+          "data-welcome-enabled",
+          expectedWelcomeEnabled,
+        );
+      } else {
+        expect(view.getByTestId("legacy-template-form")).toBeInTheDocument();
+      }
+    },
+  );
 });
