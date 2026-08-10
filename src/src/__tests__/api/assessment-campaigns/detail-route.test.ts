@@ -184,12 +184,16 @@ describe("PATCH /api/assessment-campaigns/[id]", () => {
     (db.assessmentCampaign.update as jest.Mock).mockResolvedValue({
       id: "c1",
       name: "Renamed",
+      invitedWelcomeSnapshot: { schemaVersion: 1 },
     });
     const res = await PATCH(
       patchReq({ name: "Renamed" }) as never,
       detailParams("c1"),
     );
     expect(res.status).toBe(200);
+    expect((await res.json()).data).not.toHaveProperty(
+      "invitedWelcomeSnapshot",
+    );
   });
 
   it("happy path updates name", async () => {

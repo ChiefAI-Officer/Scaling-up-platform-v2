@@ -17,6 +17,14 @@ import {
 import { logAudit } from "@/lib/audit";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
 
+function withoutInvitedWelcomeSnapshot<
+  T extends { invitedWelcomeSnapshot?: unknown },
+>(campaign: T): Omit<T, "invitedWelcomeSnapshot"> {
+  const response = { ...campaign };
+  delete response.invitedWelcomeSnapshot;
+  return response;
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -108,7 +116,10 @@ export async function POST(
       changes: { status: "ACTIVE" },
     });
 
-    return NextResponse.json({ success: true, data: updated });
+    return NextResponse.json({
+      success: true,
+      data: withoutInvitedWelcomeSnapshot(updated),
+    });
   } catch (error) {
     console.error("Error activating campaign:", error);
     return NextResponse.json(

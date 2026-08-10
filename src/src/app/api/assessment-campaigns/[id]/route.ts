@@ -665,7 +665,10 @@ export async function PATCH(
         changes: updateData as Record<string, unknown>,
       });
 
-      return NextResponse.json({ success: true, data: updated });
+      return NextResponse.json({
+        success: true,
+        data: withoutInvitedWelcomeSnapshot(updated),
+      });
     }
 
     // Slides being written: CAS re-check + update + audit in ONE tx (R2-Med-1).
@@ -716,7 +719,10 @@ export async function PATCH(
       );
     }
 
-    return NextResponse.json({ success: true, data: saved });
+    return NextResponse.json({
+      success: true,
+      data: withoutInvitedWelcomeSnapshot(saved),
+    });
   } catch (error) {
     console.error("Error updating campaign:", error);
     return NextResponse.json(

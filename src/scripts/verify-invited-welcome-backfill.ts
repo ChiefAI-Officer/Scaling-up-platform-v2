@@ -26,8 +26,11 @@ async function main() {
         SELECT 1
         FROM pg_trigger AS trigger
         JOIN pg_class AS relation ON relation.oid = trigger.tgrelid
+        JOIN pg_proc AS trigger_function ON trigger_function.oid = trigger.tgfoid
         WHERE trigger.tgname = 'assessment_campaign_invited_welcome_snapshot_immutability_trigger'
           AND relation.relname = 'assessment_campaigns'
+          AND trigger_function.proname = 'assessment_campaign_block_invited_welcome_snapshot_mutation'
+          AND trigger.tgenabled IN ('O', 'A')
           AND NOT trigger.tgisinternal
       ) AS present
     `,

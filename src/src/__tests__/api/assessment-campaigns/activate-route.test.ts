@@ -174,9 +174,13 @@ describe("POST /activate", () => {
     (db.assessmentCampaign.update as jest.Mock).mockResolvedValue({
       id: "c1",
       status: "ACTIVE",
+      invitedWelcomeSnapshot: { schemaVersion: 1 },
     });
     const res = await POST(postReq() as never, detailParams("c1"));
     expect(res.status).toBe(200);
+    expect((await res.json()).data).not.toHaveProperty(
+      "invitedWelcomeSnapshot",
+    );
     expect(db.assessmentCampaign.update).toHaveBeenCalledWith({
       where: { id: "c1" },
       data: { status: "ACTIVE" },
