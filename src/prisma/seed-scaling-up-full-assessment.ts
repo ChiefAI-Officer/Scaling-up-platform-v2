@@ -35,12 +35,13 @@
  * Run: npx tsx prisma/seed-scaling-up-full-assessment.ts
  */
 
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 import { createHash } from "crypto";
 import {
   ensureTemplateVersionContent,
   type SeedContent,
 } from "../src/lib/assessments/seed-template-version";
+import { resolveLegacyInvitedWelcomeConfig } from "../src/lib/assessments/invited-welcome-config";
 
 const db = new PrismaClient();
 
@@ -1195,6 +1196,9 @@ export async function runSeed(client: PrismaClient): Promise<SeedResult> {
           invitationSubject: INVITATION_SUBJECT,
           invitationBodyMarkdown: INVITATION_BODY_MARKDOWN,
           aggregationMode: "FULL_VISIBILITY",
+          invitedWelcomeDefault: resolveLegacyInvitedWelcomeConfig(
+            ALIAS,
+          ) as unknown as Prisma.InputJsonValue,
           createdBy: systemUser.id,
         },
         select: { id: true },

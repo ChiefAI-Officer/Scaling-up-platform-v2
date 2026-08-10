@@ -39,6 +39,7 @@ import { isCustomSlidesEnabled } from "@/lib/assessments/wave-m-flags";
 import { isOnScreenResultsEnabled } from "@/lib/assessments/wave-osr-flags";
 import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
 import { deriveReportStylePreviewCapabilities } from "@/lib/assessments/report-style-registry";
+import { isAdminOwnedAssessmentPresentationEnabled } from "@/lib/assessments/wave-admin-owned-assessment-presentation-flags";
 import {
   REPORT_COMPARISON_ALIAS,
   isReportComparisonEnabled,
@@ -163,13 +164,18 @@ export default async function CampaignDetailPage({ params }: PageProps) {
   // Report appearance availability is a server decision. The client receives
   // only this resolved capability and never derives ownership, template
   // eligibility, or flag/canary status itself.
+  const adminOwnedPresentation =
+    isAdminOwnedAssessmentPresentationEnabled();
   const reportStylesAvailable =
+    !adminOwnedPresentation &&
     campaignForFlag !== null &&
     isReportStylesEnabled({ templateId: overview.campaign.templateId, campaignId: id });
   const hasCurrentWriteAccess =
+    reportStylesAvailable &&
     campaignForFlag !== null &&
     (await canManageCampaign(asAccessDb(db), actor, id, "write"));
   const canEditReportAppearance =
+    reportStylesAvailable &&
     campaignForFlag !== null &&
     resolveCanEditReportAppearance({
       actorRole: actor.role,
@@ -231,10 +237,14 @@ export default async function CampaignDetailPage({ params }: PageProps) {
       initialCustomSlides={initialCustomSlides}
       customSlidesSections={customSlidesSections}
       reportStylesAvailable={reportStylesAvailable}
-      reportStylePreviewCapabilities={deriveReportStylePreviewCapabilities({
-        templateAlias: overview.campaign.templateAlias,
-        questions: campaignForFlag?.version?.questions ?? [],
-      })}
+      reportStylePreviewCapabilities={
+        adminOwnedPresentation
+          ? undefined
+          : deriveReportStylePreviewCapabilities({
+              templateAlias: overview.campaign.templateAlias,
+              questions: campaignForFlag?.version?.questions ?? [],
+            })
+      }
       canEditReportAppearance={canEditReportAppearance}
       legacyOverTimeRespondentIds={legacyOverTimeRespondentIds}
     />

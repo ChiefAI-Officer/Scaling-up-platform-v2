@@ -55,7 +55,21 @@ import { inngest } from "@/inngest/client";
 // fan-out function module) so the route never evaluates inngest.createFunction.
 import { ASSESSMENT_SEND_INVITES_EVENT } from "@/inngest/functions/assessment-invite-fanout-event";
 import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
-import { resolveCampaignReportStyle } from "@/lib/assessments/report-style-policy";
+import {
+  resolveCampaignReportStyle,
+  type CampaignReportStyleResolution,
+} from "@/lib/assessments/report-style-policy";
+import { isAdminOwnedAssessmentPresentationEnabled } from "@/lib/assessments/wave-admin-owned-assessment-presentation-flags";
+import { loadInvitedWelcomeSnapshot } from "@/lib/assessments/invited-welcome-snapshot";
+import type { InvitedWelcomeConfigV1 } from "@/lib/assessments/invited-welcome-config";
+
+function withoutInvitedWelcomeSnapshot<
+  T extends { invitedWelcomeSnapshot?: unknown },
+>(campaign: T): Omit<T, "invitedWelcomeSnapshot"> {
+  const response = { ...campaign };
+  delete response.invitedWelcomeSnapshot;
+  return response;
+}
 
 // C4 (Wave ED8) — the local `CAMPAIGN_LANGUAGE_DEFAULT = "enUS"` constant was
 // replaced by the shared DEFAULT_TEMPLATE_LANGUAGE (value-identical) so
@@ -123,7 +137,10 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: "desc" },
     });
 
-    return NextResponse.json({ success: true, data: campaigns });
+    return NextResponse.json({
+      success: true,
+      data: campaigns.map(withoutInvitedWelcomeSnapshot),
+    });
   } catch (error) {
     console.error("Error listing campaigns:", error);
     return NextResponse.json(
@@ -167,6 +184,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { success: false, error: "Invalid JSON body" },
         { status: 400 }
+      );
+    }
+
+    const adminOwnedPresentationEnabled =
+      isAdminOwnedAssessmentPresentationEnabled();
+    if (
+      adminOwnedPresentationEnabled &&
+      typeof body === "object" &&
+      body !== null &&
+      Object.prototype.hasOwnProperty.call(body, "reportStyle")
+    ) {
+      return NextResponse.json(
+        { success: false, error: "REPORT_STYLE_ADMIN_OWNED" },
+        { status: 400 },
       );
     }
 
@@ -458,7 +489,11 @@ export async function POST(request: NextRequest) {
     // narrowing of `actor` does not flow into nested function declarations).
     const performedByEmail = actor.email;
     // Shared create payload. `alias` is overridden on the P2002 fallback path.
-    function campaignCreateData(alias: string) {
+    function campaignCreateData(
+      alias: string,
+      invitedWelcomeSnapshot: InvitedWelcomeConfigV1,
+      resolvedReportStyle: CampaignReportStyleResolution,
+    ) {
       return {
         name: data.name,
         description: data.description ?? null,
@@ -478,8 +513,10 @@ export async function POST(request: NextRequest) {
         sendResultsToRespondent: data.sendResultsToRespondent,
         notifyCoachOnCompletion: data.notifyCoachOnCompletion,
         showResultsOnScreen: data.showResultsOnScreen,
-        reportStyle: reportStylePolicy.reportStyle,
-        reportStyleSource: reportStylePolicy.reportStyleSource,
+        reportStyle: resolvedReportStyle.reportStyle,
+        reportStyleSource: resolvedReportStyle.reportStyleSource,
+        invitedWelcomeSnapshot:
+          invitedWelcomeSnapshot as unknown as Prisma.InputJsonValue,
         // Wave M (#19): sanitized slides (flag-gated) or null. `Prisma.JsonNull`
         // is required for a nullable `Json?` column (plain `null` is rejected);
         // the persisted shape is the sanitized PersistedSlide[] (sanitize-on-save).
@@ -498,6 +535,35 @@ export async function POST(request: NextRequest) {
         "code" in error &&
         (error as { code: string }).code === "P2002"
       );
+    }
+
+    async function loadCreationPresentation(
+      tx: Prisma.TransactionClient,
+    ): Promise<{
+      invitedWelcomeSnapshot: InvitedWelcomeConfigV1;
+      resolvedReportStyle: CampaignReportStyleResolution;
+    }> {
+      const invitedWelcomeSnapshot = await loadInvitedWelcomeSnapshot(
+        tx,
+        data.templateId,
+      );
+      if (!adminOwnedPresentationEnabled) {
+        return { invitedWelcomeSnapshot, resolvedReportStyle: reportStylePolicy };
+      }
+      const currentTemplate = await tx.assessmentTemplate.findUnique({
+        where: { id: data.templateId },
+        select: { defaultReportStyle: true },
+      });
+      if (!currentTemplate) {
+        throw new Error(`Assessment template ${data.templateId} not found`);
+      }
+      return {
+        invitedWelcomeSnapshot,
+        resolvedReportStyle: resolveCampaignReportStyle(
+          undefined,
+          currentTemplate.defaultReportStyle,
+        ),
+      };
     }
 
     // The CREATE audit `changes` body. Shared by the post-commit logAudit (no
@@ -603,8 +669,13 @@ export async function POST(request: NextRequest) {
 
       async function createWaveD(alias: string) {
         return db.$transaction(async (tx) => {
+          const presentation = await loadCreationPresentation(tx);
           const created = await tx.assessmentCampaign.create({
-            data: campaignCreateData(alias),
+            data: campaignCreateData(
+              alias,
+              presentation.invitedWelcomeSnapshot,
+              presentation.resolvedReportStyle,
+            ),
           });
           if (verified.length > 0) {
             // Single batched insert (no per-row N+1); still atomic inside the tx.
@@ -664,24 +735,26 @@ export async function POST(request: NextRequest) {
       // the original plain create + post-commit logAudit.
       // ───────────────────────────────────────────────────────────────────
       async function createLegacy(alias: string) {
-        if (customSlidesToStore === null) {
-          return db.assessmentCampaign.create({
-            data: campaignCreateData(alias),
-          });
-        }
         return db.$transaction(async (tx) => {
+          const presentation = await loadCreationPresentation(tx);
           const created = await tx.assessmentCampaign.create({
-            data: campaignCreateData(alias),
+            data: campaignCreateData(
+              alias,
+              presentation.invitedWelcomeSnapshot,
+              presentation.resolvedReportStyle,
+            ),
           });
-          await tx.auditLog.create({
-            data: {
-              entityType: "AssessmentCampaign",
-              entityId: created.id,
-              action: "CREATE",
-              performedBy: performedByEmail,
-              changes: JSON.stringify(buildCreateAuditChanges(created)),
-            },
-          });
+          if (customSlidesToStore !== null) {
+            await tx.auditLog.create({
+              data: {
+                entityType: "AssessmentCampaign",
+                entityId: created.id,
+                action: "CREATE",
+                performedBy: performedByEmail,
+                changes: JSON.stringify(buildCreateAuditChanges(created)),
+              },
+            });
+          }
           return created;
         });
       }
@@ -762,7 +835,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: true,
-        data: campaign,
+        data: withoutInvitedWelcomeSnapshot(campaign),
         bulkRespondents: bulkResult,
       },
       { status: 201 }

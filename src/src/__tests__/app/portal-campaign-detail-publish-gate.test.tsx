@@ -163,6 +163,8 @@ beforeEach(() => {
   delete process.env.WAVE_REPORT_STYLES_ENABLED;
   delete process.env.WAVE_REPORT_STYLES_KILL;
   delete process.env.WAVE_REPORT_STYLES_CANARY;
+  delete process.env.WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_ENABLED;
+  delete process.env.WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_KILL;
 });
 
 afterEach(() => {
@@ -199,6 +201,32 @@ describe("CampaignDetail report appearance capability", () => {
 
     expect(captured.canEditReportAppearance).toBe(false);
   });
+
+  it.each([null, new Date("2026-08-06T04:00:00.000Z")])(
+    "suppresses coach appearance capability in admin-owned mode with lock %s",
+    async (reportStyleLockedAt) => {
+      process.env.WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_ENABLED = "1";
+      process.env.WAVE_REPORT_STYLES_ENABLED = "1";
+      mockFindFirst.mockResolvedValue(makeCampaign());
+      mockGetCampaignOverview.mockResolvedValue({
+        campaign: {
+          organizationId: "org-1",
+          templateId: TEMPLATE_ID,
+          templateAlias: "scaling-up-full",
+          status: "ACTIVE",
+          reportStyleLockedAt,
+          alias: "su-full-campaign-slug",
+        },
+      });
+
+      await runPage();
+
+      expect(captured.reportStylesAvailable).toBe(false);
+      expect(captured.canEditReportAppearance).toBe(false);
+      expect(captured.reportStylePreviewCapabilities).toBeUndefined();
+      expect(captured.groupReportHref).toBe(`/assessments/${CAMPAIGN_ID}/report`);
+    },
+  );
 });
 
 describe("CampaignDetail email capabilities", () => {

@@ -31,6 +31,14 @@ import { resolveCampaignReportStyle } from "@/lib/assessments/report-style-polic
 import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
 import { isPublicCampaignsSimpleUiEnabled } from "@/lib/assessments/wave-public-campaigns-simple-ui-flags";
 
+function withoutInvitedWelcomeSnapshot<
+  T extends { invitedWelcomeSnapshot?: unknown },
+>(campaign: T): Omit<T, "invitedWelcomeSnapshot"> {
+  const response = { ...campaign };
+  delete response.invitedWelcomeSnapshot;
+  return response;
+}
+
 // ─── alias helpers (copied from assessment-campaigns/route.ts) ───────────────
 
 function pad2(n: number): string {
@@ -137,8 +145,11 @@ export async function GET() {
       data: campaigns.map((campaign) => {
         const reportStylesAvailable = availability.get(campaign.id) === true;
         const campaignPayload = {
-          ...campaign,
-        } as Omit<typeof campaign, "_count"> & {
+          ...withoutInvitedWelcomeSnapshot(campaign),
+        } as Omit<
+          typeof campaign,
+          "_count" | "invitedWelcomeSnapshot"
+        > & {
           _count?: { submissions: number };
           version?: unknown;
         };
@@ -411,7 +422,10 @@ export async function POST(request: NextRequest) {
     });
 
     // 9. Return 201
-    return NextResponse.json({ success: true, data: campaign }, { status: 201 });
+    return NextResponse.json(
+      { success: true, data: withoutInvitedWelcomeSnapshot(campaign) },
+      { status: 201 },
+    );
   } catch (error) {
     console.error("Error creating public campaign:", error);
     return NextResponse.json(

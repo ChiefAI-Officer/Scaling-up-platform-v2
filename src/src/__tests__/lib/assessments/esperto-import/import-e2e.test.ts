@@ -126,6 +126,13 @@ function makeStatefulStore() {
   const tx = {
     $executeRaw: jest.fn().mockResolvedValue(1),
 
+    assessmentTemplate: {
+      findUnique: jest.fn().mockResolvedValue({
+        alias: "qsp-v2",
+        invitedWelcomeDefault: null,
+      }),
+    },
+
     organization: {
       findFirst: jest.fn(
         ({

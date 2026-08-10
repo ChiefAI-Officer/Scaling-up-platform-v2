@@ -235,6 +235,33 @@ describe("CampaignDetail report appearance", () => {
     expect(stored.campaign.reportStyleSource).toBe("CAMPAIGN_OVERRIDE");
   });
 
+  it.each([null, new Date("2026-08-03T12:00:00Z")])(
+    "keeps report links while suppressing every appearance control with lock %s",
+    (lockedAt) => {
+      render(
+        <CampaignDetail
+          initialOverview={overview(lockedAt)}
+          initialRespondents={[]}
+          reportStylesAvailable={false}
+          canEditReportAppearance={false}
+          canViewGroupReport
+          groupReportHref="/assessments/camp-style-1/report"
+        />,
+      );
+
+      expect(screen.queryByTestId("campaign-report-style-card")).not.toBeInTheDocument();
+      expect(screen.queryByText(/Report appearance/i)).not.toBeInTheDocument();
+      expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /Save report appearance/i })).not.toBeInTheDocument();
+      expect(screen.queryByText(/Locked on/i)).not.toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /View group report/i })).toHaveAttribute(
+        "href",
+        "/assessments/camp-style-1/report",
+      );
+      expect(toast).not.toHaveBeenCalled();
+    },
+  );
+
   it("refreshes and surfaces the exact race explanation on a locked response", async () => {
     global.fetch = jest.fn(async () => ({ ok: false, status: 409, json: async () => ({ error: "REPORT_STYLE_LOCKED", message: LOCKED_MESSAGE }) })) as unknown as typeof fetch;
     render(

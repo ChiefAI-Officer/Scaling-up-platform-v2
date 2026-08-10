@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>26 — Admin assessment Welcome screen authoring</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../_shared.css">
+  <style>
+    body { background: hsl(220 14% 96%); }
+    .page-head { max-width: 1420px; margin: auto; padding: 1.5rem 2rem 0.75rem; }
+    .page-head h1 { margin: 0 0 .3rem; font-size: 1.35rem; }
+    .page-head p { margin: 0; color: hsl(var(--muted-foreground)); font-size: .875rem; }
+    .frame { max-width: 1420px; margin: 0 auto 3rem; padding: 0 2rem; }
+    .frame-label { padding: .65rem .9rem; border: 1px solid hsl(var(--border)); border-bottom: 0; border-radius: 12px 12px 0 0; background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); font-size: .7rem; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; }
+    .shell { display: flex; min-height: 760px; overflow: hidden; border: 1px solid hsl(var(--border)); border-radius: 0 0 12px 12px; background: hsl(var(--background)); box-shadow: var(--shadow-lg); }
+    .side { width: 220px; flex: 0 0 auto; padding: 1.25rem 1rem; background: hsl(var(--sidebar)); color: hsl(var(--sidebar-foreground)); }
+    .brand { padding: 0 .4rem 1.25rem; font-weight: 800; }
+    .nav { display: grid; gap: .35rem; }
+    .nav span { padding: .7rem .8rem; border-radius: 7px; color: hsl(var(--sidebar-muted)); font-size: .82rem; }
+    .nav .active { background: hsl(var(--sidebar-active)); color: white; }
+    .workspace { flex: 1; min-width: 0; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.4rem; border-bottom: 1px solid hsl(var(--border)); background: white; }
+    .title { font-weight: 700; }
+    .tabs { display: flex; gap: .25rem; padding: .7rem 1.4rem 0; border-bottom: 1px solid hsl(var(--border)); background: white; }
+    .tab { padding: .7rem .85rem; color: hsl(var(--muted-foreground)); font-size: .82rem; font-weight: 600; }
+    .tab.active { border-bottom: 2px solid hsl(var(--primary)); color: hsl(var(--foreground)); }
+    .canvas { max-width: 1060px; margin: auto; padding: 1.5rem; }
+    .form-card { margin-bottom: 1rem; border: 1px solid hsl(var(--border)); border-radius: 12px; background: white; box-shadow: var(--shadow-xs); }
+    .form-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.1rem; }
+    .form-head h3 { margin: 0 0 .2rem; font-size: .95rem; }
+    .form-head p { margin: 0; color: hsl(var(--muted-foreground)); font-size: .76rem; }
+    .chevron { width: 32px; height: 32px; border: 1px solid hsl(var(--border)); border-radius: 7px; background: white; font-size: 1rem; }
+    .welcome-card { border-color: hsl(268 55% 75%); box-shadow: 0 0 0 1px hsl(268 55% 94%); }
+    .welcome-kicker { display: inline-flex; margin-left: .45rem; padding: .15rem .45rem; border-radius: 999px; background: hsl(268 65% 95%); color: hsl(268 60% 36%); font-size: .62rem; letter-spacing: .04em; text-transform: uppercase; }
+    .position { margin-top: .35rem; color: hsl(268 52% 38%) !important; font-weight: 600; }
+    .expanded { padding: 0 1.1rem 1.1rem; border-top: 1px solid hsl(var(--border)); }
+    .helper { margin: 1rem 0; padding: .75rem .85rem; border-radius: 8px; background: hsl(210 40% 96.1%); color: hsl(var(--muted-foreground)); font-size: .77rem; }
+    .editor-grid { display: grid; grid-template-columns: minmax(280px, .9fr) minmax(350px, 1.1fr); gap: 1.25rem; align-items: start; }
+    .fields { display: grid; gap: .8rem; }
+    label { display: grid; gap: .35rem; font-size: .74rem; font-weight: 700; }
+    input, textarea { width: 100%; padding: .65rem .7rem; border: 1px solid hsl(var(--border)); border-radius: 7px; background: white; color: hsl(var(--foreground)); font: inherit; font-size: .78rem; }
+    textarea { min-height: 88px; resize: vertical; }
+    .hint { color: hsl(var(--muted-foreground)); font-size: .67rem; font-weight: 400; }
+    .preview-wrap > p { margin: 0 0 .45rem; color: hsl(var(--muted-foreground)); font-size: .68rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+    .preview { padding: 1.25rem; border: 1px solid hsl(268 45% 88%); border-radius: 13px; background: hsl(270 30% 99%); box-shadow: var(--shadow-sm); }
+    .eyebrow { display: inline-flex; padding: .25rem .55rem; border-radius: 999px; background: hsl(268 65% 94%); color: hsl(268 65% 35%); font-size: .63rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+    .preview h2 { margin: .85rem 0 .45rem; font-size: 1.15rem; }
+    .lede { margin: 0 0 1rem; color: hsl(var(--muted-foreground)); font-size: .74rem; line-height: 1.55; }
+    .fact { display: grid; grid-template-columns: 26px 1fr; gap: .55rem; margin: .65rem 0; font-size: .71rem; }
+    .icon { display: grid; width: 26px; height: 26px; place-items: center; border-radius: 7px; background: hsl(268 65% 94%); color: hsl(268 65% 35%); }
+    .fact strong { display: block; font-size: .72rem; }
+    .fact small { color: hsl(var(--muted-foreground)); line-height: 1.4; }
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: .45rem; margin: 1rem 0; }
+    .stat { padding: .65rem .3rem; border: 1px solid hsl(268 35% 90%); border-radius: 8px; text-align: center; color: hsl(268 65% 35%); font-size: .85rem; font-weight: 800; }
+    .stat small { display: block; margin-top: .2rem; color: hsl(var(--muted-foreground)); font-size: .52rem; font-weight: 600; letter-spacing: .05em; }
+    .start { width: 100%; padding: .7rem; border: 0; border-radius: 8px; background: hsl(268 62% 36%); color: white; font-weight: 700; }
+    .section-body { padding: .9rem 1.1rem; border-top: 1px solid hsl(var(--border)); color: hsl(var(--muted-foreground)); font-size: .8rem; }
+    .respondent-shell { display: grid; min-height: 690px; place-items: center; width: 100%; padding: 2rem; background: linear-gradient(135deg, hsl(220 33% 98%), hsl(268 40% 97%)); }
+    .respondent-shell .preview { width: min(510px, 100%); padding: 1.75rem; background: white; }
+    .narrow .side { width: 185px; }
+    .narrow .canvas { padding: 1rem; }
+    .narrow .editor-grid { grid-template-columns: 1fr; }
+    .narrow .preview-wrap { grid-row: 2; }
+    @media (max-width: 800px) { .frame { padding: 0 .75rem; } .side { display: none; } .editor-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header class="page-head">
+    <h1>Welcome screen inside the Build interface</h1>
+    <p>Four locked review states. The existing Save Draft action saves this card with the assessment.</p>
+  </header>
+
+  <section class="frame">
+    <div class="frame-label">Desktop · default collapsed state</div>
+    <div class="shell">
+      <aside class="side"><div class="brand">Scaling Up Admin</div><nav class="nav"><span>Dashboard</span><span class="active">Assessments</span><span>Campaigns</span><span>Members</span></nav></aside>
+      <main class="workspace">
+        <div class="topbar"><div><div class="title">Quarterly Session Prep v1</div><small>Draft · Version 3</small></div><button class="wf-btn wf-btn-primary">Save Draft</button></div>
+        <div class="tabs"><span class="tab active">Build</span><span class="tab">Preview</span><span class="tab">Settings</span></div>
+        <div class="canvas">
+          <article class="form-card"><div class="form-head"><div><h3>Assessment title and description</h3><p>Quarterly Session Prep v1 · Internal ID: qsp-v2</p></div><button class="chevron">⌄</button></div></article>
+          <article class="form-card welcome-card"><div class="form-head"><div><h3>Welcome screen <span class="welcome-kicker">Fixed</span></h3><p>First screen respondents see</p><p class="position">Before Section 1 · A quick check on how your team works together…</p></div><button class="chevron" aria-label="Expand Welcome screen">⌄</button></div></article>
+          <article class="form-card"><div class="form-head"><div><h3>Section 1 · Looking back</h3><p>2 questions</p></div><button class="chevron">⌄</button></div><div class="section-body">How did the last quarter go? · What worked especially well?</div></article>
+        </div>
+      </main>
+    </div>
+  </section>
+
+  <section class="frame">
+    <div class="frame-label">Desktop · expanded authoring and live preview</div>
+    <div class="shell">
+      <aside class="side"><div class="brand">Scaling Up Admin</div><nav class="nav"><span>Dashboard</span><span class="active">Assessments</span><span>Campaigns</span><span>Members</span></nav></aside>
+      <main class="workspace">
+        <div class="topbar"><div><div class="title">Quarterly Session Prep v1</div><small>Unsaved changes</small></div><button class="wf-btn wf-btn-primary">Save Draft</button></div>
+        <div class="tabs"><span class="tab active">Build</span><span class="tab">Preview</span><span class="tab">Settings</span></div>
+        <div class="canvas">
+          <article class="form-card"><div class="form-head"><div><h3>Assessment title and description</h3><p>Quarterly Session Prep v1 · Internal ID: qsp-v2</p></div><button class="chevron">⌄</button></div></article>
+          <article class="form-card welcome-card">
+            <div class="form-head"><div><h3>Welcome screen <span class="welcome-kicker">Fixed</span></h3><p>First screen respondents see</p><p class="position">Before Section 1</p></div><button class="chevron" aria-label="Collapse Welcome screen">⌃</button></div>
+            <div class="expanded">
+              <p class="helper">Changes become the default for future invited campaigns. Campaigns already created keep the Welcome screen they started with.</p>
+              <div class="editor-grid">
+                <div class="fields">
+                  <label>Invitation label<input value="You're invited"></label>
+                  <label>Heading<input value="{{campaignName}}"><span class="hint">Keep {{campaignName}} so the campaign name appears automatically.</span></label>
+                  <label>Welcome message<textarea>A quick check on how your team works together. You can answer in one sitting or come back later — your link stays active.</textarea><span class="hint">Separate paragraphs with a blank line.</span></label>
+                  <label>Sharing heading<input value="How your answers are shared"></label>
+                  <label>Scores heading<input value="Your category scores"></label>
+                  <label>Scores explanation<input value="See where the team stands across each category."></label>
+                  <label>Button label<input value="Start the assessment"></label>
+                </div>
+                <div class="preview-wrap"><p>Respondent preview</p><div class="preview">
+                  <span class="eyebrow">You're invited</span><h2>Example campaign</h2><p class="lede">A quick check on how your team works together. You can answer in one sitting or come back later — your link stays active.</p>
+                  <div class="fact"><span class="icon">◷</span><div><strong>About 5 minutes</strong><small>8 short statements, rated 0–10.</small></div></div>
+                  <div class="fact"><span class="icon">♟</span><div><strong>How your answers are shared</strong><small>Your coach or facilitator and authorized Scaling Up staff can review your named individual answers.</small></div></div>
+                  <div class="fact"><span class="icon">▥</span><div><strong>Your category scores</strong><small>See where the team stands across each category.</small></div></div>
+                  <div class="stats"><div class="stat">8<small>QUESTIONS</small></div><div class="stat">4<small>SECTIONS</small></div><div class="stat">0–10<small>SCALE</small></div></div>
+                  <button class="start" disabled>Start the assessment →</button>
+                </div></div>
+              </div>
+            </div>
+          </article>
+          <article class="form-card"><div class="form-head"><div><h3>Section 1 · Looking back</h3><p>2 questions</p></div><button class="chevron">⌄</button></div></article>
+        </div>
+      </main>
+    </div>
+  </section>
+
+  <section class="frame narrow">
+    <div class="frame-label">1024 px · expanded fields stack before preview</div>
+    <div class="shell">
+      <aside class="side"><div class="brand">Scaling Up Admin</div><nav class="nav"><span class="active">Assessments</span><span>Campaigns</span></nav></aside>
+      <main class="workspace"><div class="topbar"><div class="title">Quarterly Session Prep v1</div><button class="wf-btn wf-btn-primary">Save Draft</button></div><div class="tabs"><span class="tab active">Build</span><span class="tab">Preview</span><span class="tab">Settings</span></div><div class="canvas">
+        <article class="form-card"><div class="form-head"><div><h3>Assessment title and description</h3><p>Quarterly Session Prep v1</p></div><button class="chevron">⌄</button></div></article>
+        <article class="form-card welcome-card"><div class="form-head"><div><h3>Welcome screen <span class="welcome-kicker">Fixed</span></h3><p>First screen respondents see · Before Section 1</p></div><button class="chevron">⌃</button></div><div class="expanded"><p class="helper">Changes become the default for future invited campaigns. Campaigns already created keep the Welcome screen they started with.</p><div class="editor-grid"><div class="fields"><label>Invitation label<input value="You're invited"></label><label>Heading<input value="{{campaignName}}"></label><label>Welcome message<textarea>A quick check on how your team works together.</textarea></label><label>Sharing heading<input value="How your answers are shared"></label><label>Scores heading<input value="Your category scores"></label><label>Scores explanation<input value="See where the team stands across each category."></label><label>Button label<input value="Start the assessment"></label></div><div class="preview-wrap"><p>Respondent preview</p><div class="preview"><span class="eyebrow">You're invited</span><h2>Example campaign</h2><p class="lede">A quick check on how your team works together.</p><div class="stats"><div class="stat">8<small>QUESTIONS</small></div><div class="stat">4<small>SECTIONS</small></div><div class="stat">0–10<small>SCALE</small></div></div><button class="start" disabled>Start the assessment →</button></div></div></div></div></article>
+        <article class="form-card"><div class="form-head"><div><h3>Section 1 · Looking back</h3><p>2 questions</p></div><button class="chevron">⌄</button></div></article>
+      </div></main>
+    </div>
+  </section>
+
+  <section class="frame">
+    <div class="frame-label">Result · invited respondent Welcome screen</div>
+    <div class="shell"><div class="respondent-shell"><div class="preview"><span class="eyebrow">You're invited</span><h2>Example campaign</h2><p class="lede">A quick check on how your team works together. You can answer in one sitting or come back later — your link stays active.</p><div class="fact"><span class="icon">◷</span><div><strong>About 5 minutes</strong><small>8 short statements, rated 0–10.</small></div></div><div class="fact"><span class="icon">♟</span><div><strong>How your answers are shared</strong><small>Your coach or facilitator and authorized Scaling Up staff can review your named individual answers.</small></div></div><div class="fact"><span class="icon">▥</span><div><strong>Your category scores</strong><small>See where the team stands across each category.</small></div></div><div class="stats"><div class="stat">8<small>QUESTIONS</small></div><div class="stat">4<small>SECTIONS</small></div><div class="stat">0–10<small>SCALE</small></div></div><button class="start">Start the assessment →</button></div></div></div>
+  </section>
+</body>
+</html>

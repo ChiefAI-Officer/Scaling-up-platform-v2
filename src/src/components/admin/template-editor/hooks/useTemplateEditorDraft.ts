@@ -53,6 +53,12 @@ import {
   isReportStyleKey,
   type ReportStyleKey,
 } from "@/lib/assessments/report-style-registry";
+import {
+  invitedWelcomeAuthoringInputSchema,
+  invitedWelcomeConfigSchema,
+  resolveLegacyInvitedWelcomeConfig,
+  type InvitedWelcomeAuthoringInputV1,
+} from "@/lib/assessments/invited-welcome-config";
 
 export interface UseTemplateEditorDraftArgs {
   template: TemplateEditorTabbedTemplate;
@@ -153,6 +159,29 @@ export function useTemplateEditorDraft({
     defaultReportStyle: template.defaultReportStyle ?? "CLASSIC",
   });
 
+  const initialWelcome = (() => {
+    const parsed = invitedWelcomeConfigSchema.safeParse(
+      template.invitedWelcomeDefault,
+    );
+    return parsed.success
+      ? parsed.data
+      : resolveLegacyInvitedWelcomeConfig(template.alias);
+  })();
+  const welcomeFinePrint = initialWelcome.finePrint;
+  const [welcomeValues, setWelcomeValues] =
+    useState<InvitedWelcomeAuthoringInputV1>({
+      eyebrow: initialWelcome.eyebrow,
+      headingTemplate: initialWelcome.headingTemplate,
+      ledeParagraphs: [...initialWelcome.ledeParagraphs],
+      sharingHeading: initialWelcome.sharingHeading,
+      scoresHeading: initialWelcome.scoresHeading,
+      scoresDescription: initialWelcome.scoresDescription,
+      ctaLabel: initialWelcome.ctaLabel,
+    });
+  const [welcomeErrors, setWelcomeErrors] = useState<
+    Partial<Record<keyof InvitedWelcomeAuthoringInputV1, string>>
+  >({});
+
   // Version-level editable fields (language only, in this checkpoint).
   const [versionValues, setVersionValues] = useState({
     language: version.language,
@@ -222,6 +251,11 @@ export function useTemplateEditorDraft({
       prev.version ? prev : { ...prev, version: true },
     );
   }, []);
+  const setWelcomeDirty = useCallback(() => {
+    setDirtyFlags((prev) =>
+      prev.welcome ? prev : { ...prev, welcome: true },
+    );
+  }, []);
   const setSectionsDirty = useCallback(() => {
     setDirtyFlags((prev) =>
       prev.sections ? prev : { ...prev, sections: true },
@@ -252,6 +286,22 @@ export function useTemplateEditorDraft({
       setMetadataDirty();
     },
     [setMetadataDirty],
+  );
+  const handleWelcomeFieldChange = useCallback(
+    (patch: Partial<InvitedWelcomeAuthoringInputV1>) => {
+      setWelcomeValues((prev) => ({ ...prev, ...patch }));
+      setWelcomeErrors((prev) => {
+        const next = { ...prev };
+        for (const key of Object.keys(patch) as Array<
+          keyof InvitedWelcomeAuthoringInputV1
+        >) {
+          delete next[key];
+        }
+        return next;
+      });
+      setWelcomeDirty();
+    },
+    [setWelcomeDirty],
   );
   const handleVersionFieldChange = useCallback(
     (patch: { language?: string }) => {
@@ -838,6 +888,32 @@ export function useTemplateEditorDraft({
     if (!isAnyDirty) return;
     setSavingDraft(true);
     try {
+      let invitedWelcomePayload: InvitedWelcomeAuthoringInputV1 | undefined;
+      if (dirtyFlags.welcome) {
+        const parsedWelcome = invitedWelcomeAuthoringInputSchema.safeParse(
+          welcomeValues,
+        );
+        if (!parsedWelcome.success) {
+          const errors: Partial<
+            Record<keyof InvitedWelcomeAuthoringInputV1, string>
+          > = {};
+          for (const issue of parsedWelcome.error.issues) {
+            const key = issue.path[0] as
+              | keyof InvitedWelcomeAuthoringInputV1
+              | undefined;
+            if (key && errors[key] === undefined) errors[key] = issue.message;
+          }
+          setWelcomeErrors(errors);
+          toast({
+            title: "Could not save Welcome screen",
+            description: "Review the highlighted fields and try again.",
+            variant: "destructive",
+          });
+          return;
+        }
+        invitedWelcomePayload = parsedWelcome.data;
+      }
+
       // F2: per-surface PATCH dispatch.
       // Template-level dirty (metadata) → PATCH /api/admin/assessment-templates/{id}
       // Version-level dirty (version + sections) → PATCH /api/admin/.../versions/{versionId}
@@ -897,7 +973,7 @@ export function useTemplateEditorDraft({
 
       const ops: Array<Promise<{ ok: boolean; status: number; surface: string }>> = [];
 
-      if (dirtyFlags.metadata) {
+      if (dirtyFlags.metadata || dirtyFlags.welcome) {
         // ED10 split-save (Task 7): the per-card Settings tab owns
         // aggregationMode + the results-email content/approval (immediate
         // PATCH via handleTemplateRowSave), so they are TRIMMED from the
@@ -907,28 +983,38 @@ export function useTemplateEditorDraft({
         // fields in their original insertion order, so the emitted JSON is
         // byte-identical to today — the legacy MetadataTab still edits those
         // fields through Save Draft (editor-byte-equivalence guard).
-        const body: Record<string, unknown> = {
-          name: templateValues.name,
-          description:
+        const body: Record<string, unknown> = {};
+        if (dirtyFlags.metadata) {
+          body.name = templateValues.name;
+          body.description =
             templateValues.description.length > 0
               ? templateValues.description
-              : null,
-          invitationSubject: templateValues.invitationSubject,
-          invitationBodyMarkdown: templateValues.invitationBodyMarkdown,
-        };
-        if (!ed10Active) {
-          body.aggregationMode = templateValues.aggregationMode;
-          body.resultsEmailSubject =
-            templateValues.resultsEmailSubject.length > 0
-              ? templateValues.resultsEmailSubject
               : null;
-          body.resultsEmailBodyMarkdown =
-            templateValues.resultsEmailBodyMarkdown.length > 0
-              ? templateValues.resultsEmailBodyMarkdown
-              : null;
-          body.resultsEmailContentApproved =
-            templateValues.resultsEmailContentApproved;
+          body.invitationSubject = templateValues.invitationSubject;
+          body.invitationBodyMarkdown = templateValues.invitationBodyMarkdown;
+          if (!ed10Active) {
+            body.aggregationMode = templateValues.aggregationMode;
+            body.resultsEmailSubject =
+              templateValues.resultsEmailSubject.length > 0
+                ? templateValues.resultsEmailSubject
+                : null;
+            body.resultsEmailBodyMarkdown =
+              templateValues.resultsEmailBodyMarkdown.length > 0
+                ? templateValues.resultsEmailBodyMarkdown
+                : null;
+            body.resultsEmailContentApproved =
+              templateValues.resultsEmailContentApproved;
+          }
         }
+        if (dirtyFlags.welcome) {
+          body.invitedWelcomeDefault = invitedWelcomePayload;
+        }
+        const templateSurface =
+          dirtyFlags.metadata && dirtyFlags.welcome
+            ? "assessment details and Welcome screen"
+            : dirtyFlags.welcome
+              ? "Welcome screen"
+              : "assessment details";
         ops.push(
           fetch(`/api/admin/assessment-templates/${template.id}`, {
             method: "PATCH",
@@ -937,7 +1023,7 @@ export function useTemplateEditorDraft({
           }).then((r) => ({
             ok: r.ok,
             status: r.status,
-            surface: "metadata",
+            surface: templateSurface,
           })),
         );
       }
@@ -973,7 +1059,7 @@ export function useTemplateEditorDraft({
       if (failed) {
         toast({
           title: "Could not save draft",
-          description: `Save failed (${failed.surface}). Please try again.`,
+          description: `Save failed for ${failed.surface}. Please try again.`,
           variant: "destructive",
         });
         return;
@@ -1031,6 +1117,7 @@ export function useTemplateEditorDraft({
 
       // Clear dirty flags on success.
       setDirtyFlags({});
+      setWelcomeErrors({});
       toast({ title: "Draft saved" });
       router.refresh();
     } catch (e) {
@@ -1059,11 +1146,15 @@ export function useTemplateEditorDraft({
     toast,
     version.id,
     versionValues,
+    welcomeValues,
   ]);
 
   return {
     // ─── State ───
     templateValues,
+    welcomeValues,
+    welcomeFinePrint,
+    welcomeErrors,
     versionValues,
     sections,
     questions,
@@ -1085,6 +1176,7 @@ export function useTemplateEditorDraft({
     scoringConfig: scoringConfigRef.current,
     // ─── Dirty setters ───
     setMetadataDirty,
+    setWelcomeDirty,
     setVersionDirty,
     setSectionsDirty,
     setQuestionsDirty,
@@ -1092,6 +1184,7 @@ export function useTemplateEditorDraft({
     // ─── Change handlers ───
     handleScoringConfigChange,
     handleTemplateFieldChange,
+    handleWelcomeFieldChange,
     handleVersionFieldChange,
     handleSendResultsDefaultChange,
     // ED10 (Task 7) — per-card immediate template-row Save (Settings tab).

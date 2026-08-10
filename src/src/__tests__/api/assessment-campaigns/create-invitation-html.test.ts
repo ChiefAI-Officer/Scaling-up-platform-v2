@@ -27,6 +27,7 @@ jest.mock("@/lib/db", () => ({
     assessmentTemplateVersion: { findFirst: jest.fn() },
     assessmentCampaign: { findMany: jest.fn(), create: jest.fn() },
     auditLog: { create: jest.fn().mockResolvedValue(undefined) },
+    $transaction: jest.fn(),
   },
 }));
 
@@ -90,6 +91,9 @@ beforeEach(() => {
     id: "org-1", ownerCoachId: "coach-1", deletedAt: null, name: "Acme",
   });
   (db.assessmentTemplate.findUnique as jest.Mock).mockResolvedValue({ id: "tpl-1", alias: "rockefeller" });
+  (db.$transaction as jest.Mock).mockImplementation(
+    async (callback: (tx: typeof db) => Promise<unknown>) => callback(db),
+  );
   (db.assessmentTemplateVersion.findFirst as jest.Mock).mockResolvedValue({
     id: "ver-1", language: "enUS", versionNumber: 1, publishedAt: new Date(),
   });

@@ -78,6 +78,7 @@ import {
   deriveReportStylePreviewCapabilities,
   type ReportStyleKey,
 } from "@/lib/assessments/report-style-registry";
+import type { InvitedWelcomeConfigV1 } from "@/lib/assessments/invited-welcome-config";
 
 // ────────────────────────────────────────────────────────────────────────
 // Tab definitions
@@ -159,6 +160,7 @@ export interface TemplateEditorTabbedTemplate {
   defaultReportStyle?: ReportStyleKey;
   aggregationMode: "FULL_VISIBILITY" | "CEO_ONLY";
   accessMode?: "INVITED" | "PUBLIC";
+  invitedWelcomeDefault?: InvitedWelcomeConfigV1;
 }
 
 export interface TemplateEditorTabbedVersion {
@@ -193,6 +195,7 @@ export interface TemplateEditorTabbedVersionMeta {
 
 export interface DirtyFlags {
   metadata?: boolean;
+  welcome?: boolean;
   version?: boolean;
   sections?: boolean;
   questions?: boolean;
@@ -331,6 +334,8 @@ export interface TabbedShellProps {
   plainLanguageScoringEnabled?: boolean;
   /** Server-computed availability for the report-style release. */
   reportStylesEnabled?: boolean;
+  /** Gates admin-owned Welcome authoring and coach presentation ownership. */
+  adminOwnedPresentationEnabled?: boolean;
   /**
    * Wave 48 — QSP core-values stories presentation. Server-computed and
    * forwarded to the read-only Preview pager; default false preserves ED10.
@@ -449,6 +454,7 @@ export function TabbedShell({
   previewSettingsEnabled = false,
   plainLanguageScoringEnabled = false,
   reportStylesEnabled = false,
+  adminOwnedPresentationEnabled = false,
   qspStoryGroupEnabled = false,
   // ED10 (spec 19am-plan, Task 5/10) — Active published-version snapshot for
   // the Preview tab's "Active" side; null when nothing is published (or the
@@ -1009,6 +1015,7 @@ export function TabbedShell({
                   conditionalEnabled={conditionalAuthoringEnabled}
                   publishedOptionKeys={publishedOptionKeys}
                   onGoToSections={() => handleTabChange("sections")}
+                  adminOwnedPresentationEnabled={adminOwnedPresentationEnabled}
                 />
               ) : (
                 <SingleColumnFormBuilder

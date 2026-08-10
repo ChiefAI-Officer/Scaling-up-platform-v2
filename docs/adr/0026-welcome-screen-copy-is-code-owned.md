@@ -1,6 +1,6 @@
 # ADR-0026 — Participant Welcome-screen copy is code-owned per template alias, not a Template row column
 
-**Status:** Accepted (2026-07-28) — first implemented for the Jeff July-10 welcome-lede family (#62 LVA, #66 QSP v2, #70 Rockefeller, #77 SU-Full) as [welcome-copy.ts](../../src/src/lib/assessments/welcome-copy.ts).
+**Status:** Superseded by [ADR-0033](0033-admin-owned-invited-welcome-snapshots.md) (2026-08-10). Accepted on 2026-07-28 and first implemented for the Jeff July-10 welcome-lede family (#62 LVA, #66 QSP v2, #70 Rockefeller, #77 SU-Full) as [welcome-copy.ts](../../src/src/lib/assessments/welcome-copy.ts).
 
 ## Context
 

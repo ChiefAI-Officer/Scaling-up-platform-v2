@@ -1,5 +1,3 @@
-const mockWaveDCampaignCreate = jest.fn();
-
 /**
  * Assessment v7.6 — GET/POST /api/assessment-campaigns.
  */
@@ -14,29 +12,32 @@ jest.mock("next/server", () => ({
   },
 }));
 
-jest.mock("@/lib/db", () => ({
-  db: {
+jest.mock("@/lib/db", () => {
+  const assessmentTemplate = { findUnique: jest.fn(), findMany: jest.fn() };
+  const assessmentCampaign = {
+    findMany: jest.fn(),
+    create: jest.fn(),
+  };
+  return { db: {
     organization: { findUnique: jest.fn() },
     coach: { findUnique: jest.fn() },
     accessGroupCoach: { findMany: jest.fn().mockResolvedValue([]) },
     accessGroupTemplate: { findMany: jest.fn().mockResolvedValue([]) },
-    assessmentTemplate: { findUnique: jest.fn(), findMany: jest.fn() },
+    assessmentTemplate,
     assessmentTemplateVersion: { findFirst: jest.fn() },
-    assessmentCampaign: {
-      findMany: jest.fn(),
-      create: jest.fn(),
-    },
+    assessmentCampaign,
     orgTeam: { findMany: jest.fn().mockResolvedValue([]) },
     $transaction: jest.fn(async (callback) =>
       callback({
-        assessmentCampaign: { create: mockWaveDCampaignCreate },
+        assessmentTemplate,
+        assessmentCampaign,
         assessmentCampaignParticipant: { createMany: jest.fn() },
         auditLog: { create: jest.fn() },
       }),
     ),
     auditLog: { create: jest.fn().mockResolvedValue(undefined) },
-  },
-}));
+  }};
+});
 
 jest.mock("@/lib/auth/authorization", () => ({
   getApiActor: jest.fn(),
@@ -52,6 +53,8 @@ import { GET, POST } from "@/app/api/assessment-campaigns/route";
 import { GET as listTemplates } from "@/app/api/assessment-templates/route";
 import { db } from "@/lib/db";
 import { getApiActor } from "@/lib/auth/authorization";
+
+const mockWaveDCampaignCreate = db.assessmentCampaign.create as jest.Mock;
 
 const coachActor = {
   userId: "u1",
@@ -79,6 +82,8 @@ beforeEach(() => {
   delete process.env.WAVE_REPORT_STYLES_ENABLED;
   delete process.env.WAVE_REPORT_STYLES_KILL;
   delete process.env.WAVE_REPORT_STYLES_CANARY;
+  delete process.env.WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_ENABLED;
+  delete process.env.WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_KILL;
   // Default access-group state: coach in 1 group that grants the template.
   (db.accessGroupCoach.findMany as jest.Mock).mockResolvedValue([
     {
@@ -104,6 +109,8 @@ beforeEach(() => {
     id: "tpl-1",
     alias: "rockefeller",
     disabledAt: null,
+    defaultReportStyle: "CLASSIC",
+    invitedWelcomeDefault: null,
   });
   (db.assessmentTemplateVersion.findFirst as jest.Mock).mockResolvedValue({
     id: "ver-1",
@@ -114,6 +121,22 @@ beforeEach(() => {
   mockWaveDCampaignCreate.mockResolvedValue({
     id: "c-wave-d",
     alias: "acme_scaling_up_full_260601100000",
+  });
+});
+
+describe("campaign response persistence-field boundary", () => {
+  it("omits invitedWelcomeSnapshot from list responses while the rollout is off", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    (db.assessmentCampaign.findMany as jest.Mock).mockResolvedValue([
+      { id: "c1", invitedWelcomeSnapshot: { schemaVersion: 1 } },
+    ]);
+
+    const response = await GET(
+      new Request("http://localhost/api/assessment-campaigns") as never,
+    );
+    const body = await response.json();
+
+    expect(body.data).toEqual([{ id: "c1" }]);
   });
 });
 

@@ -48,6 +48,8 @@ beforeEach(() => {
   delete process.env.WAVE_REPORT_STYLES_ENABLED;
   delete process.env.WAVE_REPORT_STYLES_CANARY;
   delete process.env.WAVE_REPORT_STYLES_KILL;
+  delete process.env.WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_ENABLED;
+  delete process.env.WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_KILL;
 });
 
 describe("GET /api/assessment-templates", () => {
@@ -176,6 +178,48 @@ describe("GET /api/assessment-templates", () => {
     );
   });
 
+  it("keeps report appearance metadata for admins when admin-owned presentation is active", async () => {
+    process.env.WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_ENABLED = "1";
+    process.env.WAVE_REPORT_STYLES_ENABLED = "1";
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    (db.assessmentTemplate.findMany as jest.Mock)
+      .mockResolvedValueOnce([
+        {
+          id: "t1",
+          name: "Rockefeller",
+          alias: "rockefeller",
+          description: null,
+          aggregationMode: "FULL_VISIBILITY",
+          defaultReportStyle: "MODERN_DASHBOARD",
+          sendResultsDefault: false,
+          resultsEmailContentApproved: false,
+          resultsEmailContentApprovedHash: null,
+          resultsEmailSubject: null,
+          resultsEmailBodyMarkdown: null,
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: "t1",
+          versions: [{ questions: [{ type: "NUMBER" }] }],
+        },
+      ]);
+
+    const res = await GET(
+      new Request("http://localhost/api/assessment-templates") as never,
+    );
+    const body = await res.json();
+
+    expect(db.assessmentTemplate.findMany).toHaveBeenCalledTimes(2);
+    expect(body.data[0]).toEqual(
+      expect.objectContaining({
+        defaultReportStyle: "MODERN_DASHBOARD",
+        reportStylesEnabled: true,
+        reportStylePreviewCapabilities: expect.any(Object),
+      }),
+    );
+  });
+
   it("admin payload carries the raw stored sendResultsDefault (Wave Q #1)", async () => {
     (getApiActor as jest.Mock).mockResolvedValue(adminActor);
     (db.assessmentTemplate.findMany as jest.Mock).mockResolvedValue([
@@ -269,6 +313,44 @@ describe("GET /api/assessment-templates", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.data[0].sendResultsDefault).toBe(false);
+  });
+
+  it("coach admin-owned presentation payload omits report appearance metadata and its preview query", async () => {
+    process.env.WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_ENABLED = "1";
+    process.env.WAVE_REPORT_STYLES_ENABLED = "1";
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    (db.accessGroupCoach.findMany as jest.Mock).mockResolvedValue([
+      { accessGroupId: "g1", coachId: "coach-1", accessGroup: { id: "g1", deletedAt: null } },
+    ]);
+    (db.accessGroupTemplate.findMany as jest.Mock).mockResolvedValue([
+      { accessGroupId: "g1", templateId: "tpl-1" },
+    ]);
+    (db.assessmentTemplate.findMany as jest.Mock).mockResolvedValue([
+      {
+        id: "tpl-1",
+        name: "R",
+        alias: "r",
+        description: null,
+        aggregationMode: "FULL_VISIBILITY",
+        sendResultsDefault: false,
+        resultsEmailContentApproved: false,
+        resultsEmailContentApprovedHash: null,
+        resultsEmailSubject: null,
+        resultsEmailBodyMarkdown: null,
+      },
+    ]);
+
+    const res = await GET(
+      new Request("http://localhost/api/assessment-templates") as never,
+    );
+    const body = await res.json();
+
+    expect(db.assessmentTemplate.findMany).toHaveBeenCalledTimes(1);
+    const query = (db.assessmentTemplate.findMany as jest.Mock).mock.calls[0][0];
+    expect(query.select).not.toHaveProperty("defaultReportStyle");
+    expect(body.data[0]).not.toHaveProperty("defaultReportStyle");
+    expect(body.data[0]).not.toHaveProperty("reportStylesEnabled");
+    expect(body.data[0]).not.toHaveProperty("reportStylePreviewCapabilities");
   });
 
   it("coach: soft-deleted groups excluded from INTERSECTION denominator", async () => {

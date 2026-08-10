@@ -165,6 +165,7 @@ const mockCampaign = {
   closeAt: null,
   createdAt: new Date(),
   updatedAt: new Date(),
+  invitedWelcomeSnapshot: null,
 };
 
 // ─── beforeEach ──────────────────────────────────────────────────────────────
@@ -201,6 +202,9 @@ describe("GET /api/admin/public-campaigns — LIST", () => {
     const res = await listGet();
 
     expect(res.status).toBe(200);
+    expect((await res.json()).data[0]).not.toHaveProperty(
+      "invitedWelcomeSnapshot",
+    );
     expect(db.assessmentCampaign.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
@@ -500,6 +504,7 @@ describe("POST /api/admin/public-campaigns — CREATE", () => {
       const body = await res.json();
       expect(body.success).toBe(true);
       expect(body.data).toBeDefined();
+      expect(body.data).not.toHaveProperty("invitedWelcomeSnapshot");
     });
 
     it("creates campaign with accessMode=PUBLIC, status=DRAFT, createdByCoachId=null", async () => {
@@ -512,6 +517,7 @@ describe("POST /api/admin/public-campaigns — CREATE", () => {
       expect(data.accessMode).toBe("PUBLIC");
       expect(data.status).toBe("DRAFT");
       expect(data.createdByCoachId).toBeNull();
+      expect(data).not.toHaveProperty("invitedWelcomeSnapshot");
     });
 
     it("derives endMode=OPEN_END and closeAt=null when no closeAt provided", async () => {

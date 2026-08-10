@@ -59,6 +59,7 @@ const ctx = {
 };
 
 interface MockTx {
+  assessmentTemplate: { findUnique: jest.Mock };
   assessmentCampaign: { findUnique: jest.Mock; findFirst: jest.Mock; create: jest.Mock; updateMany: jest.Mock };
   orgRespondent: { findMany: jest.Mock };
   assessmentCampaignParticipant: { upsert: jest.Mock; delete: jest.Mock; deleteMany: jest.Mock; updateMany: jest.Mock };
@@ -69,6 +70,22 @@ interface MockTx {
 
 function makeTx(overrides: Partial<MockTx> = {}): MockTx {
   return {
+    assessmentTemplate: {
+      findUnique: jest.fn().mockResolvedValue({
+        alias: "qsp-v2",
+        invitedWelcomeDefault: {
+          schemaVersion: 1,
+          eyebrow: "WELCOME TEST",
+          headingTemplate: "{{campaignName}} quarterly check-in",
+          ledeParagraphs: ["Take a moment to reflect."],
+          sharingHeading: "How your answers are shared",
+          scoresHeading: "Your category scores",
+          scoresDescription: "See how the team is tracking.",
+          finePrint: null,
+          ctaLabel: "Start the assessment",
+        },
+      }),
+    },
     assessmentCampaign: {
       findUnique: jest.fn().mockResolvedValue(null),
       findFirst: jest.fn().mockResolvedValue(null),
@@ -163,6 +180,13 @@ describe("commitResultsImport — campaign create", () => {
     expect(data.createdBy).toBe("admin-1");
     expect(data.createdByCoachId).toBe("coach-1");
     expect(data.name).toContain("BDvhuDORxZ");
+    expect(data.invitedWelcomeSnapshot).toEqual(
+      expect.objectContaining({
+        schemaVersion: 1,
+        eyebrow: "WELCOME TEST",
+        headingTemplate: "{{campaignName}} quarterly check-in",
+      }),
+    );
     // openAt/closeAt are Date instances derived from the plan strings.
     expect(data.openAt).toBeInstanceOf(Date);
     expect(data.closeAt).toBeInstanceOf(Date);
@@ -185,6 +209,7 @@ describe("commitResultsImport — campaign create", () => {
     const db = makeDb(tx);
     const res = await commitResultsImport(db as never, basePlan(), ctx, actor);
     expect(tx.assessmentCampaign.create).not.toHaveBeenCalled();
+    expect(tx.assessmentTemplate.findUnique).not.toHaveBeenCalled();
     expect(res.campaigns[0].campaignAction).toBe("reuse");
     expect(res.campaigns[0].campaignId).toBe("camp-existing");
   });

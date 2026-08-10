@@ -34,6 +34,7 @@ import {
   TemplateVersionForScoringSchema,
   TemplateVersionForPublishSchema,
 } from "../../lib/assessments/scoring";
+import { resolveLegacyInvitedWelcomeConfig } from "../../lib/assessments/invited-welcome-config";
 
 // ─── Mock builder ─────────────────────────────────────────────────────────
 
@@ -140,6 +141,9 @@ describe("seed-scaling-up-full-assessment", () => {
     const createTemplateCall = tx.assessmentTemplate.create.mock.calls[0][0];
     expect(createTemplateCall.data.alias).toBe(ALIAS);
     expect(createTemplateCall.data.alias).toBe("scaling-up-full");
+    expect(createTemplateCall.data.invitedWelcomeDefault).toEqual(
+      resolveLegacyInvitedWelcomeConfig(ALIAS),
+    );
 
     // contentHash must be 64-char hex
     expect(result.contentHash).toMatch(/^[0-9a-f]{64}$/);

@@ -45,13 +45,14 @@ jest.mock("@/lib/db", () => {
     updateMany: jest.fn(),
     update: jest.fn(),
   };
+  const assessmentTemplate = { findUnique: jest.fn() };
   return {
     db: {
       organization: { findUnique: jest.fn() },
       coach: { findUnique: jest.fn() },
       accessGroupCoach: { findMany: jest.fn().mockResolvedValue([]) },
       accessGroupTemplate: { findMany: jest.fn().mockResolvedValue([]) },
-      assessmentTemplate: { findUnique: jest.fn() },
+      assessmentTemplate,
       assessmentTemplateVersion: { findFirst: jest.fn() },
       assessmentCampaign,
       orgRespondent,
@@ -61,6 +62,7 @@ jest.mock("@/lib/db", () => {
       // $transaction runs the callback against a tx surface that mirrors db.
       $transaction: jest.fn(async (cb: (tx: unknown) => unknown) =>
         cb({
+          assessmentTemplate,
           assessmentCampaign,
           orgRespondent,
           orgTeam,
@@ -152,6 +154,8 @@ beforeEach(() => {
   (db.assessmentTemplate.findUnique as jest.Mock).mockResolvedValue({
     id: "tpl-1",
     alias: "rockefeller",
+    defaultReportStyle: "CLASSIC",
+    invitedWelcomeDefault: null,
   });
   (db.assessmentTemplateVersion.findFirst as jest.Mock).mockResolvedValue({
     id: "ver-1",

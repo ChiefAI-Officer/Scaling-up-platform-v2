@@ -33,6 +33,7 @@ import { FormsBuilder } from "@/components/admin/template-editor/FormsBuilder";
 import type { SectionDraft } from "@/components/admin/template-editor/SectionsCard";
 import type { QuestionDraftRow } from "@/components/admin/template-editor/question-serialization";
 import type { TemplateEditorModel } from "@/components/admin/template-editor/hooks/useTemplateEditorModel";
+import { GENERIC_INVITED_WELCOME_CONFIG } from "@/lib/assessments/invited-welcome-config";
 
 // Capture the DndContext onDragEnd so a within-section drop can be invoked (jsdom
 // can't drive a real dnd-kit drag). Everything else in @dnd-kit/core stays real
@@ -140,6 +141,18 @@ function buildModel(o: ModelOverrides = {}) {
       description: o.description ?? "The team assessment",
     },
     handleTemplateFieldChange: jest.fn(),
+    welcomeValues: {
+      eyebrow: GENERIC_INVITED_WELCOME_CONFIG.eyebrow,
+      headingTemplate: GENERIC_INVITED_WELCOME_CONFIG.headingTemplate,
+      ledeParagraphs: [...GENERIC_INVITED_WELCOME_CONFIG.ledeParagraphs],
+      sharingHeading: GENERIC_INVITED_WELCOME_CONFIG.sharingHeading,
+      scoresHeading: GENERIC_INVITED_WELCOME_CONFIG.scoresHeading,
+      scoresDescription: GENERIC_INVITED_WELCOME_CONFIG.scoresDescription,
+      ctaLabel: GENERIC_INVITED_WELCOME_CONFIG.ctaLabel,
+    },
+    welcomeFinePrint: null,
+    welcomeErrors: {},
+    handleWelcomeFieldChange: jest.fn(),
     sections,
     questions,
     selection: {
@@ -174,7 +187,7 @@ function buildModel(o: ModelOverrides = {}) {
 
 function renderBuilder(
   model: ReturnType<typeof buildModel>,
-  opts: { isReadOnly?: boolean } = {},
+  opts: { isReadOnly?: boolean; adminOwnedPresentationEnabled?: boolean } = {},
 ) {
   return render(
     <FormsBuilder
@@ -185,6 +198,7 @@ function renderBuilder(
       conditionalEnabled
       publishedOptionKeys={{}}
       onGoToSections={jest.fn()}
+      adminOwnedPresentationEnabled={opts.adminOwnedPresentationEnabled}
     />,
   );
 }
@@ -205,6 +219,19 @@ describe("FormsBuilder — structure", () => {
     expect(
       document.querySelectorAll('[data-testid^="form-section-card-"]').length,
     ).toBe(2);
+  });
+
+  it("inserts the fixed Welcome card after the header and before Section 1 only when enabled", () => {
+    renderBuilder(buildModel());
+    expect(screen.queryByTestId("welcome-screen-card")).not.toBeInTheDocument();
+
+    cleanup();
+    renderBuilder(buildModel(), { adminOwnedPresentationEnabled: true });
+    const header = screen.getByTestId("form-header-card");
+    const welcome = screen.getByTestId("welcome-screen-card");
+    const section = screen.getByTestId("forms-section-S1");
+    expect(header.compareDocumentPosition(welcome) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(welcome.compareDocumentPosition(section) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("renders a FormQuestionCard per question", () => {
@@ -250,8 +277,11 @@ describe("FormsBuilder — add model (section-local only)", () => {
   });
 
   it("the empty state (no sections) shows ONLY add-section", () => {
-    renderBuilder(buildModel({ sections: [], questions: [] }));
+    renderBuilder(buildModel({ sections: [], questions: [] }), {
+      adminOwnedPresentationEnabled: true,
+    });
     expect(screen.getByTestId("forms-builder")).toBeInTheDocument();
+    expect(screen.getByTestId("welcome-screen-card")).toBeInTheDocument();
     expect(screen.getByTestId("forms-builder-add-first-section")).toBeInTheDocument();
     // No add-question affordance can exist without a section.
     expect(screen.queryByText(/add question/i)).not.toBeInTheDocument();

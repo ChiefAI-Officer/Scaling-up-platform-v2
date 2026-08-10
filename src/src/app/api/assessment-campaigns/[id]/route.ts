@@ -38,6 +38,7 @@ import {
 import { isCustomSlidesEnabled } from "@/lib/assessments/wave-m-flags";
 import { isOnScreenResultsEnabled } from "@/lib/assessments/wave-osr-flags";
 import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
+import { isAdminOwnedAssessmentPresentationEnabled } from "@/lib/assessments/wave-admin-owned-assessment-presentation-flags";
 import type { ReportStyleKey } from "@/lib/assessments/report-style-registry";
 import { isExactCoachReportAppearanceOwner } from "@/lib/assessments/campaign-detail";
 import {
@@ -46,6 +47,14 @@ import {
   slidesAuditMeta,
 } from "@/lib/assessments/custom-slides-write";
 import { Prisma } from "@prisma/client";
+
+function withoutInvitedWelcomeSnapshot<
+  T extends { invitedWelcomeSnapshot?: unknown },
+>(campaign: T): Omit<T, "invitedWelcomeSnapshot"> {
+  const response = { ...campaign };
+  delete response.invitedWelcomeSnapshot;
+  return response;
+}
 
 const REPORT_STYLE_LOCKED_MESSAGE =
   "Report appearance was locked when the first response completed. Refresh to see the final style.";
@@ -159,15 +168,24 @@ async function patchReportAppearance(
     );
   }
 
-  // This endpoint owns coach-campaign appearance changes only. Privileged
-  // public-campaign writes use the dedicated Task 5 route; they cannot pass
-  // through this coach-owned lane.
+  const adminOwnedPresentation =
+    isAdminOwnedAssessmentPresentationEnabled();
+  if (adminOwnedPresentation && !isPrivilegedRole(actor.role)) {
+    return NextResponse.json(
+      { success: false, error: "REPORT_STYLE_ADMIN_OWNED" },
+      { status: 403 },
+    );
+  }
+
+  // Before admin ownership is enabled, retain the exact coach-owner lane.
+  // In active mode, privileged actors keep the compatibility lane so existing
+  // administrative workflows can still maintain campaign appearance.
   const isExactCoachOwner = isExactCoachReportAppearanceOwner({
     actorRole: actor.role,
     actorCoachId: actor.coachId,
     campaignOwnerCoachId: campaign.createdByCoachId,
   });
-  if (!isExactCoachOwner) {
+  if (!adminOwnedPresentation && !isExactCoachOwner) {
     return NextResponse.json(
       { success: false, error: "Forbidden" },
       { status: 403 },
@@ -313,7 +331,10 @@ export async function GET(
       );
     }
 
-    return NextResponse.json({ success: true, data: campaign });
+    return NextResponse.json({
+      success: true,
+      data: withoutInvitedWelcomeSnapshot(campaign),
+    });
   } catch (error) {
     console.error("Error fetching campaign:", error);
     return NextResponse.json(
@@ -644,7 +665,10 @@ export async function PATCH(
         changes: updateData as Record<string, unknown>,
       });
 
-      return NextResponse.json({ success: true, data: updated });
+      return NextResponse.json({
+        success: true,
+        data: withoutInvitedWelcomeSnapshot(updated),
+      });
     }
 
     // Slides being written: CAS re-check + update + audit in ONE tx (R2-Med-1).
@@ -695,7 +719,10 @@ export async function PATCH(
       );
     }
 
-    return NextResponse.json({ success: true, data: saved });
+    return NextResponse.json({
+      success: true,
+      data: withoutInvitedWelcomeSnapshot(saved),
+    });
   } catch (error) {
     console.error("Error updating campaign:", error);
     return NextResponse.json(

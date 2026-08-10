@@ -290,6 +290,7 @@ export function CampaignWizard({
   customSlidesEnabled = false,
   waveQDefaultsEnabled = false,
   onScreenResultsEnabled = false,
+  adminOwnedPresentation = false,
 }: {
   /** Wave D #20 — gate the custom-HTML invitation editor (mirrors the server flag). */
   customHtmlEmailEnabled?: boolean;
@@ -346,6 +347,8 @@ export function CampaignWizard({
    * toggles — a stored `showResultsOnScreen` is NEVER coerced when this is off.
    */
   onScreenResultsEnabled?: boolean;
+  /** Admin owns template presentation; coaches neither see nor persist style choices. */
+  adminOwnedPresentation?: boolean;
 } = {}) {
   const router = useRouter();
   const { toast } = useToast();
@@ -442,10 +445,12 @@ export function CampaignWizard({
           }
         }
         const reportStyleIntent: ReportStyleIntent =
-          parsed.reportStyleIntent === "EXPLICIT" ? "EXPLICIT" : "INHERITED";
+          !adminOwnedPresentation && parsed.reportStyleIntent === "EXPLICIT"
+            ? "EXPLICIT"
+            : "INHERITED";
         const templateAlias = selectedTemplate?.alias ??
           (typeof parsed.templateAlias === "string" ? parsed.templateAlias : "");
-        const templateDefaultReportStyle = isReportStyleKey(
+        const templateDefaultReportStyle = !adminOwnedPresentation && isReportStyleKey(
           selectedTemplate?.defaultReportStyle,
         )
           ? selectedTemplate.defaultReportStyle
@@ -453,7 +458,7 @@ export function CampaignWizard({
             ? parsed.templateDefaultReportStyle
             : "CLASSIC";
         const inheritedReportStyle =
-          selectedTemplate?.reportStylesEnabled === true
+          !adminOwnedPresentation && selectedTemplate?.reportStylesEnabled === true
             ? templateDefaultReportStyle
             : "CLASSIC";
         const merged: WizardState = {
@@ -473,9 +478,12 @@ export function CampaignWizard({
               : inheritedReportStyle,
           reportStyleIntent,
           templateReportStylesEnabled:
+            !adminOwnedPresentation &&
             selectedTemplate?.reportStylesEnabled === true,
           templatePreviewCapabilities:
-            selectedTemplate?.reportStylePreviewCapabilities,
+            adminOwnedPresentation
+              ? undefined
+              : selectedTemplate?.reportStylePreviewCapabilities,
           respondentIds: Array.isArray(parsed.respondentIds)
             ? parsed.respondentIds
             : [],
@@ -550,15 +558,19 @@ export function CampaignWizard({
             organizationId: snapshot.organizationId,
             templateId: snapshot.templateId,
             templateAlias: snapshot.templateAlias,
-            templateDefaultReportStyle: snapshot.templateDefaultReportStyle,
             respondentIds: snapshot.respondentIds,
             ceoRespondentId: snapshot.ceoRespondentId,
             name: snapshot.name,
             openAt: snapshot.openAt,
             endMode: snapshot.endMode,
             closeAt: snapshot.closeAt,
-            reportStyle: snapshot.reportStyle,
-            reportStyleIntent: snapshot.reportStyleIntent,
+            ...(!adminOwnedPresentation
+              ? {
+                  templateDefaultReportStyle: snapshot.templateDefaultReportStyle,
+                  reportStyle: snapshot.reportStyle,
+                  reportStyleIntent: snapshot.reportStyleIntent,
+                }
+              : {}),
           },
         }),
       });
@@ -568,7 +580,7 @@ export function CampaignWizard({
     } catch {
       setSaveStatus("error");
     }
-  }, []);
+  }, [adminOwnedPresentation]);
 
   // Debounced auto-save: when state changes (after the draft has been
   // loaded/handled), schedule a PUT in 800ms. Step transitions can flush
@@ -760,7 +772,7 @@ export function CampaignWizard({
           // decides disclosure itself, so a stored `true` with the flag off
           // promises nobody anything. Flags gate capability, not data.
           showResultsOnScreen: state.showResultsOnScreen,
-          ...(state.reportStyleIntent === "EXPLICIT"
+          ...(!adminOwnedPresentation && state.reportStyleIntent === "EXPLICIT"
             ? { reportStyle: state.reportStyle }
             : {}),
           // Task 10 — #2/#3 timing radio: tell server when to send invitations.
@@ -996,14 +1008,19 @@ export function CampaignWizard({
                 templateId: id,
                 templateName: name,
                 templateAlias: alias,
-                templateDefaultReportStyle: defaultReportStyle,
+                templateDefaultReportStyle: adminOwnedPresentation
+                  ? "CLASSIC"
+                  : defaultReportStyle,
                 reportStyle:
-                  templateReportStylesEnabled
+                  !adminOwnedPresentation && templateReportStylesEnabled
                     ? defaultReportStyle
                     : "CLASSIC",
                 reportStyleIntent: "INHERITED",
-                templateReportStylesEnabled,
-                templatePreviewCapabilities,
+                templateReportStylesEnabled:
+                  !adminOwnedPresentation && templateReportStylesEnabled,
+                templatePreviewCapabilities: adminOwnedPresentation
+                  ? undefined
+                  : templatePreviewCapabilities,
                 templateResultsEmailApproved: resultsEmailApproved,
                 // Wave Q (#1): with the flag on, template selection/switch
                 // re-derives #15 from the picked template's admin default —
@@ -1053,7 +1070,9 @@ export function CampaignWizard({
             sendResultsToRespondent={state.sendResultsToRespondent}
             notifyCoachOnCompletion={state.notifyCoachOnCompletion}
             showResultsOnScreen={state.showResultsOnScreen}
-            reportStylesEnabled={state.templateReportStylesEnabled}
+            reportStylesEnabled={
+              !adminOwnedPresentation && state.templateReportStylesEnabled
+            }
             reportStyle={state.reportStyle}
             reportStyleIntent={state.reportStyleIntent}
             inviteTiming={state.inviteTiming}
@@ -1088,7 +1107,9 @@ export function CampaignWizard({
             customHtmlEmailEnabled={customHtmlEmailEnabled}
             brandedCustomHtmlEnabled={brandedCustomHtmlEnabled}
             autoSend={autoSend}
-            reportStylesEnabled={state.templateReportStylesEnabled}
+            reportStylesEnabled={
+              !adminOwnedPresentation && state.templateReportStylesEnabled
+            }
             onChange={(patch) => setState((s) => ({ ...s, ...patch }))}
           />
         )}

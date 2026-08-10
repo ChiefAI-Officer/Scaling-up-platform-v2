@@ -66,6 +66,8 @@ beforeEach(() => {
   delete process.env.WAVE_REPORT_STYLES_ENABLED;
   delete process.env.WAVE_REPORT_STYLES_KILL;
   delete process.env.WAVE_REPORT_STYLES_CANARY;
+  delete process.env.WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_ENABLED;
+  delete process.env.WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_KILL;
   (db.accessGroupCoach.findMany as jest.Mock).mockResolvedValue([
     {
       accessGroupId: "g1",
@@ -117,12 +119,15 @@ describe("GET /api/assessment-campaigns/[id]", () => {
       templateId: "tpl-1",
       createdByCoachId: "coach-1",
       status: "DRAFT",
+      invitedWelcomeSnapshot: { schemaVersion: 1 },
     });
     const res = await GET(
       new Request("http://localhost/api/assessment-campaigns/c1") as never,
       detailParams("c1"),
     );
     expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data).not.toHaveProperty("invitedWelcomeSnapshot");
   });
 });
 
@@ -179,12 +184,16 @@ describe("PATCH /api/assessment-campaigns/[id]", () => {
     (db.assessmentCampaign.update as jest.Mock).mockResolvedValue({
       id: "c1",
       name: "Renamed",
+      invitedWelcomeSnapshot: { schemaVersion: 1 },
     });
     const res = await PATCH(
       patchReq({ name: "Renamed" }) as never,
       detailParams("c1"),
     );
     expect(res.status).toBe(200);
+    expect((await res.json()).data).not.toHaveProperty(
+      "invitedWelcomeSnapshot",
+    );
   });
 
   it("happy path updates name", async () => {
@@ -370,6 +379,87 @@ describe("PATCH /api/assessment-campaigns/[id]", () => {
         expect(db.assessmentCampaign.updateMany).not.toHaveBeenCalled();
       },
     );
+
+    it("returns the stable admin-owned error to a coach without update or audit", async () => {
+      process.env.WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_ENABLED = "1";
+      process.env.WAVE_REPORT_STYLES_ENABLED = "1";
+      (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+      (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValue(
+        reportStyleCampaign(),
+      );
+
+      const res = await PATCH(
+        patchReq({ reportStyle: "MODERN_DASHBOARD" }) as never,
+        detailParams("c1"),
+      );
+
+      expect(res.status).toBe(403);
+      await expect(res.json()).resolves.toEqual({
+        success: false,
+        error: "REPORT_STYLE_ADMIN_OWNED",
+      });
+      expect(db.assessmentCampaign.updateMany).not.toHaveBeenCalled();
+      expect(db.assessmentCampaign.update).not.toHaveBeenCalled();
+      expect(db.auditLog.create).not.toHaveBeenCalled();
+    });
+
+    it.each(["ADMIN", "STAFF"] as const)(
+      "keeps the isolated compatibility write lane for %s in admin-owned mode",
+      async (role) => {
+        process.env.WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_ENABLED = "1";
+        process.env.WAVE_REPORT_STYLES_ENABLED = "1";
+        (getApiActor as jest.Mock).mockResolvedValue({
+          ...coachActor,
+          role,
+          coachId: null,
+        });
+        (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValue(
+          reportStyleCampaign(),
+        );
+        (db.assessmentCampaign.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+
+        const res = await PATCH(
+          patchReq({ reportStyle: "EXECUTIVE_BOARDROOM" }) as never,
+          detailParams("c1"),
+        );
+
+        expect(res.status).toBe(200);
+        expect(db.assessmentCampaign.updateMany).toHaveBeenCalledWith({
+          where: { id: "c1", reportStyleLockedAt: null },
+          data: {
+            reportStyle: "EXECUTIVE_BOARDROOM",
+            reportStyleSource: "CAMPAIGN_OVERRIDE",
+          },
+        });
+      },
+    );
+
+    it("keeps the first-response lock on the active admin compatibility lane", async () => {
+      process.env.WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_ENABLED = "1";
+      process.env.WAVE_REPORT_STYLES_ENABLED = "1";
+      (getApiActor as jest.Mock).mockResolvedValue({
+        ...coachActor,
+        role: "ADMIN",
+        coachId: null,
+      });
+      (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValue(
+        reportStyleCampaign({
+          reportStyleLockedAt: new Date("2026-08-06T04:00:00.000Z"),
+        }),
+      );
+
+      const res = await PATCH(
+        patchReq({ reportStyle: "EXECUTIVE_BOARDROOM" }) as never,
+        detailParams("c1"),
+      );
+
+      expect(res.status).toBe(409);
+      await expect(res.json()).resolves.toEqual(
+        expect.objectContaining({ error: "REPORT_STYLE_LOCKED" }),
+      );
+      expect(db.assessmentCampaign.updateMany).not.toHaveBeenCalled();
+      expect(db.auditLog.create).not.toHaveBeenCalled();
+    });
 
     it("rejects an invalid appearance key before any campaign mutation", async () => {
       process.env.WAVE_REPORT_STYLES_ENABLED = "1";

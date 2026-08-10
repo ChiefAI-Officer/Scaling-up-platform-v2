@@ -18,6 +18,7 @@ import {
   generateTemplateInternalId,
   templateInternalIdForAttempt,
 } from "@/lib/assessments/template-internal-id";
+import { GENERIC_INVITED_WELCOME_CONFIG } from "@/lib/assessments/invited-welcome-config";
 
 interface AdminTemplateSummary {
   id: string;
@@ -236,6 +237,8 @@ export async function POST(request: NextRequest) {
             invitationSubject: createData.invitationSubject,
             invitationBodyMarkdown: createData.invitationBodyMarkdown,
             aggregationMode: createData.aggregationMode,
+            invitedWelcomeDefault:
+              GENERIC_INVITED_WELCOME_CONFIG as unknown as Prisma.InputJsonValue,
             createdBy: actorUserId,
           },
           select: { id: true, alias: true },

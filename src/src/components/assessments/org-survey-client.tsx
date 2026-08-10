@@ -65,6 +65,12 @@ import {
   reviveOnScreenReport,
 } from "@/lib/assessments/onscreen-result-store";
 import { exchangeCeoReportAccessUrl } from "@/lib/assessments/ceo-report-access-client";
+import { InvitedWelcomeCard } from "@/components/assessments/InvitedWelcomeCard";
+import {
+  invitedWelcomeConfigSchema,
+  resolveLegacyInvitedWelcomeConfig,
+  type InvitedWelcomeConfigV1,
+} from "@/lib/assessments/invited-welcome-config";
 
 // Wave OSR (#71) — the in-place report needs the report stylesheets. This route
 // group has no (report) layout to supply them, so the client imports them the
@@ -134,6 +140,7 @@ interface SurveyData {
    * no-op leaves the section pages unchanged. The client never sanitizes.
    */
   customSlides?: SafeSlide[];
+  invitedWelcome?: InvitedWelcomeConfigV1;
 }
 
 type Phase =
@@ -647,6 +654,29 @@ export function OrgSurveyClient({
     // `campaign.templateAlias`, and both helpers walk the same map.
     const welcomeLede = resolveWelcomeLede(templateAlias);
     const showResumeNote = shouldShowResumeNote(templateAlias);
+    if (phase.data.invitedWelcome !== undefined) {
+      const parsedWelcome = invitedWelcomeConfigSchema.safeParse(
+        phase.data.invitedWelcome,
+      );
+      const invitedWelcome = parsedWelcome.success
+        ? parsedWelcome.data
+        : resolveLegacyInvitedWelcomeConfig(templateAlias);
+      return (
+        <div className="su-welcome-page">
+          <WelcomeShellHeader caption={orgName ?? "Team Assessment"} />
+          <main className="su-welcome-body">
+            <InvitedWelcomeCard
+              config={invitedWelcome}
+              campaignName={phase.data.campaign.name}
+              questions={sortedQuestions}
+              sections={sortedSections}
+              onStart={() => setPhase({ kind: "ready", data: phase.data })}
+            />
+          </main>
+          <footer className="su-welcome-foot">Powered by Scaling Up</footer>
+        </div>
+      );
+    }
     return (
       <div className="su-welcome-page">
         <WelcomeShellHeader caption={orgName ?? "Team Assessment"} />
