@@ -290,4 +290,50 @@ describe("CampaignWizard — report appearance", () => {
       );
     });
   });
+
+  it("removes report appearance from the coach flow and all writes when admin-owned presentation is active", async () => {
+    installFetch({
+      currentStep: 3,
+      lastSavedAt: "2026-08-05T08:00:00.000Z",
+      stepsData: JSON.stringify({
+        organizationId: "org-1",
+        templateId: "tpl-1",
+        templateAlias: "scaling-up-full",
+        templateDefaultReportStyle: "EXECUTIVE_BOARDROOM",
+        reportStyle: "EXECUTIVE_BOARDROOM",
+        reportStyleIntent: "EXPLICIT",
+        templateReportStylesEnabled: true,
+        templatePreviewCapabilities: {
+          reportType: "scored",
+          hasMetrics: true,
+          hasNarrativeResponses: false,
+        },
+        respondentIds: ["resp-1"],
+        name: "Q3",
+        openAt: "2026-08-10T09:00",
+        endMode: "OPEN_END",
+        closeAt: "",
+      }),
+    });
+    render(<CampaignWizard adminOwnedPresentation />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Resume" }));
+    expect(screen.queryByRole("heading", { name: "Report appearance" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /^next/i }));
+    expect(screen.queryByText("Report appearance", { exact: true })).not.toBeInTheDocument();
+
+    await waitFor(() => expect(draftSaveBodies.length).toBeGreaterThan(0));
+    for (const body of draftSaveBodies as Array<{ data: Record<string, unknown> }>) {
+      expect(body.data).not.toHaveProperty("templateDefaultReportStyle");
+      expect(body.data).not.toHaveProperty("reportStyle");
+      expect(body.data).not.toHaveProperty("reportStyleIntent");
+      expect(body.data).not.toHaveProperty("templateReportStylesEnabled");
+      expect(body.data).not.toHaveProperty("templatePreviewCapabilities");
+    }
+
+    fireEvent.click(await screen.findByRole("button", { name: "Save as Draft" }));
+    await waitFor(() => expect(campaignCreateBodies).toHaveLength(1));
+    expect(campaignCreateBodies[0]).not.toHaveProperty("reportStyle");
+  });
 });

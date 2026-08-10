@@ -36,6 +36,7 @@ import {
   activePublishedWhere,
   DEFAULT_TEMPLATE_LANGUAGE,
 } from "@/lib/assessments/active-version";
+import { isAdminOwnedAssessmentPresentationEnabled } from "@/lib/assessments/wave-admin-owned-assessment-presentation-flags";
 
 interface TemplateSummary {
   id: string;
@@ -47,8 +48,8 @@ interface TemplateSummary {
   resultsEmailApproved: boolean;
   /** Wave Q (#1) — raw stored template-level default for "send results to respondent". */
   sendResultsDefault: boolean;
-  defaultReportStyle: ReportStyleKey;
-  reportStylesEnabled: boolean;
+  defaultReportStyle?: ReportStyleKey;
+  reportStylesEnabled?: boolean;
   reportStylePreviewCapabilities?: ReportStylePreviewCapabilities;
 }
 
@@ -157,6 +158,8 @@ export async function GET(request: NextRequest) {
     if (!actor.coachId) {
       return NextResponse.json({ success: true, data: [] });
     }
+    const adminOwnedPresentation =
+      isAdminOwnedAssessmentPresentationEnabled();
 
     // Step 1 — load the coach's active group IDs.
     const groupRows = await db.accessGroupCoach.findMany({
@@ -207,7 +210,7 @@ export async function GET(request: NextRequest) {
         alias: true,
         description: true,
         aggregationMode: true,
-        defaultReportStyle: true,
+        ...(!adminOwnedPresentation ? { defaultReportStyle: true } : {}),
         sendResultsDefault: true,
         resultsEmailContentApproved: true,
         resultsEmailContentApprovedHash: true,
@@ -217,10 +220,12 @@ export async function GET(request: NextRequest) {
       orderBy: { name: "asc" },
     });
     const availability = new Map(
-      templates.map((template) => [
-        template.id,
-        isReportStylesEnabled({ templateId: template.id }),
-      ]),
+      adminOwnedPresentation
+        ? []
+        : templates.map((template) => [
+            template.id,
+            isReportStylesEnabled({ templateId: template.id }),
+          ]),
     );
     const availableTemplateIds = templates
       .filter((template) => availability.get(template.id))
@@ -257,11 +262,15 @@ export async function GET(request: NextRequest) {
           alias: t.alias,
           description: t.description,
           aggregationMode: t.aggregationMode,
-          defaultReportStyle: t.defaultReportStyle,
-          reportStylesEnabled,
           resultsEmailApproved: isResultsEmailApproved(t),
           sendResultsDefault: t.sendResultsDefault,
-          ...(reportStylesEnabled
+          ...(!adminOwnedPresentation
+            ? {
+                defaultReportStyle: t.defaultReportStyle,
+                reportStylesEnabled,
+              }
+            : {}),
+          ...(!adminOwnedPresentation && reportStylesEnabled
             ? {
                 reportStylePreviewCapabilities:
                   capabilitiesByTemplateId.get(t.id) ??
