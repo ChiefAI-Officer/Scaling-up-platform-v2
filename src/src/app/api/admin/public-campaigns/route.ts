@@ -146,7 +146,10 @@ export async function GET() {
         const reportStylesAvailable = availability.get(campaign.id) === true;
         const campaignPayload = {
           ...withoutInvitedWelcomeSnapshot(campaign),
-        } as Omit<typeof campaign, "_count"> & {
+        } as Omit<
+          typeof campaign,
+          "_count" | "invitedWelcomeSnapshot"
+        > & {
           _count?: { submissions: number };
           version?: unknown;
         };
