@@ -6,7 +6,7 @@
 
 **Architecture:** Narrow the two Public Campaigns client surfaces without changing the report-style API, database fields, shared assessment editor, or list response contract. Creation stops serializing campaign overrides; the list stops rendering and managing the Public Campaigns-only report-design disclosure. Existing records and API compatibility remain intact.
 
-**Tech Stack:** Next.js 15 App Router, React 19, TypeScript, Jest, Testing Library, Tailwind CSS, Vercel feature flags.
+**Tech Stack:** Next.js 16.1.6 App Router, React 19, TypeScript, Jest, Testing Library, Tailwind CSS, Vercel feature flags.
 
 ## Global Constraints
 

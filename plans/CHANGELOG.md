@@ -11,7 +11,7 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 **Status: LOCALLY IMPLEMENTED + RELEASE-READY; not pushed, merged, deployed, Production-enabled, or browser-accepted.** Public Campaigns no longer exposes either the creation-form **Report design** picker or the campaign-list **More / Report design** management control. A new campaign now inherits the selected assessment's default report design without serializing a campaign override.
 
-**Compatibility boundary.** This is a Public Campaigns UI cleanup only: existing campaign report-style values remain stored and unchanged, while the existing API, Prisma schema, shared report-style system, assessment editor, and respondent-report screens remain compatible and unchanged. No migration or Production-data rewrite is required.
+**Compatibility boundary.** This is a Public Campaigns UI cleanup only: existing campaign report-style values remain stored and unchanged, while the existing API, Prisma schema, shared report-style system, assessment editor, and respondent-report screens remain compatible and unchanged. The canonical Wave 6 Markdown and HTML wireframes now match the simplified list and creation states. No migration or Production-data rewrite is required.
 
 **Release boundary.** Protected PR review, Preview/browser acceptance at the required desktop and narrow widths, and any Production enablement remain pending. No environment flag, Vercel setting, deployment, campaign, response, report, email, or other Production state was read or changed for this receipt.
 
