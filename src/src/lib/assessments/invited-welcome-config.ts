@@ -39,7 +39,7 @@ function normalizedText(max: number) {
 }
 
 const headingTemplateSchema = normalizedText(160).superRefine((value, ctx) => {
-  const tokens = value.match(TEMPLATE_TOKEN) ?? [];
+  const tokens: string[] = value.match(TEMPLATE_TOKEN) ?? [];
   if (!tokens.includes("{{campaignName}}")) {
     ctx.addIssue({ code: "custom", message: "Heading must contain {{campaignName}}" });
   }
@@ -96,9 +96,10 @@ export const invitedWelcomeConfigSchema = authoringFieldsSchema.extend({
   finePrint: normalizedText(1_000).nullable(),
 });
 
-const DEFAULT_WELCOME_LEDE = Object.freeze([
+const DEFAULT_WELCOME_LEDE: string[] = [
   "A quick check on how your team works together. You can answer in one sitting or come back later — your link stays active.",
-]);
+];
+Object.freeze(DEFAULT_WELCOME_LEDE);
 
 export const LEGACY_WELCOME_LEDE_BY_ALIAS: Readonly<
   Record<string, readonly string[]>
