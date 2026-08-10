@@ -18,7 +18,13 @@ import {
   generateTemplateInternalId,
   templateInternalIdForAttempt,
 } from "@/lib/assessments/template-internal-id";
-import { GENERIC_INVITED_WELCOME_CONFIG } from "@/lib/assessments/invited-welcome-config";
+import {
+  buildInvitedWelcomeConfig,
+  GENERIC_INVITED_WELCOME_CONFIG,
+  invitedWelcomeAuthoringInputSchema,
+  type InvitedWelcomeConfigV1,
+} from "@/lib/assessments/invited-welcome-config";
+import { isAdminOwnedAssessmentPresentationEnabled } from "@/lib/assessments/wave-admin-owned-assessment-presentation-flags";
 
 interface AdminTemplateSummary {
   id: string;
@@ -113,6 +119,23 @@ const SimplifiedCreateBodySchema = z
   })
   .strict();
 
+const ExactInvitedWelcomeAuthoringInputSchema = z
+  .object({
+    eyebrow: z.unknown(),
+    headingTemplate: z.unknown(),
+    ledeParagraphs: z.unknown(),
+    sharingHeading: z.unknown(),
+    scoresHeading: z.unknown(),
+    scoresDescription: z.unknown(),
+    ctaLabel: z.unknown(),
+  })
+  .strict()
+  .pipe(invitedWelcomeAuthoringInputSchema);
+
+const SimplifiedCreateWithWelcomeBodySchema = SimplifiedCreateBodySchema.extend({
+  invitedWelcomeDefault: ExactInvitedWelcomeAuthoringInputSchema.optional(),
+}).strict();
+
 const MAX_GENERATED_INTERNAL_ID_ATTEMPTS = 25;
 
 const SIMPLIFIED_DEFAULTS = {
@@ -176,6 +199,8 @@ export async function POST(request: NextRequest) {
       body.creationMode === "simplified";
     let data: NormalizedCreateData;
     let manualInternalId = false;
+    let effectiveWelcomeDefault: Readonly<InvitedWelcomeConfigV1> =
+      GENERIC_INVITED_WELCOME_CONFIG;
 
     if (simplified) {
       if (!isTemplateCreationSimplifiedEnabled()) {
@@ -185,11 +210,26 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const parsed = SimplifiedCreateBodySchema.safeParse(body);
+      const welcomeAuthoringEnabled = isAdminOwnedAssessmentPresentationEnabled();
+      const simplifiedSchema = welcomeAuthoringEnabled
+        ? SimplifiedCreateWithWelcomeBodySchema
+        : SimplifiedCreateBodySchema;
+      const parsed = simplifiedSchema.safeParse(body);
       if (!parsed.success) {
         return NextResponse.json(
           { success: false, error: "Invalid body", details: parsed.error.flatten() },
           { status: 400 },
+        );
+      }
+
+      if (
+        welcomeAuthoringEnabled &&
+        "invitedWelcomeDefault" in parsed.data &&
+        parsed.data.invitedWelcomeDefault
+      ) {
+        effectiveWelcomeDefault = buildInvitedWelcomeConfig(
+          parsed.data.invitedWelcomeDefault,
+          null,
         );
       }
 
@@ -238,7 +278,7 @@ export async function POST(request: NextRequest) {
             invitationBodyMarkdown: createData.invitationBodyMarkdown,
             aggregationMode: createData.aggregationMode,
             invitedWelcomeDefault:
-              GENERIC_INVITED_WELCOME_CONFIG as unknown as Prisma.InputJsonValue,
+              effectiveWelcomeDefault as unknown as Prisma.InputJsonValue,
             createdBy: actorUserId,
           },
           select: { id: true, alias: true },

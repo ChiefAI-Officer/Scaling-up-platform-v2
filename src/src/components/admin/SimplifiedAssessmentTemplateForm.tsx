@@ -4,12 +4,34 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useRef, useState } from "react";
 
+import { WelcomeScreenCard, type WelcomeFieldErrors } from "@/components/admin/template-editor/WelcomeScreenCard";
+import {
+  GENERIC_INVITED_WELCOME_CONFIG,
+  invitedWelcomeAuthoringInputSchema,
+  type InvitedWelcomeAuthoringInputV1,
+} from "@/lib/assessments/invited-welcome-config";
 import { generateTemplateInternalId } from "@/lib/assessments/template-internal-id";
 
 const NAME_ERROR_ID = "template-assessment-name-error";
 const INTERNAL_ID_ERROR_ID = "template-internal-id-error";
 
-export function SimplifiedAssessmentTemplateForm() {
+function initialWelcomeValues(): InvitedWelcomeAuthoringInputV1 {
+  return {
+    eyebrow: GENERIC_INVITED_WELCOME_CONFIG.eyebrow,
+    headingTemplate: GENERIC_INVITED_WELCOME_CONFIG.headingTemplate,
+    ledeParagraphs: [...GENERIC_INVITED_WELCOME_CONFIG.ledeParagraphs],
+    sharingHeading: GENERIC_INVITED_WELCOME_CONFIG.sharingHeading,
+    scoresHeading: GENERIC_INVITED_WELCOME_CONFIG.scoresHeading,
+    scoresDescription: GENERIC_INVITED_WELCOME_CONFIG.scoresDescription,
+    ctaLabel: GENERIC_INVITED_WELCOME_CONFIG.ctaLabel,
+  };
+}
+
+export function SimplifiedAssessmentTemplateForm({
+  welcomeAuthoringEnabled = false,
+}: {
+  welcomeAuthoringEnabled?: boolean;
+}) {
   const router = useRouter();
   const internalIdRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState("");
@@ -20,6 +42,13 @@ export function SimplifiedAssessmentTemplateForm() {
   const [nameError, setNameError] = useState("");
   const [internalIdError, setInternalIdError] = useState("");
   const [formError, setFormError] = useState("");
+  const [welcomeValues, setWelcomeValues] = useState(initialWelcomeValues);
+  const [welcomeExpanded, setWelcomeExpanded] = useState(false);
+  const [welcomeErrors, setWelcomeErrors] = useState<WelcomeFieldErrors>({});
+  const [welcomeFocusField, setWelcomeFocusField] = useState<
+    keyof InvitedWelcomeAuthoringInputV1 | null
+  >(null);
+  const [welcomeFocusRequestToken, setWelcomeFocusRequestToken] = useState(0);
 
   const generatedInternalId = generateTemplateInternalId(name);
   const displayedInternalId = internalIdEdited
@@ -63,16 +92,42 @@ export function SimplifiedAssessmentTemplateForm() {
       return;
     }
 
-    const payload = internalIdEdited
-      ? {
-          creationMode: "simplified" as const,
-          name: trimmedName,
-          internalId,
+    let invitedWelcomeDefault: InvitedWelcomeAuthoringInputV1 | undefined;
+    if (welcomeAuthoringEnabled) {
+      const parsedWelcome = invitedWelcomeAuthoringInputSchema.safeParse(
+        welcomeValues,
+      );
+      if (!parsedWelcome.success) {
+        const errors: WelcomeFieldErrors = {};
+        let firstInvalidField: keyof InvitedWelcomeAuthoringInputV1 | null = null;
+        for (const issue of parsedWelcome.error.issues) {
+          const key = issue.path[0] as
+            | keyof InvitedWelcomeAuthoringInputV1
+            | undefined;
+          if (!key) continue;
+          if (errors[key] === undefined) errors[key] = issue.message;
+          if (!firstInvalidField) firstInvalidField = key;
         }
-      : {
-          creationMode: "simplified" as const,
-          name: trimmedName,
-        };
+        setWelcomeErrors(errors);
+        setWelcomeExpanded(true);
+        setWelcomeFocusField(firstInvalidField);
+        setWelcomeFocusRequestToken((token) => token + 1);
+        return;
+      }
+      invitedWelcomeDefault = parsedWelcome.data;
+    }
+
+    const payload: {
+      creationMode: "simplified";
+      name: string;
+      internalId?: string;
+      invitedWelcomeDefault?: InvitedWelcomeAuthoringInputV1;
+    } = {
+      creationMode: "simplified",
+      name: trimmedName,
+      ...(internalIdEdited ? { internalId } : {}),
+      ...(invitedWelcomeDefault ? { invitedWelcomeDefault } : {}),
+    };
 
     setSubmitting(true);
     try {
@@ -147,6 +202,31 @@ export function SimplifiedAssessmentTemplateForm() {
           </p>
         )}
       </div>
+
+      {welcomeAuthoringEnabled ? (
+        <WelcomeScreenCard
+          values={welcomeValues}
+          finePrint={null}
+          questions={[]}
+          sections={[]}
+          isReadOnly={false}
+          errors={welcomeErrors}
+          expanded={welcomeExpanded}
+          onExpandedChange={setWelcomeExpanded}
+          focusField={welcomeFocusField}
+          focusRequestToken={welcomeFocusRequestToken}
+          onChange={(patch) => {
+            setWelcomeValues((values) => ({ ...values, ...patch }));
+            const [field] = Object.keys(patch) as Array<
+              keyof InvitedWelcomeAuthoringInputV1
+            >;
+            if (field) {
+              setWelcomeErrors((errors) => ({ ...errors, [field]: undefined }));
+            }
+            setWelcomeFocusField(null);
+          }}
+        />
+      ) : null}
 
       <div>
         <button

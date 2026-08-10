@@ -28,6 +28,18 @@
     .tab { padding: .7rem .85rem; color: hsl(var(--muted-foreground)); font-size: .82rem; font-weight: 600; }
     .tab.active { border-bottom: 2px solid hsl(var(--primary)); color: hsl(var(--foreground)); }
     .canvas { max-width: 1060px; margin: auto; padding: 1.5rem; }
+    .create-canvas { max-width: 900px; margin: auto; padding: 2rem 1.5rem 2.5rem; }
+    .create-head { margin-bottom: 1.4rem; }
+    .create-head h2 { margin: 0 0 .35rem; font-size: 1.35rem; }
+    .create-head p { margin: 0; color: hsl(var(--muted-foreground)); font-size: .82rem; }
+    .assessment-name { margin-bottom: 1rem; }
+    .assessment-name label, .advanced-panel label { display: grid; gap: .35rem; font-size: .78rem; font-weight: 700; }
+    .advanced-row { margin: .25rem 0 1.25rem; }
+    .advanced-trigger { padding: .2rem 0; border: 0; background: transparent; color: hsl(var(--primary)); font-size: .8rem; font-weight: 700; }
+    .advanced-panel { margin-top: .8rem; }
+    .page-actions { display: flex; align-items: center; gap: .8rem; }
+    .page-actions .cancel { padding: .65rem .2rem; color: hsl(var(--foreground)); font-size: .8rem; font-weight: 700; }
+    .create-canvas .stats { grid-template-columns: repeat(2, 1fr); }
     .form-card { margin-bottom: 1rem; border: 1px solid hsl(var(--border)); border-radius: 12px; background: white; box-shadow: var(--shadow-xs); }
     .form-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.1rem; }
     .form-head h3 { margin: 0 0 .2rem; font-size: .95rem; }
@@ -69,9 +81,65 @@
 </head>
 <body>
   <header class="page-head">
-    <h1>Welcome screen inside the Build interface</h1>
-    <p>Four locked review states. The existing Save Draft action saves this card with the assessment.</p>
+    <h1>Welcome screen across Create assessment and Build</h1>
+    <p>Six locked review states. Create and Build share one fixed Welcome card; only their page-level actions persist it.</p>
   </header>
+
+  <section class="frame">
+    <div class="frame-label">Create assessment · Welcome collapsed by default</div>
+    <div class="shell">
+      <aside class="side"><div class="brand">Scaling Up Admin</div><nav class="nav"><span>Dashboard</span><span class="active">Assessments</span><span>Campaigns</span><span>Members</span></nav></aside>
+      <main class="workspace">
+        <div class="create-canvas">
+          <header class="create-head"><h2>Create assessment</h2><p>Give it a name. You'll add questions and settings in the editor next.</p></header>
+          <div class="assessment-name"><label>Assessment name<input value="Quarterly Session Prep v3"></label></div>
+          <article class="form-card welcome-card"><div class="form-head"><div><h3>Welcome screen <span class="welcome-kicker">Fixed</span></h3><p>First screen respondents see</p><p class="position">Before Section 1 · A quick check on how your team works together…</p></div><button class="chevron" aria-label="Expand Welcome screen">⌄</button></div></article>
+          <div class="advanced-row"><button class="advanced-trigger" aria-expanded="false">Advanced</button></div>
+          <div class="page-actions"><span class="cancel">Cancel</span><button class="wf-btn wf-btn-primary">Create and start building</button></div>
+        </div>
+      </main>
+    </div>
+  </section>
+
+  <section class="frame">
+    <div class="frame-label">Create assessment · Welcome expanded · Advanced follows</div>
+    <div class="shell">
+      <aside class="side"><div class="brand">Scaling Up Admin</div><nav class="nav"><span>Dashboard</span><span class="active">Assessments</span><span>Campaigns</span><span>Members</span></nav></aside>
+      <main class="workspace">
+        <div class="create-canvas">
+          <header class="create-head"><h2>Create assessment</h2><p>Give it a name. You'll add questions and settings in the editor next.</p></header>
+          <div class="assessment-name"><label>Assessment name<input value="Quarterly Session Prep v3"></label></div>
+          <article class="form-card welcome-card">
+            <div class="form-head"><div><h3>Welcome screen <span class="welcome-kicker">Fixed</span></h3><p>First screen respondents see</p><p class="position">Before Section 1</p></div><button class="chevron" aria-label="Collapse Welcome screen">⌃</button></div>
+            <div class="expanded">
+              <p class="helper">Changes become the default for future invited campaigns. Campaigns already created keep the Welcome screen they started with.</p>
+              <div class="editor-grid">
+                <div class="fields">
+                  <label>Invitation label<input value="You're invited"></label>
+                  <label>Heading<input value="{{campaignName}}"><span class="hint">Keep {{campaignName}} so the campaign name appears automatically.</span></label>
+                  <label>Welcome message<textarea>A quick check on how your team works together. You can answer in one sitting or come back later — your link stays active.</textarea><span class="hint">Separate paragraphs with a blank line.</span></label>
+                  <label>Sharing heading<input value="How your answers are shared"></label>
+                  <label>Scores heading<input value="Your category scores"></label>
+                  <label>Scores explanation<input value="See where the team stands across each category."></label>
+                  <label>Button label<input value="Start the assessment"></label>
+                </div>
+                <div class="preview-wrap"><p>Respondent preview</p><div class="preview">
+                  <span class="eyebrow">You're invited</span><h2>Example campaign</h2><p class="lede">A quick check on how your team works together. You can answer in one sitting or come back later — your link stays active.</p>
+                  <div class="fact"><span class="icon">◷</span><div><strong>A few minutes</strong><small>0 questions.</small></div></div>
+                  <div class="fact"><span class="icon">♟</span><div><strong>How your answers are shared</strong><small>Your coach or facilitator and authorized Scaling Up staff can review your named individual answers.</small></div></div>
+                  <div class="fact"><span class="icon">▥</span><div><strong>Your category scores</strong><small>See where the team stands across each category.</small></div></div>
+                  <div class="stats"><div class="stat">0<small>QUESTIONS</small></div><div class="stat">0<small>SECTIONS</small></div></div>
+                  <button class="start" disabled>Start the assessment →</button>
+                </div></div>
+              </div>
+            </div>
+          </article>
+          <div class="advanced-row"><button class="advanced-trigger" aria-expanded="true">Advanced</button><div class="advanced-panel"><label>Internal ID<input value="quarterly-session-prep-v3"></label></div></div>
+          <div class="page-actions"><span class="cancel">Cancel</span><button class="wf-btn wf-btn-primary">Create and start building</button></div>
+        </div>
+      </main>
+    </div>
+  </section>
 
   <section class="frame">
     <div class="frame-label">Desktop · default collapsed state</div>

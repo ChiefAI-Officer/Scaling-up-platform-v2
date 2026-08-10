@@ -26,6 +26,10 @@ export function WelcomeScreenCard({
   sections,
   isReadOnly,
   errors = {},
+  expanded: controlledExpanded,
+  onExpandedChange,
+  focusField,
+  focusRequestToken,
   onChange,
 }: {
   values: InvitedWelcomeAuthoringInputV1;
@@ -34,9 +38,14 @@ export function WelcomeScreenCard({
   sections: readonly unknown[];
   isReadOnly: boolean;
   errors?: WelcomeFieldErrors;
+  expanded?: boolean;
+  onExpandedChange?: (expanded: boolean) => void;
+  focusField?: keyof InvitedWelcomeAuthoringInputV1 | null;
+  focusRequestToken?: number;
   onChange: (patch: Partial<InvitedWelcomeAuthoringInputV1>) => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [localExpanded, setLocalExpanded] = useState(false);
+  const expanded = controlledExpanded ?? localExpanded;
   const [messageDraft, setMessageDraft] = useState(() =>
     values.ledeParagraphs.join("\n\n"),
   );
@@ -50,6 +59,19 @@ export function WelcomeScreenCard({
   const summary = values.ledeParagraphs[0] || "Set the first message respondents see.";
   const shortenedSummary = summary.length > 88 ? `${summary.slice(0, 85).trimEnd()}…` : summary;
   const config = { schemaVersion: 1 as const, ...values, finePrint };
+
+  function setExpanded(next: boolean) {
+    if (controlledExpanded === undefined) setLocalExpanded(next);
+    onExpandedChange?.(next);
+  }
+
+  React.useEffect(() => {
+    if (!expanded || !focusField) return;
+    const id = focusField === "ledeParagraphs"
+      ? "welcome-ledeParagraphs"
+      : `welcome-${focusField}`;
+    requestAnimationFrame(() => document.getElementById(id)?.focus());
+  }, [expanded, focusField, focusRequestToken]);
 
   const field = (
     key: Exclude<keyof InvitedWelcomeAuthoringInputV1, "ledeParagraphs">,
@@ -106,7 +128,7 @@ export function WelcomeScreenCard({
         aria-expanded={expanded}
         aria-controls={panelId}
         aria-label={`${expanded ? "Collapse" : "Expand"} Welcome screen`}
-        onClick={() => setExpanded((current) => !current)}
+        onClick={() => setExpanded(!expanded)}
         className="flex w-full items-start justify-between gap-4 p-5 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       >
         <span className="min-w-0">

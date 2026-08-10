@@ -1,5 +1,19 @@
 # 26 — Admin assessment Welcome screen authoring
 
+## Create assessment parity
+
+The simplified **Create assessment** page uses the same fixed
+`WelcomeScreenCard` component and visual contract as Build. It appears after
+**Assessment name** and before **Advanced** / **Internal ID**. **Cancel** and
+**Create and start building** are the only page actions; there is no card-level
+save action.
+
+The collapsed state preserves the name-first journey. Expanding the card shows
+the same seven fields and respondent preview as Build. On Create, that preview
+uses `Example campaign` with zero questions and zero sections because the v1
+draft does not exist until the page action succeeds. The 1024 px state retains
+the shared fields-before-preview stack.
+
 ## Chosen state
 
 The Welcome screen is a fixed, nearly full-width card in the existing **Build**
@@ -57,6 +71,12 @@ report rendering, links, stored styles, and first-response locks remain intact.
 
 ## Acceptance notes
 
+- Create and Build import the same `WelcomeScreenCard` and share one visual,
+  field, validation, accessibility, and responsive contract.
+- Create order is Assessment name → Welcome screen → Advanced / Internal ID →
+  Cancel and Create and start building.
+- Create starts collapsed; its expanded state shows all seven fields,
+  `Example campaign`, zero questions, and zero sections.
 - The default state is collapsed.
 - The card occupies the normal Build canvas width but does not hide the header or
   Section 1 context.

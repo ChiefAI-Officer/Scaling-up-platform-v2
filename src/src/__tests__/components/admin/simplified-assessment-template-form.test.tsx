@@ -52,6 +52,161 @@ describe("SimplifiedAssessmentTemplateForm", () => {
     ).toBeInTheDocument();
   });
 
+  it("keeps the welcome card and welcome payload absent by default", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue(
+      jsonResponse(201, {
+        success: true,
+        data: { id: "tpl-1", alias: "team-health", versionId: "ver-1" },
+      }),
+    );
+    render(<SimplifiedAssessmentTemplateForm />);
+
+    expect(screen.queryByTestId("welcome-screen-card")).not.toBeInTheDocument();
+    enterName();
+    fireEvent.click(screen.getByRole("button", { name: "Create and start building" }));
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
+    expect(
+      JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body as string),
+    ).toEqual({ creationMode: "simplified", name: "Team Health" });
+  });
+
+  it("renders the collapsed welcome card between the name and Advanced controls", () => {
+    render(<SimplifiedAssessmentTemplateForm welcomeAuthoringEnabled />);
+
+    const name = screen.getByLabelText("Assessment name");
+    const card = screen.getByTestId("welcome-screen-card");
+    const advanced = screen.getByRole("button", { name: "Advanced" });
+    expect(name.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(card.compareDocumentPosition(advanced) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Expand Welcome screen" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand Welcome screen" }));
+
+    for (const label of [
+      "Invitation label",
+      "Heading",
+      "Welcome message",
+      "Sharing heading",
+      "Scores heading",
+      "Scores explanation",
+      "Button label",
+    ]) {
+      expect(screen.getByLabelText(label)).toBeInTheDocument();
+    }
+    expect(screen.getByRole("heading", { name: "Example campaign" })).toBeInTheDocument();
+    expect(screen.getByTestId("welcome-stats")).toHaveTextContent(
+      "0questions0sections",
+    );
+    expect(screen.queryByRole("button", { name: /save/i })).not.toBeInTheDocument();
+  });
+
+  it("posts the authored welcome default when welcome authoring is enabled", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue(
+      jsonResponse(201, {
+        success: true,
+        data: { id: "tpl-1", alias: "team-health", versionId: "ver-1" },
+      }),
+    );
+    render(<SimplifiedAssessmentTemplateForm welcomeAuthoringEnabled />);
+
+    enterName();
+    fireEvent.click(screen.getByRole("button", { name: "Expand Welcome screen" }));
+    fireEvent.change(screen.getByLabelText("Invitation label"), {
+      target: { value: "Please begin" },
+    });
+    fireEvent.change(screen.getByLabelText("Welcome message"), {
+      target: { value: "First paragraph.\n\nSecond paragraph." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create and start building" }));
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
+    expect(
+      JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body as string),
+    ).toEqual({
+      creationMode: "simplified",
+      name: "Team Health",
+      invitedWelcomeDefault: {
+        eyebrow: "Please begin",
+        headingTemplate: "{{campaignName}}",
+        ledeParagraphs: ["First paragraph.", "Second paragraph."],
+        sharingHeading: "How your answers are shared",
+        scoresHeading: "Your category scores",
+        scoresDescription: "See where the team stands across each category.",
+        ctaLabel: "Start the assessment",
+      },
+    });
+  });
+
+  it.each([
+    [
+      "a heading without the required token",
+      "Heading",
+      "A heading without the required token",
+      "Heading must contain {{campaignName}}",
+    ],
+    [
+      "an unsupported heading token",
+      "Heading",
+      "Welcome {{organizationName}} {{campaignName}}",
+      "Only {{campaignName}} is supported",
+    ],
+    ["an empty invitation label", "Invitation label", "", "Too small: expected string to have >=1 characters"],
+    [
+      "five welcome paragraphs",
+      "Welcome message",
+      "One.\n\nTwo.\n\nThree.\n\nFour.\n\nFive.",
+      "Too big: expected array to have <=4 items",
+    ],
+    ["a CTA longer than 80 characters", "Button label", "x".repeat(81), "Too big: expected string to have <=80 characters"],
+    ["a control character", "Invitation label", "Welcome\u0000team", "Control characters are not allowed"],
+  ])(
+    "blocks submission, expands, and focuses the first invalid field for %s",
+    async (_scenario, label, value, error) => {
+      render(<SimplifiedAssessmentTemplateForm welcomeAuthoringEnabled />);
+
+      enterName();
+      fireEvent.click(screen.getByRole("button", { name: "Expand Welcome screen" }));
+      fireEvent.change(screen.getByLabelText(label), { target: { value } });
+      fireEvent.click(screen.getByRole("button", { name: "Create and start building" }));
+
+      expect(global.fetch).not.toHaveBeenCalled();
+      expect(screen.getByRole("button", { name: "Collapse Welcome screen" })).toHaveAttribute(
+        "aria-expanded",
+        "true",
+      );
+      expect(screen.getByText(error)).toBeInTheDocument();
+      await waitFor(() => expect(screen.getByLabelText(label)).toHaveFocus());
+    },
+  );
+
+  it("refocuses the first invalid Welcome field on an unchanged repeated submit", async () => {
+    render(<SimplifiedAssessmentTemplateForm welcomeAuthoringEnabled />);
+
+    enterName();
+    fireEvent.click(screen.getByRole("button", { name: "Expand Welcome screen" }));
+    const heading = screen.getByLabelText("Heading");
+    fireEvent.change(heading, {
+      target: { value: "A heading without the required token" },
+    });
+    const submit = screen.getByRole("button", {
+      name: "Create and start building",
+    });
+
+    fireEvent.click(submit);
+    await waitFor(() => expect(heading).toHaveFocus());
+
+    submit.focus();
+    expect(submit).toHaveFocus();
+    fireEvent.click(submit);
+
+    expect(global.fetch).not.toHaveBeenCalled();
+    await waitFor(() => expect(heading).toHaveFocus());
+  });
+
   it("derives the Internal ID from the name until an administrator edits it", () => {
     render(<SimplifiedAssessmentTemplateForm />);
 

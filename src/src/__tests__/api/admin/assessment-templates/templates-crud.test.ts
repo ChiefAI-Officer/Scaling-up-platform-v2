@@ -105,6 +105,8 @@ describe("POST /api/admin/assessment-templates (create)", () => {
     "WAVE_ED9_FORMS_BUILD_KILL",
     "WAVE_T_QUESTION_EDITOR_ENABLED",
     "WAVE_T_QUESTION_EDITOR_KILL",
+    "WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_ENABLED",
+    "WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_KILL",
   ] as const;
   const savedSimplifiedCreationEnvironment = new Map(
     simplifiedCreationEnvironment.map((key) => [key, process.env[key]]),
@@ -120,11 +122,26 @@ describe("POST /api/admin/assessment-templates (create)", () => {
     scoringConfig: { tiers: [] },
   };
 
+  const authoredWelcome = {
+    eyebrow: "Please begin",
+    headingTemplate: "Complete {{campaignName}}",
+    ledeParagraphs: ["Paragraph one.", "Paragraph two."],
+    sharingHeading: "Who reviews this",
+    scoresHeading: "Your scores",
+    scoresDescription: "Review your categories.",
+    ctaLabel: "Begin",
+  };
+
   function enableSimplifiedCreation(): void {
     process.env.WAVE_TEMPLATE_CREATION_SIMPLIFIED_ENABLED = "1";
     process.env.WAVE_ED6_SINGLE_COLUMN_ENABLED = "1";
     process.env.WAVE_ED9_FORMS_BUILD_ENABLED = "1";
     process.env.WAVE_T_QUESTION_EDITOR_ENABLED = "1";
+  }
+
+  function enableWelcomeAuthoring(): void {
+    process.env.WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_ENABLED = "1";
+    delete process.env.WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_KILL;
   }
 
   beforeEach(() => {
@@ -188,6 +205,7 @@ describe("POST /api/admin/assessment-templates (create)", () => {
 
   it("keeps the exact legacy request and response while every flag is on", async () => {
     enableSimplifiedCreation();
+    enableWelcomeAuthoring();
     (getApiActor as jest.Mock).mockResolvedValue(adminActor);
     (txMock.assessmentTemplate.create as jest.Mock).mockResolvedValue({
       id: "tpl-1",
@@ -209,6 +227,7 @@ describe("POST /api/admin/assessment-templates (create)", () => {
 
   it("server-owns the exact empty v1 defaults in simplified mode", async () => {
     enableSimplifiedCreation();
+    enableWelcomeAuthoring();
     (getApiActor as jest.Mock).mockResolvedValue(adminActor);
     (txMock.assessmentTemplate.create as jest.Mock).mockImplementation(
       ({ data }: { data: { alias: string } }) => ({
@@ -268,6 +287,171 @@ describe("POST /api/admin/assessment-templates (create)", () => {
         data: expect.not.objectContaining({ invitedWelcomeDefault: expect.anything() }),
       }),
     );
+  });
+
+  it("persists an enabled authored Welcome default with the existing create transaction", async () => {
+    enableSimplifiedCreation();
+    enableWelcomeAuthoring();
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    (txMock.assessmentTemplate.create as jest.Mock).mockImplementation(
+      ({ data }: { data: { alias: string } }) => ({ id: "tpl-1", alias: data.alias }),
+    );
+
+    const response = await listPOST(
+      jsonReq("http://localhost/api/admin/assessment-templates", {
+        creationMode: "simplified",
+        name: "Test Template",
+        invitedWelcomeDefault: authoredWelcome,
+      }) as never,
+    );
+
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toEqual({
+      success: true,
+      data: { id: "tpl-1", alias: "test-template", versionId: "ver-1" },
+    });
+    expect(db.$transaction).toHaveBeenCalledTimes(1);
+    expect(txMock.assessmentTemplate.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          invitedWelcomeDefault: {
+            schemaVersion: 1,
+            ...authoredWelcome,
+            finePrint: null,
+          },
+        }),
+      }),
+    );
+    expect(txMock.assessmentTemplateVersion.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.not.objectContaining({ invitedWelcomeDefault: expect.anything() }),
+      }),
+    );
+    expect(db.auditLog.create).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    { ...authoredWelcome, schemaVersion: 1 },
+    { ...authoredWelcome, finePrint: "Mine" },
+    { ...authoredWelcome, headingTemplate: "{{respondentName}}" },
+    { ...authoredWelcome, ledeParagraphs: ["1", "2", "3", "4", "5"] },
+    { ...authoredWelcome, ctaLabel: "x".repeat(81) },
+    { ...authoredWelcome, eyebrow: "Bad\u0007copy" },
+  ])("rejects invalid enabled Welcome authoring before a transaction", async (invitedWelcomeDefault) => {
+    enableSimplifiedCreation();
+    enableWelcomeAuthoring();
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+
+    const response = await listPOST(
+      jsonReq("http://localhost/api/admin/assessment-templates", {
+        creationMode: "simplified",
+        name: "Test Template",
+        invitedWelcomeDefault,
+      }) as never,
+    );
+
+    expect(response.status).toBe(400);
+    expect(db.$transaction).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["layout", { density: "compact" }],
+    ["styles", { accentColor: "#000000" }],
+    ["disclosure", "Client-supplied disclosure"],
+    ["facts", [{ label: "Questions", value: "12" }]],
+  ])(
+    "rejects the unknown enabled Welcome key %s before a transaction",
+    async (unknownKey, unknownValue) => {
+      enableSimplifiedCreation();
+      enableWelcomeAuthoring();
+      (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+
+      const response = await listPOST(
+        jsonReq("http://localhost/api/admin/assessment-templates", {
+          creationMode: "simplified",
+          name: "Test Template",
+          invitedWelcomeDefault: {
+            ...authoredWelcome,
+            [unknownKey]: unknownValue,
+          },
+        }) as never,
+      );
+
+      expect(response.status).toBe(400);
+      expect(db.$transaction).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    ["off", () => undefined],
+    ["killed", () => {
+      enableWelcomeAuthoring();
+      process.env.WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_KILL = "1";
+    }],
+  ] as const)("rejects authored Welcome input before a transaction while presentation is %s", async (_posture, configure) => {
+    enableSimplifiedCreation();
+    configure();
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+
+    const response = await listPOST(
+      jsonReq("http://localhost/api/admin/assessment-templates", {
+        creationMode: "simplified",
+        name: "Test Template",
+        invitedWelcomeDefault: authoredWelcome,
+      }) as never,
+    );
+
+    expect(response.status).toBe(400);
+    expect(db.$transaction).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["off", () => undefined],
+    ["killed", () => {
+      enableWelcomeAuthoring();
+      process.env.WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_KILL = "1";
+    }],
+  ] as const)("keeps the generic Welcome fallback while presentation is %s", async (_posture, configure) => {
+    enableSimplifiedCreation();
+    configure();
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+
+    const response = await listPOST(
+      jsonReq("http://localhost/api/admin/assessment-templates", {
+        creationMode: "simplified",
+        name: "Test Template",
+      }) as never,
+    );
+
+    expect(response.status).toBe(201);
+    expect(txMock.assessmentTemplate.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          invitedWelcomeDefault: GENERIC_INVITED_WELCOME_CONFIG,
+        }),
+      }),
+    );
+  });
+
+  it("does not audit when the create transaction rolls back after Welcome validation", async () => {
+    enableSimplifiedCreation();
+    enableWelcomeAuthoring();
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    (txMock.assessmentTemplateVersion.create as jest.Mock).mockRejectedValueOnce(
+      new Error("version write failed"),
+    );
+
+    const response = await listPOST(
+      jsonReq("http://localhost/api/admin/assessment-templates", {
+        creationMode: "simplified",
+        name: "Test Template",
+        invitedWelcomeDefault: authoredWelcome,
+      }) as never,
+    );
+
+    expect(response.status).toBe(500);
+    expect(db.$transaction).toHaveBeenCalledTimes(1);
+    expect(db.auditLog.create).not.toHaveBeenCalled();
   });
 
   it("retries generated IDs through the third available alias exactly once per transaction", async () => {

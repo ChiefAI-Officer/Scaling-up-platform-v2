@@ -9,6 +9,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth/auth";
 import { AssessmentTemplateForm } from "@/components/admin/AssessmentTemplateForm";
 import { SimplifiedAssessmentTemplateForm } from "@/components/admin/SimplifiedAssessmentTemplateForm";
+import { isAdminOwnedAssessmentPresentationEnabled } from "@/lib/assessments/wave-admin-owned-assessment-presentation-flags";
 import { isTemplateCreationSimplifiedEnabled } from "@/lib/assessments/wave-template-creation-flags";
 
 export default async function NewAssessmentTemplatePage() {
@@ -22,6 +23,8 @@ export default async function NewAssessmentTemplatePage() {
   }
 
   const simplified = isTemplateCreationSimplifiedEnabled();
+  const welcomeAuthoringEnabled =
+    simplified && isAdminOwnedAssessmentPresentationEnabled();
 
   return (
     <div className="space-y-6">
@@ -43,7 +46,9 @@ export default async function NewAssessmentTemplatePage() {
         )}
       </header>
       {simplified ? (
-        <SimplifiedAssessmentTemplateForm />
+        <SimplifiedAssessmentTemplateForm
+          welcomeAuthoringEnabled={welcomeAuthoringEnabled}
+        />
       ) : (
         <AssessmentTemplateForm mode="create" />
       )}

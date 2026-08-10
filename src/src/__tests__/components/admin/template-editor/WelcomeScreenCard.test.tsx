@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { WelcomeScreenCard } from "@/components/admin/template-editor/WelcomeScreenCard";
 import {
   GENERIC_INVITED_WELCOME_CONFIG,
@@ -50,6 +50,32 @@ describe("WelcomeScreenCard", () => {
     const toggle = screen.getByRole("button", { name: "Expand Welcome screen" });
     expect(toggle).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByLabelText("Invitation label")).not.toBeInTheDocument();
+  });
+
+  it("requests controlled expansion and focuses the validation field after the parent opens it", async () => {
+    const onExpandedChange = jest.fn();
+    const view = renderCard({ expanded: false, onExpandedChange });
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand Welcome screen" }));
+    expect(onExpandedChange).toHaveBeenCalledWith(true);
+    expect(screen.queryByLabelText("Invitation label")).not.toBeInTheDocument();
+
+    view.rerender(
+      <WelcomeScreenCard
+        values={values}
+        finePrint={null}
+        questions={questions}
+        sections={[]}
+        isReadOnly={false}
+        errors={{ headingTemplate: "Heading must contain {{campaignName}}" }}
+        expanded
+        onExpandedChange={onExpandedChange}
+        focusField="headingTemplate"
+        onChange={jest.fn()}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByLabelText("Heading")).toHaveFocus());
   });
 
   it("expands all seven authored fields and the live Example campaign preview", () => {
