@@ -111,6 +111,13 @@ function makeRestrictedTx(): {
       },
     ),
 
+    assessmentTemplate: withDestructiveGuards("assessmentTemplate", {
+      findUnique: jest.fn().mockResolvedValue({
+        alias: "qsp-v2",
+        invitedWelcomeDefault: null,
+      }),
+    }),
+
     organization: withDestructiveGuards("organization", {
       findFirst: jest.fn().mockResolvedValue(null),
       findMany: jest.fn().mockResolvedValue([]),

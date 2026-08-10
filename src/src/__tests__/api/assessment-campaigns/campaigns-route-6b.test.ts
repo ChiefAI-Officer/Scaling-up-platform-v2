@@ -25,6 +25,7 @@ jest.mock("@/lib/db", () => ({
       create: jest.fn(),
     },
     auditLog: { create: jest.fn().mockResolvedValue(undefined) },
+    $transaction: jest.fn(),
   },
 }));
 
@@ -92,6 +93,9 @@ beforeEach(() => {
     id: "tpl-1",
     alias: "rockefeller",
   });
+  (db.$transaction as jest.Mock).mockImplementation(
+    async (callback: (tx: typeof db) => Promise<unknown>) => callback(db),
+  );
   (db.assessmentTemplateVersion.findFirst as jest.Mock).mockResolvedValue({
     id: "ver-1",
     language: "enUS",

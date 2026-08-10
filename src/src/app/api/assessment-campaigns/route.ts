@@ -63,6 +63,14 @@ import { isAdminOwnedAssessmentPresentationEnabled } from "@/lib/assessments/wav
 import { loadInvitedWelcomeSnapshot } from "@/lib/assessments/invited-welcome-snapshot";
 import type { InvitedWelcomeConfigV1 } from "@/lib/assessments/invited-welcome-config";
 
+function withoutInvitedWelcomeSnapshot<
+  T extends { invitedWelcomeSnapshot?: unknown },
+>(campaign: T): Omit<T, "invitedWelcomeSnapshot"> {
+  const response = { ...campaign };
+  delete response.invitedWelcomeSnapshot;
+  return response;
+}
+
 // C4 (Wave ED8) — the local `CAMPAIGN_LANGUAGE_DEFAULT = "enUS"` constant was
 // replaced by the shared DEFAULT_TEMPLATE_LANGUAGE (value-identical) so
 // campaign-create and version-sections can never drift again.
@@ -129,7 +137,10 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: "desc" },
     });
 
-    return NextResponse.json({ success: true, data: campaigns });
+    return NextResponse.json({
+      success: true,
+      data: campaigns.map(withoutInvitedWelcomeSnapshot),
+    });
   } catch (error) {
     console.error("Error listing campaigns:", error);
     return NextResponse.json(
@@ -824,7 +835,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: true,
-        data: campaign,
+        data: withoutInvitedWelcomeSnapshot(campaign),
         bulkRespondents: bulkResult,
       },
       { status: 201 }

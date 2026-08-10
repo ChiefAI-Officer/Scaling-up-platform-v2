@@ -119,12 +119,15 @@ describe("GET /api/assessment-campaigns/[id]", () => {
       templateId: "tpl-1",
       createdByCoachId: "coach-1",
       status: "DRAFT",
+      invitedWelcomeSnapshot: { schemaVersion: 1 },
     });
     const res = await GET(
       new Request("http://localhost/api/assessment-campaigns/c1") as never,
       detailParams("c1"),
     );
     expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data).not.toHaveProperty("invitedWelcomeSnapshot");
   });
 });
 

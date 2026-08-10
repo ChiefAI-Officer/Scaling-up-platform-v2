@@ -173,6 +173,13 @@ class E2EFakeDb implements RestrictedCommitDb {
   submissionCreates: { data: Record<string, unknown> }[] = [];
   auditCreates: { data: Record<string, unknown> }[] = [];
 
+  assessmentTemplate = {
+    findUnique: async () => ({
+      alias: "scaling-up-full",
+      invitedWelcomeDefault: null,
+    }),
+  };
+
   seedOrg(id: string, espertoSuFullCid: string | null): void {
     this.orgs.set(id, { id, espertoSuFullCid });
   }

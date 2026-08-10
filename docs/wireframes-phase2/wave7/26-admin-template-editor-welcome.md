@@ -25,12 +25,12 @@ failure toast, and retry behavior.
 
 ADMIN and STAFF author:
 
-- eyebrow;
+- invitation label;
 - heading template, retaining `{{campaignName}}`;
 - one to four Welcome-message paragraphs;
 - sharing heading;
 - scores heading;
-- scores description; and
+- scores explanation; and
 - button label.
 
 The platform derives time, question count, section count, scale, rating description,

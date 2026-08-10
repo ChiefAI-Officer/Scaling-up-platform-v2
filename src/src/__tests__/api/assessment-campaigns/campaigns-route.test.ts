@@ -82,6 +82,8 @@ beforeEach(() => {
   delete process.env.WAVE_REPORT_STYLES_ENABLED;
   delete process.env.WAVE_REPORT_STYLES_KILL;
   delete process.env.WAVE_REPORT_STYLES_CANARY;
+  delete process.env.WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_ENABLED;
+  delete process.env.WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_KILL;
   // Default access-group state: coach in 1 group that grants the template.
   (db.accessGroupCoach.findMany as jest.Mock).mockResolvedValue([
     {
@@ -119,6 +121,22 @@ beforeEach(() => {
   mockWaveDCampaignCreate.mockResolvedValue({
     id: "c-wave-d",
     alias: "acme_scaling_up_full_260601100000",
+  });
+});
+
+describe("campaign response persistence-field boundary", () => {
+  it("omits invitedWelcomeSnapshot from list responses while the rollout is off", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    (db.assessmentCampaign.findMany as jest.Mock).mockResolvedValue([
+      { id: "c1", invitedWelcomeSnapshot: { schemaVersion: 1 } },
+    ]);
+
+    const response = await GET(
+      new Request("http://localhost/api/assessment-campaigns") as never,
+    );
+    const body = await response.json();
+
+    expect(body.data).toEqual([{ id: "c1" }]);
   });
 });
 

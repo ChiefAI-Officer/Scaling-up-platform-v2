@@ -49,7 +49,7 @@ describe("WelcomeScreenCard", () => {
     expect(screen.getByText(/A quick check on how your team works together/)).toBeInTheDocument();
     const toggle = screen.getByRole("button", { name: "Expand Welcome screen" });
     expect(toggle).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByLabelText("Eyebrow")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Invitation label")).not.toBeInTheDocument();
   });
 
   it("expands all seven authored fields and the live Example campaign preview", () => {
@@ -60,12 +60,12 @@ describe("WelcomeScreenCard", () => {
       "Changes become the default for future invited campaigns. Campaigns already created keep the Welcome screen they started with.",
     )).toBeInTheDocument();
     for (const label of [
-      "Eyebrow",
+      "Invitation label",
       "Heading",
       "Welcome message",
       "Sharing heading",
       "Scores heading",
-      "Scores description",
+      "Scores explanation",
       "Button label",
     ]) {
       expect(screen.getByLabelText(label)).toBeInTheDocument();
@@ -96,6 +96,34 @@ describe("WelcomeScreenCard", () => {
     );
   });
 
+  it("preserves a blank-line paragraph separator during sequential typing", () => {
+    const StatefulCard = () => {
+      const [current, setCurrent] = React.useState(values);
+      return (
+        <WelcomeScreenCard
+          values={current}
+          finePrint={null}
+          questions={questions}
+          sections={[]}
+          isReadOnly={false}
+          onChange={(patch) => setCurrent((previous) => ({ ...previous, ...patch }))}
+        />
+      );
+    };
+    render(<StatefulCard />);
+    fireEvent.click(screen.getByRole("button", { name: "Expand Welcome screen" }));
+    const message = screen.getByLabelText("Welcome message") as HTMLTextAreaElement;
+
+    fireEvent.change(message, { target: { value: "First paragraph.\n" } });
+    expect(message).toHaveValue("First paragraph.\n");
+    fireEvent.change(message, { target: { value: "First paragraph.\n\n" } });
+    expect(message).toHaveValue("First paragraph.\n\n");
+    fireEvent.change(message, {
+      target: { value: "First paragraph.\n\nSecond paragraph." },
+    });
+    expect(message).toHaveValue("First paragraph.\n\nSecond paragraph.");
+  });
+
   it("stacks authored fields before preview in source order and disables editing when published", () => {
     renderCard({ isReadOnly: true });
     fireEvent.click(screen.getByRole("button", { name: "Expand Welcome screen" }));
@@ -104,6 +132,6 @@ describe("WelcomeScreenCard", () => {
     const fields = within(region).getByTestId("welcome-screen-fields");
     const preview = within(region).getByTestId("welcome-screen-preview");
     expect(fields.compareDocumentPosition(preview) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.getByLabelText("Eyebrow")).toBeDisabled();
+    expect(screen.getByLabelText("Invitation label")).toBeDisabled();
   });
 });

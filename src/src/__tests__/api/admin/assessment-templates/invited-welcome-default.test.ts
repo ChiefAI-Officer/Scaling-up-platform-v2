@@ -28,7 +28,7 @@ jest.mock("@/lib/rate-limit", () => ({
   withRateLimit: jest.fn().mockResolvedValue({ allowed: true, headers: {} }),
 }));
 
-import { PATCH } from "@/app/api/admin/assessment-templates/[id]/route";
+import { GET, PATCH } from "@/app/api/admin/assessment-templates/[id]/route";
 import { db } from "@/lib/db";
 import { getApiActor } from "@/lib/auth/authorization";
 import {
@@ -217,5 +217,39 @@ describe("PATCH invited Welcome template default", () => {
     );
     expect(invalid.status).toBe(400);
     expect(db.assessmentTemplate.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET invited Welcome template default", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    delete process.env.WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_ENABLED;
+    delete process.env.WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_KILL;
+    (getApiActor as jest.Mock).mockResolvedValue({
+      userId: "admin-1",
+      email: "admin@example.com",
+      role: "ADMIN",
+      coachId: null,
+    });
+    (db.assessmentTemplate.findFirst as jest.Mock).mockResolvedValue(existing());
+  });
+
+  it("omits the persistence field while off and selects it only while active", async () => {
+    const off = await GET(new Request("http://localhost") as never, params);
+    expect((await off.json()).data).not.toHaveProperty("invitedWelcomeDefault");
+    expect(db.assessmentTemplate.findFirst).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        select: expect.not.objectContaining({ invitedWelcomeDefault: true }),
+      }),
+    );
+
+    process.env.WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_ENABLED = "1";
+    const active = await GET(new Request("http://localhost") as never, params);
+    expect((await active.json()).data).toHaveProperty("invitedWelcomeDefault");
+    expect(db.assessmentTemplate.findFirst).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({ invitedWelcomeDefault: true }),
+      }),
+    );
   });
 });

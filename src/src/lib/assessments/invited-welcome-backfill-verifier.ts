@@ -1,4 +1,8 @@
-import { invitedWelcomeConfigSchema } from "@/lib/assessments/invited-welcome-config";
+import { isDeepStrictEqual } from "node:util";
+import {
+  invitedWelcomeConfigSchema,
+  resolveLegacyInvitedWelcomeConfig,
+} from "@/lib/assessments/invited-welcome-config";
 
 interface TemplateRow {
   id: string;
@@ -25,11 +29,14 @@ export interface InvitedWelcomeBackfillVerification {
   templatesNonDeleted: number;
   templatesNull: number;
   templatesInvalid: number;
+  templatesMismatched: number;
   invitedCampaignsTotal: number;
   invitedCampaignsNull: number;
   invitedCampaignsInvalid: number;
+  invitedCampaignsMismatched: number;
   publicCampaignsTotal: number;
   publicCampaignsWithSnapshot: number;
+  immutabilityTriggerPresent: boolean;
   byTemplateAlias: Record<string, AliasCounts>;
   ok: boolean;
 }
@@ -37,17 +44,21 @@ export interface InvitedWelcomeBackfillVerification {
 export function verifyInvitedWelcomeBackfill(input: {
   templates: TemplateRow[];
   campaigns: CampaignRow[];
+  immutabilityTriggerPresent: boolean;
 }): InvitedWelcomeBackfillVerification {
   const result: InvitedWelcomeBackfillVerification = {
     templatesTotal: input.templates.length,
     templatesNonDeleted: 0,
     templatesNull: 0,
     templatesInvalid: 0,
+    templatesMismatched: 0,
     invitedCampaignsTotal: 0,
     invitedCampaignsNull: 0,
     invitedCampaignsInvalid: 0,
+    invitedCampaignsMismatched: 0,
     publicCampaignsTotal: 0,
     publicCampaignsWithSnapshot: 0,
+    immutabilityTriggerPresent: input.immutabilityTriggerPresent,
     byTemplateAlias: {},
     ok: false,
   };
@@ -69,6 +80,13 @@ export function verifyInvitedWelcomeBackfill(input: {
       result.templatesNull += 1;
     } else if (!invitedWelcomeConfigSchema.safeParse(template.invitedWelcomeDefault).success) {
       result.templatesInvalid += 1;
+    } else if (
+      !isDeepStrictEqual(
+        template.invitedWelcomeDefault,
+        resolveLegacyInvitedWelcomeConfig(template.alias),
+      )
+    ) {
+      result.templatesMismatched += 1;
     }
   }
 
@@ -81,6 +99,13 @@ export function verifyInvitedWelcomeBackfill(input: {
         result.invitedCampaignsNull += 1;
       } else if (!invitedWelcomeConfigSchema.safeParse(campaign.invitedWelcomeSnapshot).success) {
         result.invitedCampaignsInvalid += 1;
+      } else if (
+        !isDeepStrictEqual(
+          campaign.invitedWelcomeSnapshot,
+          resolveLegacyInvitedWelcomeConfig(campaign.templateAlias),
+        )
+      ) {
+        result.invitedCampaignsMismatched += 1;
       }
     } else {
       result.publicCampaignsTotal += 1;
@@ -94,8 +119,11 @@ export function verifyInvitedWelcomeBackfill(input: {
   result.ok =
     result.templatesNull === 0 &&
     result.templatesInvalid === 0 &&
+    result.templatesMismatched === 0 &&
     result.invitedCampaignsNull === 0 &&
     result.invitedCampaignsInvalid === 0 &&
-    result.publicCampaignsWithSnapshot === 0;
+    result.invitedCampaignsMismatched === 0 &&
+    result.publicCampaignsWithSnapshot === 0 &&
+    result.immutabilityTriggerPresent;
   return result;
 }

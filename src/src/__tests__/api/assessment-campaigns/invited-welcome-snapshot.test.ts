@@ -163,6 +163,22 @@ describe("invited Welcome snapshot on coach campaign create", () => {
     expect(second.invitedWelcomeSnapshot.eyebrow).toBe("Changed");
   });
 
+  it("writes the snapshot while off without exposing it in the create response", async () => {
+    delete process.env.WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_ENABLED;
+
+    const response = await POST(request(baseBody) as never);
+    const body = await response.json();
+
+    expect(db.assessmentCampaign.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          invitedWelcomeSnapshot: GENERIC_INVITED_WELCOME_CONFIG,
+        }),
+      }),
+    );
+    expect(body.data).not.toHaveProperty("invitedWelcomeSnapshot");
+  });
+
   it("creates no campaign when the in-transaction resolver loses the template", async () => {
     (db.assessmentTemplate.findUnique as jest.Mock)
       .mockResolvedValueOnce({

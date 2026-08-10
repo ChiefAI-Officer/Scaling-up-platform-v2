@@ -29,7 +29,7 @@ An environment change requires a new Production deployment.
 
    ```bash
    DATABASE_URL="$EXPLICIT_PRODUCTION_DATABASE_URL" \
-     node scripts/verify-invited-welcome-migration.mjs
+     npx tsx scripts/verify-invited-welcome-backfill.ts
    ```
 
 3. Require zero missing invited snapshots, zero mismatches against the legacy

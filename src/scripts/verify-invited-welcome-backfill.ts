@@ -4,7 +4,7 @@ import { verifyInvitedWelcomeBackfill } from "../src/lib/assessments/invited-wel
 const db = new PrismaClient();
 
 async function main() {
-  const [templates, campaigns] = await Promise.all([
+  const [templates, campaigns, triggerRows] = await Promise.all([
     db.assessmentTemplate.findMany({
       select: {
         id: true,
@@ -21,6 +21,16 @@ async function main() {
         template: { select: { alias: true } },
       },
     }),
+    db.$queryRaw<Array<{ present: boolean }>>`
+      SELECT EXISTS (
+        SELECT 1
+        FROM pg_trigger AS trigger
+        JOIN pg_class AS relation ON relation.oid = trigger.tgrelid
+        WHERE trigger.tgname = 'assessment_campaign_invited_welcome_snapshot_immutability_trigger'
+          AND relation.relname = 'assessment_campaigns'
+          AND NOT trigger.tgisinternal
+      ) AS present
+    `,
   ]);
 
   const result = verifyInvitedWelcomeBackfill({
@@ -31,6 +41,7 @@ async function main() {
       templateAlias: campaign.template.alias,
       invitedWelcomeSnapshot: campaign.invitedWelcomeSnapshot,
     })),
+    immutabilityTriggerPresent: triggerRows[0]?.present === true,
   });
 
   console.log(JSON.stringify(result, null, 2));

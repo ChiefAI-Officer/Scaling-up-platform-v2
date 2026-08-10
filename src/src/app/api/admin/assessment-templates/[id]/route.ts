@@ -32,6 +32,14 @@ import {
 } from "@/lib/assessments/invited-welcome-config";
 import { isAdminOwnedAssessmentPresentationEnabled } from "@/lib/assessments/wave-admin-owned-assessment-presentation-flags";
 
+function withoutInvitedWelcomeDefault<
+  T extends { invitedWelcomeDefault?: unknown },
+>(template: T): Omit<T, "invitedWelcomeDefault"> {
+  const response = { ...template };
+  delete response.invitedWelcomeDefault;
+  return response;
+}
+
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -52,6 +60,8 @@ export async function GET(
     }
 
     const { id } = await params;
+    const adminOwnedPresentationEnabled =
+      isAdminOwnedAssessmentPresentationEnabled();
     const template = await db.assessmentTemplate.findFirst({
       where: { id, deletedAt: null },
       select: {
@@ -62,7 +72,9 @@ export async function GET(
         invitationSubject: true,
         invitationBodyMarkdown: true,
         aggregationMode: true,
-        invitedWelcomeDefault: true,
+        ...(adminOwnedPresentationEnabled
+          ? { invitedWelcomeDefault: true as const }
+          : {}),
         createdAt: true,
         updatedAt: true,
         versions: {
@@ -89,7 +101,12 @@ export async function GET(
         { status: 404 },
       );
     }
-    return NextResponse.json({ success: true, data: template });
+    return NextResponse.json({
+      success: true,
+      data: adminOwnedPresentationEnabled
+        ? template
+        : withoutInvitedWelcomeDefault(template),
+    });
   } catch (error) {
     console.error("Error fetching template:", error);
     return NextResponse.json(
@@ -386,7 +403,12 @@ export async function PATCH(
       });
     }
 
-    return NextResponse.json({ success: true, data: template });
+    return NextResponse.json({
+      success: true,
+      data: isAdminOwnedAssessmentPresentationEnabled()
+        ? template
+        : withoutInvitedWelcomeDefault(template),
+    });
   } catch (error) {
     console.error("Error updating template:", error);
     return NextResponse.json(

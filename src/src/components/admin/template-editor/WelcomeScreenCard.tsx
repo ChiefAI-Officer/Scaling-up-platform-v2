@@ -37,6 +37,9 @@ export function WelcomeScreenCard({
   onChange: (patch: Partial<InvitedWelcomeAuthoringInputV1>) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [messageDraft, setMessageDraft] = useState(() =>
+    values.ledeParagraphs.join("\n\n"),
+  );
   const panelId = useId();
   const previewQuestions: WelcomeQuestion[] = questions.map((question) => ({
     type: question.type,
@@ -142,7 +145,7 @@ export function WelcomeScreenCard({
           </p>
           <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(360px,1.1fr)]">
             <div data-testid="welcome-screen-fields" className="space-y-4">
-              {field("eyebrow", "Eyebrow")}
+              {field("eyebrow", "Invitation label")}
               {field("headingTemplate", "Heading", {
                 help: "Keep {{campaignName}} so the campaign name appears automatically.",
               })}
@@ -153,13 +156,16 @@ export function WelcomeScreenCard({
                 <textarea
                   id="welcome-ledeParagraphs"
                   rows={5}
-                  value={values.ledeParagraphs.join("\n\n")}
+                  value={messageDraft}
                   disabled={isReadOnly}
                   aria-invalid={errors.ledeParagraphs ? true : undefined}
                   aria-describedby={errors.ledeParagraphs ? messageErrorId : undefined}
-                  onChange={(event) =>
-                    onChange({ ledeParagraphs: splitWelcomeMessage(event.target.value) })
-                  }
+                  onChange={(event) => {
+                    setMessageDraft(event.target.value);
+                    onChange({
+                      ledeParagraphs: splitWelcomeMessage(event.target.value),
+                    });
+                  }}
                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
                 />
                 <p className="text-xs text-muted-foreground">
@@ -173,7 +179,7 @@ export function WelcomeScreenCard({
               </div>
               {field("sharingHeading", "Sharing heading")}
               {field("scoresHeading", "Scores heading")}
-              {field("scoresDescription", "Scores description")}
+              {field("scoresDescription", "Scores explanation")}
               {field("ctaLabel", "Button label")}
             </div>
 

@@ -3,6 +3,11 @@ import { isAdminOwnedAssessmentPresentationEnabled } from "@/lib/assessments/wav
 const ENABLED = "WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_ENABLED";
 const KILL = "WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_KILL";
 
+beforeEach(() => {
+  delete process.env[ENABLED];
+  delete process.env[KILL];
+});
+
 afterEach(() => {
   delete process.env[ENABLED];
   delete process.env[KILL];

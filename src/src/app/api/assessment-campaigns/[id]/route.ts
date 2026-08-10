@@ -48,6 +48,14 @@ import {
 } from "@/lib/assessments/custom-slides-write";
 import { Prisma } from "@prisma/client";
 
+function withoutInvitedWelcomeSnapshot<
+  T extends { invitedWelcomeSnapshot?: unknown },
+>(campaign: T): Omit<T, "invitedWelcomeSnapshot"> {
+  const response = { ...campaign };
+  delete response.invitedWelcomeSnapshot;
+  return response;
+}
+
 const REPORT_STYLE_LOCKED_MESSAGE =
   "Report appearance was locked when the first response completed. Refresh to see the final style.";
 
@@ -323,7 +331,10 @@ export async function GET(
       );
     }
 
-    return NextResponse.json({ success: true, data: campaign });
+    return NextResponse.json({
+      success: true,
+      data: withoutInvitedWelcomeSnapshot(campaign),
+    });
   } catch (error) {
     console.error("Error fetching campaign:", error);
     return NextResponse.json(

@@ -66,6 +66,8 @@ export default async function AdminAssessmentVersionEditPage({
     redirect("/unauthorized");
   }
   const { id, versionId } = await params;
+  const adminOwnedPresentationEnabled =
+    isAdminOwnedAssessmentPresentationEnabled();
 
   const [template, version, allVersions, publishedVersions] = await Promise.all([
     db.assessmentTemplate.findUnique({
@@ -84,7 +86,9 @@ export default async function AdminAssessmentVersionEditPage({
         // Wave Q (#1) — template-row results-email default toggle.
         sendResultsDefault: true,
         defaultReportStyle: true,
-        invitedWelcomeDefault: true,
+        ...(adminOwnedPresentationEnabled
+          ? { invitedWelcomeDefault: true as const }
+          : {}),
         aggregationMode: true,
       },
     }),
@@ -137,11 +141,15 @@ export default async function AdminAssessmentVersionEditPage({
   }
 
   const parsedInvitedWelcome = invitedWelcomeConfigSchema.safeParse(
-    template.invitedWelcomeDefault,
+    "invitedWelcomeDefault" in template
+      ? template.invitedWelcomeDefault
+      : undefined,
   );
-  const invitedWelcomeDefault = parsedInvitedWelcome.success
-    ? parsedInvitedWelcome.data
-    : resolveLegacyInvitedWelcomeConfig(template.alias);
+  const invitedWelcomeDefault = adminOwnedPresentationEnabled
+    ? parsedInvitedWelcome.success
+      ? parsedInvitedWelcome.data
+      : resolveLegacyInvitedWelcomeConfig(template.alias)
+    : undefined;
 
   // Wave T — union of published question stableKeys + per-question option
   // keys across all published versions (drives isInherited, D8 slug
@@ -238,7 +246,9 @@ export default async function AdminAssessmentVersionEditPage({
           resultsEmailContentApproved: template.resultsEmailContentApproved,
           sendResultsDefault: template.sendResultsDefault,
           defaultReportStyle: template.defaultReportStyle,
-          invitedWelcomeDefault,
+          ...(adminOwnedPresentationEnabled
+            ? { invitedWelcomeDefault }
+            : {}),
           aggregationMode: template.aggregationMode,
           // accessMode is a campaign-level concept; templates default to INVITED
           // (v1 PUBLIC mode is hardcoded for Website Assessment per WF16 spec).
@@ -317,7 +327,7 @@ export default async function AdminAssessmentVersionEditPage({
         // forwarded solely to the existing Scoring & Tiers presentation.
         plainLanguageScoringEnabled={isTemplateCreationSimplifiedEnabled()}
         reportStylesEnabled={isReportStylesEnabled({ templateId: template.id })}
-        adminOwnedPresentationEnabled={isAdminOwnedAssessmentPresentationEnabled()}
+        adminOwnedPresentationEnabled={adminOwnedPresentationEnabled}
         qspStoryGroupEnabled={isQspStoryGroupEnabled()}
         // Wave ED10 (spec 19am-plan, Task 5) — the Active published version
         // snapshot for the Preview tab's read-only "Active" mode. Null when

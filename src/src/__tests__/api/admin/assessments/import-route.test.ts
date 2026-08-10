@@ -23,7 +23,7 @@ jest.mock("@/lib/db", () => ({
   db: {
     organization: { findFirst: jest.fn(), findUnique: jest.fn() },
     orgRespondent: { findMany: jest.fn() },
-    assessmentTemplate: { findFirst: jest.fn() },
+    assessmentTemplate: { findFirst: jest.fn(), findUnique: jest.fn() },
     assessmentTemplateVersion: { findFirst: jest.fn() },
     auditLog: { create: jest.fn() }, // Wave Y — activity signal writes
     $transaction: jest.fn(),
@@ -172,6 +172,10 @@ beforeEach(() => {
     ownerCoachId: "coach-r",
   });
   (db.assessmentTemplate.findFirst as jest.Mock).mockResolvedValue({ id: "tmpl-1" });
+  (db.assessmentTemplate.findUnique as jest.Mock).mockResolvedValue({
+    alias: "scaling-up-full",
+    invitedWelcomeDefault: null,
+  });
   (db.assessmentTemplateVersion.findFirst as jest.Mock).mockResolvedValue({
     id: "ver-1",
     language: "enUS",
@@ -207,6 +211,9 @@ beforeEach(() => {
           findFirst: jest.fn().mockResolvedValue(null),
           create: jest.fn().mockResolvedValue({ id: "camp-new" }),
           update: jest.fn().mockResolvedValue({}),
+        },
+        assessmentTemplate: {
+          findUnique: db.assessmentTemplate.findUnique,
         },
         assessmentTemplateVersion: {
           findUnique: jest.fn().mockResolvedValue(null),
@@ -766,6 +773,9 @@ describe("POST /api/admin/assessments/import — restrictedResults (Wave O, admi
           findFirst: jest.fn().mockResolvedValue(null),
           create: createSpy,
           update: jest.fn().mockResolvedValue({}),
+        },
+        assessmentTemplate: {
+          findUnique: db.assessmentTemplate.findUnique,
         },
         assessmentTemplateVersion: { findUnique: jest.fn().mockResolvedValue(null) },
         assessmentInvitation: { upsert: jest.fn().mockResolvedValue({ id: "inv-1" }) },
