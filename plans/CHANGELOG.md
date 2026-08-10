@@ -6,6 +6,17 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="public-campaign-report-design-removed-launched"></a>
+### 2026-08-10 — Public Campaign report-design controls removed and launched <!-- ENTRY_ISO:2026-08-10 ENTRY_SLUG:public-campaign-report-design-removed-launched -->
+
+**Status: LAUNCHED + PRODUCTION-ACCEPTED.** Implementation PR [#325](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/325) squash-merged as `dea0ce89812ad8f08acf1cdd611062ecb4b48c30`. Exact Production deployment `dpl_8qtnZ7rrWZQucEHGQEbyyW16nbgu` is **Ready** at [`scaling-up-platform-v2-eaj8y5bqf-scaling-up.vercel.app`](https://scaling-up-platform-v2-eaj8y5bqf-scaling-up.vercel.app) and owns [`scaling-up-platform-v2.vercel.app`](https://scaling-up-platform-v2.vercel.app) plus [`platformtest.scalingup.com`](https://platformtest.scalingup.com). Both public `/api/health` aliases returned HTTP `200` with `status=healthy`, a healthy database, and `authPosture=safe`.
+
+**Delivered behavior and compatibility.** Public Campaigns no longer exposes the creation-form **Report design** picker or the campaign-list **More / Report design** management control. New public campaigns inherit the selected assessment's default report design; existing stored campaign styles remain intact. The shared report system, API and schema compatibility, assessment editor, and respondent-report behavior are unchanged. The already-live `WAVE_PUBLIC_CAMPAIGNS_SIMPLE_UI_ENABLED=1` Production flag continues to govern the simplified Public Campaigns experience; this cleanup introduced no new flag.
+
+**Authenticated browser acceptance.** Preview acceptance with the supplied ADMIN test account passed at **1440×900** and **1024×800**. The list and creation screens contained neither **Report design** nor **More**; the list retained **Copy link**, **View responses**, and response disclosure, while creation retained validation, **Assessment**, **Campaign name**, **Starts**, **Ends**, **Cancel**, and **Create draft**. The temporary branch Preview flag was removed and confirmed absent before merge. A Production smoke repeated the absence and required-control checks. Both Preview viewports and Production had no console errors and were write-free: no campaign was created or published, no link was copied, and no campaign data was mutated.
+
+---
+
 <a id="public-campaign-report-design-removed-release-ready"></a>
 ### 2026-08-10 — Public Campaign report-design controls removed, release-ready <!-- ENTRY_ISO:2026-08-10 ENTRY_SLUG:public-campaign-report-design-removed-release-ready -->
 
