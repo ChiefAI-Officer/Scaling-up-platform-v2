@@ -6,6 +6,17 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="admin-owned-assessment-presentation-launched"></a>
+### 2026-08-10 — Admin-owned invited Welcome screens launched <!-- ENTRY_ISO:2026-08-10 ENTRY_SLUG:admin-owned-assessment-presentation-launched -->
+
+**Status: LAUNCHED + GLOBALLY ENABLED + PRODUCTION-VERIFIED.** Feature PR [#327](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/327) passed Build, Migration Safety Gate, Assessment Email Lease (PostgreSQL), Vercel Preview, and Vercel Preview Comments, then squash-merged as `8433f9cfb7d37125eceedef3484695d5356bddc9`. The dark Production deployment `dpl_4HDpv43FM125kTQduWXMKPsrRtGH` first reached Ready. After the migration verifier passed, `WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_ENABLED=1` was added to Production and the same merged build was redeployed. Exact enabled deployment `dpl_C5mJHCDHwDgUTLidkjfbhC4SpoTx` is Ready at [`scaling-up-platform-v2-l46q1wr9n-scaling-up.vercel.app`](https://scaling-up-platform-v2-l46q1wr9n-scaling-up.vercel.app) and owns both [`scaling-up-platform-v2.vercel.app`](https://scaling-up-platform-v2.vercel.app) and [`platformtest.scalingup.com`](https://platformtest.scalingup.com). Environment-name inspection confirmed the enable flag is present and `WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_KILL` is absent.
+
+**Production data and lifecycle proof.** The post-migration verifier passed with **18 templates total / 9 non-deleted / 0 null / 0 invalid / 0 mismatched**, **86 INVITED campaigns / 0 null / 0 invalid / 0 mismatched**, and **2 PUBLIC campaigns / 0 snapshots**. The expected additive migration write populated template defaults and immutable campaign snapshots with the exact legacy per-alias copy; it did not change the rendered Welcome experience of an existing DRAFT, ACTIVE, CLOSED, or historical campaign. The non-null snapshot immutability trigger is present, enabled, and bound to the expected function. From this launch onward, each new INVITED Coach or historical-import campaign freezes the current ADMIN-owned assessment Welcome at creation, while PUBLIC campaigns remain on their separate flow.
+
+**Live acceptance and safety boundary.** Both canonical `/api/health` endpoints returned HTTP `200` with `status=healthy`, database `healthy`, and `authPosture=safe` after enablement. Read-only in-app browser checks confirmed the canonical root redirects to the sign-in screen and an invited route without a valid participant token renders the expected safe link-error shell; neither surface produced a console error. Per the Production test safety policy, no real ADMIN/STAFF/Coach account was used, so the enabled Build-card and Coach-control visual states were not claimed as authenticated Production acceptance. No template edit, campaign creation, participant assignment, invitation, response, submission, report, customer email, or other customer-data mutation was performed during acceptance. The migration backfill and Production flag addition were the only authorized Production writes. Rollback remains the documented kill-switch operation in [`docs/runbooks/admin-owned-assessment-presentation-rollout.md`](../docs/runbooks/admin-owned-assessment-presentation-rollout.md); snapshot history remains immutable under kill.
+
+---
+
 <a id="admin-owned-assessment-presentation-release-ready"></a>
 ### 2026-08-10 — Admin-owned invited Welcome screens release-ready <!-- ENTRY_ISO:2026-08-10 ENTRY_SLUG:admin-owned-assessment-presentation-release-ready -->
 
