@@ -150,13 +150,23 @@ branding.
 ### Coach byline resolver
 
 Add one pure resolver that chooses the identity once and returns a complete
-presentation model:
+presentation model plus PII-free degradation metadata:
 
 ```ts
 type InvitationCoachByline =
   | { mode: "image_name"; coachName: string; coachImageUrl: string }
   | { mode: "name_only"; coachName: string }
   | { mode: "scaling_up_only" };
+
+type InvitationCoachResolution = {
+  byline: InvitationCoachByline;
+  logoRejectedReason:
+    | "no-coach"
+    | "missing-name"
+    | "no-image"
+    | "invalid-url"
+    | null;
+};
 ```
 
 Selection order:
@@ -325,8 +335,10 @@ field for the resolved banner state:
 coachBylineMode = image_name | name_only | scaling_up_only
 ```
 
-The field contains no Coach name or image URL. Existing image rejection reason
-telemetry remains available for diagnosing degradation.
+The field contains no Coach name or image URL. The resolver's PII-free
+`logoRejectedReason` retains the existing `no-coach`, `no-image`, and
+`invalid-url` diagnostics and adds `missing-name` for the new rule that an
+image cannot render without a visible Coach name.
 
 ## Test strategy
 
