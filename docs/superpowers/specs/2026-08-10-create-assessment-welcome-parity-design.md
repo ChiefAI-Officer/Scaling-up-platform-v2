@@ -1,6 +1,6 @@
 # Create Assessment Welcome Parity
 
-**Status:** Approved design; implementation pending  
+**Status:** Built and locally verified
 **Date:** 2026-08-10  
 **Scope:** ADMIN/STAFF simplified assessment creation and the existing invited Welcome authoring contract
 
