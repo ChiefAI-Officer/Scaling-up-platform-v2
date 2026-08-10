@@ -6,6 +6,19 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="public-campaigns-simple-ui-launched"></a>
+### 2026-08-10 — Simplified Public Campaigns UI launched and Production-accepted <!-- ENTRY_ISO:2026-08-10 ENTRY_SLUG:public-campaigns-simple-ui-launched -->
+
+**Status: LAUNCHED + PRODUCTION-ENABLED + BROWSER-ACCEPTED.** Feature PR [#323](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/323) squash-merged as `90d2d60f85d9416aa45758bcdd5b03bd0ed1355f`. Production deployment `73LGmXsepq9fJuvYq587LaRk7hon` reached Ready at [`scaling-up-platform-v2-34gibmg2u-scaling-up.vercel.app`](https://scaling-up-platform-v2-34gibmg2u-scaling-up.vercel.app). This launch receipt was recorded at `2026-08-10T00:20:47Z`.
+
+**Production configuration and rollback proof.** `WAVE_PUBLIC_CAMPAIGNS_SIMPLE_UI_ENABLED=1` is set only in Production, and `WAVE_PUBLIC_CAMPAIGNS_SIMPLE_UI_KILL` is absent in the final enabled state. A bounded kill-switch browser check restored the legacy Public Campaigns manager and made `/admin/assessments/public-campaigns/new` redirect to the list. Production was enabled, and the temporary Preview flag and branch were removed.
+
+**Authenticated browser acceptance.** ADMIN acceptance ran at **1440×900** and **1024×800** across the canonical [`scaling-up-platform-v2.vercel.app`](https://scaling-up-platform-v2.vercel.app) alias and custom [`platformtest.scalingup.com`](https://platformtest.scalingup.com) domain. The list-first manager and dedicated creation page rendered at both sizes; **Copy link** produced the canonical `/quiz/...` public path; the response disclosure opened existing response detail; creation validation surfaced invalid input; and **Cancel** returned to the campaign list. The browser run did not submit the creation form or confirm Publish and performed no campaign write action.
+
+**Health receipt.** `/api/health` on both production aliases returned HTTP `200` with `database: healthy` and `authPosture: safe`. The acceptance browser performed no action that creates or changes an assessment response, report, email, campaign, or other Production data.
+
+---
+
 <a id="public-campaigns-simple-ui-release-ready"></a>
 ### 2026-08-10 — Simplified Public Campaigns UI independently approved for protected release <!-- ENTRY_ISO:2026-08-10 ENTRY_SLUG:public-campaigns-simple-ui-release-ready -->
 
