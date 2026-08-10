@@ -44,6 +44,7 @@ import type { ResultsImportPlan } from "./results-plan";
 import { isCEOFamily } from "../respondent-levels";
 import { scoreSubmission } from "../scoring";
 import type { TemplateVersionForScoring, Answer } from "../scoring";
+import { loadInvitedWelcomeSnapshot } from "../invited-welcome-snapshot";
 
 // ────────────────────────────────────────────────────────────────────────
 // Public types
@@ -125,6 +126,15 @@ interface IdRow {
 }
 
 export interface ResultsCommitTx {
+  assessmentTemplate: {
+    findUnique: (args: {
+      where: { id: string };
+      select: { alias: true; invitedWelcomeDefault: true };
+    }) => Promise<{
+      alias: string;
+      invitedWelcomeDefault: unknown;
+    } | null>;
+  };
   assessmentCampaign: {
     findUnique: (args: {
       where: { externalId: string };
@@ -297,6 +307,10 @@ export async function commitResultsImport(
           alias = `${aliasBase}-${suffix}`;
         }
 
+        const invitedWelcomeSnapshot = await loadInvitedWelcomeSnapshot(
+          tx,
+          ctx.templateId,
+        );
         const created = await tx.assessmentCampaign.create({
           data: {
             templateId: ctx.templateId,
@@ -316,6 +330,7 @@ export async function commitResultsImport(
             reportStyle: "CLASSIC",
             reportStyleSource: "TEMPLATE_DEFAULT",
             reportStyleLockedAt: earliestImportedSubmissionTime(campaign.rows),
+            invitedWelcomeSnapshot,
             createdBy: ctx.createdByUserId,
             createdByCoachId: ctx.ownerCoachId,
           },

@@ -51,6 +51,7 @@ import {
 import { canCreateCampaign, asAccessDb } from "../access-control";
 import { scoreSubmission } from "../scoring";
 import type { TemplateVersionForScoring, Answer } from "../scoring";
+import { loadInvitedWelcomeSnapshot } from "../invited-welcome-snapshot";
 import type { ApiActor } from "@/lib/auth/access-control";
 
 // ────────────────────────────────────────────────────────────────────────
@@ -68,6 +69,15 @@ export interface RestrictedExistingCampaignRow {
 }
 
 export interface RestrictedCommitDb {
+  assessmentTemplate: {
+    findUnique(args: {
+      where: { id: string };
+      select: { alias: true; invitedWelcomeDefault: true };
+    }): Promise<{
+      alias: string;
+      invitedWelcomeDefault: unknown;
+    } | null>;
+  };
   organization: {
     findUnique(args: {
       where: { id: string };
@@ -525,6 +535,10 @@ async function commitCreatePath(
   shouldPinCid: boolean,
 ): Promise<RestrictedCommitOutcome> {
   const alias = `imported-${ctx.instrumentKey ?? "sufull"}-${slugifyForAlias(campaign.cid)}-${campaign.roundLabelSlug}`;
+  const invitedWelcomeSnapshot = await loadInvitedWelcomeSnapshot(
+    tx,
+    ctx.templateId,
+  );
 
   const created = await tx.assessmentCampaign.create({
     data: {
@@ -545,6 +559,7 @@ async function commitCreatePath(
       reportStyle: "CLASSIC",
       reportStyleSource: "TEMPLATE_DEFAULT",
       reportStyleLockedAt: earliestImportedSubmissionTime(campaign.rows),
+      invitedWelcomeSnapshot,
       createdBy: ctx.createdByUserId,
       createdByCoachId: ctx.ownerCoachId,
       importManifest: {

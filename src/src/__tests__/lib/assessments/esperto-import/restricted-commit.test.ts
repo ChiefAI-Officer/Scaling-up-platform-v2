@@ -222,6 +222,23 @@ class FakeDb implements RestrictedCommitDb {
   /** Set true to force assessmentCampaign.create to throw a P2002 once. */
   forceP2002OnCreate = false;
 
+  assessmentTemplate = {
+    findUnique: async () => ({
+        alias: "scaling-up-full",
+        invitedWelcomeDefault: {
+          schemaVersion: 1,
+          eyebrow: "WELCOME TEST",
+          headingTemplate: "{{campaignName}} · Scaling Up Full",
+          ledeParagraphs: ["Complete this reflection."],
+          sharingHeading: "How your answers are shared",
+          scoresHeading: "Your category scores",
+          scoresDescription: "See where the team stands.",
+          finePrint: null,
+          ctaLabel: "Start the assessment",
+      },
+    }),
+  };
+
   organization = {
     findUnique: async (args: { where: { id: string } }) => {
       return this.orgs.get(args.where.id) ?? null;
@@ -679,6 +696,13 @@ describe("commitRestrictedImport — CREATE path", () => {
     expect(data.organizationId).toBe("org-1");
     expect(data.createdBy).toBe("coach-user-1");
     expect(data.createdByCoachId).toBe("coach-1");
+    expect(data.invitedWelcomeSnapshot).toEqual(
+      expect.objectContaining({
+        schemaVersion: 1,
+        eyebrow: "WELCOME TEST",
+        headingTemplate: "{{campaignName}} · Scaling Up Full",
+      }),
+    );
     expect(data.openAt).toBeInstanceOf(Date);
     expect(data.closeAt).toBeInstanceOf(Date);
 

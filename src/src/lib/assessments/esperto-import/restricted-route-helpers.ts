@@ -273,6 +273,15 @@ export interface RestrictedCommitPrismaLike {
     template: TemplateStringsArray | string,
     ...values: unknown[]
   ) => Promise<number>;
+  assessmentTemplate: {
+    findUnique: (args: {
+      where: { id: string };
+      select: { alias: true; invitedWelcomeDefault: true };
+    }) => Promise<{
+      alias: string;
+      invitedWelcomeDefault: unknown;
+    } | null>;
+  };
   organization: {
     findUnique: (args: { where: { id: string }; select?: object }) => Promise<{
       id: string;
@@ -380,6 +389,9 @@ export function buildRealRestrictedCommitDb(
   prisma: RestrictedCommitPrismaLike,
 ): RestrictedCommitDb {
   const adapt = (client: RestrictedCommitPrismaLike): RestrictedCommitDb => ({
+    assessmentTemplate: {
+      findUnique: (args) => client.assessmentTemplate.findUnique(args),
+    },
     organization: {
       findUnique: (args) => client.organization.findUnique(args),
       update: (args) => client.organization.update(args),

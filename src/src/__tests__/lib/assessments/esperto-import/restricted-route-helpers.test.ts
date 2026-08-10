@@ -227,6 +227,12 @@ function makePrismaLike(
   const campaignFindFirstCalls: Array<{ where: unknown; select?: unknown }> = [];
   const base: RestrictedCommitPrismaLike = {
     $executeRaw: jest.fn().mockResolvedValue(1) as unknown as RestrictedCommitPrismaLike["$executeRaw"],
+    assessmentTemplate: {
+      findUnique: jest.fn().mockResolvedValue({
+        alias: "scaling-up-full",
+        invitedWelcomeDefault: null,
+      }),
+    },
     organization: {
       findUnique: jest.fn().mockResolvedValue({ id: "org-1", espertoSuFullCid: null }),
       update: jest.fn().mockResolvedValue({}),

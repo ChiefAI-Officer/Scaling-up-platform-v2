@@ -512,6 +512,7 @@ describe("POST /api/admin/public-campaigns — CREATE", () => {
       expect(data.accessMode).toBe("PUBLIC");
       expect(data.status).toBe("DRAFT");
       expect(data.createdByCoachId).toBeNull();
+      expect(data).not.toHaveProperty("invitedWelcomeSnapshot");
     });
 
     it("derives endMode=OPEN_END and closeAt=null when no closeAt provided", async () => {
