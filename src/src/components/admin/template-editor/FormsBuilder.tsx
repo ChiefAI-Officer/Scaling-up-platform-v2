@@ -44,6 +44,7 @@ import { useSingleColumnBuilderController } from "./hooks/useSingleColumnBuilder
 import { FormHeaderCard } from "./FormHeaderCard";
 import { FormSectionCard } from "./FormSectionCard";
 import { FormQuestionCard } from "./FormQuestionCard";
+import { WelcomeScreenCard } from "./WelcomeScreenCard";
 import { computeShowIfGates, findShowIfDependents } from "./question-commands";
 
 export interface FormsBuilderProps {
@@ -61,6 +62,8 @@ export interface FormsBuilderProps {
   publishedOptionKeys: Record<string, readonly string[]>;
   /** Retained for prop-parity with the other Build bodies; unused here. */
   onGoToSections: () => void;
+  /** Coordinated ADMIN/STAFF-owned Welcome authoring surface. */
+  adminOwnedPresentationEnabled?: boolean;
 }
 
 export function FormsBuilder({
@@ -70,6 +73,7 @@ export function FormsBuilder({
   findingsEnabled,
   conditionalEnabled,
   publishedOptionKeys,
+  adminOwnedPresentationEnabled = false,
 }: FormsBuilderProps) {
   const {
     sections,
@@ -104,11 +108,23 @@ export function FormsBuilder({
       onTemplateFieldChange={model.handleTemplateFieldChange}
     />
   );
+  const welcome = adminOwnedPresentationEnabled ? (
+    <WelcomeScreenCard
+      values={model.welcomeValues}
+      finePrint={model.welcomeFinePrint}
+      errors={model.welcomeErrors}
+      questions={questions}
+      sections={sections}
+      isReadOnly={isReadOnly}
+      onChange={model.handleWelcomeFieldChange}
+    />
+  ) : null;
 
   if (sections.length === 0) {
     return (
       <div data-testid="forms-builder" className="flex flex-col gap-4">
         {header}
+        {welcome}
         <div
           data-testid="forms-builder-empty"
           className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border p-10 text-center text-muted-foreground"
@@ -138,6 +154,7 @@ export function FormsBuilder({
     >
       <div data-testid="forms-builder" className="flex flex-col gap-4">
         {header}
+        {welcome}
         {sections.map((s) => {
           const list = bySection.get(s.stableKey) ?? [];
           const collapsed = selection.isSectionCollapsed(s.stableKey);

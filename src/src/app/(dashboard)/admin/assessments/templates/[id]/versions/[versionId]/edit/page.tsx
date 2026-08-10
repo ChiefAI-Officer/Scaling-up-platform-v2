@@ -32,6 +32,11 @@ import { isPreviewSettingsEnabled } from "@/lib/assessments/wave-ed10-flags";
 import { isQspStoryGroupEnabled } from "@/lib/assessments/wave-48-flags";
 import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
 import { isTemplateCreationSimplifiedEnabled } from "@/lib/assessments/wave-template-creation-flags";
+import { isAdminOwnedAssessmentPresentationEnabled } from "@/lib/assessments/wave-admin-owned-assessment-presentation-flags";
+import {
+  invitedWelcomeConfigSchema,
+  resolveLegacyInvitedWelcomeConfig,
+} from "@/lib/assessments/invited-welcome-config";
 import { computePublishedQuestionUnions } from "@/lib/assessments/published-question-unions";
 import {
   activePublishedWhere,
@@ -79,6 +84,7 @@ export default async function AdminAssessmentVersionEditPage({
         // Wave Q (#1) — template-row results-email default toggle.
         sendResultsDefault: true,
         defaultReportStyle: true,
+        invitedWelcomeDefault: true,
         aggregationMode: true,
       },
     }),
@@ -129,6 +135,13 @@ export default async function AdminAssessmentVersionEditPage({
   if (!template || !version || version.templateId !== id) {
     notFound();
   }
+
+  const parsedInvitedWelcome = invitedWelcomeConfigSchema.safeParse(
+    template.invitedWelcomeDefault,
+  );
+  const invitedWelcomeDefault = parsedInvitedWelcome.success
+    ? parsedInvitedWelcome.data
+    : resolveLegacyInvitedWelcomeConfig(template.alias);
 
   // Wave T — union of published question stableKeys + per-question option
   // keys across all published versions (drives isInherited, D8 slug
@@ -225,6 +238,7 @@ export default async function AdminAssessmentVersionEditPage({
           resultsEmailContentApproved: template.resultsEmailContentApproved,
           sendResultsDefault: template.sendResultsDefault,
           defaultReportStyle: template.defaultReportStyle,
+          invitedWelcomeDefault,
           aggregationMode: template.aggregationMode,
           // accessMode is a campaign-level concept; templates default to INVITED
           // (v1 PUBLIC mode is hardcoded for Website Assessment per WF16 spec).
@@ -303,6 +317,7 @@ export default async function AdminAssessmentVersionEditPage({
         // forwarded solely to the existing Scoring & Tiers presentation.
         plainLanguageScoringEnabled={isTemplateCreationSimplifiedEnabled()}
         reportStylesEnabled={isReportStylesEnabled({ templateId: template.id })}
+        adminOwnedPresentationEnabled={isAdminOwnedAssessmentPresentationEnabled()}
         qspStoryGroupEnabled={isQspStoryGroupEnabled()}
         // Wave ED10 (spec 19am-plan, Task 5) — the Active published version
         // snapshot for the Preview tab's read-only "Active" mode. Null when
