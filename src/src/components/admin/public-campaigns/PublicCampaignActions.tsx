@@ -20,13 +20,9 @@ import {
 interface PublicCampaignActionsProps {
   campaign: PublicCampaignViewModel;
   origin: string;
-  onCampaignUpdated: (
-    updates: Pick<PublicCampaignViewModel, "status">,
-  ) => void;
+  onCampaignUpdated: (updates: Pick<PublicCampaignViewModel, "status">) => void;
   onToggleResponses: () => void;
   responsesExpanded: boolean;
-  onToggleReportDesign: () => void;
-  reportDesignExpanded: boolean;
 }
 
 type Notice = { kind: "status" | "alert"; message: string } | null;
@@ -37,8 +33,6 @@ export function PublicCampaignActions({
   onCampaignUpdated,
   onToggleResponses,
   responsesExpanded,
-  onToggleReportDesign,
-  reportDesignExpanded,
 }: PublicCampaignActionsProps) {
   const [publishOpen, setPublishOpen] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -149,24 +143,6 @@ export function PublicCampaignActions({
           >
             {responsesExpanded ? "Hide responses" : "View responses"}
           </Button>
-        )}
-
-        {campaign.reportStylesAvailable && (
-          <details>
-            <summary className="inline-flex h-8 cursor-pointer list-none items-center justify-center rounded-md border border-input bg-background px-3 text-xs font-semibold shadow-sm transition-colors hover:border-primary/30 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 [&::-webkit-details-marker]:hidden">
-              More
-            </summary>
-            <div className="mt-1 min-w-40 rounded-md border bg-card p-1 shadow-lg">
-              <button
-                type="button"
-                className="w-full rounded-sm px-3 py-2 text-left text-sm font-medium hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-                aria-expanded={reportDesignExpanded}
-                onClick={onToggleReportDesign}
-              >
-                Report design
-              </button>
-            </div>
-          </details>
         )}
       </div>
 

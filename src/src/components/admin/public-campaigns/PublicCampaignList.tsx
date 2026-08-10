@@ -2,7 +2,6 @@
 
 import { Fragment, useEffect, useRef, useState } from "react";
 import { PublicCampaignActions } from "@/components/admin/public-campaigns/PublicCampaignActions";
-import { PublicCampaignReportDesign } from "@/components/admin/public-campaigns/PublicCampaignReportDesign";
 import { PublicCampaignResponses } from "@/components/admin/public-campaigns/PublicCampaignResponses";
 import {
   decodePublicCampaignList,
@@ -20,13 +19,6 @@ interface ListResponse {
   data?: unknown;
 }
 
-type PublicCampaignOwnedUpdates =
-  | Pick<PublicCampaignViewModel, "status">
-  | Pick<
-      PublicCampaignViewModel,
-      "reportStyle" | "reportStyleSource" | "reportStyleLockedAt"
-    >;
-
 const cellClassName =
   "max-[1120px]:grid max-[1120px]:grid-cols-[7.5rem_minmax(0,1fr)] max-[1120px]:gap-2 max-[1120px]:border-0 max-[1120px]:py-2.5 max-[1120px]:before:text-[0.6875rem] max-[1120px]:before:font-bold max-[1120px]:before:uppercase max-[1120px]:before:tracking-[0.05em] max-[1120px]:before:text-muted-foreground max-[1120px]:before:content-[attr(data-label)]";
 
@@ -37,9 +29,6 @@ export function PublicCampaignList({
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [responsesExpandedId, setResponsesExpandedId] = useState<string | null>(null);
-  const [reportDesignExpandedId, setReportDesignExpandedId] = useState<string | null>(
-    null,
-  );
   const [visitedResponseIds, setVisitedResponseIds] = useState<ReadonlySet<string>>(
     () => new Set(),
   );
@@ -82,7 +71,7 @@ export function PublicCampaignList({
 
   function patchCampaign(
     campaignId: string,
-    updates: PublicCampaignOwnedUpdates,
+    updates: Pick<PublicCampaignViewModel, "status">,
   ) {
     setCampaigns((current) =>
       current.map((campaign) =>
@@ -171,8 +160,6 @@ export function PublicCampaignList({
                 }`;
 
                 const responsesExpanded = responsesExpandedId === campaign.id;
-                const reportDesignExpanded =
-                  reportDesignExpandedId === campaign.id;
 
                 return (
                   <Fragment key={campaign.id}>
@@ -251,12 +238,6 @@ export function PublicCampaignList({
                         }
                         onToggleResponses={() => toggleResponses(campaign.id)}
                         responsesExpanded={responsesExpanded}
-                        onToggleReportDesign={() =>
-                          setReportDesignExpandedId((current) =>
-                            current === campaign.id ? null : campaign.id,
-                          )
-                        }
-                        reportDesignExpanded={reportDesignExpanded}
                       />
                     </td>
                     </tr>
@@ -270,19 +251,6 @@ export function PublicCampaignList({
                           <PublicCampaignResponses
                             campaignId={campaign.id}
                             expanded={responsesExpanded}
-                          />
-                        </td>
-                      </tr>
-                    )}
-                    {reportDesignExpanded && (
-                      <tr className="wf-tr">
-                        <td className="wf-td" colSpan={6}>
-                          <PublicCampaignReportDesign
-                            campaign={campaign}
-                            expanded
-                            onCampaignUpdated={(updates) =>
-                              patchCampaign(campaign.id, updates)
-                            }
                           />
                         </td>
                       </tr>

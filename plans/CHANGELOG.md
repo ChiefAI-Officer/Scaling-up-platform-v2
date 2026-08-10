@@ -6,6 +6,17 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="public-campaign-report-design-removed-release-ready"></a>
+### 2026-08-10 — Public Campaign report-design controls removed, release-ready <!-- ENTRY_ISO:2026-08-10 ENTRY_SLUG:public-campaign-report-design-removed-release-ready -->
+
+**Status: LOCALLY IMPLEMENTED + RELEASE-READY; not pushed, merged, deployed, Production-enabled, or browser-accepted.** Public Campaigns no longer exposes either the creation-form **Report design** picker or the campaign-list **More / Report design** management control. A new campaign now inherits the selected assessment's default report design without serializing a campaign override.
+
+**Compatibility boundary.** This is a Public Campaigns UI cleanup only: existing campaign report-style values remain stored and unchanged, while the existing API, Prisma schema, shared report-style system, assessment editor, and respondent-report screens remain compatible and unchanged. The canonical Wave 6 Markdown and HTML wireframes now match the simplified list and creation states. No migration or Production-data rewrite is required.
+
+**Release boundary.** Protected PR review, Preview/browser acceptance at the required desktop and narrow widths, and any Production enablement remain pending. No environment flag, Vercel setting, deployment, campaign, response, report, email, or other Production state was read or changed for this receipt.
+
+---
+
 <a id="public-campaigns-simple-ui-launched"></a>
 ### 2026-08-10 — Simplified Public Campaigns UI launched and Production-accepted <!-- ENTRY_ISO:2026-08-10 ENTRY_SLUG:public-campaigns-simple-ui-launched -->
 

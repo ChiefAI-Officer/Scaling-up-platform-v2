@@ -43,7 +43,6 @@ function response(body: unknown, ok = true, status = 200): Response {
 function renderActions(value: PublicCampaignViewModel) {
   const onCampaignUpdated = jest.fn();
   const onToggleResponses = jest.fn();
-  const onToggleReportDesign = jest.fn();
   render(
     <PublicCampaignActions
       campaign={value}
@@ -51,11 +50,9 @@ function renderActions(value: PublicCampaignViewModel) {
       onCampaignUpdated={onCampaignUpdated}
       onToggleResponses={onToggleResponses}
       responsesExpanded={false}
-      onToggleReportDesign={onToggleReportDesign}
-      reportDesignExpanded={false}
     />,
   );
-  return { onCampaignUpdated, onToggleResponses, onToggleReportDesign };
+  return { onCampaignUpdated, onToggleResponses };
 }
 
 beforeEach(() => {
@@ -91,17 +88,14 @@ describe("PublicCampaignActions", () => {
   );
 
   it.each(["DRAFT", "ACTIVE", "CLOSED"] as const)(
-    "reveals report design from More for %s campaigns (catches a missing supported secondary action)",
+    "does not expose report design for %s campaigns",
     (status) => {
-      const { onToggleReportDesign } = renderActions(
-        campaign({ status, reportStylesAvailable: true }),
-      );
+      renderActions(campaign({ status, reportStylesAvailable: true }));
 
-      fireEvent.click(screen.getByText("More"));
-      const reportDesign = screen.getByRole("button", { name: "Report design" });
-      expect(reportDesign).toHaveAttribute("aria-expanded", "false");
-      fireEvent.click(reportDesign);
-      expect(onToggleReportDesign).toHaveBeenCalledTimes(1);
+      expect(screen.queryByText("More")).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Report design" }),
+      ).not.toBeInTheDocument();
     },
   );
 
@@ -223,8 +217,6 @@ describe("PublicCampaignActions", () => {
         onCampaignUpdated={jest.fn()}
         onToggleResponses={jest.fn()}
         responsesExpanded={false}
-        onToggleReportDesign={jest.fn()}
-        reportDesignExpanded={false}
       />,
     );
 
@@ -278,8 +270,6 @@ describe("PublicCampaignActions", () => {
         onCampaignUpdated={jest.fn()}
         onToggleResponses={onToggleResponses}
         responsesExpanded
-        onToggleReportDesign={jest.fn()}
-        reportDesignExpanded={false}
       />,
     );
 
