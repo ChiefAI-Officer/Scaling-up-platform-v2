@@ -38,6 +38,7 @@ import {
 import { isCustomSlidesEnabled } from "@/lib/assessments/wave-m-flags";
 import { isOnScreenResultsEnabled } from "@/lib/assessments/wave-osr-flags";
 import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
+import { isAdminOwnedAssessmentPresentationEnabled } from "@/lib/assessments/wave-admin-owned-assessment-presentation-flags";
 import type { ReportStyleKey } from "@/lib/assessments/report-style-registry";
 import { isExactCoachReportAppearanceOwner } from "@/lib/assessments/campaign-detail";
 import {
@@ -159,15 +160,24 @@ async function patchReportAppearance(
     );
   }
 
-  // This endpoint owns coach-campaign appearance changes only. Privileged
-  // public-campaign writes use the dedicated Task 5 route; they cannot pass
-  // through this coach-owned lane.
+  const adminOwnedPresentation =
+    isAdminOwnedAssessmentPresentationEnabled();
+  if (adminOwnedPresentation && !isPrivilegedRole(actor.role)) {
+    return NextResponse.json(
+      { success: false, error: "REPORT_STYLE_ADMIN_OWNED" },
+      { status: 403 },
+    );
+  }
+
+  // Before admin ownership is enabled, retain the exact coach-owner lane.
+  // In active mode, privileged actors keep the compatibility lane so existing
+  // administrative workflows can still maintain campaign appearance.
   const isExactCoachOwner = isExactCoachReportAppearanceOwner({
     actorRole: actor.role,
     actorCoachId: actor.coachId,
     campaignOwnerCoachId: campaign.createdByCoachId,
   });
-  if (!isExactCoachOwner) {
+  if (!adminOwnedPresentation && !isExactCoachOwner) {
     return NextResponse.json(
       { success: false, error: "Forbidden" },
       { status: 403 },
