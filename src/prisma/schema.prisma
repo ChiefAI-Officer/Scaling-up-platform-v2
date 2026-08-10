@@ -1207,6 +1207,7 @@ model AssessmentTemplate {
   // per-campaign flip is the override. Inert data otherwise.
   sendResultsDefault            Boolean                             @default(false)
   defaultReportStyle            AssessmentReportStyle               @default(CLASSIC)
+  invitedWelcomeDefault         Json?
   // Wave Q (Jeff July-1 #6) — "disabled" third lifecycle state, distinct from
   // soft-delete: hidden from NEW-campaign template pickers + rejected at
   // campaign create, but existing campaigns/reports/trends/re-seeds are
@@ -1293,6 +1294,7 @@ model AssessmentCampaign {
   status              AssessmentCampaignStatus     @default(DRAFT)
   accessMode          AssessmentCampaignAccessMode @default(INVITED)
   publicConfig        Json?
+  invitedWelcomeSnapshot Json?
   openAt              DateTime
   endMode             AssessmentCampaignEndMode
   closeAt             DateTime?
