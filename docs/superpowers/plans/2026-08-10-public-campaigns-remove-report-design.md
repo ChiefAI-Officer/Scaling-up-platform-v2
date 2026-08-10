@@ -217,11 +217,11 @@ Run:
 
 ```bash
 rg -n "Report design|PublicCampaignReportDesign|onToggleReportDesign|reportDesignExpanded" \
-  src/src/components/admin/public-campaigns \
-  src/src/__tests__/components/admin/public-campaigns
+  src/src/components/admin/public-campaigns
 ```
 
-Expected: no matches.
+Expected: no matches in production components. The focused tests intentionally retain
+negative assertions for the removed controls.
 
 - [ ] **Step 6: Commit Task 2**
 

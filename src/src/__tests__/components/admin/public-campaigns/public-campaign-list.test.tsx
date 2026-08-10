@@ -406,6 +406,5 @@ describe("PublicCampaignList", () => {
     expect(firstResponseRow!.querySelector("td")).toHaveAttribute("colspan", "6");
     expect(secondResponseRow).not.toBeNull();
     expect(secondResponseRow).not.toHaveAttribute("hidden");
-    expect(secondResponseRow).not.toHaveAttribute("hidden");
   });
 });
