@@ -3,17 +3,11 @@
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ReportStylePicker } from "@/components/assessments/ReportStylePicker";
 import type { PublicCampaignCreateOption } from "@/lib/assessments/public-campaign-create-options";
-import {
-  resolveReportStylePreviewAnatomy,
-  type ReportStyleKey,
-} from "@/lib/assessments/report-style-registry";
 import { publicCampaignCreateError } from "@/lib/assessments/public-campaign-ui";
 
 type StartsMode = "IMMEDIATE" | "SCHEDULED";
 type EndsMode = "NONE" | "SCHEDULED";
-type ReportStyleIntent = "INHERITED" | "EXPLICIT";
 
 interface CreatePublicCampaignFormProps {
   options: PublicCampaignCreateOption[];
@@ -55,9 +49,6 @@ export function CreatePublicCampaignForm({
   const [endsMode, setEndsMode] = useState<EndsMode>("NONE");
   const [scheduledStart, setScheduledStart] = useState("");
   const [scheduledEnd, setScheduledEnd] = useState("");
-  const [reportStyle, setReportStyle] = useState<ReportStyleKey>("CLASSIC");
-  const [reportStyleIntent, setReportStyleIntent] =
-    useState<ReportStyleIntent>("INHERITED");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [pageError, setPageError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -83,8 +74,6 @@ export function CreatePublicCampaignForm({
     );
   }
 
-  const selectedOption = options.find((option) => option.id === templateId);
-
   function clearFieldError(field: keyof FieldErrors) {
     setFieldErrors((current) => {
       if (!current[field]) return current;
@@ -95,14 +84,7 @@ export function CreatePublicCampaignForm({
   }
 
   function changeAssessment(nextTemplateId: string) {
-    const nextOption = options.find((option) => option.id === nextTemplateId);
     setTemplateId(nextTemplateId);
-    setReportStyle(
-      nextOption?.reportStylesEnabled
-        ? nextOption.defaultReportStyle
-        : "CLASSIC",
-    );
-    setReportStyleIntent("INHERITED");
     clearFieldError("templateId");
   }
 
@@ -166,10 +148,6 @@ export function CreatePublicCampaignForm({
       name: name.trim(),
       openAt,
       closeAt,
-      ...(selectedOption?.reportStylesEnabled &&
-      reportStyleIntent === "EXPLICIT"
-        ? { reportStyle }
-        : {}),
     };
 
     setSubmitting(true);
@@ -255,57 +233,6 @@ export function CreatePublicCampaignForm({
             </p>
           )}
         </div>
-
-        {selectedOption?.reportStylesEnabled && (
-          <section
-            className="space-y-4 border-y border-border py-6"
-            aria-labelledby="public-campaign-report-design-heading"
-          >
-            <div>
-              <h3
-                id="public-campaign-report-design-heading"
-                className="text-base font-semibold text-foreground"
-              >
-                Report design
-              </h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Choose how individual results will look.
-              </p>
-            </div>
-            <ReportStylePicker
-              value={reportStyle}
-              heading="Report design"
-              disabledExplanation={null}
-              previewAnatomy={resolveReportStylePreviewAnatomy({
-                templateAlias: selectedOption.alias,
-                capabilities: selectedOption.reportStylePreviewCapabilities,
-              })}
-              onChange={(value) => {
-                setReportStyle(value);
-                setReportStyleIntent("EXPLICIT");
-              }}
-            />
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="text-sm font-medium text-muted-foreground">
-                {reportStyleIntent === "INHERITED"
-                  ? "Uses the assessment's default design."
-                  : "Customized for this campaign."}
-              </p>
-              {reportStyleIntent === "EXPLICIT" && (
-                <button
-                  type="button"
-                  className="wf-btn border border-border bg-background text-foreground"
-                  onClick={() => {
-                    setReportStyle(selectedOption.defaultReportStyle);
-                    setReportStyleIntent("INHERITED");
-                  }}
-                >
-                  Use assessment default
-                </button>
-              )}
-            </div>
-          </section>
-        )}
 
         <div className="wf-field !mb-0">
           <label className="wf-label" htmlFor="public-campaign-name">

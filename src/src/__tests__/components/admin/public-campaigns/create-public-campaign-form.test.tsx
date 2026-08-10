@@ -140,13 +140,11 @@ describe("CreatePublicCampaignForm", () => {
 
     chooseAssessment();
     expect(
-      screen.getByRole("heading", { name: "Report design" }),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("group", { name: "Report design" })).toBeInTheDocument();
-    expect(screen.queryByRole("group", { name: "Report style" })).not.toBeInTheDocument();
+      screen.queryByRole("heading", { name: "Report design" }),
+    ).not.toBeInTheDocument();
     expect(
-      screen.getByText("Uses the assessment's default design."),
-    ).toBeInTheDocument();
+      screen.queryByRole("group", { name: "Report design" }),
+    ).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Create draft" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Cancel" })).toHaveAttribute(
       "href",
@@ -265,71 +263,10 @@ describe("CreatePublicCampaignForm", () => {
     });
   });
 
-  it("serializes scheduled dates and only the explicitly customized report style", async () => {
+  it("always inherits the assessment report design and omits an override", async () => {
     render(<CreatePublicCampaignForm options={OPTIONS} />);
-    chooseAssessment();
-    enterName();
-    fireEvent.click(
-      screen.getByRole("radio", { name: /Executive Boardroom/i }),
-    );
-    fireEvent.click(screen.getByRole("radio", { name: "Choose a date and time" }));
-    fireEvent.change(screen.getByLabelText("Start date and time"), {
-      target: { value: "2026-08-18T10:00" },
-    });
-    fireEvent.click(screen.getByRole("radio", { name: "Choose an end date" }));
-    fireEvent.change(screen.getByLabelText("End date and time"), {
-      target: { value: "2026-09-18T17:30" },
-    });
-
-    submit();
-
-    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
-    expect(submittedBody()).toEqual({
-      templateId: "template-scaling-up",
-      name: "Leadership Momentum",
-      openAt: new Date("2026-08-18T10:00").toISOString(),
-      closeAt: new Date("2026-09-18T17:30").toISOString(),
-      reportStyle: "EXECUTIVE_BOARDROOM",
-    });
-  });
-
-  it("resets customization to the next assessment default and resolves its preview anatomy", () => {
-    render(<CreatePublicCampaignForm options={OPTIONS} />);
-    chooseAssessment();
-    fireEvent.click(
-      screen.getByRole("radio", { name: /Executive Boardroom/i }),
-    );
-    expect(screen.getByText("Customized for this campaign.")).toBeInTheDocument();
-
     chooseAssessment("template-leadership");
-
-    expect(screen.getByRole("radio", { name: /Modern Dashboard/i })).toBeChecked();
-    expect(
-      screen.getByText("Uses the assessment's default design."),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("img", { name: "Modern Dashboard Cover preview" }),
-    ).toHaveAttribute(
-      "src",
-      "/report-style-previews/sparse-custom/modern-dashboard/cover.webp",
-    );
-  });
-
-  it("removes report design for unsupported assessments and never serializes a style", async () => {
-    render(<CreatePublicCampaignForm options={OPTIONS} />);
-    chooseAssessment();
-    fireEvent.click(
-      screen.getByRole("radio", { name: /Executive Boardroom/i }),
-    );
-
-    chooseAssessment("template-rockefeller");
     enterName();
-    expect(
-      screen.queryByRole("heading", { name: "Report design" }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("region", { name: "Report style selection" }),
-    ).not.toBeInTheDocument();
 
     submit();
 
