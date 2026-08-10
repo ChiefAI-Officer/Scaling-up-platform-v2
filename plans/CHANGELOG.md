@@ -6,6 +6,17 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="create-assessment-welcome-parity-launched"></a>
+### 2026-08-10 — Create assessment Welcome parity launched <!-- ENTRY_ISO:2026-08-10 ENTRY_SLUG:create-assessment-welcome-parity-launched -->
+
+**Status: LAUNCHED + PRODUCTION-VERIFIED.** PR [#329](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/329) passed Build, Migration Safety Gate, Assessment Email Lease (PostgreSQL), Vercel, and Vercel Preview Comments, then squash-merged as `235b18f45fa1a50ce362a0f8c2a1df1c08aa0e11`. Exact Production deployment `dpl_FFUVXcZ9AnUwQQpAoYkwHGZHk3kx` reached Ready at [`scaling-up-platform-v2-19luuqso8-scaling-up.vercel.app`](https://scaling-up-platform-v2-19luuqso8-scaling-up.vercel.app) and owns both [`scaling-up-platform-v2.vercel.app`](https://scaling-up-platform-v2.vercel.app) and [`platformtest.scalingup.com`](https://platformtest.scalingup.com). The existing `WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_ENABLED=1` capability was already active and its kill switch absent, so this parity launch required no Production environment change.
+
+**Delivered behavior and lifecycle boundary.** ADMIN/STAFF simplified assessment creation now contains the same shared, collapsed-by-default seven-field Welcome card and respondent preview as draft Build. It sits after **Assessment name** and before **Advanced** / **Internal ID**, uses only the page-level **Create and start building** action, validates and refocuses the first invalid field on every failed submit, and persists the authored default atomically with the new template and empty v1 draft. The API accepts exactly the seven authoring keys and rejects arbitrary nested presentation data before opening a transaction. This applies only to assessments created from launch onward: no existing template, INVITED campaign snapshot, DRAFT/ACTIVE/CLOSED/historical campaign, PUBLIC campaign, response, submission, report, email, or customer record was rewritten. Future INVITED campaigns continue to freeze the then-current assessment default through the already-launched snapshot path.
+
+**Verification and acceptance boundary.** Immediately before publication, the exact clean branch passed the complete repository at **683 suites / 8,505 tests / 16 snapshots**. The release-ready evidence also records **9 suites / 143 tests** for the enabled matrix, **3 suites / 103 tests** for enabled-plus-kill, changed-file ESLint, Prisma generation, all **47 migrations**, two Production-equivalent Turbopack builds with **94/94** static pages, and clean independent re-review. After deployment, both canonical `/api/health` endpoints returned HTTP `200` with `status=healthy`, database `healthy`, and `authPosture=safe`. No safe authenticated non-Production session was available and no real Production ADMIN/STAFF account was used, so signed-in visual acceptance of the Create card is not claimed; no Production assessment or other customer-data write was performed during launch verification.
+
+---
+
 <a id="create-assessment-welcome-parity-release-ready"></a>
 ### 2026-08-10 — Create assessment Welcome parity release-ready <!-- ENTRY_ISO:2026-08-10 ENTRY_SLUG:create-assessment-welcome-parity-release-ready -->
 
