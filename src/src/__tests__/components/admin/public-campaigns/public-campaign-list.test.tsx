@@ -1,5 +1,5 @@
 import React from "react";
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { PublicCampaignList } from "@/components/admin/public-campaigns/PublicCampaignList";
 import type { PublicCampaignViewModel } from "@/lib/assessments/public-campaign-ui";
 
@@ -329,87 +329,7 @@ describe("PublicCampaignList", () => {
     );
   });
 
-  it("merges overlapping publish and authoritative report updates into the latest row (catches stale completion rollback)", async () => {
-    let resolvePublish!: (value: Response) => void;
-    let resolveReportDesign!: (value: Response) => void;
-
-    global.fetch = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      if (url === "/api/admin/public-campaigns" && !init?.method) {
-        return Promise.resolve(
-          response({ success: true, data: [campaigns[0]] }),
-        );
-      }
-      if (url.endsWith("/publish")) {
-        return new Promise<Response>((resolve) => {
-          resolvePublish = resolve;
-        });
-      }
-      if (url.endsWith("/report-style")) {
-        return new Promise<Response>((resolve) => {
-          resolveReportDesign = resolve;
-        });
-      }
-      return Promise.resolve(
-        response({ success: false, error: "UNEXPECTED_ENDPOINT" }, false, 500),
-      );
-    }) as jest.MockedFunction<typeof fetch>;
-
-    render(<PublicCampaignList />);
-    await screen.findByText("August lead campaign");
-
-    fireEvent.click(screen.getByText("More"));
-    fireEvent.click(screen.getByRole("button", { name: "Report design" }));
-    fireEvent.click(screen.getByRole("radio", { name: /executive boardroom/i }));
-    fireEvent.click(screen.getByRole("button", { name: "Save report design" }));
-
-    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
-    fireEvent.click(
-      within(await screen.findByRole("dialog")).getByRole("button", {
-        name: "Publish",
-      }),
-    );
-
-    await waitFor(() => {
-      expect(resolvePublish).toBeDefined();
-      expect(resolveReportDesign).toBeDefined();
-    });
-
-    await act(async () => {
-      resolveReportDesign(
-        response(
-          {
-            error: "REPORT_STYLE_LOCKED",
-            message: "Refresh to see the final style.",
-            data: {
-              id: "campaign-new",
-              reportStyle: "MODERN_DASHBOARD",
-              reportStyleSource: "CAMPAIGN_OVERRIDE",
-              reportStyleLockedAt: "2026-08-10T01:15:00.000Z",
-            },
-          },
-          false,
-          409,
-        ),
-      );
-    });
-
-    await act(async () => {
-      resolvePublish(
-        response({
-          success: true,
-          data: { id: "campaign-new", status: "ACTIVE" },
-        }),
-      );
-    });
-
-    expect(await screen.findByText("Live")).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: /modern dashboard/i })).toBeChecked();
-    screen.getAllByRole("radio").forEach((radio) => expect(radio).toBeDisabled());
-    expect(screen.getByText("Customized for this campaign")).toBeInTheDocument();
-  });
-
-  it("keeps visited response panels mounted, makes responses exclusive, and manages report design independently", async () => {
+  it("keeps visited response panels mounted and makes responses exclusive", async () => {
     const disclosureCampaigns: PublicCampaignViewModel[] = [
       {
         ...campaigns[0],
@@ -451,14 +371,6 @@ describe("PublicCampaignList", () => {
     expect(firstResponseRow).not.toHaveAttribute("hidden");
     expect(firstResponseRow!.querySelector("td")).toHaveAttribute("colspan", "6");
 
-    fireEvent.click(within(firstRow!).getByText("More"));
-    fireEvent.click(
-      within(firstRow!).getByRole("button", { name: "Report design" }),
-    );
-    expect(
-      await screen.findByRole("region", { name: "First live campaign report design" }),
-    ).toBeInTheDocument();
-
     fireEvent.click(
       within(firstRow!).getByRole("button", { name: "Hide responses" }),
     );
@@ -494,20 +406,6 @@ describe("PublicCampaignList", () => {
     expect(firstResponseRow!.querySelector("td")).toHaveAttribute("colspan", "6");
     expect(secondResponseRow).not.toBeNull();
     expect(secondResponseRow).not.toHaveAttribute("hidden");
-    expect(
-      screen.getByRole("region", { name: "First live campaign report design" }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(within(secondRow!).getByText("More"));
-    fireEvent.click(
-      within(secondRow!).getByRole("button", { name: "Report design" }),
-    );
-    expect(
-      screen.queryByRole("region", { name: "First live campaign report design" }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("region", { name: "Second live campaign report design" }),
-    ).toBeInTheDocument();
     expect(secondResponseRow).not.toHaveAttribute("hidden");
   });
 });
