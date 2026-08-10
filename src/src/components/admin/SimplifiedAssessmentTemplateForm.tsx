@@ -48,6 +48,7 @@ export function SimplifiedAssessmentTemplateForm({
   const [welcomeFocusField, setWelcomeFocusField] = useState<
     keyof InvitedWelcomeAuthoringInputV1 | null
   >(null);
+  const [welcomeFocusRequestToken, setWelcomeFocusRequestToken] = useState(0);
 
   const generatedInternalId = generateTemplateInternalId(name);
   const displayedInternalId = internalIdEdited
@@ -110,6 +111,7 @@ export function SimplifiedAssessmentTemplateForm({
         setWelcomeErrors(errors);
         setWelcomeExpanded(true);
         setWelcomeFocusField(firstInvalidField);
+        setWelcomeFocusRequestToken((token) => token + 1);
         return;
       }
       invitedWelcomeDefault = parsedWelcome.data;
@@ -212,6 +214,7 @@ export function SimplifiedAssessmentTemplateForm({
           expanded={welcomeExpanded}
           onExpandedChange={setWelcomeExpanded}
           focusField={welcomeFocusField}
+          focusRequestToken={welcomeFocusRequestToken}
           onChange={(patch) => {
             setWelcomeValues((values) => ({ ...values, ...patch }));
             const [field] = Object.keys(patch) as Array<

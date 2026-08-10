@@ -355,6 +355,34 @@ describe("POST /api/admin/assessment-templates (create)", () => {
   });
 
   it.each([
+    ["layout", { density: "compact" }],
+    ["styles", { accentColor: "#000000" }],
+    ["disclosure", "Client-supplied disclosure"],
+    ["facts", [{ label: "Questions", value: "12" }]],
+  ])(
+    "rejects the unknown enabled Welcome key %s before a transaction",
+    async (unknownKey, unknownValue) => {
+      enableSimplifiedCreation();
+      enableWelcomeAuthoring();
+      (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+
+      const response = await listPOST(
+        jsonReq("http://localhost/api/admin/assessment-templates", {
+          creationMode: "simplified",
+          name: "Test Template",
+          invitedWelcomeDefault: {
+            ...authoredWelcome,
+            [unknownKey]: unknownValue,
+          },
+        }) as never,
+      );
+
+      expect(response.status).toBe(400);
+      expect(db.$transaction).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
     ["off", () => undefined],
     ["killed", () => {
       enableWelcomeAuthoring();

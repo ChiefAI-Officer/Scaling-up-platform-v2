@@ -119,8 +119,21 @@ const SimplifiedCreateBodySchema = z
   })
   .strict();
 
+const ExactInvitedWelcomeAuthoringInputSchema = z
+  .object({
+    eyebrow: z.unknown(),
+    headingTemplate: z.unknown(),
+    ledeParagraphs: z.unknown(),
+    sharingHeading: z.unknown(),
+    scoresHeading: z.unknown(),
+    scoresDescription: z.unknown(),
+    ctaLabel: z.unknown(),
+  })
+  .strict()
+  .pipe(invitedWelcomeAuthoringInputSchema);
+
 const SimplifiedCreateWithWelcomeBodySchema = SimplifiedCreateBodySchema.extend({
-  invitedWelcomeDefault: invitedWelcomeAuthoringInputSchema.optional(),
+  invitedWelcomeDefault: ExactInvitedWelcomeAuthoringInputSchema.optional(),
 }).strict();
 
 const MAX_GENERATED_INTERNAL_ID_ATTEMPTS = 25;

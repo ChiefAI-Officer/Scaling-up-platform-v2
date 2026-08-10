@@ -183,6 +183,30 @@ describe("SimplifiedAssessmentTemplateForm", () => {
     },
   );
 
+  it("refocuses the first invalid Welcome field on an unchanged repeated submit", async () => {
+    render(<SimplifiedAssessmentTemplateForm welcomeAuthoringEnabled />);
+
+    enterName();
+    fireEvent.click(screen.getByRole("button", { name: "Expand Welcome screen" }));
+    const heading = screen.getByLabelText("Heading");
+    fireEvent.change(heading, {
+      target: { value: "A heading without the required token" },
+    });
+    const submit = screen.getByRole("button", {
+      name: "Create and start building",
+    });
+
+    fireEvent.click(submit);
+    await waitFor(() => expect(heading).toHaveFocus());
+
+    submit.focus();
+    expect(submit).toHaveFocus();
+    fireEvent.click(submit);
+
+    expect(global.fetch).not.toHaveBeenCalled();
+    await waitFor(() => expect(heading).toHaveFocus());
+  });
+
   it("derives the Internal ID from the name until an administrator edits it", () => {
     render(<SimplifiedAssessmentTemplateForm />);
 

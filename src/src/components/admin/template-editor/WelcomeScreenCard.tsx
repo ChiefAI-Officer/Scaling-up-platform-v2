@@ -29,6 +29,7 @@ export function WelcomeScreenCard({
   expanded: controlledExpanded,
   onExpandedChange,
   focusField,
+  focusRequestToken,
   onChange,
 }: {
   values: InvitedWelcomeAuthoringInputV1;
@@ -40,6 +41,7 @@ export function WelcomeScreenCard({
   expanded?: boolean;
   onExpandedChange?: (expanded: boolean) => void;
   focusField?: keyof InvitedWelcomeAuthoringInputV1 | null;
+  focusRequestToken?: number;
   onChange: (patch: Partial<InvitedWelcomeAuthoringInputV1>) => void;
 }) {
   const [localExpanded, setLocalExpanded] = useState(false);
@@ -69,7 +71,7 @@ export function WelcomeScreenCard({
       ? "welcome-ledeParagraphs"
       : `welcome-${focusField}`;
     requestAnimationFrame(() => document.getElementById(id)?.focus());
-  }, [expanded, focusField]);
+  }, [expanded, focusField, focusRequestToken]);
 
   const field = (
     key: Exclude<keyof InvitedWelcomeAuthoringInputV1, "ledeParagraphs">,
