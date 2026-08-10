@@ -140,6 +140,7 @@ describe("Welcome presentation rendering", () => {
           expectationText="40 short statements, rated 0–3."
           sharingLabel="How your results are shared"
           sharingSub="Authorized people can review your report."
+          scoresLabel="How scoring works"
           scoresSub="Scores detail."
         />
         <WelcomeStats questionCount={40} sectionCount={10} scaleLabel="0–3" />
@@ -152,6 +153,7 @@ describe("Welcome presentation rendering", () => {
       ),
     ).toBeInTheDocument();
     const stats = screen.getByTestId("welcome-stats");
+    expect(screen.getByText("How scoring works")).toBeInTheDocument();
     expect(stats.querySelectorAll(".su-welcome-chip")).toHaveLength(3);
     expect(within(stats).getByText("0–3")).toBeInTheDocument();
   });

@@ -46,6 +46,8 @@ export interface WelcomeExpectationsProps {
   sharingSub: string;
   /** Flow-specific sub for the "category scores" row. */
   scoresSub: string;
+  /** Flow-specific title for the category-scores row. */
+  scoresLabel?: string;
 }
 
 /**
@@ -59,6 +61,7 @@ export function WelcomeExpectations({
   sharingLabel,
   sharingSub,
   scoresSub,
+  scoresLabel = "Your category scores",
 }: WelcomeExpectationsProps) {
   return (
     <ul className="su-welcome-expect" data-testid="welcome-expectations">
@@ -85,7 +88,7 @@ export function WelcomeExpectations({
           {"📊"}
         </span>
         <span className="su-welcome-expect-text">
-          <b>Your category scores</b>
+          <b>{scoresLabel}</b>
           <span>{scoresSub}</span>
         </span>
       </li>

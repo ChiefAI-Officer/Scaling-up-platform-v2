@@ -18,6 +18,11 @@ import { isCustomSlidesEnabled } from "@/lib/assessments/wave-m-flags";
 import { loadSafeSlides } from "@/lib/assessments/load-safe-slides";
 import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
 import { isFindingsLogicEnabled } from "@/lib/assessments/wave-u-flags";
+import { isAdminOwnedAssessmentPresentationEnabled } from "@/lib/assessments/wave-admin-owned-assessment-presentation-flags";
+import {
+  invitedWelcomeConfigSchema,
+  resolveLegacyInvitedWelcomeConfig,
+} from "@/lib/assessments/invited-welcome-config";
 
 const NO_STORE_HEADERS = { "Cache-Control": "no-store" } as const;
 
@@ -171,6 +176,21 @@ export async function GET(
     const customSlides = isCustomSlidesEnabled(invitation.campaignId)
       ? loadSafeSlides(invitation.campaign.customSlides)
       : undefined;
+    const invitedWelcome = (() => {
+      if (!isAdminOwnedAssessmentPresentationEnabled()) return undefined;
+      const parsed = invitedWelcomeConfigSchema.safeParse(
+        invitation.campaign.invitedWelcomeSnapshot,
+      );
+      if (parsed.success) return parsed.data;
+      console.warn("[assessment-me] invalid invited Welcome snapshot", {
+        campaignId: invitation.campaign.id,
+        templateId: invitation.campaign.templateId,
+        issueCodes: parsed.error.issues.map((issue) => issue.code),
+      });
+      return resolveLegacyInvitedWelcomeConfig(
+        invitation.campaign.template?.alias,
+      );
+    })();
 
     return NextResponse.json(
       {
@@ -178,6 +198,7 @@ export async function GET(
         data: {
           isCEO,
           ...(customSlides && customSlides.length > 0 ? { customSlides } : {}),
+          ...(invitedWelcome ? { invitedWelcome } : {}),
           // Opaque per-respondent id (the invitation cuid) for keying the
           // client-side localStorage draft. The invitation id is scoped to
           // THIS respondent's own authenticated session, so returning it to
