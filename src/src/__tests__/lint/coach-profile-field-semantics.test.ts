@@ -42,4 +42,11 @@ describe("coach profile field semantics", () => {
     const deleteHandler = editor.slice(deleteStart, saveStart);
     expect(deleteHandler).not.toMatch(/company\s*:/);
   });
+
+  it("never maps Circle title into company", () => {
+    const sync = source("src/services/circle-sync.ts");
+    expect(sync).toContain("updateData.title = profile.title.trim()");
+    expect(sync).not.toContain("updateData.company = profile.title");
+    expect(sync).not.toContain('fieldsUpdated.push("company")');
+  });
 });
