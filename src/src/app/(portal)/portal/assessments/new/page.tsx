@@ -11,7 +11,6 @@ import { db } from "@/lib/db";
 import {
   asAccessDb,
   canAccessOrganization,
-  canAccessTemplate,
 } from "@/lib/assessments/access-control";
 import { CampaignWizard } from "@/components/assessments/CampaignWizard";
 import {
@@ -26,6 +25,7 @@ import { isWaveQAdminControlsEnabled } from "@/lib/assessments/wave-q-flags";
 import { isOnScreenResultsEnabled } from "@/lib/assessments/wave-osr-flags";
 import { isAdminOwnedAssessmentPresentationEnabled } from "@/lib/assessments/wave-admin-owned-assessment-presentation-flags";
 import { getInvitationBannerAuthoringGate } from "@/lib/assessments/wave-invitation-banner-flags";
+import { campaignPickerTemplateWhere } from "@/lib/assessments/campaign-picker-template-scope";
 
 export default async function NewCampaignPage() {
   const { session, coach } = await requireCoach();
@@ -37,12 +37,30 @@ export default async function NewCampaignPage() {
   };
   const accessDb = asAccessDb(db);
   const invitationBannerGate = await getInvitationBannerAuthoringGate(
-    async (id) => {
-      const [organizationVisible, templateVisible] = await Promise.all([
-        canAccessOrganization(accessDb, actor, id),
-        canAccessTemplate(accessDb, actor, id),
+    async (configuredIds) => {
+      const templateWhere = await campaignPickerTemplateWhere(db, actor);
+      const [templateRows, organizationVisibility] = await Promise.all([
+        db.assessmentTemplate.findMany({
+          where: { AND: [templateWhere, { id: { in: [...configuredIds] } }] },
+          select: { id: true },
+        }),
+        Promise.all(
+          configuredIds.map(async (id) => ({
+            id,
+            visible: await canAccessOrganization(accessDb, actor, id),
+          })),
+        ),
       ]);
-      return organizationVisible || templateVisible;
+      const visibleTemplateIds = new Set(templateRows.map(({ id }) => id));
+      const visibleOrganizationIds = new Set(
+        organizationVisibility
+          .filter(({ visible }) => visible)
+          .map(({ id }) => id),
+      );
+
+      return configuredIds.filter(
+        (id) => visibleTemplateIds.has(id) || visibleOrganizationIds.has(id),
+      );
     },
   );
   const customHtmlEmailEnabled = waveDCustomHtmlEmailEnabled();

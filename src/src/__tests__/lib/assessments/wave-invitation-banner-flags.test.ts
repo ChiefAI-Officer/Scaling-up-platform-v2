@@ -59,39 +59,48 @@ describe("invitation banner gate", () => {
 
   it("lets KILL override global enable and returns an empty authoring snapshot", async () => {
     process.env[ENABLED] = "1";
+    process.env[CANARY] = "org_1";
     process.env[KILL] = "1";
+    const filterVisibleIds = jest.fn(async () => ["org_1"]);
 
     expect(isInvitationBannerEnabled({ organizationId: "org_1" })).toBe(false);
     await expect(
-      getInvitationBannerAuthoringGate(async () => true),
+      getInvitationBannerAuthoringGate(filterVisibleIds),
     ).resolves.toEqual({
       globallyEnabled: false,
       canaryIds: [],
     });
+    expect(filterVisibleIds).not.toHaveBeenCalled();
   });
 
-  it("serializes only canary IDs already visible to the current coach", async () => {
-    process.env[CANARY] =
-      " org_visible, org_hidden tpl_visible tpl_hidden org_visible ";
-    const visibleIds = new Set(["org_visible", "tpl_visible"]);
+  it("keeps only configured IDs returned by the picker-visibility batch filter", async () => {
+    process.env[CANARY] = "org-1 tpl-live tpl-hidden org-1";
+    const filterVisibleIds = jest.fn(
+      async (configuredIds: readonly string[]) => {
+        expect(configuredIds).toEqual(["org-1", "tpl-live", "tpl-hidden"]);
+        return ["tpl-live", "not-configured", "org-1"];
+      },
+    );
 
     await expect(
-      getInvitationBannerAuthoringGate(async (id) => visibleIds.has(id)),
+      getInvitationBannerAuthoringGate(filterVisibleIds),
     ).resolves.toEqual({
       globallyEnabled: false,
-      canaryIds: ["org_visible", "tpl_visible"],
+      canaryIds: ["org-1", "tpl-live"],
     });
   });
 
   it("omits canary IDs when global enablement makes them irrelevant", async () => {
     process.env[ENABLED] = "1";
     process.env[CANARY] = "cross_tenant_org cross_tenant_template";
-    const canAccess = jest.fn(async () => true);
+    const filterVisibleIds = jest.fn(async () => ["cross_tenant_org"]);
 
-    await expect(getInvitationBannerAuthoringGate(canAccess)).resolves.toEqual({
+    await expect(
+      getInvitationBannerAuthoringGate(filterVisibleIds),
+    ).resolves.toEqual({
       globallyEnabled: true,
       canaryIds: [],
     });
-    expect(canAccess).not.toHaveBeenCalled();
+    expect(filterVisibleIds).not.toHaveBeenCalled();
   });
 });

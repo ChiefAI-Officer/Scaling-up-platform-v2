@@ -8,6 +8,10 @@ export interface InvitationBannerAuthoringGate {
   canaryIds: string[];
 }
 
+export type FilterInvitationBannerCanaryIds = (
+  configuredIds: readonly string[],
+) => Promise<readonly string[]>;
+
 function isOn(value: string | undefined): boolean {
   return value === "1" || value === "true" || value === "TRUE" || value === "yes";
 }
@@ -33,7 +37,7 @@ export function isInvitationBannerEnabled(scope?: InvitationBannerScope): boolea
 }
 
 export async function getInvitationBannerAuthoringGate(
-  canAccessCanaryId: (id: string) => Promise<boolean>,
+  filterVisibleIds?: FilterInvitationBannerCanaryIds,
 ): Promise<InvitationBannerAuthoringGate> {
   if (isOn(process.env.WAVE_INVITATION_BANNER_KILL)) {
     return { globallyEnabled: false, canaryIds: [] };
@@ -42,12 +46,12 @@ export async function getInvitationBannerAuthoringGate(
     return { globallyEnabled: true, canaryIds: [] };
   }
 
-  const visibleCanaryIds: string[] = [];
-  for (const id of canaryIds()) {
-    if (await canAccessCanaryId(id)) visibleCanaryIds.push(id);
-  }
+  const configuredIds = canaryIds();
+  const visibleIds = new Set(
+    filterVisibleIds ? await filterVisibleIds(configuredIds) : [],
+  );
   return {
     globallyEnabled: false,
-    canaryIds: visibleCanaryIds,
+    canaryIds: configuredIds.filter((id) => visibleIds.has(id)),
   };
 }
