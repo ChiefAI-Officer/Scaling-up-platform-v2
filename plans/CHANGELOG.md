@@ -6,6 +6,19 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="universal-invitation-banner-launched"></a>
+### 2026-08-11 — Universal invitation banner launched <!-- ENTRY_ISO:2026-08-11 ENTRY_SLUG:universal-invitation-banner-launched -->
+
+**Status: LAUNCHED + GLOBALLY ENABLED + PRODUCTION-VERIFIED.** Ready PR [#331](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/331) passed Build, Migration Safety Gate, Assessment Email Lease (PostgreSQL), Vercel, and Vercel Preview Comments, then squash-merged to protected `main` as `dc0026fde29cbc8019fa8a966d369c7a6221f1bb`. Dark deployment `dpl_PJpiF5dFZwEkxF9B72oUGLEFZcCw` was Ready and GitHub deployment `5846576844` tied it to that exact merge. The enabled redeployment `dpl_H7JnKCB9eXoMoYF4cUDthxnG1sCy` is Ready and owns `scaling-up-platform-v2.vercel.app`, `platformtest.scalingup.com`, and the standard Vercel Production aliases.
+
+**Delivered behavior.** Every newly rendered `INVITED` assessment invitation—initial/manual, Inngest fan-out, reminder, and resend—uses one platform-owned Scaling Up-first shell with an optional fixed `Your coach` byline. The platform owns the banner, CTA, visible fallback link, and footer; permitted campaign custom HTML remains a sanitized body fragment. Automatic Organization/company identity is not rendered in the universal banner. PUBLIC campaign authoring/delivery and results/report email families remain unchanged. Authoring snapshots never expose the raw canary allowlist: Organization IDs require live authorization, Template IDs use the shared live campaign-picker scope, and empty/global/KILL states skip visibility queries.
+
+**Activation and safety evidence.** Both canonical dark-deployment health checks returned HTTP `200` with healthy database and safe auth posture. The fresh activation inventory ran in a PostgreSQL transaction beginning with `SET TRANSACTION READ ONLY` using the actual Production custom-HTML flags; it found **2 total overrides, 0 live, 2 soft-deleted**, so activation was not blocked and no manual review was required. The encrypted Production entry `WAVE_INVITATION_BANNER_ENABLED=1` was then created through the Vercel REST path; `WAVE_INVITATION_BANNER_CANARY` and `WAVE_INVITATION_BANNER_KILL` remain absent. After redeployment, the exact enabled host and both canonical aliases returned HTTP `200` with healthy database and safe auth posture. The initial bounded log check found zero error-level events and no organic `email-chrome` event yet; no synthetic customer invitation was sent. KILL remains the immediate rollback control.
+
+**Verification boundary.** Immediately before merge, the main-integrated branch passed **692 suites / 8,611 tests / 16 snapshots**, the focused banner/picker/changelog matrix passed **5 suites / 38 tests**, migration safety approved all **47 migrations**, the Production-equivalent Turbopack build generated **94/94** static pages, and scoped ESLint plus diff hygiene passed. No schema migration, customer-data rewrite, database write, campaign creation/edit, response, report, or customer email occurred during launch.
+
+---
+
 <a id="picker-visible-invitation-banner-canaries-final-review-fix"></a>
 ### 2026-08-11 — Picker-visible invitation banner canaries final-review fix <!-- ENTRY_ISO:2026-08-11 ENTRY_SLUG:picker-visible-invitation-banner-canaries-final-review-fix -->
 
