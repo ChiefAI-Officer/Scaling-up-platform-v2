@@ -4,7 +4,7 @@
 
 **Status:** Approved in brainstorming
 
-**Scope:** Every assessment Report Appearance configuration surface
+**Scope:** Every existing assessment Report Appearance picker
 
 ## 1. Context
 
@@ -29,8 +29,8 @@ an explicit Show/Hide disclosure.
 2. Start every report preview hidden.
 3. Preserve enough information in each style card to make a choice without
    opening the preview.
-4. Apply one interaction consistently to every assessment and every current
-   Admin or Coach configuration surface.
+4. Apply one interaction consistently to every assessment wherever the shared
+   picker is currently rendered in Admin or Coach workflows.
 5. Avoid loading preview assets until an operator requests them.
 6. Preserve report-style selection, inheritance, locking, saving, rendering,
    and respondent-output semantics.
@@ -68,16 +68,21 @@ The shared behavior applies wherever `ReportStylePicker` is rendered:
 
 1. Admin template Settings — default report appearance.
 2. Coach campaign creation — report setup.
-3. Shared Campaign Detail — editable for the owning Coach before first
-   completion, read-only after the appearance lock, and read-only in the Admin
-   view of a coach-owned campaign.
-4. Admin public-campaign creation.
-5. Admin public-campaign management — editable or read-only according to the
-   existing ownership and lock rules.
+3. Campaign Detail while the owning Coach can edit the appearance.
+4. The retained legacy Admin public-campaign creation picker while that
+   fallback surface is active.
+5. Legacy Admin public-campaign management — editable or read-only according
+   to the existing ownership and lock rules.
 
-No caller may retain a permanently visible full preview or an always-loaded
-selected thumbnail. Future Report Appearance configuration surfaces inherit the
-same behavior by using the shared picker.
+No `ReportStylePicker` caller may retain a permanently visible full preview or
+an always-loaded selected thumbnail. Future Report Appearance configuration
+surfaces inherit the same behavior by using the shared picker.
+
+The simplified public-campaign creation flow intentionally inherits the
+assessment's report design and renders no picker, so it remains unchanged. The
+selected-style summary used by read-only Campaign Detail viewers also contains
+no preview and remains unchanged. This work collapses existing previews; it does
+not add preview capability to summary-only surfaces.
 
 ## 6. User Experience
 
@@ -175,8 +180,8 @@ stored models.
   grouping label.
 - The existing tab semantics, roving focus, `aria-selected`, `aria-controls`,
   and tabpanel relationships remain intact while expanded.
-- The disclosure remains enabled when style radios are disabled because viewing
-  a preview does not mutate the report appearance.
+- The disclosure remains enabled when a rendered picker's style radios are
+  disabled because viewing a preview does not mutate the report appearance.
 - Compact sizing must preserve readable text, wrapping, and usable pointer
   targets at desktop and mobile widths.
 
@@ -232,9 +237,12 @@ Add or update `ReportStylePicker` tests to prove:
 ### 11.2 Surface integration tests
 
 Update focused tests for Admin template Settings, Coach campaign creation,
-Coach/Admin Campaign Detail, and public-campaign creation/management. Each
-surface must establish that the shared picker starts collapsed and does not
-regress its existing selection, inheritance, ownership, lock, or save behavior.
+editable Coach Campaign Detail, and legacy public-campaign
+creation/management. Each picker surface must establish that it starts
+collapsed and does not regress its existing selection, inheritance, ownership,
+lock, or save behavior. Existing tests continue to prove that simplified public
+campaign creation and summary-only Campaign Detail views do not expose a style
+override.
 
 ### 11.3 Visual and responsive review
 
@@ -264,8 +272,8 @@ No gate is reported as passing unless it is run and observed passing.
 
 The work is accepted only when:
 
-1. Every current assessment Report Appearance configuration surface uses the
-   shared compact Option A tiles.
+1. Every current `ReportStylePicker` instance uses the shared compact Option A
+   tiles.
 2. Every picker starts with preview tabs and images hidden.
 3. No preview asset is requested before Show preview is activated.
 4. Show/Hide works with correct accessible state and keyboard focus.
