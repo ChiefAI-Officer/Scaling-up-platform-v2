@@ -198,10 +198,12 @@ causes stored custom HTML to be ignored.
 
 ## Universal invitation banner — dark rollout and rollback
 
-This is a separate, **default-off** presentation gate for the INVITED invitation
-family. It has no schema, stored-content, recipient, invitation-lifecycle, or
-database-write component. It changes only newly rendered invitation email HTML/text
-after a separately authorized deployment and flag change.
+This is a separate, **default-off** presentation and authoring-validation gate for
+the INVITED invitation family. Activation performs no automatic schema migration or
+database write, and it does not rewrite existing campaign/template content or change
+recipient/invitation lifecycle state. It changes newly rendered invitation email
+HTML/text and, for an enabled scope, the future create/PATCH custom-HTML validation
+contract after a separately authorized deployment and flag change.
 
 ### Gate contract and exact canary formats
 
@@ -237,10 +239,12 @@ PUBLIC campaign creation/submission paths, respondent results/report emails, and
 report-email rendering are excluded and must remain unchanged. The banner has no
 editor control: the platform owns the banner, CTA, visible fallback URL, and footer.
 
-For a banner-enabled campaign, non-empty custom HTML is always rendered as a
-sanitized **body-only** fragment inside the universal shell when the existing
-`WAVE_D_CUSTOM_HTML_EMAIL_ENABLED` capability permits custom HTML. It deliberately
-does **not** require, set, or synchronize
+For a banner-enabled scope, future campaign create/PATCH validation permits and
+persists body-only custom HTML because the platform-owned universal shell supplies
+the canonical CTA and visible fallback URL. For a banner-enabled campaign, non-empty
+custom HTML is rendered as a sanitized **body-only** fragment inside that shell when
+the existing `WAVE_D_CUSTOM_HTML_EMAIL_ENABLED` capability permits custom HTML. It
+deliberately does **not** require, set, or synchronize
 `ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED`; that older flag retains its normal
 meaning only when the universal banner is inactive.
 
@@ -299,10 +303,14 @@ observability queries.
 
 Contain immediately by setting `WAVE_INVITATION_BANNER_KILL=1` and redeploying. For
 a bounded rollback, disable global ENABLED and/or remove the exact CANARY ID, then
-redeploy. KILL takes effect ahead of a global or canary match. Either path restores
-the existing Wave-P/legacy composition selection for subsequent renders, including
-the normal GH #220 custom-HTML behavior. No data mutation, migration rollback, outbox
-replay, resend, or content rewrite is required or authorized for this rollback.
+redeploy. KILL takes effect ahead of a global or canary match. Either path stops new
+universal rendering and restores the non-universal authoring contract for future
+writes; it does **not** rewrite already-saved tokenless body-only custom HTML. Those
+stored fragments remain subject to the normal GH #220/Wave-D selection on subsequent
+renders and may be active again if the universal gate is later re-enabled. Review or
+edit them deliberately through the normal authorized campaign path; no automatic data
+mutation, migration rollback, outbox replay, resend, or content rewrite is required
+or authorized for containment.
 
 ---
 
