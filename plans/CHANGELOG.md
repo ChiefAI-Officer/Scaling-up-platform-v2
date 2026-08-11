@@ -6,6 +6,21 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="jul10-57-lva-peer-averages-production-accepted"></a>
+### 2026-08-12 — July 10 #57 LVA peer averages accepted on Production <!-- ENTRY_ISO:2026-08-12 ENTRY_SLUG:jul10-57-lva-peer-averages-production-accepted -->
+
+**Status: DONE + LIVE ON PRODUCTION.** Ready PR [#339](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/339) passed Build, Migration Safety Gate, Assessment Email Lease (PostgreSQL), Vercel, and Vercel Preview Comments, then squash-merged to protected `main` as `013f00bbb90eb4654023fd932c72efc75f79a332`. The exact merged deployment was healthy before activation. Production Wave S was then explicitly set to enabled with the kill state off; Ready redeployment `dpl_85ZoYwgbKEi5ffTVjt7czywFYbgX` owns both canonical aliases with healthy database and safe auth posture.
+
+**Live editor receipt.** The canonical LVA active v4 Settings tab renders the peer-average editor as a normal Settings card after Default report appearance. It exposes all 16 rating-question inputs and remains gated by the immutable `leadership-vision-alignment` alias; arbitrary new assessments do not inherit LVA settings. The existing `AssessmentBenchmark` schema, atomic full-set PUT API, stable keys, import mappings, and report calculations are unchanged.
+
+![Production LVA Settings peer-average card](../docs/agents/assets/jul10-57-58/lva-settings-peer-averages-enabled-focused.png)
+
+**Safety receipt.** Four clearly temporary values were used only for the separately tracked #58 renderer acceptance, then cleared through the same admin editor. A fresh authenticated diagnostic reported effective capability **Enabled**, active LVA **v4 · enUS**, **16 rating questions**, **0 stored rows**, and coverage **0 matching · 16 missing · 0 stale**. Reloaded individual and group reports again omitted peer comparisons. No persistent benchmark dataset was invented; the single-person Jeff export remains ineligible as a peer cohort.
+
+![Production status after all temporary values were cleared](../docs/agents/assets/jul10-57-58/lva-peer-status-zero-after-clear.png)
+
+**Acceptance boundary.** July 10 #57 asked for the capability to make LVA peer averages available and extensible. That capability is now live and verified; persistent real LVA values are a separately sourced provenance follow-on and do not reopen this row. #58 remains independently tracked until its two PII-free report receipts are committed.
+
 <a id="jul10-57-lva-peer-settings-restore-ready"></a>
 ### 2026-08-12 — July 10 #57 LVA peer editor restored to Settings <!-- ENTRY_ISO:2026-08-12 ENTRY_SLUG:jul10-57-lva-peer-settings-restore-ready -->
 
