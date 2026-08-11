@@ -238,7 +238,12 @@ export default async function CoachDetailPage({
                 </div>
 
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Company</p>
+                  <p className="text-sm font-medium text-muted-foreground">Professional Title</p>
+                  <p className="text-foreground">{coach.title || "Not provided"}</p>
+                </div>
+
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Company Name</p>
                   <p className="text-foreground">{coach.company || "Not provided"}</p>
                 </div>
 

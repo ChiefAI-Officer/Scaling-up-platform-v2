@@ -10,7 +10,7 @@ const updatePortalProfileSchema = z
     lastName: z.string().optional(),
     bio: z.string().optional(),
     title: z.string().nullable().optional(), // Professional title (e.g., "Scaling Up Certified Coach")
-    company: z.string().nullable().optional(), // MR-26: Title / Credentials / business entity
+    company: z.string().nullable().optional(), // Company name / business entity
     linkedinUrl: z.string().url().nullable().optional(),
     showBookCallCta: z.boolean().optional(),
     bookCallUrl: z

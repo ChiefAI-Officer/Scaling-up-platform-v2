@@ -58,7 +58,8 @@ describe("syncCoachFromCircle", () => {
       email: "coach@example.com",
       bio: null,
       profileImage: null,
-      company: null,
+      title: null,
+      company: "A Step Above",
       circleId: null,
     });
     (getCircleProfileByEmail as jest.Mock).mockResolvedValue(null);
@@ -79,7 +80,8 @@ describe("syncCoachFromCircle", () => {
       email: "coach@example.com",
       bio: null,
       profileImage: null,
-      company: null,
+      title: null,
+      company: "A Step Above",
       circleId: null,
     });
     (getCircleProfileByEmail as jest.Mock).mockResolvedValue({
@@ -95,7 +97,7 @@ describe("syncCoachFromCircle", () => {
     expect(result.updated).toBe(true);
     expect(result.warnings).toEqual([]);
     expect(result.fieldsUpdated).toEqual(
-      expect.arrayContaining(["profileImage", "bio", "company", "circleId"])
+      expect.arrayContaining(["profileImage", "bio", "title", "circleId"])
     );
     expect(db.coach.update).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -103,12 +105,16 @@ describe("syncCoachFromCircle", () => {
         data: expect.objectContaining({
           profileImage: "https://cdn.example.com/avatar.jpg",
           bio: "Circle bio",
-          company: "Scaling Up Coach",
+          title: "Scaling Up Coach",
           circleId: "circle-123",
           syncedAt: expect.any(Date),
         }),
       })
     );
+    const updateData = (db.coach.update as jest.Mock).mock.calls[0][0].data;
+    expect(updateData).not.toHaveProperty("company");
+    expect(result.fieldsUpdated).toContain("title");
+    expect(result.fieldsUpdated).not.toContain("company");
   });
 
   it("does not overwrite non-empty profile fields unless forceOverwrite is true", async () => {
@@ -118,6 +124,7 @@ describe("syncCoachFromCircle", () => {
       email: "coach@example.com",
       bio: "Existing bio",
       profileImage: "https://existing.example.com/photo.jpg",
+      title: "Existing Title",
       company: "Existing company",
       circleId: "circle-old",
     });
@@ -143,7 +150,7 @@ describe("syncCoachFromCircle", () => {
     );
     expect((db.coach.update as jest.Mock).mock.calls[0][0].data.profileImage).toBeUndefined();
     expect((db.coach.update as jest.Mock).mock.calls[0][0].data.bio).toBeUndefined();
-    expect((db.coach.update as jest.Mock).mock.calls[0][0].data.company).toBeUndefined();
+    expect((db.coach.update as jest.Mock).mock.calls[0][0].data.title).toBeUndefined();
 
     (db.coach.update as jest.Mock).mockClear();
 
@@ -151,19 +158,23 @@ describe("syncCoachFromCircle", () => {
     expect(overwriteMode.success).toBe(true);
     expect(overwriteMode.warnings).toEqual([]);
     expect(overwriteMode.fieldsUpdated).toEqual(
-      expect.arrayContaining(["profileImage", "bio", "company", "circleId"])
+      expect.arrayContaining(["profileImage", "bio", "title", "circleId"])
     );
     expect(db.coach.update).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           profileImage: "https://new.example.com/avatar.jpg",
           bio: "New bio",
-          company: "New title",
+          title: "New title",
           circleId: "circle-new",
           syncedAt: expect.any(Date),
         }),
       })
     );
+    const updateData = (db.coach.update as jest.Mock).mock.calls[0][0].data;
+    expect(updateData).not.toHaveProperty("company");
+    expect(overwriteMode.fieldsUpdated).toContain("title");
+    expect(overwriteMode.fieldsUpdated).not.toContain("company");
   });
 
   it("returns Coach not found with no warnings", async () => {
@@ -183,15 +194,16 @@ describe("syncCoachFromCircle", () => {
   });
 
   it("rejects an eligible non-https avatar but persists unrelated fields", async () => {
-    (db.coach.findUnique as jest.Mock).mockResolvedValue({ id: "coach-1", email: "coach@example.com", bio: null, profileImage: null, company: null, circleId: null });
+    (db.coach.findUnique as jest.Mock).mockResolvedValue({ id: "coach-1", email: "coach@example.com", bio: null, profileImage: null, title: null, company: "A Step Above", circleId: null });
     (getCircleProfileByEmail as jest.Mock).mockResolvedValue({ memberId: "circle-123", bio: "Circle bio", avatarUrl: "http://cdn.example.com/private?token=SECRET", title: "Scaling Up Coach" });
 
     const result = await syncCoachFromCircle("coach-1");
 
     const updateCall = (db.coach.update as jest.Mock).mock.calls[0][0];
     expect(updateCall.data.profileImage).toBeUndefined();
-    expect(updateCall.data).toEqual(expect.objectContaining({ bio: "Circle bio", company: "Scaling Up Coach", circleId: "circle-123", syncedAt: expect.any(Date) }));
-    expect(result).toEqual({ success: true, updated: true, fieldsUpdated: ["bio", "company", "circleId"], warnings: [invalidImageWarning] });
+    expect(updateCall.data).toEqual(expect.objectContaining({ bio: "Circle bio", title: "Scaling Up Coach", circleId: "circle-123", syncedAt: expect.any(Date) }));
+    expect(updateCall.data).not.toHaveProperty("company");
+    expect(result).toEqual({ success: true, updated: true, fieldsUpdated: ["bio", "title", "circleId"], warnings: [invalidImageWarning] });
     expect(warnSpy).toHaveBeenCalledWith("[Circle Sync] Field skipped", { coachId: "coach-1", syncMode: "fill-empty", field: "profileImage", reason: "invalid-image-url" });
     expect(warnSpy.mock.invocationCallOrder[0]).toBeGreaterThan((db.coach.update as jest.Mock).mock.invocationCallOrder[0]);
     expect(JSON.stringify(warnSpy.mock.calls)).not.toContain("coach@example.com");
@@ -199,21 +211,22 @@ describe("syncCoachFromCircle", () => {
   });
 
   it("forceOverwrite preserves an existing image when the Circle avatar is invalid", async () => {
-    (db.coach.findUnique as jest.Mock).mockResolvedValue({ id: "coach-1", email: "coach@example.com", bio: "Existing bio", profileImage: "https://existing.example.com/photo.jpg", company: "Existing company", circleId: "circle-old" });
+    (db.coach.findUnique as jest.Mock).mockResolvedValue({ id: "coach-1", email: "coach@example.com", bio: "Existing bio", profileImage: "https://existing.example.com/photo.jpg", title: "Existing Title", company: "Existing company", circleId: "circle-old" });
     (getCircleProfileByEmail as jest.Mock).mockResolvedValue({ memberId: "circle-new", bio: "New bio", avatarUrl: "javascript:alert(1)", title: "New title" });
 
     const result = await syncCoachFromCircle("coach-1", { forceOverwrite: true });
 
     const updateCall = (db.coach.update as jest.Mock).mock.calls[0][0];
     expect(updateCall.data.profileImage).toBeUndefined();
-    expect(updateCall.data).toEqual(expect.objectContaining({ bio: "New bio", company: "New title", circleId: "circle-new", syncedAt: expect.any(Date) }));
-    expect(result.fieldsUpdated).toEqual(["bio", "company", "circleId"]);
+    expect(updateCall.data).toEqual(expect.objectContaining({ bio: "New bio", title: "New title", circleId: "circle-new", syncedAt: expect.any(Date) }));
+    expect(updateCall.data).not.toHaveProperty("company");
+    expect(result.fieldsUpdated).toEqual(["bio", "title", "circleId"]);
     expect(result.warnings).toEqual([invalidImageWarning]);
     expect(warnSpy).toHaveBeenCalledWith("[Circle Sync] Field skipped", { coachId: "coach-1", syncMode: "force-overwrite", field: "profileImage", reason: "invalid-image-url" });
   });
 
   it("does not validate or warn about an ineligible avatar in fill-empty mode", async () => {
-    (db.coach.findUnique as jest.Mock).mockResolvedValue({ id: "coach-1", email: "coach@example.com", bio: "Existing bio", profileImage: "https://existing.example.com/photo.jpg", company: "Existing company", circleId: "circle-123" });
+    (db.coach.findUnique as jest.Mock).mockResolvedValue({ id: "coach-1", email: "coach@example.com", bio: "Existing bio", profileImage: "https://existing.example.com/photo.jpg", title: "Existing Title", company: "Existing company", circleId: "circle-123" });
     (getCircleProfileByEmail as jest.Mock).mockResolvedValue({ memberId: "circle-123", bio: "Ignored bio", avatarUrl: "http://ignored.example.com/avatar.jpg", title: "Ignored title" });
 
     const result = await syncCoachFromCircle("coach-1");
@@ -224,7 +237,7 @@ describe("syncCoachFromCircle", () => {
   });
 
   it("returns success updated=false when only an eligible invalid avatar is skipped", async () => {
-    (db.coach.findUnique as jest.Mock).mockResolvedValue({ id: "coach-1", email: "coach@example.com", bio: "Existing bio", profileImage: null, company: "Existing company", circleId: "circle-123" });
+    (db.coach.findUnique as jest.Mock).mockResolvedValue({ id: "coach-1", email: "coach@example.com", bio: "Existing bio", profileImage: null, title: "Existing Title", company: "Existing company", circleId: "circle-123" });
     (getCircleProfileByEmail as jest.Mock).mockResolvedValue({ memberId: "circle-123", avatarUrl: "https://" });
 
     const result = await syncCoachFromCircle("coach-1");
@@ -235,7 +248,7 @@ describe("syncCoachFromCircle", () => {
 
   it("emits no field-skipped warning when persistence fails", async () => {
     jest.spyOn(console, "error").mockImplementation(() => undefined);
-    (db.coach.findUnique as jest.Mock).mockResolvedValue({ id: "coach-1", email: "coach@example.com", bio: null, profileImage: null, company: null, circleId: null });
+    (db.coach.findUnique as jest.Mock).mockResolvedValue({ id: "coach-1", email: "coach@example.com", bio: null, profileImage: null, title: null, company: "A Step Above", circleId: null });
     (getCircleProfileByEmail as jest.Mock).mockResolvedValue({ avatarUrl: "http://cdn.example.com/avatar.jpg" });
     (db.coach.update as jest.Mock).mockRejectedValue(new Error("database unavailable"));
 
@@ -246,7 +259,7 @@ describe("syncCoachFromCircle", () => {
   });
 
   it("emits one warning for every repeated eligible sync attempt", async () => {
-    (db.coach.findUnique as jest.Mock).mockResolvedValue({ id: "coach-1", email: "coach@example.com", bio: "Existing bio", profileImage: null, company: "Existing company", circleId: "circle-123" });
+    (db.coach.findUnique as jest.Mock).mockResolvedValue({ id: "coach-1", email: "coach@example.com", bio: "Existing bio", profileImage: null, title: "Existing Title", company: "Existing company", circleId: "circle-123" });
     (getCircleProfileByEmail as jest.Mock).mockResolvedValue({ memberId: "circle-123", avatarUrl: "data:image/png;base64,abc" });
 
     await syncCoachFromCircle("coach-1");

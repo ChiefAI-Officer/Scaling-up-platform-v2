@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BioPageTemplate } from "@/components/templates/bio-page-template";
+import { resolveCoachProfessionalTitle } from "@/lib/coaches/coach-profile-fields";
 
 interface BioPageData {
   coachName: string;
@@ -28,6 +29,8 @@ interface Workshop {
     lastName: string;
     bio: string | null;
     profileImage: string | null;
+    title: string | null;
+    company: string | null;
     bookCallUrl: string | null;
   };
 }
@@ -70,6 +73,7 @@ export default function BioPageEditor() {
           setFormData((prev) => ({
             ...prev,
             coachName: `${coach.firstName} ${coach.lastName}`,
+            coachTitle: resolveCoachProfessionalTitle(coach),
             biography: coach.bio || "",
             profileImageUrl: coach.profileImage || "",
             ctaButtonText: `Book a Free Call with ${coach.firstName}`,
@@ -218,7 +222,7 @@ export default function BioPageEditor() {
               </div>
 
               <div>
-                <Label htmlFor="coachTitle">Title / Credentials</Label>
+                <Label htmlFor="coachTitle">Professional Title</Label>
                 <Input
                   id="coachTitle"
                   name="coachTitle"

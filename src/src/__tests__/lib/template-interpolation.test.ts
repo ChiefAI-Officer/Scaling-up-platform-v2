@@ -260,6 +260,24 @@ describe("buildWorkshopVariables — event_time / timezone wiring", () => {
         const vars = await buildWorkshopVariables("missing");
         expect(vars).toBeNull();
     });
+
+    it("prefers professional title over company for coach title variables", async () => {
+        findUnique.mockResolvedValue(mockWorkshop({
+            coach: {
+                firstName: "Lynne",
+                lastName: "Verdun",
+                bio: null,
+                profileImage: null,
+                title: "Master Coach",
+                company: "A Step Above",
+            },
+        }));
+
+        const variables = await buildWorkshopVariables("ws-1");
+        expect(variables?.coachTitle).toBe("Master Coach");
+        expect(variables?.coach_title).toBe("Master Coach");
+        expect(variables?.coach_company).toBe("A Step Above");
+    });
 });
 
 describe("formatVenueAddress", () => {

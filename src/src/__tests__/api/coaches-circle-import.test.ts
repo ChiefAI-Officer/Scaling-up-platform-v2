@@ -41,7 +41,8 @@ const updatedCoach = {
   email: "coach@example.com",
   firstName: "Jane",
   lastName: "Coach",
-  company: "Scaling Up Coach",
+  title: "Master Coach",
+  company: "A Step Above",
   bio: "Circle bio",
   profileImage: "https://existing.example.com/photo.jpg",
   circleId: "circle-123",
@@ -75,7 +76,7 @@ it("returns changed fields and nonfatal warnings with the changed-fields message
   (syncCoachFromCircle as jest.Mock).mockResolvedValue({
     success: true,
     updated: true,
-    fieldsUpdated: ["bio", "company"],
+    fieldsUpdated: ["bio", "title"],
     warnings: [warning],
   });
 
@@ -83,7 +84,13 @@ it("returns changed fields and nonfatal warnings with the changed-fields message
   const body = await response.json();
 
   expect(response.status).toBe(200);
-  expect(body.fieldsUpdated).toEqual(["bio", "company"]);
+  expect(body.data).toEqual(expect.objectContaining({
+    title: "Master Coach",
+    company: "A Step Above",
+    titleCredentials: "Master Coach",
+  }));
+  expect(body.fieldsUpdated).toContain("title");
+  expect(body.fieldsUpdated).not.toContain("company");
   expect(body.warnings).toEqual([warning]);
   expect(body.message).toBe("Synced 2 field(s) from Circle.");
 });

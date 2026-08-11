@@ -42,6 +42,7 @@ const mockCoach = {
   bookCallUrl: null,
   bio: null,
   phone: null,
+  title: null,
   company: null,
   profileImage: null,
   linkedinUrl: null,
@@ -135,5 +136,60 @@ describe("PATCH /api/coaches/[id] — integration IDs", () => {
     expect(body.error).toBe(
       "This HubSpot/Circle ID is already assigned to another coach"
     );
+  });
+
+  it("updates professional title and company independently", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue({
+      userId: "admin-1",
+      email: "admin@example.com",
+      role: "ADMIN",
+      coachId: null,
+    });
+    (db.coach.findUnique as jest.Mock).mockResolvedValue(mockCoach);
+    (db.coach.update as jest.Mock).mockResolvedValue({
+      ...mockCoach,
+      title: "Master Coach",
+      company: "A Step Above",
+    });
+    const request = new Request("http://localhost/api/coaches/coach-1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: "  Master Coach  ",
+        company: "  A Step Above  ",
+      }),
+    });
+    const response = await PATCH(
+      request as Parameters<typeof PATCH>[0],
+      routeParams(),
+    );
+
+    expect(response.status).toBe(200);
+    expect(db.coach.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        title: "Master Coach",
+        company: "A Step Above",
+      }),
+    }));
+  });
+
+  it("clears professional title and company independently", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue({
+      userId: "admin-1",
+      email: "admin@example.com",
+      role: "ADMIN",
+      coachId: null,
+    });
+    (db.coach.findUnique as jest.Mock).mockResolvedValue(mockCoach);
+    (db.coach.update as jest.Mock).mockResolvedValue(mockCoach);
+    const request = new Request("http://localhost/api/coaches/coach-1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: null, company: null }),
+    });
+    await PATCH(request as Parameters<typeof PATCH>[0], routeParams());
+    expect(db.coach.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ title: null, company: null }),
+    }));
   });
 });

@@ -6,6 +6,7 @@ import {
   createWorkshopSchema,
   updateWorkshopSchema,
   createCoachSchema,
+  updateCoachSchema,
   createRegistrationSchema,
   coachSignupSchema,
   changePasswordSchema,
@@ -154,6 +155,23 @@ describe("Coach Validation Schema", () => {
     };
     const result = createCoachSchema.safeParse(fullCoach);
     expect(result.success).toBe(true);
+  });
+
+  it("accepts canonical title and legacy company when creating a coach", () => {
+    expect(createCoachSchema.safeParse({
+      ...validCoach,
+      title: "Master Coach",
+      company: "A Step Above",
+    }).success).toBe(true);
+  });
+
+  it("accepts nullable professional fields and integration IDs when updating a coach", () => {
+    expect(updateCoachSchema.safeParse({ title: null, company: null }).success).toBe(true);
+    expect(updateCoachSchema.safeParse({ hubspotId: null, circleId: null }).success).toBe(true);
+  });
+
+  it("rejects non-string professional titles when updating a coach", () => {
+    expect(updateCoachSchema.safeParse({ title: 42 }).success).toBe(false);
   });
 
   it("should reject invalid email", () => {

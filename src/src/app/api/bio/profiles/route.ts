@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getApiActor } from "@/lib/auth/authorization";
+import { resolveCoachProfessionalTitle } from "@/lib/coaches/coach-profile-fields";
 import { z } from "zod";
 
 const bioProfilesQuerySchema = z.object({
@@ -34,6 +35,7 @@ export async function GET(request: NextRequest) {
         id: true,
         firstName: true,
         lastName: true,
+        title: true,
         company: true,
         profileImage: true,
         createdAt: true,
@@ -44,7 +46,8 @@ export async function GET(request: NextRequest) {
     const profiles = coaches.map((coach) => ({
       id: coach.id,
       name: `${coach.firstName} ${coach.lastName}`.trim(),
-      title: coach.company || "Scaling Up Certified Coach",
+      title: resolveCoachProfessionalTitle(coach),
+      company: coach.company,
       photoUrl: coach.profileImage || "",
       createdAt: coach.createdAt.toISOString(),
       editUrl: `/bio/${coach.id}`,

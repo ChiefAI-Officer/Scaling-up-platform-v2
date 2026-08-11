@@ -6,6 +6,19 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="coach-profile-fields-aligned-release-ready"></a>
+### 2026-08-11 — Coach profile fields aligned, local verification complete <!-- ENTRY_ISO:2026-08-11 ENTRY_SLUG:coach-profile-fields-aligned-release-ready -->
+
+**Status: LOCAL VERIFICATION COMPLETE; not pushed, merged, deployed, or written to Production.** **Professional Title** maps to `Coach.title`; **Company Name** maps to `Coach.company`. Admin/self-profile routing, Admin BIO, Coach creation/details, Circle import, the BIO API, new landing-page defaults, and new duo-workshop setup metadata now preserve that separation. The read-only `company` fallback remains for legacy records; no migration or data rewrite occurred. Existing saved/published landing-page snapshots remain unchanged.
+
+**Regression closure.** The final mismatch sweep found one residual in the new duo-workshop setup metadata: it used a secondary Coach's `company` as the serialized `title`. A focused regression first failed with `expected Master Coach` / `received A Step Above`; the route now selects canonical `title` and uses `resolveCoachProfessionalTitle`, so new metadata uses `title → legacy company → default` without changing saved snapshots.
+
+**Fresh local evidence.** The expanded targeted command (including the Task 5 Duo snapshot suite and the residual route regression) passed **14 suites / 128 tests / 0 snapshots**. Git-derived ESLint completed with **0 errors** and eight pre-existing warnings (`no-img-element` plus two unused local bindings); migration safety approved all **47 migrations**; and `git diff --check` was silent. The final-review targeted matrix passed **12 suites / 119 tests / 0 snapshots**, and its native JSON full-suite result passed **688 suites / 8,531 tests / 16 snapshots**. Final review then caught an unsound `unknown` issue-message predicate at the TypeScript gate; the predicate now narrows to `{ message: string }`, its focused form suite passed **1 suite / 5 tests**, and scoped ESLint exited 0 with one existing `no-img-element` warning. The authoritative `CI=true ./node_modules/.bin/next build --turbopack` completed compile and TypeScript, generated **94/94** static pages, and exited 0. The full test stream retained established negative-path/React warning output, while the build retained the middleware-convention notice plus expected local missing Inngest-key and `DATABASE_URL` messages; none failed its gate.
+
+**Visual-acceptance limitation.** The first worktree-only local run lacked NextAuth configuration. A safe retry sourced the canonical checkout's `.env` only for the dev-server process and set `NEXTAUTH_URL=http://localhost:3000`: `/` then returned `307 → /login`, `/api/auth/providers` returned `200`, and no configuration error appeared. The in-app browser reached `/login`, which visibly advertised local demo credentials `admin@scalingup.com` / `demo123`; submitting those displayed values to localhost produced the visible alert `Invalid email or password` and remained on `/login`. No authorized local test account/session is available, so no local Coach Settings, Admin Edit, Coach Details, or BIO screen could be inspected; consequently the `Master Coach` / `A Step Above` save-reload visual acceptance is **not claimed**. No account, local/external database, or Production data was written.
+
+---
+
 <a id="report-preview-disclosure-launched"></a>
 ### 2026-08-11 — Report preview disclosure launched <!-- ENTRY_ISO:2026-08-11 ENTRY_SLUG:report-preview-disclosure-launched -->
 
@@ -34,6 +47,8 @@ focused suites passed. Changed-file ESLint, migration safety, and the
 Production-matching Turbopack build passed. Authenticated visual review covered
 Admin template Settings, Coach Report Setup, and editable Campaign Detail at
 1280px and 393px. No Production or customer data was changed.
+
+---
 
 <a id="create-assessment-welcome-parity-launched"></a>
 ### 2026-08-10 — Create assessment Welcome parity launched <!-- ENTRY_ISO:2026-08-10 ENTRY_SLUG:create-assessment-welcome-parity-launched -->
