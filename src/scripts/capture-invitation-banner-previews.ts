@@ -50,6 +50,19 @@ const cases: readonly CaptureCase[] = [
   { filename: "07-image-blocked-desktop.png", label: "Image blocked / markdown / desktop", viewport: { width: 760, height: 900 }, body: { kind: "markdown", value: "Hi {{firstName}},\n\nThe banner remains readable when the coach image is unavailable." }, byline: { mode: "image_name", coachName: "Morgan Coach", coachImageUrl }, imageBlocked: true },
 ];
 
+function fixtureForbiddenManifestValues(): readonly string[] {
+  return [...new Set([
+    ...Object.values(vars.respondent),
+    vars.organizationName,
+    vars.campaignName,
+    vars.templateName,
+    vars.coachName,
+    vars.invitationUrl,
+    ...cases.map((capture) => capture.body.value),
+    ...cases.flatMap((capture) => capture.byline.mode === "scaling_up_only" ? [] : [capture.byline.coachName]),
+  ].filter((value): value is string => Boolean(value)))];
+}
+
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
 }
@@ -72,7 +85,7 @@ function documentFor(html: string): string {
 
 function manifestHtml(): string {
   const figures = cases.map(({ filename, label }) => `<figure><img src="${filename}" alt="${label}"><figcaption>${label}</figcaption></figure>`).join("\n");
-  return `<!doctype html><html data-renderer="buildInvitationEmailShell" data-assertions="byline-state,cta,fallback,footer,no-horizontal-overflow"><head><meta charset="utf-8"><title>Invitation banner previews</title><style>body{font-family:Arial,sans-serif;margin:24px;background:#f3f4f6}figure{background:#fff;border:1px solid #ddd;padding:16px;margin:20px 0}img{max-width:100%;height:auto;display:block}figcaption{margin-top:10px} </style></head><body><h1>Universal invitation banner previews</h1><p>Renderer: buildInvitationEmailShell. Byline label: Your coach.</p>${figures}</body></html>`;
+  return `<!doctype html><html data-renderer="buildInvitationEmailShell" data-assertions="byline-state,cta,fallback,footer,no-horizontal-overflow" data-fixture-values="excluded"><head><meta charset="utf-8"><title>Invitation banner previews</title><style>body{font-family:Arial,sans-serif;margin:24px;background:#f3f4f6}figure{background:#fff;border:1px solid #ddd;padding:16px;margin:20px 0}img{max-width:100%;height:auto;display:block}figcaption{margin-top:10px} </style></head><body><h1>Universal invitation banner previews</h1><p>Renderer: buildInvitationEmailShell. Byline label: Your coach.</p>${figures}</body></html>`;
 }
 
 async function assertPng(path: string): Promise<void> {
@@ -132,7 +145,11 @@ async function main(): Promise<void> {
   } finally {
     await browser.close();
   }
-  await writeFile(join(output, "index.html"), manifestHtml(), "utf8");
+  const manifest = manifestHtml();
+  for (const value of fixtureForbiddenManifestValues()) {
+    assert(!manifest.includes(value), `Manifest must not contain fixture value: ${value}`);
+  }
+  await writeFile(join(output, "index.html"), manifest, "utf8");
 }
 
 main().catch((error) => {
