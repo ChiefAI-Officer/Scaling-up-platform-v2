@@ -170,6 +170,7 @@ export const createCoachSchema = z.object({
     firstName: z.string().min(1, "First name is required"),
     lastName: z.string().min(1, "Last name is required"),
     phone: phoneSchema,
+    title: z.string().optional(),
     company: z.string().optional(),
     bio: z.string().optional(),
     // GH #229 — defence in depth at the write boundary. This field is rendered as
@@ -210,7 +211,12 @@ export const createCoachSchema = z.object({
         ),
 });
 
-export const updateCoachSchema = createCoachSchema.partial();
+export const updateCoachSchema = createCoachSchema.partial().extend({
+    title: z.string().nullable().optional(),
+    company: z.string().nullable().optional(),
+    hubspotId: z.string().nullable().optional(),
+    circleId: z.string().nullable().optional(),
+});
 
 export const coachSignupSchema = z
     .object({

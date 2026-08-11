@@ -106,7 +106,12 @@ export async function PATCH(
         ...(data.firstName && { firstName: data.firstName }),
         ...(data.lastName && { lastName: data.lastName }),
         ...(data.phone !== undefined && { phone: data.phone }),
-        ...(data.company !== undefined && { company: data.company }),
+        ...(data.title !== undefined && {
+          title: data.title?.trim() || null,
+        }),
+        ...(data.company !== undefined && {
+          company: data.company?.trim() || null,
+        }),
         ...(data.bio !== undefined && { bio: data.bio }),
         ...(data.profileImage !== undefined && { profileImage: data.profileImage }),
         ...(data.linkedinUrl !== undefined && { linkedinUrl: data.linkedinUrl }),

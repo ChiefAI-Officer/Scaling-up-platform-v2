@@ -100,6 +100,8 @@ describe("BUG-01: password-reset URL shape (no /auth/ prefix)", () => {
         email: "newcoach@example.com",
         firstName: "New",
         lastName: "Coach",
+        title: "Master Coach",
+        company: "A Step Above",
       });
 
       await createCoachPOST(asNextRequest<typeof createCoachPOST>(req));
@@ -108,6 +110,12 @@ describe("BUG-01: password-reset URL shape (no /auth/ prefix)", () => {
       const call = (sendCoachWelcomeEmail as jest.Mock).mock.calls[0][0];
       expect(call.passwordSetUrl).toMatch(/\/reset-password\?token=token-abc-123&email=newcoach%40example\.com$/);
       expect(call.passwordSetUrl).not.toMatch(/\/auth\/reset-password/);
+      expect(db.coach.create).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({
+          title: "Master Coach",
+          company: "A Step Above",
+        }),
+      }));
     });
   });
 
