@@ -167,6 +167,11 @@ describe("admin default report appearance", () => {
     expect(
       within(card).queryByText(/changes are unavailable after the first completed response/i),
     ).toBeNull();
+    expect(
+      within(card).queryByText(
+        "Report appearance was fixed when the first response was completed.",
+      ),
+    ).toBeNull();
     expect(within(card).getByRole("button", { name: "Hide preview" })).toBeEnabled();
 
     fireEvent.click(dashboard);

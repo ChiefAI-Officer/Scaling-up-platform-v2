@@ -240,6 +240,7 @@ function DefaultReportAppearanceCard({
           value={selectedStyle}
           onChange={templateRowSaving ? () => {} : setSelectedStyle}
           disabled={templateRowSaving}
+          disabledExplanation={null}
           previewAnatomy={resolveReportStylePreviewAnatomy({
             templateAlias,
             capabilities: previewCapabilities,
