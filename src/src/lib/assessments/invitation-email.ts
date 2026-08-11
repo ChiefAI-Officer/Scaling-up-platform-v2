@@ -315,7 +315,7 @@ function renderUniversalCoachByline(coachByline: InvitationCoachByline | undefin
         ${imageCell}
         <td valign="top" style="font-size:16px;line-height:1.35;color:#ffffff;">
           <div style="font-size:11px;line-height:1.35;letter-spacing:0.08em;text-transform:uppercase;color:#ffffff;">Your coach</div>
-          <div style="font-size:16px;line-height:1.35;color:#ffffff;overflow-wrap:anywhere;word-break:break-word;">${coachName}</div>
+          <div style="font-size:16px;line-height:1.35;color:#ffffff;overflow-wrap:anywhere;word-wrap:break-word;word-break:break-all;">${coachName}</div>
         </td>
       </tr>
     </table>`;

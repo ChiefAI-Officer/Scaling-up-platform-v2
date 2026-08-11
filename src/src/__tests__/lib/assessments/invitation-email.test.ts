@@ -600,8 +600,16 @@ describe("universal invitation banner", () => {
     expect(html.match(/<img /g)).toHaveLength(1);
   });
 
-  // Catches accidental reuse of the organization header line in universal chrome.
-  it.each([false, true, undefined])("never puts organization content in the banner (showOrgLine %s)", (showOrgLine) => {
+  // Catches accidental reuse of alias-derived organization chrome in the universal branch.
+  it.each([
+    ["LVA", "leadership-vision-alignment", false],
+    ["known non-LVA", "qsp-v2", true],
+    ["null alias", null, true],
+    ["unknown alias", "future-assessment-alias", true],
+  ] as const)("never auto-inserts organization identity for %s", (_case, alias, expectedShowOrgLine) => {
+    const showOrgLine = shouldShowOrgLine(alias);
+    expect(showOrgLine).toBe(expectedShowOrgLine);
+
     const html = buildInvitationEmailHtml({
       bodyMarkdown: "Hi",
       vars: { ...baseVars, organizationName: "Organization Must Not Appear", showOrgLine },
@@ -609,18 +617,21 @@ describe("universal invitation banner", () => {
       coachByline: { mode: "scaling_up_only" },
     });
     expect(html).not.toContain("Organization Must Not Appear");
+    expect(html).not.toContain("opacity:0.85");
   });
 
   // Catches a no-wrap style that truncates long coach identities on narrow clients.
-  it("allows long coach names to wrap", () => {
+  it("forces an unbroken long coach name to wrap in email clients", () => {
+    const coachName = `Coach${"W".repeat(180)}`;
     const html = buildInvitationEmailHtml({
       bodyMarkdown: "Hi",
       vars: baseVars,
       chrome: "universalBanner",
-      coachByline: { mode: "name_only", coachName: "A very long coach name that must wrap on narrow email clients" },
+      coachByline: { mode: "name_only", coachName },
     });
-    expect(html).toContain("A very long coach name");
+    expect(html).toContain(coachName);
     expect(html).not.toContain("white-space:nowrap");
+    expect(html).toContain("overflow-wrap:anywhere;word-wrap:break-word;word-break:break-all;");
   });
 
   // Catches attribute/element injection when a caller bypasses the resolver.
