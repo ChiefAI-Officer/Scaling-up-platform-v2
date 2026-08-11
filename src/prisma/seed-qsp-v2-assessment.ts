@@ -51,15 +51,10 @@ const TEMPLATE_DESCRIPTION =
 
 const INVITATION_SUBJECT = "Please complete your Quarterly Session Prep";
 
-// Jeff #76 (seed alignment only — NO prod write): the live qsp-v2 template row
-// has been coach-forward since the 2026-07-03 Wave-P fix, but this seed still
-// carried the pre-Wave-P copy, so re-seeding a fresh environment would have
-// reintroduced exactly the "[Company] has invited you..." wording Jeff
-// reported. Pinned byte-for-byte to the live prod row (read 2026-07-27).
-// (Jeff's actual #76 QSP sighting root-caused to a campaign-level
-// invitationBodyHtml override, which bypasses this copy entirely: prod
-// EMAIL_DELIVERY telemetry shows 4 renderer="custom_html" invitation sends on
-// 2026-07-10 — the day of his report — all from campaign "2026 QSP Q2".)
+// Approved shared QSP invitation copy. {{templateName}} preserves the v1/v2
+// distinction; the universal email shell owns the coach banner, CTA, fallback
+// link, and footer. Existing campaign-level invitation overrides remain
+// authoritative when configured.
 const INVITATION_BODY_MARKDOWN = `Hi {{respondentFirstName}},
 
 You've been invited by {{coachName}} to complete the {{templateName}} for {{organizationName}}.

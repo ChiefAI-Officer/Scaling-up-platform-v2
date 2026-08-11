@@ -45,15 +45,16 @@ const TEMPLATE_DESCRIPTION =
 
 const INVITATION_SUBJECT = "Please complete your Quarterly Session Prep";
 
+// Approved shared QSP invitation copy. {{templateName}} preserves the v1/v2
+// distinction; the universal email shell owns the coach banner, CTA, fallback
+// link, and footer.
 const INVITATION_BODY_MARKDOWN = `Hi {{respondentFirstName}},
 
-{{organizationName}} has invited you to complete the Quarterly Session Prep survey in preparation for the upcoming quarterly strategy session.
+You've been invited by {{coachName}} to complete the {{templateName}} for {{organizationName}}.
 
-Please take a few minutes to reflect on the past quarter and share your thoughts:
+It takes just a few minutes, and there are no right or wrong answers — your honest perspective is what makes the results useful. Your responses are confidential.
 
-{{invitationUrl}}
-
-Your responses will be aggregated and shared with your facilitator to prepare the session.`;
+Click the button below to begin.`;
 
 // ─── Scale constant (used by every SLIDER_LIKERT question) ───────────────
 

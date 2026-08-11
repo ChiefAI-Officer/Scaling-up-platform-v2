@@ -6,6 +6,17 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="qsp-coach-forward-invitation-copy-aligned"></a>
+### 2026-08-12 — QSP coach-forward invitation copy aligned <!-- ENTRY_ISO:2026-08-12 ENTRY_SLUG:qsp-coach-forward-invitation-copy-aligned -->
+
+**Status: IMPLEMENTED + LOCALLY VERIFIED; NOT DEPLOYED OR PRODUCTION-MUTATED.** QSP v1 and QSP v2 now share the approved canonical invitation body: `You've been invited by {{coachName}} to complete the {{templateName}} for {{organizationName}}.` The dynamic template-name token preserves the v1/v2 distinction. The subject, aliases, assessment content, scoring, campaign-level overrides, and universal invitation shell are unchanged; the platform-owned shell continues to supply the Scaling Up/Coach banner, large CTA, fallback link, and footer.
+
+**Test-first evidence.** The new cross-version contract failed first only for QSP v1: its legacy body was organization-forward and contained `{{invitationUrl}}`, while QSP v2 already passed. After the minimal v1 seed correction and consolidation of the older v2-only guard, the focused matrix passed **4 suites / 95 tests / 0 snapshots** across the shared invitation contract and both complete QSP seed-content suites.
+
+**Release gates.** The complete repository passed **692 suites / 8,613 tests / 16 snapshots**. Changed-file ESLint emitted no diagnostics; migration safety approved all **47 migrations**; changelog freshness and diff hygiene passed. The Production-equivalent Turbopack build compiled, completed TypeScript, and generated **94/94** static pages. It retained the established middleware-convention deprecation and missing local Inngest-key/`DATABASE_URL` messages without failing.
+
+**Production boundary.** A read-only attempt to inspect the canonical live template rows failed closed with Prisma `P1001` because the locally configured Neon endpoint was unreachable. No database write, authenticated editor save, template publish, deployment, campaign mutation, or email send occurred. Jeff #47 therefore remains PARTIAL: verify/update both canonical Production template rows through the authenticated editor, then receive one QSP v2 invitation proving the approved body and already-launched universal banner/CTA together.
+
 <a id="universal-invitation-banner-launched"></a>
 ### 2026-08-11 — Universal invitation banner launched <!-- ENTRY_ISO:2026-08-11 ENTRY_SLUG:universal-invitation-banner-launched -->
 
