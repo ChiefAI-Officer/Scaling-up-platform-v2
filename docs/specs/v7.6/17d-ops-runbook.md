@@ -264,7 +264,8 @@ after the shared live campaign-picker scope succeeds (the same scope used by the
 template-list API). That Template scope includes the live predicate and applicable
 privileged or Coach group-intersection access, so deleted, disabled, invalid, and
 stale-grant Template IDs never enter the browser snapshot. Under global enablement or
-KILL it passes no canary IDs.
+KILL, both gates short-circuit before any picker-scope or Organization-authorization
+lookup and pass no canary IDs.
 
 Inspect only PII-free delivery metadata while validating organic sends. The initial,
 fan-out, reminder, and resend paths log an `email-chrome` event with the relevant
