@@ -6,6 +6,15 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="jul10-57-lva-peer-settings-restore-ready"></a>
+### 2026-08-12 — July 10 #57 LVA peer editor restored to Settings <!-- ENTRY_ISO:2026-08-12 ENTRY_SLUG:jul10-57-lva-peer-settings-restore-ready -->
+
+**Status: IMPLEMENTED + LOCALLY VERIFIED; NOT YET MERGED, DEPLOYED, OR REACTIVATED.** The existing Wave S peer-average editor now renders inside the ED10 Settings tab instead of floating beneath the entire assessment editor. The server page still owns the effective-flag check, exact immutable `leadership-vision-alignment` alias gate, eligible rating-question keys, report labels, and stored-value lookup; it passes only the resolved rows through the editor shell. Templates outside that canonical LVA alias receive no rows and no peer editor. The existing `AssessmentBenchmark` schema, atomic full-set PUT endpoint, stable keys, report renderers, and import mappings are unchanged.
+
+**Test-first evidence.** The new Settings behavior failed first because supplied peer rows were ignored. After the minimal relocation, the focused matrix passed **3 suites / 43 tests / 0 snapshots** across Settings, the peer editor, and the ED10 tab shell. The complete repository passed **692 suites / 8,615 tests / 16 snapshots**; changed-file ESLint emitted no diagnostics; migration safety approved all **47 migrations**; changelog freshness and diff hygiene passed. The Production-equivalent Turbopack build compiled, completed TypeScript, and generated **94/94** static pages. It retained the established middleware deprecation and missing local Inngest-key/`DATABASE_URL` messages without failing. The feature remains Production-dark until this PR is merged and the already-approved bounded activation is performed.
+
+**Data boundary.** No benchmark value was created, inferred, imported, or changed. The available Jeff LVA file is a single respondent export and is not treated as a peer cohort. Production acceptance will use explicitly temporary values only long enough to capture PII-free proof from one individual and one group LVA report, then immediately clear every value and reconfirm zero stored rows. Jeff #57 remains PARTIAL until that live editor receipt exists; #58 remains PARTIAL until both live report receipts exist.
+
 <a id="qsp-coach-forward-invitation-copy-production"></a>
 ### 2026-08-12 — QSP coach-forward invitation copy launched <!-- ENTRY_ISO:2026-08-12 ENTRY_SLUG:qsp-coach-forward-invitation-copy-production -->
 

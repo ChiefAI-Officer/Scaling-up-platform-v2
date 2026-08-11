@@ -26,6 +26,7 @@ import {
   SettingsTab,
   type SettingsTabProps,
 } from "@/components/admin/template-editor/SettingsTab";
+import type { PeerBenchmarkRow } from "@/components/assessments/PeerBenchmarksPanel";
 
 // next/link renders a plain anchor in the browser; mock it so this standalone
 // component test stays hermetic (no AppRouterContext needed). Faithful to the
@@ -51,6 +52,7 @@ afterEach(() => cleanup());
 // ── Fixtures ────────────────────────────────────────────────────────────────
 function makeProps(overrides: Partial<SettingsTabProps> = {}): SettingsTabProps {
   return {
+    templateId: "template-1",
     templateValues: {
       name: "Scaling Up Assessment",
       alias: "scaling-up-full",
@@ -87,6 +89,38 @@ function renderTab(overrides: Partial<SettingsTabProps> = {}) {
   render(<SettingsTab {...props} />);
   return props;
 }
+
+describe("SettingsTab — LVA peer averages", () => {
+  const peerRows: PeerBenchmarkRow[] = [
+    {
+      stableKey: "lva-people-leadership-team",
+      label: "The Leadership Team",
+      value: 6.3,
+    },
+  ];
+
+  it("renders supplied peer averages as a Settings card", () => {
+    render(
+      <SettingsTab
+        {...makeProps()}
+        templateId="lva-template"
+        peerBenchmarkRows={peerRows}
+      />,
+    );
+
+    const panel = screen.getByTestId("peer-benchmarks-panel");
+    expect(panel).toHaveClass("wf-card");
+    expect(within(panel).getByText("Peer averages")).toBeInTheDocument();
+    expect(
+      within(panel).getByLabelText("The Leadership Team"),
+    ).toHaveValue(6.3);
+  });
+
+  it("does not render the peer editor when the server supplies no rows", () => {
+    renderTab();
+    expect(screen.queryByTestId("peer-benchmarks-panel")).not.toBeInTheDocument();
+  });
+});
 
 // ── C-2 copy ──────────────────────────────────────────────────────────────
 describe("SettingsTab — C-2 copy (verbatim)", () => {

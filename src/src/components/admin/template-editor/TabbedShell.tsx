@@ -56,6 +56,7 @@ import { SingleColumnFormBuilder } from "@/components/admin/template-editor/Sing
 import { FormsBuilder } from "@/components/admin/template-editor/FormsBuilder";
 import { PreviewTab } from "@/components/admin/template-editor/PreviewTab";
 import { SettingsTab } from "@/components/admin/template-editor/SettingsTab";
+import type { PeerBenchmarkRow } from "@/components/assessments/PeerBenchmarksPanel";
 import type { TemplateEditorModel } from "@/components/admin/template-editor/hooks/useTemplateEditorModel";
 import { TestModeDrawer } from "@/components/admin/template-editor/TestModeDrawer";
 import { SafeToPublishBadge } from "@/components/admin/template-editor/SafeToPublishBadge";
@@ -350,6 +351,8 @@ export interface TabbedShellProps {
    * inert until then. Presentation-only.
    */
   activePreview?: ActivePreview | null;
+  /** Wave S — LVA-only rows resolved by the server for the Settings editor. */
+  peerBenchmarkRows?: PeerBenchmarkRow[] | null;
 }
 
 /**
@@ -460,6 +463,7 @@ export function TabbedShell({
   // the Preview tab's "Active" side; null when nothing is published (or the
   // flag is off). Threaded into PreviewTab below.
   activePreview = null,
+  peerBenchmarkRows = null,
   model,
 }: TabbedShellProps & {
   /**
@@ -1105,6 +1109,7 @@ export function TabbedShell({
           <TabsContent value="settings">
             <div data-testid="tab-panel-settings">
               <SettingsTab
+                templateId={template.id}
                 templateValues={templateValues}
                 language={versionValues.language}
                 isReadOnly={isPublished}
@@ -1119,6 +1124,7 @@ export function TabbedShell({
                 waveQEnabled={waveQEnabled}
                 reportStylesEnabled={reportStylesEnabled}
                 reportStylePreviewCapabilities={reportStylePreviewCapabilities}
+                peerBenchmarkRows={peerBenchmarkRows}
               />
             </div>
           </TabsContent>
