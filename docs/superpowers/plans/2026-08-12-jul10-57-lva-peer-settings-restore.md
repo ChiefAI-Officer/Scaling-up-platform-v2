@@ -47,17 +47,17 @@ Prisma, Vercel.
 - [x] Run migration safety.
 - [x] Run the full Jest suite once.
 - [x] Run the Production-equivalent Turbopack build.
-- [ ] Run `git diff --check`, review against fixed point
+- [x] Run `git diff --check`, review against fixed point
       `1d4c0d7f295e8bea19ba0835fd45ae1a349794f1`, commit, push, and open one
       ready PR for row #57.
 
 ## Task 5: Production acceptance after merge
 
-- [ ] Confirm the merged SHA is deployed and health is safe.
-- [ ] Reactivate Wave S in Production.
-- [ ] Confirm the LVA Settings panel visually.
-- [ ] Use temporary values to prove individual and group comparison rendering.
-- [ ] Capture PII-free evidence and immediately clear all temporary values.
-- [ ] Confirm zero stored benchmark rows again.
-- [ ] Close #57 through its own ledger/SoT update.
-- [ ] Close #58 through a separate evidence-only ledger/SoT update.
+- [x] Confirm the merged SHA is deployed and health is safe.
+- [x] Reactivate Wave S in Production.
+- [x] Confirm the LVA Settings panel visually.
+- [x] Use temporary values to prove individual and group comparison rendering.
+- [x] Capture PII-free evidence and immediately clear all temporary values.
+- [x] Confirm zero stored benchmark rows again.
+- [x] Close #57 through its own ledger/SoT update.
+- [x] Close #58 through a separate evidence-only ledger/SoT update.

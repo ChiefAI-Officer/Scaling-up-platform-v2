@@ -2,7 +2,7 @@
 
 **Source:** Jeff Verdun's 14-page *Scaling Up Assessment Platform - Feedback Report for Gabriel*, prepared 2026-07-10. Section 2 is canonical: 53 rows numbered #30-#87. Rows #31, #34, #36, #38, and #82 are intentionally absent because completed items were excluded.
 
-**Reconciled against:** `origin/main` at `013f00bb` on 2026-08-12 plus the Production receipts linked below. Current tally: **46 DONE / 2 PARTIAL / 5 NEEDS DECISION**.
+**Reconciled against:** `origin/main` at `b0e59cff` on 2026-08-12 plus the Production receipts linked below. Current tally: **47 DONE / 1 PARTIAL / 5 NEEDS DECISION**.
 
 **Authority:** This tracked ledger is authoritative; generated PDFs and `tmp/` files are derivatives. Completion is judged against the exact Section 2 ask. Later-discovered scope remains visible as a separately named follow-on and does not silently widen a row.
 
@@ -42,7 +42,7 @@
 | #55 | Question editor | Add and edit assessment questions directly in the platform. | DONE | [Wave T authoring](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/blob/15ee442b124f43155ffd3dfdc1dc08fbfa37cd5e/plans/CHANGELOG.md#L1566) | Wave T | None | Gabriel |
 | #56 | Findings logic | Author answer-driven findings and recommendations for report output. | DONE | [Wave U findings](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/blob/15ee442b124f43155ffd3dfdc1dc08fbfa37cd5e/plans/CHANGELOG.md#L1546) | PR #139 / `d50b576f` | None | Gabriel |
 | #57 | LVA peer averages | Make peer averages available for LVA questions and extensible to future templates. | DONE | [Production acceptance](../../plans/CHANGELOG.md#jul10-57-lva-peer-averages-production-accepted) | PR #339 / `013f00bb`; `dpl_85ZoYwgbKEi5ffTVjt7czywFYbgX` | None | Gabriel |
-| #58 | LVA peer comparison | Show peer comparison in both individual and group LVA reports. | PARTIAL | [Wave S audit](jul10-feedback-decision-packets.md#57-and-58-lva-peer-averages-and-report-comparison); [approved evidence cycle](../superpowers/specs/2026-08-12-jul10-57-lva-peer-settings-restore-design.md#production-acceptance) | PR #132 / `9220503f` | After #57 is live, capture PII-free individual and group report receipts with temporary values, immediately clear them, and record the evidence separately. | Gabriel |
+| #58 | LVA peer comparison | Show peer comparison in both individual and group LVA reports. | DONE | [Production acceptance](../../plans/CHANGELOG.md#jul10-58-lva-peer-comparisons-production-accepted) | PR #132 / `9220503f`; `dpl_85ZoYwgbKEi5ffTVjt7czywFYbgX` | None | Gabriel |
 | #59 | False removal error | Remove a respondent without showing failure after the delete succeeds. | DONE | [Session closeout](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/blob/15ee442b124f43155ffd3dfdc1dc08fbfa37cd5e/plans/CHANGELOG.md#L669) | PR #198 | None | Gabriel |
 | #60 | Edit member email | Change a member email safely and reject organization-local collisions. | DONE | [July 10 batch](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/blob/15ee442b124f43155ffd3dfdc1dc08fbfa37cd5e/plans/CHANGELOG.md#L1132) | PR #202 | None | Gabriel |
 | #61 | LVA invitation email | Remove redundant company line and raw URL and use coach-forward body copy. | DONE | [LVA invitation closeout](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/blob/15ee442b124f43155ffd3dfdc1dc08fbfa37cd5e/plans/CHANGELOG.md#L1091) | Dedicated invite PR | None | Gabriel |
@@ -77,7 +77,7 @@
 
 The eight non-DONE rows reduce to five unresolved decisions and three implementation/acceptance resumes:
 
-1. **Benchmark contract:** #32 decides what may be called an industry benchmark. #57 is closed on the restored LVA-only authoring capability; persistent real LVA peer values remain a separately sourced follow-on. #58 still needs its already-captured renderer evidence recorded.
+1. **Benchmark contract:** #32 decides what may be called an industry benchmark. #57/#58 are closed on the live LVA authoring and both report surfaces; persistent real LVA peer values remain a separately sourced follow-on.
 2. **Report fidelity:** #33 needs sanitized, report-specific annotations rather than an umbrella preference.
 3. **LVA content:** #41, #44, and #45 still require content intent before editing. #42 is closed on the active Production v4 wording and compatibility receipt.
 4. **Invitation acceptance:** #47's code and both canonical Production rows are live. Close after one authorized received QSP v2 invitation proves the active body and universal shell together; full-HTML overrides remain separate.
@@ -97,5 +97,5 @@ python3 scripts/build-jul10-closeout-artifacts.py
 
 The supplied July 10 source has 83 status occurrences: 30 in Section 1 and all
 53 canonical rows in Section 2. The generator validates that count, the exact
-row set, the 46/2/5 tally, and the twelve-outcome delta before writing
+row set, the 47/1/5 tally, and the twelve-outcome delta before writing
 deterministic PDFs under `output/pdf/`.

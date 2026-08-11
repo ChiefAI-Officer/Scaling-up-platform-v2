@@ -6,6 +6,21 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="jul10-58-lva-peer-comparisons-production-accepted"></a>
+### 2026-08-12 — July 10 #58 LVA peer comparisons accepted on Production <!-- ENTRY_ISO:2026-08-12 ENTRY_SLUG:jul10-58-lva-peer-comparisons-production-accepted -->
+
+**Status: DONE + LIVE ON PRODUCTION.** The existing Wave S individual and group LVA report renderers were verified on the Ready activation deployment `dpl_85ZoYwgbKEi5ffTVjt7czywFYbgX`, which owns both healthy canonical aliases. The acceptance used an existing four-completion LVA campaign and four explicitly temporary peer values—`6.3`, `2.5`, `5.0`, and `9.9`—covering positive, neutral, and negative difference treatments. No assessment answer, scoring result, report content, campaign, invitation, or participant was changed.
+
+**Individual receipt.** The respondent report rendered the dedicated **Organizational Strengths and Weaknesses — compared to peers** section with Factor, Your rating, Peers, and Difference columns. All four temporary rows joined by stable key and displayed the correct directional glyph and one-decimal difference.
+
+![Production individual LVA peer-comparison section](../docs/agents/assets/jul10-57-58/lva-individual-report-peer-comparison-evidence.png)
+
+**Group receipt.** The group report rendered `Peers N.N` plus the correct positive, neutral, or negative deviation beside each of the same four factor rows within Organizational Strengths and Weaknesses. Other factors remained unchanged and showed no peer cell, confirming omit-empty behavior.
+
+![Production group LVA peer comparisons](../docs/agents/assets/jul10-57-58/lva-group-report-peer-comparison-evidence.png)
+
+**Immediate cleanup.** Every temporary value was cleared through the admin editor. A fresh authenticated diagnostic then reported effective capability **Enabled**, **0 stored rows**, and **0 matching · 16 missing · 0 stale**; reloaded individual and group reports both omitted all peer comparisons again. July 10 #58 is therefore closed on direct live evidence from both required report surfaces. Persistent real LVA peer values remain a separately sourced provenance follow-on.
+
 <a id="jul10-57-lva-peer-averages-production-accepted"></a>
 ### 2026-08-12 — July 10 #57 LVA peer averages accepted on Production <!-- ENTRY_ISO:2026-08-12 ENTRY_SLUG:jul10-57-lva-peer-averages-production-accepted -->
 
