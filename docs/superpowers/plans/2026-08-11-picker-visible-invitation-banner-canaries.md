@@ -271,7 +271,7 @@ git commit -m "fix(assessments): filter banner canaries by picker visibility"
 
 ---
 
-### Task 3: Close review, update the PR, and activate Production
+### Task 3: Record readiness and run the full local verification gate
 
 **Files:**
 - Modify: `CLAUDE.md`
@@ -280,8 +280,8 @@ git commit -m "fix(assessments): filter banner canaries by picker visibility"
 
 **Interfaces:**
 - Consumes: reviewed commits from Tasks 1-2 and the locked production sequence.
-- Produces: merge-ready PR #331, a protected-main deployment, global banner
-  enablement, and a Production verification receipt.
+- Produces: a clean, locally verified branch and a truthful default-off receipt
+  ready for independent whole-branch review.
 
 - [ ] **Step 1: Update source-of-truth receipts**
 
@@ -317,27 +317,42 @@ Expected: all authoritative gates pass. If standalone `npx tsc --noEmit`
 remains nonzero only on the documented repository baseline, record it separately
 and never label it green.
 
-- [ ] **Step 3: Request scoped and whole-branch review**
+- [ ] **Step 3: Commit the local readiness receipt**
+
+```bash
+git add CLAUDE.md plans/CHANGELOG.md docs/specs/v7.6/17d-ops-runbook.md
+git commit -m "docs(assessments): record picker-visible banner canaries"
+```
+
+No push, PR readiness transition, merge, Production flag mutation, redeploy, or
+customer email occurs inside this implementation task.
+
+---
+
+## Post-SDD release procedure
+
+These controller-owned steps run only after per-task reviews and the final
+whole-branch review are clean. They are not delegated to a task implementer.
+
+- [ ] **Release Step 1: Push and close independent review**
 
 Review must explicitly verify hybrid ADMIN/STAFF, deleted/disabled/stale grant
 exclusion, ordinary Coach picker parity, Organization canaries, global/KILL
 query skipping, and no raw allowlist serialization. Any Critical/Important
 finding blocks readiness and merge.
 
-- [ ] **Step 4: Commit receipts and push PR #331**
+After a clean verdict:
 
 ```bash
-git add CLAUDE.md plans/CHANGELOG.md docs/specs/v7.6/17d-ops-runbook.md
-git commit -m "docs(assessments): record picker-visible banner canaries"
 git push origin codex/invitation-email-banner-design
 gh pr ready 331 --repo ChiefAI-Officer/Scaling-up-platform-v2
 gh pr checks 331 --repo ChiefAI-Officer/Scaling-up-platform-v2 --watch
 ```
 
-Do not mark ready until code review is clean. Do not merge until Build and
-Migration Safety Gate are successful and branch protection permits it.
+Do not merge until Build and Migration Safety Gate are successful and branch
+protection permits it.
 
-- [ ] **Step 5: Merge through protected `main`**
+- [ ] **Release Step 2: Merge through protected `main`**
 
 Use the repository's allowed merge method without bypassing protection:
 
@@ -348,7 +363,7 @@ gh pr merge 331 --repo ChiefAI-Officer/Scaling-up-platform-v2 --squash --delete-
 If approval or a required check blocks merge, stop and report the exact GitHub
 state; do not use admin bypass.
 
-- [ ] **Step 6: Verify the transient dark Production deployment**
+- [ ] **Release Step 3: Verify the transient dark Production deployment**
 
 Wait for the `main` Vercel deployment to become Ready, then verify:
 
@@ -370,7 +385,7 @@ AUDIT_READONLY_URL="$GH220_READONLY_DATABASE_URL" \
 npm run audit:invitation-html-overrides
 ```
 
-- [ ] **Step 7: Globally enable and verify**
+- [ ] **Release Step 4: Globally enable and verify**
 
 Using the authenticated Vercel REST API, target project
 `prj_xcAWuAmGZAU3DCHgAauRv2WPKneo` under team
@@ -392,7 +407,7 @@ Wait for Ready, re-run both canonical health checks, verify the Production
 aliases point to the enabled deployment, and inspect only PII-free organic-send
 telemetry. Do not manufacture a customer invitation.
 
-- [ ] **Step 8: Record launch and update tracking**
+- [ ] **Release Step 5: Record launch and update tracking**
 
 Add the exact PR, merge commit, deployment, health, flag, and telemetry receipt
 to `CLAUDE.md`, `plans/CHANGELOG.md`, and the matching Notion task. If launch is
