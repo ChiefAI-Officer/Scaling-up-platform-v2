@@ -95,26 +95,21 @@ describe("PublicCampaignsManager — orphaned-page render smoke (Z-1)", () => {
       ),
     ).toBeInTheDocument();
     expect(
+      within(createSection).queryByRole("img", { name: /preview/i }),
+    ).not.toBeInTheDocument();
+    const showCreatePreview = within(createSection).getByRole("button", {
+      name: "Show preview",
+    });
+    expect(showCreatePreview).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(showCreatePreview);
+    expect(
       within(createSection).getByRole("img", {
-        name: "Modern Dashboard selected thumbnail",
+        name: "Modern Dashboard Cover preview",
       }),
     ).toHaveAttribute(
       "src",
       "/report-style-previews/sparse-custom/modern-dashboard/cover.webp",
     );
-    expect(
-      within(createSection).queryByRole("img", {
-        name: "Modern Dashboard Cover preview",
-      }),
-    ).not.toBeInTheDocument();
-    fireEvent.click(
-      within(createSection).getByText("Preview selected appearance"),
-    );
-    expect(
-      within(createSection).getByRole("img", {
-        name: "Modern Dashboard Cover preview",
-      }),
-    ).toBeInTheDocument();
 
     fireEvent.click(
       within(createSection).getByRole("radio", {
@@ -161,6 +156,12 @@ describe("PublicCampaignsManager — orphaned-page render smoke (Z-1)", () => {
     const editor = screen.getByRole("region", {
       name: "Quick Scaling Up Check report appearance",
     });
+    expect(within(editor).getByRole("button", { name: "Show preview" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+    expect(within(editor).queryByRole("img", { name: /preview/i })).not.toBeInTheDocument();
+    fireEvent.click(within(editor).getByRole("button", { name: "Show preview" }));
     expect(
       within(editor).getByRole("img", {
         name: "Executive Boardroom Cover preview",
@@ -223,6 +224,39 @@ describe("PublicCampaignsManager — orphaned-page render smoke (Z-1)", () => {
     expect(lockedCampaign.reportStyle).toBe("EXECUTIVE_BOARDROOM");
     expect(lockedCampaign.reportStyleSource).toBe("CAMPAIGN_OVERRIDE");
     expect(lockedCampaign.reportStyleLockedAt).toBe("2026-08-06T04:00:00.000Z");
+  });
+
+  it("keeps a locked public appearance previewable without exposing a save", async () => {
+    const lockedCampaign = {
+      ...PUBLIC_CAMPAIGN,
+      reportStyleLockedAt: "2026-08-06T04:00:00.000Z",
+    };
+    (global.fetch as jest.Mock).mockImplementation(
+      async (input: RequestInfo | URL) => ({
+        ok: true,
+        status: 200,
+        json: async () =>
+          String(input).endsWith("/api/admin/public-campaigns")
+            ? { success: true, data: [lockedCampaign] }
+            : { success: true, data: [] },
+      }),
+    );
+
+    render(<PublicCampaignsManager />);
+    await screen.findByText("Quick Scaling Up Check");
+    fireEvent.click(screen.getByRole("button", { name: "View report appearance" }));
+
+    const editor = screen.getByRole("region", {
+      name: "Quick Scaling Up Check report appearance",
+    });
+    within(editor).getAllByRole("radio").forEach((radio) =>
+      expect(radio).toBeDisabled(),
+    );
+    const show = within(editor).getByRole("button", { name: "Show preview" });
+    expect(show).toBeEnabled();
+    fireEvent.click(show);
+    expect(within(editor).getByRole("img", { name: /Cover preview/ })).toBeInTheDocument();
+    expect(within(editor).queryByRole("button", { name: "Save report appearance" })).not.toBeInTheDocument();
   });
 
   it("reconciles a 409 immediately from authoritative response data without reloading the list", async () => {
