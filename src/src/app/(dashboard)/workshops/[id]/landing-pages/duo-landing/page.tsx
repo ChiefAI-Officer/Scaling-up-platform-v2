@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DuoLandingPageTemplate, SAMPLE_WORKSHOP_DUO } from "@/components/templates/duo-landing-page-template";
 import { CustomHtmlPanel } from "@/components/workshops/custom-html-panel";
+import { resolveCoachProfessionalTitle } from "@/lib/coaches/coach-profile-fields";
 
 interface Coach {
   name: string;
@@ -20,6 +21,7 @@ interface CoachBioProfile {
   id: string;
   name: string;
   title: string;
+  company: string | null;
   photoUrl: string;
   createdAt: string;
   editUrl: string;
@@ -112,7 +114,7 @@ const DEFAULT_DATA: DuoLandingData = {
 function mapProfileToCoach(profile: CoachBioProfile): Coach {
   return {
     name: profile.name,
-    title: profile.title || "Scaling Up Certified Coach",
+    title: resolveCoachProfessionalTitle(profile),
     photo: profile.photoUrl || "",
   };
 }
@@ -157,6 +159,8 @@ export default function DuoLandingEditor() {
         const nextData: DuoLandingData = { ...DEFAULT_DATA };
         let workshopPrimaryCoachId = "";
         let metadataSecondaryCoachId: string | null = null;
+        let hasSavedCoach1 = false;
+        let hasSavedCoach2 = false;
 
         const workshopData = await workshopRes.json();
         if (workshopData.success) {
@@ -192,7 +196,7 @@ export default function DuoLandingEditor() {
           nextData.coach1 = {
             name: `${w.coach.firstName} ${w.coach.lastName}`.trim(),
             photo: w.coach.profileImage || "",
-            title: w.coach.company || "Scaling Up Certified Coach",
+            title: resolveCoachProfessionalTitle(w.coach),
           };
           nextData.eventDate = eventDate.toLocaleDateString("en-US", {
             weekday: "long",
@@ -219,7 +223,9 @@ export default function DuoLandingEditor() {
 
         const pageData = await pageRes.json();
         if (pageData.success && pageData.data) {
-          const content = JSON.parse(pageData.data.content);
+          const content = JSON.parse(pageData.data.content) as Partial<DuoLandingData>;
+          hasSavedCoach1 = Object.prototype.hasOwnProperty.call(content, "coach1");
+          hasSavedCoach2 = Object.prototype.hasOwnProperty.call(content, "coach2");
           Object.assign(nextData, content);
         }
         // CustomHtmlPanel wiring — fail-closed: only activate when marker is true
@@ -255,7 +261,7 @@ export default function DuoLandingEditor() {
         setBioProfiles(availableProfiles);
 
         const preferredCoach1Id = nextData.coach1BioId || workshopPrimaryCoachId;
-        if (preferredCoach1Id) {
+        if (!hasSavedCoach1 && preferredCoach1Id) {
           const coach1Profile = availableProfiles.find((profile) => profile.id === preferredCoach1Id);
           if (coach1Profile) {
             nextData.coach1BioId = coach1Profile.id;
@@ -264,7 +270,7 @@ export default function DuoLandingEditor() {
         }
 
         const preferredCoach2Id = nextData.coach2BioId || coach2IdFromQuery || metadataSecondaryCoachId;
-        if (preferredCoach2Id) {
+        if (!hasSavedCoach2 && preferredCoach2Id) {
           const coach2Profile = availableProfiles.find((profile) => profile.id === preferredCoach2Id);
           if (coach2Profile) {
             nextData.coach2BioId = coach2Profile.id;

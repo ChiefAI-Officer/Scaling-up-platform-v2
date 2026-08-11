@@ -7,6 +7,34 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
+type CoachProfileSaveTarget = "self" | "admin";
+
+function errorMessage(error: unknown, fallback: string): string {
+    if (typeof error === "string" && error.trim()) {
+        return error;
+    }
+
+    if (Array.isArray(error)) {
+        const issue = error.find(
+            (item): item is { message: string } =>
+                typeof item === "object" && item !== null && "message" in item
+                && typeof item.message === "string" && item.message.trim().length > 0,
+        );
+        if (issue) {
+            return issue.message;
+        }
+    }
+
+    if (
+        typeof error === "object" && error !== null && "message" in error
+        && typeof error.message === "string" && error.message.trim()
+    ) {
+        return error.message;
+    }
+
+    return fallback;
+}
+
 interface CoachProfileFormProps {
     coachId: string;
     initialData: {
@@ -14,8 +42,8 @@ interface CoachProfileFormProps {
         lastName: string;
         email: string;
         bio: string;
-        title?: string | null; // Professional title (e.g., "Scaling Up Certified Coach")
-        titleCredentials?: string | null; // MR-26: Title / Credentials (company field / business entity)
+        title: string | null;
+        company: string | null;
         profileImage?: string | null;
         linkedinUrl?: string | null;
         showBookCallCta?: boolean;
@@ -23,17 +51,23 @@ interface CoachProfileFormProps {
         hubspotId?: string | null;
         circleId?: string | null;
     };
+    saveTarget?: CoachProfileSaveTarget;
     /** When true, renders editable Integration IDs section (admin only). Default false. */
     allowEditIntegrationIds?: boolean;
 }
 
-export function CoachProfileForm({ coachId, initialData, allowEditIntegrationIds = false }: CoachProfileFormProps) {
+export function CoachProfileForm({
+    coachId,
+    initialData,
+    saveTarget = "self",
+    allowEditIntegrationIds = false,
+}: CoachProfileFormProps) {
     const router = useRouter();
     const [firstName, setFirstName] = useState(initialData.firstName);
     const [lastName, setLastName] = useState(initialData.lastName);
     const [bio, setBio] = useState(initialData.bio);
-    const [title, setTitle] = useState(initialData.title || "");
-    const [titleCredentials, setTitleCredentials] = useState(initialData.titleCredentials || "");
+    const [title, setTitle] = useState(initialData.title ?? "");
+    const [company, setCompany] = useState(initialData.company ?? "");
     const [linkedinUrl, setLinkedinUrl] = useState(initialData.linkedinUrl || "");
     const [showBookCallCta, setShowBookCallCta] = useState(initialData.showBookCallCta ?? true);
     const [bookCallUrl, setBookCallUrl] = useState(initialData.bookCallUrl ?? "");
@@ -67,7 +101,7 @@ export function CoachProfileForm({ coachId, initialData, allowEditIntegrationIds
                 setProfileImage(data.url);
                 setMessage({ type: "success", text: "Photo uploaded successfully." });
             } else {
-                setMessage({ type: "error", text: data.error || "Failed to upload photo." });
+                setMessage({ type: "error", text: errorMessage(data.error, "Failed to upload photo.") });
             }
         } catch {
             setMessage({ type: "error", text: "Network error uploading photo." });
@@ -81,34 +115,37 @@ export function CoachProfileForm({ coachId, initialData, allowEditIntegrationIds
         setMessage(null);
 
         try {
-            const res = await fetch(`/api/portal/profile`, {
+            const endpoint = saveTarget === "admin"
+                ? `/api/coaches/${coachId}`
+                : "/api/portal/profile";
+            const payload = {
+                firstName,
+                lastName,
+                title: title || null,
+                company: company || null,
+                linkedinUrl: linkedinUrl || null,
+                bio,
+                showBookCallCta,
+                bookCallUrl: bookCallUrl || null,
+                ...(saveTarget === "admin" && allowEditIntegrationIds
+                    ? {
+                        hubspotId: hubspotId || null,
+                        circleId: circleId || null,
+                    }
+                    : {}),
+            };
+
+            const res = await fetch(endpoint, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ firstName, lastName, bio, title: title || null, company: titleCredentials || null, linkedinUrl: linkedinUrl || null, showBookCallCta, bookCallUrl: bookCallUrl || null }),
+                body: JSON.stringify(payload),
             });
 
             const data = await res.json();
 
             if (!res.ok || !data.success) {
-                setMessage({ type: "error", text: data.error || "Failed to save changes." });
+                setMessage({ type: "error", text: errorMessage(data.error, "Failed to save changes.") });
                 return;
-            }
-
-            // If admin is editing integration IDs, send a separate PATCH to /api/coaches/[id]
-            if (allowEditIntegrationIds) {
-                const integRes = await fetch(`/api/coaches/${coachId}`, {
-                    method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        hubspotId: hubspotId || null,
-                        circleId: circleId || null,
-                    }),
-                });
-                const integData = await integRes.json();
-                if (!integRes.ok || !integData.success) {
-                    setMessage({ type: "error", text: integData.error || "Failed to save integration IDs." });
-                    return;
-                }
             }
 
             setMessage({ type: "success", text: "Profile updated successfully." });
@@ -184,31 +221,28 @@ export function CoachProfileForm({ coachId, initialData, allowEditIntegrationIds
                 <p className="text-xs text-muted-foreground">Contact support to change your email address.</p>
             </div>
 
-            <div>
-                <label className="block text-sm font-medium text-foreground mb-1">
-                    Professional Title <span className="text-destructive">*</span>
-                </label>
-                <input
-                    type="text"
+            <div className="space-y-2">
+                <Label htmlFor="title">Professional Title</Label>
+                <Input
+                    id="title"
                     value={title}
-                    onChange={(e) => setTitle(e.target.value)}
+                    onChange={(event) => setTitle(event.target.value)}
                     placeholder="e.g., Scaling Up Certified Coach"
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
                     Your professional title — shown on landing pages
                 </p>
             </div>
 
-            {/* MR-26: Title / Credentials field matching admin bio form (business entity) */}
             <div className="space-y-2">
-                <Label htmlFor="titleCredentials">Title / Credentials</Label>
+                <Label htmlFor="company">Company Name</Label>
                 <Input
-                    id="titleCredentials"
-                    value={titleCredentials}
-                    onChange={(e) => setTitleCredentials(e.target.value)}
-                    placeholder="Scaling Up Certified Coach"
+                    id="company"
+                    value={company}
+                    onChange={(event) => setCompany(event.target.value)}
+                    placeholder="Your company or organization"
                 />
+                <p className="text-xs text-muted-foreground">The organization or business you represent</p>
             </div>
 
             <div className="space-y-2">

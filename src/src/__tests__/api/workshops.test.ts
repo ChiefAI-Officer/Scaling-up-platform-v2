@@ -458,5 +458,69 @@ describe("Workshops API", () => {
         expect.objectContaining({ name: "workshop/approved" })
       );
     });
+
+    it("uses the secondary coach's professional title in new duo setup metadata", async () => {
+      (getApiActor as jest.Mock).mockResolvedValue({
+        userId: "admin-1",
+        email: "admin@example.com",
+        role: "ADMIN",
+        coachId: null,
+      });
+      (db.coach.findUnique as jest.Mock)
+        .mockResolvedValueOnce({
+          id: "coach-1",
+          email: "primary@example.com",
+          firstName: "Primary",
+          lastName: "Coach",
+          linkedinUrl: null,
+          certifications: [{ id: "cert-1", status: "ACTIVE" }],
+        })
+        .mockResolvedValueOnce({
+          id: "coach-2",
+          email: "secondary@example.com",
+          firstName: "Lynne",
+          lastName: "Verdun",
+          profileImage: null,
+          title: "Master Coach",
+          company: "A Step Above",
+        });
+      (db.workshopType.findUnique as jest.Mock).mockResolvedValue({
+        id: "wt-1",
+        slug: "scaling-up",
+      });
+      (db.workshop.create as jest.Mock).mockResolvedValue({
+        id: "ws-1",
+        title: "Scaling Up Growth Workshop",
+      });
+      (db.workshop.update as jest.Mock).mockResolvedValue({
+        id: "ws-1",
+        landingPageSlug: "scaling-up-growth-workshop-ws-1",
+      });
+
+      const response = await POST(
+        asPostRequest(
+          new Request("http://localhost/api/workshops", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              ...buildWorkshopPayload(
+                new Date(Date.now() + 95 * 24 * 60 * 60 * 1000).toISOString()
+              ),
+              isDuoWorkshop: true,
+              secondaryCoachId: "coach-2",
+            }),
+          })
+        )
+      );
+
+      expect(response.status).toBe(201);
+      expect(db.automationTask.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            inputData: expect.stringContaining('"title":"Master Coach"'),
+          }),
+        })
+      );
+    });
   });
 });

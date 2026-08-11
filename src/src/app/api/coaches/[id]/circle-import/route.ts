@@ -77,6 +77,7 @@ export async function POST(
         email: true,
         firstName: true,
         lastName: true,
+        title: true,
         company: true,
         bio: true,
         profileImage: true,
@@ -89,7 +90,7 @@ export async function POST(
       ? {
           ...updatedCoach,
           // Backward-compatible aliases for older consumers.
-          titleCredentials: updatedCoach.company ?? "",
+          titleCredentials: updatedCoach.title ?? "",
           biography: updatedCoach.bio ?? "",
           profileImageUrl: updatedCoach.profileImage ?? "",
         }

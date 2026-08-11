@@ -23,7 +23,6 @@ export interface ReportStylePickerProps {
   disabled?: boolean;
   sourceLabel?: string;
   lockedAt?: Date | string | null;
-  compact?: boolean;
   previewAnatomy?: ReportStylePreviewAnatomy;
   heading?: string;
   disabledExplanation?: string | null;
@@ -58,20 +57,18 @@ export function ReportStylePicker({
   disabled = false,
   sourceLabel,
   lockedAt,
-  compact = false,
   previewAnatomy = "scored",
   heading = "Report style",
   disabledExplanation,
 }: ReportStylePickerProps) {
   const radioName = useId();
+  const previewRegionId = `${radioName}-preview`;
   const [previewPage, setPreviewPage] = useState<PreviewPage>("cover");
   const [previewExpanded, setPreviewExpanded] = useState(false);
   const [failedPreviews, setFailedPreviews] = useState<ReadonlySet<string>>(() => new Set());
   const [retryVersions, setRetryVersions] = useState<Readonly<Record<string, number>>>({});
 
   const selectedMetadata = REPORT_STYLE_REGISTRY[value];
-  const selectedThumbnailId = previewId(previewAnatomy, value, "cover");
-  const selectedThumbnailFailed = failedPreviews.has(selectedThumbnailId);
   const lockedTimestamp = useMemo(
     () => (lockedAt == null ? null : formatLockTimestamp(lockedAt)),
     [lockedAt],
@@ -131,13 +128,10 @@ export function ReportStylePicker({
   }
 
   return (
-    <section
-      aria-label={`${heading} selection`}
-      className={compact ? "space-y-3" : "space-y-5"}
-    >
-      <fieldset className="space-y-3">
+    <section aria-label={`${heading} selection`} className="space-y-3">
+      <fieldset className="space-y-2">
         <legend className="text-sm font-semibold text-foreground">{heading}</legend>
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="grid gap-2 md:grid-cols-3">
           {REPORT_STYLE_KEYS.map((style) => {
             const metadata = REPORT_STYLE_REGISTRY[style];
             const isSelected = style === value;
@@ -145,9 +139,7 @@ export function ReportStylePicker({
             return (
               <label
                 key={style}
-                className={`block cursor-pointer rounded-lg border border-border bg-background text-foreground shadow-sm transition focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring has-[:checked]:border-primary has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-75 ${
-                  compact ? "p-2" : "p-4"
-                }`}
+                className="block cursor-pointer rounded-lg border border-border bg-background p-3 text-foreground shadow-sm transition focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring has-[:checked]:border-primary has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-75"
               >
                 <input
                   type="radio"
@@ -160,16 +152,19 @@ export function ReportStylePicker({
                   onChange={() => selectStyle(style)}
                   onKeyDown={(event) => handleRadioKeyDown(event, style)}
                 />
-                <span className="flex items-start justify-between gap-3">
-                  <span className="font-semibold">{metadata.label}</span>
+                <span className="flex items-start justify-between gap-2">
+                  <span className="text-sm font-semibold leading-tight">{metadata.label}</span>
                   {isSelected && (
-                    <span className="text-sm font-medium" aria-live="polite">
-                      Selected
+                    <span className="shrink-0 text-sm font-semibold text-primary">
+                      <span aria-hidden="true">✓</span>
+                      <span className="sr-only">Selected</span>
                     </span>
                   )}
                 </span>
-                <span className="mt-2 block text-sm text-muted-foreground">{metadata.description}</span>
-                <span className="mt-2 block text-sm text-muted-foreground">
+                <span className="mt-1.5 block text-xs leading-snug text-muted-foreground">
+                  {metadata.description}
+                </span>
+                <span className="mt-1.5 block text-xs text-muted-foreground">
                   Paper format: {metadata.paperFormat}
                 </span>
               </label>
@@ -200,51 +195,17 @@ export function ReportStylePicker({
           </div>
         )}
 
-      {compact &&
-        (selectedThumbnailFailed ? (
+      <div
+        className={`mt-3 flex flex-wrap gap-3 ${
+          previewExpanded ? "items-start justify-between" : "justify-end"
+        }`}
+      >
+        {previewExpanded && (
           <div
-            className="space-y-2 rounded-lg border border-border bg-muted/20 p-4 text-foreground"
-            role="status"
+            role="tablist"
+            aria-label={`${heading} preview pages`}
+            className="flex flex-wrap gap-2"
           >
-            <p>Preview unavailable</p>
-            <button
-              type="button"
-              className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-ring"
-              onClick={() => retryPreview("cover")}
-            >
-              Retry
-            </button>
-          </div>
-        ) : (
-          // Compact creation surfaces keep one selected thumbnail visible while
-          // the full anatomy preview remains available on demand below.
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            key={`${selectedThumbnailId}-${retryVersions[selectedThumbnailId] ?? 0}`}
-            src={getReportStylePreviewPath(value, previewAnatomy, "cover")}
-            alt={`${selectedMetadata.label} selected thumbnail`}
-            className="h-28 w-full rounded-lg border border-border object-cover object-top"
-            onError={() =>
-              setFailedPreviews((current) =>
-                new Set(current).add(selectedThumbnailId),
-              )
-            }
-          />
-        ))}
-
-      {compact && (
-        <button
-          type="button"
-          aria-expanded={previewExpanded}
-          className="text-sm font-medium text-foreground underline underline-offset-2"
-          onClick={() => setPreviewExpanded((expanded) => !expanded)}
-        >
-          Preview selected appearance
-        </button>
-      )}
-      {(!compact || previewExpanded) && (
-        <div className="mt-3 space-y-3">
-          <div role="tablist" aria-label={`${heading} preview pages`} className="flex gap-2">
             {PREVIEW_TABS.map((tab) => {
               const isActive = tab.key === previewPage;
 
@@ -266,7 +227,25 @@ export function ReportStylePicker({
               );
             })}
           </div>
+        )}
+        <button
+          type="button"
+          aria-expanded={previewExpanded}
+          aria-controls={previewRegionId}
+          className="shrink-0 rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-ring"
+          onClick={() => setPreviewExpanded((expanded) => !expanded)}
+        >
+          {previewExpanded ? "Hide preview" : "Show preview"}
+        </button>
+      </div>
 
+      {previewExpanded && (
+        <div
+          id={previewRegionId}
+          role="region"
+          aria-label={`${heading} preview`}
+          className="mt-3"
+        >
           {PREVIEW_TABS.map((tab) => {
             const currentPreviewId = previewId(previewAnatomy, value, tab.key);
             const isActive = tab.key === previewPage;
@@ -281,7 +260,8 @@ export function ReportStylePicker({
                 aria-label={`${selectedMetadata.label} ${tab.key} preview`}
                 hidden={!isActive}
               >
-                {failedPreview ? (
+                {isActive &&
+                  (failedPreview ? (
                   <div className="space-y-2 rounded-lg border border-border bg-muted/20 p-4 text-foreground" role="status">
                     <p>Preview unavailable</p>
                     <button
@@ -292,7 +272,7 @@ export function ReportStylePicker({
                       Retry
                     </button>
                   </div>
-                ) : (
+                  ) : (
                   // Preview URLs are chosen at runtime from the closed registry; native image events
                   // let Retry remount only the failed preview without changing the selected style.
                   // eslint-disable-next-line @next/next/no-img-element
@@ -309,7 +289,7 @@ export function ReportStylePicker({
                       setFailedPreviews((current) => new Set(current).add(currentPreviewId))
                     }
                   />
-                )}
+                  ))}
               </div>
             );
           })}

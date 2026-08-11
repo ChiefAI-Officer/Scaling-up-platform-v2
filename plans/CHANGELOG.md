@@ -34,7 +34,51 @@ Future entries should be appended at the TOP of the entries section below (newes
 **Known repository limitation.** Standalone `npx tsc --noEmit` remains nonzero with **422 diagnostics across 70 broad test/config files**. This is a pre-existing repository-wide condition recorded in prior receipts; after correcting the only branch-local nullable-Organization diagnostic, the full Next/Turbopack TypeScript phase and every focused/full Jest suite completed successfully. It is not represented as a passing standalone TypeScript gate.
 
 **Production boundary.** No Production flag was read or mutated, no deployment occurred, no database write was made, and no customer email was sent. The read-only custom-HTML override audit with actual current flags, manual review of each live override, seven synthetic visual captures, one exact test canary, Ready/health validation, organic PII-free telemetry, and separate authorization before global enablement remain required rollout work. No launch or Production verification is claimed.
+---
 
+<a id="coach-profile-fields-aligned-launched"></a>
+### 2026-08-11 — Coach profile fields aligned and launched <!-- ENTRY_ISO:2026-08-11 ENTRY_SLUG:coach-profile-fields-aligned-launched -->
+
+**Status: LAUNCHED + PRODUCTION-HEALTH-VERIFIED.** Ready PR [#333](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/333) passed Build, Migration Safety Gate, Assessment Email Lease (PostgreSQL), Vercel, and Vercel Preview Comments, then squash-merged to `main` as `8b03c948a928da877611af605f061890c570c1ea`. Exact Vercel Production deployment `dpl_AdSEqp9H4HxToFuCbRTQgKU1EHXX` reached Ready and owns both canonical aliases. Their `/api/health` endpoints returned HTTP `200` with healthy database and safe auth posture.
+
+**Delivered behavior and boundary.** **Professional Title** maps to `Coach.title`; **Company Name** maps to `Coach.company`. Admin/self-profile routing, Admin BIO, Coach creation/details, Circle import, the BIO API, new landing-page defaults, and new duo-workshop setup metadata preserve that separation. The read-only `company` fallback remains for legacy records; no migration or data rewrite occurred. Existing saved/published landing-page snapshots remain unchanged.
+
+**Regression closure.** The final mismatch sweep found one residual in the new duo-workshop setup metadata: it used a secondary Coach's `company` as the serialized `title`. A focused regression first failed with `expected Master Coach` / `received A Step Above`; the route now selects canonical `title` and uses `resolveCoachProfessionalTitle`, so new metadata uses `title → legacy company → default` without changing saved snapshots.
+
+**Fresh verification evidence.** The expanded targeted command passed **14 suites / 128 tests**; final-review coverage passed **12 suites / 119 tests**; Git-derived ESLint had **0 errors** and eight existing warnings; migration safety approved all **47 migrations**; and `git diff --check` was silent. After merging concurrent `main`, the combined tree passed **10 suites / 83 tests / 4 snapshots** focused and **688 suites / 8,538 tests / 16 snapshots** full. The Production-matching Turbopack build completed TypeScript, generated **94/94** static pages, and exited 0. Established negative-path/React, missing local Inngest-key, and `DATABASE_URL` messages remained non-failing.
+
+**Visual-acceptance limitation.** The first worktree-only local run lacked NextAuth configuration. A safe retry sourced the canonical checkout's `.env` only for the dev-server process and set `NEXTAUTH_URL=http://localhost:3000`: `/` then returned `307 → /login`, `/api/auth/providers` returned `200`, and no configuration error appeared. The in-app browser reached `/login`, which visibly advertised local demo credentials `admin@scalingup.com` / `demo123`; submitting those displayed values to localhost produced the visible alert `Invalid email or password` and remained on `/login`. No authorized local test account/session is available, so no local Coach Settings, Admin Edit, Coach Details, or BIO screen could be inspected; consequently the `Master Coach` / `A Step Above` save-reload visual acceptance is **not claimed**. No account, local/external database, or Production data was written.
+
+---
+
+<a id="report-preview-disclosure-launched"></a>
+### 2026-08-11 — Report preview disclosure launched <!-- ENTRY_ISO:2026-08-11 ENTRY_SLUG:report-preview-disclosure-launched -->
+
+**Status: LAUNCHED + PRODUCTION-HEALTH-VERIFIED.** Ready PR [#332](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/332) passed Build, Migration Safety Gate, Assessment Email Lease (PostgreSQL), Vercel, and Vercel Preview Comments, then squash-merged to `main` as `9cbfa304ce9ad198791079e12cd9ffbce6e65af2`. The associated [Vercel Production deployment](https://vercel.com/scaling-up/scaling-up-platform-v2/CLtkEuaQXTLRRXAEjpaYugKMDyVF) reported **Deployment has completed** for that merge commit. No Production environment value or feature flag changed.
+
+**Delivered behavior and scope.** Every existing Report Appearance picker now uses smaller responsive style tiles and starts with Cover/Summary/Detail preview assets unmounted. **Show preview** mounts the accessible preview on demand; **Hide preview** unloads it while retaining the selected report style and same-visit page state. Style changes while expanded keep the active page and update only the mounted image. Locked and saving states disable report-style radios without disabling the disclosure, tabs, close, or retry controls, and saving no longer announces the first-completed-response lock explanation. Simplified public-campaign creation and summary-only Campaign Detail remain unchanged because they intentionally expose no picker. There is no schema, migration, API, scoring, report-renderer, respondent-output, or new rollout-flag change.
+
+**Verification and Production safety boundary.** Immediately before push, the clean reviewed branch passed **683 suites / 8,512 tests / 16 snapshots**, changed-file ESLint, all **47** migration safety checks, and the Production-matching Turbopack build with **94/94** static pages. The focused final matrix passed **7 suites / 80 tests / 4 snapshots**, and independent whole-branch review ended with no Critical, Important, or Minor findings. Authenticated read-only visual QA covered Admin template Settings, Coach Report Setup, and editable Campaign Detail at **1280px** and **393px**, including collapsed/expanded states, Detail persistence, style switching, locked controls, keyboard focus, containment, and retry isolation. After deployment, both [`scaling-up-platform-v2.vercel.app/api/health`](https://scaling-up-platform-v2.vercel.app/api/health) and [`platformtest.scalingup.com/api/health`](https://platformtest.scalingup.com/api/health) returned HTTP `200` with healthy database and safe auth posture; the public login returned HTTP `200`. Its existing Vercel Insights script request still returns a console 404/MIME error and is unrelated to this diff. Per Production safety policy, no real account was used for authenticated live picker interaction and no assessment, template, campaign, response, report, email, environment value, or customer record was created or changed during acceptance.
+
+---
+
+<a id="report-preview-disclosure-locally-verified"></a>
+### 2026-08-11 — Report preview disclosure locally verified <!-- ENTRY_ISO:2026-08-11 ENTRY_SLUG:report-preview-disclosure-locally-verified -->
+
+**Status and scope.** **LOCALLY IMPLEMENTED AND VERIFIED; not pushed, merged,
+deployed, or enabled on Production.** Every existing Report Appearance picker
+now uses compact three-column style tiles and starts with preview assets hidden.
+Show preview mounts the accessible Cover/Summary/Detail experience on demand;
+Hide preview unloads it without changing selection or same-visit tab state.
+Simplified public-campaign creation and summary-only Campaign Detail views remain
+unchanged because they intentionally expose no picker.
+
+**Verification evidence.** The shared picker plus Coach wizard/detail, Admin
+template Settings, legacy public-campaign manager, and simplified public-create
+focused suites passed. Changed-file ESLint, migration safety, and the
+Production-matching Turbopack build passed. Authenticated visual review covered
+Admin template Settings, Coach Report Setup, and editable Campaign Detail at
+1280px and 393px. No Production or customer data was changed.
 ---
 
 <a id="create-assessment-welcome-parity-launched"></a>

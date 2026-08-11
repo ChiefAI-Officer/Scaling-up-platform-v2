@@ -23,7 +23,7 @@ export interface SyncResult {
 /**
  * Sync a coach's profile data from Circle.so into the Coach record.
  *
- * By default, only fills empty fields (bio, profileImage, company).
+ * By default, only fills empty fields (bio, profileImage, title).
  * Pass forceOverwrite: true to overwrite existing values (admin explicit sync).
  * System fields (circleId, syncedAt) are always updated.
  */
@@ -45,7 +45,7 @@ export async function syncCoachFromCircle(
                 email: true,
                 bio: true,
                 profileImage: true,
-                company: true,
+                title: true,
                 circleId: true,
             },
         });
@@ -84,9 +84,9 @@ export async function syncCoachFromCircle(
             fieldsUpdated.push("bio");
         }
 
-        if (profile.title && (forceOverwrite || !coach.company)) {
-            updateData.company = profile.title;
-            fieldsUpdated.push("company");
+        if (profile.title && (forceOverwrite || !coach.title)) {
+            updateData.title = profile.title.trim();
+            fieldsUpdated.push("title");
         }
 
         // System fields — always update
