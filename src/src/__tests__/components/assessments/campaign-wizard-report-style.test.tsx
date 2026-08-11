@@ -112,6 +112,11 @@ describe("CampaignWizard — report appearance", () => {
     expect(screen.getByRole("heading", { name: "Report appearance" })).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: /modern dashboard/i })).toBeChecked();
     expect(screen.getByText("Using the admin default for this template.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show preview" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+    expect(screen.queryByRole("img", { name: /preview/i })).not.toBeInTheDocument();
   });
 
   it("omits reportStyle from creation while the coach keeps the inherited default", async () => {
@@ -141,6 +146,7 @@ describe("CampaignWizard — report appearance", () => {
   it("uses sparse custom preview assets for a narrative-only custom template", async () => {
     await advanceToSchedule(NARRATIVE_CUSTOM_TEMPLATE);
 
+    fireEvent.click(screen.getByRole("button", { name: "Show preview" }));
     expect(
       screen.getByRole("img", { name: "Modern Dashboard Cover preview" }),
     ).toHaveAttribute(

@@ -746,7 +746,6 @@ export function PublicCampaignsManager() {
               <div style={{ maxWidth: "42rem" }}>
                 <ReportStylePicker
                   value={reportStyle}
-                  compact
                   previewAnatomy={resolveReportStylePreviewAnatomy({
                     templateAlias: selectedTemplate.alias,
                     capabilities:
