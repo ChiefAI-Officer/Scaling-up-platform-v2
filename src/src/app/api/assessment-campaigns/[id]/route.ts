@@ -497,7 +497,7 @@ export async function PATCH(
           requireUrlToken: !(
             assessmentInviteBrandedCustomHtmlEnabled() ||
             isInvitationBannerEnabled({
-              organizationId: campaign.organizationId,
+              organizationId: campaign.organizationId ?? undefined,
               templateId: campaign.templateId,
             })
           ),
