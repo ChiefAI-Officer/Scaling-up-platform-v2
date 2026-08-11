@@ -26,7 +26,10 @@ import {
     renderCustomHtmlFragment,
     buildInvitationEmailShell,
     renderBrandedCustomHtmlText,
+    renderUniversalInvitationText,
     shouldShowOrgLine,
+    type InvitationChrome,
+    type InvitationCoachByline,
     type InvitationVars,
 } from "@/lib/assessments/invitation-email";
 import {
@@ -40,6 +43,7 @@ import {
 } from "@/lib/assessments/wave-d-feature-flags";
 import { SU_LOGO_PNG, SU_LOGO_CID } from "@/lib/assets/invitation-logo";
 import { resolveInvitationHtmlMode } from "@/lib/assessments/invitation-html-policy";
+import { safeImageSrc } from "@/lib/assessments/safe-image-src";
 
 // ============================================
 // Types
@@ -1135,7 +1139,9 @@ export interface AssessmentInvitationEmailInput {
      * (byte-identical branded shell). Branded custom HTML receives this chrome;
      * only the legacy full-replacement path is excluded.
      */
-    chrome?: "legacy" | "waveP";
+    chrome?: InvitationChrome;
+    /** Universal invitation banner uses a single resolved coach identity. */
+    coachByline?: InvitationCoachByline;
     /** Wave P — coach logo (creator coach ?? org owner profileImage; https-gated at render). */
     coachLogoUrl?: string | null;
     /** Jeff #65 enabled delivery keeps provider errors out of persistence. */
@@ -1170,6 +1176,29 @@ export function prepareAssessmentInvitationEmail(
     const effectiveBodyMarkdown = bodyBlank ? DEFAULT_INVITATION_BODY : data.template.invitationBodyMarkdown;
     const bodySource: "authored" | "default" = bodyBlank ? "default" : "authored";
 
+    const fallbackCoachName = (data.coachName ?? "").trim();
+    const fallbackCoachImage = fallbackCoachName
+        ? safeImageSrc(data.coachLogoUrl)
+        : null;
+    const coachByline = data.coachByline ?? (
+        fallbackCoachName.length === 0
+            ? { mode: "scaling_up_only" as const }
+            : fallbackCoachImage
+                ? {
+                    mode: "image_name" as const,
+                    coachName: fallbackCoachName,
+                    coachImageUrl: fallbackCoachImage,
+                }
+                : { mode: "name_only" as const, coachName: fallbackCoachName }
+    );
+    const universalBanner = data.chrome === "universalBanner";
+    const legacyCoachName = data.coachByline
+        ? coachByline.mode === "scaling_up_only" ? null : coachByline.coachName
+        : data.coachName ?? null;
+    const legacyCoachLogoUrl = data.coachByline
+        ? coachByline.mode === "image_name" ? coachByline.coachImageUrl : null
+        : data.coachLogoUrl ?? null;
+
     // Kill-switch: ASSESSMENT_INVITE_BRANDED=0 reverts to the legacy plain renderer.
     const branded = process.env.ASSESSMENT_INVITE_BRANDED !== "0";
 
@@ -1200,10 +1229,10 @@ export function prepareAssessmentInvitationEmail(
         organizationName: data.organizationName ?? null,
         campaignName: data.campaign.name,
         templateName: data.templateName ?? null,
-        coachName: data.coachName ?? null,
+        coachName: legacyCoachName,
         invitationUrl,
         closeAt: data.campaign.closeAt,
-        coachLogoUrl: data.coachLogoUrl ?? null,
+        coachLogoUrl: legacyCoachLogoUrl,
         // Jeff #61 — omit the header org/company line for templates that lead
         // with the coach (LVA). Alias is passed by every send path; an absent
         // alias leaves the line shown (byte-identical to prior output).
@@ -1221,7 +1250,8 @@ export function prepareAssessmentInvitationEmail(
             : null;
     const customHtmlMode = resolveInvitationHtmlMode({
         waveDCustomHtmlEnabled: waveDCustomHtmlEmailEnabled(),
-        brandedCustomHtmlEnabled: assessmentInviteBrandedCustomHtmlEnabled(),
+        brandedCustomHtmlEnabled:
+            universalBanner || assessmentInviteBrandedCustomHtmlEnabled(),
         rawHtml: rawCustomHtml,
     });
 
@@ -1241,11 +1271,29 @@ export function prepareAssessmentInvitationEmail(
             bodyHtml: fragment,
             vars,
             chrome: data.chrome ?? "legacy",
+            coachByline,
         });
-        text = renderBrandedCustomHtmlText(fragment, vars);
+        text = universalBanner
+            ? renderUniversalInvitationText({
+                body: { kind: "sanitized_html", value: rawCustomHtml },
+                vars,
+                coachByline,
+            })
+            : renderBrandedCustomHtmlText(fragment, vars);
     } else {
-        html = buildInvitationEmailHtml({ bodyMarkdown: effectiveBodyMarkdown, vars, chrome: data.chrome ?? "legacy" });
-        text = renderTextBody(effectiveBodyMarkdown, vars);
+        html = buildInvitationEmailHtml({
+            bodyMarkdown: effectiveBodyMarkdown,
+            vars,
+            chrome: data.chrome ?? "legacy",
+            coachByline,
+        });
+        text = universalBanner
+            ? renderUniversalInvitationText({
+                body: { kind: "markdown", value: effectiveBodyMarkdown },
+                vars,
+                coachByline,
+            })
+            : renderTextBody(effectiveBodyMarkdown, vars);
     }
 
     // Telemetry (PII-FREE): which renderer + whether defaults filled a blank.
@@ -1290,6 +1338,7 @@ export function prepareAssessmentInvitationEmail(
                 subjectSource,
                 bodySource: effectiveBodySource,
                 defaultVersion: usedDefault ? DEFAULT_INVITATION_VERSION : null,
+                coachBylineMode: coachByline.mode,
                 ...customHtmlMetadata,
             },
         },

@@ -327,6 +327,166 @@ describe("sendAssessmentInvitationEmail — custom HTML render selection (#220)"
     );
   });
 
+  // This catches a regression where the notification chokepoint lets legacy
+  // full-replacement policy bypass the universal platform-owned shell.
+  it("wraps universal custom HTML in the platform shell without the GH #220 flag", async () => {
+    setEnvFlag("WAVE_D_CUSTOM_HTML_EMAIL_ENABLED", true);
+
+    const prepared = prepareAssessmentInvitationEmail({
+      ...baseData(),
+      chrome: "universalBanner",
+      coachByline: {
+        mode: "image_name",
+        coachName: "Pat Coach",
+        coachImageUrl: "https://cdn.test/pat.png",
+      },
+      invitationBodyHtml: "<p>Custom-only body</p>",
+    });
+    await prepared.send();
+
+    const options = mockSendEmailViaSMTP.mock.calls[0][0];
+    expect(options.html).toContain("Custom-only body");
+    expect(options.html).toContain("cid:sulogo");
+    expect(options.html).toContain("Your coach");
+    expect(options.html).toContain("Pat Coach");
+    expect(options.html).toContain("Start the assessment");
+    expect(options.html).toContain("https://app.test/org-survey/abc#t=SECRET");
+    expect(options.html).toContain("&mdash; Scaling Up Platform");
+    expect(options.telemetry.metadata).toMatchObject({
+      customHtmlMode: "branded_body",
+      coachBylineMode: "image_name",
+    });
+  });
+
+  it("renders a universal name-only byline without an image", async () => {
+    const prepared = prepareAssessmentInvitationEmail({
+      ...baseData(),
+      chrome: "universalBanner",
+      coachByline: { mode: "name_only", coachName: "Avery Coach" },
+    });
+    await prepared.send();
+
+    const options = mockSendEmailViaSMTP.mock.calls[0][0];
+    expect(options.html).toContain("Your coach");
+    expect(options.html).toContain("Avery Coach");
+    expect(options.html).not.toContain("https://cdn.test/");
+    expect(options.telemetry.metadata.coachBylineMode).toBe("name_only");
+  });
+
+  it("omits the universal coach byline for Scaling Up-only invitations", async () => {
+    const prepared = prepareAssessmentInvitationEmail({
+      ...baseData(),
+      chrome: "universalBanner",
+      coachByline: { mode: "scaling_up_only" },
+    });
+    await prepared.send();
+
+    const options = mockSendEmailViaSMTP.mock.calls[0][0];
+    expect(options.html).toContain("cid:sulogo");
+    expect(options.html).not.toContain("Your coach");
+    expect(options.text).not.toContain("Coach:");
+    expect(options.telemetry.metadata.coachBylineMode).toBe("scaling_up_only");
+  });
+
+  it("keeps an empty sanitized universal custom fragment inside a usable shell", async () => {
+    setEnvFlag("WAVE_D_CUSTOM_HTML_EMAIL_ENABLED", true);
+    const prepared = prepareAssessmentInvitationEmail({
+      ...baseData(),
+      chrome: "universalBanner",
+      coachByline: { mode: "scaling_up_only" },
+      invitationBodyHtml: '<script>alert(1)</script><iframe src="https://evil.test"></iframe>',
+    });
+    await prepared.send();
+
+    const options = mockSendEmailViaSMTP.mock.calls[0][0];
+    expect(options.html).toContain("cid:sulogo");
+    expect(options.html).toContain("Start the assessment");
+    expect(options.html).toContain("https://app.test/org-survey/abc#t=SECRET");
+    expect(options.html).not.toContain("alert(1)");
+  });
+
+  it("escapes universal custom-HTML token values before composing the shell", async () => {
+    setEnvFlag("WAVE_D_CUSTOM_HTML_EMAIL_ENABLED", true);
+    const prepared = prepareAssessmentInvitationEmail({
+      ...baseData(),
+      chrome: "universalBanner",
+      coachByline: { mode: "name_only", coachName: "Pat <Coach>" },
+      respondent: {
+        id: "r1",
+        firstName: '<img src=x onerror="alert(1)">',
+        lastName: "Doe",
+        email: "jane@example.com",
+      },
+      invitationBodyHtml: "<p>Hello {{respondentFirstName}}</p>",
+    });
+    await prepared.send();
+
+    const html = mockSendEmailViaSMTP.mock.calls[0][0].html;
+    expect(html).toContain("Pat &lt;Coach&gt;");
+    expect(html).toContain('Hello &lt;img src=x onerror="alert(1)"&gt;');
+    expect(html).not.toContain('<img src=x onerror="alert(1)">');
+  });
+
+  it("never selects full replacement for tokenless universal custom HTML", async () => {
+    setEnvFlag("WAVE_D_CUSTOM_HTML_EMAIL_ENABLED", true);
+    const prepared = prepareAssessmentInvitationEmail({
+      ...baseData(),
+      chrome: "universalBanner",
+      coachByline: { mode: "scaling_up_only" },
+      invitationBodyHtml: "<p>Tokenless custom body</p>",
+    });
+    await prepared.send();
+
+    const options = mockSendEmailViaSMTP.mock.calls[0][0];
+    expect(options.html).toContain("cid:sulogo");
+    expect(options.attachments).toEqual(
+      expect.arrayContaining([expect.objectContaining({ cid: "sulogo" })]),
+    );
+    expect(options.telemetry.metadata.customHtmlMode).toBe("branded_body");
+  });
+
+  it("uses the same universal text structure for Markdown and custom HTML bodies", async () => {
+    const universalInput = {
+      chrome: "universalBanner" as const,
+      coachByline: { mode: "name_only" as const, coachName: "Pat Coach" },
+    };
+    const markdownPrepared = prepareAssessmentInvitationEmail({
+      ...baseData(),
+      ...universalInput,
+      template: {
+        ...baseData().template,
+        invitationBodyMarkdown: "Shared body",
+      },
+    });
+    await markdownPrepared.send();
+    const markdownText = mockSendEmailViaSMTP.mock.calls[0][0].text;
+
+    mockSendEmailViaSMTP.mockClear();
+    setEnvFlag("WAVE_D_CUSTOM_HTML_EMAIL_ENABLED", true);
+    const customPrepared = prepareAssessmentInvitationEmail({
+      ...baseData(),
+      ...universalInput,
+      invitationBodyHtml: "<p>Shared body</p>",
+    });
+    await customPrepared.send();
+
+    expect(mockSendEmailViaSMTP.mock.calls[0][0].text).toBe(markdownText);
+  });
+
+  it("propagates SMTP failures from universal custom-HTML delivery", async () => {
+    setEnvFlag("WAVE_D_CUSTOM_HTML_EMAIL_ENABLED", true);
+    mockSendEmailViaSMTP.mockRejectedValueOnce(new Error("smtp unavailable"));
+
+    const prepared = prepareAssessmentInvitationEmail({
+      ...baseData(),
+      chrome: "universalBanner",
+      coachByline: { mode: "scaling_up_only" },
+      invitationBodyHtml: "<p>Custom-only body</p>",
+    });
+
+    await expect(prepared.send()).rejects.toThrow("smtp unavailable");
+  });
+
   afterAll(() => {
     if (ORIGINAL_FLAG === undefined) delete process.env.WAVE_D_CUSTOM_HTML_EMAIL_ENABLED;
     else process.env.WAVE_D_CUSTOM_HTML_EMAIL_ENABLED = ORIGINAL_FLAG;
