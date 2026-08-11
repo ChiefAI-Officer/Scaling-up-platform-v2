@@ -1201,10 +1201,12 @@ export function prepareAssessmentInvitationEmail(
             : null
     );
 
-    // Kill-switch: ASSESSMENT_INVITE_BRANDED=0 reverts to the legacy plain renderer.
+    // The older renderer switch applies only to non-universal chrome. Universal
+    // shell ownership is controlled solely by WAVE_INVITATION_BANNER_KILL at
+    // the send-path gate that selected this explicit chrome variant.
     const branded = process.env.ASSESSMENT_INVITE_BRANDED !== "0";
 
-    if (!branded) {
+    if (!universalBanner && !branded) {
         return prepareEmailViaSMTP(buildLegacyInvitationEmailOptions({
             invitation: data.invitation,
             respondent: data.respondent,

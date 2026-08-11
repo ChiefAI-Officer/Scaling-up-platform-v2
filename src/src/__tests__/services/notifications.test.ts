@@ -358,6 +358,30 @@ describe("sendAssessmentInvitationEmail — custom HTML render selection (#220)"
     });
   });
 
+  it("keeps universal shell ownership when the older branded renderer switch is off", async () => {
+    process.env.ASSESSMENT_INVITE_BRANDED = "0";
+    setEnvFlag("WAVE_D_CUSTOM_HTML_EMAIL_ENABLED", true);
+
+    const prepared = prepareAssessmentInvitationEmail({
+      ...baseData(),
+      chrome: "universalBanner",
+      coachByline: { mode: "name_only", coachName: "Pat Coach" },
+      invitationBodyHtml: "<p>Universal body fragment</p>",
+    });
+    await prepared.send();
+
+    const options = mockSendEmailViaSMTP.mock.calls[0][0];
+    expect(options.html).toContain("cid:sulogo");
+    expect(options.html).toContain("Your coach");
+    expect(options.html).toContain("Universal body fragment");
+    expect(options.html).toContain("Start the assessment");
+    expect(options.html).toContain("&mdash; Scaling Up Platform");
+    expect(options.telemetry.metadata).toMatchObject({
+      customHtmlMode: "branded_body",
+      coachBylineMode: "name_only",
+    });
+  });
+
   it("renders a universal name-only byline without an image", async () => {
     const prepared = prepareAssessmentInvitationEmail({
       ...baseData(),

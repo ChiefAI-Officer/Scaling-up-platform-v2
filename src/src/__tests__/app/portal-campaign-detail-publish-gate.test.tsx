@@ -273,6 +273,19 @@ describe("CampaignDetail invitation banner authoring state", () => {
 
     expect(captured.invitationBannerEnabled).toBe(true);
   });
+
+  it.each([
+    ["global enablement", "global"],
+    ["template canary", "template"],
+  ])("does not pass universal body-only authoring to a PUBLIC campaign under %s", async (_name, mode) => {
+    if (mode === "global") process.env.WAVE_INVITATION_BANNER_ENABLED = "1";
+    else process.env.WAVE_INVITATION_BANNER_CANARY = TEMPLATE_ID;
+    mockFindFirst.mockResolvedValue(makeCampaign({ accessMode: "PUBLIC" }));
+
+    await runPage();
+
+    expect(captured.invitationBannerEnabled).toBe(false);
+  });
 });
 
 describe("CampaignDetail entry-point publish gate (Wave J J-3)", () => {

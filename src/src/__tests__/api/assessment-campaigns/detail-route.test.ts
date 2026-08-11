@@ -106,6 +106,7 @@ describe("GET /api/assessment-campaigns/[id]", () => {
       templateId: "tpl-1",
       createdByCoachId: "coach-1",
       status: "DRAFT",
+      accessMode: "INVITED",
     });
     const res = await GET(
       new Request("http://localhost/api/assessment-campaigns/c1") as never,
@@ -620,6 +621,7 @@ describe("PATCH /api/assessment-campaigns/[id]", () => {
       templateId: "tpl-1",
       createdByCoachId: "coach-1",
       status: "DRAFT",
+      accessMode: "INVITED",
     });
     (db.assessmentCampaign.update as jest.Mock).mockResolvedValue({ id: "c1" });
   }
@@ -740,6 +742,39 @@ describe("PATCH /api/assessment-campaigns/[id]", () => {
         data: expect.objectContaining({ invitationBodyHtml: "<p>Body fragment</p>" }),
       }),
     );
+  });
+
+  it.each([
+    ["global enablement", "global"],
+    ["template canary", "template"],
+  ])("PUBLIC campaign under universal banner %s still requires the legacy URL token", async (_name, mode) => {
+    process.env.WAVE_D_CUSTOM_HTML_EMAIL_ENABLED = "1";
+    delete process.env.ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED;
+    if (mode === "global") process.env.WAVE_INVITATION_BANNER_ENABLED = "1";
+    else process.env.WAVE_INVITATION_BANNER_CANARY = "tpl-1";
+    draftActorSetup();
+    (getApiActor as jest.Mock).mockResolvedValue({
+      userId: "admin-1",
+      email: "admin@example.com",
+      role: "ADMIN",
+      coachId: null,
+    });
+    (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValue({
+      id: "c1",
+      organizationId: null,
+      templateId: "tpl-1",
+      createdByCoachId: null,
+      status: "DRAFT",
+      accessMode: "PUBLIC",
+    });
+
+    const response = await PATCH(
+      patchReq({ invitationBodyHtml: "<p>Body fragment</p>" }) as never,
+      detailParams("c1"),
+    );
+
+    expect(response.status).toBe(400);
+    expect(db.assessmentCampaign.update).not.toHaveBeenCalled();
   });
 
   it.each([

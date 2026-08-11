@@ -405,6 +405,7 @@ export async function PATCH(
       select: {
         id: true,
         status: true,
+        accessMode: true,
         organizationId: true,
         templateId: true,
         reportStyleLockedAt: true,
@@ -496,10 +497,11 @@ export async function PATCH(
         const placement = validateInvitationHtml(rawHtml, {
           requireUrlToken: !(
             assessmentInviteBrandedCustomHtmlEnabled() ||
-            isInvitationBannerEnabled({
-              organizationId: campaign.organizationId ?? undefined,
-              templateId: campaign.templateId,
-            })
+            (campaign.accessMode === "INVITED" &&
+              isInvitationBannerEnabled({
+                organizationId: campaign.organizationId ?? undefined,
+                templateId: campaign.templateId,
+              }))
           ),
         });
         if (!placement.ok) {

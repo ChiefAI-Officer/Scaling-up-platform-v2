@@ -238,6 +238,9 @@ When enabled for a campaign, the banner reaches these **INVITED** paths only:
 PUBLIC campaign creation/submission paths, respondent results/report emails, and
 report-email rendering are excluded and must remain unchanged. The banner has no
 editor control: the platform owns the banner, CTA, visible fallback URL, and footer.
+Campaign detail props and create/PATCH validation apply the universal body-only
+authoring contract only when `accessMode=INVITED`; a global or exact Template canary
+does not opt a PUBLIC campaign into invitation authoring.
 
 For a banner-enabled scope, future campaign create/PATCH validation permits and
 persists body-only custom HTML because the platform-owned universal shell supplies
@@ -247,6 +250,18 @@ the existing `WAVE_D_CUSTOM_HTML_EMAIL_ENABLED` capability permits custom HTML. 
 deliberately does **not** require, set, or synchronize
 `ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED`; that older flag retains its normal
 meaning only when the universal banner is inactive.
+
+An explicitly selected universal banner also bypasses the older
+`ASSESSMENT_INVITE_BRANDED=0` legacy-renderer switch. That switch retains its prior
+rollback meaning for non-universal legacy/Wave-P rendering only. Use
+`WAVE_INVITATION_BANNER_KILL=1` to stop universal rendering; do not use
+`ASSESSMENT_INVITE_BRANDED=0` as a universal rollback check.
+
+The create-page server snapshot never serializes the complete CANARY environment
+allowlist. It filters each configured ID through the authenticated Coach's existing
+Organization-ownership and Template-INTERSECTION access checks, then passes only the
+already-visible IDs needed for client-side Organization/Template selection. Under
+global enablement or KILL it passes no canary IDs.
 
 Inspect only PII-free delivery metadata while validating organic sends. The initial,
 fan-out, reminder, and resend paths log an `email-chrome` event with the relevant
@@ -294,7 +309,9 @@ observability queries.
    customer invitation to exercise the canary.
 6. Confirm the exact deployment is **Ready**, owns the intended aliases, and reports
    healthy database/auth posture. Then observe the organic-send PII-free metadata
-   above for the canary. Do not manufacture a customer email solely for validation.
+   above for the canary. Confirm a real-renderer universal fixture still owns the
+   banner/CTA/footer when `ASSESSMENT_INVITE_BRANDED=0` is supplied in a controlled
+   non-Production check. Do not manufacture a customer email solely for validation.
 7. Obtain a new, explicit authorization before any global
    `WAVE_INVITATION_BANNER_ENABLED` enablement. A canary result is not global-enable
    authority.

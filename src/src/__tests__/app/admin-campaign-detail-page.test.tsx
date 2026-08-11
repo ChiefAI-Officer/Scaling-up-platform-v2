@@ -188,4 +188,27 @@ describe("Admin campaign detail — invitation banner authoring state", () => {
     await renderPage();
     expect(detailProps).toHaveProperty("invitationBannerEnabled", false);
   });
+
+  it.each([
+    ["global enablement", "global"],
+    ["template canary", "template"],
+  ])("keeps PUBLIC authoring outside the universal body-only contract under %s", async (_name, mode) => {
+    mockGetApiActor.mockResolvedValue({ role: "ADMIN", coachId: null, userId: "u1", email: "a@x.com" });
+    mockCanManage.mockResolvedValue(true);
+    mockFindFirst.mockResolvedValue({
+      id: "camp-1",
+      status: "DRAFT",
+      accessMode: "PUBLIC",
+      createdByCoachId: null,
+      organizationId: null,
+      template: { alias: "rockefeller" },
+      version: { id: "v1", publishedAt: new Date("2026-01-01") },
+    });
+    if (mode === "global") process.env.WAVE_INVITATION_BANNER_ENABLED = "1";
+    else process.env.WAVE_INVITATION_BANNER_CANARY = "tpl-1";
+
+    await renderPage();
+
+    expect(detailProps).toHaveProperty("invitationBannerEnabled", false);
+  });
 });

@@ -225,10 +225,13 @@ export default async function CampaignDetailPage({ params }: PageProps) {
       initialRespondents={respondents}
       customHtmlEmailEnabled={waveDCustomHtmlEmailEnabled()}
       brandedCustomHtmlEnabled={assessmentInviteBrandedCustomHtmlEnabled()}
-      invitationBannerEnabled={isInvitationBannerEnabled({
-        organizationId: overview.campaign.organizationId ?? undefined,
-        templateId: overview.campaign.templateId,
-      })}
+      invitationBannerEnabled={
+        campaignForFlag?.accessMode === "INVITED" &&
+        isInvitationBannerEnabled({
+          organizationId: overview.campaign.organizationId ?? undefined,
+          templateId: overview.campaign.templateId,
+        })
+      }
       resultsEmailEnabled={resultsEmailEnabled}
       resultsEmailApproved={resultsEmailApproved}
       coachNotifyEnabled={coachNotifyEnabled}

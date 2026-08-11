@@ -19,6 +19,10 @@
 - Custom HTML is a sanitized body fragment while `universalBanner` is active; the platform owns banner, CTA, visible fallback URL, and footer.
 - Scope is INVITED initial send, automatic fan-out, reminders, and resends only. PUBLIC and results/report email code remain unchanged.
 - `WAVE_INVITATION_BANNER_ENABLED`, `WAVE_INVITATION_BANNER_CANARY`, and `WAVE_INVITATION_BANNER_KILL` are default-off, with KILL taking precedence.
+- Explicit `universalBanner` chrome bypasses the older
+  `ASSESSMENT_INVITE_BRANDED=0` legacy-renderer switch; that switch retains its
+  prior meaning for non-universal legacy/Wave-P rendering, while the universal
+  KILL is `WAVE_INVITATION_BANNER_KILL`.
 - With the new gate off, current `legacy`, `waveP`, custom-HTML mode, LVA Organization suppression, HTML, and text output remain byte-identical.
 - No Prisma/schema migration, stored-content rewrite, recipient/lifecycle change, or banner editor control.
 - Logs and telemetry contain no raw Coach name, image URL, respondent value, invitation URL, or credential.
@@ -44,7 +48,9 @@
 
 **Interfaces:**
 - Consumes: the three `WAVE_INVITATION_BANNER_*` environment variables.
-- Produces: `isInvitationBannerEnabled(scope?): boolean` and `getInvitationBannerAuthoringGate(): InvitationBannerAuthoringGate`.
+- Produces: `isInvitationBannerEnabled(scope?): boolean` and an async
+  `getInvitationBannerAuthoringGate(canAccessCanaryId)` snapshot that filters
+  configured IDs through the caller's existing server-side authorization.
 
 - [ ] **Step 1: Write the failing gate tests**
 
@@ -61,13 +67,17 @@ expect(isInvitationBannerEnabled({ organizationId: "org_10" })).toBe(false);
 process.env.WAVE_INVITATION_BANNER_ENABLED = "1";
 process.env.WAVE_INVITATION_BANNER_KILL = "1";
 expect(isInvitationBannerEnabled({ organizationId: "org_1" })).toBe(false);
-expect(getInvitationBannerAuthoringGate()).toEqual({
+await expect(
+  getInvitationBannerAuthoringGate(async () => true),
+).resolves.toEqual({
   globallyEnabled: false,
   canaryIds: [],
 });
 ```
 
-Also test `"1"`, `"true"`, `"TRUE"`, and `"yes"`, plus snapshot output `{ globallyEnabled: false, canaryIds: ["org_1", "tpl_2"] }` for `" org_1, tpl_2 org_1 "`.
+Also test `"1"`, `"true"`, `"TRUE"`, and `"yes"`, plus a snapshot that
+deduplicates configured IDs and retains only those accepted by the supplied
+authorization predicate.
 
 - [ ] **Step 2: Run the missing-module test**
 
@@ -112,18 +122,33 @@ export function isInvitationBannerEnabled(scope?: InvitationBannerScope): boolea
   );
 }
 
-export function getInvitationBannerAuthoringGate(): InvitationBannerAuthoringGate {
+export async function getInvitationBannerAuthoringGate(
+  canAccessCanaryId: (id: string) => Promise<boolean>,
+): Promise<InvitationBannerAuthoringGate> {
   if (isOn(process.env.WAVE_INVITATION_BANNER_KILL)) {
     return { globallyEnabled: false, canaryIds: [] };
   }
+  if (isOn(process.env.WAVE_INVITATION_BANNER_ENABLED)) {
+    return { globallyEnabled: true, canaryIds: [] };
+  }
+  const visibleCanaryIds: string[] = [];
+  for (const id of canaryIds()) {
+    if (await canAccessCanaryId(id)) visibleCanaryIds.push(id);
+  }
   return {
-    globallyEnabled: isOn(process.env.WAVE_INVITATION_BANNER_ENABLED),
-    canaryIds: canaryIds(),
+    globallyEnabled: false,
+    canaryIds: visibleCanaryIds,
   };
 }
 ```
 
-Only server pages call the environment-backed snapshot function; client components receive its plain object. The snapshot contains only already-visible Organization/Template IDs, never names, email addresses, credentials, or secrets.
+Only server pages call the environment-backed snapshot function; client
+components receive its plain object. The final interface accepts an async
+authorization predicate and preserves only configured IDs for which the
+authenticated Coach passes existing Organization or Template access checks.
+KILL and global enablement serialize an empty ID list because the canary list is
+then irrelevant. The complete environment allowlist, cross-tenant IDs, names,
+email addresses, credentials, and secrets never reach the browser.
 
 - [ ] **Step 4: Verify and commit**
 
@@ -672,13 +697,17 @@ Add `invitationBannerEnabled?: boolean`, derive `brandedCustomHtmlEnabled || inv
 
 - [ ] **Step 5: Pass server-derived state from all pages**
 
-New-campaign page passes `getInvitationBannerAuthoringGate()`. Portal/admin detail pages pass:
+The new-campaign page awaits `getInvitationBannerAuthoringGate(...)` with a
+predicate composed from `canAccessOrganization` and `canAccessTemplate` for the
+authenticated Coach. Portal/admin detail pages pass enablement only when the
+persisted campaign has `accessMode === "INVITED"`:
 
 ```ts
-isInvitationBannerEnabled({
-  organizationId: overview.campaign.organizationId ?? undefined,
-  templateId: overview.campaign.templateId,
-})
+campaign.accessMode === "INVITED" &&
+  isInvitationBannerEnabled({
+    organizationId: overview.campaign.organizationId ?? undefined,
+    templateId: overview.campaign.templateId,
+  })
 ```
 
 Update page mocks/assertions. Client modules never read `process.env`.

@@ -57,23 +57,41 @@ describe("invitation banner gate", () => {
     expect(isInvitationBannerEnabled({ organizationId: "org_1" })).toBe(true);
   });
 
-  it("lets KILL override global enable and returns an empty authoring snapshot", () => {
+  it("lets KILL override global enable and returns an empty authoring snapshot", async () => {
     process.env[ENABLED] = "1";
     process.env[KILL] = "1";
 
     expect(isInvitationBannerEnabled({ organizationId: "org_1" })).toBe(false);
-    expect(getInvitationBannerAuthoringGate()).toEqual({
+    await expect(
+      getInvitationBannerAuthoringGate(async () => true),
+    ).resolves.toEqual({
       globallyEnabled: false,
       canaryIds: [],
     });
   });
 
-  it("deduplicates the authoring snapshot canary IDs", () => {
-    process.env[CANARY] = " org_1, tpl_2 org_1 ";
+  it("serializes only canary IDs already visible to the current coach", async () => {
+    process.env[CANARY] =
+      " org_visible, org_hidden tpl_visible tpl_hidden org_visible ";
+    const visibleIds = new Set(["org_visible", "tpl_visible"]);
 
-    expect(getInvitationBannerAuthoringGate()).toEqual({
+    await expect(
+      getInvitationBannerAuthoringGate(async (id) => visibleIds.has(id)),
+    ).resolves.toEqual({
       globallyEnabled: false,
-      canaryIds: ["org_1", "tpl_2"],
+      canaryIds: ["org_visible", "tpl_visible"],
     });
+  });
+
+  it("omits canary IDs when global enablement makes them irrelevant", async () => {
+    process.env[ENABLED] = "1";
+    process.env[CANARY] = "cross_tenant_org cross_tenant_template";
+    const canAccess = jest.fn(async () => true);
+
+    await expect(getInvitationBannerAuthoringGate(canAccess)).resolves.toEqual({
+      globallyEnabled: true,
+      canaryIds: [],
+    });
+    expect(canAccess).not.toHaveBeenCalled();
   });
 });

@@ -5,6 +5,14 @@
 
 import "@/styles/wireframes-scoped.css";
 import { requireCoach } from "@/lib/auth/authorization";
+import { normalizeRole } from "@/lib/auth/access-control";
+import type { ApiActor } from "@/lib/auth/access-control";
+import { db } from "@/lib/db";
+import {
+  asAccessDb,
+  canAccessOrganization,
+  canAccessTemplate,
+} from "@/lib/assessments/access-control";
 import { CampaignWizard } from "@/components/assessments/CampaignWizard";
 import {
   waveDCustomHtmlEmailEnabled,
@@ -20,7 +28,23 @@ import { isAdminOwnedAssessmentPresentationEnabled } from "@/lib/assessments/wav
 import { getInvitationBannerAuthoringGate } from "@/lib/assessments/wave-invitation-banner-flags";
 
 export default async function NewCampaignPage() {
-  await requireCoach();
+  const { session, coach } = await requireCoach();
+  const actor: ApiActor = {
+    userId: session.user.id,
+    email: session.user.email ?? "",
+    role: normalizeRole(session.user.role ?? "COACH"),
+    coachId: coach.id,
+  };
+  const accessDb = asAccessDb(db);
+  const invitationBannerGate = await getInvitationBannerAuthoringGate(
+    async (id) => {
+      const [organizationVisible, templateVisible] = await Promise.all([
+        canAccessOrganization(accessDb, actor, id),
+        canAccessTemplate(accessDb, actor, id),
+      ]);
+      return organizationVisible || templateVisible;
+    },
+  );
   const customHtmlEmailEnabled = waveDCustomHtmlEmailEnabled();
   const brandedCustomHtmlEnabled = assessmentInviteBrandedCustomHtmlEnabled();
   const autoSend = waveDAutoSendEnabled();
@@ -44,7 +68,7 @@ export default async function NewCampaignPage() {
       <CampaignWizard
         customHtmlEmailEnabled={customHtmlEmailEnabled}
         brandedCustomHtmlEnabled={brandedCustomHtmlEnabled}
-        invitationBannerGate={getInvitationBannerAuthoringGate()}
+        invitationBannerGate={invitationBannerGate}
         autoSend={autoSend}
         resultsEmailEnabled={resultsEmailEnabled}
         coachNotifyEnabled={coachNotifyEnabled}

@@ -286,6 +286,12 @@ does not rely on operators keeping the separate default-off
 `ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED` flag synchronized. That older
 flag retains its current meaning only while the new banner gate is off.
 
+The older `ASSESSMENT_INVITE_BRANDED=0` legacy-renderer switch likewise applies
+only to non-universal legacy/Wave-P rendering. An explicitly selected
+`universalBanner` bypasses that older switch; `WAVE_INVITATION_BANNER_KILL` is
+the rollback control for universal rendering. This keeps custom-HTML body-only
+authoring and delivery on the same shell-ownership decision.
+
 Disabling or killing the new banner restores the current behavior without
 changing stored data.
 
@@ -297,6 +303,10 @@ When the new banner behavior is active, Campaign Wizard and Campaign Detail
 describe the advanced field as **Custom HTML body (advanced)** and explain that
 Scaling Up branding, available Coach identity, CTA, fallback link, and footer
 are added automatically.
+
+This authoring contract is INVITED-only. PUBLIC campaign pages and PATCH
+validation do not derive body-only semantics from global, Organization, or
+Template universal-banner enablement.
 
 The invitation URL token remains optional in custom body HTML because the shell
 owns the canonical link. Existing token-placement restrictions still apply to
@@ -325,6 +335,9 @@ content rather than platform-owned chrome.
 - No new catch converts a failed send into a successful send.
 - No raw Coach name, image URL, respondent value, or invitation URL is added to
   logs or telemetry.
+- The new-campaign client receives only canary IDs that the authenticated Coach
+  can already access as an Organization or Template. The complete environment
+  allowlist is never serialized to the browser.
 
 ## Telemetry
 
