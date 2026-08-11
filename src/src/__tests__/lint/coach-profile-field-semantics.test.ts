@@ -9,6 +9,8 @@ describe("coach profile field semantics", () => {
   it("does not expose the ambiguous Title / Credentials profile label", () => {
     const files = [
       "src/components/coach/coach-profile-form.tsx",
+      "src/app/(dashboard)/bio/page.tsx",
+      "src/app/(dashboard)/bio/[id]/page.tsx",
     ];
     for (const file of files) {
       expect(source(file)).not.toContain("Title / Credentials");
@@ -29,5 +31,15 @@ describe("coach profile field semantics", () => {
       expect(page).toContain("Professional Title");
       expect(page).toContain("Company Name");
     }
+  });
+
+  it("does not clear company as part of deleting a bio", () => {
+    const editor = source("src/app/(dashboard)/bio/[id]/page.tsx");
+    const deleteStart = editor.indexOf("const handleDeleteBio");
+    const saveStart = editor.indexOf("const handleSave");
+    expect(deleteStart).toBeGreaterThan(-1);
+    expect(saveStart).toBeGreaterThan(deleteStart);
+    const deleteHandler = editor.slice(deleteStart, saveStart);
+    expect(deleteHandler).not.toMatch(/company\s*:/);
   });
 });

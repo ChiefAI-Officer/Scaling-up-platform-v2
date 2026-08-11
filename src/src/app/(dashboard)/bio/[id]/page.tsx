@@ -15,6 +15,7 @@ interface CoachPayload {
   email: string;
   firstName: string;
   lastName: string;
+  title: string | null;
   company: string | null;
   bio: string | null;
   profileImage: string | null;
@@ -24,7 +25,6 @@ interface CoachPayload {
 interface BioEditorForm {
   firstName: string;
   lastName: string;
-  titleCredentials: string;
   biography: string;
   profileImageUrl: string;
   circleId: string;
@@ -39,10 +39,11 @@ export default function CoachBioEditorPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [coachEmail, setCoachEmail] = useState("");
+  const [professionalTitle, setProfessionalTitle] = useState("");
+  const [companyName, setCompanyName] = useState("");
   const [formData, setFormData] = useState<BioEditorForm>({
     firstName: "",
     lastName: "",
-    titleCredentials: "",
     biography: "",
     profileImageUrl: "",
     circleId: "",
@@ -66,10 +67,11 @@ export default function CoachBioEditorPage() {
 
         const coach = data.data as CoachPayload;
         setCoachEmail(coach.email);
+        setProfessionalTitle(coach.title ?? "");
+        setCompanyName(coach.company ?? "");
         setFormData({
           firstName: coach.firstName || "",
           lastName: coach.lastName || "",
-          titleCredentials: coach.company || "",
           biography: coach.bio || "",
           profileImageUrl: coach.profileImage || "",
           circleId: coach.circleId || "",
@@ -121,7 +123,7 @@ export default function CoachBioEditorPage() {
     }
   };
 
-  // MR-25: Clear all bio fields
+  // MR-25: Clear public BIO fields while preserving company record metadata.
   const handleDeleteBio = async () => {
     if (!confirm("Clear all bio fields for this coach? This cannot be undone.")) return;
     try {
@@ -131,11 +133,12 @@ export default function CoachBioEditorPage() {
       const response = await fetch(`/api/coaches/${coachId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bio: "", profileImage: "", company: "", circleId: null }),
+        body: JSON.stringify({ title: null, bio: "", profileImage: "", circleId: null }),
       });
       const data = await response.json();
       if (!data.success) throw new Error(data.error || "Failed to clear bio");
-      setFormData((prev) => ({ ...prev, titleCredentials: "", biography: "", profileImageUrl: "", circleId: "" }));
+      setProfessionalTitle("");
+      setFormData((prev) => ({ ...prev, biography: "", profileImageUrl: "", circleId: "" }));
       setSuccess("Bio fields cleared.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to clear bio");
@@ -156,7 +159,8 @@ export default function CoachBioEditorPage() {
         body: JSON.stringify({
           firstName: formData.firstName.trim(),
           lastName: formData.lastName.trim(),
-          company: formData.titleCredentials.trim(),
+          title: professionalTitle.trim(),
+          company: companyName.trim(),
           bio: formData.biography.trim(),
           profileImage: formData.profileImageUrl.trim(),
           circleId: formData.circleId.trim() || null,
@@ -257,13 +261,21 @@ export default function CoachBioEditorPage() {
                 </div>
               </div>
               <div>
-                <Label htmlFor="titleCredentials">Title / Credentials</Label>
+                <Label htmlFor="professionalTitle">Professional Title</Label>
                 <Input
-                  id="titleCredentials"
-                  name="titleCredentials"
-                  value={formData.titleCredentials}
-                  onChange={handleChange}
+                  id="professionalTitle"
+                  value={professionalTitle}
+                  onChange={(event) => setProfessionalTitle(event.target.value)}
                   placeholder="Scaling Up Certified Coach"
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="companyName">Company Name</Label>
+                <Input
+                  id="companyName"
+                  value={companyName}
+                  onChange={(event) => setCompanyName(event.target.value)}
                   className="mt-1"
                 />
               </div>
@@ -333,7 +345,7 @@ export default function CoachBioEditorPage() {
                   {coachFullName || "Coach Name"}
                 </h3>
                 <p className="text-muted-foreground mt-1">
-                  {formData.titleCredentials || "Scaling Up Certified Coach"}
+                  {professionalTitle || "Scaling Up Certified Coach"}
                 </p>
                 <div className="mt-6 text-left text-sm text-foreground space-y-3 whitespace-pre-wrap">
                   {formData.biography || "Biography preview will appear here."}
