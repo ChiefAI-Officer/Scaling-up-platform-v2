@@ -276,6 +276,24 @@ describe("portal new-campaign invitation banner snapshot", () => {
     );
   });
 
+  it("renders the default-off snapshot without Template, Organization, or access-group queries", async () => {
+    await renderPage();
+
+    expect(mockCampaignWizard).toHaveBeenCalledWith(
+      expect.objectContaining({
+        invitationBannerGate: {
+          globallyEnabled: false,
+          canaryIds: [],
+        },
+      }),
+      undefined,
+    );
+    expect(mockAssessmentTemplateFindMany).not.toHaveBeenCalled();
+    expect(mockOrganizationFindUnique).not.toHaveBeenCalled();
+    expect(mockAccessGroupCoachFindMany).not.toHaveBeenCalled();
+    expect(mockAccessGroupTemplateFindMany).not.toHaveBeenCalled();
+  });
+
   it.each([
     ["global enablement", "WAVE_INVITATION_BANNER_ENABLED"],
     ["KILL", "WAVE_INVITATION_BANNER_KILL"],

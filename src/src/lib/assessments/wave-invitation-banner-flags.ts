@@ -47,6 +47,9 @@ export async function getInvitationBannerAuthoringGate(
   }
 
   const configuredIds = canaryIds();
+  if (configuredIds.length === 0) {
+    return { globallyEnabled: false, canaryIds: [] };
+  }
   const visibleIds = new Set(
     filterVisibleIds ? await filterVisibleIds(configuredIds) : [],
   );

@@ -6,6 +6,15 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="picker-visible-invitation-banner-canaries-final-review-fix"></a>
+### 2026-08-11 — Picker-visible invitation banner canaries final-review fix <!-- ENTRY_ISO:2026-08-11 ENTRY_SLUG:picker-visible-invitation-banner-canaries-final-review-fix -->
+
+**Status: IMPLEMENTED + LOCALLY VERIFIED + DEFAULT-OFF; final-review correction only, not merged, deployed, or activated.** In the required all-vars-absent dark state, `getInvitationBannerAuthoringGate` now returns the disabled, IDs-empty snapshot before it invokes picker visibility. The new-campaign server page therefore performs no Template, Organization, access-group, or grant query for this dormant feature path and cannot gain a banner-picker SSR failure path while no canary is configured. KILL and global enablement retain their existing earlier short-circuits; configured canaries retain the previously reviewed picker-visible filtering.
+
+**Final-fix evidence.** RED first proved the missing boundary: the helper invoked its callback once with `[]`, and the rendered new-campaign page issued one Template query even though every banner variable was absent. After the minimal empty-canary return, the affected helper/page command passed **2 suites / 18 tests / 0 snapshots** and changed-file ESLint emitted no diagnostics. Migration safety approved all **47 migrations**. The Production-equivalent Turbopack build compiled, completed TypeScript, and generated **94/94** static pages; the complete Jest suite passed **687 suites / 8,578 tests / 16 snapshots**. The build retained the established middleware-convention deprecation, absent local Inngest-key notices, and non-fatal missing-`DATABASE_URL` static-generation messages; the complete Jest stream retained established negative-path and React `act(...)` warnings. Changelog freshness and `git diff --check` passed. No ledger, Production flag, deployment, database write, or customer email was changed.
+
+---
+
 <a id="picker-visible-invitation-banner-canaries-release-ready"></a>
 ### 2026-08-11 — Picker-visible invitation banner canaries release-ready <!-- ENTRY_ISO:2026-08-11 ENTRY_SLUG:picker-visible-invitation-banner-canaries-release-ready -->
 

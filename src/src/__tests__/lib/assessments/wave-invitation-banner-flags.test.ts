@@ -73,6 +73,18 @@ describe("invitation banner gate", () => {
     expect(filterVisibleIds).not.toHaveBeenCalled();
   });
 
+  it("returns the default-off empty snapshot without evaluating picker visibility", async () => {
+    const filterVisibleIds = jest.fn(async () => ["org_1"]);
+
+    await expect(
+      getInvitationBannerAuthoringGate(filterVisibleIds),
+    ).resolves.toEqual({
+      globallyEnabled: false,
+      canaryIds: [],
+    });
+    expect(filterVisibleIds).not.toHaveBeenCalled();
+  });
+
   it("keeps only configured IDs returned by the picker-visibility batch filter", async () => {
     process.env[CANARY] = "org-1 tpl-live tpl-hidden org-1";
     const filterVisibleIds = jest.fn(
