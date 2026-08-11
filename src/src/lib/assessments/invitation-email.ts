@@ -386,6 +386,60 @@ export function resolveCoachName(creatorCoach: CoachName, ownerCoach: CoachName)
   return name.length > 0 ? name : null;
 }
 
+export type InvitationCoachByline =
+  | { mode: "image_name"; coachName: string; coachImageUrl: string }
+  | { mode: "name_only"; coachName: string }
+  | { mode: "scaling_up_only" };
+
+export interface InvitationCoachResolution {
+  byline: InvitationCoachByline;
+  logoRejectedReason: "no-coach" | "missing-name" | "no-image" | "invalid-url" | null;
+}
+
+type InvitationCoachCandidate = {
+  firstName: string;
+  lastName: string;
+  profileImage: string | null;
+} | null;
+
+/**
+ * Resolve the one Coach identity used by an invitation: campaign creator first,
+ * then organization owner. A selected creator never falls through to the owner.
+ */
+export function resolveInvitationCoachByline(
+  creatorCoach: InvitationCoachCandidate,
+  ownerCoach: InvitationCoachCandidate,
+): InvitationCoachResolution {
+  const selected = creatorCoach ?? ownerCoach;
+  if (!selected) {
+    return {
+      byline: { mode: "scaling_up_only" },
+      logoRejectedReason: "no-coach",
+    };
+  }
+
+  const coachName = `${selected.firstName ?? ""} ${selected.lastName ?? ""}`.trim();
+  if (coachName.length === 0) {
+    return {
+      byline: { mode: "scaling_up_only" },
+      logoRejectedReason: "missing-name",
+    };
+  }
+
+  const coachImageUrl = safeImageSrc(selected.profileImage);
+  if (coachImageUrl) {
+    return {
+      byline: { mode: "image_name", coachName, coachImageUrl },
+      logoRejectedReason: null,
+    };
+  }
+
+  return {
+    byline: { mode: "name_only", coachName },
+    logoRejectedReason: selected.profileImage ? "invalid-url" : "no-image",
+  };
+}
+
 // ── Coach-logo resolver (Wave P) ────────────────────────────────────────────
 type CoachLogo = { profileImage: string | null } | null;
 

@@ -145,6 +145,7 @@ import {
   buildInvitationEmailShell,
   renderBrandedCustomHtmlText,
   renderCustomHtmlFragment,
+  resolveInvitationCoachByline,
   resolveCoachName,
   shouldShowOrgLine,
 } from "@/lib/assessments/invitation-email";
@@ -323,6 +324,77 @@ describe("resolveCoachName — creatorCoach ?? owner", () => {
   });
   it("returns null when neither is present", () => {
     expect(resolveCoachName(null, null)).toBeNull();
+  });
+});
+
+describe("resolveInvitationCoachByline — one Coach presentation model", () => {
+  it("uses the creator's complete identity when it has a valid image", () => {
+    expect(resolveInvitationCoachByline(
+      { firstName: "Cre", lastName: "Ator", profileImage: "https://cdn.test/creator.png" },
+      { firstName: "Own", lastName: "Er", profileImage: "https://cdn.test/owner.png" },
+    )).toEqual({
+      byline: {
+        mode: "image_name",
+        coachName: "Cre Ator",
+        coachImageUrl: "https://cdn.test/creator.png",
+      },
+      logoRejectedReason: null,
+    });
+  });
+
+  it("keeps the creator's name when its image is absent", () => {
+    expect(resolveInvitationCoachByline(
+      { firstName: "Cre", lastName: "Ator", profileImage: null },
+      { firstName: "Own", lastName: "Er", profileImage: "https://cdn.test/owner.png" },
+    )).toEqual({
+      byline: { mode: "name_only", coachName: "Cre Ator" },
+      logoRejectedReason: "no-image",
+    });
+  });
+
+  it("rejects an invalid creator image without returning its raw URL", () => {
+    const rejectedUrl = "javascript:alert('do-not-leak')";
+    const result = resolveInvitationCoachByline(
+      { firstName: "Cre", lastName: "Ator", profileImage: rejectedUrl },
+      null,
+    );
+
+    expect(result).toEqual({
+      byline: { mode: "name_only", coachName: "Cre Ator" },
+      logoRejectedReason: "invalid-url",
+    });
+    expect(JSON.stringify(result)).not.toContain(rejectedUrl);
+  });
+
+  it("uses the owner when there is no creator", () => {
+    expect(resolveInvitationCoachByline(
+      null,
+      { firstName: "Own", lastName: "Er", profileImage: "https://cdn.test/owner.png" },
+    )).toEqual({
+      byline: {
+        mode: "image_name",
+        coachName: "Own Er",
+        coachImageUrl: "https://cdn.test/owner.png",
+      },
+      logoRejectedReason: null,
+    });
+  });
+
+  it("does not fall through to the owner when the selected creator has no name", () => {
+    expect(resolveInvitationCoachByline(
+      { firstName: " ", lastName: "", profileImage: "https://cdn.test/image.png" },
+      { firstName: "Own", lastName: "Er", profileImage: "https://cdn.test/owner.png" },
+    )).toEqual({
+      byline: { mode: "scaling_up_only" },
+      logoRejectedReason: "missing-name",
+    });
+  });
+
+  it("uses Scaling Up only when neither creator nor owner exists", () => {
+    expect(resolveInvitationCoachByline(null, null)).toEqual({
+      byline: { mode: "scaling_up_only" },
+      logoRejectedReason: "no-coach",
+    });
   });
 });
 
