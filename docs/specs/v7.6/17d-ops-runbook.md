@@ -258,10 +258,13 @@ rollback meaning for non-universal legacy/Wave-P rendering only. Use
 `ASSESSMENT_INVITE_BRANDED=0` as a universal rollback check.
 
 The create-page server snapshot never serializes the complete CANARY environment
-allowlist. It filters each configured ID through the authenticated Coach's existing
-Organization-ownership and Template-INTERSECTION access checks, then passes only the
-already-visible IDs needed for client-side Organization/Template selection. Under
-global enablement or KILL it passes no canary IDs.
+allowlist. It passes configured Organization IDs only after the authenticated actor's
+existing organization-access predicate succeeds, and configured Template IDs only
+after the shared live campaign-picker scope succeeds (the same scope used by the
+template-list API). That Template scope includes the live predicate and applicable
+privileged or Coach group-intersection access, so deleted, disabled, invalid, and
+stale-grant Template IDs never enter the browser snapshot. Under global enablement or
+KILL it passes no canary IDs.
 
 Inspect only PII-free delivery metadata while validating organic sends. The initial,
 fan-out, reminder, and resend paths log an `email-chrome` event with the relevant
