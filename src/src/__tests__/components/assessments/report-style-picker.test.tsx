@@ -29,6 +29,74 @@ describe("ReportStylePicker", () => {
     expect(screen.getAllByText(/Paper format:/)).toHaveLength(3);
   });
 
+  it("starts with compact cards and no mounted preview assets", () => {
+    render(<PickerHarness initialValue="EXECUTIVE_BOARDROOM" />);
+
+    expect(screen.getAllByRole("radio")).toHaveLength(3);
+    expect(screen.getByRole("radio", { name: /executive boardroom/i })).toBeChecked();
+    expect(screen.getByText("Editorial, restrained, and board-ready.")).toBeInTheDocument();
+    expect(screen.getAllByText(/Paper format:/)).toHaveLength(3);
+
+    const selectedCard = screen
+      .getByRole("radio", { name: /executive boardroom/i })
+      .closest("label");
+    expect(selectedCard).toHaveClass("p-3");
+    expect(selectedCard).toHaveTextContent("Selected");
+
+    const disclosure = screen.getByRole("button", { name: "Show preview" });
+    expect(disclosure).toHaveAttribute("aria-expanded", "false");
+    expect(disclosure).toHaveAttribute("aria-controls");
+    expect(screen.queryByRole("tablist", { name: "Report style preview pages" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+  });
+
+  it("shows only the active preview image and hides it again", () => {
+    render(<PickerHarness initialValue="MODERN_DASHBOARD" />);
+
+    const show = screen.getByRole("button", { name: "Show preview" });
+    const regionId = show.getAttribute("aria-controls");
+    fireEvent.click(show);
+
+    expect(screen.getByRole("button", { name: "Hide preview" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+    expect(document.getElementById(regionId!)).toHaveAttribute("role", "region");
+    expect(screen.getByRole("img", { name: "Modern Dashboard Cover preview" })).toBeInTheDocument();
+    expect(screen.getAllByRole("img")).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole("tab", { name: "Summary" }));
+    expect(screen.getByRole("img", { name: "Modern Dashboard Summary preview" })).toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: "Modern Dashboard Cover preview" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("img")).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Hide preview" }));
+    expect(screen.queryByRole("tablist", { name: "Report style preview pages" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+  });
+
+  it("preserves the active page and disclosure while changing styles", () => {
+    render(<PickerHarness />);
+    fireEvent.click(screen.getByRole("button", { name: "Show preview" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Detail" }));
+    fireEvent.click(screen.getByRole("button", { name: "Hide preview" }));
+    fireEvent.click(screen.getByRole("button", { name: "Show preview" }));
+
+    expect(screen.getByRole("tab", { name: "Detail" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+
+    fireEvent.click(screen.getByRole("radio", { name: /executive boardroom/i }));
+    expect(screen.getByRole("button", { name: "Hide preview" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+    expect(
+      screen.getByRole("img", { name: "Executive Boardroom Detail preview" }),
+    ).toBeInTheDocument();
+  });
+
   it("uses project semantic tokens for selection, focus, surfaces, and preview failure states", () => {
     const { container } = render(<PickerHarness />);
     const classic = screen.getByRole("radio", { name: /classic/i });
@@ -38,6 +106,7 @@ describe("ReportStylePicker", () => {
     expect(option?.className).toContain("focus-within:outline-ring");
     expect(option?.className).toContain("has-[:checked]:border-primary");
 
+    fireEvent.click(screen.getByRole("button", { name: "Show preview" }));
     fireEvent.error(screen.getByRole("img", { name: "Classic Cover preview" }));
     const failure = screen.getByRole("status");
     expect(failure).toHaveClass("border-border bg-muted/20 text-foreground");
@@ -67,6 +136,8 @@ describe("ReportStylePicker", () => {
 
   it("changes preview pages through selected keyboard tab buttons", () => {
     render(<PickerHarness initialValue="MODERN_DASHBOARD" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Show preview" }));
 
     const cover = screen.getByRole("tab", { name: "Cover" });
     const summary = screen.getByRole("tab", { name: "Summary" });
@@ -99,6 +170,8 @@ describe("ReportStylePicker", () => {
       />,
     );
 
+    fireEvent.click(screen.getByRole("button", { name: "Show preview" }));
+
     expect(screen.getByRole("radio", { name: /executive boardroom/i })).toBeChecked();
     expect(
       screen.getByRole("img", { name: "Executive Boardroom Cover preview" }),
@@ -108,19 +181,24 @@ describe("ReportStylePicker", () => {
     );
   });
 
-  it("keeps every tab panel mounted for its aria-controls relationship", () => {
+  it("keeps every tab panel mounted for its aria-controls relationship while only mounting the active image", () => {
     render(<PickerHarness />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Show preview" }));
 
     screen.getAllByRole("tab").forEach((tab) => {
       const panelId = tab.getAttribute("aria-controls");
       expect(panelId).toBeTruthy();
       expect(document.getElementById(panelId!)).toHaveAttribute("role", "tabpanel");
     });
+    expect(screen.getAllByRole("tabpanel", { hidden: true })).toHaveLength(3);
+    expect(screen.getAllByRole("img")).toHaveLength(1);
   });
 
   it("keeps style selection usable after a preview failure and remounts only the failed image on retry", () => {
     const { container } = render(<PickerHarness />);
 
+    fireEvent.click(screen.getByRole("button", { name: "Show preview" }));
     const initialPreview = screen.getByRole("img", { name: "Classic Cover preview" });
     fireEvent.error(initialPreview);
 
@@ -140,29 +218,6 @@ describe("ReportStylePicker", () => {
     expect(retriedPreview).not.toBe(initialPreview);
     expect(container.querySelectorAll('img[alt="Classic Cover preview"]')).toHaveLength(1);
     expect(screen.getByRole("radio", { name: /classic/i })).toBeChecked();
-  });
-
-  it("keeps compact selection usable and exposes retry when its thumbnail fails", () => {
-    render(<PickerHarness initialValue="MODERN_DASHBOARD" compact />);
-
-    const thumbnail = screen.getByRole("img", {
-      name: "Modern Dashboard selected thumbnail",
-    });
-    fireEvent.error(thumbnail);
-
-    expect(screen.getByText("Preview unavailable")).toBeInTheDocument();
-    const classic = screen.getByRole("radio", { name: /classic/i });
-    expect(classic).not.toBeDisabled();
-    fireEvent.click(classic);
-    expect(classic).toBeChecked();
-
-    fireEvent.click(screen.getByRole("radio", { name: /modern dashboard/i }));
-    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
-    expect(
-      screen.getByRole("img", {
-        name: "Modern Dashboard selected thumbnail",
-      }),
-    ).toBeInTheDocument();
   });
 
   it("keeps the selected option and previews readable while immutable", () => {
@@ -187,6 +242,9 @@ describe("ReportStylePicker", () => {
       "dateTime",
       "2026-08-05T06:30:00.000Z",
     );
+    expect(screen.getByRole("button", { name: "Show preview" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Show preview" }));
+    expect(screen.getByRole("button", { name: "Hide preview" })).toBeEnabled();
     expect(screen.getByRole("img", { name: "Executive Boardroom Cover preview" })).toBeInTheDocument();
   });
 
@@ -199,6 +257,7 @@ describe("ReportStylePicker", () => {
       ),
     ).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: /modern dashboard/i })).toBeChecked();
+    fireEvent.click(screen.getByRole("button", { name: "Show preview" }));
     expect(screen.getByRole("img", { name: "Modern Dashboard Cover preview" })).toBeInTheDocument();
   });
 
