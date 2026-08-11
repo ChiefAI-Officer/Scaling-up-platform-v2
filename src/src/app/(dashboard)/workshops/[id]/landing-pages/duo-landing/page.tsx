@@ -159,6 +159,8 @@ export default function DuoLandingEditor() {
         const nextData: DuoLandingData = { ...DEFAULT_DATA };
         let workshopPrimaryCoachId = "";
         let metadataSecondaryCoachId: string | null = null;
+        let hasSavedCoach1 = false;
+        let hasSavedCoach2 = false;
 
         const workshopData = await workshopRes.json();
         if (workshopData.success) {
@@ -221,7 +223,9 @@ export default function DuoLandingEditor() {
 
         const pageData = await pageRes.json();
         if (pageData.success && pageData.data) {
-          const content = JSON.parse(pageData.data.content);
+          const content = JSON.parse(pageData.data.content) as Partial<DuoLandingData>;
+          hasSavedCoach1 = Object.prototype.hasOwnProperty.call(content, "coach1");
+          hasSavedCoach2 = Object.prototype.hasOwnProperty.call(content, "coach2");
           Object.assign(nextData, content);
         }
         // CustomHtmlPanel wiring — fail-closed: only activate when marker is true
@@ -257,7 +261,7 @@ export default function DuoLandingEditor() {
         setBioProfiles(availableProfiles);
 
         const preferredCoach1Id = nextData.coach1BioId || workshopPrimaryCoachId;
-        if (preferredCoach1Id) {
+        if (!hasSavedCoach1 && preferredCoach1Id) {
           const coach1Profile = availableProfiles.find((profile) => profile.id === preferredCoach1Id);
           if (coach1Profile) {
             nextData.coach1BioId = coach1Profile.id;
@@ -266,7 +270,7 @@ export default function DuoLandingEditor() {
         }
 
         const preferredCoach2Id = nextData.coach2BioId || coach2IdFromQuery || metadataSecondaryCoachId;
-        if (preferredCoach2Id) {
+        if (!hasSavedCoach2 && preferredCoach2Id) {
           const coach2Profile = availableProfiles.find((profile) => profile.id === preferredCoach2Id);
           if (coach2Profile) {
             nextData.coach2BioId = coach2Profile.id;
