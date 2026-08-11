@@ -6,6 +6,36 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="picker-visible-invitation-banner-canaries-final-review-fix"></a>
+### 2026-08-11 — Picker-visible invitation banner canaries final-review fix <!-- ENTRY_ISO:2026-08-11 ENTRY_SLUG:picker-visible-invitation-banner-canaries-final-review-fix -->
+
+**Status: IMPLEMENTED + LOCALLY VERIFIED + DEFAULT-OFF; final-review correction only, not merged, deployed, or activated.** In the required all-vars-absent dark state, `getInvitationBannerAuthoringGate` now returns the disabled, IDs-empty snapshot before it invokes picker visibility. The new-campaign server page therefore performs no Template, Organization, access-group, or grant query for this dormant feature path and cannot gain a banner-picker SSR failure path while no canary is configured. KILL and global enablement retain their existing earlier short-circuits; configured canaries retain the previously reviewed picker-visible filtering.
+
+**Final-fix evidence.** RED first proved the missing boundary: the helper invoked its callback once with `[]`, and the rendered new-campaign page issued one Template query even though every banner variable was absent. After the minimal empty-canary return, the affected helper/page command passed **2 suites / 18 tests / 0 snapshots** and changed-file ESLint emitted no diagnostics. Migration safety approved all **47 migrations**. The Production-equivalent Turbopack build compiled, completed TypeScript, and generated **94/94** static pages; the complete Jest suite passed **687 suites / 8,578 tests / 16 snapshots**. The build retained the established middleware-convention deprecation, absent local Inngest-key notices, and non-fatal missing-`DATABASE_URL` static-generation messages; the complete Jest stream retained established negative-path and React `act(...)` warnings. Changelog freshness and `git diff --check` passed. No ledger, Production flag, deployment, database write, or customer email was changed.
+
+---
+
+<a id="picker-visible-invitation-banner-canaries-release-ready"></a>
+### 2026-08-11 — Picker-visible invitation banner canaries release-ready <!-- ENTRY_ISO:2026-08-11 ENTRY_SLUG:picker-visible-invitation-banner-canaries-release-ready -->
+
+**Status: IMPLEMENTED + LOCALLY VERIFIED + DEFAULT-OFF; ready for independent whole-branch review, not merged, deployed, or activated.** The invitation-banner create-page snapshot no longer authorizes configured Template IDs one at a time. It applies the same shared live campaign-picker scope used by the template-list API, then returns only the configured Template IDs in that live scope. Configured Organization IDs continue through the existing organization-access predicate. The snapshot never serializes the raw configured allowlist: deleted, disabled, invalid, inaccessible, and stale-grant Template IDs cannot enter the browser snapshot; global enablement and KILL still short-circuit before any picker/authorization lookup and serialize no canary IDs.
+
+**Local readiness evidence.** The prescribed focused Jest command passed **4 suites / 32 tests / 0 snapshots**; changed-file ESLint emitted no diagnostics; migration safety approved all **47 migrations**; and the Production-equivalent Turbopack build compiled, completed TypeScript, and generated **94/94** static pages. The full Jest suite passed **687 suites / 8,576 tests / 16 snapshots**, and `git diff --check` was silent. The build retained the established middleware deprecation notice, missing local Inngest-key notices, and three non-fatal missing-`DATABASE_URL` Prisma validation messages during static generation. The previously documented standalone `npx tsc --noEmit` baseline remains nonzero and is not represented as a green gate. No Production flag was read or mutated, no deployment or database write occurred, and no customer email was sent. The banner remains default-off until a separately authorized, post-merge Production activation is observed.
+
+---
+
+<a id="universal-invitation-banner-dark-merge"></a>
+### 2026-08-11 — Universal invitation banner implemented, dark and locally verified <!-- ENTRY_ISO:2026-08-11 ENTRY_SLUG:universal-invitation-banner-dark-merge -->
+
+**Status: IMPLEMENTED + LOCALLY VERIFIED + DEFAULT-OFF; not deployed or activated.** The universal banner is guarded by absent/default-off `WAVE_INVITATION_BANNER_ENABLED`, `WAVE_INVITATION_BANNER_CANARY`, and `WAVE_INVITATION_BANNER_KILL`; KILL overrides global enablement, which overrides an exact Organization-ID or Template-ID canary. The feature reaches only INVITED initial/manual sends, automatic fan-out, reminders, and resends. PUBLIC campaign delivery and authoring paths, results/report emails, report-email rendering, recipient lifecycle, and schema are excluded. Activation performs no automatic migration or database write and does not rewrite existing content. For an enabled INVITED scope only, future campaign create/PATCH validation permits and persists body-only custom HTML because the platform-owned shell supplies the CTA and visible fallback URL. KILL stops new universal rendering and that future authoring contract, but does not rewrite already-saved tokenless body HTML; those stored fragments require deliberate authorized review/edit if operationally needed. The universal gate does not set or synchronize `ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED`. The older `ASSESSMENT_INVITE_BRANDED=0` switch governs only non-universal rendering; an explicitly enabled universal path still renders its platform shell, while `WAVE_INVITATION_BANNER_KILL` remains the universal containment switch. Canary authoring snapshots serialize only configured Organization IDs that pass existing organization access and configured Template IDs in the shared live campaign-picker scope, never the raw configured cross-tenant allowlist. The operator sequence and containment behavior are documented in [the Wave D ops runbook](../docs/specs/v7.6/17d-ops-runbook.md#universal-invitation-banner--dark-rollout-and-rollback). Canonical design: [universal invitation banner design](../docs/superpowers/specs/2026-08-10-universal-invitation-email-banner-design.md); implementation plan: [universal invitation banner plan](../docs/superpowers/plans/2026-08-10-universal-invitation-email-banner.md).
+
+**Fresh local evidence.** The final-review focused command passed **20 suites / 429 tests / 1 snapshot**. Migration safety approved all **47 migrations**; changed-file ESLint emitted no diagnostics; the branch-local nullable Organization-ID TypeScript regression was corrected and its expanded detail-route suite passed **1 suite / 42 tests**. The Production-equivalent `CI=true npx next build --turbopack` compiled, completed its TypeScript phase, and generated **94/94** static pages. The complete Jest command passed **686 suites / 8,568 tests / 16 snapshots**. The suite retained established test-intent console output (including mocked SMTP failures and React `act(...)` warnings); the build retained expected missing local `DATABASE_URL` and Inngest-key messages without failing.
+
+**Known repository limitation.** Standalone `npx tsc --noEmit` remains nonzero with **422 diagnostics across 70 broad test/config files**. This is a pre-existing repository-wide condition recorded in prior receipts; after correcting the only branch-local nullable-Organization diagnostic, the full Next/Turbopack TypeScript phase and every focused/full Jest suite completed successfully. It is not represented as a passing standalone TypeScript gate.
+
+**Production boundary.** No Production flag was read or mutated, no deployment occurred, no database write was made, and no customer email was sent. The read-only custom-HTML override audit with actual current flags, manual review of each live override, seven synthetic visual captures, one exact test canary, Ready/health validation, organic PII-free telemetry, and separate authorization before global enablement remain required rollout work. No launch or Production verification is claimed.
+---
+
 <a id="coach-profile-fields-aligned-launched"></a>
 ### 2026-08-11 — Coach profile fields aligned and launched <!-- ENTRY_ISO:2026-08-11 ENTRY_SLUG:coach-profile-fields-aligned-launched -->
 
@@ -49,7 +79,6 @@ focused suites passed. Changed-file ESLint, migration safety, and the
 Production-matching Turbopack build passed. Authenticated visual review covered
 Admin template Settings, Coach Report Setup, and editable Campaign Detail at
 1280px and 393px. No Production or customer data was changed.
-
 ---
 
 <a id="create-assessment-welcome-parity-launched"></a>

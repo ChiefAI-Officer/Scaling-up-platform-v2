@@ -36,6 +36,7 @@ import {
   activePublishedWhere,
   DEFAULT_TEMPLATE_LANGUAGE,
 } from "@/lib/assessments/active-version";
+import { campaignPickerTemplateWhere } from "@/lib/assessments/campaign-picker-template-scope";
 import { isAdminOwnedAssessmentPresentationEnabled } from "@/lib/assessments/wave-admin-owned-assessment-presentation-flags";
 
 interface TemplateSummary {
@@ -75,11 +76,11 @@ export async function GET(request: NextRequest) {
         { status: 401 }
       );
     }
+    const templateWhere = await campaignPickerTemplateWhere(db, actor);
 
     if (isPrivilegedRole(actor.role)) {
       const templates = await db.assessmentTemplate.findMany({
-        // Wave Q (#6): `disabledAt: null` is UNCONDITIONAL (never flag-gated).
-        where: { deletedAt: null, disabledAt: null },
+        where: templateWhere,
         select: {
           id: true,
           name: true,
@@ -154,56 +155,12 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Coach path — INTERSECTION RBAC.
-    if (!actor.coachId) {
-      return NextResponse.json({ success: true, data: [] });
-    }
+    // Coach path — scope enforces INTERSECTION RBAC.
     const adminOwnedPresentation =
       isAdminOwnedAssessmentPresentationEnabled();
 
-    // Step 1 — load the coach's active group IDs.
-    const groupRows = await db.accessGroupCoach.findMany({
-      where: { coachId: actor.coachId },
-      include: { accessGroup: { select: { id: true, deletedAt: true } } },
-    });
-    const activeGroupIds = groupRows
-      .filter((r) => r.accessGroup.deletedAt === null)
-      .map((r) => r.accessGroupId);
-
-    if (activeGroupIds.length === 0) {
-      return NextResponse.json({ success: true, data: [] });
-    }
-
-    // Step 2 — load every AccessGroupTemplate row in those groups and
-    // count grants per template. A template is accessible iff every
-    // active group of the coach grants it (count === activeGroupIds.length).
-    const grantRows = await db.accessGroupTemplate.findMany({
-      where: { accessGroupId: { in: activeGroupIds } },
-      select: { templateId: true, accessGroupId: true },
-    });
-
-    const grantCount = new Map<string, Set<string>>();
-    for (const row of grantRows) {
-      if (!grantCount.has(row.templateId)) {
-        grantCount.set(row.templateId, new Set<string>());
-      }
-      grantCount.get(row.templateId)!.add(row.accessGroupId);
-    }
-
-    const accessibleTemplateIds: string[] = [];
-    for (const [templateId, groups] of grantCount) {
-      if (groups.size === activeGroupIds.length) {
-        accessibleTemplateIds.push(templateId);
-      }
-    }
-
-    if (accessibleTemplateIds.length === 0) {
-      return NextResponse.json({ success: true, data: [] });
-    }
-
     const templates = await db.assessmentTemplate.findMany({
-      // Wave Q (#6): `disabledAt: null` is UNCONDITIONAL (never flag-gated).
-      where: { id: { in: accessibleTemplateIds }, deletedAt: null, disabledAt: null },
+      where: templateWhere,
       select: {
         id: true,
         name: true,

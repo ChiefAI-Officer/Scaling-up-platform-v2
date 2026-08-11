@@ -175,6 +175,9 @@ beforeEach(() => {
   delete process.env.WAVE_REPORT_STYLES_ENABLED;
   delete process.env.WAVE_REPORT_STYLES_CANARY;
   delete process.env.WAVE_REPORT_STYLES_KILL;
+  delete process.env.WAVE_INVITATION_BANNER_ENABLED;
+  delete process.env.WAVE_INVITATION_BANNER_CANARY;
+  delete process.env.WAVE_INVITATION_BANNER_KILL;
   (isPublicCampaignsSimpleUiEnabled as jest.Mock).mockReturnValue(false);
   (resolvePublishedTemplateVersion as jest.Mock).mockResolvedValue(mockVersion);
   (db.assessmentTemplate.findUnique as jest.Mock).mockResolvedValue(
@@ -435,6 +438,29 @@ describe("POST /api/admin/public-campaigns — CREATE", () => {
           data: expect.objectContaining({ organizationId: null }),
         }),
       );
+    });
+
+    it.each([
+      ["global enablement", "WAVE_INVITATION_BANNER_ENABLED", "1"],
+      ["template canary", "WAVE_INVITATION_BANNER_CANARY", "tpl-1"],
+    ])("does not accept INVITED custom-HTML authoring fields under %s", async (_name, envKey, envValue) => {
+      process.env[envKey] = envValue;
+
+      const res = await createPost(
+        makeCreateRequest({
+          ...validBody,
+          invitationBodyHtml: "<p>Body fragment</p>",
+          invitationSubject: "Invitation-only subject",
+          invitationBodyMarkdown: "Invitation-only body",
+        }) as never,
+      );
+
+      expect(res.status).toBe(201);
+      const createData = (db.assessmentCampaign.create as jest.Mock).mock.calls[0][0].data;
+      expect(createData.accessMode).toBe("PUBLIC");
+      expect(createData).not.toHaveProperty("invitationBodyHtml");
+      expect(createData).not.toHaveProperty("invitationSubject");
+      expect(createData).not.toHaveProperty("invitationBodyMarkdown");
     });
 
     it("returns 400 when name is missing", async () => {

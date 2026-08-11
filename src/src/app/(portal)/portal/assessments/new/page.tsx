@@ -5,6 +5,13 @@
 
 import "@/styles/wireframes-scoped.css";
 import { requireCoach } from "@/lib/auth/authorization";
+import { normalizeRole } from "@/lib/auth/access-control";
+import type { ApiActor } from "@/lib/auth/access-control";
+import { db } from "@/lib/db";
+import {
+  asAccessDb,
+  canAccessOrganization,
+} from "@/lib/assessments/access-control";
 import { CampaignWizard } from "@/components/assessments/CampaignWizard";
 import {
   waveDCustomHtmlEmailEnabled,
@@ -17,9 +24,45 @@ import { isCustomSlidesEnabled } from "@/lib/assessments/wave-m-flags";
 import { isWaveQAdminControlsEnabled } from "@/lib/assessments/wave-q-flags";
 import { isOnScreenResultsEnabled } from "@/lib/assessments/wave-osr-flags";
 import { isAdminOwnedAssessmentPresentationEnabled } from "@/lib/assessments/wave-admin-owned-assessment-presentation-flags";
+import { getInvitationBannerAuthoringGate } from "@/lib/assessments/wave-invitation-banner-flags";
+import { campaignPickerTemplateWhere } from "@/lib/assessments/campaign-picker-template-scope";
 
 export default async function NewCampaignPage() {
-  await requireCoach();
+  const { session, coach } = await requireCoach();
+  const actor: ApiActor = {
+    userId: session.user.id,
+    email: session.user.email ?? "",
+    role: normalizeRole(session.user.role ?? "COACH"),
+    coachId: coach.id,
+  };
+  const accessDb = asAccessDb(db);
+  const invitationBannerGate = await getInvitationBannerAuthoringGate(
+    async (configuredIds) => {
+      const templateWhere = await campaignPickerTemplateWhere(db, actor);
+      const [templateRows, organizationVisibility] = await Promise.all([
+        db.assessmentTemplate.findMany({
+          where: { AND: [templateWhere, { id: { in: [...configuredIds] } }] },
+          select: { id: true },
+        }),
+        Promise.all(
+          configuredIds.map(async (id) => ({
+            id,
+            visible: await canAccessOrganization(accessDb, actor, id),
+          })),
+        ),
+      ]);
+      const visibleTemplateIds = new Set(templateRows.map(({ id }) => id));
+      const visibleOrganizationIds = new Set(
+        organizationVisibility
+          .filter(({ visible }) => visible)
+          .map(({ id }) => id),
+      );
+
+      return configuredIds.filter(
+        (id) => visibleTemplateIds.has(id) || visibleOrganizationIds.has(id),
+      );
+    },
+  );
   const customHtmlEmailEnabled = waveDCustomHtmlEmailEnabled();
   const brandedCustomHtmlEnabled = assessmentInviteBrandedCustomHtmlEnabled();
   const autoSend = waveDAutoSendEnabled();
@@ -43,6 +86,7 @@ export default async function NewCampaignPage() {
       <CampaignWizard
         customHtmlEmailEnabled={customHtmlEmailEnabled}
         brandedCustomHtmlEnabled={brandedCustomHtmlEnabled}
+        invitationBannerGate={invitationBannerGate}
         autoSend={autoSend}
         resultsEmailEnabled={resultsEmailEnabled}
         coachNotifyEnabled={coachNotifyEnabled}

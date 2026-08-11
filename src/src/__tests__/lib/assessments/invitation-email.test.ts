@@ -145,7 +145,8 @@ import {
   buildInvitationEmailShell,
   renderBrandedCustomHtmlText,
   renderCustomHtmlFragment,
-  resolveCoachName,
+  renderUniversalInvitationText,
+  resolveInvitationCoachByline,
   shouldShowOrgLine,
 } from "@/lib/assessments/invitation-email";
 
@@ -314,15 +315,80 @@ describe("renderFullHtmlBody — full-HTML override (#20)", () => {
   });
 });
 
-describe("resolveCoachName — creatorCoach ?? owner", () => {
-  it("prefers the campaign creator coach", () => {
-    expect(resolveCoachName({ firstName: "Cre", lastName: "Ator" }, { firstName: "Own", lastName: "Er" })).toBe("Cre Ator");
+describe("resolveInvitationCoachByline — one Coach presentation model", () => {
+  it("uses the creator's complete identity when it has a valid image", () => {
+    expect(resolveInvitationCoachByline(
+      { firstName: "Cre", lastName: "Ator", profileImage: "https://cdn.test/creator.png" },
+      { firstName: "Own", lastName: "Er", profileImage: "https://cdn.test/owner.png" },
+    )).toEqual({
+      byline: {
+        mode: "image_name",
+        coachName: "Cre Ator",
+        coachImageUrl: "https://cdn.test/creator.png",
+      },
+      legacyCoachLogoUrl: "https://cdn.test/creator.png",
+      logoRejectedReason: null,
+    });
   });
-  it("falls back to the org owner", () => {
-    expect(resolveCoachName(null, { firstName: "Own", lastName: "Er" })).toBe("Own Er");
+
+  it("keeps the creator's name when its image is absent", () => {
+    expect(resolveInvitationCoachByline(
+      { firstName: "Cre", lastName: "Ator", profileImage: null },
+      { firstName: "Own", lastName: "Er", profileImage: "https://cdn.test/owner.png" },
+    )).toEqual({
+      byline: { mode: "name_only", coachName: "Cre Ator" },
+      legacyCoachLogoUrl: null,
+      logoRejectedReason: "no-image",
+    });
   });
-  it("returns null when neither is present", () => {
-    expect(resolveCoachName(null, null)).toBeNull();
+
+  it("rejects an invalid creator image without returning its raw URL", () => {
+    const rejectedUrl = "javascript:alert('do-not-leak')";
+    const result = resolveInvitationCoachByline(
+      { firstName: "Cre", lastName: "Ator", profileImage: rejectedUrl },
+      null,
+    );
+
+    expect(result).toEqual({
+      byline: { mode: "name_only", coachName: "Cre Ator" },
+      legacyCoachLogoUrl: null,
+      logoRejectedReason: "invalid-url",
+    });
+    expect(JSON.stringify(result)).not.toContain(rejectedUrl);
+  });
+
+  it("uses the owner when there is no creator", () => {
+    expect(resolveInvitationCoachByline(
+      null,
+      { firstName: "Own", lastName: "Er", profileImage: "https://cdn.test/owner.png" },
+    )).toEqual({
+      byline: {
+        mode: "image_name",
+        coachName: "Own Er",
+        coachImageUrl: "https://cdn.test/owner.png",
+      },
+      legacyCoachLogoUrl: "https://cdn.test/owner.png",
+      logoRejectedReason: null,
+    });
+  });
+
+  it("does not fall through to the owner when the selected creator has no name", () => {
+    expect(resolveInvitationCoachByline(
+      { firstName: " ", lastName: "", profileImage: "https://cdn.test/image.png" },
+      { firstName: "Own", lastName: "Er", profileImage: "https://cdn.test/owner.png" },
+    )).toEqual({
+      byline: { mode: "scaling_up_only" },
+      legacyCoachLogoUrl: "https://cdn.test/image.png",
+      logoRejectedReason: "missing-name",
+    });
+  });
+
+  it("uses Scaling Up only when neither creator nor owner exists", () => {
+    expect(resolveInvitationCoachByline(null, null)).toEqual({
+      byline: { mode: "scaling_up_only" },
+      legacyCoachLogoUrl: null,
+      logoRejectedReason: "no-coach",
+    });
   });
 });
 
@@ -330,8 +396,6 @@ describe("resolveCoachName — creatorCoach ?? owner", () => {
 // The module is pure: it never reads the flag. Callers pass chrome:"waveP".
 // Default (no chrome arg / chrome:"legacy") must be BYTE-IDENTICAL to the
 // pre-Wave-P output, regardless of coachLogoUrl.
-
-import { resolveCoachLogo } from "@/lib/assessments/invitation-email";
 
 describe("buildInvitationEmailHtml — Wave P chrome", () => {
   const HTTPS_LOGO = "https://blob.example.com/coach-logo.png";
@@ -474,38 +538,139 @@ describe("buildInvitationEmailHtml — Wave P chrome", () => {
   });
 });
 
-describe("resolveCoachLogo — mirrors resolveCoachName identity (creatorCoach ?? owner)", () => {
-  it("prefers the creator coach's profileImage", () => {
-    expect(
-      resolveCoachLogo(
-        { profileImage: "https://x.example/creator.png" },
-        { profileImage: "https://x.example/owner.png" },
-      ),
-    ).toEqual({ coachLogoUrl: "https://x.example/creator.png", logoRejectedReason: null });
-  });
-
-  it("falls back to the org owner when there is no creator coach", () => {
-    expect(resolveCoachLogo(null, { profileImage: "https://x.example/owner.png" })).toEqual({
-      coachLogoUrl: "https://x.example/owner.png",
-      logoRejectedReason: null,
+describe("universal invitation banner", () => {
+  // Catches the universal branch accidentally retaining Wave-P/legacy header content.
+  it("renders Scaling Up followed by the escaped coach byline and branded shell", () => {
+    const html = buildInvitationEmailHtml({
+      bodyMarkdown: "Welcome to {{organizationName}}",
+      vars: baseVars,
+      chrome: "universalBanner",
+      coachByline: {
+        mode: "image_name",
+        coachName: "Martin <Coach>",
+        coachImageUrl: "https://cdn.test/martin.png",
+      },
     });
+
+    expect(html.indexOf('src="cid:sulogo"')).toBeLessThan(html.indexOf("https://cdn.test/martin.png"));
+    expect(html).toContain("Your coach");
+    expect(html).toContain("Martin &lt;Coach&gt;");
+    expect(html).toContain('alt=""');
+    expect(html).not.toContain("opacity:0.85");
+    expect(html).toContain("Welcome to Acme Corp");
+    expect(html).toContain("Start the assessment");
+    expect(html).toContain("If the button doesn't work");
+    expect(html).toContain("&mdash; Scaling Up Platform");
   });
 
-  it("does NOT fall through to the owner when the creator coach has no image (same pick as resolveCoachName)", () => {
-    expect(
-      resolveCoachLogo({ profileImage: null }, { profileImage: "https://x.example/owner.png" }),
-    ).toEqual({ coachLogoUrl: null, logoRejectedReason: "no-image" });
-  });
-
-  it("reports no-coach when neither is present", () => {
-    expect(resolveCoachLogo(null, null)).toEqual({ coachLogoUrl: null, logoRejectedReason: "no-coach" });
-  });
-
-  it("reports invalid-url for a non-https image and nulls the URL (never forwards the raw value)", () => {
-    expect(resolveCoachLogo({ profileImage: "http://x.example/logo.png" }, null)).toEqual({
-      coachLogoUrl: null,
-      logoRejectedReason: "invalid-url",
+  // Catches a name-only byline losing its visible Coach identity or adding an image.
+  it("renders name-only coach identity with just the Scaling Up logo image", () => {
+    const html = buildInvitationEmailHtml({
+      bodyMarkdown: "Hi",
+      vars: baseVars,
+      chrome: "universalBanner",
+      coachByline: { mode: "name_only", coachName: "Martin Segnitz" },
     });
+
+    expect(html).toContain("Your coach");
+    expect(html).toContain("Martin Segnitz");
+    expect(html.match(/<img /g)).toHaveLength(1);
+  });
+
+  // Catches a Scaling-Up-only invitation emitting empty coach chrome.
+  it("omits the entire coach byline for Scaling Up only", () => {
+    const html = buildInvitationEmailHtml({
+      bodyMarkdown: "Hi",
+      vars: baseVars,
+      chrome: "universalBanner",
+      coachByline: { mode: "scaling_up_only" },
+    });
+
+    expect(html).not.toContain("data-invitation-coach-byline");
+    expect(html).not.toContain("Your coach");
+    expect(html.match(/<img /g)).toHaveLength(1);
+  });
+
+  // Catches accidental reuse of alias-derived organization chrome in the universal branch.
+  it.each([
+    ["LVA", "leadership-vision-alignment", false],
+    ["known non-LVA", "qsp-v2", true],
+    ["null alias", null, true],
+    ["unknown alias", "future-assessment-alias", true],
+  ] as const)("never auto-inserts organization identity for %s", (_case, alias, expectedShowOrgLine) => {
+    const showOrgLine = shouldShowOrgLine(alias);
+    expect(showOrgLine).toBe(expectedShowOrgLine);
+
+    const html = buildInvitationEmailHtml({
+      bodyMarkdown: "Hi",
+      vars: { ...baseVars, organizationName: "Organization Must Not Appear", showOrgLine },
+      chrome: "universalBanner",
+      coachByline: { mode: "scaling_up_only" },
+    });
+    expect(html).not.toContain("Organization Must Not Appear");
+    expect(html).not.toContain("opacity:0.85");
+  });
+
+  // Catches a no-wrap style that truncates long coach identities on narrow clients.
+  it("forces an unbroken long coach name to wrap in email clients", () => {
+    const coachName = `Coach${"W".repeat(180)}`;
+    const html = buildInvitationEmailHtml({
+      bodyMarkdown: "Hi",
+      vars: baseVars,
+      chrome: "universalBanner",
+      coachByline: { mode: "name_only", coachName },
+    });
+    expect(html).toContain(coachName);
+    expect(html).not.toContain("white-space:nowrap");
+    expect(html).toContain("overflow-wrap:anywhere;word-wrap:break-word;word-break:break-all;");
+  });
+
+  // Catches attribute/element injection when a caller bypasses the resolver.
+  it("escapes and control-strips unsafe coach values", () => {
+    const html = buildInvitationEmailHtml({
+      bodyMarkdown: "Hi",
+      vars: baseVars,
+      chrome: "universalBanner",
+      coachByline: {
+        mode: "image_name",
+        coachName: 'Martin\r\n"><script>alert(1)</script>',
+        coachImageUrl: 'https://cdn.test/a.png" onerror="alert(1)',
+      },
+    });
+    expect(html).not.toContain("<script>");
+    expect(html).not.toContain('" onerror="');
+    expect(html).not.toMatch(/Martin[\r\n]/);
+    expect(html).toContain("&quot;&gt;&lt;script&gt;");
+  });
+
+  // Catches text composition using legacy vars.coachName instead of the resolved byline.
+  it("renders the universal plain-text counterpart", () => {
+    expect(renderUniversalInvitationText({
+      body: { kind: "markdown", value: "Hi {{respondentFirstName}}" },
+      vars: baseVars,
+      coachByline: { mode: "name_only", coachName: "Martin Segnitz" },
+    })).toBe([
+      "Scaling Up Platform",
+      "Coach: Martin Segnitz",
+      "",
+      "Hi Jane",
+      "",
+      `Start the assessment: ${baseVars.invitationUrl}`,
+    ].join("\n"));
+  });
+
+  it("renders sanitized HTML text and omits Coach for Scaling Up only", () => {
+    expect(renderUniversalInvitationText({
+      body: { kind: "sanitized_html", value: "<p>Hi {{respondentFirstName}}</p>" },
+      vars: baseVars,
+      coachByline: { mode: "scaling_up_only" },
+    })).toBe([
+      "Scaling Up Platform",
+      "",
+      "Hi Jane",
+      "",
+      `Start the assessment: ${baseVars.invitationUrl}`,
+    ].join("\n"));
   });
 });
 

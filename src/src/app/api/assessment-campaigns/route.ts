@@ -62,6 +62,7 @@ import {
 import { isAdminOwnedAssessmentPresentationEnabled } from "@/lib/assessments/wave-admin-owned-assessment-presentation-flags";
 import { loadInvitedWelcomeSnapshot } from "@/lib/assessments/invited-welcome-snapshot";
 import type { InvitedWelcomeConfigV1 } from "@/lib/assessments/invited-welcome-config";
+import { isInvitationBannerEnabled } from "@/lib/assessments/wave-invitation-banner-flags";
 
 function withoutInvitedWelcomeSnapshot<
   T extends { invitedWelcomeSnapshot?: unknown },
@@ -234,7 +235,13 @@ export async function POST(request: NextRequest) {
           );
         }
         const placement = validateInvitationHtml(rawHtml, {
-          requireUrlToken: !assessmentInviteBrandedCustomHtmlEnabled(),
+          requireUrlToken: !(
+            assessmentInviteBrandedCustomHtmlEnabled() ||
+            isInvitationBannerEnabled({
+              organizationId: data.organizationId,
+              templateId: data.templateId,
+            })
+          ),
         });
         if (!placement.ok) {
           return NextResponse.json(

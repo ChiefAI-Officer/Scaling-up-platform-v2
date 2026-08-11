@@ -27,9 +27,9 @@ import {
   hashToken,
 } from "@/lib/assessments/invitation-tokens";
 import {
-  resolveCoachName,
-  resolveCoachLogo,
+  resolveInvitationCoachByline,
 } from "@/lib/assessments/invitation-email";
+import { isInvitationBannerEnabled } from "@/lib/assessments/wave-invitation-banner-flags";
 import { isInviteEmailChromeEnabled } from "@/lib/assessments/wave-p-flags";
 import { sendAssessmentInvitationEmail } from "@/services/notifications";
 
@@ -176,30 +176,29 @@ export async function POST(
     const rawToken = generateRawToken();
     const tokenHash = hashToken(rawToken);
     const appUrl = process.env.APP_URL ?? "http://localhost:3000";
-    const coachName = resolveCoachName(
-      c.creatorCoach ?? null,
-      c.organization?.owner ?? null
-    );
-
-    // Wave P — invitation-email chrome (#2.1 coach logo + #2.4 larger CTA).
-    // Flag evaluated ONCE per send; logo identity MIRRORS resolveCoachName.
-    const chrome = isInviteEmailChromeEnabled({
+    const scope = {
       organizationId: c.organizationId,
       templateId: c.templateId,
-    })
-      ? ("waveP" as const)
-      : ("legacy" as const);
-    const { coachLogoUrl, logoRejectedReason } = resolveCoachLogo(
+    };
+    const chrome = isInvitationBannerEnabled(scope)
+      ? "universalBanner"
+      : isInviteEmailChromeEnabled(scope)
+        ? "waveP"
+        : "legacy";
+    const coachResolution = resolveInvitationCoachByline(
       c.creatorCoach ?? null,
-      c.organization?.owner ?? null
+      c.organization?.owner ?? null,
     );
-    // PII-free observability: variant + logo-gate outcome only — NEVER the URL.
+    const coachByline = coachResolution.byline;
+    const coachName = coachByline.mode === "scaling_up_only" ? null : coachByline.coachName;
+
+    // PII-free observability: variant + resolved mode + gate outcome only.
     console.log("[assessment-resend] email-chrome", {
       campaignId,
       invitationId,
       chromeVariant: chrome,
-      logoIncluded: chrome === "waveP" && logoRejectedReason === null,
-      logoRejectedReason,
+      coachBylineMode: coachByline.mode,
+      logoRejectedReason: coachResolution.logoRejectedReason,
     });
 
     // Reorder: send FIRST with the freshly-minted token, then rotate the
@@ -234,7 +233,8 @@ export async function POST(
         rawToken,
         baseUrl: appUrl,
         chrome,
-        coachLogoUrl,
+        coachByline,
+        coachLogoUrl: coachResolution.legacyCoachLogoUrl,
       });
     } catch (sendErr) {
       console.error(

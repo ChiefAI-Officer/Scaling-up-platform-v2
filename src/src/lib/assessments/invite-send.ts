@@ -26,6 +26,10 @@ import {
   generateRawToken,
   hashToken,
 } from "@/lib/assessments/invitation-tokens";
+import type {
+  InvitationChrome,
+  InvitationCoachByline,
+} from "@/lib/assessments/invitation-email";
 import {
   classifyInvitationSendError,
   confirmStableInvitationToken,
@@ -81,13 +85,11 @@ export interface InviteEmailInput {
   templateName: string | null;
   rawToken: string;
   baseUrl: string;
-  /**
-   * Wave P — invitation-email chrome variant (coach logo + larger CTA).
-   * Callers evaluate `isInviteEmailChromeEnabled` once per send; the mailer
-   * never reads the flag. Defaults to "legacy" (byte-identical output).
-   */
-  chrome?: "legacy" | "waveP";
-  /** Wave P — coach logo (creator coach ?? org owner profileImage). Only rendered under chrome:"waveP" + https gate. */
+  /** Invitation chrome, evaluated once by the entry point. */
+  chrome?: InvitationChrome;
+  /** One resolved Coach identity used by every invitation renderer. */
+  coachByline?: InvitationCoachByline;
+  /** Safe image retained only for legacy/Wave-P compatibility. */
   coachLogoUrl?: string | null;
 }
 
@@ -215,14 +217,12 @@ export interface SendInvitesInput {
   organizationName?: string | null;
   coachName?: string | null;
   templateName?: string | null;
-  /**
-   * Wave P — invitation-email chrome variant, evaluated ONCE per send by the
-   * caller (flag: `isInviteEmailChromeEnabled({ organizationId, templateId })`).
-   * Defaults to "legacy".
-   */
-  chrome?: "legacy" | "waveP";
-  /** Wave P — coach logo (creator coach ?? org owner profileImage; mirrors resolveCoachName). */
-  coachLogoUrl?: string | null;
+  /** Invitation chrome, evaluated once by the entry point. Defaults to legacy. */
+  chrome?: InvitationChrome;
+  /** One resolved Coach identity. Defaults to Scaling Up only. */
+  coachByline?: InvitationCoachByline;
+  /** Safe image from the same resolved Coach, retained for legacy/Wave-P only. */
+  legacyCoachLogoUrl?: string | null;
   stableLinksEnabled?: boolean;
 }
 
@@ -255,7 +255,8 @@ export async function sendInvitesBatch(
   const coachName = input.coachName ?? null;
   const templateName = input.templateName ?? null;
   const chrome = input.chrome ?? "legacy";
-  const coachLogoUrl = input.coachLogoUrl ?? null;
+  const coachByline = input.coachByline ?? { mode: "scaling_up_only" as const };
+  const legacyCoachLogoUrl = input.legacyCoachLogoUrl ?? null;
 
   if (input.stableLinksEnabled && (!deps.stableTokens || !deps.prepareEmail)) {
     throw new Error(
@@ -394,7 +395,8 @@ export async function sendInvitesBatch(
       rawToken,
       baseUrl,
       chrome,
-      coachLogoUrl,
+      coachByline,
+      coachLogoUrl: legacyCoachLogoUrl,
     };
 
     if (input.stableLinksEnabled) {

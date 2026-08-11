@@ -63,6 +63,9 @@ beforeEach(() => {
   jest.clearAllMocks();
   delete process.env.WAVE_D_CUSTOM_HTML_EMAIL_ENABLED;
   delete process.env.ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED;
+  delete process.env.WAVE_INVITATION_BANNER_ENABLED;
+  delete process.env.WAVE_INVITATION_BANNER_CANARY;
+  delete process.env.WAVE_INVITATION_BANNER_KILL;
   delete process.env.WAVE_REPORT_STYLES_ENABLED;
   delete process.env.WAVE_REPORT_STYLES_KILL;
   delete process.env.WAVE_REPORT_STYLES_CANARY;
@@ -103,6 +106,7 @@ describe("GET /api/assessment-campaigns/[id]", () => {
       templateId: "tpl-1",
       createdByCoachId: "coach-1",
       status: "DRAFT",
+      accessMode: "INVITED",
     });
     const res = await GET(
       new Request("http://localhost/api/assessment-campaigns/c1") as never,
@@ -604,6 +608,9 @@ describe("PATCH /api/assessment-campaigns/[id]", () => {
   // ── Task 12 (#20) — full-HTML invitation body on PATCH ──────────────────
   const ORIGINAL_HTML_FLAG = process.env.WAVE_D_CUSTOM_HTML_EMAIL_ENABLED;
   const ORIGINAL_BRANDED_HTML_FLAG = process.env.ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED;
+  const ORIGINAL_BANNER_FLAG = process.env.WAVE_INVITATION_BANNER_ENABLED;
+  const ORIGINAL_BANNER_CANARY = process.env.WAVE_INVITATION_BANNER_CANARY;
+  const ORIGINAL_BANNER_KILL = process.env.WAVE_INVITATION_BANNER_KILL;
   const VALID_HTML = '<h1>Hi {{respondentFirstName}}</h1><a href="{{invitationUrl}}">Go</a>';
 
   function draftActorSetup() {
@@ -614,6 +621,7 @@ describe("PATCH /api/assessment-campaigns/[id]", () => {
       templateId: "tpl-1",
       createdByCoachId: "coach-1",
       status: "DRAFT",
+      accessMode: "INVITED",
     });
     (db.assessmentCampaign.update as jest.Mock).mockResolvedValue({ id: "c1" });
   }
@@ -626,6 +634,12 @@ describe("PATCH /api/assessment-campaigns/[id]", () => {
     } else {
       process.env.ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED = ORIGINAL_BRANDED_HTML_FLAG;
     }
+    if (ORIGINAL_BANNER_FLAG === undefined) delete process.env.WAVE_INVITATION_BANNER_ENABLED;
+    else process.env.WAVE_INVITATION_BANNER_ENABLED = ORIGINAL_BANNER_FLAG;
+    if (ORIGINAL_BANNER_CANARY === undefined) delete process.env.WAVE_INVITATION_BANNER_CANARY;
+    else process.env.WAVE_INVITATION_BANNER_CANARY = ORIGINAL_BANNER_CANARY;
+    if (ORIGINAL_BANNER_KILL === undefined) delete process.env.WAVE_INVITATION_BANNER_KILL;
+    else process.env.WAVE_INVITATION_BANNER_KILL = ORIGINAL_BANNER_KILL;
   });
 
   it("flag ON + valid invitationBodyHtml → stored RAW", async () => {
@@ -702,6 +716,82 @@ describe("PATCH /api/assessment-campaigns/[id]", () => {
       patchReq({ invitationBodyHtml: "<p>No URL token</p>" }) as never,
       detailParams("c1"),
     );
+    expect(response.status).toBe(400);
+    expect(db.assessmentCampaign.update).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["global enablement", "global", "ignored"],
+    ["organization canary", "canary", "org-1"],
+    ["template canary", "canary", "tpl-1"],
+  ])("universal banner %s accepts a body-only partial PATCH with GH220 off", async (_name, mode, value) => {
+    process.env.WAVE_D_CUSTOM_HTML_EMAIL_ENABLED = "1";
+    delete process.env.ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED;
+    if (mode === "global") process.env.WAVE_INVITATION_BANNER_ENABLED = "1";
+    else process.env.WAVE_INVITATION_BANNER_CANARY = value;
+    draftActorSetup();
+
+    const response = await PATCH(
+      patchReq({ invitationBodyHtml: "<p>Body fragment</p>" }) as never,
+      detailParams("c1"),
+    );
+
+    expect(response.status).toBe(200);
+    expect(db.assessmentCampaign.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ invitationBodyHtml: "<p>Body fragment</p>" }),
+      }),
+    );
+  });
+
+  it.each([
+    ["global enablement", "global"],
+    ["template canary", "template"],
+  ])("PUBLIC campaign under universal banner %s still requires the legacy URL token", async (_name, mode) => {
+    process.env.WAVE_D_CUSTOM_HTML_EMAIL_ENABLED = "1";
+    delete process.env.ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED;
+    if (mode === "global") process.env.WAVE_INVITATION_BANNER_ENABLED = "1";
+    else process.env.WAVE_INVITATION_BANNER_CANARY = "tpl-1";
+    draftActorSetup();
+    (getApiActor as jest.Mock).mockResolvedValue({
+      userId: "admin-1",
+      email: "admin@example.com",
+      role: "ADMIN",
+      coachId: null,
+    });
+    (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValue({
+      id: "c1",
+      organizationId: null,
+      templateId: "tpl-1",
+      createdByCoachId: null,
+      status: "DRAFT",
+      accessMode: "PUBLIC",
+    });
+
+    const response = await PATCH(
+      patchReq({ invitationBodyHtml: "<p>Body fragment</p>" }) as never,
+      detailParams("c1"),
+    );
+
+    expect(response.status).toBe(400);
+    expect(db.assessmentCampaign.update).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["flag off", undefined, undefined],
+    ["nonmatching canary", "other-org", undefined],
+    ["kill switch", "org-1", "1"],
+  ])("universal banner %s retains the PATCH URL-token requirement", async (_name, canary, kill) => {
+    process.env.WAVE_D_CUSTOM_HTML_EMAIL_ENABLED = "1";
+    if (canary) process.env.WAVE_INVITATION_BANNER_CANARY = canary;
+    if (kill) process.env.WAVE_INVITATION_BANNER_KILL = kill;
+    draftActorSetup();
+
+    const response = await PATCH(
+      patchReq({ invitationBodyHtml: "<p>Body fragment</p>" }) as never,
+      detailParams("c1"),
+    );
+
     expect(response.status).toBe(400);
     expect(db.assessmentCampaign.update).not.toHaveBeenCalled();
   });

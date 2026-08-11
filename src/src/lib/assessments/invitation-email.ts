@@ -298,7 +298,58 @@ const PURPLE_DEEP = "#3d1a63";
 const D_PEOPLE = "#E4002B", D_STRATEGY = "#00A6CE", D_EXECUTION = "#FFB81C", D_CASH = "#43B02A";
 
 /** Chrome variant for the branded shell. "legacy" (the default) is byte-identical to pre-Wave-P output. */
-export type InvitationChrome = "legacy" | "waveP";
+export type InvitationChrome = "legacy" | "waveP" | "universalBanner";
+
+function renderUniversalCoachByline(coachByline: InvitationCoachByline | undefined): string {
+  if (!coachByline || coachByline.mode === "scaling_up_only") return "";
+
+  const coachName = escapeHtml(stripControlChars(coachByline.coachName));
+  const imageSrc = coachByline.mode === "image_name" ? safeImageSrc(coachByline.coachImageUrl) : null;
+  const imageCell = imageSrc
+    ? `<td width="52" valign="top" style="width:52px;padding:0 12px 0 0;"><img src="${escapeHtml(imageSrc)}" alt="" width="52" height="52" style="display:block;border:0;outline:none;width:52px;height:52px;border-radius:50%;" /></td>`
+    : "";
+
+  return `
+    <table role="presentation" data-invitation-coach-byline="true" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:16px;">
+      <tr>
+        ${imageCell}
+        <td valign="top" style="font-size:16px;line-height:1.35;color:#ffffff;">
+          <div style="font-size:11px;line-height:1.35;letter-spacing:0.08em;text-transform:uppercase;color:#ffffff;">Your coach</div>
+          <div style="font-size:16px;line-height:1.35;color:#ffffff;overflow-wrap:anywhere;word-wrap:break-word;word-break:break-all;">${coachName}</div>
+        </td>
+      </tr>
+    </table>`;
+}
+
+function buildUniversalInvitationEmailShell(input: {
+  bodyHtml: string;
+  vars: InvitationVars;
+  coachByline?: InvitationCoachByline;
+}): string {
+  const byline = renderUniversalCoachByline(input.coachByline);
+  return `
+<div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;max-width:560px;margin:0 auto;background:#ffffff;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr>
+      <td width="25%" style="height:6px;background:${D_PEOPLE};font-size:0;line-height:0;">&nbsp;</td>
+      <td width="25%" style="height:6px;background:${D_STRATEGY};font-size:0;line-height:0;">&nbsp;</td>
+      <td width="25%" style="height:6px;background:${D_EXECUTION};font-size:0;line-height:0;">&nbsp;</td>
+      <td width="25%" style="height:6px;background:${D_CASH};font-size:0;line-height:0;">&nbsp;</td>
+    </tr>
+  </table>
+  <div style="background:${PURPLE};background-image:linear-gradient(135deg,${PURPLE},${PURPLE_DEEP});padding:28px 32px;">
+    <img src="cid:${SU_LOGO_CID}" alt="Scaling Up" width="180" style="display:block;border:0;outline:none;max-width:180px;height:auto;" />${byline}
+  </div>
+  <div style="padding:28px 32px 8px;">
+    ${input.bodyHtml}
+    <div style="text-align:center;margin:24px 0 8px;">
+      <a href="${escapeHtml(input.vars.invitationUrl)}" style="display:inline-block;background:${PURPLE};color:#ffffff;padding:18px 40px;text-decoration:none;border-radius:8px;font-weight:700;font-size:17px;">Start the assessment</a>
+    </div>
+    <p style="color:#9ca3af;font-size:12px;margin-top:20px;">If the button doesn't work, paste this into your browser:<br/><span style="word-break:break-all;color:#6b7280;">${escapeHtml(input.vars.invitationUrl)}</span></p>
+  </div>
+  <div style="padding:18px 32px;border-top:1px solid #e5e7eb;color:#9ca3af;font-size:12px;">&mdash; Scaling Up Platform</div>
+</div>`.trim();
+}
 
 export function buildInvitationEmailShell(input: {
   bodyHtml: string;
@@ -310,8 +361,12 @@ export function buildInvitationEmailShell(input: {
    * once per send and pass the variant.
    */
   chrome?: InvitationChrome;
+  coachByline?: InvitationCoachByline;
 }): string {
   const { bodyHtml, vars } = input;
+  if (input.chrome === "universalBanner") {
+    return buildUniversalInvitationEmailShell(input);
+  }
   const waveP = (input.chrome ?? "legacy") === "waveP";
   const orgLine =
     vars.organizationName && vars.showOrgLine !== false ? escapeHtml(vars.organizationName) : "";
@@ -355,11 +410,13 @@ export function buildInvitationEmailHtml(input: {
   bodyMarkdown: string;
   vars: InvitationVars;
   chrome?: InvitationChrome;
+  coachByline?: InvitationCoachByline;
 }): string {
   return buildInvitationEmailShell({
     bodyHtml: renderHtmlBody(input.bodyMarkdown, input.vars),
     vars: input.vars,
     chrome: input.chrome,
+    coachByline: input.coachByline,
   });
 }
 
@@ -377,42 +434,84 @@ export function renderBrandedCustomHtmlText(
   return lines.join("\n");
 }
 
-// ── Coach-name resolver (creator coach ?? org owner) ────────────────────────
-type CoachName = { firstName: string; lastName: string } | null;
-export function resolveCoachName(creatorCoach: CoachName, ownerCoach: CoachName): string | null {
-  const pick = creatorCoach ?? ownerCoach;
-  if (!pick) return null;
-  const name = `${pick.firstName ?? ""} ${pick.lastName ?? ""}`.trim();
-  return name.length > 0 ? name : null;
+/** Plain-text counterpart for the universal invitation shell. */
+export function renderUniversalInvitationText(input: {
+  body: { kind: "markdown"; value: string } | { kind: "sanitized_html"; value: string };
+  vars: InvitationVars;
+  coachByline: InvitationCoachByline;
+}): string {
+  const bodyText = input.body.kind === "markdown"
+    ? (() => {
+      let text = dropRedundantCta(interpolateTokens(input.body.value, buildTokenValues(input.vars)), input.vars.invitationUrl);
+      text = text.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, "$1 ($2)");
+      return text.replace(/\*\*([^*]+)\*\*/g, "$1").trim();
+    })()
+    : htmlFragmentToText(renderCustomHtmlFragment(input.body.value, input.vars));
+  const lines = ["Scaling Up Platform"];
+  if (input.coachByline.mode !== "scaling_up_only") {
+    lines.push(`Coach: ${stripControlChars(input.coachByline.coachName)}`);
+  }
+  if (bodyText) lines.push("", bodyText);
+  lines.push("", `Start the assessment: ${input.vars.invitationUrl}`);
+  return lines.join("\n");
 }
 
-// ── Coach-logo resolver (Wave P) ────────────────────────────────────────────
-type CoachLogo = { profileImage: string | null } | null;
+export type InvitationCoachByline =
+  | { mode: "image_name"; coachName: string; coachImageUrl: string }
+  | { mode: "name_only"; coachName: string }
+  | { mode: "scaling_up_only" };
+
+export interface InvitationCoachResolution {
+  byline: InvitationCoachByline;
+  /** Safe image retained only for legacy/Wave-P compatibility. */
+  legacyCoachLogoUrl: string | null;
+  logoRejectedReason: "no-coach" | "missing-name" | "no-image" | "invalid-url" | null;
+}
+
+type InvitationCoachCandidate = {
+  firstName: string;
+  lastName: string;
+  profileImage: string | null;
+} | null;
 
 /**
- * Resolve the coach logo for the Wave-P email chrome. Logo identity MIRRORS
- * `resolveCoachName`: pick = creator coach ?? org owner (the org owner IS a
- * Coach row), then take that coach's profileImage — so name and logo always
- * come from the same coach (a creator coach with no image does NOT fall
- * through to the owner's image).
- *
- * `logoRejectedReason` is PII-free observability for the send paths:
- *  - "no-coach"    — no coach picked at all
- *  - "no-image"    — the picked coach has no profileImage
- *  - "invalid-url" — profileImage present but fails the https-only `safeImageSrc` gate
- *  - null          — usable logo
- *
- * A rejected URL is returned as null (never the raw value) so a downstream
- * consumer logging the mailer payload can't leak an unvetted string.
+ * Resolve the one Coach identity used by an invitation: campaign creator first,
+ * then organization owner. A selected creator never falls through to the owner.
  */
-export function resolveCoachLogo(
-  creatorCoach: CoachLogo,
-  ownerCoach: CoachLogo,
-): { coachLogoUrl: string | null; logoRejectedReason: "no-coach" | "no-image" | "invalid-url" | null } {
-  const pick = creatorCoach ?? ownerCoach;
-  if (!pick) return { coachLogoUrl: null, logoRejectedReason: "no-coach" };
-  const coachLogoUrl = pick.profileImage ?? null;
-  if (!coachLogoUrl) return { coachLogoUrl: null, logoRejectedReason: "no-image" };
-  if (!safeImageSrc(coachLogoUrl)) return { coachLogoUrl: null, logoRejectedReason: "invalid-url" };
-  return { coachLogoUrl, logoRejectedReason: null };
+export function resolveInvitationCoachByline(
+  creatorCoach: InvitationCoachCandidate,
+  ownerCoach: InvitationCoachCandidate,
+): InvitationCoachResolution {
+  const selected = creatorCoach ?? ownerCoach;
+  if (!selected) {
+    return {
+      byline: { mode: "scaling_up_only" },
+      legacyCoachLogoUrl: null,
+      logoRejectedReason: "no-coach",
+    };
+  }
+
+  const coachImageUrl = safeImageSrc(selected.profileImage);
+  const coachName = `${selected.firstName ?? ""} ${selected.lastName ?? ""}`.trim();
+  if (coachName.length === 0) {
+    return {
+      byline: { mode: "scaling_up_only" },
+      legacyCoachLogoUrl: coachImageUrl,
+      logoRejectedReason: "missing-name",
+    };
+  }
+
+  if (coachImageUrl) {
+    return {
+      byline: { mode: "image_name", coachName, coachImageUrl },
+      legacyCoachLogoUrl: coachImageUrl,
+      logoRejectedReason: null,
+    };
+  }
+
+  return {
+    byline: { mode: "name_only", coachName },
+    legacyCoachLogoUrl: null,
+    logoRejectedReason: selected.profileImage ? "invalid-url" : "no-image",
+  };
 }

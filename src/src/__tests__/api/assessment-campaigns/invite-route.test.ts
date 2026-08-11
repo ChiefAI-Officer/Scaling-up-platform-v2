@@ -664,11 +664,15 @@ describe("POST /api/assessment-campaigns/[id]/invite", () => {
   });
 });
 
-// ── Wave P — invitation-email chrome wiring (flag → mailer) ─────────────────
-describe("POST /invite — Wave P chrome + coach logo wiring", () => {
-  const FLAG = "WAVE_P_INVITE_EMAIL_ENABLED";
+// ── Invitation chrome wiring (universal banner → Wave P → legacy) ──────────
+describe("POST /invite — invitation chrome + unified coach byline wiring", () => {
+  const WAVE_P_FLAG = "WAVE_P_INVITE_EMAIL_ENABLED";
+  const BANNER_FLAG = "WAVE_INVITATION_BANNER_ENABLED";
+  const BANNER_KILL = "WAVE_INVITATION_BANNER_KILL";
   afterEach(() => {
-    delete process.env[FLAG];
+    delete process.env[WAVE_P_FLAG];
+    delete process.env[BANNER_FLAG];
+    delete process.env[BANNER_KILL];
   });
 
   function mockCampaignWith(overrides: Record<string, unknown>) {
@@ -680,8 +684,38 @@ describe("POST /invite — Wave P chrome + coach logo wiring", () => {
     );
   }
 
-  it("flag ON: mailer receives chrome=waveP + the CREATOR coach's profileImage", async () => {
-    process.env[FLAG] = "1";
+  it("uses the universal banner and keeps a creator without an image ahead of an owner with one", async () => {
+    process.env[BANNER_FLAG] = "1";
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    mockCampaignWith({
+      creatorCoach: {
+        firstName: "Pat",
+        lastName: "Coach",
+        profileImage: null,
+      },
+      organization: {
+        name: "Acme Corp",
+        owner: {
+          firstName: "Owner",
+          lastName: "Coach",
+          profileImage: "https://blob.example.com/owner.png",
+        },
+      },
+    });
+    const res = await POST(emptyReq() as never, detailParams("c1"));
+    expect(res.status).toBe(200);
+    expect(sendAssessmentInvitationEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        chrome: "universalBanner",
+        coachByline: { mode: "name_only", coachName: "Pat Coach" },
+      })
+    );
+  });
+
+  it("falls back to Wave P when the universal banner kill switch is active", async () => {
+    process.env[BANNER_FLAG] = "1";
+    process.env[BANNER_KILL] = "1";
+    process.env[WAVE_P_FLAG] = "1";
     (getApiActor as jest.Mock).mockResolvedValue(coachActor);
     mockCampaignWith({
       creatorCoach: {
@@ -703,16 +737,26 @@ describe("POST /invite — Wave P chrome + coach logo wiring", () => {
     expect(sendAssessmentInvitationEmail).toHaveBeenCalledWith(
       expect.objectContaining({
         chrome: "waveP",
-        coachLogoUrl: "https://blob.example.com/pat.png",
+        coachByline: {
+          mode: "image_name",
+          coachName: "Pat Coach",
+          coachImageUrl: "https://blob.example.com/pat.png",
+        },
       })
     );
   });
 
-  it("creatorCoach=null + org owner present: the OWNER's profileImage is used", async () => {
-    process.env[FLAG] = "1";
+  it("keeps the selected creator's safe Wave-P image when its name is blank and the banner is killed", async () => {
+    process.env[BANNER_FLAG] = "1";
+    process.env[BANNER_KILL] = "1";
+    process.env[WAVE_P_FLAG] = "1";
     (getApiActor as jest.Mock).mockResolvedValue(coachActor);
     mockCampaignWith({
-      creatorCoach: null,
+      creatorCoach: {
+        firstName: "",
+        lastName: " ",
+        profileImage: "https://blob.example.com/blank-name-creator.png",
+      },
       organization: {
         name: "Acme Corp",
         owner: {
@@ -722,17 +766,18 @@ describe("POST /invite — Wave P chrome + coach logo wiring", () => {
         },
       },
     });
+
     const res = await POST(emptyReq() as never, detailParams("c1"));
+
     expect(res.status).toBe(200);
-    expect(sendAssessmentInvitationEmail).toHaveBeenCalledWith(
-      expect.objectContaining({
-        chrome: "waveP",
-        coachLogoUrl: "https://blob.example.com/owner.png",
-      })
-    );
+    expect(sendAssessmentInvitationEmail).toHaveBeenCalledWith(expect.objectContaining({
+      chrome: "waveP",
+      coachByline: { mode: "scaling_up_only" },
+      coachLogoUrl: "https://blob.example.com/blank-name-creator.png",
+    }));
   });
 
-  it("flag OFF (default): mailer receives chrome=legacy", async () => {
+  it("uses legacy chrome when both invitation chrome gates are off", async () => {
     (getApiActor as jest.Mock).mockResolvedValue(coachActor);
     mockCampaignWith({
       creatorCoach: {
@@ -743,8 +788,13 @@ describe("POST /invite — Wave P chrome + coach logo wiring", () => {
     });
     const res = await POST(emptyReq() as never, detailParams("c1"));
     expect(res.status).toBe(200);
-    expect(sendAssessmentInvitationEmail).toHaveBeenCalledWith(
-      expect.objectContaining({ chrome: "legacy" })
-    );
+    expect(sendAssessmentInvitationEmail).toHaveBeenCalledWith(expect.objectContaining({
+      chrome: "legacy",
+      coachByline: {
+        mode: "image_name",
+        coachName: "Pat Coach",
+        coachImageUrl: "https://blob.example.com/pat.png",
+      },
+    }));
   });
 });

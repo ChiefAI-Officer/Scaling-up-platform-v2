@@ -106,12 +106,14 @@ afterEach(() => {
 
 async function advanceToReviewPanel(props: {
   brandedCustomHtmlEnabled: boolean;
+  invitationBannerGate?: { globallyEnabled: boolean; canaryIds: string[] };
 }): Promise<void> {
   installFetch();
   render(
     <CampaignWizard
       customHtmlEmailEnabled
       brandedCustomHtmlEnabled={props.brandedCustomHtmlEnabled}
+      invitationBannerGate={props.invitationBannerGate}
       autoSend={false}
     />,
   );
@@ -134,6 +136,41 @@ async function advanceToReviewPanel(props: {
 }
 
 describe("CampaignWizard — invitation HTML branding", () => {
+  it.each([
+    ["matching organization canary", { globallyEnabled: false, canaryIds: ["org-1"] }],
+    ["global banner", { globallyEnabled: true, canaryIds: [] }],
+  ])("uses body-only authoring when the invitation banner is enabled by %s", async (_name, invitationBannerGate) => {
+    await advanceToReviewPanel({
+      brandedCustomHtmlEnabled: false,
+      invitationBannerGate,
+    });
+
+    expect(screen.getByText("Custom HTML body (advanced)")).toBeInTheDocument();
+    expect(screen.getByText(/branding.*Coach identity.*button\/link.*footer/i)).toBeInTheDocument();
+    expect(screen.getByTestId("invitation-html-input")).toHaveAttribute(
+      "placeholder",
+      expect.stringContaining("body fragment"),
+    );
+    expect(screen.queryByText(/full HTML email/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/must include.*invitationUrl/i)).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["nonmatching canary", { globallyEnabled: false, canaryIds: ["other-org"] }],
+    ["kill-derived empty snapshot", { globallyEnabled: false, canaryIds: [] }],
+  ])("preserves full replacement authoring when the invitation banner is disabled by %s", async (_name, invitationBannerGate) => {
+    await advanceToReviewPanel({
+      brandedCustomHtmlEnabled: false,
+      invitationBannerGate,
+    });
+
+    expect(screen.getByText("Full custom HTML (advanced)")).toBeInTheDocument();
+    expect(screen.getByTestId("invitation-html-input")).toHaveAttribute(
+      "placeholder",
+      expect.stringContaining("full HTML email"),
+    );
+  });
+
   it("describes branded custom HTML as a body and summarizes it when collapsed", async () => {
     await advanceToReviewPanel({ brandedCustomHtmlEnabled: true });
 

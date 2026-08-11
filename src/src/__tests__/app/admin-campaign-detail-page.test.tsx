@@ -105,6 +105,9 @@ beforeEach(() => {
     version: { id: "v1", publishedAt: new Date("2026-01-01") },
   });
   mockCanViewGroup.mockResolvedValue(true);
+  delete process.env.WAVE_INVITATION_BANNER_ENABLED;
+  delete process.env.WAVE_INVITATION_BANNER_CANARY;
+  delete process.env.WAVE_INVITATION_BANNER_KILL;
 });
 
 describe("Admin campaign detail — auth gate", () => {
@@ -169,5 +172,43 @@ describe("Admin campaign detail — production chrome and report-native placemen
     );
     // The coach-only rollback affordance is not promoted into admin chrome.
     expect(detailProps).not.toHaveProperty("legacyOverTimeRespondentIds");
+  });
+});
+
+describe("Admin campaign detail — invitation banner authoring state", () => {
+  it("passes exact server-derived campaign enablement, including the kill switch", async () => {
+    mockGetApiActor.mockResolvedValue({ role: "ADMIN", coachId: null, userId: "u1", email: "a@x.com" });
+    mockCanManage.mockResolvedValue(true);
+    process.env.WAVE_INVITATION_BANNER_CANARY = "org-1";
+
+    await renderPage();
+    expect(detailProps).toHaveProperty("invitationBannerEnabled", true);
+
+    process.env.WAVE_INVITATION_BANNER_KILL = "1";
+    await renderPage();
+    expect(detailProps).toHaveProperty("invitationBannerEnabled", false);
+  });
+
+  it.each([
+    ["global enablement", "global"],
+    ["template canary", "template"],
+  ])("keeps PUBLIC authoring outside the universal body-only contract under %s", async (_name, mode) => {
+    mockGetApiActor.mockResolvedValue({ role: "ADMIN", coachId: null, userId: "u1", email: "a@x.com" });
+    mockCanManage.mockResolvedValue(true);
+    mockFindFirst.mockResolvedValue({
+      id: "camp-1",
+      status: "DRAFT",
+      accessMode: "PUBLIC",
+      createdByCoachId: null,
+      organizationId: null,
+      template: { alias: "rockefeller" },
+      version: { id: "v1", publishedAt: new Date("2026-01-01") },
+    });
+    if (mode === "global") process.env.WAVE_INVITATION_BANNER_ENABLED = "1";
+    else process.env.WAVE_INVITATION_BANNER_CANARY = "tpl-1";
+
+    await renderPage();
+
+    expect(detailProps).toHaveProperty("invitationBannerEnabled", false);
   });
 });

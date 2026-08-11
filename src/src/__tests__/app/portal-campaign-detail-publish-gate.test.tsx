@@ -165,12 +165,18 @@ beforeEach(() => {
   delete process.env.WAVE_REPORT_STYLES_CANARY;
   delete process.env.WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_ENABLED;
   delete process.env.WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_KILL;
+  delete process.env.WAVE_INVITATION_BANNER_ENABLED;
+  delete process.env.WAVE_INVITATION_BANNER_CANARY;
+  delete process.env.WAVE_INVITATION_BANNER_KILL;
 });
 
 afterEach(() => {
   delete process.env.WAVE_J_SUFULL_GROUP_ENABLED;
   delete process.env.WAVE_F_GROUP_REPORT_ENABLED;
   delete process.env.WAVE_REPORT_STYLES_ENABLED;
+  delete process.env.WAVE_INVITATION_BANNER_ENABLED;
+  delete process.env.WAVE_INVITATION_BANNER_CANARY;
+  delete process.env.WAVE_INVITATION_BANNER_KILL;
 });
 
 describe("CampaignDetail report appearance capability", () => {
@@ -255,6 +261,30 @@ describe("CampaignDetail email capabilities", () => {
       }),
     );
     expect(captured).not.toHaveProperty("resultsEmailContentApprovedHash");
+  });
+});
+
+describe("CampaignDetail invitation banner authoring state", () => {
+  it("passes exact server-derived campaign enablement", async () => {
+    process.env.WAVE_INVITATION_BANNER_CANARY = "tpl-1";
+    mockFindFirst.mockResolvedValue(makeCampaign());
+
+    await runPage();
+
+    expect(captured.invitationBannerEnabled).toBe(true);
+  });
+
+  it.each([
+    ["global enablement", "global"],
+    ["template canary", "template"],
+  ])("does not pass universal body-only authoring to a PUBLIC campaign under %s", async (_name, mode) => {
+    if (mode === "global") process.env.WAVE_INVITATION_BANNER_ENABLED = "1";
+    else process.env.WAVE_INVITATION_BANNER_CANARY = TEMPLATE_ID;
+    mockFindFirst.mockResolvedValue(makeCampaign({ accessMode: "PUBLIC" }));
+
+    await runPage();
+
+    expect(captured.invitationBannerEnabled).toBe(false);
   });
 });
 

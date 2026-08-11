@@ -249,13 +249,18 @@ describe("GET /api/assessment-templates", () => {
   it("coach with no active groups gets empty list", async () => {
     (getApiActor as jest.Mock).mockResolvedValue(coachActor);
     (db.accessGroupCoach.findMany as jest.Mock).mockResolvedValue([]);
+    (db.assessmentTemplate.findMany as jest.Mock).mockResolvedValue([]);
     const res = await GET(
       new Request("http://localhost/api/assessment-templates") as never,
     );
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.data).toEqual([]);
-    expect(db.assessmentTemplate.findMany).not.toHaveBeenCalled();
+    expect(db.assessmentTemplate.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: { in: [] }, deletedAt: null, disabledAt: null },
+      }),
+    );
   });
 
   it("coach: INTERSECTION — only templates granted by EVERY active group", async () => {

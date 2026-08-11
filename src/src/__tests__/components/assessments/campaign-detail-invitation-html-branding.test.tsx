@@ -94,6 +94,7 @@ const ROW: CampaignRespondentRow = {
 
 function renderDetail(input: {
   brandedCustomHtmlEnabled: boolean;
+  invitationBannerEnabled?: boolean;
   invitationBodyHtml: string | null;
   invitationSubject?: string | null;
   invitationBodyMarkdown?: string | null;
@@ -104,6 +105,7 @@ function renderDetail(input: {
       initialRespondents={[ROW]}
       customHtmlEmailEnabled
       brandedCustomHtmlEnabled={input.brandedCustomHtmlEnabled}
+      invitationBannerEnabled={input.invitationBannerEnabled}
     />,
   );
 }
@@ -132,6 +134,22 @@ afterEach(() => {
 });
 
 describe("CampaignDetail — invitation HTML branding", () => {
+  it("uses body-only copy and summary when banner ownership is enabled independently", () => {
+    renderDetail({
+      brandedCustomHtmlEnabled: false,
+      invitationBannerEnabled: true,
+      invitationBodyHtml: "<p>Coach body</p>",
+    });
+
+    expect(screen.getByText("Branded custom HTML body set for this campaign")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("email-overrides-toggle"));
+    expect(screen.getByRole("textbox", { name: "Custom HTML body (advanced)" })).toHaveAttribute(
+      "placeholder",
+      expect.stringContaining("body fragment"),
+    );
+    expect(screen.queryByText(/must include.*invitationUrl/i)).not.toBeInTheDocument();
+  });
+
   it("summarizes branded custom HTML without requiring another override", () => {
     renderDetail({
       brandedCustomHtmlEnabled: true,

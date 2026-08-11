@@ -51,9 +51,9 @@ import {
   sendAssessmentInvitationEmail,
 } from "@/services/notifications";
 import {
-  resolveCoachName,
-  resolveCoachLogo,
+  resolveInvitationCoachByline,
 } from "@/lib/assessments/invitation-email";
+import { isInvitationBannerEnabled } from "@/lib/assessments/wave-invitation-banner-flags";
 import { isInviteEmailChromeEnabled } from "@/lib/assessments/wave-p-flags";
 import {
   createStableOriginalTokenAdapter,
@@ -341,35 +341,35 @@ export async function runInviteFanout(
       },
     }));
 
-  const coachName = resolveCoachName(
-    campaign.creatorCoach ?? null,
-    campaign.organization?.owner ?? null,
+  const scope = {
+    organizationId: campaign.organizationId,
+    templateId: campaign.templateId,
+  };
+  const chrome = isInvitationBannerEnabled(scope)
+    ? "universalBanner"
+    : isInviteEmailChromeEnabled(scope)
+      ? "waveP"
+      : "legacy";
+  const coachResolution = resolveInvitationCoachByline(
+    campaign.creatorCoach
+      ? { ...campaign.creatorCoach, profileImage: campaign.creatorCoach.profileImage ?? null }
+      : null,
+    campaign.organization?.owner
+      ? { ...campaign.organization.owner, profileImage: campaign.organization.owner.profileImage ?? null }
+      : null,
   );
+  const coachByline = coachResolution.byline;
+  const coachName = coachByline.mode === "scaling_up_only" ? null : coachByline.coachName;
   const organizationName = campaign.organization?.name ?? null;
   const templateName = campaign.template?.name ?? null;
   const stableLinksEnabled = deps.isStableLinksEnabled(campaign.alias);
 
-  // Wave P — invitation-email chrome (#2.1 coach logo + #2.4 larger CTA).
-  // Flag evaluated ONCE per fan-out run; logo identity MIRRORS resolveCoachName
-  // (creator coach ?? org owner — the owner IS a Coach row).
-  const chrome = isInviteEmailChromeEnabled({
-    organizationId: campaign.organizationId,
-    templateId: campaign.templateId,
-  })
-    ? ("waveP" as const)
-    : ("legacy" as const);
-  const coachLogo = resolveCoachLogo(
-    campaign.creatorCoach ? { profileImage: campaign.creatorCoach.profileImage ?? null } : null,
-    campaign.organization?.owner
-      ? { profileImage: campaign.organization.owner.profileImage ?? null }
-      : null,
-  );
-  // PII-free observability: variant + logo-gate outcome only — NEVER the URL.
+  // PII-free observability: variant + resolved mode + gate outcome only.
   console.log("[assessment-invite-fanout] email-chrome", {
     campaignId,
     chromeVariant: chrome,
-    logoIncluded: chrome === "waveP" && coachLogo.logoRejectedReason === null,
-    logoRejectedReason: coachLogo.logoRejectedReason,
+    coachBylineMode: coachByline.mode,
+    logoRejectedReason: coachResolution.logoRejectedReason,
   });
 
   const batches = chunk(recipients, INVITE_BATCH_CAP);
@@ -452,7 +452,8 @@ export async function runInviteFanout(
           coachName,
           templateName,
           chrome,
-          coachLogoUrl: coachLogo.coachLogoUrl,
+          coachByline,
+          legacyCoachLogoUrl: coachResolution.legacyCoachLogoUrl,
           stableLinksEnabled,
         },
       ),

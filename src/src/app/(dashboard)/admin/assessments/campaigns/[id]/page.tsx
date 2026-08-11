@@ -48,6 +48,7 @@ import {
 } from "@/lib/assessments/wave-f-flags";
 import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
 import { deriveReportStylePreviewCapabilities } from "@/lib/assessments/report-style-registry";
+import { isInvitationBannerEnabled } from "@/lib/assessments/wave-invitation-banner-flags";
 
 const ADMIN_CAMPAIGNS = "/admin/assessments/campaigns";
 
@@ -144,6 +145,13 @@ export default async function AdminCampaignDetailPage({ params }: PageProps) {
         initialRespondents={respondents}
         customHtmlEmailEnabled={waveDCustomHtmlEmailEnabled()}
         brandedCustomHtmlEnabled={assessmentInviteBrandedCustomHtmlEnabled()}
+        invitationBannerEnabled={
+          campaignForFlag?.accessMode === "INVITED" &&
+          isInvitationBannerEnabled({
+            organizationId: overview.campaign.organizationId ?? undefined,
+            templateId: overview.campaign.templateId,
+          })
+        }
         resultsEmailEnabled={resultsEmailEnabled}
         resultsEmailApproved={resultsEmailApproved}
         coachNotifyEnabled={coachNotifyEnabled}

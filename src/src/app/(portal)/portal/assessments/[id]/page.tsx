@@ -40,6 +40,7 @@ import { isOnScreenResultsEnabled } from "@/lib/assessments/wave-osr-flags";
 import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
 import { deriveReportStylePreviewCapabilities } from "@/lib/assessments/report-style-registry";
 import { isAdminOwnedAssessmentPresentationEnabled } from "@/lib/assessments/wave-admin-owned-assessment-presentation-flags";
+import { isInvitationBannerEnabled } from "@/lib/assessments/wave-invitation-banner-flags";
 import {
   REPORT_COMPARISON_ALIAS,
   isReportComparisonEnabled,
@@ -224,6 +225,13 @@ export default async function CampaignDetailPage({ params }: PageProps) {
       initialRespondents={respondents}
       customHtmlEmailEnabled={waveDCustomHtmlEmailEnabled()}
       brandedCustomHtmlEnabled={assessmentInviteBrandedCustomHtmlEnabled()}
+      invitationBannerEnabled={
+        campaignForFlag?.accessMode === "INVITED" &&
+        isInvitationBannerEnabled({
+          organizationId: overview.campaign.organizationId ?? undefined,
+          templateId: overview.campaign.templateId,
+        })
+      }
       resultsEmailEnabled={resultsEmailEnabled}
       resultsEmailApproved={resultsEmailApproved}
       coachNotifyEnabled={coachNotifyEnabled}

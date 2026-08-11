@@ -43,6 +43,7 @@ import {
   DEFAULT_INVITATION_SUBJECT,
 } from "@/lib/assessments/invitation-defaults";
 import { resolveInvitationHtmlMode } from "@/lib/assessments/invitation-html-policy";
+import type { InvitationBannerAuthoringGate } from "@/lib/assessments/wave-invitation-banner-flags";
 import {
   invitationHtmlEditorCopy,
   invitationOverrideSummary,
@@ -284,6 +285,7 @@ function formatDateTimeLocal(d: Date): string {
 export function CampaignWizard({
   customHtmlEmailEnabled = false,
   brandedCustomHtmlEnabled = false,
+  invitationBannerGate,
   autoSend = false,
   resultsEmailEnabled = false,
   coachNotifyEnabled = false,
@@ -296,6 +298,8 @@ export function CampaignWizard({
   customHtmlEmailEnabled?: boolean;
   /** GH #220 — composes custom HTML inside the branded invitation shell. */
   brandedCustomHtmlEnabled?: boolean;
+  /** Serializable server-derived banner gate; contains IDs only. */
+  invitationBannerGate?: InvitationBannerAuthoringGate;
   /**
    * Wave D — gate the auto-send timing radio + the `inviteTiming` create-payload
    * field behind WAVE_D_AUTO_SEND_ENABLED (mirrors the server flag). When false
@@ -1106,6 +1110,7 @@ export function CampaignWizard({
             canActivate={Boolean(canActivate)}
             customHtmlEmailEnabled={customHtmlEmailEnabled}
             brandedCustomHtmlEnabled={brandedCustomHtmlEnabled}
+            invitationBannerGate={invitationBannerGate}
             autoSend={autoSend}
             reportStylesEnabled={
               !adminOwnedPresentation && state.templateReportStylesEnabled
@@ -2224,6 +2229,7 @@ function ReviewStep({
   onActivate,
   customHtmlEmailEnabled = false,
   brandedCustomHtmlEnabled = false,
+  invitationBannerGate,
   autoSend = false,
   reportStylesEnabled = false,
   onChange,
@@ -2236,6 +2242,7 @@ function ReviewStep({
   onActivate: () => void;
   customHtmlEmailEnabled?: boolean;
   brandedCustomHtmlEnabled?: boolean;
+  invitationBannerGate?: InvitationBannerAuthoringGate;
   /** Wave D auto-send flag — drives the consequence-labeled activate button. */
   autoSend?: boolean;
   reportStylesEnabled?: boolean;
@@ -2281,13 +2288,19 @@ function ReviewStep({
   }, [state.organizationId, state.templateId, state.respondentIds]);
 
   const ceo = respondents.find((r) => r.id === state.ceoRespondentId);
+  const invitationBannerEnabled =
+    invitationBannerGate?.globallyEnabled === true ||
+    invitationBannerGate?.canaryIds.includes(state.organizationId) === true ||
+    invitationBannerGate?.canaryIds.includes(state.templateId) === true;
+  const platformOwnsInvitationShell =
+    brandedCustomHtmlEnabled || invitationBannerEnabled;
   const invitationHtmlMode = resolveInvitationHtmlMode({
     waveDCustomHtmlEnabled: customHtmlEmailEnabled,
-    brandedCustomHtmlEnabled,
+    brandedCustomHtmlEnabled: platformOwnsInvitationShell,
     rawHtml: state.invitationBodyHtml,
   });
   const htmlEditorCopy = invitationHtmlEditorCopy({
-    brandedCustomHtmlEnabled,
+    brandedCustomHtmlEnabled: platformOwnsInvitationShell,
     htmlMode: invitationHtmlMode,
   });
   const hasSubjectOrMarkdown =
@@ -2493,7 +2506,7 @@ function ReviewStep({
                   maxLength={50000}
                   rows={10}
                   placeholder={
-                    brandedCustomHtmlEnabled
+                    platformOwnsInvitationShell
                       ? "Paste a custom HTML body fragment here, or upload an .html file above. Leave blank to use the markdown body above."
                       : "Paste your full HTML email here, or upload an .html file above. Leave blank to use the body above."
                   }
