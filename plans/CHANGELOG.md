@@ -6,6 +6,19 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="coach-profile-fields-aligned-release-ready"></a>
+### 2026-08-11 — Coach profile fields aligned, local verification complete <!-- ENTRY_ISO:2026-08-11 ENTRY_SLUG:coach-profile-fields-aligned-release-ready -->
+
+**Status: LOCAL VERIFICATION COMPLETE; not pushed, merged, deployed, or written to Production.** **Professional Title** maps to `Coach.title`; **Company Name** maps to `Coach.company`. Admin/self-profile routing, Admin BIO, Coach creation/details, Circle import, the BIO API, new landing-page defaults, and new duo-workshop setup metadata now preserve that separation. The read-only `company` fallback remains for legacy records; no migration or data rewrite occurred. Existing saved/published landing-page snapshots remain unchanged.
+
+**Regression closure.** The final mismatch sweep found one residual in the new duo-workshop setup metadata: it used a secondary Coach's `company` as the serialized `title`. A focused regression first failed with `expected Master Coach` / `received A Step Above`; the route now selects canonical `title` and uses `resolveCoachProfessionalTitle`, so new metadata uses `title → legacy company → default` without changing saved snapshots.
+
+**Fresh local evidence.** The expanded targeted command (including the Task 5 Duo snapshot suite and the residual route regression) passed **14 suites / 128 tests / 0 snapshots**. Git-derived ESLint completed with **0 errors** and eight pre-existing warnings (`no-img-element` plus two unused local bindings); migration safety approved all **47 migrations**; and `git diff --check` was silent. The full `npx jest --runInBand` gate passed **688 suites / 8,528 tests / 16 snapshots**. `CI=true npx next build --turbopack` compiled successfully, completed TypeScript, and generated **94/94** static pages. The full test stream retained established negative-path/React warning output, and the build retained the middleware-convention notice; neither failed its gate.
+
+**Visual-acceptance limitation.** A local `next dev` instance reached Ready, but the in-app browser's root navigation looped through NextAuth's configuration error because `NEXTAUTH_SECRET` and `NEXTAUTH_URL` are not configured in this worktree. No authenticated local Coach Settings, Admin Edit, Coach Details, or BIO screen could be rendered; consequently the `Master Coach` / `A Step Above` save-reload visual acceptance is **not claimed**. No credentials were attempted and no local or Production data was written.
+
+---
+
 <a id="create-assessment-welcome-parity-launched"></a>
 ### 2026-08-10 — Create assessment Welcome parity launched <!-- ENTRY_ISO:2026-08-10 ENTRY_SLUG:create-assessment-welcome-parity-launched -->
 
