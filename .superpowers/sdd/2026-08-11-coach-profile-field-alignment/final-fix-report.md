@@ -116,9 +116,8 @@ CI=true npx next build --turbopack
 
 Result: **inconclusive**. It compiled successfully, then the local harness stopped
 while `.next/diagnostics/build-diagnostics.json` still reported `type-checking`; no
-`.next/BUILD_ID` or terminal exit result was produced. This report does not claim a
-post-fix build pass. The parent agent will run the authoritative build after this
-commit.
+`.next/BUILD_ID` or terminal exit result was produced. This report does not claim
+that attempt as a pass; it is superseded by the authoritative build-fix round below.
 
 The authenticated visual-acceptance blocker is preserved: no authorized local test
 account was available, so visual acceptance is not claimed.
@@ -131,3 +130,49 @@ account was available, so visual acceptance is not claimed.
 - `src/src/__tests__/app/coach-bio-fields.test.tsx`
 - `CLAUDE.md`
 - `plans/CHANGELOG.md`
+
+## Build-fix round
+
+The parent's authoritative post-fix build supplied the RED signal:
+
+```text
+src/components/coach/coach-profile-form.tsx:24:13
+Type 'unknown' is not assignable to type 'string'
+```
+
+Root cause: the `Array.find` type predicate proved only `{ message: unknown }` even
+though its body checked for a non-empty string. The implementation now uses the
+sound predicate `{ message: string }`; no cast was added, and the existing runtime
+test continues to prove that a Zod issue-array message is preferred. No test file
+changed in this round, so the existing **688 suites / 8,531 tests / 16 snapshots**
+native JSON result remains valid.
+
+Focused GREEN command:
+
+```bash
+npx jest src/__tests__/portal/coach-profile-form.test.tsx --runInBand
+```
+
+Result: **1 suite / 5 tests / 0 snapshots passed**.
+
+Scoped ESLint command:
+
+```bash
+npx eslint src/components/coach/coach-profile-form.tsx
+```
+
+Result: exit 0; **0 errors, 1 existing `no-img-element` warning**.
+
+Authoritative persistent-PTY build command:
+
+```bash
+CI=true ./node_modules/.bin/next build --turbopack
+```
+
+Result: exit 0. Next.js 16.1.6 compiled successfully in **12.5s**, finished
+TypeScript in **26.1s**, collected page data with 7 workers, generated **94/94**
+static pages, finalized optimization, and printed the complete route table. The
+terminal retained the non-fatal middleware-convention notice, unset local Inngest
+key notices, and three expected static-generation Prisma messages for absent local
+`DATABASE_URL`; the process nevertheless reached its complete terminal conclusion
+and exited 0.

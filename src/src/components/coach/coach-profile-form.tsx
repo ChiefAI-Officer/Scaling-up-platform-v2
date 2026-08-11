@@ -16,7 +16,7 @@ function errorMessage(error: unknown, fallback: string): string {
 
     if (Array.isArray(error)) {
         const issue = error.find(
-            (item): item is { message: unknown } =>
+            (item): item is { message: string } =>
                 typeof item === "object" && item !== null && "message" in item
                 && typeof item.message === "string" && item.message.trim().length > 0,
         );
