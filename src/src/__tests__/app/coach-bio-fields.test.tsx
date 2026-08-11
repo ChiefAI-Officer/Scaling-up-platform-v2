@@ -87,4 +87,24 @@ describe("Admin BIO field semantics", () => {
     });
     expect(patchBodies[1]).not.toHaveProperty("company");
   });
+
+  it.each([
+    ["Professional Title", "Certified Coach"],
+    ["Company Name", "Growth Partners"],
+  ])("clears the saved status when %s is edited", async (fieldLabel, value) => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, data: coach }),
+    });
+
+    render(<CoachBioEditorPage />);
+    await screen.findByLabelText("Professional Title");
+
+    fireEvent.click(screen.getByRole("button", { name: "Save Bio" }));
+    expect(await screen.findByText("Coach bio profile saved.")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(fieldLabel), { target: { value } });
+
+    expect(screen.queryByText("Coach bio profile saved.")).not.toBeInTheDocument();
+  });
 });

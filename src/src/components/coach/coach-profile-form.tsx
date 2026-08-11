@@ -9,6 +9,32 @@ import { Textarea } from "@/components/ui/textarea";
 
 type CoachProfileSaveTarget = "self" | "admin";
 
+function errorMessage(error: unknown, fallback: string): string {
+    if (typeof error === "string" && error.trim()) {
+        return error;
+    }
+
+    if (Array.isArray(error)) {
+        const issue = error.find(
+            (item): item is { message: unknown } =>
+                typeof item === "object" && item !== null && "message" in item
+                && typeof item.message === "string" && item.message.trim().length > 0,
+        );
+        if (issue) {
+            return issue.message;
+        }
+    }
+
+    if (
+        typeof error === "object" && error !== null && "message" in error
+        && typeof error.message === "string" && error.message.trim()
+    ) {
+        return error.message;
+    }
+
+    return fallback;
+}
+
 interface CoachProfileFormProps {
     coachId: string;
     initialData: {
@@ -75,7 +101,7 @@ export function CoachProfileForm({
                 setProfileImage(data.url);
                 setMessage({ type: "success", text: "Photo uploaded successfully." });
             } else {
-                setMessage({ type: "error", text: data.error || "Failed to upload photo." });
+                setMessage({ type: "error", text: errorMessage(data.error, "Failed to upload photo.") });
             }
         } catch {
             setMessage({ type: "error", text: "Network error uploading photo." });
@@ -118,7 +144,7 @@ export function CoachProfileForm({
             const data = await res.json();
 
             if (!res.ok || !data.success) {
-                setMessage({ type: "error", text: data.error || "Failed to save changes." });
+                setMessage({ type: "error", text: errorMessage(data.error, "Failed to save changes.") });
                 return;
             }
 

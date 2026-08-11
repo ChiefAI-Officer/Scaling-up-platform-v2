@@ -149,4 +149,25 @@ describe("CoachProfileForm", () => {
       expect.anything(),
     );
   });
+
+  it("renders the readable Zod issue message from a failed admin save", async () => {
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: false,
+      json: async () => ({
+        success: false,
+        error: [{
+          code: "invalid_format",
+          format: "url",
+          path: ["linkedinUrl"],
+          message: "LinkedIn Profile URL must be a valid URL",
+        }],
+      }),
+    });
+
+    render(<CoachProfileForm {...defaultProps} saveTarget="admin" />);
+    fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+
+    expect(await screen.findByText("LinkedIn Profile URL must be a valid URL"))
+      .toBeInTheDocument();
+  });
 });

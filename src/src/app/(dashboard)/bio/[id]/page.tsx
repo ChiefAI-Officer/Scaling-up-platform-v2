@@ -265,7 +265,10 @@ export default function CoachBioEditorPage() {
                 <Input
                   id="professionalTitle"
                   value={professionalTitle}
-                  onChange={(event) => setProfessionalTitle(event.target.value)}
+                  onChange={(event) => {
+                    setProfessionalTitle(event.target.value);
+                    setSuccess(null);
+                  }}
                   placeholder="Scaling Up Certified Coach"
                   className="mt-1"
                 />
@@ -275,7 +278,10 @@ export default function CoachBioEditorPage() {
                 <Input
                   id="companyName"
                   value={companyName}
-                  onChange={(event) => setCompanyName(event.target.value)}
+                  onChange={(event) => {
+                    setCompanyName(event.target.value);
+                    setSuccess(null);
+                  }}
                   className="mt-1"
                 />
               </div>
