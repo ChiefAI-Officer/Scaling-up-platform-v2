@@ -49,6 +49,11 @@ describe("CampaignDetail report appearance", () => {
         canEditReportAppearance
       />,
     );
+    expect(screen.getByRole("button", { name: "Show preview" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+    expect(screen.queryByRole("img", { name: /preview/i })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("radio", { name: /Modern Dashboard/i }));
     fireEvent.click(screen.getByRole("button", { name: /Save report appearance/i }));
     await waitFor(() => expect(global.fetch).toHaveBeenCalled());
@@ -72,6 +77,7 @@ describe("CampaignDetail report appearance", () => {
       />,
     );
 
+    fireEvent.click(screen.getByRole("button", { name: "Show preview" }));
     expect(
       screen.getByRole("img", { name: "Classic Cover preview" }),
     ).toHaveAttribute(

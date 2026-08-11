@@ -235,21 +235,17 @@ function DefaultReportAppearanceCard({
       <p className="text-[0.6875rem] text-muted-foreground" style={{ marginBottom: "1rem" }}>
         This default is copied into future campaigns only. Existing campaigns and reports do not change.
       </p>
-      <fieldset
-        disabled={templateRowSaving}
-        aria-busy={templateRowSaving}
-        className="min-w-0 border-0 p-0"
-      >
-        <legend className="sr-only">Default report appearance options</legend>
+      <div aria-busy={templateRowSaving} className="min-w-0">
         <ReportStylePicker
           value={selectedStyle}
           onChange={templateRowSaving ? () => {} : setSelectedStyle}
+          disabled={templateRowSaving}
           previewAnatomy={resolveReportStylePreviewAnatomy({
             templateAlias,
             capabilities: previewCapabilities,
           })}
         />
-      </fieldset>
+      </div>
       <div className="mt-4 flex items-center gap-3">
         <button
           type="button"

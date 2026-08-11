@@ -81,6 +81,11 @@ describe("admin default report appearance", () => {
     expect(within(defaultAppearance).getByText("Default report appearance")).toBeInTheDocument();
     expect(within(defaultAppearance).getByText(/future campaigns only/i)).toBeInTheDocument();
     expect(within(defaultAppearance).getByRole("button", { name: "Save default" })).toBeInTheDocument();
+    expect(within(defaultAppearance).getByRole("button", { name: "Show preview" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+    expect(within(defaultAppearance).queryByRole("img", { name: /preview/i })).not.toBeInTheDocument();
 
     expect(screen.getByRole("tab", { name: "Preview" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Settings" })).toBeInTheDocument();
@@ -104,8 +109,10 @@ describe("admin default report appearance", () => {
       questions: [{ stableKey: "confidence", type: "SLIDER_LIKERT" }],
     })} />);
 
+    const card = screen.getByTestId("settings-default-report-style-card");
+    fireEvent.click(within(card).getByRole("button", { name: "Show preview" }));
     expect(
-      within(screen.getByTestId("settings-default-report-style-card")).getByRole(
+      within(card).getByRole(
         "img",
         { name: "Classic Cover preview" },
       ),
@@ -121,8 +128,10 @@ describe("admin default report appearance", () => {
       questions: [{ stableKey: "reflection", type: "TEXT" }],
     })} />);
 
+    const card = screen.getByTestId("settings-default-report-style-card");
+    fireEvent.click(within(card).getByRole("button", { name: "Show preview" }));
     expect(
-      within(screen.getByTestId("settings-default-report-style-card")).getByRole(
+      within(card).getByRole(
         "img",
         { name: "Classic Cover preview" },
       ),
@@ -148,6 +157,7 @@ describe("admin default report appearance", () => {
     const boardroom = within(card).getByRole("radio", { name: /executive boardroom/i });
     const dashboard = within(card).getByRole("radio", { name: /modern dashboard/i });
     fireEvent.click(boardroom);
+    fireEvent.click(within(card).getByRole("button", { name: "Show preview" }));
     fireEvent.click(within(card).getByRole("button", { name: "Save default" }));
 
     await waitFor(() => {
@@ -157,6 +167,7 @@ describe("admin default report appearance", () => {
     expect(
       within(card).queryByText(/changes are unavailable after the first completed response/i),
     ).toBeNull();
+    expect(within(card).getByRole("button", { name: "Hide preview" })).toBeEnabled();
 
     fireEvent.click(dashboard);
     expect(boardroom).toBeChecked();
