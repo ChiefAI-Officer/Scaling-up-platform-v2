@@ -6,6 +6,24 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="report-preview-disclosure-locally-verified"></a>
+### 2026-08-11 — Report preview disclosure locally verified <!-- ENTRY_ISO:2026-08-11 ENTRY_SLUG:report-preview-disclosure-locally-verified -->
+
+**Status and scope.** **LOCALLY IMPLEMENTED AND VERIFIED; not pushed, merged,
+deployed, or enabled on Production.** Every existing Report Appearance picker
+now uses compact three-column style tiles and starts with preview assets hidden.
+Show preview mounts the accessible Cover/Summary/Detail experience on demand;
+Hide preview unloads it without changing selection or same-visit tab state.
+Simplified public-campaign creation and summary-only Campaign Detail views remain
+unchanged because they intentionally expose no picker.
+
+**Verification evidence.** The shared picker plus Coach wizard/detail, Admin
+template Settings, legacy public-campaign manager, and simplified public-create
+focused suites passed. Changed-file ESLint, migration safety, and the
+Production-matching Turbopack build passed. Authenticated visual review covered
+Admin template Settings, Coach Report Setup, and editable Campaign Detail at
+1280px and 393px. No Production or customer data was changed.
+
 <a id="create-assessment-welcome-parity-launched"></a>
 ### 2026-08-10 — Create assessment Welcome parity launched <!-- ENTRY_ISO:2026-08-10 ENTRY_SLUG:create-assessment-welcome-parity-launched -->
 
