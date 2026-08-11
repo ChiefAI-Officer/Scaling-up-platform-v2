@@ -74,11 +74,17 @@ const MISPLACED_HTML = '<img src="{{invitationUrl}}" alt="x" />';
 
 const ORIGINAL_FLAG = process.env.WAVE_D_CUSTOM_HTML_EMAIL_ENABLED;
 const ORIGINAL_BRANDED_FLAG = process.env.ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED;
+const ORIGINAL_BANNER_FLAG = process.env.WAVE_INVITATION_BANNER_ENABLED;
+const ORIGINAL_BANNER_CANARY = process.env.WAVE_INVITATION_BANNER_CANARY;
+const ORIGINAL_BANNER_KILL = process.env.WAVE_INVITATION_BANNER_KILL;
 
 beforeEach(() => {
   jest.clearAllMocks();
   delete process.env.WAVE_D_CUSTOM_HTML_EMAIL_ENABLED;
   delete process.env.ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED;
+  delete process.env.WAVE_INVITATION_BANNER_ENABLED;
+  delete process.env.WAVE_INVITATION_BANNER_CANARY;
+  delete process.env.WAVE_INVITATION_BANNER_KILL;
   (getApiActor as jest.Mock).mockResolvedValue(coachActor);
   (db.accessGroupCoach.findMany as jest.Mock).mockResolvedValue([
     { accessGroupId: "g1", coachId: "coach-1", accessGroup: { id: "g1", deletedAt: null } },
@@ -111,6 +117,12 @@ afterAll(() => {
   } else {
     process.env.ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED = ORIGINAL_BRANDED_FLAG;
   }
+  if (ORIGINAL_BANNER_FLAG === undefined) delete process.env.WAVE_INVITATION_BANNER_ENABLED;
+  else process.env.WAVE_INVITATION_BANNER_ENABLED = ORIGINAL_BANNER_FLAG;
+  if (ORIGINAL_BANNER_CANARY === undefined) delete process.env.WAVE_INVITATION_BANNER_CANARY;
+  else process.env.WAVE_INVITATION_BANNER_CANARY = ORIGINAL_BANNER_CANARY;
+  if (ORIGINAL_BANNER_KILL === undefined) delete process.env.WAVE_INVITATION_BANNER_KILL;
+  else process.env.WAVE_INVITATION_BANNER_KILL = ORIGINAL_BANNER_KILL;
 });
 
 describe("POST /api/assessment-campaigns — invitationBodyHtml validate-on-save (#20)", () => {
@@ -187,6 +199,45 @@ describe("POST /api/assessment-campaigns — invitationBodyHtml validate-on-save
         invitationBodyHtml: "<p>No URL token</p>",
       }) as never,
     );
+    expect(response.status).toBe(400);
+    expect(db.assessmentCampaign.create).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["global enablement", "global", "ignored"],
+    ["organization canary", "canary", "org-1"],
+    ["template canary", "canary", "tpl-1"],
+  ])("universal banner %s accepts body-only HTML with GH220 off", async (_name, mode, value) => {
+    process.env.WAVE_D_CUSTOM_HTML_EMAIL_ENABLED = "1";
+    delete process.env.ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED;
+    if (mode === "global") process.env.WAVE_INVITATION_BANNER_ENABLED = "1";
+    else process.env.WAVE_INVITATION_BANNER_CANARY = value;
+
+    const response = await POST(
+      jsonReq({ ...validBody, invitationBodyHtml: NO_TOKEN_HTML }) as never,
+    );
+
+    expect(response.status).toBe(201);
+    expect(db.assessmentCampaign.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ invitationBodyHtml: NO_TOKEN_HTML }),
+      }),
+    );
+  });
+
+  it.each([
+    ["flag off", undefined, undefined],
+    ["nonmatching canary", "other-org", undefined],
+    ["kill switch", "org-1", "1"],
+  ])("universal banner %s retains the URL-token requirement", async (_name, canary, kill) => {
+    process.env.WAVE_D_CUSTOM_HTML_EMAIL_ENABLED = "1";
+    if (canary) process.env.WAVE_INVITATION_BANNER_CANARY = canary;
+    if (kill) process.env.WAVE_INVITATION_BANNER_KILL = kill;
+
+    const response = await POST(
+      jsonReq({ ...validBody, invitationBodyHtml: NO_TOKEN_HTML }) as never,
+    );
+
     expect(response.status).toBe(400);
     expect(db.assessmentCampaign.create).not.toHaveBeenCalled();
   });

@@ -47,6 +47,7 @@ import {
   slidesAuditMeta,
 } from "@/lib/assessments/custom-slides-write";
 import { Prisma } from "@prisma/client";
+import { isInvitationBannerEnabled } from "@/lib/assessments/wave-invitation-banner-flags";
 
 function withoutInvitedWelcomeSnapshot<
   T extends { invitedWelcomeSnapshot?: unknown },
@@ -404,6 +405,7 @@ export async function PATCH(
       select: {
         id: true,
         status: true,
+        organizationId: true,
         templateId: true,
         reportStyleLockedAt: true,
         versionId: true,
@@ -492,7 +494,13 @@ export async function PATCH(
           );
         }
         const placement = validateInvitationHtml(rawHtml, {
-          requireUrlToken: !assessmentInviteBrandedCustomHtmlEnabled(),
+          requireUrlToken: !(
+            assessmentInviteBrandedCustomHtmlEnabled() ||
+            isInvitationBannerEnabled({
+              organizationId: campaign.organizationId,
+              templateId: campaign.templateId,
+            })
+          ),
         });
         if (!placement.ok) {
           return NextResponse.json(
