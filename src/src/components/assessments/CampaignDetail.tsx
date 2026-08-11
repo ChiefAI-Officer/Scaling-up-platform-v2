@@ -104,6 +104,8 @@ export interface CampaignDetailProps {
   customHtmlEmailEnabled?: boolean;
   /** GH #220 — server-computed branded HTML-body mode; defaults fail-closed. */
   brandedCustomHtmlEnabled?: boolean;
+  /** Server-computed effective banner enablement for this persisted campaign. */
+  invitationBannerEnabled?: boolean;
   /** Server-computed results-email capability; absent/false fails closed. */
   resultsEmailEnabled?: boolean;
   /** Server-computed results-email approval; absent/false fails closed. */
@@ -260,6 +262,7 @@ export function CampaignDetail({
   initialRespondents,
   customHtmlEmailEnabled = false,
   brandedCustomHtmlEnabled = false,
+  invitationBannerEnabled = false,
   resultsEmailEnabled = false,
   resultsEmailApproved = false,
   coachNotifyEnabled = false,
@@ -371,19 +374,21 @@ export function CampaignDetail({
   );
   const [reportStyleSaving, setReportStyleSaving] = useState(false);
 
+  const platformOwnsInvitationShell =
+    brandedCustomHtmlEnabled || invitationBannerEnabled;
   const invitationHtmlMode = resolveInvitationHtmlMode({
     waveDCustomHtmlEnabled: customHtmlEmailEnabled,
-    brandedCustomHtmlEnabled,
+    brandedCustomHtmlEnabled: platformOwnsInvitationShell,
     rawHtml: emailHtml,
   });
   const persistedInvitationHtmlMode = resolveInvitationHtmlMode({
     waveDCustomHtmlEnabled: customHtmlEmailEnabled,
-    brandedCustomHtmlEnabled,
+    brandedCustomHtmlEnabled: platformOwnsInvitationShell,
     rawHtml: persistedHtml,
   });
   const emailHtmlChanged = emailHtml !== persistedHtml;
   const htmlEditorCopy = invitationHtmlEditorCopy({
-    brandedCustomHtmlEnabled,
+    brandedCustomHtmlEnabled: platformOwnsInvitationShell,
     htmlMode: invitationHtmlMode,
   });
 
@@ -1962,7 +1967,7 @@ export function CampaignDetail({
                     maxLength={50000}
                     rows={10}
                     placeholder={
-                      brandedCustomHtmlEnabled
+                      platformOwnsInvitationShell
                         ? "Paste a custom HTML body fragment here, or upload an .html file above. Leave blank to use the markdown body above."
                         : "Paste your full HTML email here, or upload an .html file above. Leave blank to use the body above."
                     }

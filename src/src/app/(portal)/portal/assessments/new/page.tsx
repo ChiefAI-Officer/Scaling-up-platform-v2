@@ -17,6 +17,7 @@ import { isCustomSlidesEnabled } from "@/lib/assessments/wave-m-flags";
 import { isWaveQAdminControlsEnabled } from "@/lib/assessments/wave-q-flags";
 import { isOnScreenResultsEnabled } from "@/lib/assessments/wave-osr-flags";
 import { isAdminOwnedAssessmentPresentationEnabled } from "@/lib/assessments/wave-admin-owned-assessment-presentation-flags";
+import { getInvitationBannerAuthoringGate } from "@/lib/assessments/wave-invitation-banner-flags";
 
 export default async function NewCampaignPage() {
   await requireCoach();
@@ -43,6 +44,7 @@ export default async function NewCampaignPage() {
       <CampaignWizard
         customHtmlEmailEnabled={customHtmlEmailEnabled}
         brandedCustomHtmlEnabled={brandedCustomHtmlEnabled}
+        invitationBannerGate={getInvitationBannerAuthoringGate()}
         autoSend={autoSend}
         resultsEmailEnabled={resultsEmailEnabled}
         coachNotifyEnabled={coachNotifyEnabled}

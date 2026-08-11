@@ -105,6 +105,9 @@ beforeEach(() => {
     version: { id: "v1", publishedAt: new Date("2026-01-01") },
   });
   mockCanViewGroup.mockResolvedValue(true);
+  delete process.env.WAVE_INVITATION_BANNER_ENABLED;
+  delete process.env.WAVE_INVITATION_BANNER_CANARY;
+  delete process.env.WAVE_INVITATION_BANNER_KILL;
 });
 
 describe("Admin campaign detail — auth gate", () => {
@@ -169,5 +172,20 @@ describe("Admin campaign detail — production chrome and report-native placemen
     );
     // The coach-only rollback affordance is not promoted into admin chrome.
     expect(detailProps).not.toHaveProperty("legacyOverTimeRespondentIds");
+  });
+});
+
+describe("Admin campaign detail — invitation banner authoring state", () => {
+  it("passes exact server-derived campaign enablement, including the kill switch", async () => {
+    mockGetApiActor.mockResolvedValue({ role: "ADMIN", coachId: null, userId: "u1", email: "a@x.com" });
+    mockCanManage.mockResolvedValue(true);
+    process.env.WAVE_INVITATION_BANNER_CANARY = "org-1";
+
+    await renderPage();
+    expect(detailProps).toHaveProperty("invitationBannerEnabled", true);
+
+    process.env.WAVE_INVITATION_BANNER_KILL = "1";
+    await renderPage();
+    expect(detailProps).toHaveProperty("invitationBannerEnabled", false);
   });
 });
