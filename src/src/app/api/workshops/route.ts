@@ -9,6 +9,7 @@ import { generateUniqueWorkshopCode } from "@/lib/workshops/workshop-code";
 import { sendWorkshopRequestedEmail } from "@/services/notifications";
 import { parseWorkshopCouponsInput, serializeWorkshopCoupons } from "@/lib/workshops/workshop-coupons";
 import { createWorkshopPromotionCode } from "@/services/stripe";
+import { resolveCoachProfessionalTitle } from "@/lib/coaches/coach-profile-fields";
 
 function normalizeOptionalString(value: unknown): string | undefined {
   if (typeof value !== "string") {
@@ -248,6 +249,7 @@ export async function POST(request: NextRequest) {
           lastName: string;
           email: string;
           profileImage: string | null;
+          title: string | null;
           company: string | null;
         }
       | null = null;
@@ -261,6 +263,7 @@ export async function POST(request: NextRequest) {
           lastName: true,
           email: true,
           profileImage: true,
+          title: true,
           company: true,
         },
       });
@@ -403,7 +406,7 @@ export async function POST(request: NextRequest) {
               ? {
                   id: secondaryCoachSnapshot.id,
                   name: `${secondaryCoachSnapshot.firstName} ${secondaryCoachSnapshot.lastName}`,
-                  title: secondaryCoachSnapshot.company || "Scaling Up Certified Coach",
+                  title: resolveCoachProfessionalTitle(secondaryCoachSnapshot),
                   photo: secondaryCoachSnapshot.profileImage,
                 }
               : null,
