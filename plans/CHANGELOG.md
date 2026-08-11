@@ -6,6 +6,19 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="universal-invitation-banner-dark-merge"></a>
+### 2026-08-11 — Universal invitation banner implemented, dark and locally verified <!-- ENTRY_ISO:2026-08-11 ENTRY_SLUG:universal-invitation-banner-dark-merge -->
+
+**Status: IMPLEMENTED + LOCALLY VERIFIED + DEFAULT-OFF; not deployed or activated.** The universal banner is guarded by absent/default-off `WAVE_INVITATION_BANNER_ENABLED`, `WAVE_INVITATION_BANNER_CANARY`, and `WAVE_INVITATION_BANNER_KILL`; KILL overrides global enablement, which overrides an exact Organization-ID or Template-ID canary. The feature reaches only INVITED initial/manual sends, automatic fan-out, reminders, and resends. PUBLIC campaign paths, results/report emails, report-email rendering, recipient lifecycle, schema, and stored content are excluded. When the banner is active, permitted campaign custom HTML is always a sanitized body fragment inside the platform-owned shell; it does not set or synchronize `ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED`. The operator sequence and no-data-mutation rollback are documented in [the Wave D ops runbook](../docs/specs/v7.6/17d-ops-runbook.md#universal-invitation-banner--dark-rollout-and-rollback). Canonical design: [universal invitation banner design](../docs/superpowers/specs/2026-08-10-universal-invitation-email-banner-design.md); implementation plan: [universal invitation banner plan](../docs/superpowers/plans/2026-08-10-universal-invitation-email-banner.md).
+
+**Fresh local evidence.** The prescribed focused command passed **14 suites / 301 tests / 1 snapshot**. Migration safety approved all **47 migrations**; changed-file ESLint emitted no diagnostics; the branch-local nullable Organization-ID TypeScript regression was corrected and its detail-route suite passed **1 suite / 40 tests**. The Production-equivalent `CI=true npx next build --turbopack` compiled, completed its TypeScript phase, and generated **94/94** static pages. The complete Jest command passed **685 suites / 8,555 tests / 16 snapshots**. The suite retained established test-intent console output (including mocked SMTP failures and React `act(...)` warnings); the build retained expected missing local `DATABASE_URL` and Inngest-key messages without failing.
+
+**Known repository limitation.** Standalone `npx tsc --noEmit` remains nonzero with **422 diagnostics across 70 broad test/config files**. This is a pre-existing repository-wide condition recorded in prior receipts; after correcting the only branch-local nullable-Organization diagnostic, the full Next/Turbopack TypeScript phase and every focused/full Jest suite completed successfully. It is not represented as a passing standalone TypeScript gate.
+
+**Production boundary.** No Production flag was read or mutated, no deployment occurred, no database write was made, and no customer email was sent. The read-only custom-HTML override audit with actual current flags, manual review of each live override, seven synthetic visual captures, one exact test canary, Ready/health validation, organic PII-free telemetry, and separate authorization before global enablement remain required rollout work. No launch or Production verification is claimed.
+
+---
+
 <a id="create-assessment-welcome-parity-launched"></a>
 ### 2026-08-10 — Create assessment Welcome parity launched <!-- ENTRY_ISO:2026-08-10 ENTRY_SLUG:create-assessment-welcome-parity-launched -->
 

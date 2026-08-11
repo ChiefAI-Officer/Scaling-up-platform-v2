@@ -196,6 +196,116 @@ causes stored custom HTML to be ignored.
 
 ---
 
+## Universal invitation banner — dark rollout and rollback
+
+This is a separate, **default-off** presentation gate for the INVITED invitation
+family. It has no schema, stored-content, recipient, invitation-lifecycle, or
+database-write component. It changes only newly rendered invitation email HTML/text
+after a separately authorized deployment and flag change.
+
+### Gate contract and exact canary formats
+
+| Variable | Meaning when set to a truthy value (`1`, `true`, `TRUE`, or `yes`) |
+|---------|--------------------------------------------------------------------|
+| `WAVE_INVITATION_BANNER_KILL` | Forces the universal banner off everywhere. |
+| `WAVE_INVITATION_BANNER_ENABLED` | Enables the universal banner globally. |
+| `WAVE_INVITATION_BANNER_CANARY` | Enables it only for an exact Organization ID or Template ID. |
+
+Precedence is **KILL → ENABLED → exact Organization/Template canary**: a truthy
+KILL wins over both other levers; otherwise a truthy ENABLED wins globally; otherwise
+the comma- or whitespace-separated CANARY allowlist is checked. Canary values are
+literal IDs, not names, aliases, prefixes, or substring matches. For example:
+
+```bash
+WAVE_INVITATION_BANNER_CANARY="org_123 tpl_456,org_789"
+```
+
+matches only those three exact Organization/Template IDs. An unset, empty, or
+unmatched allowlist remains off. Keep the global ENABLED variable unset/off during a
+canary; remove the exact ID from CANARY (or set KILL) to contain it.
+
+### Scope, ownership, and observability
+
+When enabled for a campaign, the banner reaches these **INVITED** paths only:
+
+- initial/manual bulk invite (`/api/assessment-campaigns/[id]/invite`);
+- automatic Inngest `assessment-invite-fanout` delivery;
+- campaign reminders; and
+- single-invitation resend.
+
+PUBLIC campaign creation/submission paths, respondent results/report emails, and
+report-email rendering are excluded and must remain unchanged. The banner has no
+editor control: the platform owns the banner, CTA, visible fallback URL, and footer.
+
+For a banner-enabled campaign, non-empty custom HTML is always rendered as a
+sanitized **body-only** fragment inside the universal shell when the existing
+`WAVE_D_CUSTOM_HTML_EMAIL_ENABLED` capability permits custom HTML. It deliberately
+does **not** require, set, or synchronize
+`ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED`; that older flag retains its normal
+meaning only when the universal banner is inactive.
+
+Inspect only PII-free delivery metadata while validating organic sends. The initial,
+fan-out, reminder, and resend paths log an `email-chrome` event with the relevant
+campaign (and resend invitation) ID, `chromeVariant`, `coachBylineMode`, and
+`logoRejectedReason`. The mail telemetry retains
+`type=assessment_invitation`, ID-only campaign/invitation/respondent references,
+`renderer`, `subjectSource`, `bodySource`, `defaultVersion`, `coachBylineMode`, and
+custom-HTML mode/fallback reason where applicable. Do not use or add raw Coach names,
+image URLs, respondent values, invitation URLs, credentials, or authored HTML to
+observability queries.
+
+### Safe operator sequence (separate authorization required)
+
+1. Merge/deploy dark with all three banner variables absent/default-off. Do not infer
+   rollout approval from a successful dark deployment.
+2. Read the actual currently-effective flags through the approved Production operator
+   access path, then run the existing audit against a supplied **read-only** database
+   URL. It rejects `DATABASE_URL`/`DIRECT_URL` and sets `SET TRANSACTION READ ONLY`:
+
+   ```bash
+   WAVE_D_CUSTOM_HTML_EMAIL_ENABLED="$CURRENT_WAVE_D_CUSTOM_HTML_EMAIL_ENABLED" \
+   ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED="$CURRENT_ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED" \
+   AUDIT_READONLY_URL="$GH220_READONLY_DATABASE_URL" \
+   npm run audit:invitation-html-overrides
+   ```
+
+   Substitute the exact observed current values; never paste a connection string or
+   flag secret into the command history, ticket, log, or receipt.
+3. Manually review **every live** override reported by the audit (soft-deleted rows
+   are context, not activation approval). Stop if any live override is unreviewed.
+4. Capture and inspect all seven synthetic visual states without SMTP, database, or
+   route invocation:
+
+   ```bash
+   preview_dir="$(mktemp -d)"
+   npm run capture:invitation-banner -- "$preview_dir"
+   find "$preview_dir" -maxdepth 1 -type f -print | sort
+   ```
+
+   Inspect image+name, name-only, Scaling-Up-only, custom-HTML, desktop, mobile,
+   long-name, and image-blocked coverage represented by the seven fixtures. Do not
+   commit generated captures without separately approved documentation scope.
+5. After separate authorization, set CANARY to one exact non-customer test
+   Organization or Template ID, keep global ENABLED off, and redeploy. Do not send a
+   customer invitation to exercise the canary.
+6. Confirm the exact deployment is **Ready**, owns the intended aliases, and reports
+   healthy database/auth posture. Then observe the organic-send PII-free metadata
+   above for the canary. Do not manufacture a customer email solely for validation.
+7. Obtain a new, explicit authorization before any global
+   `WAVE_INVITATION_BANNER_ENABLED` enablement. A canary result is not global-enable
+   authority.
+
+### Banner rollback
+
+Contain immediately by setting `WAVE_INVITATION_BANNER_KILL=1` and redeploying. For
+a bounded rollback, disable global ENABLED and/or remove the exact CANARY ID, then
+redeploy. KILL takes effect ahead of a global or canary match. Either path restores
+the existing Wave-P/legacy composition selection for subsequent renders, including
+the normal GH #220 custom-HTML behavior. No data mutation, migration rollback, outbox
+replay, resend, or content rewrite is required or authorized for this rollback.
+
+---
+
 ## Rollback
 
 > **IMPORTANT: A bare "promote previous deployment" is NOT a clean rollback.**
