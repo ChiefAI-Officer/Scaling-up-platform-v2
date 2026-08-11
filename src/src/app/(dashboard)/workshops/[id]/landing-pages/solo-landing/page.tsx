@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SoloLandingPageTemplate, SAMPLE_WORKSHOP_SOLO } from "@/components/templates/solo-landing-page-template";
 import { formatZoneAbbrev, formatTimeWithZone } from "@/lib/utils";
 import { CustomHtmlPanel } from "@/components/workshops/custom-html-panel";
+import { resolveCoachProfessionalTitle } from "@/lib/coaches/coach-profile-fields";
 
 interface SoloLandingData {
   coachPhoto: string;
@@ -121,6 +122,7 @@ export default function SoloLandingEditor() {
             ...prev,
             coachName: `${w.coach.firstName} ${w.coach.lastName}`,
             coachPhoto: w.coach.profileImage || "",
+            coachTitle: resolveCoachProfessionalTitle(w.coach),
             eventDay: eventDate.toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" }),
             eventDate: eventDate.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" }),
             eventTime: formatTimeWithZone(w.eventTime || "12:00 PM - 1:00 PM", w.eventDate, w.timezone),

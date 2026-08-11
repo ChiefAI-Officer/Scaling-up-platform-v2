@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DuoLandingPageTemplate, SAMPLE_WORKSHOP_DUO } from "@/components/templates/duo-landing-page-template";
 import { CustomHtmlPanel } from "@/components/workshops/custom-html-panel";
+import { resolveCoachProfessionalTitle } from "@/lib/coaches/coach-profile-fields";
 
 interface Coach {
   name: string;
@@ -20,6 +21,7 @@ interface CoachBioProfile {
   id: string;
   name: string;
   title: string;
+  company: string | null;
   photoUrl: string;
   createdAt: string;
   editUrl: string;
@@ -112,7 +114,7 @@ const DEFAULT_DATA: DuoLandingData = {
 function mapProfileToCoach(profile: CoachBioProfile): Coach {
   return {
     name: profile.name,
-    title: profile.title || "Scaling Up Certified Coach",
+    title: resolveCoachProfessionalTitle(profile),
     photo: profile.photoUrl || "",
   };
 }
@@ -192,7 +194,7 @@ export default function DuoLandingEditor() {
           nextData.coach1 = {
             name: `${w.coach.firstName} ${w.coach.lastName}`.trim(),
             photo: w.coach.profileImage || "",
-            title: w.coach.company || "Scaling Up Certified Coach",
+            title: resolveCoachProfessionalTitle(w.coach),
           };
           nextData.eventDate = eventDate.toLocaleDateString("en-US", {
             weekday: "long",

@@ -11,6 +11,7 @@ describe("coach profile field semantics", () => {
       "src/components/coach/coach-profile-form.tsx",
       "src/app/(dashboard)/bio/page.tsx",
       "src/app/(dashboard)/bio/[id]/page.tsx",
+      "src/app/(dashboard)/workshops/[id]/landing-pages/bio-page/page.tsx",
     ];
     for (const file of files) {
       expect(source(file)).not.toContain("Title / Credentials");
@@ -48,5 +49,17 @@ describe("coach profile field semantics", () => {
     expect(sync).toContain("updateData.title = profile.title.trim()");
     expect(sync).not.toContain("updateData.company = profile.title");
     expect(sync).not.toContain('fieldsUpdated.push("company")');
+  });
+
+  it("uses the canonical resolver for landing-page title defaults", () => {
+    const files = [
+      "src/app/(dashboard)/workshops/[id]/landing-pages/bio-page/page.tsx",
+      "src/app/(dashboard)/workshops/[id]/landing-pages/solo-landing/page.tsx",
+      "src/app/(dashboard)/workshops/[id]/landing-pages/duo-landing/page.tsx",
+    ];
+    for (const file of files) {
+      expect(source(file)).toContain("resolveCoachProfessionalTitle");
+    }
+    expect(source(files[2])).not.toMatch(/title:\s*w\.coach\.company/);
   });
 });
