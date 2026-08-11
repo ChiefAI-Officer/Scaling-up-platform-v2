@@ -34,6 +34,10 @@ import Link from "next/link";
 import React, { useEffect, useState } from "react";
 
 import { LANGUAGE_LABELS } from "./enum-labels";
+import {
+  PeerBenchmarksPanel,
+  type PeerBenchmarkRow,
+} from "@/components/assessments/PeerBenchmarksPanel";
 import { ReportStylePicker } from "@/components/assessments/ReportStylePicker";
 import {
   resolveReportStylePreviewAnatomy,
@@ -79,6 +83,7 @@ export type SettingsRowPatch = Partial<{
 }>;
 
 export interface SettingsTabProps {
+  templateId: string;
   templateValues: SettingsTabTemplateValues;
   /** Version-level language (real stored value, e.g. `enUS`). */
   language: string;
@@ -105,6 +110,12 @@ export interface SettingsTabProps {
   reportStylesEnabled?: boolean;
   /** Canonical report family + stored version-question capabilities. */
   reportStylePreviewCapabilities: ReportStylePreviewCapabilities;
+  /**
+   * Wave S — server-resolved LVA rows. Null/omitted means the capability is
+   * unavailable for this template; an array mounts the existing editor here
+   * instead of below the whole tabbed shell.
+   */
+  peerBenchmarkRows?: PeerBenchmarkRow[] | null;
 }
 
 // ────────────────────────────────────────────────────────────────────────
@@ -139,6 +150,7 @@ const coerceNull = (v: string): string | null => (v.length > 0 ? v : null);
 // Component
 // ────────────────────────────────────────────────────────────────────────
 export function SettingsTab({
+  templateId,
   templateValues,
   language,
   isReadOnly,
@@ -153,6 +165,7 @@ export function SettingsTab({
   waveQEnabled,
   reportStylesEnabled = false,
   reportStylePreviewCapabilities,
+  peerBenchmarkRows = null,
 }: SettingsTabProps) {
   return (
     <div className="space-y-6 max-w-2xl">
@@ -171,6 +184,9 @@ export function SettingsTab({
           templateRowSaving={templateRowSaving}
           templateRowError={templateRowError}
         />
+      )}
+      {peerBenchmarkRows && (
+        <PeerBenchmarksPanel templateId={templateId} rows={peerBenchmarkRows} />
       )}
       <LanguageCard
         language={language}

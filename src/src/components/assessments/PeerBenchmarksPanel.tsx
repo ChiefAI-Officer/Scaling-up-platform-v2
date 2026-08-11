@@ -104,11 +104,12 @@ export function PeerBenchmarksPanel({
 
   return (
     <section
-      className="border border-border rounded-lg bg-card p-4 space-y-4"
+      className="wf-card space-y-4"
+      style={{ padding: "1.5rem" }}
       data-testid="peer-benchmarks-panel"
     >
       <div className="space-y-1">
-        <h2 className="text-sm font-semibold text-foreground">Peer averages</h2>
+        <h2 className="wf-card-title">Peer averages</h2>
         <p className="text-sm text-muted-foreground">
           Peer averages render on LVA reports. Blank = the factor shows no peer
           comparison.

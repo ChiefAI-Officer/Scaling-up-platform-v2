@@ -48,7 +48,6 @@ import {
   getQuestionBenchmarks,
 } from "@/lib/assessments/peer-benchmarks";
 import {
-  PeerBenchmarksPanel,
   type PeerBenchmarkRow,
 } from "@/components/assessments/PeerBenchmarksPanel";
 
@@ -334,10 +333,10 @@ export default async function AdminAssessmentVersionEditPage({
         // the flag is off or nothing is published. TabbedShell holds it;
         // the Preview tab (Task 6) consumes it.
         activePreview={activePreview}
+        // Wave S — rows exist only when the feature is effective and the
+        // immutable template alias is LVA. Settings owns their placement.
+        peerBenchmarkRows={peerBenchmarkRows}
       />
-      {peerBenchmarkRows && (
-        <PeerBenchmarksPanel templateId={template.id} rows={peerBenchmarkRows} />
-      )}
     </div>
   );
 }
