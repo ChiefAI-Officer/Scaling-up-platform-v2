@@ -72,7 +72,7 @@ function documentFor(html: string): string {
 
 function manifestHtml(): string {
   const figures = cases.map(({ filename, label }) => `<figure><img src="${filename}" alt="${label}"><figcaption>${label}</figcaption></figure>`).join("\n");
-  return `<!doctype html><html data-renderer="buildInvitationEmailShell"><head><meta charset="utf-8"><title>Invitation banner previews</title><style>body{font-family:Arial,sans-serif;margin:24px;background:#f3f4f6}figure{background:#fff;border:1px solid #ddd;padding:16px;margin:20px 0}img{max-width:100%;height:auto;display:block}figcaption{margin-top:10px} </style></head><body><h1>Universal invitation banner previews</h1><p>Renderer: buildInvitationEmailShell. Byline label: Your coach.</p>${figures}</body></html>`;
+  return `<!doctype html><html data-renderer="buildInvitationEmailShell" data-assertions="byline-state,cta,fallback,footer,no-horizontal-overflow"><head><meta charset="utf-8"><title>Invitation banner previews</title><style>body{font-family:Arial,sans-serif;margin:24px;background:#f3f4f6}figure{background:#fff;border:1px solid #ddd;padding:16px;margin:20px 0}img{max-width:100%;height:auto;display:block}figcaption{margin-top:10px} </style></head><body><h1>Universal invitation banner previews</h1><p>Renderer: buildInvitationEmailShell. Byline label: Your coach.</p>${figures}</body></html>`;
 }
 
 async function assertPng(path: string): Promise<void> {
@@ -114,7 +114,17 @@ async function main(): Promise<void> {
       await assert(root.getByText("If the button doesn't work", { exact: false }).count(), `${capture.filename} is missing fallback`);
       await assert(root.getByText("Scaling Up Platform", { exact: false }).count(), `${capture.filename} is missing footer`);
       const byline = root.locator("[data-invitation-coach-byline]");
-      await assert((await byline.count()) === (capture.byline.mode === "scaling_up_only" ? 0 : 1), `${capture.filename} has wrong byline state`);
+      const hasByline = capture.byline.mode !== "scaling_up_only";
+      await assert((await byline.count()) === (hasByline ? 1 : 0), `${capture.filename} has wrong byline state`);
+      if (!hasByline) {
+        await assert((await root.locator("[data-invitation-coach-byline] img").count()) === 0, `${capture.filename} must not include a coach image`);
+      } else {
+        await assert((await byline.getByText("Your coach", { exact: true }).count()) === 1, `${capture.filename} is missing the fixed coach label`);
+        await assert((await byline.getByText(capture.byline.coachName, { exact: true }).count()) === 1, `${capture.filename} has the wrong coach name`);
+        const coachImage = byline.locator(`img[src="${coachImageUrl}"]`);
+        const expectsCoachImage = capture.byline.mode === "image_name";
+        await assert((await coachImage.count()) === (expectsCoachImage ? 1 : 0), `${capture.filename} has the wrong coach-image state`);
+      }
       await root.screenshot({ path: join(output, capture.filename), type: "png", animations: "disabled" });
       await assertPng(join(output, capture.filename));
       await context.close();

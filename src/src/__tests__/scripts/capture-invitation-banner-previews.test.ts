@@ -30,9 +30,14 @@ describe("capture:invitation-banner", () => {
 
       const manifest = readFileSync(join(outputDirectory, "index.html"), "utf8");
       expect(manifest).toContain('data-renderer="buildInvitationEmailShell"');
+      expect(manifest).toContain('data-assertions="byline-state,cta,fallback,footer,no-horizontal-overflow"');
       expect(manifest).toContain("Your coach");
       expect(manifest).not.toMatch(/smtp|customer|organization-banner/i);
       expect(manifest).not.toMatch(/@|password|token|secret/i);
+      expect(manifest).not.toContain("Morgan Coach");
+      expect(manifest).not.toContain("Avery");
+      expect(manifest).not.toContain("Synthetic preview organization");
+      expect(manifest).not.toContain("Sample leadership assessment");
     } finally {
       rmSync(outputDirectory, { recursive: true, force: true });
     }
