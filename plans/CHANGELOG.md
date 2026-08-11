@@ -6,6 +6,15 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="qsp-coach-forward-invitation-copy-production"></a>
+### 2026-08-12 — QSP coach-forward invitation copy launched <!-- ENTRY_ISO:2026-08-12 ENTRY_SLUG:qsp-coach-forward-invitation-copy-production -->
+
+**Status: LIVE ON PRODUCTION; RECEIVED-EMAIL ACCEPTANCE PENDING.** Ready PR [#337](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/337) passed Build, Migration Safety Gate, Assessment Email Lease (PostgreSQL), Vercel, and Vercel Preview Comments, then squash-merged to protected `main` as `c088ded4c51e697feafd4a1c7908253c107032fe`. GitHub Production deployment `5855883436` completed successfully for that exact SHA. Exact Vercel deployment `dpl_DZNdtLNQKn9c437zs2tfxg7uyqJM` is Ready and owns `scaling-up-platform-v2.vercel.app`, `platformtest.scalingup.com`, and the standard Production aliases.
+
+**Production row acceptance.** An authenticated editor inspection found QSP v2 active v3 already held the exact approved coach-forward body, so no QSP v2 data write was made. QSP v1 active v3 had an empty invitation body and therefore fell back to generic copy. Active v3 was duplicated to v4, only the invitation body was intentionally edited, the draft was saved, and v4 was published active. A fresh read of published QSP v1 v4 and QSP v2 v3 showed the same exact body: `You've been invited by {{coachName}} to complete the {{templateName}} for {{organizationName}}.` Both retain the existing subject. The universal shell continues to own the Scaling Up/Coach banner, large CTA, fallback link, and footer.
+
+**Health and safety boundary.** Both canonical `/api/health` endpoints returned HTTP `200` with `status=healthy`, database `healthy`, and `authPosture=safe`. No assessment question, stable key, scoring rule, report, campaign, participant, response, or environment variable was changed. No customer or test invitation was sent. Jeff #47 remains PARTIAL only until an explicitly authorized safe recipient receives one QSP v2 invitation proving the active body and already-launched universal shell together.
+
 <a id="qsp-coach-forward-invitation-copy-aligned"></a>
 ### 2026-08-12 — QSP coach-forward invitation copy aligned <!-- ENTRY_ISO:2026-08-12 ENTRY_SLUG:qsp-coach-forward-invitation-copy-aligned -->
 
