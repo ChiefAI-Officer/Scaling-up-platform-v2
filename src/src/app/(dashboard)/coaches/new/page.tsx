@@ -24,6 +24,7 @@ export default function NewCoachPage() {
     firstName: "",
     lastName: "",
     phone: "",
+    title: "",
     company: "",
     bio: "",
     hubspotId: "",
@@ -67,6 +68,7 @@ export default function NewCoachPage() {
           firstName: formData.firstName,
           lastName: formData.lastName,
           phone: formData.phone || undefined,
+          title: formData.title || undefined,
           company: formData.company || undefined,
           bio: formData.bio || undefined,
           hubspotId: formData.hubspotId || undefined,
@@ -168,7 +170,19 @@ export default function NewCoachPage() {
             </div>
 
             <div>
-              <Label htmlFor="company">Company</Label>
+              <Label htmlFor="title">Professional Title</Label>
+              <Input
+                id="title"
+                name="title"
+                value={formData.title}
+                onChange={handleChange}
+                placeholder="e.g., Master Coach"
+                className="mt-1"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="company">Company Name</Label>
               <Input
                 id="company"
                 name="company"

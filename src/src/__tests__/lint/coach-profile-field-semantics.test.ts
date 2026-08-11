@@ -1,0 +1,33 @@
+import fs from "node:fs";
+import path from "node:path";
+
+function source(relativePath: string): string {
+  return fs.readFileSync(path.join(process.cwd(), relativePath), "utf8");
+}
+
+describe("coach profile field semantics", () => {
+  it("does not expose the ambiguous Title / Credentials profile label", () => {
+    const files = [
+      "src/components/coach/coach-profile-form.tsx",
+    ];
+    for (const file of files) {
+      expect(source(file)).not.toContain("Title / Credentials");
+      expect(source(file)).not.toContain("Title/Credentials");
+    }
+  });
+
+  it("routes admin profile saves through the selected coach endpoint", () => {
+    const form = source("src/components/coach/coach-profile-form.tsx");
+    expect(form).toContain('saveTarget === "admin"');
+    expect(form).toContain("`/api/coaches/${coachId}`");
+  });
+
+  it("shows both fields on coach creation and details", () => {
+    const createPage = source("src/app/(dashboard)/coaches/new/page.tsx");
+    const detailsPage = source("src/app/(dashboard)/coaches/[id]/page.tsx");
+    for (const page of [createPage, detailsPage]) {
+      expect(page).toContain("Professional Title");
+      expect(page).toContain("Company Name");
+    }
+  });
+});

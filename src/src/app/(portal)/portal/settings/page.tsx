@@ -54,7 +54,7 @@ export default async function SettingsPage() {
                         email: coach.email,
                         bio: coach.bio || "",
                         title: coach.title || null,
-                        titleCredentials: coach.company || null, // MR-26
+                        company: coach.company || null,
                         profileImage: coach.profileImage || null,
                         linkedinUrl: coach.linkedinUrl || null,
                         showBookCallCta: coach.showBookCallCta,
