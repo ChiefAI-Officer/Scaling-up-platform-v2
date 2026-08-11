@@ -131,6 +131,28 @@ describe("sendInvitesBatch", () => {
     expect(result.results).toEqual([{ respondentId: "r1", status: "sent" }]);
   });
 
+  it("forwards the universal banner and resolved coach byline to every email", async () => {
+    const { deps, sendEmail } = makeDeps();
+    const coachByline = {
+      mode: "image_name" as const,
+      coachName: "Dana Coach",
+      coachImageUrl: "https://cdn.test/dana.png",
+    };
+
+    await sendInvitesBatch(deps, {
+      campaign: CAMPAIGN,
+      recipients: [participant("r1")],
+      baseUrl: "https://app.example.com",
+      chrome: "universalBanner",
+      coachByline,
+    });
+
+    expect(sendEmail).toHaveBeenCalledWith(expect.objectContaining({
+      chrome: "universalBanner",
+      coachByline,
+    }));
+  });
+
   it("keeps the disabled parent-only invitation write failure path byte-identical", async () => {
     const writeError = new Error("legacy invitation write failure");
     const { deps, create, sendEmail } = makeDeps();
@@ -912,9 +934,9 @@ describe("sendInvitesBatch", () => {
   });
 });
 
-// ── Wave P — chrome + coachLogoUrl threading (route/fan-out → mailer) ───────
-describe("sendInvitesBatch — Wave P chrome + coachLogoUrl passthrough", () => {
-  it("threads chrome + coachLogoUrl through to the mailer", async () => {
+// ── Invitation chrome + unified coach-byline threading ─────────────────────
+describe("sendInvitesBatch — invitation chrome + coachByline passthrough", () => {
+  it("threads the caller's chrome and byline through to the mailer", async () => {
     const { deps, sendEmail } = makeDeps();
     await sendInvitesBatch(deps, {
       campaign: CAMPAIGN,
@@ -922,17 +944,25 @@ describe("sendInvitesBatch — Wave P chrome + coachLogoUrl passthrough", () => 
       baseUrl: "https://app.example.com",
       ...NAMES,
       chrome: "waveP",
-      coachLogoUrl: "https://blob.example.com/coach.png",
+      coachByline: {
+        mode: "image_name",
+        coachName: "Pat Coach",
+        coachImageUrl: "https://blob.example.com/coach.png",
+      },
     });
     expect(sendEmail).toHaveBeenCalledWith(
       expect.objectContaining({
         chrome: "waveP",
-        coachLogoUrl: "https://blob.example.com/coach.png",
+        coachByline: {
+          mode: "image_name",
+          coachName: "Pat Coach",
+          coachImageUrl: "https://blob.example.com/coach.png",
+        },
       })
     );
   });
 
-  it("defaults to legacy chrome + null logo when the caller passes neither", async () => {
+  it("defaults to legacy chrome + Scaling Up-only byline when the caller passes neither", async () => {
     const { deps, sendEmail } = makeDeps();
     await sendInvitesBatch(deps, {
       campaign: CAMPAIGN,
@@ -940,7 +970,10 @@ describe("sendInvitesBatch — Wave P chrome + coachLogoUrl passthrough", () => 
       baseUrl: "https://app.example.com",
     });
     expect(sendEmail).toHaveBeenCalledWith(
-      expect.objectContaining({ chrome: "legacy", coachLogoUrl: null })
+      expect.objectContaining({
+        chrome: "legacy",
+        coachByline: { mode: "scaling_up_only" },
+      })
     );
   });
 });

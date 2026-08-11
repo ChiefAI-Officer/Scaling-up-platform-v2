@@ -40,9 +40,9 @@ import {
   hashToken,
 } from "@/lib/assessments/invitation-tokens";
 import {
-  resolveCoachName,
-  resolveCoachLogo,
+  resolveInvitationCoachByline,
 } from "@/lib/assessments/invitation-email";
+import { isInvitationBannerEnabled } from "@/lib/assessments/wave-invitation-banner-flags";
 import { isInviteEmailChromeEnabled } from "@/lib/assessments/wave-p-flags";
 import { isStableInvitationLinksEnabled } from "@/lib/assessments/wave-j65-flags";
 import {
@@ -340,32 +340,30 @@ export async function POST(
 
     const appUrl = process.env.APP_URL ?? "http://localhost:3000";
 
-    const coachName = resolveCoachName(
+    const scope = {
+      organizationId: campaign.organizationId,
+      templateId: campaign.templateId,
+    };
+    const chrome = isInvitationBannerEnabled(scope)
+      ? "universalBanner"
+      : isInviteEmailChromeEnabled(scope)
+        ? "waveP"
+        : "legacy";
+    const coachResolution = resolveInvitationCoachByline(
       campaign.creatorCoach ?? null,
-      campaign.organization?.owner ?? null
+      campaign.organization?.owner ?? null,
     );
+    const coachByline = coachResolution.byline;
+    const coachName = coachByline.mode === "scaling_up_only" ? null : coachByline.coachName;
     const organizationName = campaign.organization?.name ?? null;
     const templateName = campaign.template?.name ?? null;
 
-    // Wave P — invitation-email chrome (#2.1 coach logo + #2.4 larger CTA).
-    // Flag evaluated ONCE per send (campaign-level); logo identity MIRRORS
-    // resolveCoachName (creator coach ?? org owner).
-    const chrome = isInviteEmailChromeEnabled({
-      organizationId: campaign.organizationId,
-      templateId: campaign.templateId,
-    })
-      ? ("waveP" as const)
-      : ("legacy" as const);
-    const { coachLogoUrl, logoRejectedReason } = resolveCoachLogo(
-      campaign.creatorCoach ?? null,
-      campaign.organization?.owner ?? null
-    );
-    // PII-free observability: variant + logo-gate outcome only — NEVER the URL.
+    // PII-free observability: variant + resolved mode + gate outcome only.
     console.log("[assessment-reminders] email-chrome", {
       campaignId,
       chromeVariant: chrome,
-      logoIncluded: chrome === "waveP" && logoRejectedReason === null,
-      logoRejectedReason,
+      coachBylineMode: coachByline.mode,
+      logoRejectedReason: coachResolution.logoRejectedReason,
     });
 
     // Batch cap — keep SMTP latency inside the serverless budget. Targets
@@ -455,7 +453,7 @@ export async function POST(
             rawToken,
             baseUrl: appUrl,
             chrome,
-            coachLogoUrl,
+            coachByline,
             redactErrors: true,
             coalesceVerification: true,
           });
@@ -807,7 +805,7 @@ export async function POST(
           rawToken,
           baseUrl: appUrl,
           chrome,
-          coachLogoUrl,
+          coachByline,
         });
       } catch (sendErr) {
         console.error(

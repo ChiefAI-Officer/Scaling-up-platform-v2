@@ -832,16 +832,50 @@ describe("runInviteFanout", () => {
   });
 });
 
-// ── Wave P — invitation-email chrome wiring (flag → sendInvitesBatch input) ──
-describe("runInviteFanout — Wave P chrome + coach logo wiring", () => {
-  const FLAG = "WAVE_P_INVITE_EMAIL_ENABLED";
+// ── Invitation chrome wiring (universal banner → Wave P → legacy) ──────────
+describe("runInviteFanout — invitation chrome + unified coach byline wiring", () => {
+  const WAVE_P_FLAG = "WAVE_P_INVITE_EMAIL_ENABLED";
+  const BANNER_FLAG = "WAVE_INVITATION_BANNER_ENABLED";
+  const BANNER_KILL = "WAVE_INVITATION_BANNER_KILL";
   beforeEach(() => jest.clearAllMocks());
   afterEach(() => {
-    delete process.env[FLAG];
+    delete process.env[WAVE_P_FLAG];
+    delete process.env[BANNER_FLAG];
+    delete process.env[BANNER_KILL];
   });
 
-  it("flag ON: passes chrome=waveP + the CREATOR coach's profileImage into the batch input", async () => {
-    process.env[FLAG] = "1";
+  it("uses the universal banner and keeps a creator without an image ahead of an owner with one", async () => {
+    process.env[BANNER_FLAG] = "1";
+    const deps = makeDeps();
+    deps.findUnique.mockResolvedValue({
+      ...makeCampaign(),
+      creatorCoach: {
+        firstName: "Carla",
+        lastName: "Coach",
+        profileImage: null,
+      },
+      organization: {
+        name: "Acme Corp",
+        owner: {
+          firstName: "Olivia",
+          lastName: "Owner",
+          profileImage: "https://blob.example.com/olivia.png",
+        },
+      },
+    });
+    await runInviteFanout(deps, { campaignId: CAMPAIGN_ID });
+    const [, batchInput] = deps.sendInvitesBatch.mock.calls[0];
+    expect(batchInput.chrome).toBe("universalBanner");
+    expect(batchInput.coachByline).toEqual({
+      mode: "name_only",
+      coachName: "Carla Coach",
+    });
+  });
+
+  it("falls back to Wave P when the universal banner kill switch is active", async () => {
+    process.env[BANNER_FLAG] = "1";
+    process.env[BANNER_KILL] = "1";
+    process.env[WAVE_P_FLAG] = "1";
     const deps = makeDeps();
     deps.findUnique.mockResolvedValue({
       ...makeCampaign(),
@@ -850,19 +884,6 @@ describe("runInviteFanout — Wave P chrome + coach logo wiring", () => {
         lastName: "Coach",
         profileImage: "https://blob.example.com/carla.png",
       },
-    });
-    await runInviteFanout(deps, { campaignId: CAMPAIGN_ID });
-    const [, batchInput] = deps.sendInvitesBatch.mock.calls[0];
-    expect(batchInput.chrome).toBe("waveP");
-    expect(batchInput.coachLogoUrl).toBe("https://blob.example.com/carla.png");
-  });
-
-  it("creatorCoach=null + org owner present: the OWNER's profileImage is used", async () => {
-    process.env[FLAG] = "1";
-    const deps = makeDeps();
-    deps.findUnique.mockResolvedValue({
-      ...makeCampaign(),
-      creatorCoach: null,
       organization: {
         name: "Acme Corp",
         owner: {
@@ -875,14 +896,21 @@ describe("runInviteFanout — Wave P chrome + coach logo wiring", () => {
     await runInviteFanout(deps, { campaignId: CAMPAIGN_ID });
     const [, batchInput] = deps.sendInvitesBatch.mock.calls[0];
     expect(batchInput.chrome).toBe("waveP");
-    expect(batchInput.coachLogoUrl).toBe("https://blob.example.com/olivia.png");
+    expect(batchInput.coachByline).toEqual({
+      mode: "image_name",
+      coachName: "Carla Coach",
+      coachImageUrl: "https://blob.example.com/carla.png",
+    });
   });
 
-  it("flag OFF (default): passes chrome=legacy + null logo when no coach has an image", async () => {
+  it("uses legacy chrome when both invitation chrome gates are off", async () => {
     const deps = makeDeps();
     await runInviteFanout(deps, { campaignId: CAMPAIGN_ID });
     const [, batchInput] = deps.sendInvitesBatch.mock.calls[0];
     expect(batchInput.chrome).toBe("legacy");
-    expect(batchInput.coachLogoUrl).toBeNull();
+    expect(batchInput.coachByline).toEqual({
+      mode: "name_only",
+      coachName: "Carla Coach",
+    });
   });
 });

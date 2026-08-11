@@ -456,15 +456,6 @@ export function renderUniversalInvitationText(input: {
   return lines.join("\n");
 }
 
-// ── Coach-name resolver (creator coach ?? org owner) ────────────────────────
-type CoachName = { firstName: string; lastName: string } | null;
-export function resolveCoachName(creatorCoach: CoachName, ownerCoach: CoachName): string | null {
-  const pick = creatorCoach ?? ownerCoach;
-  if (!pick) return null;
-  const name = `${pick.firstName ?? ""} ${pick.lastName ?? ""}`.trim();
-  return name.length > 0 ? name : null;
-}
-
 export type InvitationCoachByline =
   | { mode: "image_name"; coachName: string; coachImageUrl: string }
   | { mode: "name_only"; coachName: string }
@@ -517,35 +508,4 @@ export function resolveInvitationCoachByline(
     byline: { mode: "name_only", coachName },
     logoRejectedReason: selected.profileImage ? "invalid-url" : "no-image",
   };
-}
-
-// ── Coach-logo resolver (Wave P) ────────────────────────────────────────────
-type CoachLogo = { profileImage: string | null } | null;
-
-/**
- * Resolve the coach logo for the Wave-P email chrome. Logo identity MIRRORS
- * `resolveCoachName`: pick = creator coach ?? org owner (the org owner IS a
- * Coach row), then take that coach's profileImage — so name and logo always
- * come from the same coach (a creator coach with no image does NOT fall
- * through to the owner's image).
- *
- * `logoRejectedReason` is PII-free observability for the send paths:
- *  - "no-coach"    — no coach picked at all
- *  - "no-image"    — the picked coach has no profileImage
- *  - "invalid-url" — profileImage present but fails the https-only `safeImageSrc` gate
- *  - null          — usable logo
- *
- * A rejected URL is returned as null (never the raw value) so a downstream
- * consumer logging the mailer payload can't leak an unvetted string.
- */
-export function resolveCoachLogo(
-  creatorCoach: CoachLogo,
-  ownerCoach: CoachLogo,
-): { coachLogoUrl: string | null; logoRejectedReason: "no-coach" | "no-image" | "invalid-url" | null } {
-  const pick = creatorCoach ?? ownerCoach;
-  if (!pick) return { coachLogoUrl: null, logoRejectedReason: "no-coach" };
-  const coachLogoUrl = pick.profileImage ?? null;
-  if (!coachLogoUrl) return { coachLogoUrl: null, logoRejectedReason: "no-image" };
-  if (!safeImageSrc(coachLogoUrl)) return { coachLogoUrl: null, logoRejectedReason: "invalid-url" };
-  return { coachLogoUrl, logoRejectedReason: null };
 }

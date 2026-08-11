@@ -147,7 +147,6 @@ import {
   renderCustomHtmlFragment,
   renderUniversalInvitationText,
   resolveInvitationCoachByline,
-  resolveCoachName,
   shouldShowOrgLine,
 } from "@/lib/assessments/invitation-email";
 
@@ -316,18 +315,6 @@ describe("renderFullHtmlBody — full-HTML override (#20)", () => {
   });
 });
 
-describe("resolveCoachName — creatorCoach ?? owner", () => {
-  it("prefers the campaign creator coach", () => {
-    expect(resolveCoachName({ firstName: "Cre", lastName: "Ator" }, { firstName: "Own", lastName: "Er" })).toBe("Cre Ator");
-  });
-  it("falls back to the org owner", () => {
-    expect(resolveCoachName(null, { firstName: "Own", lastName: "Er" })).toBe("Own Er");
-  });
-  it("returns null when neither is present", () => {
-    expect(resolveCoachName(null, null)).toBeNull();
-  });
-});
-
 describe("resolveInvitationCoachByline — one Coach presentation model", () => {
   it("uses the creator's complete identity when it has a valid image", () => {
     expect(resolveInvitationCoachByline(
@@ -403,8 +390,6 @@ describe("resolveInvitationCoachByline — one Coach presentation model", () => 
 // The module is pure: it never reads the flag. Callers pass chrome:"waveP".
 // Default (no chrome arg / chrome:"legacy") must be BYTE-IDENTICAL to the
 // pre-Wave-P output, regardless of coachLogoUrl.
-
-import { resolveCoachLogo } from "@/lib/assessments/invitation-email";
 
 describe("buildInvitationEmailHtml — Wave P chrome", () => {
   const HTTPS_LOGO = "https://blob.example.com/coach-logo.png";
@@ -680,41 +665,6 @@ describe("universal invitation banner", () => {
       "",
       `Start the assessment: ${baseVars.invitationUrl}`,
     ].join("\n"));
-  });
-});
-
-describe("resolveCoachLogo — mirrors resolveCoachName identity (creatorCoach ?? owner)", () => {
-  it("prefers the creator coach's profileImage", () => {
-    expect(
-      resolveCoachLogo(
-        { profileImage: "https://x.example/creator.png" },
-        { profileImage: "https://x.example/owner.png" },
-      ),
-    ).toEqual({ coachLogoUrl: "https://x.example/creator.png", logoRejectedReason: null });
-  });
-
-  it("falls back to the org owner when there is no creator coach", () => {
-    expect(resolveCoachLogo(null, { profileImage: "https://x.example/owner.png" })).toEqual({
-      coachLogoUrl: "https://x.example/owner.png",
-      logoRejectedReason: null,
-    });
-  });
-
-  it("does NOT fall through to the owner when the creator coach has no image (same pick as resolveCoachName)", () => {
-    expect(
-      resolveCoachLogo({ profileImage: null }, { profileImage: "https://x.example/owner.png" }),
-    ).toEqual({ coachLogoUrl: null, logoRejectedReason: "no-image" });
-  });
-
-  it("reports no-coach when neither is present", () => {
-    expect(resolveCoachLogo(null, null)).toEqual({ coachLogoUrl: null, logoRejectedReason: "no-coach" });
-  });
-
-  it("reports invalid-url for a non-https image and nulls the URL (never forwards the raw value)", () => {
-    expect(resolveCoachLogo({ profileImage: "http://x.example/logo.png" }, null)).toEqual({
-      coachLogoUrl: null,
-      logoRejectedReason: "invalid-url",
-    });
   });
 });
 
