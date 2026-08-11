@@ -326,6 +326,7 @@ describe("resolveInvitationCoachByline — one Coach presentation model", () => 
         coachName: "Cre Ator",
         coachImageUrl: "https://cdn.test/creator.png",
       },
+      legacyCoachLogoUrl: "https://cdn.test/creator.png",
       logoRejectedReason: null,
     });
   });
@@ -336,6 +337,7 @@ describe("resolveInvitationCoachByline — one Coach presentation model", () => 
       { firstName: "Own", lastName: "Er", profileImage: "https://cdn.test/owner.png" },
     )).toEqual({
       byline: { mode: "name_only", coachName: "Cre Ator" },
+      legacyCoachLogoUrl: null,
       logoRejectedReason: "no-image",
     });
   });
@@ -349,6 +351,7 @@ describe("resolveInvitationCoachByline — one Coach presentation model", () => 
 
     expect(result).toEqual({
       byline: { mode: "name_only", coachName: "Cre Ator" },
+      legacyCoachLogoUrl: null,
       logoRejectedReason: "invalid-url",
     });
     expect(JSON.stringify(result)).not.toContain(rejectedUrl);
@@ -364,6 +367,7 @@ describe("resolveInvitationCoachByline — one Coach presentation model", () => 
         coachName: "Own Er",
         coachImageUrl: "https://cdn.test/owner.png",
       },
+      legacyCoachLogoUrl: "https://cdn.test/owner.png",
       logoRejectedReason: null,
     });
   });
@@ -374,6 +378,7 @@ describe("resolveInvitationCoachByline — one Coach presentation model", () => 
       { firstName: "Own", lastName: "Er", profileImage: "https://cdn.test/owner.png" },
     )).toEqual({
       byline: { mode: "scaling_up_only" },
+      legacyCoachLogoUrl: "https://cdn.test/image.png",
       logoRejectedReason: "missing-name",
     });
   });
@@ -381,6 +386,7 @@ describe("resolveInvitationCoachByline — one Coach presentation model", () => 
   it("uses Scaling Up only when neither creator nor owner exists", () => {
     expect(resolveInvitationCoachByline(null, null)).toEqual({
       byline: { mode: "scaling_up_only" },
+      legacyCoachLogoUrl: null,
       logoRejectedReason: "no-coach",
     });
   });

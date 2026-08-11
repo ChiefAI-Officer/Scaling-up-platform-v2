@@ -13,6 +13,7 @@ DONE
 - Every path now evaluates the same precedence once per send using organization and template scope:
   `universalBanner` → `waveP` → `legacy`.
 - Every path resolves one coach presentation model: creator first; owner only when no creator exists. The existing `coachName` field is derived from that result solely to preserve legacy/unbranded rendering bytes.
+- The unified resolution envelope retains a separately safe-gated `legacyCoachLogoUrl` for compatibility. This preserves the selected coach's prior Wave-P image when its name is blank while universal rendering remains `scaling_up_only`; it never borrows the owner's identity.
 - Batch inputs default to `legacy` plus a `scaling_up_only` byline, and forward both unchanged.
 - Replaced old logo diagnostics with PII-free `chromeVariant`, `coachBylineMode`, and `logoRejectedReason` fields.
 - Removed `resolveCoachName` and `resolveCoachLogo` after all callers migrated.
@@ -33,11 +34,19 @@ GREEN run:
 npx jest src/__tests__/lib/invite-send.test.ts src/__tests__/api/assessment-campaigns/invite-route.test.ts src/__tests__/inngest/assessment-invite-fanout.test.ts src/__tests__/api/assessment-campaigns/reminders-post.test.ts src/__tests__/api/assessment-campaigns/resend-route.test.ts src/__tests__/services/notifications.test.ts src/__tests__/lib/assessments/invitation-email.test.ts --runInBand
 ```
 
-Result: 7 suites passed, 244 tests passed, 1 snapshot passed.
+Result: 7 suites passed, 246 tests passed, 1 snapshot passed.
+
+Compatibility regression RED run:
+
+```bash
+npx jest src/__tests__/api/assessment-campaigns/invite-route.test.ts src/__tests__/services/notifications.test.ts --runInBand
+```
+
+Result: 2 suites failed on the missing blank-name Wave-P compatibility image. After the unified-resolution fix, both suites passed (70 tests).
 
 ## Validation
 
-- `npx eslint` on all five modified production paths: passed.
+- `npx eslint` on all changed production paths: passed.
 - `git diff --check`: passed.
 - `rg -n "resolveCoachName|resolveCoachLogo" src/src`: no matches.
 - Scoped `tsc` review: no remaining error in `assessment-invite-fanout.ts`; full `npm run type-check` remains blocked by pre-existing repository-wide test/type errors (including ES target BigInt tests, existing NextRequest test fixtures, and template test fixture fields).

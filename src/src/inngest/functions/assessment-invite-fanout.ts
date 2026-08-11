@@ -453,6 +453,7 @@ export async function runInviteFanout(
           templateName,
           chrome,
           coachByline,
+          legacyCoachLogoUrl: coachResolution.legacyCoachLogoUrl,
           stableLinksEnabled,
         },
       ),

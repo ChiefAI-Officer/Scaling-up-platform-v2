@@ -746,6 +746,37 @@ describe("POST /invite — invitation chrome + unified coach byline wiring", () 
     );
   });
 
+  it("keeps the selected creator's safe Wave-P image when its name is blank and the banner is killed", async () => {
+    process.env[BANNER_FLAG] = "1";
+    process.env[BANNER_KILL] = "1";
+    process.env[WAVE_P_FLAG] = "1";
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    mockCampaignWith({
+      creatorCoach: {
+        firstName: "",
+        lastName: " ",
+        profileImage: "https://blob.example.com/blank-name-creator.png",
+      },
+      organization: {
+        name: "Acme Corp",
+        owner: {
+          firstName: "Owner",
+          lastName: "Coach",
+          profileImage: "https://blob.example.com/owner.png",
+        },
+      },
+    });
+
+    const res = await POST(emptyReq() as never, detailParams("c1"));
+
+    expect(res.status).toBe(200);
+    expect(sendAssessmentInvitationEmail).toHaveBeenCalledWith(expect.objectContaining({
+      chrome: "waveP",
+      coachByline: { mode: "scaling_up_only" },
+      coachLogoUrl: "https://blob.example.com/blank-name-creator.png",
+    }));
+  });
+
   it("uses legacy chrome when both invitation chrome gates are off", async () => {
     (getApiActor as jest.Mock).mockResolvedValue(coachActor);
     mockCampaignWith({

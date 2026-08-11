@@ -463,6 +463,8 @@ export type InvitationCoachByline =
 
 export interface InvitationCoachResolution {
   byline: InvitationCoachByline;
+  /** Safe image retained only for legacy/Wave-P compatibility. */
+  legacyCoachLogoUrl: string | null;
   logoRejectedReason: "no-coach" | "missing-name" | "no-image" | "invalid-url" | null;
 }
 
@@ -484,28 +486,32 @@ export function resolveInvitationCoachByline(
   if (!selected) {
     return {
       byline: { mode: "scaling_up_only" },
+      legacyCoachLogoUrl: null,
       logoRejectedReason: "no-coach",
     };
   }
 
+  const coachImageUrl = safeImageSrc(selected.profileImage);
   const coachName = `${selected.firstName ?? ""} ${selected.lastName ?? ""}`.trim();
   if (coachName.length === 0) {
     return {
       byline: { mode: "scaling_up_only" },
+      legacyCoachLogoUrl: coachImageUrl,
       logoRejectedReason: "missing-name",
     };
   }
 
-  const coachImageUrl = safeImageSrc(selected.profileImage);
   if (coachImageUrl) {
     return {
       byline: { mode: "image_name", coachName, coachImageUrl },
+      legacyCoachLogoUrl: coachImageUrl,
       logoRejectedReason: null,
     };
   }
 
   return {
     byline: { mode: "name_only", coachName },
+    legacyCoachLogoUrl: null,
     logoRejectedReason: selected.profileImage ? "invalid-url" : "no-image",
   };
 }

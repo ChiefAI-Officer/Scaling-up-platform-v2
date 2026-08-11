@@ -234,6 +234,7 @@ export async function POST(
         baseUrl: appUrl,
         chrome,
         coachByline,
+        coachLogoUrl: coachResolution.legacyCoachLogoUrl,
       });
     } catch (sendErr) {
       console.error(

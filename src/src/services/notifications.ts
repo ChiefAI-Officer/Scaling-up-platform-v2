@@ -1195,9 +1195,11 @@ export function prepareAssessmentInvitationEmail(
     const legacyCoachName = data.coachByline
         ? coachByline.mode === "scaling_up_only" ? null : coachByline.coachName
         : data.coachName ?? null;
-    const legacyCoachLogoUrl = data.coachByline
-        ? coachByline.mode === "image_name" ? coachByline.coachImageUrl : null
-        : data.coachLogoUrl ?? null;
+    const legacyCoachLogoUrl = data.coachLogoUrl ?? (
+        data.coachByline && coachByline.mode === "image_name"
+            ? coachByline.coachImageUrl
+            : null
+    );
 
     // Kill-switch: ASSESSMENT_INVITE_BRANDED=0 reverts to the legacy plain renderer.
     const branded = process.env.ASSESSMENT_INVITE_BRANDED !== "0";

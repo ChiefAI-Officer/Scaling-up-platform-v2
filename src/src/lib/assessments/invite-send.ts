@@ -89,6 +89,8 @@ export interface InviteEmailInput {
   chrome?: InvitationChrome;
   /** One resolved Coach identity used by every invitation renderer. */
   coachByline?: InvitationCoachByline;
+  /** Safe image retained only for legacy/Wave-P compatibility. */
+  coachLogoUrl?: string | null;
 }
 
 /** Mailer call — exactly the payload `sendAssessmentInvitationEmail` accepts. */
@@ -219,6 +221,8 @@ export interface SendInvitesInput {
   chrome?: InvitationChrome;
   /** One resolved Coach identity. Defaults to Scaling Up only. */
   coachByline?: InvitationCoachByline;
+  /** Safe image from the same resolved Coach, retained for legacy/Wave-P only. */
+  legacyCoachLogoUrl?: string | null;
   stableLinksEnabled?: boolean;
 }
 
@@ -252,6 +256,7 @@ export async function sendInvitesBatch(
   const templateName = input.templateName ?? null;
   const chrome = input.chrome ?? "legacy";
   const coachByline = input.coachByline ?? { mode: "scaling_up_only" as const };
+  const legacyCoachLogoUrl = input.legacyCoachLogoUrl ?? null;
 
   if (input.stableLinksEnabled && (!deps.stableTokens || !deps.prepareEmail)) {
     throw new Error(
@@ -391,6 +396,7 @@ export async function sendInvitesBatch(
       baseUrl,
       chrome,
       coachByline,
+      coachLogoUrl: legacyCoachLogoUrl,
     };
 
     if (input.stableLinksEnabled) {

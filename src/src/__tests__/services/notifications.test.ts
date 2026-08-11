@@ -704,6 +704,20 @@ describe("sendAssessmentInvitationEmail — custom HTML render selection (#220)"
     expect(mockSendEmailViaSMTP.mock.calls[0][0].html).not.toContain("javascript:");
   });
 
+  it("keeps a safe Wave-P compatibility image when the universal byline is Scaling Up only", async () => {
+    await sendAssessmentInvitationEmail({
+      ...baseData(),
+      coachName: null,
+      chrome: "waveP",
+      coachByline: { mode: "scaling_up_only" },
+      coachLogoUrl: "https://images.example/blank-name-creator.png",
+    });
+
+    const args = mockSendEmailViaSMTP.mock.calls[0][0];
+    expect(args.html).toContain('src="https://images.example/blank-name-creator.png"');
+    expect(args.html).not.toContain("Your coach");
+  });
+
   it("adds the survey link to branded-body plain text when custom HTML only uses it as an href", async () => {
     setEnvFlag("WAVE_D_CUSTOM_HTML_EMAIL_ENABLED", true);
     setEnvFlag("ASSESSMENT_INVITE_BRANDED_CUSTOM_HTML_ENABLED", true);

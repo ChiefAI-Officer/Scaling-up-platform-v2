@@ -320,6 +320,7 @@ export async function POST(
           templateName,
           chrome,
           coachByline,
+          legacyCoachLogoUrl: coachResolution.legacyCoachLogoUrl,
           stableLinksEnabled,
         },
       );
