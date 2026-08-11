@@ -490,3 +490,81 @@ redeploy.
 - Custom HTML: body-only under the universal banner.
 - Scope: invitation family only; results/report emails excluded.
 - Architecture: refine the existing shared invitation shell.
+
+## Production-blocker amendment: picker-visible canary IDs
+
+The browser authoring snapshot must contain only Organization and Template IDs
+that the authenticated actor can actually select in the new-campaign wizard.
+Generic RBAC permission is not sufficient: privileged hybrid ADMIN/STAFF Coach
+profiles must not receive invalid IDs, and stale grants must not make deleted or
+disabled templates browser-visible.
+
+### Architecture
+
+Extract one server-only campaign-picker visibility helper from the existing
+`GET /api/assessment-templates` rules. It returns the live Template IDs visible
+to an actor:
+
+- privileged ADMIN/STAFF actors: templates with `deletedAt: null` and
+  `disabledAt: null`;
+- Coach actors: the same live-template predicates intersected with the current
+  active-group picker policy; and
+- unauthenticated or actor-without-Coach cases: no Coach-picker templates.
+
+The existing template picker route and the new-campaign server page both use
+this helper. The page intersects the configured server-only canary allowlist
+with those visible Template IDs and with live Organizations already authorized
+by `canAccessOrganization`. Only the resulting IDs cross the server/client
+boundary. The raw environment allowlist never does.
+
+This shared helper is preferred over an extra client validation endpoint: it
+keeps the wizard synchronous, batches database work once per page, and prevents
+the picker and canary snapshot from acquiring separate visibility rules.
+
+### Data flow and failure behavior
+
+1. `requireCoach()` resolves the authenticated actor.
+2. A global enable or KILL returns an IDs-empty authoring snapshot without
+   visibility queries.
+3. For a canary snapshot, the server loads picker-visible Template IDs once and
+   resolves only live, authorized Organization IDs.
+4. The flag helper filters the configured IDs and serializes the safe subset.
+5. If visibility lookup fails, the page fails closed through its existing
+   server error boundary; it never falls back to the raw allowlist.
+
+No names, email addresses, credentials, disabled/deleted IDs, inaccessible IDs,
+or cross-tenant rollout targets are serialized.
+
+### Verification
+
+Tests must cover:
+
+- a hybrid ADMIN/STAFF actor with a Coach profile receives only live templates;
+- deleted, disabled, invalid, and stale-grant Template IDs are excluded;
+- a normal Coach receives exactly the Template IDs shown by the picker;
+- live authorized Organization canaries remain available;
+- global and KILL snapshots stay IDs-empty and skip visibility queries; and
+- the picker route remains behavior-compatible after adopting the shared
+  helper.
+
+### Authorized production sequence
+
+The final release uses a transient dark stage, not a dark final state:
+
+For this release, the user's explicit global-enable instruction supersedes the
+earlier bounded-canary step after the same audit, deployment-health, and stop
+conditions pass. Future releases without that explicit authority retain the
+bounded-canary-first sequence above.
+
+1. merge through protected `main` after review and required checks;
+2. deploy with the universal banner variables still default-off;
+3. verify the exact Production deployment, aliases, health, and the existing
+   read-only custom-HTML audit stop conditions;
+4. globally enable `WAVE_INVITATION_BANNER_ENABLED` under the user's explicit
+   authorization, leaving `WAVE_INVITATION_BANNER_KILL` off;
+5. verify the newly enabled deployment and PII-free organic-send telemetry; and
+6. set KILL immediately if health, rendering, or delivery signals regress.
+
+The brief dark interval separates deployment faults from activation faults and
+keeps rollback independent of a code revert. It does not postpone the approved
+global flip.
