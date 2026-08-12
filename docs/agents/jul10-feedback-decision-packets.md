@@ -3,7 +3,7 @@
 These packets preserve the bounded decisions and verification receipts behind
 the [canonical closeout ledger](jul10-feedback-closeout.md).
 They were reconciled against origin/main at
-45d99f3c5c661b8651ac62ec9ccfd0c9431a2699 on 2026-08-12. The #32 closeout
+e39ed99b163538f7aa429b8a68d14771e53465de on 2026-08-12. The #32 closeout
 implementation and live acceptance add source-backed question-level benchmark
 values and report rendering; no template version, feature flag, customer data,
 or email was changed.
@@ -196,13 +196,14 @@ company in the media?” in a new version while retaining S2_media.
 **Exact ask.** Add coach-logo space, mention the coach by name, revise the
 invitation copy, and enlarge the begin button.
 
-**Current truth.** The standard QSP v2 path already uses coach-forward copy,
-passes a valid coach logo into the Scaling Up-first shell, and renders the larger
-CTA through
-[invitation-email.ts](../../src/src/lib/assessments/invitation-email.ts).
-Campaign-level full-HTML overrides deliberately replace that shell and are a
-separate compatibility mode. Existing tests prove the renderer contract, but a
-current standard-path production smoke and final copy approval are absent.
+**Current truth.** PR [#337](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/337)
+aligned the approved coach-forward invitation body for QSP v1 and QSP v2 and
+launched it on Production. Published QSP v1 v4 and QSP v2 v3 hold the same
+approved body, including `{{coachName}}`. PR
+[#331](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/331)
+launched the shared Scaling Up-first invitation shell with coach-logo space and
+the larger CTA across initial, fan-out, reminder, and resend paths. Together
+these receipts satisfy the exact July 10 ask.
 
 **Recommended body copy.**
 
@@ -217,17 +218,19 @@ current standard-path production smoke and final copy approval are absent.
 >
 > Click the button below to begin.
 
-**Compatibility.** Invitation copy is version content. Keep legacy full-HTML
-replacement behavior until a separate migration is approved; no question key,
-scoring, or import mapping changes.
+**Acceptance.** DONE. The approved Production version content supplies the coach
+name and revised copy; the globally enabled Production shell supplies coach-logo
+space and the larger CTA. The received-email smoke is optional follow-up QA and
+is not a blocker against the original July 10 acceptance boundary.
 
-**Acceptance.** On the standard renderer, representative desktop and mobile
-email previews show the coach name, safe coach logo, approved text, and the
-larger CTA. A separately authorized live smoke confirms delivery rendering.
+**Compatibility.** Campaign-level full-HTML overrides remain a separate
+compatibility mode. Closing #47 does not change their behavior, question keys,
+scoring, reports, imports, or historical campaign version pinning.
 
-**Approval sentence.** I approve closing #47 on the standard QSP v2 renderer
-with the current coach-forward copy, coach-logo shell, and larger CTA after a
-live smoke; legacy full-HTML override conversion remains separate.
+**Disposition.** Row #47 is closed as DONE. No email was sent for this
+bookkeeping reconciliation, and no runtime code, assessment data, template
+version, campaign, response, flag, schema, migration, or Production state was
+changed.
 
 <a id="57-and-58-lva-peer-averages-and-report-comparison"></a>
 ## #57 and #58 LVA peer averages and report comparison
@@ -236,30 +239,28 @@ live smoke; legacy full-HTML override conversion remains separate.
 for future templates. #58 requires populated peer comparisons in both
 individual and group LVA reports.
 
-**Current truth.** Wave S implemented tested LVA QUESTION storage, atomic admin
-authoring, keyed joins, and both report surfaces in PR #132 / 9220503f. A
-historical four-value pilot succeeded and was then cleared. The latest retained
-production receipt shows the capability effectively dark and cannot establish
-approved populated rows. Rendering remains intentionally LVA-only.
+**Current truth.** PR [#339](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/339)
+restored the existing Wave S peer-average editor to LVA Settings and launched it
+with the capability enabled. Production deployment
+`dpl_85ZoYwgbKEi5ffTVjt7czywFYbgX` verified all 16 authorable rating-question
+inputs. Four explicitly temporary values then proved the stable-key joins and
+comparison treatments in both the individual and group LVA reports. PRs #340
+and #341 committed the PII-free editor and report receipts; all temporary values
+were cleared immediately afterward and omit-empty behavior was reconfirmed.
 
-**Recommendation.** Treat this as three explicit resumes: authorize restoring
-Wave S, approve a provenance-backed real LVA peer dataset, then verify populated
-individual and group reports. Decide future-template support one alias and
-metric contract at a time; do not imply universal support from the current LVA
-allowlist.
+**Disposition.** DONE + LIVE ON PRODUCTION. #57 is closed on the live,
+LVA-bounded authoring capability; #58 is closed on direct live evidence from
+both required report surfaces. Persistent provenance-backed LVA peer values and
+support for additional template aliases are optional separately approved
+follow-ons, not resume gates for the July 10 rows.
 
 **Compatibility.** Preserve QUESTION metric keys and omit-empty behavior.
 Missing values or a dark gate must show no fabricated comparison. GH #233's
 read-only observability is evidence infrastructure, not feature activation.
 
-**Acceptance.** An authorized production receipt establishes effective
-availability; approved values are visible in authoring; the individual report
-shows the peer section; the group report shows peer value and deviation; absent
-values remain omitted.
-
-**Approval sentence.** I approve a separately controlled Wave S restore for
-LVA, followed by entry of the approved peer dataset and live verification of
-both report surfaces; future-template enablement remains a separate decision.
+**Acceptance receipt.** Effective availability, all 16 LVA authoring inputs,
+the individual peer section, group peer values and deviations, and omit-empty
+behavior were verified on Production. No persistent peer dataset was invented.
 
 <a id="75-five-dysfunctions-answer-driven-output"></a>
 ## #75 Five Dysfunctions answer-driven output
@@ -326,9 +327,8 @@ screen/email receipts. Row #84 is DONE.
 
 ## Decision order
 
-1. Complete received-email acceptance for #47; #32 is Production-accepted.
-2. Answer the content questions: #41 and #45. #44 is evidence-verified DONE.
-3. #32/#57/#58 are closed; treat any wider or cohort-matched benchmark work as
+1. Answer the content questions: #41 and #45. #44 and #47 are DONE.
+2. #32/#57/#58 are closed; treat any wider or cohort-matched benchmark work as
    separately approved follow-ons.
-4. Handle #33 through its dedicated report-by-report matrix rather than this
+3. Handle #33 through its dedicated report-by-report matrix rather than this
    copy/data queue.
