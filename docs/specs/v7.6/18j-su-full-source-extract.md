@@ -120,12 +120,22 @@ Likert anchors: "not at all applicable" → "entirely applicable" (slider; matri
 Per-question tri-bar encoding: `you` = CEO single bar; `team` = range bar (dark=min, light=max, black stripe=avg, number=avg); `peers` = single benchmark bar. Scale 0–10. "Peers = companies of comparable size who preceded you in taking the assessment."
 
 ### Per-question PEER benchmark numbers (0–10) — provisional seed (one sample cohort)
-- **Your Employees:** recruitment 6.3 · retention 7.2 · onboarding 5.6 · satisfaction 5.9 · re-hiring 6.2 · training plan 4.6 · outsourcing 4.4 · flat-management 5.5
-- **Company Culture:** core values 7.2 · customer focus 6.4 · know core values 5.7 · transparent 5.2 · healthy culture 7.3
-- **Goals & Strategy:** long-term goal 6.7 · yearly goals 6.0 · quarterly/monthly 5.4 · strategic plan 5.3 · personalized goals 4.9 · growth methodology 4.2 · acquisitions 2.4
-- **Leadership Team:** tasks allocated 6.2 · weekly mgmt mtg 6.0 · strategic sessions 5.9
-- **Finance & Cash:** real-time insights 8.0 · cashflow planning 7.0 · growth capital 5.8
-- **Internal Communication:** know long-term goal 4.8 · know yearly goal 5.6 · know quarterly 5.0
+
+Source coordinates use the page number printed in Jeff's supplied PDFs. Q01–Q45
+and Q56–Q61 come from `ScalingUp_group_report_John CEOExec_2026-05-01T08_26_20-04_00.pdf`;
+the CEO-only leadership questions Q46–Q55 come from
+`ScalingUp_CEO_Full_report_John CEOExec_2026-05-01T08_24_56-04_00.pdf`.
+
+- **Your Employees (Q01–Q08; group report pp. 6–7):** recruitment 6.3 · retention 7.2 · onboarding 5.6 · satisfaction 5.9 · re-hiring 6.2 · training plan 4.6 · outsourcing 4.4 · flat-management 5.5
+- **Company Culture (Q09–Q13; group report p. 8):** core values 7.2 · customer focus 6.4 · know core values 5.7 · transparent 5.2 · healthy culture 7.3
+- **Goals & Strategy (Q14–Q20; group report pp. 10–11):** long-term goal 6.7 · yearly goals 6.0 · quarterly/monthly 5.4 · strategic plan 5.3 · personalized goals 4.9 · growth methodology 4.2 · acquisitions 2.4
+- **Leadership Team (Q21–Q24; group report p. 13):** tasks allocated 6.2 · weekly management meeting 6.0 · strategic sessions 5.9 · leadership training 4.7
+- **Operational Processes (Q25–Q29; group report p. 14):** goals to KPIs 5.8 · real-time performance data 5.9 · limited mistakes 5.0 · customer satisfaction 5.6 · continuous improvement 5.7
+- **Sales & Marketing (Q30–Q34; group report p. 15):** lead generation 5.6 · sales achievement 6.1 · weekly sales meeting 6.4 · head of sales is not entrepreneur 5.9 · PR/communication strategy 5.0
+- **Scalability, Innovation & Technology (Q35–Q40; group report p. 16):** process automation 6.2 · systems ready for growth 6.2 · better systems 6.3 · current technology knowledge 6.9 · more innovative 6.7 · disruptive model 6.2
+- **Finance & Cash (Q41–Q45; group report p. 18):** real-time insights 8.0 · cashflow planning 7.0 · growth capital 5.8 · financial alert 6.9 · balance-sheet understanding 7.8
+- **Your Leadership (Q46–Q55; CEO Full report pp. 22–23):** works on company 5.8 · mentor 5.0 · entrepreneurial network 5.8 · enjoys management 4.0 · energized 3.0 · CEO absence possible 6.5 · business books 6.0 · regular education 5.1 · work-life balance 6.2 · happy 5.9
+- **Internal Communication (Q56–Q61; group report p. 20):** know long-term goal 4.8 · know yearly goal 5.6 · know quarterly goals 5.0 · know vision/mission 5.9 · know elevator pitch 6.4 · company-wide meetings 5.6
 
 ### Per-SECTION peer benchmark (0–100 scale) — note the dual scale
 Your Employees 47.3 · Company Culture 31.4 · Goals & Strategy 34.9 · Leadership Team 18.1 · Finance & Cash 39 · Internal Communication 27.5. (Per-question/matrix are 0–10; section headers are 0–100. ScaleUp overall = "19" in the low sample. Esperto exposes NO formula — band cutoffs remain provisional 4.0/6.5.)

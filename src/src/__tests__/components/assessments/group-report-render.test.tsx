@@ -462,6 +462,18 @@ describe("ScoredGroupReport", () => {
       benchmarkVersion: "2026-06",
       scored: {
         ...base.scored!,
+        questions: [
+          {
+            stableKey: "Q01",
+            label: "Effective recruitment process",
+            ceo: 4,
+            teamMean: 5.3,
+            n: 3,
+            peers: 6.3,
+            devPeers: -2.3,
+            devPeersTeam: -1,
+          },
+        ],
         sections: [
           {
             stableKey: "people",
@@ -529,6 +541,13 @@ describe("ScoredGroupReport", () => {
     // ScaleUp peers
     expect(screen.getByTestId("group-scored-scaleup-peers")).toHaveTextContent("53.1");
     expect(screen.getByTestId("group-scored-scaleup-devpeers")).toHaveTextContent(/18\.9/);
+    // Per-question source fidelity: CEO + team + Peers are all visible.
+    const question = screen.getByTestId("group-scored-question-Q01");
+    expect(within(question).getByText("CEO 4")).toBeInTheDocument();
+    expect(within(question).getByText("Team 5.3")).toBeInTheDocument();
+    const peersBar = within(question).getByText("Peers 6.3").closest(".su-group-qbar-b");
+    expect(peersBar).toHaveStyle({ width: "63%" });
+    expect(screen.getByText("By question — CEO vs. team vs. peers")).toBeInTheDocument();
     // tier suppressed
     expect(screen.queryByTestId("group-scored-ceo-tier")).not.toBeInTheDocument();
     expect(screen.queryByTestId("group-scored-tier-band")).not.toBeInTheDocument();
@@ -588,6 +607,8 @@ describe("ScoredGroupReport", () => {
     // no "Dev · Peers" anywhere (that's the CEO-present variant — table header
     // AND the ScaleUp deviation figure, both suppressed without a CEO)
     expect(screen.queryByText(/Dev · Peers/i)).not.toBeInTheDocument();
+    expect(screen.getByText("By question — team vs. peers")).toBeInTheDocument();
+    expect(screen.queryByText("By question — CEO vs. team vs. peers")).not.toBeInTheDocument();
     // devPeersTeam value rendered (0.4) in the people section
     const peopleSection = screen.getByTestId("group-scored-section-people");
     expect(within(peopleSection).getByTestId("group-scored-devpeers-people")).toHaveTextContent("0.4");

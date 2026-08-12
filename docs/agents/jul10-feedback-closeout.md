@@ -2,7 +2,7 @@
 
 **Source:** Jeff Verdun's 14-page *Scaling Up Assessment Platform - Feedback Report for Gabriel*, prepared 2026-07-10. Section 2 is canonical: 53 rows numbered #30-#87. Rows #31, #34, #36, #38, and #82 are intentionally absent because completed items were excluded.
 
-**Reconciled against:** `origin/main` at `8dd9f193` on 2026-08-12 plus the Production receipts linked below. Current tally: **49 DONE / 1 PARTIAL / 3 NEEDS DECISION**.
+**Reconciled against:** `origin/main` at `8dd9f193` on 2026-08-12 plus the Production receipts linked below. Current tally: **48 DONE / 2 PARTIAL / 3 NEEDS DECISION**.
 
 **Authority:** This tracked ledger is authoritative; generated PDFs and `tmp/` files are derivatives. Completion is judged against the exact Section 2 ask. Later-discovered scope remains visible as a separately named follow-on and does not silently widen a row.
 
@@ -19,7 +19,7 @@
 | Row | Area | Exact acceptance criterion | Status | Evidence | PR / commit | Residual or resume gate | Decision owner |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | #30 | Comparison reporting | Show same-assessment answers across iterations to reveal growth or decline. | DONE | [Waves M and N](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/blob/15ee442b124f43155ffd3dfdc1dc08fbfa37cd5e/plans/CHANGELOG.md#L1717) | Wave N | None | Gabriel |
-| #32 | Scaling Up Full industry benchmarking | Restore Esperto-style score comparison for Scaling Up Full and decide whether the scope is universal or report-specific. | DONE | [Source, implementation, and Production verification](jul10-feedback-decision-packets.md#32-scaling-up-full-industry-benchmarking) | Evidence-only closeout; Wave J live receipt | None | Gabriel |
+| #32 | Scaling Up Full industry benchmarking | Restore Esperto-style answer comparison for Scaling Up Full and decide whether the scope is universal or report-specific. | PARTIAL | [Source, implementation, and acceptance gate](jul10-feedback-decision-packets.md#32-scaling-up-full-industry-benchmarking) | Closeout implementation PR pending | Merge the 61-question Peers implementation, verify the deployed Scaling Up Full report, and retain its live visual receipt. | Gabriel |
 | #33 | All-report fidelity | Compare each current report with its original and provide specific discrepancies for correction. | NEEDS DECISION | [Fidelity matrix](jul10-report-fidelity-matrix.md) | PR #268 disposition | Jeff supplies one sanitized annotated source/current pair at a time, beginning with LVA group rehire presentation. | Jeff with Gabriel disposition |
 | #35 | Admin navigation | Group the crowded admin top bar into logical dropdowns. | DONE | [Wave H grouped nav](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/blob/15ee442b124f43155ffd3dfdc1dc08fbfa37cd5e/plans/CHANGELOG.md#L1824) | Wave H | None | Gabriel |
 | #37 | Results email | Allow editing and approval of results email settings on already-published assessments. | DONE | [ED10 Settings](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/blob/15ee442b124f43155ffd3dfdc1dc08fbfa37cd5e/plans/CHANGELOG.md#L1149) | ED10 | None | Gabriel |
@@ -75,17 +75,18 @@
 
 ## Remaining decision queue
 
-The four non-DONE rows reduce to three unresolved decisions and one acceptance resume:
+The five non-DONE rows reduce to three unresolved decisions and two acceptance resumes:
 
 1. **Report fidelity:** #33 needs sanitized, report-specific annotations rather than an umbrella preference.
 2. **LVA content:** #41 and #45 still require content intent before editing. #42 is closed on the active Production v4 wording and compatibility receipt. #44 is closed as an intentional organization/annual/quarterly cascade; optional clarity wording is a separate follow-on.
 3. **Invitation acceptance:** #47's code and both canonical Production rows are live. Close after one authorized received QSP v2 invitation proves the active body and universal shell together; full-HTML overrides remain separate.
+4. **Scaling Up Full answer-level acceptance:** #32's report-specific implementation is complete. Close after merge/deploy and a durable Production screenshot visibly proves CEO, Team, and Peers beside individual questions.
 
-#32 is closed on Gabriel's report-specific Scaling Up Full decision and the
-source-backed provisional comparison already demonstrated on Production.
-Cohort-matched norms or wider benchmark coverage remain a separately named data
-enhancement rather than a hidden condition on the July 10 row. #57/#58 are also
-closed; persistent real LVA peer values remain a separate provenance follow-on.
+#32's product decision is resolved and its source-backed answer-level comparison
+is implemented, but the row remains PARTIAL until live Production visual
+acceptance. Cohort-matched norms or wider benchmark coverage remain a separately
+named data enhancement. #57/#58 are closed; persistent real LVA peer values
+remain a separate provenance follow-on.
 
 ## Update protocol
 
@@ -102,5 +103,5 @@ python3 scripts/build-jul10-closeout-artifacts.py
 
 The supplied July 10 source has 83 status occurrences: 30 in Section 1 and all
 53 canonical rows in Section 2. The generator validates that count, the exact
-row set, the 49/1/3 tally, and the twelve-outcome delta before writing
+row set, the 48/2/3 tally, and the twelve-outcome delta before writing
 deterministic PDFs under `output/pdf/`.

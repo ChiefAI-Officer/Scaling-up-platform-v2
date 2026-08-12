@@ -434,6 +434,10 @@ export interface GroupScoredQuestion {
   ceo: number | null;
   teamMean: number | null;
   n: number;
+  /** SU-Full answer-level Peers benchmark and signed CEO/team deviations. */
+  peers?: number | null;
+  devPeers?: number | null;
+  devPeersTeam?: number | null;
 }
 
 /**
@@ -1418,15 +1422,16 @@ function buildScoredTier(scoredMembers: ScoredMember[]): GroupScoredTier {
 // cohort (devPeersTeam = teamAvg - peers).
 
 /**
- * Attaches Peers/devPeers (+ devPeersTeam on domains/sections) onto the scored
- * report's domains, sections, and ScaleUp headline, and returns the application
- * metadata for provenance/metrics.
+ * Attaches Peers/devPeers (+ devPeersTeam) onto the scored report's questions,
+ * domains, sections, and ScaleUp headline, and returns the application metadata
+ * for provenance/metrics.
  *
  *  - version flows out ONLY when ≥1 peer row was actually applied,
- *  - FAIL-CLOSED on key skew (R3-Mc): if the report carries a domain/section
- *    key the benchmark does not cover (a seed/version drift), EVERY attached
- *    peer is cleared so the renderer omits Peers entirely (never a partial,
- *    misleading table) and `keyMismatch:true` flows to the audit/metric + alert.
+ *  - FAIL-CLOSED on key skew (R3-Mc): if the report carries a domain, section,
+ *    or question key the benchmark does not cover (a seed/version drift), EVERY
+ *    attached peer is cleared so the renderer omits Peers entirely (never a
+ *    partial, misleading report) and `keyMismatch:true` flows to the
+ *    audit/metric + alert.
  *
  * Mutates `report` in place (it is freshly built by `buildScoredReport`).
  */
@@ -1440,18 +1445,25 @@ export function applyBenchmarks(
   let applied = 0;
   let missing = 0;
 
-  const fill = (
-    row: { ceo: number | null; teamAvg: number | null },
+  const fillValues = (
+    ceo: number | null,
+    teamValue: number | null,
     peer: number | undefined,
     set: (p: number, dCeo: number | null, dTeam: number | null) => void,
   ): void => {
     if (typeof peer === "number") {
-      set(peer, devOf(row.ceo, peer), devOf(row.teamAvg, peer));
+      set(peer, devOf(ceo, peer), devOf(teamValue, peer));
       applied++;
     } else {
       missing++;
     }
   };
+
+  const fill = (
+    row: { ceo: number | null; teamAvg: number | null },
+    peer: number | undefined,
+    set: (p: number, dCeo: number | null, dTeam: number | null) => void,
+  ): void => fillValues(row.ceo, row.teamAvg, peer, set);
 
   for (const d of report.domains ?? []) {
     fill(d, b.domain[d.key as keyof typeof b.domain], (p, dc, dt) => {
@@ -1466,6 +1478,18 @@ export function applyBenchmarks(
       s.devPeers = dc;
       s.devPeersTeam = dt;
     });
+  }
+  for (const q of report.questions) {
+    fillValues(
+      q.ceo,
+      q.teamMean,
+      b.question[q.stableKey as keyof typeof b.question],
+      (p, dc, dt) => {
+        q.peers = p;
+        q.devPeers = dc;
+        q.devPeersTeam = dt;
+      },
+    );
   }
   if (report.scaleUpScore && typeof b.scaleUp === "number") {
     report.scaleUpScore.peers = b.scaleUp;
@@ -1486,6 +1510,11 @@ export function applyBenchmarks(
       s.peers = undefined;
       s.devPeers = undefined;
       s.devPeersTeam = undefined;
+    }
+    for (const q of report.questions) {
+      q.peers = undefined;
+      q.devPeers = undefined;
+      q.devPeersTeam = undefined;
     }
     if (report.scaleUpScore) {
       report.scaleUpScore.peers = undefined;

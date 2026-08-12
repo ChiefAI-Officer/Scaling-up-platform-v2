@@ -41,6 +41,19 @@ function buildLargeSufCohort(memberCount: number): GroupReportInput {
     { stableKey: "S_CASH", domain: "cash" as const },
     { stableKey: "S_YOU_LEAD", domain: "you" as const },
   ] as const;
+  const questionKeyBySection = new Map(
+    (
+      base.version.questions as Array<{
+        stableKey: string;
+        sectionStableKey?: string;
+      }>
+    ).map((question) => [question.sectionStableKey, question.stableKey]),
+  );
+  const questionKeyFor = (sectionStableKey: string): string => {
+    const stableKey = questionKeyBySection.get(sectionStableKey);
+    if (!stableKey) throw new Error(`Missing fixture question for ${sectionStableKey}`);
+    return stableKey;
+  };
 
   // Build a deterministic ScoreResult for a given domain-averages map.
   function makeSufResult(
@@ -68,7 +81,7 @@ function buildLargeSufCohort(memberCount: number): GroupReportInput {
     const overallAverage = vals.reduce((a, b) => a + b, 0) / vals.length;
     return {
       perQuestion: SECTIONS.map((s) => ({
-        stableKey: `Q_${s.stableKey}`,
+        stableKey: questionKeyFor(s.stableKey),
         value: domainAverages[s.domain],
         achieved: domainAverages[s.domain] >= 5,
       })),
@@ -94,7 +107,7 @@ function buildLargeSufCohort(memberCount: number): GroupReportInput {
   submissions.push({
     respondentId: "cap-ceo",
     answers: SECTIONS.map((s) => ({
-      stableKey: `Q_${s.stableKey}`,
+      stableKey: questionKeyFor(s.stableKey),
       value: ceoDomains[s.domain],
     })),
     result: makeSufResult(ceoDomains, 80, "Exemplary"),
@@ -122,7 +135,7 @@ function buildLargeSufCohort(memberCount: number): GroupReportInput {
     submissions.push({
       respondentId: id,
       answers: SECTIONS.map((s) => ({
-        stableKey: `Q_${s.stableKey}`,
+        stableKey: questionKeyFor(s.stableKey),
         value: domainAverages[s.domain],
       })),
       result: makeSufResult(domainAverages, scaleUpScore, tierLabel),

@@ -627,8 +627,9 @@ const SUF_SECTIONS = [
 const SUF_SLIDER_SCALE = { min: 0, max: 10, step: 1, anchorMin: "Low", anchorMax: "High" };
 
 function sufQuestions(): unknown[] {
-  return SUF_SECTIONS.map((s) => ({
-    stableKey: `Q_${s.stableKey}`,
+  const questionKeys = ["Q01", "Q14", "Q21", "Q41", "Q46"];
+  return SUF_SECTIONS.map((s, index) => ({
+    stableKey: questionKeys[index],
     type: "SLIDER_LIKERT",
     label: `${s.name} — rate 0-10`,
     sectionStableKey: s.stableKey,
@@ -671,7 +672,7 @@ function sufResult(
   return {
     perQuestion: SUF_SECTIONS.filter((s) => domainAverages[s.domain] != null).map(
       (s) => ({
-        stableKey: `Q_${s.stableKey}`,
+        stableKey: ["Q01", "Q14", "Q21", "Q41", "Q46"][SUF_SECTIONS.indexOf(s)],
         value: domainAverages[s.domain] as number,
         achieved: (domainAverages[s.domain] as number) >= 5,
       }),
@@ -702,7 +703,10 @@ function sufSubmission(
   tierLabel: string,
 ) {
   const answers = SUF_SECTIONS.filter((s) => domainAverages[s.domain] != null).map(
-    (s) => ({ stableKey: `Q_${s.stableKey}`, value: domainAverages[s.domain] as number }),
+    (s) => ({
+      stableKey: ["Q01", "Q14", "Q21", "Q41", "Q46"][SUF_SECTIONS.indexOf(s)],
+      value: domainAverages[s.domain] as number,
+    }),
   );
   return {
     respondentId,

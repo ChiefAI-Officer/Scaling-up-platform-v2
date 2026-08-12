@@ -3,9 +3,9 @@
 These packets preserve the bounded decisions and verification receipts behind
 the [canonical closeout ledger](jul10-feedback-closeout.md).
 They were reconciled against origin/main at
-8dd9f1936fe85fcc8237c5bab05b2d2a8b879c09 on 2026-08-12. No production state,
-template version, feature flag, benchmark value, customer data, or email was
-changed.
+8dd9f1936fe85fcc8237c5bab05b2d2a8b879c09 on 2026-08-12. The #32 closeout
+implementation adds source-backed question-level benchmark values and report
+rendering; no template version, feature flag, customer data, or email is changed.
 
 Gabriel may authorize the recommendations below. Publishing a template version,
 changing production benchmark data, enabling a flag, or sending an email still
@@ -32,32 +32,37 @@ assessment families.
 **Source and implementation proof.** Jeff's supplied [Esperto Scaling Up Full
 group report](../../From%20Jeff/APP_scaling%20up%20assessemnt/APP_scaling%20up%20assessemnt/ScalingUp_group_report_John%20CEOExec_2026-05-01T08_26_20-04_00.pdf)
 shows a Peers column on page 4 and describes peers as comparable-size growth
-companies. The durable [source extract](../specs/v7.6/18j-su-full-source-extract.md)
+companies. Its answer pages provide Q01–Q45 and Q56–Q61; the supplied [CEO Full
+report](../../From%20Jeff/APP_scaling%20up%20assessemnt/APP_scaling%20up%20assessemnt/ScalingUp_CEO_Full_report_John%20CEOExec_2026-05-01T08_24_56-04_00.pdf)
+provides the CEO-only Q46–Q55 on printed pages 22–23. The durable [source
+extract](../specs/v7.6/18j-su-full-source-extract.md)
 records the source values and the important limitation that the available
 sample represents one matched Esperto cohort, not a universal norm. Current
 [Scaling Up Full benchmark data](../../src/src/lib/assessments/su-full-benchmarks.ts)
 therefore preserves those values as the versioned
-`2026-06-28.cohort1.provisional` reference. The [group-report join](../../src/src/lib/assessments/group-report-model.ts#L1412)
-is alias-scoped to `scaling-up-full`, fails closed on key mismatch, and the
-[renderer](../../src/src/components/assessments/ScoredGroupReport.tsx#L420)
-labels the values as a provisional single Esperto cohort rather than claiming a
-size-matched universal industry standard.
+`2026-08-12.cohort1.provisional` reference. The implementation binds the full
+61-question benchmark key set to the canonical Scaling Up Full seed, attaches
+Peers and both signed deviations at the model layer, fails closed on any key
+mismatch, and renders a third Peers bar beside CEO and Team. It remains
+alias-scoped to `scaling-up-full` and labels the source as a provisional single
+Esperto cohort rather than claiming a size-matched universal industry standard.
 
 ![Live Production Scaling Up Full report with Peers comparisons](../../roadmap-sufull-group-report-crop.png)
 
-**Production proof.** The tracked screenshot above was captured from a real
-Production campaign and visibly shows the Peers values, Team-vs-Peers
-differences, and the provisional single-cohort footnote. The [Wave J launch
+**Existing Production proof.** The tracked screenshot above shows the already-live
+aggregate Peers values, Team-vs-Peers differences, and the provisional
+single-cohort footnote. The [Wave J launch
 receipt](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/blob/8dd9f1936fe85fcc8237c5bab05b2d2a8b879c09/plans/CHANGELOG.md#L2305) records the live
 campaign verification, published Scaling Up Full version, key-set match, and
-enabled report gate.
+enabled report gate. This screenshot predates the new question-level bars and is
+not presented as their acceptance evidence.
 
-**Disposition.** DONE against the exact July 10 row. Scaling Up Full has the
-requested report-specific comparison; no new benchmark values, template,
-feature flag, schema, campaign, response, report, or Production data changed in
-this reconciliation. Replacing the provisional reference with cohort-matched
-norms, or expanding comparisons to other assessments, is a separately approved
-data/product enhancement and does not reopen #32.
+**Disposition.** PARTIAL until the implementation is merged and a deployed
+Scaling Up Full report visibly confirms the CEO/Team/Peers question bars. The
+universal-versus-report-specific decision is resolved and no further product
+decision is needed. Replacing the provisional reference with cohort-matched
+norms or expanding comparisons to other assessments remains a separately
+approved data/product enhancement.
 
 <a id="41-lva-the-leadership-wording"></a>
 ## #41 LVA The leadership wording
@@ -315,9 +320,9 @@ screen/email receipts. Row #84 is DONE.
 
 ## Decision order
 
-1. Approve the remaining bounded no-new-product-intent packet: #47.
+1. Complete Production visual acceptance for implemented #32 and received-email acceptance for #47.
 2. Answer the content questions: #41 and #45. #44 is evidence-verified DONE.
-3. #32 and #57/#58 are closed; treat any wider or cohort-matched benchmark work
-   as separately approved follow-ons.
+3. #57/#58 are closed; after #32's live question-level receipt, treat any wider
+   or cohort-matched benchmark work as separately approved follow-ons.
 4. Handle #33 through its dedicated report-by-report matrix rather than this
    copy/data queue.

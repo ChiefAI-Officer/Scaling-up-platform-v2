@@ -316,9 +316,10 @@ describe("scored aggregation — robustness", () => {
 // ── Peers benchmark (Task 5 / J-2) ───────────────────────────────────────────
 //
 // applyBenchmarks attaches Peers (devPeers vs CEO, devPeersTeam vs team) onto
-// the scored domains/sections/ScaleUp ONLY for the SU-Full alias; version flows
-// to the model ONLY when ≥1 row is applied; a benchmark key the report's keys
-// don't cover (seed/version drift) fails CLOSED — every peer is cleared.
+// the scored questions/domains/sections/ScaleUp ONLY for the SU-Full alias;
+// version flows to the model ONLY when ≥1 row is applied; a benchmark key the
+// report's keys don't cover (seed/version drift) fails CLOSED — every peer is
+// cleared.
 
 describe("scored Peers benchmark — SU-Full (J-2)", () => {
   it("attaches Peers/devPeers to domains+sections+ScaleUp; version only on application; suppresses tier", () => {
@@ -332,6 +333,11 @@ describe("scored Peers benchmark — SU-Full (J-2)", () => {
     // ScaleUp: ceo 70, peers 53.1 → devPeers = +16.9.
     expect(m.scored!.scaleUpScore!.peers).toBe(53.1);
     expect(m.scored!.scaleUpScore!.devPeers).toBeCloseTo(70 - 53.1, 5);
+    // Answer-level parity: Q01 carries the source peer value and deviations.
+    const q = findQuestion(m.scored!.questions, "Q01")!;
+    expect(q.peers).toBe(6.3);
+    expect(q.devPeers).toBeCloseTo((q.ceo ?? 0) - 6.3, 5);
+    expect(q.devPeersTeam).toBeCloseTo((q.teamMean ?? 0) - 6.3, 5);
     // SU-Full suppresses the tier band in the group renderer (Task 2).
     expect(m.showTier).toBe(false);
     // version present (≥1 row applied); no key mismatch.
@@ -345,6 +351,16 @@ describe("scored Peers benchmark — SU-Full (J-2)", () => {
       expect(s.peers ?? null).toBeNull();
       expect(s.devPeers ?? null).toBeNull();
       expect(s.devPeersTeam ?? null).toBeNull();
+    }
+    for (const q of m.scored!.questions) {
+      expect(q.peers).toBeUndefined();
+      expect(q.devPeers).toBeUndefined();
+      expect(q.devPeersTeam).toBeUndefined();
+    }
+    for (const q of m.scored!.questions) {
+      expect(q.peers).toBeUndefined();
+      expect(q.devPeers).toBeUndefined();
+      expect(q.devPeersTeam).toBeUndefined();
     }
     expect(m.showTier).toBe(true);
     expect(m.benchmarkVersion).toBeUndefined();
