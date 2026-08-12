@@ -6,6 +6,19 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="jul10-47-qsp-invitation-acceptance-boundary-closed"></a>
+### 2026-08-12 — July 10 #47 QSP invitation acceptance boundary closed <!-- ENTRY_ISO:2026-08-12 ENTRY_SLUG:jul10-47-qsp-invitation-acceptance-boundary-closed -->
+
+**Status: DONE by evidence reconciliation; no runtime or Production change.** The exact July 10 ask was coach-logo space, coach name, revised invitation copy, and a larger CTA. PR [#337](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/337) (`c088ded4`) launched the approved coach-forward body for published QSP v1 v4 and QSP v2 v3. PR [#331](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/331) (`dc0026fd`) launched the globally enabled Scaling Up-first invitation shell with coach-logo space and the larger CTA across initial, fan-out, reminder, and resend paths. Those live receipts satisfy every element of the original row.
+
+**Boundary correction.** The previously required received-email smoke was stronger QA evidence than the July 10 acceptance criterion required. It is now an optional controlled follow-up, not a blocking resume gate. Campaign full-HTML overrides remain a separately scoped compatibility mode. The canonical tally is **50 DONE / 0 PARTIAL / 3 NEEDS DECISION**; only #33, #41, and #45 remain.
+
+**Artifact provenance and verification.** The pristine July 10 PDF was no longer available locally, so the 50/0/3 derivative was regenerated from the latest valid 49/1/3 status edition (SHA-256 `211c61b3ac8e8eaa56c3cd0bc74e4aca24a5496e70c3db68e6b20688f7e81a8e`). The generator removed prior `STATUS` content streams before merging the new overlay. The 14-page result (SHA-256 `4a91a5d33029785d847fa9bfc9f4a95ab8b144ab4f88cf933e87eed4771e98fc`) contains exactly 80 DONE badges, 0 PARTIAL badges, 3 NEEDS DECISION badges, one current footer per page, and no prior status footers. Every page was rendered and visually checked; original layout and page count are preserved, including a clean green DONE replacement on #47.
+
+**Safety.** This bookkeeping correction changes tracked status, decision language, generator invariants, tests, and the derivative status PDF only. It does not change runtime code, assessment data, template versions, flags, campaigns, responses, email delivery, schema, migrations, or Production state, and no email was sent.
+
+---
+
 <a id="jul10-32-su-full-question-benchmarks-production-accepted"></a>
 ### 2026-08-12 — July 10 #32 Scaling Up Full answer-level benchmarking Production-accepted <!-- ENTRY_ISO:2026-08-12 ENTRY_SLUG:jul10-32-su-full-question-benchmarks-production-accepted -->
 

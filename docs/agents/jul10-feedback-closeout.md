@@ -2,7 +2,7 @@
 
 **Source:** Jeff Verdun's 14-page *Scaling Up Assessment Platform - Feedback Report for Gabriel*, prepared 2026-07-10. Section 2 is canonical: 53 rows numbered #30-#87. Rows #31, #34, #36, #38, and #82 are intentionally absent because completed items were excluded.
 
-**Reconciled against:** `origin/main` at `45d99f3c` on 2026-08-12 plus the Production receipts linked below. Current tally: **49 DONE / 1 PARTIAL / 3 NEEDS DECISION**.
+**Reconciled against:** `origin/main` at `e39ed99b` on 2026-08-12 plus the Production receipts linked below. Current tally: **50 DONE / 0 PARTIAL / 3 NEEDS DECISION**.
 
 **Authority:** This tracked ledger is authoritative; generated PDFs and `tmp/` files are derivatives. Completion is judged against the exact Section 2 ask. Later-discovered scope remains visible as a separately named follow-on and does not silently widen a row.
 
@@ -31,7 +31,7 @@
 | #44 | LVA possible duplicate | Determine whether the middle annual-outcome prompt duplicates the preceding organization-priority prompt. | DONE | [Source and platform verification](jul10-feedback-decision-packets.md#44-lva-priority-triplet) | PR #342 / `265ec669` | None | Gabriel |
 | #45 | LVA media wording | Identify Suzanne's specific concern before changing the question. | NEEDS DECISION | [Decision packet](jul10-feedback-decision-packets.md#45-lva-media-wording) | None | Confirm whether the concern is grammar, scope, relevance, or expected answer form. | Suzanne with Gabriel approval |
 | #46 | Template results default | Set the end-user results default at template level with campaign override. | DONE | [Wave Q controls](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/blob/15ee442b124f43155ffd3dfdc1dc08fbfa37cd5e/plans/CHANGELOG.md#L1623) | Wave Q | None | Gabriel |
-| #47 | QSP v2 invitation email | Show coach logo, mention coach by name, use approved copy, and enlarge the CTA. | PARTIAL | [Production receipt](../../plans/CHANGELOG.md#qsp-coach-forward-invitation-copy-production); [universal banner launch](../../plans/CHANGELOG.md#universal-invitation-banner-launched) | PR #337 / `c088ded4`; Production QSP v1 v4 + QSP v2 v3 | Receive one authorized QSP v2 invitation proving the active coach-forward body and universal banner/CTA together. | Gabriel |
+| #47 | QSP v2 invitation email | Show coach logo, mention coach by name, use approved copy, and enlarge the CTA. | DONE | [Production acceptance boundary](jul10-feedback-decision-packets.md#47-qsp-v2-invitation-email) | PR #337 / `c088ded4`; PR #331 / `dc0026fd`; Production QSP v1 v4 + QSP v2 v3 | None | Gabriel |
 | #48 | QSP v2 core-values stories | Present one prompt with capacity for three people and stories without breaking the three historical stable keys. | DONE | [Jeff #48 launch](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/blob/15ee442b124f43155ffd3dfdc1dc08fbfa37cd5e/plans/CHANGELOG.md#L559) | PR #248 family | None | Gabriel |
 | #49 | Printable free-form answers | Give each question its own row and render the answer full width below it. | DONE | [Wave R reports](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/blob/15ee442b124f43155ffd3dfdc1dc08fbfa37cd5e/plans/CHANGELOG.md#L1604) | PR #129 | None | Gabriel |
 | #50 | Coach notification email | Identify the actual respondent rather than saying a generic respondent. | DONE | [July 10 batch](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/blob/15ee442b124f43155ffd3dfdc1dc08fbfa37cd5e/plans/CHANGELOG.md#L1132) | PR #199 | None | Gabriel |
@@ -75,11 +75,15 @@
 
 ## Remaining decision queue
 
-The four non-DONE rows reduce to three unresolved decisions and one acceptance resume:
+The three non-DONE rows are all unresolved decisions:
 
 1. **Report fidelity:** #33 needs sanitized, report-specific annotations rather than an umbrella preference.
 2. **LVA content:** #41 and #45 still require content intent before editing. #42 is closed on the active Production v4 wording and compatibility receipt. #44 is closed as an intentional organization/annual/quarterly cascade; optional clarity wording is a separate follow-on.
-3. **Invitation acceptance:** #47's code and both canonical Production rows are live. Close after one authorized received QSP v2 invitation proves the active body and universal shell together; full-HTML overrides remain separate.
+
+#47 is closed against its exact July 10 acceptance boundary: coach-logo space,
+coach name, revised copy, and the larger CTA are implemented and live. A controlled
+received-email smoke remains useful optional QA, not unfinished July 10 scope;
+full-HTML overrides remain separate.
 
 #32's product decision is resolved and its source-backed answer-level comparison
 is implemented and Production-accepted with a tracked live question-bar visual.

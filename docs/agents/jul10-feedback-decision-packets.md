@@ -196,13 +196,14 @@ company in the media?” in a new version while retaining S2_media.
 **Exact ask.** Add coach-logo space, mention the coach by name, revise the
 invitation copy, and enlarge the begin button.
 
-**Current truth.** The standard QSP v2 path already uses coach-forward copy,
-passes a valid coach logo into the Scaling Up-first shell, and renders the larger
-CTA through
-[invitation-email.ts](../../src/src/lib/assessments/invitation-email.ts).
-Campaign-level full-HTML overrides deliberately replace that shell and are a
-separate compatibility mode. Existing tests prove the renderer contract, but a
-current standard-path production smoke and final copy approval are absent.
+**Current truth.** PR [#337](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/337)
+aligned the approved coach-forward invitation body for QSP v1 and QSP v2 and
+launched it on Production. Published QSP v1 v4 and QSP v2 v3 hold the same
+approved body, including `{{coachName}}`. PR
+[#331](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/331)
+launched the shared Scaling Up-first invitation shell with coach-logo space and
+the larger CTA across initial, fan-out, reminder, and resend paths. Together
+these receipts satisfy the exact July 10 ask.
 
 **Recommended body copy.**
 
@@ -217,17 +218,19 @@ current standard-path production smoke and final copy approval are absent.
 >
 > Click the button below to begin.
 
-**Compatibility.** Invitation copy is version content. Keep legacy full-HTML
-replacement behavior until a separate migration is approved; no question key,
-scoring, or import mapping changes.
+**Acceptance.** DONE. The approved Production version content supplies the coach
+name and revised copy; the globally enabled Production shell supplies coach-logo
+space and the larger CTA. The received-email smoke is optional follow-up QA and
+is not a blocker against the original July 10 acceptance boundary.
 
-**Acceptance.** On the standard renderer, representative desktop and mobile
-email previews show the coach name, safe coach logo, approved text, and the
-larger CTA. A separately authorized live smoke confirms delivery rendering.
+**Compatibility.** Campaign-level full-HTML overrides remain a separate
+compatibility mode. Closing #47 does not change their behavior, question keys,
+scoring, reports, imports, or historical campaign version pinning.
 
-**Approval sentence.** I approve closing #47 on the standard QSP v2 renderer
-with the current coach-forward copy, coach-logo shell, and larger CTA after a
-live smoke; legacy full-HTML override conversion remains separate.
+**Disposition.** Row #47 is closed as DONE. No email was sent for this
+bookkeeping reconciliation, and no runtime code, assessment data, template
+version, campaign, response, flag, schema, migration, or Production state was
+changed.
 
 <a id="57-and-58-lva-peer-averages-and-report-comparison"></a>
 ## #57 and #58 LVA peer averages and report comparison
@@ -326,9 +329,8 @@ screen/email receipts. Row #84 is DONE.
 
 ## Decision order
 
-1. Complete received-email acceptance for #47; #32 is Production-accepted.
-2. Answer the content questions: #41 and #45. #44 is evidence-verified DONE.
-3. #32/#57/#58 are closed; treat any wider or cohort-matched benchmark work as
+1. Answer the content questions: #41 and #45. #44 and #47 are DONE.
+2. #32/#57/#58 are closed; treat any wider or cohort-matched benchmark work as
    separately approved follow-ons.
-4. Handle #33 through its dedicated report-by-report matrix rather than this
+3. Handle #33 through its dedicated report-by-report matrix rather than this
    copy/data queue.

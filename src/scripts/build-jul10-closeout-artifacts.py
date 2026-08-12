@@ -18,7 +18,7 @@ EXPECTED_ROWS = [
     66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81,
     83, 84, 85, 86, 87,
 ]
-EXPECTED_TALLY = {"DONE": 49, "PARTIAL": 1, "NEEDS DECISION": 3}
+EXPECTED_TALLY = {"DONE": 50, "PARTIAL": 0, "NEEDS DECISION": 3}
 STATUS_DATE_LONG = "12 August 2026"
 STATUS_DATE_FOOTER = "12 AUG 2026"
 PDF_DEPENDENCIES = ("pdfplumber", "pypdf", "reportlab")
@@ -97,10 +97,16 @@ def parse_ledger(path: Path) -> list[LedgerRow]:
 
     numbers = [row.number for row in rows]
     tally = Counter(row.status for row in rows)
+    normalized_tally = {
+        status: tally.get(status, 0)
+        for status in ("DONE", "PARTIAL", "NEEDS DECISION")
+    }
     if numbers != EXPECTED_ROWS:
         raise ValueError(f"Expected canonical row order {EXPECTED_ROWS}, found {numbers}")
-    if dict(tally) != EXPECTED_TALLY:
-        raise ValueError(f"Expected tally {EXPECTED_TALLY}, found {dict(tally)}")
+    if normalized_tally != EXPECTED_TALLY:
+        raise ValueError(
+            f"Expected tally {EXPECTED_TALLY}, found {normalized_tally}"
+        )
     if len(set(numbers)) != 53:
         raise ValueError("Ledger must contain 53 distinct rows")
     return rows
@@ -594,7 +600,7 @@ def main() -> None:
     )
     ledger_rows = parse_ledger(ledger_path)
     delta_rows = parse_delta(delta_path)
-    print("53 rows: 49 DONE / 1 PARTIAL / 3 NEEDS DECISION")
+    print("53 rows: 50 DONE / 0 PARTIAL / 3 NEEDS DECISION")
     print(f"Status date: {STATUS_DATE_LONG}")
     print("12 post-cutoff outcomes")
     if args.check:
