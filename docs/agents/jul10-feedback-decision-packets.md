@@ -3,7 +3,7 @@
 These packets preserve the bounded decisions and verification receipts behind
 the [canonical closeout ledger](jul10-feedback-closeout.md).
 They were reconciled against origin/main at
-45d99f3c5c661b8651ac62ec9ccfd0c9431a2699 on 2026-08-12. The #32 closeout
+e39ed99b163538f7aa429b8a68d14771e53465de on 2026-08-12. The #32 closeout
 implementation and live acceptance add source-backed question-level benchmark
 values and report rendering; no template version, feature flag, customer data,
 or email was changed.
@@ -239,30 +239,28 @@ changed.
 for future templates. #58 requires populated peer comparisons in both
 individual and group LVA reports.
 
-**Current truth.** Wave S implemented tested LVA QUESTION storage, atomic admin
-authoring, keyed joins, and both report surfaces in PR #132 / 9220503f. A
-historical four-value pilot succeeded and was then cleared. The latest retained
-production receipt shows the capability effectively dark and cannot establish
-approved populated rows. Rendering remains intentionally LVA-only.
+**Current truth.** PR [#339](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/339)
+restored the existing Wave S peer-average editor to LVA Settings and launched it
+with the capability enabled. Production deployment
+`dpl_85ZoYwgbKEi5ffTVjt7czywFYbgX` verified all 16 authorable rating-question
+inputs. Four explicitly temporary values then proved the stable-key joins and
+comparison treatments in both the individual and group LVA reports. PRs #340
+and #341 committed the PII-free editor and report receipts; all temporary values
+were cleared immediately afterward and omit-empty behavior was reconfirmed.
 
-**Recommendation.** Treat this as three explicit resumes: authorize restoring
-Wave S, approve a provenance-backed real LVA peer dataset, then verify populated
-individual and group reports. Decide future-template support one alias and
-metric contract at a time; do not imply universal support from the current LVA
-allowlist.
+**Disposition.** DONE + LIVE ON PRODUCTION. #57 is closed on the live,
+LVA-bounded authoring capability; #58 is closed on direct live evidence from
+both required report surfaces. Persistent provenance-backed LVA peer values and
+support for additional template aliases are optional separately approved
+follow-ons, not resume gates for the July 10 rows.
 
 **Compatibility.** Preserve QUESTION metric keys and omit-empty behavior.
 Missing values or a dark gate must show no fabricated comparison. GH #233's
 read-only observability is evidence infrastructure, not feature activation.
 
-**Acceptance.** An authorized production receipt establishes effective
-availability; approved values are visible in authoring; the individual report
-shows the peer section; the group report shows peer value and deviation; absent
-values remain omitted.
-
-**Approval sentence.** I approve a separately controlled Wave S restore for
-LVA, followed by entry of the approved peer dataset and live verification of
-both report surfaces; future-template enablement remains a separate decision.
+**Acceptance receipt.** Effective availability, all 16 LVA authoring inputs,
+the individual peer section, group peer values and deviations, and omit-empty
+behavior were verified on Production. No persistent peer dataset was invented.
 
 <a id="75-five-dysfunctions-answer-driven-output"></a>
 ## #75 Five Dysfunctions answer-driven output

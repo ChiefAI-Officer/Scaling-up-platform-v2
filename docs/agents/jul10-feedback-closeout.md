@@ -106,5 +106,5 @@ python3 scripts/build-jul10-closeout-artifacts.py
 
 The supplied July 10 source has 83 status occurrences: 30 in Section 1 and all
 53 canonical rows in Section 2. The generator validates that count, the exact
-row set, the 49/1/3 tally, and the twelve-outcome delta before writing
+row set, the 50/0/3 tally, and the twelve-outcome delta before writing
 deterministic PDFs under `output/pdf/`.

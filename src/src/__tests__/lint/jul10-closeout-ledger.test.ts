@@ -68,6 +68,11 @@ describe("July 10 feedback closeout ledger", () => {
     );
 
     expect(tally).toEqual({ DONE: 50, PARTIAL: 0, "NEEDS DECISION": 3 });
+    expect(
+      rows
+        .filter((row) => row.status === "NEEDS DECISION")
+        .map((row) => row.number),
+    ).toEqual([33, 41, 45]);
   });
 
   it("closes row #47 at the original July 10 acceptance boundary", () => {
