@@ -357,11 +357,6 @@ describe("scored Peers benchmark — SU-Full (J-2)", () => {
       expect(q.devPeers).toBeUndefined();
       expect(q.devPeersTeam).toBeUndefined();
     }
-    for (const q of m.scored!.questions) {
-      expect(q.peers).toBeUndefined();
-      expect(q.devPeers).toBeUndefined();
-      expect(q.devPeersTeam).toBeUndefined();
-    }
     expect(m.showTier).toBe(true);
     expect(m.benchmarkVersion).toBeUndefined();
     expect(m.benchmarkKeyMismatch).toBe(false);
@@ -405,6 +400,11 @@ describe("scored Peers benchmark — SU-Full (J-2)", () => {
       expect(s.peers).toBeUndefined();
       expect(s.devPeers).toBeUndefined();
       expect(s.devPeersTeam).toBeUndefined();
+    }
+    for (const q of m.scored!.questions) {
+      expect(q.peers).toBeUndefined();
+      expect(q.devPeers).toBeUndefined();
+      expect(q.devPeersTeam).toBeUndefined();
     }
     expect(m.scored!.scaleUpScore!.peers).toBeUndefined();
     expect(m.scored!.scaleUpScore!.devPeers).toBeUndefined();
