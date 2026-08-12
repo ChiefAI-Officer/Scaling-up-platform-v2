@@ -2,7 +2,7 @@
 
 **Source:** Jeff Verdun's 14-page *Scaling Up Assessment Platform - Feedback Report for Gabriel*, prepared 2026-07-10. Section 2 is canonical: 53 rows numbered #30-#87. Rows #31, #34, #36, #38, and #82 are intentionally absent because completed items were excluded.
 
-**Reconciled against:** `origin/main` at `b0e59cff` on 2026-08-12 plus the Production receipts linked below. Current tally: **47 DONE / 1 PARTIAL / 5 NEEDS DECISION**.
+**Reconciled against:** `origin/main` at `3b99fc3b` on 2026-08-12 plus the Production receipts linked below. Current tally: **48 DONE / 1 PARTIAL / 4 NEEDS DECISION**.
 
 **Authority:** This tracked ledger is authoritative; generated PDFs and `tmp/` files are derivatives. Completion is judged against the exact Section 2 ask. Later-discovered scope remains visible as a separately named follow-on and does not silently widen a row.
 
@@ -28,7 +28,7 @@
 | #41 | LVA The leadership wording | Establish what the factor measures before rewording it. | NEEDS DECISION | [Decision packet](jul10-feedback-decision-packets.md#41-lva-the-leadership-wording) | None | Confirm whether the factor means leadership function, senior-leader behavior, or another construct. | Gabriel |
 | #42 | LVA Growth Financing wording | Clarify that the factor means access or ability to obtain financing for growth. | DONE | [Production closeout](jul10-feedback-decision-packets.md#42-lva-growth-financing-wording) | PR #304 / `f02d85f2`; Production LVA v4 | None | Gabriel |
 | #43 | LVA core-values wording | Ask for existing values first and alternatives only when values are unset. | DONE | [Wave P quick fixes](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/blob/15ee442b124f43155ffd3dfdc1dc08fbfa37cd5e/plans/CHANGELOG.md#L1641) | Wave P | None | Gabriel |
-| #44 | LVA possible duplicate | Decide whether the adjacent organization, annual, and quarterly priority questions are intentionally distinct. | NEEDS DECISION | [Verification audit](jul10-feedback-decision-packets.md#44-lva-priority-triplet) | None | Approve keeping the Esperto-faithful three-horizon priority cascade or approve replacement wording. | Gabriel |
+| #44 | LVA possible duplicate | Determine whether the middle annual-outcome prompt duplicates the preceding organization-priority prompt. | DONE | [Source and platform verification](jul10-feedback-decision-packets.md#44-lva-priority-triplet) | PR #342 / `265ec669` | None | Gabriel |
 | #45 | LVA media wording | Identify Suzanne's specific concern before changing the question. | NEEDS DECISION | [Decision packet](jul10-feedback-decision-packets.md#45-lva-media-wording) | None | Confirm whether the concern is grammar, scope, relevance, or expected answer form. | Suzanne with Gabriel approval |
 | #46 | Template results default | Set the end-user results default at template level with campaign override. | DONE | [Wave Q controls](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/blob/15ee442b124f43155ffd3dfdc1dc08fbfa37cd5e/plans/CHANGELOG.md#L1623) | Wave Q | None | Gabriel |
 | #47 | QSP v2 invitation email | Show coach logo, mention coach by name, use approved copy, and enlarge the CTA. | PARTIAL | [Production receipt](../../plans/CHANGELOG.md#qsp-coach-forward-invitation-copy-production); [universal banner launch](../../plans/CHANGELOG.md#universal-invitation-banner-launched) | PR #337 / `c088ded4`; Production QSP v1 v4 + QSP v2 v3 | Receive one authorized QSP v2 invitation proving the active coach-forward body and universal banner/CTA together. | Gabriel |
@@ -75,11 +75,11 @@
 
 ## Remaining decision queue
 
-The eight non-DONE rows reduce to five unresolved decisions and three implementation/acceptance resumes:
+The five non-DONE rows reduce to four unresolved decisions and one acceptance resume:
 
 1. **Benchmark contract:** #32 decides what may be called an industry benchmark. #57/#58 are closed on the live LVA authoring and both report surfaces; persistent real LVA peer values remain a separately sourced follow-on.
 2. **Report fidelity:** #33 needs sanitized, report-specific annotations rather than an umbrella preference.
-3. **LVA content:** #41, #44, and #45 still require content intent before editing. #42 is closed on the active Production v4 wording and compatibility receipt.
+3. **LVA content:** #41 and #45 still require content intent before editing. #42 is closed on the active Production v4 wording and compatibility receipt. #44 is closed as an intentional organization/annual/quarterly cascade; optional clarity wording is a separate follow-on.
 4. **Invitation acceptance:** #47's code and both canonical Production rows are live. Close after one authorized received QSP v2 invitation proves the active body and universal shell together; full-HTML overrides remain separate.
 
 ## Update protocol
@@ -97,5 +97,5 @@ python3 scripts/build-jul10-closeout-artifacts.py
 
 The supplied July 10 source has 83 status occurrences: 30 in Section 1 and all
 53 canonical rows in Section 2. The generator validates that count, the exact
-row set, the 47/1/5 tally, and the twelve-outcome delta before writing
+row set, the 48/1/4 tally, and the twelve-outcome delta before writing
 deterministic PDFs under `output/pdf/`.
