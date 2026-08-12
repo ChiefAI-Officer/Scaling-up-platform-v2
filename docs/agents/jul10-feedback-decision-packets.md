@@ -124,13 +124,14 @@ migration, benchmark, or unrelated Production state was changed.
 thing to achieve this year's goals?” duplicates the immediately preceding
 priority question.
 
-**Source comparison.** Jeff's supplied Esperto workbook contains the three
-prompts separately in the `Questions` sheet: organization-wide priority at
-`A95`, the annual outcome at `A97`, and the quarterly priority at `A99`. The
-three rows contain different example answers. Current platform content preserves
-the same order as `S6_priority_org`, `S6_priority_year`, and
-`S6_priority_quarter`; the Wave X golden crosswalk also maps them separately as
-Esperto `Q29`, `Q29a`, and `Q30`.
+**Source comparison.** [Jeff's supplied Esperto workbook](../../From%20Jeff/APP_scaling%20up%20assessemnt/APP_leadership%20vision%20alignment%20assessment/leadership%20visin%20alignment%20assement.xlsx)
+contains the three prompts separately in the `Questions` sheet:
+organization-wide priority at `A95`, the annual outcome at `A97`, and the
+quarterly priority at `A99`. The three rows contain different example answers.
+[Current platform content](../../src/prisma/seed-lva-assessment.ts#L646)
+preserves the same order as `S6_priority_org`, `S6_priority_year`, and
+`S6_priority_quarter`; the [Wave X golden crosswalk](../../src/src/__tests__/lib/assessments/esperto-import/crosswalk-golden.wave-x.test.ts#L194)
+also maps them separately as Esperto `Q29`, `Q29a`, and `Q30`.
 
 ![Three-horizon LVA priority cascade](assets/jul10-44-lva-priority-triplet.svg)
 
