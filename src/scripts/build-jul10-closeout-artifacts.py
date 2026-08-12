@@ -18,7 +18,7 @@ EXPECTED_ROWS = [
     66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81,
     83, 84, 85, 86, 87,
 ]
-EXPECTED_TALLY = {"DONE": 48, "PARTIAL": 2, "NEEDS DECISION": 3}
+EXPECTED_TALLY = {"DONE": 49, "PARTIAL": 1, "NEEDS DECISION": 3}
 STATUS_DATE_LONG = "12 August 2026"
 STATUS_DATE_FOOTER = "12 AUG 2026"
 PDF_DEPENDENCIES = ("pdfplumber", "pypdf", "reportlab")
@@ -156,6 +156,7 @@ def inspect_status_rows(source: Path) -> list[list[dict]]:
     current_item: int | None = None
     with pdfplumber.open(source) as pdf:
         for page in pdf.pages:
+            page_start_item = current_item
             lines = group_lines(
                 page.extract_words(
                     x_tolerance=1,
@@ -171,7 +172,12 @@ def inspect_status_rows(source: Path) -> list[list[dict]]:
                 if match:
                     current_item = int(match.group(1))
                     headings.append((top, current_item))
-                if text.startswith("Status:"):
+                # A previously generated status edition retains the source
+                # text but interleaves the old overlay's text extraction on
+                # the same line. Accept either the pristine source line or a
+                # prior derivative so the tracked ledger can regenerate a
+                # fresh overlay without requiring an archived scratch copy.
+                if "Status:" in text:
                     if current_item is None:
                         raise RuntimeError(
                             f"Status row on page {page.page_number} has no item"
@@ -180,6 +186,56 @@ def inspect_status_rows(source: Path) -> list[list[dict]]:
                         {
                             "item": current_item,
                             "top": top,
+                            "next_heading_top": None,
+                        }
+                    )
+            if not status_rows:
+                # Regeneration may use a prior status edition when the pristine
+                # source PDF is unavailable. ReportLab emits every prior status
+                # badge as a 14pt-high rounded curve beginning at x=48. Recover
+                # those row anchors, then replace the prior overlay in place.
+                # Repeatedly refreshed editions can contain several badges at
+                # the same coordinate. De-duplicate by row position so they
+                # still resolve to exactly the canonical 83 occurrences.
+                badge_candidates = sorted(
+                    (
+                        curve
+                        for curve in page.curves
+                        if abs(curve.get("x0", -1) - 48) < 0.1
+                        and abs(curve.get("height", -1) - 14) < 0.1
+                        and round(curve.get("width", -1)) in {38, 53, 86}
+                    ),
+                    key=lambda curve: curve["top"],
+                )
+                prior_badges: list[dict] = []
+                last_badge_top: float | None = None
+                for badge in badge_candidates:
+                    # Each refresh moves its replacement two points upward;
+                    # cluster that chain of same-row badges while keeping
+                    # genuinely adjacent tracker rows distinct.
+                    if (
+                        last_badge_top is not None
+                        and badge["top"] - last_badge_top <= 3
+                    ):
+                        last_badge_top = badge["top"]
+                        continue
+                    prior_badges.append(badge)
+                    last_badge_top = badge["top"]
+                for badge in prior_badges:
+                    preceding = [
+                        (top, item)
+                        for top, item in headings
+                        if top < badge["top"]
+                    ]
+                    item = preceding[-1][1] if preceding else page_start_item
+                    if item is None:
+                        raise RuntimeError(
+                            f"Prior status badge on page {page.page_number} has no item"
+                        )
+                    status_rows.append(
+                        {
+                            "item": item,
+                            "top": badge["top"],
                             "next_heading_top": None,
                         }
                     )
@@ -246,6 +302,10 @@ def draw_overlay(page_rows: list[dict], width: float, height: float, ledger: dic
         layer.setFont("Helvetica", 7.5)
         layer.drawString(note_x, baseline, note)
 
+    # Replace, rather than stack on top of, a footer from a prior status
+    # edition. This band is below the report body and above no source content.
+    layer.setFillColor(white)
+    layer.rect(0, 0, width, 38, fill=1, stroke=0)
     layer.setStrokeColor(HexColor("#DCD4E7"))
     layer.setLineWidth(0.5)
     layer.line(48, 24, width - 48, 24)
@@ -258,6 +318,52 @@ def draw_overlay(page_rows: list[dict], width: float, height: float, ledger: dic
     )
     layer.save()
     return packet.getvalue()
+
+
+def content_streams(page) -> list:
+    from pypdf.generic import ArrayObject
+
+    contents = page.get("/Contents")
+    if contents is None:
+        return []
+    resolved = contents.get_object()
+    if isinstance(resolved, ArrayObject):
+        return list(resolved)
+    return [contents]
+
+
+def remove_prior_status_overlays(page) -> int:
+    from pypdf.generic import ArrayObject, NameObject
+
+    streams = content_streams(page)
+    survivors = [
+        stream
+        for stream in streams
+        if b"STATUS " not in stream.get_object().get_data()
+    ]
+    removed = len(streams) - len(survivors)
+    if removed:
+        page[NameObject("/Contents")] = ArrayObject(survivors)
+    return removed
+
+
+def verify_single_status_overlay(output: Path) -> None:
+    from pypdf import PdfReader
+
+    expected = f"STATUS {STATUS_DATE_FOOTER}".encode("ascii")
+    footer_pattern = re.compile(rb"STATUS \d{1,2} [A-Z]{3} \d{4}")
+    reader = PdfReader(str(output))
+    for page_number, page in enumerate(reader.pages, start=1):
+        footer_tokens = [
+            token
+            for stream in content_streams(page)
+            for token in footer_pattern.findall(stream.get_object().get_data())
+        ]
+        if footer_tokens != [expected]:
+            raise RuntimeError(
+                f"Page {page_number} must retain exactly one current status footer; "
+                f"found {footer_tokens}"
+            )
 
 
 def build_status_overlay(source: Path, output: Path, rows: list[LedgerRow]) -> None:
@@ -277,6 +383,7 @@ def build_status_overlay(source: Path, output: Path, rows: list[LedgerRow]) -> N
     ledger = {row.number: row for row in rows}
     for index, page_rows in enumerate(status_pages):
         page = writer.pages[index]
+        remove_prior_status_overlays(page)
         width = float(page.mediabox.width)
         height = float(page.mediabox.height)
         overlay = PdfReader(
@@ -295,6 +402,7 @@ def build_status_overlay(source: Path, output: Path, rows: list[LedgerRow]) -> N
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.open("wb") as stream:
         writer.write(stream)
+    verify_single_status_overlay(output)
 
 
 def build_progress_delta(output: Path, rows: list[DeltaRow]) -> None:
@@ -486,7 +594,7 @@ def main() -> None:
     )
     ledger_rows = parse_ledger(ledger_path)
     delta_rows = parse_delta(delta_path)
-    print("53 rows: 48 DONE / 2 PARTIAL / 3 NEEDS DECISION")
+    print("53 rows: 49 DONE / 1 PARTIAL / 3 NEEDS DECISION")
     print(f"Status date: {STATUS_DATE_LONG}")
     print("12 post-cutoff outcomes")
     if args.check:
