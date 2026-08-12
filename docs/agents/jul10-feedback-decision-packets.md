@@ -3,9 +3,10 @@
 These packets preserve the bounded decisions and verification receipts behind
 the [canonical closeout ledger](jul10-feedback-closeout.md).
 They were reconciled against origin/main at
-8dd9f1936fe85fcc8237c5bab05b2d2a8b879c09 on 2026-08-12. The #32 closeout
-implementation adds source-backed question-level benchmark values and report
-rendering; no template version, feature flag, customer data, or email is changed.
+45d99f3c5c661b8651ac62ec9ccfd0c9431a2699 on 2026-08-12. The #32 closeout
+implementation and live acceptance add source-backed question-level benchmark
+values and report rendering; no template version, feature flag, customer data,
+or email was changed.
 
 Gabriel may authorize the recommendations below. Publishing a template version,
 changing production benchmark data, enabling a flag, or sending an email still
@@ -47,22 +48,27 @@ mismatch, and renders a third Peers bar beside CEO and Team. It remains
 alias-scoped to `scaling-up-full` and labels the source as a provisional single
 Esperto cohort rather than claiming a size-matched universal industry standard.
 
-![Live Production Scaling Up Full report with Peers comparisons](../../roadmap-sufull-group-report-crop.png)
+![Production Scaling Up Full question-level CEO, Team, and Peers bars](assets/jul10-32-production-question-peers.png)
 
-**Existing Production proof.** The tracked screenshot above shows the already-live
-aggregate Peers values, Team-vs-Peers differences, and the provisional
-single-cohort footnote. The [Wave J launch
-receipt](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/blob/8dd9f1936fe85fcc8237c5bab05b2d2a8b879c09/plans/CHANGELOG.md#L2305) records the live
-campaign verification, published Scaling Up Full version, key-set match, and
-enabled report gate. This screenshot predates the new question-level bars and is
-not presented as their acceptance evidence.
+**Production acceptance.** PR [#343](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/343)
+squash-merged as `45d99f3c5c661b8651ac62ec9ccfd0c9431a2699`. GitHub Production
+deployment `5865542086` completed successfully at
+`scaling-up-platform-v2-9pvkvpeda-scaling-up.vercel.app`, and the canonical
+health endpoint reported a healthy database and safe auth posture. A read-only
+ADMIN inspection of existing three-completion Scaling Up Full campaign
+`cmryzinc50010s7197t5tx1ui` then visibly confirmed the “By question — CEO vs.
+team vs. peers” section and populated Peers bars beside the CEO and Team values.
+The screenshot was captured from the canonical Production alias on
+2026-08-12 at approximately 08:15 UTC and has SHA-256
+`3da3ac4bcd6ee508be36978e7bf0221dcc1be30129959b08a8b9a770946d2e01`.
+No campaign, response, assessment version, benchmark row, flag, email, or other
+Production data was created or changed during acceptance.
 
-**Disposition.** PARTIAL until the implementation is merged and a deployed
-Scaling Up Full report visibly confirms the CEO/Team/Peers question bars. The
-universal-versus-report-specific decision is resolved and no further product
-decision is needed. Replacing the provisional reference with cohort-matched
-norms or expanding comparisons to other assessments remains a separately
-approved data/product enhancement.
+**Disposition.** DONE. The universal-versus-report-specific decision is
+resolved, the Scaling Up Full-only answer comparison is live, and its visual
+acceptance is retained above. Replacing the provisional reference with
+cohort-matched norms or expanding comparisons to other assessments remains a
+separately approved data/product enhancement.
 
 <a id="41-lva-the-leadership-wording"></a>
 ## #41 LVA The leadership wording
@@ -320,9 +326,9 @@ screen/email receipts. Row #84 is DONE.
 
 ## Decision order
 
-1. Complete Production visual acceptance for implemented #32 and received-email acceptance for #47.
+1. Complete received-email acceptance for #47; #32 is Production-accepted.
 2. Answer the content questions: #41 and #45. #44 is evidence-verified DONE.
-3. #57/#58 are closed; after #32's live question-level receipt, treat any wider
-   or cohort-matched benchmark work as separately approved follow-ons.
+3. #32/#57/#58 are closed; treat any wider or cohort-matched benchmark work as
+   separately approved follow-ons.
 4. Handle #33 through its dedicated report-by-report matrix rather than this
    copy/data queue.

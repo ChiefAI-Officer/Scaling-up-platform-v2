@@ -6,6 +6,19 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="jul10-32-su-full-question-benchmarks-production-accepted"></a>
+### 2026-08-12 — July 10 #32 Scaling Up Full answer-level benchmarking Production-accepted <!-- ENTRY_ISO:2026-08-12 ENTRY_SLUG:jul10-32-su-full-question-benchmarks-production-accepted -->
+
+**Status: DONE + LIVE ON PRODUCTION.** Implementation PR [#343](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/343) squash-merged as `45d99f3c5c661b8651ac62ec9ccfd0c9431a2699`. GitHub Production deployment `5865542086` completed successfully at `scaling-up-platform-v2-9pvkvpeda-scaling-up.vercel.app`; the canonical `/api/health` endpoint returned `status=healthy`, a healthy database, and `authPosture=safe`.
+
+**Live visual receipt.** A read-only ADMIN inspection of existing three-completion Scaling Up Full campaign `cmryzinc50010s7197t5tx1ui` on `scaling-up-platform-v2.vercel.app` visibly confirmed the “By question — CEO vs. team vs. peers” section. Individual questions render populated, separately labeled CEO, Team, and amber Peers bars; representative source-backed Peers values include 6.3 for Effective recruitment process, 7.2 for High staff retention, and 5.6 for Onboarding program. The retained screenshot was captured on 2026-08-12 at approximately 08:15 UTC and has SHA-256 `3da3ac4bcd6ee508be36978e7bf0221dcc1be30129959b08a8b9a770946d2e01`.
+
+![Production Scaling Up Full answer-level peer comparison](../docs/agents/assets/jul10-32-production-question-peers.png)
+
+**Disposition and boundary.** Row #32 is DONE: Gabriel chose Scaling Up Full-only scope, all 61 canonical question benchmarks are deployed, and the live answer comparison is visually accepted. No campaign, response, assessment version, benchmark row, feature flag, email, schema, migration, or other Production data was created or changed during acceptance. Cohort-matched norms and other assessment families remain separately approved enhancements. The canonical tally is now **49 DONE / 1 PARTIAL / 3 NEEDS DECISION**; #47 is the only remaining PARTIAL.
+
+---
+
 <a id="jul10-32-su-full-question-benchmarks-implemented"></a>
 ### 2026-08-12 — July 10 #32 Scaling Up Full answer-level benchmarking implemented <!-- ENTRY_ISO:2026-08-12 ENTRY_SLUG:jul10-32-su-full-question-benchmarks-implemented -->
 
