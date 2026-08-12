@@ -6,6 +6,21 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="jul10-32-su-full-benchmarking-verified"></a>
+### 2026-08-12 — July 10 #32 Scaling Up Full benchmarking verified <!-- ENTRY_ISO:2026-08-12 ENTRY_SLUG:jul10-32-su-full-benchmarking-verified -->
+
+**Status: DONE by decision plus evidence-only reconciliation; no runtime or Production change.** The exact July 10 row says Scaling Up Full is missing the Esperto industry's answers/score comparison and asks whether the capability should be universal or report-specific. Gabriel resolved that fork as **Scaling Up Full only**. The prior ledger had added a stronger requirement for a new authoritative raw cohort-data contract; that condition is not present in the original row and is now retained only as an optional data-quality follow-on.
+
+**Source and platform receipt.** Jeff's supplied Esperto Scaling Up Full group report shows the Peers column and explains that Esperto compares against comparable-size growth companies. The durable source audit records the harvested domain, section, and ScaleUp values plus the limitation that the available sample represents one Esperto cohort. Current `su-full-benchmarks.ts` preserves those source values as version `2026-06-28.cohort1.provisional`, applies them only to `scaling-up-full`, and is value-locked and key-set-bound. The scored group model fails closed on any key mismatch; the renderer visibly labels the comparison `provisional industry benchmark (single Esperto cohort) … not yet size-matched`.
+
+![Live Production Scaling Up Full report with Peers comparison](../roadmap-sufull-group-report-crop.png)
+
+**Production evidence and scope boundary.** The retained screenshot above came from a real Production Scaling Up Full campaign and shows Peers, Team-vs-Peers deviations, and the provisional footnote. The 2026-06-30 Wave J launch receipt records the published template, enabled report gate, exact live campaign verification, and successful benchmark key match. Row #32 is therefore closed against its exact decision-and-capability request. Cohort-matched norms, per-question benchmark expansion, other assessment families, and any replacement data contract remain separately approved enhancements; none is silently imported into this row. No benchmark value, template, feature flag, schema, migration, campaign, response, report, email, or customer data changed. The canonical tally is **49 DONE / 1 PARTIAL / 3 NEEDS DECISION**.
+
+**Verification.** Source PDF text and its page-4 Peers table were inspected read-only; the retained Production screenshot and launch receipt were rechecked against current `origin/main`. The focused gate passed 5 suites / 79 tests / 1 snapshot across the source-bound benchmark value lock, key integrity, group-model application, renderer presentation, ledger, and changelog freshness. The full repository passed 692 suites / 8,615 tests / 16 snapshots. Changed-file ESLint emitted no diagnostics; migration safety approved all 47 migrations; the artifact generator compiled and its `--check` reported 53 rows at 49/1/3; `git diff --check` passed. After generating the worktree-local Prisma client, the Production-equivalent Turbopack build compiled, passed TypeScript, and generated 94/94 pages. It retained the expected local missing-Inngest-key and missing-`DATABASE_URL` diagnostics without failing.
+
+---
+
 <a id="jul10-44-lva-priority-triplet-verified"></a>
 ### 2026-08-12 — July 10 #44 LVA priority triplet verified <!-- ENTRY_ISO:2026-08-12 ENTRY_SLUG:jul10-44-lva-priority-triplet-verified -->
 
