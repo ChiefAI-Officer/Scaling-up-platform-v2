@@ -19,6 +19,14 @@ describe("su-full-benchmarks values", () => {
     expect(b.scaleUp).toBe(53.1);
   });
 
+  it("carries the Esperto per-question peer values", () => {
+    const b = benchmarksFor("scaling-up-full")!;
+    expect(b.question.Q01).toBe(6.3); // Effective recruitment process
+    expect(b.question.Q24).toBe(4.7); // Leadership team receives training
+    expect(b.question.Q46).toBe(5.8); // CEO works on the company
+    expect(b.question.Q61).toBe(5.6); // Company-wide meetings
+  });
+
   it("SU_FULL_BENCHMARKS_VERSION matches YYYY-MM-DD prefix", () => {
     expect(SU_FULL_BENCHMARKS_VERSION).toMatch(/^\d{4}-\d{2}-\d{2}/);
   });
@@ -74,6 +82,12 @@ describe("su-full-benchmarks key integrity vs seed", () => {
     .map((s) => s.stableKey)
     .filter((key) => scoredSectionKeys.has(key))
     .sort();
+  const seedQuestionKeys = (
+    content.questions as Array<{ stableKey: string; type: string }>
+  )
+    .filter((q) => q.type === "SLIDER_LIKERT")
+    .map((q) => q.stableKey)
+    .sort();
 
   it("benchmark domain keys exactly match seed scoringConfig.domains", () => {
     const benchmarkDomains = [...SU_FULL_BENCHMARK_KEYS.domains].sort();
@@ -95,6 +109,12 @@ describe("su-full-benchmarks key integrity vs seed", () => {
     expect(Object.keys(b.section).sort()).toEqual(seedSections);
   });
 
+  it("question record keys exactly match seed rating-question stableKeys", () => {
+    const b = benchmarksFor("scaling-up-full")!;
+    expect([...SU_FULL_BENCHMARK_KEYS.questions].sort()).toEqual(seedQuestionKeys);
+    expect(Object.keys(b.question).sort()).toEqual(seedQuestionKeys);
+  });
+
   it("all domain values are in range [0, 10]", () => {
     const b = benchmarksFor("scaling-up-full")!;
     for (const value of Object.values(b.domain)) {
@@ -107,6 +127,15 @@ describe("su-full-benchmarks key integrity vs seed", () => {
   it("all section values are in range [0, 10]", () => {
     const b = benchmarksFor("scaling-up-full")!;
     for (const value of Object.values(b.section)) {
+      expect(value).toBeGreaterThanOrEqual(0);
+      expect(value).toBeLessThanOrEqual(10);
+      expect(typeof value).toBe("number");
+    }
+  });
+
+  it("all question values are in range [0, 10]", () => {
+    const b = benchmarksFor("scaling-up-full")!;
+    for (const value of Object.values(b.question)) {
       expect(value).toBeGreaterThanOrEqual(0);
       expect(value).toBeLessThanOrEqual(10);
       expect(typeof value).toBe("number");

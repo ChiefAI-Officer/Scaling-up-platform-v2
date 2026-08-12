@@ -234,22 +234,33 @@ function QuestionBars({
   questions: GroupScoredQuestion[];
   hasCeo: boolean;
 }) {
-  // Scale bars by the maximum value present so the longest bar fills the track.
-  const maxVal =
-    Math.max(
-      1,
-      ...questions.flatMap((q) =>
-        [q.ceo, q.teamMean].filter(
-          (v): v is number => v !== null && Number.isFinite(v),
+  const hasPeers = questions.some(
+    (q) => q.peers != null && Number.isFinite(q.peers),
+  );
+  // SU-Full uses the source's fixed 0–10 scale; legacy scored reports retain
+  // their existing relative scale when no answer-level benchmark is present.
+  const maxVal = hasPeers
+    ? 10 // Scaling Up Full source contract: every answer bar uses a fixed 0–10 scale.
+    : Math.max(
+        1,
+        ...questions.flatMap((q) =>
+          [q.ceo, q.teamMean].filter(
+            (v): v is number => v !== null && Number.isFinite(v),
+          ),
         ),
-      ),
-    ) || 1;
+      ) || 1;
   const width = (v: number | null): number =>
     v === null || !Number.isFinite(v) ? 0 : Math.max(2, (v / maxVal) * 100);
 
   return (
     <section className="su-group-sec" data-testid="group-scored-questions">
-      <h2 className="su-group-sec-title">By question — CEO vs. team</h2>
+      <h2 className="su-group-sec-title">
+        {hasPeers
+          ? hasCeo
+            ? "By question — CEO vs. team vs. peers"
+            : "By question — team vs. peers"
+          : "By question — CEO vs. team"}
+      </h2>
       {questions.map((q) => (
         <div
           className="su-group-qbar"
@@ -275,6 +286,16 @@ function QuestionBars({
                 {q.teamMean === null ? "—" : formatGroupNumber(q.teamMean)}
               </span>
             </span>
+            {q.peers != null && Number.isFinite(q.peers) && (
+              <span
+                className="su-group-qbar-b p"
+                style={{ width: `${width(q.peers)}%` }}
+              >
+                <span className="su-group-qbar-k">
+                  Peers {formatGroupNumber(q.peers)}
+                </span>
+              </span>
+            )}
           </span>
         </div>
       ))}

@@ -6,6 +6,21 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="jul10-32-su-full-question-benchmarks-implemented"></a>
+### 2026-08-12 — July 10 #32 Scaling Up Full answer-level benchmarking implemented <!-- ENTRY_ISO:2026-08-12 ENTRY_SLUG:jul10-32-su-full-question-benchmarks-implemented -->
+
+**Status: IMPLEMENTED; live answer-level acceptance pending.** The exact July 10 row says Scaling Up Full is missing the Esperto industry's answers comparison and asks whether the capability should be universal or report-specific. Gabriel resolved that fork as **Scaling Up Full only**. The existing Production report already compared domains, sections, and ScaleUp; the source-fidelity audit showed the remaining gap was a Peers bar beside each individual answer.
+
+**Build.** PR #343 adds all 61 question-level values extracted from Jeff's supplied Esperto Scaling Up Full reports to `su-full-benchmarks.ts`, bumps the value-lock to `2026-08-12.cohort1.provisional`, and asserts exact key parity with the canonical rating-question seed. The group-report model attaches question Peers plus CEO-vs-Peers and Team-vs-Peers deviations and clears every benchmark on key mismatch. The renderer scales against all three values and shows an amber `Peers` bar beside the existing CEO and Team bars. Non-Scaling-Up-Full reports remain byte-compatible because the benchmark lookup remains alias-scoped.
+
+![Existing Production Scaling Up Full aggregate Peers comparison](../roadmap-sufull-group-report-crop.png)
+
+**Acceptance and scope boundary.** The retained screenshot above is valid evidence for the pre-existing aggregate comparison only; it is not evidence of the new question bars. Row #32 remains PARTIAL until the merged Production report is visually accepted and a durable screenshot receipt is tracked. No schema, migration, template version, feature flag, campaign, response, email, or customer data change is required. Cohort-matched norms and other assessment families remain separate enhancements. The canonical tally is **48 DONE / 2 PARTIAL / 3 NEEDS DECISION**.
+
+**Verification.** TDD began with failing value/model/render assertions. The final full repository passed **692/692 suites, 8,618/8,618 tests, and 16/16 snapshots**; the focused benchmark/model/render/ledger/changelog/capacity gate passed **6 suites / 84 tests / 1 snapshot**. Changed-file ESLint emitted no diagnostics; migration safety approved all 47 migrations; the artifact generator reported 53 rows at 48/2/3; and `git diff --check` passed. The Production-equivalent Turbopack build compiled in 21.6s, passed TypeScript, and generated 94/94 pages, retaining only the expected local missing-Inngest-key and missing-`DATABASE_URL` diagnostics.
+
+---
+
 <a id="jul10-44-lva-priority-triplet-verified"></a>
 ### 2026-08-12 — July 10 #44 LVA priority triplet verified <!-- ENTRY_ISO:2026-08-12 ENTRY_SLUG:jul10-44-lva-priority-triplet-verified -->
 
