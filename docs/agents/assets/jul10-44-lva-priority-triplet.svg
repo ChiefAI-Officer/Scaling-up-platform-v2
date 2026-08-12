@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="420" viewBox="0 0 1200 420" role="img" aria-labelledby="title desc">
+  <title id="title">LVA priority triplet source comparison</title>
+  <desc id="desc">Three separate source questions map to three separate stable keys: organization-wide priority, annual outcome, and quarterly priority.</desc>
+  <rect width="1200" height="420" rx="28" fill="#f7f3fa"/>
+  <text x="60" y="58" fill="#241833" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700">July 10 #44 - source and platform preserve three different horizons</text>
+  <text x="60" y="91" fill="#6f6780" font-family="Arial, Helvetica, sans-serif" font-size="17">Esperto workbook: Questions A95, A97, A99  |  Platform: three consecutive TEXT questions with distinct stable keys</text>
+
+  <g transform="translate(60 130)">
+    <rect width="320" height="210" rx="20" fill="#ffffff" stroke="#dcd4e7" stroke-width="2"/>
+    <rect width="320" height="48" rx="20" fill="#522583"/>
+    <rect y="28" width="320" height="20" fill="#522583"/>
+    <text x="22" y="32" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700">1. Organization-wide</text>
+    <text x="22" y="78" fill="#241833" font-family="Arial, Helvetica, sans-serif" font-size="16">Overall number-one</text>
+    <text x="22" y="100" fill="#241833" font-family="Arial, Helvetica, sans-serif" font-size="16">priority for the</text>
+    <text x="22" y="122" fill="#241833" font-family="Arial, Helvetica, sans-serif" font-size="16">organization</text>
+    <line x1="22" x2="298" y1="139" y2="139" stroke="#e8e2f2" stroke-width="2"/>
+    <text x="22" y="169" fill="#6f6780" font-family="Arial, Helvetica, sans-serif" font-size="15">Source cell A95</text>
+    <text x="22" y="195" fill="#522583" font-family="Courier New, monospace" font-size="14">S6_priority_org</text>
+  </g>
+
+  <path d="M395 235 H430" stroke="#8d73aa" stroke-width="5" stroke-linecap="round"/>
+  <path d="M422 225 L434 235 L422 245" fill="none" stroke="#8d73aa" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <g transform="translate(440 130)">
+    <rect width="320" height="210" rx="20" fill="#ffffff" stroke="#dcd4e7" stroke-width="2"/>
+    <rect width="320" height="48" rx="20" fill="#7a3fa0"/>
+    <rect y="28" width="320" height="20" fill="#7a3fa0"/>
+    <text x="22" y="32" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700">2. Annual outcome</text>
+    <text x="22" y="78" fill="#241833" font-family="Arial, Helvetica, sans-serif" font-size="16">Most important thing</text>
+    <text x="22" y="100" fill="#241833" font-family="Arial, Helvetica, sans-serif" font-size="16">needed to achieve this</text>
+    <text x="22" y="122" fill="#241833" font-family="Arial, Helvetica, sans-serif" font-size="16">year's goals</text>
+    <line x1="22" x2="298" y1="139" y2="139" stroke="#e8e2f2" stroke-width="2"/>
+    <text x="22" y="169" fill="#6f6780" font-family="Arial, Helvetica, sans-serif" font-size="15">Source cell A97</text>
+    <text x="22" y="195" fill="#522583" font-family="Courier New, monospace" font-size="14">S6_priority_year</text>
+  </g>
+
+  <path d="M775 235 H810" stroke="#8d73aa" stroke-width="5" stroke-linecap="round"/>
+  <path d="M802 225 L814 235 L802 245" fill="none" stroke="#8d73aa" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <g transform="translate(820 130)">
+    <rect width="320" height="210" rx="20" fill="#ffffff" stroke="#dcd4e7" stroke-width="2"/>
+    <rect width="320" height="48" rx="20" fill="#a45a19"/>
+    <rect y="28" width="320" height="20" fill="#a45a19"/>
+    <text x="22" y="32" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700">3. Quarterly priority</text>
+    <text x="22" y="78" fill="#241833" font-family="Arial, Helvetica, sans-serif" font-size="16">Number-one priority</text>
+    <text x="22" y="100" fill="#241833" font-family="Arial, Helvetica, sans-serif" font-size="16">this quarter to meet</text>
+    <text x="22" y="122" fill="#241833" font-family="Arial, Helvetica, sans-serif" font-size="16">the targets</text>
+    <line x1="22" x2="298" y1="139" y2="139" stroke="#e8e2f2" stroke-width="2"/>
+    <text x="22" y="169" fill="#6f6780" font-family="Arial, Helvetica, sans-serif" font-size="15">Source cell A99</text>
+    <text x="22" y="195" fill="#522583" font-family="Courier New, monospace" font-size="14">S6_priority_quarter</text>
+  </g>
+
+  <rect x="340" y="365" width="520" height="36" rx="18" fill="#e2f2e8"/>
+  <text x="600" y="389" text-anchor="middle" fill="#1e824c" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">VERDICT: intentional cascade - not a duplicate</text>
+</svg>

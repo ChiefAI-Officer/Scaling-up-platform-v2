@@ -6,6 +6,17 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="jul10-44-lva-priority-triplet-verified"></a>
+### 2026-08-12 — July 10 #44 LVA priority triplet verified <!-- ENTRY_ISO:2026-08-12 ENTRY_SLUG:jul10-44-lva-priority-triplet-verified -->
+
+**Status: DONE by evidence-only reconciliation; no runtime or Production change.** The exact July 10 row asked whether “What is in your opinion the most important thing to achieve this year's goals?” duplicates the preceding LVA priority question. Jeff's supplied Esperto workbook answers that question directly: its `Questions` sheet contains separate organization-wide, annual, and quarterly prompts at `A95`, `A97`, and `A99`, with different example answers. Current platform content preserves those same three prompts in the same order under distinct stable keys `S6_priority_org`, `S6_priority_year`, and `S6_priority_quarter`; the locked Wave X golden crosswalk independently maps them to Esperto `Q29`, `Q29a`, and `Q30`.
+
+**Disposition and scope boundary.** The middle prompt is not a duplicate. The sequence is an intentional cascade from the organization's overall priority, to the annual outcome required for this year's goals, to the current quarter's priority. Row #44 closes against that exact review request. No wording, stable key, import mapping, template version, publication, flag, schema, migration, campaign, response, report, email, or customer data changed. Optional horizon-forward rewording remains a separately approved copy improvement and does not reopen the duplicate determination. The canonical tally is **48 DONE / 1 PARTIAL / 4 NEEDS DECISION**.
+
+**Verification.** The supplied workbook was imported read-only and the relevant cells were inspected and visually rendered. The focused Jest gate passed 4 suites / 63 tests (seed content, LVA label fixture, Wave X golden crosswalk, ledger, and changelog freshness); the full Jest gate passed 692 suites / 8,615 tests / 16 snapshots. Changed-file ESLint, Python artifact-generator compilation and `--check`, migration safety across all 47 migrations, `git diff --check`, and the Turbopack production build (94/94 static pages) also passed. The build emitted only the expected local missing-Inngest-key and missing-`DATABASE_URL` diagnostics while completing successfully. The three genuine content/report discussions remain #33, #41, and #45; #32 continues on its independent benchmark-provenance path, and #47 awaits received-email evidence.
+
+---
+
 <a id="jul10-58-lva-peer-comparisons-production-accepted"></a>
 ### 2026-08-12 — July 10 #58 LVA peer comparisons accepted on Production <!-- ENTRY_ISO:2026-08-12 ENTRY_SLUG:jul10-58-lva-peer-comparisons-production-accepted -->
 

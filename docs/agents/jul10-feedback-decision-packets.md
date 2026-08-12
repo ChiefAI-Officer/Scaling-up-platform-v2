@@ -124,30 +124,26 @@ migration, benchmark, or unrelated Production state was changed.
 thing to achieve this year's goals?” duplicates the immediately preceding
 priority question.
 
-**Current truth.** The source and current seed preserve three adjacent horizons:
-the organization's overall number-one priority, the most important outcome for
-this year's goals, and the top priority for the next quarter. No later content
-decision, reword, published version, or live verification resolves the reported
-confusion. Source fidelity alone does not satisfy a clarity concern.
+**Source comparison.** Jeff's supplied Esperto workbook contains the three
+prompts separately in the `Questions` sheet: organization-wide priority at
+`A95`, the annual outcome at `A97`, and the quarterly priority at `A99`. The
+three rows contain different example answers. Current platform content preserves
+the same order as `S6_priority_org`, `S6_priority_year`, and
+`S6_priority_quarter`; the Wave X golden crosswalk also maps them separately as
+Esperto `Q29`, `Q29a`, and `Q30`.
 
-**Recommendation.** Confirm the intended priority cascade before editing:
-organization-wide priority, annual outcome, then quarterly action. If those are
-intentional, approve distinct horizon-forward labels. If not, identify which
-construct is redundant. Preserve existing stable keys only where meaning is
-continuous.
+![Three-horizon LVA priority cascade](assets/jul10-44-lva-priority-triplet.svg)
 
-**Compatibility.** Any copy-only clarification belongs in a new LVA version and
-must retain factor order and import mappings. Removing or changing a construct
-requires a fresh stable key/mapping decision.
+**Answer.** No. The middle prompt is not a duplicate of the preceding prompt.
+The first asks for the organization's overall priority; the second asks for the
+annual outcome needed to achieve this year's goals; the third asks for the
+current quarter's priority. This is an intentional three-horizon cascade.
 
-**Acceptance.** Owner-approved wording makes the three time horizons
-unambiguous in a draft; targeted seed/import tests pass; a separately authorized
-publish is followed by a live survey check.
-
-**Approval sentence.** I approve the three-question sequence as an intentional
-organization, annual, and quarterly priority cascade; prepare distinct
-horizon-forward wording while retaining stable keys only where the meaning is
-unchanged.
+**Disposition.** DONE against the exact July 10 request to review the possible
+duplicate. No wording, stable key, import mapping, template version, or
+Production state changed. If clearer horizon-forward wording is wanted later,
+that is a separate copy improvement requiring its own approval and published
+LVA version; it does not reopen the duplicate determination.
 
 <a id="45-lva-media-wording"></a>
 ## #45 LVA media wording
@@ -311,7 +307,7 @@ screen/email receipts. Row #84 is DONE.
 ## Decision order
 
 1. Approve the remaining bounded no-new-product-intent packet: #47.
-2. Answer the content questions: #41, #44, and #45.
+2. Answer the content questions: #41 and #45. #44 is evidence-verified DONE.
 3. Approve data/rollout contracts: #32 and #57/#58.
 4. Handle #33 through its dedicated report-by-report matrix rather than this
    copy/data queue.
