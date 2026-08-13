@@ -5,15 +5,26 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { Trash2 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 interface DeleteWorkshopDialogProps {
   workshopId: string;
   workshopTitle: string;
+  responsiveEnabled?: boolean;
 }
 
 export function DeleteWorkshopDialog({
   workshopId,
   workshopTitle,
+  responsiveEnabled = false,
 }: DeleteWorkshopDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -61,6 +72,109 @@ export function DeleteWorkshopDialog({
       setIsSubmitting(false);
     }
   };
+
+  if (responsiveEnabled) {
+    return (
+      <Dialog
+        open={isOpen}
+        onOpenChange={(open) => {
+          setIsOpen(open);
+          if (!open) {
+            setConfirmText("");
+            setError(null);
+          }
+        }}
+      >
+        <DialogTrigger asChild>
+          <Button
+            variant="outline"
+            onClick={() => setIsOpen(true)}
+            className="min-h-11 border-destructive/20 text-destructive hover:bg-destructive/10 hover:text-destructive"
+          >
+            <Trash2 className="w-4 h-4 mr-1" />
+            Delete Permanently
+          </Button>
+        </DialogTrigger>
+        <DialogContent responsiveEnabled className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-destructive">
+              Permanently Delete Workshop
+            </DialogTitle>
+            <DialogDescription>
+              This will permanently remove{" "}
+              <span className="font-medium text-foreground">{workshopTitle}</span>{" "}
+              and all associated data:
+            </DialogDescription>
+          </DialogHeader>
+
+          <ul className="text-sm text-muted-foreground list-disc pl-5 space-y-1">
+            <li>All registrations (including paid registration records)</li>
+            <li>All landing pages</li>
+            <li>All surveys and responses</li>
+            <li>All workflow assignments and execution logs</li>
+            <li>All approval queue entries for this workshop</li>
+            <li>All follow-up reports</li>
+            <li>File links (uploaded files remain in Blob storage)</li>
+          </ul>
+
+          <div className="rounded-lg border border-destructive/20 bg-destructive/10 p-4">
+            <p className="text-sm font-medium text-destructive">
+              This action cannot be undone.
+            </p>
+          </div>
+
+          <div>
+            <label
+              htmlFor="confirm-title-responsive"
+              className="block text-sm font-medium text-foreground mb-1"
+            >
+              Type the workshop title to confirm:
+            </label>
+            <input
+              id="confirm-title-responsive"
+              type="text"
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              placeholder={workshopTitle}
+              className="min-h-11 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-destructive/50"
+            />
+          </div>
+
+          {error && (
+            <div
+              role="alert"
+              aria-label="Delete workshop error summary"
+              className="rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+            >
+              {error}
+            </div>
+          )}
+
+          <DialogFooter className="gap-3 [&_button]:min-h-11 [&_button]:w-full sm:[&_button]:w-auto">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsOpen(false);
+                setConfirmText("");
+                setError(null);
+              }}
+              disabled={isSubmitting}
+              className="min-h-11 w-full sm:w-auto"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleDelete}
+              disabled={isSubmitting || !titleMatches}
+              className="min-h-11 w-full bg-destructive hover:bg-destructive/90 text-destructive-foreground sm:w-auto"
+            >
+              {isSubmitting ? "Deleting..." : "Delete Permanently"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   if (!isOpen) {
     return (

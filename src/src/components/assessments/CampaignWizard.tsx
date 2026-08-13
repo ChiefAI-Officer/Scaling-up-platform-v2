@@ -1872,6 +1872,7 @@ function ParticipantsStep({
         teams={teams}
         defaultTeamId={null}
         description={`Adds this person to ${orgName || "this company"}'s roster (not just this campaign).`}
+        responsiveEnabled={responsiveEnabled}
       />
     </div>
   );

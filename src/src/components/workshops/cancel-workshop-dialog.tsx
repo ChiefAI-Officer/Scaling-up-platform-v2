@@ -4,11 +4,21 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog";
 
 interface CancelWorkshopDialogProps {
     workshopId: string;
     workshopTitle: string;
     eventDate: string;
+    responsiveEnabled?: boolean;
 }
 
 const MINIMUM_LEAD_TIME_DAYS = 14;
@@ -18,6 +28,7 @@ export function CancelWorkshopDialog({
     workshopId,
     workshopTitle,
     eventDate,
+    responsiveEnabled = false,
 }: CancelWorkshopDialogProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -68,6 +79,87 @@ export function CancelWorkshopDialog({
             setIsSubmitting(false);
         }
     };
+
+    if (responsiveEnabled) {
+        return (
+            <Dialog
+                open={isOpen}
+                onOpenChange={(open) => {
+                    setIsOpen(open);
+                    if (!open) setError(null);
+                }}
+            >
+                <DialogTrigger asChild>
+                    <Button
+                        variant="outline"
+                        onClick={() => setIsOpen(true)}
+                        className="min-h-11 border-destructive/20 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    >
+                        Cancel Workshop
+                    </Button>
+                </DialogTrigger>
+                <DialogContent responsiveEnabled className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Cancel Workshop</DialogTitle>
+                        <DialogDescription>
+                            Are you sure you want to cancel <span className="font-medium">{workshopTitle}</span>?
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <p className="text-sm text-muted-foreground">
+                        Cancellations may result in fees, please refer to{" "}
+                        <a
+                            href="/api/files/terms-and-conditions"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex min-h-11 items-center text-primary underline hover:text-primary/80"
+                        >
+                            workshop terms and conditions
+                        </a>.
+                    </p>
+
+                    <p className="text-sm text-muted-foreground">
+                        This action cannot be undone. Any registrants will need to be notified separately.
+                    </p>
+
+                    {error && (
+                        <div
+                            role="alert"
+                            aria-label="Cancel workshop error summary"
+                            className="rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+                        >
+                            {error}
+                        </div>
+                    )}
+
+                    <DialogFooter className="gap-3 [&_button]:min-h-11 [&_button]:w-full sm:[&_button]:w-auto">
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                setIsOpen(false);
+                                setError(null);
+                            }}
+                            disabled={isSubmitting}
+                            className="min-h-11 w-full sm:w-auto"
+                        >
+                            Keep Workshop
+                        </Button>
+                        <Button
+                            onClick={handleCancel}
+                            disabled={isSubmitting}
+                            className="min-h-11 w-full bg-destructive hover:bg-destructive/90 text-destructive-foreground sm:w-auto"
+                        >
+                            {isSubmitting
+                                ? "Canceling..."
+                                : feeRequired
+                                  ? `Cancel & Accept $${CANCELLATION_FEE_DOLLARS} Fee`
+                                  : "Cancel Workshop"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        );
+    }
 
     if (!isOpen) {
         return (

@@ -1045,6 +1045,7 @@ export function MembersTeamsView({
         onCreated={handleCreated}
         organizations={organizations}
         loadedTeams={loadedTeamsForModal}
+        responsiveEnabled={responsiveEnabled}
       />
 
       {/* ImportMembersModal — only mount when we have an org context */}
@@ -1065,6 +1066,7 @@ export function MembersTeamsView({
             }}
             orgId={importOrgId}
             orgName={importOrg?.name ?? importOrgId}
+            responsiveEnabled={responsiveEnabled}
           />
         );
       })()}
@@ -1100,6 +1102,7 @@ export function MembersTeamsView({
             teams={modalTeams}
             defaultTeamId={modalDefaultTeamId}
             loadingTeams={orgStates[modalOrgId]?.loadingTeams ?? false}
+            responsiveEnabled={responsiveEnabled}
           />
         );
       })()}
@@ -1125,6 +1128,7 @@ export function MembersTeamsView({
             }}
             team={editingTeam}
             teams={prunedTeams}
+            responsiveEnabled={responsiveEnabled}
           />
         );
       })()}
@@ -1155,6 +1159,7 @@ export function MembersTeamsView({
             }}
             member={memberBeingEdited}
             teams={editMemberTeams}
+            responsiveEnabled={responsiveEnabled}
           />
         );
       })()}
@@ -1183,6 +1188,7 @@ export function MembersTeamsView({
             }
           }}
           organization={orgBeingEdited}
+          responsiveEnabled={responsiveEnabled}
         />
       )}
     </>

@@ -68,6 +68,7 @@ export interface AddTeamModalProps {
    * If an org has not been expanded yet the key may be absent or [].
    */
   loadedTeams: Record<string, ApiTeamNode[]>;
+  responsiveEnabled?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -100,6 +101,7 @@ export function AddTeamModal({
   onCreated,
   organizations,
   loadedTeams,
+  responsiveEnabled = false,
 }: AddTeamModalProps) {
   const nameId  = useId();
   const typeId  = useId();
@@ -267,7 +269,12 @@ export function AddTeamModal({
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose(); }}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent
+        responsiveEnabled={responsiveEnabled}
+        className={responsiveEnabled
+          ? "sm:max-w-md [&_input]:min-h-11 [&_select]:min-h-11"
+          : "sm:max-w-md"}
+      >
         <DialogHeader>
           <DialogTitle>Add Team / Company</DialogTitle>
           <DialogDescription>
@@ -360,7 +367,10 @@ export function AddTeamModal({
             )}
           </div>
 
-          <DialogFooter className="mt-4">
+          <DialogFooter className={responsiveEnabled
+            ? "mt-4 gap-2 [&_button]:min-h-11 [&_button]:w-full sm:[&_button]:w-auto"
+            : "mt-4"}
+          >
             <Button
               type="button"
               variant="outline"

@@ -180,10 +180,18 @@ export default async function WorkshopDetailPage({
         </div>
         {mobileResponsiveEnabled ? (
           <div className="max-w-full [&>div]:flex-wrap [&_button]:min-h-11">
-            <WorkshopActions workshop={workshop} userRole={session.user.role} />
+            <WorkshopActions
+              workshop={workshop}
+              userRole={session.user.role}
+              responsiveEnabled={mobileResponsiveEnabled}
+            />
           </div>
         ) : (
-          <WorkshopActions workshop={workshop} userRole={session.user.role} />
+          <WorkshopActions
+            workshop={workshop}
+            userRole={session.user.role}
+            responsiveEnabled={mobileResponsiveEnabled}
+          />
         )}
       </div>
       </FadeUp>

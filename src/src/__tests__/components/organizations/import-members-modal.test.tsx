@@ -72,7 +72,9 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  jest.runAllTimers();
+  act(() => {
+    jest.runAllTimers();
+  });
   jest.useRealTimers();
   jest.restoreAllMocks();
 });
@@ -82,6 +84,22 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("ImportMembersModal", () => {
+  test("responsive CSV preview is a labeled bounded data region", async () => {
+    renderModal({ responsiveEnabled: true });
+
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: VALID_CSV_3_ROWS },
+    });
+
+    const preview = await screen.findByRole("region", {
+      name: /CSV member preview/i,
+    });
+    expect(preview).toHaveAttribute("tabindex", "0");
+    expect(preview).toHaveClass("max-w-full overflow-x-auto");
+    expect(preview.querySelector("table")).not.toBeNull();
+    expect(screen.getByRole("dialog")).toHaveAttribute("data-responsive-dialog");
+  });
+
   /**
    * (1) Live preview parses pasted CSV — paste a 3-row valid CSV;
    *     assert the parsed-rows count + table rows.
@@ -138,7 +156,7 @@ describe("ImportMembersModal", () => {
       }),
     });
 
-    renderModal();
+    const { onUpdated } = renderModal();
 
     const textarea = screen.getByRole("textbox");
     fireEvent.change(textarea, { target: { value: VALID_CSV_2_ROWS } });
@@ -150,12 +168,16 @@ describe("ImportMembersModal", () => {
     // Change mode to merge
     fireEvent.click(screen.getByLabelText(/merge/i));
 
-    fireEvent.click(screen.getByRole("button", { name: /import 2 respondents/i }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /import 2 respondents/i }));
+    });
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledTimes(1);
     });
-
+    await waitFor(() => {
+      expect(onUpdated).toHaveBeenCalledTimes(1);
+    });
     const [url, init] = (global.fetch as jest.Mock).mock.calls[0] as [string, RequestInit];
     expect(url).toBe(`/api/organizations/${ORG_ID}/respondents/bulk`);
 

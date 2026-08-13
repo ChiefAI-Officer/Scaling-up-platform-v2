@@ -82,6 +82,7 @@ export interface EditTeamModalProps {
    * a second time, belt-and-suspenders.
    */
   teams: ApiTeamNode[];
+  responsiveEnabled?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -160,6 +161,7 @@ export function EditTeamModal({
   onUpdated,
   team,
   teams,
+  responsiveEnabled = false,
 }: EditTeamModalProps) {
   const nameId = useId();
   const typeId = useId();
@@ -363,7 +365,12 @@ export function EditTeamModal({
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose(); }}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent
+        responsiveEnabled={responsiveEnabled}
+        className={responsiveEnabled
+          ? "sm:max-w-md [&_input]:min-h-11 [&_select]:min-h-11"
+          : "sm:max-w-md"}
+      >
         <DialogHeader>
           <DialogTitle>Edit Team</DialogTitle>
           <DialogDescription>
@@ -475,7 +482,10 @@ export function EditTeamModal({
             )}
           </div>
 
-          <DialogFooter className="mt-4 sm:justify-between">
+          <DialogFooter className={responsiveEnabled
+            ? "mt-4 gap-2 sm:justify-between [&_button]:min-h-11 [&_button]:w-full sm:[&_button]:w-auto"
+            : "mt-4 sm:justify-between"}
+          >
             {/* Destructive action — left-aligned via flex parent */}
             <Button
               type="button"
@@ -486,7 +496,10 @@ export function EditTeamModal({
             >
               Delete team
             </Button>
-            <div className="flex items-center gap-2">
+            <div className={responsiveEnabled
+              ? "flex flex-col-reverse items-stretch gap-2 sm:flex-row sm:items-center"
+              : "flex items-center gap-2"}
+            >
               <Button
                 type="button"
                 variant="outline"

@@ -650,6 +650,7 @@ export default async function WorkshopDetailsPage({
             workshopId={workshop.id}
             workshopTitle={workshop.title}
             eventDate={workshop.eventDate.toISOString()}
+            responsiveEnabled={mobileResponsiveEnabled}
           />
         )}
       </div>

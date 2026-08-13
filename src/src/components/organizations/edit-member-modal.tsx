@@ -69,6 +69,7 @@ export interface EditMemberModalProps {
   member: EditMemberModalMember;
   /** Flat list of teams for this org (pre-fetched by parent). */
   teams: ApiTeamNode[];
+  responsiveEnabled?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -81,6 +82,7 @@ export function EditMemberModal({
   onUpdated,
   member,
   teams,
+  responsiveEnabled = false,
 }: EditMemberModalProps) {
   const firstNameId = useId();
   const lastNameId  = useId();
@@ -210,7 +212,12 @@ export function EditMemberModal({
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose(); }}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent
+        responsiveEnabled={responsiveEnabled}
+        className={responsiveEnabled
+          ? "sm:max-w-md [&_input]:min-h-11 [&_select]:min-h-11"
+          : "sm:max-w-md"}
+      >
         <DialogHeader>
           <DialogTitle>Edit Member</DialogTitle>
           <DialogDescription>
@@ -344,7 +351,10 @@ export function EditMemberModal({
             )}
           </div>
 
-          <DialogFooter className="mt-4">
+          <DialogFooter className={responsiveEnabled
+            ? "mt-4 gap-2 [&_button]:min-h-11 [&_button]:w-full sm:[&_button]:w-auto"
+            : "mt-4"}
+          >
             <Button
               type="button"
               variant="outline"
