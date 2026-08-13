@@ -212,6 +212,27 @@ body[data-mobile-responsive="on"] [data-auth-shell] [data-responsive-container] 
   body[data-mobile-responsive="on"] [data-auth-shell] header [data-compact-hide] {
     display: none;
   }
+
+  body[data-mobile-responsive="on"] [data-responsive-page-header] {
+    align-items: stretch;
+    gap: 1rem;
+  }
+
+  body[data-mobile-responsive="on"] [data-responsive-actions] {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    width: 100%;
+  }
+
+  body[data-mobile-responsive="on"] [data-responsive-tabs] {
+    scroll-padding-inline: 1rem;
+    overscroll-behavior-inline: contain;
+  }
+
+  body[data-mobile-responsive="on"] [data-touch-target] {
+    min-height: 44px;
+    min-width: 44px;
+  }
 }
 
 /* --- Smooth scroll & reduced-motion --- */

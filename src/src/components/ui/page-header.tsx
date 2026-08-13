@@ -5,6 +5,7 @@ interface PageHeaderProps extends React.HTMLAttributes<HTMLDivElement> {
   title: string;
   description?: string;
   actions?: React.ReactNode;
+  responsiveEnabled?: boolean;
 }
 
 function PageHeader({
@@ -12,11 +13,13 @@ function PageHeader({
   title,
   description,
   actions,
+  responsiveEnabled = false,
   ...props
 }: PageHeaderProps) {
   return (
     <div
       className={cn("flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between mb-6", className)}
+      data-responsive-page-header={responsiveEnabled ? "" : undefined}
       {...props}
     >
       <div>
@@ -27,7 +30,7 @@ function PageHeader({
           <p className="mt-1 text-sm text-muted-foreground">{description}</p>
         )}
       </div>
-      {actions && <div className="flex items-center gap-2 mt-3 sm:mt-0">{actions}</div>}
+      {actions && <div className="flex items-center gap-2 mt-3 sm:mt-0" data-responsive-actions={responsiveEnabled ? "" : undefined}>{actions}</div>}
     </div>
   );
 }
