@@ -6,6 +6,13 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="template-delete-soft-deleted-campaign-guard-launched"></a>
+### 2026-08-13 — Template-delete tombstone guard launched <!-- ENTRY_ISO:2026-08-13 ENTRY_SLUG:template-delete-soft-deleted-campaign-guard-launched -->
+
+**Status: LIVE ON PRODUCTION.** PR [#346](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/346) passed Build, Migration Safety Gate, Assessment Email Lease (PostgreSQL), Vercel, and Vercel Preview Comments, then squash-merged to protected `main` as `f511af9dc22558753c6f9a3263a9fb6816917d99`. GitHub Production deployment `5879745027` completed successfully for that exact SHA at `scaling-up-platform-v2-bal0lx0ph-scaling-up.vercel.app`. Both canonical health endpoints returned a healthy database and safe auth posture, and post-merge `main` CI run `31654812991` completed successfully.
+
+**Live behavior and data boundary.** Template deletion now ignores soft-deleted campaign tombstones while retaining their status, invitations, submissions, audit history, and other stored fields unchanged. Live `DRAFT` and `ACTIVE` campaigns continue to block template deletion; live `CLOSED` campaigns retain their prior non-blocking behavior. The `Scaling Up Quiz` template can now be deleted despite its two preserved deleted-`ACTIVE` campaign rows. Verification was read-only after deployment: no template, campaign, invitation, submission, assessment version, feature flag, schema, migration, or other Production data was changed.
+
 <a id="template-delete-soft-deleted-campaign-guard-fixed"></a>
 ### 2026-08-13 — Template deletion ignores soft-deleted campaign tombstones <!-- ENTRY_ISO:2026-08-13 ENTRY_SLUG:template-delete-soft-deleted-campaign-guard-fixed -->
 
