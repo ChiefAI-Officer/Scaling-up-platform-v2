@@ -429,3 +429,82 @@ immutable implementation commit.
 Completed in implementation commit `4749c3af`. The full root-cause,
 RED/GREEN, validation, and limitation receipt is recorded above under
 **Fix round 5 evidence — authoritative populated-route readiness**.
+
+## Post-round follow-up — shell-less authenticated report routes (2026-08-13)
+
+The latest populated matrix reached valid campaign reports at 600, 1024, and
+1440 pixels, but the harness rejected them for lacking
+`[data-auth-shell="admin"]`. That requirement was false for these URLs: both
+`/assessments/{campaignId}/report` and
+`/assessments/{campaignId}/respondents/{respondentId}/report` live in the
+deliberate `(report)` route group. Its layout explicitly omits dashboard and
+portal navigation so printable reports keep clean branded chrome. The report
+pages already expose `data-responsive-report-page` in all rendered branches,
+while the root body exposes `data-mobile-responsive="on"` when the wave is
+active.
+
+The route contract now has two explicit responsive surfaces. Dashboard routes
+retain the role-specific visible auth-shell requirement. Only the two exact
+assessment report pathname shapes opt into the shell-less report surface; an
+arbitrary `/report` suffix and the portal longitudinal report remain normal
+auth-shell routes. A shell-less report must prove the responsive body flag,
+its visible report-page marker, and the absence of any visible auth shell.
+Navigation response, HTTP status, authentication fallback, unexpected redirect,
+error-heading, and document-overflow checks are unchanged and still run for
+every route.
+
+### RED / GREEN
+
+RED command (from `src/`):
+
+```bash
+npx jest src/__tests__/e2e/mobile-responsive-acceptance-contract.test.ts --runInBand
+```
+
+Result: exit 1, **3 failed / 30 passed**. The three new behavioral cases could
+not load a responsive surface contract. They covered exact route
+classification, valid and invalid report presentation evidence, and the
+unchanged dashboard-shell requirement. Separate navigation assertions proved
+that report auth redirects and HTTP 404s remained rejected before the surface
+contract existed.
+
+GREEN with the same command: exit 0, **1 suite / 33 tests passed**. The behavior
+contract accepts only a body-flagged, report-marked, shell-less report; rejects
+missing body or report markers and reports that render a dashboard shell; and
+still rejects a dashboard route without the role-specific auth shell.
+
+### Changed files and validation
+
+- `src/e2e/helpers/responsive-route-contract.ts`
+- `src/e2e/helpers/overflow.ts`
+- `src/e2e/mobile-responsive-admin.spec.ts`
+- `src/src/__tests__/e2e/mobile-responsive-acceptance-contract.test.ts`
+- This appended evidence receipt.
+
+Validation from `src/`:
+
+```bash
+npx jest src/__tests__/e2e/mobile-responsive-acceptance-contract.test.ts --runInBand
+npx eslint e2e/helpers/responsive-route-contract.ts e2e/helpers/overflow.ts e2e/mobile-responsive-admin.spec.ts src/__tests__/e2e/mobile-responsive-acceptance-contract.test.ts
+PLAYWRIGHT_BASE_URL=https://preview.example.test npx playwright test e2e/mobile-responsive-coach.spec.ts e2e/mobile-responsive-admin.spec.ts e2e/mobile-responsive-state.spec.ts e2e/mobile-responsive-a11y.spec.ts e2e/mobile-responsive-visual.spec.ts e2e/mobile-responsive-kill-diagnostic.spec.ts --list --reporter=list --project=responsive-compact --project=responsive-medium --project=responsive-tablet-wide --project=responsive-desktop
+git diff --check
+```
+
+Fresh final verification results: Jest **33/33**, scoped ESLint exit 0 with no
+output, Playwright static listing **56 tests in 6 files** across four responsive
+projects, and diff check exit 0. The placeholder preview hostname was not
+contacted.
+
+Implementation commit: `f42a8a89` (`test: validate shellless report routes`).
+This report append is committed separately so it can name the immutable
+implementation commit.
+
+### Follow-up limitations
+
+- This is a harness correction only; no product, browser, deployment, or data
+  mutation was performed.
+- The authorized runtime matrix should be rerun by its owner to confirm the
+  previously failing valid report proceeds through the preserved overflow
+  assertion at all discovered widths.
+- The pre-existing untracked `src/playwright-report/` directory remains
+  untouched and excluded.
