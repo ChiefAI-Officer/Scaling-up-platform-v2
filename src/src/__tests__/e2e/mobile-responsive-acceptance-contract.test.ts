@@ -17,7 +17,13 @@ type PlaywrightConfigSummary = {
 type WorkshopRouteSummary = {
   admin: { reserved: boolean; detail: boolean };
   coach: { reserved: boolean; detail: boolean };
-  derived: { adminSurvey: boolean; coachSurvey: boolean; adminLanding: boolean };
+  derived: {
+    adminSurvey: boolean;
+    adminSurveyHref: string;
+    coachSurvey: boolean;
+    adminLanding: boolean;
+    invalidAdminSurveyRejected: boolean;
+  };
 };
 
 function inspectPlaywrightConfig(override?: string): PlaywrightConfigSummary {
@@ -47,9 +53,15 @@ function inspectWorkshopRouteContract(): WorkshopRouteSummary | null {
         "tsx",
         "-e",
         `import importedContract from "./e2e/helpers/workshop-route-contract";
-const { workshopChildHrefPattern, workshopDetailHrefPattern } = importedContract.default ?? importedContract;
+const { workshopChildHref, workshopChildHrefPattern, workshopDetailHrefPattern } = importedContract.default ?? importedContract;
 const adminDetail = "/workshops/cm1234567890abcdefghijkl";
 const coachDetail = "/portal/workshops/cm1234567890abcdefghijkl";
+let invalidAdminSurveyRejected = false;
+try {
+  workshopChildHref("/workshops/new", "surveys");
+} catch {
+  invalidAdminSurveyRejected = true;
+}
 console.log(JSON.stringify({
   admin: {
     reserved: workshopDetailHrefPattern("admin").test("/workshops/new"),
@@ -61,8 +73,10 @@ console.log(JSON.stringify({
   },
   derived: {
     adminSurvey: workshopChildHrefPattern(adminDetail, "surveys").test(adminDetail + "/surveys"),
+    adminSurveyHref: workshopChildHref(adminDetail, "surveys"),
     coachSurvey: workshopChildHrefPattern(coachDetail, "surveys").test(coachDetail + "/surveys"),
     adminLanding: workshopChildHrefPattern(adminDetail, "landing-pages").test(adminDetail + "/landing-pages"),
+    invalidAdminSurveyRejected,
   },
 }));`,
       ],
@@ -196,7 +210,7 @@ describe("browser-blocked responsive harness source contract", () => {
   it("keeps the selected workshop surveys owner in populated admin route discovery", () => {
     const source = readE2e("mobile-responsive-admin.spec.ts");
 
-    expect(source).toContain("admin workshop survey");
+    expect(source).toContain('workshopChildHref(workshopDetail, "surveys")');
     expect(source).toContain("workshopSurvey");
     expect(source).toContain("workshopDetail");
   });
@@ -205,16 +219,34 @@ describe("browser-blocked responsive harness source contract", () => {
     expect(inspectWorkshopRouteContract()).toEqual({
       admin: { reserved: false, detail: true },
       coach: { reserved: false, detail: true },
-      derived: { adminSurvey: true, coachSurvey: true, adminLanding: true },
+      derived: {
+        adminSurvey: true,
+        adminSurveyHref: "/workshops/cm1234567890abcdefghijkl/surveys",
+        coachSurvey: true,
+        adminLanding: true,
+        invalidAdminSurveyRejected: true,
+      },
     });
 
     const adminSource = readE2e("mobile-responsive-admin.spec.ts");
     const coachSource = readE2e("mobile-responsive-coach.spec.ts");
     expect(adminSource).toContain('workshopDetailHrefPattern("admin")');
     expect(coachSource).toContain('workshopDetailHrefPattern("coach")');
-    expect(adminSource).toContain('workshopChildHrefPattern(workshopDetail, "surveys")');
+    expect(adminSource).toContain('workshopChildHref(workshopDetail, "surveys")');
     expect(coachSource).toContain('workshopChildHrefPattern(workshopDetail, "surveys")');
     expect(adminSource).toContain('workshopChildHrefPattern(workshopDetail, "landing-pages")');
+  });
+
+  it("derives the required admin survey owner without requiring a detail-page shortcut", () => {
+    const adminSource = readE2e("mobile-responsive-admin.spec.ts");
+    const coachSource = readE2e("mobile-responsive-coach.spec.ts");
+
+    expect(adminSource).toContain('const workshopSurvey = workshopChildHref(workshopDetail, "surveys")');
+    expect(adminSource).not.toMatch(/const workshopSurvey = await firstMatchingHref/);
+    expect(adminSource).toMatch(/dynamicRoutes[\s\S]*workshopSurvey/);
+    expect(adminSource).toContain("expectResponsiveRoute");
+    expect(coachSource).toMatch(/const workshopSurvey = await firstMatchingHref/);
+    expect(coachSource).toContain('workshopChildHrefPattern(workshopDetail, "surveys")');
   });
 
   it("routes Axe and visual navigation through the authenticated responsive guard", () => {

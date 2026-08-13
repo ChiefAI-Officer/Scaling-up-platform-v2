@@ -16,13 +16,22 @@ export function workshopChildHrefPattern(
   workshopDetailHref: string,
   child: WorkshopChildOwner,
 ): RegExp {
+  const childHref = workshopChildHref(workshopDetailHref, child);
+
+  return new RegExp(
+    `^(?:https?://[^/]+)?${escapeRegex(childHref)}(?:[?#].*)?$`,
+  );
+}
+
+export function workshopChildHref(
+  workshopDetailHref: string,
+  child: WorkshopChildOwner,
+): string {
   const isValidatedDetail = workshopDetailHrefPattern("admin").test(workshopDetailHref)
     || workshopDetailHrefPattern("coach").test(workshopDetailHref);
   if (!isValidatedDetail) {
     throw new Error(`Cannot derive ${child} from an invalid workshop detail href.`);
   }
 
-  return new RegExp(
-    `^(?:https?://[^/]+)?${escapeRegex(workshopDetailHref)}/${child}(?:[?#].*)?$`,
-  );
+  return `${workshopDetailHref}/${child}`;
 }

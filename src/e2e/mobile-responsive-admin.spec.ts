@@ -6,6 +6,7 @@ import {
   type OverflowContext,
 } from "./helpers/overflow";
 import {
+  workshopChildHref,
   workshopChildHrefPattern,
   workshopDetailHrefPattern,
 } from "./helpers/workshop-route-contract";
@@ -96,12 +97,7 @@ test("populated admin routes are discovered from live links and fit every width"
     workshopDetailHrefPattern("admin"),
     "admin workshop detail",
   );
-  const workshopSurvey = await firstMatchingHref(
-    page,
-    workshopDetail,
-    workshopChildHrefPattern(workshopDetail, "surveys"),
-    "admin workshop survey",
-  );
+  const workshopSurvey = workshopChildHref(workshopDetail, "surveys");
   await page.goto(workshopDetail, { waitUntil: "domcontentloaded" });
   await page.getByRole("button", { name: "Edit Landing Page" }).click();
   await expect(page).toHaveURL(workshopChildHrefPattern(workshopDetail, "landing-pages"));
