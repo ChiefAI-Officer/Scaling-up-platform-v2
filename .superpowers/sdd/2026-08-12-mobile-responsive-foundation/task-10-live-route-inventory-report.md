@@ -143,3 +143,70 @@ separately so it can identify that immutable implementation commit.
   visual, database, deployment, and external actions were not run.
 - Concurrent unrelated product/test/style changes and an existing untracked
   `src/playwright-report/` directory remain untouched and excluded.
+
+## Fix round 2/5 — reserved workshop owner rejection (2026-08-13)
+
+The populated preview run proved that the prior generic workshop-detail regex
+selected the static `/workshops/new` owner before a populated record. Admin and
+coach discovery now share a Node-safe CUID-shaped detail matcher. It accepts
+only exact authenticated list hrefs under `/workshops/{cuid}` or
+`/portal/workshops/{cuid}` and therefore remains fail-closed when no real
+populated detail is exposed. Survey hrefs and the admin landing manager are
+derived from that validated detail path; the landing editor assertion is then
+derived from the validated landing-manager path.
+
+### RED / GREEN
+
+RED command (from `src/`):
+
+```bash
+npx jest src/__tests__/e2e/mobile-responsive-acceptance-contract.test.ts --runInBand
+```
+
+Result: exit 1, **1 failed / 20 passed**. The new behavior contract received
+`null` because the shared workshop route matcher did not exist. It independently
+expected `/workshops/new` and `/portal/workshops/new` to be rejected, realistic
+CUID detail paths to match, and survey/landing child paths to derive from those
+details.
+
+The first post-implementation run remained RED because the Node subprocess
+loaded the TypeScript CommonJS wrapper as named ESM exports. The test fixture
+was corrected to use the same `default ?? module` interop already used by the
+Playwright config contract. No E2E behavior was weakened. GREEN with the same
+Jest command: exit 0, **1 suite / 21 tests passed**.
+
+### Changed files and validation
+
+- `src/e2e/helpers/workshop-route-contract.ts`
+- `src/e2e/mobile-responsive-admin.spec.ts`
+- `src/e2e/mobile-responsive-coach.spec.ts`
+- `src/src/__tests__/e2e/mobile-responsive-acceptance-contract.test.ts`
+- This appended evidence receipt.
+
+Fresh validation from `src/`:
+
+```bash
+npx jest src/__tests__/e2e/mobile-responsive-acceptance-contract.test.ts --runInBand
+npx eslint e2e/helpers/workshop-route-contract.ts e2e/mobile-responsive-admin.spec.ts e2e/mobile-responsive-coach.spec.ts src/__tests__/e2e/mobile-responsive-acceptance-contract.test.ts
+PLAYWRIGHT_BASE_URL=https://preview.example.test npx playwright test e2e/mobile-responsive-coach.spec.ts e2e/mobile-responsive-admin.spec.ts e2e/mobile-responsive-state.spec.ts e2e/mobile-responsive-a11y.spec.ts e2e/mobile-responsive-visual.spec.ts e2e/mobile-responsive-kill-diagnostic.spec.ts --list --reporter=list --project=responsive-compact --project=responsive-medium --project=responsive-tablet-wide --project=responsive-desktop
+git diff --check
+```
+
+Results: Jest **21/21**, scoped ESLint exit 0 with no output, Playwright static
+listing **56 tests in 6 files** across four responsive projects, and diff check
+exit 0. `--reporter=list` did not create a new HTML report. No browser test ran
+and the placeholder preview hostname was not contacted.
+
+Implementation commit: `cb14a021903d874039b07d0981c3be1f362ae05b`
+(`test: reject reserved workshop routes`). This report append is committed
+separately so it can name the immutable implementation commit.
+
+### Fix-round concerns
+
+- The ID-shape contract follows the Prisma `Workshop.id @default(cuid())`
+  schema: lowercase `c` plus 20–31 lowercase alphanumeric characters. A future
+  workshop ID migration requires an explicit matcher update.
+- Evidence remains contract/static-list only; browser runtime, Axe, overflow,
+  visual, database, deployment, and external actions were not run.
+- The pre-existing untracked `src/playwright-report/` directory remains
+  untouched and excluded.
