@@ -50,11 +50,7 @@ export default async function PublicSubmissionReportPage({
       reportStylesAvailable={reportStylesAvailable}
     >
       <div
-        className={
-          mobileResponsiveEnabled
-            ? "su-report-page min-w-0 max-w-full"
-            : "su-report-page"
-        }
+        className="su-report-page"
         data-responsive-report-page={mobileResponsiveEnabled ? "" : undefined}
       >
         <div className="su-report-actions no-print">

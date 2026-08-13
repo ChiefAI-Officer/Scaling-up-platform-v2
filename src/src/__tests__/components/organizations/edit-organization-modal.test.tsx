@@ -62,6 +62,15 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("EditOrganizationModal", () => {
+  test("responsive in-flight state locks only submit and leaves inputs and cancel available", async () => {
+    (global.fetch as jest.Mock).mockReturnValue(new Promise(() => {}));
+    renderModal({ responsiveEnabled: true });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByRole("button", { name: "Saving…" })).toBeDisabled();
+    expect(screen.getByLabelText(/name/i)).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled();
+  });
+
   /**
    * (1) Pre-fill: opening populates Name + External ID fields.
    */

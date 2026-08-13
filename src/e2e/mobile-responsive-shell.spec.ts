@@ -33,6 +33,15 @@ for (const width of [320, 300, 260, 639, 640, 1023, 1024]) {
     if (width <= 639) {
       await expectTouchTarget(page.getByRole("button", { name: /toggle theme|switch to (dark|light) mode/i }), "admin theme toggle");
       await expectTouchTarget(page.locator('nav button[aria-label="Open menu"]'), "admin menu toggle");
+      const adminMenu = page.locator('nav button[aria-label="Open menu"]');
+      await adminMenu.click();
+      await page.keyboard.press("Escape");
+      await expect(adminMenu).toHaveAttribute("aria-expanded", "false");
+      await expect(adminMenu).toBeFocused();
+      await adminMenu.click();
+      await page.locator("main").click({ position: { x: 8, y: 8 } });
+      await expect(adminMenu).toHaveAttribute("aria-expanded", "false");
+      await expect(adminMenu).toBeFocused();
     }
 
     await page.context().clearCookies();
@@ -45,6 +54,15 @@ for (const width of [320, 300, 260, 639, 640, 1023, 1024]) {
     if (width <= 639) {
       await expectTouchTarget(page.getByRole("button", { name: /toggle theme|switch to (dark|light) mode/i }), "coach theme toggle");
       await expectTouchTarget(page.locator('header button[aria-label="Open menu"]'), "coach menu toggle");
+      const coachMenu = page.locator('header button[aria-label="Open menu"]');
+      await coachMenu.click();
+      await page.keyboard.press("Escape");
+      await expect(coachMenu).toHaveAttribute("aria-expanded", "false");
+      await expect(coachMenu).toBeFocused();
+      await coachMenu.click();
+      await page.locator("main").click({ position: { x: 8, y: 8 } });
+      await expect(coachMenu).toHaveAttribute("aria-expanded", "false");
+      await expect(coachMenu).toBeFocused();
     }
   });
 }

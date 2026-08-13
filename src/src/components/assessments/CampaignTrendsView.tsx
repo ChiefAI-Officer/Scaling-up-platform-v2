@@ -25,7 +25,6 @@
  */
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
 import { ChevronDown, ChevronRight, AlertTriangle } from "lucide-react";
 import type { LongitudinalTrend } from "@/lib/assessments/trends";
 
@@ -190,7 +189,7 @@ export function CampaignTrendsView({
       </div>
 
       {/* STATE 1: no campaigns */}
-      {campaigns.length === 0 && <EmptyState />}
+      {campaigns.length === 0 && <EmptyState responsiveEnabled={responsiveEnabled} />}
 
       {/* STATE 2: single campaign */}
       {campaigns.length === 1 && (
@@ -226,7 +225,7 @@ export function CampaignTrendsView({
 // Empty state
 // ────────────────────────────────────────────────────────────────────────
 
-function EmptyState() {
+function EmptyState({ responsiveEnabled = false }: { responsiveEnabled?: boolean }) {
   return (
     <div className="bg-card border border-border rounded-xl p-12 text-center">
       <h3 className="text-lg font-semibold text-foreground mb-2">
@@ -237,12 +236,16 @@ function EmptyState() {
         template and organization. Run your first campaign to start
         collecting data.
       </p>
-      <Link
+      {/* Native anchor is the feature-OFF contract; responsive mode only changes sizing classes. */}
+      {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+      <a
         href="/portal/assessments/new"
-        className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium"
+        className={responsiveEnabled
+          ? "inline-flex min-h-11 min-w-11 items-center justify-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium"
+          : "inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium"}
       >
         Start a campaign
-      </Link>
+      </a>
     </div>
   );
 }

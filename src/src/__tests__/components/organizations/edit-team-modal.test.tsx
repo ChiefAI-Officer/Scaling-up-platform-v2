@@ -135,6 +135,35 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("EditTeamModal", () => {
+  test("responsive in-flight state locks mutations and leaves inputs and cancel available", async () => {
+    (global.fetch as jest.Mock).mockReturnValue(new Promise(() => {}));
+    renderModal({ responsiveEnabled: true });
+    fireEvent.change(screen.getByTestId("select-parent"), { target: { value: "team-mkt" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByRole("button", { name: "Saving…" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Delete team" })).toBeDisabled();
+    expect(screen.getByLabelText(/name/i)).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled();
+  });
+
+  test("responsive validation collects every invalid field into linked summary and inline errors", async () => {
+    renderModal({ responsiveEnabled: true });
+    fireEvent.change(screen.getByLabelText(/name/i), { target: { value: "" } });
+    fireEvent.change(screen.getByTestId("select-type"), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    const summary = await screen.findByRole("alert", { name: "Edit team error summary" });
+    for (const [control, message] of [
+      [screen.getByLabelText(/name/i), "Name is required."],
+      [screen.getByTestId("select-type"), "Type is required."],
+      [screen.getByTestId("select-parent"), "Parent is required — a team cannot be moved to root."],
+    ] as const) {
+      expect(summary.querySelector(`a[href="#${control.id}"]`)).not.toBeNull();
+      expect(control).toHaveAttribute("aria-invalid", "true");
+      expect(screen.getAllByText(message)).toHaveLength(2);
+    }
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
   /**
    * (1) Pre-fill: opening with a team populates Name/Type/Parent/Description.
    *     The "Engineering" team is currently at root (parentTeamId=null);
@@ -549,4 +578,3 @@ describe("EditTeamModal", () => {
     });
   });
 });
-

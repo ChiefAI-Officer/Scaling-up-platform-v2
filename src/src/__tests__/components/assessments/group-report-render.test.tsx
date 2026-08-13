@@ -220,8 +220,8 @@ describe("responsive report containment", () => {
         responsiveEnabled
       />,
     );
-    expect(root).toHaveClass("min-w-0");
-    expect(root).toHaveClass("max-w-full");
+    expect(root).not.toHaveClass("min-w-0");
+    expect(root).not.toHaveClass("max-w-full");
     expect(root).toHaveAttribute("data-responsive-report", "");
   });
 

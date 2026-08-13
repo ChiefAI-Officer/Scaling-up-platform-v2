@@ -299,7 +299,7 @@ export function AddMemberModal({
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
                 placeholder="e.g. Jane"
-                disabled={submitting}
+                disabled={!responsiveEnabled && submitting}
                 required
                 aria-invalid={responsiveEnabled && fieldErrors.some((item) => item.id === firstNameId) ? true : undefined}
               />
@@ -318,7 +318,7 @@ export function AddMemberModal({
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
                 placeholder="e.g. Smith"
-                disabled={submitting}
+                disabled={!responsiveEnabled && submitting}
                 required
                 aria-invalid={responsiveEnabled && fieldErrors.some((item) => item.id === lastNameId) ? true : undefined}
               />
@@ -338,7 +338,7 @@ export function AddMemberModal({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="jane.smith@company.com"
-                disabled={submitting}
+                disabled={!responsiveEnabled && submitting}
                 required
                 aria-invalid={responsiveEnabled && fieldErrors.some((item) => item.id === emailId) ? true : undefined}
               />
@@ -357,7 +357,7 @@ export function AddMemberModal({
                 value={jobTitle}
                 onChange={(e) => setJobTitle(e.target.value)}
                 placeholder="e.g. Director of Operations"
-                disabled={submitting}
+                disabled={!responsiveEnabled && submitting}
               />
             </div>
 
@@ -373,7 +373,7 @@ export function AddMemberModal({
                 data-testid="select-team"
                 value={teamId}
                 onChange={(e) => setTeamId(e.target.value)}
-                disabled={submitting || loadingTeams}
+                disabled={loadingTeams || (!responsiveEnabled && submitting)}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {loadingTeams ? (
@@ -403,7 +403,7 @@ export function AddMemberModal({
                 data-testid="select-level"
                 value={roleType}
                 onChange={(e) => setRoleType(e.target.value)}
-                disabled={submitting}
+                disabled={!responsiveEnabled && submitting}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <option value="">— no level —</option>
@@ -434,7 +434,7 @@ export function AddMemberModal({
               type="button"
               variant="outline"
               onClick={onClose}
-              disabled={submitting}
+              disabled={!responsiveEnabled && submitting}
               className={responsiveEnabled ? "min-h-11 w-full sm:w-auto" : undefined}
             >
               Cancel

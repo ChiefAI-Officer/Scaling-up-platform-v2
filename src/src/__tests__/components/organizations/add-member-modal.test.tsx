@@ -83,6 +83,18 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("AddMemberModal", () => {
+  test("responsive in-flight state locks only submit and leaves inputs and cancel available", async () => {
+    (global.fetch as jest.Mock).mockReturnValue(new Promise(() => {}));
+    renderModal({ responsiveEnabled: true });
+    fireEvent.change(screen.getByLabelText(/first name/i), { target: { value: "Jane" } });
+    fireEvent.change(screen.getByLabelText(/last name/i), { target: { value: "Smith" } });
+    fireEvent.change(screen.getByLabelText(/e-?mail/i), { target: { value: "jane@example.com" } });
+    fireEvent.click(screen.getByRole("button", { name: /add member/i }));
+    expect(await screen.findByRole("button", { name: "Adding…" })).toBeDisabled();
+    expect(screen.getByLabelText(/first name/i)).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled();
+  });
+
   test("responsive mode exposes a viewport-bounded dialog and navigable multi-field error summary", async () => {
     renderModal({ responsiveEnabled: true });
 

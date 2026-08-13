@@ -121,6 +121,32 @@ for (const width of [320, 390, 640, 768, 1023]) {
       );
       await assertNoDocumentOverflow(page, `${route} at ${width}`);
       await assertMinimumTouchTargets(page, `${route} at ${width}`);
+      if (route === "/admin/assessments" && width < 640) {
+        const compactNav = page.getByRole("button", { name: /Assessment section:/ });
+        await compactNav.click();
+        await page.keyboard.press("Escape");
+        await expect(compactNav).toHaveAttribute("aria-expanded", "false");
+        await expect(compactNav).toBeFocused();
+        await compactNav.click();
+        await page.locator("main").click({ position: { x: 8, y: 8 } });
+        await expect(compactNav).toHaveAttribute("aria-expanded", "false");
+        await expect(compactNav).toBeFocused();
+      }
+
+      if (route === "/admin/assessments/organizations" && width === 320) {
+        const dialogTrigger = page.getByRole("button", { name: "Add Company or Team" });
+        await dialogTrigger.click();
+        await expect(page.getByRole("dialog")).toBeVisible();
+        await page.keyboard.press("Escape");
+        await expect(page.getByRole("dialog")).toBeHidden();
+        await expect(dialogTrigger).toBeFocused();
+        await dialogTrigger.click();
+        const box = await page.getByRole("dialog").boundingBox();
+        expect(box, "responsive organization dialog has a bounding box").not.toBeNull();
+        await page.mouse.click(2, Math.max(2, (box?.y ?? 100) - 8));
+        await expect(page.getByRole("dialog")).toBeHidden();
+        await expect(dialogTrigger).toBeFocused();
+      }
     }
 
     for (const discovered of discoveredAssessmentRoutes) {

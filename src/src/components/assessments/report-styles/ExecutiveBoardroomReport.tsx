@@ -45,9 +45,11 @@ function comparisonLabels(
 export function ExecutiveBoardroomReport({
   presentation,
   comparison,
+  responsiveEnabled = false,
 }: {
   presentation: IndividualReportPresentation;
   comparison?: ReportComparisonModel | null;
+  responsiveEnabled?: boolean;
 }) {
   const { summary, detail } = partitionReportBlocks(presentation.blocks);
 
@@ -55,6 +57,7 @@ export function ExecutiveBoardroomReport({
     <article
       className={`su-report--executive ${assessmentInter.variable} ${assessmentPlayfairDisplay.variable}`}
       data-testid="executive-boardroom-report"
+      data-responsive-report={responsiveEnabled ? "" : undefined}
     >
       <section className="report-page report-page--executive-cover">
         <ReportIdentityHeader
@@ -75,6 +78,7 @@ export function ExecutiveBoardroomReport({
           <ReportComparisonContent
             comparison={comparison}
             labels={comparisonLabels(presentation)}
+            responsiveEnabled={responsiveEnabled}
           />
           <ReportProvenance presentation={presentation} />
         </section>

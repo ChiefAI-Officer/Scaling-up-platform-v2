@@ -233,23 +233,13 @@ export function BrandedReport({
       });
   const classic = () =>
     config.reportType === "qualitative" ? (
-      responsiveEnabled ? (
-        <div className="min-w-0 max-w-full" data-responsive-report="">
-          <QualitativeReport
-            report={report}
-            peerComparison={peerComparison}
-            contactEmail={contactEmail}
-            reportFindingsAvailable={reportFindingsAvailable === true}
-          />
-        </div>
-      ) : (
-        <QualitativeReport
-          report={report}
-          peerComparison={peerComparison}
-          contactEmail={contactEmail}
-          reportFindingsAvailable={reportFindingsAvailable === true}
-        />
-      )
+      <QualitativeReport
+        report={report}
+        peerComparison={peerComparison}
+        contactEmail={contactEmail}
+        reportFindingsAvailable={reportFindingsAvailable === true}
+        responsiveEnabled={responsiveEnabled}
+      />
     ) : (
       <LegacyClassicReport
         report={report}
@@ -307,26 +297,20 @@ export function BrandedReport({
         <ExecutiveBoardroomReport
           presentation={presentation()}
           comparison={comparison}
+          responsiveEnabled={responsiveEnabled}
         />
       );
-      return responsiveEnabled ? (
-        <div className="min-w-0 max-w-full" data-responsive-report="">
-          {reportNode}
-        </div>
-      ) : reportNode;
+      return reportNode;
     }
     case "MODERN_DASHBOARD": {
       const dashboardNode = (
         <ModernDashboardReport
           presentation={presentation()}
           comparison={comparison}
+          responsiveEnabled={responsiveEnabled}
         />
       );
-      return responsiveEnabled ? (
-        <div className="min-w-0 max-w-full" data-responsive-report="">
-          {dashboardNode}
-        </div>
-      ) : dashboardNode;
+      return dashboardNode;
     }
     default: {
       const unreachableStyle: never = resolvedStyle;
@@ -537,11 +521,7 @@ export function LegacyClassicReport({
 
   return (
     <div
-      className={
-        responsiveEnabled
-          ? "su-public-brand su-report min-w-0 max-w-full"
-          : "su-public-brand su-report"
-      }
+      className="su-public-brand su-report"
       data-testid="branded-report"
       data-responsive-report={responsiveEnabled ? "" : undefined}
     >
@@ -715,6 +695,7 @@ export function LegacyClassicReport({
 
       <ReportComparisonContent
         comparison={comparison}
+        responsiveEnabled={responsiveEnabled}
         labels={{
           domains: Object.fromEntries(domainCards.map((domain) => [domain.key, domain.label])),
           sections: Object.fromEntries(perSection.map((section) => [

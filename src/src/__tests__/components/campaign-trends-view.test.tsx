@@ -80,6 +80,18 @@ describe("CampaignTrendsView", () => {
     ).toBeInTheDocument();
   });
 
+  it("keeps the empty-state native anchor when off and sizes it only when responsive", () => {
+    const { rerender } = render(<CampaignTrendsView trend={baseTrend()} />);
+    const legacy = screen.getByRole("link", { name: /Start a campaign/i });
+    expect(legacy.tagName).toBe("A");
+    expect(legacy).not.toHaveClass("min-h-11");
+    rerender(<CampaignTrendsView trend={baseTrend()} responsiveEnabled />);
+    const responsive = screen.getByRole("link", { name: /Start a campaign/i });
+    expect(responsive.tagName).toBe("A");
+    expect(responsive).toHaveClass("min-h-11");
+    expect(responsive).toHaveClass("min-w-11");
+  });
+
   it("single-campaign state shows banner + stat cards", () => {
     const trend = baseTrend({
       campaigns: [

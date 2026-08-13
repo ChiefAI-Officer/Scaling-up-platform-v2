@@ -1,6 +1,7 @@
 import type { Page } from "@playwright/test";
 
 export const MINIMUM_TOUCH_TARGET_PX = 44;
+export const TOUCH_TARGET_SELECTOR = 'button, [role="button"], summary, a[href]';
 
 export interface TouchTargetMeasurement {
   selector: string;
@@ -30,8 +31,7 @@ export function formatTouchTargetFailures(
 export async function measureVisibleTouchTargets(
   page: Page,
 ): Promise<TouchTargetMeasurement[]> {
-  return page.locator("[data-touch-target]").evaluateAll((nodes) => {
-    const interactiveSelector = 'button, [role="button"], summary, a[href]';
+  return page.locator(TOUCH_TARGET_SELECTOR).evaluateAll((nodes) => {
     const describe = (element: Element, index: number): string => {
       const tag = element.tagName.toLowerCase();
       const id = element.getAttribute("id");
@@ -40,13 +40,14 @@ export async function measureVisibleTouchTargets(
       if (testId) return `${tag}[data-testid="${testId}"]`;
       const label = element.getAttribute("aria-label");
       if (label) return `${tag}[aria-label="${label}"]`;
-      return `${tag}[data-touch-target]:nth-of-type(${index + 1})`;
+      const marker = element.hasAttribute("data-touch-target")
+        ? "[data-touch-target]"
+        : "";
+      return `${tag}${marker}:nth-of-type(${index + 1})`;
     };
 
     return nodes
-      .filter((node): node is HTMLElement =>
-        node instanceof HTMLElement && node.matches(interactiveSelector),
-      )
+      .filter((node): node is HTMLElement => node instanceof HTMLElement)
       .map((element, index) => {
         const rect = element.getBoundingClientRect();
         const style = window.getComputedStyle(element);

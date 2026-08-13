@@ -41,6 +41,8 @@ import { Label } from "@/components/ui/label";
 import type { ApiTeamNode } from "./members-teams-view";
 import { RESPONDENT_LEVELS, RESPONDENT_LEVEL_VALUES } from "@/lib/assessments/respondent-levels";
 
+type FieldError = { id: string; message: string };
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -105,6 +107,7 @@ export function EditMemberModal({
   // Submission state
   const [submitting, setSubmitting] = useState(false);
   const [error,      setError]      = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<FieldError[]>([]);
 
   // Reset form whenever the dialog opens (sync to new member prop)
   useEffect(() => {
@@ -117,6 +120,7 @@ export function EditMemberModal({
       setRoleType(member.roleType ?? "");
       setInitialRoleType(member.roleType);
       setError(null);
+      setFieldErrors([]);
     }
   }, [open, member.id, member.email, member.firstName, member.lastName, member.jobTitle, member.teamId, member.roleType]);
 
@@ -131,13 +135,24 @@ export function EditMemberModal({
     return null;
   }
 
+  function validateFields(): FieldError[] {
+    const errors: FieldError[] = [];
+    if (!email.trim()) errors.push({ id: emailId, message: "Email is required." });
+    if (!firstName.trim()) errors.push({ id: firstNameId, message: "First name is required." });
+    if (!lastName.trim()) errors.push({ id: lastNameId, message: "Last name is required." });
+    return errors;
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setFieldErrors([]);
 
-    const validationError = validate();
+    const responsiveFieldErrors = responsiveEnabled ? validateFields() : [];
+    const validationError = responsiveEnabled ? responsiveFieldErrors[0]?.message ?? null : validate();
     if (validationError) {
       setError(validationError);
+      setFieldErrors(responsiveFieldErrors);
       return;
     }
 
@@ -225,6 +240,12 @@ export function EditMemberModal({
           </DialogDescription>
         </DialogHeader>
 
+        {responsiveEnabled && error && (
+          <div role="alert" aria-label="Edit member error summary" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {fieldErrors.length > 0 ? <ul className="space-y-1">{fieldErrors.map((item) => <li key={`${item.id}-${item.message}`}><a className="underline" href={`#${item.id}`}>{item.message}</a></li>)}</ul> : error}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} noValidate>
           <div className="space-y-4 py-2">
             {/* ---- First name ---- */}
@@ -235,9 +256,11 @@ export function EditMemberModal({
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
                 placeholder="e.g. Jane"
-                disabled={submitting}
+                disabled={!responsiveEnabled && submitting}
                 required
+                aria-invalid={responsiveEnabled && fieldErrors.some((item) => item.id === firstNameId) ? true : undefined}
               />
+              {responsiveEnabled && fieldErrors.find((item) => item.id === firstNameId) && <p className="text-sm text-destructive">{fieldErrors.find((item) => item.id === firstNameId)?.message}</p>}
             </div>
 
             {/* ---- Last name ---- */}
@@ -248,9 +271,11 @@ export function EditMemberModal({
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
                 placeholder="e.g. Smith"
-                disabled={submitting}
+                disabled={!responsiveEnabled && submitting}
                 required
+                aria-invalid={responsiveEnabled && fieldErrors.some((item) => item.id === lastNameId) ? true : undefined}
               />
+              {responsiveEnabled && fieldErrors.find((item) => item.id === lastNameId) && <p className="text-sm text-destructive">{fieldErrors.find((item) => item.id === lastNameId)?.message}</p>}
             </div>
 
             {/* ---- E-mail (editable — #60) ---- */}
@@ -262,13 +287,15 @@ export function EditMemberModal({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="e.g. jane@example.com"
-                disabled={submitting}
+                disabled={!responsiveEnabled && submitting}
                 required
                 aria-describedby={`${emailId}-hint`}
+                aria-invalid={responsiveEnabled && fieldErrors.some((item) => item.id === emailId) ? true : undefined}
               />
               <p id={`${emailId}-hint`} className="text-xs text-muted-foreground italic">
                 Used for assessment invitations.
               </p>
+              {responsiveEnabled && fieldErrors.find((item) => item.id === emailId) && <p className="text-sm text-destructive">{fieldErrors.find((item) => item.id === emailId)?.message}</p>}
             </div>
 
             {/* ---- Job title (optional) ---- */}
@@ -279,7 +306,7 @@ export function EditMemberModal({
                 value={jobTitle}
                 onChange={(e) => setJobTitle(e.target.value)}
                 placeholder="e.g. Director of Operations"
-                disabled={submitting}
+                disabled={!responsiveEnabled && submitting}
               />
             </div>
 
@@ -295,7 +322,7 @@ export function EditMemberModal({
                 data-testid="select-team"
                 value={teamId}
                 onChange={(e) => setTeamId(e.target.value)}
-                disabled={submitting}
+                disabled={!responsiveEnabled && submitting}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <option value="">— no team —</option>
@@ -321,7 +348,7 @@ export function EditMemberModal({
                 data-testid="select-level"
                 value={roleType}
                 onChange={(e) => setRoleType(e.target.value)}
-                disabled={submitting}
+                disabled={!responsiveEnabled && submitting}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <option value="">— no level —</option>
@@ -341,7 +368,7 @@ export function EditMemberModal({
             </div>
 
             {/* ---- Inline error ---- */}
-            {error && (
+            {!responsiveEnabled && error && (
               <p
                 role="alert"
                 className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
@@ -359,7 +386,7 @@ export function EditMemberModal({
               type="button"
               variant="outline"
               onClick={onClose}
-              disabled={submitting}
+              disabled={!responsiveEnabled && submitting}
             >
               Cancel
             </Button>

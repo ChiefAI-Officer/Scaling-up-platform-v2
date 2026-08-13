@@ -39,6 +39,19 @@ const comparison: ReportComparisonModel = {
 };
 
 describe("ReportComparisonContent", () => {
+  it("gates a named focusable bounded scroll owner around every comparison table", () => {
+    const { rerender } = render(<ReportComparisonContent comparison={comparison} />);
+    expect(screen.queryAllByRole("region", { name: /comparison table/i })).toHaveLength(0);
+    rerender(<ReportComparisonContent comparison={comparison} responsiveEnabled />);
+    const regions = screen.getAllByRole("region", { name: /comparison table/i });
+    expect(regions).toHaveLength(4);
+    for (const region of regions) {
+      expect(region).toHaveAttribute("tabindex", "0");
+      expect(region).toHaveClass("su-report-data-region");
+      expect(within(region).getByRole("table")).toBeInTheDocument();
+    }
+  });
+
   it("renders the frozen comparison facts and excludes baseline-only question detail", () => {
     render(
       <ReportComparisonContent

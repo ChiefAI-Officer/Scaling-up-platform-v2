@@ -50,6 +50,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import type { ApiTeamNode } from "./members-teams-view";
 
+type FieldError = { id: string; message: string };
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -221,6 +223,7 @@ export function EditTeamModal({
   // ---- Submission state -----------------------------------------------------
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<FieldError[]>([]);
 
   // Reset form whenever the dialog opens (sync to new team prop)
   useEffect(() => {
@@ -231,6 +234,7 @@ export function EditTeamModal({
       setDescription(team.description ?? "");
       setInitialTypeWasNull(!team.type);
       setError(null);
+      setFieldErrors([]);
     }
     // pickInitialParent depends on team + parentOptions+validParentValues which
     // derive from teams. Intentionally exhaustive.
@@ -261,13 +265,25 @@ export function EditTeamModal({
     return null;
   }
 
+  function validateFields(): FieldError[] {
+    const errors: FieldError[] = [];
+    if (!name.trim()) errors.push({ id: nameId, message: "Name is required." });
+    if (!type) errors.push({ id: typeId, message: "Type is required." });
+    if (!parent) errors.push({ id: parentId, message: "Parent is required — a team cannot be moved to root." });
+    else if (!validParentValues.has(parent)) errors.push({ id: parentId, message: "Parent must be a different team in this organization." });
+    return errors;
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setFieldErrors([]);
 
-    const validationError = validate();
+    const responsiveFieldErrors = responsiveEnabled ? validateFields() : [];
+    const validationError = responsiveEnabled ? responsiveFieldErrors[0]?.message ?? null : validate();
     if (validationError) {
       setError(validationError);
+      setFieldErrors(responsiveFieldErrors);
       return;
     }
 
@@ -379,6 +395,12 @@ export function EditTeamModal({
           </DialogDescription>
         </DialogHeader>
 
+        {responsiveEnabled && error && (
+          <div role="alert" aria-label="Edit team error summary" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {fieldErrors.length > 0 ? <ul className="space-y-1">{fieldErrors.map((item) => <li key={`${item.id}-${item.message}`}><a className="underline" href={`#${item.id}`}>{item.message}</a></li>)}</ul> : error}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} noValidate>
           <div className="space-y-4 py-2">
             {/* ---- Name ---- */}
@@ -389,9 +411,11 @@ export function EditTeamModal({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Engineering"
-                disabled={submitting}
+                disabled={!responsiveEnabled && submitting}
                 required
+                aria-invalid={responsiveEnabled && fieldErrors.some((item) => item.id === nameId) ? true : undefined}
               />
+              {responsiveEnabled && fieldErrors.find((item) => item.id === nameId) && <p className="text-sm text-destructive">{fieldErrors.find((item) => item.id === nameId)?.message}</p>}
             </div>
 
             {/* ---- Type ---- (NO "Company" option) */}
@@ -402,8 +426,9 @@ export function EditTeamModal({
                 data-testid="select-type"
                 value={type}
                 onChange={(e) => setType(e.target.value as EditableTeamType | "")}
-                disabled={submitting}
+                disabled={!responsiveEnabled && submitting}
                 required
+                aria-invalid={responsiveEnabled && fieldErrors.some((item) => item.id === typeId) ? true : undefined}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <option value="" disabled>Select a type…</option>
@@ -411,6 +436,7 @@ export function EditTeamModal({
                 <option value="team">Team</option>
                 <option value="folder">Folder</option>
               </select>
+              {responsiveEnabled && fieldErrors.find((item) => item.id === typeId) && <p className="text-sm text-destructive">{fieldErrors.find((item) => item.id === typeId)?.message}</p>}
               {/* I3: hint for legacy teams that were saved without a type */}
               {initialTypeWasNull && !type && (
                 <p className="text-xs italic text-muted-foreground">
@@ -427,8 +453,9 @@ export function EditTeamModal({
                 data-testid="select-parent"
                 value={parent}
                 onChange={(e) => setParent(e.target.value)}
-                disabled={submitting}
+                disabled={!responsiveEnabled && submitting}
                 required
+                aria-invalid={responsiveEnabled && fieldErrors.some((item) => item.id === parentId) ? true : undefined}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {/*
@@ -450,6 +477,7 @@ export function EditTeamModal({
                   </option>
                 ))}
               </select>
+              {responsiveEnabled && fieldErrors.find((item) => item.id === parentId) && <p className="text-sm text-destructive">{fieldErrors.find((item) => item.id === parentId)?.message}</p>}
               {/* Inline hint — only shown when the team currently has no parent */}
               {!team.parentTeamId && (
                 <p className="text-xs italic text-muted-foreground">
@@ -466,13 +494,13 @@ export function EditTeamModal({
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Optional description"
-                disabled={submitting}
+                disabled={!responsiveEnabled && submitting}
                 className="min-h-[72px] resize-none"
               />
             </div>
 
             {/* ---- Inline error ---- */}
-            {error && (
+            {!responsiveEnabled && error && (
               <p
                 role="alert"
                 className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
@@ -504,7 +532,7 @@ export function EditTeamModal({
                 type="button"
                 variant="outline"
                 onClick={onClose}
-                disabled={submitting}
+                disabled={!responsiveEnabled && submitting}
               >
                 Cancel
               </Button>

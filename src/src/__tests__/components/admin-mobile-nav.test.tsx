@@ -68,4 +68,14 @@ describe("AdminMobileNav (Wave H)", () => {
     open();
     expect(screen.getByText("Assessments").closest("a")).not.toHaveTextContent("→");
   });
+
+  it.each(["Escape", "outside"])("responsive %s dismissal closes and restores trigger focus", (path) => {
+    render(<AdminMobileNav counts={COUNTS} email="x@y.com" responsiveEnabled />);
+    const trigger = screen.getByRole("button", { name: "Open menu" });
+    fireEvent.click(trigger);
+    if (path === "Escape") fireEvent.keyDown(document, { key: "Escape" });
+    else fireEvent.pointerDown(document.body);
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(trigger).toHaveFocus();
+  });
 });

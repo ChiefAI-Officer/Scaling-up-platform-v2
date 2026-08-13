@@ -28,6 +28,16 @@ beforeEach(() => {
 });
 
 describe("CoachMobileNav", () => {
+  it.each(["Escape", "outside"])("responsive %s dismissal closes and restores trigger focus", (path) => {
+    render(<CoachMobileNav coachName="Alex" responsiveEnabled />);
+    const trigger = screen.getByRole("button", { name: "Open menu" });
+    fireEvent.click(trigger);
+    if (path === "Escape") fireEvent.keyDown(document, { key: "Escape" });
+    else fireEvent.pointerDown(document.body);
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(trigger).toHaveFocus();
+  });
+
   it("keeps the existing mobile destinations while the surface is disabled", () => {
     openNavigation(false);
 

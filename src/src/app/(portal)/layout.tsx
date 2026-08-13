@@ -83,6 +83,7 @@ export default async function PortalLayout({ children }: PortalLayoutProps) {
                     {/* Mobile hamburger */}
                     <CoachMobileNav
                         coachName={coachName}
+                        responsiveEnabled={mobileResponsiveEnabled}
                         {...(referredResultsEnabled
                             ? { referredResultsEnabled: true as const }
                             : {})}

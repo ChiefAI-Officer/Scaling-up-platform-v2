@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronDown } from "lucide-react";
@@ -51,12 +51,35 @@ function AssessmentsCompactDisclosure({
   pathname,
 }: AssessmentsCompactNavProps & { pathname: string }) {
   const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const activeEntry = currentEntry(entries, pathname);
   const currentLabel = activeEntry?.label ?? entries[0]?.label ?? "Assessments";
 
+  useEffect(() => {
+    if (!open) return;
+    const dismiss = () => {
+      setOpen(false);
+      triggerRef.current?.focus();
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") dismiss();
+    };
+    const onPointerDown = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) dismiss();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("pointerdown", onPointerDown);
+    };
+  }, [open]);
+
   return (
-    <div className="border-b border-border bg-card/40 p-3 sm:hidden">
+    <div className="border-b border-border bg-card/40 p-3 sm:hidden" ref={rootRef}>
       <button
+        ref={triggerRef}
         type="button"
         className="flex min-h-11 w-full items-center justify-between gap-3 rounded-md border border-border bg-card px-3 py-2 text-left text-sm font-semibold text-foreground"
         aria-expanded={open}

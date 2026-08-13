@@ -27,6 +27,29 @@ afterEach(() => {
 });
 
 describe("responsive workshop dialogs", () => {
+  test("responsive delete request locks only delete and leaves confirmation and cancel available", async () => {
+    (global.fetch as jest.Mock).mockReturnValue(new Promise(() => {}));
+    render(<DeleteWorkshopDialog workshopId="workshop-0" workshopTitle="Live" responsiveEnabled />);
+    fireEvent.click(screen.getByRole("button", { name: /delete permanently/i }));
+    const confirmation = screen.getByLabelText(/type the workshop title/i);
+    fireEvent.change(confirmation, { target: { value: "Live" } });
+    fireEvent.click(screen.getByRole("button", { name: "Delete Permanently" }));
+    expect(await screen.findByRole("button", { name: "Deleting..." })).toBeDisabled();
+    expect(confirmation).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Close" })).toBeEnabled();
+  });
+
+  test("responsive cancel request locks only cancellation and leaves keep/dismiss available", async () => {
+    (global.fetch as jest.Mock).mockReturnValue(new Promise(() => {}));
+    render(<CancelWorkshopDialog workshopId="workshop-0" workshopTitle="Live" eventDate="2099-01-01T00:00:00.000Z" responsiveEnabled />);
+    fireEvent.click(screen.getByRole("button", { name: "Cancel Workshop" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel Workshop" }));
+    expect(await screen.findByRole("button", { name: "Canceling..." })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Keep Workshop" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Close" })).toBeEnabled();
+  });
+
   test("delete failure keeps confirmation and actions available for retry", async () => {
     (global.fetch as jest.Mock)
       .mockResolvedValueOnce({

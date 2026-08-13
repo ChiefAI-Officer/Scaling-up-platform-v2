@@ -139,7 +139,6 @@ export function CancelWorkshopDialog({
                                 setIsOpen(false);
                                 setError(null);
                             }}
-                            disabled={isSubmitting}
                             className="min-h-11 w-full sm:w-auto"
                         >
                             Keep Workshop

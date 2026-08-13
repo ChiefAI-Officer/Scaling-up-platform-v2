@@ -80,4 +80,14 @@ describe("AssessmentsCompactNav", () => {
       }),
     ).toHaveAttribute("aria-expanded", "false");
   });
+
+  it.each(["Escape", "outside"])("%s dismissal closes and restores trigger focus", (path) => {
+    render(<AssessmentsCompactNav entries={entries} />);
+    const trigger = screen.getByRole("button", { name: "Assessment section: Templates" });
+    fireEvent.click(trigger);
+    if (path === "Escape") fireEvent.keyDown(document, { key: "Escape" });
+    else fireEvent.pointerDown(document.body);
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(trigger).toHaveFocus();
+  });
 });

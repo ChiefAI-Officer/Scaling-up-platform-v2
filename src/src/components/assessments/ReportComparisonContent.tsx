@@ -2,6 +2,7 @@ import type {
   ComparableValue,
   ReportComparisonModel,
 } from "@/lib/assessments/report-comparison-model";
+import type { ReactNode } from "react";
 
 export interface ReportComparisonLabels {
   domains?: Record<string, string | undefined>;
@@ -61,11 +62,13 @@ function ComparisonTable({
   rows,
   labels,
   questionRows = false,
+  responsiveEnabled = false,
 }: {
   title: string;
   rows: Record<string, ComparableValue>;
   labels?: Record<string, string | undefined>;
   questionRows?: boolean;
+  responsiveEnabled?: boolean;
 }) {
   const entries = Object.entries(rows).filter(([, value]) => !questionRows || value.current !== null);
   if (entries.length === 0) return null;
@@ -73,6 +76,7 @@ function ComparisonTable({
   return (
     <section className="su-report-comparison-section" aria-labelledby={`report-comparison-${title.toLowerCase()}`}>
       <h3 id={`report-comparison-${title.toLowerCase()}`}>{title}</h3>
+      <ComparisonTableRegion label={`${title} comparison table`} responsiveEnabled={responsiveEnabled}>
       <table>
         <thead>
           <tr>
@@ -98,7 +102,25 @@ function ComparisonTable({
           ))}
         </tbody>
       </table>
+      </ComparisonTableRegion>
     </section>
+  );
+}
+
+function ComparisonTableRegion({
+  children,
+  label,
+  responsiveEnabled,
+}: {
+  children: ReactNode;
+  label: string;
+  responsiveEnabled: boolean;
+}) {
+  if (!responsiveEnabled) return <>{children}</>;
+  return (
+    <div className="su-report-data-region" role="region" tabIndex={0} aria-label={label}>
+      {children}
+    </div>
   );
 }
 
@@ -118,9 +140,11 @@ export function ComparisonCoverSubtitle({ comparison }: { comparison?: ReportCom
 export function ReportComparisonContent({
   comparison,
   labels,
+  responsiveEnabled = false,
 }: {
   comparison?: ReportComparisonModel | null;
   labels?: ReportComparisonLabels;
+  responsiveEnabled?: boolean;
 }) {
   if (!comparison) return null;
   const { coverage } = comparison;
@@ -138,6 +162,7 @@ export function ReportComparisonContent({
       </p>
       <section className="su-report-comparison-section" aria-labelledby="report-comparison-overall">
         <h3 id="report-comparison-overall">Overall result</h3>
+        <ComparisonTableRegion label="Overall result comparison table" responsiveEnabled={responsiveEnabled}>
         <table>
           <thead>
             <tr>
@@ -156,10 +181,11 @@ export function ReportComparisonContent({
             </tr>
           </tbody>
         </table>
+        </ComparisonTableRegion>
       </section>
-      <ComparisonTable title="Decisions" rows={comparison.domains} labels={labels?.domains} />
-      <ComparisonTable title="Sections" rows={comparison.sections} labels={labels?.sections} />
-      <ComparisonTable title="Questions" rows={comparison.questions} labels={labels?.questions} questionRows />
+      <ComparisonTable title="Decisions" rows={comparison.domains} labels={labels?.domains} responsiveEnabled={responsiveEnabled} />
+      <ComparisonTable title="Sections" rows={comparison.sections} labels={labels?.sections} responsiveEnabled={responsiveEnabled} />
+      <ComparisonTable title="Questions" rows={comparison.questions} labels={labels?.questions} questionRows responsiveEnabled={responsiveEnabled} />
     </section>
   );
 }

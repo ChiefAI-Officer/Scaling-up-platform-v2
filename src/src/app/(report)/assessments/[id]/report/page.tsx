@@ -69,11 +69,7 @@ export default async function CampaignGroupReportPage({ params }: PageProps) {
     const isUnpublished = outcome.reason === "unpublished";
     return (
       <div
-        className={
-          mobileResponsiveEnabled
-            ? "su-report-page min-w-0 max-w-full"
-            : "su-report-page"
-        }
+        className="su-report-page"
         data-responsive-report-page={mobileResponsiveEnabled ? "" : undefined}
       >
         <div className="su-group-empty" data-testid="group-report-not-applicable">
@@ -101,11 +97,7 @@ export default async function CampaignGroupReportPage({ params }: PageProps) {
     });
     return (
       <div
-        className={
-          mobileResponsiveEnabled
-            ? "su-report-page min-w-0 max-w-full"
-            : "su-report-page"
-        }
+        className="su-report-page"
         data-responsive-report-page={mobileResponsiveEnabled ? "" : undefined}
       >
         <GroupReportEmpty />
@@ -164,11 +156,7 @@ export default async function CampaignGroupReportPage({ params }: PageProps) {
 
   return (
     <div
-      className={
-        mobileResponsiveEnabled
-          ? "su-report-page min-w-0 max-w-full"
-          : "su-report-page"
-      }
+      className="su-report-page"
       data-responsive-report-page={mobileResponsiveEnabled ? "" : undefined}
     >
       {/* Wave R (R-3, Jeff #9): screen-only print bar on the FULL render only —

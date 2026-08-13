@@ -84,6 +84,17 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("ImportMembersModal", () => {
+  test("responsive in-flight state locks only import and leaves CSV, mode, and cancel available", async () => {
+    (global.fetch as jest.Mock).mockReturnValue(new Promise(() => {}));
+    renderModal({ responsiveEnabled: true });
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: VALID_CSV_2_ROWS } });
+    fireEvent.click(screen.getByRole("button", { name: /Import 2 respondents/ }));
+    expect(await screen.findByRole("button", { name: "Importing…" })).toBeDisabled();
+    expect(screen.getByRole("textbox")).toBeEnabled();
+    expect(screen.getByLabelText("Merge — update name and team")).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled();
+  });
+
   test("responsive CSV preview is a labeled bounded data region", async () => {
     renderModal({ responsiveEnabled: true });
 

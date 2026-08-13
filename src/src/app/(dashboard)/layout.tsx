@@ -100,7 +100,7 @@ export default async function DashboardLayout({
                 {userInitial}
               </div>
               {/* Mobile/tablet hamburger */}
-              <AdminMobileNav counts={counts} email={session.user.email || ""} />
+              <AdminMobileNav counts={counts} email={session.user.email || ""} responsiveEnabled={mobileResponsiveEnabled} />
             </div>
           </div>
         </div>

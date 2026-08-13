@@ -158,7 +158,6 @@ export function DeleteWorkshopDialog({
                 setConfirmText("");
                 setError(null);
               }}
-              disabled={isSubmitting}
               className="min-h-11 w-full sm:w-auto"
             >
               Cancel

@@ -262,7 +262,7 @@ export function ImportMembersModal({
               placeholder={"name,email,team\nAlice Smith,alice@company.com,Engineering\nBob Jones,bob@company.com,"}
               value={csvText}
               onChange={(e) => setCsvText(e.target.value)}
-              disabled={submitting || result !== null}
+              disabled={result !== null || (!responsiveEnabled && submitting)}
               className="w-full font-mono text-xs rounded-md border border-input bg-background px-3 py-2 shadow-sm resize-y ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             />
           </div>
@@ -360,7 +360,7 @@ export function ImportMembersModal({
                   value="skip"
                   checked={mode === "skip"}
                   onChange={() => setMode("skip")}
-                  disabled={submitting || result !== null}
+                  disabled={result !== null || (!responsiveEnabled && submitting)}
                   aria-label="Skip — leave existing untouched"
                 />
                 Skip — leave existing untouched
@@ -375,7 +375,7 @@ export function ImportMembersModal({
                   value="merge"
                   checked={mode === "merge"}
                   onChange={() => setMode("merge")}
-                  disabled={submitting || result !== null}
+                  disabled={result !== null || (!responsiveEnabled && submitting)}
                   aria-label="Merge — update name and team"
                 />
                 Merge — update name and team
@@ -451,7 +451,7 @@ export function ImportMembersModal({
             type="button"
             variant="outline"
             onClick={onClose}
-            disabled={submitting}
+            disabled={!responsiveEnabled && submitting}
           >
             {result !== null && result.errors.length > 0 ? "Close" : "Cancel"}
           </Button>

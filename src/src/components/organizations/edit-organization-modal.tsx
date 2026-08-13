@@ -89,7 +89,6 @@ export function EditOrganizationModal({
       setExternalId(organization.externalId ?? "");
       setError(null);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, organization.id, organization.name, organization.externalId]);
 
   // ---------------------------------------------------------------------------
@@ -179,7 +178,7 @@ export function EditOrganizationModal({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Acme Corp"
-                disabled={submitting}
+                disabled={!responsiveEnabled && submitting}
                 required
               />
             </div>
@@ -192,7 +191,7 @@ export function EditOrganizationModal({
                 value={externalId}
                 onChange={(e) => setExternalId(e.target.value)}
                 placeholder="e.g. acme-ext-001"
-                disabled={submitting}
+                disabled={!responsiveEnabled && submitting}
                 aria-describedby={`${extIdId}-hint`}
               />
               <p id={`${extIdId}-hint`} className="text-xs text-muted-foreground italic">
@@ -219,7 +218,7 @@ export function EditOrganizationModal({
               type="button"
               variant="outline"
               onClick={onClose}
-              disabled={submitting}
+              disabled={!responsiveEnabled && submitting}
             >
               Cancel
             </Button>

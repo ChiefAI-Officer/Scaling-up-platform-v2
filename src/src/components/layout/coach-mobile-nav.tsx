@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
@@ -12,21 +12,46 @@ import { getCoachPrimaryNavItems } from "@/lib/coach-nav";
 interface CoachMobileNavProps {
   coachName: string;
   referredResultsEnabled?: true;
+  responsiveEnabled?: boolean;
 }
 
 export function CoachMobileNav({
   coachName,
   referredResultsEnabled = undefined,
+  responsiveEnabled = false,
 }: CoachMobileNavProps) {
   const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const pathname = usePathname();
   const primaryNavItems = getCoachPrimaryNavItems({
     referredResultsEnabled: referredResultsEnabled === true,
   });
 
+  useEffect(() => {
+    if (!responsiveEnabled || !open) return;
+    const dismiss = () => {
+      setOpen(false);
+      triggerRef.current?.focus();
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") dismiss();
+    };
+    const onPointerDown = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) dismiss();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("pointerdown", onPointerDown);
+    };
+  }, [open, responsiveEnabled]);
+
   return (
-    <div className="md:hidden">
+    <div className="md:hidden" ref={rootRef}>
       <button
+        ref={triggerRef}
         onClick={() => setOpen(!open)}
         className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent"
         aria-label={open ? "Close menu" : "Open menu"}
