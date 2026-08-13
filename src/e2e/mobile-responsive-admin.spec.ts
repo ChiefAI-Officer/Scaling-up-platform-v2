@@ -17,9 +17,11 @@ export const ADMIN_ROUTES = [
   "/admin/assessments/aggregate", "/admin/assessments/campaigns",
   "/admin/assessments/import", "/admin/assessments/observability",
   "/admin/assessments/organizations", "/admin/assessments/public-campaigns",
+  "/admin/assessments/public-campaigns/new", "/admin/assessments/delivery-holds",
   "/admin/assessments/templates", "/admin/assessments/templates/new",
   "/admin/categories", "/coaches", "/coaches/new", "/contacts",
-  "/partners", "/surveys", "/templates", "/workshops", "/bio",
+  "/partners", "/surveys", "/templates", "/templates/new", "/workshops", "/workshops/new", "/bio",
+  "/admin/workflows/new", "/admin/surveys/templates/new",
 ] as const;
 
 const PROJECT_WIDTHS: Record<string, readonly number[]> = {
@@ -84,6 +86,12 @@ test("populated admin routes are discovered from live links and fit every width"
   await loginAdmin(page);
 
   const workshopDetail = await firstMatchingHref(page, "/workshops", /^\/workshops\/[^/?#]+$/, "admin workshop detail");
+  const workshopSurvey = await firstMatchingHref(
+    page,
+    workshopDetail,
+    /^\/workshops\/[^/?#]+\/surveys(?:[?#].*)?$/,
+    "admin workshop survey",
+  );
   await page.goto(workshopDetail, { waitUntil: "domcontentloaded" });
   await page.getByRole("button", { name: "Edit Landing Page" }).click();
   await expect(page).toHaveURL(/\/workshops\/[^/]+\/landing-pages$/);
@@ -112,6 +120,7 @@ test("populated admin routes are discovered from live links and fit every width"
   ]);
   const dynamicRoutes = [...new Set([
     workshopDetail,
+    workshopSurvey,
     landingManager,
     landingEditor,
     coachDetail,

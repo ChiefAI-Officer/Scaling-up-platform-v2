@@ -8,6 +8,7 @@ import {
 
 const COACH_EMAIL = process.env.E2E_COACH_EMAIL || "coach@example.com";
 const COACH_PASSWORD = process.env.E2E_COACH_PASSWORD || "demo123";
+const REFERRED_RESULTS_ROUTE = "/portal/assessments/referred-results";
 
 export const COACH_ROUTES = [
   "/portal/home",
@@ -15,7 +16,6 @@ export const COACH_ROUTES = [
   "/portal/request",
   "/portal/assessments",
   "/portal/assessments/new",
-  "/portal/assessments/public-leads",
   "/portal/assessments/trends",
   "/portal/members",
   "/portal/members/import",
@@ -100,13 +100,24 @@ test("populated coach routes are discovered from live links and fit every width"
     /^\/portal\/assessments\/[^/?#]+$/,
     "coach campaign detail",
   );
+  const referredResultsRoutes = await optionalHrefs(
+    page,
+    "/portal/assessments",
+    new RegExp(`^${REFERRED_RESULTS_ROUTE}$`),
+  );
 
   const optionalCampaignLinks = [
     ...(await optionalHrefs(page, campaignDetail, /^\/assessments\/[^/]+\/report(?:[?#].*)?$/)),
     ...(await optionalHrefs(page, campaignDetail, /^\/assessments\/[^/]+\/respondents\/[^/]+\/report(?:[?#].*)?$/)),
     ...(await optionalHrefs(page, campaignDetail, /^\/portal\/assessments\/respondents\/[^/]+\/longitudinal(?:[?#].*)?$/)),
   ];
-  const dynamicRoutes = [...new Set([workshopDetail, workshopSurvey, campaignDetail, ...optionalCampaignLinks])];
+  const dynamicRoutes = [...new Set([
+    workshopDetail,
+    workshopSurvey,
+    campaignDetail,
+    ...referredResultsRoutes,
+    ...optionalCampaignLinks,
+  ])];
 
   for (const width of widths) {
     await page.setViewportSize({ width, height: width >= 1024 ? 900 : 844 });

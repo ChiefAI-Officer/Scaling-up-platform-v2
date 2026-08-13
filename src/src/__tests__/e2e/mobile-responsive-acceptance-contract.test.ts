@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
@@ -7,6 +8,29 @@ import {
 
 const readE2e = (file: string) =>
   readFileSync(resolve(process.cwd(), "e2e", file), "utf8");
+
+type PlaywrightConfigSummary = {
+  baseURL: string;
+  hasWebServer: boolean;
+};
+
+function inspectPlaywrightConfig(override?: string): PlaywrightConfigSummary {
+  const environment = { ...process.env };
+  if (override === undefined) delete environment.PLAYWRIGHT_BASE_URL;
+  else environment.PLAYWRIGHT_BASE_URL = override;
+
+  const output = execFileSync(
+    process.execPath,
+    [
+      "--import",
+      "tsx",
+      "-e",
+      `import importedConfig from "./playwright.config"; const config = importedConfig.default ?? importedConfig; console.log(JSON.stringify({ baseURL: config.use?.baseURL, hasWebServer: Boolean(config.webServer) }));`,
+    ],
+    { cwd: process.cwd(), env: environment, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+  );
+  return JSON.parse(output) as PlaywrightConfigSummary;
+}
 
 describe("responsive authenticated navigation contract", () => {
   const base = {
@@ -95,6 +119,39 @@ describe("responsive OFF/KILL desktop parity lane", () => {
 });
 
 describe("browser-blocked responsive harness source contract", () => {
+  it("keeps the coach inventory free of the stale public-leads redirect and conditionally discovers the exposed referred-results owner", () => {
+    const source = readE2e("mobile-responsive-coach.spec.ts");
+
+    expect(source).not.toContain('"/portal/assessments/public-leads"');
+    expect(source).toContain('const REFERRED_RESULTS_ROUTE = "/portal/assessments/referred-results"');
+    expect(source).toMatch(/optionalHrefs\(\s*page,\s*"\/portal\/assessments",/);
+    expect(source).toContain("referredResultsRoutes");
+  });
+
+  it("covers all reachable admin create and operations owners in the static inventory", () => {
+    const source = readE2e("mobile-responsive-admin.spec.ts");
+
+    for (const route of [
+      "/workshops/new",
+      "/templates/new",
+      "/admin/workflows/new",
+      "/admin/assessments/delivery-holds",
+      "/admin/assessments/public-campaigns/new",
+      "/admin/surveys/templates/new",
+    ]) {
+      expect(source).toContain(`"${route}"`);
+    }
+    expect(source).not.toContain('"/admin/surveys/report-style-preview"');
+  });
+
+  it("keeps the selected workshop surveys owner in populated admin route discovery", () => {
+    const source = readE2e("mobile-responsive-admin.spec.ts");
+
+    expect(source).toContain("admin workshop survey");
+    expect(source).toContain("workshopSurvey");
+    expect(source).toContain("workshopDetail");
+  });
+
   it("routes Axe and visual navigation through the authenticated responsive guard", () => {
     for (const file of [
       "mobile-responsive-a11y.spec.ts",
@@ -145,4 +202,27 @@ describe("browser-blocked responsive harness source contract", () => {
     expect(source).toContain('contentType: "application/json"');
     expect(source).not.toContain("expectResponsiveRoute");
   });
+});
+
+describe("Playwright authorized-preview base URL contract", () => {
+  it("keeps localhost and the guarded local web server without an override", () => {
+    expect(inspectPlaywrightConfig()).toEqual({
+      baseURL: "http://localhost:3000",
+      hasWebServer: true,
+    });
+  });
+
+  it("uses a valid HTTPS preview override without starting a local web server", () => {
+    expect(inspectPlaywrightConfig("https://preview.example.test")).toEqual({
+      baseURL: "https://preview.example.test",
+      hasWebServer: false,
+    });
+  });
+
+  it.each(["preview.example.test", "ftp://preview.example.test"])(
+    "rejects a malformed or non-HTTP preview override: %s",
+    (override) => {
+      expect(() => inspectPlaywrightConfig(override)).toThrow();
+    },
+  );
 });
