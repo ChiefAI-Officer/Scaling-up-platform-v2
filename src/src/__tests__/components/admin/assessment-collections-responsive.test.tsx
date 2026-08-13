@@ -91,6 +91,9 @@ it("uses compact records for access-group members and grants without changing re
   expect(within(template).getByText("su-full")).toBeInTheDocument();
   expect(within(template).getByLabelText("CEO_ONLY aggregation")).toBeInTheDocument();
   expect(within(template).getByRole("button", { name: "Remove Scaling Up Full" })).toHaveClass("min-h-11");
+  const archive = screen.getByRole("button", { name: "Archive group" });
+  expect(archive).toHaveClass("min-h-11");
+  expect(archive).toHaveClass("min-w-11");
 });
 
 it("reflows observability metrics and presents audit actions as compact records", async () => {

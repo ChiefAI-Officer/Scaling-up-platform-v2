@@ -86,7 +86,10 @@ export default async function AdminPublicCampaignsPage({
           </div>
         )}
 
-        <PublicCampaignList createdCampaignId={createdCampaignId} />
+        <PublicCampaignList
+          createdCampaignId={createdCampaignId}
+          {...(mobileResponsiveEnabled ? { responsiveEnabled: true } : {})}
+        />
       </div>
     );
   }

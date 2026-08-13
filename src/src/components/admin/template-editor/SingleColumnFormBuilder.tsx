@@ -186,7 +186,7 @@ export function SingleColumnFormBuilder({
                   onChange={(e) => model.handleSectionsRename(s.uid, e.target.value)}
                   className={
                     responsiveEnabled
-                      ? "min-w-0 basis-full bg-transparent font-semibold outline-none sm:basis-auto sm:flex-1"
+                      ? "min-h-11 min-w-0 basis-full bg-transparent font-semibold outline-none sm:basis-auto sm:flex-1"
                       : "flex-1 bg-transparent font-semibold outline-none"
                   }
                 />

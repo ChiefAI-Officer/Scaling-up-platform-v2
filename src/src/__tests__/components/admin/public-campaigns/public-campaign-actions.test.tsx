@@ -68,6 +68,32 @@ afterEach(() => {
 });
 
 describe("PublicCampaignActions", () => {
+  it("gives responsive small action buttons a direct 44px target contract without changing legacy classes", () => {
+    const shared = {
+      campaign: campaign({ status: "ACTIVE" }),
+      origin: "https://host.example",
+      onCampaignUpdated: jest.fn(),
+      onToggleResponses: jest.fn(),
+      responsesExpanded: false,
+    };
+    const { rerender } = render(
+      <PublicCampaignActions {...shared} responsiveEnabled />,
+    );
+
+    for (const name of ["Copy link", "View responses"]) {
+      const button = screen.getByRole("button", { name });
+      expect(button).toHaveClass("min-h-11");
+      expect(button).toHaveClass("min-w-11");
+    }
+
+    rerender(<PublicCampaignActions {...shared} responsiveEnabled={false} />);
+    for (const name of ["Copy link", "View responses"]) {
+      const button = screen.getByRole("button", { name });
+      expect(button).not.toHaveClass("min-h-11");
+      expect(button).not.toHaveClass("min-w-11");
+    }
+  });
+
   it.each([
     ["DRAFT", ["Publish"], ["Copy link", "View responses"]],
     ["ACTIVE", ["Copy link", "View responses"], ["Publish"]],

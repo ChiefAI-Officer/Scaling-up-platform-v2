@@ -1,5 +1,5 @@
 import React from "react";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 
 import { TemplateEditorTabbed } from "@/components/admin/TemplateEditorTabbed";
 
@@ -88,6 +88,18 @@ describe("template editor mobile-responsive presentation", () => {
     expect(screen.getByTestId("single-column-builder")).toHaveClass("min-w-0");
     expect(screen.getByTestId("template-editor-save-draft-btn")).toBeVisible();
     expect(screen.getByTestId("template-editor-publish-btn")).toBeVisible();
+    for (const tab of screen.getAllByRole("tab")) {
+      expect(tab).toHaveClass("min-h-11");
+      expect(tab).toHaveClass("min-w-11");
+    }
+    for (const control of [
+      screen.getByTestId("template-editor-save-draft-btn"),
+      screen.getByTestId("template-editor-publish-btn"),
+    ]) {
+      expect(control).toHaveClass("min-h-11");
+      expect(control).toHaveClass("min-w-11");
+    }
+    expect(screen.getByTestId("sc-section-name-S1")).toHaveClass("min-h-11");
 
     fireEvent.click(screen.getByTestId("sc-section-add-q-S1"));
     expect(screen.getAllByTestId(/^question-card-/)).toHaveLength(2);
@@ -95,6 +107,11 @@ describe("template editor mobile-responsive presentation", () => {
     expect(screen.getByTestId("questions-config-form")).toHaveClass("break-words");
     expect(screen.getByTestId("questions-config-form")).toHaveAttribute(
       "data-responsive-inspector",
+    );
+    const inspector = screen.getByTestId("questions-config-form");
+    expect(within(inspector).getByLabelText("Label")).toHaveClass("min-h-11");
+    expect(within(inspector).getByLabelText("Help text")).toHaveClass(
+      "min-h-11",
     );
 
     fireEvent.click(screen.getByTestId("sc-section-down-S1"));
@@ -130,6 +147,20 @@ describe("template editor mobile-responsive presentation", () => {
     expect(screen.getByTestId("forms-builder")).toHaveAttribute(
       "data-responsive-builder",
     );
+    expect(screen.getByTestId("form-header-title")).toHaveClass("min-h-11");
+    expect(screen.getByTestId("form-header-description")).toHaveClass(
+      "min-h-11",
+    );
+    for (const control of screen.getAllByTestId(/^form-section-name-/)) {
+      expect(control).toHaveClass("min-h-11");
+    }
+    for (const control of screen.getAllByTestId(/^form-section-description-/)) {
+      expect(control).toHaveClass("min-h-11");
+    }
+
+    fireEvent.click(screen.getByTestId(/^form-card-focus-/));
+    expect(screen.getByTestId(/^form-card-title-/)).toHaveClass("min-h-11");
+    expect(screen.getByTestId(/^form-card-help-/)).toHaveClass("min-h-11");
 
     fireEvent.click(screen.getByTestId("section-menu-S1"));
     fireEvent.click(screen.getByTestId("section-menu-S1-add-question"));

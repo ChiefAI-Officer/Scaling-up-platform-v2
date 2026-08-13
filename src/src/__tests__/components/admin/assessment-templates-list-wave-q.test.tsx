@@ -147,11 +147,27 @@ describe("AssessmentTemplatesList — responsive collection", () => {
     const more = within(card).getByRole("button", {
       name: "More Rockefeller Habits actions",
     });
-    expect(more).toHaveClass("min-h-11", "min-w-11");
+    expect(more).toHaveClass("min-h-11");
+    expect(more).toHaveClass("min-w-11");
     fireEvent.keyDown(more, { key: "ArrowDown" });
     expect(await screen.findByRole("menuitem", { name: /access/i })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: /disable rockefeller habits/i })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: /soft-delete rockefeller habits/i })).toBeInTheDocument();
+  });
+
+  it("gives the actual wide Edit and Delete nodes direct 44px target contracts", async () => {
+    installFetch([ACTIVE_ROW]);
+    render(<AssessmentTemplatesList responsiveEnabled />);
+
+    const wide = await screen.findByTestId("responsive-wide-view");
+    const edit = within(wide).getByRole("link", { name: "Edit" });
+    expect(edit).toHaveClass("min-h-11");
+    expect(edit).toHaveClass("min-w-11");
+    const remove = within(wide).getByRole("button", {
+      name: "Soft-delete Rockefeller Habits",
+    });
+    expect(remove).toHaveClass("min-h-11");
+    expect(remove).toHaveClass("min-w-11");
   });
 });
 

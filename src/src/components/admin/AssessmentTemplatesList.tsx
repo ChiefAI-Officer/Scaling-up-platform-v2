@@ -393,14 +393,14 @@ export function AssessmentTemplatesList({
                             affordance; "Edit" stays as the explicit verb. */}
                         <Link
                           href={`/admin/assessments/access-groups`}
-                        className={responsiveEnabled ? "wf-action-link inline-flex min-h-11 items-center" : "wf-action-link"}
+                        className={responsiveEnabled ? "wf-action-link inline-flex min-h-11 min-w-11 items-center justify-center" : "wf-action-link"}
                         >
                           Access ↗
                         </Link>
                         <span className="wf-action-sep">·</span>
                         <Link
                           href={`/admin/assessments/templates/${row.id}`}
-                          className={responsiveEnabled ? "wf-action-link inline-flex min-h-11 items-center" : "wf-action-link"}
+                          className={responsiveEnabled ? "wf-action-link inline-flex min-h-11 min-w-11 items-center justify-center" : "wf-action-link"}
                         >
                           Edit
                         </Link>
@@ -430,7 +430,7 @@ export function AssessmentTemplatesList({
                           type="button"
                           onClick={() => handleDelete(row)}
                           disabled={deletingId !== null}
-                          className={responsiveEnabled ? "wf-action-link-destructive min-h-11" : "wf-action-link-destructive"}
+                          className={responsiveEnabled ? "wf-action-link-destructive inline-flex min-h-11 min-w-11 items-center justify-center" : "wf-action-link-destructive"}
                           data-testid={`delete-template-${row.id}`}
                           aria-label={`Soft-delete ${row.name}`}
                         >

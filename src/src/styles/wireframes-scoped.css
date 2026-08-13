@@ -123,10 +123,13 @@
 .wf-scope .template-editor-responsive .wf-page-action-row .wf-btn,
 .wf-scope .template-editor-responsive [data-responsive-builder] button:not(:disabled),
 .wf-scope .template-editor-responsive [data-responsive-builder] [role="button"]:not([aria-disabled="true"]),
+.wf-scope .template-editor-responsive [data-responsive-builder] input:not([type="checkbox"]):not(:disabled),
 .wf-scope .template-editor-responsive [data-responsive-builder] select:not(:disabled),
+.wf-scope .template-editor-responsive [data-responsive-builder] textarea:not(:disabled),
 .wf-scope .template-editor-responsive [data-responsive-inspector] button:not(:disabled),
 .wf-scope .template-editor-responsive [data-responsive-inspector] select:not(:disabled),
-.wf-scope .template-editor-responsive [data-responsive-inspector] input:not([type="checkbox"]):not(:disabled) {
+.wf-scope .template-editor-responsive [data-responsive-inspector] input:not([type="checkbox"]):not(:disabled),
+.wf-scope .template-editor-responsive [data-responsive-inspector] textarea:not(:disabled) {
   min-height: 44px;
 }
 .wf-scope .template-editor-responsive [data-responsive-builder] button:not(:disabled),

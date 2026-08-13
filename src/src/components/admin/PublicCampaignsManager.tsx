@@ -394,6 +394,10 @@ export function PublicCampaignsManager({
     return <p className="wf-muted-text">Loading…</p>;
   }
 
+  const expandedAppearanceCampaign = responsiveEnabled
+    ? campaigns.find((campaign) => campaign.id === expandedAppearanceId)
+    : undefined;
+
   return (
     <div className={responsiveEnabled ? "min-w-0 max-w-full" : undefined}>
       {error && (
@@ -455,42 +459,62 @@ export function PublicCampaignsManager({
                           </button>
                         ) : null}
                       </div>
-                      {expandedAppearanceId === campaign.id && campaign.reportStylesAvailable ? (
-                        <section className="mt-4 min-w-0" aria-label={`${campaign.name} compact report appearance`}>
-                          <ReportStylePicker
-                            value={campaign.reportStyleLockedAt !== null ? campaign.reportStyle : (appearanceDrafts[campaign.id] ?? campaign.reportStyle)}
-                            onChange={(value) => setAppearanceDrafts((current) => ({ ...current, [campaign.id]: value }))}
-                            disabled={campaign.reportStyleLockedAt !== null || appearanceSavingId === campaign.id}
-                            sourceLabel={campaign.reportStyleSource === "CAMPAIGN_OVERRIDE" ? "Campaign choice" : "Template default"}
-                            lockedAt={campaign.reportStyleLockedAt}
-                            previewAnatomy={resolveReportStylePreviewAnatomy({ templateAlias: campaign.template?.alias, capabilities: campaign.reportStylePreviewCapabilities })}
-                          />
-                          {campaign.reportStyleLockedAt === null ? (
-                            <button
-                              type="button"
-                              className="wf-btn wf-btn-primary mt-3 min-h-11 w-full"
-                              disabled={appearanceSavingId === campaign.id || (appearanceDrafts[campaign.id] ?? campaign.reportStyle) === campaign.reportStyle}
-                              onClick={() => handleSaveReportStyle(campaign)}
-                            >
-                              {appearanceSavingId === campaign.id ? "Saving…" : "Save report appearance"}
-                            </button>
-                          ) : null}
-                        </section>
-                      ) : null}
                       {expandedId === campaign.id ? (
                         <div className="mt-4 space-y-3" aria-label={`${campaign.name} submissions`}>
-                          {subsLoading === campaign.id ? <p className="wf-muted-text">Loading…</p> : subsError ? <p className="wf-muted-text" role="alert">{subsError}</p> : submissionRows.length === 0 ? <p className="wf-muted-text">No submissions yet.</p> : submissionRows.map((submission) => (
-                            <ResponsiveRecord key={submission.id} aria-label={submission.takerName} className="bg-background">
-                              <ResponsiveRecordHeader title={submission.takerName} />
-                              <ResponsiveRecordMeta items={[
-                                { label: "Email", value: submission.takerEmail ?? "—" },
-                                { label: "Referring coach", value: submission.referringCoach ? `${submission.referringCoach.name} · ${submission.referringCoach.email}` : submission.referringCoachEmail ?? "Scaling Up only" },
-                                { label: "Result", value: submission.summary ? <SubmissionResult summary={submission.summary} /> : "—" },
-                                { label: "Submitted", value: submission.submittedAt.slice(0, 10) },
-                              ]} />
-                              {submission.reportHref ? <a href={submission.reportHref} className="wf-btn mt-3 inline-flex min-h-11 w-full items-center justify-center">View report</a> : null}
-                            </ResponsiveRecord>
-                          ))}
+                          {subsLoading === campaign.id ? <p className="wf-muted-text">Loading…</p> : subsError ? <p className="wf-muted-text" role="alert">{subsError}</p> : submissionRows.length === 0 ? <p className="wf-muted-text">No submissions yet.</p> : submissionRows.map((submission) => {
+                            const details = fourDecisionDomains(submission.summary);
+                            const isExpanded = expandedSubmissionId === submission.id;
+                            return (
+                              <ResponsiveRecord key={submission.id} aria-label={submission.takerName} className="bg-background">
+                                <ResponsiveRecordHeader title={submission.takerName} />
+                                <ResponsiveRecordMeta items={[
+                                  { label: "Email", value: submission.takerEmail ?? "—" },
+                                  { label: "Referring coach", value: submission.referringCoach ? `${submission.referringCoach.name} · ${submission.referringCoach.email}` : submission.referringCoachEmail ?? "Scaling Up only" },
+                                  { label: "Result", value: submission.summary ? <SubmissionResult summary={submission.summary} /> : "—" },
+                                  { label: "Submitted", value: submission.submittedAt.slice(0, 10) },
+                                ]} />
+                                {details ? (
+                                  <button
+                                    type="button"
+                                    className="wf-btn mt-3 min-h-11 w-full"
+                                    aria-expanded={isExpanded}
+                                    onClick={() =>
+                                      setExpandedSubmissionId(
+                                        isExpanded ? null : submission.id,
+                                      )
+                                    }
+                                  >
+                                    {isExpanded ? "Hide details" : "Details"}
+                                  </button>
+                                ) : null}
+                                {isExpanded && details ? (
+                                  <div
+                                    className="mt-3"
+                                    style={{
+                                      display: "grid",
+                                      gridTemplateColumns:
+                                        "repeat(4, minmax(0, 1fr))",
+                                      gap: "0.5rem",
+                                    }}
+                                  >
+                                    {details.map(({ key, domain }) => (
+                                      <div key={key}>
+                                        <span className="wf-muted-text">
+                                          {domain.label}
+                                        </span>
+                                        <strong style={{ display: "block" }}>
+                                          {domain.score === null
+                                            ? "—"
+                                            : domain.score.toFixed(1)}
+                                        </strong>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : null}
+                                {submission.reportHref ? <a href={submission.reportHref} className="wf-btn mt-3 inline-flex min-h-11 w-full items-center justify-center">View report</a> : null}
+                              </ResponsiveRecord>
+                            );
+                          })}
                         </div>
                       ) : null}
                     </ResponsiveRecord>
@@ -571,7 +595,9 @@ export function PublicCampaignsManager({
                       )}
                     </td>
                   </tr>
-                  {c.reportStylesAvailable && expandedAppearanceId === c.id && (
+                  {!responsiveEnabled &&
+                    c.reportStylesAvailable &&
+                    expandedAppearanceId === c.id && (
                     <tr className="wf-tr">
                       <td className="wf-td" colSpan={5}>
                         <section
@@ -783,6 +809,63 @@ export function PublicCampaignsManager({
             }
           />
         )}
+        {expandedAppearanceCampaign?.reportStylesAvailable ? (
+          <section
+            className="mt-4 min-w-0 max-w-full"
+            aria-label={`${expandedAppearanceCampaign.name} report appearance`}
+            style={{ maxWidth: "64rem" }}
+          >
+            <ReportStylePicker
+              value={
+                expandedAppearanceCampaign.reportStyleLockedAt !== null
+                  ? expandedAppearanceCampaign.reportStyle
+                  : (appearanceDrafts[expandedAppearanceCampaign.id] ??
+                    expandedAppearanceCampaign.reportStyle)
+              }
+              onChange={(value) =>
+                setAppearanceDrafts((current) => ({
+                  ...current,
+                  [expandedAppearanceCampaign.id]: value,
+                }))
+              }
+              disabled={
+                expandedAppearanceCampaign.reportStyleLockedAt !== null ||
+                appearanceSavingId === expandedAppearanceCampaign.id
+              }
+              sourceLabel={
+                expandedAppearanceCampaign.reportStyleSource ===
+                "CAMPAIGN_OVERRIDE"
+                  ? "Campaign choice"
+                  : "Template default"
+              }
+              lockedAt={expandedAppearanceCampaign.reportStyleLockedAt}
+              previewAnatomy={resolveReportStylePreviewAnatomy({
+                templateAlias: expandedAppearanceCampaign.template?.alias,
+                capabilities:
+                  expandedAppearanceCampaign.reportStylePreviewCapabilities,
+              })}
+            />
+            {expandedAppearanceCampaign.reportStyleLockedAt === null ? (
+              <button
+                type="button"
+                className="wf-btn wf-btn-primary mt-3 min-h-11 min-w-11 w-full lg:w-auto"
+                disabled={
+                  appearanceSavingId === expandedAppearanceCampaign.id ||
+                  (appearanceDrafts[expandedAppearanceCampaign.id] ??
+                    expandedAppearanceCampaign.reportStyle) ===
+                    expandedAppearanceCampaign.reportStyle
+                }
+                onClick={() =>
+                  handleSaveReportStyle(expandedAppearanceCampaign)
+                }
+              >
+                {appearanceSavingId === expandedAppearanceCampaign.id
+                  ? "Saving…"
+                  : "Save report appearance"}
+              </button>
+            ) : null}
+          </section>
+        ) : null}
       </section>
 
       {/* ── Create Form ───────────────────────────────────────────── */}

@@ -31,6 +31,7 @@ export interface SafeToPublishBadgeProps {
   publishedOptionKeys: Readonly<Record<string, readonly string[]>>;
   dirty: { questions: boolean; sections: boolean };
   isDirty: boolean;
+  responsiveEnabled?: boolean;
 }
 
 export function SafeToPublishBadge(props: SafeToPublishBadgeProps) {
@@ -86,7 +87,11 @@ export function SafeToPublishBadge(props: SafeToPublishBadgeProps) {
         onClick={() => setOpen((v) => !v)}
         data-testid="safe-to-publish-badge"
         data-tone={tone}
-        className="wf-btn wf-btn-secondary wf-btn-sm"
+        className={
+          props.responsiveEnabled
+            ? "wf-btn wf-btn-secondary wf-btn-sm min-h-11 min-w-11"
+            : "wf-btn wf-btn-secondary wf-btn-sm"
+        }
       >
         {badgeLabel(nPrevent, nWarn, props.isDirty)}
       </button>

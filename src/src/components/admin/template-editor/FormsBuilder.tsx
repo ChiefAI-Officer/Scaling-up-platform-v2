@@ -109,6 +109,7 @@ export function FormsBuilder({
       sectionCount={sections.length}
       isReadOnly={isReadOnly}
       onTemplateFieldChange={model.handleTemplateFieldChange}
+      responsiveEnabled={responsiveEnabled}
     />
   );
   const welcome = adminOwnedPresentationEnabled ? (
@@ -202,6 +203,7 @@ export function FormsBuilder({
                 onMoveUp={model.handleSectionsMoveUp}
                 onMoveDown={model.handleSectionsMoveDown}
                 onDelete={commands.deleteSection}
+                responsiveEnabled={responsiveEnabled}
               />
 
               {!collapsed && (
@@ -273,6 +275,7 @@ export function FormsBuilder({
                                 model.handleUpdateQuestion(q.uid, patch)
                               }
                               registerFocusRef={registerFocusRef}
+                              responsiveEnabled={responsiveEnabled}
                             />
                             {focused && !isReadOnly && (
                               <button

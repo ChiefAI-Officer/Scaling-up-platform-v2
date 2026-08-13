@@ -764,7 +764,11 @@ export function QuestionInspector({
           value={question.label}
           onChange={(e) => onUpdate({ label: e.target.value })}
           disabled={isReadOnly}
-          className="wf-input disabled:opacity-60 disabled:cursor-not-allowed"
+          className={
+            responsiveEnabled
+              ? "wf-input min-h-11 disabled:opacity-60 disabled:cursor-not-allowed"
+              : "wf-input disabled:opacity-60 disabled:cursor-not-allowed"
+          }
         />
       </div>
 
@@ -783,7 +787,11 @@ export function QuestionInspector({
           onChange={(e) => onUpdate({ helpText: e.target.value })}
           disabled={isReadOnly}
           placeholder="Optional helper text shown to respondents"
-          className="wf-input disabled:opacity-60 disabled:cursor-not-allowed"
+          className={
+            responsiveEnabled
+              ? "wf-input min-h-11 disabled:opacity-60 disabled:cursor-not-allowed"
+              : "wf-input disabled:opacity-60 disabled:cursor-not-allowed"
+          }
         />
         <span className="block text-[0.6875rem] italic text-muted-foreground">
           Optional. Rendered below the label on the respondent form.

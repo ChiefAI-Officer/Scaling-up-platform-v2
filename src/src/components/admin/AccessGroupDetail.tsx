@@ -621,6 +621,7 @@ export function AccessGroupDetail({ accessGroupId, responsiveEnabled = false }: 
             <Button
               variant="destructive"
               onClick={() => setArchiveOpen(true)}
+              className={responsiveEnabled ? "min-h-11 min-w-11" : undefined}
             >
               Archive group
             </Button>

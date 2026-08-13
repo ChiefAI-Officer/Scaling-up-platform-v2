@@ -23,6 +23,7 @@ interface PublicCampaignActionsProps {
   onCampaignUpdated: (updates: Pick<PublicCampaignViewModel, "status">) => void;
   onToggleResponses: () => void;
   responsesExpanded: boolean;
+  responsiveEnabled?: boolean;
 }
 
 type Notice = { kind: "status" | "alert"; message: string } | null;
@@ -33,6 +34,7 @@ export function PublicCampaignActions({
   onCampaignUpdated,
   onToggleResponses,
   responsesExpanded,
+  responsiveEnabled = false,
 }: PublicCampaignActionsProps) {
   const [publishOpen, setPublishOpen] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -102,7 +104,11 @@ export function PublicCampaignActions({
         {campaign.status === "DRAFT" && (
           <Dialog open={publishOpen} onOpenChange={setPublishOpen}>
             <DialogTrigger asChild>
-              <Button size="sm" type="button">
+              <Button
+                size="sm"
+                type="button"
+                className={responsiveEnabled ? "min-h-11 min-w-11" : undefined}
+              >
                 Publish
               </Button>
             </DialogTrigger>
@@ -128,7 +134,12 @@ export function PublicCampaignActions({
         )}
 
         {campaign.status === "ACTIVE" && (
-          <Button size="sm" type="button" onClick={copyPublicLink}>
+          <Button
+            size="sm"
+            type="button"
+            onClick={copyPublicLink}
+            className={responsiveEnabled ? "min-h-11 min-w-11" : undefined}
+          >
             Copy link
           </Button>
         )}
@@ -140,6 +151,7 @@ export function PublicCampaignActions({
             variant="outline"
             aria-expanded={responsesExpanded}
             onClick={onToggleResponses}
+            className={responsiveEnabled ? "min-h-11 min-w-11" : undefined}
           >
             {responsesExpanded ? "Hide responses" : "View responses"}
           </Button>

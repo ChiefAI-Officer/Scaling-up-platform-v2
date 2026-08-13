@@ -94,6 +94,7 @@ export interface FormQuestionCardProps {
   onUpdate: (patch: Partial<QuestionDraftRow>) => void;
   /** Stable — registers the row's focus button for the parent's focus effect. */
   registerFocusRef: (uid: string, el: HTMLButtonElement | null) => void;
+  responsiveEnabled?: boolean;
   children?: React.ReactNode;
 }
 
@@ -132,6 +133,7 @@ function FormQuestionCardImpl({
   onClearDependents,
   onUpdate,
   registerFocusRef,
+  responsiveEnabled = false,
   children,
 }: FormQuestionCardProps) {
   const { uid, stableKey, type, label, position, sectionStableKey, badges } = vm;
@@ -262,7 +264,11 @@ function FormQuestionCardImpl({
               value={question.label}
               onChange={(e) => onUpdate({ label: e.target.value })}
               disabled={isReadOnly}
-              className="flex-1 rounded border border-transparent bg-transparent px-1 py-1 text-lg font-medium text-foreground outline-none focus:border-border disabled:opacity-60 disabled:cursor-not-allowed"
+              className={
+                responsiveEnabled
+                  ? "min-h-11 flex-1 rounded border border-transparent bg-transparent px-1 py-1 text-lg font-medium text-foreground outline-none focus:border-border disabled:opacity-60 disabled:cursor-not-allowed"
+                  : "flex-1 rounded border border-transparent bg-transparent px-1 py-1 text-lg font-medium text-foreground outline-none focus:border-border disabled:opacity-60 disabled:cursor-not-allowed"
+              }
             />
             <QuestionTypePicker
               question={question}
@@ -280,7 +286,11 @@ function FormQuestionCardImpl({
             value={question.helpText}
             onChange={(e) => onUpdate({ helpText: e.target.value })}
             disabled={isReadOnly}
-            className="w-full rounded border border-border bg-transparent px-2 py-1 text-sm text-muted-foreground outline-none disabled:opacity-60 disabled:cursor-not-allowed"
+            className={
+              responsiveEnabled
+                ? "w-full min-h-11 rounded border border-border bg-transparent px-2 py-1 text-sm text-muted-foreground outline-none disabled:opacity-60 disabled:cursor-not-allowed"
+                : "w-full rounded border border-border bg-transparent px-2 py-1 text-sm text-muted-foreground outline-none disabled:opacity-60 disabled:cursor-not-allowed"
+            }
           />
 
           <QuestionCanvas
@@ -400,6 +410,7 @@ export function formQuestionCardPropsAreEqual(
 ): boolean {
   if (a.isFocused || b.isFocused) return false;
   if (a.isReadOnly !== b.isReadOnly) return false;
+  if (a.responsiveEnabled !== b.responsiveEnabled) return false;
   const x = a.vm;
   const y = b.vm;
   if (
