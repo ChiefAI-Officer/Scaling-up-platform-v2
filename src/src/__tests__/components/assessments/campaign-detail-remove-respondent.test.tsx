@@ -7,7 +7,13 @@
  */
 
 import React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 
 const mockToast = jest.fn();
 const mockRefresh = jest.fn();
@@ -142,6 +148,50 @@ function renderRemovalFlow() {
 describe("CampaignDetail — respondent removal (CHI-35 / Jeff #59)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  it("labels every compact respondent-card field while preserving the labeled desktop table", () => {
+    render(
+      <CampaignDetail
+        responsiveEnabled
+        initialOverview={overview}
+        initialRespondents={[removableRespondent]}
+      />,
+    );
+
+    const row = within(
+      screen.getByTestId(`respondent-row-${RESPONDENT_ID}`),
+    );
+    for (const label of [
+      "Email",
+      "Team",
+      "Status",
+      "Sent",
+      "Submitted",
+      "Actions",
+    ]) {
+      expect(
+        row.getByTestId(
+          `compact-respondent-label-${label.toLowerCase()}`,
+        ),
+      ).toHaveClass("sm:hidden");
+    }
+    expect(
+      screen.getByRole("columnheader", { name: "Email" }),
+    ).toBeInTheDocument();
+  });
+
+  it("does not add compact respondent labels when responsive mode is off", () => {
+    render(
+      <CampaignDetail
+        initialOverview={overview}
+        initialRespondents={[removableRespondent]}
+      />,
+    );
+
+    expect(
+      screen.queryByTestId("compact-respondent-label-email"),
+    ).not.toBeInTheDocument();
   });
 
   it("treats an empty 204 as success, refreshes respondents, and never shows the false-error toast", async () => {

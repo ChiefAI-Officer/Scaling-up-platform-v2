@@ -107,7 +107,7 @@ function CompanySection({
                   <div className="min-w-0 basis-full sm:flex-1">
                     <Link
                       href={`${detailBasePath}/${c.id}`}
-                      className={responsiveEnabled ? "min-w-0 break-words font-medium text-foreground hover:text-primary text-sm" : "font-medium text-foreground hover:text-primary text-sm"}
+                      className={responsiveEnabled ? "inline-flex min-h-11 min-w-11 items-center min-w-0 break-words font-medium text-foreground hover:text-primary text-sm" : "font-medium text-foreground hover:text-primary text-sm"}
                       {...(responsiveEnabled ? { "data-touch-target": true } : {})}
                     >
                       {c.name}

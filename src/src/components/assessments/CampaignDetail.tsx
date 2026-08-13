@@ -2354,12 +2354,28 @@ export function CampaignDetail({
                         )}
                       </td>
                       <td className={responsiveEnabled ? "block break-all px-0 py-1 text-sm text-muted-foreground sm:table-cell sm:px-4 sm:py-3" : "px-4 py-3 text-sm text-muted-foreground"}>
+                        {responsiveEnabled && (
+                          <span
+                            className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground sm:hidden"
+                            data-testid="compact-respondent-label-email"
+                          >
+                            Email
+                          </span>
+                        )}
                         {row.respondent.email}
                       </td>
                       <td
                         className={responsiveEnabled ? "block px-0 py-1 text-sm sm:table-cell sm:px-4 sm:py-3" : "px-4 py-3 text-sm"}
                         data-testid={`team-cell-${row.respondent.id}`}
                       >
+                        {responsiveEnabled && (
+                          <span
+                            className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground sm:hidden"
+                            data-testid="compact-respondent-label-team"
+                          >
+                            Team
+                          </span>
+                        )}
                         {row.teamSnapshot.pathLabels.length === 0 ? (
                           <span className="text-muted-foreground italic">—</span>
                         ) : (
@@ -2376,6 +2392,14 @@ export function CampaignDetail({
                         )}
                       </td>
                       <td className={responsiveEnabled ? "block px-0 py-1 sm:table-cell sm:px-4 sm:py-3" : "px-4 py-3"}>
+                        {responsiveEnabled && (
+                          <span
+                            className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground sm:hidden"
+                            data-testid="compact-respondent-label-status"
+                          >
+                            Status
+                          </span>
+                        )}
                         {(() => {
                           const band = getInvitationBand(
                             row.invitation
@@ -2399,12 +2423,36 @@ export function CampaignDetail({
                         })()}
                       </td>
                       <td className={responsiveEnabled ? "block px-0 py-1 text-sm text-muted-foreground sm:table-cell sm:px-4 sm:py-3" : "px-4 py-3 text-sm text-muted-foreground"}>
+                        {responsiveEnabled && (
+                          <span
+                            className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground sm:hidden"
+                            data-testid="compact-respondent-label-sent"
+                          >
+                            Sent
+                          </span>
+                        )}
                         {formatDateTime(row.invitation?.sentAt)}
                       </td>
                       <td className={responsiveEnabled ? "block px-0 py-1 text-sm text-muted-foreground sm:table-cell sm:px-4 sm:py-3" : "px-4 py-3 text-sm text-muted-foreground"}>
+                        {responsiveEnabled && (
+                          <span
+                            className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground sm:hidden"
+                            data-testid="compact-respondent-label-submitted"
+                          >
+                            Submitted
+                          </span>
+                        )}
                         {formatDateTime(row.submittedAt)}
                       </td>
                       <td className={responsiveEnabled ? "block px-0 py-1 text-left sm:table-cell sm:px-4 sm:py-3 sm:text-right" : "px-4 py-3 text-right"}>
+                        {responsiveEnabled && (
+                          <span
+                            className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground sm:hidden"
+                            data-testid="compact-respondent-label-actions"
+                          >
+                            Actions
+                          </span>
+                        )}
                         <div className={responsiveEnabled ? "flex flex-wrap items-center gap-2 sm:inline-flex" : "inline-flex items-center gap-2"}>
                           {row.hasSubmission && (
                             // PRIMARY results action: the branded report.

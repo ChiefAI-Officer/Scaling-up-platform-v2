@@ -83,7 +83,9 @@ describe("CampaignsListWithFilter — grouped by company", () => {
     const campaignIdentity = screen.getByRole("link", {
       name: longCampaignName,
     });
-    expect(campaignIdentity).toHaveClass("min-w-0 break-words");
+    expect(campaignIdentity).toHaveClass(
+      "inline-flex min-h-11 min-w-11 items-center min-w-0 break-words",
+    );
     expect(screen.getByText(longOrganizationName)).toHaveClass(
       "min-w-0 break-words",
     );
@@ -92,6 +94,15 @@ describe("CampaignsListWithFilter — grouped by company", () => {
         "data-touch-target",
       );
     }
+  });
+
+  it("keeps the legacy campaign-name link class contract when responsive mode is off", () => {
+    render(<CampaignsListWithFilter campaigns={[campaignAlphaA]} />);
+
+    expect(screen.getByRole("link", { name: campaignAlphaA.name })).toHaveClass(
+      "font-medium text-foreground hover:text-primary text-sm",
+      { exact: true },
+    );
   });
 
   // Test 1: Renders company sections with correct grouping
