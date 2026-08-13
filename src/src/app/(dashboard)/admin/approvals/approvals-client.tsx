@@ -385,11 +385,15 @@ export default function ApprovalsPage({ responsiveEnabled = false }: { responsiv
         </div>
       )}
 
-      <div className={responsiveEnabled ? "mb-6 flex gap-3 overflow-x-auto pb-1" : "flex gap-3 mb-6 flex-wrap"}>
+      <div
+        className={responsiveEnabled ? "mb-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap" : "flex gap-3 mb-6 flex-wrap"}
+        role={responsiveEnabled ? "group" : undefined}
+        aria-label={responsiveEnabled ? "Filter approvals by status" : undefined}
+      >
         {FILTERS.map((status) => (
           <button
             key={status}
-            className={`${responsiveEnabled ? "min-h-11 shrink-0" : ""} px-4 py-2 border rounded-md text-sm font-medium cursor-pointer transition-all duration-200 ${
+            className={`${responsiveEnabled ? "min-h-11 w-full sm:w-auto" : ""} px-4 py-2 border rounded-md text-sm font-medium cursor-pointer transition-all duration-200 ${
               filter === status
                 ? "bg-primary text-primary-foreground border-primary"
                 : "bg-card text-foreground border-border hover:bg-accent"

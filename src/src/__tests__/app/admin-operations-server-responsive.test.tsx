@@ -15,13 +15,16 @@ jest.mock("@/components/auth/change-password-form", () => function ChangePasswor
 jest.mock("@/components/admin/invite-admin-section", () => ({ InviteAdminSection: ({ responsiveEnabled }: { responsiveEnabled?: boolean }) => <button data-testid="invite-section" data-responsive={String(responsiveEnabled)}>Invite admin</button> }));
 
 const registrationFindMany = jest.fn().mockResolvedValue([{ id: "registration-1", firstName: "Maria", lastName: "Lee", email: "maria@example.com", amountPaidCents: 15000, stripePaymentId: "pi_123", workshop: { id: "workshop-1", title: "Growth workshop", workshopCode: "GROW", updatedAt: new Date("2026-08-12") } }]);
+const mockRegistrationAggregate = jest.fn().mockResolvedValue({ _sum: { amountPaidCents: 0 } });
+const mockWorkshopFindMany = jest.fn().mockResolvedValue([]);
+const mockWorkshopTypeFindMany = jest.fn().mockResolvedValue([]);
 jest.mock("@/lib/db", () => ({
   db: {
     coach: { findMany: jest.fn().mockResolvedValue([]) },
     category: { findMany: jest.fn().mockResolvedValue([]) },
-    registration: { aggregate: jest.fn().mockResolvedValue({ _sum: { amountPaidCents: 0 } }), count: jest.fn().mockResolvedValue(0), findMany: (...args: unknown[]) => registrationFindMany(...args) },
-    workshop: { findMany: jest.fn().mockResolvedValue([]) },
-    workshopType: { findMany: jest.fn().mockResolvedValue([]) },
+    registration: { aggregate: (...args: unknown[]) => mockRegistrationAggregate(...args), count: jest.fn().mockResolvedValue(0), findMany: (...args: unknown[]) => registrationFindMany(...args) },
+    workshop: { findMany: (...args: unknown[]) => mockWorkshopFindMany(...args) },
+    workshopType: { findMany: (...args: unknown[]) => mockWorkshopTypeFindMany(...args) },
   },
 }));
 
@@ -32,12 +35,76 @@ import SettingsPage from "@/app/(dashboard)/admin/settings/page";
 beforeEach(() => {
   mockResponsiveFlag.mockReturnValue(true);
   registrationFindMany.mockClear();
+  mockRegistrationAggregate.mockReset().mockResolvedValue({ _sum: { amountPaidCents: 0 } });
+  mockWorkshopFindMany.mockReset().mockResolvedValue([]);
+  mockWorkshopTypeFindMany.mockReset().mockResolvedValue([]);
 });
 
 it("keeps the financial comparison table bounded and named", async () => {
   render(await FinancialsPage({ searchParams: Promise.resolve({ period: "all" }) }));
   expect(screen.getByRole("region", { name: "Revenue by workshop table" })).toHaveClass("overflow-x-auto");
   expect(screen.getByTestId("financial-filters")).toHaveAttribute("data-responsive", "true");
+});
+
+it("puts responsive revenue identity and value above the full-width progress bar and sizes financial links", async () => {
+  mockRegistrationAggregate.mockResolvedValue({ _sum: { amountPaidCents: 10000 } });
+  mockWorkshopFindMany.mockResolvedValue([{
+    id: "workshop-1",
+    title: "Growth workshop",
+    workshopCode: "GROW",
+    eventDate: new Date("2026-08-12T00:00:00.000Z"),
+    status: "APPROVED",
+    coach: { firstName: "Maria", lastName: "Lee" },
+    registrations: [{ amountPaidCents: 10000 }],
+    _count: { registrations: 1 },
+  }]);
+  mockWorkshopTypeFindMany.mockResolvedValue([{
+    id: "type-1",
+    name: "Growth",
+    workshops: [{ registrations: [{ amountPaidCents: 10000 }] }],
+  }]);
+
+  render(await FinancialsPage({ searchParams: Promise.resolve({ period: "all" }) }));
+
+  const revenue = screen.getByRole("group", { name: "Growth revenue" });
+  expect(revenue.children).toHaveLength(2);
+  expect(within(revenue.children[0] as HTMLElement).getByText("Growth")).toBeInTheDocument();
+  expect(within(revenue.children[0] as HTMLElement).getByText("$100.00")).toBeInTheDocument();
+  expect(within(revenue.children[0] as HTMLElement).getByText("100%")).toBeInTheDocument();
+  expect(within(revenue).getByRole("progressbar", { name: "Growth share of revenue" })).toBe(revenue.children[1]);
+  expect(screen.getByRole("link", { name: "Admin Dashboard" })).toHaveClass("min-h-11 min-w-11");
+  expect(screen.getByRole("link", { name: "Growth workshop" })).toHaveClass("min-h-11 min-w-11");
+});
+
+it("preserves exact legacy financial revenue-row and link classes", async () => {
+  mockResponsiveFlag.mockReturnValue(false);
+  mockRegistrationAggregate.mockResolvedValue({ _sum: { amountPaidCents: 10000 } });
+  mockWorkshopFindMany.mockResolvedValue([{
+    id: "workshop-1",
+    title: "Growth workshop",
+    workshopCode: "GROW",
+    eventDate: new Date("2026-08-12T00:00:00.000Z"),
+    status: "APPROVED",
+    coach: { firstName: "Maria", lastName: "Lee" },
+    registrations: [{ amountPaidCents: 10000 }],
+    _count: { registrations: 1 },
+  }]);
+  mockWorkshopTypeFindMany.mockResolvedValue([{
+    id: "type-1",
+    name: "Growth",
+    workshops: [{ registrations: [{ amountPaidCents: 10000 }] }],
+  }]);
+
+  render(await FinancialsPage({ searchParams: Promise.resolve({ period: "all" }) }));
+
+  const identity = screen.getByText("Growth");
+  const revenueRow = identity.parentElement;
+  expect(revenueRow).toHaveAttribute("class", "flex items-center gap-4");
+  expect(identity).toHaveAttribute("class", "w-40 text-sm font-medium text-foreground truncate");
+  expect(revenueRow?.children[1]).toHaveAttribute("class", "flex-1 bg-muted rounded-full h-4 overflow-hidden");
+  expect(revenueRow?.children[1]?.firstElementChild).toHaveAttribute("class", "bg-primary h-full rounded-full transition-all");
+  expect(screen.getByRole("link", { name: "Admin Dashboard" })).toHaveAttribute("class", "hover:text-foreground");
+  expect(screen.getByRole("link", { name: "Growth workshop" })).toHaveAttribute("class", "text-primary hover:text-primary/80 font-medium text-sm");
 });
 
 it("preserves original financial and refund table structure when responsive mode is disabled", async () => {

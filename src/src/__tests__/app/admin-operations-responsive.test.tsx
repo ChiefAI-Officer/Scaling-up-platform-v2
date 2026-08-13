@@ -45,6 +45,20 @@ it("preserves the exact legacy category and pricing table structure by default",
     "class",
     "bg-card rounded-xl shadow-sm border overflow-hidden",
   );
+  const categoryRow = screen.getByRole("table").querySelector("tbody tr");
+  expect(categoryRow?.children).toHaveLength(6);
+  expect(screen.getByRole("button", { name: "Active" })).toHaveAttribute(
+    "class",
+    "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium cursor-pointer bg-success/10 text-success hover:bg-success/20",
+  );
+  expect(screen.getByRole("button", { name: "Edit" })).toHaveAttribute(
+    "class",
+    "text-primary hover:text-primary/80 font-medium",
+  );
+  expect(screen.getByRole("button", { name: "Delete" })).toHaveAttribute(
+    "class",
+    "text-destructive hover:text-destructive/80 font-medium",
+  );
   categories.unmount();
 
   global.fetch = jest.fn((url: string) => Promise.resolve({
@@ -63,6 +77,28 @@ it("preserves the exact legacy category and pricing table structure by default",
   expect(screen.getByRole("table").parentElement).toHaveAttribute(
     "class",
     "bg-card rounded-xl shadow-sm border overflow-hidden",
+  );
+  const pricingRow = screen.getByRole("table").querySelector("tbody tr");
+  expect(pricingRow?.children).toHaveLength(6);
+  expect(screen.getByRole("button", { name: "Active" })).toHaveAttribute(
+    "class",
+    "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium cursor-pointer bg-success/10 text-success hover:bg-success/20",
+  );
+  expect(screen.getByRole("button", { name: "Edit" })).toHaveAttribute(
+    "class",
+    "text-primary hover:text-primary/80 font-medium",
+  );
+  expect(screen.getByRole("button", { name: "Delete" })).toHaveAttribute(
+    "class",
+    "text-destructive hover:text-destructive/80 font-medium",
+  );
+  expect(screen.getByRole("button", { name: "All Categories" })).toHaveAttribute(
+    "class",
+    "px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors bg-primary text-primary-foreground border-primary",
+  );
+  expect(screen.getByRole("button", { name: "Growth" })).toHaveAttribute(
+    "class",
+    "px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors bg-card text-foreground border-border hover:bg-accent",
   );
 });
 
@@ -89,13 +125,13 @@ it("makes responsive pricing filters and approval actions reachable at 44px", as
   const { unmount } = render(<PricingPage responsiveEnabled />);
   await screen.findByRole("list", { name: "Pricing tiers" });
   expect(screen.getByRole("button", { name: "All Categories" })).toHaveClass("min-h-11");
-  expect(screen.getByRole("button", { name: "Edit Standard" })).toHaveClass("min-h-11");
+  expect(screen.getByRole("button", { name: "Edit Standard" })).toHaveClass("min-h-11 min-w-11");
   expect(screen.getByRole("list", { name: "Pricing tiers" })).toHaveTextContent("Category");
   expect(screen.getByRole("list", { name: "Pricing tiers" })).toHaveTextContent("Workshops");
   expect(screen.getByRole("button", { name: "All Categories" }).parentElement).toHaveClass("flex-wrap");
   const pricingWide = screen.getByTestId("responsive-wide-view");
   for (const action of ["Active", "Edit", "Delete"]) {
-    expect(within(pricingWide).getByRole("button", { name: action })).toHaveClass("min-h-11");
+    expect(within(pricingWide).getByRole("button", { name: action })).toHaveClass("min-h-11 min-w-11");
   }
   unmount();
 
@@ -125,6 +161,20 @@ it("wraps a long responsive pricing category filter at tablet widths", async () 
   expect(filter).toHaveClass("flex-wrap");
   expect(filter).not.toHaveClass("sm:flex-nowrap");
   expect(within(filter).getAllByRole("button")).toHaveLength(13);
+});
+
+it("stacks enabled approval status filters below sm without a horizontal scroll rail", async () => {
+  global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ approvals: [] }) });
+
+  render(<ApprovalsPage responsiveEnabled />);
+  await screen.findByText("No pending approvals");
+
+  const filters = screen.getByRole("group", { name: "Filter approvals by status" });
+  expect(filters).toHaveClass("flex-col sm:flex-row sm:flex-wrap");
+  expect(filters).not.toHaveClass("overflow-x-auto");
+  for (const filter of within(filters).getAllByRole("button")) {
+    expect(filter).toHaveClass("min-h-11 w-full sm:w-auto");
+  }
 });
 
 it("sizes and stacks category create/edit fields and actions only when responsive mode is enabled", async () => {
@@ -199,8 +249,9 @@ it("sizes every category wide-table action in responsive mode", async () => {
   render(<CategoriesPage responsiveEnabled />);
   const wide = await screen.findByTestId("responsive-wide-view");
   for (const action of ["Active", "Edit", "Delete"]) {
-    expect(within(wide).getByRole("button", { name: action })).toHaveClass("min-h-11");
+    expect(within(wide).getByRole("button", { name: action })).toHaveClass("min-h-11 min-w-11");
   }
+  expect(screen.getByRole("button", { name: "Edit Growth" })).toHaveClass("min-h-11 min-w-11");
 });
 
 it("sizes the approval error dismiss control in responsive mode", async () => {

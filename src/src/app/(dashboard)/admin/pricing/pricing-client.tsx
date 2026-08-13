@@ -198,7 +198,7 @@ export default function PricingTiersPage({ responsiveEnabled = false }: { respon
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
         >
-            {responsiveEnabled ? <PageHeader responsiveEnabled title="Pricing Tiers" description="Manage pricing options that appear in the workshop request wizard." actions={<button onClick={openCreate} disabled={categories.length === 0} className="min-h-11 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">+ Add Pricing Tier</button>} /> : <div className="flex items-center justify-between mb-6">
+            {responsiveEnabled ? <PageHeader responsiveEnabled title="Pricing Tiers" description="Manage pricing options that appear in the workshop request wizard." actions={<button onClick={openCreate} disabled={categories.length === 0} className="min-h-11 min-w-11 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">+ Add Pricing Tier</button>} /> : <div className="flex items-center justify-between mb-6">
                 <div>
                     <h2 className="text-2xl font-bold text-foreground">Pricing Tiers</h2>
                     <p className="text-sm text-muted-foreground mt-1">
@@ -224,11 +224,17 @@ export default function PricingTiersPage({ responsiveEnabled = false }: { respon
                 >
                     <button
                         onClick={() => setFilterCategory("ALL")}
-                        className={`${responsiveEnabled ? "min-h-11 shrink-0" : ""} px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
-                            filterCategory === "ALL"
-                                ? "bg-primary text-primary-foreground border-primary"
-                                : "bg-card text-foreground border-border hover:bg-accent"
-                        }`}
+                        className={responsiveEnabled
+                            ? `min-h-11 min-w-11 shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                                filterCategory === "ALL"
+                                    ? "bg-primary text-primary-foreground border-primary"
+                                    : "bg-card text-foreground border-border hover:bg-accent"
+                            }`
+                            : `px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                                filterCategory === "ALL"
+                                    ? "bg-primary text-primary-foreground border-primary"
+                                    : "bg-card text-foreground border-border hover:bg-accent"
+                            }`}
                     >
                         All Categories
                     </button>
@@ -236,11 +242,17 @@ export default function PricingTiersPage({ responsiveEnabled = false }: { respon
                         <button
                             key={cat.id}
                             onClick={() => setFilterCategory(cat.id)}
-                            className={`${responsiveEnabled ? "min-h-11 shrink-0" : ""} px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
-                                filterCategory === cat.id
-                                    ? "bg-primary text-primary-foreground border-primary"
-                                    : "bg-card text-foreground border-border hover:bg-accent"
-                            }`}
+                            className={responsiveEnabled
+                                ? `min-h-11 min-w-11 shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                                    filterCategory === cat.id
+                                        ? "bg-primary text-primary-foreground border-primary"
+                                        : "bg-card text-foreground border-border hover:bg-accent"
+                                }`
+                                : `px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                                    filterCategory === cat.id
+                                        ? "bg-primary text-primary-foreground border-primary"
+                                        : "bg-card text-foreground border-border hover:bg-accent"
+                                }`}
                         >
                             {cat.name}
                         </button>
@@ -362,7 +374,7 @@ export default function PricingTiersPage({ responsiveEnabled = false }: { respon
                             <ResponsiveRecordHeader title={tier.name} status={<span className="text-xs text-muted-foreground">{tier.isActive ? "Active" : "Inactive"}</span>} />
                             <ResponsiveRecordMeta items={[{ label: "Amount", value: formatPrice(tier.amountCents) }, { label: "Category", value: tier.category.name }, { label: "Workshops", value: tier._count.workshops }]} />
                             <ResponsiveRecordActions
-                                primary={<button aria-label={`Edit ${tier.name}`} onClick={() => openEdit(tier)} className="rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground">Edit</button>}
+                                primary={<button aria-label={`Edit ${tier.name}`} onClick={() => openEdit(tier)} className="min-w-11 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground">Edit</button>}
                                 secondary={<>{<ResponsiveActionsItem onSelect={() => handleToggleActive(tier)} className="min-h-11 cursor-pointer px-3 py-2 text-sm">{tier.isActive ? "Deactivate" : "Activate"}</ResponsiveActionsItem>}{tier._count.workshops === 0 ? <ResponsiveActionsItem onSelect={() => handleDelete(tier)} className="min-h-11 cursor-pointer px-3 py-2 text-sm text-destructive">Delete</ResponsiveActionsItem> : null}</>}
                                 menuLabel={`More actions for ${tier.name}`}
                             />
@@ -415,11 +427,17 @@ export default function PricingTiersPage({ responsiveEnabled = false }: { respon
                                     <td className="px-6 py-4">
                                         <button
                                             onClick={() => handleToggleActive(tier)}
-                                            className={`${responsiveEnabled ? "min-h-11" : ""} inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium cursor-pointer ${
-                                                tier.isActive
-                                                    ? "bg-success/10 text-success hover:bg-success/20"
-                                                    : "bg-muted text-muted-foreground hover:bg-accent"
-                                            }`}
+                                            className={responsiveEnabled
+                                                ? `inline-flex min-h-11 min-w-11 items-center px-2.5 py-0.5 rounded-full text-xs font-medium cursor-pointer ${
+                                                    tier.isActive
+                                                        ? "bg-success/10 text-success hover:bg-success/20"
+                                                        : "bg-muted text-muted-foreground hover:bg-accent"
+                                                }`
+                                                : `inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium cursor-pointer ${
+                                                    tier.isActive
+                                                        ? "bg-success/10 text-success hover:bg-success/20"
+                                                        : "bg-muted text-muted-foreground hover:bg-accent"
+                                                }`}
                                         >
                                             {tier.isActive ? "Active" : "Inactive"}
                                         </button>
@@ -427,14 +445,14 @@ export default function PricingTiersPage({ responsiveEnabled = false }: { respon
                                     <td className="px-6 py-4 text-right text-sm space-x-3">
                                         <button
                                             onClick={() => openEdit(tier)}
-                                            className={`${responsiveEnabled ? "inline-flex min-h-11 items-center" : ""} text-primary hover:text-primary/80 font-medium`}
+                                            className={responsiveEnabled ? "inline-flex min-h-11 min-w-11 items-center justify-center text-primary hover:text-primary/80 font-medium" : "text-primary hover:text-primary/80 font-medium"}
                                         >
                                             Edit
                                         </button>
                                         {tier._count.workshops === 0 && (
                                             <button
                                                 onClick={() => handleDelete(tier)}
-                                                className={`${responsiveEnabled ? "inline-flex min-h-11 items-center" : ""} text-destructive hover:text-destructive/80 font-medium`}
+                                                className={responsiveEnabled ? "inline-flex min-h-11 min-w-11 items-center justify-center text-destructive hover:text-destructive/80 font-medium" : "text-destructive hover:text-destructive/80 font-medium"}
                                             >
                                                 Delete
                                             </button>

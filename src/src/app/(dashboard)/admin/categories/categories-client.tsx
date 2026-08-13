@@ -160,7 +160,7 @@ export default function CategoriesPage({ responsiveEnabled = false }: { responsi
                     responsiveEnabled
                     title="Workshop Categories"
                     description="Manage workshop categories that coaches select when creating workshops."
-                    actions={<button onClick={openCreate} className="min-h-11 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">+ Add Category</button>}
+                    actions={<button onClick={openCreate} className="min-h-11 min-w-11 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">+ Add Category</button>}
                 />
             ) : <div className="flex items-center justify-between mb-6">
                 <div>
@@ -284,7 +284,7 @@ export default function CategoriesPage({ responsiveEnabled = false }: { responsi
                             <ResponsiveRecordHeader title={cat.name} status={<span className="text-xs text-muted-foreground">{cat.isActive ? "Active" : "Inactive"}</span>} />
                             <ResponsiveRecordMeta items={[{ label: "Description", value: cat.description || "—" }, { label: "Pricing tiers", value: cat.pricingTiers.length }, { label: "Workshops", value: cat._count.workshops }]} />
                             <ResponsiveRecordActions
-                                primary={<button aria-label={`Edit ${cat.name}`} onClick={() => openEdit(cat)} className="rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground">Edit</button>}
+                                primary={<button aria-label={`Edit ${cat.name}`} onClick={() => openEdit(cat)} className="min-w-11 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground">Edit</button>}
                                 secondary={<>{<ResponsiveActionsItem onSelect={() => handleToggleActive(cat)} className="min-h-11 cursor-pointer px-3 py-2 text-sm">{cat.isActive ? "Deactivate" : "Activate"}</ResponsiveActionsItem>}{cat._count.workshops === 0 ? <ResponsiveActionsItem onSelect={() => handleDelete(cat)} className="min-h-11 cursor-pointer px-3 py-2 text-sm text-destructive">Delete</ResponsiveActionsItem> : null}</>}
                                 menuLabel={`More actions for ${cat.name}`}
                             />
@@ -335,11 +335,17 @@ export default function CategoriesPage({ responsiveEnabled = false }: { responsi
                                     <td className="px-6 py-4">
                                         <button
                                             onClick={() => handleToggleActive(cat)}
-                                            className={`${responsiveEnabled ? "min-h-11" : ""} inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium cursor-pointer ${
-                                                cat.isActive
-                                                    ? "bg-success/10 text-success hover:bg-success/20"
-                                                    : "bg-muted text-muted-foreground hover:bg-accent"
-                                            }`}
+                                            className={responsiveEnabled
+                                                ? `inline-flex min-h-11 min-w-11 items-center px-2.5 py-0.5 rounded-full text-xs font-medium cursor-pointer ${
+                                                    cat.isActive
+                                                        ? "bg-success/10 text-success hover:bg-success/20"
+                                                        : "bg-muted text-muted-foreground hover:bg-accent"
+                                                }`
+                                                : `inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium cursor-pointer ${
+                                                    cat.isActive
+                                                        ? "bg-success/10 text-success hover:bg-success/20"
+                                                        : "bg-muted text-muted-foreground hover:bg-accent"
+                                                }`}
                                         >
                                             {cat.isActive ? "Active" : "Inactive"}
                                         </button>
@@ -347,14 +353,14 @@ export default function CategoriesPage({ responsiveEnabled = false }: { responsi
                                     <td className="px-6 py-4 text-right text-sm space-x-3">
                                         <button
                                             onClick={() => openEdit(cat)}
-                                            className={`${responsiveEnabled ? "inline-flex min-h-11 items-center" : ""} text-primary hover:text-primary/80 font-medium`}
+                                            className={responsiveEnabled ? "inline-flex min-h-11 min-w-11 items-center justify-center text-primary hover:text-primary/80 font-medium" : "text-primary hover:text-primary/80 font-medium"}
                                         >
                                             Edit
                                         </button>
                                         {cat._count.workshops === 0 && (
                                             <button
                                                 onClick={() => handleDelete(cat)}
-                                                className={`${responsiveEnabled ? "inline-flex min-h-11 items-center" : ""} text-destructive hover:text-destructive/80 font-medium`}
+                                                className={responsiveEnabled ? "inline-flex min-h-11 min-w-11 items-center justify-center text-destructive hover:text-destructive/80 font-medium" : "text-destructive hover:text-destructive/80 font-medium"}
                                             >
                                                 Delete
                                             </button>
