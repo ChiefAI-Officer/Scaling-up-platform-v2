@@ -48,3 +48,28 @@ The drill-in regression covers initial pane visibility, organization selection, 
 ## Concerns
 
 - No Task 5 blocker. Repository-wide TypeScript validation cannot currently be used as a green gate due to pre-existing failures described above.
+
+## Fix Round 1 — Breakpoint Re-entry and Team Edit Spacing
+
+Separate fixed point: `c8610b4b1f14916479ee934fda6fad00de67be2e`.
+
+- Restricted the selected-node cache-only reopen shortcut to a live compact viewport (`max-width: 767px`). After Back, compact reopen still retains the loaded tree/member data with exactly two fetches. After widening to `md`, clicking the same selected organization resumes the existing desktop handler: it collapses the tree and performs the existing member refresh.
+- Added responsive `min-w-0 pr-12` spacing to team node buttons so long labels truncate before the always-visible 44px Edit action instead of running beneath it.
+- `selectedNode`, `compactDetailOpen`, fetch ownership/order, caches, and the flag-OFF branches remain unchanged.
+
+TDD evidence:
+
+- Breakpoint RED: after simulated widening, fetch count remained two and the organization remained expanded. GREEN: fetch count becomes three, `aria-expanded` becomes `false`, and the team row collapses.
+- Team-spacing RED: the long-label team button lacked `min-w-0 pr-12`. GREEN: the row reserves the edit space and the edit target remains `min-h-11 min-w-11 opacity-100`.
+
+Fresh verification:
+
+```text
+npx jest src/__tests__/components/organizations/members-teams-view.test.tsx src/__tests__/app/admin-organizations-page.test.tsx --runInBand
+Test Suites: 2 passed, 2 total
+Tests:       28 passed, 28 total
+```
+
+- Scoped ESLint: 0 errors; the same two pre-existing warnings remain.
+- `git diff --check`: pass.
+- Self-review: no actionable spec or standards finding remains. The viewport query gates only the presentation shortcut; all domain handlers still own their original transitions and fetches.

@@ -39,6 +39,13 @@ const TEAM_ENG = {
   ],
 };
 
+const TEAM_LONG_LABEL = {
+  ...TEAM_ENG,
+  id: "team-client-success",
+  name: "Client Success and Strategic Account Management",
+  children: [],
+};
+
 const RESPONDENT_ALICE = {
   id: "resp-1",
   firstName: "Alice",
@@ -91,6 +98,18 @@ afterEach(() => {
 
 describe("MembersTeamsView", () => {
   test("responsive compact view drills into members and preserves selection and fetched data across back/forward presentation", async () => {
+    let compactViewport = true;
+    window.matchMedia = jest.fn().mockImplementation((query: string) => ({
+      matches: query === "(max-width: 767px)" ? compactViewport : false,
+      media: query,
+      onchange: null,
+      addListener: jest.fn(),
+      removeListener: jest.fn(),
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+      dispatchEvent: jest.fn(),
+    }));
+
     render(
       <MembersTeamsView
         initialOrganizations={[ORG_1]}
@@ -129,6 +148,16 @@ describe("MembersTeamsView", () => {
     expect(screen.getByTestId("members-detail-panel")).not.toHaveClass("hidden");
     expect(screen.getByText("Alice Smith")).toBeInTheDocument();
     expect(global.fetch).toHaveBeenCalledTimes(2);
+
+    fireEvent.click(screen.getByRole("button", { name: /back to organizations/i }));
+    compactViewport = false;
+    fireEvent(window, new Event("resize"));
+    mockFetchRespondents([RESPONDENT_ALICE]);
+    fireEvent.click(selectedOrganization);
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(3));
+    expect(selectedOrganization).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("button", { name: "Engineering" })).not.toBeInTheDocument();
   });
 
   test("responsive behavior is opt-in so the default host keeps the legacy two-panel output", () => {
@@ -138,6 +167,32 @@ describe("MembersTeamsView", () => {
     expect(container.firstElementChild).not.toHaveClass("grid");
     expect(screen.queryByTestId("members-browse-panel")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /back to organizations/i })).not.toBeInTheDocument();
+  });
+
+  test("responsive team rows reserve space for the always-visible edit target", async () => {
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true, data: [TEAM_LONG_LABEL] }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true, data: [] }),
+      });
+
+    render(<MembersTeamsView initialOrganizations={[ORG_1]} responsiveEnabled />);
+    fireEvent.click(screen.getByRole("button", { name: /^Acme Corp$/i }));
+
+    const teamButton = await screen.findByRole("button", {
+      name: TEAM_LONG_LABEL.name,
+    });
+    expect(teamButton).toHaveClass("min-w-0", "pr-12");
+    expect(within(teamButton).getByText(TEAM_LONG_LABEL.name)).toHaveClass("truncate");
+    expect(screen.getByRole("button", { name: `Edit ${TEAM_LONG_LABEL.name}` })).toHaveClass(
+      "min-h-11",
+      "min-w-11",
+      "opacity-100",
+    );
   });
 
   test("(a) renders companies as root nodes in the Teams panel", () => {

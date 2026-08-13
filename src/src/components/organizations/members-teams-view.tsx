@@ -151,6 +151,15 @@ function isSameNode(a: TreeNode | null, b: TreeNode): boolean {
   return false;
 }
 
+/** The drill-in shortcut applies only while the compact presentation is active. */
+function isCompactViewport(): boolean {
+  if (typeof window === "undefined") return false;
+  if (typeof window.matchMedia === "function") {
+    return window.matchMedia("(max-width: 767px)").matches;
+  }
+  return window.innerWidth < 768;
+}
+
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
@@ -180,7 +189,7 @@ function NodeButton({
       style={{ paddingLeft: `${depth * 16 + 8}px` }}
       className={[
         "w-full flex items-center gap-2 py-1.5 pr-3 rounded-md text-sm text-left transition-colors",
-        ...(responsiveEnabled ? ["min-h-11"] : []),
+        ...(responsiveEnabled ? ["min-h-11 min-w-0 pr-12"] : []),
         selected
           ? "bg-primary/10 text-primary font-medium"
           : "text-foreground hover:bg-muted",
@@ -565,7 +574,12 @@ export function MembersTeamsView({
                     aria-pressed={isSelected}
                     aria-expanded={state.expanded}
                     onClick={() => {
-                      if (responsiveEnabled && !compactDetailOpen && isSelected) {
+                      if (
+                        responsiveEnabled &&
+                        !compactDetailOpen &&
+                        isSelected &&
+                        isCompactViewport()
+                      ) {
                         showCompactDetail();
                         return;
                       }
@@ -663,7 +677,12 @@ export function MembersTeamsView({
                               icon={<Users className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground" />}
                               responsiveEnabled={responsiveEnabled}
                               onClick={() => {
-                                if (responsiveEnabled && !compactDetailOpen && isTeamSelected) {
+                                if (
+                                  responsiveEnabled &&
+                                  !compactDetailOpen &&
+                                  isTeamSelected &&
+                                  isCompactViewport()
+                                ) {
                                   showCompactDetail();
                                   return;
                                 }
@@ -719,7 +738,8 @@ export function MembersTeamsView({
                           if (
                             responsiveEnabled &&
                             !compactDetailOpen &&
-                            isSameNode(selectedNode, unassignedNode)
+                            isSameNode(selectedNode, unassignedNode) &&
+                            isCompactViewport()
                           ) {
                             showCompactDetail();
                             return;
