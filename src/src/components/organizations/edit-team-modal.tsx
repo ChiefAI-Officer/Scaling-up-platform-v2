@@ -221,7 +221,9 @@ export function EditTeamModal({
   );
 
   // ---- Submission state -----------------------------------------------------
-  const [submitting, setSubmitting] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const submitting = saving || deleting;
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldError[]>([]);
 
@@ -287,7 +289,7 @@ export function EditTeamModal({
       return;
     }
 
-    setSubmitting(true);
+    setSaving(true);
     try {
       const body: Record<string, unknown> = {
         name: name.trim(),
@@ -317,13 +319,13 @@ export function EditTeamModal({
       }
       // Await the refresh callback before closing so the parent's data is up
       // to date and any refresh error is surfaced before the modal disappears.
-      // `submitting` stays true through the await so buttons remain disabled.
+      // The active action stays locked through the refresh callback.
       await onUpdated();
       onClose();
     } catch {
       setError("An unexpected error occurred. Please try again.");
     } finally {
-      setSubmitting(false);
+      setSaving(false);
     }
   }
 
@@ -339,7 +341,7 @@ export function EditTeamModal({
     );
     if (!confirmed) return;
 
-    setSubmitting(true);
+    setDeleting(true);
     try {
       const res = await fetch(
         `/api/organizations/${team.orgId}/teams/${team.id}`,
@@ -371,7 +373,7 @@ export function EditTeamModal({
     } catch {
       setError("An unexpected error occurred. Please try again.");
     } finally {
-      setSubmitting(false);
+      setDeleting(false);
     }
   }
 
@@ -519,7 +521,7 @@ export function EditTeamModal({
               type="button"
               variant="outline"
               onClick={handleDelete}
-              disabled={submitting}
+              disabled={responsiveEnabled ? deleting : submitting}
               className="text-destructive hover:bg-destructive/10 hover:text-destructive"
             >
               Delete team
@@ -536,8 +538,8 @@ export function EditTeamModal({
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={submitting}>
-                {submitting ? "Saving…" : "Save"}
+              <Button type="submit" disabled={responsiveEnabled ? saving : submitting}>
+                {(responsiveEnabled ? saving : submitting) ? "Saving…" : "Save"}
               </Button>
             </div>
           </DialogFooter>

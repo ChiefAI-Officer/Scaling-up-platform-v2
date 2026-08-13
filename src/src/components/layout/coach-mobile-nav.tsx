@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
@@ -28,12 +28,13 @@ export function CoachMobileNav({
     referredResultsEnabled: referredResultsEnabled === true,
   });
 
+  const dismiss = useCallback(() => {
+    setOpen(false);
+    if (responsiveEnabled) triggerRef.current?.focus();
+  }, [responsiveEnabled]);
+
   useEffect(() => {
     if (!responsiveEnabled || !open) return;
-    const dismiss = () => {
-      setOpen(false);
-      triggerRef.current?.focus();
-    };
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") dismiss();
     };
@@ -46,7 +47,7 @@ export function CoachMobileNav({
       document.removeEventListener("keydown", onKeyDown);
       document.removeEventListener("pointerdown", onPointerDown);
     };
-  }, [open, responsiveEnabled]);
+  }, [dismiss, open, responsiveEnabled]);
 
   return (
     <div className="md:hidden" ref={rootRef}>
@@ -63,7 +64,11 @@ export function CoachMobileNav({
       {open && (
         <div className="fixed inset-0 z-50 flex">
           {/* Backdrop */}
-          <div className="fixed inset-0 bg-black/50" onClick={() => setOpen(false)} />
+          <div
+            className="fixed inset-0 bg-black/50"
+            onClick={dismiss}
+            {...(responsiveEnabled ? { "data-testid": "coach-mobile-nav-backdrop" } : {})}
+          />
 
           {/* Slide-out panel */}
           <div className="relative w-72 bg-sidebar text-sidebar-foreground flex flex-col">

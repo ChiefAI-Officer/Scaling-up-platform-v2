@@ -135,15 +135,37 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("EditTeamModal", () => {
-  test("responsive in-flight state locks mutations and leaves inputs and cancel available", async () => {
+  test("responsive save in-flight disables Save only", async () => {
     (global.fetch as jest.Mock).mockReturnValue(new Promise(() => {}));
     renderModal({ responsiveEnabled: true });
     fireEvent.change(screen.getByTestId("select-parent"), { target: { value: "team-mkt" } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     expect(await screen.findByRole("button", { name: "Saving…" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Delete team" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Delete team" })).toBeEnabled();
     expect(screen.getByLabelText(/name/i)).toBeEnabled();
     expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled();
+  });
+
+  test("responsive delete in-flight disables Delete only", async () => {
+    jest.spyOn(window, "confirm").mockReturnValue(true);
+    (global.fetch as jest.Mock).mockReturnValue(new Promise(() => {}));
+    renderModal({ responsiveEnabled: true });
+    fireEvent.click(screen.getByRole("button", { name: "Delete team" }));
+    expect(screen.getByRole("button", { name: "Delete team" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
+    expect(screen.getByLabelText(/name/i)).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled();
+  });
+
+  test("flag-off save retains the legacy shared in-flight lock", async () => {
+    (global.fetch as jest.Mock).mockReturnValue(new Promise(() => {}));
+    renderModal();
+    fireEvent.change(screen.getByTestId("select-parent"), { target: { value: "team-mkt" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByRole("button", { name: "Saving…" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Delete team" })).toBeDisabled();
+    expect(screen.getByLabelText(/name/i)).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
   });
 
   test("responsive validation collects every invalid field into linked summary and inline errors", async () => {

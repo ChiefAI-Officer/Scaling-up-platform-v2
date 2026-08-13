@@ -38,6 +38,15 @@ describe("CoachMobileNav", () => {
     expect(trigger).toHaveFocus();
   });
 
+  it("responsive backdrop dismissal closes and restores trigger focus", () => {
+    render(<CoachMobileNav coachName="Alex" responsiveEnabled />);
+    const trigger = screen.getByRole("button", { name: "Open menu" });
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByTestId("coach-mobile-nav-backdrop"));
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(trigger).toHaveFocus();
+  });
+
   it("keeps the existing mobile destinations while the surface is disabled", () => {
     openNavigation(false);
 

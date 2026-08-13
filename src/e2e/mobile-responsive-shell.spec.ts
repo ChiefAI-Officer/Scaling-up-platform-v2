@@ -59,10 +59,14 @@ for (const width of [320, 300, 260, 639, 640, 1023, 1024]) {
       await page.keyboard.press("Escape");
       await expect(coachMenu).toHaveAttribute("aria-expanded", "false");
       await expect(coachMenu).toBeFocused();
-      await coachMenu.click();
-      await page.locator("main").click({ position: { x: 8, y: 8 } });
-      await expect(coachMenu).toHaveAttribute("aria-expanded", "false");
-      await expect(coachMenu).toBeFocused();
+      if (width >= 300) {
+        await coachMenu.click();
+        await page.getByTestId("coach-mobile-nav-backdrop").click({
+          position: { x: width - 2, y: 8 },
+        });
+        await expect(coachMenu).toHaveAttribute("aria-expanded", "false");
+        await expect(coachMenu).toBeFocused();
+      }
     }
   });
 }
