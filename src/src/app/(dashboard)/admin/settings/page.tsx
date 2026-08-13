@@ -34,12 +34,12 @@ export default async function AdminSettingsPage() {
           <p className="mb-4 text-sm text-muted-foreground">
             Signed in as <span className="font-medium">{session.user.email}</span>
           </p>
-          <ChangePasswordForm />
+          <ChangePasswordForm responsiveEnabled={mobileResponsiveEnabled} />
         </div>
 
         {/* Wave Q (#7): the flag gates only the remove CAPABILITY — server
             enforcement of an already-removed user stays unconditional. */}
-        <InviteAdminSection waveQEnabled={isWaveQAdminControlsEnabled()} />
+        <InviteAdminSection waveQEnabled={isWaveQAdminControlsEnabled()} responsiveEnabled={mobileResponsiveEnabled} />
       </div>
     </FadeUp>
   );

@@ -7,12 +7,12 @@ jest.mock("@/components/ui/animated", () => ({
   StaggerContainer: ({ children, ...props }: React.HTMLAttributes<HTMLDivElement>) => <div {...props}>{children}</div>,
   StaggerItem: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
-jest.mock("@/components/financials/financial-filters", () => ({ FinancialFilters: () => <div>Financial filters</div> }));
+jest.mock("@/components/financials/financial-filters", () => ({ FinancialFilters: ({ responsiveEnabled }: { responsiveEnabled?: boolean }) => <div data-testid="financial-filters" data-responsive={String(responsiveEnabled)}>Financial filters</div> }));
 jest.mock("next-auth", () => ({ getServerSession: jest.fn().mockResolvedValue({ user: { role: "ADMIN", email: "admin@example.com" } }) }));
 jest.mock("next/navigation", () => ({ redirect: jest.fn(), useRouter: () => ({ refresh: jest.fn() }) }));
 jest.mock("@/lib/auth/auth", () => ({ authOptions: {} }));
-jest.mock("@/components/auth/change-password-form", () => function ChangePasswordFormMock() { return <button>Update Password</button>; });
-jest.mock("@/components/admin/invite-admin-section", () => ({ InviteAdminSection: () => <button>Invite admin</button> }));
+jest.mock("@/components/auth/change-password-form", () => function ChangePasswordFormMock({ responsiveEnabled }: { responsiveEnabled?: boolean }) { return <button data-testid="password-form" data-responsive={String(responsiveEnabled)}>Update Password</button>; });
+jest.mock("@/components/admin/invite-admin-section", () => ({ InviteAdminSection: ({ responsiveEnabled }: { responsiveEnabled?: boolean }) => <button data-testid="invite-section" data-responsive={String(responsiveEnabled)}>Invite admin</button> }));
 
 const registrationFindMany = jest.fn().mockResolvedValue([{ id: "registration-1", firstName: "Maria", lastName: "Lee", email: "maria@example.com", amountPaidCents: 15000, stripePaymentId: "pi_123", workshop: { id: "workshop-1", title: "Growth workshop", workshopCode: "GROW", updatedAt: new Date("2026-08-12") } }]);
 jest.mock("@/lib/db", () => ({
@@ -37,12 +37,14 @@ beforeEach(() => {
 it("keeps the financial comparison table bounded and named", async () => {
   render(await FinancialsPage({ searchParams: Promise.resolve({ period: "all" }) }));
   expect(screen.getByRole("region", { name: "Revenue by workshop table" })).toHaveClass("overflow-x-auto");
+  expect(screen.getByTestId("financial-filters")).toHaveAttribute("data-responsive", "true");
 });
 
 it("preserves original financial and refund table structure when responsive mode is disabled", async () => {
   mockResponsiveFlag.mockReturnValue(false);
   const financials = render(await FinancialsPage({ searchParams: Promise.resolve({ period: "all" }) }));
   expect(screen.queryByRole("region", { name: "Revenue by workshop table" })).not.toBeInTheDocument();
+  expect(screen.getByTestId("financial-filters")).toHaveAttribute("data-responsive", "false");
   financials.unmount();
   render(await RefundsPage());
   expect(screen.queryByRole("region", { name: "Refunds needed table" })).not.toBeInTheDocument();
@@ -75,4 +77,13 @@ it("uses responsive shells while keeping the real refund and settings actions", 
   expect(document.querySelector("[data-responsive-page-header]")).toHaveTextContent("Admin Settings");
   expect(screen.getByRole("button", { name: "Update Password" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Invite admin" })).toBeInTheDocument();
+  expect(screen.getByTestId("password-form")).toHaveAttribute("data-responsive", "true");
+  expect(screen.getByTestId("invite-section")).toHaveAttribute("data-responsive", "true");
+});
+
+it("threads disabled settings mode into both default-off interactive presenters", async () => {
+  mockResponsiveFlag.mockReturnValue(false);
+  render(await SettingsPage());
+  expect(screen.getByTestId("password-form")).toHaveAttribute("data-responsive", "false");
+  expect(screen.getByTestId("invite-section")).toHaveAttribute("data-responsive", "false");
 });

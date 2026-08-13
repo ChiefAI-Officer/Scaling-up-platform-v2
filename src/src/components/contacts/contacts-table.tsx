@@ -138,14 +138,18 @@ export function ContactsTable({ data, responsiveEnabled = false }: ContactsTable
                             <TableCell>
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" className="h-8 w-8 p-0">
+                                        <Button
+                                            variant="ghost"
+                                            className={responsiveEnabled ? "h-8 min-h-11 w-8 min-w-11 p-0" : "h-8 w-8 p-0"}
+                                            aria-label={responsiveEnabled ? `More actions for ${contact.name}` : undefined}
+                                        >
                                             <MoreHorizontal className="h-4 w-4" />
                                         </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
-                                        <DropdownMenuItem>View details</DropdownMenuItem>
-                                        <DropdownMenuItem>Edit contact</DropdownMenuItem>
-                                        <DropdownMenuItem className="text-destructive">Delete</DropdownMenuItem>
+                                        <DropdownMenuItem className={responsiveEnabled ? "min-h-11" : undefined}>View details</DropdownMenuItem>
+                                        <DropdownMenuItem className={responsiveEnabled ? "min-h-11" : undefined}>Edit contact</DropdownMenuItem>
+                                        <DropdownMenuItem className={responsiveEnabled ? "min-h-11 text-destructive" : "text-destructive"}>Delete</DropdownMenuItem>
                                     </DropdownMenuContent>
                                 </DropdownMenu>
                             </TableCell>

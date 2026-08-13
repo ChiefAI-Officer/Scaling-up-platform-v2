@@ -217,7 +217,11 @@ export default function PricingTiersPage({ responsiveEnabled = false }: { respon
 
             {/* Category Filter */}
             {categories.length > 0 && (
-                <div className={responsiveEnabled ? "mb-4 flex flex-wrap gap-2 sm:flex-nowrap" : "flex gap-2 mb-4 flex-wrap"}>
+                <div
+                    className={responsiveEnabled ? "mb-4 flex flex-wrap gap-2" : "flex gap-2 mb-4 flex-wrap"}
+                    role={responsiveEnabled ? "group" : undefined}
+                    aria-label={responsiveEnabled ? "Filter pricing tiers by category" : undefined}
+                >
                     <button
                         onClick={() => setFilterCategory("ALL")}
                         className={`${responsiveEnabled ? "min-h-11 shrink-0" : ""} px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
@@ -259,7 +263,7 @@ export default function PricingTiersPage({ responsiveEnabled = false }: { respon
                                 value={formCategoryId}
                                 onChange={(e) => setFormCategoryId(e.target.value)}
                                 disabled={!!editingId}
-                                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-muted"
+                                className={responsiveEnabled ? "min-h-11 w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-muted" : "w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-muted"}
                             >
                                 <option value="">Select category...</option>
                                 {categories.map((cat) => (
@@ -277,7 +281,7 @@ export default function PricingTiersPage({ responsiveEnabled = false }: { respon
                                 type="text"
                                 value={formName}
                                 onChange={(e) => setFormName(e.target.value)}
-                                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                                className={responsiveEnabled ? "min-h-11 w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary" : "w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"}
                                 placeholder="e.g. Standard, Premium, Enterprise"
                             />
                         </div>
@@ -293,7 +297,7 @@ export default function PricingTiersPage({ responsiveEnabled = false }: { respon
                                     min="0"
                                     value={formAmount}
                                     onChange={(e) => setFormAmount(e.target.value)}
-                                    className="w-full pl-7 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                                    className={responsiveEnabled ? "min-h-11 w-full pl-7 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary" : "w-full pl-7 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"}
                                     placeholder="0.00"
                                 />
                             </div>
@@ -306,7 +310,7 @@ export default function PricingTiersPage({ responsiveEnabled = false }: { respon
                                 type="text"
                                 value={formDescription}
                                 onChange={(e) => setFormDescription(e.target.value)}
-                                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                                className={responsiveEnabled ? "min-h-11 w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary" : "w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"}
                                 placeholder="Optional description"
                             />
                         </div>
@@ -314,17 +318,17 @@ export default function PricingTiersPage({ responsiveEnabled = false }: { respon
                     {formError && (
                         <p className="text-sm text-destructive mt-3">{formError}</p>
                     )}
-                    <div className="flex gap-3 mt-4">
+                    <div className={responsiveEnabled ? "mt-4 flex flex-col gap-3 sm:flex-row" : "flex gap-3 mt-4"}>
                         <button
                             onClick={handleSave}
                             disabled={formSaving}
-                            className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 font-medium text-sm disabled:opacity-50"
+                            className={responsiveEnabled ? "min-h-11 w-full px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 font-medium text-sm disabled:opacity-50 sm:w-auto" : "px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 font-medium text-sm disabled:opacity-50"}
                         >
                             {formSaving ? "Saving..." : editingId ? "Update" : "Create"}
                         </button>
                         <button
                             onClick={closeForm}
-                            className="px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-accent font-medium text-sm"
+                            className={responsiveEnabled ? "min-h-11 w-full px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-accent font-medium text-sm sm:w-auto" : "px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-accent font-medium text-sm"}
                         >
                             Cancel
                         </button>

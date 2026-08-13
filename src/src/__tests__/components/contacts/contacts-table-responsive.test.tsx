@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { ContactsTable } from "@/components/contacts/contacts-table";
 
 const contacts = [
@@ -28,7 +28,7 @@ describe("ContactsTable responsive presentation", () => {
     expect(screen.getByRole("table")).toBeInTheDocument();
     expect(screen.queryByRole("list", { name: "Contacts" })).not.toBeInTheDocument();
     expect(screen.getByPlaceholderText("Search Contacts...").closest("div")?.parentElement)
-      .toHaveClass("flex", "items-center", "justify-between");
+      .toHaveClass("flex items-center justify-between");
   });
 
   it("shows every existing contact field and action in compact records", () => {
@@ -44,8 +44,20 @@ describe("ContactsTable responsive presentation", () => {
 
     const primary = screen.getByRole("button", { name: "View details" });
     expect(primary).toHaveClass("min-h-11");
-    fireEvent.keyDown(screen.getByRole("button", { name: "More actions for Ada Lovelace" }), { key: "ArrowDown" });
+    fireEvent.keyDown(within(list).getByRole("button", { name: "More actions for Ada Lovelace" }), { key: "ArrowDown" });
     expect(screen.getByRole("menuitem", { name: "Edit contact" })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "Delete" })).toBeInTheDocument();
+  });
+
+  it("keeps the retained responsive wide contact action at 44px", () => {
+    render(<ContactsTable data={contacts} responsiveEnabled />);
+
+    const wide = screen.getByTestId("responsive-wide-view");
+    const trigger = within(wide).getByRole("button", { name: "More actions for Ada Lovelace" });
+    expect(trigger).toHaveClass("min-h-11 min-w-11");
+    fireEvent.click(trigger);
+    for (const action of ["View details", "Edit contact", "Delete"]) {
+      expect(within(wide).getByRole("button", { name: action })).toHaveClass("min-h-11");
+    }
   });
 });

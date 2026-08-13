@@ -114,6 +114,25 @@ it("renders workflow identity, trigger, state, step count, and every real collec
   expect(screen.getByRole("button", { name: "More actions for Pre-event welcome" })).toHaveClass("min-h-11");
 });
 
+it("exposes compact workflow delete as a 44px keyboard-operable menuitem that preserves deletion", async () => {
+  const confirmSpy = jest.spyOn(window, "confirm").mockReturnValue(true);
+  render(await WorkflowsContent({ responsiveEnabled: true }));
+
+  fireEvent.keyDown(screen.getByRole("button", { name: "More actions for Pre-event welcome" }), { key: "ArrowDown" });
+  const deleteItem = await screen.findByRole("menuitem", { name: "Delete" });
+  expect(deleteItem.tagName).toBe("BUTTON");
+  expect(deleteItem).toHaveClass("min-h-11");
+  fireEvent.keyDown(deleteItem, { key: "Enter" });
+
+  expect(confirmSpy).toHaveBeenCalled();
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
+    "/api/workflows/workflow-1",
+    { method: "DELETE" },
+  ));
+  expect(mockRefresh).toHaveBeenCalled();
+  confirmSpy.mockRestore();
+});
+
 it("keeps the workflow editor contained and gives its real controls touch targets", async () => {
   render(await WorkflowEditorPage({
     params: Promise.resolve({ id: "workflow-1" }),

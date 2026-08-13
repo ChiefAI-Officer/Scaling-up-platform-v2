@@ -223,7 +223,7 @@ export default async function FinancialDashboardPage({ searchParams }: PageProps
 
       {/* Filters: Period + Coach + Category + Date Range */}
       <Suspense>
-        <FinancialFilters coaches={coaches} categories={categories} />
+        <FinancialFilters coaches={coaches} categories={categories} responsiveEnabled={mobileResponsiveEnabled} />
       </Suspense>
 
       {/* Summary Stats */}

@@ -110,6 +110,91 @@ it("makes responsive pricing filters and approval actions reachable at 44px", as
   expect(within(approvalRecord).getByRole("button", { name: "Approve" }).parentElement?.parentElement).toHaveClass("grid-cols-[minmax(0,1fr)_auto]");
 });
 
+it("wraps a long responsive pricing category filter at tablet widths", async () => {
+  const longCategories = Array.from({ length: 12 }, (_, index) => ({
+    id: `category-${index}`,
+    name: `Very long workshop category ${index}`,
+  }));
+  global.fetch = jest.fn((url: string) => Promise.resolve({
+    ok: true,
+    json: async () => url.includes("pricing-tiers") ? [] : longCategories,
+  })) as unknown as typeof fetch;
+
+  render(<PricingPage responsiveEnabled />);
+  const filter = await screen.findByRole("group", { name: "Filter pricing tiers by category" });
+  expect(filter).toHaveClass("flex-wrap");
+  expect(filter).not.toHaveClass("sm:flex-nowrap");
+  expect(within(filter).getAllByRole("button")).toHaveLength(13);
+});
+
+it("sizes and stacks category create/edit fields and actions only when responsive mode is enabled", async () => {
+  const enabled = render(<CategoriesPage responsiveEnabled />);
+  await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+  fireEvent.click(screen.getByRole("button", { name: "+ Add Category" }));
+
+  for (const field of [
+    screen.getByPlaceholderText("e.g. Master Class, Growth Summit"),
+    screen.getByPlaceholderText("Optional description"),
+    screen.getByPlaceholderText("e.g. Scaling Up AI Workshop"),
+    screen.getByPlaceholderText("Default internal description for workshops in this category..."),
+  ]) {
+    expect(field).toHaveClass("min-h-11");
+  }
+  const enabledCreate = screen.getByRole("button", { name: "Create" });
+  expect(enabledCreate).toHaveClass("min-h-11 w-full sm:w-auto");
+  expect(screen.getByRole("button", { name: "Cancel" })).toHaveClass("min-h-11 w-full sm:w-auto");
+  expect(enabledCreate.parentElement).toHaveClass("flex-col sm:flex-row");
+  enabled.unmount();
+
+  render(<CategoriesPage />);
+  await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+  fireEvent.click(screen.getByRole("button", { name: "+ Add Category" }));
+  expect(screen.getByPlaceholderText("e.g. Master Class, Growth Summit")).toHaveAttribute(
+    "class",
+    "w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary",
+  );
+  expect(screen.getByRole("button", { name: "Create" }).parentElement).toHaveAttribute("class", "flex gap-3");
+  expect(screen.getByRole("button", { name: "Create" })).toHaveAttribute(
+    "class",
+    "px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 font-medium text-sm disabled:opacity-50",
+  );
+});
+
+it("sizes and stacks pricing form fields and actions only when responsive mode is enabled", async () => {
+  global.fetch = jest.fn((url: string) => Promise.resolve({
+    ok: true,
+    json: async () => url.includes("pricing-tiers") ? [] : [{ id: "category-1", name: "Growth" }],
+  })) as unknown as typeof fetch;
+
+  const enabled = render(<PricingPage responsiveEnabled />);
+  const enabledAdd = screen.getByRole("button", { name: "+ Add Pricing Tier" });
+  await waitFor(() => expect(enabledAdd).toBeEnabled());
+  fireEvent.click(enabledAdd);
+  for (const field of [
+    screen.getByRole("combobox"),
+    screen.getByPlaceholderText("e.g. Standard, Premium, Enterprise"),
+    screen.getByPlaceholderText("0.00"),
+    screen.getByPlaceholderText("Optional description"),
+  ]) {
+    expect(field).toHaveClass("min-h-11");
+  }
+  const enabledCreate = screen.getByRole("button", { name: "Create" });
+  expect(enabledCreate).toHaveClass("min-h-11 w-full sm:w-auto");
+  expect(screen.getByRole("button", { name: "Cancel" })).toHaveClass("min-h-11 w-full sm:w-auto");
+  expect(enabledCreate.parentElement).toHaveClass("flex-col sm:flex-row");
+  enabled.unmount();
+
+  render(<PricingPage />);
+  const disabledAdd = screen.getByRole("button", { name: "+ Add Pricing Tier" });
+  await waitFor(() => expect(disabledAdd).toBeEnabled());
+  fireEvent.click(disabledAdd);
+  expect(screen.getByRole("combobox")).toHaveAttribute(
+    "class",
+    "w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-muted",
+  );
+  expect(screen.getByRole("button", { name: "Create" }).parentElement).toHaveAttribute("class", "flex gap-3 mt-4");
+});
+
 it("sizes every category wide-table action in responsive mode", async () => {
   render(<CategoriesPage responsiveEnabled />);
   const wide = await screen.findByTestId("responsive-wide-view");

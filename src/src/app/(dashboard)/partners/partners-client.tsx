@@ -523,12 +523,13 @@ export function PartnersClient({ responsiveEnabled = false }: { responsiveEnable
                       <Badge variant={partner.isActive ? "default" : "outline"}>
                         {partner.isActive ? "Active" : "Inactive"}
                       </Badge>
-                      <div className="flex items-center gap-2">
+                      <div className={responsiveEnabled ? "flex flex-col items-stretch gap-2 sm:flex-row sm:items-center" : "flex items-center gap-2"}>
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
                           onClick={() => handleEditPartner(partner)}
+                          className={responsiveEnabled ? "min-h-11 w-full sm:w-auto" : undefined}
                         >
                           Edit
                         </Button>
@@ -537,6 +538,7 @@ export function PartnersClient({ responsiveEnabled = false }: { responsiveEnable
                           variant="outline"
                           size="sm"
                           onClick={() => handleToggleActive(partner.id, !partner.isActive)}
+                          className={responsiveEnabled ? "min-h-11 w-full sm:w-auto" : undefined}
                         >
                           {partner.isActive ? "Deactivate" : "Activate"}
                         </Button>
@@ -545,6 +547,7 @@ export function PartnersClient({ responsiveEnabled = false }: { responsiveEnable
                           variant="destructive"
                           size="sm"
                           onClick={() => handleDeletePartner(partner.id)}
+                          className={responsiveEnabled ? "min-h-11 w-full sm:w-auto" : undefined}
                         >
                           Delete
                         </Button>

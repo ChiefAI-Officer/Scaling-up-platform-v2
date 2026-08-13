@@ -8,7 +8,6 @@ import { RegistrationsTable } from "./registrations-table";
 import { Button } from "@/components/ui/button";
 import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 import { PageHeader } from "@/components/ui/page-header";
-import Link from "next/link";
 
 export default async function AdminRegistrationsPage() {
   const mobileResponsiveEnabled = isMobileResponsiveEnabled();
@@ -40,7 +39,8 @@ export default async function AdminRegistrationsPage() {
 
   return (
     <div className={mobileResponsiveEnabled ? "min-w-0 max-w-full space-y-6" : "space-y-6"}>
-      {mobileResponsiveEnabled ? <PageHeader responsiveEnabled title="Contacts" description="All confirmed registrations across all workshops." actions={<Button asChild variant="outline" className="min-h-11"><Link href="/api/registrations/export">Export All</Link></Button>} /> : <div className="flex items-center justify-between">
+      {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- API export must use a document request. */}
+      {mobileResponsiveEnabled ? <PageHeader responsiveEnabled title="Contacts" description="All confirmed registrations across all workshops." actions={<Button asChild variant="outline" className="min-h-11"><a href="/api/registrations/export">Export All</a></Button>} /> : <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Contacts</h1>
           <p className="text-muted-foreground mt-1">
@@ -48,7 +48,8 @@ export default async function AdminRegistrationsPage() {
           </p>
         </div>
         <Button asChild variant="outline">
-          <Link href="/api/registrations/export">Export All</Link>
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- API export must use a document request. */}
+          <a href="/api/registrations/export">Export All</a>
         </Button>
       </div>}
       <RegistrationsTable registrations={registrations} responsiveEnabled={mobileResponsiveEnabled} />

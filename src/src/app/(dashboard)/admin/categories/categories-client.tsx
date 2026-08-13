@@ -192,7 +192,7 @@ export default function CategoriesPage({ responsiveEnabled = false }: { responsi
                                 type="text"
                                 value={formName}
                                 onChange={(e) => setFormName(e.target.value)}
-                                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                                className={responsiveEnabled ? "min-h-11 w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary" : "w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"}
                                 placeholder="e.g. Master Class, Growth Summit"
                             />
                         </div>
@@ -203,7 +203,7 @@ export default function CategoriesPage({ responsiveEnabled = false }: { responsi
                             <textarea
                                 value={formDescription}
                                 onChange={(e) => setFormDescription(e.target.value)}
-                                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                                className={responsiveEnabled ? "min-h-11 w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary" : "w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"}
                                 rows={2}
                                 placeholder="Optional description"
                             />
@@ -216,7 +216,7 @@ export default function CategoriesPage({ responsiveEnabled = false }: { responsi
                                 type="text"
                                 value={formDefaultTitle}
                                 onChange={(e) => setFormDefaultTitle(e.target.value)}
-                                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                                className={responsiveEnabled ? "min-h-11 w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary" : "w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"}
                                 placeholder="e.g. Scaling Up AI Workshop"
                             />
                             <p className="text-xs text-muted-foreground mt-1">
@@ -230,7 +230,7 @@ export default function CategoriesPage({ responsiveEnabled = false }: { responsi
                             <textarea
                                 value={formDefaultDescription}
                                 onChange={(e) => setFormDefaultDescription(e.target.value)}
-                                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                                className={responsiveEnabled ? "min-h-11 w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary" : "w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"}
                                 rows={3}
                                 placeholder="Default internal description for workshops in this category..."
                             />
@@ -241,17 +241,17 @@ export default function CategoriesPage({ responsiveEnabled = false }: { responsi
                         {formError && (
                             <p className="text-sm text-destructive">{formError}</p>
                         )}
-                        <div className="flex gap-3">
+                        <div className={responsiveEnabled ? "flex flex-col gap-3 sm:flex-row" : "flex gap-3"}>
                             <button
                                 onClick={handleSave}
                                 disabled={formSaving}
-                                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 font-medium text-sm disabled:opacity-50"
+                                className={responsiveEnabled ? "min-h-11 w-full px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 font-medium text-sm disabled:opacity-50 sm:w-auto" : "px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 font-medium text-sm disabled:opacity-50"}
                             >
                                 {formSaving ? "Saving..." : editingId ? "Update" : "Create"}
                             </button>
                             <button
                                 onClick={closeForm}
-                                className="px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-accent font-medium text-sm"
+                                className={responsiveEnabled ? "min-h-11 w-full px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-accent font-medium text-sm sm:w-auto" : "px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-accent font-medium text-sm"}
                             >
                                 Cancel
                             </button>

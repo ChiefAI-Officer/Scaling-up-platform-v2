@@ -10,6 +10,9 @@ jest.mock("next-auth", () => ({
   getServerSession: jest.fn().mockResolvedValue({ user: { role: "ADMIN" } }),
 }));
 jest.mock("next/navigation", () => ({ redirect: jest.fn() }));
+jest.mock("next/link", () => function NextLinkMock({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) {
+  return <a href={String(href)} data-next-link="true" {...props}>{children}</a>;
+});
 jest.mock("@/lib/auth/auth", () => ({ authOptions: {} }));
 jest.mock("@/lib/auth/authorization", () => ({ requireAdmin: jest.fn().mockResolvedValue(undefined) }));
 jest.mock("@/lib/db", () => ({
@@ -65,7 +68,10 @@ beforeEach(() => {
 it("evaluates the server flag for registrations and keeps the disabled header exact", async () => {
   const enabled = render(await AdminRegistrationsPage());
   expect(document.querySelector("[data-responsive-page-header]")).toHaveTextContent("Contacts");
-  expect(screen.getByRole("link", { name: "Export All" })).toHaveClass("min-h-11");
+  const enabledExport = screen.getByRole("link", { name: "Export All" });
+  expect(enabledExport).toHaveAttribute("href", "/api/registrations/export");
+  expect(enabledExport).not.toHaveAttribute("data-next-link");
+  expect(enabledExport).toHaveClass("min-h-11");
   expect(registrationFindMany).toHaveBeenCalledWith(expect.objectContaining({ take: 200 }));
   enabled.unmount();
 
@@ -76,7 +82,10 @@ it("evaluates the server flag for registrations and keeps the disabled header ex
     "class",
     "flex items-center justify-between",
   );
-  expect(screen.getByRole("link", { name: "Export All" })).not.toHaveClass("min-h-11");
+  const disabledExport = screen.getByRole("link", { name: "Export All" });
+  expect(disabledExport).toHaveAttribute("href", "/api/registrations/export");
+  expect(disabledExport).not.toHaveAttribute("data-next-link");
+  expect(disabledExport).not.toHaveClass("min-h-11");
 });
 
 it("server-hosts both survey pages and their aggregate filters", async () => {
