@@ -194,6 +194,29 @@ describe("CampaignDetail — respondent removal (CHI-35 / Jeff #59)", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("contains the responsive overview text and wraps a long campaign alias without changing flag-off classes", () => {
+    const longAlias = "a-very-long-campaign-alias-that-must-wrap-anywhere-at-phone-and-tablet-widths";
+    const longOverview = {
+      ...overview,
+      campaign: { ...overview.campaign, alias: longAlias },
+    };
+    const { rerender } = render(
+      <CampaignDetail initialOverview={longOverview} initialRespondents={[removableRespondent]} />,
+    );
+
+    const disabledAlias = screen.getByText(longAlias);
+    expect(disabledAlias.parentElement).toHaveAttribute("class", "min-w-0");
+    expect(disabledAlias).toHaveAttribute("class", "text-sm text-muted-foreground font-mono");
+
+    rerender(
+      <CampaignDetail responsiveEnabled initialOverview={longOverview} initialRespondents={[removableRespondent]} />,
+    );
+
+    const responsiveAlias = screen.getByText(longAlias);
+    expect(responsiveAlias.parentElement).toHaveClass("min-w-0", "w-full", "max-w-full");
+    expect(responsiveAlias).toHaveClass("break-all");
+  });
+
   it("treats an empty 204 as success, refreshes respondents, and never shows the false-error toast", async () => {
     global.fetch = jest.fn(
       async (input: RequestInfo | URL, init?: RequestInit) => {

@@ -69,7 +69,7 @@ export default async function NewAssessmentTemplatePage() {
           welcomeAuthoringEnabled={welcomeAuthoringEnabled}
         />
       ) : (
-        <AssessmentTemplateForm mode="create" />
+        <AssessmentTemplateForm mode="create" responsiveEnabled={mobileResponsiveEnabled} />
       )}
     </div>
   );

@@ -70,7 +70,7 @@ export default async function DashboardLayout({
               <div className="flex-shrink-0 flex items-center">
                 <Link
                   href="/admin/dashboard"
-                  className="text-xl font-bold text-primary focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded whitespace-nowrap"
+                  className={cn("text-xl font-bold text-primary focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded whitespace-nowrap", mobileResponsiveEnabled && "inline-flex min-h-11 items-center")}
                   aria-label="Scaling Up - Go to Dashboard"
                 >
                   Scaling Up

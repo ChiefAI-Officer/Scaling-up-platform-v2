@@ -176,17 +176,17 @@ export function CoachProfileForm({
                         </span>
                     </div>
                 )}
-                <div className={cn("flex-1", responsiveEnabled && "min-w-0 max-w-full")}>
+                <div className={cn("flex-1", responsiveEnabled && "w-full min-w-0 max-w-full")}>
                     <h2 className="text-lg font-semibold text-foreground">Profile Information</h2>
                     <div className="mt-1">
-                        <label className={cn("inline-flex items-center gap-2 text-sm text-muted-foreground cursor-pointer", responsiveEnabled && "min-h-11 min-w-0 max-w-full flex-wrap")}>
+                        <label className={cn("inline-flex items-center gap-2 text-sm text-muted-foreground cursor-pointer", responsiveEnabled && "min-h-11 w-full min-w-0 max-w-full flex-wrap")}>
                             <span>{uploading ? "Uploading..." : "Upload photo"}</span>
                             <input
                                 type="file"
                                 accept="image/jpeg,image/png,image/webp"
                                 onChange={handleImageUpload}
                                 disabled={uploading}
-                                className={cn("text-xs file:mr-2 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-primary/10 file:text-primary hover:file:bg-primary/15", responsiveEnabled && "min-h-11 min-w-0 max-w-full file:min-h-11")}
+                                className={cn("text-xs file:mr-2 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-primary/10 file:text-primary hover:file:bg-primary/15", responsiveEnabled && "min-h-11 w-full min-w-0 max-w-full file:min-h-11")}
                             />
                         </label>
                     </div>

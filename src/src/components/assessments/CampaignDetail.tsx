@@ -1474,11 +1474,11 @@ export function CampaignDetail({
         data-testid="campaign-overview-card"
       >
         <div className={responsiveEnabled ? "flex flex-col items-start gap-4 sm:flex-row sm:justify-between" : "flex items-start justify-between gap-4"}>
-          <div className="min-w-0">
+          <div className={responsiveEnabled ? "min-w-0 w-full max-w-full" : "min-w-0"}>
             <h1 className={responsiveEnabled ? "break-words text-2xl font-bold text-foreground" : "text-2xl font-bold text-foreground truncate"}>
               {campaign.name}
             </h1>
-            <p className="text-sm text-muted-foreground font-mono">
+            <p className={responsiveEnabled ? "text-sm text-muted-foreground font-mono break-all" : "text-sm text-muted-foreground font-mono"}>
               {campaign.alias}
             </p>
             {/* Wave V (V-3): provenance badge for Wave O historical imports. */}

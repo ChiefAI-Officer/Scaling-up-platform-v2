@@ -189,4 +189,19 @@ describe("CoachProfileForm", () => {
     expect(screen.getByRole("button", { name: /save changes/i })).toHaveClass("min-h-11");
     expect(screen.getByLabelText("First Name")).toHaveClass("min-h-11");
   });
+
+  it("constrains the responsive photo upload without changing the default upload classes", () => {
+    const { rerender } = render(<CoachProfileForm {...defaultProps} />);
+
+    const disabledUpload = screen.getByLabelText("Upload photo");
+    expect(disabledUpload.parentElement?.parentElement?.parentElement).toHaveAttribute("class", "flex-1");
+    expect(disabledUpload).not.toHaveClass("w-full", "min-w-0", "max-w-full");
+
+    rerender(<CoachProfileForm {...defaultProps} responsiveEnabled />);
+
+    const responsiveUpload = screen.getByLabelText("Upload photo");
+    expect(responsiveUpload.parentElement).toHaveClass("w-full", "min-w-0", "max-w-full");
+    expect(responsiveUpload.parentElement?.parentElement?.parentElement).toHaveClass("flex-1", "w-full", "min-w-0", "max-w-full");
+    expect(responsiveUpload).toHaveClass("w-full", "min-w-0", "max-w-full");
+  });
 });
