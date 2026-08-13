@@ -7,6 +7,37 @@ const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD || "demo123";
 
 test.setTimeout(120_000);
 
+const remainingAdminRoutes = [
+  "/dashboard",
+  "/coaches",
+  "/coaches/new",
+  "/contacts",
+  "/partners",
+  "/templates",
+  "/templates/new",
+  "/bio",
+  "/admin/approvals",
+  "/admin/categories",
+  "/admin/pricing",
+  "/admin/financials",
+  "/admin/refunds-needed",
+  "/admin/registrations",
+  "/admin/settings",
+  "/admin/surveys",
+  "/admin/surveys/aggregate",
+  "/admin/transactional-emails",
+  "/surveys",
+  "/admin/workflows",
+];
+
+const discoveredAdminRoutes = [
+  { source: "/coaches", selector: 'a[href^="/coaches/"]:not([href="/coaches/new"])', label: "coach detail" },
+  { source: "/bio", selector: 'a[href^="/bio/"]', label: "bio detail" },
+  { source: "/templates", selector: 'a[href^="/templates/"][href$="/edit"]', label: "template edit" },
+  { source: "/admin/workflows", selector: 'a[href^="/admin/workflows/"]:not([href="/admin/workflows/new"])', label: "workflow detail" },
+  { source: "/admin/transactional-emails", selector: 'a[href^="/admin/transactional-emails/"]', label: "transactional email editor" },
+];
+
 for (const width of [320, 390]) {
   test(`admin workshop and file collections fit a ${width}px viewport`, async ({ page }) => {
     await page.setViewportSize({ width, height: 844 });
@@ -36,5 +67,45 @@ for (const width of [320, 390]) {
     await page.goto(detailHref!);
     await assertNoDocumentOverflow(page, `${detailHref} at ${width}`);
     await expect(page.getByRole("region", { name: "Workshop registrations" })).toBeVisible();
+  });
+}
+
+for (const width of [320, 390]) {
+  test(`remaining admin collections fit a ${width}px viewport`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await loginAs(page, {
+      email: ADMIN_EMAIL,
+      password: ADMIN_PASSWORD,
+      expectedUrl: /\/admin|\/dashboard/,
+    });
+
+    for (const route of remainingAdminRoutes) {
+      await page.goto(route);
+      await expect(page.locator("body")).toHaveAttribute("data-mobile-responsive", "on");
+      await assertNoDocumentOverflow(page, `${route} at ${width}`);
+    }
+
+    for (const discovered of discoveredAdminRoutes) {
+      await page.goto(discovered.source);
+      const link = page.locator(discovered.selector).first();
+      await expect(
+        link,
+        `the admin fixture must include a populated ${discovered.label} link`,
+      ).toBeVisible();
+      const href = await link.getAttribute("href");
+      expect(href, `${discovered.label} link href`).toBeTruthy();
+
+      await page.goto(href!);
+      await assertNoDocumentOverflow(page, `${href} at ${width}`);
+
+      if (discovered.label === "coach detail") {
+        const editLink = page.locator('a[href^="/coaches/"][href$="/edit"]').first();
+        await expect(editLink, "the coach detail must expose its edit route").toBeVisible();
+        const editHref = await editLink.getAttribute("href");
+        expect(editHref, "coach edit link href").toBeTruthy();
+        await page.goto(editHref!);
+        await assertNoDocumentOverflow(page, `${editHref} at ${width}`);
+      }
+    }
   });
 }
