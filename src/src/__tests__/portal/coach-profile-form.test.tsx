@@ -170,4 +170,23 @@ describe("CoachProfileForm", () => {
     expect(await screen.findByText("LinkedIn Profile URL must be a valid URL"))
       .toBeInTheDocument();
   });
+
+  it("keeps flag-off classes unchanged and opts into compact touch targets explicitly", () => {
+    const { container, rerender } = render(<CoachProfileForm {...defaultProps} saveTarget="admin" />);
+
+    expect(container.firstElementChild).toHaveClass("p-8");
+    expect(screen.getByRole("button", { name: /save changes/i })).not.toHaveClass("min-h-11");
+
+    rerender(
+      <CoachProfileForm
+        {...defaultProps}
+        saveTarget="admin"
+        responsiveEnabled
+      />,
+    );
+
+    expect(container.firstElementChild).toHaveClass("min-w-0", "p-4", "sm:p-8");
+    expect(screen.getByRole("button", { name: /save changes/i })).toHaveClass("min-h-11");
+    expect(screen.getByLabelText("First Name")).toHaveClass("min-h-11");
+  });
 });

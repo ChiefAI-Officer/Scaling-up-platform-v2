@@ -5,6 +5,16 @@ import { db } from "@/lib/db";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FadeUp, StaggerContainer, StaggerItem } from "@/components/ui/animated";
+import { PageHeader } from "@/components/ui/page-header";
+import { ResponsiveDataView } from "@/components/ui/responsive-data-view";
+import {
+  ResponsiveRecord,
+  ResponsiveRecordActions,
+  ResponsiveRecordHeader,
+  ResponsiveRecordMeta,
+} from "@/components/ui/responsive-record";
+import { ResponsiveActionsItem } from "@/components/ui/responsive-actions-menu";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 
 async function getCoaches() {
   return db.coach.findMany({
@@ -39,23 +49,40 @@ function getCertificationStatusColor(status: string) {
 
 
 export default async function CoachesPage() {
+  const mobileResponsiveEnabled = isMobileResponsiveEnabled();
   const coaches = await getCoaches();
 
   return (
-    <div className="space-y-6">
+    <div className={mobileResponsiveEnabled ? "min-w-0 max-w-full space-y-6" : "space-y-6"}>
       <FadeUp>
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Coaches</h1>
-            <p className="text-muted-foreground">Manage certified coaches</p>
+        {mobileResponsiveEnabled ? (
+          <PageHeader
+            responsiveEnabled
+            title="Coaches"
+            description="Manage certified coaches"
+            actions={
+              <Link
+                href="/coaches/new"
+                className="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+              >
+                + Add Coach
+              </Link>
+            }
+          />
+        ) : (
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">Coaches</h1>
+              <p className="text-muted-foreground">Manage certified coaches</p>
+            </div>
+            <Link
+              href="/coaches/new"
+              className="bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+            >
+              + Add Coach
+            </Link>
           </div>
-          <Link
-            href="/coaches/new"
-            className="bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
-          >
-            + Add Coach
-          </Link>
-        </div>
+        )}
       </FadeUp>
 
       {/* Stats */}
@@ -105,7 +132,63 @@ export default async function CoachesPage() {
               </Link>
             </p>
           ) : (
-            <div className="overflow-x-auto">
+            <ResponsiveDataView
+              enabled={mobileResponsiveEnabled}
+              label="Coaches"
+              wideFrom="md"
+              compact={
+                <div className="space-y-3">
+                  {coaches.map((coach) => (
+                    <ResponsiveRecord key={coach.id}>
+                      <ResponsiveRecordHeader
+                        title={`${coach.firstName} ${coach.lastName}`}
+                        status={
+                          <Badge
+                            className={getCertificationStatusColor(coach.certificationStatus)}
+                            variant="secondary"
+                          >
+                            {coach.certificationStatus}
+                          </Badge>
+                        }
+                      />
+                      <ResponsiveRecordMeta
+                        items={[
+                          { label: "Email", value: coach.email },
+                          { label: "Workshops", value: coach._count.workshops },
+                        ]}
+                      />
+                      <ResponsiveRecordActions
+                        primary={
+                          <Link
+                            href={`/coaches/${coach.id}`}
+                            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                          >
+                            View coach
+                          </Link>
+                        }
+                        menuLabel={`More actions for ${coach.firstName} ${coach.lastName}`}
+                        secondary={
+                          <ResponsiveActionsItem asChild>
+                            <Link
+                              href={`/coaches/${coach.id}/edit`}
+                              className="flex min-h-11 w-full items-center px-3 text-sm"
+                            >
+                              Edit coach
+                            </Link>
+                          </ResponsiveActionsItem>
+                        }
+                      />
+                    </ResponsiveRecord>
+                  ))}
+                </div>
+              }
+              wide={
+                <div
+                  className="overflow-x-auto"
+                  role={mobileResponsiveEnabled ? "region" : undefined}
+                  aria-label={mobileResponsiveEnabled ? "Coaches table" : undefined}
+                  tabIndex={mobileResponsiveEnabled ? 0 : undefined}
+                >
               <table className="min-w-full divide-y divide-border">
                 <thead>
                   <tr>
@@ -179,7 +262,9 @@ export default async function CoachesPage() {
                   ))}
                 </tbody>
               </table>
-            </div>
+                </div>
+              }
+            />
           )}
         </CardContent>
       </Card>

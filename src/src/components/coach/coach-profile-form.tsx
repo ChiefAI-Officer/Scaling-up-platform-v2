@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 
 type CoachProfileSaveTarget = "self" | "admin";
 
@@ -54,6 +55,7 @@ interface CoachProfileFormProps {
     saveTarget?: CoachProfileSaveTarget;
     /** When true, renders editable Integration IDs section (admin only). Default false. */
     allowEditIntegrationIds?: boolean;
+    responsiveEnabled?: boolean;
 }
 
 export function CoachProfileForm({
@@ -61,6 +63,7 @@ export function CoachProfileForm({
     initialData,
     saveTarget = "self",
     allowEditIntegrationIds = false,
+    responsiveEnabled = false,
 }: CoachProfileFormProps) {
     const router = useRouter();
     const [firstName, setFirstName] = useState(initialData.firstName);
@@ -158,8 +161,8 @@ export function CoachProfileForm({
     };
 
     return (
-        <div className="bg-card rounded-xl shadow-sm border border-border p-8 space-y-6">
-            <div className="flex items-center gap-4">
+        <div className={cn("bg-card rounded-xl shadow-sm border border-border p-8 space-y-6", responsiveEnabled && "min-w-0 p-4 sm:p-8")}>
+            <div className={cn("flex items-center gap-4", responsiveEnabled && "min-w-0 flex-col items-start sm:flex-row sm:items-center")}>
                 {profileImage ? (
                     <img
                         src={profileImage}
@@ -173,17 +176,17 @@ export function CoachProfileForm({
                         </span>
                     </div>
                 )}
-                <div className="flex-1">
+                <div className={cn("flex-1", responsiveEnabled && "min-w-0 max-w-full")}>
                     <h2 className="text-lg font-semibold text-foreground">Profile Information</h2>
                     <div className="mt-1">
-                        <label className="inline-flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
+                        <label className={cn("inline-flex items-center gap-2 text-sm text-muted-foreground cursor-pointer", responsiveEnabled && "min-h-11 min-w-0 max-w-full flex-wrap")}>
                             <span>{uploading ? "Uploading..." : "Upload photo"}</span>
                             <input
                                 type="file"
                                 accept="image/jpeg,image/png,image/webp"
                                 onChange={handleImageUpload}
                                 disabled={uploading}
-                                className="text-xs file:mr-2 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-primary/10 file:text-primary hover:file:bg-primary/15"
+                                className={cn("text-xs file:mr-2 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-primary/10 file:text-primary hover:file:bg-primary/15", responsiveEnabled && "min-h-11 min-w-0 max-w-full file:min-h-11")}
                             />
                         </label>
                     </div>
@@ -203,6 +206,7 @@ export function CoachProfileForm({
                         id="firstName"
                         value={firstName}
                         onChange={(e) => setFirstName(e.target.value)}
+                        className={responsiveEnabled ? "min-h-11" : undefined}
                     />
                 </div>
                 <div className="space-y-2">
@@ -211,13 +215,14 @@ export function CoachProfileForm({
                         id="lastName"
                         value={lastName}
                         onChange={(e) => setLastName(e.target.value)}
+                        className={responsiveEnabled ? "min-h-11" : undefined}
                     />
                 </div>
             </div>
 
             <div className="space-y-2">
                 <Label htmlFor="email">Email Address</Label>
-                <Input id="email" defaultValue={initialData.email} disabled className="bg-muted" />
+                <Input id="email" defaultValue={initialData.email} disabled className={cn("bg-muted", responsiveEnabled && "min-h-11 min-w-0")} />
                 <p className="text-xs text-muted-foreground">Contact support to change your email address.</p>
             </div>
 
@@ -228,6 +233,7 @@ export function CoachProfileForm({
                     value={title}
                     onChange={(event) => setTitle(event.target.value)}
                     placeholder="e.g., Scaling Up Certified Coach"
+                    className={responsiveEnabled ? "min-h-11" : undefined}
                 />
                 <p className="text-xs text-muted-foreground mt-1">
                     Your professional title — shown on landing pages
@@ -241,6 +247,7 @@ export function CoachProfileForm({
                     value={company}
                     onChange={(event) => setCompany(event.target.value)}
                     placeholder="Your company or organization"
+                    className={responsiveEnabled ? "min-h-11" : undefined}
                 />
                 <p className="text-xs text-muted-foreground">The organization or business you represent</p>
             </div>
@@ -252,6 +259,7 @@ export function CoachProfileForm({
                     value={linkedinUrl}
                     onChange={(e) => setLinkedinUrl(e.target.value)}
                     placeholder="https://linkedin.com/in/your-profile"
+                    className={responsiveEnabled ? "min-h-11" : undefined}
                 />
             </div>
 
@@ -260,13 +268,13 @@ export function CoachProfileForm({
                 <Textarea
                     id="bio"
                     placeholder="Tell us about your coaching experience..."
-                    className="min-h-[120px]"
+                    className={cn("min-h-[120px]", responsiveEnabled && "min-w-0")}
                     value={bio}
                     onChange={(e) => setBio(e.target.value)}
                 />
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className={cn("flex items-center gap-2", responsiveEnabled && "min-h-11")}>
                 <input
                     id="showBookCallCta"
                     type="checkbox"
@@ -288,6 +296,7 @@ export function CoachProfileForm({
                         placeholder="https://calendly.com/yourname"
                         value={bookCallUrl}
                         onChange={(e) => setBookCallUrl(e.target.value)}
+                        className={responsiveEnabled ? "min-h-11" : undefined}
                     />
                     <p className="text-xs text-muted-foreground">Link for the button on your public bio page</p>
                 </div>
@@ -303,6 +312,7 @@ export function CoachProfileForm({
                             value={hubspotId}
                             onChange={(e) => setHubspotId(e.target.value)}
                             placeholder="e.g. 12345678"
+                            className={responsiveEnabled ? "min-h-11" : undefined}
                         />
                     </div>
                     <div className="space-y-2">
@@ -312,13 +322,14 @@ export function CoachProfileForm({
                             value={circleId}
                             onChange={(e) => setCircleId(e.target.value)}
                             placeholder="e.g. circle_abc123"
+                            className={responsiveEnabled ? "min-h-11" : undefined}
                         />
                     </div>
                 </div>
             )}
 
-            <div className="pt-4 border-t border-border flex justify-end">
-                <Button onClick={handleSave} disabled={saving}>
+            <div className={cn("pt-4 border-t border-border flex justify-end", responsiveEnabled && "flex-col sm:flex-row")}>
+                <Button onClick={handleSave} disabled={saving} className={responsiveEnabled ? "min-h-11 w-full sm:w-auto" : undefined}>
                     {saving ? "Saving..." : "Save Changes"}
                 </Button>
             </div>
