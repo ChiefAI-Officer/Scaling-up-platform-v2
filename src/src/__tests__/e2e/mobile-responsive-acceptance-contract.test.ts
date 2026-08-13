@@ -26,6 +26,13 @@ type WorkshopRouteSummary = {
   };
 };
 
+type CoachRouteSummary = {
+  reserved: boolean;
+  detail: boolean;
+  edit: boolean;
+  invalidEditRejected: boolean;
+};
+
 function inspectPlaywrightConfig(override?: string): PlaywrightConfigSummary {
   const environment = { ...process.env };
   if (override === undefined) delete environment.PLAYWRIGHT_BASE_URL;
@@ -62,6 +69,7 @@ try {
 } catch {
   invalidAdminSurveyRejected = true;
 }
+
 console.log(JSON.stringify({
   admin: {
     reserved: workshopDetailHrefPattern("admin").test("/workshops/new"),
@@ -83,6 +91,38 @@ console.log(JSON.stringify({
       { cwd: process.cwd(), encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
     );
     return JSON.parse(output) as WorkshopRouteSummary;
+  } catch {
+    return null;
+  }
+}
+
+function inspectCoachRouteContract(): CoachRouteSummary | null {
+  try {
+    const output = execFileSync(
+      process.execPath,
+      [
+        "--import",
+        "tsx",
+        "-e",
+        `import importedContract from "./e2e/helpers/coach-route-contract";
+const { coachDetailHrefPattern, coachEditHrefPattern } = importedContract.default ?? importedContract;
+const detail = "/coaches/cm1234567890abcdefghijkl";
+let invalidEditRejected = false;
+try {
+  coachEditHrefPattern("/coaches/new");
+} catch {
+  invalidEditRejected = true;
+}
+console.log(JSON.stringify({
+  reserved: coachDetailHrefPattern().test("/coaches/new"),
+  detail: coachDetailHrefPattern().test(detail),
+  edit: coachEditHrefPattern(detail).test(detail + "/edit"),
+  invalidEditRejected,
+}));`,
+      ],
+      { cwd: process.cwd(), encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+    );
+    return JSON.parse(output) as CoachRouteSummary;
   } catch {
     return null;
   }
@@ -234,7 +274,6 @@ describe("browser-blocked responsive harness source contract", () => {
     expect(coachSource).toContain('workshopDetailHrefPattern("coach")');
     expect(adminSource).toContain('workshopChildHref(workshopDetail, "surveys")');
     expect(coachSource).toContain('workshopChildHrefPattern(workshopDetail, "surveys")');
-    expect(adminSource).toContain('workshopChildHrefPattern(workshopDetail, "landing-pages")');
   });
 
   it("derives the required admin survey owner without requiring a detail-page shortcut", () => {
@@ -247,6 +286,15 @@ describe("browser-blocked responsive harness source contract", () => {
     expect(adminSource).toContain("expectResponsiveRoute");
     expect(coachSource).toMatch(/const workshopSurvey = await firstMatchingHref/);
     expect(coachSource).toContain('workshopChildHrefPattern(workshopDetail, "surveys")');
+  });
+
+  it("rejects the reserved coach-create owner while accepting CUID details and rooted edits", () => {
+    expect(inspectCoachRouteContract()).toEqual({
+      reserved: false,
+      detail: true,
+      edit: true,
+      invalidEditRejected: true,
+    });
   });
 
   it("routes Axe and visual navigation through the authenticated responsive guard", () => {

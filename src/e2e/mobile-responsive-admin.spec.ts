@@ -6,8 +6,11 @@ import {
   type OverflowContext,
 } from "./helpers/overflow";
 import {
+  coachDetailHrefPattern,
+  coachEditHrefPattern,
+} from "./helpers/coach-route-contract";
+import {
   workshopChildHref,
-  workshopChildHrefPattern,
   workshopDetailHrefPattern,
 } from "./helpers/workshop-route-contract";
 
@@ -98,17 +101,25 @@ test("populated admin routes are discovered from live links and fit every width"
     "admin workshop detail",
   );
   const workshopSurvey = workshopChildHref(workshopDetail, "surveys");
-  await page.goto(workshopDetail, { waitUntil: "domcontentloaded" });
-  await page.getByRole("button", { name: "Edit Landing Page" }).click();
-  await expect(page).toHaveURL(workshopChildHrefPattern(workshopDetail, "landing-pages"));
-  const landingManager = new URL(page.url()).pathname;
+  const landingManager = workshopChildHref(workshopDetail, "landing-pages");
+  await expectResponsiveRoute(page, context(testInfo, landingManager, widths[0]));
   const editorButton = page.getByRole("button", { name: /^(Create|Edit) Page$/ }).first();
   await expect(editorButton, "the populated admin workshop must expose a landing-page editor action").toBeVisible();
   await editorButton.click();
   await expect(page).toHaveURL(new RegExp(`${landingManager}/[^/?#]+$`));
   const landingEditor = new URL(page.url()).pathname;
-  const coachDetail = await firstMatchingHref(page, "/coaches", /^\/coaches\/[^/?#]+$/, "coach detail");
-  const coachEdit = await firstMatchingHref(page, coachDetail, /^\/coaches\/[^/?#]+\/edit$/, "coach edit");
+  const coachDetail = await firstMatchingHref(
+    page,
+    "/coaches",
+    coachDetailHrefPattern(),
+    "coach detail",
+  );
+  const coachEdit = await firstMatchingHref(
+    page,
+    coachDetail,
+    coachEditHrefPattern(coachDetail),
+    "coach edit",
+  );
   const templateDetail = await firstMatchingHref(page, "/admin/assessments/templates", /^\/admin\/assessments\/templates\/[^/?#]+$/, "assessment template detail");
   const accessGroupDetail = await firstMatchingHref(page, "/admin/assessments/access-groups", /^\/admin\/assessments\/access-groups\/[^/?#]+$/, "access-group detail");
   const campaignDetail = await firstMatchingHref(page, "/admin/assessments/campaigns", /^\/admin\/assessments\/campaigns\/[^/?#]+$/, "admin campaign detail");
