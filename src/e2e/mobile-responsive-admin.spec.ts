@@ -5,6 +5,10 @@ import {
   firstMatchingHref,
   type OverflowContext,
 } from "./helpers/overflow";
+import {
+  workshopChildHrefPattern,
+  workshopDetailHrefPattern,
+} from "./helpers/workshop-route-contract";
 
 const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL || "admin@scalingup.com";
 const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD || "demo123";
@@ -86,21 +90,26 @@ test("populated admin routes are discovered from live links and fit every width"
   await page.setViewportSize({ width: widths[0], height: 844 });
   await loginAdmin(page);
 
-  const workshopDetail = await firstMatchingHref(page, "/workshops", /^\/workshops\/[^/?#]+$/, "admin workshop detail");
+  const workshopDetail = await firstMatchingHref(
+    page,
+    "/workshops",
+    workshopDetailHrefPattern("admin"),
+    "admin workshop detail",
+  );
   const workshopSurvey = await firstMatchingHref(
     page,
     workshopDetail,
-    /^\/workshops\/[^/?#]+\/surveys(?:[?#].*)?$/,
+    workshopChildHrefPattern(workshopDetail, "surveys"),
     "admin workshop survey",
   );
   await page.goto(workshopDetail, { waitUntil: "domcontentloaded" });
   await page.getByRole("button", { name: "Edit Landing Page" }).click();
-  await expect(page).toHaveURL(/\/workshops\/[^/]+\/landing-pages$/);
+  await expect(page).toHaveURL(workshopChildHrefPattern(workshopDetail, "landing-pages"));
   const landingManager = new URL(page.url()).pathname;
   const editorButton = page.getByRole("button", { name: /^(Create|Edit) Page$/ }).first();
   await expect(editorButton, "the populated admin workshop must expose a landing-page editor action").toBeVisible();
   await editorButton.click();
-  await expect(page).toHaveURL(/\/workshops\/[^/]+\/landing-pages\/[^/]+$/);
+  await expect(page).toHaveURL(new RegExp(`${landingManager}/[^/?#]+$`));
   const landingEditor = new URL(page.url()).pathname;
   const coachDetail = await firstMatchingHref(page, "/coaches", /^\/coaches\/[^/?#]+$/, "coach detail");
   const coachEdit = await firstMatchingHref(page, coachDetail, /^\/coaches\/[^/?#]+\/edit$/, "coach edit");

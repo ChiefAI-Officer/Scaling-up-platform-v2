@@ -14,6 +14,12 @@ type PlaywrightConfigSummary = {
   hasWebServer: boolean;
 };
 
+type WorkshopRouteSummary = {
+  admin: { reserved: boolean; detail: boolean };
+  coach: { reserved: boolean; detail: boolean };
+  derived: { adminSurvey: boolean; coachSurvey: boolean; adminLanding: boolean };
+};
+
 function inspectPlaywrightConfig(override?: string): PlaywrightConfigSummary {
   const environment = { ...process.env };
   if (override === undefined) delete environment.PLAYWRIGHT_BASE_URL;
@@ -30,6 +36,42 @@ function inspectPlaywrightConfig(override?: string): PlaywrightConfigSummary {
     { cwd: process.cwd(), env: environment, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
   );
   return JSON.parse(output) as PlaywrightConfigSummary;
+}
+
+function inspectWorkshopRouteContract(): WorkshopRouteSummary | null {
+  try {
+    const output = execFileSync(
+      process.execPath,
+      [
+        "--import",
+        "tsx",
+        "-e",
+        `import importedContract from "./e2e/helpers/workshop-route-contract";
+const { workshopChildHrefPattern, workshopDetailHrefPattern } = importedContract.default ?? importedContract;
+const adminDetail = "/workshops/cm1234567890abcdefghijkl";
+const coachDetail = "/portal/workshops/cm1234567890abcdefghijkl";
+console.log(JSON.stringify({
+  admin: {
+    reserved: workshopDetailHrefPattern("admin").test("/workshops/new"),
+    detail: workshopDetailHrefPattern("admin").test(adminDetail),
+  },
+  coach: {
+    reserved: workshopDetailHrefPattern("coach").test("/portal/workshops/new"),
+    detail: workshopDetailHrefPattern("coach").test(coachDetail),
+  },
+  derived: {
+    adminSurvey: workshopChildHrefPattern(adminDetail, "surveys").test(adminDetail + "/surveys"),
+    coachSurvey: workshopChildHrefPattern(coachDetail, "surveys").test(coachDetail + "/surveys"),
+    adminLanding: workshopChildHrefPattern(adminDetail, "landing-pages").test(adminDetail + "/landing-pages"),
+  },
+}));`,
+      ],
+      { cwd: process.cwd(), encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+    );
+    return JSON.parse(output) as WorkshopRouteSummary;
+  } catch {
+    return null;
+  }
 }
 
 describe("responsive authenticated navigation contract", () => {
@@ -157,6 +199,22 @@ describe("browser-blocked responsive harness source contract", () => {
     expect(source).toContain("admin workshop survey");
     expect(source).toContain("workshopSurvey");
     expect(source).toContain("workshopDetail");
+  });
+
+  it("rejects reserved workshop owners while accepting ID-shaped details and deriving child routes", () => {
+    expect(inspectWorkshopRouteContract()).toEqual({
+      admin: { reserved: false, detail: true },
+      coach: { reserved: false, detail: true },
+      derived: { adminSurvey: true, coachSurvey: true, adminLanding: true },
+    });
+
+    const adminSource = readE2e("mobile-responsive-admin.spec.ts");
+    const coachSource = readE2e("mobile-responsive-coach.spec.ts");
+    expect(adminSource).toContain('workshopDetailHrefPattern("admin")');
+    expect(coachSource).toContain('workshopDetailHrefPattern("coach")');
+    expect(adminSource).toContain('workshopChildHrefPattern(workshopDetail, "surveys")');
+    expect(coachSource).toContain('workshopChildHrefPattern(workshopDetail, "surveys")');
+    expect(adminSource).toContain('workshopChildHrefPattern(workshopDetail, "landing-pages")');
   });
 
   it("routes Axe and visual navigation through the authenticated responsive guard", () => {

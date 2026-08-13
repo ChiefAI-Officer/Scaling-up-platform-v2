@@ -5,6 +5,10 @@ import {
   firstMatchingHref,
   type OverflowContext,
 } from "./helpers/overflow";
+import {
+  workshopChildHrefPattern,
+  workshopDetailHrefPattern,
+} from "./helpers/workshop-route-contract";
 
 const COACH_EMAIL = process.env.E2E_COACH_EMAIL || "coach@example.com";
 const COACH_PASSWORD = process.env.E2E_COACH_PASSWORD || "demo123";
@@ -85,13 +89,13 @@ test("populated coach routes are discovered from live links and fit every width"
   const workshopDetail = await firstMatchingHref(
     page,
     "/portal/workshops",
-    /^\/portal\/workshops\/[^/?#]+$/,
+    workshopDetailHrefPattern("coach"),
     "coach-owned workshop detail",
   );
   const workshopSurvey = await firstMatchingHref(
     page,
     workshopDetail,
-    /^\/portal\/workshops\/[^/?#]+\/surveys(?:[?#].*)?$/,
+    workshopChildHrefPattern(workshopDetail, "surveys"),
     "coach workshop survey",
   );
   const campaignDetail = await firstMatchingHref(
