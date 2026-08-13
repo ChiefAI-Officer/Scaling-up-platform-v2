@@ -211,6 +211,81 @@ separately so it can name the immutable implementation commit.
 - The pre-existing untracked `src/playwright-report/` directory remains
   untouched and excluded.
 
+## Fix round 5 evidence — authoritative populated-route readiness (2026-08-13)
+
+The next populated matrix reached Access Groups in all four projects, then
+failed before a detail link appeared. Failure snapshots showed the transient
+client state (`Loading…` at wide widths and `0 active` at compact widths), while
+authenticated live inspection showed a real Access Group CUID link after the
+client fetch completed. The shared `firstMatchingHref` helper scanned anchors
+immediately after `domcontentloaded`, so it raced async collections and could
+also select reserved create owners such as template/workflow/survey `new`.
+
+The harness now validates source navigation, waits on an authoritative
+collection-settled signal, and polls only when that settled collection reports
+items. Access Groups and assessment templates use successful API payload
+counts. Server-rendered collections settle on either a valid candidate or
+their explicit empty state. A settled empty collection returns no candidate;
+a settled populated collection without a valid detail fails closed. Static
+collection routes remain mandatory, while only genuinely present detail
+routes enter the dynamic matrix. CUID-backed owners reject create routes;
+workflow and survey matchers reject only `new`, preserving valid seeded
+non-CUID IDs. Optional public-campaign discovery now waits for its list API
+before scanning.
+
+### RED / GREEN
+
+RED command (from `src/`):
+
+```bash
+npx jest src/__tests__/e2e/mobile-responsive-acceptance-contract.test.ts --runInBand
+```
+
+The first test placement attempt produced a syntax error and was corrected
+before it was counted as RED. Valid RED: exit 1, **6 failed / 23 passed**. All
+six new behavior tests received no discovery summary because the shared live
+href contract did not exist. They independently covered delayed anchors,
+reserved create owners, authoritative empty collections, populated collections
+without details, valid non-CUID workflow/survey seeds, and navigation/auth/404
+failure posture.
+
+GREEN with the same command: exit 0, **1 suite / 29 tests passed**.
+
+### Changed files and validation
+
+- `src/e2e/helpers/live-href-discovery-contract.ts`
+- `src/e2e/mobile-responsive-admin.spec.ts`
+- `src/src/__tests__/e2e/mobile-responsive-acceptance-contract.test.ts`
+- This appended evidence receipt.
+
+Fresh validation from `src/`:
+
+```bash
+npx jest src/__tests__/e2e/mobile-responsive-acceptance-contract.test.ts --runInBand
+npx eslint e2e/helpers/live-href-discovery-contract.ts e2e/mobile-responsive-admin.spec.ts src/__tests__/e2e/mobile-responsive-acceptance-contract.test.ts
+PLAYWRIGHT_BASE_URL=https://preview.example.test npx playwright test e2e/mobile-responsive-coach.spec.ts e2e/mobile-responsive-admin.spec.ts e2e/mobile-responsive-state.spec.ts e2e/mobile-responsive-a11y.spec.ts e2e/mobile-responsive-visual.spec.ts e2e/mobile-responsive-kill-diagnostic.spec.ts --list --reporter=list --project=responsive-compact --project=responsive-medium --project=responsive-tablet-wide --project=responsive-desktop
+git diff --check
+```
+
+Results: Jest **29/29**, scoped ESLint exit 0 with no output, Playwright static
+listing **56 tests in 6 files** across four responsive projects, and diff check
+exit 0. No browser test ran and the placeholder preview hostname was not
+contacted.
+
+Implementation commit: `4749c3af` (`test: wait for settled populated routes`).
+This report append is committed separately so it can name the immutable
+implementation commit.
+
+### Fix-round concerns
+
+- DOM-settled collections rely on their explicit product empty-state copy as
+  the authoritative zero-item signal; copy changes require a harness selector
+  update.
+- Browser runtime, Axe, overflow, visual, database, deployment, and external
+  actions were intentionally not run in this fix round.
+- The pre-existing untracked `src/playwright-report/` directory remains
+  untouched and excluded.
+
 ## Fix round 3/5 — deterministic admin survey owner (2026-08-13)
 
 The second populated preview run selected a real workshop detail but found no
@@ -348,3 +423,9 @@ immutable implementation commit.
   populated matrix run remains the consumer-level verification.
 - The pre-existing untracked `src/playwright-report/` directory remains
   untouched and excluded.
+
+## Fix round 5/5 — authoritative populated-route readiness (2026-08-13)
+
+Completed in implementation commit `4749c3af`. The full root-cause,
+RED/GREEN, validation, and limitation receipt is recorded above under
+**Fix round 5 evidence — authoritative populated-route readiness**.
