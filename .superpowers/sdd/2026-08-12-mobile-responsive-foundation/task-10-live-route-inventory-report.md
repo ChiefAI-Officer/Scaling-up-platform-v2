@@ -275,3 +275,76 @@ separately so it can name the immutable implementation commit.
   visual, database, deployment, and external actions were not run.
 - The pre-existing untracked `src/playwright-report/` directory remains
   untouched and excluded.
+
+## Fix round 4/5 — populated coach and landing-manager setup (2026-08-13)
+
+The next populated preview exposed two deterministic harness setup defects.
+The admin coach inventory's generic single-segment matcher admitted the
+reserved `/coaches/new` create route before a real coach detail. The landing
+manager setup also clicked a server-rendered button immediately after
+`domcontentloaded`, before the client-side `router.push` handler was reliably
+hydrated.
+
+Coach detail selection now requires a realistic CUID-shaped owner, so
+`/coaches/new` cannot match. Edit discovery remains link-backed: the harness
+opens the validated real coach detail and searches that page for an edit link
+rooted in the same CUID. The admin landing manager is derived from the already
+validated workshop CUID and navigated through `expectResponsiveRoute` at the
+initial width. It remains in `dynamicRoutes`, preserving fail-closed response,
+authentication, redirect, 404, shell-marker, and overflow checks across every
+configured width.
+
+### RED / GREEN
+
+RED command (from `src/`):
+
+```bash
+npx jest src/__tests__/e2e/mobile-responsive-acceptance-contract.test.ts --runInBand
+```
+
+Initial result: exit 1, **2 failed / 22 passed**. The behavioral coach contract
+received `null` because the CUID-aware helper did not exist. A second
+source-text assertion also failed for the landing setup. Review correctly
+identified the new source assertions as change-detector tests; they were
+removed before GREEN, leaving only the Node-executed coach matcher behavior
+contract. The populated Playwright test remains the landing consumer test.
+
+GREEN with the same Jest command: exit 0, **1 suite / 23 tests passed**. The
+behavior contract proves `/coaches/new` is rejected, a realistic coach CUID is
+accepted, its rooted edit link matches, and edit discovery cannot be rooted in
+the reserved create owner.
+
+### Changed files and validation
+
+- `src/e2e/helpers/coach-route-contract.ts`
+- `src/e2e/mobile-responsive-admin.spec.ts`
+- `src/src/__tests__/e2e/mobile-responsive-acceptance-contract.test.ts`
+- This appended evidence receipt.
+
+Fresh validation from `src/`:
+
+```bash
+npx jest src/__tests__/e2e/mobile-responsive-acceptance-contract.test.ts --runInBand
+npx eslint e2e/helpers/coach-route-contract.ts e2e/mobile-responsive-admin.spec.ts src/__tests__/e2e/mobile-responsive-acceptance-contract.test.ts
+PLAYWRIGHT_BASE_URL=https://preview.example.test npx playwright test e2e/mobile-responsive-coach.spec.ts e2e/mobile-responsive-admin.spec.ts e2e/mobile-responsive-state.spec.ts e2e/mobile-responsive-a11y.spec.ts e2e/mobile-responsive-visual.spec.ts e2e/mobile-responsive-kill-diagnostic.spec.ts --list --reporter=list --project=responsive-compact --project=responsive-medium --project=responsive-tablet-wide --project=responsive-desktop
+git diff --check
+```
+
+Results: Jest **23/23**, scoped ESLint exit 0 with no output, Playwright static
+listing **56 tests in 6 files** across four responsive projects, and diff check
+exit 0. `--reporter=list` did not create a new HTML report. No browser test ran
+and the placeholder preview hostname was not contacted.
+
+Implementation commit: `372c7cac` (`test: harden populated admin route
+setup`). This report append is committed separately so it can name the
+immutable implementation commit.
+
+### Fix-round concerns
+
+- The coach route contract follows `Coach.id @default(cuid())` in the Prisma
+  schema. A future coach ID migration requires an explicit matcher update.
+- Browser runtime, Axe, overflow, visual, database, deployment, and external
+  actions were intentionally not run in this fix round. The next authorized
+  populated matrix run remains the consumer-level verification.
+- The pre-existing untracked `src/playwright-report/` directory remains
+  untouched and excluded.
