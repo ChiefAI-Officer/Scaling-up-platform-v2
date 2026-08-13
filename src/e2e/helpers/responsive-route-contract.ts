@@ -9,13 +9,19 @@ export interface ResponsiveNavigationContract {
 }
 
 export type ResponsiveDesktopParityMode = "off" | "kill";
-export type ResponsiveSurface = "auth-shell" | "report";
+export type ResponsiveSurface = "auth-shell" | "shellless-report";
 export type ResponsiveSurfaceRole = "admin" | "coach";
+
+export interface ResponsivePresentationContext {
+  role: ResponsiveSurfaceRole;
+  responsiveSurface: ResponsiveSurface;
+}
 
 export interface ResponsiveSurfaceContract {
   surface: ResponsiveSurface;
   role: ResponsiveSurfaceRole;
   bodyResponsive: boolean;
+  visibleAuthShellCount: number;
   visibleAuthShellRoles: readonly ResponsiveSurfaceRole[];
   reportPageResponsive: boolean;
 }
@@ -70,10 +76,23 @@ export function isShelllessAssessmentReportRoute(route: string): boolean {
   );
 }
 
+export function responsivePresentationContext(
+  role: ResponsiveSurfaceRole,
+  route: string,
+): ResponsivePresentationContext {
+  return {
+    role,
+    responsiveSurface: isShelllessAssessmentReportRoute(route)
+      ? "shellless-report"
+      : "auth-shell",
+  };
+}
+
 export function assertResponsiveSurfaceContract({
   surface,
   role,
   bodyResponsive,
+  visibleAuthShellCount,
   visibleAuthShellRoles,
   reportPageResponsive,
 }: ResponsiveSurfaceContract): void {
@@ -81,8 +100,8 @@ export function assertResponsiveSurfaceContract({
     throw new Error(`${surface} route is missing the responsive body flag`);
   }
 
-  if (surface === "report") {
-    if (visibleAuthShellRoles.length > 0) {
+  if (surface === "shellless-report") {
+    if (visibleAuthShellCount > 0) {
       throw new Error("shell-less report route rendered an authenticated dashboard shell");
     }
     if (!reportPageResponsive) {

@@ -9,6 +9,7 @@ import {
   workshopChildHrefPattern,
   workshopDetailHrefPattern,
 } from "./helpers/workshop-route-contract";
+import { responsivePresentationContext } from "./helpers/responsive-route-contract";
 
 const COACH_EMAIL = process.env.E2E_COACH_EMAIL || "coach@example.com";
 const COACH_PASSWORD = process.env.E2E_COACH_PASSWORD || "demo123";
@@ -46,7 +47,12 @@ function widthsFor(testInfo: TestInfo): readonly number[] {
 }
 
 function context(testInfo: TestInfo, route: string, width: number): OverflowContext {
-  return { role: "coach", route, project: testInfo.project.name, width };
+  return {
+    ...responsivePresentationContext("coach", route),
+    route,
+    project: testInfo.project.name,
+    width,
+  };
 }
 
 async function loginCoach(page: Page): Promise<void> {

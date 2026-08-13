@@ -73,7 +73,7 @@ function context(testInfo: TestInfo, route: string, width: number): OverflowCont
       ? { allowedFinalPathnames: ["/admin/dashboard"] }
       : {}),
     ...(isShelllessAssessmentReportRoute(route)
-      ? { responsiveSurface: "report" as const }
+      ? { responsiveSurface: "shellless-report" as const }
       : {}),
   };
 }

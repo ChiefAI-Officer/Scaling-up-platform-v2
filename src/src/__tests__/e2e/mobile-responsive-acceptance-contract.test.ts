@@ -57,7 +57,16 @@ type ResponsiveSurfaceSummary = {
   missingReportMarkerRejected: boolean;
   missingBodyFlagRejected: boolean;
   reportWithShellRejected: boolean;
+  reportWithUnknownShellRejected: boolean;
   dashboardWithoutShellRejected: boolean;
+};
+
+type CoachResponsiveContextSummary = {
+  campaignReport: { role: string; responsiveSurface: string };
+  respondentReport: { role: string; responsiveSurface: string };
+  longitudinal: { role: string; responsiveSurface: string };
+  ordinary: { role: string; responsiveSurface: string };
+  ordinaryWithoutCoachShellRejected: boolean;
 };
 
 function inspectPlaywrightConfig(override?: string): PlaywrightConfigSummary {
@@ -305,9 +314,10 @@ const {
 } = importedContract.default ?? importedContract;
 
 const report = {
-  surface: "report",
+  surface: "shellless-report",
   role: "admin",
   bodyResponsive: true,
+  visibleAuthShellCount: 0,
   visibleAuthShellRoles: [],
   reportPageResponsive: true,
 };
@@ -331,7 +341,14 @@ console.log(JSON.stringify({
   validReportAccepted,
   missingReportMarkerRejected: rejected({ reportPageResponsive: false }),
   missingBodyFlagRejected: rejected({ bodyResponsive: false }),
-  reportWithShellRejected: rejected({ visibleAuthShellRoles: ["admin"] }),
+  reportWithShellRejected: rejected({
+    visibleAuthShellCount: 1,
+    visibleAuthShellRoles: ["admin"],
+  }),
+  reportWithUnknownShellRejected: rejected({
+    visibleAuthShellCount: 1,
+    visibleAuthShellRoles: [],
+  }),
   dashboardWithoutShellRejected: rejected({
     surface: "auth-shell",
     reportPageResponsive: false,
@@ -341,6 +358,52 @@ console.log(JSON.stringify({
       { cwd: process.cwd(), encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
     );
     return JSON.parse(output) as ResponsiveSurfaceSummary;
+  } catch {
+    return null;
+  }
+}
+
+function inspectCoachResponsiveContext(): CoachResponsiveContextSummary | null {
+  try {
+    const output = execFileSync(
+      process.execPath,
+      [
+        "--import",
+        "tsx",
+        "-e",
+        `import importedContract from "./e2e/helpers/responsive-route-contract";
+const {
+  assertResponsiveSurfaceContract,
+  responsivePresentationContext,
+} = importedContract.default ?? importedContract;
+const campaignReport = responsivePresentationContext("coach", "/assessments/campaign-1/report?view=full");
+const respondentReport = responsivePresentationContext("coach", "/assessments/campaign-1/respondents/person-1/report");
+const longitudinal = responsivePresentationContext("coach", "/portal/assessments/respondents/person-1/longitudinal");
+const ordinary = responsivePresentationContext("coach", "/portal/home");
+let ordinaryWithoutCoachShellRejected = false;
+try {
+  assertResponsiveSurfaceContract({
+    surface: ordinary.responsiveSurface,
+    role: ordinary.role,
+    bodyResponsive: true,
+    visibleAuthShellCount: 0,
+    visibleAuthShellRoles: [],
+    reportPageResponsive: false,
+  });
+} catch {
+  ordinaryWithoutCoachShellRejected = true;
+}
+console.log(JSON.stringify({
+  campaignReport,
+  respondentReport,
+  longitudinal,
+  ordinary,
+  ordinaryWithoutCoachShellRejected,
+}));`,
+      ],
+      { cwd: process.cwd(), encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+    );
+    return JSON.parse(output) as CoachResponsiveContextSummary;
   } catch {
     return null;
   }
@@ -445,12 +508,34 @@ describe("responsive authenticated surface contract", () => {
     expect(summary?.missingReportMarkerRejected).toBe(true);
     expect(summary?.missingBodyFlagRejected).toBe(true);
     expect(summary?.reportWithShellRejected).toBe(true);
+    expect(summary?.reportWithUnknownShellRejected).toBe(true);
   });
 
   it("does not weaken the dashboard auth-shell requirement", () => {
     expect(
       inspectResponsiveSurfaceContract()?.dashboardWithoutShellRejected,
     ).toBe(true);
+  });
+
+  it("gives coach consumers report presentation only for standalone report routes", () => {
+    const summary = inspectCoachResponsiveContext();
+    expect(summary?.campaignReport).toEqual({
+      role: "coach",
+      responsiveSurface: "shellless-report",
+    });
+    expect(summary?.respondentReport).toEqual({
+      role: "coach",
+      responsiveSurface: "shellless-report",
+    });
+    expect(summary?.longitudinal).toEqual({
+      role: "coach",
+      responsiveSurface: "auth-shell",
+    });
+    expect(summary?.ordinary).toEqual({
+      role: "coach",
+      responsiveSurface: "auth-shell",
+    });
+    expect(summary?.ordinaryWithoutCoachShellRejected).toBe(true);
   });
 });
 

@@ -134,21 +134,25 @@ export async function expectResponsiveRoute(
         : page.locator("header").filter({ hasText: "Scaling Up" }),
     ).toBeVisible();
   } else {
+    const surface = context.responsiveSurface ?? "auth-shell";
     const bodyResponsive = await page.locator("body").getAttribute("data-mobile-responsive") === "on";
-    const visibleAuthShellRoles = await page
-      .locator("[data-auth-shell]:visible")
-      .evaluateAll((shells) => shells
-        .map((shell) => shell.getAttribute("data-auth-shell"))
-        .filter((role): role is ResponsiveRole => role === "admin" || role === "coach"));
+    const visibleAuthShells = page.locator("[data-auth-shell]:visible");
+    const visibleAuthShellCount = await visibleAuthShells.count();
+    const visibleAuthShellRoles = surface === "auth-shell"
+      ? await visibleAuthShells.evaluateAll((shells) => shells
+          .map((shell) => shell.getAttribute("data-auth-shell"))
+          .filter((role): role is ResponsiveRole => role === "admin" || role === "coach"))
+      : [];
     const reportPageResponsive = await page
       .locator("[data-responsive-report-page]")
       .first()
       .isVisible()
       .catch(() => false);
     assertResponsiveSurfaceContract({
-      surface: context.responsiveSurface ?? "auth-shell",
+      surface,
       role: context.role,
       bodyResponsive,
+      visibleAuthShellCount,
       visibleAuthShellRoles,
       reportPageResponsive,
     });
