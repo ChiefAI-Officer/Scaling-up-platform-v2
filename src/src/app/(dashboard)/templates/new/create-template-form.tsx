@@ -13,8 +13,10 @@ const TEMPLATE_TYPES = [
 
 export function CreateTemplateForm({
     categories,
+    responsiveEnabled = false,
 }: {
     categories: { id: string; name: string }[];
+    responsiveEnabled?: boolean;
 }) {
     const router = useRouter();
     const [name, setName] = useState("");
@@ -53,29 +55,35 @@ export function CreateTemplateForm({
     };
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form
+            onSubmit={handleSubmit}
+            aria-label={responsiveEnabled ? "Create template" : undefined}
+            className={responsiveEnabled ? "min-w-0 space-y-4" : "space-y-4"}
+        >
             <div>
-                <label className="block text-sm font-medium text-foreground mb-1">
+                <label htmlFor={responsiveEnabled ? "templateName" : undefined} className="block text-sm font-medium text-foreground mb-1">
                     Template Name *
                 </label>
                 <input
+                    id={responsiveEnabled ? "templateName" : undefined}
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="e.g., AI Workshop Solo Landing"
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                    className={responsiveEnabled ? "min-h-11 min-w-0 max-w-full w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" : "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"}
                     required
                 />
             </div>
 
             <div>
-                <label className="block text-sm font-medium text-foreground mb-1">
+                <label htmlFor={responsiveEnabled ? "templateType" : undefined} className="block text-sm font-medium text-foreground mb-1">
                     Template Type *
                 </label>
                 <select
+                    id={responsiveEnabled ? "templateType" : undefined}
                     value={templateType}
                     onChange={(e) => setTemplateType(e.target.value)}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                    className={responsiveEnabled ? "min-h-11 min-w-0 max-w-full w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" : "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"}
                     required
                 >
                     <option value="">Select type...</option>
@@ -88,13 +96,14 @@ export function CreateTemplateForm({
             </div>
 
             <div>
-                <label className="block text-sm font-medium text-foreground mb-1">
+                <label htmlFor={responsiveEnabled ? "templateCategory" : undefined} className="block text-sm font-medium text-foreground mb-1">
                     Category (optional — blank = global)
                 </label>
                 <select
+                    id={responsiveEnabled ? "templateCategory" : undefined}
                     value={categoryId}
                     onChange={(e) => setCategoryId(e.target.value)}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                    className={responsiveEnabled ? "min-h-11 min-w-0 max-w-full w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" : "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"}
                 >
                     <option value="">Global (all categories)</option>
                     {categories.map((c) => (
@@ -110,7 +119,7 @@ export function CreateTemplateForm({
             <button
                 type="submit"
                 disabled={saving}
-                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                className={responsiveEnabled ? "min-h-11 w-full rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 sm:w-auto" : "rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"}
             >
                 {saving ? "Creating..." : "Create Template"}
             </button>

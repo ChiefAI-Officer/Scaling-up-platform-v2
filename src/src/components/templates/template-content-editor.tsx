@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/ui/page-header";
 
 // TEMPLATE-02: customHtml is only exposed on these template types
 const ELIGIBLE_CUSTOM_HTML = ["SOLO_LANDING", "DUO_LANDING"] as const;
@@ -48,6 +49,7 @@ interface Props {
     initialContent: string;
     initialCustomCode?: string | null;
     initialCustomHtml?: string | null;
+    responsiveEnabled?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -63,6 +65,7 @@ export function TemplateContentEditor({
     initialContent,
     initialCustomCode,
     initialCustomHtml,
+    responsiveEnabled = false,
 }: Props) {
     // Parse initial content, merging over defaults for the active type only (I-1 fix)
     const parsed = safeJsonParse(initialContent);
@@ -173,8 +176,15 @@ export function TemplateContentEditor({
     const isVisual = ["SOLO_LANDING", "REGISTRATION", "THANK_YOU"].includes(templateType);
 
     return (
-        <div className="space-y-6">
+        <div className={responsiveEnabled ? "min-w-0 max-w-full space-y-6 break-words [&_button]:min-h-11 [&_input]:min-h-11 [&_select]:min-h-11" : "space-y-6"}>
             {/* Header */}
+            {responsiveEnabled ? (
+                <PageHeader
+                    responsiveEnabled
+                    title={templateName}
+                    description={`${typeLabel} · ${categoryName}${isActive ? " · Active" : ""}`}
+                />
+            ) : (
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold text-foreground">{templateName}</h1>
@@ -188,6 +198,7 @@ export function TemplateContentEditor({
                     </p>
                 </div>
             </div>
+            )}
 
             {/* TEMPLATE-02: customHtml override section (SOLO_LANDING + DUO_LANDING only) */}
             {showCustomHtmlSection && (
@@ -221,8 +232,8 @@ export function TemplateContentEditor({
                             </AlertDescription>
                         </Alert>
 
-                        <div className="grid grid-cols-1 md:grid-cols-[1fr,260px] gap-4 mt-4">
-                            <div>
+                        <div className={responsiveEnabled ? "mt-4 grid min-w-0 grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_260px]" : "grid grid-cols-1 md:grid-cols-[1fr,260px] gap-4 mt-4"}>
+                            <div className={responsiveEnabled ? "min-w-0" : undefined}>
                                 <Label htmlFor="customHtml" className="sr-only">
                                     Custom HTML
                                 </Label>
@@ -232,12 +243,12 @@ export function TemplateContentEditor({
                                     rows={24}
                                     value={customHtml}
                                     onChange={(e) => setCustomHtml(e.target.value)}
-                                    className="font-mono text-sm w-full border border-input rounded-md p-2 bg-background"
+                                    className={responsiveEnabled ? "min-w-0 max-w-full font-mono text-sm w-full border border-input rounded-md p-2 bg-background" : "font-mono text-sm w-full border border-input rounded-md p-2 bg-background"}
                                     placeholder="Paste your HTML here..."
                                     spellCheck={false}
                                 />
                             </div>
-                            <div className="text-sm space-y-1">
+                            <div className={responsiveEnabled ? "min-w-0 break-words text-sm space-y-1" : "text-sm space-y-1"}>
                                 <h4 className="font-semibold">Available variables</h4>
                                 <ul className="list-disc list-inside text-xs space-y-0.5">
                                     <li><code>{"{{workshop_title}}"}</code> — workshop title</li>
@@ -250,8 +261,8 @@ export function TemplateContentEditor({
                                     <li><code>{"{{coach_photo}}"}</code> — image URL</li>
                                     <li><code>{"{{event_day}}"}</code></li>
                                     <li><code>{"{{event_date}}"}</code></li>
-                                    <li><code>{"{{event_time}}"}</code> — includes timezone, e.g. "9:00 AM CDT"</li>
-                                    <li><code>{"{{workshop_timezone}}"}</code> — zone abbreviation only, e.g. "CDT"</li>
+                                    <li><code>{"{{event_time}}"}</code> — includes timezone, e.g. &quot;9:00 AM CDT&quot;</li>
+                                    <li><code>{"{{workshop_timezone}}"}</code> — zone abbreviation only, e.g. &quot;CDT&quot;</li>
                                     <li><code>{"{{workshop_format}}"}</code> — VIRTUAL / IN_PERSON / HYBRID</li>
                                     <li><code>{"{{venue_name}}"}</code></li>
                                     <li><code>{"{{venue_address}}"}</code></li>
@@ -277,7 +288,7 @@ export function TemplateContentEditor({
 
                         {/* Save button for DUO_LANDING (which uses the JSON fallback below) */}
                         {!isVisual && (
-                            <div className="mt-4 flex items-center gap-3">
+                            <div className={responsiveEnabled ? "mt-4 flex min-w-0 flex-col items-stretch gap-3 sm:flex-row sm:items-center" : "mt-4 flex items-center gap-3"}>
                                 <Button onClick={handleSave} disabled={saving}>
                                     {saving ? "Saving..." : "Save Template"}
                                 </Button>
@@ -311,11 +322,17 @@ export function TemplateContentEditor({
             )}
 
             {isVisual ? (
-                <div className="grid grid-cols-5 gap-6">
+                <div
+                    data-testid={responsiveEnabled ? "template-editor-layout" : undefined}
+                    className={responsiveEnabled ? "grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-5" : "grid grid-cols-5 gap-6"}
+                >
                     {/* Form Panel — 2 columns */}
-                    <div className="col-span-2 space-y-6">
+                    <div
+                        data-testid={responsiveEnabled ? "template-editor-form-panel" : undefined}
+                        className={responsiveEnabled ? "min-w-0 space-y-6 xl:col-span-2" : "col-span-2 space-y-6"}
+                    >
                         {templateType === "SOLO_LANDING" && (
-                            <SoloForm data={soloData} onChange={setSoloData} />
+                            <SoloForm data={soloData} onChange={setSoloData} responsiveEnabled={responsiveEnabled} />
                         )}
                         {templateType === "REGISTRATION" && (
                             <RegistrationForm data={regData} onChange={setRegData} />
@@ -356,8 +373,8 @@ export function TemplateContentEditor({
                         )}
 
                         {/* Save button */}
-                        <div className="flex items-center gap-3">
-                            <Button onClick={handleSave} disabled={saving}>
+                        <div className={responsiveEnabled ? "flex min-w-0 flex-col items-stretch gap-3 sm:flex-row sm:items-center" : "flex items-center gap-3"}>
+                            <Button onClick={handleSave} disabled={saving} className={responsiveEnabled ? "min-h-11" : undefined}>
                                 {saving ? "Saving..." : "Save Template"}
                             </Button>
                             {message && (
@@ -375,7 +392,10 @@ export function TemplateContentEditor({
                     </div>
 
                     {/* Preview Panel — 3 columns */}
-                    <div className="col-span-3 sticky top-4 self-start">
+                    <div
+                        data-testid={responsiveEnabled ? "template-editor-preview-panel" : undefined}
+                        className={responsiveEnabled ? "min-w-0 self-start xl:sticky xl:top-4 xl:col-span-3" : "col-span-3 sticky top-4 self-start"}
+                    >
                         <Card className="overflow-hidden">
                             <CardHeader className="bg-muted border-b py-2">
                                 <CardTitle className="text-sm font-medium">
@@ -421,6 +441,7 @@ export function TemplateContentEditor({
                 <FallbackJsonEditor
                     templateId={templateId}
                     initialContent={initialContent}
+                    responsiveEnabled={responsiveEnabled}
                 />
             )}
         </div>
@@ -434,9 +455,11 @@ export function TemplateContentEditor({
 function SoloForm({
     data,
     onChange,
+    responsiveEnabled = false,
 }: {
     data: SoloLandingFields;
     onChange: (d: SoloLandingFields) => void;
+    responsiveEnabled?: boolean;
 }) {
     const set = (field: keyof SoloLandingFields, value: string) =>
         onChange({ ...data, [field]: value });
@@ -512,7 +535,7 @@ function SoloForm({
                     <CardTitle>Event & Content</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className={responsiveEnabled ? "grid grid-cols-1 gap-3 md:grid-cols-2" : "grid grid-cols-2 gap-3"}>
                         <div>
                             <Label htmlFor="eventDay">Day</Label>
                             <Input
@@ -532,7 +555,7 @@ function SoloForm({
                             />
                         </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className={responsiveEnabled ? "grid grid-cols-1 gap-3 md:grid-cols-2" : "grid grid-cols-2 gap-3"}>
                         <div>
                             <Label htmlFor="eventTime">Time</Label>
                             <Input
@@ -945,9 +968,11 @@ function ThankYouPreview({ data }: { data: ThankYouFields }) {
 function FallbackJsonEditor({
     templateId,
     initialContent,
+    responsiveEnabled = false,
 }: {
     templateId: string;
     initialContent: string;
+    responsiveEnabled?: boolean;
 }) {
     const [content, setContent] = useState(initialContent);
     const [saving, setSaving] = useState(false);
@@ -994,18 +1019,18 @@ function FallbackJsonEditor({
     };
 
     return (
-        <div className="rounded-xl border border-border bg-card p-5 space-y-3">
+        <div className={responsiveEnabled ? "min-w-0 rounded-xl border border-border bg-card p-5 space-y-3" : "rounded-xl border border-border bg-card p-5 space-y-3"}>
             <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                 Template Content (JSON)
             </h2>
             <textarea
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
-                className="w-full h-[500px] font-mono text-xs bg-background border border-border rounded-lg p-3 resize-y"
+                className={responsiveEnabled ? "min-w-0 max-w-full w-full h-[500px] font-mono text-xs bg-background border border-border rounded-lg p-3 resize-y" : "w-full h-[500px] font-mono text-xs bg-background border border-border rounded-lg p-3 resize-y"}
                 spellCheck={false}
             />
-            <div className="flex items-center gap-3">
-                <Button onClick={handleSave} disabled={saving}>
+            <div className={responsiveEnabled ? "flex min-w-0 flex-col items-stretch gap-3 sm:flex-row sm:items-center" : "flex items-center gap-3"}>
+                <Button onClick={handleSave} disabled={saving} className={responsiveEnabled ? "min-h-11" : undefined}>
                     {saving ? "Saving..." : "Save Template"}
                 </Button>
                 {message && (
@@ -1023,4 +1048,3 @@ function FallbackJsonEditor({
         </div>
     );
 }
-

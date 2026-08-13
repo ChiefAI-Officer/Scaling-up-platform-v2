@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { PageHeader } from "@/components/ui/page-header";
+import { useBioResponsiveEnabled } from "./bio-responsive-context";
 
 interface CoachPayload {
   id: string;
@@ -31,6 +33,7 @@ interface BioEditorForm {
 }
 
 export default function CoachBioEditorPage() {
+  const responsiveEnabled = useBioResponsiveEnabled();
   const params = useParams();
   const coachId = params.id as string;
 
@@ -189,9 +192,9 @@ export default function CoachBioEditorPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className={responsiveEnabled ? "min-w-0 max-w-full space-y-6" : "space-y-6"}>
       <div className="space-y-2">
-        <div className="text-sm text-muted-foreground flex items-center gap-2">
+        <div className={responsiveEnabled ? "flex min-w-0 flex-wrap items-center gap-2 break-words text-sm text-muted-foreground" : "text-sm text-muted-foreground flex items-center gap-2"}>
           <Link href="/dashboard" className="hover:text-foreground">
             Dashboard
           </Link>
@@ -202,6 +205,21 @@ export default function CoachBioEditorPage() {
           <span>/</span>
           <span className="text-foreground">{coachFullName || "Coach"}</span>
         </div>
+        {responsiveEnabled ? (
+          <PageHeader
+            responsiveEnabled
+            title="Bio Page Editor"
+            description="Edit coach bio details and profile picture."
+            actions={
+              <Link
+                href={`/coaches/${coachId}`}
+                className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-md border border-primary/30 px-3 py-2 text-sm text-primary transition-colors hover:bg-primary/5 sm:w-auto"
+              >
+                <ExternalLink className="w-4 h-4" /> View Coach Record
+              </Link>
+            }
+          />
+        ) : (
         <div className="flex items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Bio Page Editor</h1>
@@ -214,6 +232,7 @@ export default function CoachBioEditorPage() {
             <ExternalLink className="w-4 h-4" /> View Coach Record
           </Link>
         </div>
+        )}
       </div>
 
       {error && (
@@ -227,8 +246,8 @@ export default function CoachBioEditorPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="space-y-6">
+      <div className={responsiveEnabled ? "grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-2" : "grid grid-cols-1 gap-6 lg:grid-cols-2"}>
+        <div className={responsiveEnabled ? "min-w-0 space-y-6" : "space-y-6"}>
           <Card>
             <CardHeader>
               <CardTitle>Coach Information</CardTitle>
@@ -236,7 +255,7 @@ export default function CoachBioEditorPage() {
             <CardContent className="space-y-4">
               <div>
                 <Label htmlFor="email">Email</Label>
-                <Input id="email" value={coachEmail} disabled className="mt-1 bg-muted" />
+                <Input id="email" value={coachEmail} disabled className={responsiveEnabled ? "mt-1 min-h-11 min-w-0 bg-muted" : "mt-1 bg-muted"} />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -246,7 +265,7 @@ export default function CoachBioEditorPage() {
                     name="firstName"
                     value={formData.firstName}
                     onChange={handleChange}
-                    className="mt-1"
+                    className={responsiveEnabled ? "mt-1 min-h-11 min-w-0" : "mt-1"}
                   />
                 </div>
                 <div>
@@ -256,7 +275,7 @@ export default function CoachBioEditorPage() {
                     name="lastName"
                     value={formData.lastName}
                     onChange={handleChange}
-                    className="mt-1"
+                    className={responsiveEnabled ? "mt-1 min-h-11 min-w-0" : "mt-1"}
                   />
                 </div>
               </div>
@@ -270,7 +289,7 @@ export default function CoachBioEditorPage() {
                     setSuccess(null);
                   }}
                   placeholder="Scaling Up Certified Coach"
-                  className="mt-1"
+                  className={responsiveEnabled ? "mt-1 min-h-11 min-w-0" : "mt-1"}
                 />
               </div>
               <div>
@@ -282,7 +301,7 @@ export default function CoachBioEditorPage() {
                     setCompanyName(event.target.value);
                     setSuccess(null);
                   }}
-                  className="mt-1"
+                  className={responsiveEnabled ? "mt-1 min-h-11 min-w-0" : "mt-1"}
                 />
               </div>
               <div>
@@ -291,7 +310,7 @@ export default function CoachBioEditorPage() {
                   {formData.profileImageUrl && (
                     <img src={formData.profileImageUrl} alt="Current profile" className="w-16 h-16 rounded-full object-cover" />
                   )}
-                  <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleImageUpload} className="text-sm" />
+                  <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleImageUpload} className={responsiveEnabled ? "min-h-11 min-w-0 max-w-full text-sm" : "text-sm"} />
                 </div>
               </div>
             </CardContent>
@@ -309,30 +328,30 @@ export default function CoachBioEditorPage() {
                 value={formData.biography}
                 onChange={handleChange}
                 rows={10}
-                className="mt-1"
+                className={responsiveEnabled ? "mt-1 min-w-0 max-w-full" : "mt-1"}
                 placeholder="Add coach biography..."
               />
             </CardContent>
           </Card>
 
-          <div className="flex flex-wrap gap-3">
-            <Button onClick={handleSave} disabled={saving}>
+          <div className={responsiveEnabled ? "flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap" : "flex flex-wrap gap-3"}>
+            <Button onClick={handleSave} disabled={saving} className={responsiveEnabled ? "min-h-11 w-full sm:w-auto" : undefined}>
               {saving ? "Saving..." : "Save Bio"}
             </Button>
             {/* MR-25: Delete bio button */}
-            <Button variant="destructive" onClick={handleDeleteBio} disabled={saving}>
+            <Button variant="destructive" onClick={handleDeleteBio} disabled={saving} className={responsiveEnabled ? "min-h-11 w-full sm:w-auto" : undefined}>
               Delete Bio
             </Button>
           </div>
         </div>
 
-        <Card className="h-fit">
+        <Card className={responsiveEnabled ? "min-w-0 h-fit" : "h-fit"}>
           <CardHeader>
             <CardTitle>Preview</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="rounded-lg border bg-card">
-              <div className="p-8 text-center">
+              <div className={responsiveEnabled ? "min-w-0 break-words p-4 text-center sm:p-8" : "p-8 text-center"}>
                 <h2 className="text-sm font-bold tracking-wide text-primary mb-6">
                   SCALING UP COACHES
                 </h2>
