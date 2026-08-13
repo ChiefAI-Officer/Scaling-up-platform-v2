@@ -84,7 +84,8 @@ export function AssessmentTemplatesList({
         if (body.error === "TEMPLATE_HAS_ACTIVE_CAMPAIGNS") {
           toast({
             title: "Cannot delete",
-            description: "Close all active campaigns on this template first.",
+            description:
+              "Close or delete all draft or active campaigns on this template first.",
             variant: "destructive",
           });
           return;

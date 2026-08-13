@@ -7,7 +7,8 @@
  *         Wave Q adds two flag-gated fields: `sendResultsDefault` (#1) and
  *         `disabled` (#6 → disabledAt). NO active-campaign guard on disable —
  *         existing campaigns keep running by design (contrast with DELETE).
- * DELETE — soft-delete (sets deletedAt). 409 if any non-DRAFT campaign references this template.
+ * DELETE — soft-delete (sets deletedAt). 409 if any live DRAFT/ACTIVE campaign
+ *          references this template.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -458,9 +459,13 @@ export async function DELETE(
       );
     }
 
-    // Block soft-delete if any non-CLOSED campaign references this template.
+    // Block soft-delete if any live, non-CLOSED campaign references this template.
     const activeCampaign = await db.assessmentCampaign.findFirst({
-      where: { templateId: id, status: { in: ["DRAFT", "ACTIVE"] } },
+      where: {
+        templateId: id,
+        deletedAt: null,
+        status: { in: ["DRAFT", "ACTIVE"] },
+      },
       select: { id: true },
     });
     if (activeCampaign) {

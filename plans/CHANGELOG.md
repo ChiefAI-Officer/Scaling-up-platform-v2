@@ -6,6 +6,15 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="template-delete-soft-deleted-campaign-guard-fixed"></a>
+### 2026-08-13 — Template deletion ignores soft-deleted campaign tombstones <!-- ENTRY_ISO:2026-08-13 ENTRY_SLUG:template-delete-soft-deleted-campaign-guard-fixed -->
+
+**Status: IMPLEMENTED + LOCALLY VERIFIED; NOT YET MERGED OR DEPLOYED.** Deleting an assessment campaign intentionally preserves its database row, invitations, submissions, and audit history by setting `deletedAt` without rewriting its lifecycle status. The older template-delete guard searched for `DRAFT` or `ACTIVE` campaign rows without filtering `deletedAt`, so an invisible deleted campaign whose preserved status remained `ACTIVE` incorrectly returned `TEMPLATE_HAS_ACTIVE_CAMPAIGNS`. Production data confirmed this exact state for the `Scaling Up Quiz` template after Jeff deleted the `Testing` campaign.
+
+**Fix and behavior boundary.** The template-delete guard now scopes blocking campaigns to `deletedAt: null` plus `DRAFT` or `ACTIVE`. Soft-deleted campaigns never block template deletion and retain every historical field unchanged; live draft and active campaigns still block, while closed campaigns retain their prior non-blocking behavior. The admin toast now accurately directs operators to close or delete live draft/active campaigns. No schema, migration, feature flag, assessment version, campaign status, invitation, submission, audit record, or Production data was changed.
+
+**Test-first verification.** The regression failed first with HTTP `409` instead of `200` when the campaign lookup modeled an `ACTIVE` tombstone, then passed after the live-row predicate was added. Explicit coverage also retains the live-`DRAFT` blocker. The final repository run passed **692/692 suites, 8,621/8,621 tests, and 16/16 snapshots**; the focused route/component matrix passed **3 suites / 82 tests**; changed-file ESLint emitted no diagnostics; migration safety approved all **47 migrations**; and `git diff --check` passed. The Production-equivalent Turbopack build compiled in 38.2s, passed TypeScript, and generated **94/94** static pages, retaining only the expected local middleware-deprecation and missing Inngest-key/`DATABASE_URL` diagnostics.
+
 <a id="jul10-47-qsp-invitation-acceptance-boundary-closed"></a>
 ### 2026-08-12 — July 10 #47 QSP invitation acceptance boundary closed <!-- ENTRY_ISO:2026-08-12 ENTRY_SLUG:jul10-47-qsp-invitation-acceptance-boundary-closed -->
 
