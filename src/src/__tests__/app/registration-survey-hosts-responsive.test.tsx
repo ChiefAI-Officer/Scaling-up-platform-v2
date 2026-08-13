@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 
 const mockResponsiveFlag = jest.fn(() => true);
 const registrationFindMany = jest.fn().mockResolvedValue([]);
+let surveyTemplateEditorResponsive: boolean | undefined;
 
 jest.mock("@/lib/mobile-responsive-flags", () => ({
   isMobileResponsiveEnabled: () => mockResponsiveFlag(),
@@ -19,9 +20,16 @@ jest.mock("@/lib/db", () => ({
   db: {
     registration: { findMany: (...args: unknown[]) => registrationFindMany(...args) },
     surveyTemplate: { findMany: jest.fn().mockResolvedValue([]) },
+    workshop: { findMany: jest.fn().mockResolvedValue([]) },
     coach: { findMany: jest.fn().mockResolvedValue([]) },
     category: { findMany: jest.fn().mockResolvedValue([]) },
     survey: { findMany: jest.fn().mockResolvedValue([]) },
+  },
+}));
+jest.mock("@/components/surveys/survey-template-editor", () => ({
+  SurveyTemplateEditor: ({ responsiveEnabled }: { responsiveEnabled?: boolean }) => {
+    surveyTemplateEditorResponsive = responsiveEnabled;
+    return <div data-testid="survey-template-editor" />;
   },
 }));
 jest.mock("@/components/ui/animated", () => ({
@@ -58,11 +66,28 @@ import AdminRegistrationsPage from "@/app/(dashboard)/admin/registrations/page";
 import AdminSurveysPage from "@/app/(dashboard)/admin/surveys/page";
 import AggregateSurveyResultsPage from "@/app/(dashboard)/admin/surveys/aggregate/page";
 import SurveysPage from "@/app/(dashboard)/surveys/page";
+import SurveyTemplateEditorPage from "@/app/(dashboard)/admin/surveys/templates/[id]/page";
 
 beforeEach(() => {
   jest.clearAllMocks();
   mockResponsiveFlag.mockReturnValue(true);
   registrationFindMany.mockResolvedValue([]);
+  surveyTemplateEditorResponsive = undefined;
+});
+
+it("threads the server responsive flag into the survey template editor", async () => {
+  const dbModule = jest.requireMock("@/lib/db") as {
+    db: { surveyTemplate: { findUnique: jest.Mock } };
+  };
+  dbModule.db.surveyTemplate.findUnique = jest.fn().mockResolvedValue(null);
+
+  render(await SurveyTemplateEditorPage({ params: Promise.resolve({ id: "new" }) }));
+  expect(screen.getByTestId("survey-template-editor")).toBeInTheDocument();
+  expect(surveyTemplateEditorResponsive).toBe(true);
+
+  mockResponsiveFlag.mockReturnValue(false);
+  render(await SurveyTemplateEditorPage({ params: Promise.resolve({ id: "new" }) }));
+  expect(surveyTemplateEditorResponsive).toBe(false);
 });
 
 it("evaluates the server flag for registrations and keeps the disabled header exact", async () => {

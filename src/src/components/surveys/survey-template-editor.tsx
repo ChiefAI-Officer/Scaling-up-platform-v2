@@ -83,13 +83,14 @@ interface Props {
   workshops: { id: string; title: string; workshopCode: string }[];
   categories: { id: string; name: string }[];
   isNew: boolean;
+  responsiveEnabled?: boolean;
 }
 
 // ============================================
 // Main Component
 // ============================================
 
-export function SurveyTemplateEditor({ template, workshops, categories, isNew }: Props) {
+export function SurveyTemplateEditor({ template, workshops, categories, isNew, responsiveEnabled = false }: Props) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -307,26 +308,26 @@ export function SurveyTemplateEditor({ template, workshops, categories, isNew }:
   // ============================================
 
   return (
-    <div className="space-y-6">
+    <div className={responsiveEnabled ? "min-w-0 max-w-full space-y-6" : "space-y-6"}>
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className={responsiveEnabled ? "flex min-w-0 flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between" : "flex items-center justify-between"}>
+        <div className={responsiveEnabled ? "flex min-w-0 flex-col items-start gap-3 sm:flex-row sm:items-center" : "flex items-center gap-3"}>
           <Link
             href="/admin/surveys"
-            className="text-sm text-muted-foreground hover:text-foreground"
+            className={responsiveEnabled ? "inline-flex min-h-11 min-w-11 items-center text-sm text-muted-foreground hover:text-foreground" : "text-sm text-muted-foreground hover:text-foreground"}
           >
             &larr; Back to Templates
           </Link>
-          <h1 className="text-2xl font-bold text-foreground">
+          <h1 className={responsiveEnabled ? "min-w-0 break-words text-2xl font-bold text-foreground" : "text-2xl font-bold text-foreground"}>
             {isNew ? "New Survey Template" : template?.name || ""}
           </h1>
         </div>
-        <div className="flex items-center gap-3">
+        <div className={responsiveEnabled ? "flex w-full flex-col items-stretch gap-3 sm:w-auto sm:flex-row sm:items-center" : "flex items-center gap-3"}>
           {/* ENH-MAY6-3: open the preview modal — read-only render of the template's questions */}
           {!isNew && questions.length > 0 && (
             <button
               onClick={() => setShowPreview(true)}
-              className="text-sm text-primary hover:text-primary/80 underline"
+              className={responsiveEnabled ? "inline-flex min-h-11 min-w-11 w-full items-center justify-center text-sm text-primary underline hover:text-primary/80 sm:w-auto" : "text-sm text-primary hover:text-primary/80 underline"}
               type="button"
             >
               Preview
@@ -335,7 +336,7 @@ export function SurveyTemplateEditor({ template, workshops, categories, isNew }:
           {!isNew && (
             <button
               onClick={deleteTemplate}
-              className="text-sm text-destructive hover:text-destructive/80"
+              className={responsiveEnabled ? "inline-flex min-h-11 min-w-11 w-full items-center justify-center text-sm text-destructive hover:text-destructive/80 sm:w-auto" : "text-sm text-destructive hover:text-destructive/80"}
             >
               Delete Template
             </button>

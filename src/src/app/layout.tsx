@@ -45,7 +45,7 @@ export default function RootLayout({
         >
           <SessionProvider>
             {children}
-            <Toaster />
+            <Toaster responsiveEnabled={mobileResponsiveEnabled} />
             <Analytics />
             <SpeedInsights />
           </SessionProvider>
