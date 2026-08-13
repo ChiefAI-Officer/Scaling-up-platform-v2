@@ -24,8 +24,10 @@ import {
   MembersTeamsView,
   type OrgSummary,
 } from "@/components/organizations/members-teams-view";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 
 export default async function AdminAssessmentOrganizationsPage() {
+  const mobileResponsiveEnabled = isMobileResponsiveEnabled();
   const session = await getServerSession(authOptions);
   if (!session) {
     redirect("/login");
@@ -57,7 +59,7 @@ export default async function AdminAssessmentOrganizationsPage() {
   }));
 
   return (
-    <div>
+    <div className={mobileResponsiveEnabled ? "min-w-0 max-w-full" : undefined}>
       {/* Breadcrumb */}
       <div className="wf-breadcrumb">
         <a href="/admin/dashboard">Admin</a>
@@ -68,7 +70,7 @@ export default async function AdminAssessmentOrganizationsPage() {
       </div>
 
       {/* Page header */}
-      <div className="wf-page-header-row">
+      <div className={mobileResponsiveEnabled ? "wf-page-header-row flex-col items-start sm:flex-row" : "wf-page-header-row"}>
         <div>
           <h2 className="wf-page-title">Organizations</h2>
           <p className="wf-page-subtitle-strong">
@@ -84,6 +86,7 @@ export default async function AdminAssessmentOrganizationsPage() {
         allowOrgCreate={false}
         hideEspertoImport
         allowGroupByCoach
+        responsiveEnabled={mobileResponsiveEnabled}
       />
     </div>
   );

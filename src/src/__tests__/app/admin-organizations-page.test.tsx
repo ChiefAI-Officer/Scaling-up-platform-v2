@@ -25,6 +25,10 @@ jest.mock("@/lib/db", () => ({
   db: { organization: { findMany: (...a: unknown[]) => mockFindMany(...a) } },
 }));
 
+jest.mock("@/lib/mobile-responsive-flags", () => ({
+  isMobileResponsiveEnabled: jest.fn(() => true),
+}));
+
 let viewProps: Record<string, unknown> | null = null;
 jest.mock("@/components/organizations/members-teams-view", () => ({
   MembersTeamsView: (props: Record<string, unknown>) => {
@@ -83,6 +87,7 @@ describe("Admin Organizations page — data + reduced host", () => {
     expect(viewProps).toMatchObject({
       allowOrgCreate: false,
       hideEspertoImport: true,
+      responsiveEnabled: true,
     });
     expect(
       (viewProps?.initialOrganizations as unknown[]).length,

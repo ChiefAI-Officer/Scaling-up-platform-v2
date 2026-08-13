@@ -9,7 +9,7 @@
  */
 
 import React from "react";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { MembersTeamsView } from "@/components/organizations/members-teams-view";
 
 // ---------------------------------------------------------------------------
@@ -90,6 +90,56 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("MembersTeamsView", () => {
+  test("responsive compact view drills into members and preserves selection and fetched data across back/forward presentation", async () => {
+    render(
+      <MembersTeamsView
+        initialOrganizations={[ORG_1]}
+        responsiveEnabled
+      />
+    );
+
+    expect(screen.getByTestId("members-browse-panel")).toBeVisible();
+    expect(screen.getByTestId("members-detail-panel")).toHaveClass("hidden", "md:block");
+
+    mockFetchForOrg1Teams();
+    mockFetchRespondents([RESPONDENT_ALICE]);
+    fireEvent.click(screen.getByRole("button", { name: /^Acme Corp$/i }));
+
+    await screen.findByText("Alice Smith");
+    expect(screen.getByTestId("members-browse-panel")).toHaveClass("hidden", "md:block");
+    expect(screen.getByRole("button", { name: /back to organizations/i })).toBeVisible();
+
+    const memberPresenter = screen.getByRole("region", { name: /members for acme corp/i });
+    const aliceCard = within(memberPresenter).getByTestId("member-row-resp-1");
+    expect(aliceCard).toHaveClass("block", "sm:table-row");
+    expect(within(aliceCard).getByText("Alice Smith")).toBeInTheDocument();
+    expect(within(aliceCard).getByText("alice@acme.com")).toBeInTheDocument();
+    expect(within(aliceCard).getByText("Leadership")).toBeInTheDocument();
+    expect(within(aliceCard).getByRole("button", { name: "Edit Alice Smith" })).toHaveClass(
+      "min-h-11",
+      "min-w-11",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /back to organizations/i }));
+    const selectedOrganization = screen.getByRole("button", { name: /^Acme Corp$/i });
+    expect(selectedOrganization).toHaveAttribute("aria-pressed", "true");
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+
+    fireEvent.click(selectedOrganization);
+    expect(screen.getByTestId("members-detail-panel")).not.toHaveClass("hidden");
+    expect(screen.getByText("Alice Smith")).toBeInTheDocument();
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  test("responsive behavior is opt-in so the default host keeps the legacy two-panel output", () => {
+    const { container } = render(<MembersTeamsView initialOrganizations={[ORG_1]} />);
+
+    expect(container.firstElementChild).toHaveClass("flex", "h-full");
+    expect(container.firstElementChild).not.toHaveClass("grid");
+    expect(screen.queryByTestId("members-browse-panel")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /back to organizations/i })).not.toBeInTheDocument();
+  });
+
   test("(a) renders companies as root nodes in the Teams panel", () => {
     render(
       <MembersTeamsView
