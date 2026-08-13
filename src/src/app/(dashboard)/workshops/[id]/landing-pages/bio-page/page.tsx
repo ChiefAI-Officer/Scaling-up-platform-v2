@@ -238,7 +238,10 @@ export default function BioPageEditor() {
 
               <div>
                 <Label htmlFor="profileImage">Profile Picture</Label>
-                <div className="mt-1 flex items-center gap-4">
+                <div className={cn(
+                  "mt-1 flex items-center gap-4",
+                  mobileResponsiveEnabled && "flex-col items-stretch sm:flex-row sm:items-center"
+                )}>
                   {formData.profileImageUrl && (
                     <img
                       src={formData.profileImageUrl}
@@ -246,7 +249,7 @@ export default function BioPageEditor() {
                       className="w-16 h-16 rounded-full object-cover"
                     />
                   )}
-                  <div className="flex-1">
+                  <div className={cn("flex-1", mobileResponsiveEnabled && "min-w-0")}>
                     <Input
                       id="profileImageUrl"
                       name="profileImageUrl"
@@ -259,7 +262,7 @@ export default function BioPageEditor() {
                       type="file"
                       accept="image/*"
                       onChange={handleImageUpload}
-                      className="text-sm"
+                      className={cn("text-sm", mobileResponsiveEnabled && "min-w-0 max-w-full")}
                     />
                   </div>
                 </div>

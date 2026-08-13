@@ -1,10 +1,13 @@
 "use client";
 
-import type { ReactNode } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { CopyUrlButton } from "@/components/ui/copy-url-button";
-import { ResponsiveActionsMenu } from "@/components/ui/responsive-actions-menu";
+import {
+  ResponsiveActionsItem,
+  ResponsiveActionsMenu,
+} from "@/components/ui/responsive-actions-menu";
+import { WorkshopApprovalActions } from "@/components/workshops/workshop-approval-actions";
 import {
   formatCurrency,
   formatEventDateUTC,
@@ -54,11 +57,11 @@ function formatWorkshopMode(format: string): string {
 export function AdminWorkshopRecordCard({
   workshop,
   appUrl,
-  action,
+  pendingApprovalId,
 }: {
   workshop: AdminWorkshopRecord;
   appUrl: string;
-  action: ReactNode;
+  pendingApprovalId: string | null;
 }) {
   return (
     <article role="listitem" className="min-w-0 rounded-xl border border-border bg-card p-4">
@@ -76,9 +79,23 @@ export function AdminWorkshopRecordCard({
           </p>
         </div>
         <ResponsiveActionsMenu label="More workshop actions">
-          <div className="p-1 [&_a]:flex [&_a]:min-h-11 [&_a]:items-center [&_a]:rounded-md [&_a]:px-3 [&_button]:min-h-11">
-            {action}
-          </div>
+          {pendingApprovalId ? (
+            <WorkshopApprovalActions
+              approvalId={pendingApprovalId}
+              workshopTitle={workshop.title}
+              menuItems
+            />
+          ) : (
+            <ResponsiveActionsItem asChild>
+              <Link
+                href={`/workshops/${workshop.id}/landing-pages`}
+                className="flex min-h-11 cursor-pointer items-center rounded-md px-3 text-sm outline-none focus:bg-muted"
+                data-touch-target
+              >
+                Edit workshop
+              </Link>
+            </ResponsiveActionsItem>
+          )}
         </ResponsiveActionsMenu>
       </div>
 
@@ -94,6 +111,10 @@ export function AdminWorkshopRecordCard({
         <div>
           <dt className="text-muted-foreground">Start time</dt>
           <dd>{formatStartTime(workshop)}</dd>
+        </div>
+        <div>
+          <dt className="text-muted-foreground">Category</dt>
+          <dd>{workshop.workshopType?.name ?? "—"}</dd>
         </div>
         <div>
           <dt className="text-muted-foreground">Workshop type</dt>

@@ -509,22 +509,22 @@ export default function DuoLandingEditor() {
               <div>
                 <Label className="text-success">What This Is ✓</Label>
                 {formData.whatItIs.map((item, i) => (
-                  <div key={i} className="flex gap-2 mt-2">
-                    <Input value={item} onChange={(e) => handleArrayChange("whatItIs", i, e.target.value)} />
-                    <Button variant="outline" size="sm" onClick={() => removeArrayItem("whatItIs", i)}>×</Button>
+                  <div key={i} className={cn("flex gap-2 mt-2", mobileResponsiveEnabled && "min-w-0 flex-col sm:flex-row")}>
+                    <Input className={cn(mobileResponsiveEnabled && "min-w-0")} value={item} onChange={(e) => handleArrayChange("whatItIs", i, e.target.value)} />
+                    <Button className={cn(mobileResponsiveEnabled && "min-h-11 min-w-11")} variant="outline" size="sm" onClick={() => removeArrayItem("whatItIs", i)}>×</Button>
                   </div>
                 ))}
-                <Button variant="outline" size="sm" className="mt-2" onClick={() => addArrayItem("whatItIs")}>+ Add</Button>
+                <Button variant="outline" size="sm" className={cn("mt-2", mobileResponsiveEnabled && "min-h-11")} onClick={() => addArrayItem("whatItIs")}>+ Add</Button>
               </div>
               <div>
                 <Label className="text-destructive">What This Is Not ✗</Label>
                 {formData.whatItIsNot.map((item, i) => (
-                  <div key={i} className="flex gap-2 mt-2">
-                    <Input value={item} onChange={(e) => handleArrayChange("whatItIsNot", i, e.target.value)} />
-                    <Button variant="outline" size="sm" onClick={() => removeArrayItem("whatItIsNot", i)}>×</Button>
+                  <div key={i} className={cn("flex gap-2 mt-2", mobileResponsiveEnabled && "min-w-0 flex-col sm:flex-row")}>
+                    <Input className={cn(mobileResponsiveEnabled && "min-w-0")} value={item} onChange={(e) => handleArrayChange("whatItIsNot", i, e.target.value)} />
+                    <Button className={cn(mobileResponsiveEnabled && "min-h-11 min-w-11")} variant="outline" size="sm" onClick={() => removeArrayItem("whatItIsNot", i)}>×</Button>
                   </div>
                 ))}
-                <Button variant="outline" size="sm" className="mt-2" onClick={() => addArrayItem("whatItIsNot")}>+ Add</Button>
+                <Button variant="outline" size="sm" className={cn("mt-2", mobileResponsiveEnabled && "min-h-11")} onClick={() => addArrayItem("whatItIsNot")}>+ Add</Button>
               </div>
             </CardContent>
           </Card>
@@ -536,22 +536,22 @@ export default function DuoLandingEditor() {
               <div>
                 <Label>Who This Is For</Label>
                 {formData.whoIsFor.map((item, i) => (
-                  <div key={i} className="flex gap-2 mt-2">
-                    <Input value={item} onChange={(e) => handleArrayChange("whoIsFor", i, e.target.value)} />
-                    <Button variant="outline" size="sm" onClick={() => removeArrayItem("whoIsFor", i)}>×</Button>
+                  <div key={i} className={cn("flex gap-2 mt-2", mobileResponsiveEnabled && "min-w-0 flex-col sm:flex-row")}>
+                    <Input className={cn(mobileResponsiveEnabled && "min-w-0")} value={item} onChange={(e) => handleArrayChange("whoIsFor", i, e.target.value)} />
+                    <Button className={cn(mobileResponsiveEnabled && "min-h-11 min-w-11")} variant="outline" size="sm" onClick={() => removeArrayItem("whoIsFor", i)}>×</Button>
                   </div>
                 ))}
-                <Button variant="outline" size="sm" className="mt-2" onClick={() => addArrayItem("whoIsFor")}>+ Add</Button>
+                <Button variant="outline" size="sm" className={cn("mt-2", mobileResponsiveEnabled && "min-h-11")} onClick={() => addArrayItem("whoIsFor")}>+ Add</Button>
               </div>
               <div>
                 <Label>Who Should Skip</Label>
                 {formData.whoShouldSkip.map((item, i) => (
-                  <div key={i} className="flex gap-2 mt-2">
-                    <Input value={item} onChange={(e) => handleArrayChange("whoShouldSkip", i, e.target.value)} />
-                    <Button variant="outline" size="sm" onClick={() => removeArrayItem("whoShouldSkip", i)}>×</Button>
+                  <div key={i} className={cn("flex gap-2 mt-2", mobileResponsiveEnabled && "min-w-0 flex-col sm:flex-row")}>
+                    <Input className={cn(mobileResponsiveEnabled && "min-w-0")} value={item} onChange={(e) => handleArrayChange("whoShouldSkip", i, e.target.value)} />
+                    <Button className={cn(mobileResponsiveEnabled && "min-h-11 min-w-11")} variant="outline" size="sm" onClick={() => removeArrayItem("whoShouldSkip", i)}>×</Button>
                   </div>
                 ))}
-                <Button variant="outline" size="sm" className="mt-2" onClick={() => addArrayItem("whoShouldSkip")}>+ Add</Button>
+                <Button variant="outline" size="sm" className={cn("mt-2", mobileResponsiveEnabled && "min-h-11")} onClick={() => addArrayItem("whoShouldSkip")}>+ Add</Button>
               </div>
             </CardContent>
           </Card>

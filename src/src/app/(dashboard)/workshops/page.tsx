@@ -286,16 +286,7 @@ export default async function WorkshopsPage({ searchParams }: PageProps) {
                     key={workshop.id}
                     workshop={workshop}
                     appUrl={APP_URL}
-                    action={workshop.approvals[0] ? (
-                      <WorkshopApprovalActions
-                        approvalId={workshop.approvals[0].id}
-                        workshopTitle={workshop.title}
-                      />
-                    ) : (
-                      <Link href={`/workshops/${workshop.id}/landing-pages`}>
-                        Edit workshop
-                      </Link>
-                    )}
+                    pendingApprovalId={workshop.approvals[0]?.id ?? null}
                   />
                 ))
               )}

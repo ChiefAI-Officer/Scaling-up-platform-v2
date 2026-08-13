@@ -27,7 +27,7 @@ describe("AdminWorkshopRecordCard", () => {
       <AdminWorkshopRecordCard
         workshop={workshop}
         appUrl="https://example.test"
-        action={<button type="button">Approve workshop</button>}
+        pendingApprovalId="approval-1"
       />,
     );
 
@@ -44,6 +44,7 @@ describe("AdminWorkshopRecordCard", () => {
       "/workshops/workshop-1#registrations",
     );
     expect(screen.getByText("$250.00")).toBeInTheDocument();
+    expect(screen.getByText("Leadership Workshop")).toBeInTheDocument();
     expect(screen.getByText("Full Day")).toBeInTheDocument();
     expect(screen.getByText("In-Person")).toBeInTheDocument();
     expect(screen.getByTitle("https://example.test/workshop/leadership-intensive")).toBeInTheDocument();
@@ -51,6 +52,29 @@ describe("AdminWorkshopRecordCard", () => {
     const actions = screen.getByRole("button", { name: /more workshop actions/i });
     expect(actions).toHaveClass("min-h-11");
     fireEvent.keyDown(actions, { key: "ArrowDown" });
-    expect(screen.getByRole("button", { name: "Approve workshop" })).toBeInTheDocument();
+    const approve = screen.getByRole("menuitem", { name: "Approve" });
+    expect(approve).toHaveFocus();
+    expect(screen.getByRole("menuitem", { name: "Deny" })).toBeInTheDocument();
+    const confirmSpy = jest.spyOn(window, "confirm").mockReturnValue(false);
+    fireEvent.click(approve);
+    expect(confirmSpy).toHaveBeenCalledWith('Approve "Scaling Up Leadership Intensive"?');
+    confirmSpy.mockRestore();
+  });
+
+  it("keeps the edit action keyboard reachable when approval is not pending", () => {
+    render(
+      <AdminWorkshopRecordCard
+        workshop={{ ...workshop, status: "PUBLISHED" }}
+        appUrl="https://example.test"
+        pendingApprovalId={null}
+      />,
+    );
+
+    fireEvent.keyDown(screen.getByRole("button", { name: /more workshop actions/i }), {
+      key: "ArrowDown",
+    });
+    const edit = screen.getByRole("menuitem", { name: "Edit workshop" });
+    expect(edit).toHaveFocus();
+    expect(edit).toHaveAttribute("href", "/workshops/workshop-1/landing-pages");
   });
 });

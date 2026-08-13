@@ -414,8 +414,12 @@ export default function SoloLandingEditor() {
                 <Label>Benefits (What You&rsquo;ll Learn)</Label>
                 <div className="space-y-2 mt-2">
                   {formData.benefits.map((benefit, index) => (
-                    <div key={index} className="flex gap-2">
+                    <div key={index} className={cn(
+                      "flex gap-2",
+                      mobileResponsiveEnabled && "min-w-0 flex-col sm:flex-row"
+                    )}>
                       <Input
+                        className={cn(mobileResponsiveEnabled && "min-w-0")}
                         value={benefit}
                         onChange={(e) => handleBenefitChange(index, e.target.value)}
                         placeholder="Benefit point..."
@@ -424,13 +428,20 @@ export default function SoloLandingEditor() {
                         type="button"
                         variant="outline"
                         size="sm"
+                        className={cn(mobileResponsiveEnabled && "min-h-11 min-w-11")}
                         onClick={() => removeBenefit(index)}
                       >
                         ×
                       </Button>
                     </div>
                   ))}
-                  <Button type="button" variant="outline" size="sm" onClick={addBenefit}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className={cn(mobileResponsiveEnabled && "min-h-11")}
+                    onClick={addBenefit}
+                  >
                     + Add Benefit
                   </Button>
                 </div>

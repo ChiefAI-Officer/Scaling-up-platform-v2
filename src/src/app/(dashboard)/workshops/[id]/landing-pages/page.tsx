@@ -233,12 +233,15 @@ export default function WorkshopEditorPage() {
                                             {info.status === "NOT_CREATED" ? "Create Page" : "Edit Page"}
                                         </Button>
 
-                                        <div className="flex gap-2">
+                                        <div className={cn(
+                                            "flex gap-2",
+                                            mobileResponsiveEnabled && "flex-col sm:flex-row"
+                                        )}>
                                             {info.slug && (
                                                 <Button
                                                     variant="outline"
                                                     size="sm"
-                                                    className="flex-1 text-xs"
+                                                    className={cn("flex-1 text-xs", mobileResponsiveEnabled && "min-h-11")}
                                                     onClick={() => window.open(`/workshop/${info.slug}`, "_blank")}
                                                 >
                                                     Preview
@@ -248,7 +251,7 @@ export default function WorkshopEditorPage() {
                                                 <Button
                                                     variant="outline"
                                                     size="sm"
-                                                    className="flex-1 text-xs"
+                                                    className={cn("flex-1 text-xs", mobileResponsiveEnabled && "min-h-11")}
                                                     onClick={() => loadLibrary(tpl.value)}
                                                 >
                                                     Copy from...

@@ -3,13 +3,15 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
+import { ResponsiveActionsItem } from "@/components/ui/responsive-actions-menu";
 
 interface WorkshopApprovalActionsProps {
     approvalId: string;
     workshopTitle: string;
+    menuItems?: boolean;
 }
 
-export function WorkshopApprovalActions({ approvalId, workshopTitle }: WorkshopApprovalActionsProps) {
+export function WorkshopApprovalActions({ approvalId, workshopTitle, menuItems = false }: WorkshopApprovalActionsProps) {
     const [status, setStatus] = useState<"idle" | "loading" | "done">("idle");
     const [result, setResult] = useState<string | null>(null);
     const { toast } = useToast();
@@ -61,26 +63,42 @@ export function WorkshopApprovalActions({ approvalId, workshopTitle }: WorkshopA
         );
     }
 
+    const approveButton = (
+        <Button
+            size="sm"
+            variant="outline"
+            className={menuItems ? "min-h-11 w-full justify-start border-0 px-3 text-success" : "h-7 px-2 text-xs text-success border-success/20 hover:bg-success/10"}
+            onClick={() => handleAction("APPROVE")}
+            disabled={status === "loading"}
+        >
+            {status === "loading" ? "..." : "Approve"}
+        </Button>
+    );
+    const denyButton = (
+        <Button
+            size="sm"
+            variant="outline"
+            className={menuItems ? "min-h-11 w-full justify-start border-0 px-3 text-destructive" : "h-7 px-2 text-xs text-destructive border-destructive/20 hover:bg-destructive/10"}
+            onClick={() => handleAction("DENY")}
+            disabled={status === "loading"}
+        >
+            Deny
+        </Button>
+    );
+
+    if (menuItems) {
+        return (
+            <>
+                <ResponsiveActionsItem asChild>{approveButton}</ResponsiveActionsItem>
+                <ResponsiveActionsItem asChild>{denyButton}</ResponsiveActionsItem>
+            </>
+        );
+    }
+
     return (
         <div className="flex gap-1">
-            <Button
-                size="sm"
-                variant="outline"
-                className="h-7 px-2 text-xs text-success border-success/20 hover:bg-success/10"
-                onClick={() => handleAction("APPROVE")}
-                disabled={status === "loading"}
-            >
-                {status === "loading" ? "..." : "Approve"}
-            </Button>
-            <Button
-                size="sm"
-                variant="outline"
-                className="h-7 px-2 text-xs text-destructive border-destructive/20 hover:bg-destructive/10"
-                onClick={() => handleAction("DENY")}
-                disabled={status === "loading"}
-            >
-                Deny
-            </Button>
+            {approveButton}
+            {denyButton}
         </div>
     );
 }

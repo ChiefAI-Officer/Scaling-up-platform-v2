@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 
 jest.mock("next/navigation", () => ({
   useParams: () => ({ id: "workshop-1" }),
@@ -36,6 +36,7 @@ const savedCoach2 = {
 let landingPageContent: Record<string, unknown>;
 
 beforeEach(() => {
+  delete document.body.dataset.mobileResponsive;
   landingPageContent = {
     coach1BioId: "coach-1",
     coach2BioId: "coach-2",
@@ -109,6 +110,11 @@ beforeEach(() => {
   }) as unknown as typeof fetch;
 });
 
+afterEach(() => {
+  cleanup();
+  delete document.body.dataset.mobileResponsive;
+});
+
 it("keeps saved coach snapshots when current BIO profiles have newer titles", async () => {
   render(<DuoLandingEditor />);
 
@@ -125,4 +131,16 @@ it("uses current BIO profiles when a new landing page has no saved coach snapsho
   expect(await screen.findByTestId("duo-preview")).toHaveTextContent(
     "Current Primary Professional Title|Scaling Up Certified Coach",
   );
+});
+
+it("stacks repeated-field controls and exposes 44px targets on mobile", async () => {
+  document.body.dataset.mobileResponsive = "on";
+
+  render(<DuoLandingEditor />);
+
+  await screen.findByTestId("duo-preview");
+  const removeButton = screen.getAllByRole("button", { name: "×" })[0];
+  expect(removeButton.parentElement).toHaveClass("flex-col", "sm:flex-row");
+  expect(removeButton).toHaveClass("min-h-11", "min-w-11");
+  expect(screen.getAllByRole("button", { name: "+ Add" })[0]).toHaveClass("min-h-11");
 });
