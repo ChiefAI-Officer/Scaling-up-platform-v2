@@ -141,7 +141,14 @@ it("preserves the legacy approval card structure by default", async () => {
   render(<ApprovalsPage />);
   const heading = await screen.findByRole("heading", { name: /Maria/ });
   const card = heading.parentElement?.parentElement;
-  expect(card).toHaveClass("bg-card p-6 rounded-xl shadow-sm grid grid-cols-[1fr_auto] items-center gap-4");
+  expect(card?.getAttribute("class")).toBe(
+    "bg-card p-6 rounded-xl shadow-sm grid grid-cols-[1fr_auto] gap-4 items-center ",
+  );
+  expect(card?.children).toHaveLength(2);
+  expect(card?.firstElementChild).toBe(heading.parentElement);
+  expect(card?.lastElementChild?.getAttribute("class")).toBe(
+    "flex gap-2 items-center flex-wrap justify-end",
+  );
   expect(screen.queryByRole("list", { name: "Approvals" })).not.toBeInTheDocument();
   expect(screen.queryByRole("article")).not.toBeInTheDocument();
   expect(card?.querySelector("header")).not.toBeInTheDocument();

@@ -421,9 +421,9 @@ export default function ApprovalsPage({ responsiveEnabled = false }: { responsiv
           approvals.map((approval) => (
             <ApprovalCard
               key={approval.id}
-              className={`${responsiveEnabled ? "min-w-0 grid-cols-1" : "grid grid-cols-[1fr_auto] items-center"} bg-card p-6 rounded-xl shadow-sm grid gap-4 ${
-                approval.escalatedAt ? "border-l-4 border-destructive" : ""
-              }`}
+              className={responsiveEnabled
+                ? `min-w-0 grid-cols-1 bg-card p-6 rounded-xl shadow-sm grid gap-4 ${approval.escalatedAt ? "border-l-4 border-destructive" : ""}`
+                : `bg-card p-6 rounded-xl shadow-sm grid grid-cols-[1fr_auto] gap-4 items-center ${approval.escalatedAt ? "border-l-4 border-destructive" : ""}`}
             >
               <div>
                 {responsiveEnabled ? (
