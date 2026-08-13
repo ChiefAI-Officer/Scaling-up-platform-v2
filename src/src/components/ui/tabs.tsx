@@ -28,13 +28,14 @@ const TabsList = React.forwardRef<
 >(({ className, responsiveEnabled = false, ...props }, ref) => (
   <TabsPrimitive.List
     ref={ref}
-    aria-label={responsiveEnabled ? "Scrollable sections" : undefined}
-    data-responsive-tabs={responsiveEnabled ? "" : undefined}
+    {...props}
+    {...(responsiveEnabled
+      ? { "aria-label": "Scrollable sections", "data-responsive-tabs": "" }
+      : {})}
     className={cn(
       "flex items-center gap-5 border-b border-border overflow-x-auto",
       className,
     )}
-    {...props}
   />
 ));
 TabsList.displayName = TabsPrimitive.List.displayName;

@@ -69,6 +69,49 @@ it("adds the tab scroll hook and label only when responsive behavior is enabled"
   expect(screen.getByRole("tablist", { name: "Scrollable sections" })).toHaveAttribute("data-responsive-tabs");
 });
 
+it("enforces responsive tab hooks despite caller-provided overrides", () => {
+  render(
+    <Tabs defaultValue="one">
+      <TabsList
+        responsiveEnabled
+        aria-label="Caller label"
+        data-responsive-tabs={undefined}
+      >
+        <TabsTrigger value="one">One</TabsTrigger>
+      </TabsList>
+    </Tabs>,
+  );
+
+  const tablist = screen.getByRole("tablist", { name: "Scrollable sections" });
+  expect(tablist).toHaveAttribute("aria-label", "Scrollable sections");
+  expect(tablist).toHaveAttribute("data-responsive-tabs");
+});
+
+it("preserves caller tab attributes and classes when responsive behavior is disabled", () => {
+  render(
+    <Tabs defaultValue="one">
+      <TabsList
+        responsiveEnabled={false}
+        aria-label="Caller label"
+        data-responsive-tabs="caller-marker"
+        className="caller-tabs"
+      >
+        <TabsTrigger value="one">One</TabsTrigger>
+      </TabsList>
+    </Tabs>,
+  );
+
+  const tablist = screen.getByRole("tablist", { name: "Caller label" });
+  expect(tablist).toHaveAttribute("data-responsive-tabs", "caller-marker");
+  expect(tablist).toHaveClass("flex");
+  expect(tablist).toHaveClass("items-center");
+  expect(tablist).toHaveClass("gap-5");
+  expect(tablist).toHaveClass("border-b");
+  expect(tablist).toHaveClass("border-border");
+  expect(tablist).toHaveClass("overflow-x-auto");
+  expect(tablist).toHaveClass("caller-tabs");
+});
+
 it("adds constrained dialog presentation and close target only when enabled", () => {
   const { rerender } = render(
     <Dialog open><DialogTrigger>Open</DialogTrigger><DialogContent aria-describedby={undefined}><DialogTitle>Workshop</DialogTitle></DialogContent></Dialog>,
