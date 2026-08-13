@@ -35,6 +35,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/use-toast";
+import { PageHeader } from "@/components/ui/page-header";
 
 // ============================================
 // Types (serialized from server)
@@ -120,6 +121,7 @@ interface WorkflowEditorProps {
   categories: CategoryOption[];
   isNew: boolean;
   isPreview?: boolean;
+  responsiveEnabled?: boolean;
 }
 
 // ============================================
@@ -133,6 +135,7 @@ export function WorkflowEditor({
   categories,
   isNew,
   isPreview = false,
+  responsiveEnabled = false,
 }: WorkflowEditorProps) {
   const router = useRouter();
 
@@ -367,7 +370,37 @@ export function WorkflowEditor({
   return (
     <>
       {/* Header */}
-      <div className="flex items-center justify-between">
+      {responsiveEnabled ? (
+        <div className="min-w-0">
+          <Link
+            href="/admin/workflows"
+            className="mb-2 inline-flex min-h-11 min-w-11 items-center justify-center rounded-md text-muted-foreground hover:text-foreground"
+            aria-label="Back to workflows"
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </Link>
+          <PageHeader
+            responsiveEnabled
+            title={isPreview ? "Preview Workflow" : isNew && !workflowId ? "New Workflow" : "Edit Workflow"}
+            description={isPreview
+              ? "Review this workflow without making changes."
+              : "Build automated email sequences for your workshops."}
+            actions={!isPreview ? (
+              <button
+                onClick={saveWorkflow}
+                disabled={saving}
+                className="inline-flex min-h-11 w-full items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              >
+                {saving ? "Saving..." : "Save Workflow"}
+              </button>
+            ) : undefined}
+          />
+          {isPreview ? <Badge variant="secondary">Read-only</Badge> : null}
+        </div>
+      ) : (
+        <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-3">
             <Link
@@ -399,6 +432,7 @@ export function WorkflowEditor({
           </button>
         )}
       </div>
+      )}
 
       {/* Alerts */}
       {error && (
@@ -413,7 +447,7 @@ export function WorkflowEditor({
       )}
 
       {/* === Section 1: Workflow Details === */}
-      <div className="bg-card rounded-lg shadow p-6 space-y-4">
+      <div className={responsiveEnabled ? "min-w-0 max-w-full space-y-4 rounded-lg bg-card p-4 shadow sm:p-6" : "bg-card rounded-lg shadow p-6 space-y-4"}>
         <h2 className="text-lg font-semibold text-foreground">Workflow Details</h2>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -476,7 +510,7 @@ export function WorkflowEditor({
         </label>
 
         {/* Auto-assignment filters for auto-build on approval */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-border">
+        <div className={responsiveEnabled ? "grid grid-cols-1 gap-4 border-t border-border pt-2 md:grid-cols-2 xl:grid-cols-3" : "grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-border"}>
           <div>
             <label htmlFor="wf-category" className="block text-sm font-medium text-muted-foreground">
               Category (auto-assign)
@@ -531,14 +565,14 @@ export function WorkflowEditor({
 
       {/* === Section 2: Tabbed content (Steps / Timeline / Executions) === */}
       {workflowId && (
-        <div className="bg-card rounded-lg shadow overflow-hidden">
+        <div className={responsiveEnabled ? "min-w-0 max-w-full overflow-hidden rounded-lg bg-card shadow" : "bg-card rounded-lg shadow overflow-hidden"}>
           {/* Tab bar */}
-          <div className="border-b flex">
+          <div className={responsiveEnabled ? "flex max-w-full overflow-x-auto border-b" : "border-b flex"} aria-label={responsiveEnabled ? "Workflow editor sections" : undefined}>
             {(["steps", "timeline", "executions"] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
+                className={`${responsiveEnabled ? "min-h-11 shrink-0 " : ""}px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
                   activeTab === tab
                     ? "border-primary text-primary"
                     : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
@@ -551,22 +585,22 @@ export function WorkflowEditor({
             ))}
           </div>
 
-          <div className="p-6 space-y-4">
+          <div className={responsiveEnabled ? "min-w-0 max-w-full space-y-4 p-4 sm:p-6" : "p-6 space-y-4"}>
           {/* --- Steps tab --- */}
           {activeTab === "steps" && (
             <>
           <div className="flex items-center justify-end">
-            <div className="flex gap-2">
+            <div className={responsiveEnabled ? "flex w-full flex-col gap-2 sm:w-auto sm:flex-row" : "flex gap-2"}>
               <button
                 onClick={() => setShowVariables(!showVariables)}
-                className="text-sm text-muted-foreground hover:text-foreground px-3 py-1.5 border rounded-md"
+                className={`${responsiveEnabled ? "min-h-11 " : ""}text-sm text-muted-foreground hover:text-foreground px-3 py-1.5 border rounded-md`}
               >
                 {showVariables ? "Hide" : "Show"} Variables
               </button>
               {!isPreview && (
                 <button
                   onClick={() => setShowNewStep(true)}
-                  className="inline-flex rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                  className={`${responsiveEnabled ? "min-h-11 items-center justify-center " : ""}inline-flex rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90`}
                 >
                   + Add Step
                 </button>
@@ -613,6 +647,7 @@ export function WorkflowEditor({
                 onCancelEdit={() => setEditingStepId(null)}
                 onSave={(data) => updateStep(step.id, data)}
                 onDelete={() => deleteStep(step.id)}
+                responsiveEnabled={responsiveEnabled}
               />
             ))}
           </div>
@@ -624,6 +659,7 @@ export function WorkflowEditor({
               onAdd={addStep}
               onCancel={() => setShowNewStep(false)}
               saving={saving}
+              responsiveEnabled={responsiveEnabled}
             />
           )}
             </>
@@ -631,7 +667,7 @@ export function WorkflowEditor({
 
           {/* --- Timeline tab --- */}
           {activeTab === "timeline" && (
-            <WorkflowTimeline steps={steps} />
+            <WorkflowTimeline steps={steps} responsiveEnabled={responsiveEnabled} />
           )}
 
           {/* --- Executions tab --- */}
@@ -644,14 +680,14 @@ export function WorkflowEditor({
 
       {/* === Section 3: Workshop Assignments === */}
       {workflowId && (
-        <div className="bg-card rounded-lg shadow p-6 space-y-4">
+        <div className={responsiveEnabled ? "min-w-0 max-w-full space-y-4 rounded-lg bg-card p-4 shadow sm:p-6" : "bg-card rounded-lg shadow p-6 space-y-4"}>
           <h2 className="text-lg font-semibold text-foreground">
             Assigned Workshops ({assignments.length})
           </h2>
 
           {/* Assignment form */}
           {!isPreview && (
-            <div className="flex gap-3 items-end">
+            <div className={responsiveEnabled ? "flex flex-col gap-3 sm:flex-row sm:items-end" : "flex gap-3 items-end"}>
               <div className="flex-1">
                 <label htmlFor="assign-ws" className="block text-sm font-medium text-foreground mb-1">
                   Assign to Workshop
@@ -676,7 +712,7 @@ export function WorkflowEditor({
               <button
                 onClick={assignWorkshop}
                 disabled={!assignWorkshopId || saving}
-                className="inline-flex rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                className={`${responsiveEnabled ? "min-h-11 items-center justify-center " : ""}inline-flex rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50`}
               >
                 Assign
               </button>
@@ -689,9 +725,9 @@ export function WorkflowEditor({
               {assignments.map((assignment) => (
                 <div
                   key={assignment.id}
-                  className="flex items-center justify-between py-3"
+                  className={responsiveEnabled ? "flex min-w-0 flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between" : "flex items-center justify-between py-3"}
                 >
-                  <div>
+                  <div className={responsiveEnabled ? "min-w-0 break-words" : undefined}>
                     <span className="font-medium text-foreground">
                       {assignment.workshop.title}
                     </span>
@@ -708,7 +744,7 @@ export function WorkflowEditor({
                   {!isPreview && (
                     <button
                       onClick={() => unassignWorkshop(assignment.id)}
-                      className="text-sm text-destructive hover:text-destructive/80"
+                      className={`${responsiveEnabled ? "min-h-11 self-start px-3 sm:self-auto " : ""}text-sm text-destructive hover:text-destructive/80`}
                     >
                       Remove
                     </button>
@@ -737,6 +773,7 @@ function StepCard({
   onCancelEdit,
   onSave,
   onDelete,
+  responsiveEnabled,
 }: {
   step: SerializedStep;
   index: number;
@@ -747,6 +784,7 @@ function StepCard({
   onCancelEdit: () => void;
   onSave: (data: Record<string, unknown>) => void;
   onDelete: () => void;
+  responsiveEnabled: boolean;
 }) {
   const { toast } = useToast();
   const [stepType, setStepType] = useState(step.stepType);
@@ -771,6 +809,7 @@ function StepCard({
 
   useEffect(() => {
     if (stepType === STEP_TYPES.SEND_SURVEY_LINK && isEditing) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSurveyTemplatesLoading(true);
       fetch("/api/survey-templates")
         .then((r) => r.json())
@@ -852,12 +891,12 @@ function StepCard({
 
   if (!isEditing) {
     return (
-      <div className="border rounded-lg p-4 flex items-start justify-between hover:border-border transition-colors">
-        <div className="flex gap-3">
+      <div className={responsiveEnabled ? "flex min-w-0 flex-col gap-3 rounded-lg border p-4 transition-colors hover:border-border sm:flex-row sm:items-start sm:justify-between" : "border rounded-lg p-4 flex items-start justify-between hover:border-border transition-colors"}>
+        <div className={responsiveEnabled ? "flex min-w-0 gap-3" : "flex gap-3"}>
           <div className="flex-shrink-0 w-8 h-8 bg-primary/10 text-primary rounded-full flex items-center justify-center text-sm font-bold">
             {index + 1}
           </div>
-          <div>
+          <div className={responsiveEnabled ? "min-w-0 break-words" : undefined}>
             <div className="flex items-center gap-2">
               <span className="font-medium text-foreground">
                 {STEP_TYPE_LABELS[step.stepType as StepType] || step.stepType}
@@ -878,16 +917,16 @@ function StepCard({
           </div>
         </div>
         {!readOnly && (
-          <div className="flex gap-2">
+          <div className={responsiveEnabled ? "flex gap-2 self-end sm:self-auto" : "flex gap-2"}>
             <button
               onClick={onEdit}
-              className="text-sm text-primary hover:text-primary/80"
+              className={`${responsiveEnabled ? "min-h-11 px-3 " : ""}text-sm text-primary hover:text-primary/80`}
             >
               Edit
             </button>
             <button
               onClick={onDelete}
-              className="text-sm text-destructive hover:text-destructive/80"
+              className={`${responsiveEnabled ? "min-h-11 px-3 " : ""}text-sm text-destructive hover:text-destructive/80`}
             >
               Delete
             </button>
@@ -899,7 +938,7 @@ function StepCard({
 
   // Editing mode
   return (
-    <div className="border-2 border-primary/30 rounded-lg p-4 space-y-3 bg-primary/5">
+    <div className={responsiveEnabled ? "min-w-0 max-w-full space-y-3 rounded-lg border-2 border-primary/30 bg-primary/5 p-4" : "border-2 border-primary/30 rounded-lg p-4 space-y-3 bg-primary/5"}>
       <h4 className="font-medium text-foreground">Edit Step {index + 1}</h4>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1155,7 +1194,7 @@ function StepCard({
         )}
       </div>
 
-      <div className="flex gap-2 pt-2">
+      <div className={responsiveEnabled ? "flex flex-col gap-2 pt-2 sm:flex-row" : "flex gap-2 pt-2"}>
         <button
           onClick={() => {
             if (stepType === STEP_TYPES.SEND_SURVEY_LINK && body && !body.includes("{{surveyUrl}}")) {
@@ -1177,13 +1216,13 @@ function StepCard({
               surveyTemplateId: stepType === STEP_TYPES.SEND_SURVEY_LINK ? (surveyTemplateId ?? null) : null, // BUG-06
             });
           }}
-          className="inline-flex rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          className={`${responsiveEnabled ? "min-h-11 items-center justify-center " : ""}inline-flex rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90`}
         >
           Save Changes
         </button>
         <button
           onClick={onCancelEdit}
-          className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground border rounded-md"
+          className={`${responsiveEnabled ? "min-h-11 " : ""}px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground border rounded-md`}
         >
           Cancel
         </button>
@@ -1201,6 +1240,7 @@ function NewStepForm({
   onAdd,
   onCancel,
   saving,
+  responsiveEnabled,
 }: {
   emailTemplates: EmailTemplateOption[];
   onAdd: (data: {
@@ -1216,6 +1256,7 @@ function NewStepForm({
   }) => void;
   onCancel: () => void;
   saving: boolean;
+  responsiveEnabled: boolean;
 }) {
   const { toast } = useToast();
   const [stepType, setStepType] = useState<StepType>(STEP_TYPES.EMAIL_ATTENDEES);
@@ -1234,6 +1275,7 @@ function NewStepForm({
 
   useEffect(() => {
     if (stepType === STEP_TYPES.SEND_SURVEY_LINK) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSurveyTemplatesLoading(true);
       fetch("/api/survey-templates")
         .then((r) => r.json())
@@ -1257,7 +1299,7 @@ function NewStepForm({
   };
 
   return (
-    <div className="border-2 border-success/30 rounded-lg p-4 space-y-3 bg-success/5">
+    <div className={responsiveEnabled ? "min-w-0 max-w-full space-y-3 rounded-lg border-2 border-success/30 bg-success/5 p-4" : "border-2 border-success/30 rounded-lg p-4 space-y-3 bg-success/5"}>
       <h4 className="font-medium text-foreground">New Step</h4>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1458,7 +1500,7 @@ function NewStepForm({
         </>
       )}
 
-      <div className="flex gap-2 pt-2">
+      <div className={responsiveEnabled ? "flex flex-col gap-2 pt-2 sm:flex-row" : "flex gap-2 pt-2"}>
         <button
           onClick={() => {
             if (stepType === STEP_TYPES.SEND_SURVEY_LINK && body && !body.includes("{{surveyUrl}}")) {
@@ -1481,13 +1523,13 @@ function NewStepForm({
             });
           }}
           disabled={saving}
-          className="inline-flex rounded-md bg-success px-3 py-1.5 text-sm font-medium text-success-foreground hover:bg-success/90 disabled:opacity-50"
+          className={`${responsiveEnabled ? "min-h-11 items-center justify-center " : ""}inline-flex rounded-md bg-success px-3 py-1.5 text-sm font-medium text-success-foreground hover:bg-success/90 disabled:opacity-50`}
         >
           {saving ? "Adding..." : "Add Step"}
         </button>
         <button
           onClick={onCancel}
-          className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground border rounded-md"
+          className={`${responsiveEnabled ? "min-h-11 " : ""}px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground border rounded-md`}
         >
           Cancel
         </button>

@@ -10,9 +10,19 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { Badge } from "@/components/ui/badge";
 import { DeleteWorkflowButton } from "@/components/workflows/delete-workflow-button";
+import { PageHeader } from "@/components/ui/page-header";
+import { ResponsiveActionsItem } from "@/components/ui/responsive-actions-menu";
+import { ResponsiveDataView } from "@/components/ui/responsive-data-view";
+import {
+  ResponsiveRecord,
+  ResponsiveRecordActions,
+  ResponsiveRecordHeader,
+  ResponsiveRecordMeta,
+} from "@/components/ui/responsive-record";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 import { formatTimestamp } from "@/lib/utils";
 
-async function WorkflowsContent() {
+export async function WorkflowsContent({ responsiveEnabled = false }: { responsiveEnabled?: boolean }) {
   const workflows = await db.workflow.findMany({
     include: {
       steps: { orderBy: { sortOrder: "asc" } },
@@ -45,7 +55,7 @@ async function WorkflowsContent() {
         </p>
         <Link
           href="/admin/workflows/new"
-          className="inline-flex rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          className={`inline-flex rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90${responsiveEnabled ? " min-h-11 items-center justify-center" : ""}`}
         >
           Create Workflow
         </Link>
@@ -53,7 +63,7 @@ async function WorkflowsContent() {
     );
   }
 
-  return (
+  const wideTable = (
     <div className="bg-card rounded-lg shadow overflow-hidden">
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-border">
@@ -163,12 +173,101 @@ async function WorkflowsContent() {
       </div>
     </div>
   );
+
+  return (
+    <ResponsiveDataView
+      enabled={responsiveEnabled}
+      label="Workflows"
+      wideFrom="lg"
+      wideRegionLabel="Workflows table"
+      wide={wideTable}
+      compact={
+        <div className="space-y-3">
+          {workflows.map((workflow) => {
+            const trigger = [
+              workflow.workflowPhase === "PRE_EVENT"
+                ? "Pre"
+                : workflow.workflowPhase === "POST_EVENT"
+                  ? "Post"
+                  : null,
+              workflow.category?.name ?? null,
+            ].filter(Boolean).join(" / ") || "—";
+
+            return (
+              <ResponsiveRecord key={workflow.id}>
+                <ResponsiveRecordHeader
+                  title={workflow.name}
+                  status={workflow.isActive ? <Badge variant="success">Active</Badge> : <Badge variant="outline">Inactive</Badge>}
+                />
+                {workflow.description ? (
+                  <p className="mt-1 break-words text-sm text-muted-foreground">{workflow.description}</p>
+                ) : null}
+                <ResponsiveRecordMeta
+                  items={[
+                    { label: "Trigger", value: trigger },
+                    { label: "Steps", value: `${workflow.steps.length} step${workflow.steps.length === 1 ? "" : "s"}` },
+                    { label: "Workshops", value: workflow._count.assignments },
+                    { label: "Updated", value: formatTimestamp(workflow.updatedAt) },
+                  ]}
+                />
+                <ResponsiveRecordActions
+                  menuLabel={`More actions for ${workflow.name}`}
+                  primary={
+                    <Link
+                      href={`/admin/workflows/${workflow.id}`}
+                      className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                    >
+                      Open workflow
+                    </Link>
+                  }
+                  secondary={
+                    <>
+                      <ResponsiveActionsItem asChild className="flex min-h-11 cursor-pointer items-center rounded-md px-3 text-sm outline-none focus:bg-accent">
+                        <Link href={`/admin/workflows/${workflow.id}?preview=1`}>Preview workflow</Link>
+                      </ResponsiveActionsItem>
+                      <ResponsiveActionsItem asChild className="flex min-h-11 cursor-pointer items-center rounded-md px-3 text-sm outline-none focus:bg-accent">
+                        <Link href={`/admin/workflows/${workflow.id}`}>Edit workflow</Link>
+                      </ResponsiveActionsItem>
+                      <ResponsiveActionsItem asChild className="flex min-h-11 cursor-pointer items-center rounded-md px-3 text-sm outline-none focus:bg-accent">
+                        <DeleteWorkflowButton
+                          workflowId={workflow.id}
+                          workflowName={workflow.name}
+                          assignmentCount={workflow._count.assignments}
+                        />
+                      </ResponsiveActionsItem>
+                    </>
+                  }
+                />
+              </ResponsiveRecord>
+            );
+          })}
+        </div>
+      }
+    />
+  );
 }
 
 export default function WorkflowsPage() {
+  const responsiveEnabled = isMobileResponsiveEnabled();
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className={responsiveEnabled ? "min-w-0 max-w-full space-y-6" : "space-y-6"}>
+      {responsiveEnabled ? (
+        <PageHeader
+          responsiveEnabled
+          title="Workflows"
+          description="Manage automated email sequences for pre- and post-event communications."
+          actions={
+            <Link
+              href="/admin/workflows/new"
+              className="inline-flex min-h-11 w-full items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            >
+              Create Workflow
+            </Link>
+          }
+        />
+      ) : (
+        <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Workflows</h1>
           <p className="text-muted-foreground">
@@ -183,6 +282,7 @@ export default function WorkflowsPage() {
           Create Workflow
         </Link>
       </div>
+      )}
 
       <Suspense
         fallback={
@@ -191,7 +291,7 @@ export default function WorkflowsPage() {
           </div>
         }
       >
-        <WorkflowsContent />
+        <WorkflowsContent responsiveEnabled={responsiveEnabled} />
       </Suspense>
     </div>
   );

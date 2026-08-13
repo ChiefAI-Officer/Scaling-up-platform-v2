@@ -14,6 +14,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/auth";
 import { db } from "@/lib/db";
 import { TransactionalEmailEditor } from "./editor";
+import { PageHeader } from "@/components/ui/page-header";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 
 const META: Record<string, { label: string; tokens: string[] }> = {
   REGISTRATION_CONFIRMATION: {
@@ -54,10 +56,34 @@ export default async function EditTransactionalEmailPage({ params }: PageProps) 
     where: { emailType: type },
   });
   const defaults = HARDCODED_DEFAULTS[type];
+  const responsiveEnabled = isMobileResponsiveEnabled();
 
   return (
-    <div className="space-y-6">
-      <div>
+    <div className={responsiveEnabled ? "min-w-0 max-w-full space-y-6" : "space-y-6"}>
+      {responsiveEnabled ? (
+        <div className="min-w-0">
+          <div className="mb-2 break-words text-sm text-muted-foreground">
+            <Link href="/admin/transactional-emails" className="inline-flex min-h-11 items-center underline">
+              Transactional Emails
+            </Link>{" "}
+            / {meta.label}
+          </div>
+          <PageHeader
+            responsiveEnabled
+            title={meta.label}
+            description="Changes apply globally on the next email send."
+          />
+          <p className="break-words text-sm text-muted-foreground">
+            Available tokens:{" "}
+            {meta.tokens.map((token) => (
+              <code key={token} className="mx-1 inline-block rounded bg-muted px-1.5 py-0.5 text-xs">
+                {token}
+              </code>
+            ))}
+          </p>
+        </div>
+      ) : (
+        <div>
         <div className="text-sm text-muted-foreground mb-1">
           <Link href="/admin/transactional-emails" className="underline">
             Transactional Emails
@@ -74,12 +100,14 @@ export default async function EditTransactionalEmailPage({ params }: PageProps) 
           ))}
         </p>
       </div>
+      )}
 
       <TransactionalEmailEditor
         emailType={type}
         initialSubject={row?.subject ?? defaults.subject}
         initialBody={row?.body ?? defaults.body}
         version={row?.version ?? null}
+        responsiveEnabled={responsiveEnabled}
       />
     </div>
   );
