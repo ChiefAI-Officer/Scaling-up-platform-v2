@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { WorkshopRulesPanel } from "@/components/workshops/workshop-rules-panel";
+import { useMobileResponsiveEnabled } from "@/lib/use-mobile-responsive-enabled";
 import { cn } from "@/lib/utils";
 
 interface Coach {
@@ -1216,5 +1217,7 @@ export function NewWorkshopForm({ isCoachPortal = false, prefilledCoach, respons
 }
 
 export default function NewWorkshopPage() {
-  return <NewWorkshopForm isCoachPortal={false} />;
+  const mobileResponsiveEnabled = useMobileResponsiveEnabled();
+
+  return <NewWorkshopForm isCoachPortal={false} responsiveEnabled={mobileResponsiveEnabled} />;
 }
