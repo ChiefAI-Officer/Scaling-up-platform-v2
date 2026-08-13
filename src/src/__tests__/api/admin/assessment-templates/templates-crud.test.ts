@@ -1177,6 +1177,38 @@ describe("DELETE /api/admin/assessment-templates/[id]", () => {
     expect(body.error).toBe("TEMPLATE_HAS_ACTIVE_CAMPAIGNS");
   });
 
+  it("409 when a live DRAFT campaign references the template", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    (db.assessmentTemplate.findFirst as jest.Mock).mockResolvedValue({ id: "tpl-1" });
+    (db.assessmentCampaign.findFirst as jest.Mock).mockResolvedValue({ id: "draft-1" });
+
+    const res = await detailDELETE(
+      emptyReq("http://localhost/api/admin/assessment-templates/tpl-1") as never,
+      detailParams,
+    );
+
+    expect(res.status).toBe(409);
+    expect(db.assessmentTemplate.update).not.toHaveBeenCalled();
+  });
+
+  it("ignores a soft-deleted ACTIVE campaign when deleting the template", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    (db.assessmentTemplate.findFirst as jest.Mock).mockResolvedValue({ id: "tpl-1" });
+    (db.assessmentCampaign.findFirst as jest.Mock).mockImplementation(
+      ({ where }: { where: { deletedAt?: null } }) =>
+        where.deletedAt === null ? null : { id: "deleted-active-campaign" },
+    );
+    (db.assessmentTemplate.update as jest.Mock).mockResolvedValue({});
+
+    const res = await detailDELETE(
+      emptyReq("http://localhost/api/admin/assessment-templates/tpl-1") as never,
+      detailParams,
+    );
+
+    expect(res.status).toBe(200);
+    expect(db.assessmentTemplate.update).toHaveBeenCalled();
+  });
+
   it("happy path: soft-deletes + audits when no active campaigns", async () => {
     (getApiActor as jest.Mock).mockResolvedValue(adminActor);
     (db.assessmentTemplate.findFirst as jest.Mock).mockResolvedValue({ id: "tpl-1" });
