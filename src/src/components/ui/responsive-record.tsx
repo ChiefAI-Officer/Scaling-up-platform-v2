@@ -1,9 +1,23 @@
-import { cloneElement, isValidElement, type ReactNode } from "react";
+import {
+  cloneElement,
+  isValidElement,
+  type ComponentPropsWithoutRef,
+  type ReactNode,
+} from "react";
 import { ResponsiveActionsMenu } from "./responsive-actions-menu";
 
-export function ResponsiveRecord({ children, className }: { children: ReactNode; className?: string }) {
+export function ResponsiveRecord({
+  children,
+  className,
+  ...props
+}: ComponentPropsWithoutRef<"article">) {
   return (
-    <article className={["min-w-0 rounded-xl border border-border bg-card p-4", className].filter(Boolean).join(" ")}>
+    <article
+      className={["min-w-0 rounded-xl border border-border bg-card p-4", className]
+        .filter(Boolean)
+        .join(" ")}
+      {...props}
+    >
       {children}
     </article>
   );

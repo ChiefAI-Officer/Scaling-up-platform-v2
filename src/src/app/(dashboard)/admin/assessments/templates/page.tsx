@@ -38,7 +38,7 @@ export default async function AdminAssessmentTemplatesPage() {
 
       {/* Wave Q — server-only env read; the client list receives the flag as
           a prop and gates the Enable/Disable write capability on it. */}
-      <AssessmentTemplatesList waveQEnabled={isWaveQAdminControlsEnabled()} />
+      <AssessmentTemplatesList waveQEnabled={isWaveQAdminControlsEnabled()} responsiveEnabled={mobileResponsiveEnabled} />
     </div>
   );
 }

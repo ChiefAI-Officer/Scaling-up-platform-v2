@@ -35,3 +35,8 @@ it("renders semantic record metadata and keeps primary and secondary actions rea
     screen.getByRole("button", { name: /more actions/i }),
   ).toBeInTheDocument();
 });
+
+it("forwards article accessibility attributes to the real record", () => {
+  render(<ResponsiveRecord aria-label="Acme record">Acme</ResponsiveRecord>);
+  expect(screen.getByRole("article", { name: "Acme record" })).toBeInTheDocument();
+});

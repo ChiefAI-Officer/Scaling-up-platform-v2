@@ -60,7 +60,7 @@ export default async function AdminAccessGroupsPage() {
         </div>
       )}
 
-      <AccessGroupsList />
+      <AccessGroupsList responsiveEnabled={mobileResponsiveEnabled} />
     </div>
   );
 }

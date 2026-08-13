@@ -2,6 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { RefreshCw } from "lucide-react";
+import { ResponsiveDataView } from "@/components/ui/responsive-data-view";
+import {
+  ResponsiveRecord,
+  ResponsiveRecordMeta,
+} from "@/components/ui/responsive-record";
 
 interface DashboardData {
   coaches: { active: number; pending: number; deactivated: number };
@@ -34,7 +39,11 @@ interface DashboardData {
   timestamp: string;
 }
 
-export function ObservabilityDashboard() {
+export function ObservabilityDashboard({
+  responsiveEnabled = false,
+}: {
+  responsiveEnabled?: boolean;
+} = {}) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -76,8 +85,8 @@ export function ObservabilityDashboard() {
   const generatedAt = new Date(data.timestamp);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className={responsiveEnabled ? "min-w-0 space-y-6" : "space-y-6"}>
+      <div className={responsiveEnabled ? "flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" : "flex items-center justify-between"}>
         <p className="text-xs text-muted-foreground">
           Generated {generatedAt.toLocaleString()}
         </p>
@@ -85,7 +94,7 @@ export function ObservabilityDashboard() {
           type="button"
           onClick={load}
           disabled={loading}
-          className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-md border border-border bg-card text-foreground hover:bg-muted disabled:opacity-50"
+          className={responsiveEnabled ? "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md border border-border bg-card px-3 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50" : "inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-md border border-border bg-card text-foreground hover:bg-muted disabled:opacity-50"}
           data-testid="refresh-observability"
         >
           <RefreshCw
@@ -95,24 +104,24 @@ export function ObservabilityDashboard() {
         </button>
       </div>
 
-      <Section title="Coaches">
+      <Section title="Coaches" responsiveEnabled={responsiveEnabled}>
         <Stat label="Active" value={data.coaches.active} />
         <Stat label="Pending" value={data.coaches.pending} />
         <Stat label="Deactivated" value={data.coaches.deactivated} />
       </Section>
 
-      <Section title="Organizations">
+      <Section title="Organizations" responsiveEnabled={responsiveEnabled}>
         <Stat label="Total" value={data.orgs.total} />
         <Stat label="With campaigns" value={data.orgs.withCampaigns} />
       </Section>
 
-      <Section title="Assessment templates">
+      <Section title="Assessment templates" responsiveEnabled={responsiveEnabled}>
         <Stat label="Templates" value={data.templates.total} />
         <Stat label="Published versions" value={data.templates.publishedVersions} />
         <Stat label="Draft versions" value={data.templates.draftVersions} />
       </Section>
 
-      <Section title="Campaigns">
+      <Section title="Campaigns" responsiveEnabled={responsiveEnabled}>
         <Stat label="Draft" value={data.campaigns.draft} />
         <Stat label="Active" value={data.campaigns.active} />
         <Stat label="Closed" value={data.campaigns.closed} />
@@ -120,7 +129,7 @@ export function ObservabilityDashboard() {
         <Stat label="Public" value={data.campaigns.public} />
       </Section>
 
-      <Section title="Submissions">
+      <Section title="Submissions" responsiveEnabled={responsiveEnabled}>
         <Stat label="Total" value={data.submissions.total} />
         <Stat label="Last 24h" value={data.submissions.last24h} />
         <Stat label="Last 7 days" value={data.submissions.last7d} />
@@ -129,17 +138,37 @@ export function ObservabilityDashboard() {
       </Section>
 
       {data.groupReports && (
-        <Section title="Group reports">
+        <Section title="Group reports" responsiveEnabled={responsiveEnabled}>
           <Stat label="Views 24h" value={data.groupReports.views24h} />
           <Stat label="Views 7d" value={data.groupReports.views7d} />
         </Section>
       )}
 
-      <Section title="Audit log (last 24h)">
+      <Section title="Audit log (last 24h)" responsiveEnabled={responsiveEnabled}>
         <Stat label="Total" value={data.auditLog.last24h} />
       </Section>
 
       {Object.keys(data.auditLog.byAction).length > 0 && (
+        <ResponsiveDataView
+          enabled={responsiveEnabled}
+          label="Audit log by action"
+          wideFrom="md"
+          wideRegionLabel="Audit log by action table"
+          compact={
+            <div className="space-y-3">
+              {Object.entries(data.auditLog.byAction)
+                .sort((a, b) => b[1] - a[1])
+                .map(([action, count]) => (
+                  <ResponsiveRecord key={action} aria-label={action}>
+                    <ResponsiveRecordMeta items={[
+                      { label: "Action", value: <span className="font-mono">{action}</span> },
+                      { label: "Count", value: count },
+                    ]} />
+                  </ResponsiveRecord>
+                ))}
+            </div>
+          }
+          wide={
         <div className="bg-card border border-border rounded-xl overflow-hidden">
           <div className="px-4 py-3 border-b border-border">
             <h2 className="text-sm font-semibold text-foreground">
@@ -173,6 +202,8 @@ export function ObservabilityDashboard() {
             </tbody>
           </table>
         </div>
+          }
+        />
       )}
     </div>
   );
@@ -181,14 +212,19 @@ export function ObservabilityDashboard() {
 function Section({
   title,
   children,
+  responsiveEnabled = false,
 }: {
   title: string;
   children: React.ReactNode;
+  responsiveEnabled?: boolean;
 }) {
   return (
     <div className="space-y-2">
       <h2 className="text-sm font-semibold text-foreground">{title}</h2>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div
+        className={responsiveEnabled ? "grid grid-cols-1 gap-3 sm:grid-cols-3 lg:grid-cols-5" : "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3"}
+        data-testid={responsiveEnabled ? `observability-metrics-${title.toLowerCase().replace(/\s+/g, "-")}` : undefined}
+      >
         {children}
       </div>
     </div>

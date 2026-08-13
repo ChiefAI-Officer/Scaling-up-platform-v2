@@ -48,7 +48,7 @@ export default async function AdminAccessGroupDetailPage({ params }: Props) {
         <span>Detail</span>
       </nav>
 
-      <AccessGroupDetail accessGroupId={id} />
+      <AccessGroupDetail accessGroupId={id} responsiveEnabled={mobileResponsiveEnabled} />
     </div>
   );
 }

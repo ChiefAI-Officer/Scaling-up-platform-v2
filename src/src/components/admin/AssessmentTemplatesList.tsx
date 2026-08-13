@@ -12,6 +12,14 @@
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { useToast } from "@/components/ui/use-toast";
+import { ResponsiveDataView } from "@/components/ui/responsive-data-view";
+import {
+  ResponsiveRecord,
+  ResponsiveRecordActions,
+  ResponsiveRecordHeader,
+  ResponsiveRecordMeta,
+} from "@/components/ui/responsive-record";
+import { ResponsiveActionsItem } from "@/components/ui/responsive-actions-menu";
 
 interface TemplateRow {
   id: string;
@@ -34,6 +42,7 @@ interface TemplateRow {
 
 export function AssessmentTemplatesList({
   waveQEnabled = false,
+  responsiveEnabled = false,
 }: {
   /**
    * Wave Q — gates the Enable/Disable row action (the WRITE capability).
@@ -42,6 +51,7 @@ export function AssessmentTemplatesList({
    * stays visible even when the flag is off (spec 19q durable rule).
    */
   waveQEnabled?: boolean;
+  responsiveEnabled?: boolean;
 } = {}) {
   const [rows, setRows] = useState<TemplateRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -179,8 +189,8 @@ export function AssessmentTemplatesList({
   return (
     <>
       {/* Page header + primary CTA — WF14 lines 482-498 */}
-      <div className="wf-page-header-row">
-        <div>
+      <div className={responsiveEnabled ? "wf-page-header-row min-w-0 flex-col gap-4 sm:flex-row" : "wf-page-header-row"}>
+        <div className={responsiveEnabled ? "min-w-0" : undefined}>
           <h2 className="wf-page-title">Assessment Templates</h2>
           <p className="wf-page-subtitle-strong">
             Catalogue of templates available for campaign creation. Per-coach
@@ -190,7 +200,7 @@ export function AssessmentTemplatesList({
         <div className="wf-cta-stack">
           <Link
             href="/admin/assessments/templates/new"
-            className="wf-btn wf-btn-primary"
+            className={responsiveEnabled ? "wf-btn wf-btn-primary min-h-11" : "wf-btn wf-btn-primary"}
             data-testid="new-template-btn"
           >
             + Create Template
@@ -199,7 +209,7 @@ export function AssessmentTemplatesList({
       </div>
 
       {/* Stats row — WF14 lines 501-518 */}
-      <div className="wf-stats-row">
+      <div className={responsiveEnabled ? "wf-stats-row grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4" : "wf-stats-row"}>
         <div className="wf-stat-card">
           <span className="wf-stat-label">Total Templates</span>
           <span className="wf-stat-value">{loading ? "…" : stats.total}</span>
@@ -233,6 +243,72 @@ export function AssessmentTemplatesList({
             No templates yet. Click <strong>Create Template</strong> to add one.
           </div>
         ) : (
+          <ResponsiveDataView
+            enabled={responsiveEnabled}
+            label="Assessment templates"
+            wideFrom="lg"
+            wideRegionLabel="Assessment templates table"
+            compact={
+              <div className="space-y-3 p-3">
+                {rows.map((row) => {
+                  const accessMode = row.accessMode ?? "INVITED";
+                  const status = row.status ?? "ACTIVE";
+                  const versionCount = row.versionCount ?? 1;
+                  const publishedAt = row.activeVersionPublishedAt
+                    ? new Date(row.activeVersionPublishedAt).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })
+                    : "—";
+                  return (
+                    <ResponsiveRecord key={row.id} aria-label={row.name}>
+                      <ResponsiveRecordHeader
+                        title={row.name}
+                        status={<span className="text-xs font-semibold">{status === "PENDING" ? "Pending" : status === "DRAFT" ? "Draft" : "Active"}</span>}
+                      />
+                      {row.disabledAt ? <span className="mt-2 inline-flex rounded bg-muted px-2 py-1 text-xs font-semibold text-muted-foreground">Disabled</span> : null}
+                      <ResponsiveRecordMeta items={[
+                        { label: "Access mode", value: accessMode },
+                        { label: "Aggregation", value: row.aggregationMode },
+                        { label: "Versions", value: `v${versionCount} (${versionCount} total)` },
+                        { label: "Active version published", value: publishedAt },
+                      ]} />
+                      <ResponsiveRecordActions
+                        primary={<Link href={`/admin/assessments/templates/${row.id}`} className="inline-flex items-center justify-center rounded-md bg-primary px-4 text-primary-foreground">Edit</Link>}
+                        menuLabel={`More ${row.name} actions`}
+                        secondary={
+                          <>
+                            <ResponsiveActionsItem asChild>
+                              <Link href="/admin/assessments/access-groups" className="flex min-h-11 items-center rounded-md px-3 text-sm outline-none focus:bg-accent">Access ↗</Link>
+                            </ResponsiveActionsItem>
+                            {waveQEnabled ? (
+                              <ResponsiveActionsItem
+                                className="flex min-h-11 cursor-pointer items-center rounded-md px-3 text-sm outline-none focus:bg-accent"
+                                onSelect={() => handleToggleDisabled(row)}
+                                disabled={togglingId !== null || deletingId !== null}
+                                aria-label={row.disabledAt ? `Enable ${row.name}` : `Disable ${row.name}`}
+                              >
+                                {row.disabledAt ? "Enable" : "Disable"}
+                              </ResponsiveActionsItem>
+                            ) : null}
+                            <ResponsiveActionsItem
+                              className="flex min-h-11 cursor-pointer items-center rounded-md px-3 text-sm text-destructive outline-none focus:bg-accent"
+                              onSelect={() => handleDelete(row)}
+                              disabled={deletingId !== null}
+                              aria-label={`Soft-delete ${row.name}`}
+                            >
+                              Delete
+                            </ResponsiveActionsItem>
+                          </>
+                        }
+                      />
+                    </ResponsiveRecord>
+                  );
+                })}
+              </div>
+            }
+            wide={
           <table className="wf-table">
             <thead>
               <tr>
@@ -317,14 +393,14 @@ export function AssessmentTemplatesList({
                             affordance; "Edit" stays as the explicit verb. */}
                         <Link
                           href={`/admin/assessments/access-groups`}
-                          className="wf-action-link"
+                        className={responsiveEnabled ? "wf-action-link inline-flex min-h-11 items-center" : "wf-action-link"}
                         >
                           Access ↗
                         </Link>
                         <span className="wf-action-sep">·</span>
                         <Link
                           href={`/admin/assessments/templates/${row.id}`}
-                          className="wf-action-link"
+                          className={responsiveEnabled ? "wf-action-link inline-flex min-h-11 items-center" : "wf-action-link"}
                         >
                           Edit
                         </Link>
@@ -337,7 +413,7 @@ export function AssessmentTemplatesList({
                               type="button"
                               onClick={() => handleToggleDisabled(row)}
                               disabled={togglingId !== null || deletingId !== null}
-                              className="wf-action-link"
+                              className={responsiveEnabled ? "wf-action-link min-h-11" : "wf-action-link"}
                               data-testid={`toggle-disabled-${row.id}`}
                               aria-label={
                                 row.disabledAt
@@ -354,7 +430,7 @@ export function AssessmentTemplatesList({
                           type="button"
                           onClick={() => handleDelete(row)}
                           disabled={deletingId !== null}
-                          className="wf-action-link-destructive"
+                          className={responsiveEnabled ? "wf-action-link-destructive min-h-11" : "wf-action-link-destructive"}
                           data-testid={`delete-template-${row.id}`}
                           aria-label={`Soft-delete ${row.name}`}
                         >
@@ -367,6 +443,8 @@ export function AssessmentTemplatesList({
               })}
             </tbody>
           </table>
+            }
+          />
         )}
       </div>
     </>

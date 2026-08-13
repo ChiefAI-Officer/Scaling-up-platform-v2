@@ -67,6 +67,24 @@ beforeEach(() => {
 afterEach(() => jest.restoreAllMocks());
 
 describe("PublicCampaignsManager — orphaned-page render smoke (Z-1)", () => {
+  it("keeps only the legacy campaign table when responsive presentation is disabled", async () => {
+    render(<PublicCampaignsManager responsiveEnabled={false} />);
+    await screen.findByText("Quick Scaling Up Check");
+    expect(screen.getByRole("table")).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Public campaigns" })).not.toBeInTheDocument();
+  });
+
+  it("keeps campaign identity, status, metadata and actions in compact records", async () => {
+    render(<PublicCampaignsManager responsiveEnabled />);
+    const list = await screen.findByRole("list", { name: "Public campaigns" });
+    const card = await within(list).findByRole("article", { name: "Quick Scaling Up Check" });
+    expect(within(card).getByText("scaling-up-quick")).toBeInTheDocument();
+    expect(within(card).getByText("Founder Prompts")).toBeInTheDocument();
+    expect(within(card).getByText("ACTIVE")).toBeInTheDocument();
+    expect(within(card).getByRole("button", { name: "View submissions" })).toHaveClass("min-h-11");
+    expect(within(card).getByRole("button", { name: "Manage report appearance" })).toHaveClass("min-h-11");
+  });
+
   it("renders the list and the create form without crashing", async () => {
     render(<PublicCampaignsManager />);
     // Create form is always present.

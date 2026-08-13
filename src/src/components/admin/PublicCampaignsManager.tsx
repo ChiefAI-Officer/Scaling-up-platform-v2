@@ -23,6 +23,12 @@ import {
   type ReportStyleKey,
   type ReportStylePreviewCapabilities,
 } from "@/lib/assessments/report-style-registry";
+import { ResponsiveDataView } from "@/components/ui/responsive-data-view";
+import {
+  ResponsiveRecord,
+  ResponsiveRecordHeader,
+  ResponsiveRecordMeta,
+} from "@/components/ui/responsive-record";
 
 interface TemplateSummary {
   id: string;
@@ -101,7 +107,11 @@ function SubmissionResult({ summary }: { summary: PublicResultSummary }) {
   );
 }
 
-export function PublicCampaignsManager() {
+export function PublicCampaignsManager({
+  responsiveEnabled = false,
+}: {
+  responsiveEnabled?: boolean;
+} = {}) {
   const [campaigns, setCampaigns] = useState<PublicCampaignRow[]>([]);
   const [templates, setTemplates] = useState<TemplateSummary[]>([]);
 
@@ -385,7 +395,7 @@ export function PublicCampaignsManager() {
   }
 
   return (
-    <div>
+    <div className={responsiveEnabled ? "min-w-0 max-w-full" : undefined}>
       {error && (
         <div className="wf-callout wf-callout-error" role="alert">
           {error}
@@ -398,6 +408,97 @@ export function PublicCampaignsManager() {
         {campaigns.length === 0 ? (
           <p className="wf-muted-text">No PUBLIC campaigns yet.</p>
         ) : (
+          <ResponsiveDataView
+            enabled={responsiveEnabled}
+            label="Public campaigns"
+            wideFrom="lg"
+            wideRegionLabel="Public campaigns table"
+            compact={
+              <div className="space-y-3">
+                {campaigns.map((campaign) => {
+                  const submissionRows = submissionsByCampaign[campaign.id] ?? [];
+                  return (
+                    <ResponsiveRecord key={campaign.id} aria-label={campaign.name}>
+                      <ResponsiveRecordHeader
+                        title={campaign.name}
+                        status={<span className="wf-badge">{campaign.status}</span>}
+                      />
+                      <ResponsiveRecordMeta items={[
+                        { label: "Alias", value: <code className="break-all">{campaign.alias}</code> },
+                        { label: "Template", value: campaign.template?.name ?? campaign.template?.alias ?? "—" },
+                        { label: "Opens", value: campaign.openAt.slice(0, 10) },
+                        { label: "Closes", value: campaign.closeAt ? campaign.closeAt.slice(0, 10) : "Open-ended" },
+                      ]} />
+                      <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        {campaign.status === "DRAFT" ? (
+                          <button className="wf-btn wf-btn-primary min-h-11" onClick={() => handlePublish(campaign.id)}>Publish</button>
+                        ) : null}
+                        <button
+                          className="wf-btn min-h-11"
+                          onClick={() => toggleSubmissions(campaign.id)}
+                          aria-expanded={expandedId === campaign.id}
+                        >
+                          {expandedId === campaign.id ? "Hide" : "View submissions"}
+                        </button>
+                        {campaign.reportStylesAvailable ? (
+                          <button
+                            type="button"
+                            className="wf-btn min-h-11"
+                            onClick={() => toggleAppearance(campaign)}
+                            aria-expanded={expandedAppearanceId === campaign.id}
+                          >
+                            {expandedAppearanceId === campaign.id
+                              ? "Hide report appearance"
+                              : campaign.reportStyleLockedAt === null
+                                ? "Manage report appearance"
+                                : "View report appearance"}
+                          </button>
+                        ) : null}
+                      </div>
+                      {expandedAppearanceId === campaign.id && campaign.reportStylesAvailable ? (
+                        <section className="mt-4 min-w-0" aria-label={`${campaign.name} compact report appearance`}>
+                          <ReportStylePicker
+                            value={campaign.reportStyleLockedAt !== null ? campaign.reportStyle : (appearanceDrafts[campaign.id] ?? campaign.reportStyle)}
+                            onChange={(value) => setAppearanceDrafts((current) => ({ ...current, [campaign.id]: value }))}
+                            disabled={campaign.reportStyleLockedAt !== null || appearanceSavingId === campaign.id}
+                            sourceLabel={campaign.reportStyleSource === "CAMPAIGN_OVERRIDE" ? "Campaign choice" : "Template default"}
+                            lockedAt={campaign.reportStyleLockedAt}
+                            previewAnatomy={resolveReportStylePreviewAnatomy({ templateAlias: campaign.template?.alias, capabilities: campaign.reportStylePreviewCapabilities })}
+                          />
+                          {campaign.reportStyleLockedAt === null ? (
+                            <button
+                              type="button"
+                              className="wf-btn wf-btn-primary mt-3 min-h-11 w-full"
+                              disabled={appearanceSavingId === campaign.id || (appearanceDrafts[campaign.id] ?? campaign.reportStyle) === campaign.reportStyle}
+                              onClick={() => handleSaveReportStyle(campaign)}
+                            >
+                              {appearanceSavingId === campaign.id ? "Saving…" : "Save report appearance"}
+                            </button>
+                          ) : null}
+                        </section>
+                      ) : null}
+                      {expandedId === campaign.id ? (
+                        <div className="mt-4 space-y-3" aria-label={`${campaign.name} submissions`}>
+                          {subsLoading === campaign.id ? <p className="wf-muted-text">Loading…</p> : subsError ? <p className="wf-muted-text" role="alert">{subsError}</p> : submissionRows.length === 0 ? <p className="wf-muted-text">No submissions yet.</p> : submissionRows.map((submission) => (
+                            <ResponsiveRecord key={submission.id} aria-label={submission.takerName} className="bg-background">
+                              <ResponsiveRecordHeader title={submission.takerName} />
+                              <ResponsiveRecordMeta items={[
+                                { label: "Email", value: submission.takerEmail ?? "—" },
+                                { label: "Referring coach", value: submission.referringCoach ? `${submission.referringCoach.name} · ${submission.referringCoach.email}` : submission.referringCoachEmail ?? "Scaling Up only" },
+                                { label: "Result", value: submission.summary ? <SubmissionResult summary={submission.summary} /> : "—" },
+                                { label: "Submitted", value: submission.submittedAt.slice(0, 10) },
+                              ]} />
+                              {submission.reportHref ? <a href={submission.reportHref} className="wf-btn mt-3 inline-flex min-h-11 w-full items-center justify-center">View report</a> : null}
+                            </ResponsiveRecord>
+                          ))}
+                        </div>
+                      ) : null}
+                    </ResponsiveRecord>
+                  );
+                })}
+              </div>
+            }
+            wide={
           <table className="wf-table" style={{ width: "100%" }}>
             <thead>
               <tr>
@@ -440,7 +541,7 @@ export function PublicCampaignsManager() {
                     <td className="wf-td">
                       {c.status === "DRAFT" && (
                         <button
-                          className="wf-btn wf-btn-primary wf-btn-sm"
+                          className={responsiveEnabled ? "wf-btn wf-btn-primary wf-btn-sm min-h-11" : "wf-btn wf-btn-primary wf-btn-sm"}
                           onClick={() => handlePublish(c.id)}
                         >
                           Publish
@@ -448,7 +549,7 @@ export function PublicCampaignsManager() {
                       )}
                       {/* #83 — self-enrolled submissions + which coach referred them */}
                       <button
-                        className="wf-btn wf-btn-sm"
+                        className={responsiveEnabled ? "wf-btn wf-btn-sm min-h-11" : "wf-btn wf-btn-sm"}
                         onClick={() => toggleSubmissions(c.id)}
                         aria-expanded={expandedId === c.id}
                       >
@@ -457,7 +558,7 @@ export function PublicCampaignsManager() {
                       {c.reportStylesAvailable && (
                         <button
                           type="button"
-                          className="wf-btn wf-btn-sm"
+                          className={responsiveEnabled ? "wf-btn wf-btn-sm min-h-11" : "wf-btn wf-btn-sm"}
                           onClick={() => toggleAppearance(c)}
                           aria-expanded={expandedAppearanceId === c.id}
                         >
@@ -509,7 +610,7 @@ export function PublicCampaignsManager() {
                               <div style={{ marginTop: "1rem" }}>
                                 <button
                                   type="button"
-                                  className="wf-btn wf-btn-primary wf-btn-sm"
+                                  className={responsiveEnabled ? "wf-btn wf-btn-primary wf-btn-sm min-h-11" : "wf-btn wf-btn-primary wf-btn-sm"}
                                   disabled={
                                     appearanceSavingId === c.id ||
                                     (appearanceDrafts[c.id] ?? c.reportStyle) ===
@@ -611,7 +712,7 @@ export function PublicCampaignsManager() {
                                       {details && (
                                         <button
                                           type="button"
-                                          className="wf-btn wf-btn-sm"
+                                          className={responsiveEnabled ? "wf-btn wf-btn-sm min-h-11" : "wf-btn wf-btn-sm"}
                                           aria-expanded={isExpanded}
                                           onClick={() =>
                                             setExpandedSubmissionId(
@@ -626,7 +727,7 @@ export function PublicCampaignsManager() {
                                       )}
                                       {s.reportHref && (
                                         <a
-                                          className="wf-btn wf-btn-sm"
+                                          className={responsiveEnabled ? "wf-btn wf-btn-sm inline-flex min-h-11 items-center" : "wf-btn wf-btn-sm"}
                                           href={s.reportHref}
                                         >
                                           View report
@@ -679,6 +780,8 @@ export function PublicCampaignsManager() {
               })}
             </tbody>
           </table>
+            }
+          />
         )}
       </section>
 
@@ -697,7 +800,7 @@ export function PublicCampaignsManager() {
           </div>
         )}
 
-        <form onSubmit={handleCreate} className="wf-form">
+        <form onSubmit={handleCreate} className={responsiveEnabled ? "wf-form min-w-0 max-w-full" : "wf-form"}>
           {/* Template */}
           <div className="wf-field">
             <label htmlFor="pc-template" className="wf-label">
@@ -705,7 +808,7 @@ export function PublicCampaignsManager() {
             </label>
             <select
               id="pc-template"
-              className="wf-select"
+              className={responsiveEnabled ? "wf-select min-h-11 min-w-0 max-w-full" : "wf-select"}
               value={templateId}
               onChange={(e) => {
                 const nextTemplateId = e.target.value;
@@ -743,7 +846,7 @@ export function PublicCampaignsManager() {
                   Future template-default changes will not affect this campaign.
                 </p>
               </div>
-              <div style={{ maxWidth: "42rem" }}>
+              <div className={responsiveEnabled ? "min-w-0 max-w-full" : undefined} style={{ maxWidth: "42rem" }}>
                 <ReportStylePicker
                   value={reportStyle}
                   previewAnatomy={resolveReportStylePreviewAnatomy({
@@ -773,7 +876,7 @@ export function PublicCampaignsManager() {
               {reportStyleIntent === "EXPLICIT" && (
                 <button
                   type="button"
-                  className="wf-btn wf-btn-sm"
+                  className={responsiveEnabled ? "wf-btn wf-btn-sm min-h-11" : "wf-btn wf-btn-sm"}
                   onClick={() => {
                     setReportStyle(selectedTemplate.defaultReportStyle);
                     setReportStyleIntent("INHERITED");
@@ -792,7 +895,7 @@ export function PublicCampaignsManager() {
             <input
               id="pc-name"
               type="text"
-              className="wf-input"
+              className={responsiveEnabled ? "wf-input min-h-11 min-w-0 max-w-full" : "wf-input"}
               value={name}
               onChange={(e) => setName(e.target.value)}
               maxLength={200}
@@ -809,7 +912,7 @@ export function PublicCampaignsManager() {
             <input
               id="pc-open-at"
               type="datetime-local"
-              className="wf-input"
+              className={responsiveEnabled ? "wf-input min-h-11 min-w-0 max-w-full" : "wf-input"}
               value={openAt}
               onChange={(e) => setOpenAt(e.target.value)}
               required
@@ -825,7 +928,7 @@ export function PublicCampaignsManager() {
             <input
               id="pc-close-at"
               type="datetime-local"
-              className="wf-input"
+              className={responsiveEnabled ? "wf-input min-h-11 min-w-0 max-w-full" : "wf-input"}
               value={closeAt}
               onChange={(e) => setCloseAt(e.target.value)}
             />
@@ -837,7 +940,7 @@ export function PublicCampaignsManager() {
 
           <button
             type="submit"
-            className="wf-btn wf-btn-primary"
+            className={responsiveEnabled ? "wf-btn wf-btn-primary min-h-11 w-full sm:w-auto" : "wf-btn wf-btn-primary"}
             disabled={submitting}
           >
             {submitting ? "Creating…" : "Create PUBLIC Campaign"}

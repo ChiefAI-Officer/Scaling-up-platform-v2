@@ -39,6 +39,12 @@ import {
   AccessGroupPreviewModal,
   type PreviewTarget,
 } from "@/components/admin/AccessGroupPreviewModal";
+import { ResponsiveDataView } from "@/components/ui/responsive-data-view";
+import {
+  ResponsiveRecord,
+  ResponsiveRecordHeader,
+  ResponsiveRecordMeta,
+} from "@/components/ui/responsive-record";
 
 interface CoachMember {
   id: string;
@@ -82,6 +88,7 @@ interface AccessGroupDetailData {
 
 interface Props {
   accessGroupId: string;
+  responsiveEnabled?: boolean;
 }
 
 function formatTimestamp(iso: string): string {
@@ -90,7 +97,7 @@ function formatTimestamp(iso: string): string {
   return d.toLocaleString();
 }
 
-export function AccessGroupDetail({ accessGroupId }: Props) {
+export function AccessGroupDetail({ accessGroupId, responsiveEnabled = false }: Props) {
   const router = useRouter();
   const { toast } = useToast();
   const [data, setData] = useState<AccessGroupDetailData | null>(null);
@@ -284,17 +291,17 @@ export function AccessGroupDetail({ accessGroupId }: Props) {
   const isArchived = !!data.deletedAt;
 
   return (
-    <div className="space-y-6">
-      <div className="wf-page-header-row">
-        <div>
-          <div className="wf-page-pill-row" style={{ marginBottom: "0.5rem" }}>
-            <h2 className="wf-page-title" style={{ margin: 0 }}>{data.name}</h2>
+    <div className={responsiveEnabled ? "min-w-0 space-y-6" : "space-y-6"}>
+      <div className={responsiveEnabled ? "wf-page-header-row min-w-0 flex-col gap-4 sm:flex-row" : "wf-page-header-row"}>
+        <div className={responsiveEnabled ? "min-w-0" : undefined}>
+          <div className={responsiveEnabled ? "wf-page-pill-row min-w-0 flex-wrap" : "wf-page-pill-row"} style={{ marginBottom: "0.5rem" }}>
+            <h2 className={responsiveEnabled ? "wf-page-title min-w-0 break-words" : "wf-page-title"} style={{ margin: 0 }}>{data.name}</h2>
             <Badge variant={isArchived ? "secondary" : "success"}>
               {isArchived ? "Archived" : "Active"}
             </Badge>
           </div>
           {data.description && (
-            <p className="wf-page-subtitle-strong">{data.description}</p>
+            <p className={responsiveEnabled ? "wf-page-subtitle-strong break-words" : "wf-page-subtitle-strong"}>{data.description}</p>
           )}
         </div>
         <div className="wf-page-action-row">
@@ -302,7 +309,7 @@ export function AccessGroupDetail({ accessGroupId }: Props) {
             type="button"
             onClick={openEdit}
             disabled={isArchived}
-            className="wf-btn wf-btn-secondary"
+            className={responsiveEnabled ? "wf-btn wf-btn-secondary min-h-11" : "wf-btn wf-btn-secondary"}
           >
             Edit metadata
           </button>
@@ -353,7 +360,7 @@ export function AccessGroupDetail({ accessGroupId }: Props) {
 
       {/* Coaches table */}
       <section className="space-y-3">
-        <div className="flex items-center justify-between">
+        <div className={responsiveEnabled ? "flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" : "flex items-center justify-between"}>
           <div>
             <h2 className="text-lg font-semibold text-foreground">
               Coaches in this group ({data.coachMembers.length})
@@ -367,10 +374,52 @@ export function AccessGroupDetail({ accessGroupId }: Props) {
             onClick={() => setAddCoachOpen(true)}
             disabled={isArchived}
             data-testid="add-coach-button"
+            className={responsiveEnabled ? "min-h-11" : undefined}
           >
             + Add Coach
           </Button>
         </div>
+        <ResponsiveDataView
+          enabled={responsiveEnabled}
+          label="Coaches in access group"
+          wideFrom="md"
+          wideRegionLabel="Coaches in access group table"
+          compact={
+            <div className="space-y-3">
+              {data.coachMembers.map((m) => {
+                const name = [m.coach.firstName, m.coach.lastName]
+                  .filter((value) => value && value.length > 0)
+                  .join(" ")
+                  .trim();
+                const label = name || "(no name)";
+                return (
+                  <ResponsiveRecord key={m.id} aria-label={label}>
+                    <ResponsiveRecordHeader title={label} />
+                    <ResponsiveRecordMeta items={[
+                      { label: "Email", value: m.coach.email },
+                      { label: "Joined", value: formatTimestamp(m.addedAt) },
+                    ]} />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="mt-4 min-h-11 w-full"
+                      aria-label={`Remove ${label}`}
+                      onClick={() => setPreviewTarget({
+                        kind: "REMOVE_COACH_FROM_GROUP",
+                        accessGroupId,
+                        coachId: m.coachId,
+                        label: `Remove ${label} from ${data.name}`,
+                      })}
+                      disabled={isArchived}
+                    >
+                      Remove
+                    </Button>
+                  </ResponsiveRecord>
+                );
+              })}
+            </div>
+          }
+          wide={
         <Table>
           <TableHeader>
             <TableRow>
@@ -411,6 +460,8 @@ export function AccessGroupDetail({ accessGroupId }: Props) {
                     <Button
                       size="sm"
                       variant="outline"
+                      className={responsiveEnabled ? "min-h-11" : undefined}
+                      aria-label={`Remove ${name || m.coach.email}`}
                       onClick={() =>
                         setPreviewTarget({
                           kind: "REMOVE_COACH_FROM_GROUP",
@@ -429,11 +480,13 @@ export function AccessGroupDetail({ accessGroupId }: Props) {
             })}
           </TableBody>
         </Table>
+          }
+        />
       </section>
 
       {/* Templates table */}
       <section className="space-y-3">
-        <div className="flex items-center justify-between">
+        <div className={responsiveEnabled ? "flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" : "flex items-center justify-between"}>
           <div>
             <h2 className="text-lg font-semibold text-foreground">
               Templates this group accesses ({data.templateAccess.length})
@@ -447,10 +500,48 @@ export function AccessGroupDetail({ accessGroupId }: Props) {
             onClick={() => setAddTemplateOpen(true)}
             disabled={isArchived}
             data-testid="add-template-button"
+            className={responsiveEnabled ? "min-h-11" : undefined}
           >
             + Add Template
           </Button>
         </div>
+        <ResponsiveDataView
+          enabled={responsiveEnabled}
+          label="Templates in access group"
+          wideFrom="md"
+          wideRegionLabel="Templates in access group table"
+          compact={
+            <div className="space-y-3">
+              {data.templateAccess.map((t) => (
+                <ResponsiveRecord key={t.id} aria-label={t.template.name}>
+                  <ResponsiveRecordHeader
+                    title={t.template.name}
+                    status={t.template.aggregationMode === "CEO_ONLY" ? <span title="CEO_ONLY aggregation" aria-label="CEO_ONLY aggregation">👑</span> : undefined}
+                  />
+                  <ResponsiveRecordMeta items={[
+                    { label: "Alias", value: t.template.alias },
+                    { label: "Added", value: formatTimestamp(t.addedAt) },
+                  ]} />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mt-4 min-h-11 w-full"
+                    aria-label={`Remove ${t.template.name}`}
+                    onClick={() => setPreviewTarget({
+                      kind: "REMOVE_TEMPLATE_FROM_GROUP",
+                      accessGroupId,
+                      templateId: t.templateId,
+                      label: `Remove ${t.template.name} from ${data.name}`,
+                    })}
+                    disabled={isArchived}
+                  >
+                    Remove
+                  </Button>
+                </ResponsiveRecord>
+              ))}
+            </div>
+          }
+          wide={
         <Table>
           <TableHeader>
             <TableRow>
@@ -495,6 +586,8 @@ export function AccessGroupDetail({ accessGroupId }: Props) {
                   <Button
                     size="sm"
                     variant="outline"
+                    className={responsiveEnabled ? "min-h-11" : undefined}
+                    aria-label={`Remove ${t.template.name}`}
                     onClick={() =>
                       setPreviewTarget({
                         kind: "REMOVE_TEMPLATE_FROM_GROUP",
@@ -512,6 +605,8 @@ export function AccessGroupDetail({ accessGroupId }: Props) {
             ))}
           </TableBody>
         </Table>
+          }
+        />
       </section>
 
       {/* Archive button */}

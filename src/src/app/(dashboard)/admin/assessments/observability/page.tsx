@@ -53,9 +53,9 @@ export default async function AdminObservabilityPage() {
           </p>
         </header>
       )}
-      <ObservabilityDashboard />
+      <ObservabilityDashboard responsiveEnabled={mobileResponsiveEnabled} />
       <PeerBenchmarkStatusPanel />
-      <ImportHealthPanel />
+      <ImportHealthPanel responsiveEnabled={mobileResponsiveEnabled} />
     </div>
   );
 }

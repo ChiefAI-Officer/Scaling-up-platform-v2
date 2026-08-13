@@ -69,7 +69,7 @@ export default async function AdminAggregateReportPage() {
         roles only.
       </div>
 
-      <AssessmentsAggregateReport />
+      <AssessmentsAggregateReport responsiveEnabled={mobileResponsiveEnabled} />
     </div>
   );
 }

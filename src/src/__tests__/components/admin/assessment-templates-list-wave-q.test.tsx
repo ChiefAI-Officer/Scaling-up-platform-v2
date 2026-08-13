@@ -13,7 +13,7 @@
  */
 
 import React from "react";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { AssessmentTemplatesList } from "@/components/admin/AssessmentTemplatesList";
 
 const toastMock = jest.fn();
@@ -112,6 +112,46 @@ describe("AssessmentTemplatesList — Disabled badge", () => {
     expect(
       screen.queryByTestId(`disabled-badge-${ACTIVE_ROW.id}`),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe("AssessmentTemplatesList — responsive collection", () => {
+  it("keeps only the legacy table when responsive presentation is disabled", async () => {
+    installFetch();
+    render(<AssessmentTemplatesList responsiveEnabled={false} />);
+    await screen.findByText("QSP V1");
+
+    expect(screen.getByRole("table")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("list", { name: "Assessment templates" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("presents every template field and action through compact records", async () => {
+    installFetch();
+    render(<AssessmentTemplatesList responsiveEnabled waveQEnabled />);
+    const cards = await screen.findByRole("list", {
+      name: "Assessment templates",
+    });
+    const card = within(cards).getByRole("article", {
+      name: "Rockefeller Habits",
+    });
+
+    expect(within(card).getByText("INVITED")).toBeInTheDocument();
+    expect(within(card).getByText("FULL_VISIBILITY")).toBeInTheDocument();
+    expect(within(card).getByText("v1 (1 total)")).toBeInTheDocument();
+    expect(within(card).getByText("Active", { exact: true })).toBeInTheDocument();
+    expect(within(card).getByRole("link", { name: "Edit" })).toHaveClass(
+      "min-h-11",
+    );
+    const more = within(card).getByRole("button", {
+      name: "More Rockefeller Habits actions",
+    });
+    expect(more).toHaveClass("min-h-11", "min-w-11");
+    fireEvent.keyDown(more, { key: "ArrowDown" });
+    expect(await screen.findByRole("menuitem", { name: /access/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /disable rockefeller habits/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /soft-delete rockefeller habits/i })).toBeInTheDocument();
   });
 });
 

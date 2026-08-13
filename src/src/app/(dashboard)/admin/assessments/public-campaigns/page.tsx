@@ -134,7 +134,7 @@ export default async function AdminPublicCampaignsPage({
         response.
       </div>
 
-      <PublicCampaignsManager />
+      <PublicCampaignsManager responsiveEnabled={mobileResponsiveEnabled} />
     </div>
   );
 }
