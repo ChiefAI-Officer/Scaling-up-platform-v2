@@ -1199,6 +1199,10 @@
 }
 
 @media (max-width: 639px) {
+  .wf-scope [data-responsive-campaign-wizard] .wf-stepper[data-responsive-full-stepper] {
+    display: none;
+  }
+
   .wf-scope [data-responsive-campaign-wizard] .space-y-6 > .flex.justify-end.pt-4,
   .wf-scope [data-responsive-campaign-wizard] .space-y-6 > .flex.justify-between.pt-4 {
     align-items: stretch;

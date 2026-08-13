@@ -262,7 +262,7 @@ function StepIndicator({
             {steps[current]?.title}
           </p>
         </div>
-        <ol className="wf-stepper hidden sm:flex">
+        <ol className="wf-stepper hidden sm:flex" data-responsive-full-stepper>
           {steps.map((step) => {
             const done = current > step.id;
             const active = current === step.id;

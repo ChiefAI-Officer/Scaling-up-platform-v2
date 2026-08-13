@@ -155,6 +155,21 @@ describe("CampaignWizard — compact progress", () => {
     );
   });
 
+  it("marks only the responsive full stepper for the mobile CSS visibility override", () => {
+    installFetch();
+    const { container, rerender } = render(<CampaignWizard responsiveEnabled />);
+
+    const responsiveStepper = container.querySelector("ol.wf-stepper");
+    expect(responsiveStepper).toHaveAttribute("data-responsive-full-stepper", "true");
+    expect(responsiveStepper).toHaveClass("hidden", "sm:flex");
+
+    rerender(<CampaignWizard />);
+
+    const legacyStepper = container.querySelector("ol.wf-stepper");
+    expect(legacyStepper).toHaveAttribute("class", "wf-stepper");
+    expect(legacyStepper).not.toHaveAttribute("data-responsive-full-stepper");
+  });
+
   it("gives compact organization, template, participant, CEO, and select-all choices semantic 44px wrappers", async () => {
     installFetch();
     render(<CampaignWizard responsiveEnabled />);

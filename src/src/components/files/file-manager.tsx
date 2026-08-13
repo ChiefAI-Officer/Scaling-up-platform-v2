@@ -283,7 +283,7 @@ export function FileManager({
           <select
             value={filterWorkshop}
             onChange={(e) => setFilterWorkshop(e.target.value)}
-            className={cn("rounded-md border-border text-sm shadow-sm focus:border-primary focus:ring-primary", responsiveEnabled && "min-h-11 min-w-0")}
+            className={cn("rounded-md border-border text-sm shadow-sm focus:border-primary focus:ring-primary", responsiveEnabled && "min-h-11 min-w-0 w-full max-w-full sm:w-auto sm:max-w-none")}
           >
             <option value="">All workshops</option>
             {workshops.map((w) => (
@@ -295,7 +295,7 @@ export function FileManager({
           <select
             value={filterCategory}
             onChange={(e) => setFilterCategory(e.target.value)}
-            className={cn("rounded-md border-border text-sm shadow-sm focus:border-primary focus:ring-primary", responsiveEnabled && "min-h-11 min-w-0")}
+            className={cn("rounded-md border-border text-sm shadow-sm focus:border-primary focus:ring-primary", responsiveEnabled && "min-h-11 min-w-0 w-full max-w-full sm:w-auto sm:max-w-none")}
           >
             <option value="">All categories</option>
             {FILE_CATEGORIES.filter((c) => c.value).map((c) => (
