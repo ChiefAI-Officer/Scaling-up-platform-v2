@@ -70,6 +70,8 @@ interface QuestionInspectorProps {
    * legacy). Additive; the ED3 guard + QuestionInspector.test.tsx stay green.
    */
   bare?: boolean;
+  /** Presentation-only compact containment; default false preserves legacy DOM. */
+  responsiveEnabled?: boolean;
 }
 
 /**
@@ -575,6 +577,7 @@ export function QuestionInspector({
   publishedOptionKeys,
   onUpdate,
   bare = false,
+  responsiveEnabled = false,
 }: QuestionInspectorProps) {
   const [numberOpen, setNumberOpen] = useState(false);
   const [multiOpen, setMultiOpen] = useState(false);
@@ -600,9 +603,18 @@ export function QuestionInspector({
   if (!question) {
     return (
       <section
-        className={bare ? "" : "wf-card"}
+        className={
+          responsiveEnabled
+            ? bare
+              ? "min-w-0 max-w-full break-words"
+              : "wf-card min-w-0 max-w-full break-words"
+            : bare
+              ? ""
+              : "wf-card"
+        }
         style={bare ? undefined : { padding: "1.25rem" }}
         data-testid="questions-config-form"
+        {...(responsiveEnabled ? { "data-responsive-inspector": "" } : {})}
       >
         <p className="text-xs italic text-muted-foreground text-center py-8">
           Select a question on the left to edit its configuration.
@@ -613,9 +625,18 @@ export function QuestionInspector({
 
   return (
     <section
-      className={bare ? "space-y-4" : "wf-card space-y-4"}
+      className={
+        responsiveEnabled
+          ? bare
+            ? "min-w-0 max-w-full space-y-4 break-words"
+            : "wf-card min-w-0 max-w-full space-y-4 break-words"
+          : bare
+            ? "space-y-4"
+            : "wf-card space-y-4"
+      }
       style={bare ? undefined : { padding: "1.25rem" }}
       data-testid="questions-config-form"
+      {...(responsiveEnabled ? { "data-responsive-inspector": "" } : {})}
     >
       {!bare && (
         <header className="border-b border-border pb-3">

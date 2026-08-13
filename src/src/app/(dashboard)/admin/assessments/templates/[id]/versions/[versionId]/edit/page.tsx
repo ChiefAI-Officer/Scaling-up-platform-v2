@@ -328,6 +328,7 @@ export default async function AdminAssessmentVersionEditPage({
         // yet. Default false ⇒ byte-identical ED9 shell. Presentation-only,
         // kill = flag off + redeploy.
         previewSettingsEnabled={isPreviewSettingsEnabled()}
+        mobileResponsiveEnabled={mobileResponsiveEnabled}
         // Template-creation simplification — resolved on this server page and
         // forwarded solely to the existing Scoring & Tiers presentation.
         plainLanguageScoringEnabled={isTemplateCreationSimplifiedEnabled()}

@@ -16,7 +16,7 @@
  */
 
 import React from "react";
-import { render, cleanup } from "@testing-library/react";
+import { render, cleanup, screen } from "@testing-library/react";
 
 import { TemplateEditorTabbed } from "@/components/admin/TemplateEditorTabbed";
 
@@ -54,6 +54,7 @@ type Overrides = {
   previewSettingsEnabled?: boolean;
   singleColumnEnabled?: boolean;
   formsBuildEnabled?: boolean;
+  mobileResponsiveEnabled?: boolean;
 };
 
 function shellProps(o: Overrides = {}) {
@@ -107,6 +108,7 @@ function shellProps(o: Overrides = {}) {
     singleColumnEnabled: o.singleColumnEnabled ?? true,
     formsBuildEnabled: o.formsBuildEnabled ?? true,
     previewSettingsEnabled: o.previewSettingsEnabled ?? false,
+    mobileResponsiveEnabled: o.mobileResponsiveEnabled ?? false,
   };
 }
 
@@ -195,5 +197,46 @@ describe("TabbedShell header pills — Wave ED10 raw enums when NOT ed10Active",
     );
     expect(accessPill(container)).toBe("INVITED");
     expect(aggPill(container)).toBe("FULL_VISIBILITY");
+  });
+});
+
+describe("TabbedShell mobile-responsive presentation", () => {
+  it("bounds the ED10 tab rail and stacks the header action cluster only when enabled", () => {
+    render(
+      <TemplateEditorTabbed
+        {...shellProps({
+          previewSettingsEnabled: true,
+          mobileResponsiveEnabled: true,
+        })}
+      />,
+    );
+
+    expect(
+      screen.getByRole("tablist", { name: "Template editor tabs" }),
+    ).toHaveAttribute("data-responsive-tabs");
+    expect(screen.getByTestId("template-editor-actions")).toHaveClass("flex-col");
+    expect(screen.getByTestId("template-editor-actions")).toHaveClass("sm:flex-row");
+    expect(screen.getByTestId("template-editor-save-draft-btn")).toBeVisible();
+    expect(screen.getByTestId("template-editor-publish-btn")).toBeVisible();
+  });
+
+  it("keeps the legacy tab rail and header action DOM untouched when disabled", () => {
+    const { container } = render(
+      <TemplateEditorTabbed
+        {...shellProps({
+          previewSettingsEnabled: true,
+          mobileResponsiveEnabled: false,
+        })}
+      />,
+    );
+
+    expect(
+      screen.getByRole("tablist"),
+    ).not.toHaveAttribute("data-responsive-tabs");
+    expect(container.querySelector(".wf-page-action-row")).toHaveClass(
+      "wf-page-action-row",
+    );
+    expect(container.querySelector(".wf-page-action-row")).not.toHaveClass("flex-col");
+    expect(screen.queryByTestId("template-editor-actions")).not.toBeInTheDocument();
   });
 });

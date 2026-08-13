@@ -62,6 +62,8 @@ export interface SingleColumnFormBuilderProps {
   publishedOptionKeys: Record<string, readonly string[]>;
   /** Retained for prop-parity with `ThreePaneWorkspace`; unused here. */
   onGoToSections: () => void;
+  /** Presentation-only mobile containment; default false preserves ED6 output. */
+  responsiveEnabled?: boolean;
 }
 
 export function SingleColumnFormBuilder({
@@ -71,6 +73,7 @@ export function SingleColumnFormBuilder({
   findingsEnabled,
   conditionalEnabled,
   publishedOptionKeys,
+  responsiveEnabled = false,
 }: SingleColumnFormBuilderProps) {
   const {
     sections,
@@ -95,7 +98,11 @@ export function SingleColumnFormBuilder({
 
   if (sections.length === 0) {
     return (
-      <div data-testid="single-column-builder">
+      <div
+        data-testid="single-column-builder"
+        className={responsiveEnabled ? "min-w-0 max-w-full break-words" : undefined}
+        {...(responsiveEnabled ? { "data-responsive-builder": "" } : {})}
+      >
         <div
           data-testid="single-column-empty"
           className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border p-10 text-center text-muted-foreground"
@@ -123,7 +130,15 @@ export function SingleColumnFormBuilder({
       onDragEnd={handleDragEnd}
       accessibility={{ announcements: dndAnnouncements }}
     >
-      <div data-testid="single-column-builder" className="flex flex-col gap-4">
+      <div
+        data-testid="single-column-builder"
+        className={
+          responsiveEnabled
+            ? "flex min-w-0 max-w-full flex-col gap-4 break-words"
+            : "flex flex-col gap-4"
+        }
+        {...(responsiveEnabled ? { "data-responsive-builder": "" } : {})}
+      >
         {sections.map((s) => {
           const list = bySection.get(s.stableKey) ?? [];
           const collapsed = selection.isSectionCollapsed(s.stableKey);
@@ -135,16 +150,30 @@ export function SingleColumnFormBuilder({
               role="group"
               aria-label={s.name.trim() || "Untitled section"}
               data-testid={`sc-section-${s.stableKey}`}
-              className="rounded-lg border border-border"
+              className={
+                responsiveEnabled
+                  ? "min-w-0 max-w-full rounded-lg border border-border"
+                  : "rounded-lg border border-border"
+              }
             >
-              <div className="sticky top-0 z-10 flex items-center gap-2 rounded-t-lg border-b border-border bg-muted px-3 py-2">
+              <div
+                className={
+                  responsiveEnabled
+                    ? "sticky top-0 z-10 flex min-w-0 flex-wrap items-center gap-2 rounded-t-lg border-b border-border bg-muted px-3 py-2"
+                    : "sticky top-0 z-10 flex items-center gap-2 rounded-t-lg border-b border-border bg-muted px-3 py-2"
+                }
+              >
                 <button
                   type="button"
                   data-testid={`sc-section-toggle-${s.stableKey}`}
                   aria-expanded={!collapsed}
                   aria-label={collapsed ? "Expand section" : "Collapse section"}
                   onClick={() => selection.toggleSectionCollapsed(s.stableKey)}
-                  className="text-muted-foreground"
+                  className={
+                    responsiveEnabled
+                      ? "inline-flex min-h-11 min-w-11 items-center justify-center text-muted-foreground"
+                      : "text-muted-foreground"
+                  }
                 >
                   {collapsed ? "▸" : "▾"}
                 </button>
@@ -155,17 +184,28 @@ export function SingleColumnFormBuilder({
                   placeholder="Section name"
                   disabled={isReadOnly}
                   onChange={(e) => model.handleSectionsRename(s.uid, e.target.value)}
-                  className="flex-1 bg-transparent font-semibold outline-none"
+                  className={
+                    responsiveEnabled
+                      ? "min-w-0 basis-full bg-transparent font-semibold outline-none sm:basis-auto sm:flex-1"
+                      : "flex-1 bg-transparent font-semibold outline-none"
+                  }
                 />
                 <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
                   {labeled}/{list.length} labeled
                 </span>
                 {!isReadOnly && (
-                  <span className="flex shrink-0 gap-2 text-xs text-muted-foreground">
+                  <span
+                    className={
+                      responsiveEnabled
+                        ? "flex min-w-0 flex-wrap gap-2 text-xs text-muted-foreground"
+                        : "flex shrink-0 gap-2 text-xs text-muted-foreground"
+                    }
+                  >
                     <button
                       type="button"
                       data-testid={`sc-section-add-q-${s.stableKey}`}
                       onClick={() => commands.addQuestion(s.stableKey)}
+                      className={responsiveEnabled ? "min-h-11 px-2" : undefined}
                     >
                       + Question
                     </button>
@@ -174,6 +214,11 @@ export function SingleColumnFormBuilder({
                       data-testid={`sc-section-up-${s.stableKey}`}
                       aria-label="Move section up"
                       onClick={() => model.handleSectionsMoveUp(s.uid)}
+                      className={
+                        responsiveEnabled
+                          ? "inline-flex min-h-11 min-w-11 items-center justify-center"
+                          : undefined
+                      }
                     >
                       ↑
                     </button>
@@ -182,6 +227,11 @@ export function SingleColumnFormBuilder({
                       data-testid={`sc-section-down-${s.stableKey}`}
                       aria-label="Move section down"
                       onClick={() => model.handleSectionsMoveDown(s.uid)}
+                      className={
+                        responsiveEnabled
+                          ? "inline-flex min-h-11 min-w-11 items-center justify-center"
+                          : undefined
+                      }
                     >
                       ↓
                     </button>
@@ -189,7 +239,11 @@ export function SingleColumnFormBuilder({
                       type="button"
                       data-testid={`sc-section-delete-${s.stableKey}`}
                       onClick={() => commands.deleteSection(s.uid)}
-                      className="text-destructive"
+                      className={
+                        responsiveEnabled
+                          ? "min-h-11 px-2 text-destructive"
+                          : "text-destructive"
+                      }
                     >
                       Delete
                     </button>
@@ -271,6 +325,7 @@ export function SingleColumnFormBuilder({
                                     onUpdate={(patch) =>
                                       model.handleUpdateQuestion(q.uid, patch)
                                     }
+                                    responsiveEnabled={responsiveEnabled}
                                   />
                                 </>
                               )}

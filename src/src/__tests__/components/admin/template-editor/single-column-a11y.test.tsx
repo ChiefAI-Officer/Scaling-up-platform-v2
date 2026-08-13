@@ -28,7 +28,7 @@ jest.mock("@/components/admin/template-editor/sections-serialization", () => {
 });
 afterEach(() => cleanup());
 
-function props() {
+function props(mobileResponsiveEnabled = false) {
   return {
     template: {
       id: "tpl_1",
@@ -70,6 +70,7 @@ function props() {
     testModeEnabled: true,
     safeToPublishEnabled: true,
     singleColumnEnabled: true,
+    mobileResponsiveEnabled,
   };
 }
 
@@ -95,5 +96,18 @@ describe("SingleColumnFormBuilder a11y (ED6 T13)", () => {
       .getByRole("button", { name: "Revenue" })
       .closest('[data-testid^="question-card-"]')!;
     expect(card).toHaveAttribute("aria-current", "true");
+  });
+
+  it("contains the compact builder and keeps section commands touch-sized", () => {
+    render(<TemplateEditorTabbed {...props(true)} />);
+
+    expect(screen.getByTestId("single-column-builder")).toHaveClass("min-w-0");
+    expect(screen.getByTestId("sc-section-add-q-S1")).toHaveClass("min-h-11");
+    expect(screen.getByTestId("sc-section-up-S1")).toHaveClass("min-h-11");
+    expect(screen.getByTestId("sc-section-down-S1")).toHaveClass("min-h-11");
+    expect(screen.getByTestId("sc-section-delete-S1")).toHaveClass("min-h-11");
+
+    fireEvent.click(screen.getByTestId("sc-section-add-q-S1"));
+    expect(screen.getAllByTestId(/question-card-/)).toHaveLength(2);
   });
 });

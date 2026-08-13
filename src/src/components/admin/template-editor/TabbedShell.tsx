@@ -328,6 +328,8 @@ export interface TabbedShellProps {
    * inert today (accepted + defaulted, not yet read). Presentation-only.
    */
   previewSettingsEnabled?: boolean;
+  /** Mobile-responsive presentation gate. Default false preserves editor DOM/classes. */
+  mobileResponsiveEnabled?: boolean;
   /**
    * Template-creation simplification — server-computed and forwarded only to
    * the existing Scoring & Tiers tab. Default false preserves legacy copy.
@@ -455,6 +457,7 @@ export function TabbedShell({
   // it feeds `ed10Active` (below), which humanizes the header pills; Task 10
   // mounts the Preview + Settings tabs when `ed10Active`.
   previewSettingsEnabled = false,
+  mobileResponsiveEnabled = false,
   plainLanguageScoringEnabled = false,
   reportStylesEnabled = false,
   adminOwnedPresentationEnabled = false,
@@ -737,10 +740,29 @@ export function TabbedShell({
   }, [versionLifecycleEnabled, allVersions, version.id, isPublished]);
 
   return (
-    <div className="space-y-6">
+    <div
+      className={
+        mobileResponsiveEnabled
+          ? "template-editor-responsive min-w-0 max-w-full space-y-6"
+          : "space-y-6"
+      }
+      {...(mobileResponsiveEnabled ? { "data-responsive-editor": "" } : {})}
+    >
       {/* ───────── Header (WF16/17/18 page-header-row) ───────── */}
-      <header className="wf-page-header-row">
-        <div className="wf-page-title-block">
+      <header
+        className={
+          mobileResponsiveEnabled
+            ? "wf-page-header-row min-w-0 flex-col sm:flex-row"
+            : "wf-page-header-row"
+        }
+      >
+        <div
+          className={
+            mobileResponsiveEnabled
+              ? "wf-page-title-block min-w-0 max-w-full break-words"
+              : "wf-page-title-block"
+          }
+        >
           {/* Wave ED9 (spec 19al-plan, T11, D1) — hide the page-header title
               EXACTLY when the Google-Forms Build body is active (flag ON +
               single mode); the FormHeaderCard hero owns the title there. Must
@@ -778,7 +800,16 @@ export function TabbedShell({
           </div>
         </div>
 
-        <div className="wf-page-action-row">
+        <div
+          className={
+            mobileResponsiveEnabled
+              ? "wf-page-action-row min-w-0 w-full flex-col items-stretch sm:w-auto sm:flex-row sm:items-center"
+              : "wf-page-action-row"
+          }
+          {...(mobileResponsiveEnabled
+            ? { "data-testid": "template-editor-actions" }
+            : {})}
+        >
           {safeToPublishAvailable && (
             <SafeToPublishBadge
               questions={questions}
@@ -854,7 +885,19 @@ export function TabbedShell({
         onValueChange={handleTabChange}
         aria-label="Template editor tabs"
       >
-        <TabsList className="mb-6">
+        <TabsList
+          className={
+            mobileResponsiveEnabled
+              ? "mb-6 min-w-0 max-w-full w-full overflow-x-auto"
+              : "mb-6"
+          }
+          {...(mobileResponsiveEnabled
+            ? {
+                "aria-label": "Template editor tabs",
+                "data-responsive-tabs": "",
+              }
+            : {})}
+        >
           {/* ED10 (spec 19am-plan, T10) — Metadata folds into Settings and a
               Preview tab leads. Flag OFF ⇒ the Metadata trigger renders EXACTLY
               as today (byte-identical). */}
@@ -1020,6 +1063,7 @@ export function TabbedShell({
                   publishedOptionKeys={publishedOptionKeys}
                   onGoToSections={() => handleTabChange("sections")}
                   adminOwnedPresentationEnabled={adminOwnedPresentationEnabled}
+                  responsiveEnabled={mobileResponsiveEnabled}
                 />
               ) : (
                 <SingleColumnFormBuilder
@@ -1030,6 +1074,7 @@ export function TabbedShell({
                   conditionalEnabled={conditionalAuthoringEnabled}
                   publishedOptionKeys={publishedOptionKeys}
                   onGoToSections={() => handleTabChange("sections")}
+                  responsiveEnabled={mobileResponsiveEnabled}
                 />
               )
             ) : threePaneEnabled ? (

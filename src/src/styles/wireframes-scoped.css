@@ -105,6 +105,43 @@
   flex-wrap: wrap;
 }
 
+/* Task 8C: opt-in compact editor containment. These selectors stay inert
+   unless TabbedShell receives the server-resolved responsive flag. */
+.wf-scope .template-editor-responsive .wf-page-title-block,
+.wf-scope .template-editor-responsive .wf-page-pill-row,
+.wf-scope .template-editor-responsive .wf-page-action-row {
+  min-width: 0;
+  max-width: 100%;
+}
+.wf-scope .template-editor-responsive [data-responsive-tabs] {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+.wf-scope .template-editor-responsive [data-responsive-tabs] [role="tab"],
+.wf-scope .template-editor-responsive .wf-page-action-row .wf-btn,
+.wf-scope .template-editor-responsive [data-responsive-builder] button:not(:disabled),
+.wf-scope .template-editor-responsive [data-responsive-builder] [role="button"]:not([aria-disabled="true"]),
+.wf-scope .template-editor-responsive [data-responsive-builder] select:not(:disabled),
+.wf-scope .template-editor-responsive [data-responsive-inspector] button:not(:disabled),
+.wf-scope .template-editor-responsive [data-responsive-inspector] select:not(:disabled),
+.wf-scope .template-editor-responsive [data-responsive-inspector] input:not([type="checkbox"]):not(:disabled) {
+  min-height: 44px;
+}
+.wf-scope .template-editor-responsive [data-responsive-builder] button:not(:disabled),
+.wf-scope .template-editor-responsive [data-responsive-builder] [role="button"]:not([aria-disabled="true"]),
+.wf-scope .template-editor-responsive [data-responsive-inspector] button:not(:disabled) {
+  min-width: 44px;
+}
+@media (max-width: 639px) {
+  .wf-scope .template-editor-responsive .wf-page-header-row,
+  .wf-scope .template-editor-responsive .wf-page-action-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
 /* ===========================================================
    Card
    =========================================================== */
