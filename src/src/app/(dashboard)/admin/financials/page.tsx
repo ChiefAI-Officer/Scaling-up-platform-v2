@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { formatCurrency, formatEventDateUTC } from "@/lib/utils";
 import { FadeUp, StaggerContainer, StaggerItem } from "@/components/ui/animated";
 import { FinancialFilters } from "@/components/financials/financial-filters";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 
 type PeriodFilter = "month" | "quarter" | "year" | "all" | "custom";
 
@@ -59,6 +60,7 @@ function getPeriodLabel(period: PeriodFilter, startDate?: string, endDate?: stri
 }
 
 export default async function FinancialDashboardPage({ searchParams }: PageProps) {
+  const mobileResponsiveEnabled = isMobileResponsiveEnabled();
   const { period: rawPeriod, coachId, categoryId, startDate, endDate } = await searchParams;
   const validPeriods = ["month", "quarter", "year", "all", "custom"];
   const period: PeriodFilter = validPeriods.includes(rawPeriod || "")
@@ -204,9 +206,9 @@ export default async function FinancialDashboardPage({ searchParams }: PageProps
     workshopRevenue.length > 0 ? Math.round(totalRevenueCents / workshopRevenue.length) : 0;
 
   return (
-    <div className="space-y-6">
+    <div className={mobileResponsiveEnabled ? "min-w-0 max-w-full space-y-6" : "space-y-6"}>
       <FadeUp>
-        <div className="flex items-center justify-between">
+        <div className={mobileResponsiveEnabled ? "flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between" : "flex items-center justify-between"}>
           <div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
               <Link href="/admin/dashboard" className="hover:text-foreground">Admin Dashboard</Link>
@@ -262,18 +264,18 @@ export default async function FinancialDashboardPage({ searchParams }: PageProps
             {categoryRevenue.map((cat) => {
               const pct = totalRevenueCents > 0 ? Math.round((cat.revenue / totalRevenueCents) * 100) : 0;
               return (
-                <div key={cat.id} className="flex items-center gap-4">
-                  <div className="w-40 text-sm font-medium text-foreground truncate">{cat.name}</div>
+                <div key={cat.id} className={mobileResponsiveEnabled ? "grid grid-cols-[minmax(0,1fr)_auto] gap-2" : "flex items-center gap-4"}>
+                  <div className={mobileResponsiveEnabled ? "min-w-0 break-words text-sm font-medium text-foreground" : "w-40 text-sm font-medium text-foreground truncate"}>{cat.name}</div>
                   <div className="flex-1 bg-muted rounded-full h-4 overflow-hidden">
                     <div
                       className="bg-primary h-full rounded-full transition-all"
                       style={{ width: `${Math.max(pct, 2)}%` }}
                     />
                   </div>
-                  <div className="w-24 text-right text-sm font-semibold text-foreground">
+                  <div className={mobileResponsiveEnabled ? "text-right text-sm font-semibold text-foreground" : "w-24 text-right text-sm font-semibold text-foreground"}>
                     {formatCurrency(cat.revenue)}
                   </div>
-                  <div className="w-12 text-right text-xs text-muted-foreground">{pct}%</div>
+                  <div className={mobileResponsiveEnabled ? "text-right text-xs text-muted-foreground" : "w-12 text-right text-xs text-muted-foreground"}>{pct}%</div>
                 </div>
               );
             })}
@@ -288,7 +290,7 @@ export default async function FinancialDashboardPage({ searchParams }: PageProps
         <div className="px-5 py-4 border-b border-border">
           <h3 className="text-lg font-semibold text-foreground">Revenue by Workshop</h3>
         </div>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto" role="region" aria-label="Revenue by workshop table">
           <table className="min-w-full divide-y divide-border">
             <thead className="bg-muted">
               <tr>
