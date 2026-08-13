@@ -22,8 +22,15 @@ import {
   fourDecisionDomains,
 } from "@/lib/assessments/public-result-summary";
 
+export interface PublicAssessmentCoachLink {
+  campaignId: string;
+  campaignName: string;
+  templateAlias: string;
+  url: string;
+}
+
 interface ReferredResultsListProps {
-  coachLink: string | null;
+  coachLinks: PublicAssessmentCoachLink[];
   initialQuery?: string;
   initialTemplateId?: string;
   initialCursorTrail?: string[];
@@ -233,11 +240,22 @@ function ResultActions({
 }
 
 export function ReferredResultsList({
-  coachLink,
+  coachLinks,
   initialQuery = "",
   initialTemplateId = "",
   initialCursorTrail = [],
 }: ReferredResultsListProps) {
+  const defaultCoachLink =
+    coachLinks.find((link) => link.templateAlias === "scaling-up-quick") ??
+    coachLinks[0] ??
+    null;
+  const [selectedCoachCampaignId, setSelectedCoachCampaignId] = useState(
+    defaultCoachLink?.campaignId ?? "",
+  );
+  const selectedCoachLink =
+    coachLinks.find(
+      (link) => link.campaignId === selectedCoachCampaignId,
+    ) ?? defaultCoachLink;
   const [initialState] = useState(() => ({
     query: initialQuery.trim(),
     templateId: initialTemplateId.trim(),
@@ -426,35 +444,62 @@ export function ReferredResultsList({
 
   return (
     <div className="space-y-5">
-      {coachLink && (
-        <section className="grid gap-4 rounded-xl border border-primary/25 border-l-4 border-l-primary bg-gradient-to-r from-card to-primary/[0.03] p-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
-          <div className="min-w-0">
-            <h2 className="text-sm font-bold text-foreground">
-              Your Quick Assessment link
-            </h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Share this link. Completed assessments will appear below.
-            </p>
-            <div className="mt-3 flex min-w-0 items-center gap-2">
-              <code
-                className="min-w-0 flex-1 truncate rounded-md border border-border bg-background px-3 py-2 text-xs text-muted-foreground"
-                title={coachLink}
+      <section className="grid gap-4 rounded-xl border border-primary/25 border-l-4 border-l-primary bg-gradient-to-r from-card to-primary/[0.03] p-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+        <div className="min-w-0">
+          <h2 className="text-sm font-bold text-foreground">
+            Your public assessment links
+          </h2>
+          {selectedCoachLink ? (
+            <>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Choose an assessment, then copy your coach-specific link.
+              </p>
+              <label
+                htmlFor="referred-results-coach-link"
+                className="mt-3 block text-xs font-medium text-muted-foreground"
               >
-                {coachLink}
-              </code>
-              <CopyLinkButton url={coachLink} />
-            </div>
-          </div>
-          <div className="border-border text-left md:min-w-32 md:border-l md:pl-5 md:text-center">
-            <strong className="block font-serif text-3xl font-normal text-primary">
-              {ownedTotalCount ?? "—"}
-            </strong>
-            <span className="text-xs text-muted-foreground">
-              referred results
-            </span>
-          </div>
-        </section>
-      )}
+                Public assessment link
+              </label>
+              <select
+                id="referred-results-coach-link"
+                value={selectedCoachCampaignId}
+                onChange={(event) =>
+                  setSelectedCoachCampaignId(event.target.value)
+                }
+                className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {coachLinks.map((link) => (
+                  <option key={link.campaignId} value={link.campaignId}>
+                    {link.campaignName}
+                  </option>
+                ))}
+              </select>
+              <div className="mt-3 flex min-w-0 items-center gap-2">
+                <code
+                  className="min-w-0 flex-1 truncate rounded-md border border-border bg-background px-3 py-2 text-xs text-muted-foreground"
+                  data-testid="coach-public-link"
+                  title={selectedCoachLink.url}
+                >
+                  {selectedCoachLink.url}
+                </code>
+                <CopyLinkButton url={selectedCoachLink.url} />
+              </div>
+            </>
+          ) : (
+            <p className="mt-1 text-xs text-muted-foreground">
+              No public assessments are available right now.
+            </p>
+          )}
+        </div>
+        <div className="border-border text-left md:min-w-32 md:border-l md:pl-5 md:text-center">
+          <strong className="block font-serif text-3xl font-normal text-primary">
+            {ownedTotalCount ?? "—"}
+          </strong>
+          <span className="text-xs text-muted-foreground">
+            referred results
+          </span>
+        </div>
+      </section>
 
       <div className="flex flex-col gap-3 md:flex-row md:items-end">
         <form
