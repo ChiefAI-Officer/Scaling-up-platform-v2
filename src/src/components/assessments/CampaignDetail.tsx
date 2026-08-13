@@ -2536,9 +2536,10 @@ export function CampaignDetail({
                             <button
                               type="button"
                               onClick={() => setRemoveTarget(row)}
-                              className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded border border-border text-destructive hover:bg-destructive/10"
+                              className={responsiveEnabled ? "inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded border border-border px-2 py-1 text-xs font-medium text-destructive hover:bg-destructive/10" : "inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded border border-border text-destructive hover:bg-destructive/10"}
                               data-testid={`remove-respondent-btn-${row.respondent.id}`}
                               aria-label={`Remove ${row.respondent.firstName} ${row.respondent.lastName}`}
+                              {...(responsiveEnabled ? { "data-touch-target": true } : {})}
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>

@@ -194,6 +194,34 @@ describe("CampaignDetail — respondent removal (CHI-35 / Jeff #59)", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("marks and sizes the real responsive Remove respondent action while preserving its exact default-off contract", () => {
+    const { rerender } = render(
+      <CampaignDetail
+        initialOverview={overview}
+        initialRespondents={[removableRespondent]}
+      />,
+    );
+
+    const disabledRemove = screen.getByRole("button", { name: "Remove Alice Smith" });
+    expect(disabledRemove).toHaveAttribute(
+      "class",
+      "inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded border border-border text-destructive hover:bg-destructive/10",
+    );
+    expect(disabledRemove).not.toHaveAttribute("data-touch-target");
+
+    rerender(
+      <CampaignDetail
+        responsiveEnabled
+        initialOverview={overview}
+        initialRespondents={[removableRespondent]}
+      />,
+    );
+
+    const responsiveRemove = screen.getByRole("button", { name: "Remove Alice Smith" });
+    expect(responsiveRemove).toHaveClass("min-h-11", "min-w-11");
+    expect(responsiveRemove).toHaveAttribute("data-touch-target");
+  });
+
   it("contains the responsive overview text and wraps a long campaign alias without changing flag-off classes", () => {
     const longAlias = "a-very-long-campaign-alias-that-must-wrap-anywhere-at-phone-and-tablet-widths";
     const longOverview = {
