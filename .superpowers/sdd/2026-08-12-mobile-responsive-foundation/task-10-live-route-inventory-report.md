@@ -73,7 +73,10 @@ the preview URL.
 
 ## Commit
 
-Pending at time of report writing; updated after the scoped commit.
+Scoped harness correction: `8bed20126fbec090ff82f89f0277c5a21196cf6f`
+(`test: correct mobile route inventories`). This evidence receipt is committed
+immediately after that correction so it can name the immutable implementation
+commit without a self-referential commit hash.
 
 ## Self-review concerns
 
