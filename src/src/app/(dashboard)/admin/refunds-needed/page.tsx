@@ -82,14 +82,15 @@ export default async function RefundsNeededPage() {
               enabled={mobileResponsiveEnabled}
               label="Refunds needed"
               wideFrom="md"
+              wideRegionLabel="Refunds needed table"
               compact={<div className="space-y-3">{rows.map((r) => (
                 <ResponsiveRecord key={r.id}>
                   <ResponsiveRecordHeader title={`${r.firstName} ${r.lastName}`} status={<span className="text-xs text-muted-foreground">Refund needed</span>} />
-                  <ResponsiveRecordMeta items={[{ label: "Workshop", value: r.workshop.title }, { label: "Amount", value: r.amountPaidCents != null ? formatCurrency(r.amountPaidCents) : "—" }, { label: "Cancelled", value: formatTimestamp(r.workshop.updatedAt) }, { label: "Stripe payment", value: r.stripePaymentId ? <a className="underline" href={`https://dashboard.stripe.com/payments/${r.stripePaymentId}`} target="_blank" rel="noreferrer">View in Stripe</a> : "—" }]} />
+                  <ResponsiveRecordMeta items={[{ label: "Workshop", value: r.workshop.title }, { label: "Amount", value: r.amountPaidCents != null ? formatCurrency(r.amountPaidCents) : "—" }, { label: "Cancelled", value: formatTimestamp(r.workshop.updatedAt) }, { label: "Stripe payment", value: r.stripePaymentId ? <a className="inline-flex min-h-11 items-center underline" href={`https://dashboard.stripe.com/payments/${r.stripePaymentId}`} target="_blank" rel="noreferrer">View in Stripe</a> : "—" }]} />
                   <ResponsiveRecordActions primary={<MarkRefundedButton registrationId={r.id} responsiveEnabled />} />
                 </ResponsiveRecord>
               ))}</div>}
-              wide={<div role="region" aria-label="Refunds needed table"><Table>
+              wide={<Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Registrant</TableHead>
@@ -123,7 +124,7 @@ export default async function RefundsNeededPage() {
                           href={`https://dashboard.stripe.com/payments/${r.stripePaymentId}`}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-xs underline"
+                          className={mobileResponsiveEnabled ? "inline-flex min-h-11 items-center text-xs underline" : "text-xs underline"}
                         >
                           View in Stripe ↗
                         </a>
@@ -137,7 +138,7 @@ export default async function RefundsNeededPage() {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table></div>}
+            </Table>}
             />
           )}
         </CardContent>

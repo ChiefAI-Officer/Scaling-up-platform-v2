@@ -30,6 +30,7 @@ it("shows the real category identity and edit action in compact records", async 
   expect(list).toHaveTextContent("Growth");
   expect(list).toHaveTextContent("Growth workshops");
   expect(list).toHaveTextContent("2");
+  expect(list).toHaveTextContent("Pricing tiers");
   expect(screen.getByRole("button", { name: "Edit Growth" })).toHaveClass("min-h-11");
   await waitFor(() => expect(global.fetch).toHaveBeenCalled());
 });
@@ -69,9 +70,13 @@ it("makes responsive pricing filters and approval actions reachable at 44px", as
   await screen.findByRole("list", { name: "Pricing tiers" });
   expect(screen.getByRole("button", { name: "All Categories" })).toHaveClass("min-h-11");
   expect(screen.getByRole("button", { name: "Edit Standard" })).toHaveClass("min-h-11");
+  expect(screen.getByRole("list", { name: "Pricing tiers" })).toHaveTextContent("Category");
+  expect(screen.getByRole("list", { name: "Pricing tiers" })).toHaveTextContent("Workshops");
+  expect(screen.getByRole("button", { name: "All Categories" }).parentElement).toHaveClass("flex-wrap");
   unmount();
 
   render(<ApprovalsPage responsiveEnabled />);
   expect(await screen.findByRole("button", { name: "Approve" })).toHaveClass("min-h-11");
   expect(screen.getByRole("button", { name: "Deny" })).toHaveClass("min-h-11");
+  expect(screen.getByRole("article")).toBeInTheDocument();
 });

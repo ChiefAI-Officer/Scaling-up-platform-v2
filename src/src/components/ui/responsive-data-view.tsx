@@ -12,6 +12,7 @@ export interface ResponsiveDataViewProps {
   compact: ReactNode;
   wide: ReactNode;
   wideFrom?: keyof typeof visibility;
+  wideRegionLabel?: string;
 }
 
 export function ResponsiveDataView({
@@ -20,6 +21,7 @@ export function ResponsiveDataView({
   compact,
   wide,
   wideFrom = "md",
+  wideRegionLabel,
 }: ResponsiveDataViewProps) {
   if (!enabled) return <>{wide}</>;
 
@@ -31,7 +33,7 @@ export function ResponsiveDataView({
         {compact}
       </div>
       <div data-testid="responsive-wide-view" className={classes.wide}>
-        {wide}
+        {wideRegionLabel ? <div role="region" aria-label={wideRegionLabel} className="overflow-x-auto">{wide}</div> : wide}
       </div>
     </>
   );

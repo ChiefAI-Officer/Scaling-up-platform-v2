@@ -264,9 +264,9 @@ export default async function FinancialDashboardPage({ searchParams }: PageProps
             {categoryRevenue.map((cat) => {
               const pct = totalRevenueCents > 0 ? Math.round((cat.revenue / totalRevenueCents) * 100) : 0;
               return (
-                <div key={cat.id} className={mobileResponsiveEnabled ? "grid grid-cols-[minmax(0,1fr)_auto] gap-2" : "flex items-center gap-4"}>
+                <div key={cat.id} className={mobileResponsiveEnabled ? "grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-2" : "flex items-center gap-4"}>
                   <div className={mobileResponsiveEnabled ? "min-w-0 break-words text-sm font-medium text-foreground" : "w-40 text-sm font-medium text-foreground truncate"}>{cat.name}</div>
-                  <div className="flex-1 bg-muted rounded-full h-4 overflow-hidden">
+                  <div className={mobileResponsiveEnabled ? "col-span-2 h-4 overflow-hidden rounded-full bg-muted" : "flex-1 bg-muted rounded-full h-4 overflow-hidden"}>
                     <div
                       className="bg-primary h-full rounded-full transition-all"
                       style={{ width: `${Math.max(pct, 2)}%` }}
@@ -290,7 +290,7 @@ export default async function FinancialDashboardPage({ searchParams }: PageProps
         <div className="px-5 py-4 border-b border-border">
           <h3 className="text-lg font-semibold text-foreground">Revenue by Workshop</h3>
         </div>
-        <div className="overflow-x-auto" role="region" aria-label="Revenue by workshop table">
+        <div className="overflow-x-auto" {...(mobileResponsiveEnabled ? { role: "region", "aria-label": "Revenue by workshop table" } : {})}>
           <table className="min-w-full divide-y divide-border">
             <thead className="bg-muted">
               <tr>

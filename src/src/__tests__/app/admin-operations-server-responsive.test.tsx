@@ -39,6 +39,15 @@ it("keeps the financial comparison table bounded and named", async () => {
   expect(screen.getByRole("region", { name: "Revenue by workshop table" })).toHaveClass("overflow-x-auto");
 });
 
+it("preserves original financial and refund table structure when responsive mode is disabled", async () => {
+  mockResponsiveFlag.mockReturnValue(false);
+  const financials = render(await FinancialsPage({ searchParams: Promise.resolve({ period: "all" }) }));
+  expect(screen.queryByRole("region", { name: "Revenue by workshop table" })).not.toBeInTheDocument();
+  financials.unmount();
+  render(await RefundsPage());
+  expect(screen.queryByRole("region", { name: "Refunds needed table" })).not.toBeInTheDocument();
+});
+
 it("uses responsive shells while keeping the real refund and settings actions", async () => {
   const refunds = render(await RefundsPage());
   const list = screen.getByRole("list", { name: "Refunds needed" });

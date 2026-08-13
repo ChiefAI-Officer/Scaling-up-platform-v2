@@ -217,7 +217,7 @@ export default function PricingTiersPage({ responsiveEnabled = false }: { respon
 
             {/* Category Filter */}
             {categories.length > 0 && (
-                <div className={responsiveEnabled ? "mb-4 flex gap-2 overflow-x-auto pb-1" : "flex gap-2 mb-4 flex-wrap"}>
+                <div className={responsiveEnabled ? "mb-4 flex flex-wrap gap-2 sm:flex-nowrap" : "flex gap-2 mb-4 flex-wrap"}>
                     <button
                         onClick={() => setFilterCategory("ALL")}
                         className={`${responsiveEnabled ? "min-h-11 shrink-0" : ""} px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
@@ -352,10 +352,11 @@ export default function PricingTiersPage({ responsiveEnabled = false }: { respon
                     enabled={responsiveEnabled}
                     label="Pricing tiers"
                     wideFrom="md"
+                    wideRegionLabel="Pricing tiers table"
                     compact={<div className="space-y-3">{filteredTiers.map((tier) => (
                         <ResponsiveRecord key={tier.id}>
                             <ResponsiveRecordHeader title={tier.name} status={<span className="text-xs text-muted-foreground">{tier.isActive ? "Active" : "Inactive"}</span>} />
-                            <ResponsiveRecordMeta items={[{ label: "Amount", value: formatPrice(tier.amountCents) }, { label: "Workshop type", value: tier.category.name }]} />
+                            <ResponsiveRecordMeta items={[{ label: "Amount", value: formatPrice(tier.amountCents) }, { label: "Category", value: tier.category.name }, { label: "Workshops", value: tier._count.workshops }]} />
                             <ResponsiveRecordActions
                                 primary={<button aria-label={`Edit ${tier.name}`} onClick={() => openEdit(tier)} className="rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground">Edit</button>}
                                 secondary={<>{<ResponsiveActionsItem onSelect={() => handleToggleActive(tier)} className="min-h-11 cursor-pointer px-3 py-2 text-sm">{tier.isActive ? "Deactivate" : "Activate"}</ResponsiveActionsItem>}{tier._count.workshops === 0 ? <ResponsiveActionsItem onSelect={() => handleDelete(tier)} className="min-h-11 cursor-pointer px-3 py-2 text-sm text-destructive">Delete</ResponsiveActionsItem> : null}</>}
@@ -363,7 +364,7 @@ export default function PricingTiersPage({ responsiveEnabled = false }: { respon
                             />
                         </ResponsiveRecord>
                     ))}</div>}
-                    wide={<div className="bg-card rounded-xl shadow-sm border overflow-hidden" aria-label="Pricing tiers table">
+                    wide={<div className="bg-card rounded-xl shadow-sm border overflow-hidden">
                     <table className="min-w-full divide-y divide-border">
                         <thead className="bg-muted">
                             <tr>
@@ -410,7 +411,7 @@ export default function PricingTiersPage({ responsiveEnabled = false }: { respon
                                     <td className="px-6 py-4">
                                         <button
                                             onClick={() => handleToggleActive(tier)}
-                                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium cursor-pointer ${
+                                            className={`${responsiveEnabled ? "min-h-11" : ""} inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium cursor-pointer ${
                                                 tier.isActive
                                                     ? "bg-success/10 text-success hover:bg-success/20"
                                                     : "bg-muted text-muted-foreground hover:bg-accent"
@@ -422,14 +423,14 @@ export default function PricingTiersPage({ responsiveEnabled = false }: { respon
                                     <td className="px-6 py-4 text-right text-sm space-x-3">
                                         <button
                                             onClick={() => openEdit(tier)}
-                                            className="text-primary hover:text-primary/80 font-medium"
+                                            className={`${responsiveEnabled ? "inline-flex min-h-11 items-center" : ""} text-primary hover:text-primary/80 font-medium`}
                                         >
                                             Edit
                                         </button>
                                         {tier._count.workshops === 0 && (
                                             <button
                                                 onClick={() => handleDelete(tier)}
-                                                className="text-destructive hover:text-destructive/80 font-medium"
+                                                className={`${responsiveEnabled ? "inline-flex min-h-11 items-center" : ""} text-destructive hover:text-destructive/80 font-medium`}
                                             >
                                                 Delete
                                             </button>

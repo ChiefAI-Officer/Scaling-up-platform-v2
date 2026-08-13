@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { ApprovalThread } from "@/components/approvals/approval-thread";
 import { formatTimestamp } from "@/lib/utils";
+import { ResponsiveRecord, ResponsiveRecordMeta } from "@/components/ui/responsive-record";
 
 type ApprovalStatus = "PENDING" | "APPROVED" | "DENIED" | "EXPIRED" | "INFO_REQUESTED" | "COUNTER_OFFERED";
 type FilterStatus = ApprovalStatus | "ALL";
@@ -215,6 +216,7 @@ export default function ApprovalsPage({ responsiveEnabled = false }: { responsiv
     if (status === "COUNTER_OFFERED") return "Counter-Offered";
     return status.charAt(0) + status.slice(1).toLowerCase();
   };
+  const ApprovalCard = responsiveEnabled ? ResponsiveRecord : "div";
 
   return (
     <motion.div
@@ -228,7 +230,7 @@ export default function ApprovalsPage({ responsiveEnabled = false }: { responsiv
       {actionError && (
         <div className="mb-4 flex items-center justify-between rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           <span>{actionError}</span>
-          <button onClick={() => setActionError(null)} className="ml-4 font-bold">×</button>
+          <button onClick={() => setActionError(null)} className={responsiveEnabled ? "ml-4 inline-flex min-h-11 min-w-11 items-center justify-center font-bold" : "ml-4 font-bold"}>×</button>
         </div>
       )}
 
@@ -325,7 +327,7 @@ export default function ApprovalsPage({ responsiveEnabled = false }: { responsiv
 
       <p className="mb-4 text-sm text-muted-foreground">Showing {titleText}</p>
 
-      <div className="flex flex-col gap-4">
+      <div className={responsiveEnabled ? "flex flex-col gap-4" : "flex flex-col gap-4"} {...(responsiveEnabled ? { role: "list", "aria-label": "Approvals" } : {})}>
         {isLoading ? (
           <div className="text-center p-12 text-muted-foreground bg-card rounded-xl">
             <p>Loading approvals...</p>
@@ -341,7 +343,7 @@ export default function ApprovalsPage({ responsiveEnabled = false }: { responsiv
           </div>
         ) : (
           approvals.map((approval) => (
-            <div
+            <ApprovalCard
               key={approval.id}
               className={`${responsiveEnabled ? "min-w-0 grid-cols-1" : "grid grid-cols-[1fr_auto] items-center"} bg-card p-6 rounded-xl shadow-sm grid gap-4 ${
                 approval.escalatedAt ? "border-l-4 border-destructive" : ""
@@ -369,7 +371,7 @@ export default function ApprovalsPage({ responsiveEnabled = false }: { responsiv
                 {approval.workshopId ? (
                   <Link
                     href={`/workshops/${approval.workshopId}`}
-                    className="text-foreground hover:underline hover:text-primary transition-colors"
+                    className={responsiveEnabled ? "inline-flex min-h-11 items-center text-foreground hover:underline hover:text-primary transition-colors" : "text-foreground hover:underline hover:text-primary transition-colors"}
                   >
                     {approval.details}
                   </Link>
@@ -426,6 +428,7 @@ export default function ApprovalsPage({ responsiveEnabled = false }: { responsiv
                   </div>
                 )}
                 <ApprovalThread messages={approval.messages ?? []} perspective="admin" />
+                {responsiveEnabled && <ResponsiveRecordMeta items={[{ label: "Requested", value: formatTimestamp(approval.requestedAt) }, ...(approval.workshopCode ? [{ label: "Workshop code", value: approval.workshopCode }] : [])]} />}
                 <div className="flex gap-4 text-sm text-muted-foreground mt-1">
                   <span>
                     Requested: {formatTimestamp(approval.requestedAt)}
@@ -482,7 +485,7 @@ export default function ApprovalsPage({ responsiveEnabled = false }: { responsiv
                     </span>
                     {approval.status === "DENIED" && (
                       <button
-                        className="px-4 py-2 rounded-md font-medium text-sm cursor-pointer transition-all duration-200 bg-muted text-foreground hover:bg-accent border border-border disabled:opacity-50 disabled:cursor-not-allowed"
+                        className={`${responsiveEnabled ? "min-h-11" : ""} px-4 py-2 rounded-md font-medium text-sm cursor-pointer transition-all duration-200 bg-muted text-foreground hover:bg-accent border border-border disabled:opacity-50 disabled:cursor-not-allowed`}
                         onClick={() => handleAction(approval.id, "RESET_TO_PENDING")}
                         disabled={processing === approval.id}
                         title="Move back to pending for re-review"
@@ -493,7 +496,7 @@ export default function ApprovalsPage({ responsiveEnabled = false }: { responsiv
                   </>
                 )}
               </div>
-            </div>
+            </ApprovalCard>
           ))
         )}
       </div>

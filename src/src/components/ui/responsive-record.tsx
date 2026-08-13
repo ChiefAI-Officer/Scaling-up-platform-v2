@@ -1,9 +1,9 @@
 import { cloneElement, isValidElement, type ReactNode } from "react";
 import { ResponsiveActionsMenu } from "./responsive-actions-menu";
 
-export function ResponsiveRecord({ children }: { children: ReactNode }) {
+export function ResponsiveRecord({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <article className="min-w-0 rounded-xl border border-border bg-card p-4">
+    <article className={["min-w-0 rounded-xl border border-border bg-card p-4", className].filter(Boolean).join(" ")}>
       {children}
     </article>
   );
