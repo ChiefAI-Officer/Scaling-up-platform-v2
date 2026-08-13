@@ -128,19 +128,26 @@ describe("browser-blocked responsive harness source contract", () => {
     expect(source).toContain("referredResultsRoutes");
   });
 
-  it("covers all reachable admin create and operations owners in the static inventory", () => {
+  it("keeps unconditional admin owners static and conditionally discovers public-campaign creation", () => {
     const source = readE2e("mobile-responsive-admin.spec.ts");
+    const staticInventory = source.slice(
+      source.indexOf("export const ADMIN_ROUTES"),
+      source.indexOf("] as const;"),
+    );
 
     for (const route of [
       "/workshops/new",
       "/templates/new",
       "/admin/workflows/new",
       "/admin/assessments/delivery-holds",
-      "/admin/assessments/public-campaigns/new",
       "/admin/surveys/templates/new",
     ]) {
-      expect(source).toContain(`"${route}"`);
+      expect(staticInventory).toContain(`"${route}"`);
     }
+    expect(staticInventory).not.toContain('"/admin/assessments/public-campaigns/new"');
+    expect(source).toContain('const PUBLIC_CAMPAIGN_CREATE_ROUTE = "/admin/assessments/public-campaigns/new"');
+    expect(source).toMatch(/optionalHrefs\(\s*page,\s*"\/admin\/assessments\/public-campaigns",/);
+    expect(source).toContain("publicCampaignCreateRoutes");
     expect(source).not.toContain('"/admin/surveys/report-style-preview"');
   });
 

@@ -8,6 +8,7 @@ import {
 
 const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL || "admin@scalingup.com";
 const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD || "demo123";
+const PUBLIC_CAMPAIGN_CREATE_ROUTE = "/admin/assessments/public-campaigns/new";
 
 export const ADMIN_ROUTES = [
   "/dashboard", "/admin/dashboard", "/admin/approvals", "/admin/files", "/admin/financials",
@@ -17,7 +18,7 @@ export const ADMIN_ROUTES = [
   "/admin/assessments/aggregate", "/admin/assessments/campaigns",
   "/admin/assessments/import", "/admin/assessments/observability",
   "/admin/assessments/organizations", "/admin/assessments/public-campaigns",
-  "/admin/assessments/public-campaigns/new", "/admin/assessments/delivery-holds",
+  "/admin/assessments/delivery-holds",
   "/admin/assessments/templates", "/admin/assessments/templates/new",
   "/admin/categories", "/coaches", "/coaches/new", "/contacts",
   "/partners", "/surveys", "/templates", "/templates/new", "/workshops", "/workshops/new", "/bio",
@@ -109,6 +110,11 @@ test("populated admin routes are discovered from live links and fit every width"
   const workflowDetail = await firstMatchingHref(page, "/admin/workflows", /^\/admin\/workflows\/[^/?#]+(?:\?[^#]*)?$/, "workflow detail");
   const surveyTemplateDetail = await firstMatchingHref(page, "/admin/surveys", /^\/admin\/surveys\/templates\/[^/?#]+$/, "survey-template detail");
   const emailEditor = await firstMatchingHref(page, "/admin/transactional-emails", /^\/admin\/transactional-emails\/[^/?#]+$/, "transactional-email editor");
+  const publicCampaignCreateRoutes = await optionalHrefs(
+    page,
+    "/admin/assessments/public-campaigns",
+    [new RegExp(`^${PUBLIC_CAMPAIGN_CREATE_ROUTE}$`)],
+  );
 
   await page.goto(templateDetail, { waitUntil: "domcontentloaded" });
   await expect(page).toHaveURL(/\/admin\/assessments\/templates\/[^/]+\/versions\/[^/]+\/edit/);
@@ -132,6 +138,7 @@ test("populated admin routes are discovered from live links and fit every width"
     workflowDetail,
     surveyTemplateDetail,
     emailEditor,
+    ...publicCampaignCreateRoutes,
     ...optionalCampaignLinks,
   ])];
 
