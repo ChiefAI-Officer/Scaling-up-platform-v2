@@ -1158,6 +1158,27 @@
   background: hsl(var(--primary));
 }
 
+@media (max-width: 639px) {
+  .wf-scope [data-responsive-campaign-wizard] .space-y-6 > .flex.justify-end.pt-4,
+  .wf-scope [data-responsive-campaign-wizard] .space-y-6 > .flex.justify-between.pt-4 {
+    align-items: stretch;
+    flex-direction: column-reverse;
+    gap: 0.5rem;
+  }
+
+  .wf-scope [data-responsive-campaign-wizard] .space-y-6 > .flex.pt-4 > button,
+  .wf-scope [data-responsive-campaign-wizard] .space-y-6 > .flex.pt-4 > .flex,
+  .wf-scope [data-responsive-campaign-wizard] .space-y-6 > .flex.pt-4 > .flex > button {
+    min-height: 44px;
+    width: 100%;
+  }
+
+  .wf-scope [data-responsive-campaign-wizard] .space-y-6 > .flex.pt-4 > .flex {
+    align-items: stretch;
+    flex-direction: column-reverse;
+  }
+}
+
 /* Assessment participant brand scope — purple #522583 + Roboto. NOT on .wf-scope (admin/coach share it). */
 .su-assessment-brand {
   --primary: 269 56% 33%;          /* #522583 */

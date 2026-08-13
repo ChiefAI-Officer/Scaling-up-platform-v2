@@ -69,19 +69,21 @@ interface CompanySectionProps {
   campaigns: CampaignListItem[];
   /** Base path for a campaign's detail link. Default: the coach portal. */
   detailBasePath: string;
+  responsiveEnabled: boolean;
 }
 
 function CompanySection({
   organizationName,
   campaigns,
   detailBasePath,
+  responsiveEnabled,
 }: CompanySectionProps) {
   const count = campaigns.length;
   return (
     <section className="space-y-2">
       {/* Company header */}
-      <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
-        <span>{organizationName}</span>
+      <h2 className={responsiveEnabled ? "text-sm font-semibold text-foreground flex min-w-0 flex-wrap items-center gap-2" : "text-sm font-semibold text-foreground flex items-center gap-2"}>
+        <span className={responsiveEnabled ? "min-w-0 break-words" : undefined}>{organizationName}</span>
         <span className="text-muted-foreground font-normal">
           &middot; {count} {count === 1 ? "campaign" : "campaigns"}
         </span>
@@ -97,7 +99,7 @@ function CompanySection({
             return (
               <div
                 key={c.id}
-                className="px-4 py-3 space-y-2 hover:bg-muted/30 transition-colors"
+                className={responsiveEnabled ? "min-w-0 px-4 py-3 space-y-2 hover:bg-muted/30 transition-colors" : "px-4 py-3 space-y-2 hover:bg-muted/30 transition-colors"}
                 data-testid={`campaign-row-${c.id}`}
               >
                 {/* Top row: name + template + status + date + action */}
@@ -105,11 +107,12 @@ function CompanySection({
                   <div className="min-w-0 basis-full sm:flex-1">
                     <Link
                       href={`${detailBasePath}/${c.id}`}
-                      className="font-medium text-foreground hover:text-primary text-sm"
+                      className={responsiveEnabled ? "min-w-0 break-words font-medium text-foreground hover:text-primary text-sm" : "font-medium text-foreground hover:text-primary text-sm"}
+                      {...(responsiveEnabled ? { "data-touch-target": true } : {})}
                     >
                       {c.name}
                     </Link>
-                    <div className="text-xs text-muted-foreground">{c.alias}</div>
+                    <div className={responsiveEnabled ? "break-all text-xs text-muted-foreground" : "text-xs text-muted-foreground"}>{c.alias}</div>
                   </div>
                   <span
                     className="min-w-0 max-w-full text-xs text-muted-foreground break-words"
@@ -152,7 +155,8 @@ function CompanySection({
                   </span>
                   <Link
                     href={`${detailBasePath}/${c.id}`}
-                    className="text-xs text-primary hover:underline ml-auto"
+                    className={responsiveEnabled ? "ml-auto inline-flex min-h-11 items-center text-xs text-primary hover:underline" : "text-xs text-primary hover:underline ml-auto"}
+                    {...(responsiveEnabled ? { "data-touch-target": true } : {})}
                   >
                     View
                   </Link>
@@ -181,11 +185,13 @@ function CompanySection({
 export function CampaignsListWithFilter({
   campaigns,
   detailBasePath = "/portal/assessments",
+  responsiveEnabled = false,
 }: {
   campaigns: CampaignListItem[];
   /** Base path for each campaign's detail link. Default: coach portal.
    *  The admin oversight page passes "/admin/assessments/campaigns". */
   detailBasePath?: string;
+  responsiveEnabled?: boolean;
 }) {
   const [filter, setFilter] = useState<FilterValue>("ALL");
 
@@ -263,6 +269,7 @@ export function CampaignsListWithFilter({
                   : "inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full bg-muted text-muted-foreground hover:bg-muted/80"
               }
               data-testid={`campaign-filter-pill-${p.value.toLowerCase()}`}
+              {...(responsiveEnabled ? { "data-touch-target": true } : {})}
             >
               {p.label}
               <span
@@ -296,6 +303,7 @@ export function CampaignsListWithFilter({
               organizationName={group.name}
               campaigns={group.campaigns}
               detailBasePath={detailBasePath}
+              responsiveEnabled={responsiveEnabled}
             />
           ))}
         </div>

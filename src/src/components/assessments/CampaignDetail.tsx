@@ -71,6 +71,10 @@ import {
   invitationOverrideSummary,
   invitationSaveConfirmation,
 } from "@/lib/assessments/invitation-html-editor-copy";
+import {
+  ResponsiveActionsItem,
+  ResponsiveActionsMenu,
+} from "@/components/ui/responsive-actions-menu";
 
 const REASON_MAX_LENGTH = 500;
 
@@ -174,6 +178,8 @@ export interface CampaignDetailProps {
    * Default false (coach portal shows them). The admin host sets this true.
    */
   hidePortalOnlyLinks?: boolean;
+  /** Mobile-foundation presentation gate. Defaults off to preserve legacy DOM. */
+  responsiveEnabled?: boolean;
 }
 
 interface OrgRespondentRow {
@@ -278,6 +284,7 @@ export function CampaignDetail({
   customSlidesSections = [],
   basePath = "/portal/assessments",
   hidePortalOnlyLinks = false,
+  responsiveEnabled = false,
 }: CampaignDetailProps) {
   const { toast } = useToast();
   const router = useRouter();
@@ -1382,15 +1389,16 @@ export function CampaignDetail({
   }
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between gap-4">
+    <div className={responsiveEnabled ? "min-w-0 max-w-6xl mx-auto space-y-6 [&_a]:min-h-11 [&_button]:min-h-11" : "space-y-6 max-w-6xl mx-auto"}>
+      <div className={responsiveEnabled ? "flex flex-col items-stretch gap-4 sm:flex-row sm:items-center sm:justify-between" : "flex items-center justify-between gap-4"}>
         <Link
           href={basePath}
-          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+          className={responsiveEnabled ? "inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground hover:text-foreground" : "inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"}
+          {...(responsiveEnabled ? { "data-touch-target": true } : {})}
         >
           <ArrowLeft className="w-4 h-4" /> Back to Assessments
         </Link>
-        <div className="flex items-center gap-2">
+        <div className={responsiveEnabled ? "flex items-center justify-end gap-2" : "flex items-center gap-2"}>
           {canViewGroupReport && groupReportHref && (
             // Wave F #22 (T10) — gated campaign-level group report entry.
             // R3-M2: a PLAIN <a> (NOT a Next <Link>): a Link would prefetch
@@ -1401,13 +1409,14 @@ export function CampaignDetail({
               href={groupReportHref}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-sm font-medium text-primary-foreground px-3 py-1.5 rounded-lg transition-colors"
+              className={responsiveEnabled ? "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90" : "inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-sm font-medium text-primary-foreground px-3 py-1.5 rounded-lg transition-colors"}
               data-testid="campaign-detail-view-group-report"
+              {...(responsiveEnabled ? { "data-touch-target": true } : {})}
             >
               <FileText className="w-4 h-4" /> View group report
             </a>
           )}
-          {!hidePortalOnlyLinks && (
+          {!responsiveEnabled && !hidePortalOnlyLinks && (
             <Link
               href={`/portal/assessments/trends?templateId=${encodeURIComponent(campaign.templateId)}&organizationId=${encodeURIComponent(campaign.organizationId)}`}
               className="inline-flex items-center gap-2 bg-card border border-border hover:bg-muted/40 text-sm font-medium text-foreground px-3 py-1.5 rounded-lg transition-colors"
@@ -1416,17 +1425,57 @@ export function CampaignDetail({
               <LineChart className="w-4 h-4" /> View Trends
             </Link>
           )}
+          {responsiveEnabled && (
+            <ResponsiveActionsMenu label="More campaign actions">
+              {!hidePortalOnlyLinks && (
+                <ResponsiveActionsItem asChild>
+                  <Link
+                    href={`/portal/assessments/trends?templateId=${encodeURIComponent(campaign.templateId)}&organizationId=${encodeURIComponent(campaign.organizationId)}`}
+                    className="flex min-h-11 cursor-pointer items-center gap-2 rounded-md px-3 text-sm outline-none focus:bg-muted"
+                    data-testid="campaign-detail-view-trends"
+                    data-touch-target
+                  >
+                    <LineChart className="h-4 w-4" /> View Trends
+                  </Link>
+                </ResponsiveActionsItem>
+              )}
+              {!isClosed && (
+                <ResponsiveActionsItem asChild>
+                  <button
+                    type="button"
+                    onClick={() => setCloseDialogOpen(true)}
+                    className="flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-md px-3 text-left text-sm text-destructive outline-none focus:bg-muted"
+                    data-testid="campaign-close-btn"
+                    data-touch-target
+                  >
+                    <XCircle className="h-4 w-4" /> {closeActionLabel}
+                  </button>
+                </ResponsiveActionsItem>
+              )}
+              <ResponsiveActionsItem asChild>
+                <button
+                  type="button"
+                  onClick={() => setDeleteDialogOpen(true)}
+                  className="flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-md px-3 text-left text-sm text-destructive outline-none focus:bg-muted"
+                  data-testid="campaign-delete-btn"
+                  data-touch-target
+                >
+                  <Trash2 className="h-4 w-4" /> Delete campaign
+                </button>
+              </ResponsiveActionsItem>
+            </ResponsiveActionsMenu>
+          )}
         </div>
       </div>
 
       {/* Overview card */}
       <div
-        className="bg-card border border-border rounded-xl p-6"
+        className={responsiveEnabled ? "min-w-0 rounded-xl border border-border bg-card p-4 sm:p-6" : "bg-card border border-border rounded-xl p-6"}
         data-testid="campaign-overview-card"
       >
-        <div className="flex items-start justify-between gap-4">
+        <div className={responsiveEnabled ? "flex flex-col items-start gap-4 sm:flex-row sm:justify-between" : "flex items-start justify-between gap-4"}>
           <div className="min-w-0">
-            <h1 className="text-2xl font-bold text-foreground truncate">
+            <h1 className={responsiveEnabled ? "break-words text-2xl font-bold text-foreground" : "text-2xl font-bold text-foreground truncate"}>
               {campaign.name}
             </h1>
             <p className="text-sm text-muted-foreground font-mono">
@@ -1439,12 +1488,12 @@ export function CampaignDetail({
               </div>
             ) : null}
           </div>
-          <div className="flex flex-col items-end gap-2 shrink-0">
+          <div className={responsiveEnabled ? "flex shrink-0 flex-col items-start gap-2 sm:items-end" : "flex flex-col items-end gap-2 shrink-0"}>
             <StatusPill
               status={campaign.status}
               toneMap={CAMPAIGN_STATUS_TONE}
             />
-            {!isClosed && (
+            {!responsiveEnabled && !isClosed && (
               <button
                 type="button"
                 onClick={() => setCloseDialogOpen(true)}
@@ -1459,7 +1508,7 @@ export function CampaignDetail({
                 {closeActionLabel}
               </button>
             )}
-            <button
+            {!responsiveEnabled && <button
               type="button"
               onClick={() => setDeleteDialogOpen(true)}
               className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-border bg-card text-destructive hover:bg-destructive/10 transition-colors"
@@ -1467,11 +1516,11 @@ export function CampaignDetail({
             >
               <Trash2 className="w-3.5 h-3.5" />
               Delete campaign
-            </button>
+            </button>}
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-6 text-sm">
+        <div className={responsiveEnabled ? "mt-6 grid grid-cols-1 gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4" : "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-6 text-sm"}>
           <div>
             <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Template
@@ -1544,14 +1593,14 @@ export function CampaignDetail({
                   value={openAtDraft}
                   onChange={(e) => setOpenAtDraft(e.target.value)}
                   disabled={openAtSaving}
-                  className="w-full px-2 py-1 text-sm border border-border rounded bg-background"
+                  className={responsiveEnabled ? "min-h-11 w-full rounded border border-border bg-background px-2 py-1 text-sm" : "w-full px-2 py-1 text-sm border border-border rounded bg-background"}
                 />
-                <div className="flex gap-2">
+                <div className={responsiveEnabled ? "flex flex-col gap-2 sm:flex-row" : "flex gap-2"}>
                   <button
                     type="button"
                     onClick={handleSaveOpenAt}
                     disabled={openAtSaving}
-                    className="text-xs font-medium px-2 py-1 rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                    className={responsiveEnabled ? "min-h-11 rounded bg-primary px-2 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50" : "text-xs font-medium px-2 py-1 rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"}
                   >
                     {openAtSaving ? "Saving…" : "Save"}
                   </button>
@@ -1564,14 +1613,14 @@ export function CampaignDetail({
                       );
                     }}
                     disabled={openAtSaving}
-                    className="text-xs font-medium px-2 py-1 rounded border border-border text-foreground hover:bg-muted disabled:opacity-50"
+                    className={responsiveEnabled ? "min-h-11 rounded border border-border px-2 py-1 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50" : "text-xs font-medium px-2 py-1 rounded border border-border text-foreground hover:bg-muted disabled:opacity-50"}
                   >
                     Cancel
                   </button>
                 </div>
               </div>
             ) : (
-              <div className="mt-1 flex items-center gap-2">
+              <div className={responsiveEnabled ? "mt-1 flex flex-col items-start gap-2 sm:flex-row sm:items-center" : "mt-1 flex items-center gap-2"}>
                 <span className="font-medium text-foreground">
                   {formatDateTime(campaign.openAt)}
                 </span>
@@ -1584,8 +1633,9 @@ export function CampaignDetail({
                       );
                       setOpenAtEditing(true);
                     }}
-                    className="text-xs font-medium text-primary hover:underline"
+                    className={responsiveEnabled ? "inline-flex min-h-11 items-center text-xs font-medium text-primary hover:underline" : "text-xs font-medium text-primary hover:underline"}
                     data-testid="edit-openAt"
+                    {...(responsiveEnabled ? { "data-touch-target": true } : {})}
                   >
                     Edit
                   </button>
@@ -2124,10 +2174,13 @@ export function CampaignDetail({
 
       {/* Respondents table */}
       <div
-        className="bg-card border border-border rounded-xl overflow-hidden"
+        className={responsiveEnabled ? "min-w-0 overflow-hidden rounded-xl border border-border bg-card" : "bg-card border border-border rounded-xl overflow-hidden"}
         data-testid="campaign-respondents-card"
+        role={responsiveEnabled && respondents.length > 0 ? "region" : undefined}
+        aria-label={responsiveEnabled && respondents.length > 0 ? "Campaign respondents" : undefined}
+        tabIndex={responsiveEnabled && respondents.length > 0 ? 0 : undefined}
       >
-        <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-3">
+        <div className={responsiveEnabled ? "flex flex-col items-stretch gap-3 border-b border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between" : "px-4 py-3 border-b border-border flex items-center justify-between gap-3"}>
           <div>
             <h2 className="text-sm font-semibold text-foreground">
               Respondents
@@ -2136,13 +2189,14 @@ export function CampaignDetail({
               Track invitation delivery and view individual results.
             </p>
           </div>
-          <div className="inline-flex items-center gap-2">
+          <div className={responsiveEnabled ? "flex flex-col items-stretch gap-2 sm:flex-row sm:items-center" : "inline-flex items-center gap-2"}>
             {!isClosed && (
               <button
                 type="button"
                 onClick={() => setAddDialogOpen(true)}
-                className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                className={responsiveEnabled ? "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90" : "inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"}
                 data-testid="add-respondent-btn"
+                {...(responsiveEnabled ? { "data-touch-target": true } : {})}
               >
                 <Plus className="w-3.5 h-3.5" />
                 Add Respondent
@@ -2154,7 +2208,7 @@ export function CampaignDetail({
                   type="button"
                   onClick={handleSendInvitations}
                   disabled={sendingInvitations}
-                  className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className={responsiveEnabled ? "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50" : "inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"}
                   data-testid="send-invitations-btn"
                   title="Fire the initial invitation email to respondents who haven't been invited yet"
                 >
@@ -2169,7 +2223,7 @@ export function CampaignDetail({
                   type="button"
                   onClick={handleSendReminders}
                   disabled={sendingReminders}
-                  className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-border bg-card text-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className={responsiveEnabled ? "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50" : "inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-border bg-card text-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"}
                   data-testid="send-reminders-btn"
                   title="Nudge respondents who were already invited but haven't submitted"
                 >
@@ -2185,7 +2239,7 @@ export function CampaignDetail({
             <a
               href={`/api/assessment-campaigns/${campaign.id}/respondents/export.csv`}
               download
-              className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-border bg-card text-foreground hover:bg-muted transition-colors"
+              className={responsiveEnabled ? "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted" : "inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-border bg-card text-foreground hover:bg-muted transition-colors"}
               data-testid="export-respondents-csv"
             >
               <Download className="w-3.5 h-3.5" />
@@ -2201,8 +2255,8 @@ export function CampaignDetail({
             </p>
           </div>
         ) : (
-          <table className="w-full">
-            <thead className="bg-muted/40 border-b border-border">
+          <table className={responsiveEnabled ? "block w-full sm:table" : "w-full"}>
+            <thead className={responsiveEnabled ? "hidden border-b border-border bg-muted/40 sm:table-header-group" : "bg-muted/40 border-b border-border"}>
               <tr>
                 <th className="text-left px-4 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Name
@@ -2227,7 +2281,7 @@ export function CampaignDetail({
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
+            <tbody className={responsiveEnabled ? "block space-y-3 p-3 sm:table-row-group sm:space-y-0 sm:p-0" : "divide-y divide-border"}>
               {respondents.map((row) => {
                 const expanded = expandedRespondentId === row.respondent.id;
                 const loading = loadingRespondentId === row.respondent.id;
@@ -2247,10 +2301,10 @@ export function CampaignDetail({
                 return (
                   <Fragment key={row.participantId}>
                     <tr
-                      className="hover:bg-muted/30 transition-colors"
+                      className={responsiveEnabled ? "block space-y-2 rounded-lg border border-border p-4 transition-colors hover:bg-muted/30 sm:table-row sm:space-y-0 sm:rounded-none sm:border-0 sm:border-t sm:p-0" : "hover:bg-muted/30 transition-colors"}
                       data-testid={`respondent-row-${row.respondent.id}`}
                     >
-                      <td className="px-4 py-3 text-sm">
+                      <td className={responsiveEnabled ? "block min-w-0 px-0 py-1 text-sm sm:table-cell sm:px-4 sm:py-3" : "px-4 py-3 text-sm"}>
                         <span className="font-medium text-foreground">
                           {row.respondent.firstName} {row.respondent.lastName}
                         </span>
@@ -2299,11 +2353,11 @@ export function CampaignDetail({
                           </div>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">
+                      <td className={responsiveEnabled ? "block break-all px-0 py-1 text-sm text-muted-foreground sm:table-cell sm:px-4 sm:py-3" : "px-4 py-3 text-sm text-muted-foreground"}>
                         {row.respondent.email}
                       </td>
                       <td
-                        className="px-4 py-3 text-sm"
+                        className={responsiveEnabled ? "block px-0 py-1 text-sm sm:table-cell sm:px-4 sm:py-3" : "px-4 py-3 text-sm"}
                         data-testid={`team-cell-${row.respondent.id}`}
                       >
                         {row.teamSnapshot.pathLabels.length === 0 ? (
@@ -2321,7 +2375,7 @@ export function CampaignDetail({
                           </>
                         )}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className={responsiveEnabled ? "block px-0 py-1 sm:table-cell sm:px-4 sm:py-3" : "px-4 py-3"}>
                         {(() => {
                           const band = getInvitationBand(
                             row.invitation
@@ -2344,14 +2398,14 @@ export function CampaignDetail({
                           );
                         })()}
                       </td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">
+                      <td className={responsiveEnabled ? "block px-0 py-1 text-sm text-muted-foreground sm:table-cell sm:px-4 sm:py-3" : "px-4 py-3 text-sm text-muted-foreground"}>
                         {formatDateTime(row.invitation?.sentAt)}
                       </td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">
+                      <td className={responsiveEnabled ? "block px-0 py-1 text-sm text-muted-foreground sm:table-cell sm:px-4 sm:py-3" : "px-4 py-3 text-sm text-muted-foreground"}>
                         {formatDateTime(row.submittedAt)}
                       </td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="inline-flex items-center gap-2">
+                      <td className={responsiveEnabled ? "block px-0 py-1 text-left sm:table-cell sm:px-4 sm:py-3 sm:text-right" : "px-4 py-3 text-right"}>
+                        <div className={responsiveEnabled ? "flex flex-wrap items-center gap-2 sm:inline-flex" : "inline-flex items-center gap-2"}>
                           {row.hasSubmission && (
                             // PRIMARY results action: the branded report.
                             // H6 — a PLAIN <a> (NOT a Next <Link>): a Link would

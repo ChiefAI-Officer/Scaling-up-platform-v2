@@ -24,6 +24,8 @@ import {
   resolveCampaignListEditions,
 } from "@/lib/assessments/campaign-list-editions";
 import { isReferredResultsEnabled } from "@/lib/assessments/wave-83-flags";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
+import { PageHeader } from "@/components/ui/page-header";
 
 const APP_URL =
   process.env.APP_URL || "https://scaling-up-platform-v2.vercel.app";
@@ -52,6 +54,7 @@ async function resolvePublicQuickAlias(): Promise<string | null> {
 export default async function CoachAssessmentsPage() {
   const { coach } = await requireCoach();
   const referredResultsEnabled = isReferredResultsEnabled();
+  const mobileResponsiveEnabled = isMobileResponsiveEnabled();
 
   // §4 — per-coach attributed share link for the public Quick Assessment.
   // #83 moves this card to Referred Results while its read surface is enabled.
@@ -109,7 +112,22 @@ export default async function CoachAssessmentsPage() {
   return (
     <div className="space-y-6">
       <FadeUp>
-        <div className="flex justify-between items-center">
+        {mobileResponsiveEnabled ? (
+          <PageHeader
+            title="Assessments"
+            description="Run Rockefeller-style assessments for your organizations."
+            responsiveEnabled
+            actions={
+              <Link
+                href="/portal/assessments/new"
+                className="flex min-h-11 items-center gap-2 rounded-lg bg-primary px-4 py-2 text-primary-foreground transition-colors hover:bg-primary/90"
+                data-touch-target
+              >
+                <PlusCircle className="h-5 w-5" /> New Campaign
+              </Link>
+            }
+          />
+        ) : <div className="flex justify-between items-center">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Assessments</h1>
             <p className="text-muted-foreground">
@@ -122,7 +140,7 @@ export default async function CoachAssessmentsPage() {
           >
             <PlusCircle className="w-5 h-5" /> New Campaign
           </Link>
-        </div>
+        </div>}
       </FadeUp>
 
       {coachLink && (
@@ -170,7 +188,7 @@ export default async function CoachAssessmentsPage() {
             </Link>
           </div>
         ) : (
-          <CampaignsListWithFilter campaigns={items} />
+          <CampaignsListWithFilter campaigns={items} responsiveEnabled={mobileResponsiveEnabled} />
         )}
       </FadeUp>
     </div>

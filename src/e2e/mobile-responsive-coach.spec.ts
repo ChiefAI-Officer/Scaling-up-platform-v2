@@ -78,3 +78,37 @@ for (const width of [320, 390, 1024]) {
     );
   });
 }
+
+for (const width of [320, 390]) {
+  test(`coach campaign workflow fits a ${width}px viewport`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await loginAs(page, {
+      email: COACH_EMAIL,
+      password: COACH_PASSWORD,
+      expectedUrl: /\/portal\//,
+    });
+
+    for (const route of ["/portal/assessments", "/portal/assessments/new"]) {
+      await page.goto(route);
+      await expect(page.locator("body")).toHaveAttribute(
+        "data-mobile-responsive",
+        "on",
+      );
+      await assertNoDocumentOverflow(page, `${route} at ${width}`);
+    }
+
+    await page.goto("/portal/assessments");
+    const detailLinks = page.locator(
+      'a[href^="/portal/assessments/"]:not([href="/portal/assessments/new"]):not([href^="/portal/assessments/trends"]):not([href^="/portal/assessments/referred-results"])',
+    );
+    await expect(
+      detailLinks.first(),
+      "the coach fixture must include a populated campaign detail link",
+    ).toBeVisible();
+    const detailHref = await detailLinks.first().getAttribute("href");
+    expect(detailHref).toMatch(/^\/portal\/assessments\/[^/]+$/);
+
+    await page.goto(detailHref!);
+    await assertNoDocumentOverflow(page, `${detailHref} at ${width}`);
+  });
+}

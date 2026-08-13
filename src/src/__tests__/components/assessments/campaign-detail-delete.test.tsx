@@ -76,11 +76,15 @@ const noRespondents: CampaignRespondentRow[] = [];
 function renderDetail(
   status: "DRAFT" | "ACTIVE" | "CLOSED" = "ACTIVE",
   respondents: CampaignRespondentRow[] = noRespondents,
+  responsiveEnabled = false,
 ) {
   return render(
     <CampaignDetail
       initialOverview={makeOverview(status)}
       initialRespondents={respondents}
+      responsiveEnabled={responsiveEnabled}
+      canViewGroupReport
+      groupReportHref={`/assessments/${CAMPAIGN_ID}/report`}
     />,
   );
 }
@@ -108,6 +112,30 @@ describe("CampaignDetail — Delete campaign dialog", () => {
     expect(
       screen.getByText(/responses are retained/i),
     ).toBeInTheDocument();
+  });
+
+  it("keeps the group report primary and puts secondary actions in the responsive menu", () => {
+    renderDetail("ACTIVE", noRespondents, true);
+
+    expect(
+      screen.getByRole("link", { name: "View group report" }),
+    ).toBeVisible();
+    const trigger = screen.getByRole("button", {
+      name: "More campaign actions",
+    });
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+
+    expect(screen.getByRole("menuitem", { name: "View Trends" })).toBeVisible();
+    expect(
+      screen.getByRole("menuitem", { name: /close campaign/i }),
+    ).toBeVisible();
+    const deleteItem = screen.getByRole("menuitem", {
+      name: "Delete campaign",
+    });
+    expect(deleteItem).toBeVisible();
+
+    fireEvent.click(deleteItem);
+    expect(screen.getByTestId("campaign-delete-dialog")).toBeInTheDocument();
   });
 
   it("Cancel closes the dialog without calling fetch", () => {

@@ -63,6 +63,37 @@ const twoCompanyCampaigns: CampaignListItem[] = [
 ];
 
 describe("CampaignsListWithFilter — grouped by company", () => {
+  it("keeps long campaign and company identities wrappable and makes every filter touch-sized", () => {
+    const longOrganizationName = "A Very Long Organization Name That Must Wrap On Compact Screens";
+    const longCampaignName = "A Very Long Campaign Name That Must Wrap On Compact Screens";
+    render(
+      <CampaignsListWithFilter
+        responsiveEnabled
+        campaigns={[
+          makeCampaign({
+            id: "long",
+            organizationId: "org-long",
+            organizationName: longOrganizationName,
+            name: longCampaignName,
+          }),
+        ]}
+      />,
+    );
+
+    const campaignIdentity = screen.getByRole("link", {
+      name: longCampaignName,
+    });
+    expect(campaignIdentity).toHaveClass("min-w-0 break-words");
+    expect(screen.getByText(longOrganizationName)).toHaveClass(
+      "min-w-0 break-words",
+    );
+    for (const status of ["all", "draft", "active", "closed"]) {
+      expect(screen.getByTestId(`campaign-filter-pill-${status}`)).toHaveAttribute(
+        "data-touch-target",
+      );
+    }
+  });
+
   // Test 1: Renders company sections with correct grouping
   it("renders a heading for each company and campaigns appear under the right company", () => {
     render(<CampaignsListWithFilter campaigns={twoCompanyCampaigns} />);

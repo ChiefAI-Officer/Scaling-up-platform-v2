@@ -26,8 +26,10 @@ import {
   asCampaignListEditionDb,
   resolveCampaignListEditions,
 } from "@/lib/assessments/campaign-list-editions";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 
 export default async function AdminAssessmentCampaignsPage() {
+  const mobileResponsiveEnabled = isMobileResponsiveEnabled();
   const session = await getServerSession(authOptions);
   if (!session) {
     redirect("/login");
@@ -76,7 +78,7 @@ export default async function AdminAssessmentCampaignsPage() {
   );
 
   return (
-    <div>
+    <div className={mobileResponsiveEnabled ? "min-w-0 max-w-full" : undefined}>
       {/* Breadcrumb */}
       <div className="wf-breadcrumb">
         <a href="/admin/dashboard">Admin</a>
@@ -87,7 +89,7 @@ export default async function AdminAssessmentCampaignsPage() {
       </div>
 
       {/* Page header */}
-      <div className="wf-page-header-row">
+      <div className={mobileResponsiveEnabled ? "wf-page-header-row flex-col items-start sm:flex-row" : "wf-page-header-row"}>
         <div>
           <h2 className="wf-page-title">Campaigns</h2>
           <p className="wf-page-subtitle-strong">
@@ -102,6 +104,7 @@ export default async function AdminAssessmentCampaignsPage() {
       <CampaignsListWithFilter
         campaigns={items}
         detailBasePath="/admin/assessments/campaigns"
+        responsiveEnabled={mobileResponsiveEnabled}
       />
     </div>
   );

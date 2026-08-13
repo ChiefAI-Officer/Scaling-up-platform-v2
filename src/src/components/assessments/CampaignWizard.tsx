@@ -241,10 +241,47 @@ function buildSteps(customSlidesEnabled: boolean): StepDef[] {
 function StepIndicator({
   current,
   steps,
+  responsiveEnabled = false,
 }: {
   current: number;
   steps: StepDef[];
+  responsiveEnabled?: boolean;
 }) {
+  if (responsiveEnabled) {
+    return (
+      <>
+        <div
+          data-testid="campaign-step-summary"
+          className="mb-6 rounded-xl border border-border bg-card p-4 sm:hidden"
+          aria-live="polite"
+        >
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Step {current + 1} of {steps.length}
+          </p>
+          <p className="mt-1 text-base font-semibold text-foreground">
+            {steps[current]?.title}
+          </p>
+        </div>
+        <ol className="wf-stepper hidden sm:flex">
+          {steps.map((step) => {
+            const done = current > step.id;
+            const active = current === step.id;
+            return (
+              <li
+                key={step.id}
+                className={`wf-stepper-item${active ? " is-active" : ""}${done ? " is-done" : ""}`}
+              >
+                <div className="wf-stepper-circle">
+                  {done ? <Check className="h-4 w-4" /> : step.id + 1}
+                </div>
+                <span className="wf-stepper-label">{step.title}</span>
+              </li>
+            );
+          })}
+        </ol>
+      </>
+    );
+  }
   return (
     <ol className="wf-stepper">
       {steps.map((s) => {
@@ -293,6 +330,7 @@ export function CampaignWizard({
   waveQDefaultsEnabled = false,
   onScreenResultsEnabled = false,
   adminOwnedPresentation = false,
+  responsiveEnabled = false,
 }: {
   /** Wave D #20 — gate the custom-HTML invitation editor (mirrors the server flag). */
   customHtmlEmailEnabled?: boolean;
@@ -353,6 +391,8 @@ export function CampaignWizard({
   onScreenResultsEnabled?: boolean;
   /** Admin owns template presentation; coaches neither see nor persist style choices. */
   adminOwnedPresentation?: boolean;
+  /** Mobile-foundation presentation gate. Defaults off to preserve legacy DOM. */
+  responsiveEnabled?: boolean;
 } = {}) {
   const router = useRouter();
   const { toast } = useToast();
@@ -934,7 +974,10 @@ export function CampaignWizard({
   }, [pendingDraft, saveStatus, lastSavedAt]);
 
   return (
-    <div>
+    <div
+      className={responsiveEnabled ? "min-w-0 [&_button]:min-h-11" : undefined}
+      {...(responsiveEnabled ? { "data-responsive-campaign-wizard": true } : {})}
+    >
       {pendingDraft && (
         <div
           className="mb-6 border border-primary/30 bg-primary/5 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
@@ -968,9 +1011,9 @@ export function CampaignWizard({
         {saveIndicator}
       </div>
 
-      <StepIndicator current={state.step} steps={steps} />
+      <StepIndicator current={state.step} steps={steps} responsiveEnabled={responsiveEnabled} />
 
-      <div className="bg-card border border-border rounded-xl p-6 min-h-[400px]">
+      <div className={responsiveEnabled ? "min-h-[400px] min-w-0 rounded-xl border border-border bg-card p-4 sm:p-6" : "bg-card border border-border rounded-xl p-6 min-h-[400px]"}>
         {state.step === 0 && (
           <OrganizationStep
             value={state.organizationId}

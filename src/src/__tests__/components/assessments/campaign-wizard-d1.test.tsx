@@ -142,6 +142,20 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
+describe("CampaignWizard — compact progress", () => {
+  it("summarizes the active step without changing the five-step workflow", () => {
+    installFetch();
+    render(<CampaignWizard responsiveEnabled />);
+
+    expect(screen.getByTestId("campaign-step-summary")).toHaveTextContent(
+      "Step 1 of 5",
+    );
+    expect(screen.getByTestId("campaign-step-summary")).toHaveTextContent(
+      "Organization",
+    );
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Navigation helpers
 // ---------------------------------------------------------------------------

@@ -51,6 +51,7 @@ import {
 } from "@/lib/assessments/longitudinal-eligibility";
 import type { CustomSlide } from "@/lib/assessments/custom-slides";
 import type { CustomSlidesPanelSection } from "@/components/assessments/CustomSlidesPanel";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -59,6 +60,7 @@ interface PageProps {
 export default async function CampaignDetailPage({ params }: PageProps) {
   const { coach, session } = await requireCoach();
   const { id } = await params;
+  const mobileResponsiveEnabled = isMobileResponsiveEnabled();
 
   const actor: ApiActor = {
     userId: session.user.id,
@@ -221,6 +223,7 @@ export default async function CampaignDetailPage({ params }: PageProps) {
 
   return (
     <CampaignDetail
+      responsiveEnabled={mobileResponsiveEnabled}
       initialOverview={overview}
       initialRespondents={respondents}
       customHtmlEmailEnabled={waveDCustomHtmlEmailEnabled()}
