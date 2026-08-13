@@ -210,3 +210,68 @@ separately so it can name the immutable implementation commit.
   visual, database, deployment, and external actions were not run.
 - The pre-existing untracked `src/playwright-report/` directory remains
   untouched and excluded.
+
+## Fix round 3/5 — deterministic admin survey owner (2026-08-13)
+
+The second populated preview run selected a real workshop detail but found no
+survey shortcut in that detail UI. Admin survey coverage now constructs the
+exact `/workshops/{validatedCuid}/surveys` owner from the already validated
+detail href. It remains a required member of `dynamicRoutes`, so the existing
+`expectResponsiveRoute` guard rejects missing responses, 4xx responses,
+redirects, authentication fallbacks, missing authenticated shell markers, and
+overflow at every width. Coach retains its portal-specific visible-link
+discovery using the same validated-detail child pattern.
+
+### RED / GREEN
+
+RED command (from `src/`):
+
+```bash
+npx jest src/__tests__/e2e/mobile-responsive-acceptance-contract.test.ts --runInBand
+```
+
+Result: exit 1, **2 failed / 20 passed**. The contract failed because the route
+helper could not yet construct an exact child href and the admin spec still
+required `firstMatchingHref` for the survey owner. The independent expected
+literal was `/workshops/cm1234567890abcdefghijkl/surveys`; `/workshops/new`
+was required to throw.
+
+GREEN with the same command: exit 0, **1 suite / 22 tests passed**. The final
+contracts prove exact construction from a valid admin CUID, rejection of the
+reserved create owner, inclusion in `dynamicRoutes` under
+`expectResponsiveRoute`, and unchanged coach link-discovery semantics.
+
+### Changed files and validation
+
+- `src/e2e/helpers/workshop-route-contract.ts`
+- `src/e2e/mobile-responsive-admin.spec.ts`
+- `src/src/__tests__/e2e/mobile-responsive-acceptance-contract.test.ts`
+- This appended evidence receipt.
+
+Fresh validation from `src/`:
+
+```bash
+npx jest src/__tests__/e2e/mobile-responsive-acceptance-contract.test.ts --runInBand
+npx eslint e2e/helpers/workshop-route-contract.ts e2e/mobile-responsive-admin.spec.ts e2e/mobile-responsive-coach.spec.ts src/__tests__/e2e/mobile-responsive-acceptance-contract.test.ts
+PLAYWRIGHT_BASE_URL=https://preview.example.test npx playwright test e2e/mobile-responsive-coach.spec.ts e2e/mobile-responsive-admin.spec.ts e2e/mobile-responsive-state.spec.ts e2e/mobile-responsive-a11y.spec.ts e2e/mobile-responsive-visual.spec.ts e2e/mobile-responsive-kill-diagnostic.spec.ts --list --reporter=list --project=responsive-compact --project=responsive-medium --project=responsive-tablet-wide --project=responsive-desktop
+git diff --check
+```
+
+Results: Jest **22/22**, scoped ESLint exit 0 with no output, Playwright static
+listing **56 tests in 6 files** across four responsive projects, and diff check
+exit 0. `--reporter=list` did not create a new HTML report. No browser test ran
+and the placeholder preview hostname was not contacted.
+
+Implementation commit: `43aa7940ddcba4aa5ab9d567f14724867fd9e62c`
+(`test: derive admin workshop survey route`). This report append is committed
+separately so it can name the immutable implementation commit.
+
+### Fix-round concerns
+
+- This deliberately tests the surveys page even when the selected admin detail
+  offers no visible shortcut; runtime route validity remains fail-closed rather
+  than optional or redirect-tolerant.
+- Evidence remains contract/static-list only; browser runtime, Axe, overflow,
+  visual, database, deployment, and external actions were not run.
+- The pre-existing untracked `src/playwright-report/` directory remains
+  untouched and excluded.
