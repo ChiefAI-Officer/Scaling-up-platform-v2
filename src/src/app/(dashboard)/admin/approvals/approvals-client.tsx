@@ -6,7 +6,12 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { ApprovalThread } from "@/components/approvals/approval-thread";
 import { formatTimestamp } from "@/lib/utils";
-import { ResponsiveRecord, ResponsiveRecordMeta } from "@/components/ui/responsive-record";
+import {
+  ResponsiveRecord,
+  ResponsiveRecordActions,
+  ResponsiveRecordHeader,
+  ResponsiveRecordMeta,
+} from "@/components/ui/responsive-record";
 
 type ApprovalStatus = "PENDING" | "APPROVED" | "DENIED" | "EXPIRED" | "INFO_REQUESTED" | "COUNTER_OFFERED";
 type FilterStatus = ApprovalStatus | "ALL";
@@ -217,6 +222,77 @@ export default function ApprovalsPage({ responsiveEnabled = false }: { responsiv
     return status.charAt(0) + status.slice(1).toLowerCase();
   };
   const ApprovalCard = responsiveEnabled ? ResponsiveRecord : "div";
+  const renderApprovalTitle = (approval: Approval) => (
+    <>
+      <span
+        className={`inline-block px-3 py-1 rounded-full text-xs font-medium text-white ${getTypeBadgeClasses(approval.type)}`}
+      >
+        {approval.type.replace(/_/g, " ")}
+      </span>
+      {approval.type === "CUSTOM_PRICING" && (
+        <span className="inline-block ml-2 px-3 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-300">
+          Custom Price Requested
+        </span>
+      )}
+      {approval.status === "COUNTER_OFFERED" && typeof approval.counterOfferCents === "number" && (
+        <span className="inline-block ml-2 px-3 py-1 rounded-full text-xs font-medium bg-warning text-white">
+          Offered: ${(approval.counterOfferCents / 100).toLocaleString()}
+        </span>
+      )}
+      &nbsp; {approval.coachName}
+    </>
+  );
+
+  const renderApprovalActions = (approval: Approval) => approval.status === "PENDING" ? (
+    <>
+      <button
+        className={`${responsiveEnabled ? "min-h-11" : ""} px-5 py-2.5 rounded-md font-medium text-sm cursor-pointer transition-all duration-200 bg-success text-primary-foreground hover:bg-success/90 disabled:opacity-50 disabled:cursor-not-allowed`}
+        onClick={() => handleAction(approval.id, "APPROVE")}
+        disabled={processing === approval.id}
+      >
+        {processing === approval.id ? "..." : "Approve"}
+      </button>
+      <button
+        className={`${responsiveEnabled ? "min-h-11" : ""} px-5 py-2.5 rounded-md font-medium text-sm cursor-pointer transition-all duration-200 bg-destructive text-primary-foreground hover:bg-destructive/90 disabled:opacity-50 disabled:cursor-not-allowed`}
+        onClick={() => handleAction(approval.id, "DENY")}
+        disabled={processing === approval.id}
+      >
+        {processing === approval.id ? "..." : "Deny"}
+      </button>
+      <button
+        className={`${responsiveEnabled ? "min-h-11" : ""} px-5 py-2.5 rounded-md font-medium text-sm cursor-pointer transition-all duration-200 bg-warning text-white hover:bg-warning/90 disabled:opacity-50 disabled:cursor-not-allowed`}
+        onClick={() => { setInfoModalId(approval.id); setInfoQuestion(""); }}
+        disabled={processing === approval.id}
+      >
+        Request Info
+      </button>
+      {approval.type === "CUSTOM_PRICING" && (
+        <button
+          className={`${responsiveEnabled ? "min-h-11" : ""} px-5 py-2.5 rounded-md font-medium text-sm cursor-pointer transition-all duration-200 bg-warning text-white hover:bg-warning/90 disabled:opacity-50 disabled:cursor-not-allowed`}
+          onClick={() => { setCounterOfferModalId(approval.id); setCounterOfferAmount(""); setCounterOfferNoteInput(""); }}
+          disabled={processing === approval.id}
+        >
+          Counter-Offer
+        </button>
+      )}
+    </>
+  ) : (
+    <>
+      <span className={`px-4 py-2 rounded-md font-medium text-sm ${getStatusBadgeClasses(approval.status)}`}>
+        {getStatusLabel(approval.status)}
+      </span>
+      {approval.status === "DENIED" && (
+        <button
+          className={`${responsiveEnabled ? "min-h-11" : ""} px-4 py-2 rounded-md font-medium text-sm cursor-pointer transition-all duration-200 bg-muted text-foreground hover:bg-accent border border-border disabled:opacity-50 disabled:cursor-not-allowed`}
+          onClick={() => handleAction(approval.id, "RESET_TO_PENDING")}
+          disabled={processing === approval.id}
+          title="Move back to pending for re-review"
+        >
+          {processing === approval.id ? "..." : "Move to Pending"}
+        </button>
+      )}
+    </>
+  );
 
   return (
     <motion.div
@@ -350,24 +426,13 @@ export default function ApprovalsPage({ responsiveEnabled = false }: { responsiv
               }`}
             >
               <div>
-                <h3 className="mb-2 text-foreground font-semibold">
-                  <span
-                    className={`inline-block px-3 py-1 rounded-full text-xs font-medium text-white ${getTypeBadgeClasses(approval.type)}`}
-                  >
-                    {approval.type.replace(/_/g, " ")}
-                  </span>
-                  {approval.type === "CUSTOM_PRICING" && (
-                    <span className="inline-block ml-2 px-3 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-300">
-                      Custom Price Requested
-                    </span>
-                  )}
-                  {approval.status === "COUNTER_OFFERED" && typeof approval.counterOfferCents === "number" && (
-                    <span className="inline-block ml-2 px-3 py-1 rounded-full text-xs font-medium bg-warning text-white">
-                      Offered: ${(approval.counterOfferCents / 100).toLocaleString()}
-                    </span>
-                  )}
-                  &nbsp; {approval.coachName}
-                </h3>
+                {responsiveEnabled ? (
+                  <ResponsiveRecordHeader
+                    title={<h3 className="mb-2 text-foreground font-semibold">{renderApprovalTitle(approval)}</h3>}
+                  />
+                ) : (
+                  <h3 className="mb-2 text-foreground font-semibold">{renderApprovalTitle(approval)}</h3>
+                )}
                 {approval.workshopId ? (
                   <Link
                     href={`/workshops/${approval.workshopId}`}
@@ -429,14 +494,14 @@ export default function ApprovalsPage({ responsiveEnabled = false }: { responsiv
                 )}
                 <ApprovalThread messages={approval.messages ?? []} perspective="admin" />
                 {responsiveEnabled && <ResponsiveRecordMeta items={[{ label: "Requested", value: formatTimestamp(approval.requestedAt) }, ...(approval.workshopCode ? [{ label: "Workshop code", value: approval.workshopCode }] : [])]} />}
-                <div className="flex gap-4 text-sm text-muted-foreground mt-1">
+                {!responsiveEnabled && <div className="flex gap-4 text-sm text-muted-foreground mt-1">
                   <span>
                     Requested: {formatTimestamp(approval.requestedAt)}
                   </span>
                   {approval.workshopCode && (
                     <span className="font-mono">{approval.workshopCode}</span>
                   )}
-                </div>
+                </div>}
                 {approval.escalatedAt && (
                   <p className="text-destructive font-medium text-sm mt-2">
                     ⚠️ Escalated - pending for 24+ hours
@@ -444,58 +509,13 @@ export default function ApprovalsPage({ responsiveEnabled = false }: { responsiv
                 )}
               </div>
 
-              <div className={responsiveEnabled ? "flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end" : "flex gap-2 items-center flex-wrap justify-end"}>
-                {approval.status === "PENDING" ? (
-                  <>
-                    <button
-                      className={`${responsiveEnabled ? "min-h-11" : ""} px-5 py-2.5 rounded-md font-medium text-sm cursor-pointer transition-all duration-200 bg-success text-primary-foreground hover:bg-success/90 disabled:opacity-50 disabled:cursor-not-allowed`}
-                      onClick={() => handleAction(approval.id, "APPROVE")}
-                      disabled={processing === approval.id}
-                    >
-                      {processing === approval.id ? "..." : "Approve"}
-                    </button>
-                    <button
-                      className={`${responsiveEnabled ? "min-h-11" : ""} px-5 py-2.5 rounded-md font-medium text-sm cursor-pointer transition-all duration-200 bg-destructive text-primary-foreground hover:bg-destructive/90 disabled:opacity-50 disabled:cursor-not-allowed`}
-                      onClick={() => handleAction(approval.id, "DENY")}
-                      disabled={processing === approval.id}
-                    >
-                      {processing === approval.id ? "..." : "Deny"}
-                    </button>
-                    <button
-                      className={`${responsiveEnabled ? "min-h-11" : ""} px-5 py-2.5 rounded-md font-medium text-sm cursor-pointer transition-all duration-200 bg-warning text-white hover:bg-warning/90 disabled:opacity-50 disabled:cursor-not-allowed`}
-                      onClick={() => { setInfoModalId(approval.id); setInfoQuestion(""); }}
-                      disabled={processing === approval.id}
-                    >
-                      Request Info
-                    </button>
-                    {approval.type === "CUSTOM_PRICING" && (
-                      <button
-                        className={`${responsiveEnabled ? "min-h-11" : ""} px-5 py-2.5 rounded-md font-medium text-sm cursor-pointer transition-all duration-200 bg-warning text-white hover:bg-warning/90 disabled:opacity-50 disabled:cursor-not-allowed`}
-                        onClick={() => { setCounterOfferModalId(approval.id); setCounterOfferAmount(""); setCounterOfferNoteInput(""); }}
-                        disabled={processing === approval.id}
-                      >
-                        Counter-Offer
-                      </button>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <span className={`px-4 py-2 rounded-md font-medium text-sm ${getStatusBadgeClasses(approval.status)}`}>
-                      {getStatusLabel(approval.status)}
-                    </span>
-                    {approval.status === "DENIED" && (
-                      <button
-                        className={`${responsiveEnabled ? "min-h-11" : ""} px-4 py-2 rounded-md font-medium text-sm cursor-pointer transition-all duration-200 bg-muted text-foreground hover:bg-accent border border-border disabled:opacity-50 disabled:cursor-not-allowed`}
-                        onClick={() => handleAction(approval.id, "RESET_TO_PENDING")}
-                        disabled={processing === approval.id}
-                        title="Move back to pending for re-review"
-                      >
-                        {processing === approval.id ? "..." : "Move to Pending"}
-                      </button>
-                    )}
-                  </>
-                )}
-              </div>
+              {responsiveEnabled ? (
+                <ResponsiveRecordActions
+                  primary={<div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">{renderApprovalActions(approval)}</div>}
+                />
+              ) : (
+                <div className="flex gap-2 items-center flex-wrap justify-end">{renderApprovalActions(approval)}</div>
+              )}
             </ApprovalCard>
           ))
         )}

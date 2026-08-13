@@ -62,7 +62,7 @@ export default async function RefundsNeededPage() {
             href="https://dashboard.stripe.com/payments"
             target="_blank"
             rel="noreferrer"
-            className="underline"
+            className={mobileResponsiveEnabled ? "inline-flex min-h-11 items-center underline" : "underline"}
           >
             Stripe dashboard
           </a>{" "}
@@ -133,7 +133,7 @@ export default async function RefundsNeededPage() {
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      <MarkRefundedButton registrationId={r.id} />
+                      <MarkRefundedButton registrationId={r.id} responsiveEnabled={mobileResponsiveEnabled} />
                     </TableCell>
                   </TableRow>
                 ))}

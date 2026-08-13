@@ -46,6 +46,15 @@ it("preserves original financial and refund table structure when responsive mode
   financials.unmount();
   render(await RefundsPage());
   expect(screen.queryByRole("region", { name: "Refunds needed table" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("list", { name: "Refunds needed" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("article")).not.toBeInTheDocument();
+  expect(screen.getByRole("table").parentElement).toHaveAttribute(
+    "class",
+    "relative w-full overflow-auto rounded-lg border",
+  );
+  expect(screen.getByRole("link", { name: "Stripe dashboard" })).toHaveClass("underline");
+  expect(screen.getByRole("link", { name: "Stripe dashboard" })).not.toHaveClass("min-h-11");
+  expect(screen.getByRole("button", { name: "Mark Refunded" })).not.toHaveClass("min-h-11");
 });
 
 it("uses responsive shells while keeping the real refund and settings actions", async () => {
@@ -53,6 +62,13 @@ it("uses responsive shells while keeping the real refund and settings actions", 
   const list = screen.getByRole("list", { name: "Refunds needed" });
   expect(list).toHaveTextContent("Growth workshop");
   expect(within(list).getByRole("button", { name: "Mark Refunded" })).toHaveClass("min-h-11");
+  expect(screen.getByRole("link", { name: "Stripe dashboard" })).toHaveClass("min-h-11");
+  for (const link of screen.getAllByRole("link", { name: /View in Stripe/ })) {
+    expect(link).toHaveClass("min-h-11");
+  }
+  for (const button of screen.getAllByRole("button", { name: "Mark Refunded" })) {
+    expect(button).toHaveClass("min-h-11");
+  }
   refunds.unmount();
 
   render(await SettingsPage());
