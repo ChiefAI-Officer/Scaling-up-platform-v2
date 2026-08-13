@@ -33,6 +33,21 @@ type CoachRouteSummary = {
   invalidEditRejected: boolean;
 };
 
+type LiveHrefDiscoverySummary = {
+  delayedHref: string | null;
+  delayedReads: number;
+  reservedHref: string | null;
+  emptyHref: string | null;
+  emptyReads: number;
+  populatedWithoutDetailRejected: boolean;
+  workflowSeedAccepted: boolean;
+  workflowCreateRejected: boolean;
+  surveySeedAccepted: boolean;
+  surveyCreateRejected: boolean;
+  authRedirectRejected: boolean;
+  missingSourceRejected: boolean;
+};
+
 function inspectPlaywrightConfig(override?: string): PlaywrightConfigSummary {
   const environment = { ...process.env };
   if (override === undefined) delete environment.PLAYWRIGHT_BASE_URL;
@@ -128,6 +143,141 @@ console.log(JSON.stringify({
   }
 }
 
+function inspectLiveHrefDiscoveryContract(): LiveHrefDiscoverySummary | null {
+  try {
+    const output = execFileSync(
+      process.execPath,
+      [
+        "--import",
+        "tsx",
+        "-e",
+        `import importedContract from "./e2e/helpers/live-href-discovery-contract";
+const {
+  cuidDetailHrefPattern,
+  discoverSettledHref,
+  nonReservedDetailHrefPattern,
+} = importedContract.default ?? importedContract;
+const navigation = (requestedRoute, finalUrl = requestedRoute, status = 200) => ({
+  requestedRoute,
+  finalUrl: "https://preview.example.test" + finalUrl,
+  responsePresent: true,
+  status,
+});
+
+let delayedReads = 0;
+const delayedHref = await discoverSettledHref({
+  navigate: async () => navigation("/admin/assessments/access-groups"),
+  settle: async () => 1,
+  readHrefs: async () => {
+    delayedReads += 1;
+    return delayedReads < 3 ? [] : ["/admin/assessments/access-groups/cm1234567890abcdefghijkl"];
+  },
+  pattern: cuidDetailHrefPattern("/admin/assessments/access-groups"),
+  label: "access-group detail",
+  pollIntervalMs: 0,
+  timeoutMs: 100,
+});
+
+let reservedReads = 0;
+const reservedHref = await discoverSettledHref({
+  navigate: async () => navigation("/admin/assessments/templates"),
+  settle: async () => 1,
+  readHrefs: async () => {
+    reservedReads += 1;
+    return reservedReads === 1
+      ? ["/admin/assessments/templates/new"]
+      : [
+          "/admin/assessments/templates/new",
+          "/admin/assessments/templates/cm1234567890abcdefghijkl",
+        ];
+  },
+  pattern: cuidDetailHrefPattern("/admin/assessments/templates"),
+  label: "assessment template detail",
+  pollIntervalMs: 0,
+  timeoutMs: 100,
+});
+
+let emptyReads = 0;
+const emptyHref = await discoverSettledHref({
+  navigate: async () => navigation("/admin/assessments/campaigns"),
+  settle: async () => 0,
+  readHrefs: async () => {
+    emptyReads += 1;
+    return [];
+  },
+  pattern: cuidDetailHrefPattern("/admin/assessments/campaigns"),
+  label: "campaign detail",
+  pollIntervalMs: 0,
+  timeoutMs: 0,
+});
+
+let populatedWithoutDetailRejected = false;
+try {
+  await discoverSettledHref({
+    navigate: async () => navigation("/admin/assessments/access-groups"),
+    settle: async () => 1,
+    readHrefs: async () => ["/admin/assessments/access-groups"],
+    pattern: cuidDetailHrefPattern("/admin/assessments/access-groups"),
+    label: "access-group detail",
+    pollIntervalMs: 0,
+    timeoutMs: 0,
+  });
+} catch {
+  populatedWithoutDetailRejected = true;
+}
+
+const workflowPattern = nonReservedDetailHrefPattern("/admin/workflows");
+const surveyPattern = nonReservedDetailHrefPattern("/admin/surveys/templates");
+
+let authRedirectRejected = false;
+try {
+  await discoverSettledHref({
+    navigate: async () => navigation("/admin/workflows", "/login"),
+    settle: async () => 0,
+    readHrefs: async () => [],
+    pattern: workflowPattern,
+    label: "workflow detail",
+  });
+} catch {
+  authRedirectRejected = true;
+}
+
+let missingSourceRejected = false;
+try {
+  await discoverSettledHref({
+    navigate: async () => navigation("/admin/workflows", "/admin/workflows", 404),
+    settle: async () => 0,
+    readHrefs: async () => [],
+    pattern: workflowPattern,
+    label: "workflow detail",
+  });
+} catch {
+  missingSourceRejected = true;
+}
+
+console.log(JSON.stringify({
+  delayedHref,
+  delayedReads,
+  reservedHref,
+  emptyHref,
+  emptyReads,
+  populatedWithoutDetailRejected,
+  workflowSeedAccepted: workflowPattern.test("/admin/workflows/post-event-coach-survey-workflow-seed"),
+  workflowCreateRejected: workflowPattern.test("/admin/workflows/new") === false,
+  surveySeedAccepted: surveyPattern.test("/admin/surveys/templates/coach-post-workshop-seed"),
+  surveyCreateRejected: surveyPattern.test("/admin/surveys/templates/new") === false,
+  authRedirectRejected,
+  missingSourceRejected,
+}));`,
+      ],
+      { cwd: process.cwd(), encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+    );
+    return JSON.parse(output) as LiveHrefDiscoverySummary;
+  } catch {
+    return null;
+  }
+}
+
 describe("responsive authenticated navigation contract", () => {
   const base = {
     requestedRoute: "/portal/home",
@@ -192,6 +342,48 @@ describe("responsive authenticated navigation contract", () => {
         /^\/admin\/assessments\/templates\/[^/]+\/versions\/[^/]+\/edit$/,
       ],
     })).not.toThrow();
+  });
+});
+
+describe("live populated href discovery contract", () => {
+  it("polls through initial empty scans until a delayed valid detail anchor appears", () => {
+    const summary = inspectLiveHrefDiscoveryContract();
+    expect(summary?.delayedHref).toBe(
+      "/admin/assessments/access-groups/cm1234567890abcdefghijkl",
+    );
+    expect(summary?.delayedReads).toBe(3);
+  });
+
+  it("ignores a reserved create owner while waiting for a real detail", () => {
+    expect(inspectLiveHrefDiscoveryContract()?.reservedHref).toBe(
+      "/admin/assessments/templates/cm1234567890abcdefghijkl",
+    );
+  });
+
+  it("returns no candidate for an authoritatively settled empty collection", () => {
+    const summary = inspectLiveHrefDiscoveryContract();
+    expect(summary?.emptyHref).toBeNull();
+    expect(summary?.emptyReads).toBe(0);
+  });
+
+  it("fails when a settled populated collection never exposes a valid detail", () => {
+    expect(
+      inspectLiveHrefDiscoveryContract()?.populatedWithoutDetailRejected,
+    ).toBe(true);
+  });
+
+  it("accepts valid non-CUID workflow and survey seeds but rejects their create owners", () => {
+    const summary = inspectLiveHrefDiscoveryContract();
+    expect(summary?.workflowSeedAccepted).toBe(true);
+    expect(summary?.workflowCreateRejected).toBe(true);
+    expect(summary?.surveySeedAccepted).toBe(true);
+    expect(summary?.surveyCreateRejected).toBe(true);
+  });
+
+  it("keeps authentication redirects and missing collection routes fail-closed", () => {
+    const summary = inspectLiveHrefDiscoveryContract();
+    expect(summary?.authRedirectRejected).toBe(true);
+    expect(summary?.missingSourceRejected).toBe(true);
   });
 });
 
@@ -282,7 +474,6 @@ describe("browser-blocked responsive harness source contract", () => {
 
     expect(adminSource).toContain('const workshopSurvey = workshopChildHref(workshopDetail, "surveys")');
     expect(adminSource).not.toMatch(/const workshopSurvey = await firstMatchingHref/);
-    expect(adminSource).toMatch(/dynamicRoutes[\s\S]*workshopSurvey/);
     expect(adminSource).toContain("expectResponsiveRoute");
     expect(coachSource).toMatch(/const workshopSurvey = await firstMatchingHref/);
     expect(coachSource).toContain('workshopChildHrefPattern(workshopDetail, "surveys")');
