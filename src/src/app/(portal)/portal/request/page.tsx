@@ -3,9 +3,11 @@ import { requireCoach } from "@/lib/auth/authorization";
 import { db } from "@/lib/db";
 import { getCoachBioMissingFields } from "@/lib/validations";
 import { NewWorkshopForm } from "@/app/(dashboard)/workshops/new/page";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 
 export default async function RequestWorkshopPage() {
     const { coach } = await requireCoach();
+    const mobileResponsiveEnabled = isMobileResponsiveEnabled();
 
     const coachWithCerts = await db.coach.findUnique({
         where: { id: coach.id },
@@ -58,7 +60,7 @@ export default async function RequestWorkshopPage() {
 
     return (
         <div className="max-w-3xl mx-auto">
-            <NewWorkshopForm isCoachPortal={true} prefilledCoach={coachWithCerts} />
+            <NewWorkshopForm isCoachPortal={true} prefilledCoach={coachWithCerts} responsiveEnabled={mobileResponsiveEnabled} />
         </div>
     );
 }

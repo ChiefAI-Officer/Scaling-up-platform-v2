@@ -4,6 +4,8 @@ import Link from "next/link";
 import { PlusCircle } from "lucide-react";
 import { PortalWorkshopList } from "@/components/workshops/workshop-list-filters";
 import { FadeUp } from "@/components/ui/animated";
+import { PageHeader } from "@/components/ui/page-header";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 
 /**
  * My Workshops Page
@@ -12,6 +14,7 @@ import { FadeUp } from "@/components/ui/animated";
  */
 export default async function MyWorkshopsPage() {
     const { coach } = await requireCoach();
+    const mobileResponsiveEnabled = isMobileResponsiveEnabled();
 
     const workshops = await db.workshop.findMany({
         where: { coachId: coach.id },
@@ -56,22 +59,38 @@ export default async function MyWorkshopsPage() {
     return (
         <div className="space-y-6">
             <FadeUp>
-              <div className="flex justify-between items-center">
-                  <div>
-                      <h1 className="text-2xl font-bold text-foreground">My Workshops</h1>
-                      <p className="text-muted-foreground">Manage your upcoming and past events.</p>
-                  </div>
-                  <Link
-                      href="/portal/request"
-                      className="bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-2"
-                  >
-                      <PlusCircle className="w-5 h-5" /> Request New
-                  </Link>
-              </div>
+              {mobileResponsiveEnabled ? (
+                <PageHeader
+                    title="My Workshops"
+                    description="Manage your upcoming and past events."
+                    responsiveEnabled
+                    actions={
+                      <Link
+                          href="/portal/request"
+                          className="bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors flex min-h-11 items-center gap-2"
+                      >
+                          <PlusCircle className="w-5 h-5" /> Request New
+                      </Link>
+                    }
+                />
+              ) : (
+                <div className="flex justify-between items-center">
+                    <div>
+                        <h1 className="text-2xl font-bold text-foreground">My Workshops</h1>
+                        <p className="text-muted-foreground">Manage your upcoming and past events.</p>
+                    </div>
+                    <Link
+                        href="/portal/request"
+                        className="bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-2"
+                    >
+                        <PlusCircle className="w-5 h-5" /> Request New
+                    </Link>
+                </div>
+              )}
             </FadeUp>
 
             <FadeUp delay={0.1}>
-              <PortalWorkshopList workshops={serialized} />
+              <PortalWorkshopList workshops={serialized} responsiveEnabled={mobileResponsiveEnabled} />
             </FadeUp>
         </div>
     );

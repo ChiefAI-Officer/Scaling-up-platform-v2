@@ -6,7 +6,8 @@ import { Search, SlidersHorizontal, X } from "lucide-react";
 import { StatusPill } from "@/components/ui/status-pill";
 import { CheckCircle2, Circle } from "lucide-react";
 import { CopyUrlButton } from "@/components/ui/copy-url-button";
-import { formatEventDateUTC } from "@/lib/utils";
+import { ResponsiveDataView } from "@/components/ui/responsive-data-view";
+import { cn, formatEventDateUTC } from "@/lib/utils";
 
 interface WorkshopItem {
     id: string;
@@ -26,9 +27,10 @@ interface WorkshopItem {
     hasCounterOffer?: boolean;
 }
 
-interface PortalWorkshopListProps {
+export interface PortalWorkshopListProps {
     workshops: WorkshopItem[];
     isAdmin?: boolean;
+    responsiveEnabled?: boolean;
 }
 
 const STATUS_OPTIONS = [
@@ -43,7 +45,7 @@ const STATUS_OPTIONS = [
     { value: "CANCELED", label: "Canceled" },
 ];
 
-export function PortalWorkshopList({ workshops, isAdmin = false }: PortalWorkshopListProps) {
+export function PortalWorkshopList({ workshops, isAdmin = false, responsiveEnabled = false }: PortalWorkshopListProps) {
     const [search, setSearch] = useState("");
     const [statusFilter, setStatusFilter] = useState("");
     const [showFilters, setShowFilters] = useState(false);
@@ -64,8 +66,8 @@ export function PortalWorkshopList({ workshops, isAdmin = false }: PortalWorksho
     return (
         <>
             {/* Filters & Search */}
-            <div className="flex gap-4 mb-6">
-                <div className="relative flex-1 max-w-sm">
+            <div className={cn("flex gap-4 mb-6", responsiveEnabled && "flex-col sm:flex-row")}>
+                <div className={cn("relative flex-1 max-w-sm", responsiveEnabled && "max-w-none sm:max-w-sm")}>
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <input
                         type="text"
@@ -77,7 +79,7 @@ export function PortalWorkshopList({ workshops, isAdmin = false }: PortalWorksho
                 </div>
                 <button
                     onClick={() => setShowFilters(!showFilters)}
-                    className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm transition-colors ${
+                    className={`${cn("flex items-center gap-2 px-4 py-2 border rounded-lg text-sm transition-colors", responsiveEnabled && "min-h-11 justify-center sm:w-auto")} ${
                         showFilters || statusFilter
                             ? "border-primary text-primary bg-primary/10"
                             : "border-border text-foreground hover:bg-accent"
@@ -88,7 +90,7 @@ export function PortalWorkshopList({ workshops, isAdmin = false }: PortalWorksho
                 {hasActiveFilters && (
                     <button
                         onClick={() => { setSearch(""); setStatusFilter(""); }}
-                        className="flex items-center gap-1 px-3 py-2 text-sm text-muted-foreground hover:text-foreground"
+                        className={cn("flex items-center gap-1 px-3 py-2 text-sm text-muted-foreground hover:text-foreground", responsiveEnabled && "min-h-11 justify-center sm:w-auto")}
                     >
                         <X className="w-4 h-4" /> Clear
                     </button>
@@ -120,6 +122,50 @@ export function PortalWorkshopList({ workshops, isAdmin = false }: PortalWorksho
                 </p>
             )}
 
+            <ResponsiveDataView
+                enabled={responsiveEnabled}
+                label="Workshops"
+                wideFrom="lg"
+                compact={
+                    <div className="space-y-3">
+                        {filtered.length === 0 ? (
+                            <div className="rounded-xl border border-border bg-card p-6 text-center text-muted-foreground">
+                                {hasActiveFilters
+                                    ? "No workshops match your search."
+                                    : "No workshops found. Request your first one above!"}
+                            </div>
+                        ) : (
+                            filtered.map((workshop) => (
+                                <article key={workshop.id} role="listitem" className="rounded-xl border border-border bg-card p-4">
+                                    <div className="flex min-w-0 items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <Link href={`/portal/workshops/${workshop.id}`} className="font-semibold text-primary break-words">
+                                                {workshop.title}
+                                            </Link>
+                                            <p className="text-sm text-muted-foreground">{formatEventDateUTC(workshop.eventDate)}</p>
+                                        </div>
+                                        {workshop.hasCounterOffer ? (
+                                            <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-warning/15 px-3 py-1 text-xs font-semibold text-warning border border-warning/30">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-warning animate-pulse" />
+                                                Counter-Offer
+                                            </span>
+                                        ) : (
+                                            <StatusPill status={workshop.status} />
+                                        )}
+                                    </div>
+                                    <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                                        <div><dt className="text-muted-foreground">Registrations</dt><dd>{workshop._count.registrations} of {workshop.maxAttendees} max</dd></div>
+                                        <div><dt className="text-muted-foreground">Format</dt><dd>{workshop.workshopType?.name ?? "—"}</dd></div>
+                                    </dl>
+                                    <Link data-touch-target href={`/portal/workshops/${workshop.id}`} className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-md bg-primary px-4 text-primary-foreground">
+                                        Manage workshop
+                                    </Link>
+                                </article>
+                            ))
+                        )}
+                    </div>
+                }
+                wide={
             <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
                 <table className="w-full text-left border-collapse">
                     <thead>
@@ -257,6 +303,8 @@ export function PortalWorkshopList({ workshops, isAdmin = false }: PortalWorksho
                     </tbody>
                 </table>
             </div>
+                }
+            />
         </>
     );
 }

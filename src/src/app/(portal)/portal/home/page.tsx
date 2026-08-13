@@ -1,9 +1,11 @@
 import { db } from "@/lib/db";
 import { requireCoach } from "@/lib/auth/authorization";
-import { formatTimeWithZone } from "@/lib/utils";
+import { cn, formatTimeWithZone } from "@/lib/utils";
 import Link from "next/link";
 import { StatusPill } from "@/components/ui/status-pill";
 import { FadeUp, StaggerContainer, StaggerItem } from "@/components/ui/animated";
+import { PageHeader } from "@/components/ui/page-header";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 
 /**
  * Coach Dashboard - Home Page
@@ -13,6 +15,7 @@ import { FadeUp, StaggerContainer, StaggerItem } from "@/components/ui/animated"
 export default async function CoachDashboardPage() {
   // Get authenticated coach
   const { coach } = await requireCoach();
+  const mobileResponsiveEnabled = isMobileResponsiveEnabled();
 
   const now = new Date();
 
@@ -65,17 +68,32 @@ export default async function CoachDashboardPage() {
   return (
     <div className="space-y-6">
       <FadeUp>
-        <div className="flex justify-between items-center">
-          <h2 className="text-2xl font-bold text-foreground">
-            Welcome Back, {coach.firstName}!
-          </h2>
-          <Link
-            href="/portal/request"
-            className="bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
-          >
-            + Request New Workshop
-          </Link>
-        </div>
+        {mobileResponsiveEnabled ? (
+          <PageHeader
+            title={`Welcome Back, ${coach.firstName}!`}
+            responsiveEnabled
+            actions={
+              <Link
+                href="/portal/request"
+                className="inline-flex min-h-11 items-center rounded-lg bg-primary px-4 py-2 text-primary-foreground transition-colors hover:bg-primary/90"
+              >
+                + Request New Workshop
+              </Link>
+            }
+          />
+        ) : (
+          <div className="flex justify-between items-center">
+            <h2 className="text-2xl font-bold text-foreground">
+              Welcome Back, {coach.firstName}!
+            </h2>
+            <Link
+              href="/portal/request"
+              className="bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
+            >
+              + Request New Workshop
+            </Link>
+          </div>
+        )}
       </FadeUp>
 
       {/* Stats Grid - Sprint 3: Only attendee/count stats, NO revenue */}
@@ -134,9 +152,9 @@ export default async function CoachDashboardPage() {
             <ul className="divide-y divide-border">
               {upcomingWorkshops.map((workshop) => (
                 <li key={workshop.id} className="px-6 py-4 hover:bg-accent transition-colors">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <h4 className="font-medium text-foreground">{workshop.title}</h4>
+                  <div className={cn("flex justify-between items-center", mobileResponsiveEnabled && "flex-col items-start gap-3 sm:flex-row sm:items-center")}>
+                    <div className={cn(mobileResponsiveEnabled && "min-w-0")}>
+                      <h4 className={cn("font-medium text-foreground", mobileResponsiveEnabled && "break-words")}>{workshop.title}</h4>
                       <p className="text-sm text-muted-foreground">
                         {new Date(workshop.eventDate).toLocaleDateString("en-US", {
                           weekday: "long",
@@ -149,7 +167,7 @@ export default async function CoachDashboardPage() {
                           ` at ${formatTimeWithZone(workshop.eventTime, workshop.eventDate, workshop.timezone)}`}
                       </p>
                     </div>
-                    <div className="text-right">
+                    <div className={cn("text-right", mobileResponsiveEnabled && "text-left sm:text-right")}>
                       {/* Sprint 3: Only show attendee count, NOT revenue */}
                       <div className="text-lg font-semibold text-primary">
                         {workshop._count.registrations}
@@ -170,8 +188,8 @@ export default async function CoachDashboardPage() {
       {/* Pending Follow-Ups Alert */}
       {stats.pendingFollowUps > 0 && (
         <FadeUp delay={0.25}>
-          <div className="bg-warning/10 border border-warning/20 rounded-xl p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
+          <div className={cn("bg-warning/10 border border-warning/20 rounded-xl p-4 flex items-center justify-between", mobileResponsiveEnabled && "flex-col items-stretch gap-4 sm:flex-row sm:items-center")}>
+            <div className="flex min-w-0 items-center gap-3">
               <span className="text-2xl">⚠️</span>
               <div>
                 <p className="font-medium text-warning">
@@ -184,7 +202,7 @@ export default async function CoachDashboardPage() {
             </div>
             <Link
               href="/portal/follow-up"
-              className="bg-warning text-primary-foreground px-4 py-2 rounded-lg hover:bg-warning/90 transition-colors whitespace-nowrap"
+              className={cn("bg-warning text-primary-foreground px-4 py-2 rounded-lg hover:bg-warning/90 transition-colors whitespace-nowrap", mobileResponsiveEnabled && "inline-flex min-h-11 items-center justify-center")}
             >
               Submit Reports
             </Link>

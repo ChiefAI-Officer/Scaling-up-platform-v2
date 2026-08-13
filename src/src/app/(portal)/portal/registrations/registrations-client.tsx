@@ -23,6 +23,7 @@ export { SORT_ALLOWLIST };
 interface RegistrationsClientProps {
   registrations: CoachRegistrationView[];
   currentSort?: SortField;
+  responsiveEnabled?: boolean;
 }
 
 function toCsvCell(value: string): string {
@@ -57,7 +58,7 @@ function paymentBadgeVariant(
 
 const PAGE_SIZE = 25;
 
-export function RegistrationsClient({ registrations: initialRegistrations, currentSort = "createdAt" }: RegistrationsClientProps) {
+export function RegistrationsClient({ registrations: initialRegistrations, currentSort = "createdAt", responsiveEnabled = false }: RegistrationsClientProps) {
   const router = useRouter();
   const [registrations, setRegistrations] = useState(initialRegistrations);
   const [selectedWorkshopId, setSelectedWorkshopId] = useState("all");
@@ -357,7 +358,7 @@ export function RegistrationsClient({ registrations: initialRegistrations, curre
       </div>
 
       <div className="rounded-xl border border-border bg-card">
-        <Table>
+        <Table responsiveEnabled={responsiveEnabled} regionLabel="Workshop registrations">
           <TableHeader>
             <TableRow>
               <TableHead
@@ -398,7 +399,7 @@ export function RegistrationsClient({ registrations: initialRegistrations, curre
                     <div className="font-medium text-foreground">
                       {registration.firstName} {registration.lastName}
                     </div>
-                    <div className="text-sm text-muted-foreground">{registration.email}</div>
+                    <div className={responsiveEnabled ? "break-all text-sm text-muted-foreground" : "text-sm text-muted-foreground"}>{registration.email}</div>
                     {registration.company && (
                       <div className="text-sm text-muted-foreground">{registration.company}</div>
                     )}
@@ -463,7 +464,7 @@ export function RegistrationsClient({ registrations: initialRegistrations, curre
         </Table>
         {/* MR-31: Pagination controls */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between border-t border-border px-4 py-3">
+          <div className={responsiveEnabled ? "flex flex-col items-start gap-3 border-t border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between" : "flex items-center justify-between border-t border-border px-4 py-3"}>
             <p className="text-sm text-muted-foreground">
               Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filteredSorted.length)} of {filteredSorted.length}
             </p>

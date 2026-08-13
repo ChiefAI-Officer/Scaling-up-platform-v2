@@ -15,6 +15,8 @@
 
 import React from 'react';
 import { BookOpen, Video, Presentation, Palette, HelpCircle, FileText, Folder, Library, Construction } from "lucide-react";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
+import { cn } from "@/lib/utils";
 
 interface Resource {
     id: string;
@@ -115,11 +117,12 @@ const getTypeIcon = (type: Resource['type']) => {
 };
 
 export function CoachResourcesPage() {
+    const mobileResponsiveEnabled = isMobileResponsiveEnabled();
     const publishedResources = coachResources.filter(r => r.status === 'Published');
     const draftResources = coachResources.filter(r => r.status === 'Draft');
 
     return (
-        <div className="min-h-screen bg-muted">
+        <div className={cn("min-h-screen bg-muted", mobileResponsiveEnabled && "min-w-0 max-w-full")}>
             {/* Header */}
             <header className="bg-gradient-to-r from-purple-800 to-blue-600 text-white py-12 px-6">
                 <div className="max-w-4xl mx-auto">
@@ -134,7 +137,7 @@ export function CoachResourcesPage() {
             <main className="max-w-4xl mx-auto py-10 px-6">
                 {/* Additional Resources Section */}
                 <section className="mb-10">
-                    <div className="flex items-center justify-between mb-6">
+                    <div className={cn("flex items-center justify-between mb-6", mobileResponsiveEnabled && "flex-col items-start gap-2 sm:flex-row sm:items-center")}>
                         <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
                             <Library className="w-5 h-5 text-primary" /> Additional Resources
                         </h2>
@@ -147,17 +150,17 @@ export function CoachResourcesPage() {
                         {publishedResources.map((resource, index) => (
                             <div
                                 key={resource.id}
-                                className={`flex items-center justify-between p-4 hover:bg-accent transition-colors ${index !== publishedResources.length - 1 ? 'border-b border-border' : ''
+                                className={`${cn("flex items-center justify-between p-4 hover:bg-accent transition-colors", mobileResponsiveEnabled && "flex-col items-start gap-3 sm:flex-row sm:items-center")} ${index !== publishedResources.length - 1 ? 'border-b border-border' : ''
                                     }`}
                             >
-                                <div className="flex items-center gap-4">
+                                <div className={cn("flex items-center gap-4", mobileResponsiveEnabled && "min-w-0 items-start")}>
                                     <span className="flex-shrink-0">{getTypeIcon(resource.type)}</span>
-                                    <div>
+                                    <div className={cn(mobileResponsiveEnabled && "min-w-0")}>
                                         <h3 className="font-medium text-foreground">
                                             {resource.link ? (
                                                 <a
                                                     href={resource.link}
-                                                    className="text-primary hover:underline"
+                                                    className={cn("text-primary hover:underline", mobileResponsiveEnabled && "break-words")}
                                                 >
                                                     {resource.title}
                                                 </a>
@@ -168,7 +171,7 @@ export function CoachResourcesPage() {
                                         <p className="text-sm text-muted-foreground">{resource.description}</p>
                                     </div>
                                 </div>
-                                <span className="px-3 py-1 text-xs font-medium rounded-full bg-success/10 text-success">
+                                <span className="shrink-0 px-3 py-1 text-xs font-medium rounded-full bg-success/10 text-success">
                                     {resource.status}
                                 </span>
                             </div>
@@ -186,11 +189,11 @@ export function CoachResourcesPage() {
                             {draftResources.map((resource) => (
                                 <div
                                     key={resource.id}
-                                    className="flex items-center justify-between p-4"
+                                    className={cn("flex items-center justify-between p-4", mobileResponsiveEnabled && "flex-col items-start gap-3 sm:flex-row sm:items-center")}
                                 >
-                                    <div className="flex items-center gap-4">
+                                    <div className={cn("flex items-center gap-4", mobileResponsiveEnabled && "min-w-0 items-start")}>
                                         <span className="flex-shrink-0">{getTypeIcon(resource.type)}</span>
-                                        <div>
+                                        <div className={cn(mobileResponsiveEnabled && "min-w-0")}>
                                             <h3 className="font-medium text-muted-foreground">{resource.title}</h3>
                                             <p className="text-sm text-muted-foreground">{resource.description}</p>
                                         </div>
