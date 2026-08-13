@@ -2,12 +2,14 @@
  * Task 5.3 — CampaignsListWithFilter grouped-by-company with per-campaign metrics (TDD).
  *
  * Tests:
- *  1. Renders company sections — both company headers and their campaigns appear under the right company
- *  2. Hides a company with zero matching campaigns after filter
- *  3. CampaignStatusMetrics renders per campaign — tile group appears for each campaign
- *  4. EmptyHint shown for DRAFT-with-zero-metrics, NOT for ACTIVE-with-zero-metrics
- *  5. Global pill counts are correct — All/Draft/Active/Closed sum across companies
- *  6. Empty campaigns array — component renders without crashing
+ *  1. Renders collapsed company triggers and reveals campaigns on demand
+ *  2. Keeps at most one company expanded and allows the open company to close
+ *  3. Resets the accordion when the status filter changes
+ *  4. Hides a company with zero matching campaigns after filter
+ *  5. CampaignStatusMetrics renders per expanded campaign
+ *  6. EmptyHint shown for DRAFT-with-zero-metrics, NOT for ACTIVE-with-zero-metrics
+ *  7. Global pill counts are correct — All/Draft/Active/Closed sum across companies
+ *  8. Empty campaigns array — component renders without crashing
  */
 
 import React from "react";
@@ -63,22 +65,31 @@ const twoCompanyCampaigns: CampaignListItem[] = [
 ];
 
 describe("CampaignsListWithFilter — grouped by company", () => {
-  // Test 1: Renders company sections with correct grouping
-  it("renders a heading for each company and campaigns appear under the right company", () => {
+  it("renders each company as a collapsed accessible trigger", () => {
     render(<CampaignsListWithFilter campaigns={twoCompanyCampaigns} />);
 
-    // Company headers — at least one element contains the company name
-    expect(screen.getAllByText(/Alpha Corp/).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText(/Beta Inc/).length).toBeGreaterThanOrEqual(1);
+    const alphaTrigger = screen.getByRole("button", {
+      name: /Alpha Corp.*2 campaigns/i,
+    });
+    const betaTrigger = screen.getByRole("button", {
+      name: /Beta Inc.*2 campaigns/i,
+    });
 
-    // Campaigns appear (by name)
-    expect(screen.getByText("Campaign c1")).toBeInTheDocument();
-    expect(screen.getByText("Campaign c2")).toBeInTheDocument();
-    expect(screen.getByText("Campaign c3")).toBeInTheDocument();
-    expect(screen.getByText("Campaign c4")).toBeInTheDocument();
+    expect(alphaTrigger).toHaveAttribute("aria-expanded", "false");
+    expect(betaTrigger).toHaveAttribute("aria-expanded", "false");
+
+    for (const trigger of [alphaTrigger, betaTrigger]) {
+      const controlledId = trigger.getAttribute("aria-controls");
+      expect(controlledId).toBeTruthy();
+      expect(document.getElementById(controlledId!)).toHaveAttribute("hidden");
+    }
+
+    expect(screen.queryByText("Campaign c1")).not.toBeInTheDocument();
+    expect(screen.queryByText("Campaign c2")).not.toBeInTheDocument();
+    expect(screen.queryByText("Campaign c3")).not.toBeInTheDocument();
+    expect(screen.queryByText("Campaign c4")).not.toBeInTheDocument();
   });
 
-  // Test 1b: Campaign count appears in company header
   it("shows campaign count in company header", () => {
     render(<CampaignsListWithFilter campaigns={twoCompanyCampaigns} />);
     // Company name + count appear in the section heading
@@ -86,6 +97,60 @@ describe("CampaignsListWithFilter — grouped by company", () => {
     expect(screen.getAllByText(/Beta Inc/).length).toBeGreaterThanOrEqual(1);
     // Count text appears near the headings
     expect(screen.getAllByText(/2 campaigns/).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("expands only one company at a time", () => {
+    render(<CampaignsListWithFilter campaigns={twoCompanyCampaigns} />);
+
+    const alpha = screen.getByRole("button", {
+      name: /Alpha Corp.*2 campaigns/i,
+    });
+    const beta = screen.getByRole("button", { name: /Beta Inc.*2 campaigns/i });
+
+    fireEvent.click(alpha);
+    expect(alpha).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("Campaign c1")).toBeInTheDocument();
+    expect(screen.getByText("Campaign c2")).toBeInTheDocument();
+    expect(screen.queryByText("Campaign c3")).not.toBeInTheDocument();
+
+    fireEvent.click(beta);
+    expect(alpha).toHaveAttribute("aria-expanded", "false");
+    expect(beta).toHaveAttribute("aria-expanded", "true");
+    expect(screen.queryByText("Campaign c1")).not.toBeInTheDocument();
+    expect(screen.queryByText("Campaign c2")).not.toBeInTheDocument();
+    expect(screen.getByText("Campaign c3")).toBeInTheDocument();
+    expect(screen.getByText("Campaign c4")).toBeInTheDocument();
+  });
+
+  it("collapses the open company when its trigger is clicked again", () => {
+    render(<CampaignsListWithFilter campaigns={twoCompanyCampaigns} />);
+
+    const alpha = screen.getByRole("button", {
+      name: /Alpha Corp.*2 campaigns/i,
+    });
+    fireEvent.click(alpha);
+    expect(screen.getByText("Campaign c1")).toBeInTheDocument();
+
+    fireEvent.click(alpha);
+    expect(alpha).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Campaign c1")).not.toBeInTheDocument();
+  });
+
+  it("collapses the open company when the status filter changes", () => {
+    render(<CampaignsListWithFilter campaigns={twoCompanyCampaigns} />);
+
+    const alpha = screen.getByRole("button", {
+      name: /Alpha Corp.*2 campaigns/i,
+    });
+    fireEvent.click(alpha);
+    expect(screen.getByText("Campaign c1")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("campaign-filter-pill-active"));
+
+    expect(
+      screen.getByRole("button", { name: /Alpha Corp.*1 campaign$/i }),
+    ).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Campaign c1")).not.toBeInTheDocument();
   });
 
   // Test 2: Filtering hides companies with zero visible campaigns
@@ -110,6 +175,9 @@ describe("CampaignsListWithFilter — grouped by company", () => {
 
     expect(screen.getAllByText(/Alpha Corp/).length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText(/Beta Inc/)).not.toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: /Alpha Corp.*1 campaign$/i }),
+    );
     expect(screen.getByText("Campaign c2")).toBeInTheDocument(); // the DRAFT one
     expect(screen.queryByText("Campaign c1")).not.toBeInTheDocument(); // ACTIVE
   });
@@ -118,15 +186,19 @@ describe("CampaignsListWithFilter — grouped by company", () => {
   it("renders a CampaignStatusMetrics tile group for each campaign", () => {
     render(<CampaignsListWithFilter campaigns={twoCompanyCampaigns} />);
 
-    // Each campaign should have a metrics wrapper with testIdPrefix = "campaign-metrics-{id}"
-    // The container div has data-testid="campaign-metrics-c1" etc (exact match, not sub-tiles).
-    // Sub-tiles have "-total" "-new" suffix — use an exact array of the 4 container IDs.
+    fireEvent.click(
+      screen.getByRole("button", { name: /Alpha Corp.*2 campaigns/i }),
+    );
     const c1Group = screen.getByTestId("campaign-metrics-c1");
     const c2Group = screen.getByTestId("campaign-metrics-c2");
-    const c3Group = screen.getByTestId("campaign-metrics-c3");
-    const c4Group = screen.getByTestId("campaign-metrics-c4");
     expect(c1Group).toBeInTheDocument();
     expect(c2Group).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Beta Inc.*2 campaigns/i }),
+    );
+    const c3Group = screen.getByTestId("campaign-metrics-c3");
+    const c4Group = screen.getByTestId("campaign-metrics-c4");
     expect(c3Group).toBeInTheDocument();
     expect(c4Group).toBeInTheDocument();
   });
@@ -139,6 +211,9 @@ describe("CampaignsListWithFilter — grouped by company", () => {
     ];
     render(<CampaignsListWithFilter campaigns={campaigns} />);
 
+    fireEvent.click(
+      screen.getByRole("button", { name: /X Corp.*1 campaign$/i }),
+    );
     // Total tile should show 5
     const totalTile = screen.getByTestId("campaign-metrics-cx1-total");
     expect(totalTile).toHaveTextContent("5");
@@ -150,6 +225,9 @@ describe("CampaignsListWithFilter — grouped by company", () => {
       makeCampaign({ id: "d1", organizationId: "org-a", organizationName: "Org A", status: "DRAFT", metrics: zeroMetrics }),
     ];
     render(<CampaignsListWithFilter campaigns={campaigns} />);
+    fireEvent.click(
+      screen.getByRole("button", { name: /Org A.*1 campaign$/i }),
+    );
     expect(screen.getByText(/No invitations yet/)).toBeInTheDocument();
   });
 
@@ -158,6 +236,9 @@ describe("CampaignsListWithFilter — grouped by company", () => {
       makeCampaign({ id: "a1", organizationId: "org-a", organizationName: "Org A", status: "ACTIVE", metrics: zeroMetrics }),
     ];
     render(<CampaignsListWithFilter campaigns={campaigns} />);
+    fireEvent.click(
+      screen.getByRole("button", { name: /Org A.*1 campaign$/i }),
+    );
     expect(screen.queryByText(/No invitations yet/)).not.toBeInTheDocument();
   });
 
@@ -203,6 +284,9 @@ describe("CampaignsListWithFilter — detailBasePath", () => {
 
   it("defaults campaign detail links to the coach portal (regression)", () => {
     render(<CampaignsListWithFilter campaigns={one} />);
+    fireEvent.click(
+      screen.getByRole("button", { name: /Alpha Corp.*1 campaign$/i }),
+    );
     // Both the name link and the "View" link point at the portal by default.
     expect(screen.getByRole("link", { name: "Campaign c1" })).toHaveAttribute(
       "href",
@@ -220,6 +304,9 @@ describe("CampaignsListWithFilter — detailBasePath", () => {
         campaigns={one}
         detailBasePath="/admin/assessments/campaigns"
       />,
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: /Alpha Corp.*1 campaign$/i }),
     );
     expect(screen.getByRole("link", { name: "Campaign c1" })).toHaveAttribute(
       "href",
@@ -252,12 +339,19 @@ describe("CampaignsListWithFilter — edition standing", () => {
     pinnedRetired: false,
   };
 
+  function expandEditionOrg() {
+    fireEvent.click(
+      screen.getByRole("button", { name: /Edition Org.*1 campaign$/i }),
+    );
+  }
+
   it("shows persistent edition identity without a positive current badge", () => {
     render(
       <CampaignsListWithFilter
         campaigns={[editionCampaign("ACTIVE", currentEdition)]}
       />,
     );
+    expandEditionOrg();
     const identity = screen.getByTestId(
       "campaign-edition-identity-active-edition",
     );
@@ -273,6 +367,7 @@ describe("CampaignsListWithFilter — edition standing", () => {
         campaigns={[editionCampaign("ACTIVE", currentEdition)]}
       />,
     );
+    expandEditionOrg();
     const campaignLink = screen.getByRole("link", {
       name: "Campaign active-edition",
     });
@@ -290,6 +385,7 @@ describe("CampaignsListWithFilter — edition standing", () => {
         ]}
       />,
     );
+    expandEditionOrg();
     const marker = screen.getByTestId("campaign-edition-stale-draft-edition");
     expect(marker).toHaveTextContent("Not latest");
     expect(marker).toHaveClass(
@@ -311,6 +407,7 @@ describe("CampaignsListWithFilter — edition standing", () => {
         ]}
       />,
     );
+    expandEditionOrg();
     const marker = screen.getByTestId(
       "campaign-edition-retired-active-edition",
     );
@@ -337,6 +434,7 @@ describe("CampaignsListWithFilter — edition standing", () => {
         ]}
       />,
     );
+    expandEditionOrg();
     expect(
       screen.getByTestId("campaign-edition-identity-closed-edition"),
     ).toHaveTextContent("Edition 1");
@@ -356,6 +454,7 @@ describe("CampaignsListWithFilter — edition standing", () => {
         ]}
       />,
     );
+    expandEditionOrg();
     expect(screen.getByText("Edition 2")).toBeInTheDocument();
     expect(screen.queryByText("Retired")).not.toBeInTheDocument();
     expect(screen.queryByText("Not latest")).not.toBeInTheDocument();
@@ -367,6 +466,7 @@ describe("CampaignsListWithFilter — edition standing", () => {
         campaigns={[editionCampaign("ACTIVE", null)]}
       />,
     );
+    expandEditionOrg();
     expect(
       screen.getByTestId("campaign-edition-identity-active-edition"),
     ).toHaveTextContent("QSP v2");
