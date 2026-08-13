@@ -38,6 +38,37 @@ const discoveredAdminRoutes = [
   { source: "/admin/transactional-emails", selector: 'a[href^="/admin/transactional-emails/"]', label: "transactional email editor" },
 ];
 
+const assessmentAdminRoutes = [
+  "/admin/assessments",
+  "/admin/assessments/access-groups",
+  "/admin/assessments/aggregate",
+  "/admin/assessments/campaigns",
+  "/admin/assessments/import",
+  "/admin/assessments/observability",
+  "/admin/assessments/organizations",
+  "/admin/assessments/public-campaigns",
+  "/admin/assessments/templates",
+  "/admin/assessments/templates/new",
+];
+
+const discoveredAssessmentRoutes = [
+  {
+    source: "/admin/assessments/access-groups",
+    selector: 'a[href^="/admin/assessments/access-groups/"]',
+    label: "assessment access-group detail",
+  },
+  {
+    source: "/admin/assessments/campaigns",
+    selector: 'a[href^="/admin/assessments/campaigns/"]',
+    label: "assessment campaign detail",
+  },
+  {
+    source: "/admin/assessments/templates",
+    selector: 'a[href^="/admin/assessments/templates/"]',
+    label: "assessment template detail",
+  },
+];
+
 for (const width of [320, 390]) {
   test(`admin workshop and file collections fit a ${width}px viewport`, async ({ page }) => {
     await page.setViewportSize({ width, height: 844 });
@@ -67,6 +98,47 @@ for (const width of [320, 390]) {
     await page.goto(detailHref!);
     await assertNoDocumentOverflow(page, `${detailHref} at ${width}`);
     await expect(page.getByRole("region", { name: "Workshop registrations" })).toBeVisible();
+  });
+}
+
+for (const width of [320, 390]) {
+  test(`assessment workspace routes fit a ${width}px viewport`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await loginAs(page, {
+      email: ADMIN_EMAIL,
+      password: ADMIN_PASSWORD,
+      expectedUrl: /\/admin|\/dashboard/,
+    });
+
+    for (const route of assessmentAdminRoutes) {
+      await page.goto(route);
+      await expect(page.locator("body")).toHaveAttribute(
+        "data-mobile-responsive",
+        "on",
+      );
+      await assertNoDocumentOverflow(page, `${route} at ${width}`);
+    }
+
+    for (const discovered of discoveredAssessmentRoutes) {
+      await page.goto(discovered.source);
+      const link = page.locator(discovered.selector).first();
+      await expect(
+        link,
+        `the admin fixture must include a populated ${discovered.label} link`,
+      ).toBeVisible();
+      const href = await link.getAttribute("href");
+      expect(href, `${discovered.label} link href`).toBeTruthy();
+
+      await page.goto(href!);
+      await assertNoDocumentOverflow(page, `${href} at ${width}`);
+
+      if (discovered.label === "assessment template detail") {
+        await expect(page).toHaveURL(
+          /\/admin\/assessments\/templates\/[^/]+\/versions\/[^/]+\/edit/,
+        );
+        await assertNoDocumentOverflow(page, `template version editor at ${width}`);
+      }
+    }
   });
 }
 

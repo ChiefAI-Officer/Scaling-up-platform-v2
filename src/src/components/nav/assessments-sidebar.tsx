@@ -16,6 +16,10 @@
 import type { Session } from "next-auth";
 import { AssessmentsNavLink } from "@/components/nav/assessments-nav-link";
 import {
+  AssessmentsCompactNav,
+  type AssessmentsNavEntry,
+} from "@/components/nav/assessments-compact-nav";
+import {
   isPrivilegedRole,
   normalizeRole,
 } from "@/lib/auth/access-control";
@@ -24,19 +28,10 @@ import { isReferredResultsEnabled } from "@/lib/assessments/wave-83-flags";
 
 interface AssessmentsSidebarProps {
   session: Session;
+  responsiveEnabled?: boolean;
 }
 
-interface SidebarEntry {
-  href: string;
-  label: string;
-  exact?: boolean;
-  /**
-   * When true, the entry renders as a "Coming soon" placeholder: dimmed,
-   * non-competing for active state. The Link still navigates (lands on
-   * /portal/assessments) so the row is not a dead end.
-   */
-  placeholder?: boolean;
-}
+type SidebarEntry = AssessmentsNavEntry;
 
 const ADMIN_ENTRIES: SidebarEntry[] = [
   { href: "/admin/assessments", label: "Dashboard", exact: true },
@@ -72,7 +67,10 @@ const REFERRED_RESULTS_ENTRY: SidebarEntry = {
   label: "Referred Results",
 };
 
-export function AssessmentsSidebar({ session }: AssessmentsSidebarProps) {
+export function AssessmentsSidebar({
+  session,
+  responsiveEnabled = false,
+}: AssessmentsSidebarProps) {
   const rawRole = (session.user as { role?: string } | undefined)?.role ?? "";
   const role = normalizeRole(rawRole);
   const showAdminSection = isPrivilegedRole(role);
@@ -92,10 +90,19 @@ export function AssessmentsSidebar({ session }: AssessmentsSidebarProps) {
     }
     return true;
   });
+  const entries = showAdminSection
+    ? adminEntries
+    : showCoachSection
+      ? coachEntries
+      : [];
 
-  return (
+  const sidebar = (
     <aside
-      className="w-full md:w-60 md:flex-shrink-0 border-b md:border-b-0 md:border-r border-border bg-card/40"
+      className={
+        responsiveEnabled
+          ? "hidden w-full border-border bg-card/40 sm:block sm:w-60 sm:flex-shrink-0 sm:border-r"
+          : "w-full md:w-60 md:flex-shrink-0 border-b md:border-b-0 md:border-r border-border bg-card/40"
+      }
       aria-label="Assessments navigation"
     >
       <nav className="p-3 md:p-4 space-y-6">
@@ -104,7 +111,7 @@ export function AssessmentsSidebar({ session }: AssessmentsSidebarProps) {
             <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Assessments
             </p>
-            {adminEntries.map((entry) => (
+            {entries.map((entry) => (
               <AssessmentsNavLink
                 key={entry.href + entry.label}
                 href={entry.href}
@@ -121,7 +128,7 @@ export function AssessmentsSidebar({ session }: AssessmentsSidebarProps) {
             <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Coach lane
             </p>
-            {coachEntries.map((entry) => (
+            {entries.map((entry) => (
               <AssessmentsNavLink
                 key={entry.href + entry.label}
                 href={entry.href}
@@ -134,5 +141,14 @@ export function AssessmentsSidebar({ session }: AssessmentsSidebarProps) {
         )}
       </nav>
     </aside>
+  );
+
+  if (!responsiveEnabled) return sidebar;
+
+  return (
+    <>
+      <AssessmentsCompactNav entries={entries} />
+      {sidebar}
+    </>
   );
 }

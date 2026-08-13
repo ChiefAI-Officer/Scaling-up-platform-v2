@@ -18,12 +18,16 @@ import { notFound, redirect } from "next/navigation";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth/auth";
 import { db } from "@/lib/db";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 
 export default async function AdminAssessmentTemplateDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
+  // Redirect-only route: evaluate the server gate without changing its query
+  // or URL-selection path; the parent layout owns its responsive host.
+  isMobileResponsiveEnabled();
   const session = await getServerSession(authOptions);
   if (!session) {
     redirect("/login");

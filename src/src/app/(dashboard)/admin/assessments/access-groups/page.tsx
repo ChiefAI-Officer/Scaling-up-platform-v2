@@ -15,8 +15,11 @@ import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth/auth";
 import { AccessGroupsList } from "@/components/admin/AccessGroupsList";
+import { PageHeader } from "@/components/ui/page-header";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 
 export default async function AdminAccessGroupsPage() {
+  const mobileResponsiveEnabled = isMobileResponsiveEnabled();
   const session = await getServerSession(authOptions);
   if (!session) {
     redirect("/login");
@@ -27,23 +30,35 @@ export default async function AdminAccessGroupsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div
+      className={
+        mobileResponsiveEnabled ? "min-w-0 max-w-full space-y-6" : "space-y-6"
+      }
+    >
       <nav className="wf-breadcrumb" aria-label="Breadcrumb">
         <a href="/admin/assessments">Assessments</a>
         <span className="wf-breadcrumb-sep">›</span>
         <span>Access Groups</span>
       </nav>
 
-      <div className="wf-page-header-row">
-        <div>
-          <h2 className="wf-page-title">Access Groups</h2>
-          <p className="wf-page-subtitle-strong">
-            Grant template access to coaches via group membership. A coach in
-            multiple groups sees only templates that ALL their groups grant
-            (INTERSECTION).
-          </p>
+      {mobileResponsiveEnabled ? (
+        <PageHeader
+          responsiveEnabled
+          title="Access Groups"
+          description="Grant template access to coaches via group membership. A coach in multiple groups sees only templates that ALL their groups grant (INTERSECTION)."
+        />
+      ) : (
+        <div className="wf-page-header-row">
+          <div>
+            <h2 className="wf-page-title">Access Groups</h2>
+            <p className="wf-page-subtitle-strong">
+              Grant template access to coaches via group membership. A coach in
+              multiple groups sees only templates that ALL their groups grant
+              (INTERSECTION).
+            </p>
+          </div>
         </div>
-      </div>
+      )}
 
       <AccessGroupsList />
     </div>

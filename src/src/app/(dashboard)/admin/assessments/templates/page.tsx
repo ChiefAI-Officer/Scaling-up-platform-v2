@@ -12,8 +12,10 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth/auth";
 import { AssessmentTemplatesList } from "@/components/admin/AssessmentTemplatesList";
 import { isWaveQAdminControlsEnabled } from "@/lib/assessments/wave-q-flags";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 
 export default async function AdminAssessmentTemplatesPage() {
+  const mobileResponsiveEnabled = isMobileResponsiveEnabled();
   const session = await getServerSession(authOptions);
   if (!session) {
     redirect("/login");
@@ -24,7 +26,7 @@ export default async function AdminAssessmentTemplatesPage() {
   }
 
   return (
-    <div>
+    <div className={mobileResponsiveEnabled ? "min-w-0 max-w-full" : undefined}>
       {/* Breadcrumb — WF14 */}
       <div className="wf-breadcrumb">
         <a href="/admin/dashboard">Admin</a>

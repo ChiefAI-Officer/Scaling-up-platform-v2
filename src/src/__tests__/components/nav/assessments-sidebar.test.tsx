@@ -24,6 +24,7 @@ jest.mock("@/lib/assessments/wave-83-flags", () => ({
 }));
 
 import { render, screen } from "@testing-library/react";
+import { fireEvent, within } from "@testing-library/react";
 import type { Session } from "next-auth";
 import { AssessmentsSidebar } from "@/components/nav/assessments-sidebar";
 
@@ -46,6 +47,56 @@ beforeEach(() => {
 });
 
 describe("AssessmentsSidebar", () => {
+  it("preserves the exact legacy sidebar wrapper while responsive mode is off", () => {
+    const { container } = render(
+      <AssessmentsSidebar
+        session={makeSession("ADMIN")}
+        responsiveEnabled={false}
+      />,
+    );
+
+    expect(container.children).toHaveLength(1);
+    expect(container.firstElementChild).toHaveAttribute(
+      "class",
+      "w-full md:w-60 md:flex-shrink-0 border-b md:border-b-0 md:border-r border-border bg-card/40",
+    );
+    expect(
+      screen.queryByRole("button", { name: /assessment section:/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it.each(["ADMIN", "STAFF", "COACH"] as const)(
+    "responsive mode gives both %s navigation presentations the identical filtered entries",
+    (role) => {
+      const { container } = render(
+        <AssessmentsSidebar
+          session={makeSession(role)}
+          responsiveEnabled
+        />,
+      );
+      const sidebar = container.querySelector(
+        'aside[aria-label="Assessments navigation"]',
+      );
+      expect(sidebar).not.toBeNull();
+      const wideHrefs = within(sidebar as HTMLElement)
+        .getAllByRole("link")
+        .map((link) => link.getAttribute("href"));
+
+      fireEvent.click(
+        screen.getByRole("button", { name: /assessment section:/i }),
+      );
+      const compact = container.querySelector(
+        'nav[aria-label="Compact assessments navigation"]',
+      );
+      expect(compact).not.toBeNull();
+      const compactHrefs = within(compact as HTMLElement)
+        .getAllByRole("link")
+        .map((link) => link.getAttribute("href"));
+
+      expect(compactHrefs).toEqual(wideHrefs);
+    },
+  );
+
   it("renders 7 admin entries for ADMIN role (including Aggregate Report)", () => {
     render(<AssessmentsSidebar session={makeSession("ADMIN")} />);
     expect(screen.getByText("Dashboard")).toBeInTheDocument();

@@ -25,6 +25,7 @@ import {
   type OrgSummary,
 } from "@/components/organizations/members-teams-view";
 import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
+import { PageHeader } from "@/components/ui/page-header";
 
 export default async function AdminAssessmentOrganizationsPage() {
   const mobileResponsiveEnabled = isMobileResponsiveEnabled();
@@ -70,16 +71,24 @@ export default async function AdminAssessmentOrganizationsPage() {
       </div>
 
       {/* Page header */}
-      <div className={mobileResponsiveEnabled ? "wf-page-header-row flex-col items-start sm:flex-row" : "wf-page-header-row"}>
-        <div>
-          <h2 className="wf-page-title">Organizations</h2>
-          <p className="wf-page-subtitle-strong">
-            Every company across the platform. Select a company to view and
-            manage its members and teams. Admin and STAFF only. New companies
-            are created by their owning coach.
-          </p>
+      {mobileResponsiveEnabled ? (
+        <PageHeader
+          responsiveEnabled
+          title="Organizations"
+          description="Every company across the platform. Select a company to view and manage its members and teams. Admin and STAFF only. New companies are created by their owning coach."
+        />
+      ) : (
+        <div className="wf-page-header-row">
+          <div>
+            <h2 className="wf-page-title">Organizations</h2>
+            <p className="wf-page-subtitle-strong">
+              Every company across the platform. Select a company to view and
+              manage its members and teams. Admin and STAFF only. New companies
+              are created by their owning coach.
+            </p>
+          </div>
         </div>
-      </div>
+      )}
 
       <MembersTeamsView
         initialOrganizations={items}
