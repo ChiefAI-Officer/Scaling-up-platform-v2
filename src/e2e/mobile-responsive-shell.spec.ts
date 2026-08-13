@@ -35,12 +35,19 @@ for (const width of [320, 300, 260, 639, 640, 1023, 1024]) {
       await expectTouchTarget(page.locator('nav button[aria-label="Open menu"]'), "admin menu toggle");
       const adminMenu = page.locator('nav button[aria-label="Open menu"]');
       await adminMenu.click();
+      await expect(adminMenu).toHaveAttribute("aria-expanded", "true");
+      const adminOverlay = adminMenu.locator("xpath=following-sibling::div[1]");
+      await expect(adminOverlay).toBeVisible();
       await page.keyboard.press("Escape");
       await expect(adminMenu).toHaveAttribute("aria-expanded", "false");
+      await expect(adminOverlay).toBeHidden();
       await expect(adminMenu).toBeFocused();
       await adminMenu.click();
+      await expect(adminMenu).toHaveAttribute("aria-expanded", "true");
+      await expect(adminOverlay).toBeVisible();
       await page.locator("main").click({ position: { x: 8, y: 8 } });
       await expect(adminMenu).toHaveAttribute("aria-expanded", "false");
+      await expect(adminOverlay).toBeHidden();
       await expect(adminMenu).toBeFocused();
     }
 
@@ -56,15 +63,22 @@ for (const width of [320, 300, 260, 639, 640, 1023, 1024]) {
       await expectTouchTarget(page.locator('header button[aria-label="Open menu"]'), "coach menu toggle");
       const coachMenu = page.locator('header button[aria-label="Open menu"]');
       await coachMenu.click();
+      await expect(coachMenu).toHaveAttribute("aria-expanded", "true");
+      const coachOverlay = page.getByTestId("coach-mobile-nav-backdrop");
+      await expect(coachOverlay).toBeVisible();
       await page.keyboard.press("Escape");
       await expect(coachMenu).toHaveAttribute("aria-expanded", "false");
+      await expect(coachOverlay).toBeHidden();
       await expect(coachMenu).toBeFocused();
       if (width >= 300) {
         await coachMenu.click();
-        await page.getByTestId("coach-mobile-nav-backdrop").click({
+        await expect(coachMenu).toHaveAttribute("aria-expanded", "true");
+        await expect(coachOverlay).toBeVisible();
+        await coachOverlay.click({
           position: { x: width - 2, y: 8 },
         });
         await expect(coachMenu).toHaveAttribute("aria-expanded", "false");
+        await expect(coachOverlay).toBeHidden();
         await expect(coachMenu).toBeFocused();
       }
     }

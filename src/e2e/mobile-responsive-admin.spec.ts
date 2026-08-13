@@ -38,7 +38,15 @@ function widthsFor(testInfo: TestInfo): readonly number[] {
 }
 
 function context(testInfo: TestInfo, route: string, width: number): OverflowContext {
-  return { role: "admin", route, project: testInfo.project.name, width };
+  return {
+    role: "admin",
+    route,
+    project: testInfo.project.name,
+    width,
+    ...(route === "/dashboard"
+      ? { allowedFinalPathnames: ["/admin/dashboard"] }
+      : {}),
+  };
 }
 
 async function loginAdmin(page: Page): Promise<void> {
@@ -121,7 +129,16 @@ test("populated admin routes are discovered from live links and fit every width"
   for (const width of widths) {
     await page.setViewportSize({ width, height: width >= 1024 ? 900 : 844 });
     for (const route of dynamicRoutes) {
-      await expectResponsiveRoute(page, context(testInfo, route, width));
+      await expectResponsiveRoute(page, {
+        ...context(testInfo, route, width),
+        ...(route === templateDetail
+          ? {
+              allowedFinalPathnames: [
+                /^\/admin\/assessments\/templates\/[^/]+\/versions\/[^/]+\/edit$/,
+              ],
+            }
+          : {}),
+      });
     }
   }
 });

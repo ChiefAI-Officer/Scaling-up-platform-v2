@@ -1,4 +1,8 @@
 import { expect, type Page } from "@playwright/test";
+import {
+  assertResponsiveNavigationContract,
+  type AllowedFinalPathname,
+} from "./responsive-route-contract";
 
 export type ResponsiveRole = "admin" | "coach";
 
@@ -7,9 +11,11 @@ export interface OverflowContext {
   route: string;
   project: string;
   width?: number;
+  allowedFinalPathnames?: readonly AllowedFinalPathname[];
+  responsiveMode?: "on" | "off";
 }
 
-type OverflowProbe = {
+export type OverflowProbe = {
   viewport: number;
   documentWidth: number;
   offenders: Array<{ selector: string; left: number; right: number; width: number }>;
@@ -29,8 +35,17 @@ export async function assertNoDocumentOverflow(
   page: Page,
   context: string | OverflowContext,
 ): Promise<void> {
+  const result = await probeDocumentOverflow(page);
+
+  expect(
+    result.documentWidth,
+    `${contextLabel(context)}: viewport=${result.viewport}, document=${result.documentWidth}, offenders=${JSON.stringify(result.offenders)}`,
+  ).toBeLessThanOrEqual(result.viewport + 1);
+}
+
+export async function probeDocumentOverflow(page: Page): Promise<OverflowProbe> {
   await page.evaluate(() => document.fonts.ready);
-  const result = await page.evaluate<OverflowProbe>(() => {
+  return page.evaluate<OverflowProbe>(() => {
     const viewport = document.documentElement.clientWidth;
     const selectorFor = (element: Element) => {
       const id = element.id ? `#${element.id}` : "";
@@ -51,22 +66,20 @@ export async function assertNoDocumentOverflow(
       offenders,
     };
   });
-
-  expect(
-    result.documentWidth,
-    `${contextLabel(context)}: viewport=${result.viewport}, document=${result.documentWidth}, offenders=${JSON.stringify(result.offenders)}`,
-  ).toBeLessThanOrEqual(result.viewport + 1);
 }
 
-export async function expectResponsiveRoute(
+export async function expectResponsiveKillSwitchOverflow(
   page: Page,
   context: OverflowContext,
-): Promise<void> {
+): Promise<OverflowProbe> {
   const response = await page.goto(context.route, { waitUntil: "domcontentloaded" });
-  expect(
-    response?.status() ?? 200,
-    `${contextLabel(context)} returned an HTTP error`,
-  ).toBeLessThan(400);
+  assertResponsiveNavigationContract({
+    requestedRoute: context.route,
+    finalUrl: page.url(),
+    responsePresent: response !== null,
+    status: response?.status() ?? null,
+    allowedFinalPathnames: context.allowedFinalPathnames,
+  });
   await page.evaluate(() => document.fonts.ready);
   await expect(
     page.getByRole("heading", {
@@ -74,7 +87,52 @@ export async function expectResponsiveRoute(
     }),
     `${contextLabel(context)} rendered an error heading`,
   ).toHaveCount(0);
-  await expect(page.locator("body")).toHaveAttribute("data-mobile-responsive", "on");
+  await expect(page.locator("body")).not.toHaveAttribute("data-mobile-responsive", "on");
+  await expect(page.locator("[data-auth-shell]")).toHaveCount(0);
+  await expect(
+    context.role === "admin"
+      ? page.locator('nav[aria-label="Main navigation"]')
+      : page.locator("header").filter({ hasText: "Scaling Up" }),
+  ).toBeVisible();
+
+  const result = await probeDocumentOverflow(page);
+  const diagnostic = `${contextLabel(context)}: viewport=${result.viewport}, document=${result.documentWidth}, offenders=${JSON.stringify(result.offenders)}`;
+  expect(result.documentWidth, `${diagnostic}: expected legacy overflow to return under KILL`).toBeGreaterThan(result.viewport + 1);
+  expect(result.offenders.length, `${diagnostic}: overflow must name at least one offending element`).toBeGreaterThan(0);
+  return result;
+}
+
+export async function expectResponsiveRoute(
+  page: Page,
+  context: OverflowContext,
+): Promise<void> {
+  const response = await page.goto(context.route, { waitUntil: "domcontentloaded" });
+  assertResponsiveNavigationContract({
+    requestedRoute: context.route,
+    finalUrl: page.url(),
+    responsePresent: response !== null,
+    status: response?.status() ?? null,
+    allowedFinalPathnames: context.allowedFinalPathnames,
+  });
+  await page.evaluate(() => document.fonts.ready);
+  await expect(
+    page.getByRole("heading", {
+      name: /404|500|not found|could not be found|internal server error|application error/i,
+    }),
+    `${contextLabel(context)} rendered an error heading`,
+  ).toHaveCount(0);
+  if (context.responsiveMode === "off") {
+    await expect(page.locator("body")).not.toHaveAttribute("data-mobile-responsive", "on");
+    await expect(page.locator("[data-auth-shell]")).toHaveCount(0);
+    await expect(
+      context.role === "admin"
+        ? page.locator('nav[aria-label="Main navigation"]')
+        : page.locator("header").filter({ hasText: "Scaling Up" }),
+    ).toBeVisible();
+  } else {
+    await expect(page.locator(`[data-auth-shell="${context.role}"]`)).toBeVisible();
+    await expect(page.locator("body")).toHaveAttribute("data-mobile-responsive", "on");
+  }
   await assertNoDocumentOverflow(page, context);
 }
 
@@ -85,7 +143,12 @@ export async function firstMatchingHref(
   label = pattern.toString(),
 ): Promise<string> {
   const response = await page.goto(source, { waitUntil: "domcontentloaded" });
-  expect(response?.status() ?? 200, `${source} must load before discovering ${label}`).toBeLessThan(400);
+  assertResponsiveNavigationContract({
+    requestedRoute: source,
+    finalUrl: page.url(),
+    responsePresent: response !== null,
+    status: response?.status() ?? null,
+  });
   const hrefs = await page.locator("a[href]").evaluateAll((links) =>
     links
       .map((link) => link.getAttribute("href"))
