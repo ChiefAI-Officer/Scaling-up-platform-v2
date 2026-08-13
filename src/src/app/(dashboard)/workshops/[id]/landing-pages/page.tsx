@@ -6,6 +6,8 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useMobileResponsiveEnabled } from "@/lib/use-mobile-responsive-enabled";
+import { cn } from "@/lib/utils";
 
 interface Workshop {
     id: string;
@@ -72,6 +74,7 @@ const LANDING_TEMPLATES = [
 ];
 
 export default function WorkshopEditorPage() {
+    const mobileResponsiveEnabled = useMobileResponsiveEnabled();
     const params = useParams();
     const router = useRouter();
     const workshopId = params.id as string;
@@ -269,8 +272,8 @@ export default function WorkshopEditorPage() {
         return (
             <Card>
                 <CardContent className="pt-6">
-                    <div className="flex items-center justify-between">
-                        <div>
+                    <div className={cn("flex items-center justify-between", mobileResponsiveEnabled && "flex-col items-start gap-3 sm:flex-row sm:items-center")}>
+                        <div className={cn(mobileResponsiveEnabled && "min-w-0")}>
                             <h3 className="font-semibold text-lg">
                                 {activeTab === "REGISTRATION" ? "Registration / Payment Page" : "Thank You Page"}
                             </h3>
@@ -285,7 +288,7 @@ export default function WorkshopEditorPage() {
                                 </Badge>
                             </div>
                         </div>
-                        <div className="flex gap-2">
+                        <div className={cn("flex gap-2", mobileResponsiveEnabled && "w-full flex-col sm:w-auto sm:flex-row [&_button]:min-h-11")}>
                             {info.slug && (
                                 <Button
                                     variant="outline"
@@ -317,10 +320,10 @@ export default function WorkshopEditorPage() {
     }
 
     return (
-        <div className="max-w-5xl mx-auto">
+        <div className={cn("max-w-5xl mx-auto", mobileResponsiveEnabled && "min-w-0 max-w-full")}>
             {/* Breadcrumb */}
             <div className="mb-6">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                <div className={cn("flex items-center gap-2 text-sm text-muted-foreground mb-2", mobileResponsiveEnabled && "min-w-0 flex-wrap [&_a]:min-h-11 [&_a]:items-center")}>
                     <Link href="/workshops" className="hover:text-foreground">Workshops</Link>
                     <span>/</span>
                     <Link href={`/workshops/${workshopId}`} className="hover:text-foreground">{workshop.title}</Link>
@@ -336,7 +339,7 @@ export default function WorkshopEditorPage() {
 
             {/* Page Type Tabs */}
             <div className="border-b mb-6">
-                <nav className="flex gap-1">
+                <nav className={cn("flex gap-1", mobileResponsiveEnabled && "overflow-x-auto [&_button]:min-h-11")} aria-label={mobileResponsiveEnabled ? "Workshop page types" : undefined}>
                     {PAGE_TABS.map((tab) => (
                         <button
                             key={tab.value}
@@ -365,7 +368,7 @@ export default function WorkshopEditorPage() {
             {copyTarget && (
                 <Card className="mt-6">
                     <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between">
+                        <div className={cn("flex items-center justify-between", mobileResponsiveEnabled && "flex-col items-start gap-3 sm:flex-row sm:items-center")}>
                             <CardTitle className="text-base">Copy Content from Existing Page</CardTitle>
                             <Button variant="ghost" size="sm" onClick={() => { setCopyTarget(null); setCopyMessage(null); }}>
                                 Close
@@ -382,7 +385,7 @@ export default function WorkshopEditorPage() {
                                 <select
                                     value={selectedSourceId}
                                     onChange={(e) => setSelectedSourceId(e.target.value)}
-                                    className="w-full rounded-md border border-border px-3 py-2 text-sm"
+                                    className={cn("w-full rounded-md border border-border px-3 py-2 text-sm", mobileResponsiveEnabled && "min-h-11 min-w-0")}
                                 >
                                     <option value="">Select a page to copy from...</option>
                                     {libraryItems.map((item) => (
@@ -392,7 +395,7 @@ export default function WorkshopEditorPage() {
                                     ))}
                                 </select>
 
-                                <div className="flex items-center gap-3">
+                                <div className={cn("flex items-center gap-3", mobileResponsiveEnabled && "flex-col items-stretch sm:flex-row sm:items-center [&_button]:min-h-11")}>
                                     <Button
                                         onClick={handleCopyTemplate}
                                         disabled={!selectedSourceId || copying}
@@ -421,7 +424,7 @@ export default function WorkshopEditorPage() {
             )}
 
             {/* Quick Actions */}
-            <div className="mt-6 flex gap-3">
+            <div className={cn("mt-6 flex gap-3", mobileResponsiveEnabled && "flex-col sm:flex-row [&_button]:min-h-11")}>
                 <Button
                     variant="outline"
                     onClick={() => router.push(`/workshops/${workshopId}`)}

@@ -8,6 +8,7 @@ import {
   SurveyResultsView,
   type SurveyResultTemplateGroup,
 } from "@/components/surveys/survey-results-view";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,7 @@ interface AdminSurveyResultsPageProps {
 export default async function AdminSurveyResultsPage({
   params,
 }: AdminSurveyResultsPageProps) {
+  const mobileResponsiveEnabled = isMobileResponsiveEnabled();
   const { id: workshopId } = await params;
 
   const workshop = await db.workshop.findUnique({
@@ -74,11 +76,19 @@ export default async function AdminSurveyResultsPage({
     });
   }
 
-  return (
+  const resultsView = (
     <SurveyResultsView
       workshopTitle={workshop.title}
       backHref={`/workshops/${workshopId}`}
       templateGroups={Array.from(templateMap.values())}
     />
+  );
+
+  return mobileResponsiveEnabled ? (
+    <div className="min-w-0 max-w-full" data-responsive-container="">
+      {resultsView}
+    </div>
+  ) : (
+    resultsView
   );
 }

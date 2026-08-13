@@ -10,6 +10,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DuoLandingPageTemplate, SAMPLE_WORKSHOP_DUO } from "@/components/templates/duo-landing-page-template";
 import { CustomHtmlPanel } from "@/components/workshops/custom-html-panel";
 import { resolveCoachProfessionalTitle } from "@/lib/coaches/coach-profile-fields";
+import { useMobileResponsiveEnabled } from "@/lib/use-mobile-responsive-enabled";
+import { cn } from "@/lib/utils";
 
 interface Coach {
   name: string;
@@ -128,6 +130,7 @@ function formatCreatedDate(value: string): string {
 }
 
 export default function DuoLandingEditor() {
+  const mobileResponsiveEnabled = useMobileResponsiveEnabled();
   const params = useParams();
   const searchParams = useSearchParams();
   const workshopId = params.id as string;
@@ -374,7 +377,7 @@ export default function DuoLandingEditor() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto">
+    <div className={cn("max-w-7xl mx-auto", mobileResponsiveEnabled && "min-w-0 max-w-full")}>
       <div className="mb-6">
         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
           <Link href="/workshops" className="hover:text-foreground">Workshops</Link>
@@ -390,9 +393,9 @@ export default function DuoLandingEditor() {
       {error && <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-3 rounded-lg mb-6">{error}</div>}
       {success && <div className="bg-success/10 border border-success/20 text-success px-4 py-3 rounded-lg mb-6">Changes saved!</div>}
 
-      <div className="grid grid-cols-5 gap-6">
+      <div className={cn("grid grid-cols-5 gap-6", mobileResponsiveEnabled && "grid-cols-1 xl:grid-cols-5")}>
         {/* Editor Panel */}
-        <div className="col-span-2 space-y-6 max-h-[calc(100vh-150px)] overflow-y-auto pr-2">
+        <div className={cn("col-span-2 space-y-6 max-h-[calc(100vh-150px)] overflow-y-auto pr-2", mobileResponsiveEnabled && "col-span-1 min-w-0 max-h-none overflow-visible pr-0 xl:col-span-2 xl:max-h-[calc(100vh-150px)] xl:overflow-y-auto xl:pr-2")}>
           <Card>
             <CardHeader>
               <CardTitle>Coach Mapping via BIO Pages</CardTitle>
@@ -440,7 +443,12 @@ export default function DuoLandingEditor() {
                     No coach bio pages found. Create or update coach bios first.
                   </p>
                 ) : (
-                  <div className="max-h-48 overflow-y-auto">
+                  <div
+                    className={cn("max-h-48 overflow-y-auto", mobileResponsiveEnabled && "overflow-x-auto")}
+                    role={mobileResponsiveEnabled ? "region" : undefined}
+                    aria-label={mobileResponsiveEnabled ? "Available bio pages" : undefined}
+                    tabIndex={mobileResponsiveEnabled ? 0 : undefined}
+                  >
                     <table className="min-w-full divide-y divide-border text-sm">
                       <thead className="bg-card">
                         <tr>
@@ -557,7 +565,7 @@ export default function DuoLandingEditor() {
             </CardContent>
           </Card>
 
-          <div className="flex gap-3 sticky bottom-0 bg-card py-3">
+          <div className={cn("flex gap-3 sticky bottom-0 bg-card py-3", mobileResponsiveEnabled && "flex-col sm:flex-row [&_button]:min-h-11")}>
             <Button onClick={() => handleSave(false)} variant="outline" disabled={saving} className="flex-1">
               {saving ? "Saving..." : "Save Draft"}
             </Button>
@@ -585,7 +593,7 @@ export default function DuoLandingEditor() {
         </div>
 
         {/* Preview Panel */}
-        <div className="col-span-3 sticky top-4">
+        <div className={cn("col-span-3 sticky top-4", mobileResponsiveEnabled && "col-span-1 min-w-0 xl:col-span-3")}>
           <Card className="overflow-hidden">
             <CardHeader className="bg-muted border-b py-2">
               <CardTitle className="text-sm font-medium">Live Preview</CardTitle>

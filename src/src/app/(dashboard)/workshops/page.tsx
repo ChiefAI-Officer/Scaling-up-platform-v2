@@ -17,6 +17,10 @@ import { WorkshopApprovalActions } from "@/components/workshops/workshop-approva
 import { AdminWorkshopFilters } from "@/components/workshops/admin-workshop-filters";
 import { FadeUp } from "@/components/ui/animated";
 import { ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
+import { PageHeader } from "@/components/ui/page-header";
+import { ResponsiveDataView } from "@/components/ui/responsive-data-view";
+import { AdminWorkshopRecordCard } from "@/components/workshops/admin-workshop-record-card";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 
 const APP_URL = process.env.APP_URL || "https://scaling-up-platform-v2.vercel.app";
 
@@ -171,6 +175,7 @@ function SortHeader({
 }
 
 export default async function WorkshopsPage({ searchParams }: PageProps) {
+  const mobileResponsiveEnabled = isMobileResponsiveEnabled();
   const params = await searchParams;
   const search = params.search;
   const status = params.status;
@@ -219,7 +224,23 @@ export default async function WorkshopsPage({ searchParams }: PageProps) {
   return (
     <div className="space-y-6">
       <FadeUp>
-        <div className="flex items-center justify-between">
+        {mobileResponsiveEnabled ? (
+          <PageHeader
+            responsiveEnabled
+            title="All Workshops"
+            description="Manage all workshop events"
+            actions={
+              <Link
+                href="/workshops/new"
+                className="inline-flex min-h-11 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                data-touch-target
+              >
+                + New Workshop
+              </Link>
+            }
+          />
+        ) : (
+          <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground">All Workshops</h1>
             <p className="text-muted-foreground">Manage all workshop events</p>
@@ -230,16 +251,63 @@ export default async function WorkshopsPage({ searchParams }: PageProps) {
           >
             + New Workshop
           </Link>
-        </div>
+          </div>
+        )}
       </FadeUp>
 
       {/* Search & Filter Bar */}
       <Suspense>
-        <AdminWorkshopFilters />
+        <AdminWorkshopFilters responsiveEnabled={mobileResponsiveEnabled} />
       </Suspense>
 
       <div className="bg-card rounded-lg shadow overflow-hidden">
-        <div className="overflow-x-auto">
+        <ResponsiveDataView
+          enabled={mobileResponsiveEnabled}
+          label="Admin workshops"
+          wideFrom="lg"
+          compact={
+            <div className="space-y-3 p-3">
+              {workshops.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-border p-6 text-center text-muted-foreground">
+                  {search || status ? (
+                    "No workshops match your filters."
+                  ) : (
+                    <>
+                      No workshops yet.{" "}
+                      <Link href="/workshops/new" className="inline-flex min-h-11 items-center text-primary hover:underline">
+                        Create your first workshop
+                      </Link>
+                    </>
+                  )}
+                </div>
+              ) : (
+                workshops.map((workshop) => (
+                  <AdminWorkshopRecordCard
+                    key={workshop.id}
+                    workshop={workshop}
+                    appUrl={APP_URL}
+                    action={workshop.approvals[0] ? (
+                      <WorkshopApprovalActions
+                        approvalId={workshop.approvals[0].id}
+                        workshopTitle={workshop.title}
+                      />
+                    ) : (
+                      <Link href={`/workshops/${workshop.id}/landing-pages`}>
+                        Edit workshop
+                      </Link>
+                    )}
+                  />
+                ))
+              )}
+            </div>
+          }
+          wide={
+        <div
+          className="overflow-x-auto"
+          role={mobileResponsiveEnabled ? "region" : undefined}
+          aria-label={mobileResponsiveEnabled ? "Admin workshop table" : undefined}
+          tabIndex={mobileResponsiveEnabled ? 0 : undefined}
+        >
           <table className="min-w-full divide-y divide-border">
             <thead className="bg-muted">
               <tr>
@@ -372,9 +440,63 @@ export default async function WorkshopsPage({ searchParams }: PageProps) {
             </tbody>
           </table>
         </div>
+          }
+        />
 
         {/* MR-09: Pagination */}
-        <div className="flex items-center justify-between px-4 py-3 border-t border-border bg-muted/40">
+        {mobileResponsiveEnabled ? (
+          <div className="flex flex-col items-stretch gap-3 border-t border-border bg-muted/40 px-4 py-3">
+            <span className="text-center text-sm text-muted-foreground">
+              {total === 0
+                ? "0 workshops"
+                : `${(page - 1) * perPage + 1}–${Math.min(page * perPage, total)} of ${total}`}
+            </span>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <Link
+                href={pageUrl(page - 1)}
+                aria-disabled={page <= 1}
+                className={`inline-flex min-h-11 items-center justify-center rounded border px-3 text-xs font-medium transition-colors ${
+                  page <= 1
+                    ? "pointer-events-none border-border opacity-40"
+                    : "border-border hover:bg-accent"
+                }`}
+                data-touch-target
+              >
+                ← Prev
+              </Link>
+              <Link
+                href={pageUrl(page + 1)}
+                aria-disabled={page >= totalPages}
+                className={`inline-flex min-h-11 items-center justify-center rounded border px-3 text-xs font-medium transition-colors ${
+                  page >= totalPages
+                    ? "pointer-events-none border-border opacity-40"
+                    : "border-border hover:bg-accent"
+                }`}
+                data-touch-target
+              >
+                Next →
+              </Link>
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-2 text-sm text-muted-foreground">
+              <span>Rows per page:</span>
+              {PER_PAGE_OPTIONS.map((pp) => (
+                <Link
+                  key={pp}
+                  href={perPageUrl(pp)}
+                  className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded px-2 text-xs font-medium transition-colors ${
+                    perPage === pp
+                      ? "bg-primary text-primary-foreground"
+                      : "text-foreground hover:bg-accent"
+                  }`}
+                  data-touch-target
+                >
+                  {pp}
+                </Link>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-border bg-muted/40">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <span>Rows per page:</span>
             {PER_PAGE_OPTIONS.map((pp) => (
@@ -421,7 +543,8 @@ export default async function WorkshopsPage({ searchParams }: PageProps) {
               Next →
             </Link>
           </div>
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RegistrationPageTemplate, SAMPLE_WORKSHOP_REGISTRATION } from "@/components/templates/registration-page-template";
+import { useMobileResponsiveEnabled } from "@/lib/use-mobile-responsive-enabled";
+import { cn } from "@/lib/utils";
 
 interface RegistrationPageData {
   coachName: string;
@@ -46,6 +48,7 @@ const DEFAULT_DATA: RegistrationPageData = {
 };
 
 export default function RegistrationPageEditor() {
+  const mobileResponsiveEnabled = useMobileResponsiveEnabled();
   const params = useParams();
   const workshopId = params.id as string;
 
@@ -149,7 +152,7 @@ export default function RegistrationPageEditor() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className={cn("max-w-6xl mx-auto", mobileResponsiveEnabled && "min-w-0 max-w-full")}>
       <div className="mb-6">
         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
           <Link href="/workshops" className="hover:text-foreground">Workshops</Link>
@@ -165,9 +168,9 @@ export default function RegistrationPageEditor() {
       {error && <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-3 rounded-lg mb-6">{error}</div>}
       {success && <div className="bg-success/10 border border-success/20 text-success px-4 py-3 rounded-lg mb-6">Changes saved!</div>}
 
-      <div className="grid grid-cols-2 gap-6">
+      <div className={cn("grid grid-cols-2 gap-6", mobileResponsiveEnabled && "grid-cols-1 xl:grid-cols-2")}>
         {/* Editor */}
-        <div className="space-y-6">
+        <div className={cn("space-y-6", mobileResponsiveEnabled && "min-w-0")}>
           <div className="rounded-md border border-primary/20 bg-primary/10 px-4 py-3 text-sm text-primary">
             Coach information and workshop details are auto-mapped from the workshop and coach BIO profile.
           </div>
@@ -220,7 +223,7 @@ export default function RegistrationPageEditor() {
             </CardContent>
           </Card>
 
-          <div className="flex gap-3 sticky bottom-0 bg-card py-3">
+          <div className={cn("flex gap-3 sticky bottom-0 bg-card py-3", mobileResponsiveEnabled && "flex-col sm:flex-row [&_button]:min-h-11")}>
             <Button onClick={() => handleSave(false)} variant="outline" disabled={saving} className="flex-1">
               {saving ? "Saving..." : "Save Draft"}
             </Button>
@@ -236,7 +239,7 @@ export default function RegistrationPageEditor() {
         </div>
 
         {/* Preview */}
-        <div className="sticky top-4">
+        <div className={cn("sticky top-4", mobileResponsiveEnabled && "min-w-0")}>
           <Card className="overflow-hidden">
             <CardHeader className="bg-muted border-b py-2">
               <CardTitle className="text-sm font-medium">Live Preview</CardTitle>

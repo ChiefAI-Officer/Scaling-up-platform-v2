@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SoloLandingPageTemplate, SAMPLE_WORKSHOP_SOLO } from "@/components/templates/solo-landing-page-template";
-import { formatZoneAbbrev, formatTimeWithZone } from "@/lib/utils";
+import { cn, formatZoneAbbrev, formatTimeWithZone } from "@/lib/utils";
+import { useMobileResponsiveEnabled } from "@/lib/use-mobile-responsive-enabled";
 import { CustomHtmlPanel } from "@/components/workshops/custom-html-panel";
 import { resolveCoachProfessionalTitle } from "@/lib/coaches/coach-profile-fields";
 
@@ -65,6 +66,7 @@ const DEFAULT_BENEFITS = [
 ];
 
 export default function SoloLandingEditor() {
+  const mobileResponsiveEnabled = useMobileResponsiveEnabled();
   const params = useParams();
   const workshopId = params.id as string;
 
@@ -301,7 +303,7 @@ export default function SoloLandingEditor() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto">
+    <div className={cn("max-w-7xl mx-auto", mobileResponsiveEnabled && "min-w-0 max-w-full")}>
       <div className="mb-6">
         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
           <Link href="/workshops" className="hover:text-foreground">Workshops</Link>
@@ -326,9 +328,9 @@ export default function SoloLandingEditor() {
         </div>
       )}
 
-      <div className="grid grid-cols-5 gap-6">
+      <div className={cn("grid grid-cols-5 gap-6", mobileResponsiveEnabled && "grid-cols-1 xl:grid-cols-5")}>
         {/* Editor Panel - 2 columns */}
-        <div className="col-span-2 space-y-6">
+        <div className={cn("col-span-2 space-y-6", mobileResponsiveEnabled && "col-span-1 min-w-0 xl:col-span-2")}>
           <Card>
             <CardHeader>
               <CardTitle>Hero Section</CardTitle>
@@ -468,7 +470,7 @@ export default function SoloLandingEditor() {
             </CardContent>
           </Card>
 
-          <div className="sticky bottom-0 bg-card border-t border-border py-3 px-4 flex gap-3 items-center">
+          <div className={cn("sticky bottom-0 bg-card border-t border-border py-3 px-4 flex gap-3 items-center", mobileResponsiveEnabled && "flex-col items-stretch sm:flex-row sm:items-center [&_button]:min-h-11")}>
             <Button
               onClick={() => handleSave(false)}
               variant="outline"
@@ -506,7 +508,7 @@ export default function SoloLandingEditor() {
 
 
         {/* Preview Panel - 3 columns */}
-        <div className="col-span-3 sticky top-4">
+        <div className={cn("col-span-3 sticky top-4", mobileResponsiveEnabled && "col-span-1 min-w-0 xl:col-span-3")}>
           <Card className="overflow-hidden">
             <CardHeader className="bg-muted border-b py-2">
               <CardTitle className="text-sm font-medium">Live Preview</CardTitle>
