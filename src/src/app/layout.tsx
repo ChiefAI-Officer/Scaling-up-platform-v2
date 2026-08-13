@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/providers/theme-provider";
 import { Toaster } from "@/components/ui/toaster";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 import "./globals.css";
 
 const plusJakarta = Plus_Jakarta_Sans({
@@ -28,9 +29,12 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const mobileResponsiveEnabled = isMobileResponsiveEnabled();
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body
+        data-mobile-responsive={mobileResponsiveEnabled ? "on" : undefined}
         className={`${plusJakarta.variable} ${geistMono.variable} antialiased`}
       >
         <ThemeProvider

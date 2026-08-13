@@ -181,6 +181,31 @@ body {
   color: hsl(var(--foreground));
 }
 
+body[data-mobile-responsive="on"] [data-auth-shell] {
+  min-width: 0;
+  max-width: 100%;
+}
+
+body[data-mobile-responsive="on"] [data-auth-shell] main,
+body[data-mobile-responsive="on"] [data-auth-shell] [data-responsive-container] {
+  min-width: 0;
+  max-width: 100%;
+}
+
+@media (max-width: 639px) {
+  body[data-mobile-responsive="on"] [data-auth-shell] main {
+    padding-inline: 1rem;
+  }
+
+  body[data-mobile-responsive="on"] [data-auth-shell] main > .space-y-6 > div > .flex.items-center.justify-between {
+    flex-wrap: wrap;
+  }
+
+  body[data-mobile-responsive="on"] [data-auth-shell] header [data-compact-hide] {
+    display: none;
+  }
+}
+
 /* --- Smooth scroll & reduced-motion --- */
 html {
   scroll-behavior: smooth;

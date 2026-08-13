@@ -9,6 +9,8 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { SignOutButton } from "@/components/layout/sign-out-button";
 import { getAdminNavBadgeCounts } from "@/lib/nav/admin-nav-badges";
 import { db } from "@/lib/db";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
+import { cn } from "@/lib/utils";
 
 export default async function DashboardLayout({
   children,
@@ -41,9 +43,13 @@ export default async function DashboardLayout({
   const counts = await getAdminNavBadgeCounts();
 
   const userInitial = (session.user.name || session.user.email || "A").charAt(0).toUpperCase();
+  const mobileResponsiveEnabled = isMobileResponsiveEnabled();
 
   return (
-    <div className="min-h-screen bg-background">
+    <div
+      data-auth-shell={mobileResponsiveEnabled ? "admin" : undefined}
+      className={cn("min-h-screen bg-background", mobileResponsiveEnabled && "min-w-0 max-w-full")}
+    >
       {/* Skip to main content link for accessibility */}
       <a
         href="#main-content"
@@ -76,12 +82,12 @@ export default async function DashboardLayout({
               <AdminNavLinks counts={counts} />
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
-              <span className="hidden 2xl:inline text-sm text-muted-foreground max-w-[180px] truncate" aria-label="Logged in user">
+              <span {...(mobileResponsiveEnabled ? { "data-compact-hide": true } : {})} className="hidden 2xl:inline text-sm text-muted-foreground max-w-[180px] truncate" aria-label="Logged in user">
                 {session.user.email}
               </span>
               <ThemeToggle />
-              <Separator orientation="vertical" className="hidden xl:block h-5" />
-              <div className="hidden xl:flex items-center gap-2">
+              <Separator {...(mobileResponsiveEnabled ? { "data-compact-hide": true } : {})} orientation="vertical" className="hidden xl:block h-5" />
+              <div {...(mobileResponsiveEnabled ? { "data-compact-hide": true } : {})} className="hidden xl:flex items-center gap-2">
                 <Link
                   href="/admin/settings"
                   className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200 whitespace-nowrap"
@@ -90,7 +96,7 @@ export default async function DashboardLayout({
                 </Link>
                 <SignOutButton className="text-sm text-destructive hover:text-destructive/80 transition-colors duration-200 whitespace-nowrap" />
               </div>
-              <div className="hidden xl:flex h-8 w-8 rounded-full bg-primary/10 text-primary items-center justify-center text-sm font-semibold flex-shrink-0">
+              <div {...(mobileResponsiveEnabled ? { "data-compact-hide": true } : {})} className="hidden xl:flex h-8 w-8 rounded-full bg-primary/10 text-primary items-center justify-center text-sm font-semibold flex-shrink-0">
                 {userInitial}
               </div>
               {/* Mobile/tablet hamburger */}
@@ -103,7 +109,7 @@ export default async function DashboardLayout({
       {/* Main Content */}
       <main
         id="main-content"
-        className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8"
+        className={cn("max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8", mobileResponsiveEnabled && "min-w-0 max-w-full")}
         role="main"
         aria-label="Page content"
       >
