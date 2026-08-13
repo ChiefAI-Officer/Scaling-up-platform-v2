@@ -1,16 +1,26 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import Link from "next/link";
 import { formatTimestamp } from "@/lib/utils";
+import { ResponsiveDataView } from "@/components/ui/responsive-data-view";
+import {
+  ResponsiveRecord,
+  ResponsiveRecordActions,
+  ResponsiveRecordHeader,
+  ResponsiveRecordMeta,
+} from "@/components/ui/responsive-record";
 
 interface Registration {
   id: string;
+  workshopId: string;
   firstName: string;
   lastName: string;
   email: string;
   company: string | null;
   phone: string | null;
   paymentStatus: string;
+  attended: boolean;
   createdAt: Date | string;
   workshop: {
     title: string;
@@ -25,6 +35,7 @@ interface Registration {
 
 interface RegistrationsTableProps {
   registrations: Registration[];
+  responsiveEnabled?: boolean;
 }
 
 function paymentStatusBadge(status: string) {
@@ -42,7 +53,7 @@ function paymentStatusBadge(status: string) {
   );
 }
 
-export function RegistrationsTable({ registrations }: RegistrationsTableProps) {
+export function RegistrationsTable({ registrations, responsiveEnabled = false }: RegistrationsTableProps) {
   const [search, setSearch] = useState("");
 
   const filtered = useMemo(() => {
@@ -56,13 +67,13 @@ export function RegistrationsTable({ registrations }: RegistrationsTableProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-4">
+      <div className={responsiveEnabled ? "flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:gap-4" : "flex items-center gap-4"}>
         <input
           type="text"
           placeholder="Search by name or email..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full max-w-sm rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+          className={responsiveEnabled ? "min-h-11 w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 sm:max-w-sm" : "w-full max-w-sm rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"}
         />
         <span className="text-sm text-muted-foreground whitespace-nowrap">
           {filtered.length} of {registrations.length} registrations
@@ -74,7 +85,55 @@ export function RegistrationsTable({ registrations }: RegistrationsTableProps) {
           <p className="text-muted-foreground">No registrations found.</p>
         </div>
       ) : (
-        <div className="rounded-lg border border-border bg-card overflow-hidden">
+        <ResponsiveDataView
+          enabled={responsiveEnabled}
+          label="Registrations"
+          wideRegionLabel="Registrations table"
+          compact={
+            <div className="space-y-3">
+              {filtered.map((reg) => (
+                <ResponsiveRecord key={reg.id}>
+                  <ResponsiveRecordHeader
+                    title={`${reg.firstName} ${reg.lastName}`}
+                    status={paymentStatusBadge(reg.paymentStatus)}
+                  />
+                  <ResponsiveRecordMeta
+                    items={[
+                      { label: "Email", value: <span className="break-all">{reg.email}</span> },
+                      { label: "Company", value: reg.company ?? "—" },
+                      { label: "Phone", value: reg.phone ?? "—" },
+                      { label: "Workshop", value: reg.workshop?.title ?? "—" },
+                      {
+                        label: "Coach",
+                        value: reg.workshop?.coach
+                          ? `${reg.workshop.coach.firstName} ${reg.workshop.coach.lastName}`
+                          : "—",
+                      },
+                      {
+                        label: "Registered",
+                        value: reg.createdAt ? formatTimestamp(new Date(reg.createdAt)) : "—",
+                      },
+                      { label: "Attendance", value: reg.attended ? "Attended" : "Not attended" },
+                    ]}
+                  />
+                  {reg.workshop ? (
+                    <ResponsiveRecordActions
+                      primary={
+                        <Link
+                          href={`/workshops/${reg.workshopId}`}
+                          className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                        >
+                          Open workshop
+                        </Link>
+                      }
+                    />
+                  ) : null}
+                </ResponsiveRecord>
+              ))}
+            </div>
+          }
+          wide={
+            <div className="rounded-lg border border-border bg-card overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -123,7 +182,9 @@ export function RegistrationsTable({ registrations }: RegistrationsTableProps) {
               </tbody>
             </table>
           </div>
-        </div>
+            </div>
+          }
+        />
       )}
       {registrations.length >= 200 && (
         <p className="text-sm text-muted-foreground mt-3 text-center">

@@ -24,13 +24,9 @@ function buildQuestion(over: Partial<SurveyQuestion> = {}): SurveyQuestion {
     sortOrder: over.sortOrder ?? 0,
     questionType: over.questionType ?? "RATING",
     label: over.label ?? "Question",
+    description: over.description ?? null,
     isRequired: over.isRequired ?? false,
-    helpText: over.helpText ?? null,
     options: over.options ?? null,
-    minLabel: over.minLabel ?? null,
-    maxLabel: over.maxLabel ?? null,
-    minValue: over.minValue ?? null,
-    maxValue: over.maxValue ?? null,
     createdAt: over.createdAt ?? new Date("2026-01-01T00:00:00Z"),
     updatedAt: over.updatedAt ?? new Date("2026-01-01T00:00:00Z"),
   } as SurveyQuestion;
@@ -48,12 +44,13 @@ function buildRow(over: Partial<SurveyResponseRow> & {
   }
   return {
     surveyId: over.surveyId ?? "s1",
-    workshop: over.workshop ?? { id: "w1", title: "Workshop One", workshopCode: "WS-2026-AAAA" },
+    workshop: over.workshop ?? { id: "w1", title: "Workshop One", workshopCode: "WS-2026-AAAA", format: null },
     coach: over.coach === undefined ? { id: "c1", name: "Alice Coach" } : over.coach,
     category: over.category === undefined ? { id: "cat1", name: "Sales" } : over.category,
     respondent: over.respondent === undefined
       ? { firstName: "Bob", lastName: "Reg", email: "bob@example.com" }
       : over.respondent,
+    sentAt: over.sentAt ?? null,
     completedAt: over.completedAt ?? new Date("2026-05-10T12:00:00Z"),
     answersByQuestionId,
   };
@@ -66,7 +63,7 @@ describe("SurveyResponsesTable (Round 15 Wave 4)", () => {
     const questions = [buildQuestion({ id: "q1", questionType: "TEXT", label: "Comment" })];
     const rows = [
       buildRow({
-        workshop: { id: "ws-abc", title: "Workshop Alpha", workshopCode: "WS-2026-ABCD" },
+        workshop: { id: "ws-abc", title: "Workshop Alpha", workshopCode: "WS-2026-ABCD", format: null },
         answers: [{ questionId: "q1", value: "Great content" }],
       }),
     ];
@@ -91,13 +88,13 @@ describe("SurveyResponsesTable (Round 15 Wave 4)", () => {
     const rows = [
       buildRow({
         surveyId: "s1",
-        workshop: { id: "w1", title: "Beta Workshop", workshopCode: "WS-2026-BETA" },
+        workshop: { id: "w1", title: "Beta Workshop", workshopCode: "WS-2026-BETA", format: null },
         completedAt: new Date("2026-05-10T12:00:00Z"),
         answers: [{ questionId: "q1", value: "x" }],
       }),
       buildRow({
         surveyId: "s2",
-        workshop: { id: "w2", title: "Alpha Workshop", workshopCode: "WS-2026-ALPH" },
+        workshop: { id: "w2", title: "Alpha Workshop", workshopCode: "WS-2026-ALPH", format: null },
         completedAt: new Date("2026-05-11T12:00:00Z"),
         answers: [{ questionId: "q1", value: "y" }],
       }),
@@ -215,6 +212,33 @@ describe("SurveyResponsesTable (Round 15 Wave 4)", () => {
     expect(csvLink).toHaveAttribute("href", "/api/surveys/responses.csv?templateId=t1&coachId=c1");
   });
 
+  it("uses a named bounded table and 44px actions only in responsive mode", () => {
+    const props = {
+      rows: [buildRow()],
+      questions: [buildQuestion()],
+      surveyType: "POST_WORKSHOP",
+      totalCount: 1,
+      cappedAt: null,
+      exportHref: "/export",
+    };
+    const { rerender } = render(<SurveyResponsesTable {...props} responsiveEnabled />);
+
+    expect(screen.getByRole("region", { name: "Individual survey responses table" })).toHaveClass(
+      "max-w-full overflow-auto",
+    );
+    expect(screen.getByRole("link", { name: "Export CSV" })).toHaveClass("min-h-11");
+    expect(screen.getByRole("link", { name: "Workshop One" })).toHaveClass("min-h-11");
+    for (const button of screen.getAllByRole("button")) {
+      expect(button).toHaveClass("min-h-11");
+    }
+
+    rerender(<SurveyResponsesTable {...props} />);
+    expect(screen.queryByRole("region", { name: "Individual survey responses table" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Export CSV" })).not.toHaveClass("min-h-11");
+    expect(screen.getByRole("link", { name: "Workshop One" })).not.toHaveClass("min-h-11");
+    expect(screen.getByRole("button", { name: /^Workshop$/i })).not.toHaveClass("min-h-11");
+  });
+
   it("truncates long comment values to 60 chars with an ellipsis", () => {
     const longText = "A".repeat(80);
     const questions = [buildQuestion({ id: "q1", questionType: "TEXTAREA", label: "Comment" })];
@@ -243,13 +267,13 @@ describe("SurveyResponsesTable (Round 15 Wave 4)", () => {
     const rows = [
       buildRow({
         surveyId: "s1",
-        workshop: { id: "w1", title: "Beta Workshop", workshopCode: "WS-2026-BETA" },
+        workshop: { id: "w1", title: "Beta Workshop", workshopCode: "WS-2026-BETA", format: null },
         completedAt: new Date("2026-05-10T12:00:00Z"),
         answers: [{ questionId: "q1", value: "x" }],
       }),
       buildRow({
         surveyId: "s2",
-        workshop: { id: "w2", title: "Alpha Workshop", workshopCode: "WS-2026-ALPH" },
+        workshop: { id: "w2", title: "Alpha Workshop", workshopCode: "WS-2026-ALPH", format: null },
         completedAt: new Date("2026-05-11T12:00:00Z"),
         answers: [{ questionId: "q1", value: "y" }],
       }),
@@ -288,7 +312,7 @@ describe("SurveyResponsesTable (Round 15 Wave 4)", () => {
     const rows = [
       buildRow({
         surveyId: "s1",
-        workshop: { id: "wA", title: "RowA", workshopCode: "WS-A" },
+        workshop: { id: "wA", title: "RowA", workshopCode: "WS-A", format: null },
         answers: [
           { questionId: "q1", numValue: 4 },
           { questionId: "q2", numValue: 5 },
@@ -296,7 +320,7 @@ describe("SurveyResponsesTable (Round 15 Wave 4)", () => {
       }),
       buildRow({
         surveyId: "s2",
-        workshop: { id: "wB", title: "RowB", workshopCode: "WS-B" },
+        workshop: { id: "wB", title: "RowB", workshopCode: "WS-B", format: null },
         answers: [], // no rating answers → em-dash
       }),
     ];

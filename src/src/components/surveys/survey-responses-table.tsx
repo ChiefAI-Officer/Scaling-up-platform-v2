@@ -37,6 +37,7 @@ export interface SurveyResponsesTableProps {
   totalCount: number;
   cappedAt: number | null;
   exportHref: string;
+  responsiveEnabled?: boolean;
 }
 
 // ---------- sort state ----------
@@ -155,6 +156,7 @@ export function SurveyResponsesTable({
   totalCount,
   cappedAt,
   exportHref,
+  responsiveEnabled = false,
 }: SurveyResponsesTableProps) {
   // Default sort matches the server-side findMany orderBy.
   const [sortKey, setSortKey] = React.useState<SortKey>("completedAt");
@@ -261,7 +263,7 @@ export function SurveyResponsesTable({
       <button
         type="button"
         onClick={() => handleSort(key)}
-        className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground"
+        className={responsiveEnabled ? "inline-flex min-h-11 items-center gap-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground" : "inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground"}
       >
         <span>{label}</span>
         {renderSortIndicator(key)}
@@ -288,13 +290,16 @@ export function SurveyResponsesTable({
           )}
         </div>
         <div className="flex-shrink-0">
-          <Button asChild variant="outline" size="sm">
+          <Button asChild variant="outline" size="sm" className={responsiveEnabled ? "min-h-11" : undefined}>
             <a href={exportHref}>Export CSV</a>
           </Button>
         </div>
       </div>
 
-      <Table>
+      <Table
+        responsiveEnabled={responsiveEnabled}
+        regionLabel="Individual survey responses table"
+      >
         <TableHeader>
           <TableRow>
             {sortableHeader("Workshop", "workshop")}
@@ -330,7 +335,7 @@ export function SurveyResponsesTable({
                   <TableCell className="font-medium">
                     <Link
                       href={`/workshops/${row.workshop.id}`}
-                      className="text-primary hover:text-primary/80"
+                      className={responsiveEnabled ? "inline-flex min-h-11 items-center text-primary hover:text-primary/80" : "text-primary hover:text-primary/80"}
                     >
                       {row.workshop.title}
                     </Link>
