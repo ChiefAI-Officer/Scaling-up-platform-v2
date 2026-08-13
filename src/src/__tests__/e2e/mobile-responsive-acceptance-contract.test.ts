@@ -48,6 +48,18 @@ type LiveHrefDiscoverySummary = {
   missingSourceRejected: boolean;
 };
 
+type ResponsiveSurfaceSummary = {
+  assessmentReportClassified: boolean;
+  respondentReportClassified: boolean;
+  longitudinalKeptInShell: boolean;
+  arbitraryReportKeptInShell: boolean;
+  validReportAccepted: boolean;
+  missingReportMarkerRejected: boolean;
+  missingBodyFlagRejected: boolean;
+  reportWithShellRejected: boolean;
+  dashboardWithoutShellRejected: boolean;
+};
+
 function inspectPlaywrightConfig(override?: string): PlaywrightConfigSummary {
   const environment = { ...process.env };
   if (override === undefined) delete environment.PLAYWRIGHT_BASE_URL;
@@ -278,6 +290,62 @@ console.log(JSON.stringify({
   }
 }
 
+function inspectResponsiveSurfaceContract(): ResponsiveSurfaceSummary | null {
+  try {
+    const output = execFileSync(
+      process.execPath,
+      [
+        "--import",
+        "tsx",
+        "-e",
+        `import importedContract from "./e2e/helpers/responsive-route-contract";
+const {
+  assertResponsiveSurfaceContract,
+  isShelllessAssessmentReportRoute,
+} = importedContract.default ?? importedContract;
+
+const report = {
+  surface: "report",
+  role: "admin",
+  bodyResponsive: true,
+  visibleAuthShellRoles: [],
+  reportPageResponsive: true,
+};
+let validReportAccepted = true;
+try { assertResponsiveSurfaceContract(report); } catch { validReportAccepted = false; }
+
+const rejected = (overrides) => {
+  try {
+    assertResponsiveSurfaceContract({ ...report, ...overrides });
+    return false;
+  } catch {
+    return true;
+  }
+};
+
+console.log(JSON.stringify({
+  assessmentReportClassified: isShelllessAssessmentReportRoute("/assessments/campaign-1/report?view=full"),
+  respondentReportClassified: isShelllessAssessmentReportRoute("/assessments/campaign-1/respondents/person-1/report"),
+  longitudinalKeptInShell: !isShelllessAssessmentReportRoute("/portal/assessments/respondents/person-1/longitudinal"),
+  arbitraryReportKeptInShell: !isShelllessAssessmentReportRoute("/admin/arbitrary/report"),
+  validReportAccepted,
+  missingReportMarkerRejected: rejected({ reportPageResponsive: false }),
+  missingBodyFlagRejected: rejected({ bodyResponsive: false }),
+  reportWithShellRejected: rejected({ visibleAuthShellRoles: ["admin"] }),
+  dashboardWithoutShellRejected: rejected({
+    surface: "auth-shell",
+    reportPageResponsive: false,
+  }),
+}));`,
+      ],
+      { cwd: process.cwd(), encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+    );
+    return JSON.parse(output) as ResponsiveSurfaceSummary;
+  } catch {
+    return null;
+  }
+}
+
 describe("responsive authenticated navigation contract", () => {
   const base = {
     requestedRoute: "/portal/home",
@@ -342,6 +410,47 @@ describe("responsive authenticated navigation contract", () => {
         /^\/admin\/assessments\/templates\/[^/]+\/versions\/[^/]+\/edit$/,
       ],
     })).not.toThrow();
+  });
+
+  it("keeps shell-less report auth redirects and missing routes fail-closed", () => {
+    const reportRoute = "/assessments/campaign-1/report";
+
+    expect(() => assertResponsiveNavigationContract({
+      requestedRoute: reportRoute,
+      finalUrl: "http://localhost:3000/login",
+      responsePresent: true,
+      status: 200,
+    })).toThrow("authentication fallback /login");
+    expect(() => assertResponsiveNavigationContract({
+      requestedRoute: reportRoute,
+      finalUrl: `http://localhost:3000${reportRoute}`,
+      responsePresent: true,
+      status: 404,
+    })).toThrow("returned HTTP 404");
+  });
+});
+
+describe("responsive authenticated surface contract", () => {
+  it("classifies only the two shell-less assessment report route shapes", () => {
+    const summary = inspectResponsiveSurfaceContract();
+    expect(summary?.assessmentReportClassified).toBe(true);
+    expect(summary?.respondentReportClassified).toBe(true);
+    expect(summary?.longitudinalKeptInShell).toBe(true);
+    expect(summary?.arbitraryReportKeptInShell).toBe(true);
+  });
+
+  it("accepts a responsive report only with its route marker, body flag, and no auth shell", () => {
+    const summary = inspectResponsiveSurfaceContract();
+    expect(summary?.validReportAccepted).toBe(true);
+    expect(summary?.missingReportMarkerRejected).toBe(true);
+    expect(summary?.missingBodyFlagRejected).toBe(true);
+    expect(summary?.reportWithShellRejected).toBe(true);
+  });
+
+  it("does not weaken the dashboard auth-shell requirement", () => {
+    expect(
+      inspectResponsiveSurfaceContract()?.dashboardWithoutShellRejected,
+    ).toBe(true);
   });
 });
 

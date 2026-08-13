@@ -9,6 +9,16 @@ export interface ResponsiveNavigationContract {
 }
 
 export type ResponsiveDesktopParityMode = "off" | "kill";
+export type ResponsiveSurface = "auth-shell" | "report";
+export type ResponsiveSurfaceRole = "admin" | "coach";
+
+export interface ResponsiveSurfaceContract {
+  surface: ResponsiveSurface;
+  role: ResponsiveSurfaceRole;
+  bodyResponsive: boolean;
+  visibleAuthShellRoles: readonly ResponsiveSurfaceRole[];
+  reportPageResponsive: boolean;
+}
 
 function pathnameOf(value: string): string {
   return new URL(value, "http://localhost").pathname;
@@ -51,6 +61,38 @@ export function assertResponsiveNavigationContract({
     throw new Error(
       `${requestedRoute} reached unexpected final pathname ${finalPathname}`,
     );
+  }
+}
+
+export function isShelllessAssessmentReportRoute(route: string): boolean {
+  return /^\/assessments\/[^/]+(?:\/respondents\/[^/]+)?\/report$/.test(
+    pathnameOf(route),
+  );
+}
+
+export function assertResponsiveSurfaceContract({
+  surface,
+  role,
+  bodyResponsive,
+  visibleAuthShellRoles,
+  reportPageResponsive,
+}: ResponsiveSurfaceContract): void {
+  if (!bodyResponsive) {
+    throw new Error(`${surface} route is missing the responsive body flag`);
+  }
+
+  if (surface === "report") {
+    if (visibleAuthShellRoles.length > 0) {
+      throw new Error("shell-less report route rendered an authenticated dashboard shell");
+    }
+    if (!reportPageResponsive) {
+      throw new Error("shell-less report route is missing its responsive report marker");
+    }
+    return;
+  }
+
+  if (!visibleAuthShellRoles.includes(role)) {
+    throw new Error(`${role} dashboard route is missing its authenticated shell`);
   }
 }
 

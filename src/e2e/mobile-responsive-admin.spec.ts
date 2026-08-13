@@ -16,7 +16,10 @@ import {
   firstMatchingHref,
   type OverflowContext,
 } from "./helpers/overflow";
-import { assertResponsiveNavigationContract } from "./helpers/responsive-route-contract";
+import {
+  assertResponsiveNavigationContract,
+  isShelllessAssessmentReportRoute,
+} from "./helpers/responsive-route-contract";
 import {
   coachDetailHrefPattern,
   coachEditHrefPattern,
@@ -68,6 +71,9 @@ function context(testInfo: TestInfo, route: string, width: number): OverflowCont
     width,
     ...(route === "/dashboard"
       ? { allowedFinalPathnames: ["/admin/dashboard"] }
+      : {}),
+    ...(isShelllessAssessmentReportRoute(route)
+      ? { responsiveSurface: "report" as const }
       : {}),
   };
 }

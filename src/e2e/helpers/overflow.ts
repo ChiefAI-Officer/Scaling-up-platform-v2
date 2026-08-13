@@ -1,7 +1,9 @@
 import { expect, type Page } from "@playwright/test";
 import {
   assertResponsiveNavigationContract,
+  assertResponsiveSurfaceContract,
   type AllowedFinalPathname,
+  type ResponsiveSurface,
 } from "./responsive-route-contract";
 
 export type ResponsiveRole = "admin" | "coach";
@@ -13,6 +15,7 @@ export interface OverflowContext {
   width?: number;
   allowedFinalPathnames?: readonly AllowedFinalPathname[];
   responsiveMode?: "on" | "off";
+  responsiveSurface?: ResponsiveSurface;
 }
 
 export type OverflowProbe = {
@@ -28,6 +31,7 @@ function contextLabel(context: string | OverflowContext): string {
     `route=${context.route}`,
     `project=${context.project}`,
     context.width === undefined ? null : `width=${context.width}`,
+    context.responsiveSurface === undefined ? null : `surface=${context.responsiveSurface}`,
   ].filter(Boolean).join(", ");
 }
 
@@ -130,8 +134,24 @@ export async function expectResponsiveRoute(
         : page.locator("header").filter({ hasText: "Scaling Up" }),
     ).toBeVisible();
   } else {
-    await expect(page.locator(`[data-auth-shell="${context.role}"]`)).toBeVisible();
-    await expect(page.locator("body")).toHaveAttribute("data-mobile-responsive", "on");
+    const bodyResponsive = await page.locator("body").getAttribute("data-mobile-responsive") === "on";
+    const visibleAuthShellRoles = await page
+      .locator("[data-auth-shell]:visible")
+      .evaluateAll((shells) => shells
+        .map((shell) => shell.getAttribute("data-auth-shell"))
+        .filter((role): role is ResponsiveRole => role === "admin" || role === "coach"));
+    const reportPageResponsive = await page
+      .locator("[data-responsive-report-page]")
+      .first()
+      .isVisible()
+      .catch(() => false);
+    assertResponsiveSurfaceContract({
+      surface: context.responsiveSurface ?? "auth-shell",
+      role: context.role,
+      bodyResponsive,
+      visibleAuthShellRoles,
+      reportPageResponsive,
+    });
   }
   await assertNoDocumentOverflow(page, context);
 }
