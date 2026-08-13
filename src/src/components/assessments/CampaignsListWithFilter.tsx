@@ -6,8 +6,9 @@
  * Server component fetches the full campaign list with pre-computed metrics;
  * this client wrapper renders:
  *  - Global status filter pills (All / Draft / Active / Closed) with global counts.
- *  - One section per company (Organization), alphabetically ordered.
- *    Each section has a company header + per-campaign rows with staged-progress metrics.
+ *  - One collapsed section per company (Organization), alphabetically ordered.
+ *    Expanding a company reveals its campaign rows and staged-progress metrics.
+ *    At most one company is open; changing the status filter closes it.
  *  - Companies with zero campaigns after filtering are hidden entirely.
  *
  * URL state is intentionally NOT persisted — keep it simple.
@@ -15,6 +16,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { ChevronRight } from "lucide-react";
 import { CampaignStatusMetrics } from "@/components/assessments/CampaignStatusMetrics";
 import type { CampaignStatusMetrics as CampaignStatusMetricsType } from "@/lib/assessments/campaign-status-metrics";
 
@@ -65,115 +67,142 @@ function formatDate(iso: string): string {
 
 // A company section — campaigns filtered by the active pill
 interface CompanySectionProps {
+  organizationId: string;
   organizationName: string;
   campaigns: CampaignListItem[];
+  isOpen: boolean;
+  onToggle: () => void;
   /** Base path for a campaign's detail link. Default: the coach portal. */
   detailBasePath: string;
 }
 
 function CompanySection({
+  organizationId,
   organizationName,
   campaigns,
+  isOpen,
+  onToggle,
   detailBasePath,
 }: CompanySectionProps) {
   const count = campaigns.length;
+  const campaignsId = `company-campaigns-${organizationId}`;
+
   return (
-    <section className="space-y-2">
-      {/* Company header */}
-      <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
-        <span>{organizationName}</span>
-        <span className="text-muted-foreground font-normal">
-          &middot; {count} {count === 1 ? "campaign" : "campaigns"}
-        </span>
+    <section className="bg-card border border-border rounded-xl overflow-hidden">
+      <h2>
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={isOpen}
+          aria-controls={campaignsId}
+          className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-semibold text-foreground hover:bg-muted/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset"
+        >
+          <ChevronRight
+            aria-hidden="true"
+            className={`h-4 w-4 shrink-0 text-primary transition-transform ${
+              isOpen ? "rotate-90" : ""
+            }`}
+          />
+          <span>{organizationName}</span>
+          <span className="text-muted-foreground font-normal">
+            &middot; {count} {count === 1 ? "campaign" : "campaigns"}
+          </span>
+        </button>
       </h2>
 
-      {/* Campaign rows */}
-      <div className="bg-card border border-border rounded-xl overflow-hidden">
-        <div className="divide-y divide-border">
-          {campaigns.map((c) => {
-            const isDraftNoInvites = c.status === "DRAFT" && c.metrics.total === 0;
-            const canShowEditionWarning =
-              c.status === "DRAFT" || c.status === "ACTIVE";
-            return (
-              <div
-                key={c.id}
-                className="px-4 py-3 space-y-2 hover:bg-muted/30 transition-colors"
-                data-testid={`campaign-row-${c.id}`}
-              >
-                {/* Top row: name + template + status + date + action */}
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                  <div className="min-w-0 basis-full sm:flex-1">
+      {isOpen && (
+        <div id={campaignsId} className="border-t border-border">
+          <div className="divide-y divide-border">
+            {campaigns.map((c) => {
+              const isDraftNoInvites =
+                c.status === "DRAFT" && c.metrics.total === 0;
+              const canShowEditionWarning =
+                c.status === "DRAFT" || c.status === "ACTIVE";
+              return (
+                <div
+                  key={c.id}
+                  className="px-4 py-3 space-y-2 hover:bg-muted/30 transition-colors"
+                  data-testid={`campaign-row-${c.id}`}
+                >
+                  {/* Top row: name + template + status + date + action */}
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                    <div className="min-w-0 basis-full sm:flex-1">
+                      <Link
+                        href={`${detailBasePath}/${c.id}`}
+                        className="font-medium text-foreground hover:text-primary text-sm"
+                      >
+                        {c.name}
+                      </Link>
+                      <div className="text-xs text-muted-foreground">
+                        {c.alias}
+                      </div>
+                    </div>
+                    <span
+                      className="min-w-0 max-w-full text-xs text-muted-foreground break-words"
+                      data-testid={`campaign-edition-identity-${c.id}`}
+                    >
+                      {c.templateName}
+                      {c.edition ? (
+                        <>
+                          <span aria-hidden="true"> &middot; </span>
+                          <span className="whitespace-nowrap tabular-nums">
+                            Edition {c.edition.versionNumber}
+                          </span>
+                        </>
+                      ) : null}
+                    </span>
+                    {canShowEditionWarning && c.edition?.pinnedRetired ? (
+                      <span
+                        className="inline-flex items-center rounded-md border border-destructive bg-destructive/10 px-1.5 py-0.5 text-xs font-semibold text-destructive"
+                        data-testid={`campaign-edition-retired-${c.id}`}
+                      >
+                        Retired
+                      </span>
+                    ) : canShowEditionWarning &&
+                      c.edition?.newerEditionAvailable ? (
+                      <span
+                        className="inline-flex items-center rounded-md border border-warning/30 bg-warning/10 px-1.5 py-0.5 text-xs font-semibold text-warning"
+                        data-testid={`campaign-edition-stale-${c.id}`}
+                      >
+                        Not latest
+                      </span>
+                    ) : null}
+                    <span
+                      className={`inline-flex items-center text-xs font-medium px-2 py-0.5 rounded border ${
+                        STATUS_TONE[c.status] ??
+                        "bg-muted text-muted-foreground border-border"
+                      }`}
+                    >
+                      {STATUS_LABELS[c.status] ?? c.status}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      Opens {formatDate(c.openAt)}
+                    </span>
                     <Link
                       href={`${detailBasePath}/${c.id}`}
-                      className="font-medium text-foreground hover:text-primary text-sm"
+                      className="text-xs text-primary hover:underline ml-auto"
                     >
-                      {c.name}
+                      View
                     </Link>
-                    <div className="text-xs text-muted-foreground">{c.alias}</div>
                   </div>
-                  <span
-                    className="min-w-0 max-w-full text-xs text-muted-foreground break-words"
-                    data-testid={`campaign-edition-identity-${c.id}`}
-                  >
-                    {c.templateName}
-                    {c.edition ? (
-                      <>
-                        <span aria-hidden="true"> &middot; </span>
-                        <span className="whitespace-nowrap tabular-nums">
-                          Edition {c.edition.versionNumber}
-                        </span>
-                      </>
-                    ) : null}
-                  </span>
-                  {canShowEditionWarning && c.edition?.pinnedRetired ? (
-                    <span
-                      className="inline-flex items-center rounded-md border border-destructive bg-destructive/10 px-1.5 py-0.5 text-xs font-semibold text-destructive"
-                      data-testid={`campaign-edition-retired-${c.id}`}
-                    >
-                      Retired
-                    </span>
-                  ) : canShowEditionWarning && c.edition?.newerEditionAvailable ? (
-                    <span
-                      className="inline-flex items-center rounded-md border border-warning/30 bg-warning/10 px-1.5 py-0.5 text-xs font-semibold text-warning"
-                      data-testid={`campaign-edition-stale-${c.id}`}
-                    >
-                      Not latest
-                    </span>
-                  ) : null}
-                  <span
-                    className={`inline-flex items-center text-xs font-medium px-2 py-0.5 rounded border ${
-                      STATUS_TONE[c.status] ?? "bg-muted text-muted-foreground border-border"
-                    }`}
-                  >
-                    {STATUS_LABELS[c.status] ?? c.status}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    Opens {formatDate(c.openAt)}
-                  </span>
-                  <Link
-                    href={`${detailBasePath}/${c.id}`}
-                    className="text-xs text-primary hover:underline ml-auto"
-                  >
-                    View
-                  </Link>
-                </div>
 
-                {/* Metrics row */}
-                <CampaignStatusMetrics
-                  metrics={c.metrics}
-                  emptyHint={
-                    isDraftNoInvites
-                      ? "No invitations yet — activate the campaign to send."
-                      : undefined
-                  }
-                  compact
-                  testIdPrefix={`campaign-metrics-${c.id}`}
-                />
-              </div>
-            );
-          })}
+                  {/* Metrics row */}
+                  <CampaignStatusMetrics
+                    metrics={c.metrics}
+                    emptyHint={
+                      isDraftNoInvites
+                        ? "No invitations yet — activate the campaign to send."
+                        : undefined
+                    }
+                    compact
+                    testIdPrefix={`campaign-metrics-${c.id}`}
+                  />
+                </div>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
     </section>
   );
 }
@@ -188,6 +217,9 @@ export function CampaignsListWithFilter({
   detailBasePath?: string;
 }) {
   const [filter, setFilter] = useState<FilterValue>("ALL");
+  const [openOrganizationId, setOpenOrganizationId] = useState<string | null>(
+    null,
+  );
 
   // Global counts across all companies
   const counts = useMemo(() => {
@@ -255,7 +287,10 @@ export function CampaignsListWithFilter({
             <button
               key={p.value}
               type="button"
-              onClick={() => setFilter(p.value)}
+              onClick={() => {
+                setFilter(p.value);
+                setOpenOrganizationId(null);
+              }}
               aria-pressed={selected}
               className={
                 selected
@@ -293,8 +328,15 @@ export function CampaignsListWithFilter({
           {visibleGroups.map((group) => (
             <CompanySection
               key={group.orgId}
+              organizationId={group.orgId}
               organizationName={group.name}
               campaigns={group.campaigns}
+              isOpen={openOrganizationId === group.orgId}
+              onToggle={() =>
+                setOpenOrganizationId((current) =>
+                  current === group.orgId ? null : group.orgId,
+                )
+              }
               detailBasePath={detailBasePath}
             />
           ))}

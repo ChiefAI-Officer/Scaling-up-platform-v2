@@ -6,6 +6,15 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="customer-campaign-accordion-implemented"></a>
+### 2026-08-13 — Customer-first campaign accordion implemented <!-- ENTRY_ISO:2026-08-13 ENTRY_SLUG:customer-campaign-accordion-implemented -->
+
+**Status: IMPLEMENTED + LOCALLY VERIFIED; NOT YET MERGED OR DEPLOYED.** Coach **My Campaigns** and Admin **Campaigns** reuse `CampaignsListWithFilter`, so both surfaces now present the same customer-first hierarchy. Every customer starts collapsed; activating its full-width, keyboard-accessible header reveals only that customer's campaigns; opening another customer closes the first; activating the open header closes it; and choosing **All / Draft / Active / Closed** resets the list to the collapsed overview. Filter counts, filtered customer visibility, campaign detail routes, staged-progress metrics, and empty states retain their existing behavior.
+
+**Compatibility and accessibility.** The change is client-only and adds no API, query, schema, migration, flag, environment, or customer-data mutation. The trigger exposes `aria-expanded` and `aria-controls`, retains the company heading hierarchy, shows a directional chevron, and supplies an inset keyboard focus ring. The newer campaign edition identity plus **Not latest** / **Retired** warnings remain unchanged inside expanded campaign rows.
+
+**Test-first verification.** On the latest `main` baseline, the related matrix first passed **3 suites / 31 tests**. The new accordion expectations then failed **22 tests** because customer headings were not controls and all campaign rows rendered immediately. After implementation, the focused coach/admin matrix passed **3 suites / 34 tests**; changed-file ESLint emitted no diagnostics; migration safety approved all **47 migrations**; `git diff --check` passed; and the Production-equivalent Turbopack build compiled in **49s**, passed TypeScript, and generated **94/94** static pages. The build retained only the expected local middleware-deprecation and missing Inngest-key/`DATABASE_URL` diagnostics.
+
 <a id="referred-results-all-public-links-implemented"></a>
 ### 2026-08-13 — Referred Results exposes every active public-assessment coach link <!-- ENTRY_ISO:2026-08-13 ENTRY_SLUG:referred-results-all-public-links-implemented -->
 
@@ -14,14 +23,12 @@ Future entries should be appended at the TOP of the entries section below (newes
 **Fix and behavior boundary.** The enabled Jeff #83 Referred Results page now queries every non-deleted `ACTIVE` `PUBLIC` campaign, ordered by campaign name, and derives each coach-specific URL from the campaign alias plus the canonical certified Coach email. The card provides a dedicated **Public assessment link** dropdown, defaults to the Quick Assessment when available (otherwise the first ordered campaign), updates the displayed and copied URL on selection, and shows a clear empty state when none are active. Draft, closed, invited, and soft-deleted campaigns remain excluded. The existing results **Assessment** filter is independent and unchanged. The Jeff #83 flag-off My Campaigns Quick Assessment card and query path remain untouched. No schema, migration, flag, assessment content or version, campaign, response, email, or Production data changed.
 
 **Test-first verification.** The regression first failed because the enabled page still rendered only **Your Quick Assessment link**, performed the template-restricted `findFirst`, and had no share-link selector. Empty-state coverage separately failed while the link card disappeared. The final focused Referred Results and portal-assessment gate passed **2 suites / 20 tests**, and the changelog-freshness gate passed **1 suite / 4 tests**. Changed-file ESLint emitted no diagnostics, migration safety approved all **47 migrations**, and `git diff --check` passed. The Production-equivalent Turbopack build compiled in 4.3 minutes, passed TypeScript, and generated **94/94** static pages, retaining only the expected local workspace-root, middleware-deprecation, missing Inngest-key, and missing `DATABASE_URL` diagnostics.
-
 <a id="template-delete-soft-deleted-campaign-guard-launched"></a>
 ### 2026-08-13 — Template-delete tombstone guard launched <!-- ENTRY_ISO:2026-08-13 ENTRY_SLUG:template-delete-soft-deleted-campaign-guard-launched -->
 
 **Status: LIVE ON PRODUCTION.** PR [#346](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/346) passed Build, Migration Safety Gate, Assessment Email Lease (PostgreSQL), Vercel, and Vercel Preview Comments, then squash-merged to protected `main` as `f511af9dc22558753c6f9a3263a9fb6816917d99`. GitHub Production deployment `5879745027` completed successfully for that exact SHA at `scaling-up-platform-v2-bal0lx0ph-scaling-up.vercel.app`. Both canonical health endpoints returned a healthy database and safe auth posture, and post-merge `main` CI run `31654812991` completed successfully.
 
 **Live behavior and data boundary.** Template deletion now ignores soft-deleted campaign tombstones while retaining their status, invitations, submissions, audit history, and other stored fields unchanged. Live `DRAFT` and `ACTIVE` campaigns continue to block template deletion; live `CLOSED` campaigns retain their prior non-blocking behavior. The `Scaling Up Quiz` template can now be deleted despite its two preserved deleted-`ACTIVE` campaign rows. Verification was read-only after deployment: no template, campaign, invitation, submission, assessment version, feature flag, schema, migration, or other Production data was changed.
-
 <a id="template-delete-soft-deleted-campaign-guard-fixed"></a>
 ### 2026-08-13 — Template deletion ignores soft-deleted campaign tombstones <!-- ENTRY_ISO:2026-08-13 ENTRY_SLUG:template-delete-soft-deleted-campaign-guard-fixed -->
 
