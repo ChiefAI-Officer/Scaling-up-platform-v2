@@ -92,7 +92,10 @@ export default async function TrendsPage({ searchParams }: PageProps) {
       >
         <ArrowLeft className="w-4 h-4" /> Back to Assessments
       </Link>
-      <CampaignTrendsView trend={trend} />
+      <CampaignTrendsView
+        trend={trend}
+        responsiveEnabled={mobileResponsiveEnabled}
+      />
     </div>
   );
 }

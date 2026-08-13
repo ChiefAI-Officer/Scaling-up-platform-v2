@@ -99,23 +99,38 @@ function niceCeiling(value: number): number {
 
 export interface RespondentLongitudinalViewProps {
   outcome: RespondentLongitudinalOutcome;
+  responsiveEnabled?: boolean;
 }
 
 export function RespondentLongitudinalView({
   outcome,
+  responsiveEnabled = false,
 }: RespondentLongitudinalViewProps) {
   return (
-    <div className="space-y-6" data-testid="respondent-longitudinal-view">
+    <div
+      className={
+        responsiveEnabled ? "min-w-0 max-w-full space-y-6" : "space-y-6"
+      }
+      data-testid="respondent-longitudinal-view"
+      data-responsive-report={responsiveEnabled ? "" : undefined}
+    >
       <Link
         href="/portal/assessments"
-        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        className={
+          responsiveEnabled
+            ? "inline-flex min-h-11 items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            : "inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        }
+        {...(responsiveEnabled ? { "data-touch-target": true } : {})}
       >
         <ArrowLeft className="w-4 h-4" /> Back to Assessments
       </Link>
 
       {outcome.kind === "notApplicable" && <NotApplicableCard />}
       {outcome.kind === "empty" && <EmptyCard />}
-      {outcome.kind === "ok" && <OkView data={outcome.data} />}
+      {outcome.kind === "ok" && (
+        <OkView data={outcome.data} responsiveEnabled={responsiveEnabled} />
+      )}
       {/* forbidden never reaches this component — the page 404s. Defensive: */}
       {outcome.kind === "forbidden" && <EmptyCard />}
     </div>
@@ -177,8 +192,10 @@ function EmptyCard() {
 
 function OkView({
   data,
+  responsiveEnabled = false,
 }: {
   data: Extract<RespondentLongitudinalOutcome, { kind: "ok" }>["data"];
+  responsiveEnabled?: boolean;
 }) {
   const {
     respondent,
@@ -225,7 +242,7 @@ function OkView({
       {/* HEADER */}
       <div className="bg-card border border-border rounded-xl p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
+          <div className={responsiveEnabled ? "min-w-0 break-words" : undefined}>
             <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">
               Comparison across campaigns · {assessment.alias}
             </p>
@@ -286,10 +303,23 @@ function OkView({
       </div>
 
       {/* OVERALL TREND LINE */}
-      <OverallTrendLine points={points} />
+      <OverallTrendLine points={points} responsiveEnabled={responsiveEnabled} />
 
       {/* PER-SECTION / DOMAIN TABLE */}
-      <div className="bg-card border border-border rounded-xl p-6 overflow-x-auto">
+      <div
+        className={
+          responsiveEnabled
+            ? "min-w-0 max-w-full overflow-x-auto rounded-xl border border-border bg-card p-4 sm:p-6"
+            : "bg-card border border-border rounded-xl p-6 overflow-x-auto"
+        }
+        {...(responsiveEnabled
+          ? {
+              role: "region",
+              tabIndex: 0,
+              "aria-label": "Section detail over time comparison table",
+            }
+          : {})}
+      >
         <h2 className="text-lg font-semibold text-foreground mb-1">
           Section detail over time
         </h2>
@@ -449,8 +479,10 @@ function Cell({
 
 function OverallTrendLine({
   points,
+  responsiveEnabled = false,
 }: {
   points: RespondentLongitudinalPoint[];
+  responsiveEnabled?: boolean;
 }) {
   // Degraded (malformed-result) points have no trustworthy value (average left
   // at 0); plotting them would draw a fabricated plunge. Exclude them from the
@@ -494,7 +526,14 @@ function OverallTrendLine({
   }));
 
   return (
-    <div className="bg-card border border-border rounded-xl p-6">
+    <div
+      className={
+        responsiveEnabled
+          ? "min-w-0 max-w-full rounded-xl border border-border bg-card p-4 sm:p-6"
+          : "bg-card border border-border rounded-xl p-6"
+      }
+      data-testid={responsiveEnabled ? "longitudinal-chart-region" : undefined}
+    >
       <div className="mb-4">
         <h2 className="text-lg font-semibold text-foreground">
           Overall score over time

@@ -74,6 +74,7 @@ export interface GroupReportProvenance {
 
 export interface GroupReportProps extends GroupReportProvenance {
   report: CampaignGroupReport;
+  responsiveEnabled?: boolean;
 }
 
 // ── Formatters ───────────────────────────────────────────────────────────────

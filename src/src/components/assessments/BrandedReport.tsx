@@ -201,6 +201,8 @@ export interface BrandedReportProps {
   reportFindingsAvailable?: boolean;
   /** Server-authorized frozen baseline facts; renderers consume this in Task 7. */
   comparison?: ReportComparisonModel | null;
+  /** Enables the default-off responsive report containment pass. */
+  responsiveEnabled?: boolean;
 }
 
 export function BrandedReport({
@@ -212,6 +214,7 @@ export function BrandedReport({
   reportStylesAvailable,
   reportFindingsAvailable,
   comparison,
+  responsiveEnabled = false,
 }: BrandedReportProps) {
   // This component is imported by client result flows. Availability must arrive
   // from their server response; WAVE_REPORT_STYLES_* is never read here.
@@ -230,12 +233,23 @@ export function BrandedReport({
       });
   const classic = () =>
     config.reportType === "qualitative" ? (
-      <QualitativeReport
-        report={report}
-        peerComparison={peerComparison}
-        contactEmail={contactEmail}
-        reportFindingsAvailable={reportFindingsAvailable === true}
-      />
+      responsiveEnabled ? (
+        <div className="min-w-0 max-w-full" data-responsive-report="">
+          <QualitativeReport
+            report={report}
+            peerComparison={peerComparison}
+            contactEmail={contactEmail}
+            reportFindingsAvailable={reportFindingsAvailable === true}
+          />
+        </div>
+      ) : (
+        <QualitativeReport
+          report={report}
+          peerComparison={peerComparison}
+          contactEmail={contactEmail}
+          reportFindingsAvailable={reportFindingsAvailable === true}
+        />
+      )
     ) : (
       <LegacyClassicReport
         report={report}
@@ -244,6 +258,7 @@ export function BrandedReport({
         contactEmail={contactEmail}
         reportFindingsAvailable={reportFindingsAvailable}
         comparison={comparison}
+        responsiveEnabled={responsiveEnabled}
       />
     );
 
@@ -287,20 +302,32 @@ export function BrandedReport({
       }
       return classic();
     }
-    case "EXECUTIVE_BOARDROOM":
-      return (
+    case "EXECUTIVE_BOARDROOM": {
+      const reportNode = (
         <ExecutiveBoardroomReport
           presentation={presentation()}
           comparison={comparison}
         />
       );
-    case "MODERN_DASHBOARD":
-      return (
+      return responsiveEnabled ? (
+        <div className="min-w-0 max-w-full" data-responsive-report="">
+          {reportNode}
+        </div>
+      ) : reportNode;
+    }
+    case "MODERN_DASHBOARD": {
+      const dashboardNode = (
         <ModernDashboardReport
           presentation={presentation()}
           comparison={comparison}
         />
       );
+      return responsiveEnabled ? (
+        <div className="min-w-0 max-w-full" data-responsive-report="">
+          {dashboardNode}
+        </div>
+      ) : dashboardNode;
+    }
     default: {
       const unreachableStyle: never = resolvedStyle;
       void unreachableStyle;
@@ -317,6 +344,7 @@ export function LegacyClassicReport({
   contactEmail,
   reportFindingsAvailable,
   comparison,
+  responsiveEnabled = false,
 }: Omit<BrandedReportProps, "reportStylesAvailable" | "peerComparison">) {
 
   const result: ScoreResult = report.result ?? ({} as ScoreResult);
@@ -508,7 +536,15 @@ export function LegacyClassicReport({
   const hasAdditional = additional.length > 0;
 
   return (
-    <div className="su-public-brand su-report" data-testid="branded-report">
+    <div
+      className={
+        responsiveEnabled
+          ? "su-public-brand su-report min-w-0 max-w-full"
+          : "su-public-brand su-report"
+      }
+      data-testid="branded-report"
+      data-responsive-report={responsiveEnabled ? "" : undefined}
+    >
       {report.degraded && (
         <div
           className="su-report-degraded"
@@ -811,7 +847,20 @@ export function LegacyClassicReport({
 
       {/* ── 4. Scores table (G3 — no team average; #24 — gated by report-config) ── */}
       {reportConfigFor(report.templateAlias).showScoreTable && (
-      <section className="su-report-scores">
+      <section
+        className={
+          responsiveEnabled
+            ? "su-report-scores su-report-data-region"
+            : "su-report-scores"
+        }
+        {...(responsiveEnabled
+          ? {
+              role: "region",
+              tabIndex: 0,
+              "aria-label": "Score summary table",
+            }
+          : {})}
+      >
         <div className="su-report-eyebrow">Score summary</div>
         <h2 className="su-h2 su-report-sec-title">All sections</h2>
         <table className="su-report-table" data-testid="report-scores-table">

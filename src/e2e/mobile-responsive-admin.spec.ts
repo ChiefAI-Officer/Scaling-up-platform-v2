@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { loginAs } from "./helpers/auth";
 import { assertNoDocumentOverflow } from "./helpers/overflow";
+import { assertMinimumTouchTargets } from "./helpers/touch-targets";
 
 const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL || "admin@scalingup.com";
 const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD || "demo123";
@@ -69,7 +70,7 @@ const discoveredAssessmentRoutes = [
   },
 ];
 
-for (const width of [320, 390]) {
+for (const width of [320, 390, 640, 768, 1023]) {
   test(`admin workshop and file collections fit a ${width}px viewport`, async ({ page }) => {
     await page.setViewportSize({ width, height: 844 });
     await loginAs(page, {
@@ -82,6 +83,7 @@ for (const width of [320, 390]) {
       await page.goto(route);
       await expect(page.locator("body")).toHaveAttribute("data-mobile-responsive", "on");
       await assertNoDocumentOverflow(page, `${route} at ${width}`);
+      await assertMinimumTouchTargets(page, `${route} at ${width}`);
     }
 
     await page.goto("/workshops");
@@ -97,11 +99,12 @@ for (const width of [320, 390]) {
 
     await page.goto(detailHref!);
     await assertNoDocumentOverflow(page, `${detailHref} at ${width}`);
+    await assertMinimumTouchTargets(page, `${detailHref} at ${width}`);
     await expect(page.getByRole("region", { name: "Workshop registrations" })).toBeVisible();
   });
 }
 
-for (const width of [320, 390]) {
+for (const width of [320, 390, 640, 768, 1023]) {
   test(`assessment workspace routes fit a ${width}px viewport`, async ({ page }) => {
     await page.setViewportSize({ width, height: 844 });
     await loginAs(page, {
@@ -117,6 +120,7 @@ for (const width of [320, 390]) {
         "on",
       );
       await assertNoDocumentOverflow(page, `${route} at ${width}`);
+      await assertMinimumTouchTargets(page, `${route} at ${width}`);
     }
 
     for (const discovered of discoveredAssessmentRoutes) {
@@ -131,18 +135,20 @@ for (const width of [320, 390]) {
 
       await page.goto(href!);
       await assertNoDocumentOverflow(page, `${href} at ${width}`);
+      await assertMinimumTouchTargets(page, `${href} at ${width}`);
 
       if (discovered.label === "assessment template detail") {
         await expect(page).toHaveURL(
           /\/admin\/assessments\/templates\/[^/]+\/versions\/[^/]+\/edit/,
         );
         await assertNoDocumentOverflow(page, `template version editor at ${width}`);
+        await assertMinimumTouchTargets(page, `template version editor at ${width}`);
       }
     }
   });
 }
 
-for (const width of [320, 390]) {
+for (const width of [320, 390, 640, 768, 1023]) {
   test(`remaining admin collections fit a ${width}px viewport`, async ({ page }) => {
     await page.setViewportSize({ width, height: 844 });
     await loginAs(page, {
@@ -155,6 +161,7 @@ for (const width of [320, 390]) {
       await page.goto(route);
       await expect(page.locator("body")).toHaveAttribute("data-mobile-responsive", "on");
       await assertNoDocumentOverflow(page, `${route} at ${width}`);
+      await assertMinimumTouchTargets(page, `${route} at ${width}`);
     }
 
     for (const discovered of discoveredAdminRoutes) {
@@ -169,6 +176,7 @@ for (const width of [320, 390]) {
 
       await page.goto(href!);
       await assertNoDocumentOverflow(page, `${href} at ${width}`);
+      await assertMinimumTouchTargets(page, `${href} at ${width}`);
 
       if (discovered.label === "coach detail") {
         const editLink = page.locator('a[href^="/coaches/"][href$="/edit"]').first();
@@ -177,6 +185,7 @@ for (const width of [320, 390]) {
         expect(editHref, "coach edit link href").toBeTruthy();
         await page.goto(editHref!);
         await assertNoDocumentOverflow(page, `${editHref} at ${width}`);
+        await assertMinimumTouchTargets(page, `${editHref} at ${width}`);
       }
     }
   });

@@ -11,7 +11,7 @@
  * ALL snapshot entries grouped by section, after the last section; flag OFF
  * or empty snapshot → the section is absent and output is byte-identical.
  */
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { BrandedReport } from "@/components/assessments/BrandedReport";
 import { QualitativeReport } from "@/components/assessments/QualitativeReport";
 import type { RespondentReport } from "@/lib/assessments/respondent-report";
@@ -123,6 +123,28 @@ function qualReport(withFindings: boolean): RespondentReport {
 // ── Scored merge ────────────────────────────────────────────────────────────
 
 describe("BrandedReport — scored findings merge", () => {
+  it("keeps the flag-off classic root exact and contains the enabled report score table", () => {
+    const { rerender } = render(<BrandedReport report={scoredReport(false)} />);
+    const root = screen.getByTestId("branded-report");
+    expect(root).toHaveAttribute("class", "su-public-brand su-report");
+    expect(root).not.toHaveAttribute("data-responsive-report");
+
+    rerender(
+      <BrandedReport report={scoredReport(false)} responsiveEnabled />,
+    );
+    expect(root).toHaveClass("min-w-0");
+    expect(root).toHaveClass("max-w-full");
+    expect(root).toHaveAttribute("data-responsive-report", "");
+    const region = screen.getByRole("region", {
+      name: "Score summary table",
+    });
+    expect(region).toHaveAttribute("tabindex", "0");
+    expect(region).toHaveClass("su-report-data-region");
+    expect(
+      within(region).getByTestId("report-scores-table"),
+    ).toBeInTheDocument();
+  });
+
   it("server decision ON: non-slider findings merge into 'What to work on next'; slider snapshot entries are IGNORED", () => {
     render(<BrandedReport report={scoredReport(true)} reportFindingsAvailable />);
     const recs = screen.getByTestId("report-recommendations");

@@ -143,6 +143,48 @@ describe("CampaignTrendsView", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("contains long responsive chart and table content without changing the flag-off root", () => {
+    const trend = baseTrend({
+      template: {
+        id: "tpl-1",
+        name: "A very long assessment name that must remain inside the available report width",
+        alias: "a-very-long-assessment-alias-that-must-wrap",
+      },
+      organization: {
+        id: "org-1",
+        name: "A very long organization name that must wrap instead of widening the page",
+      },
+      campaigns: [
+        buildCampaign("c1", new Date("2026-01-15T00:00:00Z"), 15, 3),
+        buildCampaign("c2", new Date("2026-05-15T00:00:00Z"), 28, 3),
+      ],
+    });
+    const { container, rerender } = render(<CampaignTrendsView trend={trend} />);
+    expect(container.firstElementChild).toHaveAttribute(
+      "class",
+      "space-y-6",
+    );
+    expect(container.firstElementChild).not.toHaveAttribute(
+      "data-responsive-report",
+    );
+
+    rerender(<CampaignTrendsView trend={trend} responsiveEnabled />);
+    const root = screen.getByTestId("campaign-trends-view");
+    expect(root).toHaveClass("min-w-0");
+    expect(root).toHaveClass("max-w-full");
+    expect(root).toHaveAttribute("data-responsive-report", "");
+    expect(screen.getByTestId("trends-chart-region")).toHaveClass("min-w-0");
+    expect(screen.getByTestId("trends-chart-region")).toHaveClass(
+      "max-w-full",
+    );
+    const tableRegion = screen.getByRole("region", {
+      name: "Per-section trend comparison table",
+    });
+    expect(tableRegion).toHaveAttribute("tabindex", "0");
+    expect(tableRegion).toHaveClass("min-w-0");
+    expect(tableRegion).toHaveClass("max-w-full");
+  });
+
   it("hasMultipleVersions shows banner", () => {
     const trend = baseTrend({
       hasMultipleVersions: true,

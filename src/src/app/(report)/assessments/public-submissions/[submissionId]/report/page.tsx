@@ -17,6 +17,7 @@ import {
   viewPublicReferralReport,
 } from "@/lib/assessments/report-access-gate";
 import { isFindingsLogicEnabled } from "@/lib/assessments/wave-u-flags";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -29,6 +30,7 @@ export default async function PublicSubmissionReportPage({
   params,
 }: PageProps) {
   const { submissionId } = await params;
+  const mobileResponsiveEnabled = isMobileResponsiveEnabled();
   const { outcome } = await viewPublicReferralReport(
     defaultReportGateDeps(),
     { submissionId },
@@ -47,7 +49,14 @@ export default async function PublicSubmissionReportPage({
       report={report}
       reportStylesAvailable={reportStylesAvailable}
     >
-      <div className="su-report-page">
+      <div
+        className={
+          mobileResponsiveEnabled
+            ? "su-report-page min-w-0 max-w-full"
+            : "su-report-page"
+        }
+        data-responsive-report-page={mobileResponsiveEnabled ? "" : undefined}
+      >
         <div className="su-report-actions no-print">
           <PrintReportButton
             fileName={
@@ -60,6 +69,7 @@ export default async function PublicSubmissionReportPage({
           campaignLabel={report.campaignLabel}
           reportStylesAvailable={reportStylesAvailable}
           reportFindingsAvailable={isFindingsLogicEnabled()}
+          responsiveEnabled={mobileResponsiveEnabled}
         />
       </div>
     </ReportStyleScope>

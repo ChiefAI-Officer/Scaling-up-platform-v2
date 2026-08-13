@@ -111,15 +111,28 @@ function peerCell(v: number | null | undefined): string {
 function ProfileTable({
   rows,
   hasCeo,
+  responsiveEnabled = false,
+  label = "Alignment profile comparison table",
 }: {
   rows: ProfileRow[];
   hasCeo: boolean;
+  responsiveEnabled?: boolean;
+  label?: string;
 }) {
   // Omit-empty: only show the Peers + peer-deviation columns when ≥1 row
   // carries a finite peer benchmark.
   const hasPeers = rows.some((r) => r.peers != null && Number.isFinite(r.peers));
   return (
-    <div className="su-group-prof-scroll">
+    <div
+      className={
+        responsiveEnabled
+          ? "su-group-prof-scroll su-report-data-region"
+          : "su-group-prof-scroll"
+      }
+      {...(responsiveEnabled
+        ? { role: "region", tabIndex: 0, "aria-label": label }
+        : {})}
+    >
       <table className="su-group-prof" data-testid="group-scored-profile">
         <thead>
           <tr>
@@ -201,9 +214,11 @@ function toProfileRows(sections: GroupScoredSection[]): ProfileRow[] {
 function DomainsBlock({
   domains,
   hasCeo,
+  responsiveEnabled,
 }: {
   domains: GroupScoredDomain[];
   hasCeo: boolean;
+  responsiveEnabled: boolean;
 }) {
   return (
     <section className="su-group-sec" data-testid="group-scored-domains">
@@ -220,6 +235,8 @@ function DomainsBlock({
           devPeersTeam: d.devPeersTeam,
         }))}
         hasCeo={hasCeo}
+        responsiveEnabled={responsiveEnabled}
+        label="Domain comparison table"
       />
     </section>
   );
@@ -319,7 +336,13 @@ const APPENDIX_B_DOMAIN_LABELS: Record<(typeof APPENDIX_B_DOMAIN_KEYS)[number], 
  * People/Strategy/Execution/Cash (the CEO-personal "You" domain is excluded),
  * cells = each person's 0–10 domain score ("—" when they answered none).
  */
-function AppendixB({ rows }: { rows: GroupAppendixBRow[] }) {
+function AppendixB({
+  rows,
+  responsiveEnabled,
+}: {
+  rows: GroupAppendixBRow[];
+  responsiveEnabled: boolean;
+}) {
   return (
     <section className="su-group-sec" data-testid="group-scored-appendix-b">
       <h2 className="su-group-sec-title">Appendix B — team members (anonymized)</h2>
@@ -327,7 +350,20 @@ function AppendixB({ rows }: { rows: GroupAppendixBRow[] }) {
         Each team member&rsquo;s domain scores, de-identified. Members are listed
         as &ldquo;Person 1&rdquo;…&ldquo;Person N&rdquo; — names are not shown.
       </p>
-      <div className="su-group-prof-scroll">
+      <div
+        className={
+          responsiveEnabled
+            ? "su-group-prof-scroll su-report-data-region"
+            : "su-group-prof-scroll"
+        }
+        {...(responsiveEnabled
+          ? {
+              role: "region",
+              tabIndex: 0,
+              "aria-label": "Appendix B team member comparison table",
+            }
+          : {})}
+      >
         <table className="su-group-prof su-group-apxb" data-testid="group-scored-appendix-b-table">
           <thead>
             <tr>
@@ -365,6 +401,7 @@ function AppendixB({ rows }: { rows: GroupAppendixBRow[] }) {
 
 export function ScoredGroupReport(props: GroupReportProps) {
   const { report } = props;
+  const responsiveEnabled = props.responsiveEnabled === true;
   const scored = report.scored;
   const hasCeo = cohortHasCeo(report);
   // Tier presentation policy (Wave J / J-2): SU-Full sets showTier=false to
@@ -382,7 +419,15 @@ export function ScoredGroupReport(props: GroupReportProps) {
         Number.isFinite(scored.scaleUpScore.peers)));
 
   return (
-    <div className="su-public-brand su-report" data-testid="scored-group-report">
+    <div
+      className={
+        responsiveEnabled
+          ? "su-public-brand su-report min-w-0 max-w-full"
+          : "su-public-brand su-report"
+      }
+      data-testid="scored-group-report"
+      data-responsive-report={responsiveEnabled ? "" : undefined}
+    >
       <GroupReportCover
         assessmentName={props.assessmentName}
         companyName={props.companyName}
@@ -422,7 +467,11 @@ export function ScoredGroupReport(props: GroupReportProps) {
                 leaders (CEO excluded), with the gap. ▲/▼ show direction, not
                 good/bad.
               </p>
-              <ProfileTable rows={toProfileRows(scored.sections)} hasCeo={hasCeo} />
+              <ProfileTable
+                rows={toProfileRows(scored.sections)}
+                hasCeo={hasCeo}
+                responsiveEnabled={responsiveEnabled}
+              />
 
               {showTier && scored.tier.teamDistribution.length > 0 && (
                 <div
@@ -452,7 +501,11 @@ export function ScoredGroupReport(props: GroupReportProps) {
 
             {/* ── Domains (presence-driven) ───────────────────────────────── */}
             {scored.domains && scored.domains.length > 0 && (
-              <DomainsBlock domains={scored.domains} hasCeo={hasCeo} />
+              <DomainsBlock
+                domains={scored.domains}
+                hasCeo={hasCeo}
+                responsiveEnabled={responsiveEnabled}
+              />
             )}
 
             {/* ── ScaleUp Score (presence-driven) ─────────────────────────── */}
@@ -520,7 +573,10 @@ export function ScoredGroupReport(props: GroupReportProps) {
 
             {/* ── Appendix B — pseudonymized per-member grid (SU-Full) ──────── */}
             {scored.appendixB && scored.appendixB.length > 0 && (
-              <AppendixB rows={scored.appendixB} />
+              <AppendixB
+                rows={scored.appendixB}
+                responsiveEnabled={responsiveEnabled}
+              />
             )}
           </>
         )}

@@ -54,6 +54,7 @@ import {
 } from "@/lib/assessments/peer-benchmarks";
 import type { RespondentReport } from "@/lib/assessments/respondent-report";
 import { isFindingsLogicEnabled } from "@/lib/assessments/wave-u-flags";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 
 // H15: never statically render or cache the report (PII).
 export const dynamic = "force-dynamic";
@@ -65,6 +66,7 @@ interface PageProps {
 }
 
 export default async function RespondentReportPage({ params, searchParams }: PageProps) {
+  const mobileResponsiveEnabled = isMobileResponsiveEnabled();
   const { id, respondentId } = await params;
   const compareTo = (await searchParams)?.compareTo;
   const actor = await getApiActor();
@@ -113,7 +115,14 @@ export default async function RespondentReportPage({ params, searchParams }: Pag
       report={report}
       reportStylesAvailable={reportStylesAvailable}
     >
-      <div className="su-report-page">
+      <div
+        className={
+          mobileResponsiveEnabled
+            ? "su-report-page min-w-0 max-w-full"
+            : "su-report-page"
+        }
+        data-responsive-report-page={mobileResponsiveEnabled ? "" : undefined}
+      >
         <div className="su-report-actions no-print">
           <PrintReportButton
             fileName={reportExportName(report, comparison.model)}
@@ -139,6 +148,7 @@ export default async function RespondentReportPage({ params, searchParams }: Pag
           reportStylesAvailable={reportStylesAvailable}
           reportFindingsAvailable={isFindingsLogicEnabled()}
           comparison={comparison.model}
+          responsiveEnabled={mobileResponsiveEnabled}
         />
       </div>
     </ReportStyleScope>

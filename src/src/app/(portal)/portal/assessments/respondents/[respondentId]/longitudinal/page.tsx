@@ -44,6 +44,7 @@ import {
 } from "@/lib/assessments/respondent-longitudinal";
 import { emitRespondentLongitudinalMetric } from "@/lib/assessments/respondent-longitudinal-metrics";
 import { RespondentLongitudinalView } from "@/components/assessments/RespondentLongitudinalView";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 
 // Named single-person PII — never statically render or cache.
 export const dynamic = "force-dynamic";
@@ -73,6 +74,7 @@ export default async function RespondentLongitudinalPage({
   // Coach-only entry (R1-Low-1, trends parity). requireCoach() may redirect —
   // that throws BEFORE the load try, so it is never swallowed.
   const { coach, session } = await requireCoach();
+  const mobileResponsiveEnabled = isMobileResponsiveEnabled();
 
   const { respondentId } = await params;
   const sp = await searchParams;
@@ -120,12 +122,22 @@ export default async function RespondentLongitudinalPage({
         role: actor.role,
         reason: outcome.reason,
       });
-      return <RespondentLongitudinalView outcome={outcome} />;
+      return (
+        <RespondentLongitudinalView
+          outcome={outcome}
+          responsiveEnabled={mobileResponsiveEnabled}
+        />
+      );
     }
 
     if (outcome.kind === "empty") {
       emitRespondentLongitudinalMetric("empty", { role: actor.role });
-      return <RespondentLongitudinalView outcome={outcome} />;
+      return (
+        <RespondentLongitudinalView
+          outcome={outcome}
+          responsiveEnabled={mobileResponsiveEnabled}
+        />
+      );
     }
 
     // ok — write the lightweight, fail-SAFE audit (NO raw emails) then render.
@@ -179,7 +191,12 @@ export default async function RespondentLongitudinalPage({
       });
     }
 
-    return <RespondentLongitudinalView outcome={outcome} />;
+    return (
+      <RespondentLongitudinalView
+        outcome={outcome}
+        responsiveEnabled={mobileResponsiveEnabled}
+      />
+    );
   } catch (err) {
     // CRITICAL: let notFound()/redirect() control-flow errors propagate (Next 16
     // digest NEXT_HTTP_ERROR_FALLBACK;404) — never swallow them (ADR-0012).

@@ -1,6 +1,7 @@
 import { expect, test, type Locator } from "@playwright/test";
 import { loginAs } from "./helpers/auth";
 import { assertNoDocumentOverflow } from "./helpers/overflow";
+import { assertMinimumTouchTargets } from "./helpers/touch-targets";
 
 const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL || "admin@scalingup.com";
 const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD || "demo123";
@@ -28,6 +29,7 @@ for (const width of [320, 300, 260, 639, 640, 1023, 1024]) {
     await expect(page.locator("body")).toHaveAttribute("data-mobile-responsive", "on");
     await expect(page.locator('[data-auth-shell="admin"]')).toBeVisible();
     await assertNoDocumentOverflow(page, `admin dashboard at ${width}`);
+    await assertMinimumTouchTargets(page, `admin dashboard at ${width}`);
     if (width <= 639) {
       await expectTouchTarget(page.getByRole("button", { name: /toggle theme|switch to (dark|light) mode/i }), "admin theme toggle");
       await expectTouchTarget(page.locator('nav button[aria-label="Open menu"]'), "admin menu toggle");
@@ -39,6 +41,7 @@ for (const width of [320, 300, 260, 639, 640, 1023, 1024]) {
     await expect(page.locator("body")).toHaveAttribute("data-mobile-responsive", "on");
     await expect(page.locator('[data-auth-shell="coach"]')).toBeVisible();
     await assertNoDocumentOverflow(page, `coach home at ${width}`);
+    await assertMinimumTouchTargets(page, `coach home at ${width}`);
     if (width <= 639) {
       await expectTouchTarget(page.getByRole("button", { name: /toggle theme|switch to (dark|light) mode/i }), "coach theme toggle");
       await expectTouchTarget(page.locator('header button[aria-label="Open menu"]'), "coach menu toggle");

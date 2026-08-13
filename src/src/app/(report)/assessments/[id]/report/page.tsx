@@ -29,6 +29,7 @@ import {
   GroupReportEmpty,
 } from "@/components/assessments/GroupReport";
 import { PrintReportButton } from "@/components/assessments/PrintReportButton";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 
 // H15: never statically render or cache the report (bulk PII).
 export const dynamic = "force-dynamic";
@@ -40,6 +41,7 @@ interface PageProps {
 
 export default async function CampaignGroupReportPage({ params }: PageProps) {
   const { id: campaignId } = await params;
+  const mobileResponsiveEnabled = isMobileResponsiveEnabled();
   // Server component — renders once per request; a wall-clock latency stamp is
   // intentional and safe (the react-hooks/purity rule targets client components).
   // eslint-disable-next-line react-hooks/purity
@@ -66,7 +68,14 @@ export default async function CampaignGroupReportPage({ params }: PageProps) {
     });
     const isUnpublished = outcome.reason === "unpublished";
     return (
-      <div className="su-report-page">
+      <div
+        className={
+          mobileResponsiveEnabled
+            ? "su-report-page min-w-0 max-w-full"
+            : "su-report-page"
+        }
+        data-responsive-report-page={mobileResponsiveEnabled ? "" : undefined}
+      >
         <div className="su-group-empty" data-testid="group-report-not-applicable">
           <p className="su-group-empty-title">
             {isUnpublished
@@ -91,7 +100,14 @@ export default async function CampaignGroupReportPage({ params }: PageProps) {
       completedCount: 0,
     });
     return (
-      <div className="su-report-page">
+      <div
+        className={
+          mobileResponsiveEnabled
+            ? "su-report-page min-w-0 max-w-full"
+            : "su-report-page"
+        }
+        data-responsive-report-page={mobileResponsiveEnabled ? "" : undefined}
+      >
         <GroupReportEmpty />
       </div>
     );
@@ -147,7 +163,14 @@ export default async function CampaignGroupReportPage({ params }: PageProps) {
   const ceoName = report.respondents.find((r) => r.isCEO)?.name ?? null;
 
   return (
-    <div className="su-report-page">
+    <div
+      className={
+        mobileResponsiveEnabled
+          ? "su-report-page min-w-0 max-w-full"
+          : "su-report-page"
+      }
+      data-responsive-report-page={mobileResponsiveEnabled ? "" : undefined}
+    >
       {/* Wave R (R-3, Jeff #9): screen-only print bar on the FULL render only —
           identical placement to the per-respondent report page (top, no bottom
           duplicate). The notApplicable / empty panels above return earlier and
@@ -172,6 +195,7 @@ export default async function CampaignGroupReportPage({ params }: PageProps) {
         coachLogoUrl={provenance.coachLogoUrl}
         coachName={provenance.coachName}
         isImported={provenance.isImported}
+        responsiveEnabled={mobileResponsiveEnabled}
       />
     </div>
   );

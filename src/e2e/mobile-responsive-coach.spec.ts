@@ -1,6 +1,7 @@
 import { expect, test, type Locator } from "@playwright/test";
 import { loginAs } from "./helpers/auth";
 import { assertNoDocumentOverflow } from "./helpers/overflow";
+import { assertMinimumTouchTargets } from "./helpers/touch-targets";
 
 const COACH_EMAIL = process.env.E2E_COACH_EMAIL || "coach@example.com";
 const COACH_PASSWORD = process.env.E2E_COACH_PASSWORD || "demo123";
@@ -15,7 +16,7 @@ async function expectTouchTarget(locator: Locator, label: string) {
   expect(box?.height, `${label} height`).toBeGreaterThanOrEqual(44);
 }
 
-for (const width of [320, 390, 1024]) {
+for (const width of [320, 390, 640, 768, 1023, 1024]) {
   test(`coach workshop surfaces fit a ${width}px viewport`, async ({ page }) => {
     await page.setViewportSize({ width, height: 844 });
     await loginAs(page, {
@@ -36,6 +37,7 @@ for (const width of [320, 390, 1024]) {
         "on",
       );
       await assertNoDocumentOverflow(page, `${route} at ${width}`);
+      await assertMinimumTouchTargets(page, `${route} at ${width}`);
       if (route === "/portal/workshops") {
         if (width < 1024) {
           const cards = page.getByRole("list", { name: "Workshops" });
@@ -72,6 +74,7 @@ for (const width of [320, 390, 1024]) {
 
     await page.goto(detailHref!);
     await assertNoDocumentOverflow(page, `${detailHref} at ${width}`);
+    await assertMinimumTouchTargets(page, `${detailHref} at ${width}`);
     await expectTouchTarget(
       page.getByRole("link", { name: "Back to Workshops" }),
       "detail footer back link",
@@ -79,7 +82,7 @@ for (const width of [320, 390, 1024]) {
   });
 }
 
-for (const width of [320, 390]) {
+for (const width of [320, 390, 640, 768, 1023]) {
   test(`coach campaign workflow fits a ${width}px viewport`, async ({ page }) => {
     await page.setViewportSize({ width, height: 844 });
     await loginAs(page, {
@@ -95,6 +98,7 @@ for (const width of [320, 390]) {
         "on",
       );
       await assertNoDocumentOverflow(page, `${route} at ${width}`);
+      await assertMinimumTouchTargets(page, `${route} at ${width}`);
     }
 
     await page.goto("/portal/assessments");
@@ -110,5 +114,24 @@ for (const width of [320, 390]) {
 
     await page.goto(detailHref!);
     await assertNoDocumentOverflow(page, `${detailHref} at ${width}`);
+    await assertMinimumTouchTargets(page, `${detailHref} at ${width}`);
+
+    const moreActions = page.getByRole("button", {
+      name: "More campaign actions",
+    });
+    await expect(moreActions).toBeVisible();
+    await moreActions.click();
+    await expect(page.getByRole("menu")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("menu")).toBeHidden();
+    await expect(moreActions).toBeFocused();
+
+    await moreActions.click();
+    await expect(page.getByRole("menu")).toBeVisible();
+    await page.getByTestId("campaign-overview-card").click({
+      position: { x: 8, y: 8 },
+    });
+    await expect(page.getByRole("menu")).toBeHidden();
+    await expect(moreActions).toBeFocused();
   });
 }
