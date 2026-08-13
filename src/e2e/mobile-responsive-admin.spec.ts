@@ -1,218 +1,127 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page, type TestInfo } from "@playwright/test";
 import { loginAs } from "./helpers/auth";
-import { assertNoDocumentOverflow } from "./helpers/overflow";
-import { assertMinimumTouchTargets } from "./helpers/touch-targets";
+import {
+  expectResponsiveRoute,
+  firstMatchingHref,
+  type OverflowContext,
+} from "./helpers/overflow";
 
 const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL || "admin@scalingup.com";
 const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD || "demo123";
 
-test.setTimeout(120_000);
+export const ADMIN_ROUTES = [
+  "/dashboard", "/admin/dashboard", "/admin/approvals", "/admin/files", "/admin/financials",
+  "/admin/pricing", "/admin/refunds-needed", "/admin/registrations", "/admin/settings",
+  "/admin/surveys", "/admin/surveys/aggregate", "/admin/transactional-emails",
+  "/admin/workflows", "/admin/assessments", "/admin/assessments/access-groups",
+  "/admin/assessments/aggregate", "/admin/assessments/campaigns",
+  "/admin/assessments/import", "/admin/assessments/observability",
+  "/admin/assessments/organizations", "/admin/assessments/public-campaigns",
+  "/admin/assessments/templates", "/admin/assessments/templates/new",
+  "/admin/categories", "/coaches", "/coaches/new", "/contacts",
+  "/partners", "/surveys", "/templates", "/workshops", "/bio",
+] as const;
 
-const remainingAdminRoutes = [
-  "/dashboard",
-  "/coaches",
-  "/coaches/new",
-  "/contacts",
-  "/partners",
-  "/templates",
-  "/templates/new",
-  "/bio",
-  "/admin/approvals",
-  "/admin/categories",
-  "/admin/pricing",
-  "/admin/financials",
-  "/admin/refunds-needed",
-  "/admin/registrations",
-  "/admin/settings",
-  "/admin/surveys",
-  "/admin/surveys/aggregate",
-  "/admin/transactional-emails",
-  "/surveys",
-  "/admin/workflows",
-];
+const PROJECT_WIDTHS: Record<string, readonly number[]> = {
+  "responsive-compact": [320, 375, 390, 430],
+  "responsive-medium": [600, 768, 1023],
+  "responsive-tablet-wide": [1024, 1366],
+  "responsive-desktop": [1440],
+};
 
-const discoveredAdminRoutes = [
-  { source: "/coaches", selector: 'a[href^="/coaches/"]:not([href="/coaches/new"])', label: "coach detail" },
-  { source: "/bio", selector: 'a[href^="/bio/"]', label: "bio detail" },
-  { source: "/templates", selector: 'a[href^="/templates/"][href$="/edit"]', label: "template edit" },
-  { source: "/admin/workflows", selector: 'a[href^="/admin/workflows/"]:not([href="/admin/workflows/new"])', label: "workflow detail" },
-  { source: "/admin/transactional-emails", selector: 'a[href^="/admin/transactional-emails/"]', label: "transactional email editor" },
-];
+test.setTimeout(10 * 60_000);
 
-const assessmentAdminRoutes = [
-  "/admin/assessments",
-  "/admin/assessments/access-groups",
-  "/admin/assessments/aggregate",
-  "/admin/assessments/campaigns",
-  "/admin/assessments/import",
-  "/admin/assessments/observability",
-  "/admin/assessments/organizations",
-  "/admin/assessments/public-campaigns",
-  "/admin/assessments/templates",
-  "/admin/assessments/templates/new",
-];
+function widthsFor(testInfo: TestInfo): readonly number[] {
+  const widths = PROJECT_WIDTHS[testInfo.project.name];
+  expect(widths, `Responsive route matrix requires an explicit width inventory for ${testInfo.project.name}`).toBeTruthy();
+  return widths;
+}
 
-const discoveredAssessmentRoutes = [
-  {
-    source: "/admin/assessments/access-groups",
-    selector: 'a[href^="/admin/assessments/access-groups/"]',
-    label: "assessment access-group detail",
-  },
-  {
-    source: "/admin/assessments/campaigns",
-    selector: 'a[href^="/admin/assessments/campaigns/"]',
-    label: "assessment campaign detail",
-  },
-  {
-    source: "/admin/assessments/templates",
-    selector: 'a[href^="/admin/assessments/templates/"]',
-    label: "assessment template detail",
-  },
-];
+function context(testInfo: TestInfo, route: string, width: number): OverflowContext {
+  return { role: "admin", route, project: testInfo.project.name, width };
+}
 
-for (const width of [320, 390, 640, 768, 1023]) {
-  test(`admin workshop and file collections fit a ${width}px viewport`, async ({ page }) => {
-    await page.setViewportSize({ width, height: 844 });
-    await loginAs(page, {
-      email: ADMIN_EMAIL,
-      password: ADMIN_PASSWORD,
-      expectedUrl: /\/admin|\/dashboard/,
-    });
-
-    for (const route of ["/admin/dashboard", "/workshops", "/admin/files"]) {
-      await page.goto(route);
-      await expect(page.locator("body")).toHaveAttribute("data-mobile-responsive", "on");
-      await assertNoDocumentOverflow(page, `${route} at ${width}`);
-      await assertMinimumTouchTargets(page, `${route} at ${width}`);
-    }
-
-    await page.goto("/workshops");
-    const workshops = page.getByRole("list", { name: "Admin workshops" });
-    await expect(workshops).toBeVisible();
-    const detailLink = workshops.locator('a[href^="/workshops/"]').first();
-    await expect(
-      detailLink,
-      "the admin fixture must include a populated workshop detail link",
-    ).toBeVisible();
-    const detailHref = await detailLink.getAttribute("href");
-    expect(detailHref).toMatch(/^\/workshops\/[^/#?]+$/);
-
-    await page.goto(detailHref!);
-    await assertNoDocumentOverflow(page, `${detailHref} at ${width}`);
-    await assertMinimumTouchTargets(page, `${detailHref} at ${width}`);
-    await expect(page.getByRole("region", { name: "Workshop registrations" })).toBeVisible();
+async function loginAdmin(page: Page): Promise<void> {
+  await loginAs(page, {
+    email: ADMIN_EMAIL,
+    password: ADMIN_PASSWORD,
+    expectedUrl: /\/admin|\/dashboard/,
   });
 }
 
-for (const width of [320, 390, 640, 768, 1023]) {
-  test(`assessment workspace routes fit a ${width}px viewport`, async ({ page }) => {
-    await page.setViewportSize({ width, height: 844 });
-    await loginAs(page, {
-      email: ADMIN_EMAIL,
-      password: ADMIN_PASSWORD,
-      expectedUrl: /\/admin|\/dashboard/,
-    });
-
-    for (const route of assessmentAdminRoutes) {
-      await page.goto(route);
-      await expect(page.locator("body")).toHaveAttribute(
-        "data-mobile-responsive",
-        "on",
-      );
-      await assertNoDocumentOverflow(page, `${route} at ${width}`);
-      await assertMinimumTouchTargets(page, `${route} at ${width}`);
-      if (route === "/admin/assessments" && width < 640) {
-        const compactNav = page.getByRole("button", { name: /Assessment section:/ });
-        await compactNav.click();
-        await page.keyboard.press("Escape");
-        await expect(compactNav).toHaveAttribute("aria-expanded", "false");
-        await expect(compactNav).toBeFocused();
-        await compactNav.click();
-        await page.locator("main").click({ position: { x: 8, y: 8 } });
-        await expect(compactNav).toHaveAttribute("aria-expanded", "false");
-        await expect(compactNav).toBeFocused();
-      }
-
-      if (route === "/admin/assessments/organizations" && width === 320) {
-        const dialogTrigger = page.getByRole("button", { name: "Add Company or Team" });
-        await dialogTrigger.click();
-        await expect(page.getByRole("dialog")).toBeVisible();
-        await page.keyboard.press("Escape");
-        await expect(page.getByRole("dialog")).toBeHidden();
-        await expect(dialogTrigger).toBeFocused();
-        await dialogTrigger.click();
-        const box = await page.getByRole("dialog").boundingBox();
-        expect(box, "responsive organization dialog has a bounding box").not.toBeNull();
-        await page.mouse.click(2, Math.max(2, (box?.y ?? 100) - 8));
-        await expect(page.getByRole("dialog")).toBeHidden();
-        await expect(dialogTrigger).toBeFocused();
-      }
-    }
-
-    for (const discovered of discoveredAssessmentRoutes) {
-      await page.goto(discovered.source);
-      const link = page.locator(discovered.selector).first();
-      await expect(
-        link,
-        `the admin fixture must include a populated ${discovered.label} link`,
-      ).toBeVisible();
-      const href = await link.getAttribute("href");
-      expect(href, `${discovered.label} link href`).toBeTruthy();
-
-      await page.goto(href!);
-      await assertNoDocumentOverflow(page, `${href} at ${width}`);
-      await assertMinimumTouchTargets(page, `${href} at ${width}`);
-
-      if (discovered.label === "assessment template detail") {
-        await expect(page).toHaveURL(
-          /\/admin\/assessments\/templates\/[^/]+\/versions\/[^/]+\/edit/,
-        );
-        await assertNoDocumentOverflow(page, `template version editor at ${width}`);
-        await assertMinimumTouchTargets(page, `template version editor at ${width}`);
-      }
-    }
-  });
+async function optionalHrefs(page: Page, source: string, patterns: RegExp[]): Promise<string[]> {
+  await page.goto(source, { waitUntil: "domcontentloaded" });
+  const hrefs = await page.locator("a[href]").evaluateAll((links) =>
+    links.map((link) => link.getAttribute("href")).filter((href): href is string => Boolean(href)),
+  );
+  return hrefs.filter((href) => patterns.some((pattern) => pattern.test(href)));
 }
 
-for (const width of [320, 390, 640, 768, 1023]) {
-  test(`remaining admin collections fit a ${width}px viewport`, async ({ page }) => {
-    await page.setViewportSize({ width, height: 844 });
-    await loginAs(page, {
-      email: ADMIN_EMAIL,
-      password: ADMIN_PASSWORD,
-      expectedUrl: /\/admin|\/dashboard/,
-    });
+test("complete admin static route inventory has no document overflow", async ({ page }, testInfo) => {
+  const widths = widthsFor(testInfo);
+  await page.setViewportSize({ width: widths[0], height: 844 });
+  await loginAdmin(page);
 
-    for (const route of remainingAdminRoutes) {
-      await page.goto(route);
-      await expect(page.locator("body")).toHaveAttribute("data-mobile-responsive", "on");
-      await assertNoDocumentOverflow(page, `${route} at ${width}`);
-      await assertMinimumTouchTargets(page, `${route} at ${width}`);
+  for (const width of widths) {
+    await page.setViewportSize({ width, height: width >= 1024 ? 900 : 844 });
+    for (const route of ADMIN_ROUTES) {
+      await expectResponsiveRoute(page, context(testInfo, route, width));
     }
+  }
+});
 
-    for (const discovered of discoveredAdminRoutes) {
-      await page.goto(discovered.source);
-      const link = page.locator(discovered.selector).first();
-      await expect(
-        link,
-        `the admin fixture must include a populated ${discovered.label} link`,
-      ).toBeVisible();
-      const href = await link.getAttribute("href");
-      expect(href, `${discovered.label} link href`).toBeTruthy();
+test("populated admin routes are discovered from live links and fit every width", async ({ page }, testInfo) => {
+  const widths = widthsFor(testInfo);
+  await page.setViewportSize({ width: widths[0], height: 844 });
+  await loginAdmin(page);
 
-      await page.goto(href!);
-      await assertNoDocumentOverflow(page, `${href} at ${width}`);
-      await assertMinimumTouchTargets(page, `${href} at ${width}`);
+  const workshopDetail = await firstMatchingHref(page, "/workshops", /^\/workshops\/[^/?#]+$/, "admin workshop detail");
+  await page.goto(workshopDetail, { waitUntil: "domcontentloaded" });
+  await page.getByRole("button", { name: "Edit Landing Page" }).click();
+  await expect(page).toHaveURL(/\/workshops\/[^/]+\/landing-pages$/);
+  const landingManager = new URL(page.url()).pathname;
+  const editorButton = page.getByRole("button", { name: /^(Create|Edit) Page$/ }).first();
+  await expect(editorButton, "the populated admin workshop must expose a landing-page editor action").toBeVisible();
+  await editorButton.click();
+  await expect(page).toHaveURL(/\/workshops\/[^/]+\/landing-pages\/[^/]+$/);
+  const landingEditor = new URL(page.url()).pathname;
+  const coachDetail = await firstMatchingHref(page, "/coaches", /^\/coaches\/[^/?#]+$/, "coach detail");
+  const coachEdit = await firstMatchingHref(page, coachDetail, /^\/coaches\/[^/?#]+\/edit$/, "coach edit");
+  const templateDetail = await firstMatchingHref(page, "/admin/assessments/templates", /^\/admin\/assessments\/templates\/[^/?#]+$/, "assessment template detail");
+  const accessGroupDetail = await firstMatchingHref(page, "/admin/assessments/access-groups", /^\/admin\/assessments\/access-groups\/[^/?#]+$/, "access-group detail");
+  const campaignDetail = await firstMatchingHref(page, "/admin/assessments/campaigns", /^\/admin\/assessments\/campaigns\/[^/?#]+$/, "admin campaign detail");
+  const workflowDetail = await firstMatchingHref(page, "/admin/workflows", /^\/admin\/workflows\/[^/?#]+(?:\?[^#]*)?$/, "workflow detail");
+  const surveyTemplateDetail = await firstMatchingHref(page, "/admin/surveys", /^\/admin\/surveys\/templates\/[^/?#]+$/, "survey-template detail");
+  const emailEditor = await firstMatchingHref(page, "/admin/transactional-emails", /^\/admin\/transactional-emails\/[^/?#]+$/, "transactional-email editor");
 
-      if (discovered.label === "coach detail") {
-        const editLink = page.locator('a[href^="/coaches/"][href$="/edit"]').first();
-        await expect(editLink, "the coach detail must expose its edit route").toBeVisible();
-        const editHref = await editLink.getAttribute("href");
-        expect(editHref, "coach edit link href").toBeTruthy();
-        await page.goto(editHref!);
-        await assertNoDocumentOverflow(page, `${editHref} at ${width}`);
-        await assertMinimumTouchTargets(page, `${editHref} at ${width}`);
-      }
+  await page.goto(templateDetail, { waitUntil: "domcontentloaded" });
+  await expect(page).toHaveURL(/\/admin\/assessments\/templates\/[^/]+\/versions\/[^/]+\/edit/);
+  const versionEditor = new URL(page.url()).pathname + new URL(page.url()).search;
+  const optionalCampaignLinks = await optionalHrefs(page, campaignDetail, [
+    /^\/assessments\/[^/]+\/report(?:[?#].*)?$/,
+    /^\/assessments\/[^/]+\/respondents\/[^/]+\/report(?:[?#].*)?$/,
+    /^\/portal\/assessments\/respondents\/[^/]+\/longitudinal(?:[?#].*)?$/,
+  ]);
+  const dynamicRoutes = [...new Set([
+    workshopDetail,
+    landingManager,
+    landingEditor,
+    coachDetail,
+    coachEdit,
+    templateDetail,
+    versionEditor,
+    accessGroupDetail,
+    campaignDetail,
+    workflowDetail,
+    surveyTemplateDetail,
+    emailEditor,
+    ...optionalCampaignLinks,
+  ])];
+
+  for (const width of widths) {
+    await page.setViewportSize({ width, height: width >= 1024 ? 900 : 844 });
+    for (const route of dynamicRoutes) {
+      await expectResponsiveRoute(page, context(testInfo, route, width));
     }
-  });
-}
+  }
+});

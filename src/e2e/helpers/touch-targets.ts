@@ -2,6 +2,13 @@ import type { Page } from "@playwright/test";
 
 export const MINIMUM_TOUCH_TARGET_PX = 44;
 export const TOUCH_TARGET_SELECTOR = 'button, [role="button"], summary, a[href]';
+export const AUTHENTICATED_ACTION_TARGET_SELECTOR = [
+  "[data-touch-target]",
+  "[data-auth-shell] nav button",
+  '[data-auth-shell] nav [role="menuitem"]',
+  "[data-auth-shell] article button",
+  '[data-auth-shell] article [role="menuitem"]',
+].join(", ");
 
 export interface TouchTargetMeasurement {
   selector: string;
@@ -30,8 +37,9 @@ export function formatTouchTargetFailures(
 
 export async function measureVisibleTouchTargets(
   page: Page,
+  selector = TOUCH_TARGET_SELECTOR,
 ): Promise<TouchTargetMeasurement[]> {
-  return page.locator(TOUCH_TARGET_SELECTOR).evaluateAll((nodes) => {
+  return page.locator(selector).evaluateAll((nodes) => {
     const describe = (element: Element, index: number): string => {
       const tag = element.tagName.toLowerCase();
       const id = element.getAttribute("id");
@@ -70,9 +78,10 @@ export async function measureVisibleTouchTargets(
 export async function assertMinimumTouchTargets(
   page: Page,
   label: string,
+  selector = TOUCH_TARGET_SELECTOR,
 ): Promise<void> {
   const failures = findUndersizedTouchTargets(
-    await measureVisibleTouchTargets(page),
+    await measureVisibleTouchTargets(page, selector),
   );
   if (failures.length > 0) {
     throw new Error(

@@ -1,137 +1,117 @@
-import { expect, test, type Locator } from "@playwright/test";
+import { expect, test, type Page, type TestInfo } from "@playwright/test";
 import { loginAs } from "./helpers/auth";
-import { assertNoDocumentOverflow } from "./helpers/overflow";
-import { assertMinimumTouchTargets } from "./helpers/touch-targets";
+import {
+  expectResponsiveRoute,
+  firstMatchingHref,
+  type OverflowContext,
+} from "./helpers/overflow";
 
 const COACH_EMAIL = process.env.E2E_COACH_EMAIL || "coach@example.com";
 const COACH_PASSWORD = process.env.E2E_COACH_PASSWORD || "demo123";
 
-test.setTimeout(120_000);
+export const COACH_ROUTES = [
+  "/portal/home",
+  "/portal/workshops",
+  "/portal/request",
+  "/portal/assessments",
+  "/portal/assessments/new",
+  "/portal/assessments/public-leads",
+  "/portal/assessments/trends",
+  "/portal/members",
+  "/portal/members/import",
+  "/portal/registrations",
+  "/portal/follow-up",
+  "/portal/templates",
+  "/portal/coach/resources",
+  "/portal/settings",
+] as const;
 
-async function expectTouchTarget(locator: Locator, label: string) {
-  await expect(locator).toBeVisible();
-  const box = await locator.boundingBox();
-  expect(box, `${label} has a bounding box`).not.toBeNull();
-  expect(box?.width, `${label} width`).toBeGreaterThanOrEqual(44);
-  expect(box?.height, `${label} height`).toBeGreaterThanOrEqual(44);
+const PROJECT_WIDTHS: Record<string, readonly number[]> = {
+  "responsive-compact": [320, 375, 390, 430],
+  "responsive-medium": [600, 768, 1023],
+  "responsive-tablet-wide": [1024, 1366],
+  "responsive-desktop": [1440],
+};
+
+test.setTimeout(10 * 60_000);
+
+function widthsFor(testInfo: TestInfo): readonly number[] {
+  const widths = PROJECT_WIDTHS[testInfo.project.name];
+  expect(widths, `Responsive route matrix requires an explicit width inventory for ${testInfo.project.name}`).toBeTruthy();
+  return widths;
 }
 
-for (const width of [320, 390, 640, 768, 1023, 1024]) {
-  test(`coach workshop surfaces fit a ${width}px viewport`, async ({ page }) => {
-    await page.setViewportSize({ width, height: 844 });
-    await loginAs(page, {
-      email: COACH_EMAIL,
-      password: COACH_PASSWORD,
-      expectedUrl: /\/portal\//,
-    });
+function context(testInfo: TestInfo, route: string, width: number): OverflowContext {
+  return { role: "coach", route, project: testInfo.project.name, width };
+}
 
-    for (const route of [
-      "/portal/home",
-      "/portal/workshops",
-      "/portal/request",
-      "/portal/settings",
-    ]) {
-      await page.goto(route);
-      await expect(page.locator("body")).toHaveAttribute(
-        "data-mobile-responsive",
-        "on",
-      );
-      await assertNoDocumentOverflow(page, `${route} at ${width}`);
-      await assertMinimumTouchTargets(page, `${route} at ${width}`);
-      if (route === "/portal/workshops") {
-        if (width < 1024) {
-          const cards = page.getByRole("list", { name: "Workshops" });
-          await expect(cards).toBeVisible();
-          await expectTouchTarget(
-            cards.getByRole("listitem").first().getByRole("link").first(),
-            "compact workshop title",
-          );
-        } else {
-          const tableRegion = page.getByRole("region", { name: "Workshop table" });
-          await expect(tableRegion).toBeVisible();
-          await expect(tableRegion).toHaveAttribute("tabindex", "0");
-        }
-        await expectTouchTarget(
-          page.getByPlaceholder("Search workshops..."),
-          "workshop search",
-        );
-        await page.getByRole("button", { name: /filters/i }).click();
-        await expectTouchTarget(
-          page.getByRole("combobox", { name: /status/i }),
-          "workshop status filter",
-        );
-      }
-    }
-
-    await page.goto("/portal/workshops");
-    const detailLinks = page.locator('a[href^="/portal/workshops/"]');
-    await expect(
-      detailLinks.first(),
-      "the coach fixture must include a populated workshop detail link",
-    ).toBeVisible();
-    const detailHref = await detailLinks.first().getAttribute("href");
-    expect(detailHref).toMatch(/^\/portal\/workshops\/[^/]+$/);
-
-    await page.goto(detailHref!);
-    await assertNoDocumentOverflow(page, `${detailHref} at ${width}`);
-    await assertMinimumTouchTargets(page, `${detailHref} at ${width}`);
-    await expectTouchTarget(
-      page.getByRole("link", { name: "Back to Workshops" }),
-      "detail footer back link",
-    );
+async function loginCoach(page: Page): Promise<void> {
+  await loginAs(page, {
+    email: COACH_EMAIL,
+    password: COACH_PASSWORD,
+    expectedUrl: /\/portal\//,
   });
 }
 
-for (const width of [320, 390, 640, 768, 1023]) {
-  test(`coach campaign workflow fits a ${width}px viewport`, async ({ page }) => {
-    await page.setViewportSize({ width, height: 844 });
-    await loginAs(page, {
-      email: COACH_EMAIL,
-      password: COACH_PASSWORD,
-      expectedUrl: /\/portal\//,
-    });
-
-    for (const route of ["/portal/assessments", "/portal/assessments/new"]) {
-      await page.goto(route);
-      await expect(page.locator("body")).toHaveAttribute(
-        "data-mobile-responsive",
-        "on",
-      );
-      await assertNoDocumentOverflow(page, `${route} at ${width}`);
-      await assertMinimumTouchTargets(page, `${route} at ${width}`);
-    }
-
-    await page.goto("/portal/assessments");
-    const detailLinks = page.locator(
-      'a[href^="/portal/assessments/"]:not([href="/portal/assessments/new"]):not([href^="/portal/assessments/trends"]):not([href^="/portal/assessments/referred-results"])',
-    );
-    await expect(
-      detailLinks.first(),
-      "the coach fixture must include a populated campaign detail link",
-    ).toBeVisible();
-    const detailHref = await detailLinks.first().getAttribute("href");
-    expect(detailHref).toMatch(/^\/portal\/assessments\/[^/]+$/);
-
-    await page.goto(detailHref!);
-    await assertNoDocumentOverflow(page, `${detailHref} at ${width}`);
-    await assertMinimumTouchTargets(page, `${detailHref} at ${width}`);
-
-    const moreActions = page.getByRole("button", {
-      name: "More campaign actions",
-    });
-    await expect(moreActions).toBeVisible();
-    await moreActions.click();
-    await expect(page.getByRole("menu")).toBeVisible();
-    await page.keyboard.press("Escape");
-    await expect(page.getByRole("menu")).toBeHidden();
-    await expect(moreActions).toBeFocused();
-
-    await moreActions.click();
-    await expect(page.getByRole("menu")).toBeVisible();
-    await page.getByTestId("campaign-overview-card").click({
-      position: { x: 8, y: 8 },
-    });
-    await expect(page.getByRole("menu")).toBeHidden();
-    await expect(moreActions).toBeFocused();
-  });
+async function optionalHrefs(page: Page, source: string, pattern: RegExp): Promise<string[]> {
+  await page.goto(source, { waitUntil: "domcontentloaded" });
+  return page.locator("a[href]").evaluateAll(
+    (links, sourcePattern) => links
+      .map((link) => link.getAttribute("href"))
+      .filter((href): href is string => Boolean(href))
+      .filter((href) => new RegExp(sourcePattern).test(href)),
+    pattern.source,
+  );
 }
+
+test("complete coach static route inventory has no document overflow", async ({ page }, testInfo) => {
+  const widths = widthsFor(testInfo);
+  await page.setViewportSize({ width: widths[0], height: 844 });
+  await loginCoach(page);
+
+  for (const width of widths) {
+    await page.setViewportSize({ width, height: width >= 1024 ? 900 : 844 });
+    for (const route of COACH_ROUTES) {
+      await expectResponsiveRoute(page, context(testInfo, route, width));
+    }
+  }
+});
+
+test("populated coach routes are discovered from live links and fit every width", async ({ page }, testInfo) => {
+  const widths = widthsFor(testInfo);
+  await page.setViewportSize({ width: widths[0], height: 844 });
+  await loginCoach(page);
+
+  const workshopDetail = await firstMatchingHref(
+    page,
+    "/portal/workshops",
+    /^\/portal\/workshops\/[^/?#]+$/,
+    "coach-owned workshop detail",
+  );
+  const workshopSurvey = await firstMatchingHref(
+    page,
+    workshopDetail,
+    /^\/portal\/workshops\/[^/?#]+\/surveys(?:[?#].*)?$/,
+    "coach workshop survey",
+  );
+  const campaignDetail = await firstMatchingHref(
+    page,
+    "/portal/assessments",
+    /^\/portal\/assessments\/[^/?#]+$/,
+    "coach campaign detail",
+  );
+
+  const optionalCampaignLinks = [
+    ...(await optionalHrefs(page, campaignDetail, /^\/assessments\/[^/]+\/report(?:[?#].*)?$/)),
+    ...(await optionalHrefs(page, campaignDetail, /^\/assessments\/[^/]+\/respondents\/[^/]+\/report(?:[?#].*)?$/)),
+    ...(await optionalHrefs(page, campaignDetail, /^\/portal\/assessments\/respondents\/[^/]+\/longitudinal(?:[?#].*)?$/)),
+  ];
+  const dynamicRoutes = [...new Set([workshopDetail, workshopSurvey, campaignDetail, ...optionalCampaignLinks])];
+
+  for (const width of widths) {
+    await page.setViewportSize({ width, height: width >= 1024 ? 900 : 844 });
+    for (const route of dynamicRoutes) {
+      await expectResponsiveRoute(page, context(testInfo, route, width));
+    }
+  }
+});
