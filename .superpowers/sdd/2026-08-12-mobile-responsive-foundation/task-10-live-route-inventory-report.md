@@ -508,3 +508,70 @@ implementation commit.
   assertion at all discovered widths.
 - The pre-existing untracked `src/playwright-report/` directory remains
   untouched and excluded.
+
+## Focused-review correction — complete shell and coach coverage (2026-08-13)
+
+Focused review found two Important gaps in the first report-route contract.
+First, the browser helper filtered auth-shell attribute values down to the two
+known roles before reporting shell presence. A visible element such as
+`data-auth-shell="unexpected"` therefore disappeared from the report evidence
+and could be accepted. Shell-less reports now use the unfiltered visible
+`[data-auth-shell]` count; role extraction runs only for ordinary auth-shell
+routes, where it proves the expected admin or coach role.
+
+Second, only the admin route consumer selected the standalone report surface.
+Coach dynamic campaign report links still defaulted to the coach auth shell and
+would reproduce the original false failure. The coach context now consumes the
+same exact pathname classifier through a pure presentation-context seam. The
+two standalone assessment report shapes receive `shellless-report`; portal
+longitudinal, `/portal/home`, and every other route receive `auth-shell` and
+still require the visible coach shell.
+
+### Vertical RED / GREEN evidence
+
+Unknown-shell slice, RED with the focused Jest command: exit 1, **1 failed / 32
+passed**. The only failure showed a shell-less report accepting one visible
+unknown-valued auth shell. GREEN after switching report proof to the unfiltered
+visible-shell count: **33/33 passed**.
+
+Coach-consumer slice, RED before the context seam existed: exit 1, **1 failed /
+33 passed**. After pinning the explicit `shellless-report` contract name, RED
+also proved the old generic `report` surface was no longer accepted. GREEN
+after implementing and wiring the shared presentation context: **34/34
+passed**. The consumer behavior contract proves both standalone report shapes,
+keeps longitudinal and ordinary coach routes on `auth-shell`, and rejects an
+ordinary coach route without a coach shell.
+
+### Changed files and validation
+
+- `src/e2e/helpers/responsive-route-contract.ts`
+- `src/e2e/helpers/overflow.ts`
+- `src/e2e/mobile-responsive-admin.spec.ts`
+- `src/e2e/mobile-responsive-coach.spec.ts`
+- `src/src/__tests__/e2e/mobile-responsive-acceptance-contract.test.ts`
+- This appended review receipt.
+
+Validation from `src/`:
+
+```bash
+npx jest src/__tests__/e2e/mobile-responsive-acceptance-contract.test.ts --runInBand
+npx eslint e2e/helpers/responsive-route-contract.ts e2e/helpers/overflow.ts e2e/mobile-responsive-admin.spec.ts e2e/mobile-responsive-coach.spec.ts src/__tests__/e2e/mobile-responsive-acceptance-contract.test.ts
+PLAYWRIGHT_BASE_URL=https://preview.example.test npx playwright test e2e/mobile-responsive-coach.spec.ts e2e/mobile-responsive-admin.spec.ts e2e/mobile-responsive-state.spec.ts e2e/mobile-responsive-a11y.spec.ts e2e/mobile-responsive-visual.spec.ts e2e/mobile-responsive-kill-diagnostic.spec.ts --list --reporter=list --project=responsive-compact --project=responsive-medium --project=responsive-tablet-wide --project=responsive-desktop
+git diff --check
+```
+
+Pre-commit verification: Jest **34/34**, scoped ESLint exit 0 with no output,
+Playwright static listing **56 tests in 6 files** across four responsive
+projects, and diff check exit 0. No browser test ran and the placeholder preview
+hostname was not contacted.
+
+Implementation commit: `513d6aaa` (`test: close shellless report contract
+gaps`). This report correction is committed separately so it can name the
+immutable implementation commit.
+
+### Remaining limitation
+
+The authorized runtime matrix remains the consumer-level proof that discovered
+admin and coach reports reach the preserved overflow assertion at every width.
+No product, browser, deployment, external, or data mutation was performed, and
+the pre-existing untracked `src/playwright-report/` remains untouched.
