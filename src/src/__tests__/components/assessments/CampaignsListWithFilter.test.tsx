@@ -68,12 +68,21 @@ describe("CampaignsListWithFilter — grouped by company", () => {
   it("renders each company as a collapsed accessible trigger", () => {
     render(<CampaignsListWithFilter campaigns={twoCompanyCampaigns} />);
 
-    expect(
-      screen.getByRole("button", { name: /Alpha Corp.*2 campaigns/i }),
-    ).toHaveAttribute("aria-expanded", "false");
-    expect(
-      screen.getByRole("button", { name: /Beta Inc.*2 campaigns/i }),
-    ).toHaveAttribute("aria-expanded", "false");
+    const alphaTrigger = screen.getByRole("button", {
+      name: /Alpha Corp.*2 campaigns/i,
+    });
+    const betaTrigger = screen.getByRole("button", {
+      name: /Beta Inc.*2 campaigns/i,
+    });
+
+    expect(alphaTrigger).toHaveAttribute("aria-expanded", "false");
+    expect(betaTrigger).toHaveAttribute("aria-expanded", "false");
+
+    for (const trigger of [alphaTrigger, betaTrigger]) {
+      const controlledId = trigger.getAttribute("aria-controls");
+      expect(controlledId).toBeTruthy();
+      expect(document.getElementById(controlledId!)).toHaveAttribute("hidden");
+    }
 
     expect(screen.queryByText("Campaign c1")).not.toBeInTheDocument();
     expect(screen.queryByText("Campaign c2")).not.toBeInTheDocument();

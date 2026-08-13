@@ -110,8 +110,12 @@ function CompanySection({
         </button>
       </h2>
 
-      {isOpen && (
-        <div id={campaignsId} className="border-t border-border">
+      <div
+        id={campaignsId}
+        hidden={!isOpen}
+        className="border-t border-border"
+      >
+        {isOpen && (
           <div className="divide-y divide-border">
             {campaigns.map((c) => {
               const isDraftNoInvites =
@@ -201,8 +205,8 @@ function CompanySection({
               );
             })}
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </section>
   );
 }
