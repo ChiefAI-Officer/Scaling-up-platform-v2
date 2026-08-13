@@ -511,7 +511,7 @@ export function PartnersClient({ responsiveEnabled = false }: { responsiveEnable
                         <a
                           href={partner.logoUrl}
                           target="_blank"
-                          className="text-sm text-primary hover:underline"
+                          className={responsiveEnabled ? "inline-flex min-h-11 items-center text-sm text-primary hover:underline" : "text-sm text-primary hover:underline"}
                         >
                           View logo
                         </a>

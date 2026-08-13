@@ -29,6 +29,14 @@ describe("ContactsTable responsive presentation", () => {
     expect(screen.queryByRole("list", { name: "Contacts" })).not.toBeInTheDocument();
     expect(screen.getByPlaceholderText("Search Contacts...").closest("div")?.parentElement)
       .toHaveClass("flex items-center justify-between");
+    for (const checkbox of screen.getAllByRole("checkbox")) {
+      expect(checkbox).toHaveAttribute(
+        "class",
+        "h-4 w-4 rounded border border-border text-primary focus:ring-primary ",
+      );
+      expect(checkbox).not.toHaveAttribute("aria-label");
+      expect(checkbox.closest("label")).toBeNull();
+    }
   });
 
   it("shows every existing contact field and action in compact records", () => {
@@ -58,6 +66,17 @@ describe("ContactsTable responsive presentation", () => {
     fireEvent.click(trigger);
     for (const action of ["View details", "Edit contact", "Delete"]) {
       expect(within(wide).getByRole("button", { name: action })).toHaveClass("min-h-11");
+    }
+  });
+
+  it("gives both retained wide selection checkboxes labeled 44px targets", () => {
+    render(<ContactsTable data={contacts} responsiveEnabled />);
+
+    const wide = screen.getByTestId("responsive-wide-view");
+    for (const name of ["Select all contacts", "Select Ada Lovelace"]) {
+      const checkbox = within(wide).getByRole("checkbox", { name });
+      expect(checkbox).toHaveClass("h-4 w-4");
+      expect(checkbox.closest("label")).toHaveClass("inline-flex min-h-11 min-w-11");
     }
   });
 });

@@ -84,7 +84,11 @@ export function ContactsTable({ data, responsiveEnabled = false }: ContactsTable
                 <TableHeader>
                     <TableRow>
                         <TableHead className="w-[50px]">
-                            <Checkbox />
+                            {responsiveEnabled ? (
+                                <label className="inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center">
+                                    <Checkbox aria-label="Select all contacts" />
+                                </label>
+                            ) : <Checkbox />}
                         </TableHead>
                         <TableHead className="cursor-pointer" onClick={() => handleSort("name")}>
                             Name {sortField === "name" && (sortDirection === "asc" ? "↑" : "↓")}
@@ -109,7 +113,11 @@ export function ContactsTable({ data, responsiveEnabled = false }: ContactsTable
                     {filteredData.map((contact) => (
                         <TableRow key={contact.id}>
                             <TableCell>
-                                <Checkbox />
+                                {responsiveEnabled ? (
+                                    <label className="inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center">
+                                        <Checkbox aria-label={`Select ${contact.name}`} />
+                                    </label>
+                                ) : <Checkbox />}
                             </TableCell>
                             <TableCell>
                                 <div className="flex items-center gap-3">

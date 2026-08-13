@@ -31,6 +31,10 @@ it("preserves the existing partner list DOM when responsive mode is disabled", a
   expect(screen.getByRole("button", { name: "Edit" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Deactivate" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Delete" })).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "View logo" })).toHaveAttribute(
+    "class",
+    "text-sm text-primary hover:underline",
+  );
 });
 
 it("uses the existing profile form as the compact primary entry and keeps mutations reachable", async () => {
@@ -64,4 +68,5 @@ it("sizes and stacks the retained responsive partner actions", async () => {
   for (const name of ["Edit", "Deactivate", "Delete"]) {
     expect(within(wide).getByRole("button", { name })).toHaveClass("min-h-11");
   }
+  expect(within(wide).getByRole("link", { name: "View logo" })).toHaveClass("inline-flex min-h-11 items-center");
 });
