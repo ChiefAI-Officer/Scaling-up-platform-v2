@@ -600,7 +600,7 @@ export function AssessmentTemplateForm({ responsiveEnabled = false }: Assessment
                 onClick={() => moveQuestionWithinAll(idx, -1)}
                 disabled={idx === 0}
                 className={cn("text-muted-foreground hover:text-foreground disabled:opacity-30", responsiveEnabled && "inline-flex min-h-11 min-w-11 items-center justify-center")}
-                aria-label={`Move question ${idx + 1} up`}
+                aria-label={responsiveEnabled ? `Move question ${idx + 1} up` : undefined}
               >
                 <ArrowUp className="w-3.5 h-3.5" />
               </button>
@@ -609,7 +609,7 @@ export function AssessmentTemplateForm({ responsiveEnabled = false }: Assessment
                 onClick={() => moveQuestionWithinAll(idx, 1)}
                 disabled={idx === questions.length - 1}
                 className={cn("text-muted-foreground hover:text-foreground disabled:opacity-30", responsiveEnabled && "inline-flex min-h-11 min-w-11 items-center justify-center")}
-                aria-label={`Move question ${idx + 1} down`}
+                aria-label={responsiveEnabled ? `Move question ${idx + 1} down` : undefined}
               >
                 <ArrowDown className="w-3.5 h-3.5" />
               </button>
@@ -619,7 +619,7 @@ export function AssessmentTemplateForm({ responsiveEnabled = false }: Assessment
                   setQuestions((cur) => cur.filter((_, i) => i !== idx))
                 }
                 className={cn("text-destructive hover:text-destructive/80", responsiveEnabled && "inline-flex min-h-11 min-w-11 items-center justify-center")}
-                aria-label={`Remove question ${idx + 1}`}
+                aria-label={responsiveEnabled ? `Remove question ${idx + 1}` : undefined}
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
@@ -850,13 +850,13 @@ export function AssessmentTemplateForm({ responsiveEnabled = false }: Assessment
                   className="w-full px-2 py-1 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
               </div>
-              <div className={cn("sm:col-span-1 flex items-end justify-end gap-1", responsiveEnabled && "flex-wrap sm:flex-nowrap")}>
+              <div className={responsiveEnabled ? "sm:col-span-12 flex flex-wrap items-end justify-end gap-1" : "sm:col-span-1 flex items-end justify-end gap-1"}>
                 <button
                   type="button"
                   onClick={() => moveTier(idx, -1)}
                   disabled={idx === 0}
                   className={cn("text-muted-foreground hover:text-foreground disabled:opacity-30", responsiveEnabled && "inline-flex min-h-11 min-w-11 items-center justify-center")}
-                  aria-label={`Move tier ${idx + 1} up`}
+                  aria-label={responsiveEnabled ? `Move tier ${idx + 1} up` : undefined}
                 >
                   <ArrowUp className="w-3.5 h-3.5" />
                 </button>
@@ -865,7 +865,7 @@ export function AssessmentTemplateForm({ responsiveEnabled = false }: Assessment
                   onClick={() => moveTier(idx, 1)}
                   disabled={idx === tiers.length - 1}
                   className={cn("text-muted-foreground hover:text-foreground disabled:opacity-30", responsiveEnabled && "inline-flex min-h-11 min-w-11 items-center justify-center")}
-                  aria-label={`Move tier ${idx + 1} down`}
+                  aria-label={responsiveEnabled ? `Move tier ${idx + 1} down` : undefined}
                 >
                   <ArrowDown className="w-3.5 h-3.5" />
                 </button>
@@ -876,7 +876,7 @@ export function AssessmentTemplateForm({ responsiveEnabled = false }: Assessment
                   }
                   disabled={tiers.length === 1}
                   className={cn("text-destructive hover:text-destructive/80 disabled:opacity-30", responsiveEnabled && "inline-flex min-h-11 min-w-11 items-center justify-center")}
-                  aria-label={`Remove tier ${idx + 1}`}
+                  aria-label={responsiveEnabled ? `Remove tier ${idx + 1}` : undefined}
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>

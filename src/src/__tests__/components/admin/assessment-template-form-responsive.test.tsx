@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 
 jest.mock("next/navigation", () => ({
   useRouter: () => ({ push: jest.fn() }),
@@ -52,5 +52,27 @@ describe("AssessmentTemplateForm responsive presentation", () => {
     expect(screen.getByPlaceholderText("Question label")).toHaveClass("min-h-11", "min-w-0");
     expect(screen.getAllByRole("combobox")[1]).toHaveClass("min-h-11", "min-w-0");
     expect(screen.getByText("Required").closest("label")).toHaveClass("min-h-11");
+  });
+
+  it("keeps dynamic question and tier icon controls unnamed while responsive mode is off", () => {
+    render(<AssessmentTemplateForm mode="create" />);
+
+    fireEvent.click(screen.getByTestId("add-question"));
+    fireEvent.click(screen.getByTestId("add-tier"));
+
+    for (const button of within(screen.getByTestId("question-row-0")).getAllByRole("button")) {
+      expect(button).not.toHaveAttribute("aria-label");
+    }
+    for (const button of within(screen.getByTestId("tier-row-0")).getAllByRole("button")) {
+      expect(button).not.toHaveAttribute("aria-label");
+    }
+  });
+
+  it("gives responsive tier actions a full grid row that can wrap at sm widths", () => {
+    render(<AssessmentTemplateForm mode="create" responsiveEnabled />);
+
+    const actionGroup = screen.getByTestId("tier-row-0").firstElementChild?.lastElementChild;
+    expect(actionGroup).toHaveClass("sm:col-span-12", "flex-wrap");
+    expect(actionGroup).not.toHaveClass("sm:flex-nowrap");
   });
 });
