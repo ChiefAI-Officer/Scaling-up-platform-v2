@@ -6,6 +6,15 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="referred-results-all-public-links-implemented"></a>
+### 2026-08-13 — Referred Results exposes every active public-assessment coach link <!-- ENTRY_ISO:2026-08-13 ENTRY_SLUG:referred-results-all-public-links-implemented -->
+
+**Status: IMPLEMENTED + LOCALLY VERIFIED.** Jeff reported that new public-assessment results were attributed correctly when the coach parameter was manually appended, but Referred Results exposed only the hard-coded Scaling Up Quick Assessment link. The enabled page queried one active public campaign constrained to template alias `scaling-up-quick` and passed a single URL to the link card.
+
+**Fix and behavior boundary.** The enabled Jeff #83 Referred Results page now queries every non-deleted `ACTIVE` `PUBLIC` campaign, ordered by campaign name, and derives each coach-specific URL from the campaign alias plus the canonical certified Coach email. The card provides a dedicated **Public assessment link** dropdown, defaults to the Quick Assessment when available (otherwise the first ordered campaign), updates the displayed and copied URL on selection, and shows a clear empty state when none are active. Draft, closed, invited, and soft-deleted campaigns remain excluded. The existing results **Assessment** filter is independent and unchanged. The Jeff #83 flag-off My Campaigns Quick Assessment card and query path remain untouched. No schema, migration, flag, assessment content or version, campaign, response, email, or Production data changed.
+
+**Test-first verification.** The regression first failed because the enabled page still rendered only **Your Quick Assessment link**, performed the template-restricted `findFirst`, and had no share-link selector. Empty-state coverage separately failed while the link card disappeared. The final focused Referred Results and portal-assessment gate passed **2 suites / 20 tests**, and the changelog-freshness gate passed **1 suite / 4 tests**. Changed-file ESLint emitted no diagnostics, migration safety approved all **47 migrations**, and `git diff --check` passed. The Production-equivalent Turbopack build compiled in 4.3 minutes, passed TypeScript, and generated **94/94** static pages, retaining only the expected local workspace-root, middleware-deprecation, missing Inngest-key, and missing `DATABASE_URL` diagnostics.
+
 <a id="template-delete-soft-deleted-campaign-guard-launched"></a>
 ### 2026-08-13 — Template-delete tombstone guard launched <!-- ENTRY_ISO:2026-08-13 ENTRY_SLUG:template-delete-soft-deleted-campaign-guard-launched -->
 
