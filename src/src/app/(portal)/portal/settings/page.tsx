@@ -51,6 +51,7 @@ export default async function SettingsPage() {
 
                 <CoachProfileForm
                     coachId={coach.id}
+                    responsiveEnabled={mobileResponsiveEnabled}
                     initialData={{
                         firstName: coach.firstName || "",
                         lastName: coach.lastName || "",
