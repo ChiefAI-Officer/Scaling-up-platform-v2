@@ -74,7 +74,7 @@ export function PortalWorkshopList({ workshops, isAdmin = false, responsiveEnabl
                         placeholder="Search workshops..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                        className={cn("w-full pl-10 pr-4 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary", responsiveEnabled && "min-h-11")}
                     />
                 </div>
                 <button
@@ -100,12 +100,13 @@ export function PortalWorkshopList({ workshops, isAdmin = false, responsiveEnabl
             {/* Filter Panel */}
             {showFilters && (
                 <div className="mb-4 p-4 bg-muted rounded-lg border border-border">
-                    <div className="flex items-center gap-4">
-                        <label className="text-sm font-medium text-foreground">Status:</label>
+                    <div className={cn("flex items-center gap-4", responsiveEnabled && "flex-col items-stretch sm:flex-row sm:items-center")}>
+                        <label htmlFor={responsiveEnabled ? "workshop-status-filter" : undefined} className="text-sm font-medium text-foreground">Status:</label>
                         <select
+                            id={responsiveEnabled ? "workshop-status-filter" : undefined}
                             value={statusFilter}
                             onChange={(e) => setStatusFilter(e.target.value)}
-                            className="px-3 py-1.5 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                            className={cn("px-3 py-1.5 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary", responsiveEnabled && "min-h-11")}
                         >
                             {STATUS_OPTIONS.map((opt) => (
                                 <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -139,7 +140,7 @@ export function PortalWorkshopList({ workshops, isAdmin = false, responsiveEnabl
                                 <article key={workshop.id} role="listitem" className="rounded-xl border border-border bg-card p-4">
                                     <div className="flex min-w-0 items-start justify-between gap-3">
                                         <div className="min-w-0">
-                                            <Link href={`/portal/workshops/${workshop.id}`} className="font-semibold text-primary break-words">
+                                            <Link href={`/portal/workshops/${workshop.id}`} className="inline-flex min-h-11 min-w-11 items-center break-words font-semibold text-primary">
                                                 {workshop.title}
                                             </Link>
                                             <p className="text-sm text-muted-foreground">{formatEventDateUTC(workshop.eventDate)}</p>
@@ -156,7 +157,33 @@ export function PortalWorkshopList({ workshops, isAdmin = false, responsiveEnabl
                                     <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
                                         <div><dt className="text-muted-foreground">Registrations</dt><dd>{workshop._count.registrations} of {workshop.maxAttendees} max</dd></div>
                                         <div><dt className="text-muted-foreground">Format</dt><dd>{workshop.workshopType?.name ?? "—"}</dd></div>
+                                        <div>
+                                            <dt className="text-muted-foreground">Cost</dt>
+                                            <dd>
+                                                {workshop.isFree
+                                                    ? "Free"
+                                                    : workshop.priceCents != null
+                                                    ? `$${(workshop.priceCents / 100).toFixed(2)}`
+                                                    : workshop.pricingTier
+                                                    ? `$${(workshop.pricingTier.amountCents / 100).toFixed(2)}`
+                                                    : "—"}
+                                            </dd>
+                                        </div>
                                     </dl>
+                                    <div className="mt-3 flex min-h-11 items-center justify-between gap-3 text-sm [&_button]:inline-flex [&_button]:min-h-11 [&_button]:min-w-11 [&_button]:items-center [&_button]:justify-center">
+                                        <span className="text-muted-foreground">Landing page</span>
+                                        {isAdmin ? (
+                                            workshop.landingPageUrl ? (
+                                                <CopyUrlButton url={workshop.landingPageUrl} />
+                                            ) : (
+                                                <span className="text-xs text-muted-foreground">Not published</span>
+                                            )
+                                        ) : ["PRE_EVENT", "POST_EVENT", "COMPLETED"].includes(workshop.status) && workshop.landingPageUrl ? (
+                                            <CopyUrlButton url={workshop.landingPageUrl} />
+                                        ) : (
+                                            <span className="text-xs text-muted-foreground">Available after approval</span>
+                                        )}
+                                    </div>
                                     <Link data-touch-target href={`/portal/workshops/${workshop.id}`} className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-md bg-primary px-4 text-primary-foreground">
                                         Manage workshop
                                     </Link>
@@ -166,7 +193,14 @@ export function PortalWorkshopList({ workshops, isAdmin = false, responsiveEnabl
                     </div>
                 }
                 wide={
-            <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
+            <div
+                role={responsiveEnabled ? "region" : undefined}
+                aria-label={responsiveEnabled ? "Workshop table" : undefined}
+                tabIndex={responsiveEnabled ? 0 : undefined}
+                className={responsiveEnabled
+                    ? "bg-card rounded-xl shadow-sm border border-border overflow-x-auto"
+                    : "bg-card rounded-xl shadow-sm border border-border overflow-hidden"}
+            >
                 <table className="w-full text-left border-collapse">
                     <thead>
                         <tr className="bg-muted border-b border-border">

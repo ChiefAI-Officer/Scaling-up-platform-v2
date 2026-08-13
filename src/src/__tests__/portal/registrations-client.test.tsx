@@ -94,4 +94,23 @@ describe("RegistrationsClient", () => {
 
     expect(await screen.findByText("Cancelled")).toBeInTheDocument();
   });
+
+  it("gives the attendance checkbox a 44px target only in responsive mode", () => {
+    const { rerender } = render(
+      <RegistrationsClient registrations={[baseRegistration]} responsiveEnabled />
+    );
+
+    const responsiveCheckbox = screen.getByRole("checkbox", {
+      name: /mark alex rivera as attended/i,
+    });
+    expect(responsiveCheckbox.closest("label")).toHaveClass(
+      "min-h-11",
+      "min-w-11",
+    );
+
+    rerender(<RegistrationsClient registrations={[baseRegistration]} />);
+    expect(
+      screen.getByRole("checkbox", { name: /mark alex rivera as attended/i }).closest("label"),
+    ).toBeNull();
+  });
 });

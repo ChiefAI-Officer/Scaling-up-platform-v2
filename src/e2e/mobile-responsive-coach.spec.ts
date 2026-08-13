@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator } from "@playwright/test";
 import { loginAs } from "./helpers/auth";
 import { assertNoDocumentOverflow } from "./helpers/overflow";
 
@@ -7,7 +7,15 @@ const COACH_PASSWORD = process.env.E2E_COACH_PASSWORD || "demo123";
 
 test.setTimeout(120_000);
 
-for (const width of [320, 390]) {
+async function expectTouchTarget(locator: Locator, label: string) {
+  await expect(locator).toBeVisible();
+  const box = await locator.boundingBox();
+  expect(box, `${label} has a bounding box`).not.toBeNull();
+  expect(box?.width, `${label} width`).toBeGreaterThanOrEqual(44);
+  expect(box?.height, `${label} height`).toBeGreaterThanOrEqual(44);
+}
+
+for (const width of [320, 390, 1024]) {
   test(`coach workshop surfaces fit a ${width}px viewport`, async ({ page }) => {
     await page.setViewportSize({ width, height: 844 });
     await loginAs(page, {
@@ -29,7 +37,27 @@ for (const width of [320, 390]) {
       );
       await assertNoDocumentOverflow(page, `${route} at ${width}`);
       if (route === "/portal/workshops") {
-        await expect(page.getByRole("list", { name: "Workshops" })).toBeVisible();
+        if (width < 1024) {
+          const cards = page.getByRole("list", { name: "Workshops" });
+          await expect(cards).toBeVisible();
+          await expectTouchTarget(
+            cards.getByRole("listitem").first().getByRole("link").first(),
+            "compact workshop title",
+          );
+        } else {
+          const tableRegion = page.getByRole("region", { name: "Workshop table" });
+          await expect(tableRegion).toBeVisible();
+          await expect(tableRegion).toHaveAttribute("tabindex", "0");
+        }
+        await expectTouchTarget(
+          page.getByPlaceholder("Search workshops..."),
+          "workshop search",
+        );
+        await page.getByRole("button", { name: /filters/i }).click();
+        await expectTouchTarget(
+          page.getByRole("combobox", { name: /status/i }),
+          "workshop status filter",
+        );
       }
     }
 
@@ -44,5 +72,9 @@ for (const width of [320, 390]) {
 
     await page.goto(detailHref!);
     await assertNoDocumentOverflow(page, `${detailHref} at ${width}`);
+    await expectTouchTarget(
+      page.getByRole("link", { name: "Back to Workshops" }),
+      "detail footer back link",
+    );
   });
 }

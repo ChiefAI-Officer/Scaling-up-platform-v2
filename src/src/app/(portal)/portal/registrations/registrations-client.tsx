@@ -428,16 +428,28 @@ export function RegistrationsClient({ registrations: initialRegistrations, curre
                   </TableCell>
                   <TableCell>
                     {registration.status !== "CANCELLED" &&
-                      registration.status !== "PENDING_REMOVAL" && (
-                      <input
-                        type="checkbox"
-                        checked={registration.attended}
-                        onChange={() => handleToggleAttendance(registration)}
-                        disabled={togglingAttendanceId === registration.id}
-                        className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-                        aria-label={`Mark ${registration.firstName} ${registration.lastName} as ${registration.attended ? "not attended" : "attended"}`}
-                      />
-                    )}
+                      registration.status !== "PENDING_REMOVAL" &&
+                      (responsiveEnabled ? (
+                        <label className="inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center">
+                          <input
+                            type="checkbox"
+                            checked={registration.attended}
+                            onChange={() => handleToggleAttendance(registration)}
+                            disabled={togglingAttendanceId === registration.id}
+                            className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                            aria-label={`Mark ${registration.firstName} ${registration.lastName} as ${registration.attended ? "not attended" : "attended"}`}
+                          />
+                        </label>
+                      ) : (
+                        <input
+                          type="checkbox"
+                          checked={registration.attended}
+                          onChange={() => handleToggleAttendance(registration)}
+                          disabled={togglingAttendanceId === registration.id}
+                          className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                          aria-label={`Mark ${registration.firstName} ${registration.lastName} as ${registration.attended ? "not attended" : "attended"}`}
+                        />
+                      ))}
                   </TableCell>
                   <TableCell className="text-right">
                     {registration.status === "PENDING_REMOVAL" ? (

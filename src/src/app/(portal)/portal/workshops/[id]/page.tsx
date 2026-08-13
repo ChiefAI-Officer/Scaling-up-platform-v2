@@ -625,14 +625,14 @@ export default async function WorkshopDetailsPage({
       <div className={cn("flex items-center gap-3 flex-wrap", mobileResponsiveEnabled && "flex-col items-stretch sm:flex-row sm:items-center")}>
         <Link
           href="/portal/workshops"
-          className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-accent"
+          className={cn("rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-accent", mobileResponsiveEnabled && "inline-flex min-h-11 min-w-11 items-center justify-center")}
         >
           Back to Workshops
         </Link>
         {["PRE_EVENT", "POST_EVENT", "COMPLETED"].includes(workshop.status) && (
           <Link
             href="/portal/registrations"
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            className={cn("rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90", mobileResponsiveEnabled && "inline-flex min-h-11 min-w-11 items-center justify-center")}
           >
             View Registrations
           </Link>
@@ -640,7 +640,7 @@ export default async function WorkshopDetailsPage({
         {surveyCount > 0 && (
           <Link
             href={`/portal/workshops/${workshop.id}/surveys`}
-            className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-accent"
+            className={cn("rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-accent", mobileResponsiveEnabled && "inline-flex min-h-11 min-w-11 items-center justify-center")}
           >
             Survey Results ({surveyCount})
           </Link>
