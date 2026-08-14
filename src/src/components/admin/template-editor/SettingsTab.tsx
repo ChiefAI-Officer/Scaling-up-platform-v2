@@ -111,7 +111,7 @@ export interface SettingsTabProps {
   /** Canonical report family + stored version-question capabilities. */
   reportStylePreviewCapabilities: ReportStylePreviewCapabilities;
   /**
-   * Wave S — server-resolved LVA rows. Null/omitted means the capability is
+   * Server-resolved peer benchmark rows. Null/omitted means the capability is
    * unavailable for this template; an array mounts the existing editor here
    * instead of below the whole tabbed shell.
    */

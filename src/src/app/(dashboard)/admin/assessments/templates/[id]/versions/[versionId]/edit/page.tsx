@@ -43,7 +43,7 @@ import {
   DEFAULT_TEMPLATE_LANGUAGE,
 } from "@/lib/assessments/active-version";
 import {
-  isPeerRenderEnabledAlias,
+  isPeerEditorEnabledAlias,
   listRatingQuestionKeys,
   getQuestionBenchmarks,
 } from "@/lib/assessments/peer-benchmarks";
@@ -158,8 +158,9 @@ export default async function AdminAssessmentVersionEditPage({
   );
 
   // Wave S (spec 19s S-3) — peer-averages editor rows. Rendered ONLY when the
-  // flag is ON and the alias is render-enabled (D10 — same list as the report
-  // joins, so no dead switches); otherwise nothing is fetched or rendered.
+  // flag is ON and the alias is editor-enabled; otherwise nothing is fetched
+  // or rendered. Scaling Up Full is intentionally editable before its
+  // paired-bar report presentation is released.
   // Rows come from the current ACTIVE version (not the URL's version),
   // matching the API's validKeys resolution. Wave ED8 (C3) — archived
   // versions are excluded here exactly like the benchmarks API route
@@ -167,7 +168,7 @@ export default async function AdminAssessmentVersionEditPage({
   // above deliberately KEEPS archived versions (identity locks against ALL
   // history).
   let peerBenchmarkRows: PeerBenchmarkRow[] | null = null;
-  if (isPeerBenchmarksEnabled() && isPeerRenderEnabledAlias(template.alias)) {
+  if (isPeerBenchmarksEnabled() && isPeerEditorEnabledAlias(template.alias)) {
     const published = await db.assessmentTemplateVersion.findFirst({
       where: { templateId: id, ...activePublishedWhere },
       orderBy: { versionNumber: "desc" },

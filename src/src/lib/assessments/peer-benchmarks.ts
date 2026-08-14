@@ -4,12 +4,13 @@
  * Spec: docs/specs/v7.6/19s-wave-s-lva-peers-design.md (S-3 lib + S-5
  * individual-report builder). Peer averages are ADMIN-SET `AssessmentBenchmark`
  * rows (metricKind QUESTION, template-level — see spec S-1/C1 for why NOT
- * version-level), never seeded, never aggregated live (D1/ADR-0019-to-be).
+ * version-level), never aggregated live. LVA is admin-entered; Scaling Up Full
+ * also has a governed source snapshot (ADR-0019 amendment).
  *
  * This module is the single home for:
- *  - `PEER_RENDER_ENABLED_ALIASES` (D10) — the ONE list that gates BOTH the
- *    admin editor panel and the report render joins, so a dead switch can
- *    never exist (Wave O honest-framing rule).
+ *  - Separate editor/render alias gates. Scaling Up Full's verified values can
+ *    be administered before its paired-bar report UI is released; report
+ *    joins remain limited to aliases with a completed render path.
  *  - `listRatingQuestionKeys` — the editor's row source: SLIDER_LIKERT
  *    questions of the published version, labelled the way the REPORT prints
  *    them (LVA report factor-label overrides, legacy-suffix strip).
@@ -32,16 +33,25 @@ import {
   lvaReportFactorLabel,
 } from "@/lib/assessments/lva-report-display";
 import { stripLegacyDecimalSuffix } from "@/lib/assessments/question-label";
+import { SCALING_UP_FULL_TEMPLATE_ALIAS } from "@/lib/assessments/su-full-question-benchmarks";
 
-// ─── D10 — render-enabled aliases ───────────────────────────────────────────
+// ─── Editor/render-enabled aliases ─────────────────────────────────────────────
 
 /**
- * Template aliases whose peer benchmarks BOTH render on reports and expose the
- * admin editor panel (one list, no dead switches). Wave S: LVA only. Adding an
- * alias here lights panel + render together.
+ * Template aliases whose peer benchmarks have a completed report render path.
  */
 export const PEER_RENDER_ENABLED_ALIASES: readonly string[] = [
   LVA_TEMPLATE_ALIAS,
+];
+
+/**
+ * Template aliases whose per-question peer values can be administered.
+ * Scaling Up Full is intentionally editor-only until its paired-bar report UI
+ * ships; keeping these gates separate prevents unfinished report rendering.
+ */
+export const PEER_EDITOR_ENABLED_ALIASES: readonly string[] = [
+  LVA_TEMPLATE_ALIAS,
+  SCALING_UP_FULL_TEMPLATE_ALIAS,
 ];
 
 /** Whether a template alias is peer-render-enabled. Null/undefined → false. */
@@ -50,6 +60,15 @@ export function isPeerRenderEnabledAlias(
 ): boolean {
   return (
     typeof alias === "string" && PEER_RENDER_ENABLED_ALIASES.includes(alias)
+  );
+}
+
+/** Whether a template alias exposes the peer-benchmark admin editor. */
+export function isPeerEditorEnabledAlias(
+  alias: string | null | undefined,
+): boolean {
+  return (
+    typeof alias === "string" && PEER_EDITOR_ENABLED_ALIASES.includes(alias)
   );
 }
 

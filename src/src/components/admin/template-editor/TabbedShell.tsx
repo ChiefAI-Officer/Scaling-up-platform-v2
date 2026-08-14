@@ -351,7 +351,7 @@ export interface TabbedShellProps {
    * inert until then. Presentation-only.
    */
   activePreview?: ActivePreview | null;
-  /** Wave S — LVA-only rows resolved by the server for the Settings editor. */
+  /** Peer benchmark rows resolved by the server for the Settings editor. */
   peerBenchmarkRows?: PeerBenchmarkRow[] | null;
 }
 

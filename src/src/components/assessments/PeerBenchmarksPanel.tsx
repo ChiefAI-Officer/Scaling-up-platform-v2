@@ -13,7 +13,7 @@
  *
  * The server page supplies the initial rows (no GET endpoint exists) and only
  * mounts this panel when the Wave S flag is ON and the template alias is
- * render-enabled (D10) — the panel itself carries no flag logic.
+ * editor-enabled — the panel itself carries no flag logic.
  */
 
 import { useState } from "react";
@@ -111,8 +111,8 @@ export function PeerBenchmarksPanel({
       <div className="space-y-1">
         <h2 className="wf-card-title">Peer averages</h2>
         <p className="text-sm text-muted-foreground">
-          Peer averages render on LVA reports. Blank = the factor shows no peer
-          comparison.
+          Stored reference values for each rating question. Blank = no stored
+          peer comparison.
         </p>
       </div>
 
