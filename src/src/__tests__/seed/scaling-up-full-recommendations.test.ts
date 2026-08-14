@@ -2,7 +2,7 @@
  * Per-question recommendation tests for the Scaling Up Full Assessment seed.
  *
  * Verifies the full 5-stop recommendation bands (0/3/5/7/10 → tiled as
- * [0-2]/[3-4]/[5-6]/[7-9]/[10-10]) harvested from Esperto uniform-fill
+ * [0-2]/[3-4]/[5-6]/[7-8]/[9-10]) harvested from Esperto uniform-fill
  * sample reports.
  *
  * These tests are DB-free and run against the exported builders only.
@@ -73,13 +73,13 @@ describe("SU Full 5-stop recommendations — tiling [0, 10]", () => {
     }
   });
 
-  it("every question's bands match the expected 5-stop tiling [0-2],[3-4],[5-6],[7-9],[10-10]", () => {
+  it("every question's bands match the Esperto 5-stop tiling [0-2],[3-4],[5-6],[7-8],[9-10]", () => {
     const expectedTiling = [
       { minScore: 0, maxScore: 2 },
       { minScore: 3, maxScore: 4 },
       { minScore: 5, maxScore: 6 },
-      { minScore: 7, maxScore: 9 },
-      { minScore: 10, maxScore: 10 },
+      { minScore: 7, maxScore: 8 },
+      { minScore: 9, maxScore: 10 },
     ];
     for (const q of questions) {
       const sorted = [...q.recommendations].sort((a, b) => a.minScore - b.minScore);
@@ -105,7 +105,7 @@ describe("SU Full 5-stop recommendations — verbatim spot-checks", () => {
   it("Q02 'High staff retention' s10 band starts 'Your employee turnover is very little / none'", () => {
     const q02 = questions.find((q) => q.stableKey === "Q02");
     expect(q02).toBeDefined();
-    const s10 = q02!.recommendations.find((b) => b.minScore === 10 && b.maxScore === 10);
+    const s10 = q02!.recommendations.find((b) => b.minScore === 9 && b.maxScore === 10);
     expect(s10).toBeDefined();
     expect(s10!.text).toContain("Your employee turnover is very little / none");
   });

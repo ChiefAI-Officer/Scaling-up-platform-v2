@@ -290,9 +290,9 @@ interface QuestionSeedDef {
   s3: string;
   /** Score stop 5: maps to band [5, 6] */
   s5: string;
-  /** Score stop 7: maps to band [7, 9] */
+  /** Score stop 7: maps to band [7, 8] */
   s7: string;
-  /** Score stop 10 (best): maps to band [10, 10] */
+  /** Score stop 10 (best): maps to band [9, 10] */
   s10: string;
 }
 
@@ -958,14 +958,14 @@ function buildSectionsAndQuestions(): {
         anchorMax: ANCHOR_MAX,
       },
       recommendations: [
-        // 5-stop integer-touching bands: [0-2], [3-4], [5-6], [7-9], [10-10].
+        // 5-stop integer-touching bands: [0-2], [3-4], [5-6], [7-8], [9-10].
         // Every integer in [0, 10] is covered by exactly one band (no overlap, no gap).
         // Stops sourced verbatim from Esperto uniform-fill sample reports.
         { minScore: 0, maxScore: 2, text: q.s0 },
         { minScore: 3, maxScore: 4, text: q.s3 },
         { minScore: 5, maxScore: 6, text: q.s5 },
-        { minScore: 7, maxScore: 9, text: q.s7 },
-        { minScore: 10, maxScore: 10, text: q.s10 },
+        { minScore: 7, maxScore: 8, text: q.s7 },
+        { minScore: 9, maxScore: 10, text: q.s10 },
       ],
     };
   });
