@@ -1,9 +1,9 @@
 /**
  * SU-Full Peers benchmark — static, versioned, key-set bound.
  *
- * PROVISIONAL: values are derived from a single Esperto cohort (cohort1) and
- * are NOT cohort-matched to any particular company size, geography, or
- * industry. They will be updated when a larger reference cohort is available.
+ * MIXED PROVENANCE: domain/section/ScaleUp values remain provisional values
+ * from a single Esperto cohort. The 61 question values come from the controlled
+ * 2026-08-14 snapshot in `su-full-question-benchmarks.ts`.
  *
  * Scale conventions:
  *   domain / section  — 0–10  (Esperto's 0–100 section SUM ÷ #questions,
@@ -20,8 +20,11 @@
  * (R2-L1) will fail if values change without a version bump.
  */
 
+import { SU_FULL_QUESTION_BENCHMARKS } from "@/lib/assessments/su-full-question-benchmarks";
+
 /** Semver-style provenance string — bump on every value change. */
-export const SU_FULL_BENCHMARKS_VERSION = "2026-08-12.cohort1.provisional";
+export const SU_FULL_BENCHMARKS_VERSION =
+  "2026-08-14.question-controlled-aggregate-provisional";
 
 /** Canonical key sets — must stay in sync with the SU-Full seed. */
 export const SU_FULL_BENCHMARK_KEYS = {
@@ -38,21 +41,14 @@ export const SU_FULL_BENCHMARK_KEYS = {
     "S_YOU_LEAD",
     "S_YOU_IC",
   ] as const,
-  questions: [
-    "Q01", "Q02", "Q03", "Q04", "Q05", "Q06", "Q07", "Q08", "Q09", "Q10",
-    "Q11", "Q12", "Q13", "Q14", "Q15", "Q16", "Q17", "Q18", "Q19", "Q20",
-    "Q21", "Q22", "Q23", "Q24", "Q25", "Q26", "Q27", "Q28", "Q29", "Q30",
-    "Q31", "Q32", "Q33", "Q34", "Q35", "Q36", "Q37", "Q38", "Q39", "Q40",
-    "Q41", "Q42", "Q43", "Q44", "Q45", "Q46", "Q47", "Q48", "Q49", "Q50",
-    "Q51", "Q52", "Q53", "Q54", "Q55", "Q56", "Q57", "Q58", "Q59", "Q60",
-    "Q61",
-  ] as const,
+  questions: SU_FULL_QUESTION_BENCHMARKS.map((entry) => entry.stableKey),
 } as const;
 
 /** Literal key types derived from the canonical key set (above). */
 type DomainKey = (typeof SU_FULL_BENCHMARK_KEYS.domains)[number];
 type SectionKey = (typeof SU_FULL_BENCHMARK_KEYS.sections)[number];
-type QuestionKey = (typeof SU_FULL_BENCHMARK_KEYS.questions)[number];
+type QuestionKey =
+  (typeof SU_FULL_QUESTION_BENCHMARKS)[number]["stableKey"];
 
 export interface SuFullBenchmarks {
   version: string;
@@ -87,72 +83,12 @@ const SU_FULL_DATA: SuFullBenchmarks = {
     S_YOU_LEAD: 6.1,
     S_YOU_IC: 4.6,
   },
-  // Extracted in canonical question order from Jeff's Esperto Scaling Up Full
-  // group + CEO reports. These are the same single-cohort, provisional values
-  // as the aggregate benchmark above; the renderer labels that provenance.
-  question: {
-    Q01: 6.3,
-    Q02: 7.2,
-    Q03: 5.6,
-    Q04: 5.9,
-    Q05: 6.2,
-    Q06: 4.6,
-    Q07: 4.4,
-    Q08: 5.5,
-    Q09: 7.2,
-    Q10: 6.4,
-    Q11: 5.7,
-    Q12: 5.2,
-    Q13: 7.3,
-    Q14: 6.7,
-    Q15: 6.0,
-    Q16: 5.4,
-    Q17: 5.3,
-    Q18: 4.9,
-    Q19: 4.2,
-    Q20: 2.4,
-    Q21: 6.2,
-    Q22: 6.0,
-    Q23: 5.9,
-    Q24: 4.7,
-    Q25: 5.8,
-    Q26: 5.9,
-    Q27: 5.0,
-    Q28: 5.6,
-    Q29: 5.7,
-    Q30: 5.6,
-    Q31: 6.1,
-    Q32: 6.4,
-    Q33: 5.9,
-    Q34: 5.0,
-    Q35: 6.2,
-    Q36: 6.2,
-    Q37: 6.3,
-    Q38: 6.9,
-    Q39: 6.7,
-    Q40: 6.2,
-    Q41: 8.0,
-    Q42: 7.0,
-    Q43: 5.8,
-    Q44: 6.9,
-    Q45: 7.8,
-    Q46: 5.8,
-    Q47: 5.0,
-    Q48: 5.8,
-    Q49: 4.0,
-    Q50: 3.0,
-    Q51: 6.5,
-    Q52: 6.0,
-    Q53: 5.1,
-    Q54: 6.2,
-    Q55: 5.9,
-    Q56: 4.8,
-    Q57: 5.6,
-    Q58: 5.0,
-    Q59: 5.9,
-    Q60: 6.4,
-    Q61: 5.6,
-  },
+  question: Object.fromEntries(
+    SU_FULL_QUESTION_BENCHMARKS.map(({ stableKey, value }) => [
+      stableKey,
+      value,
+    ]),
+  ) as Record<QuestionKey, number>,
   scaleUp: 53.1,
 };
 

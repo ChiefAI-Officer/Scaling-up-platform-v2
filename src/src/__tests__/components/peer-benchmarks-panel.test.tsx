@@ -51,7 +51,7 @@ describe("PeerBenchmarksPanel", () => {
     expect(screen.getByText("Peer averages")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Peer averages render on LVA reports. Blank = the factor shows no peer comparison.",
+        "Stored reference values for each rating question. Blank = no stored peer comparison.",
       ),
     ).toBeInTheDocument();
     expect(screen.getByText("Recruitment of new employees")).toBeInTheDocument();

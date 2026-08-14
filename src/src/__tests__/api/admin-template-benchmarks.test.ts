@@ -3,7 +3,7 @@
  *
  * Guard ladder: rate limit → 401 (no actor) → 403 (not privileged) →
  * 404 (flag off) → 404 (template missing/deleted) → 404 (alias not
- * render-enabled) → Zod 400 → 409 (no published version) →
+ * editor-enabled) → Zod 400 → 409 (no published version) →
  * PeerBenchmarkValidationError 400 → reconcile + audit + saved-set 200.
  *
  * Harness mirrors templates-crud.test.ts (mocked next/server, db,
@@ -68,6 +68,7 @@ import {
   PeerBenchmarkValidationError,
 } from "@/lib/assessments/peer-benchmarks";
 import { LVA_TEMPLATE_ALIAS } from "@/lib/assessments/lva-report-display";
+import { SCALING_UP_FULL_TEMPLATE_ALIAS } from "@/lib/assessments/su-full-question-benchmarks";
 
 const adminActor = {
   userId: "u1",
@@ -184,7 +185,7 @@ describe("PUT /api/admin/assessment-templates/[id]/benchmarks", () => {
     expect(where).toMatchObject({ id: "tpl-1", deletedAt: null });
   });
 
-  it("404 when the template alias is not render-enabled (e.g. qsp-v2)", async () => {
+  it("404 when the template alias is not editor-enabled (e.g. qsp-v2)", async () => {
     (db.assessmentTemplate.findFirst as jest.Mock).mockResolvedValue({
       id: "tpl-1",
       alias: "qsp-v2",
@@ -195,6 +196,33 @@ describe("PUT /api/admin/assessment-templates/[id]/benchmarks", () => {
     );
     expect(res.status).toBe(404);
     expect(reconcileQuestionBenchmarks).not.toHaveBeenCalled();
+  });
+
+  it("allows Scaling Up Full values through the editor-only alias gate", async () => {
+    (db.assessmentTemplate.findFirst as jest.Mock).mockResolvedValue({
+      id: "tpl-1",
+      alias: SCALING_UP_FULL_TEMPLATE_ALIAS,
+    });
+    (db.assessmentTemplateVersion.findFirst as jest.Mock).mockResolvedValue({
+      id: "ver-1",
+      questions: [
+        { stableKey: "Q01", type: "SLIDER_LIKERT", label: "Recruitment" },
+      ],
+    });
+
+    const res = await PUT(
+      putReq({ entries: [{ stableKey: "Q01", value: 6.3 }] }) as never,
+      routeParams,
+    );
+
+    expect(res.status).toBe(200);
+    expect(reconcileQuestionBenchmarks).toHaveBeenCalledWith(
+      db,
+      expect.objectContaining({
+        templateId: "tpl-1",
+        entries: [{ stableKey: "Q01", value: 6.3 }],
+      }),
+    );
   });
 
   it("400 on Zod bad shape (entries not an array)", async () => {

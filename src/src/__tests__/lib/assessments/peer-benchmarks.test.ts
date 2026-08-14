@@ -2,7 +2,8 @@
  * Wave S — peer-benchmarks lib (spec 19s S-3 + S-5).
  *
  * Covers:
- *  - PEER_RENDER_ENABLED_ALIASES / isPeerRenderEnabledAlias (D10 single list)
+ *  - Separate editor/render alias gates: SU-Full can be configured before its
+ *    paired-bar report UI is released, while LVA remains fully render-enabled.
  *  - listRatingQuestionKeys (SLIDER_LIKERT filter, version order, LVA report
  *    label overrides, malformed-input safety)
  *  - reconcileQuestionBenchmarks (atomic full-set reconcile, D14 + C3:
@@ -14,7 +15,9 @@
  */
 import { LVA_TEMPLATE_ALIAS } from "@/lib/assessments/lva-report-display";
 import {
+  PEER_EDITOR_ENABLED_ALIASES,
   PEER_RENDER_ENABLED_ALIASES,
+  isPeerEditorEnabledAlias,
   isPeerRenderEnabledAlias,
   listRatingQuestionKeys,
   getQuestionBenchmarks,
@@ -151,9 +154,34 @@ const VALID_KEYS: ReadonlySet<string> = new Set([
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("PEER_RENDER_ENABLED_ALIASES", () => {
-  it("contains exactly the LVA alias (D10)", () => {
+  it("keeps report rendering limited to LVA", () => {
     expect(PEER_RENDER_ENABLED_ALIASES).toEqual([LVA_TEMPLATE_ALIAS]);
   });
+});
+
+describe("PEER_EDITOR_ENABLED_ALIASES", () => {
+  it("allows LVA and Scaling Up Full values to be administered", () => {
+    expect(PEER_EDITOR_ENABLED_ALIASES).toEqual([
+      LVA_TEMPLATE_ALIAS,
+      "scaling-up-full",
+    ]);
+  });
+});
+
+describe("isPeerEditorEnabledAlias", () => {
+  it.each([LVA_TEMPLATE_ALIAS, "scaling-up-full"])(
+    "is true for editor-enabled alias %j",
+    (alias) => {
+      expect(isPeerEditorEnabledAlias(alias)).toBe(true);
+    },
+  );
+
+  it.each(["qsp-v1", "", null, undefined])(
+    "is false for non-enabled alias %j",
+    (alias) => {
+      expect(isPeerEditorEnabledAlias(alias)).toBe(false);
+    },
+  );
 });
 
 describe("isPeerRenderEnabledAlias", () => {

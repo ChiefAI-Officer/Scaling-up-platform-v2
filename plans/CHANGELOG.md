@@ -6,6 +6,17 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="su-full-peer-benchmark-store-implemented"></a>
+### 2026-08-14 — Scaling Up Full peer benchmark store implemented <!-- ENTRY_ISO:2026-08-14 ENTRY_SLUG:su-full-peer-benchmark-store-implemented -->
+
+**Status: IMPLEMENTED + LOCALLY VERIFIED; PRODUCTION REFRESH IS AN EXPLICIT POST-DEPLOY OPERATION.** Controlled Esperto experiments varied Effective recruitment through every integer from 0 to 10 and also varied company size, baseline answers, and organizational phase. All 61 question-level Peer values remained fixed within the tested reports, including Effective recruitment at `6.3`. The experiments rule out current-company respondents as the source of the displayed values but do not disclose Esperto's historical cohort formula or refresh schedule.
+
+**Canonical data and operator workflow.** Scaling Up Full now has one versioned `Q01`–`Q61` snapshot consumed by both the existing static report comparison and a dedicated database refresh routine. The admin benchmark editor is enabled for this assessment, using the existing `AssessmentBenchmark` table and audit trail. Ordinary assessment seeding remains isolated from benchmark refreshes, so routine deploys cannot silently overwrite operator-maintained values. The explicit refresh requires `BENCHMARK_REFRESH_ACTOR`, selects the active canonical `enUS` template version, validates exact question-key parity, and atomically records the operator, mechanism, source, benchmark/effective version, template version, and full before/after delta with the database reconciliation.
+
+**Scope boundary and deployment procedure.** The existing Scaling Up Full report retains its current question-level CEO/Team/Peers bars, values, and layout; this change does not implement the separately proposed paired micro-bar redesign or switch that report to a database join. Deploying the code alone does not populate benchmark rows. After deployment, an authorized operator must run `BENCHMARK_REFRESH_ACTOR=<operator-email> npm run seed:scaling-up-full-peers` against Production and verify that all 61 rows are present. The committed evidence ledger records the tested campaign/report provenance and the complete captured value table.
+
+**Verification.** The final repository run passed **694/694 suites, 8,644/8,644 tests, and 16/16 snapshots**. The focused benchmark matrix passed **8 suites / 167 tests / 1 snapshot**; changed-file ESLint emitted no diagnostics; migration safety approved all **47 migrations**; `git diff --check` passed; and the Production-equivalent Turbopack build completed successfully with TypeScript validation. Two independent reviews found the final implementation aligned with the approved scope and project standards.
+
 <a id="customer-campaign-accordion-launched"></a>
 ### 2026-08-13 — Customer-first campaign accordion launched <!-- ENTRY_ISO:2026-08-13 ENTRY_SLUG:customer-campaign-accordion-launched -->
 
