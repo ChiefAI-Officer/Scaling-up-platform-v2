@@ -16,8 +16,9 @@
  *    them (LVA report factor-label overrides, legacy-suffix strip).
  *  - `getQuestionBenchmarks` / `reconcileQuestionBenchmarks` — thin DB
  *    helpers. The reconcile is the atomic full-set save (D8/D14, mechanism per
- *    co-validate C3): one transaction, delete-missing / update-changed /
- *    create-new, unchanged rows keep their id + timestamps.
+ *    co-validate C3): one transaction, batch-replace changed rows, remove
+ *    missing rows, and batch-create new rows; unchanged rows keep their id +
+ *    timestamps.
  *  - `buildPeerComparisonSection` — the PURE individual-report builder (S-5).
  *    Deliberately NOT part of `buildQualitativeModel`: that model is shared
  *    with the results email, and keeping the peers section a separate builder
@@ -159,17 +160,13 @@ export interface PeerBenchmarksReadDb {
 /** Write side — the client the reconcile transaction runs against. */
 export interface PeerBenchmarksTx extends PeerBenchmarksReadDb {
   assessmentBenchmark: PeerBenchmarksReadDb["assessmentBenchmark"] & {
-    create(args: {
-      data: {
+    createMany(args: {
+      data: Array<{
         templateId: string;
         metricKind: "QUESTION";
         metricKey: string;
         value: number;
-      };
-    }): Promise<unknown>;
-    update(args: {
-      where: { id: string };
-      data: { value: number };
+      }>;
     }): Promise<unknown>;
     deleteMany(args: {
       where: { id: { in: string[] } };
@@ -300,30 +297,41 @@ async function reconcileDesiredQuestionBenchmarks(
   const before: Record<string, number> = {};
   for (const row of existing) before[row.metricKey] = row.value;
 
-  // Delete rows whose key is missing from the submission (blank + stale).
-  const staleIds = existing
-    .filter((row) => !desired.has(row.metricKey))
+  // Delete stale and changed rows in one batch. Changed rows are recreated
+  // below; unchanged rows remain untouched so their id/timestamps stay honest.
+  const replacedIds = existing
+    .filter((row) => {
+      const desiredValue = desired.get(row.metricKey);
+      return desiredValue === undefined || desiredValue !== row.value;
+    })
     .map((row) => row.id);
-  if (staleIds.length > 0) {
+  if (replacedIds.length > 0) {
     await tx.assessmentBenchmark.deleteMany({
-      where: { id: { in: staleIds } },
+      where: { id: { in: replacedIds } },
     });
   }
 
-  // Update rows whose rounded value changed; leave unchanged rows untouched.
+  // Recreate changed rows and add new rows with one bounded batch write.
   const existingByKey = new Map(existing.map((row) => [row.metricKey, row]));
+  const newRows: Array<{
+    templateId: string;
+    metricKind: "QUESTION";
+    metricKey: string;
+    value: number;
+  }> = [];
   for (const [stableKey, value] of desired) {
     const row = existingByKey.get(stableKey);
-    if (!row) {
-      await tx.assessmentBenchmark.create({
-        data: { templateId, metricKind: "QUESTION", metricKey: stableKey, value },
-      });
-    } else if (row.value !== value) {
-      await tx.assessmentBenchmark.update({
-        where: { id: row.id },
-        data: { value },
+    if (!row || row.value !== value) {
+      newRows.push({
+        templateId,
+        metricKind: "QUESTION",
+        metricKey: stableKey,
+        value,
       });
     }
+  }
+  if (newRows.length > 0) {
+    await tx.assessmentBenchmark.createMany({ data: newRows });
   }
 
   return { before, after: Object.fromEntries(desired) };
@@ -354,10 +362,10 @@ export async function reconcileQuestionBenchmarksInTx(
  * Values are then rounded to 1dp — the rounded value is what gets compared
  * and written.
  *
- * In ONE `db.$transaction`: read existing rows → delete rows missing from the
- * submission → update rows whose rounded value changed → create rows for new
- * keys. Rows with unchanged values are NOT touched (id + timestamps kept, so
- * `updatedAt` provenance stays honest).
+ * In ONE `db.$transaction`: read existing rows → batch-delete rows missing
+ * from the submission or whose rounded value changed → batch-create changed
+ * and new rows. Rows with unchanged values are NOT touched (id + timestamps
+ * kept, so `updatedAt` provenance stays honest).
  *
  * Returns before/after value maps for the caller's audit delta.
  */

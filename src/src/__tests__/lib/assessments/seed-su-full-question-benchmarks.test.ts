@@ -18,6 +18,7 @@ function makeDb() {
         { id: "stale", metricKey: "OLD_KEY", value: 5 },
       ]),
       create: jest.fn().mockResolvedValue({}),
+      createMany: jest.fn().mockResolvedValue({ count: 60 }),
       update: jest.fn().mockResolvedValue({}),
       deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
@@ -44,7 +45,11 @@ describe("reconcileScalingUpFullQuestionBenchmarkSnapshot", () => {
     expect(Object.keys(result.after)).toHaveLength(61);
     expect(result.after.Q01).toBe(6.3);
     expect(result.after.Q61).toBe(5.6);
-    expect(tx.assessmentBenchmark.create).toHaveBeenCalledTimes(60);
+    expect(tx.assessmentBenchmark.createMany).toHaveBeenCalledTimes(1);
+    expect(tx.assessmentBenchmark.createMany.mock.calls[0][0].data).toHaveLength(
+      60,
+    );
+    expect(tx.assessmentBenchmark.create).not.toHaveBeenCalled();
     expect(tx.assessmentBenchmark.update).not.toHaveBeenCalled();
     expect(tx.assessmentBenchmark.deleteMany).toHaveBeenCalledWith({
       where: { id: { in: ["stale"] } },
@@ -85,6 +90,7 @@ describe("refreshScalingUpFullQuestionBenchmarkSnapshot", () => {
       assessmentBenchmark: {
         findMany: jest.fn().mockResolvedValue([]),
         create: jest.fn().mockResolvedValue({}),
+        createMany: jest.fn().mockResolvedValue({ count: 61 }),
         update: jest.fn().mockResolvedValue({}),
         deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
@@ -134,6 +140,46 @@ describe("refreshScalingUpFullQuestionBenchmarkSnapshot", () => {
       before: {},
     });
     expect(Object.keys(JSON.parse(audit.changes).after)).toHaveLength(61);
+  });
+
+  it("inserts the complete 61-row snapshot with one bounded batch write", async () => {
+    const { db, tx } = makeRefreshDb();
+
+    await refreshScalingUpFullQuestionBenchmarkSnapshot(
+      db,
+      "operator@example.com",
+    );
+
+    expect(tx.assessmentBenchmark.createMany).toHaveBeenCalledTimes(1);
+    const inserted = tx.assessmentBenchmark.createMany.mock.calls[0][0].data;
+    expect(inserted).toHaveLength(61);
+    expect(inserted[0]).toEqual({
+      templateId: "tpl-su",
+      metricKind: "QUESTION",
+      metricKey: "Q01",
+      value: 6.3,
+    });
+    expect(inserted[60]).toEqual({
+      templateId: "tpl-su",
+      metricKind: "QUESTION",
+      metricKey: "Q61",
+      value: 5.6,
+    });
+    expect(tx.assessmentBenchmark.create).not.toHaveBeenCalled();
+  });
+
+  it("uses the established cross-continent production transaction window", async () => {
+    const { db } = makeRefreshDb();
+
+    await refreshScalingUpFullQuestionBenchmarkSnapshot(
+      db,
+      "operator@example.com",
+    );
+
+    expect(db.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      maxWait: 10_000,
+      timeout: 55_000,
+    });
   });
 
   it("requires an explicit operator before opening the transaction", async () => {

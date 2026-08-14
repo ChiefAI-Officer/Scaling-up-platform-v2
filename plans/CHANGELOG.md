@@ -6,6 +6,15 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="su-full-peer-benchmark-refresh-batched"></a>
+### 2026-08-14 — Scaling Up Full benchmark refresh batched for Production <!-- ENTRY_ISO:2026-08-14 ENTRY_SLUG:su-full-peer-benchmark-refresh-batched -->
+
+**Status: IMPLEMENTED + LOCALLY VERIFIED; RELEASE AND PRODUCTION POPULATION PENDING.** PR #352 launched the governed 61-value snapshot and explicit audited refresh path. The first authorized Production population attempt reached the direct database connection but exceeded Prisma's default five-second interactive-transaction window while performing sequential inserts from a cross-continent operator connection. The transaction rolled back atomically; follow-up reads confirmed **0 benchmark rows and 0 matching audit rows**, so Production remained unchanged.
+
+**Fix and behavior boundary.** Benchmark reconciliation now batch-deletes stale or changed rows and batch-creates changed or new rows, while leaving unchanged rows untouched so their identifiers and timestamps remain honest. The explicit Scaling Up Full refresh uses the repository's established cross-continent transaction window (`maxWait: 10s`, `timeout: 55s`). The benchmark values, source metadata, exact-key validation, operator requirement, audit payload, admin editing behavior, report layout, and ordinary-seed isolation are unchanged. No schema or migration is required.
+
+**Test-first verification.** A 61-row regression first failed because the reconcile issued one create per value, then passed with one bounded batch write. Mixed changed/stale/new coverage first failed because changed rows were still updated individually, then passed with one batch replacement while an unchanged row remained untouched. A production-window regression first failed because no transaction options were supplied, then passed with the established 10-second wait and 55-second timeout. The final repository run passed **694/694 suites, 8,647/8,647 tests, and 16/16 snapshots**; the focused benchmark/API/changelog matrix passed **4 suites / 91 tests**; changed-file ESLint emitted no diagnostics; migration safety approved all **47 migrations**; `git diff --check` passed; and the Production-equivalent Turbopack build compiled, passed TypeScript, and generated **94/94** pages. Production population remains explicitly pending until this fix passes the protected release gates and the resulting 61 rows plus audit record are read back successfully.
+
 <a id="su-full-peer-benchmark-store-implemented"></a>
 ### 2026-08-14 — Scaling Up Full peer benchmark store implemented <!-- ENTRY_ISO:2026-08-14 ENTRY_SLUG:su-full-peer-benchmark-store-implemented -->
 
