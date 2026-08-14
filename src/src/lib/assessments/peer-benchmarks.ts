@@ -243,30 +243,10 @@ export interface ReconcileQuestionBenchmarksResult {
   after: Record<string, number>;
 }
 
-/**
- * Atomic full-set reconcile of a template's QUESTION benchmarks (D8/D14,
- * mechanism per co-validate C3). The DB always mirrors the last-saved form:
- * blank field = key absent = row deleted; stale keys (no longer in the
- * published version) are pruned the same way.
- *
- * Validation (typed `PeerBenchmarkValidationError`, thrown BEFORE the
- * transaction opens): unknown stableKey, duplicate stableKey, non-finite
- * value, value outside [0, 10], more than `MAX_BENCHMARK_ENTRIES` entries.
- * Values are then rounded to 1dp — the rounded value is what gets compared
- * and written.
- *
- * In ONE `db.$transaction`: read existing rows → delete rows missing from the
- * submission → update rows whose rounded value changed → create rows for new
- * keys. Rows with unchanged values are NOT touched (id + timestamps kept, so
- * `updatedAt` provenance stays honest).
- *
- * Returns before/after value maps for the caller's audit delta.
- */
-export async function reconcileQuestionBenchmarks(
-  db: PeerBenchmarksDb,
+function buildDesiredQuestionBenchmarks(
   input: ReconcileQuestionBenchmarksInput,
-): Promise<ReconcileQuestionBenchmarksResult> {
-  const { templateId, entries, validKeys } = input;
+): Map<string, number> {
+  const { entries, validKeys } = input;
 
   if (entries.length > MAX_BENCHMARK_ENTRIES) {
     throw new PeerBenchmarkValidationError(
@@ -304,42 +284,92 @@ export async function reconcileQuestionBenchmarks(
     desired.set(entry.stableKey, round1(entry.value));
   }
 
-  return db.$transaction(async (tx) => {
-    const existing = await tx.assessmentBenchmark.findMany({
-      where: { templateId, metricKind: "QUESTION" },
-      select: { id: true, metricKey: true, value: true },
+  return desired;
+}
+
+async function reconcileDesiredQuestionBenchmarks(
+  tx: PeerBenchmarksTx,
+  templateId: string,
+  desired: ReadonlyMap<string, number>,
+): Promise<ReconcileQuestionBenchmarksResult> {
+  const existing = await tx.assessmentBenchmark.findMany({
+    where: { templateId, metricKind: "QUESTION" },
+    select: { id: true, metricKey: true, value: true },
+  });
+
+  const before: Record<string, number> = {};
+  for (const row of existing) before[row.metricKey] = row.value;
+
+  // Delete rows whose key is missing from the submission (blank + stale).
+  const staleIds = existing
+    .filter((row) => !desired.has(row.metricKey))
+    .map((row) => row.id);
+  if (staleIds.length > 0) {
+    await tx.assessmentBenchmark.deleteMany({
+      where: { id: { in: staleIds } },
     });
+  }
 
-    const before: Record<string, number> = {};
-    for (const row of existing) before[row.metricKey] = row.value;
-
-    // Delete rows whose key is missing from the submission (blank + stale).
-    const staleIds = existing
-      .filter((row) => !desired.has(row.metricKey))
-      .map((row) => row.id);
-    if (staleIds.length > 0) {
-      await tx.assessmentBenchmark.deleteMany({
-        where: { id: { in: staleIds } },
+  // Update rows whose rounded value changed; leave unchanged rows untouched.
+  const existingByKey = new Map(existing.map((row) => [row.metricKey, row]));
+  for (const [stableKey, value] of desired) {
+    const row = existingByKey.get(stableKey);
+    if (!row) {
+      await tx.assessmentBenchmark.create({
+        data: { templateId, metricKind: "QUESTION", metricKey: stableKey, value },
+      });
+    } else if (row.value !== value) {
+      await tx.assessmentBenchmark.update({
+        where: { id: row.id },
+        data: { value },
       });
     }
+  }
 
-    // Update rows whose rounded value changed; leave unchanged rows untouched.
-    const existingByKey = new Map(existing.map((row) => [row.metricKey, row]));
-    for (const [stableKey, value] of desired) {
-      const row = existingByKey.get(stableKey);
-      if (!row) {
-        await tx.assessmentBenchmark.create({
-          data: { templateId, metricKind: "QUESTION", metricKey: stableKey, value },
-        });
-      } else if (row.value !== value) {
-        await tx.assessmentBenchmark.update({
-          where: { id: row.id },
-          data: { value },
-        });
-      }
-    }
+  return { before, after: Object.fromEntries(desired) };
+}
 
-    return { before, after: Object.fromEntries(desired) };
+/**
+ * Full-set reconcile inside a caller-owned transaction. Seed/repair paths use
+ * this variant when the benchmark mutation and its audit row must commit or
+ * roll back together.
+ */
+export async function reconcileQuestionBenchmarksInTx(
+  tx: PeerBenchmarksTx,
+  input: ReconcileQuestionBenchmarksInput,
+): Promise<ReconcileQuestionBenchmarksResult> {
+  const desired = buildDesiredQuestionBenchmarks(input);
+  return reconcileDesiredQuestionBenchmarks(tx, input.templateId, desired);
+}
+
+/**
+ * Atomic full-set reconcile of a template's QUESTION benchmarks (D8/D14,
+ * mechanism per co-validate C3). The DB always mirrors the last-saved form:
+ * blank field = key absent = row deleted; stale keys (no longer in the
+ * published version) are pruned the same way.
+ *
+ * Validation (typed `PeerBenchmarkValidationError`, thrown BEFORE the
+ * transaction opens): unknown stableKey, duplicate stableKey, non-finite
+ * value, value outside [0, 10], more than `MAX_BENCHMARK_ENTRIES` entries.
+ * Values are then rounded to 1dp — the rounded value is what gets compared
+ * and written.
+ *
+ * In ONE `db.$transaction`: read existing rows → delete rows missing from the
+ * submission → update rows whose rounded value changed → create rows for new
+ * keys. Rows with unchanged values are NOT touched (id + timestamps kept, so
+ * `updatedAt` provenance stays honest).
+ *
+ * Returns before/after value maps for the caller's audit delta.
+ */
+export async function reconcileQuestionBenchmarks(
+  db: PeerBenchmarksDb,
+  input: ReconcileQuestionBenchmarksInput,
+): Promise<ReconcileQuestionBenchmarksResult> {
+  // Preserve the API contract that validation fails before a transaction opens.
+  const desired = buildDesiredQuestionBenchmarks(input);
+
+  return db.$transaction(async (tx) => {
+    return reconcileDesiredQuestionBenchmarks(tx, input.templateId, desired);
   });
 }
 

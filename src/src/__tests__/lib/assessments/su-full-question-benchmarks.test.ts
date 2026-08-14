@@ -6,6 +6,10 @@ import {
   SU_FULL_QUESTION_BENCHMARKS_SOURCE,
   SU_FULL_QUESTION_BENCHMARKS_VERSION,
 } from "@/lib/assessments/su-full-question-benchmarks";
+import {
+  benchmarksFor,
+  SU_FULL_BENCHMARKS_VERSION,
+} from "@/lib/assessments/su-full-benchmarks";
 
 const EXPECTED_VALUES = [
   6.3, 7.2, 5.6, 5.9, 6.2, 4.6, 4.4, 5.5, 7.2, 6.4,
@@ -65,6 +69,22 @@ describe("Scaling Up Full per-question peer benchmark snapshot", () => {
     expect(ratingKeys).toEqual(EXPECTED_KEYS);
     expect(SU_FULL_QUESTION_BENCHMARKS.map((entry) => entry.stableKey)).toEqual(
       ratingKeys,
+    );
+  });
+
+  it("is the canonical question source consumed by the existing report benchmark", () => {
+    const expected = Object.fromEntries(
+      SU_FULL_QUESTION_BENCHMARKS.map(({ stableKey, value }) => [
+        stableKey,
+        value,
+      ]),
+    );
+
+    expect(benchmarksFor(SCALING_UP_FULL_TEMPLATE_ALIAS)?.question).toEqual(
+      expected,
+    );
+    expect(SU_FULL_BENCHMARKS_VERSION).toBe(
+      "2026-08-14.question-controlled-aggregate-provisional",
     );
   });
 });

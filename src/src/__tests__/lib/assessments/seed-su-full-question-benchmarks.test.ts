@@ -1,11 +1,14 @@
 import { buildScalingUpFullContent } from "../../../../prisma/seed-scaling-up-full-assessment";
 import {
   reconcileScalingUpFullQuestionBenchmarkSnapshot,
+  refreshScalingUpFullQuestionBenchmarkSnapshot,
 } from "@/lib/assessments/seed-su-full-question-benchmarks";
 import type {
   PeerBenchmarksDb,
   PeerBenchmarksTx,
 } from "@/lib/assessments/peer-benchmarks";
+
+const SCALING_UP_FULL_QUESTIONS = buildScalingUpFullContent().questions;
 
 function makeDb() {
   const tx = {
@@ -29,15 +32,13 @@ function makeDb() {
 }
 
 describe("reconcileScalingUpFullQuestionBenchmarkSnapshot", () => {
-  const questions = buildScalingUpFullContent().questions;
-
   it("reconciles the complete verified snapshot idempotently", async () => {
     const { db, tx } = makeDb();
 
     const result = await reconcileScalingUpFullQuestionBenchmarkSnapshot(
       db,
       "tpl-su",
-      questions,
+      SCALING_UP_FULL_QUESTIONS,
     );
 
     expect(Object.keys(result.after)).toHaveLength(61);
@@ -52,7 +53,7 @@ describe("reconcileScalingUpFullQuestionBenchmarkSnapshot", () => {
 
   it("fails before opening a transaction when template question keys drift", async () => {
     const { db, dbSpy } = makeDb();
-    const questionsWithoutQ61 = (questions as Array<{
+    const questionsWithoutQ61 = (SCALING_UP_FULL_QUESTIONS as Array<{
       stableKey: string;
       type: string;
     }>).filter((question) => question.stableKey !== "Q61");
@@ -65,5 +66,94 @@ describe("reconcileScalingUpFullQuestionBenchmarkSnapshot", () => {
       ),
     ).rejects.toThrow(/question-key mismatch.*Q61/i);
     expect(dbSpy.$transaction).not.toHaveBeenCalled();
+  });
+});
+
+describe("refreshScalingUpFullQuestionBenchmarkSnapshot", () => {
+  function makeRefreshDb() {
+    const tx = {
+      assessmentTemplate: {
+        findFirst: jest.fn().mockResolvedValue({ id: "tpl-su" }),
+      },
+      assessmentTemplateVersion: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: "ver-su",
+          versionNumber: 4,
+          questions: SCALING_UP_FULL_QUESTIONS,
+        }),
+      },
+      assessmentBenchmark: {
+        findMany: jest.fn().mockResolvedValue([]),
+        create: jest.fn().mockResolvedValue({}),
+        update: jest.fn().mockResolvedValue({}),
+        deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+      auditLog: { create: jest.fn().mockResolvedValue({}) },
+    };
+    const db = {
+      $transaction: jest.fn(async (fn: (inner: typeof tx) => unknown) =>
+        fn(tx),
+      ),
+    };
+    return { db, tx };
+  }
+
+  it("atomically writes the snapshot and durable source provenance", async () => {
+    const { db, tx } = makeRefreshDb();
+
+    const result = await refreshScalingUpFullQuestionBenchmarkSnapshot(
+      db,
+      "operator@example.com",
+    );
+
+    expect(result.storedCount).toBe(61);
+    expect(tx.assessmentTemplateVersion.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          templateId: "tpl-su",
+          language: "enUS",
+          publishedAt: { not: null },
+          archivedAt: null,
+        },
+      }),
+    );
+    expect(tx.auditLog.create).toHaveBeenCalledTimes(1);
+    const audit = tx.auditLog.create.mock.calls[0][0].data;
+    expect(audit).toMatchObject({
+      entityType: "ASSESSMENT_TEMPLATE",
+      entityId: "tpl-su",
+      action: "BENCHMARKS_RECONCILED",
+      performedBy: "operator@example.com",
+    });
+    expect(JSON.parse(audit.changes)).toMatchObject({
+      mechanism: "seed:scaling-up-full-peers",
+      benchmarkVersion: "2026-08-14.esperto-controlled-v1",
+      effectiveDate: "2026-08-14",
+      templateVersionId: "ver-su",
+      templateVersionNumber: 4,
+      before: {},
+    });
+    expect(Object.keys(JSON.parse(audit.changes).after)).toHaveLength(61);
+  });
+
+  it("requires an explicit operator before opening the transaction", async () => {
+    const { db } = makeRefreshDb();
+
+    await expect(
+      refreshScalingUpFullQuestionBenchmarkSnapshot(db, "  "),
+    ).rejects.toThrow(/operator/i);
+    expect(db.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("fails the refresh when the audit write fails", async () => {
+    const { db, tx } = makeRefreshDb();
+    tx.auditLog.create.mockRejectedValueOnce(new Error("audit unavailable"));
+
+    await expect(
+      refreshScalingUpFullQuestionBenchmarkSnapshot(
+        db,
+        "operator@example.com",
+      ),
+    ).rejects.toThrow("audit unavailable");
   });
 });

@@ -42,7 +42,9 @@ mapped differences.
 
 The captured Q01–Q61 values and their version/effective date live in
 `src/src/lib/assessments/su-full-question-benchmarks.ts`. Integrity tests match
-that snapshot against the canonical Scaling Up Full assessment seed.
+that snapshot against the canonical Scaling Up Full assessment seed. The full
+value table and campaign/report evidence ledger are recorded in
+`esperto-peer-benchmark-snapshot-2026-08-14.md`.
 
 ## Primary-source context
 

@@ -6,8 +6,10 @@
  * two additional controls varied company size and organizational phase. All
  * 61 peer values stayed fixed by question across the controlled set.
  *
- * This is a source snapshot for the `AssessmentBenchmark` table, not report
- * rendering logic. Admin changes remain possible through the benchmark editor.
+ * This is the canonical question-value source for both the existing static
+ * report benchmark and explicit `AssessmentBenchmark` table refreshes. It
+ * contains data only, not presentation logic. DB-row changes remain possible
+ * through the benchmark editor.
  */
 
 export const SCALING_UP_FULL_TEMPLATE_ALIAS = "scaling-up-full";

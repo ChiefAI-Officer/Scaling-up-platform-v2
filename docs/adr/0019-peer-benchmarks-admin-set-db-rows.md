@@ -23,7 +23,8 @@ solution:
 
 ## Decision
 
-Per-question peer benchmarks are **admin-entered database rows**, not code constants:
+LVA per-question peer benchmarks are **admin-entered database rows**. Scaling Up Full adds the source-backed
+snapshot exception described below:
 
 - New `AssessmentBenchmark` model (`templateId + metricKind + metricKey(stableKey) + value`), unique per
   tuple. `metricKind` has the single value `QUESTION` this wave; other kinds arrive as additive enum
@@ -43,17 +44,18 @@ Per-question peer benchmarks are **admin-entered database rows**, not code const
 - **Wave S originally seeded no values.** LVA still ships empty because no source dataset exists; its rows
   appear only after an admin enters them. Scaling Up Full now has a separately governed, source-backed
   exception described in the 2026-08-14 amendment below.
-- **SU-Full's static file is retained untouched.** Migrating a live, verified render path (with its own
-  fail-closed key-skew semantics) buys no user-visible value in this wave.
+- **SU-Full's static render path is retained.** Its question record now consumes the same canonical
+  controlled snapshot used by the explicit DB refresh; its domain/section/ScaleUp values remain provisional.
+  The existing report layout and fail-closed key-skew behavior do not change.
 
 ## Consequences
 
 - Jeff's #12 is satisfied literally: admins set peer averages per LVA question today, and any future template
   gets the same configuration capability by adding its alias to the editor-enabled list.
-- **Two benchmark systems coexist** (SU-Full static file at domain/section/scaleup granularity; DB rows at
-  question granularity). This is deliberate and temporary; a named follow-on consolidates SU-Full into the
-  table — and must decide then whether to keep SU-Full's all-or-nothing fail-closed rule (right for seed
-  drift) or adopt Wave S's per-key omit-empty (right for deliberate admin input).
+- **Two storage/read paths coexist.** The existing SU-Full report reads the canonical static snapshot; DB
+  rows support the editor and the future paired-bar path. The explicit refresh mirrors the same source into
+  DB, avoiding two code copies, but a manual DB edit does not alter today's static SU-Full report. The render
+  follow-on must choose DB semantics (all-or-nothing fail-closed versus per-key omit-empty) before switching.
 - Because benchmarks are template-level, editing values changes every campaign report that currently has a
   peer render path, including historical reports. Editor-only templates begin using the rows when their
   report path later ships. This is the intended reference-dataset semantics; `updatedAt` and admin audit
@@ -68,22 +70,29 @@ reports varied Q01 through scores 0–10, and additional controls varied company
 phase. Every displayed Peer value stayed fixed by question across that controlled set. This rules out live
 calculation from the current company's respondents and provides sufficient evidence to treat the displayed
 values as a stored per-question lookup for this implementation. It does **not** reveal Esperto's private
-historical cohort formula or refresh schedule. The evidence ledger and remaining unknowns are recorded in
-`docs/research/esperto-peer-benchmark-sources.md`.
+historical cohort formula or refresh schedule. The evidence ledger and complete captured value table are in
+`docs/research/esperto-peer-benchmark-snapshot-2026-08-14.md`; source interpretation and remaining unknowns
+are in `docs/research/esperto-peer-benchmark-sources.md`.
 
 The implementation therefore:
 
-- stores a versioned, effective-dated source snapshot in
-  `su-full-question-benchmarks.ts` (`2026-08-14.esperto-controlled-v1`);
-- provides an explicit, idempotent reconcile command (`npm run seed:scaling-up-full-peers`) that validates
-  the active template still contains exactly Q01–Q61 before replacing the table's QUESTION rows;
+- stores a single canonical, versioned, effective-dated question snapshot in
+  `su-full-question-benchmarks.ts` (`2026-08-14.esperto-controlled-v1`), consumed by both the existing static
+  report benchmark and the DB refresh;
+- provides an explicit, idempotent reconcile command
+  (`BENCHMARK_REFRESH_ACTOR=<operator> npm run seed:scaling-up-full-peers`) that validates the active `enUS`
+  template still contains exactly Q01–Q61 before replacing the table's QUESTION rows;
 - keeps that refresh separate from the ordinary assessment seed so routine seed runs cannot overwrite later
   manual admin changes;
+- writes the reconcile delta, operator, source, benchmark version, effective date, and active template version
+  to `AuditLog` in the same transaction as the benchmark mutation;
 - exposes Scaling Up Full through the existing peer editor and audited save route for manual or annual
   maintenance; and
-- keeps `PEER_RENDER_ENABLED_ALIASES` LVA-only until the approved Scaling Up Full paired-bar report UI ships.
-  `PEER_EDITOR_ENABLED_ALIASES` is now the separate capability gate for configuration.
+- keeps the DB-backed Wave S `PEER_RENDER_ENABLED_ALIASES` LVA-only until the approved Scaling Up Full
+  paired-bar report UI ships. `PEER_EDITOR_ENABLED_ALIASES` is the separate configuration gate; the legacy
+  Scaling Up Full report continues rendering the canonical static values independently of that Wave S gate.
 
-The existing static Scaling Up Full domain, section, and ScaleUp-score benchmarks remain the current report
-render source. This amendment adds the verified question-level data foundation only; it does not change the
-report UI.
+The existing static Scaling Up Full domain, section, question, and ScaleUp-score benchmark remains the current
+report source. This amendment governs its question data and adds the table/editor foundation; it does not
+change the report layout. Deploying code alone does not populate table rows: the explicit audited refresh is
+a post-deploy operator step.
