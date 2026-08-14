@@ -118,6 +118,7 @@ interface ScalingUpFullBenchmarkRefreshTx extends PeerBenchmarksTx {
 export interface ScalingUpFullBenchmarkRefreshDb {
   $transaction<T>(
     fn: (tx: ScalingUpFullBenchmarkRefreshTx) => Promise<T>,
+    options: { maxWait: number; timeout: number },
   ): Promise<T>;
 }
 
@@ -145,62 +146,65 @@ export async function refreshScalingUpFullQuestionBenchmarkSnapshot(
     );
   }
 
-  return db.$transaction(async (tx) => {
-    const template = await tx.assessmentTemplate.findFirst({
-      where: { alias: SCALING_UP_FULL_TEMPLATE_ALIAS, deletedAt: null },
-      select: { id: true },
-    });
-    if (!template) {
-      throw new Error(
-        `Active template "${SCALING_UP_FULL_TEMPLATE_ALIAS}" was not found.`,
-      );
-    }
+  return db.$transaction(
+    async (tx) => {
+      const template = await tx.assessmentTemplate.findFirst({
+        where: { alias: SCALING_UP_FULL_TEMPLATE_ALIAS, deletedAt: null },
+        select: { id: true },
+      });
+      if (!template) {
+        throw new Error(
+          `Active template "${SCALING_UP_FULL_TEMPLATE_ALIAS}" was not found.`,
+        );
+      }
 
-    const activeVersion = await tx.assessmentTemplateVersion.findFirst({
-      where: {
+      const activeVersion = await tx.assessmentTemplateVersion.findFirst({
+        where: {
+          templateId: template.id,
+          language: DEFAULT_TEMPLATE_LANGUAGE,
+          ...activePublishedWhere,
+        },
+        orderBy: { versionNumber: "desc" },
+        select: { id: true, versionNumber: true, questions: true },
+      });
+      if (!activeVersion) {
+        throw new Error(
+          `Template "${SCALING_UP_FULL_TEMPLATE_ALIAS}" has no active published ${DEFAULT_TEMPLATE_LANGUAGE} version.`,
+        );
+      }
+
+      const { before, after } = await reconcileQuestionBenchmarksInTx(
+        tx,
+        buildSnapshotReconcileInput(template.id, activeVersion.questions),
+      );
+
+      await tx.auditLog.create({
+        data: {
+          entityType: "ASSESSMENT_TEMPLATE",
+          entityId: template.id,
+          action: "BENCHMARKS_RECONCILED",
+          performedBy,
+          changes: JSON.stringify({
+            mechanism: "seed:scaling-up-full-peers",
+            benchmarkVersion: SU_FULL_QUESTION_BENCHMARKS_VERSION,
+            effectiveDate: SU_FULL_QUESTION_BENCHMARKS_EFFECTIVE_DATE,
+            source: SU_FULL_QUESTION_BENCHMARKS_SOURCE,
+            templateVersionId: activeVersion.id,
+            templateVersionNumber: activeVersion.versionNumber,
+            before,
+            after,
+          }),
+        },
+      });
+
+      return {
         templateId: template.id,
-        language: DEFAULT_TEMPLATE_LANGUAGE,
-        ...activePublishedWhere,
-      },
-      orderBy: { versionNumber: "desc" },
-      select: { id: true, versionNumber: true, questions: true },
-    });
-    if (!activeVersion) {
-      throw new Error(
-        `Template "${SCALING_UP_FULL_TEMPLATE_ALIAS}" has no active published ${DEFAULT_TEMPLATE_LANGUAGE} version.`,
-      );
-    }
-
-    const { before, after } = await reconcileQuestionBenchmarksInTx(
-      tx,
-      buildSnapshotReconcileInput(template.id, activeVersion.questions),
-    );
-
-    await tx.auditLog.create({
-      data: {
-        entityType: "ASSESSMENT_TEMPLATE",
-        entityId: template.id,
-        action: "BENCHMARKS_RECONCILED",
-        performedBy,
-        changes: JSON.stringify({
-          mechanism: "seed:scaling-up-full-peers",
-          benchmarkVersion: SU_FULL_QUESTION_BENCHMARKS_VERSION,
-          effectiveDate: SU_FULL_QUESTION_BENCHMARKS_EFFECTIVE_DATE,
-          source: SU_FULL_QUESTION_BENCHMARKS_SOURCE,
-          templateVersionId: activeVersion.id,
-          templateVersionNumber: activeVersion.versionNumber,
-          before,
-          after,
-        }),
-      },
-    });
-
-    return {
-      templateId: template.id,
-      templateVersionId: activeVersion.id,
-      templateVersionNumber: activeVersion.versionNumber,
-      previousCount: Object.keys(before).length,
-      storedCount: Object.keys(after).length,
-    };
-  });
+        templateVersionId: activeVersion.id,
+        templateVersionNumber: activeVersion.versionNumber,
+        previousCount: Object.keys(before).length,
+        storedCount: Object.keys(after).length,
+      };
+    },
+    { maxWait: 10_000, timeout: 55_000 },
+  );
 }

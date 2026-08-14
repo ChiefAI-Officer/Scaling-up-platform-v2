@@ -7,7 +7,7 @@
  *  - listRatingQuestionKeys (SLIDER_LIKERT filter, version order, LVA report
  *    label overrides, malformed-input safety)
  *  - reconcileQuestionBenchmarks (atomic full-set reconcile, D14 + C3:
- *    prune/update/create, unchanged rows untouched, typed validation errors,
+ *    batch replace/create, unchanged rows untouched, typed validation errors,
  *    1dp rounding, single transaction)
  *  - buildPeerComparisonSection (pure individual-report builder: 1/2/3 →
  *    0/5/10, omit rules, string-number coercion, null on empty, dev
@@ -130,6 +130,7 @@ function makeDb(existing: QuestionBenchmarkRow[]) {
     assessmentBenchmark: {
       findMany: jest.fn().mockResolvedValue(existing),
       create: jest.fn().mockResolvedValue({}),
+      createMany: jest.fn().mockResolvedValue({ count: 0 }),
       update: jest.fn().mockResolvedValue({}),
       deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
     },
@@ -333,14 +334,14 @@ describe("reconcileQuestionBenchmarks", () => {
     });
 
     expect(dbSpy.$transaction).toHaveBeenCalledTimes(1);
-    expect(tx.assessmentBenchmark.create).toHaveBeenCalledTimes(1);
-    expect(tx.assessmentBenchmark.create).toHaveBeenCalledWith({
-      data: {
+    expect(tx.assessmentBenchmark.createMany).toHaveBeenCalledTimes(1);
+    expect(tx.assessmentBenchmark.createMany).toHaveBeenCalledWith({
+      data: [{
         templateId: "tpl_1",
         metricKind: "QUESTION",
         metricKey: "S3_recruitment",
         value: 6.3, // Math.round(6.25 * 10) / 10
-      },
+      }],
     });
     expect(tx.assessmentBenchmark.update).not.toHaveBeenCalled();
     expect(tx.assessmentBenchmark.deleteMany).not.toHaveBeenCalled();
@@ -401,11 +402,58 @@ describe("reconcileQuestionBenchmarks", () => {
       validKeys: VALID_KEYS,
     });
 
-    expect(tx.assessmentBenchmark.update).toHaveBeenCalledTimes(1);
-    expect(tx.assessmentBenchmark.update).toHaveBeenCalledWith({
-      where: { id: "b1" },
-      data: { value: 7.1 },
+    expect(tx.assessmentBenchmark.deleteMany).toHaveBeenCalledWith({
+      where: { id: { in: ["b1"] } },
     });
+    expect(tx.assessmentBenchmark.createMany).toHaveBeenCalledWith({
+      data: [{
+        templateId: "tpl_1",
+        metricKind: "QUESTION",
+        metricKey: "S3_recruitment",
+        value: 7.1,
+      }],
+    });
+  });
+
+  it("batches changed, stale, and new rows while leaving unchanged rows untouched", async () => {
+    const { db, tx } = makeDb([
+      { id: "b1", metricKey: "S3_recruitment", value: 6.3 },
+      { id: "b2", metricKey: "S3_market", value: 4 },
+      { id: "stale", metricKey: "S3_retired_factor", value: 5 },
+    ]);
+
+    await reconcileQuestionBenchmarks(db, {
+      templateId: "tpl_1",
+      entries: [
+        { stableKey: "S3_recruitment", value: 7.1 },
+        { stableKey: "S3_market", value: 4 },
+        { stableKey: "S3_leadership_team", value: 5 },
+      ],
+      validKeys: VALID_KEYS,
+    });
+
+    expect(tx.assessmentBenchmark.deleteMany).toHaveBeenCalledTimes(1);
+    expect(tx.assessmentBenchmark.deleteMany).toHaveBeenCalledWith({
+      where: { id: { in: ["b1", "stale"] } },
+    });
+    expect(tx.assessmentBenchmark.createMany).toHaveBeenCalledTimes(1);
+    expect(tx.assessmentBenchmark.createMany).toHaveBeenCalledWith({
+      data: [
+        {
+          templateId: "tpl_1",
+          metricKind: "QUESTION",
+          metricKey: "S3_recruitment",
+          value: 7.1,
+        },
+        {
+          templateId: "tpl_1",
+          metricKind: "QUESTION",
+          metricKey: "S3_leadership_team",
+          value: 5,
+        },
+      ],
+    });
+    expect(tx.assessmentBenchmark.update).not.toHaveBeenCalled();
   });
 
   it("does NOT touch unchanged rows (no update, no delete — id/timestamps kept)", async () => {
@@ -422,7 +470,7 @@ describe("reconcileQuestionBenchmarks", () => {
 
     expect(tx.assessmentBenchmark.update).not.toHaveBeenCalled();
     expect(tx.assessmentBenchmark.deleteMany).not.toHaveBeenCalled();
-    expect(tx.assessmentBenchmark.create).not.toHaveBeenCalled();
+    expect(tx.assessmentBenchmark.createMany).not.toHaveBeenCalled();
     expect(result).toEqual({
       before: { S3_recruitment: 6.3 },
       after: { S3_recruitment: 6.3 },
@@ -463,8 +511,8 @@ describe("reconcileQuestionBenchmarks", () => {
 
     expect(dbSpy.$transaction).toHaveBeenCalledTimes(1);
     expect(tx.assessmentBenchmark.findMany).toHaveBeenCalledTimes(1);
-    expect(tx.assessmentBenchmark.update).toHaveBeenCalledTimes(1);
-    expect(tx.assessmentBenchmark.create).toHaveBeenCalledTimes(1);
+    expect(tx.assessmentBenchmark.deleteMany).toHaveBeenCalledTimes(1);
+    expect(tx.assessmentBenchmark.createMany).toHaveBeenCalledTimes(1);
   });
 
   describe("validation (typed PeerBenchmarkValidationError, thrown BEFORE any write)", () => {
@@ -543,7 +591,10 @@ describe("reconcileQuestionBenchmarks", () => {
         ],
         validKeys: VALID_KEYS,
       });
-      expect(tx.assessmentBenchmark.create).toHaveBeenCalledTimes(2);
+      expect(tx.assessmentBenchmark.createMany).toHaveBeenCalledTimes(1);
+      expect(tx.assessmentBenchmark.createMany.mock.calls[0][0].data).toHaveLength(
+        2,
+      );
     });
   });
 });

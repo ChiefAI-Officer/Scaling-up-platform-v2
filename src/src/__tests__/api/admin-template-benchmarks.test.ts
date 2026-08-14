@@ -27,6 +27,7 @@ const txMock = {
   assessmentBenchmark: {
     findMany: jest.fn(),
     create: jest.fn(),
+    createMany: jest.fn(),
     update: jest.fn(),
     deleteMany: jest.fn(),
   },
@@ -127,6 +128,7 @@ beforeEach(() => {
   });
   (txMock.assessmentBenchmark.findMany as jest.Mock).mockResolvedValue([]);
   (txMock.assessmentBenchmark.create as jest.Mock).mockResolvedValue({});
+  (txMock.assessmentBenchmark.createMany as jest.Mock).mockResolvedValue({});
   (txMock.assessmentBenchmark.update as jest.Mock).mockResolvedValue({});
   (txMock.assessmentBenchmark.deleteMany as jest.Mock).mockResolvedValue({});
 });
@@ -358,13 +360,13 @@ describe("PUT /api/admin/assessment-templates/[id]/benchmarks", () => {
     expect(txMock.assessmentBenchmark.deleteMany).toHaveBeenCalledWith({
       where: { id: { in: ["b1"] } },
     });
-    expect(txMock.assessmentBenchmark.create).toHaveBeenCalledWith({
-      data: {
+    expect(txMock.assessmentBenchmark.createMany).toHaveBeenCalledWith({
+      data: [{
         templateId: "tpl-1",
         metricKind: "QUESTION",
         metricKey: "S3_market",
         value: 6.3,
-      },
+      }],
     });
 
     // Audit: BENCHMARKS_RECONCILED with before/after delta.
