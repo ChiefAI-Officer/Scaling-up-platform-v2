@@ -457,12 +457,19 @@ answers or other PII.
 - Chromium PDF output contains exactly 26 physical pages; and
 - PDF text extraction finds Q01-Q61 labels in canonical order with no missing
   feedback text;
+- browser geometry and label measurements run with print media enabled across
+  opener pages 7, 11, 14, 19, and 21 plus Appendix A;
+- the six print surfaces contain exactly ten charts and 122 canonical chart
+  rows: each Q01-Q61 key once on its opener and once in Appendix A;
 - real browser measurements prove each full canonical chart label's scroll and
   visual bounds remain inside its row on all five opener pages and Appendix A;
-- print contours stay within 1px of their rendered 0–10 scales and row centers;
-  and
+- every contour on all five openers and Appendix A stays within 1px of its
+  rendered 0–10 scale and row center;
+- kicker text and contour lines meet their contrast thresholds in all five
+  chapter colors; and
 - 375px and 760px views have no document overflow and show truth-scaled visible
-  `Peers` bars/values in every chart row.
+  `Peers` bars/values in exactly the same 122 canonical chart rows while all
+  ten connected contours are hidden.
 
 ### Required visual review
 

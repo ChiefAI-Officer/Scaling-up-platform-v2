@@ -20,6 +20,8 @@ jest.setTimeout(60_000);
 
 const ENABLED = "NEXT_PUBLIC_WAVE_SU_FULL_LANDSCAPE_REPORT_ENABLED";
 const KILL = "NEXT_PUBLIC_WAVE_SU_FULL_LANDSCAPE_REPORT_KILL";
+const OPENER_PAGES = [7, 11, 14, 19, 21] as const;
+const CHART_PAGES = [...OPENER_PAGES, 26] as const;
 
 function stylesheet(): string {
   return ["su-public-brand.css", "su-report.css"]
@@ -72,7 +74,7 @@ async function labelFit(page: Page, pageNumbers: readonly number[]) {
 }
 
 function expectLabelsToFit(rows: Awaited<ReturnType<typeof labelFit>>) {
-  expect(rows.length).toBeGreaterThan(0);
+  expect(rows).toHaveLength(122);
   expect(rows.filter((row) =>
     row.label === ""
     || row.scrollHeight > row.clientHeight + 1
@@ -83,6 +85,35 @@ function expectLabelsToFit(rows: Awaited<ReturnType<typeof labelFit>>) {
     || row.textOverflow === "ellipsis"
     || row.webkitLineClamp !== "none"
   )).toEqual([]);
+}
+
+function expectedChartMembership(report: ReturnType<typeof completeSuFullLandscapeReport>) {
+  const keys = report.result.perQuestion.map((question) => question.stableKey);
+  const chapters = [
+    keys.slice(0, 13),
+    keys.slice(13, 20),
+    keys.slice(20, 40),
+    keys.slice(40, 45),
+    keys.slice(45, 61),
+  ];
+  return [
+    { page: "7", charts: [chapters[0]] },
+    { page: "11", charts: [chapters[1]] },
+    { page: "14", charts: [chapters[2]] },
+    { page: "19", charts: [chapters[3]] },
+    { page: "21", charts: [chapters[4]] },
+    { page: "26", charts: chapters },
+  ];
+}
+
+async function chartMembership(page: Page) {
+  return page.locator(CHART_PAGES.map((number) => `[data-page-number="${number}"]`).join(","))
+    .evaluateAll((surfaces) => surfaces.map((surface) => ({
+      page: (surface as HTMLElement).dataset.pageNumber ?? "unknown",
+      charts: [...surface.querySelectorAll<HTMLElement>(".su-full-landscape-vertical-chart")]
+        .map((chart) => [...chart.querySelectorAll<HTMLElement>(".su-full-landscape-chart-row")]
+          .map((row) => (row.dataset.testid ?? "").replace("su-landscape-vertical-row-", ""))),
+    })));
 }
 
 async function mobilePeerRows(page: Page, pageNumbers: readonly number[]) {
@@ -98,6 +129,7 @@ async function mobilePeerRows(page: Page, pageNumbers: readonly number[]) {
     const fillRect = fill.getBoundingClientRect();
     const expected = Number((row as HTMLElement).dataset.peerScore);
     return {
+      stableKey: ((row as HTMLElement).dataset.testid ?? "").replace("su-landscape-vertical-row-", ""),
       expected,
       labelVisible: getComputedStyle(label).display !== "none" && label.getBoundingClientRect().width > 0,
       scaleVisible: getComputedStyle(scale).display !== "none" && scaleRect.width > 0,
@@ -179,14 +211,15 @@ describe("SU Full landscape browser and PDF contract", () => {
     else process.env[KILL] = savedKill;
   });
 
-  it("keeps contour points on the 0-10 tracks and rendered row centers on opener and Appendix layouts", async () => {
-    const { html } = routeMarkup();
+  it("under print media keeps every opener and Appendix contour on its 0-10 track and row center", async () => {
+    const { html, report } = routeMarkup();
     const page = await browser.newPage({ viewport: { width: 1123, height: 794 } });
     try {
       await load(page, html);
+      await page.emulateMedia({ media: "print" });
       await expect(page.locator("[data-enabled-report-style]").getAttribute("data-enabled-report-style"))
         .resolves.toBe("CLASSIC");
-      for (const pageNumber of [7, 11, 21]) {
+      for (const pageNumber of OPENER_PAGES) {
         const charts = await geometry(page, pageNumber);
         expect(charts).toHaveLength(1);
         for (const chart of charts) {
@@ -198,7 +231,6 @@ describe("SU Full landscape browser and PDF contract", () => {
           }
         }
       }
-      await page.emulateMedia({ media: "print" });
       const appendixCharts = await geometry(page, 26);
       expect(appendixCharts).toHaveLength(5);
       for (const chart of appendixCharts) {
@@ -206,7 +238,10 @@ describe("SU Full landscape browser and PDF contract", () => {
         expect(chart.vectorEffect).toBe("non-scaling-stroke");
         expect(chart.rows.every((row) => row.xError <= 1 && row.yError <= 1)).toBe(true);
       }
-      expectLabelsToFit(await labelFit(page, [7, 11, 14, 19, 21, 26]));
+      const membership = await chartMembership(page);
+      expect(membership).toEqual(expectedChartMembership(report));
+      expect(membership.flatMap((surface) => surface.charts.flat())).toHaveLength(122);
+      expectLabelsToFit(await labelFit(page, CHART_PAGES));
       await expect(page.locator("main").count()).resolves.toBe(1);
       await expect(page.locator("main[data-testid='route-wrapper']").count()).resolves.toBe(1);
       await expect(page.locator(".su-full-landscape-peer-contour").count()).resolves.toBe(10);
@@ -216,8 +251,8 @@ describe("SU Full landscape browser and PDF contract", () => {
     }
   });
 
-  it.each([375, 760])("has no horizontal overflow and retains a visible truthful contour at %ipx", async (width) => {
-    const { html } = routeMarkup();
+  it.each([375, 760])("has no horizontal overflow and uses governed visible peer bars with the contour hidden at %ipx", async (width) => {
+    const { html, report } = routeMarkup();
     const page = await browser.newPage({ viewport: { width, height: 900 } });
     try {
       await load(page, html);
@@ -234,28 +269,37 @@ describe("SU Full landscape browser and PDF contract", () => {
       }));
       expect(dimensions.offenders).toEqual([]);
       expect(dimensions.document).toBeLessThanOrEqual(dimensions.viewport + 1);
-      await expect(page.locator("[data-page-number='7'] .su-full-landscape-peer-contour").isVisible())
-        .resolves.toBe(false);
-      const peerRows = await mobilePeerRows(page, [7, 11, 14, 19, 21, 26]);
-      expect(peerRows.length).toBeGreaterThanOrEqual(61);
+      const contourVisibility = await page.locator(
+        CHART_PAGES.map((number) => `[data-page-number="${number}"] .su-full-landscape-peer-contour`).join(","),
+      ).evaluateAll((contours) => contours.map((contour) => getComputedStyle(contour).display));
+      expect(contourVisibility).toHaveLength(10);
+      expect(contourVisibility.every((display) => display === "none")).toBe(true);
+      const peerRows = await mobilePeerRows(page, CHART_PAGES);
+      expect(peerRows).toHaveLength(122);
+      expect(peerRows.map((row) => row.stableKey)).toEqual(
+        expectedChartMembership(report).flatMap((surface) => surface.charts.flat()),
+      );
       expect(peerRows.every((row) => row.labelVisible && row.scaleVisible && row.valueVisible)).toBe(true);
       expect(peerRows.every((row) => row.value === row.expected && row.widthError <= 1)).toBe(true);
       await expect(page.locator("[data-page-number='7'] .su-full-landscape-chart-legend").isVisible())
         .resolves.toBe(true);
-      expectLabelsToFit(await labelFit(page, [7, 11, 14, 19, 21, 26]));
+      expectLabelsToFit(await labelFit(page, CHART_PAGES));
     } finally {
       await page.close();
     }
   });
 
-  it("meets visible text and peer-line contrast and produces a complete 26-page A4 landscape PDF", async () => {
+  it("meets all five chapter contrast contracts and produces a complete 26-page A4 landscape PDF", async () => {
     const { html, report } = routeMarkup();
     const page = await browser.newPage({ viewport: { width: 1123, height: 794 } });
     const directory = mkdtempSync(join(tmpdir(), "su-full-landscape-browser-"));
     const pdfPath = join(directory, "report.pdf");
     try {
       await load(page, html);
-      const contrast = await page.locator("[data-page-number='7']").evaluate((root) => {
+      await page.emulateMedia({ media: "print" });
+      const contrast = await page.locator(
+        OPENER_PAGES.map((number) => `[data-page-number="${number}"]`).join(","),
+      ).evaluateAll((roots) => {
         const rgb = (value: string) => (value.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
         const luminance = (value: string) => {
           const [red, green, blue] = rgb(value).map((channel) => {
@@ -269,18 +313,21 @@ describe("SU Full landscape browser and PDF contract", () => {
           const second = luminance(background);
           return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
         };
-        const kicker = root.querySelector<HTMLElement>(".su-full-landscape-chapter-kicker");
-        const contour = root.querySelector<SVGSVGElement>(".su-full-landscape-peer-contour");
-        if (!kicker || !contour) throw new Error("Missing contrast targets");
-        return {
-          kicker: ratio(getComputedStyle(kicker).color, "rgb(255, 255, 255)"),
-          contour: ratio(getComputedStyle(contour).color, "rgb(255, 255, 255)"),
-        };
+        return roots.map((root) => {
+          const kicker = root.querySelector<HTMLElement>(".su-full-landscape-chapter-kicker");
+          const contour = root.querySelector<SVGSVGElement>(".su-full-landscape-peer-contour");
+          if (!kicker || !contour) throw new Error("Missing contrast targets");
+          return {
+            page: (root as HTMLElement).dataset.pageNumber,
+            kicker: ratio(getComputedStyle(kicker).color, "rgb(255, 255, 255)"),
+            contour: ratio(getComputedStyle(contour).color, "rgb(255, 255, 255)"),
+          };
+        });
       });
-      expect(contrast.kicker).toBeGreaterThanOrEqual(4.5);
-      expect(contrast.contour).toBeGreaterThanOrEqual(3);
+      expect(contrast).toHaveLength(5);
+      expect(contrast.every((chapter) => chapter.kicker >= 4.5)).toBe(true);
+      expect(contrast.every((chapter) => chapter.contour >= 3)).toBe(true);
 
-      await page.emulateMedia({ media: "print" });
       const profileFit = await page.locator("[data-page-number='5']").evaluate((profile) => {
         const footer = profile.querySelector<HTMLElement>(".su-full-landscape-page-footer");
         const rows = [...profile.querySelectorAll<HTMLElement>("tbody tr")];
