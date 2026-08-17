@@ -6,6 +6,19 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="su-full-feedback-bands-published"></a>
+### 2026-08-14 — Scaling Up Full feedback bands corrected and published <!-- ENTRY_ISO:2026-08-14 ENTRY_SLUG:su-full-feedback-bands-published -->
+
+**Status: LIVE IN PRODUCTION AS EDITION 4 + DATA-VERIFIED.** Controlled Esperto reports established that score `9` selects the same top feedback as score `10`, correcting the provisional upper mapping from `7–9 / 10` to `7–8 / 9–10`. The complete five-band mapping is now `0–2 / 3–4 / 5–6 / 7–8 / 9–10` for all 61 scored Scaling Up Full questions. The patch changed only `minScore`/`maxScore`; all five records per question and all **305/305 feedback texts** were preserved exactly.
+
+**Immutable-version workflow and safeguards.** The active Edition 3 was cloned to an audited Edition 4 draft instead of being edited in place. The guarded patch fails closed unless it sees exactly 61 scored questions, exactly five complete feedback records per question, exactly 305 records overall, and one uniform recognized legacy or corrected range shape. It is idempotent, refuses to overwrite an unrelated draft, supports a read-only dry run, retains every non-boundary version field, and records the source version, before/after ranges, content hash, operator, and text-preservation assertion. The guarded publication path requires an active privileged operator, the exact patch audit/content hash, normal publish validation, and a compare-and-set update in the same transaction as the publication audit.
+
+The narrowly named helpers and scripts are retained as a reproducible, idempotent recovery path for local, Preview, or restored environments that still contain the legacy Edition 3 ranges. They are not a general feedback migration framework and reject any unrecognized or partially changed range shape.
+
+**Production receipt.** The authorized patch attributed to `gabriel@chiefaiofficer.com` cloned Edition 3 `cmr09tcox0003j84kgtszwvru` into Edition 4 `cmst26ix40002rx04ybh20vvy`. Normal editor validation reported **Ready to publish** with zero issues; because the automated browser could not resolve the native confirmation dialog, the exact audited draft was published through the guarded fallback by active ADMIN `jcbdelossantos.va@gmail.com` at `2026-08-14T14:57:09.758Z`. A separate read-back confirmed Edition 4 is the active published version, contains 61 scored questions and 305 feedback records, has only the corrected range shape, and matches Edition 3 for feedback text, sections, scoring configuration, report configuration, and all non-boundary question data. Five existing campaigns remain intentionally pinned to immutable Edition 3; future campaigns resolve Edition 4. No existing campaign, response, answer, invitation, email, benchmark value, schema, migration, or environment flag was changed.
+
+**Verification.** Focused patch, content, and recommendation coverage passed **3 suites / 41 tests**. The repository-wide run passed **695/695 suites, 8,659/8,659 tests, and 16/16 snapshots**; changed-file ESLint emitted no diagnostics; migration safety approved all **47 migrations**; and `git diff --check` passed. The Production-equivalent Turbopack build compiled, passed TypeScript, and generated **94/94** pages, retaining only the expected local workspace-root, middleware-deprecation, missing Inngest-key, and missing `DATABASE_URL` diagnostics.
+
 <a id="su-full-peer-benchmark-refresh-batched"></a>
 ### 2026-08-14 — Scaling Up Full benchmark refresh launched and populated <!-- ENTRY_ISO:2026-08-14 ENTRY_SLUG:su-full-peer-benchmark-refresh-batched -->
 

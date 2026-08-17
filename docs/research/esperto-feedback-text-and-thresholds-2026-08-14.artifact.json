@@ -1,0 +1,279 @@
+{
+  "surface": "report",
+  "manifest": {
+    "version": 1,
+    "surface": "report",
+    "title": "Esperto feedback text and score thresholds",
+    "description": "Audit-ready capture of the 61-question Esperto feedback library and the evidence for its score bands.",
+    "generatedAt": "2026-08-14T21:12:46+08:00",
+    "sources": [
+      {
+        "id": "catalogue",
+        "label": "Esperto feedback-text catalogue",
+        "path": "docs/research/esperto-feedback-text-catalogue-2026-08-14.csv",
+        "query": {
+          "description": "Mechanical export of all 61 questions and five source feedback levels, with live question-1 wording overlaid where verified.",
+          "executed_at": "2026-08-14T21:12:46+08:00",
+          "language": "TypeScript",
+          "filters": [
+            "SLIDER_LIKERT questions only",
+            "Five source levels per question: 0, 3, 5, 7, 10"
+          ],
+          "metric_definitions": [
+            "Feedback record: one question at one captured Esperto source level"
+          ]
+        }
+      },
+      {
+        "id": "uniform-reports",
+        "label": "Five official Esperto uniform-fill reports dated 2026-05-01",
+        "query": {
+          "description": "Official reports with every scored answer set uniformly to 0, 3, 5, 7, or 10; each report exposes the feedback selected for all 61 questions at that score.",
+          "filters": [
+            "Full CEO report",
+            "One report per uniform score stop"
+          ]
+        }
+      },
+      {
+        "id": "live-sweep",
+        "label": "Eleven live Esperto reports for Effective recruitment process",
+        "query": {
+          "description": "Otherwise identical CEO reports with question 1 set once to every integer from 0 through 10.",
+          "executed_at": "2026-08-14T00:00:00+08:00",
+          "filters": [
+            "Only Effective recruitment process varied",
+            "All other scored answers held at 5"
+          ]
+        }
+      },
+      {
+        "id": "platform-seed",
+        "label": "Scaling Up Full assessment seed",
+        "path": "src/prisma/seed-scaling-up-full-assessment.ts",
+        "query": {
+          "description": "Application source library containing the 61 questions and five captured feedback texts per question."
+        }
+      },
+      {
+        "id": "report-datasets",
+        "label": "Reproducible report dataset queries",
+        "path": "docs/research/esperto-feedback-report-datasets.sql",
+        "query": {
+          "description": "SQL that reconstructs the reviewed rows used by the report chart and audit tables."
+        }
+      }
+    ],
+    "tables": [
+      {
+        "id": "band-map",
+        "title": "Recommended five-level score map",
+        "subtitle": "Direct live evidence fixes the top boundary at 9; low-band interiors remain a high-confidence inference.",
+        "showDescription": true,
+        "dataset": "band_map",
+        "defaultSort": {
+          "field": "source_level",
+          "direction": "asc"
+        },
+        "density": "spacious",
+        "sourceId": "report-datasets",
+        "layout": "full",
+        "columns": [
+          { "field": "source_level", "label": "Stored level", "type": "number" },
+          { "field": "score_range", "label": "Score range", "type": "text" },
+          { "field": "evidence", "label": "Evidence", "type": "text" }
+        ]
+      },
+      {
+        "id": "coverage-audit",
+        "title": "Capture and quality checks",
+        "subtitle": "The five uniform reports provide complete source-stop coverage across the 61 scored questions.",
+        "showDescription": true,
+        "dataset": "coverage",
+        "defaultSort": {
+          "field": "check",
+          "direction": "asc"
+        },
+        "density": "spacious",
+        "sourceId": "report-datasets",
+        "layout": "full",
+        "columns": [
+          { "field": "check", "label": "Check", "type": "text" },
+          { "field": "result", "label": "Result", "type": "text" },
+          { "field": "interpretation", "label": "Interpretation", "type": "text" }
+        ]
+      },
+      {
+        "id": "duplicate-text-audit",
+        "title": "Adjacent source levels with identical text",
+        "subtitle": "Duplicate text can hide a stored boundary in a visible report, as it does for question 1 at levels 0 and 3.",
+        "showDescription": true,
+        "dataset": "duplicates",
+        "defaultSort": {
+          "field": "levels",
+          "direction": "asc"
+        },
+        "density": "spacious",
+        "sourceId": "report-datasets",
+        "layout": "full",
+        "columns": [
+          { "field": "levels", "label": "Adjacent levels", "type": "text" },
+          { "field": "identical_questions", "label": "Identical questions", "type": "number" },
+          { "field": "out_of", "label": "Out of", "type": "number" },
+          { "field": "meaning", "label": "Meaning", "type": "text" }
+        ]
+      }
+    ],
+    "charts": [
+      {
+        "id": "coverage-by-level",
+        "title": "Questions with captured feedback by source level",
+        "subtitle": "All 61 scored questions are present at each of the five sampled Esperto levels; missing texts = 0.",
+        "showDescription": true,
+        "intent": "comparison",
+        "question": "Does every sampled Esperto level contain feedback for every scored question?",
+        "rationale": "A simple bar comparison makes any missing level immediately visible while retaining exact audit fields in the source dataset.",
+        "type": "bar",
+        "dataset": "coverage_by_level",
+        "sourceId": "report-datasets",
+        "encodings": {
+          "x": { "field": "source_level", "type": "ordinal", "label": "Esperto source level" },
+          "y": { "field": "questions_captured", "type": "quantitative", "label": "Questions captured", "format": "number" },
+          "tooltip": [
+            { "field": "expected_questions", "type": "quantitative", "label": "Expected questions", "format": "number" },
+            { "field": "missing_texts", "type": "quantitative", "label": "Missing texts", "format": "number" },
+            { "field": "source_date", "type": "text", "label": "Source date" }
+          ]
+        },
+        "xAxisTitle": "Esperto source level",
+        "yAxisTitle": "Questions captured",
+        "valueFormat": "number",
+        "layout": "full",
+        "maxRows": 5,
+        "emptyState": "No capture-audit rows are available."
+      }
+    ],
+    "blocks": [
+      {
+        "id": "title",
+        "type": "markdown",
+        "layout": "full",
+        "body": "# Esperto feedback text and score thresholds"
+      },
+      {
+        "id": "technical-summary",
+        "type": "markdown",
+        "layout": "full",
+        "sourceId": "catalogue",
+        "body": "## The feedback capture is complete; one threshold correction is required\n\nAll **61 scored questions** now have feedback captured at **five Esperto source levels**, yielding **305 non-empty records**. The implementation-ready mapping is **0–2, 3–4, 5–6, 7–8, and 9–10**. A live 0-through-10 sweep of question 1 proves the top feedback starts at score 9, so the platform's provisional **7–9 / 10-only** split does not match current Esperto behavior for that question."
+      },
+      {
+        "id": "finding-bands-intro",
+        "type": "markdown",
+        "layout": "full",
+        "body": "## Five stored levels explain four visible answers on question 1\n\nQuestion 1 displays the same text from 0 through 4 because its level-0 and level-3 source texts are identical. That visible collapse must not be mistaken for a four-level system: two other questions contain different text at levels 0 and 3. Preserve all five stored records."
+      },
+      {
+        "id": "band-map-block",
+        "type": "table",
+        "layout": "full",
+        "tableId": "band-map"
+      },
+      {
+        "id": "coverage-intro",
+        "type": "markdown",
+        "layout": "full",
+        "body": "## The source library covers every question at every sampled level\n\nFive official uniform-fill reports expose one feedback response per question at scores 0, 3, 5, 7, and 10. The catalogue joins these records by exact question label and overlays current live wording for question 1, where the August report differs from the May sample."
+      },
+      {
+        "id": "coverage-chart-block",
+        "type": "chart",
+        "layout": "full",
+        "chartId": "coverage-by-level"
+      },
+      {
+        "id": "coverage-block",
+        "type": "table",
+        "layout": "full",
+        "tableId": "coverage-audit"
+      },
+      {
+        "id": "definitions",
+        "type": "markdown",
+        "layout": "full",
+        "body": "## What the score map means\n\nA **source level** is one of the five answers used to expose Esperto's stored feedback text: 0, 3, 5, 7, or 10. A **score range** is the set of integer answers that should select that stored text. A **visible range** can span more than one stored level when adjacent levels contain identical wording."
+      },
+      {
+        "id": "duplicate-intro",
+        "type": "markdown",
+        "layout": "full",
+        "body": "## Duplicate wording hides some transitions\n\nMost questions use identical text at levels 0 and 3, so a report-only experiment cannot see that low boundary unless it varies one of the two questions whose texts differ. The source catalogue therefore retains duplicate records and records provenance instead of deduplicating them."
+      },
+      {
+        "id": "duplicate-block",
+        "type": "table",
+        "layout": "full",
+        "tableId": "duplicate-text-audit"
+      },
+      {
+        "id": "method",
+        "type": "markdown",
+        "layout": "full",
+        "body": "## The evidence combines uniform source reports with a live boundary sweep\n\nThe five May reports established the text selected at each source stop for all 61 questions. Eleven live August reports then varied only Effective recruitment process from 0 through 10 while holding the other answers constant. Comparing the selected text located live transitions at 5, 7, and 9 and exposed current wording drift."
+      },
+      {
+        "id": "limitations",
+        "type": "markdown",
+        "layout": "full",
+        "body": "## One boundary remains inferred rather than question-by-question proven\n\nThe mapping **0–2 / 3–4 / 5–6 / 7–8 / 9–10** is the best-supported common five-band model. Scores 1, 2, and 4 have not been swept on a question whose level-0 and level-3 texts differ, so the low interior boundary is a high-confidence inference, not direct vendor confirmation. The other 60 questions also retain May wording unless independently refreshed."
+      },
+      {
+        "id": "recommendation",
+        "type": "markdown",
+        "layout": "full",
+        "body": "## Implement five bands and preserve provenance\n\nUse five stored feedback records with score ranges **0–2, 3–4, 5–6, 7–8, and 9–10**. Keep duplicate texts as separate records. Treat question 1 as current-live wording and the remaining catalogue as May 2026 source wording. Do not describe every interior boundary as vendor-confirmed."
+      },
+      {
+        "id": "further-question",
+        "type": "markdown",
+        "layout": "full",
+        "body": "## Smallest remaining parity check\n\nIf exact vendor parity is required, sweep scores 0 through 4 on **Financial alert function** or **Employees know yearly goal**. Those are the only two questions whose level-0 and level-3 texts differ, so either one can reveal the hidden low-end transition with five reports."
+      }
+    ]
+  },
+  "snapshot": {
+    "version": 1,
+    "generatedAt": "2026-08-14T21:12:46+08:00",
+    "status": "ready",
+    "datasets": {
+      "band_map": [
+        { "source_level": 0, "min_score": 0, "score_range": "0–2", "evidence": "Scores 0 and 3 observed in uniform reports; interior split inferred" },
+        { "source_level": 3, "min_score": 3, "score_range": "3–4", "evidence": "Score 3 observed; interior split inferred" },
+        { "source_level": 5, "min_score": 5, "score_range": "5–6", "evidence": "Directly confirmed in live question-1 sweep" },
+        { "source_level": 7, "min_score": 7, "score_range": "7–8", "evidence": "Directly confirmed in live question-1 sweep" },
+        { "source_level": 10, "min_score": 9, "score_range": "9–10", "evidence": "Directly confirmed in live question-1 sweep" }
+      ],
+      "coverage": [
+        { "check_order": 1, "check": "Unique scored questions", "result": "61", "interpretation": "All assessment sliders represented" },
+        { "check_order": 2, "check": "Source levels per question", "result": "5", "interpretation": "0, 3, 5, 7, and 10" },
+        { "check_order": 3, "check": "Feedback records", "result": "305", "interpretation": "61 questions × 5 source levels" },
+        { "check_order": 4, "check": "Blank feedback records", "result": "0", "interpretation": "No missing narrative text" },
+        { "check_order": 5, "check": "Question-label drift", "result": "0", "interpretation": "Exact-label join succeeded across source reports" }
+      ],
+      "coverage_by_level": [
+        { "source_level": "0", "questions_captured": 61, "expected_questions": 61, "missing_texts": 0, "source_date": "1 May 2026" },
+        { "source_level": "3", "questions_captured": 61, "expected_questions": 61, "missing_texts": 0, "source_date": "1 May 2026" },
+        { "source_level": "5", "questions_captured": 61, "expected_questions": 61, "missing_texts": 0, "source_date": "1 May 2026" },
+        { "source_level": "7", "questions_captured": 61, "expected_questions": 61, "missing_texts": 0, "source_date": "1 May 2026" },
+        { "source_level": "10", "questions_captured": 61, "expected_questions": 61, "missing_texts": 0, "source_date": "1 May 2026" }
+      ],
+      "duplicates": [
+        { "pair_order": 1, "levels": "0 and 3", "identical_questions": 59, "out_of": 61, "meaning": "Often appears as one visible 0–4 response" },
+        { "pair_order": 2, "levels": "3 and 5", "identical_questions": 4, "out_of": 61, "meaning": "Boundary exists but text does not visibly change" },
+        { "pair_order": 3, "levels": "5 and 7", "identical_questions": 0, "out_of": 61, "meaning": "Every question visibly changes" },
+        { "pair_order": 4, "levels": "7 and 10", "identical_questions": 2, "out_of": 61, "meaning": "Two questions show the same high-end wording" }
+      ]
+    }
+  },
+  "sources": []
+}
