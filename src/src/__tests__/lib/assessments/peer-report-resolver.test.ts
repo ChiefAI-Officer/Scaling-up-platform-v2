@@ -30,6 +30,7 @@ import {
 import { hasSourcePublicResult } from "@/lib/assessments/report-config";
 import { LVA_TEMPLATE_ALIAS } from "@/lib/assessments/lva-report-display";
 import { PEER_RENDER_ENABLED_ALIASES } from "@/lib/assessments/peer-benchmarks";
+import { SCALING_UP_FULL_TEMPLATE_ALIAS } from "@/lib/assessments/su-full-question-benchmarks";
 import * as peerBenchmarksModule from "@/lib/assessments/peer-benchmarks";
 import * as suFullPeerPresentationModule from "@/lib/assessments/su-full-peer-presentation";
 import type { RespondentReport } from "@/lib/assessments/respondent-report";
@@ -128,10 +129,13 @@ test("an absent render alias skips the benchmark query", async () => {
   expect(result.report).toBe(report);
 });
 
-test("the default render aliases keep SU Full dark while LVA remains enabled", async () => {
-  expect(PEER_RENDER_ENABLED_ALIASES).not.toContain("scaling-up-full");
-  expect(PEER_RENDER_ENABLED_ALIASES).toContain(LVA_TEMPLATE_ALIAS);
+test("the default render aliases enable SU Full and LVA", async () => {
+  expect(PEER_RENDER_ENABLED_ALIASES).toEqual([
+    LVA_TEMPLATE_ALIAS,
+    SCALING_UP_FULL_TEMPLATE_ALIAS,
+  ]);
 
+  findMany.mockResolvedValueOnce(completeSuFullBenchmarkRows());
   const suFullReport = completeSuFullPeerReport();
   const suFullResult = await resolvePeerReportEnhancements({
     db,
@@ -142,8 +146,8 @@ test("the default render aliases keep SU Full dark while LVA remains enabled", a
     logger: { warn },
   });
 
-  expect(findMany).not.toHaveBeenCalled();
-  expect(suFullResult.report).toBe(suFullReport);
+  expect(findMany).toHaveBeenCalledTimes(1);
+  expect(suFullResult.report.suFullPeerPresentation).toBeDefined();
 
   findMany.mockResolvedValue([
     {
@@ -162,7 +166,7 @@ test("the default render aliases keep SU Full dark while LVA remains enabled", a
     logger: { warn },
   });
 
-  expect(findMany).toHaveBeenCalledTimes(1);
+  expect(findMany).toHaveBeenCalledTimes(2);
   expect(lvaResult.lvaPeerComparison?.items).toEqual([
     expect.objectContaining({ stableKey: "S3_culture", peers: 6.3 }),
   ]);
@@ -187,7 +191,6 @@ test.each(["EXECUTIVE_BOARDROOM", "MODERN_DASHBOARD"])(
     expect(result.report).toBe(report);
   },
 );
-
 test("unavailable report styles fall back to Classic and query", async () => {
   findMany.mockResolvedValue(completeSuFullBenchmarkRows());
   const report = {
