@@ -18,8 +18,15 @@
  */
 
 import { activePublishedWhere } from "@/lib/assessments/active-version";
+import type {
+  AssessmentCampaignAccessMode,
+  AssessmentTemplateDeliveryType,
+} from "@prisma/client";
+import { isTemplateCompatibleWithAccessMode } from "@/lib/assessments/template-delivery-policy";
 
-export type CampaignCreateCode = "TEMPLATE_VERSION_NOT_PUBLISHED";
+export type CampaignCreateCode =
+  | "TEMPLATE_VERSION_NOT_PUBLISHED"
+  | "TEMPLATE_DELIVERY_TYPE_MISMATCH";
 
 export class CampaignCreateError extends Error {
   constructor(
@@ -30,6 +37,19 @@ export class CampaignCreateError extends Error {
     super(message ?? code);
     this.name = "CampaignCreateError";
     Object.setPrototypeOf(this, CampaignCreateError.prototype);
+  }
+}
+
+export function assertTemplateDeliveryCompatible(
+  deliveryType: AssessmentTemplateDeliveryType,
+  accessMode: AssessmentCampaignAccessMode,
+): void {
+  if (!isTemplateCompatibleWithAccessMode(deliveryType, accessMode)) {
+    throw new CampaignCreateError(
+      "TEMPLATE_DELIVERY_TYPE_MISMATCH",
+      { deliveryType, accessMode },
+      "This template cannot be used with the selected campaign type.",
+    );
   }
 }
 

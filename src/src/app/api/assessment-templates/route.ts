@@ -38,6 +38,7 @@ import {
 } from "@/lib/assessments/active-version";
 import { campaignPickerTemplateWhere } from "@/lib/assessments/campaign-picker-template-scope";
 import { isAdminOwnedAssessmentPresentationEnabled } from "@/lib/assessments/wave-admin-owned-assessment-presentation-flags";
+import { isPublicMarketingCtaEnabled } from "@/lib/assessments/wave-public-marketing-cta-flags";
 
 interface TemplateSummary {
   id: string;
@@ -52,6 +53,7 @@ interface TemplateSummary {
   defaultReportStyle?: ReportStyleKey;
   reportStylesEnabled?: boolean;
   reportStylePreviewCapabilities?: ReportStylePreviewCapabilities;
+  deliveryType?: "PUBLIC_MARKETING_QUIZ" | "INVITED_ASSESSMENT";
 }
 
 const previewVersionSelection = {
@@ -68,7 +70,9 @@ export async function GET(request: NextRequest) {
   try {
     // Touch request.url to satisfy the unused-arg lint and keep route
     // handler signature aligned with other GET routes.
-    void request.url;
+    const publicPicker =
+      new URL(request.url).searchParams.get("campaignType") === "public" ||
+      request.headers.get("x-campaign-type") === "public";
     const actor = await getApiActor();
     if (!actor) {
       return NextResponse.json(
@@ -76,7 +80,17 @@ export async function GET(request: NextRequest) {
         { status: 401 }
       );
     }
-    const templateWhere = await campaignPickerTemplateWhere(db, actor);
+    const baseTemplateWhere = await campaignPickerTemplateWhere(db, actor);
+    const templateWhere = {
+      ...baseTemplateWhere,
+      ...(isPublicMarketingCtaEnabled()
+        ? {
+            deliveryType: publicPicker
+              ? ("PUBLIC_MARKETING_QUIZ" as const)
+              : ("INVITED_ASSESSMENT" as const),
+          }
+        : {}),
+    };
 
     if (isPrivilegedRole(actor.role)) {
       const templates = await db.assessmentTemplate.findMany({
@@ -93,6 +107,7 @@ export async function GET(request: NextRequest) {
           resultsEmailContentApprovedHash: true,
           resultsEmailSubject: true,
           resultsEmailBodyMarkdown: true,
+          deliveryType: true,
         },
         orderBy: { name: "asc" },
       });
@@ -140,6 +155,7 @@ export async function GET(request: NextRequest) {
             reportStylesEnabled,
             resultsEmailApproved: isResultsEmailApproved(t),
             sendResultsDefault: t.sendResultsDefault,
+            deliveryType: t.deliveryType,
             ...(reportStylesEnabled
               ? {
                   reportStylePreviewCapabilities:
@@ -173,6 +189,7 @@ export async function GET(request: NextRequest) {
         resultsEmailContentApprovedHash: true,
         resultsEmailSubject: true,
         resultsEmailBodyMarkdown: true,
+        deliveryType: true,
       },
       orderBy: { name: "asc" },
     });
@@ -221,6 +238,7 @@ export async function GET(request: NextRequest) {
           aggregationMode: t.aggregationMode,
           resultsEmailApproved: isResultsEmailApproved(t),
           sendResultsDefault: t.sendResultsDefault,
+          deliveryType: t.deliveryType,
           ...(!adminOwnedPresentation
             ? {
                 defaultReportStyle: t.defaultReportStyle,
