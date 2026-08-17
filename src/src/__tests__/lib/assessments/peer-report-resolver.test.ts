@@ -290,6 +290,68 @@ test("the campaign wrapper performs one template lookup then one benchmark query
   expect(findMany).toHaveBeenCalledTimes(1);
 });
 
+const wrapperGateCases: Array<[
+  string,
+  {
+    report: RespondentReport;
+    reportStylesAvailable: boolean;
+    peerBenchmarksEnabled: boolean;
+    enabledAliases?: readonly string[];
+  },
+]> = [
+  ["the flag is off", {
+    report: completeSuFullPeerReport(),
+    reportStylesAvailable: true,
+    peerBenchmarksEnabled: false,
+  }],
+  ["the alias is absent", {
+    report: completeSuFullPeerReport(),
+    reportStylesAvailable: true,
+    peerBenchmarksEnabled: true,
+    enabledAliases: [LVA_TEMPLATE_ALIAS],
+  }],
+  ["SU Full is not Classic", {
+    report: {
+      ...completeSuFullPeerReport(),
+      reportStyle: "MODERN_DASHBOARD",
+    } as RespondentReport,
+    reportStylesAvailable: true,
+    peerBenchmarksEnabled: true,
+    enabledAliases: ["scaling-up-full"],
+  }],
+];
+
+test.each(wrapperGateCases)(
+  "the campaign wrapper skips its template lookup when %s",
+  async (_caseName, options) => {
+    const result = await resolvePeerReportEnhancementsForCampaign({
+      db,
+      ...options,
+      campaignId: "camp-1",
+      logger: { warn },
+    });
+
+    expect(findCampaign).not.toHaveBeenCalled();
+    expect(findMany).not.toHaveBeenCalled();
+    expect(result.report).toBe(options.report);
+  },
+);
+
+test.each(wrapperGateCases)(
+  "the submission wrapper skips its template lookup when %s",
+  async (_caseName, options) => {
+    const result = await resolvePeerReportEnhancementsForSubmission({
+      db,
+      ...options,
+      logger: { warn },
+    });
+
+    expect(findSubmission).not.toHaveBeenCalled();
+    expect(findMany).not.toHaveBeenCalled();
+    expect(result.report).toBe(options.report);
+  },
+);
+
 test("a missing submission retains the original report without a benchmark query", async () => {
   const report = completeSuFullPeerReport();
   findSubmission.mockResolvedValue(null);

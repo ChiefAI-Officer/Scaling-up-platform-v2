@@ -55,6 +55,11 @@ type ResolverInput = {
   logger?: Pick<Console, "warn">;
 };
 
+type PeerReportPreflight = Readonly<{
+  templateAlias: string;
+  isLva: boolean;
+}>;
+
 function unchanged(report: RespondentReport): PeerReportEnhancements {
   return { report, lvaPeerComparison: null };
 }
@@ -82,26 +87,23 @@ function errorName(error: unknown): string {
 }
 
 /**
- * Adds the currently applicable peer reference data to one frozen report.
- * All gates run before the single template-level QUESTION benchmark query.
+ * Resolves every eligibility fact available from the frozen report alone.
+ * Core and ID-wrapper callers share this gate so a miss never needs a lookup.
  */
-export async function resolvePeerReportEnhancements(
-  input: ResolverInput & { templateId: string },
-): Promise<PeerReportEnhancements> {
-  const logger = input.logger ?? console;
+function resolvePeerReportPreflight(input: ResolverInput): PeerReportPreflight | null {
   const peerBenchmarksEnabled = input.peerBenchmarksEnabled ?? isPeerBenchmarksEnabled();
-  if (!peerBenchmarksEnabled) return unchanged(input.report);
+  if (!peerBenchmarksEnabled) return null;
 
   const templateAlias = input.report.templateAlias;
   const enabledAliases = input.enabledAliases ?? PEER_RENDER_ENABLED_ALIASES;
   const aliasEnabled = input.enabledAliases === undefined
     ? isPeerRenderEnabledAlias(templateAlias)
     : enabledAliases.includes(templateAlias);
-  if (!aliasEnabled) return unchanged(input.report);
+  if (!aliasEnabled) return null;
 
   const isSuFull = templateAlias === SCALING_UP_FULL_TEMPLATE_ALIAS;
   const isLva = templateAlias === LVA_TEMPLATE_ALIAS;
-  if (!isSuFull && !isLva) return unchanged(input.report);
+  if (!isSuFull && !isLva) return null;
 
   const resolvedStyle = hasSourcePublicResult(
     templateAlias,
@@ -114,7 +116,21 @@ export async function resolvePeerReportEnhancements(
           : undefined,
         available: input.reportStylesAvailable,
       });
-  if (isSuFull && resolvedStyle !== "CLASSIC") return unchanged(input.report);
+  if (isSuFull && resolvedStyle !== "CLASSIC") return null;
+
+  return { templateAlias, isLva };
+}
+
+/**
+ * Adds the currently applicable peer reference data to one frozen report.
+ * All gates run before the single template-level QUESTION benchmark query.
+ */
+export async function resolvePeerReportEnhancements(
+  input: ResolverInput & { templateId: string },
+): Promise<PeerReportEnhancements> {
+  const logger = input.logger ?? console;
+  const preflight = resolvePeerReportPreflight(input);
+  if (!preflight) return unchanged(input.report);
 
   let rows: BenchmarkRow[];
   try {
@@ -127,14 +143,14 @@ export async function resolvePeerReportEnhancements(
     return unchanged(input.report);
   }
 
-  if (isLva) {
+  if (preflight.isLva) {
     return {
       report: input.report,
       lvaPeerComparison: buildPeerComparisonSection({
         questionsByKey: input.report.questionsByKey,
         rawAnswers: input.report.rawAnswers,
         benchmarks: new Map(rows.map((row) => [row.metricKey, row.value])),
-        templateAlias,
+        templateAlias: preflight.templateAlias,
       }),
     };
   }
@@ -163,6 +179,7 @@ export async function resolvePeerReportEnhancementsForCampaign(
   input: ResolverInput & { campaignId: string },
 ): Promise<PeerReportEnhancements> {
   const logger = input.logger ?? console;
+  if (!resolvePeerReportPreflight(input)) return unchanged(input.report);
   try {
     const campaign = await input.db.assessmentCampaign?.findFirst({
       where: { id: input.campaignId, deletedAt: null },
@@ -183,6 +200,7 @@ export async function resolvePeerReportEnhancementsForSubmission(
   input: ResolverInput,
 ): Promise<PeerReportEnhancements> {
   const logger = input.logger ?? console;
+  if (!resolvePeerReportPreflight(input)) return unchanged(input.report);
   try {
     const submission = await input.db.assessmentSubmission?.findFirst({
       where: { id: input.report.provenance.submissionId },
