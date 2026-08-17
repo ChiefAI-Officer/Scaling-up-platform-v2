@@ -37,7 +37,7 @@ export function completeSuFullPeerReport(): RespondentReport {
         recommendation: `Frozen feedback ${stableKey}`,
       })),
       perSection: [],
-    } as RespondentReport["result"],
+    } as unknown as RespondentReport["result"],
     sections: [
       { stableKey: "S_PEOPLE_YE", name: "Your Employees", domain: "people" },
       { stableKey: "S_REST", name: "Remaining Questions", domain: "strategy" },

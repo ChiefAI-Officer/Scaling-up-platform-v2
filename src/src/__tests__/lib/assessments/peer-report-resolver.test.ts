@@ -13,6 +13,7 @@ import {
 } from "@/__tests__/fixtures/su-full-peer";
 import { hasSourcePublicResult } from "@/lib/assessments/report-config";
 import { LVA_TEMPLATE_ALIAS } from "@/lib/assessments/lva-report-display";
+import { PEER_RENDER_ENABLED_ALIASES } from "@/lib/assessments/peer-benchmarks";
 import type { RespondentReport } from "@/lib/assessments/respondent-report";
 
 const findMany = jest.fn();
@@ -107,6 +108,46 @@ test("an absent render alias skips the benchmark query", async () => {
 
   expect(findMany).not.toHaveBeenCalled();
   expect(result.report).toBe(report);
+});
+
+test("the default render aliases keep SU Full dark while LVA remains enabled", async () => {
+  expect(PEER_RENDER_ENABLED_ALIASES).not.toContain("scaling-up-full");
+  expect(PEER_RENDER_ENABLED_ALIASES).toContain(LVA_TEMPLATE_ALIAS);
+
+  const suFullReport = completeSuFullPeerReport();
+  const suFullResult = await resolvePeerReportEnhancements({
+    db,
+    report: suFullReport,
+    templateId: "tpl-su",
+    reportStylesAvailable: true,
+    peerBenchmarksEnabled: true,
+    logger: { warn },
+  });
+
+  expect(findMany).not.toHaveBeenCalled();
+  expect(suFullResult.report).toBe(suFullReport);
+
+  findMany.mockResolvedValue([
+    {
+      metricKey: "S3_culture",
+      value: 6.3,
+      updatedAt: new Date("2026-08-14T00:00:00Z"),
+    },
+  ]);
+
+  const lvaResult = await resolvePeerReportEnhancements({
+    db,
+    report: lvaReport(),
+    templateId: "tpl-lva",
+    reportStylesAvailable: true,
+    peerBenchmarksEnabled: true,
+    logger: { warn },
+  });
+
+  expect(findMany).toHaveBeenCalledTimes(1);
+  expect(lvaResult.lvaPeerComparison?.items).toEqual([
+    expect.objectContaining({ stableKey: "S3_culture", peers: 6.3 }),
+  ]);
 });
 
 test.each(["EXECUTIVE_BOARDROOM", "MODERN_DASHBOARD"])(
