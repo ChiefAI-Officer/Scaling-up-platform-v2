@@ -6,6 +6,7 @@ import {
 
 const EXPECTED_KEYS = SU_FULL_QUESTION_BENCHMARKS.map((row) => row.stableKey);
 const EXPECTED_KEY_SET = new Set<string>(EXPECTED_KEYS);
+const ISO_TIMESTAMP_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
 
 export type SuFullPeerBenchmarkRow = Readonly<{
   metricKey: string;
@@ -96,6 +97,9 @@ function roundedTotal(values: readonly number[]): number {
 }
 
 function dateFromUpdatedAt(value: Date | string): Date | null {
+  if (typeof value === "string" && !ISO_TIMESTAMP_PATTERN.test(value)) {
+    return null;
+  }
   const date = value instanceof Date
     ? value
     : typeof value === "string"
