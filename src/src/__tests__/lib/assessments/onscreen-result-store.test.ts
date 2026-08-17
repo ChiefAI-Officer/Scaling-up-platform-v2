@@ -40,12 +40,33 @@ const OTHER_KEY = "inv_respondent_b";
 
 const sampleReport = {
   respondentName: "Resp Ondent",
-  templateAlias: "rockefeller",
-  reportStyle: "MODERN_DASHBOARD",
-  assessmentName: "Rockefeller Habits Checklist",
+  templateAlias: "scaling-up-full",
+  reportStyle: "CLASSIC",
+  assessmentName: "Scaling Up Full",
   submittedAt: new Date("2026-07-29T10:30:00.000Z"),
   result: { countAchieved: 12 },
   degraded: false,
+  suFullPeerPresentation: {
+    benchmarkUpdatedAt: "2026-08-18T00:00:00.000Z",
+    sections: [
+      {
+        stableKey: "s_people",
+        label: "People",
+        domain: "People",
+        youTotal: 7,
+        peersTotal: 6.3,
+        questions: [
+          {
+            stableKey: "people_recruitment",
+            label: "Effective recruitment process",
+            you: 7,
+            peers: 6.3,
+            recommendation: null,
+          },
+        ],
+      },
+    ],
+  },
 };
 
 beforeEach(() => {
@@ -77,8 +98,8 @@ describe("round trip", () => {
     const read = readOnScreenResult(ALIAS, KEY);
     expect(read).not.toBeNull();
     expect(read?.respondentName).toBe("Resp Ondent");
-    expect(read?.templateAlias).toBe("rockefeller");
-    expect(Object.getOwnPropertyDescriptor(read ?? {}, "reportStyle")?.value).toBe("MODERN_DASHBOARD");
+    expect(read?.templateAlias).toBe("scaling-up-full");
+    expect(Object.getOwnPropertyDescriptor(read ?? {}, "reportStyle")?.value).toBe("CLASSIC");
   });
 
   it("normalizes an untrusted serialized reportStyle at revival without changing other facts", () => {
@@ -98,6 +119,16 @@ describe("round trip", () => {
     expect((read?.submittedAt as Date).toISOString()).toBe(
       "2026-07-29T10:30:00.000Z",
     );
+  });
+
+  it("preserves the optional peer presentation across the session-storage JSON round trip", () => {
+    writeOnScreenResult(ALIAS, sampleReport as never, KEY);
+    const revived = readOnScreenResult(ALIAS, KEY);
+
+    expect(revived?.suFullPeerPresentation).toEqual(
+      sampleReport.suFullPeerPresentation,
+    );
+    expect(revived?.submittedAt).toBeInstanceOf(Date);
   });
 
   it("does not leak across aliases", () => {

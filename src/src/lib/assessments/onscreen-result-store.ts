@@ -250,6 +250,8 @@ export function reviveOnScreenReport(
       : serialized.submittedAt;
 
   return {
+    // Additive report payloads pass through unchanged. In particular,
+    // suFullPeerPresentation.benchmarkUpdatedAt remains an ISO string by contract.
     ...serialized,
     submittedAt:
       submittedAt instanceof Date && !Number.isNaN(submittedAt.getTime())
