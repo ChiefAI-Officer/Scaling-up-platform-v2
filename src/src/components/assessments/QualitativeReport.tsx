@@ -70,7 +70,31 @@ function peerSliceIndex(sections: readonly QualSection[]): number {
  * two surfaces can never drift). Renders ONLY via the optional prop below;
  * classes styled in su-report.css (`.su-peer-*`, print break-inside: avoid).
  */
-function PeerComparisonBlock({ section }: { section: PeerComparisonSection }) {
+function PeerComparisonBlock({ section, responsiveEnabled = false }: { section: PeerComparisonSection; responsiveEnabled?: boolean }) {
+  const table = (
+    <table className="su-peer-table">
+      <thead>
+        <tr>
+          <th className="su-peer-th su-peer-th-factor">Factor</th>
+          <th className="su-peer-th">Your rating</th>
+          <th className="su-peer-th">Peers</th>
+          <th className="su-peer-th">Difference</th>
+        </tr>
+      </thead>
+      <tbody>
+        {section.items.map((item) => (
+          <tr key={item.stableKey} data-testid={`peer-comparison-row-${item.stableKey}`}>
+            <td className="su-peer-factor">{item.label}</td>
+            <td className="su-peer-own">{item.ownRating} <span className="su-peer-own-val">({item.ownValue.toFixed(1)})</span></td>
+            <td className="su-peer-peers">{item.peers.toFixed(1)}</td>
+            <td className={item.dev < 0 ? "su-peer-dev neg" : "su-peer-dev"} data-testid={`peer-comparison-dev-${item.stableKey}`}>
+              <span aria-hidden="true">{peerDevGlyph(item.dev)}</span>{" "}{peerDevText(item.dev)}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
   return (
     <section
       className="su-section su-peer-section"
@@ -78,42 +102,7 @@ function PeerComparisonBlock({ section }: { section: PeerComparisonSection }) {
     >
       <h2 className="su-section-title su-h2">{section.title}</h2>
       <p className="su-section-intro">{section.intro}</p>
-      <table className="su-peer-table">
-        <thead>
-          <tr>
-            <th className="su-peer-th su-peer-th-factor">Factor</th>
-            <th className="su-peer-th">Your rating</th>
-            <th className="su-peer-th">Peers</th>
-            <th className="su-peer-th">Difference</th>
-          </tr>
-        </thead>
-        <tbody>
-          {section.items.map((item) => (
-            <tr
-              key={item.stableKey}
-              data-testid={`peer-comparison-row-${item.stableKey}`}
-            >
-              <td className="su-peer-factor">{item.label}</td>
-              <td className="su-peer-own">
-                {item.ownRating}{" "}
-                <span className="su-peer-own-val">
-                  ({item.ownValue.toFixed(1)})
-                </span>
-              </td>
-              <td className="su-peer-peers">{item.peers.toFixed(1)}</td>
-              {/* `neg` styled in su-report.css — the report route loads no
-                  Tailwind, so utility classes would silently no-op here. */}
-              <td
-                className={item.dev < 0 ? "su-peer-dev neg" : "su-peer-dev"}
-                data-testid={`peer-comparison-dev-${item.stableKey}`}
-              >
-                <span aria-hidden="true">{peerDevGlyph(item.dev)}</span>{" "}
-                {peerDevText(item.dev)}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {responsiveEnabled ? <div className="su-report-data-region" role="region" tabIndex={0} aria-label="Peer comparison table">{table}</div> : table}
     </section>
   );
 }
@@ -420,6 +409,7 @@ export function QualitativeReport({
   peerComparison,
   contactEmail,
   reportFindingsAvailable,
+  responsiveEnabled = false,
 }: {
   report: RespondentReport;
   /** Server-verified current coach email for the contact link. */
@@ -436,6 +426,7 @@ export function QualitativeReport({
   peerComparison?: PeerComparisonSection | null;
   /** Exact server-side Wave U decision; omission fails closed. */
   reportFindingsAvailable?: boolean;
+  responsiveEnabled?: boolean;
 }) {
   const model = buildQualitativeModel({
     templateAlias: report.templateAlias,
@@ -464,7 +455,7 @@ export function QualitativeReport({
     : null;
 
   return (
-    <div className="su-public-brand su-report" data-testid="qualitative-report">
+    <div className="su-public-brand su-report" data-testid="qualitative-report" data-responsive-report={responsiveEnabled ? "" : undefined}>
       {/* ── 1. Cover ─────────────────────────────────────────────────────── */}
       <section className="su-report-cover" data-testid="report-cover">
         <div className="su-stripe-h" />
@@ -531,7 +522,7 @@ export function QualitativeReport({
       {model.sections.map((section, i) => (
         <Fragment key={section.stableKey}>
           {peerComparison && i === peerSliceIndex(model.sections) && (
-            <PeerComparisonBlock section={peerComparison} />
+            <PeerComparisonBlock section={peerComparison} responsiveEnabled={responsiveEnabled} />
           )}
           <section
             className="su-section"
@@ -546,7 +537,7 @@ export function QualitativeReport({
         </Fragment>
       ))}
       {peerComparison && peerSliceIndex(model.sections) === -1 && (
-        <PeerComparisonBlock section={peerComparison} />
+        <PeerComparisonBlock section={peerComparison} responsiveEnabled={responsiveEnabled} />
       )}
 
       {/* Wave U (spec 19u U-5): the consolidated findings section — renders

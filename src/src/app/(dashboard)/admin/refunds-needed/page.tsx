@@ -22,8 +22,12 @@ import { formatCurrency, formatTimestamp } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { MarkRefundedButton } from "./mark-refunded-button";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
+import { ResponsiveDataView } from "@/components/ui/responsive-data-view";
+import { ResponsiveRecord, ResponsiveRecordActions, ResponsiveRecordHeader, ResponsiveRecordMeta } from "@/components/ui/responsive-record";
 
 export default async function RefundsNeededPage() {
+  const mobileResponsiveEnabled = isMobileResponsiveEnabled();
   const session = await getServerSession(authOptions);
   if (!session) redirect("/login");
   const role = session.user?.role;
@@ -49,7 +53,7 @@ export default async function RefundsNeededPage() {
   });
 
   return (
-    <div className="space-y-6">
+    <div className={mobileResponsiveEnabled ? "min-w-0 max-w-full space-y-6" : "space-y-6"}>
       <div>
         <h1 className="text-3xl font-bold">Refunds Needed</h1>
         <p className="text-muted-foreground mt-1">
@@ -58,7 +62,7 @@ export default async function RefundsNeededPage() {
             href="https://dashboard.stripe.com/payments"
             target="_blank"
             rel="noreferrer"
-            className="underline"
+            className={mobileResponsiveEnabled ? "inline-flex min-h-11 items-center underline" : "underline"}
           >
             Stripe dashboard
           </a>{" "}
@@ -74,7 +78,19 @@ export default async function RefundsNeededPage() {
           {rows.length === 0 ? (
             <p className="text-muted-foreground text-sm">No refunds pending. Nice.</p>
           ) : (
-            <Table>
+            <ResponsiveDataView
+              enabled={mobileResponsiveEnabled}
+              label="Refunds needed"
+              wideFrom="md"
+              wideRegionLabel="Refunds needed table"
+              compact={<div className="space-y-3">{rows.map((r) => (
+                <ResponsiveRecord key={r.id}>
+                  <ResponsiveRecordHeader title={`${r.firstName} ${r.lastName}`} status={<span className="text-xs text-muted-foreground">Refund needed</span>} />
+                  <ResponsiveRecordMeta items={[{ label: "Workshop", value: r.workshop.title }, { label: "Amount", value: r.amountPaidCents != null ? formatCurrency(r.amountPaidCents) : "—" }, { label: "Cancelled", value: formatTimestamp(r.workshop.updatedAt) }, { label: "Stripe payment", value: r.stripePaymentId ? <a className="inline-flex min-h-11 items-center underline" href={`https://dashboard.stripe.com/payments/${r.stripePaymentId}`} target="_blank" rel="noreferrer">View in Stripe</a> : "—" }]} />
+                  <ResponsiveRecordActions primary={<MarkRefundedButton registrationId={r.id} responsiveEnabled />} />
+                </ResponsiveRecord>
+              ))}</div>}
+              wide={<Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Registrant</TableHead>
@@ -108,7 +124,7 @@ export default async function RefundsNeededPage() {
                           href={`https://dashboard.stripe.com/payments/${r.stripePaymentId}`}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-xs underline"
+                          className={mobileResponsiveEnabled ? "inline-flex min-h-11 items-center text-xs underline" : "text-xs underline"}
                         >
                           View in Stripe ↗
                         </a>
@@ -117,12 +133,13 @@ export default async function RefundsNeededPage() {
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      <MarkRefundedButton registrationId={r.id} />
+                      <MarkRefundedButton registrationId={r.id} responsiveEnabled={mobileResponsiveEnabled} />
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+            </Table>}
+            />
           )}
         </CardContent>
       </Card>

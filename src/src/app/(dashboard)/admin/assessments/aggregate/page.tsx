@@ -15,8 +15,11 @@ import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth/auth";
 import { AssessmentsAggregateReport } from "@/components/admin/AssessmentsAggregateReport";
+import { PageHeader } from "@/components/ui/page-header";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 
 export default async function AdminAggregateReportPage() {
+  const mobileResponsiveEnabled = isMobileResponsiveEnabled();
   const session = await getServerSession(authOptions);
   if (!session) {
     redirect("/login");
@@ -27,7 +30,7 @@ export default async function AdminAggregateReportPage() {
   }
 
   return (
-    <div>
+    <div className={mobileResponsiveEnabled ? "min-w-0 max-w-full" : undefined}>
       {/* Breadcrumb — WF23 */}
       <div className="wf-breadcrumb">
         <a href="/admin/dashboard">Admin</a>
@@ -38,16 +41,24 @@ export default async function AdminAggregateReportPage() {
       </div>
 
       {/* Page header — WF23 */}
-      <div className="wf-page-header-row">
-        <div>
-          <h2 className="wf-page-title">Aggregate Report</h2>
-          <p className="wf-page-subtitle-strong">
-            Per-template, per-version aggregate statistics across all
-            submissions in the platform. Admin-only — coaches and
-            respondents never see this view.
-          </p>
+      {mobileResponsiveEnabled ? (
+        <PageHeader
+          responsiveEnabled
+          title="Aggregate Report"
+          description="Per-template, per-version aggregate statistics across all submissions in the platform. Admin-only — coaches and respondents never see this view."
+        />
+      ) : (
+        <div className="wf-page-header-row">
+          <div>
+            <h2 className="wf-page-title">Aggregate Report</h2>
+            <p className="wf-page-subtitle-strong">
+              Per-template, per-version aggregate statistics across all
+              submissions in the platform. Admin-only — coaches and
+              respondents never see this view.
+            </p>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Anonymity banner — WF23 */}
       <div className="wf-intersection-banner">
@@ -58,7 +69,7 @@ export default async function AdminAggregateReportPage() {
         roles only.
       </div>
 
-      <AssessmentsAggregateReport />
+      <AssessmentsAggregateReport responsiveEnabled={mobileResponsiveEnabled} />
     </div>
   );
 }

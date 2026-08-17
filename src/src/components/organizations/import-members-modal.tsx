@@ -59,6 +59,7 @@ export interface ImportMembersModalProps {
   onUpdated: () => void | Promise<void>;
   orgId:     string;
   orgName:   string;
+  responsiveEnabled?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -79,6 +80,7 @@ export function ImportMembersModal({
   onUpdated,
   orgId,
   orgName,
+  responsiveEnabled = false,
 }: ImportMembersModalProps) {
   // --------------------------------------------------------------------------
   // Form state
@@ -223,7 +225,12 @@ export function ImportMembersModal({
       open={open}
       onOpenChange={(isOpen) => { if (!isOpen) onClose(); }}
     >
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent
+        responsiveEnabled={responsiveEnabled}
+        className={responsiveEnabled
+          ? "sm:max-w-2xl [&_textarea]:min-h-11"
+          : "sm:max-w-2xl max-h-[90vh] overflow-y-auto"}
+      >
         <DialogHeader>
           <DialogTitle>Import members — {orgName}</DialogTitle>
           <DialogDescription>
@@ -255,7 +262,7 @@ export function ImportMembersModal({
               placeholder={"name,email,team\nAlice Smith,alice@company.com,Engineering\nBob Jones,bob@company.com,"}
               value={csvText}
               onChange={(e) => setCsvText(e.target.value)}
-              disabled={submitting || result !== null}
+              disabled={result !== null || (!responsiveEnabled && submitting)}
               className="w-full font-mono text-xs rounded-md border border-input bg-background px-3 py-2 shadow-sm resize-y ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             />
           </div>
@@ -297,7 +304,14 @@ export function ImportMembersModal({
 
               {/* Preview table (first N rows) */}
               {rows.length > 0 && (
-                <div className="overflow-x-auto rounded-md border border-border">
+                <div
+                  role={responsiveEnabled ? "region" : undefined}
+                  aria-label={responsiveEnabled ? "CSV member preview" : undefined}
+                  tabIndex={responsiveEnabled ? 0 : undefined}
+                  className={responsiveEnabled
+                    ? "max-w-full overflow-x-auto rounded-md border border-border"
+                    : "overflow-x-auto rounded-md border border-border"}
+                >
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="border-b border-border bg-muted/40">
@@ -336,26 +350,32 @@ export function ImportMembersModal({
               If a member already exists (same email)
             </legend>
             <div className="flex items-center gap-4 pt-1">
-              <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+              <label className={responsiveEnabled
+                ? "flex min-h-11 items-center gap-1.5 text-sm cursor-pointer"
+                : "flex items-center gap-1.5 text-sm cursor-pointer"}
+              >
                 <input
                   type="radio"
                   name="conflict-mode"
                   value="skip"
                   checked={mode === "skip"}
                   onChange={() => setMode("skip")}
-                  disabled={submitting || result !== null}
+                  disabled={result !== null || (!responsiveEnabled && submitting)}
                   aria-label="Skip — leave existing untouched"
                 />
                 Skip — leave existing untouched
               </label>
-              <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+              <label className={responsiveEnabled
+                ? "flex min-h-11 items-center gap-1.5 text-sm cursor-pointer"
+                : "flex items-center gap-1.5 text-sm cursor-pointer"}
+              >
                 <input
                   type="radio"
                   name="conflict-mode"
                   value="merge"
                   checked={mode === "merge"}
                   onChange={() => setMode("merge")}
-                  disabled={submitting || result !== null}
+                  disabled={result !== null || (!responsiveEnabled && submitting)}
                   aria-label="Merge — update name and team"
                 />
                 Merge — update name and team
@@ -423,12 +443,15 @@ export function ImportMembersModal({
           )}
         </div>
 
-        <DialogFooter className="mt-4">
+          <DialogFooter className={responsiveEnabled
+            ? "mt-4 gap-2 [&_button]:min-h-11 [&_button]:w-full sm:[&_button]:w-auto"
+            : "mt-4"}
+          >
           <Button
             type="button"
             variant="outline"
             onClick={onClose}
-            disabled={submitting}
+            disabled={!responsiveEnabled && submitting}
           >
             {result !== null && result.errors.length > 0 ? "Close" : "Cancel"}
           </Button>

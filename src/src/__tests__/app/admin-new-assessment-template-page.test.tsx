@@ -30,8 +30,17 @@ jest.mock("@/lib/assessments/wave-admin-owned-assessment-presentation-flags", ()
   isAdminOwnedAssessmentPresentationEnabled: () => mockIsPresentationEnabled(),
 }));
 
+const mockResponsiveFlag = jest.fn(() => false);
+jest.mock("@/lib/mobile-responsive-flags", () => ({
+  isMobileResponsiveEnabled: () => mockResponsiveFlag(),
+}));
+
+let legacyFormProps: { responsiveEnabled?: boolean } | null = null;
 jest.mock("@/components/admin/AssessmentTemplateForm", () => ({
-  AssessmentTemplateForm: () => <div data-testid="legacy-template-form" />,
+  AssessmentTemplateForm: (props: { responsiveEnabled?: boolean }) => {
+    legacyFormProps = props;
+    return <div data-testid="legacy-template-form" />;
+  },
 }));
 jest.mock("@/components/admin/SimplifiedAssessmentTemplateForm", () => ({
   SimplifiedAssessmentTemplateForm: ({
@@ -53,6 +62,8 @@ beforeEach(() => {
   mockGetServerSession.mockResolvedValue({ user: { role: "ADMIN" } });
   mockIsEnabled.mockReturnValue(false);
   mockIsPresentationEnabled.mockReturnValue(false);
+  mockResponsiveFlag.mockReturnValue(false);
+  legacyFormProps = null;
 });
 
 describe("NewAssessmentTemplatePage auth gate", () => {
@@ -90,6 +101,15 @@ describe("NewAssessmentTemplatePage release gate", () => {
     expect(legacy.getByText("New Assessment Template")).toBeInTheDocument();
     expect(legacy.getByTestId("legacy-template-form")).toBeInTheDocument();
     expect(legacy.queryByTestId("simplified-template-form")).toBeNull();
+  });
+
+  it("forwards the root mobile flag to the legacy form only when enabled", async () => {
+    render(await NewAssessmentTemplatePage());
+    expect(legacyFormProps).toEqual({ mode: "create", responsiveEnabled: false });
+
+    mockResponsiveFlag.mockReturnValue(true);
+    render(await NewAssessmentTemplatePage());
+    expect(legacyFormProps).toEqual({ mode: "create", responsiveEnabled: true });
   });
 
   it("shows the simplified heading, guidance, and form when the flow is active", async () => {

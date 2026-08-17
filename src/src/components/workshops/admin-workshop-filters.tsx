@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useCallback } from "react";
 import { Search, X } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const STATUS_OPTIONS = [
     { value: "", label: "All Statuses" },
@@ -15,7 +16,7 @@ const STATUS_OPTIONS = [
     { value: "CANCELED", label: "Canceled" },
 ];
 
-export function AdminWorkshopFilters() {
+export function AdminWorkshopFilters({ responsiveEnabled = false }: { responsiveEnabled?: boolean }) {
     const router = useRouter();
     const searchParams = useSearchParams();
 
@@ -48,8 +49,8 @@ export function AdminWorkshopFilters() {
     const hasFilters = searchParams.get("search") || searchParams.get("status");
 
     return (
-        <div className="flex items-center gap-3 flex-wrap">
-            <form onSubmit={handleSearchSubmit} className="relative flex-1 min-w-[200px] max-w-sm">
+        <div className={cn("flex items-center gap-3 flex-wrap", responsiveEnabled && "flex-col items-stretch sm:flex-row sm:items-center")}>
+            <form onSubmit={handleSearchSubmit} className={cn("relative flex-1 min-w-[200px] max-w-sm", responsiveEnabled && "min-w-0 max-w-none sm:max-w-sm")}>
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input
                     type="text"
@@ -57,13 +58,14 @@ export function AdminWorkshopFilters() {
                     value={searchValue}
                     onChange={(e) => setSearchValue(e.target.value)}
                     onBlur={() => updateParams("search", searchValue.trim())}
-                    className="w-full pl-10 pr-4 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    className={cn("w-full pl-10 pr-4 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary", responsiveEnabled && "min-h-11 min-w-0")}
                 />
             </form>
             <select
                 value={currentStatus}
                 onChange={(e) => updateParams("status", e.target.value)}
-                className="px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                aria-label={responsiveEnabled ? "Workshop status" : undefined}
+                className={cn("px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary", responsiveEnabled && "min-h-11 min-w-0")}
             >
                 {STATUS_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -72,7 +74,7 @@ export function AdminWorkshopFilters() {
             {hasFilters && (
                 <button
                     onClick={clearAll}
-                    className="flex items-center gap-1 px-3 py-2 text-sm text-muted-foreground hover:text-foreground"
+                    className={cn("flex items-center gap-1 px-3 py-2 text-sm text-muted-foreground hover:text-foreground", responsiveEnabled && "min-h-11 justify-center")}
                 >
                     <X className="w-4 h-4" /> Clear
                 </button>

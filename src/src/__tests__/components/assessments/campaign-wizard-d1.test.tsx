@@ -142,6 +142,124 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
+describe("CampaignWizard — compact progress", () => {
+  it("summarizes the active step without changing the five-step workflow", () => {
+    installFetch();
+    render(<CampaignWizard responsiveEnabled />);
+
+    expect(screen.getByTestId("campaign-step-summary")).toHaveTextContent(
+      "Step 1 of 5",
+    );
+    expect(screen.getByTestId("campaign-step-summary")).toHaveTextContent(
+      "Organization",
+    );
+  });
+
+  it("marks only the responsive full stepper for the mobile CSS visibility override", () => {
+    installFetch();
+    const { container, rerender } = render(<CampaignWizard responsiveEnabled />);
+
+    const responsiveStepper = container.querySelector("ol.wf-stepper");
+    expect(responsiveStepper).toHaveAttribute("data-responsive-full-stepper", "true");
+    expect(responsiveStepper).toHaveClass("hidden", "sm:flex");
+
+    rerender(<CampaignWizard />);
+
+    const legacyStepper = container.querySelector("ol.wf-stepper");
+    expect(legacyStepper).toHaveAttribute("class", "wf-stepper");
+    expect(legacyStepper).not.toHaveAttribute("data-responsive-full-stepper");
+  });
+
+  it("gives compact organization, template, participant, CEO, and select-all choices semantic 44px wrappers", async () => {
+    installFetch();
+    render(<CampaignWizard responsiveEnabled />);
+
+    const organizationChoice = await screen.findByRole("radio", {
+      name: /acme corp/i,
+    });
+    expect(organizationChoice.closest("label")).toHaveClass(
+      "min-h-11",
+      "min-w-11",
+    );
+    fireEvent.click(organizationChoice);
+    fireEvent.click(screen.getByRole("button", { name: /next/i }));
+
+    const templateChoice = await screen.findByRole("radio", {
+      name: /rockefeller habits/i,
+    });
+    expect(templateChoice.closest("label")).toHaveClass(
+      "min-h-11",
+      "min-w-11",
+    );
+    fireEvent.click(templateChoice);
+    fireEvent.click(screen.getByRole("button", { name: /next/i }));
+
+    const includeAlice = await screen.findByRole("checkbox", {
+      name: /include alice smith/i,
+    });
+    expect(includeAlice.closest("label")).toHaveClass(
+      "min-h-11",
+      "min-w-11",
+    );
+    expect(
+      screen
+        .getByRole("checkbox", { name: /select all engineering/i })
+        .closest("label"),
+    ).toHaveClass("min-h-11", "min-w-11");
+    expect(
+      screen
+        .getByRole("radio", { name: /mark alice smith as ceo/i })
+        .closest("label"),
+    ).toHaveClass("min-h-11", "min-w-11");
+  });
+
+  it("gives compact scheduling and notification choices semantic 44px wrappers", async () => {
+    installFetch();
+    render(
+      <CampaignWizard
+        responsiveEnabled
+        autoSend
+        resultsEmailEnabled
+        coachNotifyEnabled
+        onScreenResultsEnabled
+      />,
+    );
+
+    await advanceToSchedule();
+
+    for (const name of [
+      "Immediately",
+      "When the campaign opens",
+      "Open-ended",
+      "Ends at a specific time",
+      "Show each respondent their results on screen after they submit",
+      "Email each respondent their results",
+      "Email me when someone completes",
+    ]) {
+      const role = /Immediately|When the campaign opens|Open-ended|Ends at a specific time/.test(
+        name,
+      )
+        ? "radio"
+        : "checkbox";
+      expect(screen.getByRole(role, { name }).closest("label")).toHaveClass(
+        "min-h-11",
+        "min-w-11",
+      );
+    }
+  });
+
+  it("keeps legacy choice wrappers unchanged when responsive mode is off", async () => {
+    installFetch();
+    render(<CampaignWizard />);
+
+    const organizationChoice = await screen.findByRole("radio", {
+      name: /acme corp/i,
+    });
+    expect(organizationChoice.closest("label")).not.toHaveClass("min-h-11");
+    expect(organizationChoice.closest("label")).not.toHaveClass("min-w-11");
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Navigation helpers
 // ---------------------------------------------------------------------------

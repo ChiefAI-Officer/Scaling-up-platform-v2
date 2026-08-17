@@ -28,6 +28,7 @@ import {
   getLongitudinalTrend,
 } from "@/lib/assessments/trends";
 import { CampaignTrendsView } from "@/components/assessments/CampaignTrendsView";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 
 interface PageProps {
   searchParams: Promise<{
@@ -41,6 +42,7 @@ export default async function TrendsPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const templateId = params.templateId;
   const organizationId = params.organizationId;
+  const mobileResponsiveEnabled = isMobileResponsiveEnabled();
 
   const actor: ApiActor = {
     userId: session.user.id,
@@ -56,6 +58,7 @@ export default async function TrendsPage({ searchParams }: PageProps) {
         actor={actor}
         prefillTemplateId={templateId}
         prefillOrganizationId={organizationId}
+        responsiveEnabled={mobileResponsiveEnabled}
       />
     );
   }
@@ -81,14 +84,18 @@ export default async function TrendsPage({ searchParams }: PageProps) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className={mobileResponsiveEnabled ? "min-w-0 max-w-full space-y-4" : "space-y-4"}>
       <Link
         href="/portal/assessments"
-        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        className={mobileResponsiveEnabled ? "inline-flex min-h-11 items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground" : "inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"}
+        {...(mobileResponsiveEnabled ? { "data-touch-target": true } : {})}
       >
         <ArrowLeft className="w-4 h-4" /> Back to Assessments
       </Link>
-      <CampaignTrendsView trend={trend} />
+      <CampaignTrendsView
+        trend={trend}
+        responsiveEnabled={mobileResponsiveEnabled}
+      />
     </div>
   );
 }
@@ -102,10 +109,12 @@ async function TrendsSelector({
   actor,
   prefillTemplateId,
   prefillOrganizationId,
+  responsiveEnabled = false,
 }: {
   actor: ApiActor;
   prefillTemplateId?: string;
   prefillOrganizationId?: string;
+  responsiveEnabled?: boolean;
 }) {
   // Load orgs the coach owns (admin sees all).
   const orgs = await db.organization.findMany({
@@ -142,15 +151,16 @@ async function TrendsSelector({
   }
 
   return (
-    <div className="space-y-6">
+    <div className={responsiveEnabled ? "min-w-0 max-w-full space-y-6" : "space-y-6"}>
       <Link
         href="/portal/assessments"
-        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        className={responsiveEnabled ? "inline-flex min-h-11 items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground" : "inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"}
+        {...(responsiveEnabled ? { "data-touch-target": true } : {})}
       >
         <ArrowLeft className="w-4 h-4" /> Back to Assessments
       </Link>
 
-      <div className="bg-card border border-border rounded-xl p-8 max-w-2xl">
+      <div className={responsiveEnabled ? "min-w-0 max-w-2xl rounded-xl border border-border bg-card p-4 sm:p-8" : "bg-card border border-border rounded-xl p-8 max-w-2xl"}>
         <div className="flex items-center gap-3 mb-6">
           <div className="bg-primary/10 text-primary rounded-lg p-3">
             <LineChart className="w-6 h-6" />
@@ -198,7 +208,7 @@ async function TrendsSelector({
                 name="templateId"
                 defaultValue={prefillTemplateId ?? ""}
                 required
-                className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className={responsiveEnabled ? "min-h-11 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" : "w-full px-3 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"}
               >
                 <option value="" disabled>
                   Select a template…
@@ -223,7 +233,7 @@ async function TrendsSelector({
                 name="organizationId"
                 defaultValue={prefillOrganizationId ?? ""}
                 required
-                className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className={responsiveEnabled ? "min-h-11 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" : "w-full px-3 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"}
               >
                 <option value="" disabled>
                   Select an organization…
@@ -238,7 +248,8 @@ async function TrendsSelector({
 
             <button
               type="submit"
-              className="bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium"
+              className={responsiveEnabled ? "min-h-11 w-full rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 sm:w-auto" : "bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium"}
+              {...(responsiveEnabled ? { "data-touch-target": true } : {})}
             >
               View Trends
             </button>

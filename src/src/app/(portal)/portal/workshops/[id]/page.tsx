@@ -12,7 +12,7 @@ import { CounterOfferCard } from "@/components/workshops/counter-offer-card";
 import { CopyUrlButton } from "@/components/ui/copy-url-button";
 import { InlineEditDescription } from "@/components/workshops/inline-edit-description";
 import { getSessionDownloadPath } from "@/lib/files/file-download-path";
-import { getWorkshopStatusExplanation, formatTimestamp, formatEventDateUTC, formatTimeWithZone } from "@/lib/utils";
+import { cn, getWorkshopStatusExplanation, formatTimestamp, formatEventDateUTC, formatTimeWithZone } from "@/lib/utils";
 import { formatStepLabel } from "@/lib/workflows/workflow-types";
 import {
   calculateWorkshopRevenueSplit,
@@ -20,6 +20,7 @@ import {
 } from "@/lib/workshops/workshop-financials";
 import { ApprovalThread } from "@/components/approvals/approval-thread";
 import { CoachReplyForm } from "@/components/approvals/coach-reply-form";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 
 const APP_URL = process.env.APP_URL || "https://scaling-up-platform-v2.vercel.app";
 
@@ -46,6 +47,7 @@ export default async function WorkshopDetailsPage({
 }: WorkshopDetailsPageProps) {
   const { id } = await params;
   const { coach } = await requireCoach();
+  const mobileResponsiveEnabled = isMobileResponsiveEnabled();
 
   const [workshop, workflowAssignments, surveyCount, latestDenial, workshopFiles, registrationFinancials, infoRequestedApproval, fallbackLandingPage, pendingPriceChange, approvalHistory] = await Promise.all([
     db.workshop.findFirst({
@@ -199,12 +201,12 @@ export default async function WorkshopDetailsPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">{workshop.title}</h1>
+      <div className={cn("flex items-center justify-between", mobileResponsiveEnabled && "flex-col items-start gap-3 sm:flex-row sm:items-center")}>
+        <div className={cn(mobileResponsiveEnabled && "min-w-0")}>
+          <h1 className={cn("text-2xl font-bold text-foreground", mobileResponsiveEnabled && "break-words")}>{workshop.title}</h1>
           <p className="text-muted-foreground">{workshop.workshopType?.name}</p>
         </div>
-        <div className="text-right">
+        <div className={cn("text-right", mobileResponsiveEnabled && "text-left sm:text-right")}>
           <StatusPill status={workshop.status} />
           <p className="text-xs text-muted-foreground mt-1">
             {getWorkshopStatusExplanation(workshop.status)}
@@ -275,13 +277,13 @@ export default async function WorkshopDetailsPage({
             (workshop.landingPageSlug || fallbackLandingPage?.slug) && (
             <div className="mt-3 pt-3 border-t border-border">
               <p className="text-xs font-medium text-muted-foreground mb-1">Landing Page URL</p>
-              <div className="flex items-center gap-2">
+              <div className={cn("flex items-center gap-2", mobileResponsiveEnabled && "min-w-0 flex-wrap")}>
                 <CopyUrlButton url={`${APP_URL}/workshop/${workshop.landingPageSlug ?? fallbackLandingPage!.slug}`} />
                 <a
                   href={`${APP_URL}/workshop/${workshop.landingPageSlug ?? fallbackLandingPage!.slug}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm text-primary hover:text-primary/80 underline"
+                  className={cn("text-sm text-primary hover:text-primary/80 underline", mobileResponsiveEnabled && "break-all")}
                 >
                   Open ↗
                 </a>
@@ -458,7 +460,12 @@ export default async function WorkshopDetailsPage({
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
             Registrations ({workshop.registrations.length})
           </h2>
-          <div className="overflow-x-auto">
+          <div
+            className="overflow-x-auto"
+            role={mobileResponsiveEnabled ? "region" : undefined}
+            aria-label={mobileResponsiveEnabled ? "Workshop registrations" : undefined}
+            tabIndex={mobileResponsiveEnabled ? 0 : undefined}
+          >
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -476,7 +483,7 @@ export default async function WorkshopDetailsPage({
                     <td className="py-2 pr-4 font-medium text-foreground">
                       {r.firstName} {r.lastName}
                     </td>
-                    <td className="py-2 pr-4 text-muted-foreground truncate max-w-[200px]">{r.email}</td>
+                    <td className={cn("py-2 pr-4 text-muted-foreground truncate max-w-[200px]", mobileResponsiveEnabled && "break-all whitespace-normal")}>{r.email}</td>
                     <td className="py-2 pr-4 text-muted-foreground">{r.company || "—"}</td>
                     <td className="py-2 pr-4">
                       <span
@@ -513,13 +520,13 @@ export default async function WorkshopDetailsPage({
           </h2>
           <div className="space-y-2">
             {workshopFiles.map((file) => (
-              <div key={file.id} className="flex items-center justify-between text-sm">
-                <div>
+              <div key={file.id} className={cn("flex items-center justify-between text-sm", mobileResponsiveEnabled && "min-w-0 flex-col items-start gap-1 sm:flex-row sm:items-center")}>
+                <div className={cn(mobileResponsiveEnabled && "min-w-0")}>
                   <a
                     href={getSessionDownloadPath(file.id)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="font-medium text-primary hover:text-primary/80"
+                    className={cn("font-medium text-primary hover:text-primary/80", mobileResponsiveEnabled && "break-all")}
                   >
                     {file.filename}
                   </a>
@@ -615,17 +622,17 @@ export default async function WorkshopDetailsPage({
         </div>
       )}
 
-      <div className="flex items-center gap-3 flex-wrap">
+      <div className={cn("flex items-center gap-3 flex-wrap", mobileResponsiveEnabled && "flex-col items-stretch sm:flex-row sm:items-center")}>
         <Link
           href="/portal/workshops"
-          className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-accent"
+          className={cn("rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-accent", mobileResponsiveEnabled && "inline-flex min-h-11 min-w-11 items-center justify-center")}
         >
           Back to Workshops
         </Link>
         {["PRE_EVENT", "POST_EVENT", "COMPLETED"].includes(workshop.status) && (
           <Link
             href="/portal/registrations"
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            className={cn("rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90", mobileResponsiveEnabled && "inline-flex min-h-11 min-w-11 items-center justify-center")}
           >
             View Registrations
           </Link>
@@ -633,7 +640,7 @@ export default async function WorkshopDetailsPage({
         {surveyCount > 0 && (
           <Link
             href={`/portal/workshops/${workshop.id}/surveys`}
-            className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-accent"
+            className={cn("rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-accent", mobileResponsiveEnabled && "inline-flex min-h-11 min-w-11 items-center justify-center")}
           >
             Survey Results ({surveyCount})
           </Link>
@@ -643,6 +650,7 @@ export default async function WorkshopDetailsPage({
             workshopId={workshop.id}
             workshopTitle={workshop.title}
             eventDate={workshop.eventDate.toISOString()}
+            responsiveEnabled={mobileResponsiveEnabled}
           />
         )}
       </div>

@@ -50,6 +50,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import type { ApiTeamNode } from "./members-teams-view";
 
+type FieldError = { id: string; message: string };
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -82,6 +84,7 @@ export interface EditTeamModalProps {
    * a second time, belt-and-suspenders.
    */
   teams: ApiTeamNode[];
+  responsiveEnabled?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -160,6 +163,7 @@ export function EditTeamModal({
   onUpdated,
   team,
   teams,
+  responsiveEnabled = false,
 }: EditTeamModalProps) {
   const nameId = useId();
   const typeId = useId();
@@ -217,8 +221,11 @@ export function EditTeamModal({
   );
 
   // ---- Submission state -----------------------------------------------------
-  const [submitting, setSubmitting] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const submitting = saving || deleting;
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<FieldError[]>([]);
 
   // Reset form whenever the dialog opens (sync to new team prop)
   useEffect(() => {
@@ -229,6 +236,7 @@ export function EditTeamModal({
       setDescription(team.description ?? "");
       setInitialTypeWasNull(!team.type);
       setError(null);
+      setFieldErrors([]);
     }
     // pickInitialParent depends on team + parentOptions+validParentValues which
     // derive from teams. Intentionally exhaustive.
@@ -259,17 +267,29 @@ export function EditTeamModal({
     return null;
   }
 
+  function validateFields(): FieldError[] {
+    const errors: FieldError[] = [];
+    if (!name.trim()) errors.push({ id: nameId, message: "Name is required." });
+    if (!type) errors.push({ id: typeId, message: "Type is required." });
+    if (!parent) errors.push({ id: parentId, message: "Parent is required — a team cannot be moved to root." });
+    else if (!validParentValues.has(parent)) errors.push({ id: parentId, message: "Parent must be a different team in this organization." });
+    return errors;
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setFieldErrors([]);
 
-    const validationError = validate();
+    const responsiveFieldErrors = responsiveEnabled ? validateFields() : [];
+    const validationError = responsiveEnabled ? responsiveFieldErrors[0]?.message ?? null : validate();
     if (validationError) {
       setError(validationError);
+      setFieldErrors(responsiveFieldErrors);
       return;
     }
 
-    setSubmitting(true);
+    setSaving(true);
     try {
       const body: Record<string, unknown> = {
         name: name.trim(),
@@ -299,13 +319,13 @@ export function EditTeamModal({
       }
       // Await the refresh callback before closing so the parent's data is up
       // to date and any refresh error is surfaced before the modal disappears.
-      // `submitting` stays true through the await so buttons remain disabled.
+      // The active action stays locked through the refresh callback.
       await onUpdated();
       onClose();
     } catch {
       setError("An unexpected error occurred. Please try again.");
     } finally {
-      setSubmitting(false);
+      setSaving(false);
     }
   }
 
@@ -321,7 +341,7 @@ export function EditTeamModal({
     );
     if (!confirmed) return;
 
-    setSubmitting(true);
+    setDeleting(true);
     try {
       const res = await fetch(
         `/api/organizations/${team.orgId}/teams/${team.id}`,
@@ -353,7 +373,7 @@ export function EditTeamModal({
     } catch {
       setError("An unexpected error occurred. Please try again.");
     } finally {
-      setSubmitting(false);
+      setDeleting(false);
     }
   }
 
@@ -363,7 +383,12 @@ export function EditTeamModal({
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose(); }}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent
+        responsiveEnabled={responsiveEnabled}
+        className={responsiveEnabled
+          ? "sm:max-w-md [&_input]:min-h-11 [&_select]:min-h-11"
+          : "sm:max-w-md"}
+      >
         <DialogHeader>
           <DialogTitle>Edit Team</DialogTitle>
           <DialogDescription>
@@ -371,6 +396,12 @@ export function EditTeamModal({
             to a Company or moved to root.
           </DialogDescription>
         </DialogHeader>
+
+        {responsiveEnabled && error && (
+          <div role="alert" aria-label="Edit team error summary" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {fieldErrors.length > 0 ? <ul className="space-y-1">{fieldErrors.map((item) => <li key={`${item.id}-${item.message}`}><a className="underline" href={`#${item.id}`}>{item.message}</a></li>)}</ul> : error}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} noValidate>
           <div className="space-y-4 py-2">
@@ -382,9 +413,11 @@ export function EditTeamModal({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Engineering"
-                disabled={submitting}
+                disabled={!responsiveEnabled && submitting}
                 required
+                aria-invalid={responsiveEnabled && fieldErrors.some((item) => item.id === nameId) ? true : undefined}
               />
+              {responsiveEnabled && fieldErrors.find((item) => item.id === nameId) && <p className="text-sm text-destructive">{fieldErrors.find((item) => item.id === nameId)?.message}</p>}
             </div>
 
             {/* ---- Type ---- (NO "Company" option) */}
@@ -395,8 +428,9 @@ export function EditTeamModal({
                 data-testid="select-type"
                 value={type}
                 onChange={(e) => setType(e.target.value as EditableTeamType | "")}
-                disabled={submitting}
+                disabled={!responsiveEnabled && submitting}
                 required
+                aria-invalid={responsiveEnabled && fieldErrors.some((item) => item.id === typeId) ? true : undefined}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <option value="" disabled>Select a type…</option>
@@ -404,6 +438,7 @@ export function EditTeamModal({
                 <option value="team">Team</option>
                 <option value="folder">Folder</option>
               </select>
+              {responsiveEnabled && fieldErrors.find((item) => item.id === typeId) && <p className="text-sm text-destructive">{fieldErrors.find((item) => item.id === typeId)?.message}</p>}
               {/* I3: hint for legacy teams that were saved without a type */}
               {initialTypeWasNull && !type && (
                 <p className="text-xs italic text-muted-foreground">
@@ -420,8 +455,9 @@ export function EditTeamModal({
                 data-testid="select-parent"
                 value={parent}
                 onChange={(e) => setParent(e.target.value)}
-                disabled={submitting}
+                disabled={!responsiveEnabled && submitting}
                 required
+                aria-invalid={responsiveEnabled && fieldErrors.some((item) => item.id === parentId) ? true : undefined}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {/*
@@ -443,6 +479,7 @@ export function EditTeamModal({
                   </option>
                 ))}
               </select>
+              {responsiveEnabled && fieldErrors.find((item) => item.id === parentId) && <p className="text-sm text-destructive">{fieldErrors.find((item) => item.id === parentId)?.message}</p>}
               {/* Inline hint — only shown when the team currently has no parent */}
               {!team.parentTeamId && (
                 <p className="text-xs italic text-muted-foreground">
@@ -459,13 +496,13 @@ export function EditTeamModal({
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Optional description"
-                disabled={submitting}
+                disabled={!responsiveEnabled && submitting}
                 className="min-h-[72px] resize-none"
               />
             </div>
 
             {/* ---- Inline error ---- */}
-            {error && (
+            {!responsiveEnabled && error && (
               <p
                 role="alert"
                 className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
@@ -475,28 +512,34 @@ export function EditTeamModal({
             )}
           </div>
 
-          <DialogFooter className="mt-4 sm:justify-between">
+          <DialogFooter className={responsiveEnabled
+            ? "mt-4 gap-2 sm:justify-between [&_button]:min-h-11 [&_button]:w-full sm:[&_button]:w-auto"
+            : "mt-4 sm:justify-between"}
+          >
             {/* Destructive action — left-aligned via flex parent */}
             <Button
               type="button"
               variant="outline"
               onClick={handleDelete}
-              disabled={submitting}
+              disabled={responsiveEnabled ? deleting : submitting}
               className="text-destructive hover:bg-destructive/10 hover:text-destructive"
             >
               Delete team
             </Button>
-            <div className="flex items-center gap-2">
+            <div className={responsiveEnabled
+              ? "flex flex-col-reverse items-stretch gap-2 sm:flex-row sm:items-center"
+              : "flex items-center gap-2"}
+            >
               <Button
                 type="button"
                 variant="outline"
                 onClick={onClose}
-                disabled={submitting}
+                disabled={!responsiveEnabled && submitting}
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={submitting}>
-                {submitting ? "Saving…" : "Save"}
+              <Button type="submit" disabled={responsiveEnabled ? saving : submitting}>
+                {(responsiveEnabled ? saving : submitting) ? "Saving…" : "Save"}
               </Button>
             </div>
           </DialogFooter>

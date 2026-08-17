@@ -20,6 +20,11 @@ jest.mock("@/lib/assessments/wave-public-campaigns-simple-ui-flags", () => ({
   isPublicCampaignsSimpleUiEnabled: () => mockIsEnabled(),
 }));
 
+const mockResponsiveEnabled = jest.fn();
+jest.mock("@/lib/mobile-responsive-flags", () => ({
+  isMobileResponsiveEnabled: () => mockResponsiveEnabled(),
+}));
+
 jest.mock("@/components/admin/PublicCampaignsManager", () => ({
   PublicCampaignsManager: () => (
     <section aria-label="Legacy public campaign manager">
@@ -28,9 +33,9 @@ jest.mock("@/components/admin/PublicCampaignsManager", () => ({
   ),
 }));
 
-let listProps: { createdCampaignId?: string } | null = null;
+let listProps: { createdCampaignId?: string; responsiveEnabled?: boolean } | null = null;
 jest.mock("@/components/admin/public-campaigns/PublicCampaignList", () => ({
-  PublicCampaignList: (props: { createdCampaignId?: string }) => {
+  PublicCampaignList: (props: { createdCampaignId?: string; responsiveEnabled?: boolean }) => {
     listProps = props;
     return (
       <section aria-label="Simple public campaign list">
@@ -55,6 +60,7 @@ beforeEach(() => {
   listProps = null;
   mockGetServerSession.mockResolvedValue({ user: { role: "ADMIN" } });
   mockIsEnabled.mockReturnValue(false);
+  mockResponsiveEnabled.mockReturnValue(false);
 });
 
 describe("AdminPublicCampaignsPage auth gate", () => {
@@ -139,6 +145,18 @@ describe("AdminPublicCampaignsPage release composition", () => {
     await renderPage("campaign-23");
 
     expect(listProps).toEqual({ createdCampaignId: "campaign-23" });
+  });
+
+  it("forwards the responsive contract to the active simple campaign list", async () => {
+    mockIsEnabled.mockReturnValue(true);
+    mockResponsiveEnabled.mockReturnValue(true);
+
+    await renderPage();
+
+    expect(listProps).toEqual({
+      createdCampaignId: undefined,
+      responsiveEnabled: true,
+    });
   });
 
   it("ignores an array-valued created query parameter", async () => {

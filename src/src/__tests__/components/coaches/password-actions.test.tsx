@@ -196,7 +196,7 @@ describe("coach detail action structure", () => {
 
     expect(source).toContain("isAdmin && passwordActionsEnabled");
     expect(source).toContain(
-      'className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-start"',
+      ': "flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-start"',
     );
     expect(source).toContain('className="text-muted-foreground break-all"');
     expect(source).toContain("flex flex-wrap justify-end gap-2");

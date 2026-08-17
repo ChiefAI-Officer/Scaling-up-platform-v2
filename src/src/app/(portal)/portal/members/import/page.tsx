@@ -26,6 +26,7 @@ import { FadeUp } from "@/components/ui/animated";
 import { EspertoImportClient } from "@/components/admin/esperto-import/EspertoImportClient";
 import { isEspertoSuFullImportEnabled } from "@/lib/assessments/wave-o-flags";
 import { isEspertoLvaRockImportEnabled } from "@/lib/assessments/wave-x-flags";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 
 export default async function CoachEspertoImportPage() {
   await requireCoach();
@@ -35,14 +36,18 @@ export default async function CoachEspertoImportPage() {
   // follow-on; see docs/specs/v7.6/18o-ops-runbook.md §3.
   const suFullImportEnabled = isEspertoSuFullImportEnabled();
   const lvaRockImportEnabled = isEspertoLvaRockImportEnabled();
+  const mobileResponsiveEnabled = isMobileResponsiveEnabled();
 
   return (
-    <div className="space-y-6">
+    <div className={mobileResponsiveEnabled ? "min-w-0 max-w-full space-y-6" : "space-y-6"}>
       <FadeUp>
         <div className="space-y-2">
           <Link
             href="/portal/members"
-            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+            className={mobileResponsiveEnabled
+              ? "inline-flex min-h-11 items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+              : "inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"}
+            {...(mobileResponsiveEnabled ? { "data-touch-target": true } : {})}
           >
             <ChevronLeft className="w-4 h-4" />
             Back to Members &amp; Teams

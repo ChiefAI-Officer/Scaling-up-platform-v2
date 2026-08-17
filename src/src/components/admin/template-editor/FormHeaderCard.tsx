@@ -46,6 +46,7 @@ export interface FormHeaderCardProps {
   onTemplateFieldChange: (
     patch: Partial<{ name: string; description: string }>,
   ) => void;
+  responsiveEnabled?: boolean;
 }
 
 // Canonical display order for the meta-row type-count chips — mirrors the
@@ -68,6 +69,7 @@ export function FormHeaderCard({
   sectionCount,
   isReadOnly,
   onTemplateFieldChange,
+  responsiveEnabled = false,
 }: FormHeaderCardProps) {
   const counts = new Map<string, number>();
   for (const question of questions) {
@@ -103,7 +105,11 @@ export function FormHeaderCard({
         value={template.name}
         disabled={isReadOnly}
         onChange={(e) => onTemplateFieldChange({ name: e.target.value })}
-        className="w-full rounded border border-transparent bg-transparent px-1 py-1 text-2xl font-semibold text-foreground outline-none focus:border-border disabled:opacity-60 disabled:cursor-not-allowed"
+        className={
+          responsiveEnabled
+            ? "w-full min-h-11 rounded border border-transparent bg-transparent px-1 py-1 text-2xl font-semibold text-foreground outline-none focus:border-border disabled:opacity-60 disabled:cursor-not-allowed"
+            : "w-full rounded border border-transparent bg-transparent px-1 py-1 text-2xl font-semibold text-foreground outline-none focus:border-border disabled:opacity-60 disabled:cursor-not-allowed"
+        }
       />
       <input
         type="text"
@@ -115,7 +121,11 @@ export function FormHeaderCard({
         onChange={(e) =>
           onTemplateFieldChange({ description: e.target.value })
         }
-        className="w-full rounded border border-transparent bg-transparent px-1 py-1 text-sm text-muted-foreground outline-none focus:border-border disabled:opacity-60 disabled:cursor-not-allowed"
+        className={
+          responsiveEnabled
+            ? "w-full min-h-11 rounded border border-transparent bg-transparent px-1 py-1 text-sm text-muted-foreground outline-none focus:border-border disabled:opacity-60 disabled:cursor-not-allowed"
+            : "w-full rounded border border-transparent bg-transparent px-1 py-1 text-sm text-muted-foreground outline-none focus:border-border disabled:opacity-60 disabled:cursor-not-allowed"
+        }
       />
       <div
         data-testid="form-header-meta"

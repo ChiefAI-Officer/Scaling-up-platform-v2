@@ -105,6 +105,46 @@
   flex-wrap: wrap;
 }
 
+/* Task 8C: opt-in compact editor containment. These selectors stay inert
+   unless TabbedShell receives the server-resolved responsive flag. */
+.wf-scope .template-editor-responsive .wf-page-title-block,
+.wf-scope .template-editor-responsive .wf-page-pill-row,
+.wf-scope .template-editor-responsive .wf-page-action-row {
+  min-width: 0;
+  max-width: 100%;
+}
+.wf-scope .template-editor-responsive [data-responsive-tabs] {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+.wf-scope .template-editor-responsive [data-responsive-tabs] [role="tab"],
+.wf-scope .template-editor-responsive .wf-page-action-row .wf-btn,
+.wf-scope .template-editor-responsive [data-responsive-builder] button:not(:disabled),
+.wf-scope .template-editor-responsive [data-responsive-builder] [role="button"]:not([aria-disabled="true"]),
+.wf-scope .template-editor-responsive [data-responsive-builder] input:not([type="checkbox"]):not(:disabled),
+.wf-scope .template-editor-responsive [data-responsive-builder] select:not(:disabled),
+.wf-scope .template-editor-responsive [data-responsive-builder] textarea:not(:disabled),
+.wf-scope .template-editor-responsive [data-responsive-inspector] button:not(:disabled),
+.wf-scope .template-editor-responsive [data-responsive-inspector] select:not(:disabled),
+.wf-scope .template-editor-responsive [data-responsive-inspector] input:not([type="checkbox"]):not(:disabled),
+.wf-scope .template-editor-responsive [data-responsive-inspector] textarea:not(:disabled) {
+  min-height: 44px;
+}
+.wf-scope .template-editor-responsive [data-responsive-builder] button:not(:disabled),
+.wf-scope .template-editor-responsive [data-responsive-builder] [role="button"]:not([aria-disabled="true"]),
+.wf-scope .template-editor-responsive [data-responsive-inspector] button:not(:disabled) {
+  min-width: 44px;
+}
+@media (max-width: 639px) {
+  .wf-scope .template-editor-responsive .wf-page-header-row,
+  .wf-scope .template-editor-responsive .wf-page-action-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
 /* ===========================================================
    Card
    =========================================================== */
@@ -1156,6 +1196,31 @@
 }
 .wf-scope .wf-stepper-item.is-done:not(:last-child)::after {
   background: hsl(var(--primary));
+}
+
+@media (max-width: 639px) {
+  .wf-scope [data-responsive-campaign-wizard] .wf-stepper[data-responsive-full-stepper] {
+    display: none;
+  }
+
+  .wf-scope [data-responsive-campaign-wizard] .space-y-6 > .flex.justify-end.pt-4,
+  .wf-scope [data-responsive-campaign-wizard] .space-y-6 > .flex.justify-between.pt-4 {
+    align-items: stretch;
+    flex-direction: column-reverse;
+    gap: 0.5rem;
+  }
+
+  .wf-scope [data-responsive-campaign-wizard] .space-y-6 > .flex.pt-4 > button,
+  .wf-scope [data-responsive-campaign-wizard] .space-y-6 > .flex.pt-4 > .flex,
+  .wf-scope [data-responsive-campaign-wizard] .space-y-6 > .flex.pt-4 > .flex > button {
+    min-height: 44px;
+    width: 100%;
+  }
+
+  .wf-scope [data-responsive-campaign-wizard] .space-y-6 > .flex.pt-4 > .flex {
+    align-items: stretch;
+    flex-direction: column-reverse;
+  }
 }
 
 /* Assessment participant brand scope — purple #522583 + Roboto. NOT on .wf-scope (admin/coach share it). */

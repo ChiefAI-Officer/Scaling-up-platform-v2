@@ -124,7 +124,11 @@ function buildSparklinePoints(
     .join(" ");
 }
 
-export function AssessmentsAggregateReport() {
+export function AssessmentsAggregateReport({
+  responsiveEnabled = false,
+}: {
+  responsiveEnabled?: boolean;
+} = {}) {
   const [templates, setTemplates] = useState<TemplateSummary[]>([]);
   const [templatesError, setTemplatesError] = useState<string | null>(null);
   const [templateId, setTemplateId] = useState<string>("");
@@ -241,14 +245,14 @@ export function AssessmentsAggregateReport() {
   const latestVersionId = versions[0]?.id ?? null;
 
   return (
-    <div className="space-y-6">
+    <div className={responsiveEnabled ? "min-w-0 max-w-full space-y-6" : "space-y-6"}>
       {/* Selectors */}
       <Card>
         <CardHeader>
           <CardTitle>Filters</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className={responsiveEnabled ? "grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2" : "grid grid-cols-1 gap-4 sm:grid-cols-2"}>
             <div>
               <label
                 htmlFor="template-select"
@@ -258,7 +262,7 @@ export function AssessmentsAggregateReport() {
               </label>
               <select
                 id="template-select"
-                className="block w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                className={responsiveEnabled ? "block min-h-11 min-w-0 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" : "block w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"}
                 value={templateId}
                 onChange={(e) => setTemplateId(e.target.value)}
                 disabled={templates.length === 0}
@@ -284,7 +288,7 @@ export function AssessmentsAggregateReport() {
               </label>
               <select
                 id="version-select"
-                className="block w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                className={responsiveEnabled ? "block min-h-11 min-w-0 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" : "block w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"}
                 value={versionId}
                 onChange={(e) => setVersionId(e.target.value)}
                 disabled={versions.length === 0}
@@ -330,8 +334,9 @@ export function AssessmentsAggregateReport() {
           )}
 
           {/* CSV exports — disabled until both selectors resolve. */}
-          <div className="flex flex-wrap gap-2 pt-1" data-testid="aggregate-export-buttons">
+          <div className={responsiveEnabled ? "flex flex-col gap-2 pt-1 sm:flex-row sm:flex-wrap" : "flex flex-wrap gap-2 pt-1"} data-testid="aggregate-export-buttons">
             <ExportLink
+              responsiveEnabled={responsiveEnabled}
               label="Export summary (CSV)"
               templateId={templateId}
               versionId={versionId}
@@ -339,6 +344,7 @@ export function AssessmentsAggregateReport() {
               testId="export-aggregate-summary-csv"
             />
             <ExportLink
+              responsiveEnabled={responsiveEnabled}
               label="Export submissions (CSV)"
               templateId={templateId}
               versionId={versionId}
@@ -398,7 +404,7 @@ export function AssessmentsAggregateReport() {
       {/* Stats + visuals */}
       {report && report.totalSubmissions > 0 && (
         <>
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <div className={responsiveEnabled ? "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4" : "grid grid-cols-2 gap-4 lg:grid-cols-4"}>
             <StatCard label="Total submissions" value={report.totalSubmissions} />
             <StatCard label="Distinct organizations" value={report.distinctOrgs} />
             <StatCard
@@ -468,7 +474,13 @@ export function AssessmentsAggregateReport() {
                   No sections configured on this template version.
                 </p>
               ) : (
-                <div className="overflow-x-auto">
+                <div
+                  className={responsiveEnabled ? "max-w-full overflow-x-auto" : "overflow-x-auto"}
+                  role={responsiveEnabled ? "region" : undefined}
+                  aria-label={responsiveEnabled ? "Per-section means comparison" : undefined}
+                  tabIndex={responsiveEnabled ? 0 : undefined}
+                  data-responsive-data-region={responsiveEnabled ? "" : undefined}
+                >
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b text-left text-muted-foreground">
@@ -561,12 +573,14 @@ function ExportLink({
   templateId,
   versionId,
   testId,
+  responsiveEnabled = false,
 }: {
   label: string;
   path: string;
   templateId: string;
   versionId: string;
   testId: string;
+  responsiveEnabled?: boolean;
 }) {
   const disabled = !templateId || !versionId;
   if (disabled) {
@@ -574,7 +588,7 @@ function ExportLink({
       <button
         type="button"
         disabled
-        className="wf-btn wf-btn-secondary"
+        className={responsiveEnabled ? "wf-btn wf-btn-secondary min-h-11 w-full sm:w-auto" : "wf-btn wf-btn-secondary"}
         style={{ opacity: 0.6, cursor: "not-allowed" }}
         data-testid={testId}
       >
@@ -588,7 +602,7 @@ function ExportLink({
     <a
       href={`${path}?${qs}`}
       download
-      className="wf-btn wf-btn-secondary"
+      className={responsiveEnabled ? "wf-btn wf-btn-secondary min-h-11 w-full sm:w-auto" : "wf-btn wf-btn-secondary"}
       data-testid={testId}
     >
       {label}

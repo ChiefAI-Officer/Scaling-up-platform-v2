@@ -10,7 +10,7 @@ import {
     ToastViewport,
 } from "@/components/ui/toast"
 
-export function Toaster() {
+export function Toaster({ responsiveEnabled = false }: { responsiveEnabled?: boolean }) {
     const { toasts } = useToast()
 
     return (
@@ -29,7 +29,7 @@ export function Toaster() {
                     </Toast>
                 )
             })}
-            <ToastViewport />
+            <ToastViewport responsiveEnabled={responsiveEnabled} />
         </ToastProvider>
     )
 }

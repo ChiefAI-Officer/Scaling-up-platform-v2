@@ -7,11 +7,11 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth/authorization";
-import { SURVEY_TYPE_LABELS } from "@/lib/surveys/survey-types";
-import type { SurveyType } from "@/lib/surveys/survey-types";
-import { DeleteSurveyTemplateButton } from "@/components/surveys/delete-survey-template-button";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
+import { PageHeader } from "@/components/ui/page-header";
+import { SurveyTemplatesView } from "./survey-templates-view";
 
-async function SurveyTemplatesList() {
+async function SurveyTemplatesList({ responsiveEnabled }: { responsiveEnabled: boolean }) {
   await requireAdmin();
 
   const templates = await db.surveyTemplate.findMany({
@@ -32,7 +32,7 @@ async function SurveyTemplatesList() {
         <div className="mt-6">
           <Link
             href="/admin/surveys/templates/new"
-            className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            className={responsiveEnabled ? "inline-flex min-h-11 items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90" : "inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"}
           >
             + Create Template
           </Link>
@@ -41,99 +41,14 @@ async function SurveyTemplatesList() {
     );
   }
 
-  return (
-    <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-border">
-        <thead className="bg-muted">
-          <tr>
-            <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Name
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Type
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Questions
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Responses
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Status
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Actions
-            </th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border bg-card">
-          {templates.map((template) => (
-            <tr key={template.id} className="hover:bg-accent">
-              <td className="px-6 py-4">
-                <div>
-                  <div className="text-sm font-medium text-foreground">{template.name}</div>
-                  {template.description && (
-                    <div className="text-sm text-muted-foreground">{template.description}</div>
-                  )}
-                </div>
-              </td>
-              <td className="px-6 py-4">
-                <span className="inline-flex rounded-full bg-info/10 px-2.5 py-0.5 text-xs font-medium text-info">
-                  {SURVEY_TYPE_LABELS[template.surveyType as SurveyType] || template.surveyType}
-                </span>
-              </td>
-              <td className="px-6 py-4 text-sm text-foreground">
-                {template.questions.length}
-              </td>
-              <td className="px-6 py-4 text-sm text-foreground">
-                {template._count.surveys}
-              </td>
-              <td className="px-6 py-4">
-                <span
-                  className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                    template.isActive
-                      ? "bg-success/10 text-success"
-                      : "bg-muted text-foreground"
-                  }`}
-                >
-                  {template.isActive ? "Active" : "Inactive"}
-                </span>
-              </td>
-              <td className="px-6 py-4">
-                <div className="flex items-center gap-2">
-                  <Link
-                    href={`/admin/surveys/templates/${template.id}`}
-                    className="text-sm font-medium text-primary hover:text-primary/80"
-                  >
-                    Edit
-                  </Link>
-                  {template._count.surveys > 0 && (
-                    <Link
-                      href={`/admin/surveys/templates/${template.id}?tab=results`}
-                      className="text-sm font-medium text-success hover:text-success/80"
-                    >
-                      Results
-                    </Link>
-                  )}
-                  <DeleteSurveyTemplateButton
-                    templateId={template.id}
-                    templateName={template.name}
-                    surveyCount={template._count.surveys}
-                  />
-                </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
+  return <SurveyTemplatesView templates={templates} responsiveEnabled={responsiveEnabled} />;
 }
 
 export default function AdminSurveysPage() {
+  const responsiveEnabled = isMobileResponsiveEnabled();
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className={responsiveEnabled ? "min-w-0 max-w-full space-y-6" : "space-y-6"}>
+      {responsiveEnabled ? <PageHeader responsiveEnabled title="Survey Templates" description="Build custom surveys to collect pre/post-event feedback and NPS scores." actions={<div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row"><Link href="/admin/surveys/aggregate" className="inline-flex min-h-11 items-center justify-center rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-accent">Aggregated Results</Link><Link href="/admin/surveys/templates/new" className="inline-flex min-h-11 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">+ Create Template</Link></div>} /> : <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Survey Templates</h1>
           <p className="text-muted-foreground">
@@ -154,7 +69,7 @@ export default function AdminSurveysPage() {
             + Create Template
           </Link>
         </div>
-      </div>
+      </div>}
 
       <div className="rounded-lg bg-card shadow">
         <Suspense
@@ -164,7 +79,7 @@ export default function AdminSurveysPage() {
             </div>
           }
         >
-          <SurveyTemplatesList />
+          <SurveyTemplatesList responsiveEnabled={responsiveEnabled} />
         </Suspense>
       </div>
     </div>

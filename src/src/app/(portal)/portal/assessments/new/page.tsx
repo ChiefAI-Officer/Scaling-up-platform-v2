@@ -26,6 +26,7 @@ import { isOnScreenResultsEnabled } from "@/lib/assessments/wave-osr-flags";
 import { isAdminOwnedAssessmentPresentationEnabled } from "@/lib/assessments/wave-admin-owned-assessment-presentation-flags";
 import { getInvitationBannerAuthoringGate } from "@/lib/assessments/wave-invitation-banner-flags";
 import { campaignPickerTemplateWhere } from "@/lib/assessments/campaign-picker-template-scope";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 
 export default async function NewCampaignPage() {
   const { session, coach } = await requireCoach();
@@ -81,9 +82,11 @@ export default async function NewCampaignPage() {
   const onScreenResultsEnabled = isOnScreenResultsEnabled();
   const adminOwnedPresentation =
     isAdminOwnedAssessmentPresentationEnabled();
+  const mobileResponsiveEnabled = isMobileResponsiveEnabled();
   return (
-    <div className="wf-scope max-w-3xl mx-auto">
+    <div className={mobileResponsiveEnabled ? "wf-scope min-w-0 max-w-3xl mx-auto" : "wf-scope max-w-3xl mx-auto"}>
       <CampaignWizard
+        responsiveEnabled={mobileResponsiveEnabled}
         customHtmlEmailEnabled={customHtmlEmailEnabled}
         brandedCustomHtmlEnabled={brandedCustomHtmlEnabled}
         invitationBannerGate={invitationBannerGate}

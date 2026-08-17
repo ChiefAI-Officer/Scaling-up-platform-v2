@@ -13,6 +13,7 @@ import {
   getRegistrationDisplayStatus,
   parseJsonField,
   VenueAddress,
+  cn,
 } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -33,6 +34,7 @@ import { ApprovalThread } from "@/components/approvals/approval-thread";
 import { AdminNotesEditor } from "@/components/workshops/admin-notes-editor";
 import { formatStepLabel } from "@/lib/workflows/workflow-types";
 import { requireAuth } from "@/lib/auth/authorization";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 
 function executionStatusVariant(status: string): "success" | "warning" | "destructive" | "secondary" {
   switch (status) {
@@ -55,6 +57,7 @@ interface WorkshopDetailPageProps {
 export default async function WorkshopDetailPage({
   params,
 }: WorkshopDetailPageProps) {
+  const mobileResponsiveEnabled = isMobileResponsiveEnabled();
   const session = await requireAuth();
   const { id } = await params;
 
@@ -141,21 +144,21 @@ export default async function WorkshopDetailPage({
   const isLocked = workshop.isLocked || (hoursUntilEvent >= 0 && hoursUntilEvent <= 48);
 
   return (
-    <div className="space-y-6">
+    <div className={mobileResponsiveEnabled ? "min-w-0 max-w-full space-y-6" : "space-y-6"}>
       {/* Header */}
       <FadeUp>
-      <div className="flex justify-between items-start">
-        <div>
+      <div className={cn("flex justify-between items-start", mobileResponsiveEnabled && "min-w-0 flex-col gap-3 lg:flex-row")}>
+        <div className={cn(mobileResponsiveEnabled && "min-w-0")}>
           <div className="flex items-center gap-3 mb-2">
             <Link
               href="/workshops"
-              className="text-muted-foreground hover:text-foreground"
+              className={cn("text-muted-foreground hover:text-foreground", mobileResponsiveEnabled && "inline-flex min-h-11 items-center")}
             >
               &larr; Workshops
             </Link>
           </div>
-          <h1 className="text-2xl font-bold text-foreground">{workshop.title}</h1>
-          <div className="flex items-center gap-3 mt-2">
+          <h1 className={cn("text-2xl font-bold text-foreground", mobileResponsiveEnabled && "break-words")}>{workshop.title}</h1>
+          <div className={cn("flex items-center gap-3 mt-2", mobileResponsiveEnabled && "flex-wrap")}>
             {workshop.workshopCode && (
               <span className="font-mono text-sm text-muted-foreground bg-muted px-2 py-0.5 rounded">
                 {workshop.workshopCode}
@@ -175,7 +178,21 @@ export default async function WorkshopDetailPage({
             <span className="text-muted-foreground">{workshop.workshopType?.name}</span>
           </div>
         </div>
-        <WorkshopActions workshop={workshop} userRole={session.user.role} />
+        {mobileResponsiveEnabled ? (
+          <div className="max-w-full [&>div]:flex-wrap [&_button]:min-h-11">
+            <WorkshopActions
+              workshop={workshop}
+              userRole={session.user.role}
+              responsiveEnabled={mobileResponsiveEnabled}
+            />
+          </div>
+        ) : (
+          <WorkshopActions
+            workshop={workshop}
+            userRole={session.user.role}
+            responsiveEnabled={mobileResponsiveEnabled}
+          />
+        )}
       </div>
       </FadeUp>
 
@@ -191,7 +208,7 @@ export default async function WorkshopDetailPage({
       )}
 
       {/* Quick Stats */}
-      <StaggerContainer className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <StaggerContainer className={cn("grid grid-cols-1 md:grid-cols-4 gap-4", mobileResponsiveEnabled && "sm:grid-cols-2 lg:grid-cols-4")}>
         <StaggerItem>
           <Card>
             <CardContent className="pt-6">
@@ -268,7 +285,7 @@ export default async function WorkshopDetailPage({
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className={cn("grid grid-cols-2 gap-4", mobileResponsiveEnabled && "grid-cols-1 sm:grid-cols-2")}>
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Coach</p>
                   <p className="text-foreground">
@@ -323,7 +340,7 @@ export default async function WorkshopDetailPage({
                 return isApproved && copySlug ? (
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Landing Page</p>
-                    <div className="flex items-center gap-2">
+                    <div className={cn("flex items-center gap-2", mobileResponsiveEnabled && "flex-wrap [&_a]:min-h-11 [&_a]:items-center [&_button]:min-h-11 [&_button]:min-w-11")}>
                       <CopyUrlButton url={`${APP_URL}/workshop/${copySlug}`} />
                       <a
                         href={`${APP_URL}/workshop/${copySlug}`}
@@ -360,7 +377,11 @@ export default async function WorkshopDetailPage({
           </Card>
 
           {/* Registrations */}
-          <Card id="registrations">
+          <Card
+            id="registrations"
+            role={mobileResponsiveEnabled ? "region" : undefined}
+            aria-label={mobileResponsiveEnabled ? "Workshop registrations" : undefined}
+          >
             <CardHeader>
               <CardTitle>Registrations ({workshop.registrations.filter((r) => r.paymentStatus !== "PENDING").length})</CardTitle>
             </CardHeader>
@@ -370,7 +391,10 @@ export default async function WorkshopDetailPage({
                   No registrations yet
                 </p>
               ) : (
-                <div className="overflow-x-auto">
+                <div
+                  className="overflow-x-auto"
+                  tabIndex={mobileResponsiveEnabled ? 0 : undefined}
+                >
                   <table className="min-w-full divide-y divide-border">
                     <thead>
                       <tr>

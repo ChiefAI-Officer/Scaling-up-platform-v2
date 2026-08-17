@@ -2,14 +2,17 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { ResponsiveActionsItem } from "@/components/ui/responsive-actions-menu";
 
 interface Props {
   templateId: string;
   templateName: string;
   surveyCount: number;
+  responsiveEnabled?: boolean;
+  menuItem?: boolean;
 }
 
-export function DeleteSurveyTemplateButton({ templateId, templateName, surveyCount }: Props) {
+export function DeleteSurveyTemplateButton({ templateId, templateName, surveyCount, responsiveEnabled = false, menuItem = false }: Props) {
   const [deleting, setDeleting] = useState(false);
   const router = useRouter();
 
@@ -35,13 +38,15 @@ export function DeleteSurveyTemplateButton({ templateId, templateName, surveyCou
     }
   }
 
-  return (
+  const button = (
     <button
       onClick={handleDelete}
       disabled={deleting}
-      className="text-sm font-medium text-destructive hover:text-destructive/80 disabled:opacity-50"
+      className={responsiveEnabled ? "flex min-h-11 w-full items-center rounded-md px-3 text-sm font-medium text-destructive outline-none hover:bg-accent hover:text-destructive/80 disabled:opacity-50" : "text-sm font-medium text-destructive hover:text-destructive/80 disabled:opacity-50"}
     >
       {deleting ? "Deleting…" : "Delete"}
     </button>
   );
+
+  return menuItem ? <ResponsiveActionsItem asChild>{button}</ResponsiveActionsItem> : button;
 }

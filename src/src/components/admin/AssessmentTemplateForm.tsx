@@ -4,9 +4,11 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Plus, Trash2, ArrowUp, ArrowDown } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import { cn } from "@/lib/utils";
 
 export interface AssessmentTemplateFormProps {
   mode: "create";
+  responsiveEnabled?: boolean;
 }
 
 // ────────────────────────────────────────────────────────────────────────
@@ -73,7 +75,7 @@ const DEFAULT_TIER: Omit<TierDraft, "uid"> = {
   message: "",
 };
 
-export function AssessmentTemplateForm({ mode: _mode }: AssessmentTemplateFormProps) {
+export function AssessmentTemplateForm({ responsiveEnabled = false }: AssessmentTemplateFormProps) {
   const router = useRouter();
   const { toast } = useToast();
 
@@ -307,9 +309,9 @@ export function AssessmentTemplateForm({ mode: _mode }: AssessmentTemplateFormPr
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className={cn("space-y-6", responsiveEnabled && "min-w-0 max-w-full [&_input]:min-h-11 [&_input]:min-w-0 [&_select]:min-h-11 [&_select]:min-w-0 [&_textarea]:min-h-11 [&_textarea]:min-w-0 [&_button]:min-h-11")}>
       {/* ─── Metadata ─────────────────────────────────────────────── */}
-      <div className="bg-card border border-border rounded-xl p-6 space-y-4">
+      <div className={cn("bg-card border border-border rounded-xl p-6 space-y-4", responsiveEnabled && "min-w-0 max-w-full p-4 sm:p-6")}>
         <h2 className="text-sm font-semibold text-foreground">Metadata</h2>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -323,7 +325,7 @@ export function AssessmentTemplateForm({ mode: _mode }: AssessmentTemplateFormPr
               onChange={(e) => setName(e.target.value)}
               required
               maxLength={200}
-              className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+              className={cn("w-full px-3 py-2 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30", responsiveEnabled && "min-h-11 min-w-0")}
               data-testid="template-name"
             />
           </div>
@@ -374,7 +376,7 @@ export function AssessmentTemplateForm({ mode: _mode }: AssessmentTemplateFormPr
                   e.target.value as "FULL_VISIBILITY" | "CEO_ONLY",
                 )
               }
-              className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+              className={cn("w-full px-3 py-2 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30", responsiveEnabled && "min-h-11 min-w-0")}
               data-testid="template-aggregation-mode"
             >
               <option value="FULL_VISIBILITY">FULL_VISIBILITY</option>
@@ -399,7 +401,7 @@ export function AssessmentTemplateForm({ mode: _mode }: AssessmentTemplateFormPr
       </div>
 
       {/* ─── Invitation email ─────────────────────────────────────── */}
-      <div className="bg-card border border-border rounded-xl p-6 space-y-4">
+      <div className={cn("bg-card border border-border rounded-xl p-6 space-y-4", responsiveEnabled && "min-w-0 max-w-full p-4 sm:p-6")}>
         <h2 className="text-sm font-semibold text-foreground">Invitation email</h2>
         <div>
           <label className="block text-xs font-medium text-foreground mb-1">
@@ -432,15 +434,15 @@ export function AssessmentTemplateForm({ mode: _mode }: AssessmentTemplateFormPr
       </div>
 
       {/* ─── Sections ─────────────────────────────────────────────── */}
-      <div className="bg-card border border-border rounded-xl p-6 space-y-3">
-        <div className="flex items-center justify-between">
+      <div className={cn("bg-card border border-border rounded-xl p-6 space-y-3", responsiveEnabled && "min-w-0 max-w-full p-4 sm:p-6")}>
+        <div className={cn("flex items-center justify-between", responsiveEnabled && "flex-col items-stretch gap-3 sm:flex-row sm:items-center")}>
           <h2 className="text-sm font-semibold text-foreground">Sections</h2>
           <button
             type="button"
             onClick={() =>
               setSections((s) => [...s, { uid: genUid(), ...DEFAULT_SECTION }])
             }
-            className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md border border-border bg-card text-foreground hover:bg-muted"
+            className={cn("inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md border border-border bg-card text-foreground hover:bg-muted", responsiveEnabled && "min-h-11 justify-center")}
             data-testid="add-section"
           >
             <Plus className="w-3.5 h-3.5" /> Section
@@ -453,10 +455,10 @@ export function AssessmentTemplateForm({ mode: _mode }: AssessmentTemplateFormPr
         {sections.map((s, idx) => (
           <div
             key={s.uid}
-            className="border border-border rounded-md p-3 space-y-2"
+            className={cn("border border-border rounded-md p-3 space-y-2", responsiveEnabled && "min-w-0 max-w-full")}
             data-testid={`section-row-${idx}`}
           >
-            <div className="flex items-center gap-2">
+            <div className={cn("flex items-center gap-2", responsiveEnabled && "min-w-0 flex-wrap")}>
               <span className="text-[10px] font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
                 S{idx + 1}
               </span>
@@ -471,13 +473,13 @@ export function AssessmentTemplateForm({ mode: _mode }: AssessmentTemplateFormPr
                   )
                 }
                 placeholder="Section name"
-                className="flex-1 px-2 py-1 text-sm border border-border rounded bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className={cn("flex-1 px-2 py-1 text-sm border border-border rounded bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30", responsiveEnabled && "min-w-0 w-full sm:flex-1")}
               />
               <button
                 type="button"
                 onClick={() => moveSection(idx, -1)}
                 disabled={idx === 0}
-                className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                className={cn("text-muted-foreground hover:text-foreground disabled:opacity-30", responsiveEnabled && "inline-flex min-h-11 min-w-11 items-center justify-center")}
                 aria-label="Move up"
               >
                 <ArrowUp className="w-3.5 h-3.5" />
@@ -486,7 +488,7 @@ export function AssessmentTemplateForm({ mode: _mode }: AssessmentTemplateFormPr
                 type="button"
                 onClick={() => moveSection(idx, 1)}
                 disabled={idx === sections.length - 1}
-                className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                className={cn("text-muted-foreground hover:text-foreground disabled:opacity-30", responsiveEnabled && "inline-flex min-h-11 min-w-11 items-center justify-center")}
                 aria-label="Move down"
               >
                 <ArrowDown className="w-3.5 h-3.5" />
@@ -502,7 +504,7 @@ export function AssessmentTemplateForm({ mode: _mode }: AssessmentTemplateFormPr
                   );
                 }}
                 disabled={sections.length === 1}
-                className="text-destructive hover:text-destructive/80 disabled:opacity-30"
+                className={cn("text-destructive hover:text-destructive/80 disabled:opacity-30", responsiveEnabled && "inline-flex min-h-11 min-w-11 items-center justify-center")}
                 aria-label="Remove section"
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -539,8 +541,8 @@ export function AssessmentTemplateForm({ mode: _mode }: AssessmentTemplateFormPr
       </div>
 
       {/* ─── Questions ────────────────────────────────────────────── */}
-      <div className="bg-card border border-border rounded-xl p-6 space-y-3">
-        <div className="flex items-center justify-between">
+      <div className={cn("bg-card border border-border rounded-xl p-6 space-y-3", responsiveEnabled && "min-w-0 max-w-full p-4 sm:p-6")}>
+        <div className={cn("flex items-center justify-between", responsiveEnabled && "flex-col items-stretch gap-3 sm:flex-row sm:items-center")}>
           <h2 className="text-sm font-semibold text-foreground">Questions</h2>
           <button
             type="button"
@@ -555,7 +557,7 @@ export function AssessmentTemplateForm({ mode: _mode }: AssessmentTemplateFormPr
               ])
             }
             disabled={sections.length === 0}
-            className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md border border-border bg-card text-foreground hover:bg-muted disabled:opacity-50"
+            className={cn("inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md border border-border bg-card text-foreground hover:bg-muted disabled:opacity-50", responsiveEnabled && "min-h-11 justify-center")}
             data-testid="add-question"
           >
             <Plus className="w-3.5 h-3.5" /> Question
@@ -573,10 +575,10 @@ export function AssessmentTemplateForm({ mode: _mode }: AssessmentTemplateFormPr
         {questions.map((q, idx) => (
           <div
             key={q.uid}
-            className="border border-border rounded-md p-3 space-y-2"
+            className={cn("border border-border rounded-md p-3 space-y-2", responsiveEnabled && "min-w-0 max-w-full")}
             data-testid={`question-row-${idx}`}
           >
-            <div className="flex items-center gap-2">
+            <div className={cn("flex items-center gap-2", responsiveEnabled && "min-w-0 flex-wrap")}>
               <span className="text-[10px] font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded shrink-0">
                 Q{idx + 1}
               </span>
@@ -591,13 +593,14 @@ export function AssessmentTemplateForm({ mode: _mode }: AssessmentTemplateFormPr
                   )
                 }
                 placeholder="Question label"
-                className="flex-1 px-2 py-1 text-sm border border-border rounded bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className={cn("flex-1 px-2 py-1 text-sm border border-border rounded bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30", responsiveEnabled && "min-h-11 min-w-0 w-full sm:flex-1")}
               />
               <button
                 type="button"
                 onClick={() => moveQuestionWithinAll(idx, -1)}
                 disabled={idx === 0}
-                className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                className={cn("text-muted-foreground hover:text-foreground disabled:opacity-30", responsiveEnabled && "inline-flex min-h-11 min-w-11 items-center justify-center")}
+                aria-label={responsiveEnabled ? `Move question ${idx + 1} up` : undefined}
               >
                 <ArrowUp className="w-3.5 h-3.5" />
               </button>
@@ -605,7 +608,8 @@ export function AssessmentTemplateForm({ mode: _mode }: AssessmentTemplateFormPr
                 type="button"
                 onClick={() => moveQuestionWithinAll(idx, 1)}
                 disabled={idx === questions.length - 1}
-                className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                className={cn("text-muted-foreground hover:text-foreground disabled:opacity-30", responsiveEnabled && "inline-flex min-h-11 min-w-11 items-center justify-center")}
+                aria-label={responsiveEnabled ? `Move question ${idx + 1} down` : undefined}
               >
                 <ArrowDown className="w-3.5 h-3.5" />
               </button>
@@ -614,7 +618,8 @@ export function AssessmentTemplateForm({ mode: _mode }: AssessmentTemplateFormPr
                 onClick={() =>
                   setQuestions((cur) => cur.filter((_, i) => i !== idx))
                 }
-                className="text-destructive hover:text-destructive/80"
+                className={cn("text-destructive hover:text-destructive/80", responsiveEnabled && "inline-flex min-h-11 min-w-11 items-center justify-center")}
+                aria-label={responsiveEnabled ? `Remove question ${idx + 1}` : undefined}
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
@@ -629,7 +634,7 @@ export function AssessmentTemplateForm({ mode: _mode }: AssessmentTemplateFormPr
                     ),
                   )
                 }
-                className="px-2 py-1 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className={cn("px-2 py-1 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30", responsiveEnabled && "min-h-11 min-w-0")}
               >
                 {sections.map((s, sIdx) => (
                   <option key={s.uid} value={s.uid}>
@@ -637,7 +642,7 @@ export function AssessmentTemplateForm({ mode: _mode }: AssessmentTemplateFormPr
                   </option>
                 ))}
               </select>
-              <label className="inline-flex items-center gap-2 text-xs text-foreground">
+              <label className={cn("inline-flex items-center gap-2 text-xs text-foreground", responsiveEnabled && "min-h-11")}>
                 <input
                   type="checkbox"
                   checked={q.isRequired}
@@ -727,7 +732,7 @@ export function AssessmentTemplateForm({ mode: _mode }: AssessmentTemplateFormPr
       </div>
 
       {/* ─── Scoring ──────────────────────────────────────────────── */}
-      <div className="bg-card border border-border rounded-xl p-6 space-y-3">
+      <div className={cn("bg-card border border-border rounded-xl p-6 space-y-3", responsiveEnabled && "min-w-0 max-w-full p-4 sm:p-6")}>
         <h2 className="text-sm font-semibold text-foreground">Scoring</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
@@ -757,14 +762,14 @@ export function AssessmentTemplateForm({ mode: _mode }: AssessmentTemplateFormPr
           </div>
         </div>
 
-        <div className="flex items-center justify-between pt-2">
+        <div className={cn("flex items-center justify-between pt-2", responsiveEnabled && "flex-col items-stretch gap-3 sm:flex-row sm:items-center")}>
           <h3 className="text-xs font-semibold text-foreground">Tiers</h3>
           <button
             type="button"
             onClick={() =>
               setTiers((t) => [...t, { uid: genUid(), ...DEFAULT_TIER }])
             }
-            className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md border border-border bg-card text-foreground hover:bg-muted"
+            className={cn("inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md border border-border bg-card text-foreground hover:bg-muted", responsiveEnabled && "min-h-11 justify-center")}
             data-testid="add-tier"
           >
             <Plus className="w-3.5 h-3.5" /> Tier
@@ -777,10 +782,10 @@ export function AssessmentTemplateForm({ mode: _mode }: AssessmentTemplateFormPr
         {tiers.map((t, idx) => (
           <div
             key={t.uid}
-            className="border border-border rounded-md p-3 space-y-2"
+            className={cn("border border-border rounded-md p-3 space-y-2", responsiveEnabled && "min-w-0 max-w-full")}
             data-testid={`tier-row-${idx}`}
           >
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+            <div className={cn("grid grid-cols-1 sm:grid-cols-12 gap-2 items-center", responsiveEnabled && "min-w-0 max-w-full")}>
               <NumInput
                 label="min"
                 value={t.minMetric}
@@ -845,12 +850,13 @@ export function AssessmentTemplateForm({ mode: _mode }: AssessmentTemplateFormPr
                   className="w-full px-2 py-1 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
               </div>
-              <div className="sm:col-span-1 flex items-end justify-end gap-1">
+              <div className={responsiveEnabled ? "sm:col-span-12 flex flex-wrap items-end justify-end gap-1" : "sm:col-span-1 flex items-end justify-end gap-1"}>
                 <button
                   type="button"
                   onClick={() => moveTier(idx, -1)}
                   disabled={idx === 0}
-                  className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                  className={cn("text-muted-foreground hover:text-foreground disabled:opacity-30", responsiveEnabled && "inline-flex min-h-11 min-w-11 items-center justify-center")}
+                  aria-label={responsiveEnabled ? `Move tier ${idx + 1} up` : undefined}
                 >
                   <ArrowUp className="w-3.5 h-3.5" />
                 </button>
@@ -858,7 +864,8 @@ export function AssessmentTemplateForm({ mode: _mode }: AssessmentTemplateFormPr
                   type="button"
                   onClick={() => moveTier(idx, 1)}
                   disabled={idx === tiers.length - 1}
-                  className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                  className={cn("text-muted-foreground hover:text-foreground disabled:opacity-30", responsiveEnabled && "inline-flex min-h-11 min-w-11 items-center justify-center")}
+                  aria-label={responsiveEnabled ? `Move tier ${idx + 1} down` : undefined}
                 >
                   <ArrowDown className="w-3.5 h-3.5" />
                 </button>
@@ -868,7 +875,8 @@ export function AssessmentTemplateForm({ mode: _mode }: AssessmentTemplateFormPr
                     setTiers((cur) => cur.filter((_, i) => i !== idx))
                   }
                   disabled={tiers.length === 1}
-                  className="text-destructive hover:text-destructive/80 disabled:opacity-30"
+                  className={cn("text-destructive hover:text-destructive/80 disabled:opacity-30", responsiveEnabled && "inline-flex min-h-11 min-w-11 items-center justify-center")}
+                  aria-label={responsiveEnabled ? `Remove tier ${idx + 1}` : undefined}
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
@@ -879,7 +887,7 @@ export function AssessmentTemplateForm({ mode: _mode }: AssessmentTemplateFormPr
       </div>
 
       {/* ─── reportConfig (advanced) ─────────────────────────────── */}
-      <div className="bg-card border border-border rounded-xl p-6 space-y-2">
+      <div className={cn("bg-card border border-border rounded-xl p-6 space-y-2", responsiveEnabled && "min-w-0 max-w-full p-4 sm:p-6")}>
         <h2 className="text-sm font-semibold text-foreground">
           Report config (advanced, optional)
         </h2>
@@ -902,19 +910,19 @@ export function AssessmentTemplateForm({ mode: _mode }: AssessmentTemplateFormPr
         </div>
       )}
 
-      <div className="flex justify-end gap-2">
+      <div className={cn("flex justify-end gap-2", responsiveEnabled && "flex-col items-stretch sm:flex-row sm:items-center")}>
         <button
           type="button"
           onClick={() => router.push("/admin/assessments/templates")}
           disabled={submitting}
-          className="inline-flex items-center text-sm font-medium px-3 py-2 rounded-md border border-border bg-card text-foreground hover:bg-muted disabled:opacity-50"
+          className={cn("inline-flex items-center text-sm font-medium px-3 py-2 rounded-md border border-border bg-card text-foreground hover:bg-muted disabled:opacity-50", responsiveEnabled && "min-h-11 justify-center")}
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={submitting}
-          className="inline-flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+          className={cn("inline-flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50", responsiveEnabled && "min-h-11 justify-center")}
           data-testid="template-submit"
         >
           {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}

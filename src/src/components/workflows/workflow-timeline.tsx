@@ -32,6 +32,7 @@ interface TimelineStep {
 
 interface WorkflowTimelineProps {
   steps: TimelineStep[];
+  responsiveEnabled?: boolean;
 }
 
 const STEP_COLORS: Record<string, { bg: string; border: string; text: string }> = {
@@ -42,7 +43,7 @@ const STEP_COLORS: Record<string, { bg: string; border: string; text: string }> 
   NOTIFICATION: { bg: "bg-muted", border: "border-muted-foreground/40", text: "text-foreground" },
 };
 
-export function WorkflowTimeline({ steps }: WorkflowTimelineProps) {
+export function WorkflowTimeline({ steps, responsiveEnabled = false }: WorkflowTimelineProps) {
   // Separate relative steps (plotted on timeline) from event-triggered steps (listed below)
   const { relativeSteps, eventSteps } = useMemo(() => {
     const relative: (TimelineStep & { totalHours: number })[] = [];
@@ -81,10 +82,10 @@ export function WorkflowTimeline({ steps }: WorkflowTimelineProps) {
 
   const eventPosition = getPosition(0);
 
-  return (
-    <div className="space-y-4">
+  const timeline = (
+    <>
       {/* Timeline visualization */}
-      <div className="relative pt-8 pb-16 px-4">
+      <div className={responsiveEnabled ? "relative min-w-[720px] px-4 pb-16 pt-8" : "relative pt-8 pb-16 px-4"}>
         {/* Horizontal line */}
         <div className="absolute top-[50%] left-4 right-4 h-0.5 bg-border" />
 
@@ -142,6 +143,17 @@ export function WorkflowTimeline({ steps }: WorkflowTimelineProps) {
           );
         })}
       </div>
+
+    </>
+  );
+
+  return (
+    <div className={responsiveEnabled ? "min-w-0 max-w-full space-y-4" : "space-y-4"}>
+      {responsiveEnabled ? (
+        <div role="region" aria-label="Workflow timeline" className="max-w-full overflow-x-auto">
+          {timeline}
+        </div>
+      ) : timeline}
 
       {/* Legend */}
       <div className="flex flex-wrap gap-3 justify-center">

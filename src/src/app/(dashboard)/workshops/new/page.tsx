@@ -9,6 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { WorkshopRulesPanel } from "@/components/workshops/workshop-rules-panel";
+import { useMobileResponsiveEnabled } from "@/lib/use-mobile-responsive-enabled";
+import { cn } from "@/lib/utils";
 
 interface Coach {
   id: string;
@@ -93,6 +95,7 @@ function generateCouponCode(discountPercent: string, title: string): string {
 interface NewWorkshopFormProps {
   isCoachPortal?: boolean;
   prefilledCoach?: Coach;
+  responsiveEnabled?: boolean;
 }
 
 // MR-21: Multi-coupon entry
@@ -105,7 +108,7 @@ interface CouponEntry {
   singleUse: boolean;
 }
 
-export function NewWorkshopForm({ isCoachPortal = false, prefilledCoach }: NewWorkshopFormProps) {
+export function NewWorkshopForm({ isCoachPortal = false, prefilledCoach, responsiveEnabled = false }: NewWorkshopFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -551,7 +554,7 @@ export function NewWorkshopForm({ isCoachPortal = false, prefilledCoach }: NewWo
   };
 
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className={cn("max-w-3xl mx-auto", responsiveEnabled && "min-w-0 max-w-full")}>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-foreground">
           {isCoachPortal ? "Request New Workshop" : "Create New Workshop"}
@@ -769,7 +772,7 @@ export function NewWorkshopForm({ isCoachPortal = false, prefilledCoach }: NewWo
             <CardTitle>Schedule & Format</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className={cn("grid grid-cols-2 gap-4", responsiveEnabled && "grid-cols-1 sm:grid-cols-2")}>
               <div>
                 <Label htmlFor="format">Format *</Label>
                 <select
@@ -799,7 +802,7 @@ export function NewWorkshopForm({ isCoachPortal = false, prefilledCoach }: NewWo
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className={cn("grid grid-cols-2 gap-4", responsiveEnabled && "grid-cols-1 sm:grid-cols-2")}>
               <div>
                 <Label htmlFor="eventTime">Start Time</Label>
                 <Input
@@ -891,7 +894,7 @@ export function NewWorkshopForm({ isCoachPortal = false, prefilledCoach }: NewWo
                 />
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className={cn("grid grid-cols-3 gap-4", responsiveEnabled && "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3")}>
                 <div>
                   <Label htmlFor="venueCity">City</Label>
                   <Input
@@ -1193,7 +1196,7 @@ export function NewWorkshopForm({ isCoachPortal = false, prefilledCoach }: NewWo
           </CardContent>
         </Card>
 
-        <div className="flex gap-4">
+        <div className={cn("flex gap-4", responsiveEnabled && "flex-col-reverse sm:flex-row")}>
           <Button
             type="button"
             variant="outline"
@@ -1214,5 +1217,7 @@ export function NewWorkshopForm({ isCoachPortal = false, prefilledCoach }: NewWo
 }
 
 export default function NewWorkshopPage() {
-  return <NewWorkshopForm isCoachPortal={false} />;
+  const mobileResponsiveEnabled = useMobileResponsiveEnabled();
+
+  return <NewWorkshopForm isCoachPortal={false} responsiveEnabled={mobileResponsiveEnabled} />;
 }

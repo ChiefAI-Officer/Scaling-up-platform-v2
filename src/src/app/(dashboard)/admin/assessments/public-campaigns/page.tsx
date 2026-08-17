@@ -20,6 +20,8 @@ import { authOptions } from "@/lib/auth/auth";
 import { PublicCampaignsManager } from "@/components/admin/PublicCampaignsManager";
 import { PublicCampaignList } from "@/components/admin/public-campaigns/PublicCampaignList";
 import { isPublicCampaignsSimpleUiEnabled } from "@/lib/assessments/wave-public-campaigns-simple-ui-flags";
+import { PageHeader } from "@/components/ui/page-header";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 
 interface PublicCampaignsPageProps {
   searchParams: Promise<{ created?: string | string[] }>;
@@ -28,6 +30,7 @@ interface PublicCampaignsPageProps {
 export default async function AdminPublicCampaignsPage({
   searchParams,
 }: PublicCampaignsPageProps) {
+  const mobileResponsiveEnabled = isMobileResponsiveEnabled();
   const session = await getServerSession(authOptions);
   if (!session) {
     redirect("/login");
@@ -43,7 +46,7 @@ export default async function AdminPublicCampaignsPage({
       typeof created === "string" ? created : undefined;
 
     return (
-      <div>
+      <div className={mobileResponsiveEnabled ? "min-w-0 max-w-full" : undefined}>
         <div className="wf-breadcrumb">
           <a href="/admin/dashboard">Admin</a>
           <span className="wf-breadcrumb-sep">/</span>
@@ -52,28 +55,47 @@ export default async function AdminPublicCampaignsPage({
           <span className="wf-breadcrumb-current">Public campaigns</span>
         </div>
 
-        <div className="wf-page-header-row">
-          <div>
-            <h2 className="wf-page-title">Public campaigns</h2>
-            <p className="wf-page-subtitle">
-              Share an assessment with anyone using a public link.
-            </p>
+        {mobileResponsiveEnabled ? (
+          <PageHeader
+            responsiveEnabled
+            title="Public campaigns"
+            description="Share an assessment with anyone using a public link."
+            actions={
+              <Link
+                className="wf-btn wf-btn-primary min-h-11"
+                href="/admin/assessments/public-campaigns/new"
+              >
+                Create campaign
+              </Link>
+            }
+          />
+        ) : (
+          <div className="wf-page-header-row">
+            <div>
+              <h2 className="wf-page-title">Public campaigns</h2>
+              <p className="wf-page-subtitle">
+                Share an assessment with anyone using a public link.
+              </p>
+            </div>
+            <Link
+              className="wf-btn wf-btn-primary"
+              href="/admin/assessments/public-campaigns/new"
+            >
+              Create campaign
+            </Link>
           </div>
-          <Link
-            className="wf-btn wf-btn-primary"
-            href="/admin/assessments/public-campaigns/new"
-          >
-            Create campaign
-          </Link>
-        </div>
+        )}
 
-        <PublicCampaignList createdCampaignId={createdCampaignId} />
+        <PublicCampaignList
+          createdCampaignId={createdCampaignId}
+          {...(mobileResponsiveEnabled ? { responsiveEnabled: true } : {})}
+        />
       </div>
     );
   }
 
   return (
-    <div>
+    <div className={mobileResponsiveEnabled ? "min-w-0 max-w-full" : undefined}>
       {/* Breadcrumb */}
       <div className="wf-breadcrumb">
         <a href="/admin/dashboard">Admin</a>
@@ -84,18 +106,26 @@ export default async function AdminPublicCampaignsPage({
       </div>
 
       {/* Page header */}
-      <div className="wf-page-header-row">
-        <div>
-          <h2 className="wf-page-title">Public Campaigns</h2>
-          <p className="wf-page-subtitle-strong">
-            Create and publish{" "}
-            <code>accessMode=&quot;PUBLIC&quot;</code> assessment campaigns.
-            Respondents self-enroll — no invitation required.
-            When report appearances are available, Admin and STAFF can choose
-            one until the first response is completed.
-          </p>
+      {mobileResponsiveEnabled ? (
+        <PageHeader
+          responsiveEnabled
+          title="Public Campaigns"
+          description="Create and publish public assessment campaigns. Respondents self-enroll with no invitation required."
+        />
+      ) : (
+        <div className="wf-page-header-row">
+          <div>
+            <h2 className="wf-page-title">Public Campaigns</h2>
+            <p className="wf-page-subtitle-strong">
+              Create and publish{" "}
+              <code>accessMode=&quot;PUBLIC&quot;</code> assessment campaigns.
+              Respondents self-enroll — no invitation required.
+              When report appearances are available, Admin and STAFF can choose
+              one until the first response is completed.
+            </p>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Info banner */}
       <div className="wf-intersection-banner">
@@ -107,7 +137,7 @@ export default async function AdminPublicCampaignsPage({
         response.
       </div>
 
-      <PublicCampaignsManager />
+      <PublicCampaignsManager responsiveEnabled={mobileResponsiveEnabled} />
     </div>
   );
 }

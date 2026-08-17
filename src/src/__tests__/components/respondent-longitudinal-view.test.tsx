@@ -119,6 +119,45 @@ describe("RespondentLongitudinalView", () => {
     expect(screen.getByText("Results")).toBeInTheDocument();
   });
 
+  it("contains long responsive chart and comparison-table values while preserving flag-off classes", () => {
+    const data = okData({
+      respondent: {
+        id: "resp-1",
+        name: "A respondent name long enough to force wrapping on a compact screen",
+        jobTitle: "A long executive title that must not widen the document",
+      },
+      companyName:
+        "A company name long enough to force wrapping instead of page overflow",
+    });
+    const { rerender } = render(
+      <RespondentLongitudinalView outcome={ok(data)} />,
+    );
+    expect(screen.getByTestId("respondent-longitudinal-view")).toHaveAttribute(
+      "class",
+      "space-y-6",
+    );
+
+    rerender(
+      <RespondentLongitudinalView outcome={ok(data)} responsiveEnabled />,
+    );
+    const root = screen.getByTestId("respondent-longitudinal-view");
+    expect(root).toHaveClass("min-w-0");
+    expect(root).toHaveClass("max-w-full");
+    expect(root).toHaveAttribute("data-responsive-report", "");
+    expect(screen.getByTestId("longitudinal-chart-region")).toHaveClass(
+      "min-w-0",
+    );
+    expect(screen.getByTestId("longitudinal-chart-region")).toHaveClass(
+      "max-w-full",
+    );
+    const tableRegion = screen.getByRole("region", {
+      name: "Section detail over time comparison table",
+    });
+    expect(tableRegion).toHaveAttribute("tabindex", "0");
+    expect(tableRegion).toHaveClass("min-w-0");
+    expect(tableRegion).toHaveClass("max-w-full");
+  });
+
   it("ok: shows ▲ delta on a comparable up-move and ▼ on a comparable down-move", () => {
     render(<RespondentLongitudinalView outcome={ok(okData())} />);
     const table = screen.getByTestId("longitudinal-section-table");

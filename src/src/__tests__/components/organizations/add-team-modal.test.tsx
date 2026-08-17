@@ -17,7 +17,7 @@
  */
 
 import React from "react";
-import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { AddTeamModal } from "@/components/organizations/add-team-modal";
 import { MembersTeamsView } from "@/components/organizations/members-teams-view";
 import type { OrgSummary, ApiTeamNode } from "@/components/organizations/members-teams-view";
@@ -75,6 +75,34 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("AddTeamModal", () => {
+  test("responsive in-flight state locks only submit and leaves inputs and cancel available", async () => {
+    (global.fetch as jest.Mock).mockReturnValue(new Promise(() => {}));
+    renderModal({ responsiveEnabled: true });
+    fireEvent.change(screen.getByLabelText(/name/i), { target: { value: "Acme" } });
+    fireEvent.change(screen.getByTestId("select-type"), { target: { value: "company" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create" }));
+    expect(await screen.findByRole("button", { name: "Creating…" })).toBeDisabled();
+    expect(screen.getByLabelText(/name/i)).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled();
+  });
+
+  test("responsive validation collects every invalid field into linked summary and inline errors", async () => {
+    renderModal({ responsiveEnabled: true });
+    fireEvent.click(screen.getByRole("button", { name: "Create" }));
+    const summary = await screen.findByRole("alert", { name: "Add team error summary" });
+    const name = screen.getByLabelText(/name/i);
+    const type = screen.getByLabelText(/type/i);
+    expect(summary).toHaveTextContent("Name is required.");
+    expect(summary).toHaveTextContent("Type is required.");
+    expect(summary.querySelector(`a[href="#${name.id}"]`)).not.toBeNull();
+    expect(summary.querySelector(`a[href="#${type.id}"]`)).not.toBeNull();
+    expect(name).toHaveAttribute("aria-invalid", "true");
+    expect(type).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getAllByText("Name is required.")).toHaveLength(2);
+    expect(screen.getAllByText("Type is required.")).toHaveLength(2);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
   /**
    * (1) Parent=root + Type=Company → POST /api/organizations with {name}
    */

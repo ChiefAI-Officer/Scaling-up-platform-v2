@@ -180,6 +180,20 @@ const PEER_SECTION: PeerComparisonSection = {
 };
 
 describe("Wave S — individual peer-comparison section", () => {
+  it("responsive peers table has the named focusable bounded scroll owner and defaults off", () => {
+    const { rerender } = render(
+      <QualitativeReport report={lvaReport()} peerComparison={PEER_SECTION} />,
+    );
+    expect(screen.queryByRole("region", { name: "Peer comparison table" })).toBeNull();
+    rerender(
+      <QualitativeReport report={lvaReport()} peerComparison={PEER_SECTION} responsiveEnabled />,
+    );
+    const region = screen.getByRole("region", { name: "Peer comparison table" });
+    expect(region).toHaveAttribute("tabindex", "0");
+    expect(region).toHaveClass("su-report-data-region");
+    expect(within(region).getByRole("table")).toBeInTheDocument();
+  });
+
   it("prop absent ⇒ no peer section (Esperto-faithful suppression untouched)", () => {
     render(<QualitativeReport report={lvaReport()} />);
     expect(screen.queryByTestId("qual-section-peer-comparison")).toBeNull();

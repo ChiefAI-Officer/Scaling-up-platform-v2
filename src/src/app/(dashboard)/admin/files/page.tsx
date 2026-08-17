@@ -8,8 +8,10 @@ import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth/authorization";
 import { FileManager } from "@/components/files/file-manager";
 import { mapFileForClient } from "@/lib/files/file-service";
+import { PageHeader } from "@/components/ui/page-header";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 
-async function FilesPageData() {
+async function FilesPageData({ responsiveEnabled }: { responsiveEnabled: boolean }) {
   await requireAdmin();
 
   const [files, workshops] = await Promise.all([
@@ -38,19 +40,30 @@ async function FilesPageData() {
     <FileManager
       initialFiles={serializedFiles}
       workshops={workshops}
+      responsiveEnabled={responsiveEnabled}
     />
   );
 }
 
 export default function AdminFilesPage() {
+  const mobileResponsiveEnabled = isMobileResponsiveEnabled();
+
   return (
-    <div className="space-y-6">
-      <div>
+    <div className={mobileResponsiveEnabled ? "min-w-0 max-w-full space-y-6" : "space-y-6"}>
+      {mobileResponsiveEnabled ? (
+        <PageHeader
+          responsiveEnabled
+          title="File Manager"
+          description="Upload and manage files for workshops and workflow email attachments."
+        />
+      ) : (
+        <div>
         <h1 className="text-2xl font-bold text-foreground">File Manager</h1>
         <p className="text-muted-foreground">
           Upload and manage files for workshops and workflow email attachments.
         </p>
-      </div>
+        </div>
+      )}
 
       <Suspense
         fallback={
@@ -59,7 +72,7 @@ export default function AdminFilesPage() {
           </div>
         }
       >
-        <FilesPageData />
+        <FilesPageData responsiveEnabled={mobileResponsiveEnabled} />
       </Suspense>
     </div>
   );

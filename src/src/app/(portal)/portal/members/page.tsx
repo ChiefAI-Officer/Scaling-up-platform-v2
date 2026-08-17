@@ -18,9 +18,11 @@ import {
   MembersTeamsView,
   type OrgSummary,
 } from "@/components/organizations/members-teams-view";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 
 export default async function MembersPage() {
   const { coach } = await requireCoach();
+  const mobileResponsiveEnabled = isMobileResponsiveEnabled();
 
   const organizations = await db.organization.findMany({
     where: { ownerCoachId: coach.id, deletedAt: null },
@@ -36,7 +38,7 @@ export default async function MembersPage() {
   }));
 
   return (
-    <div className="space-y-6">
+    <div className={mobileResponsiveEnabled ? "min-w-0 max-w-full space-y-6" : "space-y-6"}>
       <FadeUp>
         <div>
           <h1 className="text-2xl font-bold text-foreground">Members &amp; Teams</h1>
@@ -47,7 +49,10 @@ export default async function MembersPage() {
       </FadeUp>
 
       <FadeUp delay={0.1}>
-        <MembersTeamsView initialOrganizations={items} />
+        <MembersTeamsView
+          initialOrganizations={items}
+          responsiveEnabled={mobileResponsiveEnabled}
+        />
       </FadeUp>
     </div>
   );

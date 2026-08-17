@@ -17,7 +17,7 @@ const initialForm: PasswordFormData = {
   confirmNewPassword: "",
 };
 
-export default function ChangePasswordForm() {
+export default function ChangePasswordForm({ responsiveEnabled = false }: { responsiveEnabled?: boolean }) {
   const [formData, setFormData] = useState<PasswordFormData>(initialForm);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -96,6 +96,7 @@ export default function ChangePasswordForm() {
           autoComplete="current-password"
           value={formData.currentPassword}
           onChange={handleChange("currentPassword")}
+          className={responsiveEnabled ? "min-h-11" : undefined}
           required
         />
       </div>
@@ -108,6 +109,7 @@ export default function ChangePasswordForm() {
           autoComplete="new-password"
           value={formData.newPassword}
           onChange={handleChange("newPassword")}
+          className={responsiveEnabled ? "min-h-11" : undefined}
           required
         />
       </div>
@@ -120,6 +122,7 @@ export default function ChangePasswordForm() {
           autoComplete="new-password"
           value={formData.confirmNewPassword}
           onChange={handleChange("confirmNewPassword")}
+          className={responsiveEnabled ? "min-h-11" : undefined}
           required
         />
       </div>
@@ -129,8 +132,8 @@ export default function ChangePasswordForm() {
         a number, and a special character.
       </p>
 
-      <div className="flex justify-end">
-        <Button type="submit" disabled={isSubmitting}>
+      <div className={responsiveEnabled ? "flex flex-col sm:flex-row sm:justify-end" : "flex justify-end"}>
+        <Button type="submit" disabled={isSubmitting} className={responsiveEnabled ? "min-h-11 w-full sm:w-auto" : undefined}>
           {isSubmitting ? "Updating..." : "Update Password"}
         </Button>
       </div>

@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
  * The actual refund must already have been processed in Stripe dashboard
  * — this button only records evidence of that work.
  */
-export function MarkRefundedButton({ registrationId }: { registrationId: string }) {
+export function MarkRefundedButton({ registrationId, responsiveEnabled = false }: { registrationId: string; responsiveEnabled?: boolean }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +50,7 @@ export function MarkRefundedButton({ registrationId }: { registrationId: string 
 
   return (
     <div className="flex flex-col items-end gap-1">
-      <Button size="sm" onClick={handleClick} disabled={busy}>
+      <Button size="sm" onClick={handleClick} disabled={busy} className={responsiveEnabled ? "min-h-11" : undefined}>
         {busy ? "Marking…" : "Mark Refunded"}
       </Button>
       {error && <span className="text-xs text-destructive">{error}</span>}

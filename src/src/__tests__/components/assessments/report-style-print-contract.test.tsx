@@ -247,6 +247,22 @@ const renderers = [
 ] as const;
 
 describe("adaptive report print and responsive contracts", () => {
+  it("keeps enabled responsive containment in screen-only CSS instead of print-active utilities", () => {
+    const css = source("styles/su-report.css");
+    const screenCss = blockFor(css, "@media screen");
+    expect(screenCss).toContain("[data-responsive-report]");
+    expect(screenCss).toContain("min-width: 0");
+    expect(screenCss).toContain("max-width: 100%");
+
+    const responsiveSources = [
+      source("components/assessments/BrandedReport.tsx"),
+      source("components/assessments/QualitativeGroupReport.tsx"),
+      source("components/assessments/ScoredGroupReport.tsx"),
+    ].join("\n");
+    expect(responsiveSources).not.toMatch(/su-public-brand su-report min-w-0 max-w-full/);
+    expect(responsiveSources).not.toMatch(/className="min-w-0 max-w-full" data-responsive-report/);
+  });
+
   it.each([
     ["executive", ExecutiveBoardroomReport],
     ["dashboard", ModernDashboardReport],

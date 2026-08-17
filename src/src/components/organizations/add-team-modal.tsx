@@ -68,6 +68,7 @@ export interface AddTeamModalProps {
    * If an org has not been expanded yet the key may be absent or [].
    */
   loadedTeams: Record<string, ApiTeamNode[]>;
+  responsiveEnabled?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -75,6 +76,7 @@ export interface AddTeamModalProps {
 // ---------------------------------------------------------------------------
 
 type FlatTeamEntry = { teamId: string; orgId: string; name: string; depth: number };
+type FieldError = { id: string; message: string };
 
 /** Flatten nested ApiTeamNode tree into a list for the Parent select. */
 function flattenTeams(
@@ -100,6 +102,7 @@ export function AddTeamModal({
   onCreated,
   organizations,
   loadedTeams,
+  responsiveEnabled = false,
 }: AddTeamModalProps) {
   const nameId  = useId();
   const typeId  = useId();
@@ -115,6 +118,7 @@ export function AddTeamModal({
   // Submission state
   const [submitting, setSubmitting] = useState(false);
   const [error, setError]           = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<FieldError[]>([]);
 
   // Reset form whenever the dialog opens
   useEffect(() => {
@@ -124,6 +128,7 @@ export function AddTeamModal({
       setParent("root");
       setDescription("");
       setError(null);
+      setFieldErrors([]);
     }
   }, [open]);
 
@@ -144,13 +149,31 @@ export function AddTeamModal({
     return null;
   }
 
+  function validateFields(): FieldError[] {
+    const errors: FieldError[] = [];
+    if (!name.trim()) errors.push({ id: nameId, message: "Name is required." });
+    if (!type) errors.push({ id: typeId, message: "Type is required." });
+    if (type === "company" && parent !== "root") {
+      errors.push({ id: parentId, message: 'A Company type must have no parent — set Parent to "— none (root) —".' });
+    }
+    if (type && type !== "company" && parent === "root") {
+      errors.push({ id: parentId, message: "Only the Company type may be at root. Choose a parent company or team." });
+    }
+    return errors;
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setFieldErrors([]);
 
-    const validationError = validate();
+    const responsiveFieldErrors = responsiveEnabled ? validateFields() : [];
+    const validationError = responsiveEnabled
+      ? responsiveFieldErrors[0]?.message ?? null
+      : validate();
     if (validationError) {
       setError(validationError);
+      setFieldErrors(responsiveFieldErrors);
       return;
     }
 
@@ -267,13 +290,24 @@ export function AddTeamModal({
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose(); }}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent
+        responsiveEnabled={responsiveEnabled}
+        className={responsiveEnabled
+          ? "sm:max-w-md [&_input]:min-h-11 [&_select]:min-h-11"
+          : "sm:max-w-md"}
+      >
         <DialogHeader>
           <DialogTitle>Add Team / Company</DialogTitle>
           <DialogDescription>
             Create a company, department, team, or folder.
           </DialogDescription>
         </DialogHeader>
+
+        {responsiveEnabled && error && (
+          <div role="alert" aria-label="Add team error summary" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {fieldErrors.length > 0 ? <ul className="space-y-1">{fieldErrors.map((item) => <li key={`${item.id}-${item.message}`}><a className="underline" href={`#${item.id}`}>{item.message}</a></li>)}</ul> : error}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} noValidate>
           <div className="space-y-4 py-2">
@@ -285,9 +319,11 @@ export function AddTeamModal({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Engineering"
-                disabled={submitting}
+                disabled={!responsiveEnabled && submitting}
                 required
+                aria-invalid={responsiveEnabled && fieldErrors.some((item) => item.id === nameId) ? true : undefined}
               />
+              {responsiveEnabled && fieldErrors.find((item) => item.id === nameId) && <p className="text-sm text-destructive">{fieldErrors.find((item) => item.id === nameId)?.message}</p>}
             </div>
 
             {/* ---- Type ---- */}
@@ -303,8 +339,9 @@ export function AddTeamModal({
                 data-testid="select-type"
                 value={type}
                 onChange={(e) => setType(e.target.value as TeamType | "")}
-                disabled={submitting}
+                disabled={!responsiveEnabled && submitting}
                 required
+                aria-invalid={responsiveEnabled && fieldErrors.some((item) => item.id === typeId) ? true : undefined}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <option value="" disabled>Select a type…</option>
@@ -313,6 +350,7 @@ export function AddTeamModal({
                 <option value="team">Team</option>
                 <option value="folder">Folder</option>
               </select>
+              {responsiveEnabled && fieldErrors.find((item) => item.id === typeId) && <p className="text-sm text-destructive">{fieldErrors.find((item) => item.id === typeId)?.message}</p>}
             </div>
 
             {/* ---- Parent ---- */}
@@ -323,7 +361,8 @@ export function AddTeamModal({
                 data-testid="select-parent"
                 value={parent}
                 onChange={(e) => setParent(e.target.value as ParentValue)}
-                disabled={submitting}
+                disabled={!responsiveEnabled && submitting}
+                aria-invalid={responsiveEnabled && fieldErrors.some((item) => item.id === parentId) ? true : undefined}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {parentOptions.map((opt) => (
@@ -332,6 +371,7 @@ export function AddTeamModal({
                   </option>
                 ))}
               </select>
+              {responsiveEnabled && fieldErrors.find((item) => item.id === parentId) && <p className="text-sm text-destructive">{fieldErrors.find((item) => item.id === parentId)?.message}</p>}
             </div>
 
             {/* ---- Description (optional, not sent for orgs; hidden when Type=Company) ---- */}
@@ -343,14 +383,14 @@ export function AddTeamModal({
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Optional description"
-                  disabled={submitting}
+                  disabled={!responsiveEnabled && submitting}
                   className="min-h-[72px] resize-none"
                 />
               </div>
             )}
 
             {/* ---- Inline error ---- */}
-            {error && (
+            {!responsiveEnabled && error && (
               <p
                 role="alert"
                 className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
@@ -360,12 +400,15 @@ export function AddTeamModal({
             )}
           </div>
 
-          <DialogFooter className="mt-4">
+          <DialogFooter className={responsiveEnabled
+            ? "mt-4 gap-2 [&_button]:min-h-11 [&_button]:w-full sm:[&_button]:w-auto"
+            : "mt-4"}
+          >
             <Button
               type="button"
               variant="outline"
               onClick={onClose}
-              disabled={submitting}
+              disabled={!responsiveEnabled && submitting}
             >
               Cancel
             </Button>

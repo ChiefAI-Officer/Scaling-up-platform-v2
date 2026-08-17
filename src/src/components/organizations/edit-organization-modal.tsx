@@ -57,6 +57,7 @@ export interface EditOrganizationModalProps {
   onUpdated: () => void | Promise<void>;
   /** The organization being edited. */
   organization: EditOrganizationModalOrg;
+  responsiveEnabled?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -68,6 +69,7 @@ export function EditOrganizationModal({
   onClose,
   onUpdated,
   organization,
+  responsiveEnabled = false,
 }: EditOrganizationModalProps) {
   const nameId     = useId();
   const extIdId    = useId();
@@ -87,7 +89,6 @@ export function EditOrganizationModal({
       setExternalId(organization.externalId ?? "");
       setError(null);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, organization.id, organization.name, organization.externalId]);
 
   // ---------------------------------------------------------------------------
@@ -154,7 +155,12 @@ export function EditOrganizationModal({
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose(); }}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent
+        responsiveEnabled={responsiveEnabled}
+        className={responsiveEnabled
+          ? "sm:max-w-md [&_input]:min-h-11"
+          : "sm:max-w-md"}
+      >
         <DialogHeader>
           <DialogTitle>Edit Organization</DialogTitle>
           <DialogDescription>
@@ -172,7 +178,7 @@ export function EditOrganizationModal({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Acme Corp"
-                disabled={submitting}
+                disabled={!responsiveEnabled && submitting}
                 required
               />
             </div>
@@ -185,7 +191,7 @@ export function EditOrganizationModal({
                 value={externalId}
                 onChange={(e) => setExternalId(e.target.value)}
                 placeholder="e.g. acme-ext-001"
-                disabled={submitting}
+                disabled={!responsiveEnabled && submitting}
                 aria-describedby={`${extIdId}-hint`}
               />
               <p id={`${extIdId}-hint`} className="text-xs text-muted-foreground italic">
@@ -204,12 +210,15 @@ export function EditOrganizationModal({
             )}
           </div>
 
-          <DialogFooter className="mt-4">
+          <DialogFooter className={responsiveEnabled
+            ? "mt-4 gap-2 [&_button]:min-h-11 [&_button]:w-full sm:[&_button]:w-auto"
+            : "mt-4"}
+          >
             <Button
               type="button"
               variant="outline"
               onClick={onClose}
-              disabled={submitting}
+              disabled={!responsiveEnabled && submitting}
             >
               Cancel
             </Button>

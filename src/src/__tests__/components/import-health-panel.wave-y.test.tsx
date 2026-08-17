@@ -3,7 +3,7 @@
  * cron health, alert firings, volume, breakdowns, recent signals + honest
  * empty/error/truncation states.
  */
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import { ImportHealthPanel } from "@/components/admin/ImportHealthPanel";
 import type { ImportHealthSummary } from "@/lib/assessments/esperto-import/import-health";
 
@@ -68,4 +68,33 @@ it("shows an error state when the fetch fails", async () => {
   mockFetch({ success: false }, false, 500);
   render(<ImportHealthPanel />);
   await waitFor(() => expect(screen.getByText(/HTTP 500/)).toBeInTheDocument());
+});
+
+it("renders repeated operational rows as compact records while metrics reflow", async () => {
+  const vol = {
+    ...summary().volume.last24h,
+    commitResults: 2,
+    commitResultsByOutcome: { imported: 2 },
+  };
+  mockFetch({
+    success: true,
+    data: summary({
+      history: {
+        last24h: [{ code: "divergent-reimport", count: 2, lastFiredAt: "2026-07-07T19:50:00.000Z" }],
+        last7d: [],
+      },
+      volume: { last24h: vol, last7d: vol },
+      recent: [{ at: "2026-07-07T19:45:00.000Z", action: "commit", org: "org-1", outcome: "imported", code: null, latencyMs: 42 }],
+    }),
+  });
+  render(<ImportHealthPanel responsiveEnabled />);
+
+  expect(await screen.findByRole("list", { name: "Alert firings (last 24h)" })).toBeInTheDocument();
+  expect(screen.getByRole("list", { name: "Results by outcome" })).toBeInTheDocument();
+  const recent = screen.getByRole("list", { name: "Recent import signals" });
+  expect(within(recent).getByText("commit")).toBeInTheDocument();
+  expect(within(recent).getByText("org-1")).toBeInTheDocument();
+  expect(within(recent).getByText("42 ms")).toBeInTheDocument();
+  expect(screen.getByTestId("import-volume-stats")).toHaveClass("grid-cols-1", "sm:grid-cols-4");
+  expect(screen.getByTestId("refresh-import-health")).toHaveClass("min-h-11");
 });

@@ -17,6 +17,7 @@ import type { SurveyType } from "@/lib/surveys/survey-types";
 import { FadeUp } from "@/components/ui/animated";
 import { SurveyFilters } from "@/components/surveys/survey-filters";
 import { SurveyResponsesTable } from "@/components/surveys/survey-responses-table";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 
 interface PageProps {
   searchParams: Promise<{
@@ -33,6 +34,7 @@ interface PageProps {
 type GroupByOpt = "coach" | "category" | "format" | "workshopType";
 
 export default async function AggregateSurveyResultsPage({ searchParams }: PageProps) {
+  const mobileResponsiveEnabled = isMobileResponsiveEnabled();
   await requireAdmin();
   const sp = await searchParams;
 
@@ -191,12 +193,12 @@ export default async function AggregateSurveyResultsPage({ searchParams }: PageP
     : "";
 
   return (
-    <div className="space-y-6">
+    <div className={mobileResponsiveEnabled ? "min-w-0 max-w-full space-y-6" : "space-y-6"}>
       <FadeUp>
         <div className="flex items-center justify-between">
           <div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-              <Link href="/admin/surveys" className="hover:text-foreground">Survey Templates</Link>
+            <div className={mobileResponsiveEnabled ? "mb-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground" : "flex items-center gap-2 text-sm text-muted-foreground mb-1"}>
+              <Link href="/admin/surveys" className={mobileResponsiveEnabled ? "inline-flex min-h-11 items-center hover:text-foreground" : "hover:text-foreground"}>Survey Templates</Link>
               <span>/</span>
               <span className="text-foreground">Aggregated Results</span>
             </div>
@@ -212,7 +214,7 @@ export default async function AggregateSurveyResultsPage({ searchParams }: PageP
           <Link
             key={t.id}
             href={`/admin/surveys/aggregate?templateId=${t.id}`}
-            className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+            className={`${mobileResponsiveEnabled ? "inline-flex min-h-11 items-center" : ""} rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
               t.id === selectedId
                 ? "bg-primary text-primary-foreground"
                 : "bg-card border border-border text-foreground hover:bg-accent"
@@ -225,7 +227,7 @@ export default async function AggregateSurveyResultsPage({ searchParams }: PageP
       </div>
 
       {/* ENH-MAY6-9: filters mirror Financials pattern */}
-      <SurveyFilters coaches={coaches} categories={categories} />
+      <SurveyFilters coaches={coaches} categories={categories} responsiveEnabled={mobileResponsiveEnabled} />
 
       {!results && (
         <div className="rounded-lg border-2 border-dashed border-border p-12 text-center">
@@ -262,6 +264,12 @@ export default async function AggregateSurveyResultsPage({ searchParams }: PageP
               <h2 className="text-lg font-semibold text-foreground mb-3">
                 By {groupBy === "workshopType" ? "Workshop Type" : (groupBy ?? "").charAt(0).toUpperCase() + (groupBy ?? "").slice(1)}
               </h2>
+              <div
+                role={mobileResponsiveEnabled ? "region" : undefined}
+                aria-label={mobileResponsiveEnabled ? `Survey results by ${groupBy === "workshopType" ? "workshop type" : groupBy} table` : undefined}
+                tabIndex={mobileResponsiveEnabled ? 0 : undefined}
+                className={mobileResponsiveEnabled ? "max-w-full overflow-x-auto" : undefined}
+              >
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border">
@@ -278,6 +286,7 @@ export default async function AggregateSurveyResultsPage({ searchParams }: PageP
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
           )}
 
@@ -286,9 +295,9 @@ export default async function AggregateSurveyResultsPage({ searchParams }: PageP
             <h2 className="text-lg font-semibold text-foreground">Question Breakdown</h2>
             {results.questionStats.map((q) => (
               <div key={q.questionId} className="rounded-xl border border-border bg-card p-5">
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <p className="font-medium text-foreground">{q.label}</p>
+                  <div className={mobileResponsiveEnabled ? "mb-3 flex min-w-0 items-start justify-between gap-3" : "flex items-start justify-between mb-3"}>
+                  <div className={mobileResponsiveEnabled ? "min-w-0" : undefined}>
+                    <p className={mobileResponsiveEnabled ? "break-words font-medium text-foreground" : "font-medium text-foreground"}>{q.label}</p>
                     <p className="text-xs text-muted-foreground">{q.type} &middot; {q.totalResponses} responses</p>
                   </div>
                   {q.avgNumeric !== undefined && (
@@ -308,8 +317,8 @@ export default async function AggregateSurveyResultsPage({ searchParams }: PageP
                       .map(([value, count]) => {
                         const pct = q.totalResponses > 0 ? Math.round((count / q.totalResponses) * 100) : 0;
                         return (
-                          <div key={value} className="flex items-center gap-3">
-                            <div className="w-24 text-sm text-foreground truncate" title={value}>
+                          <div key={value} className={mobileResponsiveEnabled ? "grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 sm:flex sm:gap-3" : "flex items-center gap-3"}>
+                            <div className={mobileResponsiveEnabled ? "col-span-3 min-w-0 truncate text-sm text-foreground sm:col-span-1 sm:w-24" : "w-24 text-sm text-foreground truncate"} title={value}>
                               {value}
                             </div>
                             <div className="flex-1 bg-muted rounded-full h-3 overflow-hidden">
@@ -318,8 +327,8 @@ export default async function AggregateSurveyResultsPage({ searchParams }: PageP
                                 style={{ width: `${Math.max(pct, 2)}%` }}
                               />
                             </div>
-                            <div className="w-10 text-right text-sm font-medium text-foreground">{count}</div>
-                            <div className="w-10 text-right text-xs text-muted-foreground">{pct}%</div>
+                            <div className={mobileResponsiveEnabled ? "text-right text-sm font-medium text-foreground sm:w-10" : "w-10 text-right text-sm font-medium text-foreground"}>{count}</div>
+                            <div className={mobileResponsiveEnabled ? "text-right text-xs text-muted-foreground sm:w-10" : "w-10 text-right text-xs text-muted-foreground"}>{pct}%</div>
                           </div>
                         );
                       })}
@@ -385,7 +394,12 @@ export default async function AggregateSurveyResultsPage({ searchParams }: PageP
               <div className="px-5 py-4 border-b border-border">
                 <h3 className="text-lg font-semibold text-foreground">Results by Workshop</h3>
               </div>
-              <div className="overflow-x-auto">
+              <div
+                className="overflow-x-auto"
+                role={mobileResponsiveEnabled ? "region" : undefined}
+                aria-label={mobileResponsiveEnabled ? "Survey results by workshop table" : undefined}
+                tabIndex={mobileResponsiveEnabled ? 0 : undefined}
+              >
                 <table className="min-w-full divide-y divide-border">
                   <thead className="bg-muted">
                     <tr>
@@ -401,7 +415,7 @@ export default async function AggregateSurveyResultsPage({ searchParams }: PageP
                       <tr key={w.workshopId} className="hover:bg-accent">
                         <td className="px-4 py-3 text-sm font-mono text-muted-foreground">{w.workshopCode || "---"}</td>
                         <td className="px-4 py-3">
-                          <Link href={`/workshops/${w.workshopId}`} className="text-sm text-primary hover:text-primary/80 font-medium">
+                          <Link href={`/workshops/${w.workshopId}`} className={mobileResponsiveEnabled ? "inline-flex min-h-11 items-center text-sm font-medium text-primary hover:text-primary/80" : "text-sm text-primary hover:text-primary/80 font-medium"}>
                             {w.workshopTitle}
                           </Link>
                         </td>
@@ -418,7 +432,7 @@ export default async function AggregateSurveyResultsPage({ searchParams }: PageP
                         <td className="px-4 py-3 text-sm text-right">
                           <Link
                             href={`/admin/surveys/templates/${selectedId}?tab=results&workshopId=${w.workshopId}`}
-                            className="text-primary hover:underline"
+                            className={mobileResponsiveEnabled ? "inline-flex min-h-11 items-center text-primary hover:underline" : "text-primary hover:underline"}
                           >
                             View
                           </Link>
@@ -454,6 +468,7 @@ export default async function AggregateSurveyResultsPage({ searchParams }: PageP
                 totalCount={responseRowsData.totalCount}
                 cappedAt={responseRowsData.cappedAt}
                 exportHref={exportHref}
+                responsiveEnabled={mobileResponsiveEnabled}
               />
             </section>
           )}

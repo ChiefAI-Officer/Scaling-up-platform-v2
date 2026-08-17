@@ -15,6 +15,8 @@ import { SetPasswordButton } from "@/components/coaches/set-password-button";
 import { HubSpotSideCard } from "@/components/coaches/hubspot-side-card";
 import { requireAuth } from "@/lib/auth/authorization";
 import { lookupHubSpotContact, getHubSpotPortalId } from "@/services/hubspot";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
+import { PageHeader } from "@/components/ui/page-header";
 import { isCoachPasswordActionsEnabled } from "@/lib/auth/coach-password-actions-flags";
 
 interface CoachDetailPageProps {
@@ -69,6 +71,7 @@ function getWorkshopStatusColor(status: string) {
 export default async function CoachDetailPage({
   params,
 }: CoachDetailPageProps) {
+  const mobileResponsiveEnabled = isMobileResponsiveEnabled();
   const session = await requireAuth();
   const isAdmin = session.user.role === "ADMIN";
   const passwordActionsEnabled = isCoachPasswordActionsEnabled();
@@ -124,15 +127,15 @@ export default async function CoachDetailPage({
   );
 
   return (
-    <div className="space-y-6">
+    <div className={mobileResponsiveEnabled ? "min-w-0 max-w-full space-y-6" : "space-y-6"}>
       {/* Header */}
       <FadeUp>
-      <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-start">
+      <div className={mobileResponsiveEnabled ? "flex min-w-0 flex-col items-stretch gap-4 sm:flex-row sm:items-start sm:justify-between" : "flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-start"}>
         <div className="min-w-0">
           <div className="flex items-center gap-3 mb-2">
             <Link
               href="/coaches"
-              className="text-muted-foreground hover:text-foreground"
+              className={mobileResponsiveEnabled ? "inline-flex min-h-11 items-center text-muted-foreground hover:text-foreground" : "text-muted-foreground hover:text-foreground"}
             >
               &larr; Coaches
             </Link>
@@ -151,14 +154,25 @@ export default async function CoachDetailPage({
                 </span>
               </div>
             )}
-            <div className="min-w-0">
-              <h1 className="text-2xl font-bold text-foreground">
-                {coach.firstName} {coach.lastName}
-              </h1>
-              <p className="text-muted-foreground break-all">{coach.email}</p>
-            </div>
+            {mobileResponsiveEnabled ? (
+              <div className="min-w-0 flex-1">
+                <PageHeader
+                  responsiveEnabled
+                  className="mb-0"
+                  title={`${coach.firstName} ${coach.lastName}`}
+                />
+                <p className="break-all text-muted-foreground">{coach.email}</p>
+              </div>
+            ) : (
+              <div className="min-w-0">
+                <h1 className="text-2xl font-bold text-foreground">
+                  {coach.firstName} {coach.lastName}
+                </h1>
+                <p className="text-muted-foreground break-all">{coach.email}</p>
+              </div>
+            )}
           </div>
-          <div className="flex items-center gap-3 mt-3">
+          <div className={mobileResponsiveEnabled ? "mt-3 flex flex-wrap items-center gap-3" : "flex items-center gap-3 mt-3"}>
             <Badge
               className={getCertificationStatusColor(coach.certificationStatus)}
               variant="secondary"
@@ -173,7 +187,7 @@ export default async function CoachDetailPage({
             </Badge>
           </div>
         </div>
-        <div className="flex flex-wrap justify-end gap-2 w-full sm:w-auto">
+        <div className={mobileResponsiveEnabled ? "flex w-full flex-col gap-2 sm:w-auto sm:flex-row [&>button]:min-h-11" : "flex flex-wrap justify-end gap-2 w-full sm:w-auto"}>
           {isAdmin && passwordActionsEnabled ? (
             <SetPasswordButton
               coachId={coach.id}
@@ -188,7 +202,7 @@ export default async function CoachDetailPage({
           />
           <Link
             href={`/coaches/${coach.id}/edit`}
-            className="bg-muted text-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-accent transition-colors"
+            className={mobileResponsiveEnabled ? "inline-flex min-h-11 items-center justify-center rounded-lg bg-muted px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent" : "bg-muted text-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-accent transition-colors"}
           >
             Edit Coach
           </Link>
@@ -245,25 +259,25 @@ export default async function CoachDetailPage({
               <CardTitle>Coach Details</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className={mobileResponsiveEnabled ? "grid grid-cols-1 gap-4 md:grid-cols-2" : "grid grid-cols-2 gap-4"}>
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Phone</p>
-                  <p className="text-foreground">{coach.phone || "Not provided"}</p>
+                  <p className={mobileResponsiveEnabled ? "break-words text-foreground" : "text-foreground"}>{coach.phone || "Not provided"}</p>
                 </div>
 
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Professional Title</p>
-                  <p className="text-foreground">{coach.title || "Not provided"}</p>
+                  <p className={mobileResponsiveEnabled ? "break-words text-foreground" : "text-foreground"}>{coach.title || "Not provided"}</p>
                 </div>
 
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Company Name</p>
-                  <p className="text-foreground">{coach.company || "Not provided"}</p>
+                  <p className={mobileResponsiveEnabled ? "break-words text-foreground" : "text-foreground"}>{coach.company || "Not provided"}</p>
                 </div>
 
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Territory</p>
-                  <p className="text-foreground">{coach.territory || "Not assigned"}</p>
+                  <p className={mobileResponsiveEnabled ? "break-words text-foreground" : "text-foreground"}>{coach.territory || "Not assigned"}</p>
                 </div>
 
                 <div>
@@ -275,24 +289,24 @@ export default async function CoachDetailPage({
               {coach.bio && (
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Bio</p>
-                  <p className="text-foreground whitespace-pre-wrap">{coach.bio}</p>
+                  <p className={mobileResponsiveEnabled ? "break-words whitespace-pre-wrap text-foreground" : "text-foreground whitespace-pre-wrap"}>{coach.bio}</p>
                 </div>
               )}
 
               {(coach.hubspotId || coach.circleId || coach.syncedAt) && (
                 <div className="pt-4 border-t">
                   <p className="text-sm font-medium text-muted-foreground mb-2">Integration IDs</p>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className={mobileResponsiveEnabled ? "grid grid-cols-1 gap-4 md:grid-cols-2" : "grid grid-cols-2 gap-4"}>
                     {coach.hubspotId && (
                       <div>
                         <p className="text-xs text-muted-foreground">HubSpot ID</p>
-                        <p className="text-sm text-muted-foreground font-mono">{coach.hubspotId}</p>
+                        <p className={mobileResponsiveEnabled ? "break-all font-mono text-sm text-muted-foreground" : "text-sm text-muted-foreground font-mono"}>{coach.hubspotId}</p>
                       </div>
                     )}
                     {coach.circleId && (
                       <div>
                         <p className="text-xs text-muted-foreground">Circle ID</p>
-                        <p className="text-sm text-muted-foreground font-mono">{coach.circleId}</p>
+                        <p className={mobileResponsiveEnabled ? "break-all font-mono text-sm text-muted-foreground" : "text-sm text-muted-foreground font-mono"}>{coach.circleId}</p>
                       </div>
                     )}
                     {coach.syncedAt && (
@@ -309,11 +323,11 @@ export default async function CoachDetailPage({
 
           {/* Workshops */}
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
+            <CardHeader className={mobileResponsiveEnabled ? "flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between" : "flex flex-row items-center justify-between"}>
               <CardTitle>Recent Workshops</CardTitle>
               <Link
                 href={`/workshops/new?coachId=${coach.id}`}
-                className="text-sm text-primary hover:text-primary/80"
+                className={mobileResponsiveEnabled ? "inline-flex min-h-11 items-center text-sm text-primary hover:text-primary/80" : "text-sm text-primary hover:text-primary/80"}
               >
                 + Create Workshop
               </Link>
@@ -330,7 +344,12 @@ export default async function CoachDetailPage({
                   </Link>
                 </p>
               ) : (
-                <div className="overflow-x-auto">
+                <div
+                  className={mobileResponsiveEnabled ? "max-w-full overflow-x-auto rounded-lg border" : "overflow-x-auto"}
+                  role={mobileResponsiveEnabled ? "region" : undefined}
+                  aria-label={mobileResponsiveEnabled ? "Recent workshops table" : undefined}
+                  tabIndex={mobileResponsiveEnabled ? 0 : undefined}
+                >
                   <table className="min-w-full divide-y divide-border">
                     <thead>
                       <tr>
@@ -394,7 +413,7 @@ export default async function CoachDetailPage({
             <CardHeader>
               <CardTitle>Certifications</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className={mobileResponsiveEnabled ? "[&_button]:min-h-11 [&_button]:min-w-11" : undefined}>
               {coach.certifications.length === 0 ? (
                 <p className="text-muted-foreground text-sm">No certifications yet</p>
               ) : (
@@ -402,9 +421,9 @@ export default async function CoachDetailPage({
                   {coach.certifications.map((cert) => (
                     <div
                       key={cert.id}
-                      className="border rounded-lg p-3"
+                      className={mobileResponsiveEnabled ? "min-w-0 rounded-lg border p-3" : "border rounded-lg p-3"}
                     >
-                      <div className="flex items-center justify-between mb-1">
+                      <div className={mobileResponsiveEnabled ? "mb-1 flex flex-wrap items-center justify-between gap-2" : "flex items-center justify-between mb-1"}>
                         <span className="font-medium text-foreground">
                           {cert.workshopType.name}
                         </span>
@@ -440,10 +459,10 @@ export default async function CoachDetailPage({
             <CardHeader>
               <CardTitle>Quick Actions</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
+            <CardContent className={mobileResponsiveEnabled ? "space-y-2 [&_a]:min-h-11 [&_button]:min-h-11" : "space-y-2"}>
               <Link
                 href={`/workshops/new?coachId=${coach.id}`}
-                className="block w-full text-center bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
+                className={mobileResponsiveEnabled ? "flex min-h-11 w-full items-center justify-center rounded-lg bg-primary px-4 py-2 text-center text-primary-foreground transition-colors hover:bg-primary/90" : "block w-full text-center bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"}
               >
                 Create Workshop
               </Link>

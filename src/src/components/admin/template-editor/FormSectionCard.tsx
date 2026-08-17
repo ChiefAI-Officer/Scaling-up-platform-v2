@@ -43,6 +43,7 @@ export interface FormSectionCardProps {
   onMoveUp: (uid: string) => void;
   onMoveDown: (uid: string) => void;
   onDelete: (uid: string) => void;
+  responsiveEnabled?: boolean;
 }
 
 export function FormSectionCard({
@@ -58,6 +59,7 @@ export function FormSectionCard({
   onMoveUp,
   onMoveDown,
   onDelete,
+  responsiveEnabled = false,
 }: FormSectionCardProps) {
   const { uid, stableKey, name, description } = section;
   const [menuOpen, setMenuOpen] = useState(false);
@@ -95,7 +97,11 @@ export function FormSectionCard({
             value={name}
             disabled={isReadOnly}
             onChange={(e) => onRename(uid, e.target.value)}
-            className="w-full rounded border border-transparent bg-transparent px-1 py-0.5 text-sm font-semibold text-foreground outline-none focus:border-border focus:bg-background disabled:opacity-60 disabled:cursor-not-allowed"
+            className={
+              responsiveEnabled
+                ? "w-full min-h-11 rounded border border-transparent bg-transparent px-1 py-0.5 text-sm font-semibold text-foreground outline-none focus:border-border focus:bg-background disabled:opacity-60 disabled:cursor-not-allowed"
+                : "w-full rounded border border-transparent bg-transparent px-1 py-0.5 text-sm font-semibold text-foreground outline-none focus:border-border focus:bg-background disabled:opacity-60 disabled:cursor-not-allowed"
+            }
           />
           <textarea
             data-testid={`form-section-description-${uid}`}
@@ -105,7 +111,11 @@ export function FormSectionCard({
             disabled={isReadOnly}
             rows={1}
             onChange={(e) => onSetDescription(uid, e.target.value)}
-            className="w-full resize-none rounded border border-transparent bg-transparent px-1 py-0.5 text-xs text-muted-foreground outline-none focus:border-border focus:bg-background disabled:opacity-60 disabled:cursor-not-allowed"
+            className={
+              responsiveEnabled
+                ? "w-full min-h-11 resize-none rounded border border-transparent bg-transparent px-1 py-0.5 text-xs text-muted-foreground outline-none focus:border-border focus:bg-background disabled:opacity-60 disabled:cursor-not-allowed"
+                : "w-full resize-none rounded border border-transparent bg-transparent px-1 py-0.5 text-xs text-muted-foreground outline-none focus:border-border focus:bg-background disabled:opacity-60 disabled:cursor-not-allowed"
+            }
           />
         </div>
 

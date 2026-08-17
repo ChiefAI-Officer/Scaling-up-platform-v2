@@ -25,6 +25,7 @@ interface CategoryOption {
 interface SurveyFiltersProps {
   coaches: CoachOption[];
   categories: CategoryOption[];
+  responsiveEnabled?: boolean;
 }
 
 const FORMAT_OPTIONS = ["VIRTUAL", "IN_PERSON", "HYBRID"] as const;
@@ -36,7 +37,7 @@ const GROUP_BY_OPTIONS = [
   { value: "workshopType", label: "By Workshop Type" },
 ] as const;
 
-export function SurveyFilters({ coaches, categories }: SurveyFiltersProps) {
+export function SurveyFilters({ coaches, categories, responsiveEnabled = false }: SurveyFiltersProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -79,13 +80,13 @@ export function SurveyFilters({ coaches, categories }: SurveyFiltersProps) {
   );
 
   return (
-    <div className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-card p-4">
-      <div className="flex flex-col gap-1">
+    <div className={responsiveEnabled ? "flex flex-col items-stretch gap-3 rounded-lg border border-border bg-card p-4 sm:flex-row sm:flex-wrap sm:items-end" : "flex flex-wrap items-end gap-3 rounded-lg border border-border bg-card p-4"}>
+      <div className={responsiveEnabled ? "flex min-w-0 flex-col gap-1 sm:w-auto" : "flex flex-col gap-1"}>
         <label className="text-xs text-muted-foreground">Coach</label>
         <select
           value={coachId}
           onChange={(e) => handleChange("coachId", e.target.value)}
-          className="rounded-md border border-border bg-background px-3 py-1.5 text-sm"
+          className={responsiveEnabled ? "min-h-11 w-full min-w-0 max-w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm" : "rounded-md border border-border bg-background px-3 py-1.5 text-sm"}
         >
           <option value="">All Coaches</option>
           {coaches.map((c) => (
@@ -96,12 +97,12 @@ export function SurveyFilters({ coaches, categories }: SurveyFiltersProps) {
         </select>
       </div>
 
-      <div className="flex flex-col gap-1">
+      <div className={responsiveEnabled ? "flex min-w-0 flex-col gap-1 sm:w-auto" : "flex flex-col gap-1"}>
         <label className="text-xs text-muted-foreground">Category</label>
         <select
           value={categoryId}
           onChange={(e) => handleChange("categoryId", e.target.value)}
-          className="rounded-md border border-border bg-background px-3 py-1.5 text-sm"
+          className={responsiveEnabled ? "min-h-11 w-full min-w-0 max-w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm" : "rounded-md border border-border bg-background px-3 py-1.5 text-sm"}
         >
           <option value="">All Categories</option>
           {categories.map((c) => (
@@ -112,12 +113,12 @@ export function SurveyFilters({ coaches, categories }: SurveyFiltersProps) {
         </select>
       </div>
 
-      <div className="flex flex-col gap-1">
+      <div className={responsiveEnabled ? "flex min-w-0 flex-col gap-1 sm:w-auto" : "flex flex-col gap-1"}>
         <label className="text-xs text-muted-foreground">Format</label>
         <select
           value={workshopFormat}
           onChange={(e) => handleChange("workshopFormat", e.target.value)}
-          className="rounded-md border border-border bg-background px-3 py-1.5 text-sm"
+          className={responsiveEnabled ? "min-h-11 w-full min-w-0 max-w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm" : "rounded-md border border-border bg-background px-3 py-1.5 text-sm"}
         >
           <option value="">All Formats</option>
           {FORMAT_OPTIONS.map((f) => (
@@ -128,32 +129,32 @@ export function SurveyFilters({ coaches, categories }: SurveyFiltersProps) {
         </select>
       </div>
 
-      <div className="flex flex-col gap-1">
+      <div className={responsiveEnabled ? "flex min-w-0 flex-col gap-1 sm:w-auto" : "flex flex-col gap-1"}>
         <label className="text-xs text-muted-foreground">From</label>
         <input
           type="date"
           value={startDate}
           onChange={(e) => handleChange("startDate", e.target.value)}
-          className="rounded-md border border-border bg-background px-3 py-1.5 text-sm"
+          className={responsiveEnabled ? "min-h-11 w-full min-w-0 max-w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm" : "rounded-md border border-border bg-background px-3 py-1.5 text-sm"}
         />
       </div>
 
-      <div className="flex flex-col gap-1">
+      <div className={responsiveEnabled ? "flex min-w-0 flex-col gap-1 sm:w-auto" : "flex flex-col gap-1"}>
         <label className="text-xs text-muted-foreground">To</label>
         <input
           type="date"
           value={endDate}
           onChange={(e) => handleChange("endDate", e.target.value)}
-          className="rounded-md border border-border bg-background px-3 py-1.5 text-sm"
+          className={responsiveEnabled ? "min-h-11 w-full min-w-0 max-w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm" : "rounded-md border border-border bg-background px-3 py-1.5 text-sm"}
         />
       </div>
 
-      <div className="flex flex-col gap-1">
+      <div className={responsiveEnabled ? "flex min-w-0 flex-col gap-1 sm:w-auto" : "flex flex-col gap-1"}>
         <label className="text-xs text-muted-foreground">Group by</label>
         <select
           value={groupBy}
           onChange={(e) => handleChange("groupBy", e.target.value)}
-          className="rounded-md border border-border bg-background px-3 py-1.5 text-sm"
+          className={responsiveEnabled ? "min-h-11 w-full min-w-0 max-w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm" : "rounded-md border border-border bg-background px-3 py-1.5 text-sm"}
         >
           {GROUP_BY_OPTIONS.map((o) => (
             <option key={o.value} value={o.value}>
@@ -166,7 +167,7 @@ export function SurveyFilters({ coaches, categories }: SurveyFiltersProps) {
       {hasActiveFilter && (
         <button
           onClick={clearFilters}
-          className="rounded-md border border-border bg-background px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground"
+          className={responsiveEnabled ? "min-h-11 rounded-md border border-border bg-background px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground" : "rounded-md border border-border bg-background px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground"}
         >
           Clear filters
         </button>

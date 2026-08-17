@@ -38,9 +38,10 @@ interface InviteAdminSectionProps {
    * user is unconditional server-side). When false, no Remove buttons render.
    */
   waveQEnabled?: boolean;
+  responsiveEnabled?: boolean;
 }
 
-export function InviteAdminSection({ waveQEnabled = false }: InviteAdminSectionProps) {
+export function InviteAdminSection({ waveQEnabled = false, responsiveEnabled = false }: InviteAdminSectionProps) {
   const [invites, setInvites] = useState<AdminInvite[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -208,6 +209,7 @@ export function InviteAdminSection({ waveQEnabled = false }: InviteAdminSectionP
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                className={responsiveEnabled ? "min-h-11" : undefined}
                 placeholder="admin@example.com"
                 required
               />
@@ -219,11 +221,12 @@ export function InviteAdminSection({ waveQEnabled = false }: InviteAdminSectionP
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                className={responsiveEnabled ? "min-h-11" : undefined}
                 placeholder="Full name"
               />
             </div>
           </div>
-          <Button type="submit" disabled={isSubmitting} size="sm">
+          <Button type="submit" disabled={isSubmitting} size="sm" className={responsiveEnabled ? "min-h-11 w-full sm:w-auto" : undefined}>
             <Mail className="w-4 h-4 mr-1" />
             {isSubmitting ? "Sending..." : "Send Invite"}
           </Button>
@@ -231,13 +234,15 @@ export function InviteAdminSection({ waveQEnabled = false }: InviteAdminSectionP
 
         {/* Users + Invites */}
         <div>
-          <div className="flex items-center justify-between mb-3">
+          <div className={responsiveEnabled ? "mb-3 flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between" : "flex items-center justify-between mb-3"}>
             <h4 className="text-sm font-medium text-foreground">Current Admins</h4>
             <Button
               variant="ghost"
               size="sm"
               onClick={fetchAll}
               disabled={isLoading}
+              aria-label={responsiveEnabled ? "Refresh admins" : undefined}
+              className={responsiveEnabled ? "min-h-11 min-w-11 self-end sm:self-auto" : undefined}
             >
               <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
             </Button>
@@ -255,7 +260,7 @@ export function InviteAdminSection({ waveQEnabled = false }: InviteAdminSectionP
                 <div
                   key={user.id}
                   data-testid="admin-user-row"
-                  className="flex items-center justify-between p-3 rounded-lg border border-border bg-background"
+                  className={responsiveEnabled ? "flex flex-col items-stretch gap-3 p-3 rounded-lg border border-border bg-background sm:flex-row sm:items-center sm:justify-between" : "flex items-center justify-between p-3 rounded-lg border border-border bg-background"}
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -284,7 +289,7 @@ export function InviteAdminSection({ waveQEnabled = false }: InviteAdminSectionP
                       size="sm"
                       onClick={() => handleRemoveUser(user)}
                       disabled={removingId === user.id}
-                      className="text-destructive hover:text-destructive hover:bg-destructive/10 ml-2"
+                      className={responsiveEnabled ? "min-h-11 w-full text-destructive hover:text-destructive hover:bg-destructive/10 sm:ml-2 sm:w-auto" : "text-destructive hover:text-destructive hover:bg-destructive/10 ml-2"}
                     >
                       <UserX className="w-4 h-4 mr-1" />
                       {removingId === user.id ? "Removing..." : "Remove"}
@@ -298,7 +303,7 @@ export function InviteAdminSection({ waveQEnabled = false }: InviteAdminSectionP
                 return (
                   <div
                     key={invite.id}
-                    className="flex items-center justify-between p-3 rounded-lg border border-border bg-background"
+                    className={responsiveEnabled ? "flex flex-col items-stretch gap-3 p-3 rounded-lg border border-border bg-background sm:flex-row sm:items-center sm:justify-between" : "flex items-center justify-between p-3 rounded-lg border border-border bg-background"}
                   >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
@@ -342,7 +347,7 @@ export function InviteAdminSection({ waveQEnabled = false }: InviteAdminSectionP
                         variant="ghost"
                         size="sm"
                         onClick={() => handleRevoke(invite.id, invite.email)}
-                        className="text-destructive hover:text-destructive hover:bg-destructive/10 ml-2"
+                        className={responsiveEnabled ? "min-h-11 min-w-11 self-end text-destructive hover:text-destructive hover:bg-destructive/10 sm:ml-2 sm:self-auto" : "text-destructive hover:text-destructive hover:bg-destructive/10 ml-2"}
                         aria-label={`Revoke invite for ${invite.email}`}
                       >
                         <Trash2 className="w-4 h-4" />

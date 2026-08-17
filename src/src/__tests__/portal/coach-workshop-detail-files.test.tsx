@@ -78,9 +78,14 @@ jest.mock("@/components/workshops/coach-response-form", () => ({
   CoachResponseForm: () => null,
 }));
 
+jest.mock("@/lib/mobile-responsive-flags", () => ({
+  isMobileResponsiveEnabled: jest.fn(() => false),
+}));
+
 import WorkshopDetailsPage from "@/app/(portal)/portal/workshops/[id]/page";
 import { requireCoach } from "@/lib/auth/authorization";
 import { db } from "@/lib/db";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 
 describe("Coach workshop detail file links", () => {
   beforeEach(() => {
@@ -187,5 +192,21 @@ describe("Coach workshop detail file links", () => {
     });
     const markup = renderToStaticMarkup(element);
     expect(markup).not.toContain("View Registrations");
+  });
+
+  it("gives responsive detail footer links 44px touch targets", async () => {
+    (isMobileResponsiveEnabled as jest.Mock).mockReturnValueOnce(true);
+    const element = await WorkshopDetailsPage({
+      params: Promise.resolve({ id: "ws-1" }),
+    });
+    const container = document.createElement("div");
+    container.innerHTML = renderToStaticMarkup(element);
+
+    for (const label of ["Back to Workshops", "View Registrations"]) {
+      const link = Array.from(container.querySelectorAll("a")).find(
+        (candidate) => candidate.textContent?.trim() === label,
+      );
+      expect(link).toHaveClass("min-h-11", "min-w-11");
+    }
   });
 });

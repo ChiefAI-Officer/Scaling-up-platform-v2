@@ -241,10 +241,47 @@ function buildSteps(customSlidesEnabled: boolean): StepDef[] {
 function StepIndicator({
   current,
   steps,
+  responsiveEnabled = false,
 }: {
   current: number;
   steps: StepDef[];
+  responsiveEnabled?: boolean;
 }) {
+  if (responsiveEnabled) {
+    return (
+      <>
+        <div
+          data-testid="campaign-step-summary"
+          className="mb-6 rounded-xl border border-border bg-card p-4 sm:hidden"
+          aria-live="polite"
+        >
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Step {current + 1} of {steps.length}
+          </p>
+          <p className="mt-1 text-base font-semibold text-foreground">
+            {steps[current]?.title}
+          </p>
+        </div>
+        <ol className="wf-stepper hidden sm:flex" data-responsive-full-stepper>
+          {steps.map((step) => {
+            const done = current > step.id;
+            const active = current === step.id;
+            return (
+              <li
+                key={step.id}
+                className={`wf-stepper-item${active ? " is-active" : ""}${done ? " is-done" : ""}`}
+              >
+                <div className="wf-stepper-circle">
+                  {done ? <Check className="h-4 w-4" /> : step.id + 1}
+                </div>
+                <span className="wf-stepper-label">{step.title}</span>
+              </li>
+            );
+          })}
+        </ol>
+      </>
+    );
+  }
   return (
     <ol className="wf-stepper">
       {steps.map((s) => {
@@ -293,6 +330,7 @@ export function CampaignWizard({
   waveQDefaultsEnabled = false,
   onScreenResultsEnabled = false,
   adminOwnedPresentation = false,
+  responsiveEnabled = false,
 }: {
   /** Wave D #20 — gate the custom-HTML invitation editor (mirrors the server flag). */
   customHtmlEmailEnabled?: boolean;
@@ -353,6 +391,8 @@ export function CampaignWizard({
   onScreenResultsEnabled?: boolean;
   /** Admin owns template presentation; coaches neither see nor persist style choices. */
   adminOwnedPresentation?: boolean;
+  /** Mobile-foundation presentation gate. Defaults off to preserve legacy DOM. */
+  responsiveEnabled?: boolean;
 } = {}) {
   const router = useRouter();
   const { toast } = useToast();
@@ -934,7 +974,10 @@ export function CampaignWizard({
   }, [pendingDraft, saveStatus, lastSavedAt]);
 
   return (
-    <div>
+    <div
+      className={responsiveEnabled ? "min-w-0 [&_button]:min-h-11" : undefined}
+      {...(responsiveEnabled ? { "data-responsive-campaign-wizard": true } : {})}
+    >
       {pendingDraft && (
         <div
           className="mb-6 border border-primary/30 bg-primary/5 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
@@ -968,11 +1011,12 @@ export function CampaignWizard({
         {saveIndicator}
       </div>
 
-      <StepIndicator current={state.step} steps={steps} />
+      <StepIndicator current={state.step} steps={steps} responsiveEnabled={responsiveEnabled} />
 
-      <div className="bg-card border border-border rounded-xl p-6 min-h-[400px]">
+      <div className={responsiveEnabled ? "min-h-[400px] min-w-0 rounded-xl border border-border bg-card p-4 sm:p-6" : "bg-card border border-border rounded-xl p-6 min-h-[400px]"}>
         {state.step === 0 && (
           <OrganizationStep
+            responsiveEnabled={responsiveEnabled}
             value={state.organizationId}
             onChange={({ id, name }) =>
               setState((s) => {
@@ -996,6 +1040,7 @@ export function CampaignWizard({
         )}
         {state.step === 1 && (
           <TemplateStep
+            responsiveEnabled={responsiveEnabled}
             value={state.templateId}
             onChange={(
               id,
@@ -1046,6 +1091,7 @@ export function CampaignWizard({
         )}
         {state.step === 2 && (
           <ParticipantsStep
+            responsiveEnabled={responsiveEnabled}
             organizationId={state.organizationId}
             orgName={state.orgName}
             respondentIds={state.respondentIds}
@@ -1063,6 +1109,7 @@ export function CampaignWizard({
         )}
         {state.step === 3 && (
           <ScheduleStep
+            responsiveEnabled={responsiveEnabled}
             name={state.name}
             openAt={state.openAt}
             endMode={state.endMode}
@@ -1126,10 +1173,12 @@ export function CampaignWizard({
 // ── Step 0 — Organization ───────────────────────────────────────────────
 
 function OrganizationStep({
+  responsiveEnabled,
   value,
   onChange,
   onNext,
 }: {
+  responsiveEnabled: boolean;
   value: string;
   onChange: (v: { id: string; name: string }) => void;
   onNext: () => void;
@@ -1189,7 +1238,7 @@ function OrganizationStep({
           {orgs.map((o) => (
             <label
               key={o.id}
-              className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+              className={`${responsiveEnabled ? "min-h-11 min-w-11 " : ""}flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
                 value === o.id
                   ? "border-primary bg-primary/5"
                   : "border-border hover:border-primary/50"
@@ -1228,11 +1277,13 @@ function OrganizationStep({
 // ── Step 1 — Template ──────────────────────────────────────────────────
 
 function TemplateStep({
+  responsiveEnabled,
   value,
   onChange,
   onBack,
   onNext,
 }: {
+  responsiveEnabled: boolean;
   value: string;
   onChange: (
     id: string,
@@ -1300,7 +1351,7 @@ function TemplateStep({
           {templates.map((t) => (
             <label
               key={t.id}
-              className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+              className={`${responsiveEnabled ? "min-h-11 min-w-11 " : ""}flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
                 value === t.id
                   ? "border-primary bg-primary/5"
                   : "border-border hover:border-primary/50"
@@ -1380,6 +1431,7 @@ function TemplateStep({
 type CeoPickSource = "auto" | "user" | null;
 
 function ParticipantsStep({
+  responsiveEnabled,
   organizationId,
   orgName,
   respondentIds,
@@ -1388,6 +1440,7 @@ function ParticipantsStep({
   onBack,
   onNext,
 }: {
+  responsiveEnabled: boolean;
   organizationId: string;
   /** Display name of the selected org — used for the quick-add modal hint. */
   orgName: string;
@@ -1624,18 +1677,27 @@ function ParticipantsStep({
     const checked = respondentIds.includes(r.id);
     const isCEO = ceoRespondentId === r.id;
     const isAutoSuggested = isCEO && ceoPickSource === "auto";
+    const includeControl = (
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => toggleRespondent(r.id, e.target.checked)}
+        className="accent-primary"
+        aria-label={`Include ${r.firstName} ${r.lastName}`}
+      />
+    );
     return (
       <div
         key={r.id}
         className="flex items-center gap-3 px-3 py-2 hover:bg-muted/30"
       >
-        <input
-          type="checkbox"
-          checked={checked}
-          onChange={(e) => toggleRespondent(r.id, e.target.checked)}
-          className="accent-primary"
-          aria-label={`Include ${r.firstName} ${r.lastName}`}
-        />
+        {responsiveEnabled ? (
+          <label className="inline-flex min-h-11 min-w-11 items-center justify-center cursor-pointer">
+            {includeControl}
+          </label>
+        ) : (
+          includeControl
+        )}
         <div className="flex-1 text-sm">
           <div className="font-medium text-foreground">
             {r.firstName} {r.lastName}
@@ -1646,7 +1708,7 @@ function ParticipantsStep({
           </div>
         </div>
         <div className="flex flex-col items-end gap-0.5">
-          <label className="flex items-center gap-1 text-xs text-muted-foreground cursor-pointer">
+          <label className={responsiveEnabled ? "flex min-h-11 min-w-11 items-center justify-center gap-1 text-xs text-muted-foreground cursor-pointer" : "flex items-center gap-1 text-xs text-muted-foreground cursor-pointer"}>
             <input
               type="radio"
               name="ceo"
@@ -1743,6 +1805,17 @@ function ParticipantsStep({
             const allSelected =
               visibleIds.length > 0 &&
               selectedInGroup.length === visibleIds.length;
+            const selectAllControl = (
+              <input
+                type="checkbox"
+                checked={allSelected}
+                onChange={(e) =>
+                  toggleSelectAll(g.key, visibleIds, e.target.checked)
+                }
+                aria-label={`Select all ${g.label}`}
+                className="accent-primary"
+              />
+            );
             return (
               <div
                 key={g.key}
@@ -1753,15 +1826,13 @@ function ParticipantsStep({
                   className="flex items-center gap-2 px-3 py-2 bg-muted/40 border-b border-border"
                   style={{ paddingLeft: `${g.depth * 16 + 12}px` }}
                 >
-                  <input
-                    type="checkbox"
-                    checked={allSelected}
-                    onChange={(e) =>
-                      toggleSelectAll(g.key, visibleIds, e.target.checked)
-                    }
-                    aria-label={`Select all ${g.label}`}
-                    className="accent-primary"
-                  />
+                  {responsiveEnabled ? (
+                    <label className="inline-flex min-h-11 min-w-11 items-center justify-center cursor-pointer">
+                      {selectAllControl}
+                    </label>
+                  ) : (
+                    selectAllControl
+                  )}
                   <Users className="w-3.5 h-3.5 text-muted-foreground" />
                   <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     {g.label}
@@ -1801,6 +1872,7 @@ function ParticipantsStep({
         teams={teams}
         defaultTeamId={null}
         description={`Adds this person to ${orgName || "this company"}'s roster (not just this campaign).`}
+        responsiveEnabled={responsiveEnabled}
       />
     </div>
   );
@@ -1809,6 +1881,7 @@ function ParticipantsStep({
 // ── Step 3 — Schedule ──────────────────────────────────────────────────
 
 function ScheduleStep({
+  responsiveEnabled,
   name,
   openAt,
   endMode,
@@ -1832,6 +1905,7 @@ function ScheduleStep({
   onBack,
   onNext,
 }: {
+  responsiveEnabled: boolean;
   name: string;
   openAt: string;
   endMode: EndMode;
@@ -1934,7 +2008,7 @@ function ScheduleStep({
           <div className="space-y-2">
             <Label>When to send invitations</Label>
             <div className="flex flex-col gap-2 sm:flex-row sm:gap-6">
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <label className={responsiveEnabled ? "flex min-h-11 min-w-11 items-center gap-2 text-sm cursor-pointer" : "flex items-center gap-2 text-sm cursor-pointer"}>
                 <input
                   type="radio"
                   name="inviteTiming"
@@ -1945,7 +2019,7 @@ function ScheduleStep({
                 />
                 Immediately
               </label>
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <label className={responsiveEnabled ? "flex min-h-11 min-w-11 items-center gap-2 text-sm cursor-pointer" : "flex items-center gap-2 text-sm cursor-pointer"}>
                 <input
                   type="radio"
                   name="inviteTiming"
@@ -1999,7 +2073,7 @@ function ScheduleStep({
         <div className="space-y-2">
           <Label>End</Label>
           <div className="flex gap-4">
-            <label className="flex items-center gap-2 text-sm">
+            <label className={responsiveEnabled ? "flex min-h-11 min-w-11 items-center gap-2 text-sm" : "flex items-center gap-2 text-sm"}>
               <input
                 type="radio"
                 name="endMode"
@@ -2009,7 +2083,7 @@ function ScheduleStep({
               />
               Open-ended
             </label>
-            <label className="flex items-center gap-2 text-sm">
+            <label className={responsiveEnabled ? "flex min-h-11 min-w-11 items-center gap-2 text-sm" : "flex items-center gap-2 text-sm"}>
               <input
                 type="radio"
                 name="endMode"
@@ -2056,7 +2130,7 @@ function ScheduleStep({
             Results on screen
           </h3>
           <div className="space-y-1">
-            <label className="flex items-center gap-3 cursor-pointer">
+            <label className={responsiveEnabled ? "flex min-h-11 min-w-11 items-center gap-3 cursor-pointer" : "flex items-center gap-3 cursor-pointer"}>
               <input
                 id="showResultsOnScreen"
                 type="checkbox"
@@ -2117,7 +2191,7 @@ function ScheduleStep({
           {/* #15 — Respondent results email */}
           {resultsEmailEnabled && (
             <div className="space-y-1">
-              <label className="flex items-center gap-3 cursor-pointer">
+              <label className={responsiveEnabled ? "flex min-h-11 min-w-11 items-center gap-3 cursor-pointer" : "flex items-center gap-3 cursor-pointer"}>
                 <input
                   id="sendResultsToRespondent"
                   type="checkbox"
@@ -2143,7 +2217,7 @@ function ScheduleStep({
 
           {/* #16 — Coach completion notify */}
           {coachNotifyEnabled && (
-            <label className="flex items-center gap-3 cursor-pointer">
+            <label className={responsiveEnabled ? "flex min-h-11 min-w-11 items-center gap-3 cursor-pointer" : "flex items-center gap-3 cursor-pointer"}>
               <input
                 id="notifyCoachOnCompletion"
                 type="checkbox"

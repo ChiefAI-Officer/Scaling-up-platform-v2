@@ -170,4 +170,38 @@ describe("CoachProfileForm", () => {
     expect(await screen.findByText("LinkedIn Profile URL must be a valid URL"))
       .toBeInTheDocument();
   });
+
+  it("keeps flag-off classes unchanged and opts into compact touch targets explicitly", () => {
+    const { container, rerender } = render(<CoachProfileForm {...defaultProps} saveTarget="admin" />);
+
+    expect(container.firstElementChild).toHaveClass("p-8");
+    expect(screen.getByRole("button", { name: /save changes/i })).not.toHaveClass("min-h-11");
+
+    rerender(
+      <CoachProfileForm
+        {...defaultProps}
+        saveTarget="admin"
+        responsiveEnabled
+      />,
+    );
+
+    expect(container.firstElementChild).toHaveClass("min-w-0", "p-4", "sm:p-8");
+    expect(screen.getByRole("button", { name: /save changes/i })).toHaveClass("min-h-11");
+    expect(screen.getByLabelText("First Name")).toHaveClass("min-h-11");
+  });
+
+  it("constrains the responsive photo upload without changing the default upload classes", () => {
+    const { rerender } = render(<CoachProfileForm {...defaultProps} />);
+
+    const disabledUpload = screen.getByLabelText("Upload photo");
+    expect(disabledUpload.parentElement?.parentElement?.parentElement).toHaveAttribute("class", "flex-1");
+    expect(disabledUpload).not.toHaveClass("w-full", "min-w-0", "max-w-full");
+
+    rerender(<CoachProfileForm {...defaultProps} responsiveEnabled />);
+
+    const responsiveUpload = screen.getByLabelText("Upload photo");
+    expect(responsiveUpload.parentElement).toHaveClass("w-full", "min-w-0", "max-w-full");
+    expect(responsiveUpload.parentElement?.parentElement?.parentElement).toHaveClass("flex-1", "w-full", "min-w-0", "max-w-full");
+    expect(responsiveUpload).toHaveClass("w-full", "min-w-0", "max-w-full");
+  });
 });

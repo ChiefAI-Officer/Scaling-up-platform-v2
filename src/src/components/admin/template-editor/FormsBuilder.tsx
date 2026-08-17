@@ -64,6 +64,8 @@ export interface FormsBuilderProps {
   onGoToSections: () => void;
   /** Coordinated ADMIN/STAFF-owned Welcome authoring surface. */
   adminOwnedPresentationEnabled?: boolean;
+  /** Presentation-only mobile containment; default false preserves ED9 output. */
+  responsiveEnabled?: boolean;
 }
 
 export function FormsBuilder({
@@ -74,6 +76,7 @@ export function FormsBuilder({
   conditionalEnabled,
   publishedOptionKeys,
   adminOwnedPresentationEnabled = false,
+  responsiveEnabled = false,
 }: FormsBuilderProps) {
   const {
     sections,
@@ -106,6 +109,7 @@ export function FormsBuilder({
       sectionCount={sections.length}
       isReadOnly={isReadOnly}
       onTemplateFieldChange={model.handleTemplateFieldChange}
+      responsiveEnabled={responsiveEnabled}
     />
   );
   const welcome = adminOwnedPresentationEnabled ? (
@@ -122,7 +126,15 @@ export function FormsBuilder({
 
   if (sections.length === 0) {
     return (
-      <div data-testid="forms-builder" className="flex flex-col gap-4">
+      <div
+        data-testid="forms-builder"
+        className={
+          responsiveEnabled
+            ? "flex min-w-0 max-w-full flex-col gap-4 break-words"
+            : "flex flex-col gap-4"
+        }
+        {...(responsiveEnabled ? { "data-responsive-builder": "" } : {})}
+      >
         {header}
         {welcome}
         <div
@@ -152,7 +164,15 @@ export function FormsBuilder({
       onDragEnd={handleDragEnd}
       accessibility={{ announcements: dndAnnouncements }}
     >
-      <div data-testid="forms-builder" className="flex flex-col gap-4">
+      <div
+        data-testid="forms-builder"
+        className={
+          responsiveEnabled
+            ? "flex min-w-0 max-w-full flex-col gap-4 break-words"
+            : "flex flex-col gap-4"
+        }
+        {...(responsiveEnabled ? { "data-responsive-builder": "" } : {})}
+      >
         {header}
         {welcome}
         {sections.map((s) => {
@@ -164,7 +184,11 @@ export function FormsBuilder({
             <div
               key={s.uid}
               data-testid={`forms-section-${s.stableKey}`}
-              className="flex flex-col gap-2"
+              className={
+                responsiveEnabled
+                  ? "flex min-w-0 max-w-full flex-col gap-2 break-words"
+                  : "flex flex-col gap-2"
+              }
             >
               <FormSectionCard
                 section={s}
@@ -179,10 +203,17 @@ export function FormsBuilder({
                 onMoveUp={model.handleSectionsMoveUp}
                 onMoveDown={model.handleSectionsMoveDown}
                 onDelete={commands.deleteSection}
+                responsiveEnabled={responsiveEnabled}
               />
 
               {!collapsed && (
-                <div className="flex flex-col gap-2 pl-3">
+                <div
+                  className={
+                    responsiveEnabled
+                      ? "flex min-w-0 flex-col gap-2 pl-0 sm:pl-3"
+                      : "flex flex-col gap-2 pl-3"
+                  }
+                >
                   {list.length === 0 ? (
                     <div
                       data-testid={`forms-section-empty-${s.stableKey}`}
@@ -244,6 +275,7 @@ export function FormsBuilder({
                                 model.handleUpdateQuestion(q.uid, patch)
                               }
                               registerFocusRef={registerFocusRef}
+                              responsiveEnabled={responsiveEnabled}
                             />
                             {focused && !isReadOnly && (
                               <button

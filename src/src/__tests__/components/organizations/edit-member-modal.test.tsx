@@ -93,6 +93,35 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("EditMemberModal", () => {
+  test("responsive in-flight state locks only submit and leaves inputs and cancel available", async () => {
+    (global.fetch as jest.Mock).mockReturnValue(new Promise(() => {}));
+    renderModal({ responsiveEnabled: true });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByRole("button", { name: "Saving…" })).toBeDisabled();
+    expect(screen.getByLabelText(/first name/i)).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled();
+  });
+
+  test("responsive validation collects every invalid field into linked summary and inline errors", async () => {
+    renderModal({ responsiveEnabled: true });
+    fireEvent.change(screen.getByLabelText(/first name/i), { target: { value: "" } });
+    fireEvent.change(screen.getByLabelText(/last name/i), { target: { value: "" } });
+    fireEvent.change(screen.getByLabelText(/e-mail/i), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    const summary = await screen.findByRole("alert", { name: "Edit member error summary" });
+    for (const [label, message] of [
+      [/first name/i, "First name is required."],
+      [/last name/i, "Last name is required."],
+      [/e-mail/i, "Email is required."],
+    ] as const) {
+      const control = screen.getByLabelText(label);
+      expect(summary.querySelector(`a[href="#${control.id}"]`)).not.toBeNull();
+      expect(control).toHaveAttribute("aria-invalid", "true");
+      expect(screen.getAllByText(message)).toHaveLength(2);
+    }
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
   /**
    * (1) Pre-fill: opening with a member populates all displayed fields.
    */

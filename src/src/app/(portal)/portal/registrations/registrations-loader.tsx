@@ -21,9 +21,11 @@ const RegistrationsClient = dynamic(
 export function RegistrationsLoader({
   registrations,
   currentSort,
+  responsiveEnabled = false,
 }: {
   registrations: CoachRegistrationView[];
   currentSort?: SortField;
+  responsiveEnabled?: boolean;
 }) {
-  return <RegistrationsClient registrations={registrations} currentSort={currentSort} />;
+  return <RegistrationsClient registrations={registrations} currentSort={currentSort} responsiveEnabled={responsiveEnabled} />;
 }

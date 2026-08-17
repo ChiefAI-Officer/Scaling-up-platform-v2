@@ -83,6 +83,109 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("AddMemberModal", () => {
+  test("responsive in-flight state locks only submit and leaves inputs and cancel available", async () => {
+    (global.fetch as jest.Mock).mockReturnValue(new Promise(() => {}));
+    renderModal({ responsiveEnabled: true });
+    fireEvent.change(screen.getByLabelText(/first name/i), { target: { value: "Jane" } });
+    fireEvent.change(screen.getByLabelText(/last name/i), { target: { value: "Smith" } });
+    fireEvent.change(screen.getByLabelText(/e-?mail/i), { target: { value: "jane@example.com" } });
+    fireEvent.click(screen.getByRole("button", { name: /add member/i }));
+    expect(await screen.findByRole("button", { name: "Adding…" })).toBeDisabled();
+    expect(screen.getByLabelText(/first name/i)).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled();
+  });
+
+  test("responsive mode exposes a viewport-bounded dialog and navigable multi-field error summary", async () => {
+    renderModal({ responsiveEnabled: true });
+
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveAttribute("data-responsive-dialog");
+    expect(dialog).toHaveClass(
+      "max-h-[calc(100dvh-2rem)] max-w-[calc(100vw-2rem)] overflow-y-auto"
+    );
+    expect(screen.getByRole("button", { name: "Close" })).toHaveClass(
+      "min-h-11 min-w-11"
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /add member/i }));
+
+    const summary = await screen.findByRole("alert", {
+      name: /add member error summary/i,
+    });
+    expect(summary).toHaveTextContent("First name is required.");
+    expect(summary).toHaveTextContent("Last name is required.");
+    expect(summary).toHaveTextContent("Email is required.");
+
+    const firstName = screen.getByLabelText(/first name/i);
+    const lastName = screen.getByLabelText(/last name/i);
+    const email = screen.getByLabelText(/e-?mail/i);
+    expect(summary.querySelector(`a[href="#${firstName.id}"]`)).not.toBeNull();
+    expect(summary.querySelector(`a[href="#${lastName.id}"]`)).not.toBeNull();
+    expect(summary.querySelector(`a[href="#${email.id}"]`)).not.toBeNull();
+
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /add member/i })).toBeInTheDocument();
+  });
+
+  test("responsive request failure preserves values and footer actions for retry", async () => {
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 503,
+        json: async () => ({ success: false, error: "Please try again." }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 201,
+        json: async () => ({
+          success: true,
+          data: {
+            id: "r-retry",
+            firstName: "Ada",
+            lastName: "Lovelace",
+            email: "ada@example.com",
+            jobTitle: "Founder",
+            teamId: "team-eng",
+          },
+        }),
+      });
+
+    const { onClose, onCreated } = renderModal({ responsiveEnabled: true });
+    const firstName = screen.getByLabelText(/first name/i);
+    const lastName = screen.getByLabelText(/last name/i);
+    const email = screen.getByLabelText(/e-?mail/i);
+    const jobTitle = screen.getByLabelText(/job title/i);
+
+    fireEvent.change(firstName, { target: { value: "Ada" } });
+    fireEvent.change(lastName, { target: { value: "Lovelace" } });
+    fireEvent.change(email, { target: { value: "ada@example.com" } });
+    fireEvent.change(jobTitle, { target: { value: "Founder" } });
+    fireEvent.change(screen.getByTestId("select-team"), {
+      target: { value: "team-eng" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /add member/i }));
+    const summary = await screen.findByRole("alert", {
+      name: /add member error summary/i,
+    });
+    expect(summary).toHaveTextContent("Please try again.");
+    expect(firstName).toHaveValue("Ada");
+    expect(lastName).toHaveValue("Lovelace");
+    expect(email).toHaveValue("ada@example.com");
+    expect(jobTitle).toHaveValue("Founder");
+    expect(screen.getByTestId("select-team")).toHaveValue("team-eng");
+
+    const retry = screen.getByRole("button", { name: /add member/i });
+    expect(retry).toBeEnabled();
+    expect(retry).toHaveClass("min-h-11");
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+
+    fireEvent.click(retry);
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   /**
    * (1) Valid submit POSTs to the correct endpoint with exact body including teamId
    */

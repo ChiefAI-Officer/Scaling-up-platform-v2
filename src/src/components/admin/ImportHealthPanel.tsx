@@ -14,6 +14,11 @@ import type {
   FiringSummary,
   RecentSignal,
 } from "@/lib/assessments/esperto-import/import-health";
+import { ResponsiveDataView } from "@/components/ui/responsive-data-view";
+import {
+  ResponsiveRecord,
+  ResponsiveRecordMeta,
+} from "@/components/ui/responsive-record";
 
 const HEALTH_STYLE: Record<ImportHealthSummary["cron"]["health"], { label: string; cls: string }> = {
   healthy: { label: "Healthy", cls: "bg-success/10 text-success" },
@@ -21,7 +26,11 @@ const HEALTH_STYLE: Record<ImportHealthSummary["cron"]["health"], { label: strin
   disabled: { label: "Alerting disabled", cls: "bg-muted text-muted-foreground" },
 };
 
-export function ImportHealthPanel() {
+export function ImportHealthPanel({
+  responsiveEnabled = false,
+}: {
+  responsiveEnabled?: boolean;
+} = {}) {
   const [data, setData] = useState<ImportHealthSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -56,8 +65,8 @@ export function ImportHealthPanel() {
   const health = HEALTH_STYLE[data.cron.health];
 
   return (
-    <div className="space-y-6" data-testid="import-health-panel">
-      <div className="flex items-center justify-between">
+    <div className={responsiveEnabled ? "min-w-0 space-y-6" : "space-y-6"} data-testid="import-health-panel">
+      <div className={responsiveEnabled ? "flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" : "flex items-center justify-between"}>
         <div>
           <h2 className="text-lg font-bold text-foreground">Esperto import health</h2>
           <p className="text-xs text-muted-foreground">
@@ -68,7 +77,7 @@ export function ImportHealthPanel() {
           type="button"
           onClick={load}
           disabled={loading}
-          className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-md border border-border bg-card text-foreground hover:bg-muted disabled:opacity-50"
+          className={responsiveEnabled ? "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md border border-border bg-card px-3 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50" : "inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-md border border-border bg-card text-foreground hover:bg-muted disabled:opacity-50"}
           data-testid="refresh-import-health"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
@@ -100,12 +109,12 @@ export function ImportHealthPanel() {
       </div>
 
       {/* Alert history — the cron's actual firings */}
-      <FiringTable title="Alert firings (last 24h)" rows={data.history.last24h} />
+      <FiringTable title="Alert firings (last 24h)" rows={data.history.last24h} responsiveEnabled={responsiveEnabled} />
 
       {/* Volume rollups (uncapped totals) */}
       <section className="space-y-2">
         <h3 className="text-sm font-semibold text-foreground">Volume (last 24h)</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className={responsiveEnabled ? "grid grid-cols-1 gap-3 sm:grid-cols-4" : "grid grid-cols-2 sm:grid-cols-4 gap-3"} data-testid={responsiveEnabled ? "import-volume-stats" : undefined}>
           <Stat label="Commit results" value={v.commitResults} />
           <Stat label="Commit conflicts" value={v.commitConflicts} />
           <Stat label="Route refusals" value={v.refusals} />
@@ -127,18 +136,18 @@ export function ImportHealthPanel() {
 
       {/* Breakdowns */}
       <div className="grid gap-4 md:grid-cols-3">
-        <CountTable title="Results by outcome" map={v.commitResultsByOutcome} />
-        <CountTable title="Conflicts by code" map={v.commitConflictsByCode} />
-        <CountTable title="Refusals by code" map={v.refusalsByCode} />
+        <CountTable title="Results by outcome" map={v.commitResultsByOutcome} responsiveEnabled={responsiveEnabled} />
+        <CountTable title="Conflicts by code" map={v.commitConflictsByCode} responsiveEnabled={responsiveEnabled} />
+        <CountTable title="Refusals by code" map={v.refusalsByCode} responsiveEnabled={responsiveEnabled} />
       </div>
 
       {/* Recent signals */}
-      <RecentTable rows={data.recent} />
+      <RecentTable rows={data.recent} responsiveEnabled={responsiveEnabled} />
     </div>
   );
 }
 
-function FiringTable({ title, rows }: { title: string; rows: FiringSummary[] }) {
+function FiringTable({ title, rows, responsiveEnabled = false }: { title: string; rows: FiringSummary[]; responsiveEnabled?: boolean }) {
   return (
     <div className="bg-card border border-border rounded-xl overflow-hidden">
       <div className="px-4 py-3 border-b border-border">
@@ -147,6 +156,13 @@ function FiringTable({ title, rows }: { title: string; rows: FiringSummary[] }) 
       {rows.length === 0 ? (
         <p className="px-4 py-3 text-sm text-muted-foreground">No alert conditions fired.</p>
       ) : (
+        <ResponsiveDataView
+          enabled={responsiveEnabled}
+          label={title}
+          wideFrom="md"
+          wideRegionLabel={`${title} table`}
+          compact={<div className="space-y-3 p-3">{rows.map((f) => <ResponsiveRecord key={f.code} aria-label={f.code}><ResponsiveRecordMeta items={[{ label: "Condition", value: <span className="font-mono">{f.code}</span> }, { label: "Sweeps fired", value: f.count }, { label: "Last fired", value: new Date(f.lastFiredAt).toLocaleString() }]} /></ResponsiveRecord>)}</div>}
+          wide={
         <table className="w-full">
           <thead className="bg-muted/40 border-b border-border">
             <tr>
@@ -167,12 +183,14 @@ function FiringTable({ title, rows }: { title: string; rows: FiringSummary[] }) 
             ))}
           </tbody>
         </table>
+          }
+        />
       )}
     </div>
   );
 }
 
-function CountTable({ title, map }: { title: string; map: Record<string, number> }) {
+function CountTable({ title, map, responsiveEnabled = false }: { title: string; map: Record<string, number>; responsiveEnabled?: boolean }) {
   const entries = Object.entries(map).sort((a, b) => b[1] - a[1]);
   return (
     <div className="bg-card border border-border rounded-xl overflow-hidden">
@@ -182,6 +200,13 @@ function CountTable({ title, map }: { title: string; map: Record<string, number>
       {entries.length === 0 ? (
         <p className="px-4 py-3 text-sm text-muted-foreground">None.</p>
       ) : (
+        <ResponsiveDataView
+          enabled={responsiveEnabled}
+          label={title}
+          wideFrom="md"
+          wideRegionLabel={`${title} table`}
+          compact={<div className="space-y-3 p-3">{entries.map(([key, value]) => <ResponsiveRecord key={key} aria-label={key}><ResponsiveRecordMeta items={[{ label: "Code", value: <span className="font-mono">{key}</span> }, { label: "Count", value }]} /></ResponsiveRecord>)}</div>}
+          wide={
         <table className="w-full">
           <tbody className="divide-y divide-border">
             {entries.map(([k, n]) => (
@@ -192,12 +217,14 @@ function CountTable({ title, map }: { title: string; map: Record<string, number>
             ))}
           </tbody>
         </table>
+          }
+        />
       )}
     </div>
   );
 }
 
-function RecentTable({ rows }: { rows: RecentSignal[] }) {
+function RecentTable({ rows, responsiveEnabled = false }: { rows: RecentSignal[]; responsiveEnabled?: boolean }) {
   return (
     <div className="bg-card border border-border rounded-xl overflow-hidden">
       <div className="px-4 py-3 border-b border-border">
@@ -206,6 +233,13 @@ function RecentTable({ rows }: { rows: RecentSignal[] }) {
       {rows.length === 0 ? (
         <p className="px-4 py-3 text-sm text-muted-foreground">No import signals yet.</p>
       ) : (
+        <ResponsiveDataView
+          enabled={responsiveEnabled}
+          label="Recent import signals"
+          wideFrom="lg"
+          wideRegionLabel="Recent import signals table"
+          compact={<div className="space-y-3 p-3">{rows.map((row, index) => <ResponsiveRecord key={`${row.at}-${index}`} aria-label={`${row.action} ${row.org}`}><ResponsiveRecordMeta items={[{ label: "When", value: new Date(row.at).toLocaleString() }, { label: "Action", value: <span className="font-mono">{row.action}</span> }, { label: "Org", value: <span className="font-mono">{row.org}</span> }, { label: "Outcome / code", value: row.outcome ?? row.code ?? "—" }, { label: "Latency", value: row.latencyMs === null ? "—" : `${row.latencyMs} ms` }]} /></ResponsiveRecord>)}</div>}
+          wide={
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px]">
             <thead className="bg-muted/40 border-b border-border">
@@ -232,6 +266,8 @@ function RecentTable({ rows }: { rows: RecentSignal[] }) {
             </tbody>
           </table>
         </div>
+          }
+        />
       )}
     </div>
   );

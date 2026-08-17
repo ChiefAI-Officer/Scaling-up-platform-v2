@@ -45,9 +45,11 @@ function comparisonLabels(
 export function ModernDashboardReport({
   presentation,
   comparison,
+  responsiveEnabled = false,
 }: {
   presentation: IndividualReportPresentation;
   comparison?: ReportComparisonModel | null;
+  responsiveEnabled?: boolean;
 }) {
   const { summary, detail } = partitionReportBlocks(presentation.blocks);
   const coverBlocks = summary.filter((block) => block.kind === "score-summary");
@@ -57,6 +59,7 @@ export function ModernDashboardReport({
     <article
       className={`su-report--dashboard ${assessmentInter.variable}`}
       data-testid="modern-dashboard-report"
+      data-responsive-report={responsiveEnabled ? "" : undefined}
     >
       <section className="report-page report-page--dashboard-cover">
         <ReportIdentityHeader
@@ -78,6 +81,7 @@ export function ModernDashboardReport({
           <ReportComparisonContent
             comparison={comparison}
             labels={comparisonLabels(presentation)}
+            responsiveEnabled={responsiveEnabled}
           />
           <ReportProvenance presentation={presentation} />
         </section>

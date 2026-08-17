@@ -7,7 +7,13 @@
  */
 
 import React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 
 const mockToast = jest.fn();
 const mockRefresh = jest.fn();
@@ -142,6 +148,101 @@ function renderRemovalFlow() {
 describe("CampaignDetail — respondent removal (CHI-35 / Jeff #59)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  it("labels every compact respondent-card field while preserving the labeled desktop table", () => {
+    render(
+      <CampaignDetail
+        responsiveEnabled
+        initialOverview={overview}
+        initialRespondents={[removableRespondent]}
+      />,
+    );
+
+    const row = within(
+      screen.getByTestId(`respondent-row-${RESPONDENT_ID}`),
+    );
+    for (const label of [
+      "Email",
+      "Team",
+      "Status",
+      "Sent",
+      "Submitted",
+      "Actions",
+    ]) {
+      expect(
+        row.getByTestId(
+          `compact-respondent-label-${label.toLowerCase()}`,
+        ),
+      ).toHaveClass("sm:hidden");
+    }
+    expect(
+      screen.getByRole("columnheader", { name: "Email" }),
+    ).toBeInTheDocument();
+  });
+
+  it("does not add compact respondent labels when responsive mode is off", () => {
+    render(
+      <CampaignDetail
+        initialOverview={overview}
+        initialRespondents={[removableRespondent]}
+      />,
+    );
+
+    expect(
+      screen.queryByTestId("compact-respondent-label-email"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("marks and sizes the real responsive Remove respondent action while preserving its exact default-off contract", () => {
+    const { rerender } = render(
+      <CampaignDetail
+        initialOverview={overview}
+        initialRespondents={[removableRespondent]}
+      />,
+    );
+
+    const disabledRemove = screen.getByRole("button", { name: "Remove Alice Smith" });
+    expect(disabledRemove).toHaveAttribute(
+      "class",
+      "inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded border border-border text-destructive hover:bg-destructive/10",
+    );
+    expect(disabledRemove).not.toHaveAttribute("data-touch-target");
+
+    rerender(
+      <CampaignDetail
+        responsiveEnabled
+        initialOverview={overview}
+        initialRespondents={[removableRespondent]}
+      />,
+    );
+
+    const responsiveRemove = screen.getByRole("button", { name: "Remove Alice Smith" });
+    expect(responsiveRemove).toHaveClass("min-h-11", "min-w-11");
+    expect(responsiveRemove).toHaveAttribute("data-touch-target");
+  });
+
+  it("contains the responsive overview text and wraps a long campaign alias without changing flag-off classes", () => {
+    const longAlias = "a-very-long-campaign-alias-that-must-wrap-anywhere-at-phone-and-tablet-widths";
+    const longOverview = {
+      ...overview,
+      campaign: { ...overview.campaign, alias: longAlias },
+    };
+    const { rerender } = render(
+      <CampaignDetail initialOverview={longOverview} initialRespondents={[removableRespondent]} />,
+    );
+
+    const disabledAlias = screen.getByText(longAlias);
+    expect(disabledAlias.parentElement).toHaveAttribute("class", "min-w-0");
+    expect(disabledAlias).toHaveAttribute("class", "text-sm text-muted-foreground font-mono");
+
+    rerender(
+      <CampaignDetail responsiveEnabled initialOverview={longOverview} initialRespondents={[removableRespondent]} />,
+    );
+
+    const responsiveAlias = screen.getByText(longAlias);
+    expect(responsiveAlias.parentElement).toHaveClass("min-w-0", "w-full", "max-w-full");
+    expect(responsiveAlias).toHaveClass("break-all");
   });
 
   it("treats an empty 204 as success, refreshes respondents, and never shows the false-error toast", async () => {

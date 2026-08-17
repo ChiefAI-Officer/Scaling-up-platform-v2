@@ -2307,6 +2307,91 @@
   .su-report-comparison thead { display: table-header-group; }
 }
 
+/* Wave mobile-responsive foundation: additive screen containment only. The
+   hooks are emitted exclusively by server-evaluated responsive report hosts;
+   print layout and the default-OFF report tree remain unchanged. Keep these
+   rules at the stylesheet tail so they override legacy desktop constraints. */
+@media screen {
+  [data-responsive-report],
+  [data-responsive-report] section,
+  [data-responsive-report] .su-report-cover-inner,
+  [data-responsive-report] .su-report-overall-main,
+  [data-responsive-report] .su-report-card-grid,
+  [data-responsive-report] .su-report-grid,
+  [data-responsive-report] .su-group-body,
+  [data-responsive-report] .su-group-sec,
+  [data-responsive-report] .su-group-rating,
+  [data-responsive-report] .su-group-choices,
+  [data-responsive-report] .su-group-qbar,
+  [data-responsive-report] .su-group-qbar-pair,
+  [data-responsive-report] .su-group-scaleup,
+  [data-responsive-report] .su-group-legend,
+  [data-responsive-report] .su-report-comparison,
+  [data-responsive-report] .su-report-comparison-section {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  [data-responsive-report] .su-report-data-region {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  [data-responsive-report] .su-report-data-region:focus-visible {
+    outline: 3px solid #522583;
+    outline-offset: 3px;
+  }
+
+  [data-responsive-report] .su-report-title,
+  [data-responsive-report] .su-report-for,
+  [data-responsive-report] .su-report-sub,
+  [data-responsive-report] .su-group-sec-title,
+  [data-responsive-report] .su-group-intro,
+  [data-responsive-report] .su-group-sec-intro,
+  [data-responsive-report] .su-group-qbar-lab,
+  [data-responsive-report] .su-group-legend-note {
+    overflow-wrap: anywhere;
+  }
+
+  [data-responsive-report] .su-group-scaleup,
+  [data-responsive-report] .su-group-legend,
+  [data-responsive-report-page] .su-report-actions,
+  [data-responsive-report-page] .su-report-print-actions {
+    flex-wrap: wrap;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  [data-responsive-report] .su-group-qbar-b {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  [data-responsive-report] .su-group-qbar-k {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
+@media screen and (max-width: 720px) {
+  [data-responsive-report] .su-group-rat-row,
+  [data-responsive-report] .su-group-rat-row.has-peers,
+  [data-responsive-report] .su-group-obs {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  [data-responsive-report] .su-group-rat-lab,
+  [data-responsive-report] .su-group-rat-val,
+  [data-responsive-report] .su-group-rat-n,
+  [data-responsive-report] .su-group-obs-lab,
+  [data-responsive-report] .su-group-obs-pct,
+  [data-responsive-report] .su-group-rat-row.has-peers .su-group-rat-peers {
+    text-align: left;
+  }
+}
+
 /* ── Scaling Up Full individual peer comparison (Classic only) ───────────── */
 .su-report .su-peer-sequence {
   padding: 6px 60px 40px;

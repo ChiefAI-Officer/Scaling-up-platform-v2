@@ -14,7 +14,7 @@
 
 import React, { useState, useCallback, useRef } from "react";
 import Link from "next/link";
-import { ChevronRight, ChevronDown, Building2, Users, UserPlus, Upload, FolderPlus, Pencil, FileDown } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, Building2, Users, UserPlus, Upload, FolderPlus, Pencil, FileDown } from "lucide-react";
 import { levelLabel } from "@/lib/assessments/respondent-levels";
 import { AddTeamModal } from "./add-team-modal";
 import type { CreatedResult } from "./add-team-modal";
@@ -108,6 +108,8 @@ export interface MembersTeamsViewProps {
    * company list; "By coach" groups companies under their owning-coach header.
    */
   allowGroupByCoach?: boolean;
+  /** Enables the adaptive compact drill-in presentation. */
+  responsiveEnabled?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -149,6 +151,15 @@ function isSameNode(a: TreeNode | null, b: TreeNode): boolean {
   return false;
 }
 
+/** The drill-in shortcut applies only while the compact presentation is active. */
+function isCompactViewport(): boolean {
+  if (typeof window === "undefined") return false;
+  if (typeof window.matchMedia === "function") {
+    return window.matchMedia("(max-width: 767px)").matches;
+  }
+  return window.innerWidth < 768;
+}
+
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
@@ -159,12 +170,14 @@ function NodeButton({
   depth,
   icon,
   onClick,
+  responsiveEnabled = false,
 }: {
   label: string;
   selected: boolean;
   depth: number;
   icon?: React.ReactNode;
   onClick: () => void;
+  responsiveEnabled?: boolean;
 }) {
   return (
     <button
@@ -172,9 +185,11 @@ function NodeButton({
       aria-label={label}
       aria-pressed={selected}
       onClick={onClick}
+      {...(responsiveEnabled ? { "data-touch-target": true } : {})}
       style={{ paddingLeft: `${depth * 16 + 8}px` }}
       className={[
         "w-full flex items-center gap-2 py-1.5 pr-3 rounded-md text-sm text-left transition-colors",
+        ...(responsiveEnabled ? ["min-h-11 min-w-0 pr-12"] : []),
         selected
           ? "bg-primary/10 text-primary font-medium"
           : "text-foreground hover:bg-muted",
@@ -195,6 +210,7 @@ export function MembersTeamsView({
   allowOrgCreate = true,
   hideEspertoImport = false,
   allowGroupByCoach = false,
+  responsiveEnabled = false,
 }: MembersTeamsViewProps) {
   // Companies list — may grow when a new Company is created via the modal
   const [organizations, setOrganizations] = useState<OrgSummary[]>(initialOrganizations);
@@ -231,6 +247,9 @@ export function MembersTeamsView({
 
   // Selected node drives the right panel
   const [selectedNode, setSelectedNode] = useState<TreeNode | null>(null);
+
+  // Presentation-only compact navigation; selectedNode remains the domain selection.
+  const [compactDetailOpen, setCompactDetailOpen] = useState(false);
 
   // Members for the currently selected node
   const [members, setMembers] = useState<ApiRespondent[]>([]);
@@ -333,6 +352,10 @@ export function MembersTeamsView({
   // Handlers
   // --------------------------------------------------------------------------
 
+  const showCompactDetail = useCallback(() => {
+    if (responsiveEnabled) setCompactDetailOpen(true);
+  }, [responsiveEnabled]);
+
   const handleOrgClick = useCallback(
     async (org: OrgSummary) => {
       const state = orgStates[org.id];
@@ -353,8 +376,9 @@ export function MembersTeamsView({
       const node: TreeNode = { kind: "organization", id: org.id, name: org.name };
       setSelectedNode(node);
       await loadMembers(node);
+      showCompactDetail();
     },
-    [orgStates, loadTeams, loadMembers]
+    [orgStates, loadTeams, loadMembers, showCompactDetail]
   );
 
   const handleTeamClick = useCallback(
@@ -368,8 +392,9 @@ export function MembersTeamsView({
       };
       setSelectedNode(node);
       await loadMembers(node);
+      showCompactDetail();
     },
-    [loadMembers]
+    [loadMembers, showCompactDetail]
   );
 
   const handleUnassignedClick = useCallback(
@@ -377,8 +402,9 @@ export function MembersTeamsView({
       const node: TreeNode = { kind: "unassigned", orgId };
       setSelectedNode(node);
       await loadMembers(node);
+      showCompactDetail();
     },
-    [loadMembers]
+    [loadMembers, showCompactDetail]
   );
 
   // --------------------------------------------------------------------------
@@ -452,7 +478,14 @@ export function MembersTeamsView({
         })
       : organizations;
     return (
-      <div className="flex-none w-64 border-r border-border overflow-y-auto">
+      <div
+        data-testid={responsiveEnabled ? "members-browse-panel" : undefined}
+        className={responsiveEnabled
+          ? compactDetailOpen
+            ? "hidden min-w-0 overflow-y-auto md:block md:border-r md:border-border"
+            : "min-w-0 overflow-y-auto md:block md:border-r md:border-border"
+          : "flex-none w-64 border-r border-border overflow-y-auto"}
+      >
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide">
             Teams
@@ -462,8 +495,11 @@ export function MembersTeamsView({
               type="button"
               onClick={() => setAddTeamOpen(true)}
               title="Add Company or Team"
-              className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              className={responsiveEnabled
+                ? "inline-flex min-h-11 min-w-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                : "p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"}
               aria-label="Add Company or Team"
+              {...(responsiveEnabled ? { "data-touch-target": true } : {})}
             >
               <FolderPlus className="w-4 h-4" />
             </button>
@@ -478,8 +514,10 @@ export function MembersTeamsView({
               type="button"
               aria-pressed={!groupByCoach}
               onClick={() => setGroupByCoach(false)}
+              {...(responsiveEnabled ? { "data-touch-target": true } : {})}
               className={[
                 "px-2 py-0.5 rounded text-xs transition-colors",
+                ...(responsiveEnabled ? ["min-h-11"] : []),
                 !groupByCoach
                   ? "bg-primary/10 text-primary font-medium"
                   : "text-muted-foreground hover:bg-muted",
@@ -491,8 +529,10 @@ export function MembersTeamsView({
               type="button"
               aria-pressed={groupByCoach}
               onClick={() => setGroupByCoach(true)}
+              {...(responsiveEnabled ? { "data-touch-target": true } : {})}
               className={[
                 "px-2 py-0.5 rounded text-xs transition-colors",
+                ...(responsiveEnabled ? ["min-h-11"] : []),
                 groupByCoach
                   ? "bg-primary/10 text-primary font-medium"
                   : "text-muted-foreground hover:bg-muted",
@@ -533,9 +573,22 @@ export function MembersTeamsView({
                     aria-label={org.name}
                     aria-pressed={isSelected}
                     aria-expanded={state.expanded}
-                    onClick={() => handleOrgClick(org)}
+                    onClick={() => {
+                      if (
+                        responsiveEnabled &&
+                        !compactDetailOpen &&
+                        isSelected &&
+                        isCompactViewport()
+                      ) {
+                        showCompactDetail();
+                        return;
+                      }
+                      void handleOrgClick(org);
+                    }}
+                    {...(responsiveEnabled ? { "data-touch-target": true } : {})}
                     className={[
                       "flex-1 flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-left transition-colors",
+                      ...(responsiveEnabled ? ["min-h-11 min-w-0 pr-12"] : []),
                       isSelected
                         ? "bg-primary/10 text-primary font-medium"
                         : "text-foreground hover:bg-muted",
@@ -555,6 +608,7 @@ export function MembersTeamsView({
                     aria-label={`Edit organization ${org.name}`}
                     title={`Edit ${org.name}`}
                     data-testid={`edit-org-${org.id}`}
+                    {...(responsiveEnabled ? { "data-touch-target": true } : {})}
                     onClick={(e) => {
                       e.stopPropagation();
                       setOrgBeingEdited({
@@ -565,8 +619,14 @@ export function MembersTeamsView({
                     }}
                     className={[
                       "absolute right-1 top-1/2 -translate-y-1/2",
-                      "p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors",
-                      isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
+                      responsiveEnabled
+                        ? "inline-flex min-h-11 min-w-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        : "p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors",
+                      responsiveEnabled
+                        ? "opacity-100"
+                        : isSelected
+                        ? "opacity-100"
+                        : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
                     ].join(" ")}
                   >
                     <Pencil className="w-3.5 h-3.5" />
@@ -586,7 +646,10 @@ export function MembersTeamsView({
                         <button
                           type="button"
                           onClick={() => loadTeams(org.id)}
-                          className="text-xs text-primary underline hover:no-underline"
+                          className={responsiveEnabled
+                            ? "inline-flex min-h-11 items-center px-2 text-xs text-primary underline hover:no-underline"
+                            : "text-xs text-primary underline hover:no-underline"}
+                          {...(responsiveEnabled ? { "data-touch-target": true } : {})}
                         >
                           Retry
                         </button>
@@ -612,7 +675,19 @@ export function MembersTeamsView({
                               selected={isTeamSelected}
                               depth={depth}
                               icon={<Users className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground" />}
-                              onClick={() => handleTeamClick(tn, org.id)}
+                              responsiveEnabled={responsiveEnabled}
+                              onClick={() => {
+                                if (
+                                  responsiveEnabled &&
+                                  !compactDetailOpen &&
+                                  isTeamSelected &&
+                                  isCompactViewport()
+                                ) {
+                                  showCompactDetail();
+                                  return;
+                                }
+                                void handleTeamClick(tn, org.id);
+                              }}
                             />
                             {/* Edit affordance — shown on hover or when row is selected */}
                             <button
@@ -620,6 +695,7 @@ export function MembersTeamsView({
                               aria-label={`Edit ${tn.name}`}
                               title="Edit team"
                               data-testid={`edit-team-${tn.id}`}
+                              {...(responsiveEnabled ? { "data-touch-target": true } : {})}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setEditingTeam({
@@ -633,8 +709,14 @@ export function MembersTeamsView({
                               }}
                               className={[
                                 "absolute right-1 top-1/2 -translate-y-1/2",
-                                "p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors",
-                                isTeamSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
+                                responsiveEnabled
+                                  ? "inline-flex min-h-11 min-w-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                  : "p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors",
+                                responsiveEnabled
+                                  ? "opacity-100"
+                                  : isTeamSelected
+                                  ? "opacity-100"
+                                  : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
                               ].join(" ")}
                             >
                               <Pencil className="w-3.5 h-3.5" />
@@ -650,7 +732,20 @@ export function MembersTeamsView({
                         selected={isSameNode(selectedNode, { kind: "unassigned", orgId: org.id })}
                         depth={1}
                         icon={<Users className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground opacity-50" />}
-                        onClick={() => handleUnassignedClick(org.id)}
+                        responsiveEnabled={responsiveEnabled}
+                        onClick={() => {
+                          const unassignedNode: TreeNode = { kind: "unassigned", orgId: org.id };
+                          if (
+                            responsiveEnabled &&
+                            !compactDetailOpen &&
+                            isSameNode(selectedNode, unassignedNode) &&
+                            isCompactViewport()
+                          ) {
+                            showCompactDetail();
+                            return;
+                          }
+                          void handleUnassignedClick(org.id);
+                        }}
                       />
                     )}
                   </div>
@@ -677,8 +772,29 @@ export function MembersTeamsView({
       : null;
 
     return (
-      <div className="flex-1 overflow-y-auto">
-        <div className="flex items-center justify-between px-6 py-3 border-b border-border">
+      <div
+        data-testid={responsiveEnabled ? "members-detail-panel" : undefined}
+        className={responsiveEnabled
+          ? compactDetailOpen
+            ? "min-w-0 overflow-y-auto md:block"
+            : "hidden min-w-0 overflow-y-auto md:block"
+          : "flex-1 overflow-y-auto"}
+      >
+        {responsiveEnabled && (
+          <button
+            type="button"
+            data-touch-target
+            onClick={() => setCompactDetailOpen(false)}
+            className="inline-flex min-h-11 items-center gap-1 px-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground md:hidden"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Back to organizations
+          </button>
+        )}
+        <div className={responsiveEnabled
+          ? "flex flex-col items-stretch gap-3 border-b border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6"
+          : "flex items-center justify-between px-6 py-3 border-b border-border"}
+        >
           <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide">
             {panelTitle ? `Members — ${panelTitle}` : "Members"}
           </h2>
@@ -690,7 +806,10 @@ export function MembersTeamsView({
                 href="/portal/members/import"
                 title="Import from Esperto"
                 aria-label="Import from Esperto"
-                className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                className={responsiveEnabled
+                  ? "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  : "inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"}
+                {...(responsiveEnabled ? { "data-touch-target": true } : {})}
               >
                 <FileDown className="w-4 h-4" />
                 Import from Esperto
@@ -707,12 +826,15 @@ export function MembersTeamsView({
               }}
               title={selectedNode ? "Import members" : "Select a company or team first"}
               className={[
-                "p-1 rounded-md transition-colors",
+                responsiveEnabled
+                  ? "inline-flex min-h-11 min-w-11 items-center justify-center rounded-md transition-colors"
+                  : "p-1 rounded-md transition-colors",
                 selectedNode
                   ? "text-muted-foreground hover:text-foreground hover:bg-muted"
                   : "text-muted-foreground opacity-40 cursor-not-allowed",
               ].join(" ")}
               aria-label={selectedNode ? "Import members" : "Import members (select a node first)"}
+              {...(responsiveEnabled ? { "data-touch-target": true } : {})}
             >
               <Upload className="w-4 h-4" />
             </button>
@@ -735,12 +857,15 @@ export function MembersTeamsView({
               }}
               title={selectedNode ? "Add Member" : "Select a company or team first"}
               className={[
-                "p-1 rounded-md transition-colors",
+                responsiveEnabled
+                  ? "inline-flex min-h-11 min-w-11 items-center justify-center rounded-md transition-colors"
+                  : "p-1 rounded-md transition-colors",
                 selectedNode
                   ? "text-muted-foreground hover:text-foreground hover:bg-muted"
                   : "text-muted-foreground opacity-40 cursor-not-allowed",
               ].join(" ")}
               aria-label={selectedNode ? "Add Member" : "Add Member (select a node first)"}
+              {...(responsiveEnabled ? { "data-touch-target": true } : {})}
             >
               <UserPlus className="w-4 h-4" />
             </button>
@@ -767,7 +892,10 @@ export function MembersTeamsView({
             <button
               type="button"
               onClick={() => loadMembers(selectedNode)}
-              className="text-sm text-primary underline hover:no-underline"
+              className={responsiveEnabled
+                ? "inline-flex min-h-11 items-center px-3 text-sm text-primary underline hover:no-underline"
+                : "text-sm text-primary underline hover:no-underline"}
+              {...(responsiveEnabled ? { "data-touch-target": true } : {})}
             >
               Retry
             </button>
@@ -781,9 +909,14 @@ export function MembersTeamsView({
         )}
 
         {selectedNode && !loadingMembers && !membersError && members.length > 0 && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
+          <div
+            role={responsiveEnabled ? "region" : undefined}
+            aria-label={responsiveEnabled ? `Members for ${panelTitle}` : undefined}
+            tabIndex={responsiveEnabled ? 0 : undefined}
+            className={responsiveEnabled ? "min-w-0 p-3 sm:overflow-x-auto sm:p-0" : "overflow-x-auto"}
+          >
+            <table className={responsiveEnabled ? "block w-full text-sm sm:table" : "w-full text-sm"}>
+              <thead className={responsiveEnabled ? "hidden sm:table-header-group" : undefined}>
                 <tr className="border-b border-border bg-muted/40">
                   <th className="px-6 py-2.5 text-left font-medium text-muted-foreground">Name</th>
                   <th className="px-6 py-2.5 text-left font-medium text-muted-foreground">Email</th>
@@ -791,7 +924,7 @@ export function MembersTeamsView({
                   <th className="px-3 py-2.5 text-left font-medium text-muted-foreground w-12"></th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className={responsiveEnabled ? "block space-y-3 sm:table-row-group sm:space-y-0" : undefined}>
                 {members.map((m) => {
                   // Resolve orgId from the selected node for the Edit modal
                   const memberOrgId =
@@ -812,23 +945,49 @@ export function MembersTeamsView({
                   return (
                     <tr
                       key={m.id}
-                      className="border-b border-border hover:bg-muted/20 transition-colors group"
+                      className={responsiveEnabled
+                        ? "group block space-y-2 rounded-lg border border-border p-4 transition-colors hover:bg-muted/20 sm:table-row sm:space-y-0 sm:rounded-none sm:border-0 sm:border-b sm:p-0"
+                        : "border-b border-border hover:bg-muted/20 transition-colors group"}
                       data-testid={`member-row-${m.id}`}
                     >
-                      <td className="px-6 py-3 text-foreground font-medium">
+                      <td className={responsiveEnabled
+                        ? "block min-w-0 break-words py-1 font-medium text-foreground sm:table-cell sm:px-6 sm:py-3"
+                        : "px-6 py-3 text-foreground font-medium"}
+                      >
                         {m.firstName} {m.lastName}
                       </td>
-                      <td className="px-6 py-3 text-muted-foreground">{m.email}</td>
-                      <td className="px-6 py-3 text-muted-foreground">
+                      <td className={responsiveEnabled
+                        ? "block min-w-0 break-all py-1 text-muted-foreground sm:table-cell sm:px-6 sm:py-3"
+                        : "px-6 py-3 text-muted-foreground"}
+                      >
+                        {responsiveEnabled && (
+                          <span className="mr-2 text-xs font-medium uppercase tracking-wide text-muted-foreground sm:hidden">
+                            Email
+                          </span>
+                        )}
+                        {m.email}
+                      </td>
+                      <td className={responsiveEnabled
+                        ? "block py-1 text-muted-foreground sm:table-cell sm:px-6 sm:py-3"
+                        : "px-6 py-3 text-muted-foreground"}
+                      >
+                        {responsiveEnabled && (
+                          <span className="mr-2 text-xs font-medium uppercase tracking-wide text-muted-foreground sm:hidden">
+                            Level
+                          </span>
+                        )}
                         {levelLabel(m.roleType)}
                       </td>
-                      <td className="px-3 py-3 text-right">
-                        {/* Edit affordance — shown on row hover */}
+                      <td className={responsiveEnabled
+                        ? "block py-1 text-left sm:table-cell sm:px-3 sm:py-3 sm:text-right"
+                        : "px-3 py-3 text-right"}
+                      >
                         <button
                           type="button"
                           aria-label={`Edit ${m.firstName} ${m.lastName}`}
                           title="Edit member"
                           data-testid={`edit-member-${m.id}`}
+                          {...(responsiveEnabled ? { "data-touch-target": true } : {})}
                           onClick={() => {
                             setMemberBeingEdited({
                               id: m.id,
@@ -848,7 +1007,9 @@ export function MembersTeamsView({
                               loadTeams(memberOrgId);
                             }
                           }}
-                          className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                          className={responsiveEnabled
+                            ? "inline-flex min-h-11 min-w-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                            : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100 p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"}
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
@@ -870,7 +1031,10 @@ export function MembersTeamsView({
 
   return (
     <>
-      <div className="flex h-full min-h-[500px] rounded-xl border border-border bg-card overflow-hidden">
+      <div className={responsiveEnabled
+        ? "grid min-h-[500px] min-w-0 overflow-hidden rounded-xl border border-border bg-card md:grid-cols-[minmax(16rem,35%)_minmax(0,65%)]"
+        : "flex h-full min-h-[500px] rounded-xl border border-border bg-card overflow-hidden"}
+      >
         {renderLeftPanel()}
         {renderRightPanel()}
       </div>
@@ -881,6 +1045,7 @@ export function MembersTeamsView({
         onCreated={handleCreated}
         organizations={organizations}
         loadedTeams={loadedTeamsForModal}
+        responsiveEnabled={responsiveEnabled}
       />
 
       {/* ImportMembersModal — only mount when we have an org context */}
@@ -901,6 +1066,7 @@ export function MembersTeamsView({
             }}
             orgId={importOrgId}
             orgName={importOrg?.name ?? importOrgId}
+            responsiveEnabled={responsiveEnabled}
           />
         );
       })()}
@@ -936,6 +1102,7 @@ export function MembersTeamsView({
             teams={modalTeams}
             defaultTeamId={modalDefaultTeamId}
             loadingTeams={orgStates[modalOrgId]?.loadingTeams ?? false}
+            responsiveEnabled={responsiveEnabled}
           />
         );
       })()}
@@ -961,6 +1128,7 @@ export function MembersTeamsView({
             }}
             team={editingTeam}
             teams={prunedTeams}
+            responsiveEnabled={responsiveEnabled}
           />
         );
       })()}
@@ -991,6 +1159,7 @@ export function MembersTeamsView({
             }}
             member={memberBeingEdited}
             teams={editMemberTeams}
+            responsiveEnabled={responsiveEnabled}
           />
         );
       })()}
@@ -1019,6 +1188,7 @@ export function MembersTeamsView({
             }
           }}
           organization={orgBeingEdited}
+          responsiveEnabled={responsiveEnabled}
         />
       )}
     </>

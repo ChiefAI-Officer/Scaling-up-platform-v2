@@ -181,6 +181,60 @@ body {
   color: hsl(var(--foreground));
 }
 
+body[data-mobile-responsive="on"] [data-auth-shell] {
+  min-width: 0;
+  max-width: 100%;
+}
+
+body[data-mobile-responsive="on"] [data-auth-shell] main,
+body[data-mobile-responsive="on"] [data-auth-shell] [data-responsive-container] {
+  min-width: 0;
+  max-width: 100%;
+}
+
+@media (max-width: 639px) {
+  body[data-mobile-responsive="on"] [data-auth-shell] main {
+    padding-inline: 1rem;
+  }
+
+  body[data-mobile-responsive="on"] [data-auth-shell] main > .space-y-6 > div > .flex.items-center.justify-between {
+    flex-wrap: wrap;
+  }
+
+  body[data-mobile-responsive="on"] [data-auth-shell] :is(header, nav) button[aria-label="Open menu"],
+  body[data-mobile-responsive="on"] [data-auth-shell] :is(header, nav) button[aria-label="Close menu"],
+  body[data-mobile-responsive="on"] [data-auth-shell] :is(header, nav) button[aria-label="Toggle theme"],
+  body[data-mobile-responsive="on"] [data-auth-shell] :is(header, nav) button[aria-label^="Switch to "] {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  body[data-mobile-responsive="on"] [data-auth-shell] header [data-compact-hide] {
+    display: none;
+  }
+
+  body[data-mobile-responsive="on"] [data-responsive-page-header] {
+    align-items: stretch;
+    gap: 1rem;
+  }
+
+  body[data-mobile-responsive="on"] [data-responsive-actions] {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    width: 100%;
+  }
+
+  body[data-mobile-responsive="on"] [data-responsive-tabs] {
+    scroll-padding-inline: 1rem;
+    overscroll-behavior-inline: contain;
+  }
+
+  body[data-mobile-responsive="on"] [data-touch-target] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
 /* --- Smooth scroll & reduced-motion --- */
 html {
   scroll-behavior: smooth;

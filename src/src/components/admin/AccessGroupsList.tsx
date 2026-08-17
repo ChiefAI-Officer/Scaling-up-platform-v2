@@ -31,6 +31,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
+import { ResponsiveDataView } from "@/components/ui/responsive-data-view";
+import {
+  ResponsiveRecord,
+  ResponsiveRecordActions,
+  ResponsiveRecordHeader,
+  ResponsiveRecordMeta,
+} from "@/components/ui/responsive-record";
 
 interface AccessGroupRow {
   id: string;
@@ -62,7 +69,11 @@ function formatRelative(iso: string): string {
   return `${year} year${year === 1 ? "" : "s"} ago`;
 }
 
-export function AccessGroupsList() {
+export function AccessGroupsList({
+  responsiveEnabled = false,
+}: {
+  responsiveEnabled?: boolean;
+} = {}) {
   const router = useRouter();
   const { toast } = useToast();
   const [groups, setGroups] = useState<AccessGroupRow[]>([]);
@@ -146,12 +157,12 @@ export function AccessGroupsList() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="wf-page-action-row">
+    <div className={responsiveEnabled ? "min-w-0 space-y-6" : "space-y-6"}>
+      <div className={responsiveEnabled ? "wf-page-action-row flex flex-wrap" : "wf-page-action-row"}>
         <button
           type="button"
           onClick={() => setCreateOpen(true)}
-          className="wf-btn wf-btn-primary"
+          className={responsiveEnabled ? "wf-btn wf-btn-primary min-h-11" : "wf-btn wf-btn-primary"}
         >
           + New Access Group
         </button>
@@ -168,8 +179,8 @@ export function AccessGroupsList() {
         </p>
       </div>
 
-      <div className="flex items-center justify-between">
-        <label className="inline-flex items-center gap-2 text-sm text-foreground">
+      <div className={responsiveEnabled ? "flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" : "flex items-center justify-between"}>
+        <label className={responsiveEnabled ? "inline-flex min-h-11 items-center gap-2 text-sm text-foreground" : "inline-flex items-center gap-2 text-sm text-foreground"}>
           <input
             type="checkbox"
             className="h-4 w-4 rounded border-input"
@@ -190,6 +201,52 @@ export function AccessGroupsList() {
         </div>
       )}
 
+      <ResponsiveDataView
+        enabled={responsiveEnabled}
+        label="Access groups"
+        wideFrom="lg"
+        wideRegionLabel="Access groups table"
+        compact={
+          <div className="space-y-3">
+            {groups.map((g) => {
+              const archived = !!g.deletedAt;
+              return (
+                <ResponsiveRecord
+                  key={g.id}
+                  aria-label={g.name}
+                  className={archived ? "opacity-60" : undefined}
+                >
+                  <ResponsiveRecordHeader
+                    title={g.name}
+                    status={archived ? <span className="text-xs italic text-muted-foreground">Archived</span> : <span className="text-xs text-success">Active</span>}
+                  />
+                  <p className="mt-2 break-words text-sm text-muted-foreground">
+                    {g.description ?? "—"}
+                  </p>
+                  <ResponsiveRecordMeta
+                    items={[
+                      { label: "Coaches", value: archived ? "—" : g.coachCount },
+                      { label: "Templates", value: archived ? "—" : g.templateCount },
+                      { label: "Updated", value: archived ? "—" : formatRelative(g.updatedAt) },
+                    ]}
+                  />
+                  <ResponsiveRecordActions
+                    primary={
+                      <Link
+                        href={`/admin/assessments/access-groups/${g.id}`}
+                        aria-label={`Manage ${g.name}`}
+                        className="inline-flex items-center justify-center rounded-md bg-primary px-4 text-primary-foreground"
+                      >
+                        Manage
+                      </Link>
+                    }
+                  />
+                </ResponsiveRecord>
+              );
+            })}
+          </div>
+        }
+        wide={
       <Table>
         <TableHeader>
           <TableRow>
@@ -224,7 +281,7 @@ export function AccessGroupsList() {
                 <TableCell>
                   <Link
                     href={`/admin/assessments/access-groups/${g.id}`}
-                    className={`text-primary hover:underline ${
+                    className={`${responsiveEnabled ? "inline-flex min-h-11 items-center" : ""} text-primary hover:underline ${
                       archived ? "italic" : ""
                     }`}
                   >
@@ -247,7 +304,7 @@ export function AccessGroupsList() {
                 <TableCell className="text-right">
                   <Link
                     href={`/admin/assessments/access-groups/${g.id}`}
-                    className="text-primary hover:underline"
+                    className={responsiveEnabled ? "inline-flex min-h-11 items-center text-primary hover:underline" : "text-primary hover:underline"}
                     aria-label={`Manage ${g.name}`}
                   >
                     Manage ›
@@ -258,6 +315,8 @@ export function AccessGroupsList() {
           })}
         </TableBody>
       </Table>
+        }
+      />
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>

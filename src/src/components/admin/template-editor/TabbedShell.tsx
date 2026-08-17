@@ -328,6 +328,8 @@ export interface TabbedShellProps {
    * inert today (accepted + defaulted, not yet read). Presentation-only.
    */
   previewSettingsEnabled?: boolean;
+  /** Mobile-responsive presentation gate. Default false preserves editor DOM/classes. */
+  mobileResponsiveEnabled?: boolean;
   /**
    * Template-creation simplification — server-computed and forwarded only to
    * the existing Scoring & Tiers tab. Default false preserves legacy copy.
@@ -455,6 +457,7 @@ export function TabbedShell({
   // it feeds `ed10Active` (below), which humanizes the header pills; Task 10
   // mounts the Preview + Settings tabs when `ed10Active`.
   previewSettingsEnabled = false,
+  mobileResponsiveEnabled = false,
   plainLanguageScoringEnabled = false,
   reportStylesEnabled = false,
   adminOwnedPresentationEnabled = false,
@@ -737,10 +740,29 @@ export function TabbedShell({
   }, [versionLifecycleEnabled, allVersions, version.id, isPublished]);
 
   return (
-    <div className="space-y-6">
+    <div
+      className={
+        mobileResponsiveEnabled
+          ? "template-editor-responsive min-w-0 max-w-full space-y-6"
+          : "space-y-6"
+      }
+      {...(mobileResponsiveEnabled ? { "data-responsive-editor": "" } : {})}
+    >
       {/* ───────── Header (WF16/17/18 page-header-row) ───────── */}
-      <header className="wf-page-header-row">
-        <div className="wf-page-title-block">
+      <header
+        className={
+          mobileResponsiveEnabled
+            ? "wf-page-header-row min-w-0 flex-col sm:flex-row"
+            : "wf-page-header-row"
+        }
+      >
+        <div
+          className={
+            mobileResponsiveEnabled
+              ? "wf-page-title-block min-w-0 max-w-full break-words"
+              : "wf-page-title-block"
+          }
+        >
           {/* Wave ED9 (spec 19al-plan, T11, D1) — hide the page-header title
               EXACTLY when the Google-Forms Build body is active (flag ON +
               single mode); the FormHeaderCard hero owns the title there. Must
@@ -778,7 +800,16 @@ export function TabbedShell({
           </div>
         </div>
 
-        <div className="wf-page-action-row">
+        <div
+          className={
+            mobileResponsiveEnabled
+              ? "wf-page-action-row min-w-0 w-full flex-col items-stretch sm:w-auto sm:flex-row sm:items-center"
+              : "wf-page-action-row"
+          }
+          {...(mobileResponsiveEnabled
+            ? { "data-testid": "template-editor-actions" }
+            : {})}
+        >
           {safeToPublishAvailable && (
             <SafeToPublishBadge
               questions={questions}
@@ -790,13 +821,18 @@ export function TabbedShell({
               publishedOptionKeys={publishedOptionKeys}
               dirty={badgeDirty}
               isDirty={isAnyDirty}
+              responsiveEnabled={mobileResponsiveEnabled}
             />
           )}
           {testModeAvailable && (
             <button
               type="button"
               onClick={() => setTestModeOpen(true)}
-              className="wf-btn wf-btn-secondary wf-btn-sm"
+              className={
+                mobileResponsiveEnabled
+                  ? "wf-btn wf-btn-secondary wf-btn-sm min-h-11 min-w-11"
+                  : "wf-btn wf-btn-secondary wf-btn-sm"
+              }
               data-testid="template-editor-test-mode-btn"
             >
               Test Mode
@@ -806,7 +842,11 @@ export function TabbedShell({
             type="button"
             onClick={handleSaveDraft}
             disabled={isPublished || savingDraft || !isAnyDirty}
-            className="wf-btn wf-btn-secondary wf-btn-sm"
+            className={
+              mobileResponsiveEnabled
+                ? "wf-btn wf-btn-secondary wf-btn-sm min-h-11 min-w-11"
+                : "wf-btn wf-btn-secondary wf-btn-sm"
+            }
             data-testid="template-editor-save-draft-btn"
           >
             {savingDraft ? (
@@ -819,7 +859,11 @@ export function TabbedShell({
             onClick={handlePublish}
             disabled={isPublished || publishing}
             data-testid="template-editor-publish-btn"
-            className="wf-btn wf-btn-primary wf-btn-sm"
+            className={
+              mobileResponsiveEnabled
+                ? "wf-btn wf-btn-primary wf-btn-sm min-h-11 min-w-11"
+                : "wf-btn wf-btn-primary wf-btn-sm"
+            }
           >
             {publishing ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -854,34 +898,71 @@ export function TabbedShell({
         onValueChange={handleTabChange}
         aria-label="Template editor tabs"
       >
-        <TabsList className="mb-6">
+        <TabsList
+          className={
+            mobileResponsiveEnabled
+              ? "mb-6 min-w-0 max-w-full w-full overflow-x-auto"
+              : "mb-6"
+          }
+          {...(mobileResponsiveEnabled
+            ? {
+                "aria-label": "Template editor tabs",
+                "data-responsive-tabs": "",
+              }
+            : {})}
+        >
           {/* ED10 (spec 19am-plan, T10) — Metadata folds into Settings and a
               Preview tab leads. Flag OFF ⇒ the Metadata trigger renders EXACTLY
               as today (byte-identical). */}
           {ed10Active ? (
-            <TabsTrigger value="preview">
+            <TabsTrigger
+              value="preview"
+              {...(mobileResponsiveEnabled
+                ? { className: "min-h-11 min-w-11" }
+                : {})}
+            >
               {TAB_LABELS.preview}
             </TabsTrigger>
           ) : (
-            <TabsTrigger value="metadata">
+            <TabsTrigger
+              value="metadata"
+              {...(mobileResponsiveEnabled
+                ? { className: "min-h-11 min-w-11" }
+                : {})}
+            >
               {TAB_LABELS.metadata}
             </TabsTrigger>
           )}
           {/* ED6 — single-column folds Sections into the Build tab, so its
               trigger disappears in single mode. Three/legacy render it. */}
           {activeAuthoringMode !== "single" && (
-            <TabsTrigger value="sections">
+            <TabsTrigger
+              value="sections"
+              {...(mobileResponsiveEnabled
+                ? { className: "min-h-11 min-w-11" }
+                : {})}
+            >
               {TAB_LABELS.sections}
             </TabsTrigger>
           )}
-          <TabsTrigger value="questions">
+          <TabsTrigger
+            value="questions"
+            {...(mobileResponsiveEnabled
+              ? { className: "min-h-11 min-w-11" }
+              : {})}
+          >
             {activeAuthoringMode === "single"
               ? "Build"
               : activeAuthoringMode === "three"
                 ? "Edit"
                 : TAB_LABELS.questions}
           </TabsTrigger>
-          <TabsTrigger value="scoring">
+          <TabsTrigger
+            value="scoring"
+            {...(mobileResponsiveEnabled
+              ? { className: "min-h-11 min-w-11" }
+              : {})}
+          >
             {TAB_LABELS.scoring}
           </TabsTrigger>
           {/* ED10 (spec 19am-plan, T10) — the Settings tab takes the Access
@@ -896,7 +977,12 @@ export function TabbedShell({
               semantics correct we mark it as a tab but override its
               click to navigate instead of switching panels. */}
           {ed10Active ? (
-            <TabsTrigger value="settings">
+            <TabsTrigger
+              value="settings"
+              {...(mobileResponsiveEnabled
+                ? { className: "min-h-11 min-w-11" }
+                : {})}
+            >
               {TAB_LABELS.settings}
             </TabsTrigger>
           ) : (
@@ -905,12 +991,21 @@ export function TabbedShell({
               role="tab"
               aria-selected="false"
               data-testid="template-editor-access-link"
-              className="inline-flex items-center gap-1.5 whitespace-nowrap px-0.5 py-2.5 text-sm font-medium text-muted-foreground border-b-2 border-transparent hover:text-foreground"
+              className={
+                mobileResponsiveEnabled
+                  ? "inline-flex min-h-11 min-w-11 items-center gap-1.5 whitespace-nowrap px-0.5 py-2.5 text-sm font-medium text-muted-foreground border-b-2 border-transparent hover:text-foreground"
+                  : "inline-flex items-center gap-1.5 whitespace-nowrap px-0.5 py-2.5 text-sm font-medium text-muted-foreground border-b-2 border-transparent hover:text-foreground"
+              }
             >
               Access
             </Link>
           )}
-          <TabsTrigger value="versions">
+          <TabsTrigger
+            value="versions"
+            {...(mobileResponsiveEnabled
+              ? { className: "min-h-11 min-w-11" }
+              : {})}
+          >
             {TAB_LABELS.versions}
           </TabsTrigger>
         </TabsList>
@@ -1020,6 +1115,7 @@ export function TabbedShell({
                   publishedOptionKeys={publishedOptionKeys}
                   onGoToSections={() => handleTabChange("sections")}
                   adminOwnedPresentationEnabled={adminOwnedPresentationEnabled}
+                  responsiveEnabled={mobileResponsiveEnabled}
                 />
               ) : (
                 <SingleColumnFormBuilder
@@ -1030,6 +1126,7 @@ export function TabbedShell({
                   conditionalEnabled={conditionalAuthoringEnabled}
                   publishedOptionKeys={publishedOptionKeys}
                   onGoToSections={() => handleTabChange("sections")}
+                  responsiveEnabled={mobileResponsiveEnabled}
                 />
               )
             ) : threePaneEnabled ? (

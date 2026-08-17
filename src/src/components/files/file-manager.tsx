@@ -3,24 +3,14 @@
 import { useState, useRef } from "react";
 import { upload } from "@vercel/blob/client";
 import { sanitizeFilename, validateFile } from "@/lib/files/file-rules";
-import { formatTimestamp } from "@/lib/utils";
-
-interface FileRecord {
-  id: string;
-  filename: string;
-  downloadUrl: string;
-  blobUrl?: string | null;
-  contentType: string;
-  sizeBytes: number;
-  workshopId: string | null;
-  workshopCode: string | null;
-  workflowStepId: string | null;
-  uploadedBy: string;
-  category: string | null;
-  createdAt: string;
-  workshop: { id: string; title: string; workshopCode: string } | null;
-  workflowStep: { id: string; stepType: string; subject: string | null } | null;
-}
+import { cn, formatTimestamp } from "@/lib/utils";
+import { ResponsiveDataView } from "@/components/ui/responsive-data-view";
+import {
+  FileRecordCard,
+  formatFileSize,
+  getFileIcon,
+  type FileRecord,
+} from "@/components/files/file-record-card";
 
 interface Workshop {
   id: string;
@@ -28,9 +18,10 @@ interface Workshop {
   workshopCode: string;
 }
 
-interface Props {
+export interface FileManagerProps {
   initialFiles: FileRecord[];
   workshops: Workshop[];
+  responsiveEnabled?: boolean;
 }
 
 const FILE_CATEGORIES = [
@@ -43,23 +34,11 @@ const FILE_CATEGORIES = [
   { value: "other", label: "Other" },
 ];
 
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function getFileIcon(contentType: string): string {
-  if (contentType.startsWith("image/")) return "🖼️";
-  if (contentType === "application/pdf") return "📄";
-  if (contentType.includes("spreadsheet") || contentType.includes("excel")) return "📊";
-  if (contentType.includes("presentation") || contentType.includes("powerpoint")) return "📽️";
-  if (contentType.includes("word") || contentType.includes("document")) return "📝";
-  if (contentType.startsWith("text/")) return "📃";
-  return "📎";
-}
-
-export function FileManager({ initialFiles, workshops }: Props) {
+export function FileManager({
+  initialFiles,
+  workshops,
+  responsiveEnabled = false,
+}: FileManagerProps) {
   const [files, setFiles] = useState<FileRecord[]>(initialFiles);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
@@ -210,7 +189,13 @@ export function FileManager({ initialFiles, workshops }: Props) {
       {/* Upload Form */}
       <div className="rounded-lg bg-card p-6 shadow">
         <h2 className="text-lg font-medium text-foreground mb-4">Upload File</h2>
-        <form onSubmit={handleUpload} className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+        <form
+          onSubmit={handleUpload}
+          className={cn(
+            "grid grid-cols-1 gap-4 sm:grid-cols-4",
+            responsiveEnabled && "sm:grid-cols-2 lg:grid-cols-4",
+          )}
+        >
           <div className="sm:col-span-2">
             <label htmlFor="file-input" className="block text-sm font-medium text-foreground mb-1">
               File (max 250MB)
@@ -219,7 +204,10 @@ export function FileManager({ initialFiles, workshops }: Props) {
               id="file-input"
               ref={fileInputRef}
               type="file"
-              className="block w-full text-sm text-muted-foreground file:mr-4 file:rounded-md file:border-0 file:bg-primary/10 file:px-4 file:py-2 file:text-sm file:font-medium file:text-primary hover:file:bg-primary/15"
+              className={cn(
+                "block w-full text-sm text-muted-foreground file:mr-4 file:rounded-md file:border-0 file:bg-primary/10 file:px-4 file:py-2 file:text-sm file:font-medium file:text-primary hover:file:bg-primary/15",
+                responsiveEnabled && "min-w-0 max-w-full file:min-h-11",
+              )}
             />
           </div>
 
@@ -231,7 +219,7 @@ export function FileManager({ initialFiles, workshops }: Props) {
               id="upload-workshop"
               value={uploadWorkshopId}
               onChange={(e) => setUploadWorkshopId(e.target.value)}
-              className="block w-full rounded-md border-border text-sm shadow-sm focus:border-primary focus:ring-primary"
+              className={cn("block w-full rounded-md border-border text-sm shadow-sm focus:border-primary focus:ring-primary", responsiveEnabled && "min-h-11 min-w-0")}
             >
               <option value="">No workshop</option>
               {workshops.map((w) => (
@@ -250,7 +238,7 @@ export function FileManager({ initialFiles, workshops }: Props) {
               id="upload-category"
               value={uploadCategory}
               onChange={(e) => setUploadCategory(e.target.value)}
-              className="block w-full rounded-md border-border text-sm shadow-sm focus:border-primary focus:ring-primary"
+              className={cn("block w-full rounded-md border-border text-sm shadow-sm focus:border-primary focus:ring-primary", responsiveEnabled && "min-h-11 min-w-0")}
             >
               {FILE_CATEGORIES.map((c) => (
                 <option key={c.value} value={c.value}>
@@ -260,11 +248,11 @@ export function FileManager({ initialFiles, workshops }: Props) {
             </select>
           </div>
 
-          <div className="sm:col-span-4 flex items-center gap-4">
+          <div className={cn("sm:col-span-4 flex items-center gap-4", responsiveEnabled && "sm:col-span-2 lg:col-span-4")}>
             <button
               type="submit"
               disabled={uploading}
-              className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              className={cn("inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50", responsiveEnabled && "min-h-11 justify-center")}
             >
               {uploading
                 ? uploadProgress !== null
@@ -290,12 +278,12 @@ export function FileManager({ initialFiles, workshops }: Props) {
 
       {/* Filters */}
       <div className="rounded-lg bg-card p-4 shadow">
-        <div className="flex flex-wrap items-center gap-4">
+        <div className={cn("flex flex-wrap items-center gap-4", responsiveEnabled && "flex-col items-stretch sm:flex-row sm:items-center")}>
           <span className="text-sm font-medium text-foreground">Filter:</span>
           <select
             value={filterWorkshop}
             onChange={(e) => setFilterWorkshop(e.target.value)}
-            className="rounded-md border-border text-sm shadow-sm focus:border-primary focus:ring-primary"
+            className={cn("rounded-md border-border text-sm shadow-sm focus:border-primary focus:ring-primary", responsiveEnabled && "min-h-11 min-w-0 w-full max-w-full sm:w-auto sm:max-w-none")}
           >
             <option value="">All workshops</option>
             {workshops.map((w) => (
@@ -307,7 +295,7 @@ export function FileManager({ initialFiles, workshops }: Props) {
           <select
             value={filterCategory}
             onChange={(e) => setFilterCategory(e.target.value)}
-            className="rounded-md border-border text-sm shadow-sm focus:border-primary focus:ring-primary"
+            className={cn("rounded-md border-border text-sm shadow-sm focus:border-primary focus:ring-primary", responsiveEnabled && "min-h-11 min-w-0 w-full max-w-full sm:w-auto sm:max-w-none")}
           >
             <option value="">All categories</option>
             {FILE_CATEGORIES.filter((c) => c.value).map((c) => (
@@ -332,7 +320,29 @@ export function FileManager({ initialFiles, workshops }: Props) {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <ResponsiveDataView
+            enabled={responsiveEnabled}
+            label="Files"
+            compact={
+              <div className="space-y-3 p-3">
+                {filteredFiles.map((file) => (
+                  <FileRecordCard
+                    key={file.id}
+                    file={file}
+                    deleting={deletingId === file.id}
+                    onEdit={openEdit}
+                    onDelete={handleDelete}
+                  />
+                ))}
+              </div>
+            }
+            wide={
+          <div
+            className="overflow-x-auto"
+            role={responsiveEnabled ? "region" : undefined}
+            aria-label={responsiveEnabled ? "File table" : undefined}
+            tabIndex={responsiveEnabled ? 0 : undefined}
+          >
             <table className="min-w-full divide-y divide-border">
               <thead className="bg-muted">
                 <tr>
@@ -441,13 +451,15 @@ export function FileManager({ initialFiles, workshops }: Props) {
               </tbody>
             </table>
           </div>
+            }
+          />
         )}
       </div>
 
       {/* MR-41: Edit file metadata modal */}
       {editingFile && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-card rounded-lg shadow-lg w-full max-w-sm p-6 space-y-4">
+        <div className={cn("fixed inset-0 z-50 flex items-center justify-center bg-black/40", responsiveEnabled && "p-4")}>
+          <div className={cn("bg-card rounded-lg shadow-lg w-full max-w-sm p-6 space-y-4", responsiveEnabled && "min-w-0 max-h-[calc(100dvh-2rem)] overflow-y-auto")}>
             <h3 className="text-base font-semibold text-foreground">Edit File Metadata</h3>
             <p className="text-sm text-muted-foreground truncate">{editingFile.filename}</p>
 
@@ -457,7 +469,7 @@ export function FileManager({ initialFiles, workshops }: Props) {
                 <select
                   value={editWorkshopId}
                   onChange={(e) => setEditWorkshopId(e.target.value)}
-                  className="block w-full rounded-md border border-border px-3 py-2 text-sm"
+                  className={cn("block w-full rounded-md border border-border px-3 py-2 text-sm", responsiveEnabled && "min-h-11 min-w-0")}
                 >
                   <option value="">No workshop</option>
                   {workshops.map((w) => (
@@ -472,7 +484,7 @@ export function FileManager({ initialFiles, workshops }: Props) {
                 <select
                   value={editCategory}
                   onChange={(e) => setEditCategory(e.target.value)}
-                  className="block w-full rounded-md border border-border px-3 py-2 text-sm"
+                  className={cn("block w-full rounded-md border border-border px-3 py-2 text-sm", responsiveEnabled && "min-h-11 min-w-0")}
                 >
                   {FILE_CATEGORIES.map((c) => (
                     <option key={c.value} value={c.value}>{c.label}</option>
@@ -481,17 +493,17 @@ export function FileManager({ initialFiles, workshops }: Props) {
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2">
+            <div className={cn("flex justify-end gap-2 pt-2", responsiveEnabled && "flex-col sm:flex-row")}>
               <button
                 onClick={() => setEditingFile(null)}
-                className="rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-accent"
+                className={cn("rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-accent", responsiveEnabled && "min-h-11")}
               >
                 Cancel
               </button>
               <button
                 onClick={handleSaveEdit}
                 disabled={saving}
-                className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                className={cn("rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50", responsiveEnabled && "min-h-11")}
               >
                 {saving ? "Saving…" : "Save"}
               </button>

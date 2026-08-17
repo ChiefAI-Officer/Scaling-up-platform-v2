@@ -10,6 +10,7 @@ import { isReferredResultsEnabled } from "@/lib/assessments/wave-83-flags";
 import { getApiActor } from "@/lib/auth/authorization";
 import { isCoachCurrentlyCertified } from "@/lib/auth/coach-status";
 import { db } from "@/lib/db";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 
 const APP_URL =
   process.env.APP_URL || "https://scaling-up-platform-v2.vercel.app";
@@ -76,6 +77,7 @@ export default async function ReferredResultsPage({
     resolveActivePublicCampaigns(),
     searchParams,
   ]);
+  const mobileResponsiveEnabled = isMobileResponsiveEnabled();
   const coachLinks: PublicAssessmentCoachLink[] = coach.email
     ? publicCampaigns.map((campaign) => ({
         campaignId: campaign.id,
@@ -86,13 +88,13 @@ export default async function ReferredResultsPage({
     : [];
 
   return (
-    <div className="space-y-6">
+    <div className={mobileResponsiveEnabled ? "min-w-0 max-w-full space-y-6" : "space-y-6"}>
       <FadeUp>
         <div>
           <p className="mb-2 text-xs text-muted-foreground">
             Assessments / Referred Results
           </p>
-          <h1 className="font-serif text-3xl font-medium text-foreground">
+          <h1 className={mobileResponsiveEnabled ? "break-words font-serif text-3xl font-medium text-foreground" : "font-serif text-3xl font-medium text-foreground"}>
             Referred Results
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">

@@ -18,17 +18,24 @@ import { cn } from "@/lib/utils";
  */
 const Tabs = TabsPrimitive.Root;
 
+type TabsListProps = React.ComponentPropsWithoutRef<typeof TabsPrimitive.List> & {
+  responsiveEnabled?: boolean;
+};
+
 const TabsList = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.List>,
-  React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>
->(({ className, ...props }, ref) => (
+  TabsListProps
+>(({ className, responsiveEnabled = false, ...props }, ref) => (
   <TabsPrimitive.List
     ref={ref}
+    {...props}
+    {...(responsiveEnabled
+      ? { "aria-label": "Scrollable sections", "data-responsive-tabs": "" }
+      : {})}
     className={cn(
       "flex items-center gap-5 border-b border-border overflow-x-auto",
       className,
     )}
-    {...props}
   />
 ));
 TabsList.displayName = TabsPrimitive.List.displayName;

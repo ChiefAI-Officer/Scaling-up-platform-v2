@@ -1,8 +1,23 @@
 import * as React from "react";
+import { cn } from "@/lib/utils";
 
-const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
-  ({ className, ...props }, ref) => (
-    <div className="relative w-full overflow-auto rounded-lg border">
+interface TableProps extends React.HTMLAttributes<HTMLTableElement> {
+  regionLabel?: string;
+  containerClassName?: string;
+  responsiveEnabled?: boolean;
+}
+
+const Table = React.forwardRef<HTMLTableElement, TableProps>(
+  ({ className, regionLabel, containerClassName, responsiveEnabled = false, ...props }, ref) => (
+    <div
+      role={responsiveEnabled && regionLabel ? "region" : undefined}
+      aria-label={responsiveEnabled ? regionLabel : undefined}
+      tabIndex={responsiveEnabled && regionLabel ? 0 : undefined}
+      data-responsive-data-region={responsiveEnabled ? "" : undefined}
+      className={responsiveEnabled
+        ? cn("relative w-full max-w-full overflow-auto rounded-lg border", containerClassName)
+        : "relative w-full overflow-auto rounded-lg border"}
+    >
       <table ref={ref} className={`w-full caption-bottom text-sm ${className || ""}`} {...props} />
     </div>
   )

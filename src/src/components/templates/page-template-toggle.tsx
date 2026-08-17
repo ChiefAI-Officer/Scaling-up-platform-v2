@@ -3,13 +3,16 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
+import { ResponsiveActionsItem } from "@/components/ui/responsive-actions-menu";
 
 interface PageTemplateToggleProps {
   templateId: string;
   isActive: boolean;
+  menuItem?: boolean;
+  responsiveEnabled?: boolean;
 }
 
-export function PageTemplateToggle({ templateId, isActive }: PageTemplateToggleProps) {
+export function PageTemplateToggle({ templateId, isActive, menuItem = false, responsiveEnabled = false }: PageTemplateToggleProps) {
   const [active, setActive] = useState(isActive);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -46,11 +49,23 @@ export function PageTemplateToggle({ templateId, isActive }: PageTemplateToggleP
     }
   };
 
+  if (menuItem) {
+    return (
+      <ResponsiveActionsItem
+        disabled={loading}
+        onSelect={() => void handleToggle()}
+        className="flex min-h-11 cursor-pointer items-center rounded-md px-3 text-sm outline-none focus:bg-accent disabled:pointer-events-none disabled:opacity-50"
+      >
+        {loading ? "Updating..." : active ? "Deactivate template" : "Activate template"}
+      </ResponsiveActionsItem>
+    );
+  }
+
   return (
     <button
       onClick={handleToggle}
       disabled={loading}
-      className={`inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium transition-all disabled:opacity-50 ${
+      className={`inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium transition-all disabled:opacity-50 ${responsiveEnabled ? "min-h-11 " : ""}${
         active
           ? "bg-success text-white hover:bg-success/90 shadow-sm"
           : "border border-primary text-primary hover:bg-primary hover:text-primary-foreground"

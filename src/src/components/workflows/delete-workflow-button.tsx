@@ -1,15 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { forwardRef, useState, type ButtonHTMLAttributes } from "react";
 import { useRouter } from "next/navigation";
+import { cn } from "@/lib/utils";
 
-interface Props {
+interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
   workflowId: string;
   workflowName: string;
   assignmentCount: number;
 }
 
-export function DeleteWorkflowButton({ workflowId, workflowName, assignmentCount }: Props) {
+export const DeleteWorkflowButton = forwardRef<HTMLButtonElement, Props>(function DeleteWorkflowButton(
+  { workflowId, workflowName, assignmentCount, className, disabled, onClick, ...buttonProps },
+  ref,
+) {
   const [deleting, setDeleting] = useState(false);
   const router = useRouter();
 
@@ -37,11 +41,17 @@ export function DeleteWorkflowButton({ workflowId, workflowName, assignmentCount
 
   return (
     <button
-      onClick={handleDelete}
-      disabled={deleting}
-      className="text-sm font-medium text-destructive hover:text-destructive/80 disabled:opacity-50"
+      {...buttonProps}
+      ref={ref}
+      type="button"
+      onClick={(event) => {
+        onClick?.(event);
+        if (!event.defaultPrevented) void handleDelete();
+      }}
+      disabled={deleting || disabled}
+      className={cn("text-sm font-medium text-destructive hover:text-destructive/80 disabled:opacity-50", className)}
     >
       {deleting ? "Deleting…" : "Delete"}
     </button>
   );
-}
+});

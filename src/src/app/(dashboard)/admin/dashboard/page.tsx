@@ -2,9 +2,11 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { db } from "@/lib/db";
-import { getWorkshopStatusColor, getWorkshopStatusLabel, formatCurrency } from "@/lib/utils";
+import { cn, getWorkshopStatusColor, getWorkshopStatusLabel, formatCurrency } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { FadeUp, StaggerContainer, StaggerItem } from "@/components/ui/animated";
+import { PageHeader } from "@/components/ui/page-header";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 
 const PIPELINE_STAGES = [
   { status: "INFO_REQUESTED", icon: "📝" },
@@ -42,6 +44,7 @@ export default async function AdminDashboardPage({
 }: {
   searchParams: Promise<{ activity?: string }>;
 }) {
+  const mobileResponsiveEnabled = isMobileResponsiveEnabled();
   const { activity } = await searchParams;
   const showExtendedActivity = activity === "more";
   const activityTake = showExtendedActivity ? 9 : 6;
@@ -138,7 +141,32 @@ export default async function AdminDashboardPage({
   return (
     <div className="space-y-6">
       <FadeUp>
-        <div className="flex items-center justify-between">
+        {mobileResponsiveEnabled ? (
+          <PageHeader
+            responsiveEnabled
+            title="Admin Dashboard"
+            actions={
+              <>
+                <Link
+                  href="/admin/approvals"
+                  className="inline-flex min-h-11 min-w-0 items-center justify-center rounded-lg bg-primary px-3 py-2 text-center text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                  data-touch-target
+                >
+                  Review Approvals {pendingApprovals > 0 && `(${pendingApprovals})`}
+                </Link>
+                <Link
+                  href="/admin/financials"
+                  aria-label="Financial Dashboard"
+                  className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-border bg-card px-3 py-2 text-center text-sm font-medium text-foreground hover:bg-accent max-[399px]:px-2"
+                  data-touch-target
+                >
+                  <span className="max-[399px]:sr-only">Financial </span>Dashboard
+                </Link>
+              </>
+            }
+          />
+        ) : (
+          <div className="flex items-center justify-between">
           <h2 className="text-2xl font-bold text-foreground">Admin Dashboard</h2>
           <div className="flex gap-3">
             <Link
@@ -154,11 +182,12 @@ export default async function AdminDashboardPage({
               Financial Dashboard
             </Link>
           </div>
-        </div>
+          </div>
+        )}
       </FadeUp>
 
       {/* Top-level Stats */}
-      <StaggerContainer className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <StaggerContainer className={cn("grid gap-4 sm:grid-cols-2 xl:grid-cols-4", mobileResponsiveEnabled && "grid-cols-1 min-[400px]:grid-cols-2")}>
         <StaggerItem>
           <StatCard label="Pending Approvals" value={pendingApprovals} urgent={pendingApprovals > 0} />
         </StaggerItem>
@@ -220,8 +249,8 @@ export default async function AdminDashboardPage({
             <>
               <ul className="divide-y divide-border">
                 {activities.map((activity) => (
-                  <li key={activity.id} className="flex items-start justify-between py-3">
-                    <div className="pr-4">
+                  <li key={activity.id} className={cn("flex items-start justify-between py-3", mobileResponsiveEnabled && "min-w-0 flex-col gap-2 sm:flex-row")}>
+                    <div className={cn("pr-4", mobileResponsiveEnabled && "min-w-0 break-words")}>
                       <span
                         className={`mr-2 inline-flex rounded px-2 py-1 text-xs font-medium ${
                           activity.type === "APPROVAL"
@@ -245,7 +274,7 @@ export default async function AdminDashboardPage({
                 <div className="mt-3 pt-3 border-t border-border text-center">
                   <Link
                     href="/admin/dashboard?activity=more"
-                    className="text-sm text-primary hover:text-primary/80 font-medium"
+                    className={cn("text-sm text-primary hover:text-primary/80 font-medium", mobileResponsiveEnabled && "inline-flex min-h-11 items-center justify-center")}
                   >
                     Show next 10
                   </Link>

@@ -9,6 +9,7 @@ interface Props {
   initialBody: string;
   // null = no row yet; the helper falls back to hardcoded defaults.
   version: number | null;
+  responsiveEnabled?: boolean;
 }
 
 export function TransactionalEmailEditor({
@@ -16,6 +17,7 @@ export function TransactionalEmailEditor({
   initialSubject,
   initialBody,
   version,
+  responsiveEnabled = false,
 }: Props) {
   const router = useRouter();
   const [subject, setSubject] = useState(initialSubject);
@@ -68,7 +70,7 @@ export function TransactionalEmailEditor({
   }
 
   return (
-    <div className="space-y-4 rounded-lg border border-border bg-card p-6">
+    <div className={responsiveEnabled ? "min-w-0 max-w-full space-y-4 rounded-lg border border-border bg-card p-4 sm:p-6" : "space-y-4 rounded-lg border border-border bg-card p-6"}>
       <div className="space-y-1">
         <label className="text-sm font-medium" htmlFor="subject">
           Subject
@@ -77,7 +79,7 @@ export function TransactionalEmailEditor({
           id="subject"
           value={subject}
           onChange={(e) => setSubject(e.target.value)}
-          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+          className={responsiveEnabled ? "min-h-11 w-full min-w-0 max-w-full rounded-md border border-border bg-background px-3 py-2 text-sm" : "w-full rounded-md border border-border bg-background px-3 py-2 text-sm"}
           maxLength={200}
         />
       </div>
@@ -91,24 +93,24 @@ export function TransactionalEmailEditor({
           value={body}
           onChange={(e) => setBody(e.target.value)}
           rows={18}
-          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm font-mono"
+          className={responsiveEnabled ? "w-full min-w-0 max-w-full rounded-md border border-border bg-background px-3 py-2 text-sm font-mono" : "w-full rounded-md border border-border bg-background px-3 py-2 text-sm font-mono"}
         />
         <p className="text-xs text-muted-foreground">
           Raw HTML. Token values are HTML-escaped before insertion at send time.
         </p>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className={responsiveEnabled ? "flex min-w-0 flex-col items-stretch gap-3 sm:flex-row sm:items-center" : "flex items-center gap-3"}>
         <button
           onClick={handleSave}
           disabled={busy}
-          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+          className={`${responsiveEnabled ? "min-h-11 " : ""}rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50`}
         >
           {busy ? "Saving…" : "Save"}
         </button>
         {message && (
           <span
-            className={`text-sm ${
+            className={`${responsiveEnabled ? "break-words " : ""}text-sm ${
               message.type === "success" ? "text-success" : "text-destructive"
             }`}
           >
@@ -116,7 +118,7 @@ export function TransactionalEmailEditor({
           </span>
         )}
         {version !== null && (
-          <span className="ml-auto text-xs text-muted-foreground">v{version}</span>
+          <span className={responsiveEnabled ? "text-xs text-muted-foreground sm:ml-auto" : "ml-auto text-xs text-muted-foreground"}>v{version}</span>
         )}
       </div>
     </div>

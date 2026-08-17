@@ -2,9 +2,12 @@ import { requireCoach } from "@/lib/auth/authorization";
 import { getCoachBioMissingFields } from "@/lib/validations";
 import ChangePasswordForm from "@/components/auth/change-password-form";
 import { CoachProfileForm } from "@/components/coach/coach-profile-form";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
+import { cn } from "@/lib/utils";
 
 export default async function SettingsPage() {
     const { coach } = await requireCoach();
+    const mobileResponsiveEnabled = isMobileResponsiveEnabled();
 
     const missingFields = getCoachBioMissingFields(coach);
     const bioFields = [
@@ -48,6 +51,7 @@ export default async function SettingsPage() {
 
                 <CoachProfileForm
                     coachId={coach.id}
+                    responsiveEnabled={mobileResponsiveEnabled}
                     initialData={{
                         firstName: coach.firstName || "",
                         lastName: coach.lastName || "",
@@ -68,13 +72,13 @@ export default async function SettingsPage() {
                             Integration IDs
                         </h2>
                         <div className="space-y-2 text-sm">
-                            <div className="flex items-center justify-between">
+                            <div className={cn("flex items-center justify-between", mobileResponsiveEnabled && "flex-col items-start gap-1 sm:flex-row sm:items-center")}>
                                 <span className="text-muted-foreground">HubSpot Contact ID</span>
-                                <span className="font-mono text-foreground">{coach.hubspotId ?? "—"}</span>
+                                <span className={cn("font-mono text-foreground", mobileResponsiveEnabled && "break-all")}>{coach.hubspotId ?? "—"}</span>
                             </div>
-                            <div className="flex items-center justify-between">
+                            <div className={cn("flex items-center justify-between", mobileResponsiveEnabled && "flex-col items-start gap-1 sm:flex-row sm:items-center")}>
                                 <span className="text-muted-foreground">Circle Member ID</span>
-                                <span className="font-mono text-foreground">{coach.circleId ?? "—"}</span>
+                                <span className={cn("font-mono text-foreground", mobileResponsiveEnabled && "break-all")}>{coach.circleId ?? "—"}</span>
                             </div>
                         </div>
                     </div>

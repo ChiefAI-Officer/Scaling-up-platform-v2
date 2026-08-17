@@ -6,6 +6,15 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="mobile-responsive-foundation-release-candidate"></a>
+### 2026-08-17 — Mobile responsive foundation Production release candidate <!-- ENTRY_ISO:2026-08-17 ENTRY_SLUG:mobile-responsive-foundation-release-candidate -->
+
+**Status: USER-AUTHORIZED FOR PRODUCTION; PR/MERGE/FLAG ACTIVATION PENDING.** The first mobile implementation wave removes full-page horizontal overflow across authenticated ADMIN/STAFF and COACH surfaces while preserving the existing desktop product. Shared shells, page headers, responsive records/data views, compact actions, forms, dialogs, tables, reports, assessment editor surfaces, campaign workflows, workshops, people, files, registrations, surveys, workflows, transactional email administration, and financial controls now reflow or contain their own dense regions from phone through tablet widths. The current Production behavior remains unchanged until `WAVE_MOBILE_RESPONSIVE_ENABLED=1` is captured in a Production deployment; `WAVE_MOBILE_RESPONSIVE_KILL=1` remains the immediate rollback.
+
+**Compatibility and integration.** The release branch was merged forward through current protected `main`, preserving the newer campaign accordion, coach password actions and session revocation, current Referred Results link catalog, Scaling Up Full peer-report activation, and report print contracts. Flag-OFF markup and behavior remain explicitly covered, responsive report containment stays screen-only so print output is unaffected, and dense tables retain focused horizontal regions instead of forcing document-level overflow.
+
+**Verification.** The exact merged source passed **747/747 Jest suites, 9,013/9,013 tests, and 16/16 snapshots**. Branch-wide changed-TypeScript ESLint completed with **0 errors** (17 retained warnings), migration safety approved all **48 migrations**, and `git diff --check` passed. The Production-equivalent `CI=true npx next build --turbopack` compiled, passed TypeScript, and generated **94/94** pages after refreshing the local generated Prisma client from the merged schema; expected local missing-Inngest-key and missing-`DATABASE_URL` messages remained non-fatal. Browser acceptance covered the authenticated admin/coach route matrix at phone, tablet, desktop, and zoom widths on a flagged Preview; physical-device acceptance and Production authenticated smoke remain post-deployment gates for real testers.
+
 <a id="su-full-individual-peer-comparison-launched"></a>
 ### 2026-08-17 — Scaling Up Full individual peer comparison launched <!-- ENTRY_ISO:2026-08-17 ENTRY_SLUG:su-full-individual-peer-comparison-launched -->
 

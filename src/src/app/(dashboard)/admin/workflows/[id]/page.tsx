@@ -11,6 +11,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/auth";
 import { db } from "@/lib/db";
 import { WorkflowEditor } from "@/components/workflows/workflow-editor";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 
 interface WorkflowEditorPageProps {
   params: Promise<{ id: string }>;
@@ -26,6 +27,7 @@ export default async function WorkflowEditorPage({ params, searchParams }: Workf
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const isNew = id === "new";
   const isPreview = resolvedSearchParams.preview === "1";
+  const responsiveEnabled = isMobileResponsiveEnabled();
 
   if (isNew && isPreview) {
     redirect("/admin/workflows/new");
@@ -113,7 +115,10 @@ export default async function WorkflowEditorPage({ params, searchParams }: Workf
   }));
 
   return (
-    <div className="space-y-6">
+    <div className={responsiveEnabled
+      ? "min-w-0 max-w-full space-y-6 [&_button]:min-h-11 [&_select]:min-h-11 [&_input:not([type=checkbox])]:min-h-11 [&_label:has(input[type=checkbox])]:min-h-11"
+      : "space-y-6"}
+    >
       <WorkflowEditor
         workflow={serializedWorkflow}
         emailTemplates={emailTemplates}
@@ -121,6 +126,7 @@ export default async function WorkflowEditorPage({ params, searchParams }: Workf
         categories={categories}
         isNew={isNew}
         isPreview={isPreview}
+        responsiveEnabled={responsiveEnabled}
       />
     </div>
   );

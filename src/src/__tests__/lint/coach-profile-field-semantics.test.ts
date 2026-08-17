@@ -27,8 +27,10 @@ describe("coach profile field semantics", () => {
 
   it("shows both fields on coach creation and details", () => {
     const createPage = source("src/app/(dashboard)/coaches/new/page.tsx");
+    const createForm = source("src/app/(dashboard)/coaches/new/new-coach-form.tsx");
     const detailsPage = source("src/app/(dashboard)/coaches/[id]/page.tsx");
-    for (const page of [createPage, detailsPage]) {
+    expect(createPage).toContain("<NewCoachForm");
+    for (const page of [createForm, detailsPage]) {
       expect(page).toContain("Professional Title");
       expect(page).toContain("Company Name");
     }

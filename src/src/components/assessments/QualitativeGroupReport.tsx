@@ -352,7 +352,12 @@ function SectionBody({
 }) {
   switch (section.presentation) {
     case "metric-table":
-      return <MetricTableSection section={section} respondents={respondents} />;
+      return (
+        <MetricTableSection
+          section={section}
+          respondents={respondents}
+        />
+      );
     case "rating":
       return <RatingSectionBlock section={section} />;
     case "choices":
@@ -367,6 +372,7 @@ function SectionBody({
 
 export function QualitativeGroupReport(props: GroupReportProps) {
   const { report } = props;
+  const responsiveEnabled = props.responsiveEnabled === true;
   const hasCeo = cohortHasCeo(report);
   const sections = report.qualitative?.sections ?? [];
   // Wave L (L4b): LVA renders a verbatim Esperto intro under each section
@@ -377,6 +383,7 @@ export function QualitativeGroupReport(props: GroupReportProps) {
     <div
       className="su-public-brand su-report"
       data-testid="qualitative-group-report"
+      data-responsive-report={responsiveEnabled ? "" : undefined}
     >
       <GroupReportCover
         assessmentName={props.assessmentName}
@@ -405,9 +412,20 @@ export function QualitativeGroupReport(props: GroupReportProps) {
               const intro = isLva ? lvaSectionIntro(section.stableKey) : null;
               return (
                 <section
-                  className="su-group-sec"
+                  className={
+                    responsiveEnabled && section.presentation === "metric-table"
+                      ? "su-group-sec su-report-data-region"
+                      : "su-group-sec"
+                  }
                   key={section.stableKey}
                   data-testid={`group-section-${section.stableKey}`}
+                  {...(responsiveEnabled && section.presentation === "metric-table"
+                    ? {
+                        role: "region",
+                        tabIndex: 0,
+                        "aria-label": `${section.name} comparison table`,
+                      }
+                    : {})}
                 >
                   <h2 className="su-group-sec-title">{section.name}</h2>
                   {intro ? (
@@ -418,7 +436,10 @@ export function QualitativeGroupReport(props: GroupReportProps) {
                       {intro}
                     </p>
                   ) : null}
-                  <SectionBody section={section} respondents={report.respondents} />
+                  <SectionBody
+                    section={section}
+                    respondents={report.respondents}
+                  />
                 </section>
               );
             })}

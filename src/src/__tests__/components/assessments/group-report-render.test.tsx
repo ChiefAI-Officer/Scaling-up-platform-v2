@@ -204,6 +204,64 @@ describe("GroupReport dispatcher", () => {
   });
 });
 
+describe("responsive report containment", () => {
+  it("keeps the flag-off group report root byte-compatible and contains the enabled root", () => {
+    const { container, rerender } = render(
+      <GroupReport report={qualitativeReport()} {...provenance()} />,
+    );
+    const root = screen.getByTestId("qualitative-group-report");
+    expect(root).toHaveAttribute("class", "su-public-brand su-report");
+    expect(container.querySelector("[data-responsive-report]")).toBeNull();
+
+    rerender(
+      <GroupReport
+        report={qualitativeReport()}
+        {...provenance()}
+        responsiveEnabled
+      />,
+    );
+    expect(root).not.toHaveClass("min-w-0");
+    expect(root).not.toHaveClass("max-w-full");
+    expect(root).toHaveAttribute("data-responsive-report", "");
+  });
+
+  it("places the enabled qualitative metric matrix in a named focusable bounded region", () => {
+    render(
+      <QualitativeGroupReport
+        report={qualitativeReport()}
+        {...provenance()}
+        responsiveEnabled
+      />,
+    );
+
+    const region = screen.getByRole("region", {
+      name: "The Vision on the Future comparison table",
+    });
+    expect(region).toHaveAttribute("tabindex", "0");
+    expect(region).toHaveClass("su-report-data-region");
+    expect(
+      within(region).getByTestId("group-metric-table-S1_financials"),
+    ).toBeInTheDocument();
+  });
+
+  it("places every enabled scored comparison table in a named focusable bounded region", () => {
+    render(
+      <ScoredGroupReport
+        report={scoredReport()}
+        {...provenance({ assessmentName: "Rockefeller Habits" })}
+        responsiveEnabled
+      />,
+    );
+
+    const region = screen.getByRole("region", {
+      name: "Alignment profile comparison table",
+    });
+    expect(region).toHaveAttribute("tabindex", "0");
+    expect(region).toHaveClass("su-report-data-region");
+    expect(within(region).getByTestId("group-scored-profile")).toBeInTheDocument();
+  });
+});
+
 // ══════════════════════════════════════════════════════════════════════════
 // Cover + provenance (shared)
 // ══════════════════════════════════════════════════════════════════════════

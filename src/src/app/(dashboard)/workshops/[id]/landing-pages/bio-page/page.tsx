@@ -9,6 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BioPageTemplate } from "@/components/templates/bio-page-template";
 import { resolveCoachProfessionalTitle } from "@/lib/coaches/coach-profile-fields";
+import { useMobileResponsiveEnabled } from "@/lib/use-mobile-responsive-enabled";
+import { cn } from "@/lib/utils";
 
 interface BioPageData {
   coachName: string;
@@ -36,6 +38,7 @@ interface Workshop {
 }
 
 export default function BioPageEditor() {
+  const mobileResponsiveEnabled = useMobileResponsiveEnabled();
   const params = useParams();
   const router = useRouter();
   const workshopId = params.id as string;
@@ -177,7 +180,7 @@ export default function BioPageEditor() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className={cn("max-w-6xl mx-auto", mobileResponsiveEnabled && "min-w-0 max-w-full")}>
       <div className="mb-6">
         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
           <Link href="/workshops" className="hover:text-foreground">Workshops</Link>
@@ -202,9 +205,9 @@ export default function BioPageEditor() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-6">
+      <div className={cn("grid grid-cols-2 gap-6", mobileResponsiveEnabled && "grid-cols-1 xl:grid-cols-2")}>
         {/* Editor Panel */}
-        <div className="space-y-6">
+        <div className={cn("space-y-6", mobileResponsiveEnabled && "min-w-0")}>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Coach Information</CardTitle>
@@ -235,7 +238,10 @@ export default function BioPageEditor() {
 
               <div>
                 <Label htmlFor="profileImage">Profile Picture</Label>
-                <div className="mt-1 flex items-center gap-4">
+                <div className={cn(
+                  "mt-1 flex items-center gap-4",
+                  mobileResponsiveEnabled && "flex-col items-stretch sm:flex-row sm:items-center"
+                )}>
                   {formData.profileImageUrl && (
                     <img
                       src={formData.profileImageUrl}
@@ -243,7 +249,7 @@ export default function BioPageEditor() {
                       className="w-16 h-16 rounded-full object-cover"
                     />
                   )}
-                  <div className="flex-1">
+                  <div className={cn("flex-1", mobileResponsiveEnabled && "min-w-0")}>
                     <Input
                       id="profileImageUrl"
                       name="profileImageUrl"
@@ -256,7 +262,7 @@ export default function BioPageEditor() {
                       type="file"
                       accept="image/*"
                       onChange={handleImageUpload}
-                      className="text-sm"
+                      className={cn("text-sm", mobileResponsiveEnabled && "min-w-0 max-w-full")}
                     />
                   </div>
                 </div>
@@ -329,7 +335,7 @@ export default function BioPageEditor() {
             </CardContent>
           </Card>
 
-          <div className="flex gap-3">
+          <div className={cn("flex gap-3", mobileResponsiveEnabled && "flex-col sm:flex-row [&_button]:min-h-11")}>
             <Button
               onClick={() => handleSave(false)}
               variant="outline"
@@ -349,7 +355,7 @@ export default function BioPageEditor() {
         </div>
 
         {/* Preview Panel */}
-        <div className="sticky top-4">
+        <div className={cn("sticky top-4", mobileResponsiveEnabled && "min-w-0")}>
           <Card className="overflow-hidden">
             <CardHeader className="bg-muted border-b py-2">
               <CardTitle className="text-sm font-medium">Live Preview</CardTitle>

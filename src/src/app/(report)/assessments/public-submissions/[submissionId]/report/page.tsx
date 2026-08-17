@@ -19,6 +19,7 @@ import {
 import { db } from "@/lib/db";
 import { resolvePeerReportEnhancementsForSubmission } from "@/lib/assessments/peer-report-resolver";
 import { isFindingsLogicEnabled } from "@/lib/assessments/wave-u-flags";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -31,6 +32,7 @@ export default async function PublicSubmissionReportPage({
   params,
 }: PageProps) {
   const { submissionId } = await params;
+  const mobileResponsiveEnabled = isMobileResponsiveEnabled();
   const { outcome } = await viewPublicReferralReport(
     defaultReportGateDeps(),
     { submissionId },
@@ -55,7 +57,10 @@ export default async function PublicSubmissionReportPage({
       report={renderedReport}
       reportStylesAvailable={reportStylesAvailable}
     >
-      <div className="su-report-page">
+      <div
+        className="su-report-page"
+        data-responsive-report-page={mobileResponsiveEnabled ? "" : undefined}
+      >
         <div className="su-report-actions no-print">
           <PrintReportButton
             fileName={
@@ -69,6 +74,7 @@ export default async function PublicSubmissionReportPage({
           peerComparison={peerEnhancements.lvaPeerComparison}
           reportStylesAvailable={reportStylesAvailable}
           reportFindingsAvailable={isFindingsLogicEnabled()}
+          responsiveEnabled={mobileResponsiveEnabled}
         />
       </div>
     </ReportStyleScope>

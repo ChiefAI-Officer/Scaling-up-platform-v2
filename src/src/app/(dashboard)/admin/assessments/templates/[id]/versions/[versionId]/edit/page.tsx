@@ -50,12 +50,14 @@ import {
 import {
   type PeerBenchmarkRow,
 } from "@/components/assessments/PeerBenchmarksPanel";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 
 export default async function AdminAssessmentVersionEditPage({
   params,
 }: {
   params: Promise<{ id: string; versionId: string }>;
 }) {
+  const mobileResponsiveEnabled = isMobileResponsiveEnabled();
   const session = await getServerSession(authOptions);
   if (!session) {
     redirect("/login");
@@ -232,7 +234,11 @@ export default async function AdminAssessmentVersionEditPage({
   }
 
   return (
-    <div className="space-y-6">
+    <div
+      className={
+        mobileResponsiveEnabled ? "min-w-0 max-w-full space-y-6" : "space-y-6"
+      }
+    >
       <TemplateEditorTabbed
         template={{
           id: template.id,
@@ -323,6 +329,7 @@ export default async function AdminAssessmentVersionEditPage({
         // yet. Default false ⇒ byte-identical ED9 shell. Presentation-only,
         // kill = flag off + redeploy.
         previewSettingsEnabled={isPreviewSettingsEnabled()}
+        mobileResponsiveEnabled={mobileResponsiveEnabled}
         // Template-creation simplification — resolved on this server page and
         // forwarded solely to the existing Scoring & Tiers presentation.
         plainLanguageScoringEnabled={isTemplateCreationSimplifiedEnabled()}

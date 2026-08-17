@@ -65,6 +65,58 @@ const twoCompanyCampaigns: CampaignListItem[] = [
 ];
 
 describe("CampaignsListWithFilter — grouped by company", () => {
+  it("keeps long campaign and company identities wrappable and makes every filter touch-sized", () => {
+    const longOrganizationName = "A Very Long Organization Name That Must Wrap On Compact Screens";
+    const longCampaignName = "A Very Long Campaign Name That Must Wrap On Compact Screens";
+    render(
+      <CampaignsListWithFilter
+        responsiveEnabled
+        campaigns={[
+          makeCampaign({
+            id: "long",
+            organizationId: "org-long",
+            organizationName: longOrganizationName,
+            name: longCampaignName,
+          }),
+        ]}
+      />,
+    );
+
+    const companyTrigger = screen.getByRole("button", {
+      name: new RegExp(longOrganizationName),
+    });
+    expect(companyTrigger).toHaveClass("min-h-11", "min-w-0");
+    expect(companyTrigger).toHaveAttribute("data-touch-target");
+    fireEvent.click(companyTrigger);
+
+    const campaignIdentity = screen.getByRole("link", {
+      name: longCampaignName,
+    });
+    expect(campaignIdentity).toHaveClass(
+      "inline-flex min-h-11 min-w-11 items-center min-w-0 break-words",
+    );
+    expect(screen.getByText(longOrganizationName)).toHaveClass(
+      "min-w-0 break-words",
+    );
+    for (const status of ["all", "draft", "active", "closed"]) {
+      expect(screen.getByTestId(`campaign-filter-pill-${status}`)).toHaveAttribute(
+        "data-touch-target",
+      );
+    }
+  });
+
+  it("keeps the legacy campaign-name link class contract when responsive mode is off", () => {
+    render(<CampaignsListWithFilter campaigns={[campaignAlphaA]} />);
+    fireEvent.click(
+      screen.getByRole("button", { name: /Alpha Corp.*1 campaign$/i }),
+    );
+
+    expect(screen.getByRole("link", { name: campaignAlphaA.name })).toHaveClass(
+      "font-medium text-foreground hover:text-primary text-sm",
+      { exact: true },
+    );
+  });
+
   it("renders each company as a collapsed accessible trigger", () => {
     render(<CampaignsListWithFilter campaigns={twoCompanyCampaigns} />);
 

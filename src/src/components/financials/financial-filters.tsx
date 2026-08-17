@@ -17,9 +17,10 @@ interface CategoryOption {
 interface FinancialFiltersProps {
   coaches: CoachOption[];
   categories: CategoryOption[];
+  responsiveEnabled?: boolean;
 }
 
-export function FinancialFilters({ coaches, categories }: FinancialFiltersProps) {
+export function FinancialFilters({ coaches, categories, responsiveEnabled = false }: FinancialFiltersProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -59,14 +60,14 @@ export function FinancialFilters({ coaches, categories }: FinancialFiltersProps)
   };
 
   return (
-    <div className="flex flex-wrap items-end gap-3">
+    <div className={responsiveEnabled ? "flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-end" : "flex flex-wrap items-end gap-3"}>
       {/* Period Presets */}
-      <div className="flex gap-1.5">
+      <div className={responsiveEnabled ? "grid grid-cols-2 gap-1.5 sm:flex" : "flex gap-1.5"}>
         {(["month", "quarter", "year", "all"] as const).map((p) => (
           <button
             key={p}
             onClick={() => handleChange("period", p)}
-            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+            className={`${responsiveEnabled ? "min-h-11 " : ""}rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
               period === p
                 ? "bg-primary text-primary-foreground"
                 : "bg-card border border-border text-foreground hover:bg-accent"
@@ -78,7 +79,7 @@ export function FinancialFilters({ coaches, categories }: FinancialFiltersProps)
       </div>
 
       {/* Coach Filter */}
-      <div>
+      <div className={responsiveEnabled ? "w-full sm:w-auto" : undefined}>
         <label htmlFor="coachFilter" className="block text-xs font-medium text-muted-foreground mb-1">
           Coach
         </label>
@@ -86,7 +87,7 @@ export function FinancialFilters({ coaches, categories }: FinancialFiltersProps)
           id="coachFilter"
           value={coachId}
           onChange={(e) => handleChange("coachId", e.target.value)}
-          className="rounded-md border border-border bg-card px-3 py-1.5 text-sm text-foreground"
+          className={responsiveEnabled ? "min-h-11 w-full rounded-md border border-border bg-card px-3 py-1.5 text-sm text-foreground sm:w-auto" : "rounded-md border border-border bg-card px-3 py-1.5 text-sm text-foreground"}
         >
           <option value="">All Coaches</option>
           {coaches.map((c) => (
@@ -98,7 +99,7 @@ export function FinancialFilters({ coaches, categories }: FinancialFiltersProps)
       </div>
 
       {/* Category Filter */}
-      <div>
+      <div className={responsiveEnabled ? "w-full sm:w-auto" : undefined}>
         <label htmlFor="categoryFilter" className="block text-xs font-medium text-muted-foreground mb-1">
           Category
         </label>
@@ -106,7 +107,7 @@ export function FinancialFilters({ coaches, categories }: FinancialFiltersProps)
           id="categoryFilter"
           value={categoryId}
           onChange={(e) => handleChange("categoryId", e.target.value)}
-          className="rounded-md border border-border bg-card px-3 py-1.5 text-sm text-foreground"
+          className={responsiveEnabled ? "min-h-11 w-full rounded-md border border-border bg-card px-3 py-1.5 text-sm text-foreground sm:w-auto" : "rounded-md border border-border bg-card px-3 py-1.5 text-sm text-foreground"}
         >
           <option value="">All Categories</option>
           {categories.map((cat) => (
@@ -118,7 +119,7 @@ export function FinancialFilters({ coaches, categories }: FinancialFiltersProps)
       </div>
 
       {/* Date Range */}
-      <div>
+      <div className={responsiveEnabled ? "w-full sm:w-auto" : undefined}>
         <label htmlFor="startDate" className="block text-xs font-medium text-muted-foreground mb-1">
           From
         </label>
@@ -127,10 +128,10 @@ export function FinancialFilters({ coaches, categories }: FinancialFiltersProps)
           type="date"
           value={startDate}
           onChange={(e) => handleDateChange("startDate", e.target.value)}
-          className="rounded-md border border-border bg-card px-3 py-1.5 text-sm text-foreground"
+          className={responsiveEnabled ? "min-h-11 w-full rounded-md border border-border bg-card px-3 py-1.5 text-sm text-foreground sm:w-auto" : "rounded-md border border-border bg-card px-3 py-1.5 text-sm text-foreground"}
         />
       </div>
-      <div>
+      <div className={responsiveEnabled ? "w-full sm:w-auto" : undefined}>
         <label htmlFor="endDate" className="block text-xs font-medium text-muted-foreground mb-1">
           To
         </label>
@@ -139,7 +140,7 @@ export function FinancialFilters({ coaches, categories }: FinancialFiltersProps)
           type="date"
           value={endDate}
           onChange={(e) => handleDateChange("endDate", e.target.value)}
-          className="rounded-md border border-border bg-card px-3 py-1.5 text-sm text-foreground"
+          className={responsiveEnabled ? "min-h-11 w-full rounded-md border border-border bg-card px-3 py-1.5 text-sm text-foreground sm:w-auto" : "rounded-md border border-border bg-card px-3 py-1.5 text-sm text-foreground"}
         />
       </div>
 
@@ -147,7 +148,7 @@ export function FinancialFilters({ coaches, categories }: FinancialFiltersProps)
       {(coachId || categoryId || startDate || endDate) && (
         <button
           onClick={() => router.push(`/admin/financials?period=${period === "custom" ? "month" : period}`)}
-          className="rounded-md px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          className={responsiveEnabled ? "min-h-11 w-full rounded-md px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors sm:w-auto" : "rounded-md px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"}
         >
           Clear filters
         </button>

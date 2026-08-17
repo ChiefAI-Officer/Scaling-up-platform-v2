@@ -6,6 +6,7 @@
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth/authorization";
 import { SurveyTemplateEditor } from "@/components/surveys/survey-template-editor";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 
 export default async function SurveyTemplateEditorPage({
   params,
@@ -14,6 +15,7 @@ export default async function SurveyTemplateEditorPage({
 }) {
   await requireAdmin();
   const { id } = await params;
+  const mobileResponsiveEnabled = isMobileResponsiveEnabled();
 
   const isNew = id === "new";
 
@@ -114,6 +116,7 @@ export default async function SurveyTemplateEditorPage({
       workshops={workshops}
       categories={categories}
       isNew={isNew}
+      responsiveEnabled={mobileResponsiveEnabled}
     />
   );
 }

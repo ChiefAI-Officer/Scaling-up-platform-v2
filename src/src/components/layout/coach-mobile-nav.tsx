@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
@@ -12,21 +12,47 @@ import { getCoachPrimaryNavItems } from "@/lib/coach-nav";
 interface CoachMobileNavProps {
   coachName: string;
   referredResultsEnabled?: true;
+  responsiveEnabled?: boolean;
 }
 
 export function CoachMobileNav({
   coachName,
   referredResultsEnabled = undefined,
+  responsiveEnabled = false,
 }: CoachMobileNavProps) {
   const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const pathname = usePathname();
   const primaryNavItems = getCoachPrimaryNavItems({
     referredResultsEnabled: referredResultsEnabled === true,
   });
 
+  const dismiss = useCallback(() => {
+    setOpen(false);
+    if (responsiveEnabled) triggerRef.current?.focus();
+  }, [responsiveEnabled]);
+
+  useEffect(() => {
+    if (!responsiveEnabled || !open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") dismiss();
+    };
+    const onPointerDown = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) dismiss();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("pointerdown", onPointerDown);
+    };
+  }, [dismiss, open, responsiveEnabled]);
+
   return (
-    <div className="md:hidden">
+    <div className="md:hidden" ref={rootRef}>
       <button
+        ref={triggerRef}
         onClick={() => setOpen(!open)}
         className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent"
         aria-label={open ? "Close menu" : "Open menu"}
@@ -38,7 +64,11 @@ export function CoachMobileNav({
       {open && (
         <div className="fixed inset-0 z-50 flex">
           {/* Backdrop */}
-          <div className="fixed inset-0 bg-black/50" onClick={() => setOpen(false)} />
+          <div
+            className="fixed inset-0 bg-black/50"
+            onClick={dismiss}
+            {...(responsiveEnabled ? { "data-testid": "coach-mobile-nav-backdrop" } : {})}
+          />
 
           {/* Slide-out panel */}
           <div className="relative w-72 bg-sidebar text-sidebar-foreground flex flex-col">

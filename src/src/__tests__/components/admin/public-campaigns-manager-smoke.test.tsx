@@ -67,6 +67,24 @@ beforeEach(() => {
 afterEach(() => jest.restoreAllMocks());
 
 describe("PublicCampaignsManager — orphaned-page render smoke (Z-1)", () => {
+  it("keeps only the legacy campaign table when responsive presentation is disabled", async () => {
+    render(<PublicCampaignsManager responsiveEnabled={false} />);
+    await screen.findByText("Quick Scaling Up Check");
+    expect(screen.getByRole("table")).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Public campaigns" })).not.toBeInTheDocument();
+  });
+
+  it("keeps campaign identity, status, metadata and actions in compact records", async () => {
+    render(<PublicCampaignsManager responsiveEnabled />);
+    const list = await screen.findByRole("list", { name: "Public campaigns" });
+    const card = await within(list).findByRole("article", { name: "Quick Scaling Up Check" });
+    expect(within(card).getByText("scaling-up-quick")).toBeInTheDocument();
+    expect(within(card).getByText("Founder Prompts")).toBeInTheDocument();
+    expect(within(card).getByText("ACTIVE")).toBeInTheDocument();
+    expect(within(card).getByRole("button", { name: "View submissions" })).toHaveClass("min-h-11");
+    expect(within(card).getByRole("button", { name: "Manage report appearance" })).toHaveClass("min-h-11");
+  });
+
   it("renders the list and the create form without crashing", async () => {
     render(<PublicCampaignsManager />);
     // Create form is always present.
@@ -186,6 +204,51 @@ describe("PublicCampaignsManager — orphaned-page render smoke (Z-1)", () => {
         reportStyle: "MODERN_DASHBOARD",
       });
     });
+  });
+
+  it("keeps one campaign appearance picker and its preview state across responsive breakpoint changes", async () => {
+    const { rerender } = render(<PublicCampaignsManager responsiveEnabled />);
+    await screen.findByRole("list", { name: "Public campaigns" });
+
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "Manage report appearance" })[0],
+    );
+
+    expect(screen.getAllByRole("group", { name: "Report style" })).toHaveLength(1);
+    const appearance = screen.getByRole("region", {
+      name: "Quick Scaling Up Check report appearance",
+    });
+    fireEvent.click(within(appearance).getByRole("button", { name: "Show preview" }));
+    fireEvent.click(within(appearance).getByRole("tab", { name: "Summary" }));
+    const pickerNode = within(appearance).getByRole("group", {
+      name: "Report style",
+    });
+
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 768,
+    });
+    fireEvent(window, new Event("resize"));
+    rerender(<PublicCampaignsManager responsiveEnabled />);
+
+    const resizedAppearance = screen.getByRole("region", {
+      name: "Quick Scaling Up Check report appearance",
+    });
+    expect(
+      within(resizedAppearance).getByRole("group", { name: "Report style" }),
+    ).toBe(pickerNode);
+    expect(
+      within(resizedAppearance).getByRole("button", { name: "Hide preview" }),
+    ).toHaveAttribute("aria-expanded", "true");
+    expect(within(resizedAppearance).getByRole("tab", { name: "Summary" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(
+      within(resizedAppearance).getByRole("img", {
+        name: "Executive Boardroom Summary preview",
+      }),
+    ).toBeInTheDocument();
   });
 
   it("removes every existing-campaign appearance affordance when rollout availability is off while retaining server data", async () => {
@@ -475,6 +538,40 @@ describe("PublicCampaignsManager — public-quiz submissions (#83)", () => {
       "href",
       "/assessments/public-submissions/s1/report",
     );
+  });
+
+  it("retains Four Decisions details and per-domain scores in responsive submission records", async () => {
+    render(<PublicCampaignsManager responsiveEnabled />);
+
+    const campaigns = await screen.findByRole("list", {
+      name: "Public campaigns",
+    });
+    const campaign = within(campaigns).getByRole("article", {
+      name: "Quick Scaling Up Check",
+    });
+    fireEvent.click(
+      within(campaign).getByRole("button", { name: "View submissions" }),
+    );
+
+    const submission = await within(campaign).findByRole("article", {
+      name: "Jane Smith",
+    });
+    const details = within(submission).getByRole("button", {
+      name: "Details",
+    });
+    expect(details).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(details);
+
+    expect(details).toHaveAttribute("aria-expanded", "true");
+    expect(within(submission).getByText("People")).toBeInTheDocument();
+    expect(within(submission).getByText("7.1")).toBeInTheDocument();
+    expect(within(submission).getByText("Strategy")).toBeInTheDocument();
+    expect(within(submission).getByText("7.2")).toBeInTheDocument();
+    expect(within(submission).getByText("Execution")).toBeInTheDocument();
+    expect(within(submission).getByText("7.3")).toBeInTheDocument();
+    expect(within(submission).getByText("Cash")).toBeInTheDocument();
+    expect(within(submission).getByText("8.0")).toBeInTheDocument();
   });
 
   it("keeps the legacy three-column expander when enrichment is absent", async () => {

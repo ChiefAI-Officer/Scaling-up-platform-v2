@@ -19,6 +19,7 @@ type WorkshopStatus =
 interface WorkshopActionsProps {
   workshop: Workshop;
   userRole?: string;
+  responsiveEnabled?: boolean;
 }
 
 // Sprint 5: Status transitions are now automated via auto-build on approval.
@@ -43,7 +44,11 @@ const statusLabels: Record<WorkshopStatus, string> = {
   CANCELED: "Canceled",
 };
 
-export function WorkshopActions({ workshop, userRole }: WorkshopActionsProps) {
+export function WorkshopActions({
+  workshop,
+  userRole,
+  responsiveEnabled = false,
+}: WorkshopActionsProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
@@ -90,7 +95,7 @@ export function WorkshopActions({ workshop, userRole }: WorkshopActionsProps) {
   }
 
   return (
-    <div className="flex gap-2">
+    <div className={responsiveEnabled ? "flex flex-wrap gap-2" : "flex gap-2"}>
       {availableTransitions.map((status) => (
         <Button
           key={status}
@@ -106,6 +111,7 @@ export function WorkshopActions({ workshop, userRole }: WorkshopActionsProps) {
         <DeleteWorkshopDialog
           workshopId={workshop.id}
           workshopTitle={workshop.title}
+          responsiveEnabled={responsiveEnabled}
         />
       )}
     </div>

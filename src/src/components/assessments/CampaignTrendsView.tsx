@@ -80,9 +80,13 @@ function trendCellClasses(tone: "up" | "down" | "flat" | "none"): string {
 
 export interface CampaignTrendsViewProps {
   trend: LongitudinalTrend;
+  responsiveEnabled?: boolean;
 }
 
-export function CampaignTrendsView({ trend }: CampaignTrendsViewProps) {
+export function CampaignTrendsView({
+  trend,
+  responsiveEnabled = false,
+}: CampaignTrendsViewProps) {
   const {
     template,
     organization,
@@ -137,11 +141,17 @@ export function CampaignTrendsView({ trend }: CampaignTrendsViewProps) {
   }, [campaigns]);
 
   return (
-    <div className="space-y-6">
+    <div
+      className={
+        responsiveEnabled ? "min-w-0 max-w-full space-y-6" : "space-y-6"
+      }
+      data-testid={responsiveEnabled ? "campaign-trends-view" : undefined}
+      data-responsive-report={responsiveEnabled ? "" : undefined}
+    >
       {/* HEADER */}
       <div className="bg-card border border-border rounded-xl p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
+          <div className={responsiveEnabled ? "min-w-0 break-words" : undefined}>
             <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">
               Trends · {template.alias}
             </p>
@@ -179,7 +189,7 @@ export function CampaignTrendsView({ trend }: CampaignTrendsViewProps) {
       </div>
 
       {/* STATE 1: no campaigns */}
-      {campaigns.length === 0 && <EmptyState />}
+      {campaigns.length === 0 && <EmptyState responsiveEnabled={responsiveEnabled} />}
 
       {/* STATE 2: single campaign */}
       {campaigns.length === 1 && (
@@ -189,16 +199,21 @@ export function CampaignTrendsView({ trend }: CampaignTrendsViewProps) {
       {/* STATE 3: multi-campaign */}
       {campaigns.length >= 2 && (
         <>
-          <CompositeLineChart campaigns={campaigns} />
+          <CompositeLineChart
+            campaigns={campaigns}
+            responsiveEnabled={responsiveEnabled}
+          />
           <PerSectionTable
             campaigns={campaigns}
             sectionDefs={sectionDefs}
             sectionMeansByCampaign={sectionMeansByCampaign}
+            responsiveEnabled={responsiveEnabled}
           />
           <PerQuestionSparklines
             open={questionsOpen}
             onToggle={() => setQuestionsOpen((v) => !v)}
             sparklines={questionSparklines}
+            responsiveEnabled={responsiveEnabled}
           />
         </>
       )}
@@ -210,7 +225,7 @@ export function CampaignTrendsView({ trend }: CampaignTrendsViewProps) {
 // Empty state
 // ────────────────────────────────────────────────────────────────────────
 
-function EmptyState() {
+function EmptyState({ responsiveEnabled = false }: { responsiveEnabled?: boolean }) {
   return (
     <div className="bg-card border border-border rounded-xl p-12 text-center">
       <h3 className="text-lg font-semibold text-foreground mb-2">
@@ -221,9 +236,13 @@ function EmptyState() {
         template and organization. Run your first campaign to start
         collecting data.
       </p>
+      {/* Native anchor is the feature-OFF contract; responsive mode only changes sizing classes. */}
+      {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
       <a
         href="/portal/assessments/new"
-        className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium"
+        className={responsiveEnabled
+          ? "inline-flex min-h-11 min-w-11 items-center justify-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium"
+          : "inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium"}
       >
         Start a campaign
       </a>
@@ -295,8 +314,10 @@ function StatCard({ label, value }: { label: string; value: number }) {
 
 function CompositeLineChart({
   campaigns,
+  responsiveEnabled = false,
 }: {
   campaigns: LongitudinalTrend["campaigns"];
+  responsiveEnabled?: boolean;
 }) {
   // Chart geometry — fixed viewBox for SVG, scales nicely with CSS width.
   const W = 800;
@@ -331,7 +352,14 @@ function CompositeLineChart({
   }));
 
   return (
-    <div className="bg-card border border-border rounded-xl p-6">
+    <div
+      className={
+        responsiveEnabled
+          ? "min-w-0 max-w-full rounded-xl border border-border bg-card p-4 sm:p-6"
+          : "bg-card border border-border rounded-xl p-6"
+      }
+      data-testid={responsiveEnabled ? "trends-chart-region" : undefined}
+    >
       <div className="mb-4">
         <h2 className="text-lg font-semibold text-foreground">
           Composite score over time
@@ -448,17 +476,32 @@ function PerSectionTable({
   campaigns,
   sectionDefs,
   sectionMeansByCampaign,
+  responsiveEnabled = false,
 }: {
   campaigns: LongitudinalTrend["campaigns"];
   sectionDefs: Array<{ stableKey: string; name: string }>;
   sectionMeansByCampaign: Record<string, Record<string, number>>;
+  responsiveEnabled?: boolean;
 }) {
   if (sectionDefs.length === 0) {
     return null;
   }
 
   return (
-    <div className="bg-card border border-border rounded-xl p-6 overflow-x-auto">
+    <div
+      className={
+        responsiveEnabled
+          ? "min-w-0 max-w-full overflow-x-auto rounded-xl border border-border bg-card p-4 sm:p-6"
+          : "bg-card border border-border rounded-xl p-6 overflow-x-auto"
+      }
+      {...(responsiveEnabled
+        ? {
+            role: "region",
+            tabIndex: 0,
+            "aria-label": "Per-section trend comparison table",
+          }
+        : {})}
+    >
       <h2 className="text-lg font-semibold text-foreground mb-1">
         Per-section trend
       </h2>
@@ -528,10 +571,12 @@ function PerQuestionSparklines({
   open,
   onToggle,
   sparklines,
+  responsiveEnabled = false,
 }: {
   open: boolean;
   onToggle: () => void;
   sparklines: LongitudinalTrend["questionSparklines"];
+  responsiveEnabled?: boolean;
 }) {
   const entries = Object.entries(sparklines);
   if (entries.length === 0) {
@@ -544,7 +589,12 @@ function PerQuestionSparklines({
         type="button"
         onClick={onToggle}
         aria-expanded={open}
-        className="w-full flex items-center justify-between p-6 hover:bg-muted/30 transition-colors text-left"
+        className={
+          responsiveEnabled
+            ? "flex min-h-11 w-full items-center justify-between gap-3 p-4 text-left transition-colors hover:bg-muted/30 sm:p-6"
+            : "w-full flex items-center justify-between p-6 hover:bg-muted/30 transition-colors text-left"
+        }
+        {...(responsiveEnabled ? { "data-touch-target": true } : {})}
       >
         <div>
           <h2 className="text-lg font-semibold text-foreground">

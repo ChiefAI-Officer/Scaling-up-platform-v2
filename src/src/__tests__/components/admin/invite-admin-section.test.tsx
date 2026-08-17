@@ -235,4 +235,28 @@ describe("InviteAdminSection — live admin users list", () => {
 
     confirmSpy.mockRestore();
   });
+
+  it("sizes actual invite controls and stacks compact action rows only in responsive mode", async () => {
+    mockFetch();
+    const enabled = render(<InviteAdminSection waveQEnabled responsiveEnabled />);
+    await screen.findByText("hybrid@scalingup.com");
+
+    expect(screen.getByLabelText("Email")).toHaveClass("min-h-11");
+    expect(screen.getByLabelText("Name (optional)")).toHaveClass("min-h-11");
+    expect(screen.getByRole("button", { name: "Send Invite" })).toHaveClass("min-h-11 w-full sm:w-auto");
+    expect(screen.getByRole("button", { name: "Refresh admins" })).toHaveClass("min-h-11 min-w-11");
+    expect(screen.getByRole("button", { name: "Remove" })).toHaveClass("min-h-11 w-full sm:w-auto");
+    expect(screen.getByRole("button", { name: "Revoke invite for pending@scalingup.com" })).toHaveClass("min-h-11 min-w-11");
+    expect(screen.getByText("hybrid@scalingup.com").closest("[data-testid='admin-user-row']")).toHaveClass("flex-col sm:flex-row");
+    enabled.unmount();
+
+    render(<InviteAdminSection waveQEnabled />);
+    await screen.findByText("hybrid@scalingup.com");
+    expect(screen.getByLabelText("Email")).not.toHaveClass("min-h-11");
+    expect(screen.getByRole("button", { name: "Send Invite" })).not.toHaveClass("min-h-11");
+    expect(screen.getByText("hybrid@scalingup.com").closest("[data-testid='admin-user-row']")).toHaveAttribute(
+      "class",
+      "flex items-center justify-between p-3 rounded-lg border border-border bg-background",
+    );
+  });
 });

@@ -12,6 +12,7 @@ import {
 
 interface PublicCampaignListProps {
   createdCampaignId?: string;
+  responsiveEnabled?: boolean;
 }
 
 interface ListResponse {
@@ -24,6 +25,7 @@ const cellClassName =
 
 export function PublicCampaignList({
   createdCampaignId,
+  responsiveEnabled = false,
 }: PublicCampaignListProps) {
   const [campaigns, setCampaigns] = useState<PublicCampaignViewModel[]>([]);
   const [loading, setLoading] = useState(true);
@@ -238,6 +240,7 @@ export function PublicCampaignList({
                         }
                         onToggleResponses={() => toggleResponses(campaign.id)}
                         responsesExpanded={responsesExpanded}
+                        responsiveEnabled={responsiveEnabled}
                       />
                     </td>
                     </tr>

@@ -49,6 +49,7 @@ import {
 import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
 import { deriveReportStylePreviewCapabilities } from "@/lib/assessments/report-style-registry";
 import { isInvitationBannerEnabled } from "@/lib/assessments/wave-invitation-banner-flags";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 
 const ADMIN_CAMPAIGNS = "/admin/assessments/campaigns";
 
@@ -57,6 +58,7 @@ interface PageProps {
 }
 
 export default async function AdminCampaignDetailPage({ params }: PageProps) {
+  const mobileResponsiveEnabled = isMobileResponsiveEnabled();
   const actor = await getApiActor();
   if (!actor) {
     redirect("/login");
@@ -128,7 +130,7 @@ export default async function AdminCampaignDetailPage({ params }: PageProps) {
     });
 
   return (
-    <div>
+    <div className={mobileResponsiveEnabled ? "min-w-0 max-w-full" : undefined}>
       {/* Breadcrumb */}
       <div className="wf-breadcrumb">
         <a href="/admin/dashboard">Admin</a>
@@ -141,6 +143,7 @@ export default async function AdminCampaignDetailPage({ params }: PageProps) {
       </div>
 
       <CampaignDetail
+        responsiveEnabled={mobileResponsiveEnabled}
         initialOverview={overview}
         initialRespondents={respondents}
         customHtmlEmailEnabled={waveDCustomHtmlEmailEnabled()}

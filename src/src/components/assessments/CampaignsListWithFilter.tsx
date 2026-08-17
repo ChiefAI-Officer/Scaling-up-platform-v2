@@ -74,6 +74,7 @@ interface CompanySectionProps {
   onToggle: () => void;
   /** Base path for a campaign's detail link. Default: the coach portal. */
   detailBasePath: string;
+  responsiveEnabled: boolean;
 }
 
 function CompanySection({
@@ -83,6 +84,7 @@ function CompanySection({
   isOpen,
   onToggle,
   detailBasePath,
+  responsiveEnabled,
 }: CompanySectionProps) {
   const count = campaigns.length;
   const campaignsId = `company-campaigns-${organizationId}`;
@@ -95,7 +97,8 @@ function CompanySection({
           onClick={onToggle}
           aria-expanded={isOpen}
           aria-controls={campaignsId}
-          className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-semibold text-foreground hover:bg-muted/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset"
+          className={responsiveEnabled ? "flex min-h-11 w-full min-w-0 items-center gap-2 px-4 py-3 text-left text-sm font-semibold text-foreground transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset" : "flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-semibold text-foreground hover:bg-muted/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset"}
+          {...(responsiveEnabled ? { "data-touch-target": true } : {})}
         >
           <ChevronRight
             aria-hidden="true"
@@ -103,7 +106,7 @@ function CompanySection({
               isOpen ? "rotate-90" : ""
             }`}
           />
-          <span>{organizationName}</span>
+          <span className={responsiveEnabled ? "min-w-0 break-words" : undefined}>{organizationName}</span>
           <span className="text-muted-foreground font-normal">
             &middot; {count} {count === 1 ? "campaign" : "campaigns"}
           </span>
@@ -125,7 +128,7 @@ function CompanySection({
               return (
                 <div
                   key={c.id}
-                  className="px-4 py-3 space-y-2 hover:bg-muted/30 transition-colors"
+                  className={responsiveEnabled ? "min-w-0 px-4 py-3 space-y-2 hover:bg-muted/30 transition-colors" : "px-4 py-3 space-y-2 hover:bg-muted/30 transition-colors"}
                   data-testid={`campaign-row-${c.id}`}
                 >
                   {/* Top row: name + template + status + date + action */}
@@ -133,11 +136,12 @@ function CompanySection({
                     <div className="min-w-0 basis-full sm:flex-1">
                       <Link
                         href={`${detailBasePath}/${c.id}`}
-                        className="font-medium text-foreground hover:text-primary text-sm"
+                        className={responsiveEnabled ? "inline-flex min-h-11 min-w-11 items-center min-w-0 break-words font-medium text-foreground hover:text-primary text-sm" : "font-medium text-foreground hover:text-primary text-sm"}
+                        {...(responsiveEnabled ? { "data-touch-target": true } : {})}
                       >
                         {c.name}
                       </Link>
-                      <div className="text-xs text-muted-foreground">
+                      <div className={responsiveEnabled ? "break-all text-xs text-muted-foreground" : "text-xs text-muted-foreground"}>
                         {c.alias}
                       </div>
                     </div>
@@ -184,7 +188,8 @@ function CompanySection({
                     </span>
                     <Link
                       href={`${detailBasePath}/${c.id}`}
-                      className="text-xs text-primary hover:underline ml-auto"
+                      className={responsiveEnabled ? "ml-auto inline-flex min-h-11 items-center text-xs text-primary hover:underline" : "text-xs text-primary hover:underline ml-auto"}
+                      {...(responsiveEnabled ? { "data-touch-target": true } : {})}
                     >
                       View
                     </Link>
@@ -214,11 +219,13 @@ function CompanySection({
 export function CampaignsListWithFilter({
   campaigns,
   detailBasePath = "/portal/assessments",
+  responsiveEnabled = false,
 }: {
   campaigns: CampaignListItem[];
   /** Base path for each campaign's detail link. Default: coach portal.
    *  The admin oversight page passes "/admin/assessments/campaigns". */
   detailBasePath?: string;
+  responsiveEnabled?: boolean;
 }) {
   const [filter, setFilter] = useState<FilterValue>("ALL");
   const [openOrganizationId, setOpenOrganizationId] = useState<string | null>(
@@ -302,6 +309,7 @@ export function CampaignsListWithFilter({
                   : "inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full bg-muted text-muted-foreground hover:bg-muted/80"
               }
               data-testid={`campaign-filter-pill-${p.value.toLowerCase()}`}
+              {...(responsiveEnabled ? { "data-touch-target": true } : {})}
             >
               {p.label}
               <span
@@ -342,6 +350,7 @@ export function CampaignsListWithFilter({
                 )
               }
               detailBasePath={detailBasePath}
+              responsiveEnabled={responsiveEnabled}
             />
           ))}
         </div>

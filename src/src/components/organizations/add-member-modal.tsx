@@ -76,7 +76,10 @@ export interface AddMemberModalProps {
    * Pass from the campaign wizard to show the decision-#8 roster hint.
    */
   description?: string;
+  responsiveEnabled?: boolean;
 }
+
+type FieldError = { id: string; message: string };
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -100,6 +103,7 @@ export function AddMemberModal({
   defaultTeamId,
   loadingTeams = false,
   description,
+  responsiveEnabled = false,
 }: AddMemberModalProps) {
   const firstNameId = useId();
   const lastNameId  = useId();
@@ -119,6 +123,7 @@ export function AddMemberModal({
   // Submission state
   const [submitting, setSubmitting] = useState(false);
   const [error,      setError]      = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<FieldError[]>([]);
 
   // Reset form whenever the dialog opens or the defaultTeamId changes
   useEffect(() => {
@@ -130,6 +135,7 @@ export function AddMemberModal({
       setTeamId(defaultTeamId ?? "");
       setRoleType("");
       setError(null);
+      setFieldErrors([]);
     }
   }, [open, defaultTeamId]);
 
@@ -145,13 +151,30 @@ export function AddMemberModal({
     return null;
   }
 
+  function validateFields(): FieldError[] {
+    const errors: FieldError[] = [];
+    if (!firstName.trim()) errors.push({ id: firstNameId, message: "First name is required." });
+    if (!lastName.trim()) errors.push({ id: lastNameId, message: "Last name is required." });
+    if (!email.trim()) {
+      errors.push({ id: emailId, message: "Email is required." });
+    } else if (!isEmailShape(email.trim())) {
+      errors.push({ id: emailId, message: "Please enter a valid email address." });
+    }
+    return errors;
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setFieldErrors([]);
 
-    const validationError = validate();
+    const responsiveFieldErrors = responsiveEnabled ? validateFields() : [];
+    const validationError = responsiveEnabled
+      ? responsiveFieldErrors[0]?.message ?? null
+      : validate();
     if (validationError) {
       setError(validationError);
+      setFieldErrors(responsiveFieldErrors);
       return;
     }
 
@@ -180,6 +203,22 @@ export function AddMemberModal({
 
       const json = await res.json();
       if (!res.ok || !json.success) {
+        if (responsiveEnabled && Array.isArray(json.error)) {
+          const fieldIds: Record<string, string> = {
+            firstName: firstNameId,
+            lastName: lastNameId,
+            email: emailId,
+          };
+          setFieldErrors(
+            json.error.flatMap((issue: { message?: unknown; path?: unknown }) => {
+              const path = Array.isArray(issue.path) ? issue.path[0] : undefined;
+              const id = typeof path === "string" ? fieldIds[path] : undefined;
+              return id && typeof issue.message === "string"
+                ? [{ id, message: issue.message }]
+                : [];
+            })
+          );
+        }
         setError(
           Array.isArray(json.error)
             ? (json.error[0]?.message ?? "Failed to add member. Please try again.")
@@ -215,13 +254,40 @@ export function AddMemberModal({
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose(); }}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent
+        responsiveEnabled={responsiveEnabled}
+        className={responsiveEnabled
+          ? "sm:max-w-md [&_input]:min-h-11 [&_select]:min-h-11"
+          : "sm:max-w-md"}
+      >
         <DialogHeader>
           <DialogTitle>Add Member</DialogTitle>
           <DialogDescription>
             {description ?? "Add a respondent to this organization. Fields marked * are required."}
           </DialogDescription>
         </DialogHeader>
+
+        {responsiveEnabled && error && (
+          <div
+            role="alert"
+            aria-label="Add member error summary"
+            className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
+          >
+            {fieldErrors.length > 0 ? (
+              <ul className="space-y-1">
+                {fieldErrors.map((fieldError) => (
+                  <li key={`${fieldError.id}-${fieldError.message}`}>
+                    <a className="underline" href={`#${fieldError.id}`}>
+                      {fieldError.message}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              error
+            )}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} noValidate>
           <div className="space-y-4 py-2">
@@ -233,9 +299,15 @@ export function AddMemberModal({
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
                 placeholder="e.g. Jane"
-                disabled={submitting}
+                disabled={!responsiveEnabled && submitting}
                 required
+                aria-invalid={responsiveEnabled && fieldErrors.some((item) => item.id === firstNameId) ? true : undefined}
               />
+              {responsiveEnabled && fieldErrors.find((item) => item.id === firstNameId) && (
+                <p className="text-sm text-destructive">
+                  {fieldErrors.find((item) => item.id === firstNameId)?.message}
+                </p>
+              )}
             </div>
 
             {/* ---- Last name ---- */}
@@ -246,9 +318,15 @@ export function AddMemberModal({
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
                 placeholder="e.g. Smith"
-                disabled={submitting}
+                disabled={!responsiveEnabled && submitting}
                 required
+                aria-invalid={responsiveEnabled && fieldErrors.some((item) => item.id === lastNameId) ? true : undefined}
               />
+              {responsiveEnabled && fieldErrors.find((item) => item.id === lastNameId) && (
+                <p className="text-sm text-destructive">
+                  {fieldErrors.find((item) => item.id === lastNameId)?.message}
+                </p>
+              )}
             </div>
 
             {/* ---- E-mail ---- */}
@@ -260,9 +338,15 @@ export function AddMemberModal({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="jane.smith@company.com"
-                disabled={submitting}
+                disabled={!responsiveEnabled && submitting}
                 required
+                aria-invalid={responsiveEnabled && fieldErrors.some((item) => item.id === emailId) ? true : undefined}
               />
+              {responsiveEnabled && fieldErrors.find((item) => item.id === emailId) && (
+                <p className="text-sm text-destructive">
+                  {fieldErrors.find((item) => item.id === emailId)?.message}
+                </p>
+              )}
             </div>
 
             {/* ---- Job title (optional) ---- */}
@@ -273,7 +357,7 @@ export function AddMemberModal({
                 value={jobTitle}
                 onChange={(e) => setJobTitle(e.target.value)}
                 placeholder="e.g. Director of Operations"
-                disabled={submitting}
+                disabled={!responsiveEnabled && submitting}
               />
             </div>
 
@@ -289,7 +373,7 @@ export function AddMemberModal({
                 data-testid="select-team"
                 value={teamId}
                 onChange={(e) => setTeamId(e.target.value)}
-                disabled={submitting || loadingTeams}
+                disabled={loadingTeams || (!responsiveEnabled && submitting)}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {loadingTeams ? (
@@ -319,7 +403,7 @@ export function AddMemberModal({
                 data-testid="select-level"
                 value={roleType}
                 onChange={(e) => setRoleType(e.target.value)}
-                disabled={submitting}
+                disabled={!responsiveEnabled && submitting}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <option value="">— no level —</option>
@@ -332,7 +416,7 @@ export function AddMemberModal({
             </div>
 
             {/* ---- Inline error ---- */}
-            {error && (
+            {!responsiveEnabled && error && (
               <p
                 role="alert"
                 className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
@@ -342,16 +426,24 @@ export function AddMemberModal({
             )}
           </div>
 
-          <DialogFooter className="mt-4">
+          <DialogFooter className={responsiveEnabled
+            ? "mt-4 gap-2 [&_button]:min-h-11 [&_button]:w-full sm:[&_button]:w-auto"
+            : "mt-4"}
+          >
             <Button
               type="button"
               variant="outline"
               onClick={onClose}
-              disabled={submitting}
+              disabled={!responsiveEnabled && submitting}
+              className={responsiveEnabled ? "min-h-11 w-full sm:w-auto" : undefined}
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={submitting}>
+            <Button
+              type="submit"
+              disabled={submitting}
+              className={responsiveEnabled ? "min-h-11 w-full sm:w-auto" : undefined}
+            >
               {submitting ? "Adding…" : "Add member"}
             </Button>
           </DialogFooter>

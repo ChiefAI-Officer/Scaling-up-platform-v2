@@ -5,6 +5,17 @@ import { db } from "@/lib/db";
 import { FadeUp, StaggerContainer, StaggerItem } from "@/components/ui/animated";
 import { PageTemplateToggle } from "@/components/templates/page-template-toggle";
 import { DeletePageTemplateButton } from "@/components/templates/delete-page-template-button";
+import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/ui/page-header";
+import { ResponsiveDataView } from "@/components/ui/responsive-data-view";
+import {
+  ResponsiveRecord,
+  ResponsiveRecordActions,
+  ResponsiveRecordHeader,
+  ResponsiveRecordMeta,
+} from "@/components/ui/responsive-record";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 
 // Template type metadata — emoji, label, description
 const TEMPLATE_TYPE_META: Record<
@@ -60,6 +71,7 @@ interface TemplatesPageProps {
 }
 
 export default async function TemplatesPage({ searchParams }: TemplatesPageProps) {
+  const mobileResponsiveEnabled = isMobileResponsiveEnabled();
   const params = await searchParams;
   const selectedTab = params.tab ?? "global";
 
@@ -88,9 +100,25 @@ export default async function TemplatesPage({ searchParams }: TemplatesPageProps
   const activeCount = visibleTemplates.filter((t) => t.isActive).length;
 
   return (
-    <div className="space-y-8">
+    <div className={mobileResponsiveEnabled ? "min-w-0 max-w-full space-y-8" : "space-y-8"}>
       {/* Header */}
       <FadeUp>
+        {mobileResponsiveEnabled ? (
+          <PageHeader
+            responsiveEnabled
+            title="Templates"
+            description="Edit the page templates used when building workshop-specific pages. Filter by category to manage per-category templates (AI vs Exit & Valuation)."
+            actions={
+              <Link
+                href="/templates/new"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 hover:shadow-md"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+                Create Template
+              </Link>
+            }
+          />
+        ) : (
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-foreground">Templates</h1>
@@ -107,10 +135,25 @@ export default async function TemplatesPage({ searchParams }: TemplatesPageProps
             Create Template
           </Link>
         </div>
+        )}
       </FadeUp>
 
       {/* Category filter tabs */}
       <FadeUp delay={0.05}>
+        {mobileResponsiveEnabled ? (
+          <Tabs value={selectedTab}>
+            <TabsList responsiveEnabled>
+              <TabsTrigger value="global" asChild className="min-h-11">
+                <Link href="/templates">All</Link>
+              </TabsTrigger>
+              {categories.map((cat) => (
+                <TabsTrigger key={cat.id} value={cat.id} asChild className="min-h-11">
+                  <Link href={`/templates?tab=${cat.id}`}>{cat.name}</Link>
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+        ) : (
         <div className="flex items-center gap-3 flex-wrap">
           <span className="text-sm font-medium text-muted-foreground">Filter by category:</span>
           <div className="flex items-center gap-2">
@@ -139,6 +182,7 @@ export default async function TemplatesPage({ searchParams }: TemplatesPageProps
             ))}
           </div>
         </div>
+        )}
       </FadeUp>
 
       {/* Context note for category tab */}
@@ -165,7 +209,7 @@ export default async function TemplatesPage({ searchParams }: TemplatesPageProps
             </p>
             <Link
               href="/templates/new"
-              className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
+              className={mobileResponsiveEnabled ? "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors" : "inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"}
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
               Create Template
@@ -173,6 +217,69 @@ export default async function TemplatesPage({ searchParams }: TemplatesPageProps
           </div>
         </FadeUp>
       ) : (
+        <ResponsiveDataView
+          enabled={mobileResponsiveEnabled}
+          label="Templates"
+          wideFrom="md"
+          compact={
+            <div className="space-y-3">
+              {visibleTemplates.map((template) => {
+                const meta = TEMPLATE_TYPE_META[template.templateType] ?? {
+                  emoji: "📃",
+                  label: template.templateType,
+                  description: "Page template",
+                };
+                const categoryName = template.category?.name ?? "All Categories";
+
+                return (
+                  <ResponsiveRecord key={template.id}>
+                    <ResponsiveRecordHeader
+                      title={template.name}
+                      status={
+                        <Badge variant={template.isActive ? "success" : "secondary"}>
+                          {template.isActive ? "Active" : "Inactive"}
+                        </Badge>
+                      }
+                    />
+                    <ResponsiveRecordMeta
+                      items={[
+                        { label: "Type", value: meta.label },
+                        { label: "Category", value: categoryName },
+                      ]}
+                    />
+                    <ResponsiveRecordActions
+                      primary={
+                        <Link
+                          href={`/templates/${template.id}/edit`}
+                          className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                        >
+                          Edit template
+                        </Link>
+                      }
+                      menuLabel={`More actions for ${template.name}`}
+                      secondary={
+                        <>
+                          <PageTemplateToggle
+                            templateId={template.id}
+                            isActive={template.isActive}
+                            responsiveEnabled={mobileResponsiveEnabled}
+                            menuItem
+                          />
+                          <DeletePageTemplateButton
+                            templateId={template.id}
+                            templateName={template.name}
+                            isActive={template.isActive}
+                            menuItem
+                          />
+                        </>
+                      }
+                    />
+                  </ResponsiveRecord>
+                );
+              })}
+            </div>
+          }
+          wide={
         <StaggerContainer className="space-y-4">
           {visibleTemplates.map((template) => {
             const meta = TEMPLATE_TYPE_META[template.templateType] ?? {
@@ -244,10 +351,11 @@ export default async function TemplatesPage({ searchParams }: TemplatesPageProps
                           <PageTemplateToggle
                             templateId={template.id}
                             isActive={template.isActive}
+                            responsiveEnabled={mobileResponsiveEnabled}
                           />
                           <Link
                             href={`/templates/${template.id}/edit`}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3.5 py-2 text-sm font-medium text-foreground hover:bg-accent transition-colors"
+                            className={mobileResponsiveEnabled ? "inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border bg-card px-3.5 py-2 text-sm font-medium text-foreground hover:bg-accent transition-colors" : "inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3.5 py-2 text-sm font-medium text-foreground hover:bg-accent transition-colors"}
                           >
                             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                             Edit
@@ -256,6 +364,7 @@ export default async function TemplatesPage({ searchParams }: TemplatesPageProps
                             templateId={template.id}
                             templateName={template.name}
                             isActive={template.isActive}
+                            responsiveEnabled={mobileResponsiveEnabled}
                           />
                         </div>
                       </div>
@@ -266,6 +375,8 @@ export default async function TemplatesPage({ searchParams }: TemplatesPageProps
             );
           })}
         </StaggerContainer>
+          }
+        />
       )}
 
       {/* Summary stats */}

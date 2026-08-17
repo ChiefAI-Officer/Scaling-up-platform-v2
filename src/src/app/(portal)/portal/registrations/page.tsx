@@ -4,6 +4,7 @@ import type { CoachRegistrationView } from "./registrations-types";
 import { SORT_ALLOWLIST } from "./registrations-types";
 import { RegistrationsErrorBoundary } from "./registrations-error-boundary";
 import { RegistrationsLoader } from "./registrations-loader";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 
 export default async function RegistrationsPage({
   searchParams,
@@ -12,6 +13,7 @@ export default async function RegistrationsPage({
 }) {
   console.log("[RegistrationsPage] page function entered");
   const { coach } = await requireCoach();
+  const mobileResponsiveEnabled = isMobileResponsiveEnabled();
   console.log("[RegistrationsPage] requireCoach passed, coachId:", coach?.id);
   const params = await searchParams;
 
@@ -78,7 +80,7 @@ export default async function RegistrationsPage({
 
   return (
     <RegistrationsErrorBoundary>
-      <RegistrationsLoader registrations={rows} currentSort={sortField} />
+      <RegistrationsLoader registrations={rows} currentSort={sortField} responsiveEnabled={mobileResponsiveEnabled} />
     </RegistrationsErrorBoundary>
   );
 }

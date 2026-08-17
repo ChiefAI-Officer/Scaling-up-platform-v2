@@ -15,8 +15,11 @@ import { authOptions } from "@/lib/auth/auth";
 import { ObservabilityDashboard } from "@/components/admin/ObservabilityDashboard";
 import { PeerBenchmarkStatusPanel } from "@/components/admin/PeerBenchmarkStatusPanel";
 import { ImportHealthPanel } from "@/components/admin/ImportHealthPanel";
+import { PageHeader } from "@/components/ui/page-header";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 
 export default async function AdminObservabilityPage() {
+  const mobileResponsiveEnabled = isMobileResponsiveEnabled();
   const session = await getServerSession(authOptions);
   if (!session) {
     redirect("/login");
@@ -27,20 +30,32 @@ export default async function AdminObservabilityPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-bold text-foreground">Observability</h1>
-        <p className="text-sm text-muted-foreground">
-          v1 — DB-derived counters. Esperto historical-import observability
-          (durable signals + the alert cron&apos;s own decisions) is now live
-          in the panel below; the other 7 Vercel/Inngest metrics + 6 alert gates
-          (see <code>docs/specs/v7.6/06-observability.md</code>) still wire in
-          v1.5.
-        </p>
-      </header>
-      <ObservabilityDashboard />
+    <div
+      className={
+        mobileResponsiveEnabled ? "min-w-0 max-w-full space-y-6" : "space-y-6"
+      }
+    >
+      {mobileResponsiveEnabled ? (
+        <PageHeader
+          responsiveEnabled
+          title="Observability"
+          description="v1 — DB-derived counters. Esperto historical-import observability is live below; the remaining Vercel/Inngest metrics and alert gates still wire in v1.5."
+        />
+      ) : (
+        <header className="space-y-1">
+          <h1 className="text-2xl font-bold text-foreground">Observability</h1>
+          <p className="text-sm text-muted-foreground">
+            v1 — DB-derived counters. Esperto historical-import observability
+            (durable signals + the alert cron&apos;s own decisions) is now live
+            in the panel below; the other 7 Vercel/Inngest metrics + 6 alert gates
+            (see <code>docs/specs/v7.6/06-observability.md</code>) still wire in
+            v1.5.
+          </p>
+        </header>
+      )}
+      <ObservabilityDashboard responsiveEnabled={mobileResponsiveEnabled} />
       <PeerBenchmarkStatusPanel />
-      <ImportHealthPanel />
+      <ImportHealthPanel responsiveEnabled={mobileResponsiveEnabled} />
     </div>
   );
 }

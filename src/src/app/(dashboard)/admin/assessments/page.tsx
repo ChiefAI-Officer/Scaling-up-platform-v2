@@ -5,25 +5,41 @@
  * lib/assessments/dashboard-stats.ts so the queries can be reused / tested
  * independently of the page surface.
  */
+/* eslint-disable @next/next/no-html-link-for-pages -- legacy flag-OFF markup */
 
 export const dynamic = "force-dynamic";
 
 import { getAssessmentsDashboardStats } from "@/lib/assessments/dashboard-stats";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
+import { PageHeader } from "@/components/ui/page-header";
 
 export default async function AdminAssessmentsLandingPage() {
+  const mobileResponsiveEnabled = isMobileResponsiveEnabled();
   // The parent layout already enforces admin/staff. We rely on that guard so
   // this page stays a thin stats-renderer.
   const stats = await getAssessmentsDashboardStats();
 
   return (
-    <div className="space-y-6">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-bold text-foreground">Assessments</h1>
-        <p className="text-sm text-muted-foreground">
-          Manage organizations, access groups, templates, and campaigns. The
-          sidebar is the entry point for every assessment-tool surface.
-        </p>
-      </header>
+    <div
+      className={
+        mobileResponsiveEnabled ? "min-w-0 max-w-full space-y-6" : "space-y-6"
+      }
+    >
+      {mobileResponsiveEnabled ? (
+        <PageHeader
+          responsiveEnabled
+          title="Assessments"
+          description="Manage organizations, access groups, templates, and campaigns. The section navigation is the entry point for every assessment-tool surface."
+        />
+      ) : (
+        <header className="space-y-1">
+          <h1 className="text-2xl font-bold text-foreground">Assessments</h1>
+          <p className="text-sm text-muted-foreground">
+            Manage organizations, access groups, templates, and campaigns. The
+            sidebar is the entry point for every assessment-tool surface.
+          </p>
+        </header>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-3">

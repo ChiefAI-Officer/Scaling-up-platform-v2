@@ -15,12 +15,14 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth/auth";
 import Link from "next/link";
 import { AccessGroupDetail } from "@/components/admin/AccessGroupDetail";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 
 interface Props {
   params: Promise<{ id: string }>;
 }
 
 export default async function AdminAccessGroupDetailPage({ params }: Props) {
+  const mobileResponsiveEnabled = isMobileResponsiveEnabled();
   const session = await getServerSession(authOptions);
   if (!session) {
     redirect("/login");
@@ -33,7 +35,11 @@ export default async function AdminAccessGroupDetailPage({ params }: Props) {
   const { id } = await params;
 
   return (
-    <div className="space-y-6">
+    <div
+      className={
+        mobileResponsiveEnabled ? "min-w-0 max-w-full space-y-6" : "space-y-6"
+      }
+    >
       <nav className="wf-breadcrumb" aria-label="Breadcrumb">
         <Link href="/admin/assessments">Assessments</Link>
         <span className="wf-breadcrumb-sep">›</span>
@@ -42,7 +48,7 @@ export default async function AdminAccessGroupDetailPage({ params }: Props) {
         <span>Detail</span>
       </nav>
 
-      <AccessGroupDetail accessGroupId={id} />
+      <AccessGroupDetail accessGroupId={id} responsiveEnabled={mobileResponsiveEnabled} />
     </div>
   );
 }

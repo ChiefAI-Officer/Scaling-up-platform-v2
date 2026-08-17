@@ -6,8 +6,11 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { RegistrationsTable } from "./registrations-table";
 import { Button } from "@/components/ui/button";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
+import { PageHeader } from "@/components/ui/page-header";
 
 export default async function AdminRegistrationsPage() {
+  const mobileResponsiveEnabled = isMobileResponsiveEnabled();
   const session = await getServerSession(authOptions);
 
   if (!session) {
@@ -35,8 +38,9 @@ export default async function AdminRegistrationsPage() {
   });
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className={mobileResponsiveEnabled ? "min-w-0 max-w-full space-y-6" : "space-y-6"}>
+      {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- API export must use a document request. */}
+      {mobileResponsiveEnabled ? <PageHeader responsiveEnabled title="Contacts" description="All confirmed registrations across all workshops." actions={<Button asChild variant="outline" className="min-h-11"><a href="/api/registrations/export">Export All</a></Button>} /> : <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Contacts</h1>
           <p className="text-muted-foreground mt-1">
@@ -44,10 +48,11 @@ export default async function AdminRegistrationsPage() {
           </p>
         </div>
         <Button asChild variant="outline">
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- API export must use a document request. */}
           <a href="/api/registrations/export">Export All</a>
         </Button>
-      </div>
-      <RegistrationsTable registrations={registrations} />
+      </div>}
+      <RegistrationsTable registrations={registrations} responsiveEnabled={mobileResponsiveEnabled} />
     </div>
   );
 }

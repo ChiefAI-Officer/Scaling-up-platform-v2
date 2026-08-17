@@ -14,6 +14,26 @@ const { createAssessmentReportE2eWebServer } = require("./scripts/report-style-e
 const configuredWorkers = Number(process.env.PLAYWRIGHT_WORKERS || "1");
 const workers = Number.isFinite(configuredWorkers) && configuredWorkers > 0 ? configuredWorkers : 1;
 
+function previewBaseUrl(override: string | undefined): string | undefined {
+  if (override === undefined || override === "") return undefined;
+  if (override.trim() !== override) {
+    throw new Error("PLAYWRIGHT_BASE_URL must be an absolute http: or https: URL.");
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(override);
+  } catch {
+    throw new Error("PLAYWRIGHT_BASE_URL must be an absolute http: or https: URL.");
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error("PLAYWRIGHT_BASE_URL must be an absolute http: or https: URL.");
+  }
+  return override;
+}
+
+const authorizedPreviewBaseUrl = previewBaseUrl(process.env.PLAYWRIGHT_BASE_URL);
+
 export default defineConfig({
   testDir: "./e2e",
   /* Run tests in files in parallel */
@@ -32,7 +52,7 @@ export default defineConfig({
   /* Shared settings for all the projects below */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
-    baseURL: "http://localhost:3000",
+    baseURL: authorizedPreviewBaseUrl || "http://localhost:3000",
     /* Collect trace when retrying the failed test */
     trace: "on-first-retry",
     /* Screenshot on failure */
@@ -59,6 +79,38 @@ export default defineConfig({
       name: "Mobile Chrome",
       use: { ...devices["Pixel 5"] },
     },
+    {
+      name: "responsive-compact",
+      use: {
+        ...devices["Desktop Chrome"],
+        viewport: { width: 320, height: 844 },
+        hasTouch: true,
+        isMobile: true,
+      },
+    },
+    {
+      name: "responsive-medium",
+      use: {
+        ...devices["Desktop Chrome"],
+        viewport: { width: 768, height: 1024 },
+        hasTouch: true,
+      },
+    },
+    {
+      name: "responsive-tablet-wide",
+      use: {
+        ...devices["Desktop Chrome"],
+        viewport: { width: 1024, height: 768 },
+        hasTouch: true,
+      },
+    },
+    {
+      name: "responsive-desktop",
+      use: {
+        ...devices["Desktop Chrome"],
+        viewport: { width: 1440, height: 900 },
+      },
+    },
     // Enable for full cross-browser testing
     // {
     //   name: "Mobile Safari",
@@ -67,5 +119,5 @@ export default defineConfig({
   ],
 
   /* Build and run a production server only after the disposable DB guard. */
-  webServer: createAssessmentReportE2eWebServer(process.env),
+  webServer: authorizedPreviewBaseUrl ? undefined : createAssessmentReportE2eWebServer(process.env),
 });

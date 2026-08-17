@@ -5,6 +5,7 @@ import {
   SurveyResultsView,
   type SurveyResultTemplateGroup,
 } from "@/components/surveys/survey-results-view";
+import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 
 interface SurveyResultsPageProps {
   params: Promise<{ id: string }>;
@@ -15,6 +16,7 @@ export default async function CoachSurveyResultsPage({
 }: SurveyResultsPageProps) {
   const { id: workshopId } = await params;
   const { coach } = await requireCoach();
+  const mobileResponsiveEnabled = isMobileResponsiveEnabled();
 
   const workshop = await db.workshop.findFirst({
     where: { id: workshopId, coachId: coach.id },
@@ -70,11 +72,19 @@ export default async function CoachSurveyResultsPage({
     });
   }
 
-  return (
+  const resultsView = (
     <SurveyResultsView
       workshopTitle={workshop.title}
       backHref={`/portal/workshops/${workshopId}`}
       templateGroups={Array.from(templateMap.values())}
     />
+  );
+
+  return mobileResponsiveEnabled ? (
+    <div className="min-w-0 max-w-full" data-responsive-container="">
+      {resultsView}
+    </div>
+  ) : (
+    resultsView
   );
 }
