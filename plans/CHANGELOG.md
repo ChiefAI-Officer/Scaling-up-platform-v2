@@ -6,6 +6,15 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="su-full-individual-peer-comparison-launched"></a>
+### 2026-08-17 — Scaling Up Full individual peer comparison launched <!-- ENTRY_ISO:2026-08-17 ENTRY_SLUG:su-full-individual-peer-comparison-launched -->
+
+**Status: LAUNCHED + HEALTH/AUTH-BOUNDARY VERIFIED; AUTHORIZED VISUAL SMOKE PENDING.** Activation PR [#361](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/361) received independent approval, passed Build, Migration Safety Gate, Assessment Email Lease (PostgreSQL), Vercel, and Vercel Preview Comments, then squash-merged as `af2b0a47dae28353f93998b364d7cacbee231402`. The existing sensitive Production variable `WAVE_S_PEER_BENCHMARKS_ENABLED` was updated through Vercel's authenticated API path; `WAVE_S_PEER_BENCHMARKS_KILL` remains logically off. Because Vercel environment changes affect only new deployments, the exact merged activation deployment was rebuilt after the update. Ready deployment `dpl_DT1MeunntHmts1WbFkTQpMAzTWtK`, created at `2026-08-17T12:57:38Z`, owns `scaling-up-platform-v2.vercel.app`, `platformtest.scalingup.com`, and the main aliases.
+
+**Production safety and smoke receipt.** Before activation, the committed read-only verifier confirmed active English Edition **4**, exactly **61** active/stored/governed QUESTION keys `Q01`–`Q61`, finite values inside `[0, 10]`, and greatest benchmark update `2026-08-14T11:57:04.945Z`; no benchmark seed or Prisma mutation ran. After redeploy, both canonical `/api/health` endpoints returned HTTP `200`, `status=healthy`, `checks.database=healthy`, and `checks.authPosture=safe`. An unauthenticated individual-report request was intercepted with HTTP `307` and a NextAuth sign-in redirect, and the live login page rendered in the in-app browser. No authorized Production browser session was available, so the Classic overview/detail bars, browser-print PDF, invited on-screen result, and unchanged Executive/Modern views were not falsely claimed as observed. No assessment, campaign, response, invitation, report record, benchmark row, template version, email, schema, migration, or customer data was created or changed during smoke testing.
+
+**Rollback and remaining acceptance.** Turning on `WAVE_S_PEER_BENCHMARKS_KILL` restores the generic report path without deleting benchmark rows; the group report, growth-phase survey, report email, public mini-quiz, and scoring/feedback selection remain outside this release. Complete the final read-only visual acceptance by signing into Production in Chrome and opening one existing Classic Scaling Up Full individual report; then inspect both peer surfaces and browser print, plus one existing Executive or Modern report if available. Do not submit an assessment or create test Production data.
+
 <a id="su-full-individual-peer-comparison-activation-ready"></a>
 ### 2026-08-17 — Scaling Up Full individual peer comparison activation ready <!-- ENTRY_ISO:2026-08-17 ENTRY_SLUG:su-full-individual-peer-comparison-activation-ready -->
 
