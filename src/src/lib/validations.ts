@@ -244,6 +244,16 @@ export const changePasswordSchema = z
         message: "New passwords do not match",
     });
 
+export const adminSetCoachPasswordSchema = z
+    .object({
+        newPassword: strongPasswordSchema,
+        confirmNewPassword: z.string().min(1, "Please confirm the password"),
+    })
+    .refine((data) => data.newPassword === data.confirmNewPassword, {
+        path: ["confirmNewPassword"],
+        message: "Passwords do not match",
+    });
+
 export const forgotPasswordSchema = z.object({
     email: emailSchema,
 });

@@ -55,6 +55,7 @@ jest.mock("@/lib/utils", () => {
 
 import {
   prepareAssessmentInvitationEmail,
+  sendCoachPasswordSetByAdminEmail,
   sendWorkshopDateChangeEmail,
 } from "@/services/notifications";
 import { db } from "@/lib/db";
@@ -91,6 +92,40 @@ const baseParams = {
   durationHours: 8,
   landingPageUrl: "https://example.com/workshop/scaling-up",
 };
+
+describe("sendCoachPasswordSetByAdminEmail", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockSendEmailViaSMTP.mockResolvedValue(undefined);
+  });
+
+  it("advises the coach to contact their administrator without sending credentials or an action link", async () => {
+    await sendCoachPasswordSetByAdminEmail({
+      coachEmail: "coach@example.com",
+      coachName: "Casey Coach",
+    });
+
+    expect(mockSendEmailViaSMTP).toHaveBeenCalledTimes(1);
+    const email = mockSendEmailViaSMTP.mock.calls[0][0];
+    expect(email.to).toBe("coach@example.com");
+    expect(`${email.subject} ${email.html}`).toMatch(/password.*administrator|administrator.*password/i);
+    expect(email.html).toMatch(/contact your administrator/i);
+    expect(email.html).not.toMatch(/href=|reset-password|token=/i);
+    expect(JSON.stringify(email)).not.toContain("StrongPass1!");
+    expect(JSON.stringify(email)).not.toContain("passwordHash");
+  });
+
+  it("propagates delivery failures so the admin can retry the notification", async () => {
+    mockSendEmailViaSMTP.mockRejectedValue(new Error("SMTP unavailable"));
+
+    await expect(
+      sendCoachPasswordSetByAdminEmail({
+        coachEmail: "coach@example.com",
+        coachName: "Casey Coach",
+      }),
+    ).rejects.toThrow("SMTP unavailable");
+  });
+});
 
 // ---------------------------------------------------------------------------
 // Tests
