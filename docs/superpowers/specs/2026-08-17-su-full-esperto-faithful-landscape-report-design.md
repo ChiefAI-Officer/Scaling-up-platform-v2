@@ -1,6 +1,6 @@
 # Scaling Up Full Esperto-faithful landscape report design
 
-Date: 2026-08-17  
+Date: 2026-08-17
 Status: Draft for written-spec approval
 
 ## 1. Purpose
