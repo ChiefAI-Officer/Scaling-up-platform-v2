@@ -94,7 +94,10 @@ function isAuthSensitivePath(pathname: string): boolean {
     pathname === "/api/auth/change-password" ||
     pathname === "/api/auth/coach-signup" ||
     pathname === "/api/auth/callback/credentials" ||
-    pathname === "/api/auth/signin/credentials"
+    pathname === "/api/auth/signin/credentials" ||
+    /^\/api\/coaches\/[^/]+\/(?:set-password|password-set-notification|send-password-reset)$/.test(
+      pathname,
+    )
   );
 }
 
@@ -229,4 +232,3 @@ export function enforceGlobalApiRateLimit(input: GlobalRateLimitInput): GlobalRa
     },
   };
 }
-

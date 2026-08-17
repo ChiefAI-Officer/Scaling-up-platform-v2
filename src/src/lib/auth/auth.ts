@@ -17,6 +17,7 @@ export function isCanonicalAdminEmail(email: string): boolean {
 
 declare module "next-auth" {
   interface Session {
+    sessionRevoked?: boolean;
     user: {
       id: string;
       email: string;
@@ -28,6 +29,7 @@ declare module "next-auth" {
 
   interface User {
     role: UserRole;
+    authVersion: number;
   }
 }
 
@@ -35,6 +37,8 @@ declare module "next-auth/jwt" {
   interface JWT {
     id: string;
     role: UserRole;
+    authVersion?: number;
+    sessionRevoked?: boolean;
   }
 }
 
@@ -128,6 +132,7 @@ export const authOptions: NextAuthOptions = {
           name: user.name,
           role: user.role as UserRole,
           image: user.image,
+          authVersion: user.authVersion,
         };
       },
     }),
@@ -137,7 +142,28 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id;
         token.role = user.role;
+        token.authVersion = user.authVersion;
+        token.sessionRevoked = false;
+        return token;
       }
+
+      if (token.sessionRevoked || !token.id) {
+        token.sessionRevoked = true;
+        return token;
+      }
+
+      const liveUser = await db.user.findUnique({
+        where: { id: token.id },
+        select: { authVersion: true, deletedAt: true },
+      });
+      const tokenVersion =
+        typeof token.authVersion === "number" ? token.authVersion : 0;
+
+      token.authVersion = tokenVersion;
+      token.sessionRevoked =
+        !liveUser ||
+        Boolean(liveUser.deletedAt) ||
+        liveUser.authVersion !== tokenVersion;
       return token;
     },
     async session({ session, token }) {
@@ -145,6 +171,7 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.id;
         session.user.role = token.role;
       }
+      session.sessionRevoked = Boolean(token.sessionRevoked);
       return session;
     },
   },

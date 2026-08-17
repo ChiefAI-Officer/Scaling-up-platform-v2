@@ -112,4 +112,16 @@ describe("(dashboard)/layout — liveness", () => {
       "REDIRECT:/unauthorized"
     );
   });
+
+  it("redirects a credential-revoked session before reading dashboard data", async () => {
+    (getServerSession as jest.Mock).mockResolvedValue({
+      ...SESSION,
+      sessionRevoked: true,
+    });
+
+    await expect(DashboardLayout({ children: null })).rejects.toThrow(
+      "REDIRECT:/login"
+    );
+    expect(db.user.findUnique).not.toHaveBeenCalled();
+  });
 });
