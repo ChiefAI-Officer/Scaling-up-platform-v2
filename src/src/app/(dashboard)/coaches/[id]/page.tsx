@@ -127,8 +127,8 @@ export default async function CoachDetailPage({
     <div className="space-y-6">
       {/* Header */}
       <FadeUp>
-      <div className="flex justify-between items-start">
-        <div>
+      <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-start">
+        <div className="min-w-0">
           <div className="flex items-center gap-3 mb-2">
             <Link
               href="/coaches"
@@ -137,7 +137,7 @@ export default async function CoachDetailPage({
               &larr; Coaches
             </Link>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex min-w-0 items-center gap-4">
             {coach.profileImage ? (
               <img
                 src={coach.profileImage}
@@ -145,17 +145,17 @@ export default async function CoachDetailPage({
                 className="w-16 h-16 rounded-full object-cover"
               />
             ) : (
-              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
+              <div className="w-16 h-16 shrink-0 bg-primary/10 rounded-full flex items-center justify-center">
                 <span className="text-xl font-medium text-primary">
                   {coach.firstName[0]}{coach.lastName[0]}
                 </span>
               </div>
             )}
-            <div>
+            <div className="min-w-0">
               <h1 className="text-2xl font-bold text-foreground">
                 {coach.firstName} {coach.lastName}
               </h1>
-              <p className="text-muted-foreground">{coach.email}</p>
+              <p className="text-muted-foreground break-all">{coach.email}</p>
             </div>
           </div>
           <div className="flex items-center gap-3 mt-3">
@@ -173,7 +173,7 @@ export default async function CoachDetailPage({
             </Badge>
           </div>
         </div>
-        <div className="flex flex-wrap justify-end gap-2">
+        <div className="flex flex-wrap justify-end gap-2 w-full sm:w-auto">
           {isAdmin && passwordActionsEnabled ? (
             <SetPasswordButton
               coachId={coach.id}

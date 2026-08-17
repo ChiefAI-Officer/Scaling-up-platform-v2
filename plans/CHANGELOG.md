@@ -6,6 +6,17 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="admin-coach-password-actions-implemented"></a>
+### 2026-08-17 — Admin coach-password actions implemented <!-- ENTRY_ISO:2026-08-17 ENTRY_SLUG:admin-coach-password-actions-implemented -->
+
+**Status: IMPLEMENTED + LOCALLY VERIFIED; PRODUCTION CODE/FLAGS PENDING.** The Coach Detail header now presents **Set Password**, **Send Password Reset**, and **Edit Coach** in the approved order. Set Password is ADMIN-only and uses a two-step dialog ending at **Set Password & Sign Out Coach**. A successful submission immediately makes the chosen password current, revokes the coach's existing sessions, and records the privileged action. The follow-up email contains no password or action link and tells the coach that their admin set the password and that they must contact the admin for access. If that email fails after the credential commits, the UI preserves the success state and exposes **Retry Notification** without re-running the password change.
+
+**Reset and session safety.** ADMIN and STAFF retain the separate reset action. With the capability enabled it sends a dedicated single-use link valid for 15 minutes; sending the link does not alter the current password or session, while successful completion rotates the credential and revokes prior sessions. JWTs carry the user's live `authVersion`; legacy versionless JWTs are treated as version zero, and missing, deleted, or version-mismatched users fail closed at protected server/API gates. Invite revival also advances the version so an old credential session cannot survive account restoration. The set-password endpoint additionally requires one live linked COACH user, rejects self/non-coach targets, and uses the existing auth rate-limit class. A default-off capability flag and independent kill switch cover all enhanced behavior.
+
+**Schema and visual evidence.** The additive `User.authVersion Int @default(0)` migration was deployed ahead of application code and is inert for the existing release. Read-only browser acceptance covered the header and both dialogs at desktop width and 320px using a disposable demo admin/coach fixture. Neither credential action was submitted and no email was sent. The narrow mobile pass found the old header's horizontal overflow; the responsive stack/wrap and email breaking fix removed it (`scrollWidth` no longer exceeds the 320px viewport). The exact disposable fixture was then deleted.
+
+**Verification.** The complete repository passed **701/701 suites, 8,705/8,705 tests, and 16/16 snapshots**. The final focused matrix passed **16/16 suites and 152/152 tests** after the responsive correction. Changed-file ESLint emitted no errors and retained one pre-existing `<img>` warning in Coach Detail; migration safety approved all **48 migrations**; `git diff --check` passed; and the final Production-equivalent Turbopack build compiled, passed TypeScript, and generated **94/94** pages. No real coach password, session, notification, or reset email was changed or sent.
+
 <a id="referred-results-template-name-sync"></a>
 ### 2026-08-17 — Referred Results follows assessment-template renames <!-- ENTRY_ISO:2026-08-17 ENTRY_SLUG:referred-results-template-name-sync -->
 
