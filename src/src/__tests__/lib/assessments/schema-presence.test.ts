@@ -78,5 +78,12 @@ describe("Assessment v7.6 schema presence", () => {
             expect(field.type).toBe("String");
             expect(field.isRequired).toBe(false);
         });
+
+        it("AssessmentTemplate.deliveryType is a required enum", () => {
+            const field = findField("AssessmentTemplate", "deliveryType");
+            expect(field.type).toBe("AssessmentTemplateDeliveryType");
+            expect(field.kind).toBe("enum");
+            expect(field.isRequired).toBe(true);
+        });
     });
 });
