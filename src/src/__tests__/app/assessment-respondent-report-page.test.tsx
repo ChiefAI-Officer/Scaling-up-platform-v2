@@ -720,7 +720,7 @@ describe("(report) respondent report page — report-native comparison", () => {
 });
 
 describe("(report) route-group layout — print regression (H1)", () => {
-  it("wraps children in the brand scope and imports no portal nav", async () => {
+  it("wraps children in one route-level main brand scope and imports no portal nav", async () => {
     const LayoutMod = await import("@/app/(report)/layout");
     const Layout = LayoutMod.default as (props: {
       children: React.ReactNode;
@@ -732,6 +732,8 @@ describe("(report) route-group layout — print regression (H1)", () => {
     expect(markup).toContain("su-public-brand");
     expect(markup).toContain("su-report");
     expect(markup).toContain('data-testid="child"');
+    expect(markup.match(/<main\b/g)).toHaveLength(1);
+    expect(markup).toMatch(/^<main\b[^>]*>.*<\/main>$/);
 
     expect(markup).not.toContain("Scaling Up Coach");
     expect(markup).not.toContain("bg-sidebar");
@@ -744,5 +746,11 @@ describe("(report) route-group layout — print regression (H1)", () => {
     );
     expect(src).not.toMatch(/coach-nav|coach-mobile-nav|coach-nav-link|CoachNav/);
     expect(src).not.toMatch(/(?:import|from)[^\n]*\(portal\)/);
+    for (const reportPage of [
+      "src/app/(report)/assessments/[id]/respondents/[respondentId]/report/page.tsx",
+      "src/app/(report)/assessments/public-submissions/[submissionId]/report/page.tsx",
+    ]) {
+      expect(fs.readFileSync(path.join(process.cwd(), reportPage), "utf8")).not.toMatch(/<main\b/);
+    }
   });
 });

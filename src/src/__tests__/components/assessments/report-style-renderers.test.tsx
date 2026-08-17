@@ -20,6 +20,23 @@ import {
   completeSuFullPeerReport,
 } from "@/__tests__/fixtures/su-full-peer";
 import { buildSuFullPeerPresentationResult } from "@/lib/assessments/su-full-peer-presentation";
+import {
+  completeSuFullLandscapePresentation,
+  completeSuFullLandscapeReport,
+} from "@/__tests__/fixtures/su-full-landscape";
+
+const LANDSCAPE_ENABLED = "NEXT_PUBLIC_WAVE_SU_FULL_LANDSCAPE_REPORT_ENABLED";
+
+function withLandscapeGateOn<T>(test: () => T): T {
+  const saved = process.env[LANDSCAPE_ENABLED];
+  process.env[LANDSCAPE_ENABLED] = "1";
+  try {
+    return test();
+  } finally {
+    if (saved === undefined) delete process.env[LANDSCAPE_ENABLED];
+    else process.env[LANDSCAPE_ENABLED] = saved;
+  }
+}
 
 const identity = {
   assessmentName: "Authored assessment title",
@@ -323,54 +340,55 @@ describe("adaptive alternate report renderers", () => {
   ] as const)(
     "does not render the Classic SU Full peer sequence in %s",
     (reportStyle, rendererTestId) => {
-      const report = completeSuFullPeerReport();
-      const built = buildSuFullPeerPresentationResult({
-        report,
-        benchmarks: completeSuFullBenchmarkRows(),
+      withLandscapeGateOn(() => {
+        const report = completeSuFullLandscapeReport();
+
+        render(
+          <BrandedReport
+            report={{
+              ...report,
+              reportStyle,
+              suFullPeerPresentation: completeSuFullLandscapePresentation(report),
+            }}
+            reportStylesAvailable
+          />,
+        );
+
+        expect(screen.getByTestId(rendererTestId)).toBeInTheDocument();
+        expect(screen.queryByTestId("su-full-peer-sequence")).not.toBeInTheDocument();
+        expect(screen.queryByTestId("su-full-landscape-report")).not.toBeInTheDocument();
       });
-      if (built.status !== "ready") throw new Error(built.reason);
-
-      render(
-        <BrandedReport
-          report={{
-            ...report,
-            reportStyle,
-            suFullPeerPresentation: built.presentation,
-          }}
-          reportStylesAvailable
-        />,
-      );
-
-      expect(screen.getByTestId(rendererTestId)).toBeInTheDocument();
-      expect(screen.queryByTestId("su-full-peer-sequence")).not.toBeInTheDocument();
     },
   );
 
   it.each(["rockefeller-habits", "leadership-vision-alignment"])(
     "ignores an SU Full peer payload for the %s Classic report",
     (templateAlias) => {
-      const suFull = completeSuFullPeerReport();
-      const built = buildSuFullPeerPresentationResult({
-        report: suFull,
-        benchmarks: completeSuFullBenchmarkRows(),
-      });
-      if (built.status !== "ready") throw new Error(built.reason);
-      const report = {
-        ...suFull,
-        templateAlias,
-        suFullPeerPresentation: built.presentation,
-      };
-      const withoutPayload = {
-        ...report,
-        suFullPeerPresentation: null,
-      };
+      withLandscapeGateOn(() => {
+        const suFull = completeSuFullPeerReport();
+        const built = buildSuFullPeerPresentationResult({
+          report: suFull,
+          benchmarks: completeSuFullBenchmarkRows(),
+        });
+        if (built.status !== "ready") throw new Error(built.reason);
+        const report = {
+          ...suFull,
+          templateAlias,
+          suFullPeerPresentation: built.presentation,
+        };
+        const withoutPayload = {
+          ...report,
+          suFullPeerPresentation: null,
+        };
 
-      const rendered = render(<LegacyClassicReport report={report} />);
-      const withPayloadHtml = rendered.container.innerHTML;
-      expect(screen.queryByTestId("su-full-peer-sequence")).not.toBeInTheDocument();
-      rendered.unmount();
-      expect(render(<LegacyClassicReport report={withoutPayload} />).container.innerHTML)
-        .toBe(withPayloadHtml);
+        const rendered = render(<LegacyClassicReport report={report} />);
+        const withPayloadHtml = rendered.container.innerHTML;
+        expect(screen.queryByTestId("su-full-peer-sequence")).not.toBeInTheDocument();
+        expect(screen.queryByTestId("su-full-landscape-report")).not.toBeInTheDocument();
+        rendered.unmount();
+        expect(render(<LegacyClassicReport report={withoutPayload} />).container.innerHTML)
+          .toBe(withPayloadHtml);
+      });
     },
   );
 

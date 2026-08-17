@@ -7,8 +7,30 @@ import {
   completeSuFullBenchmarkRows,
   completeSuFullPeerReport,
 } from "@/__tests__/fixtures/su-full-peer";
+import {
+  completeSuFullLandscapePresentation,
+  completeSuFullLandscapeReport,
+} from "@/__tests__/fixtures/su-full-landscape";
 import { buildSuFullPeerPresentationResult } from "@/lib/assessments/su-full-peer-presentation";
 import { reviveOnScreenReport } from "@/lib/assessments/onscreen-result-store";
+
+const LANDSCAPE_ENABLED = "NEXT_PUBLIC_WAVE_SU_FULL_LANDSCAPE_REPORT_ENABLED";
+const LANDSCAPE_KILL = "NEXT_PUBLIC_WAVE_SU_FULL_LANDSCAPE_REPORT_KILL";
+const savedLandscapeEnv: Record<string, string | undefined> = {};
+
+beforeEach(() => {
+  for (const key of [LANDSCAPE_ENABLED, LANDSCAPE_KILL]) {
+    savedLandscapeEnv[key] = process.env[key];
+    delete process.env[key];
+  }
+});
+
+afterEach(() => {
+  for (const key of [LANDSCAPE_ENABLED, LANDSCAPE_KILL]) {
+    if (savedLandscapeEnv[key] === undefined) delete process.env[key];
+    else process.env[key] = savedLandscapeEnv[key];
+  }
+});
 
 function suFullReportWithPeers() {
   const report = completeSuFullPeerReport();
@@ -35,7 +57,15 @@ function presentationFor(report = completeSuFullPeerReport()) {
   return built.presentation;
 }
 
-test("renders the Classic SU Full overview and detail sequence without duplicate generic content", () => {
+function suFullLandscapeReportWithPeers() {
+  const report = completeSuFullLandscapeReport();
+  return {
+    ...report,
+    suFullPeerPresentation: completeSuFullLandscapePresentation(report),
+  };
+}
+
+test("keeps the shipped Classic SU Full peer sequence while the landscape gate is OFF", () => {
   render(<BrandedReport report={suFullReportWithPeers()} />);
 
   const overview = screen.getByTestId(
@@ -63,6 +93,70 @@ test("renders the Classic SU Full overview and detail sequence without duplicate
   expect(screen.getAllByText("Frozen feedback Q01")).toHaveLength(1);
 });
 
+test("renders the complete Classic SU Full peer report as the landscape composition when the gate is ON", () => {
+  process.env[LANDSCAPE_ENABLED] = "1";
+  render(<BrandedReport report={suFullLandscapeReportWithPeers()} contactEmail="coach@example.com" />);
+
+  const landscape = screen.getByTestId("su-full-landscape-report");
+  expect(landscape).toBeInTheDocument();
+  expect(landscape.closest(".su-public-brand.su-report.su-full-landscape")).toBeInTheDocument();
+  expect(screen.queryByTestId("su-full-peer-sequence")).not.toBeInTheDocument();
+  expect(screen.queryByTestId("report-sections")).not.toBeInTheDocument();
+
+  const chapterPolylines = [7, 11, 14, 19, 21].flatMap((number) =>
+    Array.from(screen.getByTestId(`su-full-landscape-page-${number}`).querySelectorAll("polyline")),
+  );
+  const appendixPolylines = Array.from(
+    screen.getByTestId("su-full-landscape-page-26").querySelectorAll("polyline"),
+  );
+  expect(chapterPolylines).toHaveLength(5);
+  expect(appendixPolylines).toHaveLength(5);
+  for (const polyline of [...chapterPolylines, ...appendixPolylines]) {
+    expect(polyline).not.toHaveAttribute("stroke-dasharray");
+  }
+
+  const details = screen.getAllByTestId(/^su-full-landscape-detail-Q/);
+  expect(details).toHaveLength(61);
+  for (const detail of details) {
+    expect(within(detail).getByTestId(`su-landscape-detail-bars-${detail.dataset.questionKey}`)).toBeInTheDocument();
+    expect(detail).toHaveTextContent("Frozen feedback");
+  }
+});
+
+test("keeps valid peers on the shipped sequence when landscape composition fails", () => {
+  process.env[LANDSCAPE_ENABLED] = "1";
+  const warning = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+  const report = suFullReportWithPeers();
+  render(<BrandedReport report={{ ...report, respondentName: "PII Name", respondentEmail: "pii@example.com" }} />);
+
+  expect(screen.getByTestId("su-full-peer-sequence")).toBeInTheDocument();
+  expect(screen.queryByTestId("su-full-landscape-report")).not.toBeInTheDocument();
+  expect(screen.queryByTestId("report-sections")).not.toBeInTheDocument();
+  expect(warning).toHaveBeenCalledTimes(1);
+  expect(warning).toHaveBeenCalledWith("assessment.su_full_landscape.fallback", {
+    reason: "INCOMPLETE_FROZEN_REPORT",
+    resolvedStyle: "CLASSIC",
+  });
+  expect(JSON.stringify(warning.mock.calls)).not.toMatch(/PII Name|pii@example\.com|submission|campaign/i);
+  warning.mockRestore();
+});
+
+test("renders landscape for stored unavailable style after it resolves to Classic", () => {
+  process.env[LANDSCAPE_ENABLED] = "1";
+  const report = suFullLandscapeReportWithPeers();
+  const warning = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+
+  render(<BrandedReport report={{ ...report, reportStyle: "EXECUTIVE_BOARDROOM" }} />);
+
+  expect(screen.getByTestId("su-full-landscape-report")).toBeInTheDocument();
+  expect(warning).toHaveBeenCalledWith("assessment.report_style.fallback", expect.objectContaining({
+    requestedStyle: "EXECUTIVE_BOARDROOM",
+    resolvedStyle: "CLASSIC",
+    fallbackReason: "UNAVAILABLE",
+  }));
+  warning.mockRestore();
+});
+
 test("scopes responsive and print-safe paired-bar styles to the SU report", () => {
   const css = readFileSync(
     join(process.cwd(), "src", "styles", "su-report.css"),
@@ -86,7 +180,7 @@ test("scopes responsive and print-safe paired-bar styles to the SU report", () =
   );
 });
 
-test("keeps every overview and detail comparison explicit, identical, and independent", () => {
+test("keeps every overview and detail comparison explicit, identical, and independent while the gate is OFF", () => {
   const presentation = presentationFor();
   render(
     <BrandedReport
@@ -124,9 +218,6 @@ test("keeps every overview and detail comparison explicit, identical, and indepe
     }
   }
 
-  expect(sequence.querySelector("svg")).toBeNull();
-  expect(sequence.querySelector("path")).toBeNull();
-  expect(sequence.querySelector(".connected-contour")).toBeNull();
 });
 
 test("omits blank frozen feedback without inventing placeholder copy", () => {
@@ -169,6 +260,7 @@ test.each([
 ] as const)(
   "preserves generic sections and recommendations when the peer model is %s",
   (_label, suFullPeerPresentation) => {
+    process.env[LANDSCAPE_ENABLED] = "1";
     render(
       <BrandedReport
         report={{
@@ -183,10 +275,12 @@ test.each([
       "Frozen feedback Q01",
     );
     expect(screen.queryByTestId("su-full-peer-sequence")).not.toBeInTheDocument();
+    expect(document.querySelector(".su-landscape-vertical-chart")).toBeNull();
   },
 );
 
 test("an invalid revived peer presentation falls back to the unchanged Classic report", () => {
+  process.env[LANDSCAPE_ENABLED] = "1";
   const revived = reviveOnScreenReport({
     ...completeSuFullPeerReport(),
     suFullPeerPresentation: {
@@ -203,4 +297,5 @@ test("an invalid revived peer presentation falls back to the unchanged Classic r
     "Frozen feedback Q01",
   );
   expect(screen.queryByTestId("su-full-peer-sequence")).not.toBeInTheDocument();
+  expect(document.querySelector(".su-landscape-vertical-chart")).toBeNull();
 });

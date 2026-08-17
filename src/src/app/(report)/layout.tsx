@@ -7,7 +7,7 @@
  * report URL never inherits the portal chrome.
  *
  * The root layout (src/app/layout.tsx) already declares <html>/<body>, so we
- * only return a wrapper <div> — never redeclare the document shell.
+ * only return one semantic <main> wrapper — never redeclare the document shell.
  *
  * Brand scope (ADR-0005): everything is wrapped in `.su-public-brand .su-report`
  * so the public brand tokens + the detailed report CSS are fully scoped and
@@ -25,8 +25,8 @@ export default function ReportLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className={`su-public-brand su-report ${assessmentInter.variable} ${assessmentPlayfairDisplay.variable}`}>
+    <main className={`su-public-brand su-report ${assessmentInter.variable} ${assessmentPlayfairDisplay.variable}`}>
       {children}
-    </div>
+    </main>
   );
 }
