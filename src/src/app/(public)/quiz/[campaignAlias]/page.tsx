@@ -15,6 +15,8 @@ import { isCustomSlidesEnabled } from "@/lib/assessments/wave-m-flags";
 import { loadSafeSlides } from "@/lib/assessments/load-safe-slides";
 import { isReferredResultsEnabled } from "@/lib/assessments/wave-83-flags";
 import { isQspStoryGroupEnabled } from "@/lib/assessments/wave-48-flags";
+import { isPublicMarketingCtaEnabled } from "@/lib/assessments/wave-public-marketing-cta-flags";
+import { loadPublicMarketingResultConfig } from "@/lib/assessments/public-marketing-result";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -47,7 +49,7 @@ export default async function PublicQuizPage({
       deletedAt: true,
       // Wave M (#19): coach-authored custom slides (raw CustomSlide[] JSON).
       customSlides: true,
-      template: { select: { id: true, name: true, alias: true } },
+      template: { select: { id: true, name: true, alias: true, deliveryType: true } },
     },
   });
   // SEC-M6: a soft-deleted campaign is invisible — 404 like a missing one.
@@ -61,6 +63,7 @@ export default async function PublicQuizPage({
       questions: true,
       sections: true,
       publishedAt: true,
+      reportConfig: true,
     },
   });
   if (!version || version.publishedAt === null) {
@@ -82,6 +85,11 @@ export default async function PublicQuizPage({
   const customSlides = isCustomSlidesEnabled(campaign.id)
     ? loadSafeSlides(campaign.customSlides)
     : [];
+  const marketingResultConfig =
+    isPublicMarketingCtaEnabled() &&
+    campaign.template.deliveryType === "PUBLIC_MARKETING_QUIZ"
+      ? loadPublicMarketingResultConfig(version.reportConfig)
+      : null;
 
   // Render the client directly (no constrained wrapper) so the full-bleed
   // branded welcome shell matches the org-survey flow + the approved mockup.
@@ -99,6 +107,7 @@ export default async function PublicQuizPage({
       sections={version.sections as unknown}
       questions={version.questions as unknown}
       customSlides={customSlides}
+      marketingResultConfig={marketingResultConfig}
       {...(isReferredResultsEnabled()
         ? { referredResultsEnabled: true }
         : {})}
