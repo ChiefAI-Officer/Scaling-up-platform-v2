@@ -28,6 +28,11 @@ import {
   writeOnScreenResult,
   clearOnScreenResult,
 } from "@/lib/assessments/onscreen-result-store";
+import {
+  completeSuFullBenchmarkRows,
+  completeSuFullPeerReport,
+} from "@/__tests__/fixtures/su-full-peer";
+import { buildSuFullPeerPresentationResult } from "@/lib/assessments/su-full-peer-presentation";
 
 const ALIAS = "demo-campaign";
 
@@ -38,6 +43,15 @@ const ALIAS = "demo-campaign";
 const KEY = "inv_respondent_a";
 const OTHER_KEY = "inv_respondent_b";
 
+function completePeerPresentation() {
+  const built = buildSuFullPeerPresentationResult({
+    report: completeSuFullPeerReport(),
+    benchmarks: completeSuFullBenchmarkRows(),
+  });
+  if (built.status !== "ready") throw new Error(built.reason);
+  return built.presentation;
+}
+
 const sampleReport = {
   respondentName: "Resp Ondent",
   templateAlias: "scaling-up-full",
@@ -46,27 +60,7 @@ const sampleReport = {
   submittedAt: new Date("2026-07-29T10:30:00.000Z"),
   result: { countAchieved: 12 },
   degraded: false,
-  suFullPeerPresentation: {
-    benchmarkUpdatedAt: "2026-08-18T00:00:00.000Z",
-    sections: [
-      {
-        stableKey: "s_people",
-        label: "People",
-        domain: "People",
-        youTotal: 7,
-        peersTotal: 6.3,
-        questions: [
-          {
-            stableKey: "people_recruitment",
-            label: "Effective recruitment process",
-            you: 7,
-            peers: 6.3,
-            recommendation: null,
-          },
-        ],
-      },
-    ],
-  },
+  suFullPeerPresentation: completePeerPresentation(),
 };
 
 beforeEach(() => {
@@ -129,6 +123,107 @@ describe("round trip", () => {
       sampleReport.suFullPeerPresentation,
     );
     expect(revived?.submittedAt).toBeInstanceOf(Date);
+  });
+
+  const validPeerPresentation = completePeerPresentation();
+
+  it.each([
+    ["a malformed", "not-an-object"],
+    ["a missing-sections", { ...validPeerPresentation, sections: {} }],
+    ["an empty", { ...validPeerPresentation, sections: [] }],
+    [
+      "an incomplete",
+      {
+        ...validPeerPresentation,
+        sections: validPeerPresentation.sections.map((section, index, sections) =>
+          index === sections.length - 1
+            ? { ...section, questions: section.questions.slice(0, -1) }
+            : section,
+        ),
+      },
+    ],
+    [
+      "a stale",
+      {
+        ...validPeerPresentation,
+        sections: validPeerPresentation.sections.map((section, index, sections) =>
+          index === sections.length - 1
+            ? {
+                ...section,
+                questions: section.questions.map((question, questionIndex, questions) =>
+                  questionIndex === questions.length - 1
+                    ? { ...question, stableKey: "Q62" }
+                    : question,
+                ),
+              }
+            : section,
+        ),
+      },
+    ],
+    ["an invalid-date", { ...validPeerPresentation, benchmarkUpdatedAt: "2026-08-18" }],
+    [
+      "an out-of-range",
+      {
+        ...validPeerPresentation,
+        sections: validPeerPresentation.sections.map((section, index) =>
+          index === 0
+            ? {
+                ...section,
+                questions: section.questions.map((question, questionIndex) =>
+                  questionIndex === 0 ? { ...question, you: 10.1 } : question,
+                ),
+              }
+            : section,
+        ),
+      },
+    ],
+    [
+      "a wrong-total",
+      {
+        ...validPeerPresentation,
+        sections: validPeerPresentation.sections.map((section, index) =>
+          index === 0 ? { ...section, peersTotal: section.peersTotal + 0.1 } : section,
+        ),
+      },
+    ],
+    [
+      "a blank-label",
+      {
+        ...validPeerPresentation,
+        sections: validPeerPresentation.sections.map((section, index) =>
+          index === 0 ? { ...section, label: "   " } : section,
+        ),
+      },
+    ],
+    [
+      "an invalid-recommendation",
+      {
+        ...validPeerPresentation,
+        sections: validPeerPresentation.sections.map((section, index) =>
+          index === 0
+            ? {
+                ...section,
+                questions: section.questions.map((question, questionIndex) =>
+                  questionIndex === 0
+                    ? { ...question, recommendation: { text: "untrusted" } }
+                    : question,
+                ),
+              }
+            : section,
+        ),
+      },
+    ],
+  ])("strips %s optional peer presentation without rejecting the stored report", (_case, presentation) => {
+    writeOnScreenResult(
+      ALIAS,
+      { ...sampleReport, suFullPeerPresentation: presentation } as never,
+      KEY,
+    );
+
+    const revived = readOnScreenResult(ALIAS, KEY);
+
+    expect(revived?.respondentName).toBe(sampleReport.respondentName);
+    expect(revived?.suFullPeerPresentation).toBeUndefined();
   });
 
   it("does not leak across aliases", () => {

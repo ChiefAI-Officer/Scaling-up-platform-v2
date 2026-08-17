@@ -1,6 +1,22 @@
 jest.mock("@/lib/assessments/report-config", () => ({
   hasSourcePublicResult: jest.fn(() => false),
 }));
+jest.mock("@/lib/assessments/peer-benchmarks", () => {
+  const actual = jest.requireActual("@/lib/assessments/peer-benchmarks");
+  return {
+    ...actual,
+    buildPeerComparisonSection: jest.fn(actual.buildPeerComparisonSection),
+  };
+});
+jest.mock("@/lib/assessments/su-full-peer-presentation", () => {
+  const actual = jest.requireActual("@/lib/assessments/su-full-peer-presentation");
+  return {
+    ...actual,
+    buildSuFullPeerPresentationResult: jest.fn(
+      actual.buildSuFullPeerPresentationResult,
+    ),
+  };
+});
 
 import {
   resolvePeerReportEnhancements,
@@ -14,6 +30,8 @@ import {
 import { hasSourcePublicResult } from "@/lib/assessments/report-config";
 import { LVA_TEMPLATE_ALIAS } from "@/lib/assessments/lva-report-display";
 import { PEER_RENDER_ENABLED_ALIASES } from "@/lib/assessments/peer-benchmarks";
+import * as peerBenchmarksModule from "@/lib/assessments/peer-benchmarks";
+import * as suFullPeerPresentationModule from "@/lib/assessments/su-full-peer-presentation";
 import type { RespondentReport } from "@/lib/assessments/respondent-report";
 
 const findMany = jest.fn();
@@ -267,6 +285,81 @@ test("a benchmark DB failure retains the original report and logs only the error
   });
 });
 
+test("an unexpected SU Full builder exception retains the original report with bounded telemetry", async () => {
+  const report = completeSuFullPeerReport();
+  findMany.mockResolvedValue(completeSuFullBenchmarkRows());
+  jest
+    .mocked(suFullPeerPresentationModule.buildSuFullPeerPresentationResult)
+    .mockImplementationOnce(() => {
+      throw new EvalError("respondent answer must not reach telemetry");
+    });
+
+  const resolution = resolvePeerReportEnhancements({
+    db,
+    report,
+    templateId: "tpl-su",
+    reportStylesAvailable: true,
+    peerBenchmarksEnabled: true,
+    enabledAliases: ["scaling-up-full"],
+    logger: { warn },
+  });
+  await expect(resolution).resolves.toEqual({
+    report,
+    lvaPeerComparison: null,
+  });
+  const result = await resolution;
+
+  expect(result.report).toBe(report);
+  expect(warn).toHaveBeenCalledWith("assessment.peer_benchmark.unavailable", {
+    reason: "BUILD_ERROR",
+    templateAlias: "scaling-up-full",
+    templateId: "tpl-su",
+    submissionId: "sub-1",
+    versionId: "ver-4",
+    errorName: "EvalError",
+  });
+  expect(warn.mock.calls[0][1]).not.toHaveProperty("message");
+});
+
+test("an unexpected LVA builder exception retains the original report with bounded telemetry", async () => {
+  const report = lvaReport();
+  findMany.mockResolvedValue([
+    { metricKey: "S3_culture", value: 6.3, updatedAt: new Date("2026-08-14T00:00:00Z") },
+  ]);
+  jest
+    .mocked(peerBenchmarksModule.buildPeerComparisonSection)
+    .mockImplementationOnce(() => {
+      throw new RangeError("respondent answer must not reach telemetry");
+    });
+
+  const resolution = resolvePeerReportEnhancements({
+    db,
+    report,
+    templateId: "tpl-lva",
+    reportStylesAvailable: true,
+    peerBenchmarksEnabled: true,
+    enabledAliases: [LVA_TEMPLATE_ALIAS],
+    logger: { warn },
+  });
+  await expect(resolution).resolves.toEqual({
+    report,
+    lvaPeerComparison: null,
+  });
+  const result = await resolution;
+
+  expect(result.report).toBe(report);
+  expect(result.lvaPeerComparison).toBeNull();
+  expect(warn).toHaveBeenCalledWith("assessment.peer_benchmark.unavailable", {
+    reason: "BUILD_ERROR",
+    templateAlias: LVA_TEMPLATE_ALIAS,
+    templateId: "tpl-lva",
+    submissionId: "sub-1",
+    versionId: "ver-4",
+    errorName: "RangeError",
+  });
+  expect(warn.mock.calls[0][1]).not.toHaveProperty("message");
+});
+
 test("LVA preserves its existing PeerComparisonSection builder behavior", async () => {
   const report = lvaReport();
   findMany.mockResolvedValue([
@@ -416,3 +509,45 @@ test("a missing submission retains the original report without a benchmark query
     versionId: "ver-4",
   });
 });
+
+test.each(["campaign", "submission"] as const)(
+  "the %s wrapper intercepts an unexpected delegated rejection",
+  async (wrapperKind) => {
+    const report = completeSuFullPeerReport();
+    findCampaign.mockResolvedValue({ templateId: "tpl-su" });
+    findSubmission.mockResolvedValue({ campaign: { templateId: "tpl-su" } });
+    findMany.mockResolvedValue(completeSuFullBenchmarkRows());
+    const resolveEnhancements = jest.fn().mockRejectedValue(
+      new URIError("respondent answer must not reach telemetry"),
+    );
+    const baseInput = {
+      db,
+      report,
+      reportStylesAvailable: true,
+      peerBenchmarksEnabled: true,
+      enabledAliases: ["scaling-up-full"],
+      logger: { warn },
+      resolveEnhancements,
+    };
+
+    const result = wrapperKind === "campaign"
+      ? await resolvePeerReportEnhancementsForCampaign({
+          ...baseInput,
+          campaignId: "camp-1",
+        })
+      : await resolvePeerReportEnhancementsForSubmission(baseInput);
+
+    expect(result.report).toBe(report);
+    expect(result.lvaPeerComparison).toBeNull();
+    expect(resolveEnhancements).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith("assessment.peer_benchmark.unavailable", {
+      reason: "RESOLVER_ERROR",
+      templateAlias: "scaling-up-full",
+      templateId: "tpl-su",
+      submissionId: "sub-1",
+      versionId: "ver-4",
+      errorName: "URIError",
+    });
+    expect(warn.mock.calls[0][1]).not.toHaveProperty("message");
+  },
+);

@@ -66,9 +66,9 @@ function SuFullPeerOverview({
     >
       <div className="su-report-eyebrow">Section overview</div>
       <h2 className="su-h2 su-report-sec-title">{section.label}</h2>
-      <div className="su-peer-overview-list">
+      <ul className="su-peer-overview-list">
         {section.questions.map((question) => (
-          <div
+          <li
             className="su-peer-overview-row"
             data-testid={`su-full-peer-overview-row-${question.stableKey}`}
             key={question.stableKey}
@@ -78,9 +78,9 @@ function SuFullPeerOverview({
               question={question}
               testId={`su-full-peer-overview-bars-${question.stableKey}`}
             />
-          </div>
+          </li>
         ))}
-      </div>
+      </ul>
     </section>
   );
 }

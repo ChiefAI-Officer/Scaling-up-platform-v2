@@ -8,6 +8,7 @@ import {
   completeSuFullPeerReport,
 } from "@/__tests__/fixtures/su-full-peer";
 import { buildSuFullPeerPresentationResult } from "@/lib/assessments/su-full-peer-presentation";
+import { reviveOnScreenReport } from "@/lib/assessments/onscreen-result-store";
 
 function suFullReportWithPeers() {
   const report = completeSuFullPeerReport();
@@ -43,6 +44,8 @@ test("renders the Classic SU Full overview and detail sequence without duplicate
   const q01Overview = within(overview).getByTestId(
     "su-full-peer-overview-row-Q01",
   );
+  const overviewList = within(overview).getByRole("list");
+  expect(within(overviewList).getAllByRole("listitem")).toHaveLength(8);
   expect(q01Overview).toHaveTextContent("You");
   expect(q01Overview).toHaveTextContent("4.0");
   expect(q01Overview).toHaveTextContent("Peers");
@@ -182,3 +185,22 @@ test.each([
     expect(screen.queryByTestId("su-full-peer-sequence")).not.toBeInTheDocument();
   },
 );
+
+test("an invalid revived peer presentation falls back to the unchanged Classic report", () => {
+  const revived = reviveOnScreenReport({
+    ...completeSuFullPeerReport(),
+    suFullPeerPresentation: {
+      benchmarkUpdatedAt: "2026-08-18T00:00:00.000Z",
+      sections: [],
+    },
+  });
+  if (!revived) throw new Error("the base report must remain available");
+
+  render(<BrandedReport report={revived} />);
+
+  expect(screen.getByTestId("report-sections")).toBeInTheDocument();
+  expect(screen.getByTestId("report-recommendations")).toHaveTextContent(
+    "Frozen feedback Q01",
+  );
+  expect(screen.queryByTestId("su-full-peer-sequence")).not.toBeInTheDocument();
+});

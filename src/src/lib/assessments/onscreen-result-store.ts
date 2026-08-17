@@ -74,6 +74,7 @@
 
 import type { RespondentReport } from "./respondent-report";
 import { isReportStyleKey } from "./report-style-registry";
+import { isSuFullPeerPresentation } from "./su-full-peer-presentation";
 
 const PREFIX = "su-onscreen-result:";
 
@@ -243,15 +244,17 @@ export function reviveOnScreenReport(
   report: unknown,
 ): RespondentReport | null {
   if (typeof report !== "object" || report === null) return null;
-  const serialized = report as { submittedAt?: unknown; reportStyle?: unknown };
+  const serialized = report as {
+    submittedAt?: unknown;
+    reportStyle?: unknown;
+    suFullPeerPresentation?: unknown;
+  };
   const submittedAt =
     typeof serialized.submittedAt === "string"
       ? new Date(serialized.submittedAt)
       : serialized.submittedAt;
 
   return {
-    // Additive report payloads pass through unchanged. In particular,
-    // suFullPeerPresentation.benchmarkUpdatedAt remains an ISO string by contract.
     ...serialized,
     submittedAt:
       submittedAt instanceof Date && !Number.isNaN(submittedAt.getTime())
@@ -262,6 +265,14 @@ export function reviveOnScreenReport(
     reportStyle: isReportStyleKey(serialized.reportStyle)
       ? serialized.reportStyle
       : "CLASSIC",
+    // Enhancement data is untrusted after session JSON revival. Keep only a
+    // complete canonical Q01-Q61 presentation; otherwise Classic uses the
+    // untouched generic report content. benchmarkUpdatedAt stays an ISO string.
+    suFullPeerPresentation: isSuFullPeerPresentation(
+      serialized.suFullPeerPresentation,
+    )
+      ? serialized.suFullPeerPresentation
+      : undefined,
   } as RespondentReport;
 }
 

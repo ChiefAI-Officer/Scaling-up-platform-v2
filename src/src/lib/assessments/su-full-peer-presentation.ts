@@ -96,6 +96,17 @@ function roundedTotal(values: readonly number[]): number {
   return Math.round((values.reduce((total, value) => total + value, 0) + Number.EPSILON) * 10) / 10;
 }
 
+function isNonBlankString(value: unknown): value is string {
+  return typeof value === "string" && value.trim() !== "";
+}
+
+function isPeerValue(value: unknown): value is number {
+  return typeof value === "number"
+    && Number.isFinite(value)
+    && value >= 0
+    && value <= 10;
+}
+
 function dateFromUpdatedAt(value: Date | string): Date | null {
   if (typeof value === "string" && !ISO_TIMESTAMP_PATTERN.test(value)) {
     return null;
@@ -115,6 +126,82 @@ function deepFreeze<T>(value: T, seen = new WeakSet<object>()): T {
   seen.add(object);
   for (const child of Object.values(object)) deepFreeze(child, seen);
   return Object.freeze(value);
+}
+
+/**
+ * Validates the optional presentation after an untrusted JSON round trip.
+ * Invalid enhancement data is discarded by the caller; the base report stays
+ * usable and can render its unchanged Classic fallback.
+ */
+export function isSuFullPeerPresentation(
+  value: unknown,
+): value is SuFullPeerPresentation {
+  if (!isRecord(value)) return false;
+  if (
+    typeof value.benchmarkUpdatedAt !== "string"
+    || dateFromUpdatedAt(value.benchmarkUpdatedAt) === null
+  ) {
+    return false;
+  }
+  if (!Array.isArray(value.sections) || value.sections.length === 0) {
+    return false;
+  }
+
+  const sectionKeys = new Set<string>();
+  const questionKeys: string[] = [];
+
+  for (const section of value.sections) {
+    if (
+      !isRecord(section)
+      || !isNonBlankString(section.stableKey)
+      || sectionKeys.has(section.stableKey)
+      || !isNonBlankString(section.label)
+      || !(
+        section.domain === null
+        || isNonBlankString(section.domain)
+      )
+      || typeof section.youTotal !== "number"
+      || !Number.isFinite(section.youTotal)
+      || typeof section.peersTotal !== "number"
+      || !Number.isFinite(section.peersTotal)
+      || !Array.isArray(section.questions)
+      || section.questions.length === 0
+    ) {
+      return false;
+    }
+    sectionKeys.add(section.stableKey);
+
+    const youValues: number[] = [];
+    const peerValues: number[] = [];
+    for (const question of section.questions) {
+      if (
+        !isRecord(question)
+        || !isNonBlankString(question.stableKey)
+        || !isNonBlankString(question.label)
+        || !isPeerValue(question.you)
+        || !isPeerValue(question.peers)
+        || !(
+          question.recommendation === null
+          || isNonBlankString(question.recommendation)
+        )
+      ) {
+        return false;
+      }
+      questionKeys.push(question.stableKey);
+      youValues.push(question.you);
+      peerValues.push(question.peers);
+    }
+
+    if (
+      section.youTotal !== roundedTotal(youValues)
+      || section.peersTotal !== roundedTotal(peerValues)
+    ) {
+      return false;
+    }
+  }
+
+  return questionKeys.length === EXPECTED_KEYS.length
+    && questionKeys.every((key, index) => key === EXPECTED_KEYS[index]);
 }
 
 /**

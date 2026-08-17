@@ -24,6 +24,14 @@ test("builds both sections in frozen order and joins all 61 rows by stable key",
     peers: 6.3,
     recommendation: "Frozen feedback Q01",
   });
+  expect(result.presentation.sections[0]).toMatchObject({
+    youTotal: 28,
+    peersTotal: 45.7,
+  });
+  expect(result.presentation.sections[1]).toMatchObject({
+    youTotal: 262,
+    peersTotal: 307.1,
+  });
   expect(result.presentation.benchmarkUpdatedAt).toBe("2026-08-18T00:00:00.000Z");
   expect(Object.isFrozen(result.presentation)).toBe(true);
   expect(Object.isFrozen(result.presentation.sections[0].questions)).toBe(true);

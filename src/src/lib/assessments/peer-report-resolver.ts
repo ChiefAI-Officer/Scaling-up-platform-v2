@@ -46,14 +46,18 @@ export type PeerReportEnhancements = Readonly<{
   lvaPeerComparison: PeerComparisonSection | null;
 }>;
 
-type ResolverInput = {
+interface ResolverInput {
   db: PeerReportResolverDb;
   report: RespondentReport;
   reportStylesAvailable: boolean;
   peerBenchmarksEnabled?: boolean;
   enabledAliases?: readonly string[];
   logger?: Pick<Console, "warn">;
-};
+  /** Narrow seam for proving wrapper-level fail-soft behavior. */
+  resolveEnhancements?: (
+    input: ResolverInput & { templateId: string },
+  ) => Promise<PeerReportEnhancements>;
+}
 
 type PeerReportPreflight = Readonly<{
   templateAlias: string;
@@ -143,36 +147,44 @@ export async function resolvePeerReportEnhancements(
     return unchanged(input.report);
   }
 
-  if (preflight.isLva) {
-    return {
-      report: input.report,
-      lvaPeerComparison: buildPeerComparisonSection({
-        questionsByKey: input.report.questionsByKey,
-        rawAnswers: input.report.rawAnswers,
-        benchmarks: new Map(rows.map((row) => [row.metricKey, row.value])),
-        templateAlias: preflight.templateAlias,
-      }),
-    };
-  }
+  try {
+    if (preflight.isLva) {
+      return {
+        report: input.report,
+        lvaPeerComparison: buildPeerComparisonSection({
+          questionsByKey: input.report.questionsByKey,
+          rawAnswers: input.report.rawAnswers,
+          benchmarks: new Map(rows.map((row) => [row.metricKey, row.value])),
+          templateAlias: preflight.templateAlias,
+        }),
+      };
+    }
 
-  const result = buildSuFullPeerPresentationResult({
-    report: input.report,
-    benchmarks: rows,
-  });
-  if (result.status === "unavailable") {
+    const result = buildSuFullPeerPresentationResult({
+      report: input.report,
+      benchmarks: rows,
+    });
+    if (result.status === "unavailable") {
+      logUnavailable(logger, input, {
+        reason: result.reason,
+        expectedCount: result.expectedCount,
+        benchmarkCount: result.benchmarkCount,
+        scoreCount: result.scoreCount,
+      });
+      return unchanged(input.report);
+    }
+
+    return {
+      report: { ...input.report, suFullPeerPresentation: result.presentation },
+      lvaPeerComparison: null,
+    };
+  } catch (error) {
     logUnavailable(logger, input, {
-      reason: result.reason,
-      expectedCount: result.expectedCount,
-      benchmarkCount: result.benchmarkCount,
-      scoreCount: result.scoreCount,
+      reason: "BUILD_ERROR",
+      errorName: errorName(error),
     });
     return unchanged(input.report);
   }
-
-  return {
-    report: { ...input.report, suFullPeerPresentation: result.presentation },
-    lvaPeerComparison: null,
-  };
 }
 
 export async function resolvePeerReportEnhancementsForCampaign(
@@ -180,18 +192,33 @@ export async function resolvePeerReportEnhancementsForCampaign(
 ): Promise<PeerReportEnhancements> {
   const logger = input.logger ?? console;
   if (!resolvePeerReportPreflight(input)) return unchanged(input.report);
+  let campaign: { templateId: string } | null | undefined;
   try {
-    const campaign = await input.db.assessmentCampaign?.findFirst({
+    campaign = await input.db.assessmentCampaign?.findFirst({
       where: { id: input.campaignId, deletedAt: null },
       select: { templateId: true },
     });
-    if (!campaign) {
-      logUnavailable(logger, input, { reason: "CAMPAIGN_TEMPLATE_NOT_FOUND" });
-      return unchanged(input.report);
-    }
-    return resolvePeerReportEnhancements({ ...input, templateId: campaign.templateId });
   } catch (error) {
     logUnavailable(logger, input, { reason: "DB_ERROR", errorName: errorName(error) });
+    return unchanged(input.report);
+  }
+  if (!campaign) {
+    logUnavailable(logger, input, { reason: "CAMPAIGN_TEMPLATE_NOT_FOUND" });
+    return unchanged(input.report);
+  }
+  try {
+    const resolveEnhancements = input.resolveEnhancements
+      ?? resolvePeerReportEnhancements;
+    return await resolveEnhancements({
+      ...input,
+      templateId: campaign.templateId,
+    });
+  } catch (error) {
+    logUnavailable(
+      logger,
+      { report: input.report, templateId: campaign.templateId },
+      { reason: "RESOLVER_ERROR", errorName: errorName(error) },
+    );
     return unchanged(input.report);
   }
 }
@@ -201,21 +228,33 @@ export async function resolvePeerReportEnhancementsForSubmission(
 ): Promise<PeerReportEnhancements> {
   const logger = input.logger ?? console;
   if (!resolvePeerReportPreflight(input)) return unchanged(input.report);
+  let submission: { campaign: { templateId: string } } | null | undefined;
   try {
-    const submission = await input.db.assessmentSubmission?.findFirst({
+    submission = await input.db.assessmentSubmission?.findFirst({
       where: { id: input.report.provenance.submissionId },
       select: { campaign: { select: { templateId: true } } },
     });
-    if (!submission) {
-      logUnavailable(logger, input, { reason: "SUBMISSION_TEMPLATE_NOT_FOUND" });
-      return unchanged(input.report);
-    }
-    return resolvePeerReportEnhancements({
+  } catch (error) {
+    logUnavailable(logger, input, { reason: "DB_ERROR", errorName: errorName(error) });
+    return unchanged(input.report);
+  }
+  if (!submission) {
+    logUnavailable(logger, input, { reason: "SUBMISSION_TEMPLATE_NOT_FOUND" });
+    return unchanged(input.report);
+  }
+  try {
+    const resolveEnhancements = input.resolveEnhancements
+      ?? resolvePeerReportEnhancements;
+    return await resolveEnhancements({
       ...input,
       templateId: submission.campaign.templateId,
     });
   } catch (error) {
-    logUnavailable(logger, input, { reason: "DB_ERROR", errorName: errorName(error) });
+    logUnavailable(
+      logger,
+      { report: input.report, templateId: submission.campaign.templateId },
+      { reason: "RESOLVER_ERROR", errorName: errorName(error) },
+    );
     return unchanged(input.report);
   }
 }

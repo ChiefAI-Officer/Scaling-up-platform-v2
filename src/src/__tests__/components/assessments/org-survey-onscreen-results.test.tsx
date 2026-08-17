@@ -20,6 +20,11 @@ import {
   readOnScreenResult,
 } from "@/lib/assessments/onscreen-result-store";
 import { BrandedReport } from "@/components/assessments/BrandedReport";
+import {
+  completeSuFullBenchmarkRows,
+  completeSuFullPeerReport,
+} from "@/__tests__/fixtures/su-full-peer";
+import { buildSuFullPeerPresentationResult } from "@/lib/assessments/su-full-peer-presentation";
 
 jest.mock("next/navigation", () => ({
   useRouter: () => ({ push: jest.fn(), replace: jest.fn() }),
@@ -83,10 +88,14 @@ const EMPTY_CANONICAL_RESULT = {
   unansweredKeys: [],
 };
 
-const PEER_PRESENTATION = {
-  benchmarkUpdatedAt: "2026-08-18T00:00:00.000Z",
-  sections: [],
-};
+const builtPeerPresentation = buildSuFullPeerPresentationResult({
+  report: completeSuFullPeerReport(),
+  benchmarks: completeSuFullBenchmarkRows(),
+});
+if (builtPeerPresentation.status !== "ready") {
+  throw new Error(builtPeerPresentation.reason);
+}
+const PEER_PRESENTATION = builtPeerPresentation.presentation;
 
 /** Install a fetch that answers /me with the given status and server decisions. */
 function installFetch(
