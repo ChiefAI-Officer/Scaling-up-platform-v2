@@ -40,9 +40,9 @@ print-contract fixes found during the same review round:
 - Integration assertions cover the real dispatch wrapper, exactly ten
   contour polylines with no dashed series, unique chart title IDs, coach
   provenance, and all 61 detailed paired-bar/feedback blocks.
-- `CI=true npx next build --turbopack` passed before this final print-contract
-  commit; it emitted only the existing missing optional Inngest/DATABASE_URL
-  environment warnings during static generation.
+- Final `CI=true npx next build --turbopack` passed after both fix commits; it
+  emitted only the existing missing optional Inngest/DATABASE_URL environment
+  warnings during static generation.
 
 ## Remaining concerns
 
