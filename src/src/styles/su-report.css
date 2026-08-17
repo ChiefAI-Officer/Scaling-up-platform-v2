@@ -2794,18 +2794,9 @@
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-peer-contour { display: none; }
 }
 
-@page { size: A4 landscape; margin: 0; }
+@page suFullLandscape { size: A4 landscape; margin: 0; }
 
 @media print {
-  html,
-  body {
-    width: 297mm;
-    height: auto;
-    margin: 0;
-    padding: 0;
-    background: #ffffff;
-  }
-
   .su-public-brand.su-report.su-full-landscape {
     width: 297mm;
     margin: 0;
@@ -2814,7 +2805,7 @@
     print-color-adjust: exact;
   }
 
-  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page { break-after: page; page-break-after: always; width: 297mm; min-height: 210mm; height: 210mm; margin: 0; box-shadow: none; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page { page: suFullLandscape; break-after: page; page-break-after: always; width: 297mm; min-height: 210mm; height: 210mm; margin: 0; box-shadow: none; }
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page:last-child { break-after: auto; page-break-after: auto; }
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-detail { break-inside: avoid; page-break-inside: avoid; }
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page-header,

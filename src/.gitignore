@@ -13,6 +13,9 @@
 # testing
 /coverage
 
+# Deterministic SU Full landscape PDF capture evidence (regenerable).
+/tmp/pdfs/su-full-landscape-*
+
 # next.js
 /.next/
 /out/

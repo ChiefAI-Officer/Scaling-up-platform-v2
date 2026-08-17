@@ -111,8 +111,9 @@ test("keeps the landscape renderer's A4 print and responsive screen contract sco
     "utf8",
   );
 
-  expect(stylesheet).toContain("@page { size: A4 landscape; margin: 0; }");
-  expect(stylesheet).toContain(".su-full-landscape-page { break-after: page;");
+  expect(stylesheet).toContain("@page suFullLandscape { size: A4 landscape; margin: 0; }");
+  expect(stylesheet).toContain(".su-full-landscape-page { page: suFullLandscape; break-after: page;");
+  expect(stylesheet).not.toMatch(/@page\s*\{\s*size:\s*A4\s+landscape\s*;/);
   expect(stylesheet).toContain(".su-full-landscape-detail { break-inside: avoid;");
   expect(stylesheet).toMatch(/\.su-full-landscape-bar-fill\s*\{[^}]*display: block;[^}]*border-radius: 0;/);
   expect(stylesheet).toMatch(/\.su-full-landscape-peer-contour\s*\{[^}]*color: var\(--chapter-peer-color\);/);
