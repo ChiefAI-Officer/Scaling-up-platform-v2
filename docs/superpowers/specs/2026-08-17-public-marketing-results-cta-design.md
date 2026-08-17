@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-17
 
-**Status:** Approved in visual and section-by-section design review; awaiting written-spec review
+**Status:** Approved in visual, section-by-section, and written-spec review; cleared for implementation planning
 
 **Source:** August 13, 2026 Jeff meeting, ESPERTO verification, production code and data inspection, and the August 10–17 scoping session
 
