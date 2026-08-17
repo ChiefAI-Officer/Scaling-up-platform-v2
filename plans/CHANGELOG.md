@@ -6,6 +6,15 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="referred-results-template-name-sync"></a>
+### 2026-08-17 — Referred Results follows assessment-template renames <!-- ENTRY_ISO:2026-08-17 ENTRY_SLUG:referred-results-template-name-sync -->
+
+**Status: IMPLEMENTED + LOCALLY VERIFIED; READY FOR PRODUCTION.** Jeff reported that renaming the SunHub assessment to **Scaling Up 4 Decisions 8 Question Quiz** left the Coach Referred Results public-link selector showing the old **Scaling Up 4 Decisions Quick Quiz (SunHub)** label. The assessment rename correctly updated `AssessmentTemplate.name`, but the Referred Results query selected only the template alias and rendered `AssessmentCampaign.name`, which is a separate campaign snapshot and therefore remained stale.
+
+**Fix and behavior boundary.** The Referred Results page now selects and displays the current `AssessmentTemplate.name` while retaining the public campaign ID and alias for link generation. Existing campaign URLs, coach attribution, result filtering, campaign state, assessment content, template aliases, schemas, migrations, flags, and Production data are unchanged.
+
+**Test-first verification.** A regression modeled the renamed template beside the stale SunHub campaign name and failed first because the query omitted `template.name` and the selector rendered the old campaign label. After the minimal data-source correction, the focused suite passed **20/20 tests**. The complete repository passed **694/694 suites, 8,648/8,648 tests, and 16/16 snapshots**; the three browser-backed suites that Chromium could not start inside the macOS sandbox passed separately and in the complete unrestricted run. Changed-file ESLint emitted no diagnostics, migration safety approved all **47 migrations**, `git diff --check` passed, and the Production-equivalent Turbopack build compiled, passed TypeScript, and generated **94/94** pages. The build retained only the established workspace-root, middleware-deprecation, and missing local Inngest-key/`DATABASE_URL` messages.
+
 <a id="su-full-feedback-bands-published"></a>
 ### 2026-08-14 — Scaling Up Full feedback bands corrected and published <!-- ENTRY_ISO:2026-08-14 ENTRY_SLUG:su-full-feedback-bands-published -->
 

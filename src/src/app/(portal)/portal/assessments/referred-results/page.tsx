@@ -37,7 +37,7 @@ async function resolveActivePublicCampaigns() {
       id: true,
       name: true,
       alias: true,
-      template: { select: { alias: true } },
+      template: { select: { name: true, alias: true } },
     },
     orderBy: [{ name: "asc" }, { createdAt: "desc" }],
   });
@@ -79,7 +79,7 @@ export default async function ReferredResultsPage({
   const coachLinks: PublicAssessmentCoachLink[] = coach.email
     ? publicCampaigns.map((campaign) => ({
         campaignId: campaign.id,
-        campaignName: campaign.name,
+        campaignName: campaign.template.name,
         templateAlias: campaign.template.alias,
         url: `${APP_URL}/quiz/${campaign.alias}?coach=${encodeURIComponent(coach.email)}`,
       }))
