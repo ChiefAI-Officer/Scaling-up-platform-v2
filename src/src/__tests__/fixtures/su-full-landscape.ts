@@ -66,6 +66,7 @@ export function completeSuFullLandscapeReport(): RespondentReport {
     campaignLabel: null,
     submittedAt: new Date("2026-08-17T00:00:00Z"),
     result: {
+      scaleUpScore: 55,
       perQuestion: sliderQuestions.map((question, index) => {
         const value = index % 11;
         const selectedBand = question.recommendations.find(

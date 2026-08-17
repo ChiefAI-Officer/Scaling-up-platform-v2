@@ -347,6 +347,7 @@ export function LegacyClassicReport({
     const landscapeModel = buildSuFullLandscapeReportModel({
       report,
       presentation: suFullPeers,
+      resolvedStyle: "CLASSIC",
     });
     if (landscapeModel) {
       return (
@@ -357,6 +358,10 @@ export function LegacyClassicReport({
         />
       );
     }
+    console.warn("assessment.su_full_landscape.fallback", {
+      reason: "INCOMPLETE_FROZEN_REPORT",
+      resolvedStyle: "CLASSIC",
+    });
   }
 
   const result: ScoreResult = report.result ?? ({} as ScoreResult);

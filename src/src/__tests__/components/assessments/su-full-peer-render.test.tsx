@@ -125,11 +125,36 @@ test("renders the complete Classic SU Full peer report as the landscape composit
 
 test("keeps valid peers on the shipped sequence when landscape composition fails", () => {
   process.env[LANDSCAPE_ENABLED] = "1";
-  render(<BrandedReport report={suFullReportWithPeers()} />);
+  const warning = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+  const report = suFullReportWithPeers();
+  render(<BrandedReport report={{ ...report, respondentName: "PII Name", respondentEmail: "pii@example.com" }} />);
 
   expect(screen.getByTestId("su-full-peer-sequence")).toBeInTheDocument();
   expect(screen.queryByTestId("su-full-landscape-report")).not.toBeInTheDocument();
   expect(screen.queryByTestId("report-sections")).not.toBeInTheDocument();
+  expect(warning).toHaveBeenCalledTimes(1);
+  expect(warning).toHaveBeenCalledWith("assessment.su_full_landscape.fallback", {
+    reason: "INCOMPLETE_FROZEN_REPORT",
+    resolvedStyle: "CLASSIC",
+  });
+  expect(JSON.stringify(warning.mock.calls)).not.toMatch(/PII Name|pii@example\.com|submission|campaign/i);
+  warning.mockRestore();
+});
+
+test("renders landscape for stored unavailable style after it resolves to Classic", () => {
+  process.env[LANDSCAPE_ENABLED] = "1";
+  const report = suFullLandscapeReportWithPeers();
+  const warning = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+
+  render(<BrandedReport report={{ ...report, reportStyle: "EXECUTIVE_BOARDROOM" }} />);
+
+  expect(screen.getByTestId("su-full-landscape-report")).toBeInTheDocument();
+  expect(warning).toHaveBeenCalledWith("assessment.report_style.fallback", expect.objectContaining({
+    requestedStyle: "EXECUTIVE_BOARDROOM",
+    resolvedStyle: "CLASSIC",
+    fallbackReason: "UNAVAILABLE",
+  }));
+  warning.mockRestore();
 });
 
 test("scopes responsive and print-safe paired-bar styles to the SU report", () => {

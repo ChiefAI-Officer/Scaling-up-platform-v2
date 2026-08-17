@@ -28,7 +28,7 @@ describe("buildSuFullLandscapeReportModel", () => {
     const report = completeSuFullLandscapeReport();
     const presentation = completeSuFullLandscapePresentation(report);
 
-    const model = buildSuFullLandscapeReportModel({ report, presentation });
+    const model = buildSuFullLandscapeReportModel({ report, presentation, resolvedStyle: "CLASSIC" });
 
     expect(model).not.toBeNull();
     expect(model!.pages).toHaveLength(26);
@@ -47,6 +47,7 @@ describe("buildSuFullLandscapeReportModel", () => {
     const model = buildSuFullLandscapeReportModel({
       report: completeSuFullLandscapeReport(),
       presentation: completeSuFullLandscapePresentation(),
+      resolvedStyle: "CLASSIC",
     });
 
     expect(model).not.toBeNull();
@@ -73,6 +74,7 @@ describe("buildSuFullLandscapeReportModel", () => {
     const model = buildSuFullLandscapeReportModel({
       report: completeSuFullLandscapeReport(),
       presentation: completeSuFullLandscapePresentation(),
+      resolvedStyle: "CLASSIC",
     });
 
     expect(model).not.toBeNull();
@@ -97,20 +99,63 @@ describe("buildSuFullLandscapeReportModel", () => {
     const report = completeSuFullLandscapeReport();
     const presentation = completeSuFullLandscapePresentation(report);
 
-    expect(buildSuFullLandscapeReportModel({ report, presentation })!.growthPhase).toMatchObject({ number: 2 });
+    expect(buildSuFullLandscapeReportModel({ report, presentation, resolvedStyle: "CLASSIC" })!.growthPhase).toMatchObject({ number: 2 });
     expect(buildSuFullLandscapeReportModel({
       report: { ...report, rawAnswers: [{ stableKey: "Q_FTE_CONTRACT", value: 0 }] },
       presentation,
+      resolvedStyle: "CLASSIC",
     })!.growthPhase).toBeNull();
   });
 
-  it("fails closed outside the Classic report style", () => {
+  it("uses the resolved Classic style even when the stored unavailable style differs", () => {
     const report = completeSuFullLandscapeReport();
     const presentation = completeSuFullLandscapePresentation(report);
 
     expect(buildSuFullLandscapeReportModel({
       report: { ...report, reportStyle: "EXECUTIVE_BOARDROOM" },
       presentation,
+      resolvedStyle: "CLASSIC",
+    })).not.toBeNull();
+    expect(buildSuFullLandscapeReportModel({
+      report,
+      presentation,
+      resolvedStyle: "MODERN_DASHBOARD",
+    })).toBeNull();
+  });
+
+  it("requires a frozen ScaleUp Score and all 61 nonblank frozen feedback records", () => {
+    const report = completeSuFullLandscapeReport();
+    const presentation = completeSuFullLandscapePresentation(report);
+    const first = report.result.perQuestion[0];
+
+    expect(buildSuFullLandscapeReportModel({ report, presentation, resolvedStyle: "CLASSIC" })?.scaleUpScore).toBe(55);
+    expect(buildSuFullLandscapeReportModel({
+      report: { ...report, result: { ...report.result, scaleUpScore: undefined } },
+      presentation,
+      resolvedStyle: "CLASSIC",
+    })).toBeNull();
+    expect(buildSuFullLandscapeReportModel({
+      report: {
+        ...report,
+        result: {
+          ...report.result,
+          perQuestion: report.result.perQuestion.map((question) => question === first
+            ? { ...question, recommendation: "   " }
+            : question),
+        },
+      },
+      presentation: {
+        ...presentation,
+        sections: presentation.sections.map((section, sectionIndex) => sectionIndex === 0
+          ? {
+              ...section,
+              questions: section.questions.map((question, questionIndex) => questionIndex === 0
+                ? { ...question, recommendation: "   " }
+                : question),
+            }
+          : section),
+      },
+      resolvedStyle: "CLASSIC",
     })).toBeNull();
   });
 
@@ -122,6 +167,7 @@ describe("buildSuFullLandscapeReportModel", () => {
     expect(buildSuFullLandscapeReportModel({
       report,
       presentation,
+      resolvedStyle: "CLASSIC",
     })).not.toBeNull();
     expect(buildSuFullLandscapeReportModel({
       report: {
@@ -131,10 +177,12 @@ describe("buildSuFullLandscapeReportModel", () => {
           : section),
       },
       presentation,
+      resolvedStyle: "CLASSIC",
     })).toBeNull();
     expect(buildSuFullLandscapeReportModel({
       report: { ...report, sections: [...sections, { stableKey: "S_UNKNOWN", name: "Unknown", domain: "people" }] },
       presentation,
+      resolvedStyle: "CLASSIC",
     })).toBeNull();
   });
 
@@ -150,6 +198,6 @@ describe("buildSuFullLandscapeReportModel", () => {
     const report = completeSuFullLandscapeReport();
     const presentation = completeSuFullLandscapePresentation(report);
 
-    expect(buildSuFullLandscapeReportModel({ report, presentation: mutate(presentation) })).toBeNull();
+    expect(buildSuFullLandscapeReportModel({ report, presentation: mutate(presentation), resolvedStyle: "CLASSIC" })).toBeNull();
   });
 });

@@ -52,11 +52,8 @@ function rawFte(rawAnswers: unknown): number | null {
     : null;
 }
 
-function scaleUpScore(report: RespondentReport): string {
-  const value = report.result?.scaleUpScore;
-  return typeof value === "number" && Number.isFinite(value)
-    ? `${Math.round(value)} / 100`
-    : "Not available";
+function scaleUpScore(value: number): string {
+  return `${Math.round(value)} / 100`;
 }
 
 function questionByKey(model: SuFullLandscapeReportModel): ReadonlyMap<string, SuFullLandscapeQuestion> {
@@ -143,7 +140,7 @@ function IntroductionPage({ report, model, number }: {
   return (
     <SuFullLandscapePage number={number} footerBrand={report}>
       <h2>Introduction</h2>
-      <p><strong>ScaleUp Score</strong> {scaleUpScore(report)}</p>
+      <p><strong>ScaleUp Score</strong> {scaleUpScore(model.scaleUpScore)}</p>
       <p>{PEER_DISCLOSURE}</p>
       {model.growthPhase && fte !== null ? (
         <section aria-label="Growth phase">
@@ -163,14 +160,24 @@ function ProfilePage({ model, number, footerBrand }: { model: SuFullLandscapeRep
       <table>
         <thead><tr><th>Chapter / subsection</th><th>You</th><th>Peers</th><th>Deviation</th></tr></thead>
         <tbody>
-          {model.profileRows.map((row) => (
-            <tr key={row.stableKey}>
-              <th>{row.label}</th>
-              <td>{formatNumber(row.youAverage)}</td>
-              <td>{formatNumber(row.peersAverage)}</td>
-              <td>{formatNumber(row.deviation)}</td>
-            </tr>
-          ))}
+          {model.chapters.flatMap((chapter) => [
+            <tr className="su-full-landscape-profile-row--chapter" key={`chapter-${chapter.key}`}>
+              <th><strong>{chapter.label}</strong> <span>Chapter aggregate</span></th>
+              <td>{formatNumber(chapter.youAverage)}</td>
+              <td>{formatNumber(chapter.peersAverage)}</td>
+              <td>{formatNumber(chapter.youAverage - chapter.peersAverage)}</td>
+            </tr>,
+            ...model.profileRows
+              .filter((row) => row.chapterKey === chapter.key)
+              .map((row) => (
+                <tr className="su-full-landscape-profile-row--subsection" key={row.stableKey}>
+                  <th>{row.label} <span>Subsection</span></th>
+                  <td>{formatNumber(row.youAverage)}</td>
+                  <td>{formatNumber(row.peersAverage)}</td>
+                  <td>{formatNumber(row.deviation)}</td>
+                </tr>
+              )),
+          ])}
         </tbody>
       </table>
       <p>Strongest chapter: {model.strongestChapter.label}. Focus chapter: {model.weakestChapter.label}.</p>
@@ -233,7 +240,7 @@ function DetailPage({
           >
             <h3>{question.label}</h3>
             <SuFullDetailPairedBars chapterKey={page.chapterKey} question={question} />
-            <p><strong>Frozen feedback</strong> {question.recommendation ?? "No frozen feedback was recorded for this question."}</p>
+            <p><strong>Frozen feedback</strong> {question.recommendation}</p>
           </article>
         );
       })}
@@ -250,11 +257,13 @@ function ConclusionPage({ report, model, contactEmail, number }: {
   return (
     <SuFullLandscapePage number={number} footerBrand={report}>
       <h2>Conclusion</h2>
-      <p><strong>ScaleUp Score</strong> {scaleUpScore(report)}</p>
+      <p><strong>ScaleUp Score</strong> {scaleUpScore(model.scaleUpScore)}</p>
       <p>Your strongest chapter is {model.strongestChapter.label}; your focus chapter is {model.weakestChapter.label}.</p>
       <h3>Next steps</h3>
       <p>Choose one priority from the feedback, agree a concrete owner and review date, and return to the remaining findings in your next planning cycle.</p>
-      {contactEmail ? <p><a href={`mailto:${contactEmail}`}>Contact your coach</a></p> : null}
+      {(contactEmail ?? report.referringCoachEmail) ? (
+        <p><a href={`mailto:${contactEmail ?? report.referringCoachEmail}`}>Contact your coach</a></p>
+      ) : null}
     </SuFullLandscapePage>
   );
 }

@@ -30,7 +30,7 @@ async function reportCss(): Promise<string> {
 async function main(): Promise<void> {
   const report = completeSuFullLandscapeReport();
   const presentation = completeSuFullLandscapePresentation(report);
-  const model = buildSuFullLandscapeReportModel({ report, presentation });
+  const model = buildSuFullLandscapeReportModel({ report, presentation, resolvedStyle: "CLASSIC" });
   if (!model) throw new Error("Canonical SU Full landscape model is unavailable");
 
   const [styles] = await Promise.all([reportCss(), mkdir(dirname(outputPath), { recursive: true })]);

@@ -34,7 +34,7 @@ export function SuFullLandscapePage({
         <span className="is-cash" />
         <span className="is-you" />
       </header>
-      <main className="su-full-landscape-page-body">{children}</main>
+      <div className="su-full-landscape-page-body">{children}</div>
       <footer className="su-full-landscape-page-footer">
         <span className="su-full-landscape-page-footer-brand">
           <span>Scaling Up Assessment</span>

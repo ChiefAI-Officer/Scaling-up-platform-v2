@@ -7,6 +7,7 @@ import {
 } from "@/lib/assessments/su-full-peer-presentation";
 import { SCALING_UP_FULL_TEMPLATE_ALIAS } from "@/lib/assessments/su-full-question-benchmarks";
 import { computeGrowthPhase, type GrowthPhase } from "@/lib/assessments/su-full-phase";
+import type { ReportStyleKey } from "@/lib/assessments/report-style-registry";
 
 export type SuFullLandscapeChapterKey =
   | "people" | "strategy" | "execution" | "cash" | "you";
@@ -42,6 +43,7 @@ export type SuFullLandscapePage =
   | Readonly<{ number: 26; kind: "appendix" }>;
 
 export type SuFullLandscapeReportModel = Readonly<{
+  scaleUpScore: number;
   benchmarkUpdatedAt: string;
   growthPhase: GrowthPhase | null;
   chapters: readonly SuFullLandscapeChapter[];
@@ -217,6 +219,46 @@ function validPresentationSections(presentation: SuFullPeerPresentation): boolea
   });
 }
 
+function frozenOutput(
+  report: RespondentReport,
+  presentation: SuFullPeerPresentation,
+): Readonly<{ scaleUpScore: number }> | null {
+  const score = report.result?.scaleUpScore;
+  const frozenQuestions = report.result?.perQuestion;
+  if (
+    typeof score !== "number"
+    || !Number.isFinite(score)
+    || score < 0
+    || score > 100
+    || !Array.isArray(frozenQuestions)
+    || !sameKeys(
+      frozenQuestions.map((question) => question.stableKey),
+      CANONICAL_QUESTION_KEYS,
+    )
+  ) {
+    return null;
+  }
+
+  const frozenByKey = new Map(frozenQuestions.map((question) => [question.stableKey, question]));
+  const presentationQuestions = presentation.sections.flatMap((section) => section.questions);
+  for (const question of presentationQuestions) {
+    const frozen = frozenByKey.get(question.stableKey);
+    if (
+      !frozen
+      || typeof frozen.value !== "number"
+      || !Number.isFinite(frozen.value)
+      || typeof frozen.recommendation !== "string"
+      || frozen.recommendation.trim() === ""
+      || question.you !== frozen.value
+      || question.recommendation !== frozen.recommendation
+    ) {
+      return null;
+    }
+  }
+
+  return { scaleUpScore: score };
+}
+
 function growthPhaseFromRawAnswers(rawAnswers: unknown): GrowthPhase | null {
   if (!Array.isArray(rawAnswers)) return null;
   const fteAnswer = rawAnswers.find(
@@ -267,13 +309,14 @@ function pages(): readonly SuFullLandscapePage[] {
 export function buildSuFullLandscapeReportModel(input: {
   report: RespondentReport;
   presentation: SuFullPeerPresentation;
+  resolvedStyle: ReportStyleKey;
 }): SuFullLandscapeReportModel | null {
   const report = input?.report;
   const presentation = input?.presentation;
   if (
     !report
     || report.templateAlias !== SCALING_UP_FULL_TEMPLATE_ALIAS
-    || report.reportStyle !== "CLASSIC"
+    || input.resolvedStyle !== "CLASSIC"
     || report.degraded
     || !presentation
     || !isSuFullPeerPresentation(presentation)
@@ -283,6 +326,8 @@ export function buildSuFullLandscapeReportModel(input: {
   ) {
     return null;
   }
+  const frozen = frozenOutput(report, presentation);
+  if (!frozen) return null;
 
   const sectionsByKey = new Map(presentation.sections.map((section) => [section.stableKey, section]));
   const profileRows: SuFullLandscapeProfileRow[] = [];
@@ -354,6 +399,7 @@ export function buildSuFullLandscapeReportModel(input: {
     .slice(0, SUMMARY_QUESTION_COUNT);
 
   return deepFreeze({
+    scaleUpScore: frozen.scaleUpScore,
     benchmarkUpdatedAt: presentation.benchmarkUpdatedAt,
     growthPhase: growthPhaseFromRawAnswers(report.rawAnswers),
     chapters,

@@ -3,10 +3,6 @@ import type {
   SuFullLandscapeQuestion,
 } from "@/lib/assessments/su-full-landscape-report";
 
-const ROW_HEIGHT = 44;
-const PLOT_LEFT = 176;
-const PLOT_WIDTH = 264;
-
 const CHAPTER_CLASS: Readonly<Record<SuFullLandscapeChapterKey, string>> = {
   people: "is-people",
   strategy: "is-strategy",
@@ -29,14 +25,6 @@ function formatValue(value: number): string {
 
 function fillWidth(value: number): string {
   return `${clamp(value, 0, 10) * 10}%`;
-}
-
-function rowY(rowIndex: number): number {
-  return rowIndex * ROW_HEIGHT + ROW_HEIGHT / 2;
-}
-
-function peerX(question: SuFullLandscapeQuestion): number {
-  return PLOT_LEFT + (clamp(question.peers, 0, 10) / 10) * PLOT_WIDTH;
 }
 
 function barFillClass(kind: "you" | "peers"): string {
@@ -76,9 +64,8 @@ export function SuFullVerticalPeerChart({
   title?: string;
   instanceId?: string;
 }) {
-  const plotHeight = Math.max(ROW_HEIGHT, questions.length * ROW_HEIGHT);
   const points = questions
-    .map((question, index) => `${peerX(question)},${rowY(index)}`)
+    .map((question, index) => `${clamp(question.peers, 0, 10) * 10},${index + 0.5}`)
     .join(" ");
 
   return (
@@ -97,7 +84,7 @@ export function SuFullVerticalPeerChart({
         <svg
           aria-hidden="true"
           className="su-full-landscape-peer-contour"
-          viewBox={`0 0 ${PLOT_LEFT + PLOT_WIDTH} ${plotHeight}`}
+          viewBox={`0 0 100 ${Math.max(1, questions.length)}`}
           preserveAspectRatio="none"
         >
           <polyline
@@ -105,6 +92,7 @@ export function SuFullVerticalPeerChart({
             points={points}
             stroke="currentColor"
             strokeWidth="2"
+            vectorEffect="non-scaling-stroke"
           />
         </svg>
         <ol className="su-full-landscape-chart-rows">
@@ -112,12 +100,20 @@ export function SuFullVerticalPeerChart({
             <li
               className="su-full-landscape-chart-row"
               key={question.stableKey}
+              data-peer-score={question.peers}
               data-testid={`su-landscape-vertical-row-${question.stableKey}`}
             >
               <h4 className="su-full-landscape-chart-question">
                 {question.label}
               </h4>
-              <BarMeasure label="You" value={question.you} />
+              <span className="su-full-landscape-vertical-you-label">You</span>
+              <span className="su-full-landscape-vertical-scale" aria-hidden="true">
+                <span
+                  className={barFillClass("you")}
+                  style={{ width: fillWidth(question.you) }}
+                />
+              </span>
+              <strong className="su-full-landscape-bar-value">{formatValue(question.you)}</strong>
               <span className="sr-only">
                 You {formatValue(question.you)}. Peers {formatValue(question.peers)}.
               </span>

@@ -16,7 +16,7 @@ import { buildSuFullLandscapeReportModel } from "@/lib/assessments/su-full-lands
 function peopleQuestions() {
   const report = completeSuFullLandscapeReport();
   const presentation = completeSuFullLandscapePresentation(report);
-  const model = buildSuFullLandscapeReportModel({ report, presentation });
+  const model = buildSuFullLandscapeReportModel({ report, presentation, resolvedStyle: "CLASSIC" });
   if (!model) throw new Error("The canonical landscape fixture must build");
   return model.chapters.find((chapter) => chapter.key === "people")!.questions;
 }
@@ -53,7 +53,7 @@ test("renders detail paired bars in You then Peers order with visible values", (
 test("renders the fixed 26-page landscape composition with truthful peer context", () => {
   const report = completeSuFullLandscapeReport();
   const presentation = completeSuFullLandscapePresentation(report);
-  const model = buildSuFullLandscapeReportModel({ report, presentation });
+  const model = buildSuFullLandscapeReportModel({ report, presentation, resolvedStyle: "CLASSIC" });
   if (!model) throw new Error("The canonical landscape fixture must build");
 
   render(
@@ -105,6 +105,9 @@ test("renders the fixed 26-page landscape composition with truthful peer context
   expect(screen.getByTestId("su-full-landscape-page-5")).toHaveTextContent("You");
   expect(screen.getByTestId("su-full-landscape-page-5")).toHaveTextContent("Peers");
   expect(screen.getByTestId("su-full-landscape-page-5")).toHaveTextContent("Deviation");
+  expect(screen.getByTestId("su-full-landscape-page-5").querySelectorAll("tbody tr")).toHaveLength(15);
+  expect(screen.getByTestId("su-full-landscape-page-5").querySelectorAll(".su-full-landscape-profile-row--chapter")).toHaveLength(5);
+  expect(screen.getByTestId("su-full-landscape-page-5").querySelectorAll(".su-full-landscape-profile-row--subsection")).toHaveLength(10);
   expect(screen.getByTestId("su-full-landscape-page-6")).toHaveTextContent(
     "Peers are a current benchmark reference. Values are not yet matched to company size, growth phase, geography, or industry.",
   );
@@ -127,8 +130,23 @@ test("renders the fixed 26-page landscape composition with truthful peer context
   }
 
   expect(screen.getByTestId("su-full-landscape-page-25")).toHaveTextContent("ScaleUp Score");
+  expect(screen.getByTestId("su-full-landscape-page-4")).toHaveTextContent("55 / 100");
+  expect(screen.getByTestId("su-full-landscape-page-25")).toHaveTextContent("55 / 100");
+  expect(screen.getByRole("link", { name: "Contact your coach" })).toHaveAttribute("href", "mailto:coach@example.com");
   expect(screen.getByTestId("su-full-landscape-page-25")).toHaveTextContent("Next steps");
   expect(document.body.textContent).not.toMatch(/Esperto|TCPDF/i);
+});
+
+test("falls back to the frozen referring coach email when no explicit contact is supplied", () => {
+  const report = { ...completeSuFullLandscapeReport(), referringCoachEmail: "referrer@example.com" };
+  const presentation = completeSuFullLandscapePresentation(report);
+  const model = buildSuFullLandscapeReportModel({ report, presentation, resolvedStyle: "CLASSIC" });
+  if (!model) throw new Error("The canonical landscape fixture must build");
+
+  render(<SuFullLandscapeReport report={report} model={model} />);
+
+  expect(screen.getByRole("link", { name: "Contact your coach" }))
+    .toHaveAttribute("href", "mailto:referrer@example.com");
 });
 
 test("keeps the landscape renderer's A4 print and responsive screen contract scoped", () => {
@@ -143,7 +161,7 @@ test("keeps the landscape renderer's A4 print and responsive screen contract sco
   expect(stylesheet).not.toMatch(/@page\s*\{\s*size:\s*A4\s+landscape\s*;/);
   expect(stylesheet).toContain(".su-full-landscape-detail { break-inside: avoid;");
   expect(stylesheet).toMatch(/\.su-full-landscape-bar-fill\s*\{[^}]*display: block;[^}]*border-radius: 0;/);
-  expect(stylesheet).toMatch(/\.su-full-landscape-peer-contour\s*\{[^}]*color: var\(--chapter-peer-color\);/);
+  expect(stylesheet).toMatch(/\.su-full-landscape-peer-contour\s*\{[^}]*color: var\(--chapter-line-color\);/);
   expect(stylesheet).toContain(".su-full-landscape-report .is-people { --chapter-color:");
   expect(stylesheet).toContain(".su-full-landscape-report .is-strategy { --chapter-color:");
   expect(stylesheet).toContain(".su-full-landscape-report .is-execution { --chapter-color:");
@@ -156,8 +174,8 @@ test("keeps the landscape renderer's A4 print and responsive screen contract sco
   expect(stylesheet).toContain(".su-full-landscape-page--detail .su-full-landscape-page-body > h2");
   expect(stylesheet).toContain(".su-full-landscape-page--appendix .su-full-landscape-chart-question { display: block;");
   expect(stylesheet).toContain("grid-template-columns: 1.1fr .8fr 1.55fr 1.35fr;");
-  expect(stylesheet).toContain("font-size: 11px; line-height: 1.1;");
-  expect(stylesheet).toContain(".is-people { --chapter-color: #f7a600; --chapter-peer-color: #ffd37a; }");
+  expect(stylesheet).toContain("font-size: 9px; line-height: 1.05;");
+  expect(stylesheet).toContain(".is-people { --chapter-color: #f7a600; --chapter-peer-color: #ffd37a; --chapter-line-color: #7a5000; }");
   expect(stylesheet).toMatch(/\.su-full-landscape-page-footer \.su-report-coach-name\s*\{[^}]*color: #6b6480;/);
   expect(stylesheet).not.toMatch(/\.su-full-landscape-page\s*\{[^}]*overflow:\s*hidden;/);
   expect(stylesheet).not.toContain(".su-full-landscape-page--appendix .su-full-landscape-chart-question,\n  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-bar-label { display: none;");

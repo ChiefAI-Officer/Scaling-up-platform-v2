@@ -2583,6 +2583,7 @@
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-report {
   --chapter-color: #522583;
   --chapter-peer-color: #8f78ad;
+  --chapter-line-color: #522583;
   color: #1a1322;
   counter-reset: landscape-page;
 }
@@ -2599,11 +2600,11 @@
   border: 0;
 }
 
-.su-public-brand.su-report.su-full-landscape .su-full-landscape-report .is-people { --chapter-color: #f7a600; --chapter-peer-color: #ffd37a; }
-.su-public-brand.su-report.su-full-landscape .su-full-landscape-report .is-strategy { --chapter-color: #008bd2; --chapter-peer-color: #70c7ef; }
-.su-public-brand.su-report.su-full-landscape .su-full-landscape-report .is-execution { --chapter-color: #946b36; --chapter-peer-color: #d2b084; }
-.su-public-brand.su-report.su-full-landscape .su-full-landscape-report .is-cash { --chapter-color: #95c11f; --chapter-peer-color: #d7ee9b; }
-.su-public-brand.su-report.su-full-landscape .su-full-landscape-report .is-you { --chapter-color: #522583; --chapter-peer-color: #a88fc6; }
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-report .is-people { --chapter-color: #f7a600; --chapter-peer-color: #ffd37a; --chapter-line-color: #7a5000; }
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-report .is-strategy { --chapter-color: #008bd2; --chapter-peer-color: #70c7ef; --chapter-line-color: #00628f; }
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-report .is-execution { --chapter-color: #946b36; --chapter-peer-color: #d2b084; --chapter-line-color: #624018; }
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-report .is-cash { --chapter-color: #95c11f; --chapter-peer-color: #d7ee9b; --chapter-line-color: #4d6600; }
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-report .is-you { --chapter-color: #522583; --chapter-peer-color: #a88fc6; --chapter-line-color: #522583; }
 
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-page {
   display: grid;
@@ -2677,7 +2678,7 @@
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-cover-brand .su-report-coach { color: #ffffff; }
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-chapter-kicker {
   margin: 0 0 6px;
-  color: var(--chapter-color);
+  color: var(--chapter-line-color);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: .14em;
@@ -2763,9 +2764,34 @@
   letter-spacing: .06em;
   text-transform: uppercase;
 }
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-profile-row--chapter {
+  background: #f4f0fa;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-profile-row--chapter th {
+  color: #3f1c66;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-profile-row--subsection th {
+  padding-left: 22px;
+  font-weight: 400;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-profile-row--chapter th span,
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-profile-row--subsection th span {
+  display: inline;
+  margin-left: 8px;
+  color: #6b6480;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
 
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-vertical-chart {
-  color: var(--chapter-color);
+  --chart-question-column: 120px;
+  --chart-you-label-column: 48px;
+  --chart-value-column: 34px;
+  --chart-column-gap: 8px;
+  --chart-row-height: 44px;
+  color: var(--chapter-line-color);
 }
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-chart-title {
   margin: 12px 0 7px;
@@ -2779,12 +2805,13 @@
 }
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-peer-contour {
   position: absolute;
-  inset: 0 auto auto 0;
+  top: 0;
+  left: calc(var(--chart-question-column) + var(--chart-you-label-column) + var(--chart-column-gap) * 2);
   z-index: 2;
-  width: 440px;
-  max-width: 100%;
+  width: calc(100% - var(--chart-question-column) - var(--chart-you-label-column) - var(--chart-value-column) - var(--chart-column-gap) * 3);
+  max-width: none;
   height: 100%;
-  color: var(--chapter-peer-color);
+  color: var(--chapter-line-color);
   overflow: visible;
   pointer-events: none;
 }
@@ -2799,9 +2826,12 @@
 }
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-chart-row {
   display: grid;
-  grid-template-columns: 120px minmax(0, 1fr);
+  grid-template-columns: var(--chart-question-column) var(--chart-you-label-column) minmax(0, 1fr) var(--chart-value-column);
+  column-gap: var(--chart-column-gap);
   align-items: center;
-  min-height: 44px;
+  height: var(--chart-row-height);
+  min-width: 0;
+  overflow: hidden;
 }
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-chart-question {
   margin: 0;
@@ -2810,6 +2840,18 @@
   font-size: 11px;
   font-weight: 700;
   overflow-wrap: anywhere;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-vertical-you-label {
+  color: #4b4359;
+  font-size: 10px;
+  font-weight: 700;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-vertical-scale {
+  display: block;
+  height: 9px;
+  min-width: 0;
+  overflow: hidden;
+  background: #e9e7eb;
 }
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-bar-measure {
   display: grid;
@@ -2851,7 +2893,7 @@
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-chart-legend-mark {
   display: inline-block;
   width: 18px;
-  border-top: 2px solid var(--chapter-peer-color);
+  border-top: 2px solid var(--chapter-line-color);
 }
 
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-detail {
@@ -2877,6 +2919,7 @@
   }
 
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page-body { grid-template-columns: 1fr; padding: 24px 18px; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-cover-brand { margin: -24px -18px 16px; padding: 10px 18px; }
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--chapter .su-full-landscape-vertical-chart,
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-chapter-copy,
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--detail .su-full-landscape-page-body > h2 {
@@ -2884,9 +2927,16 @@
     grid-row: auto;
   }
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-chart-plot { width: 100%; }
-  .su-public-brand.su-report.su-full-landscape .su-full-landscape-chart-row { grid-template-columns: minmax(0, 1fr); gap: 3px; padding: 7px 0; }
-  .su-public-brand.su-report.su-full-landscape .su-full-landscape-chart-question { padding-right: 0; }
-  .su-public-brand.su-report.su-full-landscape .su-full-landscape-peer-contour { display: none; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-vertical-chart {
+    --chart-question-column: 38%;
+    --chart-you-label-column: 24px;
+    --chart-value-column: 30px;
+    --chart-column-gap: 4px;
+    --chart-row-height: 58px;
+  }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-chart-question { padding-right: 0; font-size: 10px; line-height: 1.15; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-vertical-you-label { font-size: 9px; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page-body table { table-layout: fixed; overflow-wrap: anywhere; }
 }
 
 @page suFullLandscape { size: A4 landscape; margin: 0; }
@@ -2909,8 +2959,8 @@
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-bar-fill,
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-peer-contour { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
-  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--chapter.is-execution .su-full-landscape-chart-row { min-height: 28px; }
-  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--chapter.is-you .su-full-landscape-chart-row { min-height: 34px; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--chapter.is-execution .su-full-landscape-vertical-chart { --chart-row-height: 28px; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--chapter.is-you .su-full-landscape-vertical-chart { --chart-row-height: 34px; }
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--chapter.is-execution .su-full-landscape-chart-question,
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--chapter.is-you .su-full-landscape-chart-question { font-size: 9px; line-height: 1.05; }
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--detail .su-full-landscape-page-body { column-gap: 8mm; padding: 6mm 10mm 2mm; }
@@ -2941,10 +2991,11 @@
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-vertical-chart:nth-of-type(5) { grid-column: 4; grid-row: 2 / span 2; }
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-chart-title { margin: 0 0 3px; font-size: 12px; }
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-chart-plot { width: 100%; }
-  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-chart-row { grid-template-columns: minmax(0, 1fr); min-height: 29px; align-content: center; }
-  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-chart-question { display: block; padding: 0; font-size: 11px; line-height: 1.1; }
-  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-bar-label { display: none; }
-  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-bar-measure { grid-template-columns: minmax(0, 1fr) 22px; gap: 4px; box-sizing: border-box; padding-left: 0; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-vertical-chart { --chart-question-column: 48%; --chart-you-label-column: 0px; --chart-value-column: 22px; --chart-column-gap: 3px; --chart-row-height: 27px; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-vertical-chart.is-execution { --chart-row-height: 24px; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-vertical-chart.is-you { --chart-row-height: 28px; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-chart-question { display: block; padding: 0; font-size: 9px; line-height: 1.05; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-vertical-you-label { overflow: hidden; font-size: 0; }
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-bar-value { font-size: 10px; }
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-bar-track { height: 7px; }
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-chart-legend { justify-content: flex-start; margin-top: 3px; font-size: 10px; }
