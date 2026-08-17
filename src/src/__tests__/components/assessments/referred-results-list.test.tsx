@@ -255,6 +255,37 @@ describe("Referred Results page ownership", () => {
     expect(mockCampaignFindFirst).not.toHaveBeenCalled();
   });
 
+  it("shows certification guidance to a pending Coach before loading referral data", async () => {
+    mockIsReferredResultsEnabled.mockReturnValue(true);
+    mockCoachFindUnique.mockResolvedValue({
+      id: "coach-1",
+      email: "canonical-coach@example.com",
+      firstName: "Alex",
+      certificationStatus: "PENDING",
+      certificationExpiry: null,
+    });
+
+    render(
+      await ReferredResultsPage({
+        searchParams: Promise.resolve({}),
+      }),
+    );
+
+    expect(
+      screen.getByRole("heading", { name: "Certification pending" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Your Referred Results will be available once an administrator assigns your coach certification. Please try again after setup is complete.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Back to My Campaigns" }),
+    ).toHaveAttribute("href", "/portal/assessments");
+    expect(mockCampaignFindMany).not.toHaveBeenCalled();
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
   it.each([
     ["missing", null],
     [

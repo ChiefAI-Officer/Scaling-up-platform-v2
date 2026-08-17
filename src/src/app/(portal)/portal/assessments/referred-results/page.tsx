@@ -5,10 +5,14 @@ import {
   type PublicAssessmentCoachLink,
 } from "@/components/assessments/ReferredResultsList";
 import { FadeUp } from "@/components/ui/animated";
+import { EmptyState } from "@/components/ui/empty-state";
 import { normalizePublicReferralCursorTrail } from "@/lib/assessments/referred-results-page-state";
 import { isReferredResultsEnabled } from "@/lib/assessments/wave-83-flags";
 import { getApiActor } from "@/lib/auth/authorization";
-import { isCoachCurrentlyCertified } from "@/lib/auth/coach-status";
+import {
+  isCoachCurrentlyCertified,
+  PENDING_STATUS,
+} from "@/lib/auth/coach-status";
 import { db } from "@/lib/db";
 
 const APP_URL =
@@ -65,10 +69,39 @@ export default async function ReferredResultsPage({
       certificationExpiry: true,
     },
   });
-  if (
-    !coach ||
-    !isCoachCurrentlyCertified(coach)
-  ) {
+  if (!coach) {
+    notFound();
+  }
+
+  if (coach.certificationStatus === PENDING_STATUS) {
+    return (
+      <div className="space-y-6">
+        <FadeUp>
+          <div>
+            <p className="mb-2 text-xs text-muted-foreground">
+              Assessments / Referred Results
+            </p>
+            <h1 className="font-serif text-3xl font-medium text-foreground">
+              Referred Results
+            </h1>
+          </div>
+        </FadeUp>
+
+        <FadeUp delay={0.05}>
+          <div className="rounded-xl border border-border bg-card shadow-sm">
+            <EmptyState
+              title="Certification pending"
+              description="Your Referred Results will be available once an administrator assigns your coach certification. Please try again after setup is complete."
+              actionLabel="Back to My Campaigns"
+              actionHref="/portal/assessments"
+            />
+          </div>
+        </FadeUp>
+      </div>
+    );
+  }
+
+  if (!isCoachCurrentlyCertified(coach)) {
     notFound();
   }
 

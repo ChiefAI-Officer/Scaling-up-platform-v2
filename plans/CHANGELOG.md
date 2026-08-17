@@ -6,6 +6,15 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="referred-results-pending-certification-guidance-ready"></a>
+### 2026-08-17 — Referred Results pending-certification guidance ready <!-- ENTRY_ISO:2026-08-17 ENTRY_SLUG:referred-results-pending-certification-guidance-ready -->
+
+**Status: IMPLEMENTED + LOCALLY VERIFIED; NOT YET MERGED OR DEPLOYED.** A newly created Coach could see the globally enabled **Referred Results** navigation item while their certification setup was still `PENDING`, but the destination treated every non-current certification state as missing and rendered the generic dark `404`. The affected Coach has separately been unblocked in Production by assigning all seven available certifications through the authorized Admin UI.
+
+**Fix and behavior boundary.** The Referred Results route now distinguishes a canonical `PENDING` Coach from unavailable access. Pending Coaches receive a page-local **Certification pending** state explaining that an administrator must assign their coach certification, plus a **Back to My Campaigns** action. Missing Coach records and deactivated or expired certification access retain the existing dark `404`. The campaign/results queries are not executed for the pending state. No schema, migration, feature flag, campaign, response, invitation, email, assessment version, or referral result changed.
+
+**Test-first verification.** The regression first failed with `NEXT_NOT_FOUND`, then passed after the pending-state branch was introduced. After rebasing over the adjacent assessment-name fix, the final focused matrix passed **4 suites / 39 tests**; changed-file ESLint emitted no diagnostics; migration safety approved all **47 migrations**; and `git diff --check` passed. The final Production-equivalent Turbopack build compiled in 18.0 seconds, passed TypeScript, and generated **94/94** pages, retaining only the expected local workspace-root, middleware-deprecation, and missing Inngest-key/`DATABASE_URL` diagnostics.
+
 <a id="referred-results-template-name-sync"></a>
 ### 2026-08-17 — Referred Results follows assessment-template renames <!-- ENTRY_ISO:2026-08-17 ENTRY_SLUG:referred-results-template-name-sync -->
 
