@@ -51,6 +51,7 @@ jest.mock("@/lib/rate-limit", () => ({
 }));
 
 const mockAuditCreate = jest.fn();
+const mockResolvePeerReportEnhancementsForSubmission = jest.fn();
 jest.mock("@/lib/db", () => ({
   db: {
     auditLog: {
@@ -60,6 +61,11 @@ jest.mock("@/lib/db", () => ({
       findFirst: jest.fn().mockResolvedValue({ campaign: { id: "camp-83", templateId: "tpl-83" } }),
     },
   },
+}));
+
+jest.mock("@/lib/assessments/peer-report-resolver", () => ({
+  resolvePeerReportEnhancementsForSubmission: (input: unknown) =>
+    mockResolvePeerReportEnhancementsForSubmission(input),
 }));
 
 jest.mock("@/lib/assessments/wave-report-styles-flags", () => ({
@@ -183,6 +189,12 @@ beforeEach(() => {
   });
   mockAuditCreate.mockResolvedValue({ id: "audit-83" });
   mockGetPublicReferralReport.mockResolvedValue(okOutcome());
+  mockResolvePeerReportEnhancementsForSubmission.mockImplementation(
+    async ({ report }: { report: unknown }) => ({
+      report,
+      lvaPeerComparison: null,
+    }),
+  );
 });
 
 describe("public referral report page", () => {
@@ -257,6 +269,36 @@ describe("public referral report page", () => {
     });
   });
 
+  it("forwards an enriched Classic SU Full report after the access gate succeeds", async () => {
+    const sourceOutcome = okOutcome({
+      assessmentName: "Scaling Up Assessment",
+      templateAlias: "scaling-up-full",
+      reportStyle: "CLASSIC",
+    });
+    const enrichedReport = {
+      ...sourceOutcome.report,
+      suFullPeerPresentation: { sections: [] },
+    };
+    mockGetPublicReferralReport.mockResolvedValue(sourceOutcome);
+    mockResolvePeerReportEnhancementsForSubmission.mockResolvedValue({
+      report: enrichedReport,
+      lvaPeerComparison: null,
+    });
+
+    const node = await Page(makeProps());
+    renderToStaticMarkup(node as React.ReactElement);
+
+    expect(mockBrandedReport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        report: expect.objectContaining({
+          suFullPeerPresentation: expect.objectContaining({
+            sections: expect.any(Array),
+          }),
+        }),
+      }),
+    );
+  });
+
   it("retains the existing public-referral report surface when report styles are killed", async () => {
     mockGetPublicReferralReport.mockResolvedValue({
       ...okOutcome(),
@@ -303,6 +345,7 @@ describe("public referral report page", () => {
       );
 
       expect(mockAuditCreate).not.toHaveBeenCalled();
+      expect(mockResolvePeerReportEnhancementsForSubmission).not.toHaveBeenCalled();
       expect(mockBrandedReport).not.toHaveBeenCalled();
       expect(mockPrintReportButton).not.toHaveBeenCalled();
     },

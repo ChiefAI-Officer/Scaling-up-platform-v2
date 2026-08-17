@@ -16,6 +16,8 @@ import {
   defaultReportGateDeps,
   viewPublicReferralReport,
 } from "@/lib/assessments/report-access-gate";
+import { db } from "@/lib/db";
+import { resolvePeerReportEnhancementsForSubmission } from "@/lib/assessments/peer-report-resolver";
 import { isFindingsLogicEnabled } from "@/lib/assessments/wave-u-flags";
 
 export const dynamic = "force-dynamic";
@@ -41,23 +43,30 @@ export default async function PublicSubmissionReportPage({
   }
 
   const { report, reportStylesAvailable } = outcome;
+  const peerEnhancements = await resolvePeerReportEnhancementsForSubmission({
+    db,
+    report,
+    reportStylesAvailable,
+  });
+  const renderedReport = peerEnhancements.report;
 
   return (
     <ReportStyleScope
-      report={report}
+      report={renderedReport}
       reportStylesAvailable={reportStylesAvailable}
     >
       <div className="su-report-page">
         <div className="su-report-actions no-print">
           <PrintReportButton
             fileName={
-              `${report.respondentName} - ${report.assessmentName} - Report`
+              `${renderedReport.respondentName} - ${renderedReport.assessmentName} - Report`
             }
           />
         </div>
         <BrandedReport
-          report={report}
-          campaignLabel={report.campaignLabel}
+          report={renderedReport}
+          campaignLabel={renderedReport.campaignLabel}
+          peerComparison={peerEnhancements.lvaPeerComparison}
           reportStylesAvailable={reportStylesAvailable}
           reportFindingsAvailable={isFindingsLogicEnabled()}
         />

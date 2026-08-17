@@ -1,12 +1,11 @@
 /**
  * Wave S (Jeff #12/#13) — respondent-report PAGE flag/alias gating tests.
  *
- * `resolvePeerComparison` must gate on the wave flag + render-enabled alias
- * BEFORE any DB read (spec 19s S-2): flag OFF ⇒ assessmentBenchmark is never
- * queried and BrandedReport receives NO peerComparison; flag ON + LVA ⇒ the
- * rows are fetched and the built section flows in as the prop; a DB throw is
- * fail-soft (report still renders, no section). Harness mirrors
- * assessment-respondent-report-page.test.tsx.
+ * The shared peer-report resolver owns all peer gates and benchmark reads.
+ * This page suite proves the authorized route forwards both of its outputs to
+ * BrandedReport: LVA's existing peerComparison and a test-only enabled SU Full
+ * presentation. Resolver correctness and fail-soft behavior live in its unit
+ * suite; this route must not recreate them.
  */
 
 jest.mock("next/navigation", () => ({
@@ -48,6 +47,7 @@ jest.mock("next/headers", () => ({
 const mockAuditCreate = jest.fn().mockResolvedValue({ id: "audit-1" });
 const mockCampaignFindFirst = jest.fn();
 const mockBenchmarkFindMany = jest.fn();
+const mockResolvePeerReportEnhancementsForCampaign = jest.fn();
 
 jest.mock("@/lib/db", () => ({
   db: {
@@ -61,9 +61,14 @@ jest.mock("@/lib/db", () => ({
   },
 }));
 
+jest.mock("@/lib/assessments/peer-report-resolver", () => ({
+  resolvePeerReportEnhancementsForCampaign: (input: unknown) =>
+    mockResolvePeerReportEnhancementsForCampaign(input),
+}));
+
 // Capture the peerComparison prop the page hands the report tree.
-jest.mock("@/components/assessments/BrandedReport", () => ({
-  BrandedReport: ({
+const mockBrandedReport = jest.fn(
+  ({
     report,
     peerComparison,
     reportStylesAvailable,
@@ -81,6 +86,9 @@ jest.mock("@/components/assessments/BrandedReport", () => ({
       {report.respondentName}
     </div>
   ),
+);
+jest.mock("@/components/assessments/BrandedReport", () => ({
+  BrandedReport: (props: unknown) => mockBrandedReport(props as never),
 }));
 
 jest.mock("@/components/assessments/PrintReportButton", () => ({
@@ -142,8 +150,12 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockGetApiActor.mockResolvedValue({ id: "u1", role: "ADMIN", coachId: null });
   mockGetRespondentReport.mockResolvedValue(okLvaReport());
-  // Longitudinal resolver also calls assessmentCampaign.findFirst — default it
-  // to null (no link) unless a test overrides.
+  mockResolvePeerReportEnhancementsForCampaign.mockImplementation(
+    async ({ report }: { report: unknown }) => ({
+      report,
+      lvaPeerComparison: null,
+    }),
+  );
   mockCampaignFindFirst.mockResolvedValue(null);
   delete process.env.WAVE_S_PEER_BENCHMARKS_ENABLED;
   delete process.env.WAVE_S_PEER_BENCHMARKS_KILL;
@@ -154,33 +166,25 @@ afterEach(() => {
   delete process.env.WAVE_S_PEER_BENCHMARKS_KILL;
 });
 
-test("flag OFF ⇒ assessmentBenchmark never queried, no peerComparison prop", async () => {
+test("forwards an unchanged resolver result without direct benchmark reads", async () => {
   const html = await renderPage();
   expect(mockBenchmarkFindMany).not.toHaveBeenCalled();
   expect(html).toContain('data-peer-items="none"');
 });
 
-test("flag ON + LVA ⇒ benchmarks fetched and the built section flows into the prop", async () => {
-  process.env.WAVE_S_PEER_BENCHMARKS_ENABLED = "1";
-  mockCampaignFindFirst.mockResolvedValue({ templateId: "tpl-1" });
-  mockBenchmarkFindMany.mockResolvedValue([{
-    metricKey: "S3_culture",
-    value: 6.3,
-    updatedAt: new Date("2026-08-14T00:00:00Z"),
-  }]);
-  const html = await renderPage();
-  expect(mockBenchmarkFindMany).toHaveBeenCalledWith({
-    where: { templateId: "tpl-1", metricKind: "QUESTION" },
-    select: { metricKey: true, value: true, updatedAt: true },
+test("forwards the existing LVA peerComparison from the shared resolver", async () => {
+  const outcome = okLvaReport();
+  mockResolvePeerReportEnhancementsForCampaign.mockResolvedValue({
+    report: outcome.report,
+    lvaPeerComparison: { items: [{}] },
   });
-  // One qualifying factor (Culture: own Strong=10 vs peers 6.3) → 1 item.
+  const html = await renderPage();
   expect(html).toContain('data-peer-items="1"');
   expect(html).toContain('data-report-style="MODERN_DASHBOARD"');
   expect(html).toContain('data-report-styles-available="true"');
 });
 
-test("flag ON + non-LVA alias ⇒ no benchmark query", async () => {
-  process.env.WAVE_S_PEER_BENCHMARKS_ENABLED = "1";
+test("an ineligible resolver result leaves the report unenhanced", async () => {
   const r = okLvaReport();
   r.report.templateAlias = "qsp-v2";
   mockGetRespondentReport.mockResolvedValue(r);
@@ -189,11 +193,30 @@ test("flag ON + non-LVA alias ⇒ no benchmark query", async () => {
   expect(html).toContain('data-peer-items="none"');
 });
 
-test("a benchmark DB throw is fail-soft: report renders without a section", async () => {
-  process.env.WAVE_S_PEER_BENCHMARKS_ENABLED = "1";
-  mockCampaignFindFirst.mockResolvedValue({ templateId: "tpl-1" });
-  mockBenchmarkFindMany.mockRejectedValue(new Error("boom"));
+test("forwards the resolver's test-only enabled Classic SU Full presentation", async () => {
+  const outcome = okLvaReport();
+  const sourceReport = {
+    ...outcome.report,
+    templateAlias: "scaling-up-full",
+    reportStyle: "CLASSIC",
+  };
+  const enrichedReport = {
+    ...sourceReport,
+    suFullPeerPresentation: { sections: [] },
+  };
+  mockGetRespondentReport.mockResolvedValue({ ...outcome, report: sourceReport });
+  mockResolvePeerReportEnhancementsForCampaign.mockResolvedValue({
+    report: enrichedReport,
+    lvaPeerComparison: null,
+  });
+
   const html = await renderPage();
   expect(html).toContain("Jane Respondent");
-  expect(html).toContain('data-peer-items="none"');
+  expect(mockBrandedReport).toHaveBeenCalledWith(
+    expect.objectContaining({
+      report: expect.objectContaining({
+        suFullPeerPresentation: expect.objectContaining({ sections: expect.any(Array) }),
+      }),
+    }),
+  );
 });
