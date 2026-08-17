@@ -41,6 +41,8 @@ import {
   isReportStyleKey,
   type ReportStyleKey,
 } from "@/lib/assessments/report-style-registry";
+import { PublicMarketingResult } from "@/components/assessments/PublicMarketingResult";
+import type { PublicMarketingResultConfig } from "@/lib/assessments/public-marketing-result";
 
 interface SectionDef {
   stableKey: string;
@@ -112,6 +114,7 @@ interface PublicQuizClientProps {
    * so this is normally empty.
    */
   customSlides?: SafeSlide[];
+  marketingResultConfig?: PublicMarketingResultConfig | null;
 }
 
 type Step = "intro" | "info" | "form" | "results" | "error";
@@ -131,6 +134,7 @@ export function PublicQuizClient({
   customSlides,
   referredResultsEnabled = false,
   qspStoryGroupEnabled = false,
+  marketingResultConfig = null,
 }: PublicQuizClientProps) {
   const sections = useMemo(() => toSections(rawSections), [rawSections]);
   const questions = useMemo(() => toQuestions(rawQuestions), [rawQuestions]);
@@ -473,6 +477,17 @@ export function PublicQuizClient({
               reportStylesAvailable={reportStylesAvailable}
               reportFindingsAvailable={reportFindingsAvailable}
             />
+            {marketingResultConfig && (
+              <PublicMarketingResult
+                score={
+                  results.scaleUpScore ??
+                  Math.max(0, Math.min(100, results.overallAverage * 10))
+                }
+                scoreBands={marketingResultConfig.scoreBands}
+                marketingCta={marketingResultConfig.marketingCta}
+                referringCoachEmail={verifiedCoachEmail}
+              />
+            )}
           </div>
         </main>
       </ReportStyleScope>

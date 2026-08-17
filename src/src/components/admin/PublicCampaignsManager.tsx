@@ -38,6 +38,7 @@ interface TemplateSummary {
   defaultReportStyle: ReportStyleKey;
   reportStylesEnabled: boolean;
   reportStylePreviewCapabilities: ReportStylePreviewCapabilities;
+  deliveryType?: "PUBLIC_MARKETING_QUIZ" | "INVITED_ASSESSMENT";
 }
 
 interface PublicCampaignRow {
@@ -190,7 +191,9 @@ export function PublicCampaignsManager({
       // Load campaigns filtered to PUBLIC
       const [campsRes, tmplRes] = await Promise.all([
         fetch("/api/admin/public-campaigns"),
-        fetch("/api/assessment-templates"),
+        fetch("/api/assessment-templates", {
+          headers: { "x-campaign-type": "public" },
+        }),
       ]);
 
       if (campsRes.ok) {
@@ -221,7 +224,14 @@ export function PublicCampaignsManager({
         // Wave Q (#6): the admin list keeps disabled templates (for the
         // badge/enable UI) — but they must not be offered for NEW public
         // campaigns. The POST 409s regardless; this hides them up front.
-        setTemplates((body.data ?? []).filter((t) => !t.disabledAt));
+        setTemplates(
+          (body.data ?? []).filter(
+            (t) =>
+              !t.disabledAt &&
+              (t.deliveryType === undefined ||
+                t.deliveryType === "PUBLIC_MARKETING_QUIZ"),
+          ),
+        );
       }
 
     } catch (e) {

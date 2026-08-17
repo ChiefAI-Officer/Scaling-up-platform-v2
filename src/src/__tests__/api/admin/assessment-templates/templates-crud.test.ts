@@ -33,6 +33,7 @@ jest.mock("@/lib/db", () => ({
       update: jest.fn(),
     },
     assessmentTemplateVersion: {
+      findFirst: jest.fn(),
       findUnique: jest.fn(),
       update: jest.fn(),
     },
@@ -65,6 +66,7 @@ import { db } from "@/lib/db";
 import { getApiActor } from "@/lib/auth/authorization";
 import { withRateLimit } from "@/lib/rate-limit";
 import { GENERIC_INVITED_WELCOME_CONFIG } from "@/lib/assessments/invited-welcome-config";
+import { createMarketingCtaPreset } from "@/lib/assessments/marketing-cta";
 
 const adminActor = {
   userId: "u1",
@@ -107,6 +109,8 @@ describe("POST /api/admin/assessment-templates (create)", () => {
     "WAVE_T_QUESTION_EDITOR_KILL",
     "WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_ENABLED",
     "WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_KILL",
+    "WAVE_PUBLIC_MARKETING_CTA_ENABLED",
+    "WAVE_PUBLIC_MARKETING_CTA_KILL",
   ] as const;
   const savedSimplifiedCreationEnvironment = new Map(
     simplifiedCreationEnvironment.map((key) => [key, process.env[key]]),
@@ -142,6 +146,11 @@ describe("POST /api/admin/assessment-templates (create)", () => {
   function enableWelcomeAuthoring(): void {
     process.env.WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_ENABLED = "1";
     delete process.env.WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_KILL;
+  }
+
+  function enablePublicMarketingCta(): void {
+    process.env.WAVE_PUBLIC_MARKETING_CTA_ENABLED = "1";
+    delete process.env.WAVE_PUBLIC_MARKETING_CTA_KILL;
   }
 
   beforeEach(() => {
@@ -285,6 +294,48 @@ describe("POST /api/admin/assessment-templates (create)", () => {
     expect(txMock.assessmentTemplateVersion.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.not.objectContaining({ invitedWelcomeDefault: expect.anything() }),
+      }),
+    );
+  });
+
+  it("requires an explicit delivery type in simplified mode when the wave is enabled", async () => {
+    enableSimplifiedCreation();
+    enablePublicMarketingCta();
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+
+    const response = await listPOST(
+      jsonReq("http://localhost/api/admin/assessment-templates", {
+        creationMode: "simplified",
+        name: "Test Template",
+      }) as never,
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: "DELIVERY_TYPE_REQUIRED",
+    });
+    expect(db.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("persists the selected public delivery type", async () => {
+    enableSimplifiedCreation();
+    enablePublicMarketingCta();
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+
+    const response = await listPOST(
+      jsonReq("http://localhost/api/admin/assessment-templates", {
+        creationMode: "simplified",
+        name: "Test Template",
+        deliveryType: "PUBLIC_MARKETING_QUIZ",
+      }) as never,
+    );
+
+    expect(response.status).toBe(201);
+    expect(txMock.assessmentTemplate.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          deliveryType: "PUBLIC_MARKETING_QUIZ",
+        }),
       }),
     );
   });
@@ -661,6 +712,101 @@ describe("PATCH /api/admin/assessment-templates/[id]", () => {
     );
   }
   const detailParams = { params: Promise.resolve({ id: "tpl-1" }) };
+
+  describe("delivery type lock", () => {
+    const savedEnabled = process.env.WAVE_PUBLIC_MARKETING_CTA_ENABLED;
+    const savedKill = process.env.WAVE_PUBLIC_MARKETING_CTA_KILL;
+
+    function existingDeliveryTemplate(
+      deliveryType: "PUBLIC_MARKETING_QUIZ" | "INVITED_ASSESSMENT" =
+        "INVITED_ASSESSMENT",
+    ) {
+      return {
+        id: "tpl-1",
+        alias: "test-template",
+        deliveryType,
+        resultsEmailSubject: null,
+        resultsEmailBodyMarkdown: null,
+        sendResultsDefault: false,
+        disabledAt: null,
+        invitedWelcomeDefault: null,
+      };
+    }
+
+    beforeEach(() => {
+      process.env.WAVE_PUBLIC_MARKETING_CTA_ENABLED = "1";
+      delete process.env.WAVE_PUBLIC_MARKETING_CTA_KILL;
+      (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+      (db.assessmentTemplate.findFirst as jest.Mock).mockResolvedValue(
+        existingDeliveryTemplate(),
+      );
+      (db.assessmentTemplate.update as jest.Mock).mockResolvedValue(
+        existingDeliveryTemplate("PUBLIC_MARKETING_QUIZ"),
+      );
+      (db.assessmentTemplateVersion.findFirst as jest.Mock).mockResolvedValue(
+        null,
+      );
+    });
+
+    afterEach(() => {
+      if (savedEnabled === undefined) {
+        delete process.env.WAVE_PUBLIC_MARKETING_CTA_ENABLED;
+      } else {
+        process.env.WAVE_PUBLIC_MARKETING_CTA_ENABLED = savedEnabled;
+      }
+      if (savedKill === undefined) {
+        delete process.env.WAVE_PUBLIC_MARKETING_CTA_KILL;
+      } else {
+        process.env.WAVE_PUBLIC_MARKETING_CTA_KILL = savedKill;
+      }
+    });
+
+    it("allows a delivery type correction before first publication", async () => {
+      const response = await detailPATCH(
+        patchReq({ deliveryType: "PUBLIC_MARKETING_QUIZ" }) as never,
+        detailParams,
+      );
+
+      expect(response.status).toBe(200);
+      expect(db.assessmentTemplate.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            deliveryType: "PUBLIC_MARKETING_QUIZ",
+          }),
+        }),
+      );
+    });
+
+    it("rejects a delivery type change after first publication", async () => {
+      (db.assessmentTemplateVersion.findFirst as jest.Mock).mockResolvedValue({
+        id: "ver-published",
+      });
+
+      const response = await detailPATCH(
+        patchReq({ deliveryType: "PUBLIC_MARKETING_QUIZ" }) as never,
+        detailParams,
+      );
+
+      expect(response.status).toBe(409);
+      await expect(response.json()).resolves.toMatchObject({
+        code: "DELIVERY_TYPE_LOCKED",
+      });
+      expect(db.assessmentTemplate.update).not.toHaveBeenCalled();
+    });
+
+    it("rejects delivery type writes while the wave is off", async () => {
+      delete process.env.WAVE_PUBLIC_MARKETING_CTA_ENABLED;
+
+      const response = await detailPATCH(
+        patchReq({ deliveryType: "PUBLIC_MARKETING_QUIZ" }) as never,
+        detailParams,
+      );
+
+      expect(response.status).toBe(403);
+      expect(db.assessmentTemplate.findFirst).not.toHaveBeenCalled();
+      expect(db.assessmentTemplate.update).not.toHaveBeenCalled();
+    });
+  });
 
   describe("report-style default writes", () => {
     const savedEnabled = process.env.WAVE_REPORT_STYLES_ENABLED;
@@ -1342,5 +1488,36 @@ describe("POST /api/admin/assessment-templates/[id]/versions/[versionId]/publish
     expect(res.status).toBe(422);
     const body = await res.json();
     expect(body.error).toBe("PUBLISH_VALIDATION_FAILED");
+  });
+
+  it("requires an action-ready CTA before publishing a public quiz", async () => {
+    process.env.WAVE_PUBLIC_MARKETING_CTA_ENABLED = "1";
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    (db.assessmentTemplateVersion.findUnique as jest.Mock).mockResolvedValue({
+      id: "ver-1",
+      templateId: "tpl-1",
+      publishedAt: null,
+      versionNumber: 1,
+      questions: [],
+      sections: [],
+      scoringConfig: { tiers: [] },
+      reportConfig: {
+        publicMarketing: {
+          marketingCta: createMarketingCtaPreset("BLANK"),
+        },
+      },
+      template: { deliveryType: "PUBLIC_MARKETING_QUIZ" },
+    });
+
+    const res = await publishPOST(pubReq() as never, publishParams);
+
+    expect(res.status).toBe(422);
+    const body = await res.json();
+    expect(body.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ message: expect.stringMatching(/button/i) }),
+      ]),
+    );
+    delete process.env.WAVE_PUBLIC_MARKETING_CTA_ENABLED;
   });
 });

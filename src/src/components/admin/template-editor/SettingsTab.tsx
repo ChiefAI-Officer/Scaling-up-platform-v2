@@ -32,7 +32,11 @@
 
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
+import type { AssessmentTemplateDeliveryType } from "@prisma/client";
 
+import { AssessmentDeliveryTypePicker } from "@/components/admin/AssessmentDeliveryTypePicker";
+import { MarketingCtaEditor } from "@/components/admin/template-editor/MarketingCtaEditor";
+import type { MarketingCtaConfigV1 } from "@/lib/assessments/marketing-cta";
 import { LANGUAGE_LABELS } from "./enum-labels";
 import {
   PeerBenchmarksPanel,
@@ -62,6 +66,7 @@ export interface SettingsTabTemplateValues {
   resultsEmailBodyMarkdown: string | null;
   resultsEmailContentApproved: boolean;
   aggregationMode: "FULL_VISIBILITY" | "CEO_ONLY";
+  deliveryType?: AssessmentTemplateDeliveryType;
   /** Optional only for legacy isolated editor fixtures; live page always supplies it. */
   defaultReportStyle?: ReportStyleKey;
 }
@@ -75,6 +80,7 @@ export interface SettingsTabTemplateValues {
  * `model.handleTemplateRowSave` in (see the note in the wave plan).
  */
 export type SettingsRowPatch = Partial<{
+  deliveryType: AssessmentTemplateDeliveryType;
   aggregationMode: "FULL_VISIBILITY" | "CEO_ONLY";
   resultsEmailSubject: string | null;
   resultsEmailBodyMarkdown: string | null;
@@ -84,6 +90,7 @@ export type SettingsRowPatch = Partial<{
 
 export interface SettingsTabProps {
   templateId: string;
+  versionId?: string;
   templateValues: SettingsTabTemplateValues;
   /** Version-level language (real stored value, e.g. `enUS`). */
   language: string;
@@ -116,6 +123,13 @@ export interface SettingsTabProps {
    * instead of below the whole tabbed shell.
    */
   peerBenchmarkRows?: PeerBenchmarkRow[] | null;
+  /** Public-quiz classification is editable only until the first publication. */
+  deliveryType?: AssessmentTemplateDeliveryType;
+  hasPublishedVersion?: boolean;
+  publicMarketingCtaEnabled?: boolean;
+  marketingCta?: MarketingCtaConfigV1 | null;
+  onMarketingCtaChange?: (next: MarketingCtaConfigV1) => void;
+  marketingCtaDirty?: boolean;
 }
 
 // ────────────────────────────────────────────────────────────────────────
@@ -151,6 +165,7 @@ const coerceNull = (v: string): string | null => (v.length > 0 ? v : null);
 // ────────────────────────────────────────────────────────────────────────
 export function SettingsTab({
   templateId,
+  versionId = "",
   templateValues,
   language,
   isReadOnly,
@@ -166,11 +181,20 @@ export function SettingsTab({
   reportStylesEnabled = false,
   reportStylePreviewCapabilities,
   peerBenchmarkRows = null,
+  deliveryType = templateValues.deliveryType ?? "INVITED_ASSESSMENT",
+  hasPublishedVersion = false,
+  publicMarketingCtaEnabled = false,
+  marketingCta = null,
+  onMarketingCtaChange = () => {},
+  marketingCtaDirty = false,
 }: SettingsTabProps) {
   return (
     <div className="space-y-6 max-w-2xl">
       <AudienceCard
         aggregationMode={templateValues.aggregationMode}
+        deliveryType={deliveryType}
+        hasPublishedVersion={hasPublishedVersion}
+        publicMarketingCtaEnabled={publicMarketingCtaEnabled}
         handleTemplateRowSave={handleTemplateRowSave}
         templateRowSaving={templateRowSaving}
         templateRowError={templateRowError}
@@ -193,6 +217,22 @@ export function SettingsTab({
         onVersionFieldChange={onVersionFieldChange}
         isReadOnly={isReadOnly}
       />
+      {publicMarketingCtaEnabled &&
+        deliveryType === "PUBLIC_MARKETING_QUIZ" && (
+          <MarketingCtaEditor
+            templateId={templateId}
+            value={marketingCta}
+            onChange={onMarketingCtaChange}
+            previewDisabled={marketingCtaDirty}
+            onPreview={() => {
+              window.open(
+                `/admin/assessments/templates/${templateId}/versions/${versionId}/preview-public-result`,
+                "_blank",
+                "noopener,noreferrer",
+              );
+            }}
+          />
+        )}
       <InvitationEmailCard
         subject={templateValues.invitationSubject}
         body={templateValues.invitationBodyMarkdown}
@@ -292,11 +332,17 @@ function DefaultReportAppearanceCard({
 // ────────────────────────────────────────────────────────────────────────
 function AudienceCard({
   aggregationMode,
+  deliveryType,
+  hasPublishedVersion,
+  publicMarketingCtaEnabled,
   handleTemplateRowSave,
   templateRowSaving,
   templateRowError,
 }: {
   aggregationMode: "FULL_VISIBILITY" | "CEO_ONLY";
+  deliveryType: AssessmentTemplateDeliveryType;
+  hasPublishedVersion: boolean;
+  publicMarketingCtaEnabled: boolean;
   handleTemplateRowSave: (patch: SettingsRowPatch) => void | Promise<void>;
   templateRowSaving: boolean;
   templateRowError: string | null;
@@ -304,7 +350,14 @@ function AudienceCard({
   const [mode, setMode] = useState<"FULL_VISIBILITY" | "CEO_ONLY">(
     aggregationMode,
   );
+  const [selectedDeliveryType, setSelectedDeliveryType] =
+    useState<AssessmentTemplateDeliveryType>(deliveryType);
   const dirty = mode !== aggregationMode;
+  const deliveryTypeDirty = selectedDeliveryType !== deliveryType;
+
+  useEffect(() => {
+    setSelectedDeliveryType(deliveryType);
+  }, [deliveryType]);
 
   return (
     <section className="wf-card" style={{ padding: "1.5rem" }} data-testid="settings-audience-card">
@@ -312,14 +365,49 @@ function AudienceCard({
         Who takes it &amp; who sees results
       </h3>
 
-      {/* Access — read-only fact (D7: no PUBLIC radio). */}
-      <div className="space-y-1.5">
-        <span className="wf-label">Who can take it</span>
-        <p className="text-sm text-foreground">
-          <strong>Invited only</strong> — each respondent gets a private magic
-          link; answers are attributable.
-        </p>
-      </div>
+      {publicMarketingCtaEnabled ? (
+        <div className="space-y-3">
+          {hasPublishedVersion ? (
+            <>
+              <span className="wf-label">Assessment type</span>
+              <p className="text-sm font-semibold text-foreground">
+                {deliveryType === "PUBLIC_MARKETING_QUIZ"
+                  ? "Public marketing quiz"
+                  : "Invited assessment"}
+              </p>
+              <p className="text-[0.6875rem] text-muted-foreground">
+                Locked after this template&apos;s first published version.
+              </p>
+            </>
+          ) : (
+            <>
+              <AssessmentDeliveryTypePicker
+                value={selectedDeliveryType}
+                onChange={setSelectedDeliveryType}
+                disabled={templateRowSaving}
+              />
+              <button
+                type="button"
+                disabled={!deliveryTypeDirty || templateRowSaving}
+                onClick={() =>
+                  handleTemplateRowSave({ deliveryType: selectedDeliveryType })
+                }
+                className="wf-btn wf-btn-primary disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {templateRowSaving ? "Saving…" : "Save assessment type"}
+              </button>
+            </>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-1.5">
+          <span className="wf-label">Who can take it</span>
+          <p className="text-sm text-foreground">
+            <strong>Invited only</strong> — each respondent gets a private magic
+            link; answers are attributable.
+          </p>
+        </div>
+      )}
 
       {/* Aggregation — editable radios (humanized), per-card Save. */}
       <div className="space-y-2" style={{ marginTop: "1.25rem" }}>

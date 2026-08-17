@@ -18,9 +18,11 @@ import { logAudit } from "@/lib/audit";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
 import type { Prisma } from "@prisma/client";
 import {
+  assertTemplateDeliveryCompatible,
   CampaignCreateError,
   resolvePublishedTemplateVersion,
 } from "@/lib/assessments/campaign-create-service";
+import { isPublicMarketingCtaEnabled } from "@/lib/assessments/wave-public-marketing-cta-flags";
 import { DEFAULT_TEMPLATE_LANGUAGE } from "@/lib/assessments/active-version";
 import {
   deriveReportStylePreviewCapabilities,
@@ -306,6 +308,7 @@ export async function POST(request: NextRequest) {
         alias: true,
         disabledAt: true,
         defaultReportStyle: true,
+        deliveryType: true,
       },
     });
     if (!template) {
@@ -313,6 +316,22 @@ export async function POST(request: NextRequest) {
         { success: false, error: "Template not found" },
         { status: 404 }
       );
+    }
+    if (isPublicMarketingCtaEnabled()) {
+      try {
+        assertTemplateDeliveryCompatible(template.deliveryType, "PUBLIC");
+      } catch (error) {
+        if (
+          error instanceof CampaignCreateError &&
+          error.code === "TEMPLATE_DELIVERY_TYPE_MISMATCH"
+        ) {
+          return NextResponse.json(
+            { success: false, error: error.message, code: error.code },
+            { status: 409 },
+          );
+        }
+        throw error;
+      }
     }
     // Wave Q (#6): a disabled template cannot be used for NEW campaigns —
     // public campaigns included. UNCONDITIONAL (not flag-gated), mirroring

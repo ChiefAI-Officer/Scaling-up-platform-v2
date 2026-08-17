@@ -1182,6 +1182,11 @@ enum AssessmentReportStyleSource {
   CAMPAIGN_OVERRIDE
 }
 
+enum AssessmentTemplateDeliveryType {
+  PUBLIC_MARKETING_QUIZ
+  INVITED_ASSESSMENT
+}
+
 model AssessmentTemplate {
   id                            String                              @id @default(cuid())
   name                          String
@@ -1211,6 +1216,7 @@ model AssessmentTemplate {
   sendResultsDefault            Boolean                             @default(false)
   defaultReportStyle            AssessmentReportStyle               @default(CLASSIC)
   invitedWelcomeDefault         Json?
+  deliveryType                  AssessmentTemplateDeliveryType     @default(INVITED_ASSESSMENT)
   // Wave Q (Jeff July-1 #6) — "disabled" third lifecycle state, distinct from
   // soft-delete: hidden from NEW-campaign template pickers + rejected at
   // campaign create, but existing campaigns/reports/trends/re-seeds are

@@ -51,6 +51,7 @@ import {
   type PeerBenchmarkRow,
 } from "@/components/assessments/PeerBenchmarksPanel";
 import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
+import { isPublicMarketingCtaEnabled } from "@/lib/assessments/wave-public-marketing-cta-flags";
 
 export default async function AdminAssessmentVersionEditPage({
   params,
@@ -91,6 +92,7 @@ export default async function AdminAssessmentVersionEditPage({
           ? { invitedWelcomeDefault: true as const }
           : {}),
         aggregationMode: true,
+        deliveryType: true,
       },
     }),
     db.assessmentTemplateVersion.findUnique({
@@ -256,6 +258,7 @@ export default async function AdminAssessmentVersionEditPage({
             ? { invitedWelcomeDefault }
             : {}),
           aggregationMode: template.aggregationMode,
+          deliveryType: template.deliveryType,
           // accessMode is a campaign-level concept; templates default to INVITED
           // (v1 PUBLIC mode is hardcoded for Website Assessment per WF16 spec).
           accessMode: "INVITED",
@@ -344,6 +347,7 @@ export default async function AdminAssessmentVersionEditPage({
         // Wave S — rows exist only when the feature is effective and the
         // immutable template alias is LVA. Settings owns their placement.
         peerBenchmarkRows={peerBenchmarkRows}
+        publicMarketingCtaEnabled={isPublicMarketingCtaEnabled()}
       />
     </div>
   );

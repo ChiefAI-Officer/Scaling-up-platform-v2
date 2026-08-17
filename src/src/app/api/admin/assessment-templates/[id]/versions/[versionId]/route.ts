@@ -26,6 +26,8 @@ import { RateLimits, withRateLimit } from "@/lib/rate-limit";
 import { computeTemplateContentHash } from "@/lib/assessments/template-content-hash";
 import { QuestionSchema } from "@/lib/assessments/scoring";
 import { isVersionLifecycleEnabled } from "@/lib/assessments/wave-ed8-flags";
+import { isPublicMarketingCtaEnabled } from "@/lib/assessments/wave-public-marketing-cta-flags";
+import { prepareMarketingCtaForStorage } from "@/lib/assessments/marketing-cta-compiler";
 
 export async function GET(
   _request: NextRequest,
@@ -308,6 +310,7 @@ export async function PATCH(
         select: {
           invitationSubject: true,
           invitationBodyMarkdown: true,
+          deliveryType: true,
         },
       }),
     ]);
@@ -325,6 +328,25 @@ export async function PATCH(
     }
 
     const data = parsed.data;
+    let preparedReportConfig: unknown = data.reportConfig ?? null;
+    if (
+      isPublicMarketingCtaEnabled() &&
+      template.deliveryType === "PUBLIC_MARKETING_QUIZ"
+    ) {
+      const prepared = prepareMarketingCtaForStorage(preparedReportConfig);
+      if (!prepared.ok) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Invalid Marketing CTA",
+            code: "INVALID_MARKETING_CTA",
+            issues: prepared.issues,
+          },
+          { status: 422 },
+        );
+      }
+      preparedReportConfig = prepared.reportConfig;
+    }
 
     // ── Wave T §T-5 — unconditional validation (gates, never rewrites) ──
     const structuralFailure = validateQuestionRowsStructural(data.questions);
@@ -376,7 +398,7 @@ export async function PATCH(
       questions: data.questions,
       sections: data.sections,
       scoringConfig: data.scoringConfig,
-      reportConfig: data.reportConfig ?? null,
+      reportConfig: preparedReportConfig,
       invitationSubject: template.invitationSubject,
       invitationBodyMarkdown: template.invitationBodyMarkdown,
     });
@@ -393,9 +415,9 @@ export async function PATCH(
       sections: data.sections as Prisma.InputJsonValue,
       scoringConfig: data.scoringConfig as Prisma.InputJsonValue,
       reportConfig:
-        data.reportConfig === null || data.reportConfig === undefined
+        preparedReportConfig === null || preparedReportConfig === undefined
           ? Prisma.JsonNull
-          : (data.reportConfig as Prisma.InputJsonValue),
+          : (preparedReportConfig as Prisma.InputJsonValue),
       contentHash,
     };
     if (data.language !== undefined) {

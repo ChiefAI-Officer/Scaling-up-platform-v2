@@ -31,6 +31,47 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe("SimplifiedAssessmentTemplateForm", () => {
+  it("requires an explicit public or invited assessment type when enabled", () => {
+    render(<SimplifiedAssessmentTemplateForm deliveryTypeEnabled />);
+
+    expect(
+      screen.getByRole("radio", { name: /public marketing quiz/i }),
+    ).not.toBeChecked();
+    expect(
+      screen.getByRole("radio", { name: /invited assessment/i }),
+    ).not.toBeChecked();
+    expect(
+      screen.getByRole("button", { name: "Create and start building" }),
+    ).toBeDisabled();
+  });
+
+  it("posts the selected public delivery type", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue(
+      jsonResponse(201, {
+        success: true,
+        data: { id: "tpl-1", alias: "team-health", versionId: "ver-1" },
+      }),
+    );
+    render(<SimplifiedAssessmentTemplateForm deliveryTypeEnabled />);
+
+    fireEvent.click(
+      screen.getByRole("radio", { name: /public marketing quiz/i }),
+    );
+    enterName();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Create and start building" }),
+    );
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
+    expect(
+      JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body as string),
+    ).toEqual({
+      creationMode: "simplified",
+      name: "Team Health",
+      deliveryType: "PUBLIC_MARKETING_QUIZ",
+    });
+  });
+
   it("shows only the required identity field and a collapsed Advanced disclosure", () => {
     render(<SimplifiedAssessmentTemplateForm />);
 
