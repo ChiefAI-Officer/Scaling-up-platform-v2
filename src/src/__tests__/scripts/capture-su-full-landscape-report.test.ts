@@ -22,4 +22,5 @@ test("captures the canonical landscape fixture as a CSS-sized print PDF", () => 
   expect(script).toContain("landscape: true");
   expect(script).toContain("printBackground: true");
   expect(script).toContain("tmp/pdfs/su-full-landscape-fixture.pdf");
+  expect(script).not.toContain('<div className="su-public-brand su-report su-full-landscape">');
 });

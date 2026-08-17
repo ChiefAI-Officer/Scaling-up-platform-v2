@@ -7,6 +7,7 @@ import {
   SU_FULL_QUESTION_BENCHMARKS,
 } from "@/lib/assessments/su-full-question-benchmarks";
 import type { RespondentReport } from "@/lib/assessments/respondent-report";
+import { buildTemplateContent } from "../../../prisma/seed-scaling-up-full-assessment";
 
 export const LANDSCAPE_SECTION_RANGES = [
   ["S_PEOPLE_YE", "Your Employees", "people", 1, 8],
@@ -27,21 +28,28 @@ function keyFor(number: number): string {
 
 /** A canonical ten-section frozen report for landscape-composition tests. */
 export function completeSuFullLandscapeReport(): RespondentReport {
+  const content = buildTemplateContent();
+  const sliderQuestions = content.questions.filter(
+    (question): question is Extract<(typeof content.questions)[number], { type: "SLIDER_LIKERT" }> =>
+      question.type === "SLIDER_LIKERT",
+  );
+  if (sliderQuestions.length !== SU_FULL_QUESTION_BENCHMARKS.length) {
+    throw new Error("Canonical seed and peer benchmark question counts differ");
+  }
+
   const questionsByKey = Object.fromEntries(
-    SU_FULL_QUESTION_BENCHMARKS.map((benchmark, index) => {
-      const section = LANDSCAPE_SECTION_RANGES.find(
-        ([, , , start, end]) => index + 1 >= start && index + 1 <= end,
-      );
-      if (!section) throw new Error(`No canonical section for ${benchmark.stableKey}`);
+    sliderQuestions.map((question, index) => {
+      const benchmark = SU_FULL_QUESTION_BENCHMARKS[index];
+      if (question.stableKey !== benchmark.stableKey) {
+        throw new Error(`Canonical seed/benchmark mismatch at ${question.stableKey}`);
+      }
       return [
-        benchmark.stableKey,
+        question.stableKey,
         {
           type: "SLIDER_LIKERT",
-          label: index === 34
-            ? "Scalability, innovation and technology — the longest representative canonical question label"
-            : `Canonical question ${index + 1}`,
-          sectionStableKey: section[0],
-          max: 10,
+          label: question.label,
+          sectionStableKey: question.sectionStableKey,
+          max: question.scale.max,
         },
       ];
     }),
@@ -58,32 +66,31 @@ export function completeSuFullLandscapeReport(): RespondentReport {
     campaignLabel: null,
     submittedAt: new Date("2026-08-17T00:00:00Z"),
     result: {
-      perQuestion: SU_FULL_QUESTION_BENCHMARKS.map((benchmark, index) => ({
-        stableKey: benchmark.stableKey,
-        value: index % 11,
-        achieved: true,
-        recommendation: benchmark.stableKey === "Q35"
-          ? `Frozen feedback for ${benchmark.stableKey}. ${"This deliberately long canonical recommendation exercises landscape print density with the representative maximum-content case, preserving the approved fixed page allocation while keeping the full recommendation readable for respondent review. ".repeat(6)}`.trim()
-          : `Frozen feedback for ${benchmark.stableKey}. This deliberately long canonical recommendation exercises landscape print density without changing its fixed page allocation.`,
-      })),
+      perQuestion: sliderQuestions.map((question, index) => {
+        const value = index % 11;
+        const selectedBand = question.recommendations.find(
+          (band) => value >= band.minScore && value <= band.maxScore,
+        );
+        if (!selectedBand) throw new Error(`No canonical feedback band for ${question.stableKey}=${value}`);
+        return {
+          stableKey: question.stableKey,
+          value,
+          achieved: true,
+          recommendation: selectedBand.text,
+        };
+      }),
       perSection: [],
     } as unknown as RespondentReport["result"],
-    sections: LANDSCAPE_SECTION_RANGES.map(([stableKey, name, domain]) => ({
-      stableKey,
-      name,
-      domain,
-    })),
+    sections: content.sections,
     questionByKey: Object.fromEntries(
-      SU_FULL_QUESTION_BENCHMARKS.map((benchmark, index) => [
-        benchmark.stableKey,
-        index === 34
-          ? "Scalability, innovation and technology — the longest representative canonical question label"
-          : `Canonical question ${index + 1}`,
+      sliderQuestions.map((question) => [
+        question.stableKey,
+        question.label,
       ]),
     ),
     questionsByKey,
     rawAnswers: [{ stableKey: "Q_FTE_CONTRACT", value: 12 }],
-    scoringConfig: {},
+    scoringConfig: content.scoringConfig,
     provenance: {
       submissionId: "sub-landscape-1",
       versionId: "ver-landscape-4",

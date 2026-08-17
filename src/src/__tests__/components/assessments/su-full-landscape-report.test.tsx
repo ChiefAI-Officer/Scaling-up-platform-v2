@@ -73,11 +73,23 @@ test("renders the fixed 26-page landscape composition with truthful peer context
     expect(screen.getByTestId(`su-full-landscape-page-${number}`))
       .toHaveTextContent("Score of Peers");
   }
-  expect(screen.getByTestId("su-full-landscape-page-26").querySelectorAll("polyline"))
-    .toHaveLength(5);
+  const appendix = screen.getByTestId("su-full-landscape-page-26");
+  expect(appendix.querySelectorAll("polyline")).toHaveLength(5);
+  expect(appendix.querySelectorAll(".su-full-landscape-chart-row")).toHaveLength(61);
+  for (const question of model.chapters.flatMap((chapter) => chapter.questions)) {
+    expect(appendix).toHaveTextContent(question.label);
+  }
   expect(document.querySelectorAll(".su-full-landscape-peer-contour")).toHaveLength(10);
   expect(document.querySelectorAll(".su-full-landscape-peer-contour[stroke-dasharray]")).toHaveLength(0);
   expect(screen.getByTestId("su-full-landscape-page-1")).toHaveTextContent("Coach Example");
+  expect(screen.getAllByTestId("coach-name")).toHaveLength(27);
+  expect(screen.getAllByTestId("coach-logo")).toHaveLength(27);
+  const chapterKeyItems = screen.getByTestId("su-full-landscape-page-3")
+    .querySelectorAll(".su-full-landscape-chapter-key li");
+  expect(chapterKeyItems).toHaveLength(5);
+  expect(Array.from(chapterKeyItems).map((item) => item.className)).toEqual([
+    "is-people", "is-strategy", "is-execution", "is-cash", "is-you",
+  ]);
   const chartTitleIds = Array.from(
     document.querySelectorAll<HTMLElement>("[aria-labelledby^=\"su-landscape-vertical-chart-title-\"]"),
   ).map((chart) => chart.getAttribute("aria-labelledby"));
@@ -126,7 +138,8 @@ test("keeps the landscape renderer's A4 print and responsive screen contract sco
   );
 
   expect(stylesheet).toContain("@page suFullLandscape { size: A4 landscape; margin: 0; }");
-  expect(stylesheet).toContain(".su-full-landscape-page { page: suFullLandscape; break-after: page;");
+  expect(stylesheet).toMatch(/\.su-public-brand\.su-report\.su-full-landscape\s*\{[^}]*page: suFullLandscape;/);
+  expect(stylesheet).toMatch(/\.su-full-landscape-page \{[^}]*break-before: page;[^}]*break-after: page;[^}]*break-inside: avoid;/);
   expect(stylesheet).not.toMatch(/@page\s*\{\s*size:\s*A4\s+landscape\s*;/);
   expect(stylesheet).toContain(".su-full-landscape-detail { break-inside: avoid;");
   expect(stylesheet).toMatch(/\.su-full-landscape-bar-fill\s*\{[^}]*display: block;[^}]*border-radius: 0;/);
@@ -142,5 +155,19 @@ test("keeps the landscape renderer's A4 print and responsive screen contract sco
   expect(stylesheet).toContain(".su-full-landscape-page--chapter .su-full-landscape-vertical-chart");
   expect(stylesheet).toContain(".su-full-landscape-page--detail .su-full-landscape-page-body > h2");
   expect(stylesheet).toContain(".su-full-landscape-page--appendix .su-full-landscape-chart-question { display: block;");
+  expect(stylesheet).toContain("grid-template-columns: 1.1fr .8fr 1.55fr 1.35fr;");
+  expect(stylesheet).toContain("font-size: 11px; line-height: 1.1;");
+  expect(stylesheet).toContain(".is-people { --chapter-color: #f7a600; --chapter-peer-color: #ffd37a; }");
+  expect(stylesheet).toMatch(/\.su-full-landscape-page-footer \.su-report-coach-name\s*\{[^}]*color: #6b6480;/);
+  expect(stylesheet).not.toMatch(/\.su-full-landscape-page\s*\{[^}]*overflow:\s*hidden;/);
   expect(stylesheet).not.toContain(".su-full-landscape-page--appendix .su-full-landscape-chart-question,\n  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-bar-label { display: none;");
+});
+
+test("uses canonical seed labels and score-selected feedback at maximum live density", () => {
+  const report = completeSuFullLandscapeReport();
+  const q35 = report.result?.perQuestion.find((question) => question.stableKey === "Q35");
+
+  expect(report.questionByKey?.Q35).toBe("Most processes are automated");
+  expect(q35?.value).toBe(1);
+  expect(q35?.recommendation).toHaveLength(482);
 });

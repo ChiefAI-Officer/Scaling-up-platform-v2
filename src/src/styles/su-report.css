@@ -2599,11 +2599,11 @@
   border: 0;
 }
 
-.su-public-brand.su-report.su-full-landscape .su-full-landscape-report .is-people { --chapter-color: #f7a600; --chapter-peer-color: #d99b43; }
-.su-public-brand.su-report.su-full-landscape .su-full-landscape-report .is-strategy { --chapter-color: #008bd2; --chapter-peer-color: #63b5d9; }
-.su-public-brand.su-report.su-full-landscape .su-full-landscape-report .is-execution { --chapter-color: #946b36; --chapter-peer-color: #c19a68; }
-.su-public-brand.su-report.su-full-landscape .su-full-landscape-report .is-cash { --chapter-color: #95c11f; --chapter-peer-color: #b8d665; }
-.su-public-brand.su-report.su-full-landscape .su-full-landscape-report .is-you { --chapter-color: #522583; --chapter-peer-color: #8f78ad; }
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-report .is-people { --chapter-color: #f7a600; --chapter-peer-color: #ffd37a; }
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-report .is-strategy { --chapter-color: #008bd2; --chapter-peer-color: #70c7ef; }
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-report .is-execution { --chapter-color: #946b36; --chapter-peer-color: #d2b084; }
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-report .is-cash { --chapter-color: #95c11f; --chapter-peer-color: #d7ee9b; }
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-report .is-you { --chapter-color: #522583; --chapter-peer-color: #a88fc6; }
 
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-page {
   display: grid;
@@ -2611,7 +2611,7 @@
   width: min(100%, 297mm);
   min-height: 210mm;
   margin: 20px auto;
-  overflow: hidden;
+  overflow: visible;
   background: linear-gradient(to right, #f7a600 0 20%, #008bd2 20% 40%, #946b36 40% 60%, #95c11f 60% 80%, #522583 80% 100%) top / 100% 8px no-repeat, #ffffff;
   box-shadow: 0 10px 30px rgba(26, 19, 34, 0.16);
 }
@@ -2683,6 +2683,25 @@
   letter-spacing: .14em;
   text-transform: uppercase;
 }
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-chapter-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin: 18px 0;
+  padding: 0;
+  list-style: none;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-chapter-key li {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 700;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-chapter-key li > span {
+  width: 20px;
+  height: 8px;
+  background: var(--chapter-color);
+}
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-page-body h1,
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-page-body h2,
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-page-body h3,
@@ -2704,6 +2723,27 @@
   font-size: 10px;
   letter-spacing: .05em;
   text-transform: uppercase;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-page-footer-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-page-footer .su-report-coach {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #6b6480;
+  text-transform: none;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-page-footer .su-report-coach-logo-footer {
+  width: auto;
+  height: 14px;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-page-footer .su-report-coach-name {
+  color: #6b6480;
+  font-size: 9px;
+  letter-spacing: 0;
 }
 
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-page-body table {
@@ -2853,6 +2893,7 @@
 
 @media print {
   .su-public-brand.su-report.su-full-landscape {
+    page: suFullLandscape;
     width: 297mm;
     margin: 0;
     background: #ffffff;
@@ -2860,37 +2901,51 @@
     print-color-adjust: exact;
   }
 
-  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page { page: suFullLandscape; break-after: page; page-break-after: always; width: 297mm; min-height: 210mm; height: 210mm; margin: 0; box-shadow: none; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page { break-before: page; page-break-before: always; break-after: page; page-break-after: always; break-inside: avoid; page-break-inside: avoid; width: 297mm; min-height: 210mm; height: 210mm; margin: 0; box-shadow: none; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page:first-child { break-before: auto; page-break-before: auto; }
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page:last-child { break-after: auto; page-break-after: auto; }
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-detail { break-inside: avoid; page-break-inside: avoid; }
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page-header,
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-bar-fill,
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-peer-contour { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
-  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page.is-execution .su-full-landscape-chart-plot { height: 581px; }
-  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page.is-execution .su-full-landscape-chart-rows,
-  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page.is-execution .su-full-landscape-peer-contour { transform: scaleY(.66); transform-origin: top left; }
-  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page.is-execution .su-full-landscape-peer-contour { height: 880px; }
-  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page.is-you .su-full-landscape-chart-plot { height: 549px; }
-  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page.is-you .su-full-landscape-chart-rows,
-  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page.is-you .su-full-landscape-peer-contour { transform: scaleY(.78); transform-origin: top left; }
-  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page.is-you .su-full-landscape-peer-contour { height: 704px; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--chapter.is-execution .su-full-landscape-chart-row { min-height: 28px; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--chapter.is-you .su-full-landscape-chart-row { min-height: 34px; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--chapter.is-execution .su-full-landscape-chart-question,
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--chapter.is-you .su-full-landscape-chart-question { font-size: 9px; line-height: 1.05; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--detail .su-full-landscape-page-body { column-gap: 8mm; padding: 6mm 10mm 2mm; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--detail .su-full-landscape-page-body > h2 { font-size: 20px; margin-bottom: 4px; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--detail .su-full-landscape-detail { padding: 5px 0 5px 9px; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--detail .su-full-landscape-detail + .su-full-landscape-detail { margin-top: 3px; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--detail .su-full-landscape-detail h3 { margin: 0 0 3px; font-size: 12px; line-height: 1.2; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--detail .su-full-landscape-detail p { margin: 4px 0 0; font-size: 11px; line-height: 1.25; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--detail .su-full-landscape-detail-bars { gap: 3px; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--detail .su-full-landscape-bar-measure { grid-template-columns: 40px minmax(0, 1fr) 30px; gap: 6px; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--detail .su-full-landscape-bar-label { font-size: 9px; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--detail .su-full-landscape-bar-value { font-size: 10px; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--detail .su-full-landscape-bar-track { height: 7px; }
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-page-body {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    column-gap: 2mm;
-    row-gap: 1mm;
-    align-items: start;
-    padding: 5mm 6mm 3mm;
+    grid-template-columns: 1.1fr .8fr 1.55fr 1.35fr;
+    grid-template-rows: auto repeat(2, minmax(0, 1fr));
+    column-gap: 3mm;
+    row-gap: 2mm;
+    align-items: stretch;
+    padding: 5mm 6mm 2mm;
   }
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-page-body > h2 { grid-column: 1 / -1; font-size: 16px; margin-bottom: 1mm; }
-  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-chart-title { margin: 0 0 2px; font-size: 10px; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-vertical-chart:nth-of-type(1) { grid-column: 1; grid-row: 2 / span 2; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-vertical-chart:nth-of-type(2) { grid-column: 2; grid-row: 2; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-vertical-chart:nth-of-type(3) { grid-column: 3; grid-row: 2 / span 2; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-vertical-chart:nth-of-type(4) { grid-column: 2; grid-row: 3; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-vertical-chart:nth-of-type(5) { grid-column: 4; grid-row: 2 / span 2; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-chart-title { margin: 0 0 3px; font-size: 12px; }
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-chart-plot { width: 100%; }
-  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-chart-row { grid-template-columns: minmax(0, 1fr); min-height: 27px; }
-  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-chart-question { display: block; padding: 0; font-size: 7px; line-height: 1.1; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-chart-row { grid-template-columns: minmax(0, 1fr); min-height: 29px; align-content: center; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-chart-question { display: block; padding: 0; font-size: 11px; line-height: 1.1; }
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-bar-label { display: none; }
-  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-bar-measure { grid-template-columns: minmax(0, 1fr) 20px; gap: 3px; box-sizing: border-box; padding-left: 0; }
-  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-bar-value { font-size: 8px; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-bar-measure { grid-template-columns: minmax(0, 1fr) 22px; gap: 4px; box-sizing: border-box; padding-left: 0; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-bar-value { font-size: 10px; }
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-bar-track { height: 7px; }
-  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-chart-legend { justify-content: flex-start; margin-top: 2px; font-size: 8px; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-chart-legend { justify-content: flex-start; margin-top: 3px; font-size: 10px; }
 }

@@ -10,7 +10,10 @@ import {
   SuFullDetailPairedBars,
   SuFullVerticalPeerChart,
 } from "@/components/assessments/su-full-landscape/SuFullLandscapeCharts";
-import { SuFullLandscapePage } from "@/components/assessments/su-full-landscape/SuFullLandscapePages";
+import {
+  SuFullLandscapePage,
+  type SuFullLandscapeFooterBrand,
+} from "@/components/assessments/su-full-landscape/SuFullLandscapePages";
 
 const PEER_DISCLOSURE = "Peers are a current benchmark reference. Values are not yet matched to company size, growth phase, geography, or industry.";
 
@@ -66,7 +69,7 @@ function questionByKey(model: SuFullLandscapeReportModel): ReadonlyMap<string, S
 
 function CoverPage({ report, number }: { report: RespondentReport; number: number }) {
   return (
-    <SuFullLandscapePage number={number}>
+    <SuFullLandscapePage number={number} footerBrand={report}>
       <div className="su-full-landscape-cover-brand">
         <span className="su-full-landscape-cover-mark">Scaling Up</span>
         <CoachLogo url={report.coachLogoUrl} name={report.coachName} variant="cover" />
@@ -81,9 +84,9 @@ function CoverPage({ report, number }: { report: RespondentReport; number: numbe
   );
 }
 
-function PrefacePage({ number }: { number: number }) {
+function PrefacePage({ number, footerBrand }: { number: number; footerBrand: SuFullLandscapeFooterBrand }) {
   return (
-    <SuFullLandscapePage number={number}>
+    <SuFullLandscapePage number={number} footerBrand={footerBrand}>
       <h2>Welcome</h2>
       <p>
         This report turns your submitted assessment into a practical view of the
@@ -99,7 +102,7 @@ function PrefacePage({ number }: { number: number }) {
   );
 }
 
-function ContentsPage({ number }: { number: number }) {
+function ContentsPage({ number, footerBrand }: { number: number; footerBrand: SuFullLandscapeFooterBrand }) {
   const entries = [
     ["People", 7, ["Your Employees (8–9)", "Company Culture (10)"]],
     ["Strategy", 11, ["Strategy (12–13)"]],
@@ -108,7 +111,7 @@ function ContentsPage({ number }: { number: number }) {
     ["You", 21, ["Your Leadership (22–23)", "Internal Communication (24)"]],
   ] as const;
   return (
-    <SuFullLandscapePage number={number}>
+    <SuFullLandscapePage number={number} footerBrand={footerBrand}>
       <h2>Contents</h2>
       <ol>
         {entries.map(([label, page, subsections]) => (
@@ -118,7 +121,14 @@ function ContentsPage({ number }: { number: number }) {
           </li>
         ))}
       </ol>
-      <p>Chapter key: People · Strategy · Execution · Cash · You</p>
+      <ul className="su-full-landscape-chapter-key" aria-label="Chapter key">
+        {(["people", "strategy", "execution", "cash", "you"] as const).map((chapter) => (
+          <li className={`is-${chapter}`} key={chapter}>
+            <span aria-hidden="true" />
+            {chapter[0].toUpperCase() + chapter.slice(1)}
+          </li>
+        ))}
+      </ul>
       <p>Appendix A: chapter comparisons <span>26</span></p>
     </SuFullLandscapePage>
   );
@@ -131,7 +141,7 @@ function IntroductionPage({ report, model, number }: {
 }) {
   const fte = rawFte(report.rawAnswers);
   return (
-    <SuFullLandscapePage number={number}>
+    <SuFullLandscapePage number={number} footerBrand={report}>
       <h2>Introduction</h2>
       <p><strong>ScaleUp Score</strong> {scaleUpScore(report)}</p>
       <p>{PEER_DISCLOSURE}</p>
@@ -146,9 +156,9 @@ function IntroductionPage({ report, model, number }: {
   );
 }
 
-function ProfilePage({ model, number }: { model: SuFullLandscapeReportModel; number: number }) {
+function ProfilePage({ model, number, footerBrand }: { model: SuFullLandscapeReportModel; number: number; footerBrand: SuFullLandscapeFooterBrand }) {
   return (
-    <SuFullLandscapePage number={number}>
+    <SuFullLandscapePage number={number} footerBrand={footerBrand}>
       <h2>Your profile</h2>
       <table>
         <thead><tr><th>Chapter / subsection</th><th>You</th><th>Peers</th><th>Deviation</th></tr></thead>
@@ -168,9 +178,9 @@ function ProfilePage({ model, number }: { model: SuFullLandscapeReportModel; num
   );
 }
 
-function PeerDashboardPage({ model, number }: { model: SuFullLandscapeReportModel; number: number }) {
+function PeerDashboardPage({ model, number, footerBrand }: { model: SuFullLandscapeReportModel; number: number; footerBrand: SuFullLandscapeFooterBrand }) {
   return (
-    <SuFullLandscapePage number={number}>
+    <SuFullLandscapePage number={number} footerBrand={footerBrand}>
       <h2>Peers and comparisons</h2>
       <p>Benchmark reference updated {formatDate(model.benchmarkUpdatedAt)}.</p>
       <table>
@@ -186,9 +196,9 @@ function PeerDashboardPage({ model, number }: { model: SuFullLandscapeReportMode
   );
 }
 
-function ChapterPage({ chapter, number }: { chapter: SuFullLandscapeChapter; number: number }) {
+function ChapterPage({ chapter, number, footerBrand }: { chapter: SuFullLandscapeChapter; number: number; footerBrand: SuFullLandscapeFooterBrand }) {
   return (
-    <SuFullLandscapePage number={number} chapterKey={chapter.key} variant="chapter">
+    <SuFullLandscapePage number={number} chapterKey={chapter.key} variant="chapter" footerBrand={footerBrand}>
       <div className="su-full-landscape-chapter-copy">
         <p className="su-full-landscape-chapter-kicker">{chapter.key}</p>
         <h2>{chapter.label}</h2>
@@ -202,12 +212,14 @@ function ChapterPage({ chapter, number }: { chapter: SuFullLandscapeChapter; num
 function DetailPage({
   page,
   questions,
+  footerBrand,
 }: {
   page: Extract<SuFullLandscapePageDescriptor, { kind: "detail" }>;
   questions: ReadonlyMap<string, SuFullLandscapeQuestion>;
+  footerBrand: SuFullLandscapeFooterBrand;
 }) {
   return (
-    <SuFullLandscapePage number={page.number} chapterKey={page.chapterKey} variant="detail">
+    <SuFullLandscapePage number={page.number} chapterKey={page.chapterKey} variant="detail" footerBrand={footerBrand}>
       <h2>Detailed comparison</h2>
       {page.questionKeys.map((key) => {
         const question = questions.get(key);
@@ -236,7 +248,7 @@ function ConclusionPage({ report, model, contactEmail, number }: {
   number: number;
 }) {
   return (
-    <SuFullLandscapePage number={number}>
+    <SuFullLandscapePage number={number} footerBrand={report}>
       <h2>Conclusion</h2>
       <p><strong>ScaleUp Score</strong> {scaleUpScore(report)}</p>
       <p>Your strongest chapter is {model.strongestChapter.label}; your focus chapter is {model.weakestChapter.label}.</p>
@@ -247,9 +259,9 @@ function ConclusionPage({ report, model, contactEmail, number }: {
   );
 }
 
-function AppendixPage({ model, number }: { model: SuFullLandscapeReportModel; number: number }) {
+function AppendixPage({ model, number, footerBrand }: { model: SuFullLandscapeReportModel; number: number; footerBrand: SuFullLandscapeFooterBrand }) {
   return (
-    <SuFullLandscapePage number={number} variant="appendix">
+    <SuFullLandscapePage number={number} variant="appendix" footerBrand={footerBrand}>
       <h2>Appendix A: chapter comparisons</h2>
       {model.chapters.map((chapter) => (
         <SuFullVerticalPeerChart
@@ -282,19 +294,19 @@ export function SuFullLandscapeReport({
         {model.pages.map((page) => {
         switch (page.kind) {
           case "cover": return <CoverPage key={page.number} number={page.number} report={report} />;
-          case "preface": return <PrefacePage key={page.number} number={page.number} />;
-          case "contents": return <ContentsPage key={page.number} number={page.number} />;
+          case "preface": return <PrefacePage key={page.number} number={page.number} footerBrand={report} />;
+          case "contents": return <ContentsPage key={page.number} number={page.number} footerBrand={report} />;
           case "introduction": return <IntroductionPage key={page.number} number={page.number} report={report} model={model} />;
-          case "profile": return <ProfilePage key={page.number} number={page.number} model={model} />;
-          case "peer-dashboard": return <PeerDashboardPage key={page.number} number={page.number} model={model} />;
+          case "profile": return <ProfilePage key={page.number} number={page.number} model={model} footerBrand={report} />;
+          case "peer-dashboard": return <PeerDashboardPage key={page.number} number={page.number} model={model} footerBrand={report} />;
           case "chapter": {
             const chapter = chapters.get(page.chapterKey);
             if (!chapter) throw new Error(`Landscape chapter page ${page.number} is missing ${page.chapterKey}`);
-            return <ChapterPage chapter={chapter} key={page.number} number={page.number} />;
+            return <ChapterPage chapter={chapter} key={page.number} number={page.number} footerBrand={report} />;
           }
-          case "detail": return <DetailPage key={page.number} page={page} questions={questions} />;
+          case "detail": return <DetailPage key={page.number} page={page} questions={questions} footerBrand={report} />;
           case "conclusion": return <ConclusionPage key={page.number} number={page.number} report={report} model={model} contactEmail={contactEmail} />;
-          case "appendix": return <AppendixPage key={page.number} number={page.number} model={model} />;
+          case "appendix": return <AppendixPage key={page.number} number={page.number} model={model} footerBrand={report} />;
           default: {
             const impossible: never = page;
             throw new Error(`Unsupported landscape page: ${JSON.stringify(impossible)}`);

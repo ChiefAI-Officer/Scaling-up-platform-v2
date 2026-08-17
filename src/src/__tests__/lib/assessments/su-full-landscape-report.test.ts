@@ -117,18 +117,23 @@ describe("buildSuFullLandscapeReportModel", () => {
   it("allows only the governed people-domain background container outside the canonical sections", () => {
     const report = completeSuFullLandscapeReport();
     const presentation = completeSuFullLandscapePresentation(report);
-    const background = { stableKey: "S_BACKGROUND", name: "Background", domain: "people" };
+    const sections = report.sections as Array<Record<string, unknown>>;
 
     expect(buildSuFullLandscapeReportModel({
-      report: { ...report, sections: [...report.sections as object[], background] },
+      report,
       presentation,
     })).not.toBeNull();
     expect(buildSuFullLandscapeReportModel({
-      report: { ...report, sections: [...report.sections as object[], { ...background, domain: "strategy" }] },
+      report: {
+        ...report,
+        sections: sections.map((section) => section.stableKey === "S_BACKGROUND"
+          ? { ...section, domain: "strategy" }
+          : section),
+      },
       presentation,
     })).toBeNull();
     expect(buildSuFullLandscapeReportModel({
-      report: { ...report, sections: [...report.sections as object[], { stableKey: "S_UNKNOWN", name: "Unknown", domain: "people" }] },
+      report: { ...report, sections: [...sections, { stableKey: "S_UNKNOWN", name: "Unknown", domain: "people" }] },
       presentation,
     })).toBeNull();
   });

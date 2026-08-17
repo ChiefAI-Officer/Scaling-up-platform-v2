@@ -1,16 +1,24 @@
 import type { ReactNode } from "react";
 
 import type { SuFullLandscapeChapterKey } from "@/lib/assessments/su-full-landscape-report";
+import { CoachLogo } from "@/components/assessments/CoachLogo";
+
+export type SuFullLandscapeFooterBrand = Readonly<{
+  coachLogoUrl?: string | null;
+  coachName?: string | null;
+}>;
 
 export function SuFullLandscapePage({
   number,
   chapterKey,
   variant,
+  footerBrand,
   children,
 }: {
   number: number;
   chapterKey?: SuFullLandscapeChapterKey;
   variant?: "chapter" | "detail" | "appendix";
+  footerBrand: SuFullLandscapeFooterBrand;
   children: ReactNode;
 }) {
   return (
@@ -28,7 +36,14 @@ export function SuFullLandscapePage({
       </header>
       <main className="su-full-landscape-page-body">{children}</main>
       <footer className="su-full-landscape-page-footer">
-        <span>Scaling Up Assessment</span>
+        <span className="su-full-landscape-page-footer-brand">
+          <span>Scaling Up Assessment</span>
+          <CoachLogo
+            url={footerBrand.coachLogoUrl}
+            name={footerBrand.coachName}
+            variant="footer"
+          />
+        </span>
         <span aria-label={`Page ${number}`}>{number}</span>
       </footer>
     </section>

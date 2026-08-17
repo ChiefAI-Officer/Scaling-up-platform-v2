@@ -35,15 +35,17 @@ async function main(): Promise<void> {
 
   const [styles] = await Promise.all([reportCss(), mkdir(dirname(outputPath), { recursive: true })]);
   const markup = renderToStaticMarkup(
-    <div className="su-public-brand su-report su-full-landscape">
-      <SuFullLandscapeReport report={report} model={model} contactEmail="coach@example.com" />
-    </div>,
+    <SuFullLandscapeReport
+      report={{ ...report, coachName: "Coach Example" }}
+      model={model}
+      contactEmail="coach@example.com"
+    />,
   );
 
   const browser = await chromium.launch({ headless: true });
   try {
     const page = await browser.newPage({ viewport: { width: 1123, height: 794 }, deviceScaleFactor: 1 });
-    await page.setContent(`<!doctype html><html><head><meta charset="utf-8"><style>${styles}</style></head><body>${markup}</body></html>`, { waitUntil: "load" });
+    await page.setContent(`<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0}${styles}</style></head><body>${markup}</body></html>`, { waitUntil: "load" });
     await page.evaluate(async () => { await document.fonts.ready; });
     await page.emulateMedia({ media: "print" });
     await page.pdf({
