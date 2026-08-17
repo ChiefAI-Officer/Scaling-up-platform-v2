@@ -88,6 +88,16 @@ describe("getUserForApiRoute / getApiActor — liveness check on deletedAt", () 
     expect(await getApiActor()).toBeNull();
   });
 
+  it("returns null for a credential-revoked session before reading the user", async () => {
+    (getServerSession as jest.Mock).mockResolvedValue({
+      ...SESSION,
+      sessionRevoked: true,
+    });
+
+    expect(await getUserForApiRoute()).toBeNull();
+    expect(db.user.findUnique).not.toHaveBeenCalled();
+  });
+
   it("still resolves coachId for a live hybrid user (regression)", async () => {
     (db.user.findUnique as jest.Mock).mockResolvedValue(
       makeUser({ coachProfile: { id: "coach-9" } })

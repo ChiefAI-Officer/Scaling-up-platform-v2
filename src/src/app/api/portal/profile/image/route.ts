@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { put } from "@vercel/blob";
 import { db } from "@/lib/db";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth/auth";
+import { getApiActor } from "@/lib/auth/authorization";
 
 const MAX_SIZE = 5 * 1024 * 1024; // 5 MB
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -14,17 +13,11 @@ const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
  */
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
+    const actor = await getApiActor();
+    if (!actor) {
       return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 });
     }
-
-    const coach = await db.coach.findUnique({
-      where: { email: session.user.email },
-      select: { id: true },
-    });
-
-    if (!coach) {
+    if (!actor.coachId) {
       return NextResponse.json({ success: false, error: "Coach profile not found" }, { status: 404 });
     }
 
@@ -50,14 +43,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Upload to Vercel Blob
-    const blob = await put(`coach-profiles/${coach.id}-${Date.now()}`, file, {
+    const blob = await put(`coach-profiles/${actor.coachId}-${Date.now()}`, file, {
       access: "public",
       addRandomSuffix: true,
     });
 
     // Update coach record
     await db.coach.update({
-      where: { id: coach.id },
+      where: { id: actor.coachId },
       data: { profileImage: blob.url },
     });
 

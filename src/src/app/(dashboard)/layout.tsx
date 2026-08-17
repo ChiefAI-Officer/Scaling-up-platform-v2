@@ -9,6 +9,7 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { SignOutButton } from "@/components/layout/sign-out-button";
 import { getAdminNavBadgeCounts } from "@/lib/nav/admin-nav-badges";
 import { db } from "@/lib/db";
+import { isSessionRevoked } from "@/lib/auth/session-revocation";
 
 export default async function DashboardLayout({
   children,
@@ -17,7 +18,7 @@ export default async function DashboardLayout({
 }) {
   const session = await getServerSession(authOptions);
 
-  if (!session) {
+  if (!session || isSessionRevoked(session)) {
     redirect("/login");
   }
 

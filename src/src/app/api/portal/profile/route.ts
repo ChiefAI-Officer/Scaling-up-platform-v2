@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth/auth";
+import { getApiActor } from "@/lib/auth/authorization";
 import { z } from "zod";
 
 const updatePortalProfileSchema = z
@@ -28,16 +27,11 @@ const updatePortalProfileSchema = z
 
 export async function PATCH(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
+    const actor = await getApiActor();
+    if (!actor) {
       return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 });
     }
-
-    const coach = await db.coach.findUnique({
-      where: { email: session.user.email },
-    });
-
-    if (!coach) {
+    if (!actor.coachId) {
       return NextResponse.json({ success: false, error: "Coach profile not found" }, { status: 404 });
     }
 
@@ -52,7 +46,7 @@ export async function PATCH(request: NextRequest) {
     const { firstName, lastName, bio, title, company, linkedinUrl, showBookCallCta, bookCallUrl } = bodyValidation.data;
 
     const updated = await db.coach.update({
-      where: { id: coach.id },
+      where: { id: actor.coachId },
       data: {
         ...(typeof firstName === "string" && { firstName: firstName.trim() }),
         ...(typeof lastName === "string" && { lastName: lastName.trim() }),
