@@ -132,8 +132,7 @@ describe("BrandedReport — scored findings merge", () => {
     rerender(
       <BrandedReport report={scoredReport(false)} responsiveEnabled />,
     );
-    expect(root).toHaveClass("min-w-0");
-    expect(root).toHaveClass("max-w-full");
+    expect(root).toHaveAttribute("class", "su-public-brand su-report");
     expect(root).toHaveAttribute("data-responsive-report", "");
     const region = screen.getByRole("region", {
       name: "Score summary table",

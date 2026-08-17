@@ -532,7 +532,7 @@ export function LegacyClassicReport({
 
   return (
     <div
-      className={responsiveEnabled ? "su-public-brand su-report min-w-0 max-w-full" : "su-public-brand su-report"}
+      className="su-public-brand su-report"
       data-testid="branded-report"
       data-responsive-report={responsiveEnabled ? "" : undefined}
     >
