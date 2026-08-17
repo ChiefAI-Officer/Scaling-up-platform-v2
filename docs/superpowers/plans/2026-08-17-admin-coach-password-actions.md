@@ -60,7 +60,7 @@ describe("coach password action flags", () => {
 
 - [ ] **Step 2: Run the flag test and verify RED**
 
-Run: `npx jest src/__tests__/unit/coach-password-actions-flags.test.ts --runInBand`  
+Run: `npx jest src/__tests__/unit/coach-password-actions-flags.test.ts --runInBand`
 Expected: FAIL because the flag module does not exist.
 
 - [ ] **Step 3: Implement the flag helper**
@@ -166,7 +166,7 @@ expect(JSON.stringify(tx.auditLog.create.mock.calls)).not.toContain("plaintext")
 
 - [ ] **Step 2: Run the helper test and verify RED**
 
-Run: `npx jest src/__tests__/lib/auth/password-credentials.test.ts --runInBand`  
+Run: `npx jest src/__tests__/lib/auth/password-credentials.test.ts --runInBand`
 Expected: FAIL because `rotateUserPassword` does not exist.
 
 - [ ] **Step 3: Implement the minimal server-only helper**
@@ -202,7 +202,7 @@ Add the three credential actions to `AuditAction` so route code cannot drift to 
 
 - [ ] **Step 4: Run focused tests**
 
-Run: `npx jest src/__tests__/lib/auth/password-credentials.test.ts --runInBand`  
+Run: `npx jest src/__tests__/lib/auth/password-credentials.test.ts --runInBand`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
@@ -254,7 +254,7 @@ Also pin missing/deleted users as revoked and assert that `session()` forwards `
 
 - [ ] **Step 2: Run the revocation tests and verify RED**
 
-Run: `npx jest src/__tests__/lib/auth/session-revocation.test.ts --runInBand`  
+Run: `npx jest src/__tests__/lib/auth/session-revocation.test.ts --runInBand`
 Expected: FAIL because JWTs do not carry or verify `authVersion`.
 
 - [ ] **Step 3: Implement JWT versioning and legacy-zero compatibility**
@@ -353,7 +353,7 @@ Capture the SMTP payload and assert subject/body contain administrator-change an
 
 - [ ] **Step 3: Run tests and verify RED**
 
-Run: `npx jest src/__tests__/api/coaches-set-password.test.ts src/__tests__/services/notifications.test.ts --runInBand`  
+Run: `npx jest src/__tests__/api/coaches-set-password.test.ts src/__tests__/services/notifications.test.ts --runInBand`
 Expected: new route/module exports missing.
 
 - [ ] **Step 4: Implement schema, target guard, transaction, and notification**
@@ -376,7 +376,7 @@ The retry route repeats flag/auth/target checks and calls only `sendCoachPasswor
 
 - [ ] **Step 5: Run focused API and email tests**
 
-Run: `npx jest src/__tests__/api/coaches-set-password.test.ts src/__tests__/services/notifications.test.ts --runInBand`  
+Run: `npx jest src/__tests__/api/coaches-set-password.test.ts src/__tests__/services/notifications.test.ts --runInBand`
 Expected: PASS.
 
 - [ ] **Step 6: Commit**
@@ -408,7 +408,7 @@ Pin admin render order, staff absence, form validation, password clearing, confi
 
 - [ ] **Step 2: Run UI tests and verify RED**
 
-Run: `npx jest src/__tests__/components/coaches/password-actions.test.tsx --runInBand`  
+Run: `npx jest src/__tests__/components/coaches/password-actions.test.tsx --runInBand`
 Expected: FAIL because `SetPasswordButton` is missing.
 
 - [ ] **Step 3: Implement accessible Radix dialogs**

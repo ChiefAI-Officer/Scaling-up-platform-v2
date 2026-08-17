@@ -41,7 +41,8 @@ export async function POST(
         { status: 404 },
       );
     }
-    if (!coach.user || coach.user.deletedAt || coach.user.role !== "COACH") {
+    const targetUser = coach.user;
+    if (!targetUser || targetUser.deletedAt || targetUser.role !== "COACH") {
       return NextResponse.json(
         {
           success: false,
@@ -62,7 +63,7 @@ export async function POST(
     const passwordHash = await bcrypt.hash(validation.data.newPassword, 12);
     await db.$transaction((tx) =>
       rotateUserPassword(tx, {
-        userId: coach.user!.id,
+        userId: targetUser.id,
         passwordHash,
         action: "ADMIN_PASSWORD_SET",
         performedBy: actor.email,

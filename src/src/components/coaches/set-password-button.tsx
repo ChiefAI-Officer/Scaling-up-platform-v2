@@ -21,7 +21,13 @@ interface SetPasswordButtonProps {
 }
 
 type Stage = "form" | "confirm";
-type SubmitState = "idle" | "saving" | "success" | "partial" | "error";
+type SubmitState =
+  | "idle"
+  | "saving"
+  | "success"
+  | "partial"
+  | "retrying"
+  | "error";
 
 interface SetPasswordResponse {
   success?: boolean;
@@ -51,7 +57,7 @@ export function SetPasswordButton({
   }
 
   function handleOpenChange(nextOpen: boolean) {
-    if (!nextOpen && submitState === "saving") return;
+    if (!nextOpen && (submitState === "saving" || submitState === "retrying")) return;
     setOpen(nextOpen);
     if (!nextOpen) resetDialog();
   }
@@ -106,8 +112,9 @@ export function SetPasswordButton({
   }
 
   async function retryNotification() {
-    setSubmitState("saving");
-    setMessage("");
+    if (submitState === "retrying") return;
+    setSubmitState("retrying");
+    setMessage("Sending coach notification…");
     try {
       const response = await fetch(
         `/api/coaches/${coachId}/password-set-notification`,
@@ -126,7 +133,10 @@ export function SetPasswordButton({
     }
   }
 
-  const completed = submitState === "success" || submitState === "partial";
+  const completed =
+    submitState === "success" ||
+    submitState === "partial" ||
+    submitState === "retrying";
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -218,16 +228,29 @@ export function SetPasswordButton({
               className={
                 submitState === "partial"
                   ? "text-sm text-warning"
-                  : "text-sm text-success"
+                  : submitState === "retrying"
+                    ? "text-sm text-muted-foreground"
+                    : "text-sm text-success"
               }
             >
               {message}
             </p>
             <DialogFooter>
-              {submitState === "partial" ? (
-                <Button onClick={retryNotification}>Retry Notification</Button>
+              {submitState === "partial" || submitState === "retrying" ? (
+                <Button
+                  disabled={submitState === "retrying"}
+                  onClick={retryNotification}
+                >
+                  {submitState === "retrying"
+                    ? "Sending Notification…"
+                    : "Retry Notification"}
+                </Button>
               ) : null}
-              <Button variant="outline" onClick={() => handleOpenChange(false)}>
+              <Button
+                variant="outline"
+                disabled={submitState === "retrying"}
+                onClick={() => handleOpenChange(false)}
+              >
                 Close
               </Button>
             </DialogFooter>

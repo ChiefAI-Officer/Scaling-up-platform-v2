@@ -102,6 +102,7 @@ describe("SetPasswordButton", () => {
   });
 
   it("shows a retry action after partial success and retries only notification", async () => {
+    let resolveRetry!: (value: Response) => void;
     (global.fetch as jest.Mock)
       .mockResolvedValueOnce(
         response({
@@ -111,8 +112,10 @@ describe("SetPasswordButton", () => {
           warning: "Password updated, but notification failed.",
         }),
       )
-      .mockResolvedValueOnce(
-        response({ success: true, notificationSent: true }),
+      .mockReturnValueOnce(
+        new Promise<Response>((resolve) => {
+          resolveRetry = resolve;
+        }),
       );
 
     openSetPassword();
@@ -130,12 +133,18 @@ describe("SetPasswordButton", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Retry Notification" }));
     await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
+    expect(
+      screen.getByRole("button", { name: "Sending Notification…" }),
+    ).toBeDisabled();
     expect(global.fetch).toHaveBeenLastCalledWith(
       "/api/coaches/coach-1/password-set-notification",
       { method: "POST" },
     );
-    expect(await screen.findByRole("status")).toHaveTextContent(
-      "Coach notification sent",
+    resolveRetry(response({ success: true, notificationSent: true }));
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "Coach notification sent",
+      ),
     );
   });
 });

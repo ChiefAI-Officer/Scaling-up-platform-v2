@@ -1,7 +1,7 @@
 # Admin Coach Password Actions — Design
 
-**Date:** 2026-08-17  
-**Status:** Approved in conversation; implementation authorized  
+**Date:** 2026-08-17
+**Status:** Approved in conversation; implementation authorized
 **Scope:** Coach-detail password actions, coach notifications, 15-minute admin reset links, and real JWT-session revocation
 
 ## Goal
@@ -318,4 +318,3 @@ The flag gates the new **Set Password** UI/routes and the revised admin reset-em
 - Replacing Credentials authentication or migrating to database sessions
 - Changing new-coach welcome/setup behavior
 - Building general administrator-user credential management
-
