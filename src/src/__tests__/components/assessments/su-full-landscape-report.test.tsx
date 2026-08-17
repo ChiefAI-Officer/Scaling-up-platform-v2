@@ -1,4 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 import {
   SuFullDetailPairedBars,
@@ -101,4 +103,25 @@ test("renders the fixed 26-page landscape composition with truthful peer context
   expect(screen.getByTestId("su-full-landscape-page-25")).toHaveTextContent("ScaleUp Score");
   expect(screen.getByTestId("su-full-landscape-page-25")).toHaveTextContent("Next steps");
   expect(document.body.textContent).not.toMatch(/Esperto|TCPDF/i);
+});
+
+test("keeps the landscape renderer's A4 print and responsive screen contract scoped", () => {
+  const stylesheet = readFileSync(
+    join(process.cwd(), "src", "styles", "su-report.css"),
+    "utf8",
+  );
+
+  expect(stylesheet).toContain("@page { size: A4 landscape; margin: 0; }");
+  expect(stylesheet).toContain(".su-full-landscape-page { break-after: page;");
+  expect(stylesheet).toContain(".su-full-landscape-detail { break-inside: avoid;");
+  expect(stylesheet).toMatch(/\.su-full-landscape-bar-fill\s*\{[^}]*display: block;[^}]*border-radius: 0;/);
+  expect(stylesheet).toMatch(/\.su-full-landscape-peer-contour\s*\{[^}]*color: var\(--chapter-peer-color\);/);
+  expect(stylesheet).toContain(".su-full-landscape-report .is-people { --chapter-color:");
+  expect(stylesheet).toContain(".su-full-landscape-report .is-strategy { --chapter-color:");
+  expect(stylesheet).toContain(".su-full-landscape-report .is-execution { --chapter-color:");
+  expect(stylesheet).toContain(".su-full-landscape-report .is-cash { --chapter-color:");
+  expect(stylesheet).toContain(".su-full-landscape-report .is-you { --chapter-color:");
+  expect(stylesheet).toContain("print-color-adjust: exact;");
+  expect(stylesheet).toContain("@media screen and (max-width: 760px)");
+  expect(stylesheet).toContain(".su-full-landscape-page-body { grid-template-columns: 1fr;");
 });
