@@ -81,6 +81,7 @@ import {
   type ReportStyleKey,
 } from "@/lib/assessments/report-style-registry";
 import type { InvitedWelcomeConfigV1 } from "@/lib/assessments/invited-welcome-config";
+import { extractMarketingCta } from "@/lib/assessments/marketing-cta";
 
 // ────────────────────────────────────────────────────────────────────────
 // Tab definitions
@@ -203,6 +204,7 @@ export interface DirtyFlags {
   sections?: boolean;
   questions?: boolean;
   scoringConfig?: boolean;
+  reportConfig?: boolean;
 }
 
 /**
@@ -592,7 +594,9 @@ export function TabbedShell({
     rawQuestions,
     rawSections,
     scoringConfig,
+    reportConfig,
     handleScoringConfigChange,
+    handleMarketingCtaChange,
     handleTemplateFieldChange,
     handleVersionFieldChange,
     handleSendResultsDefaultChange,
@@ -1212,6 +1216,7 @@ export function TabbedShell({
             <div data-testid="tab-panel-settings">
               <SettingsTab
                 templateId={template.id}
+                versionId={version.id}
                 templateValues={templateValues}
                 language={versionValues.language}
                 isReadOnly={isPublished}
@@ -1232,6 +1237,9 @@ export function TabbedShell({
                   (candidate) => candidate.publishedAt !== null,
                 )}
                 publicMarketingCtaEnabled={publicMarketingCtaEnabled}
+                marketingCta={extractMarketingCta(reportConfig)}
+                onMarketingCtaChange={handleMarketingCtaChange}
+                marketingCtaDirty={Boolean(dirtyFlags.reportConfig)}
               />
             </div>
           </TabsContent>

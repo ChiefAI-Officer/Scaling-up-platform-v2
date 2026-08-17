@@ -35,6 +35,8 @@ import React, { useEffect, useState } from "react";
 import type { AssessmentTemplateDeliveryType } from "@prisma/client";
 
 import { AssessmentDeliveryTypePicker } from "@/components/admin/AssessmentDeliveryTypePicker";
+import { MarketingCtaEditor } from "@/components/admin/template-editor/MarketingCtaEditor";
+import type { MarketingCtaConfigV1 } from "@/lib/assessments/marketing-cta";
 import { LANGUAGE_LABELS } from "./enum-labels";
 import {
   PeerBenchmarksPanel,
@@ -88,6 +90,7 @@ export type SettingsRowPatch = Partial<{
 
 export interface SettingsTabProps {
   templateId: string;
+  versionId?: string;
   templateValues: SettingsTabTemplateValues;
   /** Version-level language (real stored value, e.g. `enUS`). */
   language: string;
@@ -124,6 +127,9 @@ export interface SettingsTabProps {
   deliveryType?: AssessmentTemplateDeliveryType;
   hasPublishedVersion?: boolean;
   publicMarketingCtaEnabled?: boolean;
+  marketingCta?: MarketingCtaConfigV1 | null;
+  onMarketingCtaChange?: (next: MarketingCtaConfigV1) => void;
+  marketingCtaDirty?: boolean;
 }
 
 // ────────────────────────────────────────────────────────────────────────
@@ -159,6 +165,7 @@ const coerceNull = (v: string): string | null => (v.length > 0 ? v : null);
 // ────────────────────────────────────────────────────────────────────────
 export function SettingsTab({
   templateId,
+  versionId = "",
   templateValues,
   language,
   isReadOnly,
@@ -177,6 +184,9 @@ export function SettingsTab({
   deliveryType = templateValues.deliveryType ?? "INVITED_ASSESSMENT",
   hasPublishedVersion = false,
   publicMarketingCtaEnabled = false,
+  marketingCta = null,
+  onMarketingCtaChange = () => {},
+  marketingCtaDirty = false,
 }: SettingsTabProps) {
   return (
     <div className="space-y-6 max-w-2xl">
@@ -207,6 +217,22 @@ export function SettingsTab({
         onVersionFieldChange={onVersionFieldChange}
         isReadOnly={isReadOnly}
       />
+      {publicMarketingCtaEnabled &&
+        deliveryType === "PUBLIC_MARKETING_QUIZ" && (
+          <MarketingCtaEditor
+            templateId={templateId}
+            value={marketingCta}
+            onChange={onMarketingCtaChange}
+            previewDisabled={marketingCtaDirty}
+            onPreview={() => {
+              window.open(
+                `/admin/assessments/templates/${templateId}/versions/${versionId}/preview-public-result`,
+                "_blank",
+                "noopener,noreferrer",
+              );
+            }}
+          />
+        )}
       <InvitationEmailCard
         subject={templateValues.invitationSubject}
         body={templateValues.invitationBodyMarkdown}

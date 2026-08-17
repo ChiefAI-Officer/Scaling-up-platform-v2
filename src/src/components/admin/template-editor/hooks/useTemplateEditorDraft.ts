@@ -60,6 +60,10 @@ import {
   resolveLegacyInvitedWelcomeConfig,
   type InvitedWelcomeAuthoringInputV1,
 } from "@/lib/assessments/invited-welcome-config";
+import {
+  mergeMarketingCta,
+  type MarketingCtaConfigV1,
+} from "@/lib/assessments/marketing-cta";
 
 export interface UseTemplateEditorDraftArgs {
   template: TemplateEditorTabbedTemplate;
@@ -219,6 +223,9 @@ export function useTemplateEditorDraft({
     Array.isArray(version.sections) ? (version.sections as unknown[]) : [],
   );
   const scoringConfigRef = useRef<unknown>(version.scoringConfig ?? {});
+  const [reportConfig, setReportConfig] = useState<unknown>(
+    version.reportConfig ?? null,
+  );
   const reportConfigRef = useRef<unknown>(version.reportConfig ?? null);
 
   // F4 — Scoring & Tiers tab state. Hydrate from version.scoringConfig.
@@ -281,6 +288,21 @@ export function useTemplateEditorDraft({
       setScoringConfigDirty();
     },
     [setScoringConfigDirty],
+  );
+  const handleMarketingCtaChange = useCallback(
+    (cta: MarketingCtaConfigV1 | null) => {
+      setReportConfig((current: unknown) => {
+        const next = mergeMarketingCta(current, cta);
+        reportConfigRef.current = next;
+        return next;
+      });
+      setDirtyFlags((current) =>
+        current.reportConfig
+          ? current
+          : { ...current, reportConfig: true },
+      );
+    },
+    [],
   );
 
   const handleTemplateFieldChange = useCallback(
@@ -924,7 +946,8 @@ export function useTemplateEditorDraft({
         Boolean(dirtyFlags.version) ||
         Boolean(dirtyFlags.sections) ||
         Boolean(dirtyFlags.questions) ||
-        Boolean(dirtyFlags.scoringConfig);
+        Boolean(dirtyFlags.scoringConfig) ||
+        Boolean(dirtyFlags.reportConfig);
 
       // Serialize the version payloads BEFORE dispatching any fetch so a
       // serializer guard violation (Wave T) aborts the whole save without
@@ -1162,6 +1185,7 @@ export function useTemplateEditorDraft({
     sections,
     questions,
     scoringConfigState,
+    reportConfig,
     dirtyFlags,
     isAnyDirty,
     savingDraft,
@@ -1186,6 +1210,7 @@ export function useTemplateEditorDraft({
     setScoringConfigDirty,
     // ─── Change handlers ───
     handleScoringConfigChange,
+    handleMarketingCtaChange,
     handleTemplateFieldChange,
     handleWelcomeFieldChange,
     handleVersionFieldChange,
