@@ -1,6 +1,9 @@
 import { notFound } from "next/navigation";
 
-import { ReferredResultsList } from "@/components/assessments/ReferredResultsList";
+import {
+  ReferredResultsList,
+  type PublicAssessmentCoachLink,
+} from "@/components/assessments/ReferredResultsList";
 import { FadeUp } from "@/components/ui/animated";
 import { normalizePublicReferralCursorTrail } from "@/lib/assessments/referred-results-page-state";
 import { isReferredResultsEnabled } from "@/lib/assessments/wave-83-flags";
@@ -24,18 +27,21 @@ function firstSearchValue(
   return typeof value === "string" ? value : "";
 }
 
-async function resolvePublicQuickAlias(): Promise<string | null> {
-  const campaign = await db.assessmentCampaign.findFirst({
+async function resolveActivePublicCampaigns() {
+  return db.assessmentCampaign.findMany({
     where: {
       deletedAt: null,
       accessMode: "PUBLIC",
       status: "ACTIVE",
-      template: { alias: "scaling-up-quick" },
     },
-    select: { alias: true },
-    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      name: true,
+      alias: true,
+      template: { select: { name: true, alias: true } },
+    },
+    orderBy: [{ name: "asc" }, { createdAt: "desc" }],
   });
-  return campaign?.alias ?? null;
 }
 
 export default async function ReferredResultsPage({
@@ -67,15 +73,19 @@ export default async function ReferredResultsPage({
     notFound();
   }
 
-  const [publicQuickAlias, params] = await Promise.all([
-    resolvePublicQuickAlias(),
+  const [publicCampaigns, params] = await Promise.all([
+    resolveActivePublicCampaigns(),
     searchParams,
   ]);
-  const coachLink =
-    publicQuickAlias && coach.email
-      ? `${APP_URL}/quiz/${publicQuickAlias}?coach=${encodeURIComponent(coach.email)}`
-      : null;
   const mobileResponsiveEnabled = isMobileResponsiveEnabled();
+  const coachLinks: PublicAssessmentCoachLink[] = coach.email
+    ? publicCampaigns.map((campaign) => ({
+        campaignId: campaign.id,
+        campaignName: campaign.template.name,
+        templateAlias: campaign.template.alias,
+        url: `${APP_URL}/quiz/${campaign.alias}?coach=${encodeURIComponent(coach.email)}`,
+      }))
+    : [];
 
   return (
     <div className={mobileResponsiveEnabled ? "min-w-0 max-w-full space-y-6" : "space-y-6"}>
@@ -88,14 +98,14 @@ export default async function ReferredResultsPage({
             Referred Results
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            See the Quick Assessment results attributed to your coach link.
+            See public assessment results attributed to your coach links.
           </p>
         </div>
       </FadeUp>
 
       <FadeUp delay={0.05}>
         <ReferredResultsList
-          coachLink={coachLink}
+          coachLinks={coachLinks}
           initialQuery={firstSearchValue(params.query)}
           initialTemplateId={firstSearchValue(params.templateId)}
           initialCursorTrail={normalizePublicReferralCursorTrail(params.cursor)}

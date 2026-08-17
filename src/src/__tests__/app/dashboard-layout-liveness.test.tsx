@@ -131,4 +131,16 @@ describe("(dashboard)/layout — liveness", () => {
     render(await DashboardLayout({ children: null }));
     expect(screen.getAllByRole("link", { name: "Scaling Up - Go to Dashboard" })[1]).toHaveClass("min-h-11");
   });
+
+  it("redirects a credential-revoked session before reading dashboard data", async () => {
+    (getServerSession as jest.Mock).mockResolvedValue({
+      ...SESSION,
+      sessionRevoked: true,
+    });
+
+    await expect(DashboardLayout({ children: null })).rejects.toThrow(
+      "REDIRECT:/login"
+    );
+    expect(db.user.findUnique).not.toHaveBeenCalled();
+  });
 });

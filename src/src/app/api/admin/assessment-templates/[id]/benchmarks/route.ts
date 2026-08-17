@@ -9,7 +9,7 @@
  *
  * Guard ladder (S-2 + house convention): rate limit → getApiActor 401 →
  * isPrivilegedRole 403 → flag OFF 404 → template missing/deleted 404 → alias
- * not render-enabled 404 (D10 — the same list that gates the panel + renders).
+ * not editor-enabled 404.
  *
  * No published version → 409 `TEMPLATE_VERSION_NOT_PUBLISHED`: chosen over
  * 400 because the body is well-formed — the TEMPLATE's state conflicts with
@@ -31,7 +31,7 @@ import { RateLimits, withRateLimit } from "@/lib/rate-limit";
 import { isPeerBenchmarksEnabled } from "@/lib/assessments/wave-s-flags";
 import { activePublishedWhere } from "@/lib/assessments/active-version";
 import {
-  isPeerRenderEnabledAlias,
+  isPeerEditorEnabledAlias,
   listRatingQuestionKeys,
   reconcileQuestionBenchmarks,
   PeerBenchmarkValidationError,
@@ -95,8 +95,9 @@ export async function PUT(
         { status: 404 },
       );
     }
-    // D10 — only render-enabled aliases expose the editor (no dead switches).
-    if (!isPeerRenderEnabledAlias(template.alias)) {
+    // Only aliases with a governed benchmark dataset expose the editor.
+    // Scaling Up Full is editor-enabled before its paired-bar report UI ships.
+    if (!isPeerEditorEnabledAlias(template.alias)) {
       return NextResponse.json(
         { success: false, error: "Not found" },
         { status: 404 },

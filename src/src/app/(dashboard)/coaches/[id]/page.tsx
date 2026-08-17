@@ -11,11 +11,13 @@ import { AddCertificationModal } from "@/components/coaches/add-certification-mo
 import { RemoveCertificationButton } from "@/components/coaches/remove-certification-button";
 import { DeleteCoachButton } from "@/components/coaches/delete-coach-button";
 import { SendPasswordResetButton } from "@/components/coaches/send-password-reset-button";
+import { SetPasswordButton } from "@/components/coaches/set-password-button";
 import { HubSpotSideCard } from "@/components/coaches/hubspot-side-card";
 import { requireAuth } from "@/lib/auth/authorization";
 import { lookupHubSpotContact, getHubSpotPortalId } from "@/services/hubspot";
 import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 import { PageHeader } from "@/components/ui/page-header";
+import { isCoachPasswordActionsEnabled } from "@/lib/auth/coach-password-actions-flags";
 
 interface CoachDetailPageProps {
   params: Promise<{ id: string }>;
@@ -72,6 +74,7 @@ export default async function CoachDetailPage({
   const mobileResponsiveEnabled = isMobileResponsiveEnabled();
   const session = await requireAuth();
   const isAdmin = session.user.role === "ADMIN";
+  const passwordActionsEnabled = isCoachPasswordActionsEnabled();
   const { id } = await params;
 
   const coach = await db.coach.findUnique({
@@ -127,8 +130,8 @@ export default async function CoachDetailPage({
     <div className={mobileResponsiveEnabled ? "min-w-0 max-w-full space-y-6" : "space-y-6"}>
       {/* Header */}
       <FadeUp>
-      <div className={mobileResponsiveEnabled ? "flex min-w-0 flex-col items-stretch gap-4 sm:flex-row sm:items-start sm:justify-between" : "flex justify-between items-start"}>
-        <div>
+      <div className={mobileResponsiveEnabled ? "flex min-w-0 flex-col items-stretch gap-4 sm:flex-row sm:items-start sm:justify-between" : "flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-start"}>
+        <div className="min-w-0">
           <div className="flex items-center gap-3 mb-2">
             <Link
               href="/coaches"
@@ -137,7 +140,7 @@ export default async function CoachDetailPage({
               &larr; Coaches
             </Link>
           </div>
-          <div className={mobileResponsiveEnabled ? "flex min-w-0 items-center gap-4" : "flex items-center gap-4"}>
+          <div className="flex min-w-0 items-center gap-4">
             {coach.profileImage ? (
               <img
                 src={coach.profileImage}
@@ -145,7 +148,7 @@ export default async function CoachDetailPage({
                 className="w-16 h-16 rounded-full object-cover"
               />
             ) : (
-              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
+              <div className="w-16 h-16 shrink-0 bg-primary/10 rounded-full flex items-center justify-center">
                 <span className="text-xl font-medium text-primary">
                   {coach.firstName[0]}{coach.lastName[0]}
                 </span>
@@ -161,11 +164,11 @@ export default async function CoachDetailPage({
                 <p className="break-all text-muted-foreground">{coach.email}</p>
               </div>
             ) : (
-              <div>
+              <div className="min-w-0">
                 <h1 className="text-2xl font-bold text-foreground">
                   {coach.firstName} {coach.lastName}
                 </h1>
-                <p className="text-muted-foreground">{coach.email}</p>
+                <p className="text-muted-foreground break-all">{coach.email}</p>
               </div>
             )}
           </div>
@@ -184,8 +187,19 @@ export default async function CoachDetailPage({
             </Badge>
           </div>
         </div>
-        <div className={mobileResponsiveEnabled ? "flex flex-col gap-2 sm:flex-row [&>button]:min-h-11" : "flex gap-2"}>
-          <SendPasswordResetButton coachId={coach.id} coachEmail={coach.email} />
+        <div className={mobileResponsiveEnabled ? "flex w-full flex-col gap-2 sm:w-auto sm:flex-row [&>button]:min-h-11" : "flex flex-wrap justify-end gap-2 w-full sm:w-auto"}>
+          {isAdmin && passwordActionsEnabled ? (
+            <SetPasswordButton
+              coachId={coach.id}
+              coachName={`${coach.firstName} ${coach.lastName}`}
+              coachEmail={coach.email}
+            />
+          ) : null}
+          <SendPasswordResetButton
+            coachId={coach.id}
+            coachEmail={coach.email}
+            enhanced={passwordActionsEnabled}
+          />
           <Link
             href={`/coaches/${coach.id}/edit`}
             className={mobileResponsiveEnabled ? "inline-flex min-h-11 items-center justify-center rounded-lg bg-muted px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent" : "bg-muted text-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-accent transition-colors"}

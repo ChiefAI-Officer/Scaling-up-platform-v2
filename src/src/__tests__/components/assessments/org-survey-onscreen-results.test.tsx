@@ -19,10 +19,28 @@ import {
   writeOnScreenResult,
   readOnScreenResult,
 } from "@/lib/assessments/onscreen-result-store";
+import { BrandedReport } from "@/components/assessments/BrandedReport";
+import {
+  completeSuFullBenchmarkRows,
+  completeSuFullPeerReport,
+} from "@/__tests__/fixtures/su-full-peer";
+import { buildSuFullPeerPresentationResult } from "@/lib/assessments/su-full-peer-presentation";
 
 jest.mock("next/navigation", () => ({
   useRouter: () => ({ push: jest.fn(), replace: jest.fn() }),
 }));
+
+jest.mock("@/components/assessments/BrandedReport", () => {
+  const actual = jest.requireActual(
+    "@/components/assessments/BrandedReport",
+  );
+  return {
+    ...actual,
+    BrandedReport: jest.fn(actual.BrandedReport),
+  };
+});
+
+const brandedReportMock = BrandedReport as unknown as jest.Mock;
 
 const ALIAS = "demo-campaign";
 
@@ -69,6 +87,15 @@ const EMPTY_CANONICAL_RESULT = {
   tierMetricValue: 0,
   unansweredKeys: [],
 };
+
+const builtPeerPresentation = buildSuFullPeerPresentationResult({
+  report: completeSuFullPeerReport(),
+  benchmarks: completeSuFullBenchmarkRows(),
+});
+if (builtPeerPresentation.status !== "ready") {
+  throw new Error(builtPeerPresentation.reason);
+}
+const PEER_PRESENTATION = builtPeerPresentation.presentation;
 
 /** Install a fetch that answers /me with the given status and server decisions. */
 function installFetch(
@@ -118,6 +145,7 @@ function installFetch(
 }
 
 beforeEach(() => {
+  jest.clearAllMocks();
   window.sessionStorage.clear();
   // No #t= fragment — this is the plain-reload case, which is exactly the path
   // the exchange purge does NOT cover.
@@ -203,6 +231,31 @@ describe("rehydrate authorization (the /me 410 gate)", () => {
 });
 
 describe("the rendered report", () => {
+  it("forwards the revived peer presentation to BrandedReport without recomputing it", async () => {
+    writeOnScreenResult(
+      ALIAS,
+      {
+        ...(REPORT as unknown as Record<string, unknown>),
+        templateAlias: "scaling-up-full",
+        reportStyle: "CLASSIC",
+        suFullPeerPresentation: PEER_PRESENTATION,
+      } as never,
+      KEY,
+    );
+    installFetch(410, {
+      reportStylesAvailable: true,
+      reportFindingsAvailable: true,
+    });
+
+    render(<OrgSurveyClient campaignAlias={ALIAS} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("org-survey-results")).toBeInTheDocument();
+    });
+    const forwardedReport = brandedReportMock.mock.calls.at(-1)?.[0]?.report;
+    expect(forwardedReport?.suFullPeerPresentation).toEqual(PEER_PRESENTATION);
+  });
+
   it.each([
     [
       "scored",

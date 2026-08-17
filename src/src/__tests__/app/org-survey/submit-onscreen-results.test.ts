@@ -122,6 +122,44 @@ jest.mock("@/lib/assessments/wave-report-comparison-flags", () => ({
 }));
 
 // eslint-disable-next-line no-var
+var peerResolverState: {
+  mode: "enhance" | "unchanged" | "throw";
+  calls: Array<Record<string, unknown>>;
+  transactionStates: boolean[];
+} = {
+  mode: "enhance",
+  calls: [],
+  transactionStates: [],
+};
+jest.mock("@/lib/assessments/peer-report-resolver", () => ({
+  resolvePeerReportEnhancements: jest.fn(
+    async (args: { report: Record<string, unknown> }) => {
+      peerResolverState.calls.push(args);
+      peerResolverState.transactionStates.push(mockOnscreenTransactionActive);
+      if (peerResolverState.mode === "throw") {
+        throw new Error("peer resolver unavailable");
+      }
+      if (
+        peerResolverState.mode === "unchanged" ||
+        args.report.templateAlias !== "scaling-up-full"
+      ) {
+        return { report: args.report, lvaPeerComparison: null };
+      }
+      return {
+        report: {
+          ...args.report,
+          suFullPeerPresentation: {
+            benchmarkUpdatedAt: "2026-08-18T00:00:00.000Z",
+            sections: [],
+          },
+        },
+        lvaPeerComparison: null,
+      };
+    },
+  ),
+}));
+
+// eslint-disable-next-line no-var
 var ceoAccessTokenMock: jest.Mock;
 jest.mock("@/lib/assessments/ceo-report-access-token", () => {
   ceoAccessTokenMock = jest.fn(() => "signed-ceo-access-token");
@@ -165,7 +203,11 @@ jest.mock("@/lib/assessments/report-email", () => ({
       buildState.calls.push(args);
       buildState.transactionStates.push(mockOnscreenTransactionActive);
       if (buildState.throws) throw new Error("report model build failed");
-      return { ...BUILT_REPORT, reportStyle: args.reportStyle };
+      return {
+        ...BUILT_REPORT,
+        templateAlias: args.templateAlias,
+        reportStyle: args.reportStyle,
+      };
     },
   ),
   buildReportEmailHtml: jest.fn(() => ({
@@ -319,6 +361,9 @@ beforeEach(() => {
   buildState.throws = false;
   buildState.calls = [];
   buildState.transactionStates = [];
+  peerResolverState.mode = "enhance";
+  peerResolverState.calls = [];
+  peerResolverState.transactionStates = [];
   mockOnscreenTransactionActive = false;
   process.env.APP_URL = "https://app.example.com";
   txMock.assessmentSubmission.create.mockResolvedValue({ id: "sub-1" });
@@ -343,6 +388,158 @@ describe("report style first-completion freeze with on-screen results", () => {
     expect(tx).toBe(txMock);
     expect(campaignId).toBe("c1");
     expect(submissionData.submittedAt).toBe(submittedAt);
+  });
+});
+
+describe("Scaling Up Full on-screen peer enrichment", () => {
+  it("enriches the disclosed report only after the submission transaction commits", async () => {
+    reportStyleLockMock.mockResolvedValueOnce("CLASSIC");
+    mockInvitation({
+      templateAlias: "scaling-up-full",
+      reportStyle: "CLASSIC",
+      showResultsOnScreen: true,
+    });
+
+    const response = await POST(
+      jsonReq(goodAnswers) as never,
+      aliasParams("demo"),
+    );
+    const body = (await response.json()) as SubmitBody;
+
+    expect(response.status).toBe(200);
+    expect(peerResolverState.transactionStates).toEqual([false]);
+    expect(body.data?.report).toMatchObject({
+      suFullPeerPresentation: { sections: expect.any(Array) },
+    });
+  });
+
+  it("does not resolve peers when locked disclosure is false", async () => {
+    mockInvitation({
+      templateAlias: "scaling-up-full",
+      showResultsOnScreen: false,
+      sendResultsToRespondent: true,
+    });
+
+    const response = await POST(
+      jsonReq(goodAnswers) as never,
+      aliasParams("demo"),
+    );
+    const body = (await response.json()) as SubmitBody;
+
+    expect(response.status).toBe(200);
+    expect(body.data?.report).toBeUndefined();
+    expect(peerResolverState.calls).toHaveLength(0);
+  });
+
+  it("does not resolve peers when every report candidate fails to build", async () => {
+    buildState.throws = true;
+    mockInvitation({
+      templateAlias: "scaling-up-full",
+      showResultsOnScreen: true,
+    });
+
+    const response = await POST(
+      jsonReq(goodAnswers) as never,
+      aliasParams("demo"),
+    );
+    const body = (await response.json()) as SubmitBody;
+
+    expect(response.status).toBe(200);
+    expect(body.data?.submissionId).toBe("sub-1");
+    expect(body.data?.report).toBeUndefined();
+    expect(peerResolverState.calls).toHaveLength(0);
+  });
+
+  it("keeps the original report when benchmark lookup fails soft", async () => {
+    peerResolverState.mode = "unchanged";
+    reportStyleLockMock.mockResolvedValueOnce("CLASSIC");
+    mockInvitation({
+      templateAlias: "scaling-up-full",
+      reportStyle: "CLASSIC",
+      showResultsOnScreen: true,
+    });
+
+    const response = await POST(
+      jsonReq(goodAnswers) as never,
+      aliasParams("demo"),
+    );
+    const body = (await response.json()) as SubmitBody;
+
+    expect(response.status).toBe(200);
+    expect(body.data?.submissionId).toBe("sub-1");
+    expect(body.data?.report).toEqual({
+      ...BUILT_REPORT,
+      templateAlias: "scaling-up-full",
+      reportStyle: "CLASSIC",
+    });
+  });
+
+  it("keeps the original report when the resolver unexpectedly throws", async () => {
+    peerResolverState.mode = "throw";
+    reportStyleLockMock.mockResolvedValueOnce("CLASSIC");
+    mockInvitation({
+      templateAlias: "scaling-up-full",
+      reportStyle: "CLASSIC",
+      showResultsOnScreen: true,
+    });
+
+    const response = await POST(
+      jsonReq(goodAnswers) as never,
+      aliasParams("demo"),
+    );
+    const body = (await response.json()) as SubmitBody;
+
+    expect(response.status).toBe(200);
+    expect(body.data?.submissionId).toBe("sub-1");
+    expect(body.data?.report).toEqual({
+      ...BUILT_REPORT,
+      templateAlias: "scaling-up-full",
+      reportStyle: "CLASSIC",
+    });
+  });
+
+  it("enriches only the locked selected style and leaves results email rendering unchanged", async () => {
+    reportStyleLockMock.mockResolvedValueOnce("CLASSIC");
+    mockInvitation({
+      templateAlias: "scaling-up-full",
+      reportStyle: "CLASSIC",
+      showResultsOnScreen: true,
+      sendResultsToRespondent: true,
+    });
+    const { buildReportEmailHtml } = jest.requireMock(
+      "@/lib/assessments/report-email",
+    ) as { buildReportEmailHtml: jest.Mock };
+
+    const response = await POST(
+      jsonReq(goodAnswers) as never,
+      aliasParams("demo"),
+    );
+    const body = (await response.json()) as SubmitBody;
+
+    expect(response.status).toBe(200);
+    expect(peerResolverState.calls).toHaveLength(1);
+    expect(peerResolverState.calls[0]).toMatchObject({
+      templateId: "tpl-1",
+      reportStylesAvailable: false,
+      report: { reportStyle: "CLASSIC" },
+    });
+    expect(body.data?.report).toMatchObject({
+      reportStyle: "CLASSIC",
+      suFullPeerPresentation: { sections: [] },
+    });
+    expect(buildReportEmailHtml).toHaveBeenCalledTimes(1);
+    expect(buildReportEmailHtml.mock.calls[0][0].report).toEqual({
+      ...BUILT_REPORT,
+      templateAlias: "scaling-up-full",
+      reportStyle: "CLASSIC",
+    });
+    expect(txMock.assessmentEmailOutbox.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          bodyHtml: "<p>BODY</p><table>REPORT</table>",
+        }),
+      }),
+    );
   });
 });
 
@@ -748,6 +945,7 @@ describe("CEO self-access is delivered only through approved disclosures", () =>
   });
 
   it("keeps the submission and ordinary report when CEO-link generation fails", async () => {
+    peerResolverState.mode = "unchanged";
     mockInvitation({
       templateAlias: "scaling-up-full",
       showResultsOnScreen: true,
@@ -765,6 +963,7 @@ describe("CEO self-access is delivered only through approved disclosures", () =>
     expect(body.data?.submissionId).toBe("sub-1");
     expect(body.data?.report).toEqual({
       ...BUILT_REPORT,
+      templateAlias: "scaling-up-full",
       reportStyle: "MODERN_DASHBOARD",
     });
     expect(body.data?.ceoSelfAccessUrl).toBeUndefined();

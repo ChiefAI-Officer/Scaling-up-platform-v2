@@ -87,19 +87,27 @@ describe("CampaignsListWithFilter", () => {
     ).toBeInTheDocument();
   });
 
-  it("default filter is ALL — every campaign is rendered", () => {
+  it("default filter is ALL — every company is listed and collapsed", () => {
     render(<CampaignsListWithFilter campaigns={fixture} />);
-    expect(screen.getByTestId("campaign-row-c1")).toBeInTheDocument();
-    expect(screen.getByTestId("campaign-row-c2")).toBeInTheDocument();
-    expect(screen.getByTestId("campaign-row-c3")).toBeInTheDocument();
-    expect(screen.getByTestId("campaign-row-c4")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Acme.*2 campaigns/i }),
+    ).toHaveAttribute("aria-expanded", "false");
+    expect(
+      screen.getByRole("button", { name: /Beta.*2 campaigns/i }),
+    ).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByTestId("campaign-row-c1")).not.toBeInTheDocument();
   });
 
-  it("clicking a status pill filters the rendered rows", () => {
+  it("clicking a status pill filters each company's expanded rows", () => {
     render(<CampaignsListWithFilter campaigns={fixture} />);
     fireEvent.click(screen.getByTestId("campaign-filter-pill-active"));
+
+    fireEvent.click(screen.getByRole("button", { name: /Acme.*1 campaign$/i }));
     expect(screen.queryByTestId("campaign-row-c1")).toBeNull();
     expect(screen.getByTestId("campaign-row-c2")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Beta.*1 campaign$/i }));
+    expect(screen.queryByTestId("campaign-row-c2")).toBeNull();
     expect(screen.getByTestId("campaign-row-c3")).toBeInTheDocument();
     expect(screen.queryByTestId("campaign-row-c4")).toBeNull();
   });
@@ -107,19 +115,30 @@ describe("CampaignsListWithFilter", () => {
   it("clicking DRAFT shows only DRAFT campaigns", () => {
     render(<CampaignsListWithFilter campaigns={fixture} />);
     fireEvent.click(screen.getByTestId("campaign-filter-pill-draft"));
+    fireEvent.click(screen.getByRole("button", { name: /Acme.*1 campaign$/i }));
     expect(screen.getByTestId("campaign-row-c1")).toBeInTheDocument();
     expect(screen.queryByTestId("campaign-row-c2")).toBeNull();
     expect(screen.queryByTestId("campaign-row-c3")).toBeNull();
     expect(screen.queryByTestId("campaign-row-c4")).toBeNull();
   });
 
-  it("returning to ALL re-displays everything", () => {
+  it("returning to ALL restores every company in a collapsed state", () => {
     render(<CampaignsListWithFilter campaigns={fixture} />);
     fireEvent.click(screen.getByTestId("campaign-filter-pill-closed"));
-    expect(screen.queryByTestId("campaign-row-c1")).toBeNull();
+    expect(screen.queryByText("Acme")).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId("campaign-filter-pill-all"));
+
+    const acme = screen.getByRole("button", { name: /Acme.*2 campaigns/i });
+    const beta = screen.getByRole("button", { name: /Beta.*2 campaigns/i });
+    expect(acme).toHaveAttribute("aria-expanded", "false");
+    expect(beta).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(acme);
     expect(screen.getByTestId("campaign-row-c1")).toBeInTheDocument();
     expect(screen.getByTestId("campaign-row-c2")).toBeInTheDocument();
+
+    fireEvent.click(beta);
+    expect(screen.queryByTestId("campaign-row-c1")).toBeNull();
     expect(screen.getByTestId("campaign-row-c3")).toBeInTheDocument();
     expect(screen.getByTestId("campaign-row-c4")).toBeInTheDocument();
   });

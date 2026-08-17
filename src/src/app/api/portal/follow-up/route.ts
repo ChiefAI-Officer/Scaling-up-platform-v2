@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth/auth";
+import { getApiActor } from "@/lib/auth/authorization";
 import { z } from "zod";
 
 const submitFollowUpSchema = z.object({
@@ -15,23 +14,18 @@ const submitFollowUpSchema = z.object({
 
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
+    const actor = await getApiActor();
+    if (!actor) {
       return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 });
     }
-
-    const coach = await db.coach.findUnique({
-      where: { email: session.user.email },
-    });
-
-    if (!coach) {
+    if (!actor.coachId) {
       return NextResponse.json({ success: false, error: "Coach not found" }, { status: 404 });
     }
 
     // Get completed/post-event workshops for this coach
     const workshops = await db.workshop.findMany({
       where: {
-        coachId: coach.id,
+        coachId: actor.coachId,
         status: { in: ["POST_EVENT", "COMPLETED"] },
       },
       select: {
@@ -45,7 +39,7 @@ export async function GET() {
 
     // Get existing follow-up reports for this coach
     const existingReports = await db.followUpReport.findMany({
-      where: { coachId: coach.id },
+      where: { coachId: actor.coachId },
       select: { workshopId: true, status: true },
     });
 
@@ -68,16 +62,11 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
+    const actor = await getApiActor();
+    if (!actor) {
       return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 });
     }
-
-    const coach = await db.coach.findUnique({
-      where: { email: session.user.email },
-    });
-
-    if (!coach) {
+    if (!actor.coachId) {
       return NextResponse.json({ success: false, error: "Coach not found" }, { status: 404 });
     }
 
@@ -94,7 +83,7 @@ export async function POST(request: NextRequest) {
 
     // Verify the workshop belongs to this coach
     const workshop = await db.workshop.findFirst({
-      where: { id: workshopId, coachId: coach.id },
+      where: { id: workshopId, coachId: actor.coachId },
     });
 
     if (!workshop) {
@@ -103,7 +92,7 @@ export async function POST(request: NextRequest) {
 
     // Upsert the follow-up report
     const existing = await db.followUpReport.findFirst({
-      where: { workshopId, coachId: coach.id },
+      where: { workshopId, coachId: actor.coachId },
     });
 
     const reportData = JSON.stringify({
@@ -127,7 +116,7 @@ export async function POST(request: NextRequest) {
       await db.followUpReport.create({
         data: {
           workshopId,
-          coachId: coach.id,
+          coachId: actor.coachId,
           dueDate: new Date(workshop.eventDate.getTime() + 90 * 24 * 60 * 60 * 1000),
           reportData,
           submittedAt: new Date(),

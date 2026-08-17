@@ -80,6 +80,7 @@ import {
 import { lockReportStyleForFirstCompletion } from "@/lib/assessments/report-style-lock";
 import { isReportComparisonEnabled } from "@/lib/assessments/wave-report-comparison-flags";
 import { createCeoReportAccessToken } from "@/lib/assessments/ceo-report-access-token";
+import { resolvePeerReportEnhancements } from "@/lib/assessments/peer-report-resolver";
 
 const NO_STORE_HEADERS = { "Cache-Control": "no-store" } as const;
 
@@ -1404,7 +1405,7 @@ export async function POST(
       // is the data subject reading their own data. The log below records that a
       // payload was ISSUED — it is not, and must not be described as, proof the
       // respondent VIEWED it.
-      const onScreenReport =
+      let onScreenReport: RespondentReport | undefined =
         result.discloseOnScreen && respondentReport !== null
           ? respondentReport
           : undefined;
@@ -1413,6 +1414,27 @@ export async function POST(
         campaignId: invitation.campaign.id,
       });
       const reportFindingsAvailable = isFindingsLogicEnabled();
+
+      if (onScreenReport) {
+        try {
+          const enhancements = await resolvePeerReportEnhancements({
+            db,
+            report: onScreenReport,
+            templateId: invitation.campaign.templateId,
+            reportStylesAvailable,
+          });
+          onScreenReport = enhancements.report;
+        } catch (error) {
+          console.warn(
+            "[assessment-submit] on-screen peer enrichment unavailable — original report retained",
+            {
+              campaignId: result.campaignId,
+              invitationId: result.invitationId,
+              errorName: errorNameOnly(error),
+            },
+          );
+        }
+      }
 
       if (onScreenReport) {
         console.info("[assessment-report] onscreen_report_payload_issued", {

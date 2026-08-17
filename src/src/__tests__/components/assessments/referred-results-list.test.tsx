@@ -13,6 +13,7 @@ const mockCampaignFindFirst = jest.fn();
 const mockCampaignFindMany = jest.fn();
 const mockCoachFindUnique = jest.fn();
 const mockIsReferredResultsEnabled = jest.fn<boolean, []>();
+const mockClipboardWrite = jest.fn();
 const mockNotFound = jest.fn(() => {
   throw new Error("NEXT_NOT_FOUND");
 });
@@ -102,6 +103,38 @@ const degradedItem = {
   },
 };
 
+const activePublicCampaigns = [
+  {
+    id: "campaign-four-decisions",
+    name: "Scaling Up 4 Decisions",
+    alias: "four-decisions-public",
+    template: {
+      name: "Scaling Up 4 Decisions",
+      alias: "four-decisions",
+    },
+  },
+  {
+    id: "campaign-quick",
+    name: "Scaling Up Quick Assessment",
+    alias: "scaling-up-quick-public",
+    template: {
+      name: "Scaling Up Quick Assessment",
+      alias: "scaling-up-quick",
+    },
+  },
+];
+
+function coachLinks(url: string) {
+  return [
+    {
+      campaignId: "campaign-quick",
+      campaignName: "Scaling Up Quick Assessment",
+      templateAlias: "scaling-up-quick",
+      url,
+    },
+  ];
+}
+
 function scoredItemAt(index: number) {
   return {
     ...scoredItem,
@@ -141,6 +174,10 @@ beforeEach(() => {
   mockFetch.mockReset();
   mockFetch.mockResolvedValue(apiResponse());
   global.fetch = mockFetch;
+  Object.defineProperty(navigator, "clipboard", {
+    configurable: true,
+    value: { writeText: mockClipboardWrite },
+  });
   window.history.replaceState({}, "", "/portal/assessments/referred-results");
   mockIsReferredResultsEnabled.mockReturnValue(false);
   mockRequireCoach.mockResolvedValue({
@@ -252,8 +289,9 @@ describe("Referred Results page ownership", () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it("makes the enabled page the sole owner of the link card and forwards shareable filters", async () => {
+  it("makes the enabled page the sole owner of every active public-assessment link and forwards filters", async () => {
     mockIsReferredResultsEnabled.mockReturnValue(true);
+    mockCampaignFindMany.mockResolvedValue(activePublicCampaigns);
 
     render(
       await ReferredResultsPage({
@@ -269,13 +307,21 @@ describe("Referred Results page ownership", () => {
       screen.getByRole("heading", { name: "Referred Results" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: "Your Quick Assessment link" }),
+      screen.getByRole("heading", { name: "Your public assessment links" }),
+    ).toBeInTheDocument();
+    const linkPicker = screen.getByRole("combobox", {
+      name: "Public assessment link",
+    }) as HTMLSelectElement;
+    expect(linkPicker).toHaveValue("campaign-quick");
+    expect(
+      screen.getByRole("option", { name: "Scaling Up 4 Decisions" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByTitle(
-        /coach=canonical-coach%40example\.com/,
-      ),
+      screen.getByRole("option", { name: "Scaling Up Quick Assessment" }),
     ).toBeInTheDocument();
+    expect(screen.getByTestId("coach-public-link")).toHaveTextContent(
+      "https://scaling-up-platform-v2.vercel.app/quiz/scaling-up-quick-public?coach=canonical-coach%40example.com",
+    );
     expect(mockCoachFindUnique).toHaveBeenCalledWith({
       where: { id: "coach-1" },
       select: {
@@ -287,9 +333,24 @@ describe("Referred Results page ownership", () => {
       },
     });
     expect(mockRequireCoach).not.toHaveBeenCalled();
+    expect(mockCampaignFindFirst).not.toHaveBeenCalled();
+    expect(mockCampaignFindMany).toHaveBeenCalledWith({
+      where: {
+        accessMode: "PUBLIC",
+        deletedAt: null,
+        status: "ACTIVE",
+      },
+      select: {
+        id: true,
+        name: true,
+        alias: true,
+        template: { select: { name: true, alias: true } },
+      },
+      orderBy: [{ name: "asc" }, { createdAt: "desc" }],
+    });
     expect(
       screen.getByText(
-        "See the Quick Assessment results attributed to your coach link.",
+        "See public assessment results attributed to your coach links.",
       ),
     ).toBeInTheDocument();
     await waitFor(() =>
@@ -301,6 +362,42 @@ describe("Referred Results page ownership", () => {
     expect(window.location.search).toBe(
       "?query=jordan&templateId=tpl-1&cursor=sub-4&cursor=sub-9",
     );
+  });
+
+  it("shows a renamed assessment template instead of the stale public campaign name", async () => {
+    mockIsReferredResultsEnabled.mockReturnValue(true);
+    mockCampaignFindMany.mockResolvedValue([
+      {
+        id: "campaign-sunhub",
+        name: "Scaling Up 4 Decisions Quick Quiz (SunHub)",
+        alias: "sunhub-quick-quiz",
+        template: {
+          name: "Scaling Up 4 Decisions 8 Question Quiz",
+          alias: "scaling-up-quick",
+        },
+      },
+    ]);
+
+    render(
+      await ReferredResultsPage({ searchParams: Promise.resolve({}) }),
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.queryByText("Loading referred results…"),
+      ).not.toBeInTheDocument(),
+    );
+
+    expect(
+      screen.getByRole("option", {
+        name: "Scaling Up 4 Decisions 8 Question Quiz",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("option", {
+        name: "Scaling Up 4 Decisions Quick Quiz (SunHub)",
+      }),
+    ).not.toBeInTheDocument();
   });
 
   it("rejects a forged cursor trail before it can inflate page state", async () => {
@@ -332,16 +429,79 @@ afterAll(() => {
 });
 
 describe("ReferredResultsList", () => {
+  it("shows a clear empty share-link state when no public assessment is active", () => {
+    const view = render(<ReferredResultsList coachLinks={[]} />);
+
+    expect(
+      screen.getByRole("heading", { name: "Your public assessment links" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("No public assessments are available right now."),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("combobox", { name: "Public assessment link" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Copy link" }),
+    ).not.toBeInTheDocument();
+    view.unmount();
+  });
+
+  it("updates and copies the selected public-assessment link", async () => {
+    render(
+      <ReferredResultsList
+        coachLinks={[
+          {
+            campaignId: "campaign-four-decisions",
+            campaignName: "Scaling Up 4 Decisions",
+            templateAlias: "four-decisions",
+            url: "https://example.test/quiz/four?coach=a%40example.com",
+          },
+          {
+            campaignId: "campaign-quick",
+            campaignName: "Scaling Up Quick Assessment",
+            templateAlias: "scaling-up-quick",
+            url: "https://example.test/quiz/quick?coach=a%40example.com",
+          },
+        ]}
+      />,
+    );
+
+    const picker = screen.getByRole("combobox", {
+      name: "Public assessment link",
+    }) as HTMLSelectElement;
+    expect(picker).toHaveValue("campaign-quick");
+    fireEvent.change(picker, {
+      target: { value: "campaign-four-decisions" },
+    });
+    expect(screen.getByTestId("coach-public-link")).toHaveTextContent(
+      "https://example.test/quiz/four?coach=a%40example.com",
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Copy link" }));
+    });
+    expect(mockClipboardWrite).toHaveBeenCalledWith(
+      "https://example.test/quiz/four?coach=a%40example.com",
+    );
+  });
+
   it("renders the approved link card and scored result treatment", async () => {
     render(
-      <ReferredResultsList coachLink="https://example.test/quiz/quick?coach=a%40example.com" />,
+      <ReferredResultsList
+        coachLinks={coachLinks(
+          "https://example.test/quiz/quick?coach=a%40example.com",
+        )}
+      />,
     );
 
     expect(
-      screen.getByRole("heading", { name: "Your Quick Assessment link" }),
+      screen.getByRole("heading", { name: "Your public assessment links" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("Share this link. Completed assessments will appear below."),
+      screen.getByText(
+        "Choose an assessment, then copy your coach-specific link.",
+      ),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Copy link" })).toBeInTheDocument();
     expect(await screen.findByText("18")).toBeInTheDocument();
@@ -380,7 +540,9 @@ describe("ReferredResultsList", () => {
 
     render(
       <ReferredResultsList
-        coachLink="https://example.test/quiz/quick?coach=a%40example.com"
+        coachLinks={coachLinks(
+          "https://example.test/quiz/quick?coach=a%40example.com",
+        )}
         initialQuery="Jordan"
       />,
     );
@@ -394,7 +556,7 @@ describe("ReferredResultsList", () => {
     mockFetch.mockResolvedValue(
       apiResponse([scoredItem, qualitativeItem, degradedItem]),
     );
-    render(<ReferredResultsList coachLink={null} />);
+    render(<ReferredResultsList coachLinks={[]} />);
 
     const details = await screen.findAllByRole("button", { name: "Details" });
     expect(details).toHaveLength(2);
@@ -414,14 +576,14 @@ describe("ReferredResultsList", () => {
 
   it("renders loading, empty, no-results, and enumeration-safe error states", async () => {
     mockFetch.mockImplementationOnce(() => new Promise(() => undefined));
-    const loadingView = render(<ReferredResultsList coachLink={null} />);
+    const loadingView = render(<ReferredResultsList coachLinks={[]} />);
     expect(screen.getByRole("status")).toHaveTextContent(
       "Loading referred results",
     );
     loadingView.unmount();
 
     mockFetch.mockResolvedValueOnce(apiResponse([]));
-    const emptyView = render(<ReferredResultsList coachLink={null} />);
+    const emptyView = render(<ReferredResultsList coachLinks={[]} />);
     expect(
       await screen.findByText(
         /results will appear here after someone submits through your coach link/i,
@@ -431,7 +593,7 @@ describe("ReferredResultsList", () => {
 
     mockFetch.mockResolvedValueOnce(apiResponse([]));
     const noResultsView = render(
-      <ReferredResultsList coachLink={null} initialQuery="nobody" />,
+      <ReferredResultsList coachLinks={[]} initialQuery="nobody" />,
     );
     expect(
       await screen.findByText(/no referred results match your search/i),
@@ -439,7 +601,7 @@ describe("ReferredResultsList", () => {
     noResultsView.unmount();
 
     mockFetch.mockRejectedValueOnce(new Error("database internals"));
-    render(<ReferredResultsList coachLink={null} />);
+    render(<ReferredResultsList coachLinks={[]} />);
     expect(
       await screen.findByText(
         "We couldn’t load referred results. Please try again.",
@@ -455,7 +617,7 @@ describe("ReferredResultsList", () => {
       .mockResolvedValueOnce(apiResponse([scoredItem], "sub-1", undefined, 1))
       .mockResolvedValueOnce(apiResponse([scoredItem], null, undefined, 1));
 
-    render(<ReferredResultsList coachLink={null} />);
+    render(<ReferredResultsList coachLinks={[]} />);
     await screen.findAllByText("Jordan Lee");
 
     const search = screen.getByRole("searchbox", {
@@ -513,7 +675,7 @@ describe("ReferredResultsList", () => {
         apiResponse([qualitativeItem], null, undefined, 1, 18),
       );
 
-    render(<ReferredResultsList coachLink={null} />);
+    render(<ReferredResultsList coachLinks={[]} />);
 
     const search = screen.getByRole("searchbox", {
       name: "Search referred results",
@@ -563,7 +725,7 @@ describe("ReferredResultsList", () => {
 
     render(
       <ReferredResultsList
-        coachLink={null}
+        coachLinks={[]}
         initialCursorTrail={["sub-25", "sub-50"]}
       />,
     );
@@ -596,7 +758,7 @@ describe("ReferredResultsList", () => {
   });
 
   it("provides desktop table and mobile card semantics without hiding content from assistive tech", async () => {
-    render(<ReferredResultsList coachLink={null} />);
+    render(<ReferredResultsList coachLinks={[]} />);
     await screen.findAllByText("Jordan Lee");
 
     const desktopTable = screen.getByRole("table", {

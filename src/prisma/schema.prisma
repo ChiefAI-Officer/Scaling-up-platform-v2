@@ -19,6 +19,9 @@ model User {
   role          String    @default("STAFF")
   image         String?
   passwordHash  String?   // Sprint 1: Password hashing for credentials auth
+  // Incremented whenever credentials rotate so previously issued JWT sessions
+  // can be rejected without storing server-side session state.
+  authVersion   Int       @default(0)
   emailVerified DateTime?
   // Wave Q (Jeff July-1 #7) — soft removal (admin offboarding, ADR-0018).
   // Hard delete is impossible (non-nullable createdBy FKs). Enforced at login
@@ -1234,8 +1237,9 @@ model AssessmentTemplate {
 // continuity (ADR-0001) and peers are a reference dataset, not version content
 // (spec 19s S-1 records the version-scoping trade-off). QUESTION is the only
 // kind this wave; the SU-Full consolidation follow-on adds DOMAIN/SECTION/
-// SCALEUP as additive enum migrations. Rows exist only when an admin enters
-// values — reports omit-empty per key (ADR-0019).
+// SCALEUP as additive enum migrations. LVA rows exist only when an admin
+// enters values; SU-Full also has an explicit source-backed seed snapshot.
+// Reports omit-empty per key (ADR-0019).
 enum BenchmarkMetricKind {
   QUESTION
 }

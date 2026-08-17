@@ -860,6 +860,90 @@ export async function sendCoachWelcomeEmail(data: {
     });
 }
 
+/**
+ * Strict notification sent after an administrator changes a coach password.
+ * It intentionally contains no credential, reset link, or action link.
+ */
+export async function sendCoachPasswordSetByAdminEmail(data: {
+    coachEmail: string;
+    coachName: string;
+}): Promise<void> {
+    const html = `
+    <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 560px; margin: 0 auto;">
+      <h2 style="color: #1a1a1a;">Your password was set by an administrator</h2>
+      <p style="color: #4a4a4a;">Hi ${escapeHtml(data.coachName)},</p>
+      <p style="color: #4a4a4a;">
+        An administrator has set a new password for your Scaling Up Workshop Platform account.
+        Your previous password will no longer work.
+      </p>
+      <p style="color: #4a4a4a;">
+        Please contact your administrator to request the new password and regain access.
+      </p>
+      <p style="color: #9ca3af; font-size: 14px;">
+        For your security, passwords are never included in email.
+      </p>
+      <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;"/>
+      <p style="color: #9ca3af; font-size: 12px;">&mdash; Scaling Up Workshop Platform</p>
+    </div>
+  `;
+
+    await sendEmailViaSMTP({
+        to: data.coachEmail,
+        subject: "Your password was set by an administrator",
+        html,
+        telemetry: {
+            recipientRole: "COACH",
+            metadata: { type: "coach_password_set_by_admin" },
+        },
+    });
+}
+
+/** Strict reset email for an admin-triggered, short-lived reset token. */
+export async function sendCoachPasswordResetEmail(data: {
+    coachEmail: string;
+    coachName: string;
+    resetUrl: string;
+    expiresInMinutes: number;
+}): Promise<void> {
+    const html = `
+    <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 560px; margin: 0 auto;">
+      <h2 style="color: #1a1a1a;">Reset your Scaling Up password</h2>
+      <p style="color: #4a4a4a;">Hi ${escapeHtml(data.coachName)},</p>
+      <p style="color: #4a4a4a;">
+        An administrator requested a password reset for your coach account.
+      </p>
+      <div style="text-align: center; margin: 24px 0;">
+        <a href="${escapeHtml(data.resetUrl)}"
+           style="display: inline-block; background-color: #1D4ED8; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
+          Reset Password
+        </a>
+      </div>
+      <p style="color: #4a4a4a;">
+        This secure link expires in ${data.expiresInMinutes} minutes. Your current
+        password remains active until you complete the reset.
+      </p>
+      <p style="color: #9ca3af; font-size: 14px;">
+        If you did not expect this request, contact your administrator.
+      </p>
+      <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;"/>
+      <p style="color: #9ca3af; font-size: 12px;">&mdash; Scaling Up Workshop Platform</p>
+    </div>
+  `;
+
+    await sendEmailViaSMTP({
+        to: data.coachEmail,
+        subject: "Reset your Scaling Up password",
+        html,
+        telemetry: {
+            recipientRole: "COACH",
+            metadata: {
+                type: "coach_password_reset",
+                expiresInMinutes: data.expiresInMinutes,
+            },
+        },
+    });
+}
+
 // ============================================
 // Sprint 4: Approval Info Request Emails
 // ============================================

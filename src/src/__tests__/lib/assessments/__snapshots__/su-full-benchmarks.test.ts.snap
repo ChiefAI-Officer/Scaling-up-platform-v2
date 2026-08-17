@@ -86,8 +86,8 @@ exports[`su-full-benchmarks value-lock benchmark values are version-locked (bump
       "S_YOU_IC": 4.6,
       "S_YOU_LEAD": 6.1,
     },
-    "version": "2026-08-12.cohort1.provisional",
+    "version": "2026-08-14.question-controlled-aggregate-provisional",
   },
-  "v": "2026-08-12.cohort1.provisional",
+  "v": "2026-08-14.question-controlled-aggregate-provisional",
 }
 `;

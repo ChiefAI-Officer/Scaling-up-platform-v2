@@ -4,19 +4,21 @@
  * Spec: docs/specs/v7.6/19s-wave-s-lva-peers-design.md (S-3 lib + S-5
  * individual-report builder). Peer averages are ADMIN-SET `AssessmentBenchmark`
  * rows (metricKind QUESTION, template-level — see spec S-1/C1 for why NOT
- * version-level), never seeded, never aggregated live (D1/ADR-0019-to-be).
+ * version-level), never aggregated live. LVA is admin-entered; Scaling Up Full
+ * also has a governed source snapshot (ADR-0019 amendment).
  *
  * This module is the single home for:
- *  - `PEER_RENDER_ENABLED_ALIASES` (D10) — the ONE list that gates BOTH the
- *    admin editor panel and the report render joins, so a dead switch can
- *    never exist (Wave O honest-framing rule).
+ *  - Separate editor/render alias gates. Scaling Up Full's verified values can
+ *    be administered before its paired-bar report UI is released; report
+ *    joins remain limited to aliases with a completed render path.
  *  - `listRatingQuestionKeys` — the editor's row source: SLIDER_LIKERT
  *    questions of the published version, labelled the way the REPORT prints
  *    them (LVA report factor-label overrides, legacy-suffix strip).
  *  - `getQuestionBenchmarks` / `reconcileQuestionBenchmarks` — thin DB
  *    helpers. The reconcile is the atomic full-set save (D8/D14, mechanism per
- *    co-validate C3): one transaction, delete-missing / update-changed /
- *    create-new, unchanged rows keep their id + timestamps.
+ *    co-validate C3): one transaction, batch-replace changed rows, remove
+ *    missing rows, and batch-create new rows; unchanged rows keep their id +
+ *    timestamps.
  *  - `buildPeerComparisonSection` — the PURE individual-report builder (S-5).
  *    Deliberately NOT part of `buildQualitativeModel`: that model is shared
  *    with the results email, and keeping the peers section a separate builder
@@ -32,16 +34,25 @@ import {
   lvaReportFactorLabel,
 } from "@/lib/assessments/lva-report-display";
 import { stripLegacyDecimalSuffix } from "@/lib/assessments/question-label";
+import { SCALING_UP_FULL_TEMPLATE_ALIAS } from "@/lib/assessments/su-full-question-benchmarks";
 
-// ─── D10 — render-enabled aliases ───────────────────────────────────────────
+// ─── Editor/render-enabled aliases ─────────────────────────────────────────────
 
 /**
- * Template aliases whose peer benchmarks BOTH render on reports and expose the
- * admin editor panel (one list, no dead switches). Wave S: LVA only. Adding an
- * alias here lights panel + render together.
+ * Template aliases whose peer benchmarks have a completed report render path.
  */
 export const PEER_RENDER_ENABLED_ALIASES: readonly string[] = [
   LVA_TEMPLATE_ALIAS,
+];
+
+/**
+ * Template aliases whose per-question peer values can be administered.
+ * Scaling Up Full is intentionally editor-only until its paired-bar report UI
+ * ships; keeping these gates separate prevents unfinished report rendering.
+ */
+export const PEER_EDITOR_ENABLED_ALIASES: readonly string[] = [
+  LVA_TEMPLATE_ALIAS,
+  SCALING_UP_FULL_TEMPLATE_ALIAS,
 ];
 
 /** Whether a template alias is peer-render-enabled. Null/undefined → false. */
@@ -50,6 +61,15 @@ export function isPeerRenderEnabledAlias(
 ): boolean {
   return (
     typeof alias === "string" && PEER_RENDER_ENABLED_ALIASES.includes(alias)
+  );
+}
+
+/** Whether a template alias exposes the peer-benchmark admin editor. */
+export function isPeerEditorEnabledAlias(
+  alias: string | null | undefined,
+): boolean {
+  return (
+    typeof alias === "string" && PEER_EDITOR_ENABLED_ALIASES.includes(alias)
   );
 }
 
@@ -140,17 +160,13 @@ export interface PeerBenchmarksReadDb {
 /** Write side — the client the reconcile transaction runs against. */
 export interface PeerBenchmarksTx extends PeerBenchmarksReadDb {
   assessmentBenchmark: PeerBenchmarksReadDb["assessmentBenchmark"] & {
-    create(args: {
-      data: {
+    createMany(args: {
+      data: Array<{
         templateId: string;
         metricKind: "QUESTION";
         metricKey: string;
         value: number;
-      };
-    }): Promise<unknown>;
-    update(args: {
-      where: { id: string };
-      data: { value: number };
+      }>;
     }): Promise<unknown>;
     deleteMany(args: {
       where: { id: { in: string[] } };
@@ -224,30 +240,10 @@ export interface ReconcileQuestionBenchmarksResult {
   after: Record<string, number>;
 }
 
-/**
- * Atomic full-set reconcile of a template's QUESTION benchmarks (D8/D14,
- * mechanism per co-validate C3). The DB always mirrors the last-saved form:
- * blank field = key absent = row deleted; stale keys (no longer in the
- * published version) are pruned the same way.
- *
- * Validation (typed `PeerBenchmarkValidationError`, thrown BEFORE the
- * transaction opens): unknown stableKey, duplicate stableKey, non-finite
- * value, value outside [0, 10], more than `MAX_BENCHMARK_ENTRIES` entries.
- * Values are then rounded to 1dp — the rounded value is what gets compared
- * and written.
- *
- * In ONE `db.$transaction`: read existing rows → delete rows missing from the
- * submission → update rows whose rounded value changed → create rows for new
- * keys. Rows with unchanged values are NOT touched (id + timestamps kept, so
- * `updatedAt` provenance stays honest).
- *
- * Returns before/after value maps for the caller's audit delta.
- */
-export async function reconcileQuestionBenchmarks(
-  db: PeerBenchmarksDb,
+function buildDesiredQuestionBenchmarks(
   input: ReconcileQuestionBenchmarksInput,
-): Promise<ReconcileQuestionBenchmarksResult> {
-  const { templateId, entries, validKeys } = input;
+): Map<string, number> {
+  const { entries, validKeys } = input;
 
   if (entries.length > MAX_BENCHMARK_ENTRIES) {
     throw new PeerBenchmarkValidationError(
@@ -285,42 +281,103 @@ export async function reconcileQuestionBenchmarks(
     desired.set(entry.stableKey, round1(entry.value));
   }
 
-  return db.$transaction(async (tx) => {
-    const existing = await tx.assessmentBenchmark.findMany({
-      where: { templateId, metricKind: "QUESTION" },
-      select: { id: true, metricKey: true, value: true },
+  return desired;
+}
+
+async function reconcileDesiredQuestionBenchmarks(
+  tx: PeerBenchmarksTx,
+  templateId: string,
+  desired: ReadonlyMap<string, number>,
+): Promise<ReconcileQuestionBenchmarksResult> {
+  const existing = await tx.assessmentBenchmark.findMany({
+    where: { templateId, metricKind: "QUESTION" },
+    select: { id: true, metricKey: true, value: true },
+  });
+
+  const before: Record<string, number> = {};
+  for (const row of existing) before[row.metricKey] = row.value;
+
+  // Delete stale and changed rows in one batch. Changed rows are recreated
+  // below; unchanged rows remain untouched so their id/timestamps stay honest.
+  const replacedIds = existing
+    .filter((row) => {
+      const desiredValue = desired.get(row.metricKey);
+      return desiredValue === undefined || desiredValue !== row.value;
+    })
+    .map((row) => row.id);
+  if (replacedIds.length > 0) {
+    await tx.assessmentBenchmark.deleteMany({
+      where: { id: { in: replacedIds } },
     });
+  }
 
-    const before: Record<string, number> = {};
-    for (const row of existing) before[row.metricKey] = row.value;
-
-    // Delete rows whose key is missing from the submission (blank + stale).
-    const staleIds = existing
-      .filter((row) => !desired.has(row.metricKey))
-      .map((row) => row.id);
-    if (staleIds.length > 0) {
-      await tx.assessmentBenchmark.deleteMany({
-        where: { id: { in: staleIds } },
+  // Recreate changed rows and add new rows with one bounded batch write.
+  const existingByKey = new Map(existing.map((row) => [row.metricKey, row]));
+  const newRows: Array<{
+    templateId: string;
+    metricKind: "QUESTION";
+    metricKey: string;
+    value: number;
+  }> = [];
+  for (const [stableKey, value] of desired) {
+    const row = existingByKey.get(stableKey);
+    if (!row || row.value !== value) {
+      newRows.push({
+        templateId,
+        metricKind: "QUESTION",
+        metricKey: stableKey,
+        value,
       });
     }
+  }
+  if (newRows.length > 0) {
+    await tx.assessmentBenchmark.createMany({ data: newRows });
+  }
 
-    // Update rows whose rounded value changed; leave unchanged rows untouched.
-    const existingByKey = new Map(existing.map((row) => [row.metricKey, row]));
-    for (const [stableKey, value] of desired) {
-      const row = existingByKey.get(stableKey);
-      if (!row) {
-        await tx.assessmentBenchmark.create({
-          data: { templateId, metricKind: "QUESTION", metricKey: stableKey, value },
-        });
-      } else if (row.value !== value) {
-        await tx.assessmentBenchmark.update({
-          where: { id: row.id },
-          data: { value },
-        });
-      }
-    }
+  return { before, after: Object.fromEntries(desired) };
+}
 
-    return { before, after: Object.fromEntries(desired) };
+/**
+ * Full-set reconcile inside a caller-owned transaction. Seed/repair paths use
+ * this variant when the benchmark mutation and its audit row must commit or
+ * roll back together.
+ */
+export async function reconcileQuestionBenchmarksInTx(
+  tx: PeerBenchmarksTx,
+  input: ReconcileQuestionBenchmarksInput,
+): Promise<ReconcileQuestionBenchmarksResult> {
+  const desired = buildDesiredQuestionBenchmarks(input);
+  return reconcileDesiredQuestionBenchmarks(tx, input.templateId, desired);
+}
+
+/**
+ * Atomic full-set reconcile of a template's QUESTION benchmarks (D8/D14,
+ * mechanism per co-validate C3). The DB always mirrors the last-saved form:
+ * blank field = key absent = row deleted; stale keys (no longer in the
+ * published version) are pruned the same way.
+ *
+ * Validation (typed `PeerBenchmarkValidationError`, thrown BEFORE the
+ * transaction opens): unknown stableKey, duplicate stableKey, non-finite
+ * value, value outside [0, 10], more than `MAX_BENCHMARK_ENTRIES` entries.
+ * Values are then rounded to 1dp — the rounded value is what gets compared
+ * and written.
+ *
+ * In ONE `db.$transaction`: read existing rows → batch-delete rows missing
+ * from the submission or whose rounded value changed → batch-create changed
+ * and new rows. Rows with unchanged values are NOT touched (id + timestamps
+ * kept, so `updatedAt` provenance stays honest).
+ *
+ * Returns before/after value maps for the caller's audit delta.
+ */
+export async function reconcileQuestionBenchmarks(
+  db: PeerBenchmarksDb,
+  input: ReconcileQuestionBenchmarksInput,
+): Promise<ReconcileQuestionBenchmarksResult> {
+  // Preserve the API contract that validation fails before a transaction opens.
+  const desired = buildDesiredQuestionBenchmarks(input);
+
+  return db.$transaction(async (tx) => {
+    return reconcileDesiredQuestionBenchmarks(tx, input.templateId, desired);
   });
 }
 

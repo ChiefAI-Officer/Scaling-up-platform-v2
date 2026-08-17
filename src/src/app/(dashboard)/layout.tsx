@@ -11,6 +11,7 @@ import { getAdminNavBadgeCounts } from "@/lib/nav/admin-nav-badges";
 import { db } from "@/lib/db";
 import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 import { cn } from "@/lib/utils";
+import { isSessionRevoked } from "@/lib/auth/session-revocation";
 
 export default async function DashboardLayout({
   children,
@@ -19,7 +20,7 @@ export default async function DashboardLayout({
 }) {
   const session = await getServerSession(authOptions);
 
-  if (!session) {
+  if (!session || isSessionRevoked(session)) {
     redirect("/login");
   }
 

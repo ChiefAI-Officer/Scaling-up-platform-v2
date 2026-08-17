@@ -46,12 +46,9 @@ import {
 import { resolveCeoViewerFromExactPathSession } from "@/lib/assessments/ceo-report-access";
 import { getCeoReportAccessSession } from "@/lib/assessments/ceo-report-access-cookie";
 import { logAuditStrict } from "@/lib/audit";
-import { isPeerBenchmarksEnabled } from "@/lib/assessments/wave-s-flags";
 import {
-  buildPeerComparisonSection,
-  isPeerRenderEnabledAlias,
-  type PeerComparisonSection,
-} from "@/lib/assessments/peer-benchmarks";
+  resolvePeerReportEnhancementsForCampaign,
+} from "@/lib/assessments/peer-report-resolver";
 import type { RespondentReport } from "@/lib/assessments/respondent-report";
 import { isFindingsLogicEnabled } from "@/lib/assessments/wave-u-flags";
 import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
@@ -85,6 +82,12 @@ export default async function RespondentReportPage({ params, searchParams }: Pag
   }
 
   const { report, reportStylesAvailable } = outcome;
+  const peerEnhancements = await resolvePeerReportEnhancementsForCampaign({
+    db,
+    report,
+    campaignId: id,
+    reportStylesAvailable,
+  });
 
   // Page-owned success marker (the gate emits only the request-ending events).
   emitReportMetric("respondent", "view", {
@@ -105,14 +108,9 @@ export default async function RespondentReportPage({ params, searchParams }: Pag
       })
     : { candidates: [], bounded: false, model: null, error: false };
 
-  // Wave S (Jeff #12/#13) — the optional "compared to peers" section. Gated on
-  // the wave flag + render-enabled alias BEFORE any DB read (flag OFF ⇒ zero
-  // benchmark queries, byte-identical page — spec 19s S-2). Fail-soft like the
-  // longitudinal entry: any error ⇒ no section, never a broken report.
-  const peerComparison = await resolvePeerComparison(id, report);
   return (
     <ReportStyleScope
-      report={report}
+      report={peerEnhancements.report}
       reportStylesAvailable={reportStylesAvailable}
     >
       <div
@@ -121,7 +119,7 @@ export default async function RespondentReportPage({ params, searchParams }: Pag
       >
         <div className="su-report-actions no-print">
           <PrintReportButton
-            fileName={reportExportName(report, comparison.model)}
+            fileName={reportExportName(peerEnhancements.report, comparison.model)}
           />
           {comparison.candidates.length > 0 ? (
             <ReportComparisonControls
@@ -138,9 +136,9 @@ export default async function RespondentReportPage({ params, searchParams }: Pag
           </p>
         ) : null}
         <BrandedReport
-          report={report}
-          campaignLabel={report.campaignLabel}
-          peerComparison={peerComparison}
+          report={peerEnhancements.report}
+          campaignLabel={peerEnhancements.report.campaignLabel}
+          peerComparison={peerEnhancements.lvaPeerComparison}
           reportStylesAvailable={reportStylesAvailable}
           reportFindingsAvailable={isFindingsLogicEnabled()}
           comparison={comparison.model}
@@ -258,45 +256,4 @@ function reportPeriodLabel(label: string | null, submittedAt: Date): string {
     timeZone: "UTC",
   }).format(submittedAt);
   return `Scaling Up Assessment · ${date}`;
-}
-
-/**
- * Wave S — resolve the "compared to peers" section for this report, or null.
- * Flag + render-enabled-alias gates run FIRST (no DB touch when off); then the
- * campaign's templateId keys the AssessmentBenchmark rows and the PURE builder
- * derives the section from the frozen report payload (questionsByKey +
- * rawAnswers — the same inputs the qualitative renderer consumes). Fail-soft:
- * a missing campaign, zero rows, no qualifying factors, or a throw all resolve
- * to null (the report renders exactly as pre-Wave-S).
- */
-async function resolvePeerComparison(
-  campaignId: string,
-  report: RespondentReport,
-): Promise<PeerComparisonSection | null> {
-  try {
-    if (!isPeerBenchmarksEnabled()) return null;
-    if (!isPeerRenderEnabledAlias(report.templateAlias ?? null)) return null;
-
-    const campaign = await db.assessmentCampaign.findFirst({
-      where: { id: campaignId, deletedAt: null },
-      select: { templateId: true },
-    });
-    if (!campaign) return null;
-
-    const rows = await db.assessmentBenchmark.findMany({
-      where: { templateId: campaign.templateId, metricKind: "QUESTION" },
-      select: { metricKey: true, value: true },
-    });
-    if (rows.length === 0) return null;
-
-    return buildPeerComparisonSection({
-      questionsByKey: report.questionsByKey,
-      rawAnswers: report.rawAnswers,
-      benchmarks: new Map(rows.map((r) => [r.metricKey, r.value])),
-      templateAlias: report.templateAlias ?? null,
-    });
-  } catch {
-    // Never let peer-comparison resolution break the report render.
-    return null;
-  }
 }

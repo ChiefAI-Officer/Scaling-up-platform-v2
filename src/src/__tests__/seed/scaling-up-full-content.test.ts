@@ -188,7 +188,7 @@ describe("buildScalingUpFullContent() — recommendations preserved", () => {
     expect(s10!.text).toContain("Your employee turnover is very little / none");
   });
 
-  it("Q01 5 bands tile [0-2], [3-4], [5-6], [7-9], [10-10] (integer touching, full 0-10 coverage)", () => {
+  it("Q01 5 bands tile [0-2], [3-4], [5-6], [7-8], [9-10] (integer touching, full 0-10 coverage)", () => {
     const q01 = (content.questions as Array<{
       stableKey: string;
       recommendations: Array<{ minScore: number; maxScore: number; text: string }>;
@@ -199,8 +199,8 @@ describe("buildScalingUpFullContent() — recommendations preserved", () => {
     expect(sorted[0]).toMatchObject({ minScore: 0, maxScore: 2 });
     expect(sorted[1]).toMatchObject({ minScore: 3, maxScore: 4 });
     expect(sorted[2]).toMatchObject({ minScore: 5, maxScore: 6 });
-    expect(sorted[3]).toMatchObject({ minScore: 7, maxScore: 9 });
-    expect(sorted[4]).toMatchObject({ minScore: 10, maxScore: 10 });
+    expect(sorted[3]).toMatchObject({ minScore: 7, maxScore: 8 });
+    expect(sorted[4]).toMatchObject({ minScore: 9, maxScore: 10 });
   });
 });
 

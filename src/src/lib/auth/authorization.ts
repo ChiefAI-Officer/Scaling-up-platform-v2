@@ -12,6 +12,7 @@ import { authOptions } from "@/lib/auth/auth";
 import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
 import type { Session } from "next-auth";
+import { isSessionRevoked } from "@/lib/auth/session-revocation";
 import {
     ApiActor,
     normalizeRole,
@@ -34,7 +35,7 @@ export interface ExtendedSession extends Session {
 export async function requireAuth(): Promise<ExtendedSession> {
     const session = await getServerSession(authOptions);
 
-    if (!session?.user?.email) {
+    if (!session?.user?.email || isSessionRevoked(session)) {
         redirect("/api/auth/signin");
     }
 
@@ -61,7 +62,7 @@ export async function requireAdmin(): Promise<ExtendedSession> {
 export async function getCoachForSession() {
     const session = await getServerSession(authOptions);
 
-    if (!session?.user?.email) {
+    if (!session?.user?.email || isSessionRevoked(session)) {
         return null;
     }
 
@@ -125,7 +126,7 @@ export function scopedWorkshopWhere(coachId: string) {
 export async function canAccessWorkshop(workshopId: string): Promise<boolean> {
     const session = await getServerSession(authOptions);
 
-    if (!session?.user?.email) {
+    if (!session?.user?.email || isSessionRevoked(session)) {
         return false;
     }
 
@@ -168,7 +169,7 @@ export async function canAccessWorkshop(workshopId: string): Promise<boolean> {
 export async function isAdmin(): Promise<boolean> {
     const session = await getServerSession(authOptions);
 
-    if (!session?.user?.email) {
+    if (!session?.user?.email || isSessionRevoked(session)) {
         return false;
     }
 
@@ -282,7 +283,7 @@ export async function getWorkshopLockStatus(workshopId: string): Promise<Worksho
 export async function getUserForApiRoute() {
     const session = await getServerSession(authOptions);
 
-    if (!session?.user?.email) {
+    if (!session?.user?.email || isSessionRevoked(session)) {
         return null;
     }
 
@@ -319,4 +320,4 @@ export async function getApiActor(): Promise<ApiActor | null> {
 
 export type { ApiActor, ApiUserRole } from "@/lib/auth/access-control";
 export { canManageCoachData, isPrivilegedRole };
-
+export { isSessionRevoked } from "@/lib/auth/session-revocation";

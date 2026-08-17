@@ -125,6 +125,7 @@ describe("POST /api/auth/accept-invite — revive-on-accept", () => {
       data: {
         deletedAt: null,
         passwordHash: "$2a$12$freshhash",
+        authVersion: { increment: 1 },
         role: "ADMIN",
         name: "Returning Admin",
       },
@@ -168,6 +169,7 @@ describe("POST /api/auth/accept-invite — revive-on-accept", () => {
         passwordHash: "$2a$12$freshhash",
       },
     });
+    expect(txMock.user.create.mock.calls[0][0].data).not.toHaveProperty("authVersion");
     expect(txMock.user.update).not.toHaveBeenCalled();
     const audit = txMock.auditLog.create.mock.calls[0][0].data;
     expect(JSON.parse(audit.changes)).not.toMatchObject({ revived: true });
