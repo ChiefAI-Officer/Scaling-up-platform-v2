@@ -27,9 +27,11 @@ import { logAudit } from "@/lib/audit";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
 import { Prisma } from "@prisma/client";
 import {
+  assertTemplateDeliveryCompatible,
   CampaignCreateError,
   resolvePublishedTemplateVersion,
 } from "@/lib/assessments/campaign-create-service";
+import { isPublicMarketingCtaEnabled } from "@/lib/assessments/wave-public-marketing-cta-flags";
 import { DEFAULT_TEMPLATE_LANGUAGE } from "@/lib/assessments/active-version";
 import { splitName } from "@/lib/assessments/respondent-csv";
 import { normalizeEmail } from "@/app/api/organizations/[id]/respondents/route";
@@ -311,13 +313,29 @@ export async function POST(request: NextRequest) {
 
     const template = await db.assessmentTemplate.findUnique({
       where: { id: data.templateId },
-      select: { id: true, alias: true, disabledAt: true, defaultReportStyle: true },
+      select: { id: true, alias: true, disabledAt: true, defaultReportStyle: true, deliveryType: true },
     });
     if (!template) {
       return NextResponse.json(
         { success: false, error: "Template not found" },
         { status: 404 }
       );
+    }
+    if (isPublicMarketingCtaEnabled()) {
+      try {
+        assertTemplateDeliveryCompatible(template.deliveryType, "INVITED");
+      } catch (error) {
+        if (
+          error instanceof CampaignCreateError &&
+          error.code === "TEMPLATE_DELIVERY_TYPE_MISMATCH"
+        ) {
+          return NextResponse.json(
+            { success: false, error: error.message, code: error.code },
+            { status: 409 },
+          );
+        }
+        throw error;
+      }
     }
 
     // Wave Q (#6) — a disabled template can never start a NEW campaign.

@@ -13,6 +13,7 @@ import { isAdminOwnedAssessmentPresentationEnabled } from "@/lib/assessments/wav
 import { isTemplateCreationSimplifiedEnabled } from "@/lib/assessments/wave-template-creation-flags";
 import { PageHeader } from "@/components/ui/page-header";
 import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
+import { isPublicMarketingCtaEnabled } from "@/lib/assessments/wave-public-marketing-cta-flags";
 
 export default async function NewAssessmentTemplatePage() {
   const mobileResponsiveEnabled = isMobileResponsiveEnabled();
@@ -28,6 +29,7 @@ export default async function NewAssessmentTemplatePage() {
   const simplified = isTemplateCreationSimplifiedEnabled();
   const welcomeAuthoringEnabled =
     simplified && isAdminOwnedAssessmentPresentationEnabled();
+  const deliveryTypeEnabled = isPublicMarketingCtaEnabled();
 
   return (
     <div
@@ -67,9 +69,14 @@ export default async function NewAssessmentTemplatePage() {
       {simplified ? (
         <SimplifiedAssessmentTemplateForm
           welcomeAuthoringEnabled={welcomeAuthoringEnabled}
+          deliveryTypeEnabled={deliveryTypeEnabled}
         />
       ) : (
-        <AssessmentTemplateForm mode="create" responsiveEnabled={mobileResponsiveEnabled} />
+        <AssessmentTemplateForm
+          mode="create"
+          responsiveEnabled={mobileResponsiveEnabled}
+          deliveryTypeEnabled={deliveryTypeEnabled}
+        />
       )}
     </div>
   );

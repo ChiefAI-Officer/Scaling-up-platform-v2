@@ -35,9 +35,17 @@ jest.mock("@/lib/mobile-responsive-flags", () => ({
   isMobileResponsiveEnabled: () => mockResponsiveFlag(),
 }));
 
-let legacyFormProps: { responsiveEnabled?: boolean } | null = null;
+let legacyFormProps: {
+  mode?: "create" | "edit";
+  responsiveEnabled?: boolean;
+  deliveryTypeEnabled?: boolean;
+} | null = null;
 jest.mock("@/components/admin/AssessmentTemplateForm", () => ({
-  AssessmentTemplateForm: (props: { responsiveEnabled?: boolean }) => {
+  AssessmentTemplateForm: (props: {
+    mode?: "create" | "edit";
+    responsiveEnabled?: boolean;
+    deliveryTypeEnabled?: boolean;
+  }) => {
     legacyFormProps = props;
     return <div data-testid="legacy-template-form" />;
   },
@@ -105,11 +113,19 @@ describe("NewAssessmentTemplatePage release gate", () => {
 
   it("forwards the root mobile flag to the legacy form only when enabled", async () => {
     render(await NewAssessmentTemplatePage());
-    expect(legacyFormProps).toEqual({ mode: "create", responsiveEnabled: false });
+    expect(legacyFormProps).toEqual({
+      mode: "create",
+      responsiveEnabled: false,
+      deliveryTypeEnabled: false,
+    });
 
     mockResponsiveFlag.mockReturnValue(true);
     render(await NewAssessmentTemplatePage());
-    expect(legacyFormProps).toEqual({ mode: "create", responsiveEnabled: true });
+    expect(legacyFormProps).toEqual({
+      mode: "create",
+      responsiveEnabled: true,
+      deliveryTypeEnabled: false,
+    });
   });
 
   it("shows the simplified heading, guidance, and form when the flow is active", async () => {

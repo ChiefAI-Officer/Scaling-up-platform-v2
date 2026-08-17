@@ -64,6 +64,9 @@ const ALLOWLIST: string[] = [
   "app/(dashboard)/admin/assessments/public-campaigns/new/page.tsx",
   "app/(dashboard)/admin/assessments/templates/[id]/page.tsx",
   "app/(dashboard)/admin/assessments/templates/[id]/versions/[versionId]/edit/page.tsx",
+  // [LAYOUT] the public-result preview is nested under the dashboard layout;
+  // it also performs its own ADMIN/STAFF role check before reading draft data.
+  "app/(dashboard)/admin/assessments/templates/[id]/versions/[versionId]/preview-public-result/page.tsx",
   "app/(dashboard)/admin/assessments/templates/new/page.tsx",
   "app/(dashboard)/admin/assessments/templates/page.tsx",
   "app/(dashboard)/admin/refunds-needed/page.tsx",

@@ -15,10 +15,33 @@
  */
 
 import {
+  assertTemplateDeliveryCompatible,
   resolvePublishedTemplateVersion,
   CampaignCreateError,
   type CampaignCreateDb,
 } from "@/lib/assessments/campaign-create-service";
+
+describe("assessment delivery compatibility", () => {
+  it.each([
+    ["PUBLIC_MARKETING_QUIZ", "PUBLIC"],
+    ["INVITED_ASSESSMENT", "INVITED"],
+  ] as const)("allows %s with %s", (deliveryType, accessMode) => {
+    expect(() =>
+      assertTemplateDeliveryCompatible(deliveryType, accessMode),
+    ).not.toThrow();
+  });
+
+  it.each([
+    ["PUBLIC_MARKETING_QUIZ", "INVITED"],
+    ["INVITED_ASSESSMENT", "PUBLIC"],
+  ] as const)("rejects %s with %s", (deliveryType, accessMode) => {
+    expect(() =>
+      assertTemplateDeliveryCompatible(deliveryType, accessMode),
+    ).toThrow(
+      expect.objectContaining({ code: "TEMPLATE_DELIVERY_TYPE_MISMATCH" }),
+    );
+  });
+});
 
 // ─── Filtering stub ────────────────────────────────────────────────────────
 
