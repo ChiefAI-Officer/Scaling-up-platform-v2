@@ -31,6 +31,7 @@ import {
   type CeoReportAccessTransaction,
 } from "@/lib/assessments/ceo-report-access";
 import type { CeoReportSessionPayload } from "@/lib/assessments/ceo-report-access-cookie";
+import type { SuFullPeerPresentation } from "@/lib/assessments/su-full-peer-presentation";
 
 // Re-export so existing `import { QuestionMeta } from "respondent-report"`
 // consumers keep working after the shared builder extraction.
@@ -197,6 +198,8 @@ export interface RespondentReport {
    * absent ⇒ no badge (fail-closed).
    */
   isImported?: boolean;
+  /** Current template-level reference data resolved for this render; not submission provenance. */
+  suFullPeerPresentation?: SuFullPeerPresentation | null;
 }
 
 export type RespondentReportOutcome =
