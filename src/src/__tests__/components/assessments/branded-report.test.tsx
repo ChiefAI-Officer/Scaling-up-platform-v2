@@ -14,6 +14,11 @@ import { BrandedReport } from "@/components/assessments/BrandedReport";
 import type { RespondentReport } from "@/lib/assessments/respondent-report";
 import type { ScoreResult } from "@/lib/assessments/scoring";
 import type { ReportComparisonModel } from "@/lib/assessments/report-comparison-model";
+import {
+  completeSuFullBenchmarkRows,
+  completeSuFullPeerReport,
+} from "@/__tests__/fixtures/su-full-peer";
+import { buildSuFullPeerPresentationResult } from "@/lib/assessments/su-full-peer-presentation";
 
 // ── Fixture builders ───────────────────────────────────────────────────────
 
@@ -663,6 +668,41 @@ describe("BrandedReport — recommendations", () => {
     expect(
       screen.queryByTestId("report-recommendations"),
     ).not.toBeInTheDocument();
+  });
+
+  it("keeps non-slider snapshot findings when peer details replace slider recommendations", () => {
+    const report = completeSuFullPeerReport();
+    const built = buildSuFullPeerPresentationResult({
+      report,
+      benchmarks: completeSuFullBenchmarkRows(),
+    });
+    if (built.status !== "ready") throw new Error(built.reason);
+
+    render(
+      <BrandedReport
+        report={{
+          ...report,
+          result: {
+            ...report.result,
+            findings: [
+              {
+                stableKey: "BACKGROUND_FTE",
+                questionType: "NUMBER",
+                questionLabel: "Employee count",
+                text: "Keep the non-slider finding visible.",
+              },
+            ],
+          } as ScoreResult,
+          suFullPeerPresentation: built.presentation,
+        }}
+        reportFindingsAvailable
+      />,
+    );
+
+    expect(screen.getByTestId("report-recommendations")).toHaveTextContent(
+      "Keep the non-slider finding visible.",
+    );
+    expect(screen.getAllByText("Frozen feedback Q01")).toHaveLength(1);
   });
 });
 

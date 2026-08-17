@@ -65,6 +65,8 @@ import {
   ComparisonCoverSubtitle,
   ReportComparisonContent,
 } from "@/components/assessments/ReportComparisonContent";
+import { SuFullPeerComparison } from "@/components/assessments/SuFullPeerComparison";
+import { SCALING_UP_FULL_TEMPLATE_ALIAS } from "@/lib/assessments/su-full-question-benchmarks";
 
 const LOGO_SRC = "/brand/su-logo-white.svg";
 
@@ -319,6 +321,11 @@ export function LegacyClassicReport({
   comparison,
 }: Omit<BrandedReportProps, "reportStylesAvailable" | "peerComparison">) {
 
+  const suFullPeers =
+    report.templateAlias === SCALING_UP_FULL_TEMPLATE_ALIAS
+      ? report.suFullPeerPresentation ?? null
+      : null;
+
   const result: ScoreResult = report.result ?? ({} as ScoreResult);
   const perQuestion: PerQuestionResult[] = Array.isArray(result.perQuestion)
     ? result.perQuestion
@@ -478,18 +485,22 @@ export function LegacyClassicReport({
     .map(({ ps, rows }) => ({
       name: ps.name,
       recs: [
-        ...rows
-          .filter((r) => r.recommendation && r.recommendation.trim() !== "")
-          .map((r) => ({ key: r.stableKey, text: r.recommendation as string })),
+        ...(suFullPeers === null
+          ? rows
+              .filter((r) => r.recommendation && r.recommendation.trim() !== "")
+              .map((r) => ({ key: r.stableKey, text: r.recommendation as string }))
+          : []),
         ...(findingsBySection.get(ps.stableKey) ?? []),
       ],
     }))
     .filter((g) => g.recs.length > 0);
   // include orphan recommendations under a generic group
   const orphanRecs = [
-    ...orphanRows
-      .filter((r) => r.recommendation && r.recommendation.trim() !== "")
-      .map((r) => ({ key: r.stableKey, text: r.recommendation as string })),
+    ...(suFullPeers === null
+      ? orphanRows
+          .filter((r) => r.recommendation && r.recommendation.trim() !== "")
+          .map((r) => ({ key: r.stableKey, text: r.recommendation as string }))
+      : []),
     ...orphanFindings,
   ];
   if (orphanRecs.length > 0) {
@@ -690,7 +701,9 @@ export function LegacyClassicReport({
       />
 
       {/* ── 3. Section breakdown ────────────────────────────────────────── */}
-      {reportConfigFor(report.templateAlias).showDetailedBreakdown !== false && (
+      {suFullPeers !== null ? (
+        <SuFullPeerComparison presentation={suFullPeers} />
+      ) : reportConfigFor(report.templateAlias).showDetailedBreakdown !== false && (
       <section className="su-report-sections" data-testid="report-sections">
         <div className="su-report-eyebrow">Detailed breakdown</div>
         <h2 className="su-h2 su-report-sec-title">How you scored, section by section</h2>
