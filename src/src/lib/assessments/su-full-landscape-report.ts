@@ -168,20 +168,39 @@ function validCanonicalDefinitions(): boolean {
 
 function validReportSectionMap(report: RespondentReport): boolean {
   if (!Array.isArray(report.sections)) return false;
-  const relevantSections = report.sections.filter(
-    (section): section is Record<string, unknown> => isRecord(section)
-      && typeof section.stableKey === "string"
-      && CANONICAL_SECTION_BY_KEY.has(section.stableKey),
-  );
-  if (!sameKeys(relevantSections.map((section) => section.stableKey as string), CANONICAL_SECTIONS.map((section) => section.stableKey))) {
-    return false;
+  const seenCanonicalSectionKeys: string[] = [];
+  let backgroundCount = 0;
+
+  for (const section of report.sections) {
+    if (
+      !isRecord(section)
+      || typeof section.stableKey !== "string"
+      || typeof section.name !== "string"
+      || section.name.trim() === ""
+      || typeof section.domain !== "string"
+    ) {
+      return false;
+    }
+    if (section.stableKey === "S_BACKGROUND") {
+      backgroundCount += 1;
+      if (backgroundCount > 1 || section.domain !== "people") return false;
+      continue;
+    }
+    const canonical = CANONICAL_SECTION_BY_KEY.get(section.stableKey);
+    if (
+      canonical === undefined
+      || section.name !== canonical.label
+      || section.domain !== canonical.domain
+    ) {
+      return false;
+    }
+    seenCanonicalSectionKeys.push(section.stableKey);
   }
-  return relevantSections.every((section) => {
-    const canonical = CANONICAL_SECTION_BY_KEY.get(section.stableKey as string);
-    return canonical !== undefined
-      && section.name === canonical.label
-      && section.domain === canonical.domain;
-  });
+
+  return sameKeys(
+    seenCanonicalSectionKeys,
+    CANONICAL_SECTIONS.map((section) => section.stableKey),
+  );
 }
 
 function validPresentationSections(presentation: SuFullPeerPresentation): boolean {
@@ -254,6 +273,7 @@ export function buildSuFullLandscapeReportModel(input: {
   if (
     !report
     || report.templateAlias !== SCALING_UP_FULL_TEMPLATE_ALIAS
+    || report.reportStyle !== "CLASSIC"
     || report.degraded
     || !presentation
     || !isSuFullPeerPresentation(presentation)

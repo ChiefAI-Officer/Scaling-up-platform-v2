@@ -104,6 +104,35 @@ describe("buildSuFullLandscapeReportModel", () => {
     })!.growthPhase).toBeNull();
   });
 
+  it("fails closed outside the Classic report style", () => {
+    const report = completeSuFullLandscapeReport();
+    const presentation = completeSuFullLandscapePresentation(report);
+
+    expect(buildSuFullLandscapeReportModel({
+      report: { ...report, reportStyle: "EXECUTIVE_BOARDROOM" },
+      presentation,
+    })).toBeNull();
+  });
+
+  it("allows only the governed people-domain background container outside the canonical sections", () => {
+    const report = completeSuFullLandscapeReport();
+    const presentation = completeSuFullLandscapePresentation(report);
+    const background = { stableKey: "S_BACKGROUND", name: "Background", domain: "people" };
+
+    expect(buildSuFullLandscapeReportModel({
+      report: { ...report, sections: [...report.sections as object[], background] },
+      presentation,
+    })).not.toBeNull();
+    expect(buildSuFullLandscapeReportModel({
+      report: { ...report, sections: [...report.sections as object[], { ...background, domain: "strategy" }] },
+      presentation,
+    })).toBeNull();
+    expect(buildSuFullLandscapeReportModel({
+      report: { ...report, sections: [...report.sections as object[], { stableKey: "S_UNKNOWN", name: "Unknown", domain: "people" }] },
+      presentation,
+    })).toBeNull();
+  });
+
   it.each([
     ["a missing canonical section", (presentation: ReturnType<typeof completeSuFullLandscapePresentation>) => ({ ...presentation, sections: presentation.sections.slice(1) })],
     ["a duplicate section", (presentation: ReturnType<typeof completeSuFullLandscapePresentation>) => ({ ...presentation, sections: [presentation.sections[0], presentation.sections[0], ...presentation.sections.slice(1)] })],
