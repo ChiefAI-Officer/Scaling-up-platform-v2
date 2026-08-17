@@ -163,11 +163,15 @@ test("flag OFF ⇒ assessmentBenchmark never queried, no peerComparison prop", a
 test("flag ON + LVA ⇒ benchmarks fetched and the built section flows into the prop", async () => {
   process.env.WAVE_S_PEER_BENCHMARKS_ENABLED = "1";
   mockCampaignFindFirst.mockResolvedValue({ templateId: "tpl-1" });
-  mockBenchmarkFindMany.mockResolvedValue([{ metricKey: "S3_culture", value: 6.3 }]);
+  mockBenchmarkFindMany.mockResolvedValue([{
+    metricKey: "S3_culture",
+    value: 6.3,
+    updatedAt: new Date("2026-08-14T00:00:00Z"),
+  }]);
   const html = await renderPage();
   expect(mockBenchmarkFindMany).toHaveBeenCalledWith({
     where: { templateId: "tpl-1", metricKind: "QUESTION" },
-    select: { metricKey: true, value: true },
+    select: { metricKey: true, value: true, updatedAt: true },
   });
   // One qualifying factor (Culture: own Strong=10 vs peers 6.3) → 1 item.
   expect(html).toContain('data-peer-items="1"');

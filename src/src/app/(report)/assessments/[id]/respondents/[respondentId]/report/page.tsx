@@ -279,7 +279,7 @@ async function resolvePeerComparison(
 
     const rows = await db.assessmentBenchmark.findMany({
       where: { templateId: campaign.templateId, metricKind: "QUESTION" },
-      select: { metricKey: true, value: true },
+      select: { metricKey: true, value: true, updatedAt: true },
     });
     if (rows.length === 0) return null;
 
