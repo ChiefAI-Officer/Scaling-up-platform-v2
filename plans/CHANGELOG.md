@@ -6,6 +6,15 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="public-marketing-results-cta-launched"></a>
+### 2026-08-17 — Public Marketing Results CTA launched <!-- ENTRY_ISO:2026-08-17 ENTRY_SLUG:public-marketing-results-cta-launched -->
+
+**Status: LAUNCHED FOR PRODUCTION TESTING; SUCCESSOR DRAFTS REMAIN UNPUBLISHED BY DESIGN.** PR [#365](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/365) passed Build, Migration Safety Gate, and Assessment Email Lease (PostgreSQL), then squash-merged as `d4744ab045872fb1db38d27df186d1498561e351`. The Production-only sensitive variable `WAVE_PUBLIC_MARKETING_CTA_ENABLED=1` was added after merge, with no kill variable enabled, and the exact merged deployment was rebuilt so the new setting was captured. Ready deployment `dpl_Gnex8KtE4CPckhaRbtX9qkPAahqi` (`scaling-up-platform-v2-pwbgq4r8h-scaling-up.vercel.app`) owns both canonical aliases.
+
+**Forward-only Production content.** The guarded idempotent seeder created Scaling Up Quick **v2** (`cmsxexlot0001sgrtk7wheysa`) with preset `SCALING_UP_QUICK` and SunHub **v3** (`cmsxexmkm0003sgrt3hwpf4bw`) with preset `FULL_MARKETING` plus the exact `[0–24]`, `[25–49]`, `[50–74]`, and `[75–100]` score bands. Both versions have `publishedAt=null`. No version was published, no active version pointer was changed, and no campaign was created or repointed; therefore existing Scaling Up Quick and SunHub campaigns remain on their prior immutable versions and do not receive the new CTA.
+
+**Production receipt and tester boundary.** The deployment-specific health endpoint, `scaling-up-platform-v2.vercel.app/api/health`, and `platformtest.scalingup.com/api/health` each returned HTTP `200`, `status=healthy`, `checks.database=healthy`, and `checks.authPosture=safe`. Both existing public quiz entry pages rendered their expected question counts and public copy without a page failure. The unauthenticated no-write preview URLs returned the expected HTTP `307` NextAuth interception. The only browser console messages were the pre-existing disabled Vercel Insights script `404`/MIME pair. Per read-only live-test policy, no real Production account was used and neither draft was published; ADMIN/STAFF visual editor and preview acceptance remain the intended prod-tester action.
+
 <a id="public-marketing-results-cta-implementation-ready"></a>
 ### 2026-08-17 — Public Marketing Results CTA implementation ready <!-- ENTRY_ISO:2026-08-17 ENTRY_SLUG:public-marketing-results-cta-implementation-ready -->
 
