@@ -11,9 +11,11 @@ import { AddCertificationModal } from "@/components/coaches/add-certification-mo
 import { RemoveCertificationButton } from "@/components/coaches/remove-certification-button";
 import { DeleteCoachButton } from "@/components/coaches/delete-coach-button";
 import { SendPasswordResetButton } from "@/components/coaches/send-password-reset-button";
+import { SetPasswordButton } from "@/components/coaches/set-password-button";
 import { HubSpotSideCard } from "@/components/coaches/hubspot-side-card";
 import { requireAuth } from "@/lib/auth/authorization";
 import { lookupHubSpotContact, getHubSpotPortalId } from "@/services/hubspot";
+import { isCoachPasswordActionsEnabled } from "@/lib/auth/coach-password-actions-flags";
 
 interface CoachDetailPageProps {
   params: Promise<{ id: string }>;
@@ -69,6 +71,7 @@ export default async function CoachDetailPage({
 }: CoachDetailPageProps) {
   const session = await requireAuth();
   const isAdmin = session.user.role === "ADMIN";
+  const passwordActionsEnabled = isCoachPasswordActionsEnabled();
   const { id } = await params;
 
   const coach = await db.coach.findUnique({
@@ -170,8 +173,19 @@ export default async function CoachDetailPage({
             </Badge>
           </div>
         </div>
-        <div className="flex gap-2">
-          <SendPasswordResetButton coachId={coach.id} coachEmail={coach.email} />
+        <div className="flex flex-wrap justify-end gap-2">
+          {isAdmin && passwordActionsEnabled ? (
+            <SetPasswordButton
+              coachId={coach.id}
+              coachName={`${coach.firstName} ${coach.lastName}`}
+              coachEmail={coach.email}
+            />
+          ) : null}
+          <SendPasswordResetButton
+            coachId={coach.id}
+            coachEmail={coach.email}
+            enhanced={passwordActionsEnabled}
+          />
           <Link
             href={`/coaches/${coach.id}/edit`}
             className="bg-muted text-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-accent transition-colors"
