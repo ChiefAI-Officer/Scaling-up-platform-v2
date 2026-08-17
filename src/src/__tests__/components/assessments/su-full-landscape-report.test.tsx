@@ -28,6 +28,8 @@ test("renders one accessible semantic row and one decorative peer contour per ch
   expect(vertical.querySelectorAll("polyline")).toHaveLength(1);
   expect(vertical.querySelector("[stroke-dasharray]")).toBeNull();
   expect(within(vertical).getByText("Score of Peers")).toBeVisible();
+  const q01Row = within(vertical).getByTestId("su-landscape-vertical-row-Q01");
+  expect(within(q01Row).getByText("0.0")).toBeVisible();
   expect(within(vertical).getByText(/You 0\.0\. Peers 6\.3\./)).toBeInTheDocument();
 });
 
