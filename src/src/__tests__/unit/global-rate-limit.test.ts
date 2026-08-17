@@ -10,6 +10,10 @@ describe("classifyGlobalRateLimit", () => {
     expect(classifyGlobalRateLimit("/api/auth/reset-password", "POST")).toBe("auth");
     expect(classifyGlobalRateLimit("/api/auth/change-password", "POST")).toBe("auth");
     expect(classifyGlobalRateLimit("/api/auth/coach-signup", "POST")).toBe("auth");
+    expect(classifyGlobalRateLimit("/api/coaches/c1/set-password", "POST")).toBe("auth");
+    expect(classifyGlobalRateLimit("/api/coaches/c1/password-set-notification", "POST")).toBe("auth");
+    expect(classifyGlobalRateLimit("/api/coaches/c1/send-password-reset", "POST")).toBe("auth");
+    expect(classifyGlobalRateLimit("/api/coaches/c1/set-password", "GET")).toBeNull();
   });
 
   it("classifies registration and checkout mutation routes", () => {

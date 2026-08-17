@@ -108,13 +108,19 @@ const activePublicCampaigns = [
     id: "campaign-four-decisions",
     name: "Scaling Up 4 Decisions",
     alias: "four-decisions-public",
-    template: { alias: "four-decisions" },
+    template: {
+      name: "Scaling Up 4 Decisions",
+      alias: "four-decisions",
+    },
   },
   {
     id: "campaign-quick",
     name: "Scaling Up Quick Assessment",
     alias: "scaling-up-quick-public",
-    template: { alias: "scaling-up-quick" },
+    template: {
+      name: "Scaling Up Quick Assessment",
+      alias: "scaling-up-quick",
+    },
   },
 ];
 
@@ -338,7 +344,7 @@ describe("Referred Results page ownership", () => {
         id: true,
         name: true,
         alias: true,
-        template: { select: { alias: true } },
+        template: { select: { name: true, alias: true } },
       },
       orderBy: [{ name: "asc" }, { createdAt: "desc" }],
     });
@@ -356,6 +362,42 @@ describe("Referred Results page ownership", () => {
     expect(window.location.search).toBe(
       "?query=jordan&templateId=tpl-1&cursor=sub-4&cursor=sub-9",
     );
+  });
+
+  it("shows a renamed assessment template instead of the stale public campaign name", async () => {
+    mockIsReferredResultsEnabled.mockReturnValue(true);
+    mockCampaignFindMany.mockResolvedValue([
+      {
+        id: "campaign-sunhub",
+        name: "Scaling Up 4 Decisions Quick Quiz (SunHub)",
+        alias: "sunhub-quick-quiz",
+        template: {
+          name: "Scaling Up 4 Decisions 8 Question Quiz",
+          alias: "scaling-up-quick",
+        },
+      },
+    ]);
+
+    render(
+      await ReferredResultsPage({ searchParams: Promise.resolve({}) }),
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.queryByText("Loading referred results…"),
+      ).not.toBeInTheDocument(),
+    );
+
+    expect(
+      screen.getByRole("option", {
+        name: "Scaling Up 4 Decisions 8 Question Quiz",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("option", {
+        name: "Scaling Up 4 Decisions Quick Quiz (SunHub)",
+      }),
+    ).not.toBeInTheDocument();
   });
 
   it("rejects a forged cursor trail before it can inflate page state", async () => {

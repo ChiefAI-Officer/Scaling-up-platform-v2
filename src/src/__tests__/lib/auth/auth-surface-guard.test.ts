@@ -33,11 +33,6 @@ const SRC_ROOT = path.join(process.cwd(), "src");
  *   [ACTOR]      — every handler that mutates/reads privileged data also calls
  *                  getApiActor()/require*ApiActor (liveness-covered); the raw
  *                  session read is auxiliary.
- *   [JWT-ONLY]   — pre-existing surface authenticated by JWT alone (NO
- *                  per-request liveness). Known residual gap, reported in the
- *                  Wave Q build notes: a removed admin holding a live JWT can
- *                  reach these until token expiry. Follow-on hardening item —
- *                  do NOT add new files in this category.
  */
 const ALLOWLIST: string[] = [
   // [CHECKPOINT] getUserForApiRoute/getApiActor liveness lives here.
@@ -80,12 +75,6 @@ const ALLOWLIST: string[] = [
 
   // [ACTOR] download GET resolves getApiActor() after the session read.
   "app/api/files/[id]/download/route.ts",
-
-  // [JWT-ONLY] coach portal profile/follow-up (coach offboarding is out of
-  // Wave Q scope per ADR-0018; coach deletion today hard-deletes the row).
-  "app/api/portal/follow-up/route.ts",
-  "app/api/portal/profile/image/route.ts",
-  "app/api/portal/profile/route.ts",
 
   // Wave Q gap closure: files/[id] (all methods), survey-templates (all 3
   // routes) and workflows GET/[id]/assign now resolve auth exclusively via
