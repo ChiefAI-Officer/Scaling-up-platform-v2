@@ -15,6 +15,11 @@ import { buildReportStylePreviewReport } from "@/lib/assessments/report-style-pr
 import type { RespondentReport } from "@/lib/assessments/respondent-report";
 import type { ReportComparisonModel } from "@/lib/assessments/report-comparison-model";
 import type { ScoreResult } from "@/lib/assessments/scoring";
+import {
+  completeSuFullBenchmarkRows,
+  completeSuFullPeerReport,
+} from "@/__tests__/fixtures/su-full-peer";
+import { buildSuFullPeerPresentationResult } from "@/lib/assessments/su-full-peer-presentation";
 
 const identity = {
   assessmentName: "Authored assessment title",
@@ -312,6 +317,63 @@ function scalingUpFullReport(reportStyle: string): RespondentReport {
 }
 
 describe("adaptive alternate report renderers", () => {
+  it.each([
+    ["EXECUTIVE_BOARDROOM", "executive-boardroom-report"],
+    ["MODERN_DASHBOARD", "modern-dashboard-report"],
+  ] as const)(
+    "does not render the Classic SU Full peer sequence in %s",
+    (reportStyle, rendererTestId) => {
+      const report = completeSuFullPeerReport();
+      const built = buildSuFullPeerPresentationResult({
+        report,
+        benchmarks: completeSuFullBenchmarkRows(),
+      });
+      if (built.status !== "ready") throw new Error(built.reason);
+
+      render(
+        <BrandedReport
+          report={{
+            ...report,
+            reportStyle,
+            suFullPeerPresentation: built.presentation,
+          }}
+          reportStylesAvailable
+        />,
+      );
+
+      expect(screen.getByTestId(rendererTestId)).toBeInTheDocument();
+      expect(screen.queryByTestId("su-full-peer-sequence")).not.toBeInTheDocument();
+    },
+  );
+
+  it.each(["rockefeller-habits", "leadership-vision-alignment"])(
+    "ignores an SU Full peer payload for the %s Classic report",
+    (templateAlias) => {
+      const suFull = completeSuFullPeerReport();
+      const built = buildSuFullPeerPresentationResult({
+        report: suFull,
+        benchmarks: completeSuFullBenchmarkRows(),
+      });
+      if (built.status !== "ready") throw new Error(built.reason);
+      const report = {
+        ...suFull,
+        templateAlias,
+        suFullPeerPresentation: built.presentation,
+      };
+      const withoutPayload = {
+        ...report,
+        suFullPeerPresentation: null,
+      };
+
+      const rendered = render(<LegacyClassicReport report={report} />);
+      const withPayloadHtml = rendered.container.innerHTML;
+      expect(screen.queryByTestId("su-full-peer-sequence")).not.toBeInTheDocument();
+      rendered.unmount();
+      expect(render(<LegacyClassicReport report={withoutPayload} />).container.innerHTML)
+        .toBe(withPayloadHtml);
+    },
+  );
+
   it("keeps visible compatibility explanations in printable comparison facts for every launched report style", () => {
     const comparison: ReportComparisonModel = {
       baseline: {
