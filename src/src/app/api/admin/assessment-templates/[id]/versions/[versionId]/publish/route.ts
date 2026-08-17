@@ -11,6 +11,11 @@ import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import { logAudit } from "@/lib/audit";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
 import { getPublishValidationIssues } from "@/lib/assessments/scoring";
+import { isPublicMarketingCtaEnabled } from "@/lib/assessments/wave-public-marketing-cta-flags";
+import {
+  extractMarketingCta,
+  getMarketingCtaPublishIssues,
+} from "@/lib/assessments/marketing-cta";
 
 export async function POST(
   request: NextRequest,
@@ -51,6 +56,8 @@ export async function POST(
         questions: true,
         sections: true,
         scoringConfig: true,
+        reportConfig: true,
+        template: { select: { deliveryType: true } },
       },
     });
     if (!version || version.templateId !== templateId) {
@@ -75,12 +82,19 @@ export async function POST(
       sections: version.sections,
       scoringConfig: version.scoringConfig,
     });
-    if (publishIssues.length > 0) {
+    const marketingIssues =
+      isPublicMarketingCtaEnabled() &&
+      version.template?.deliveryType === "PUBLIC_MARKETING_QUIZ"
+        ? getMarketingCtaPublishIssues(
+          extractMarketingCta(version.reportConfig),
+        ).map((issue) => ({ path: issue.path, message: issue.message }))
+        : [];
+    if (publishIssues.length > 0 || marketingIssues.length > 0) {
       return NextResponse.json(
         {
           success: false,
           error: "PUBLISH_VALIDATION_FAILED",
-          issues: publishIssues,
+          issues: [...publishIssues, ...marketingIssues],
         },
         { status: 422 },
       );

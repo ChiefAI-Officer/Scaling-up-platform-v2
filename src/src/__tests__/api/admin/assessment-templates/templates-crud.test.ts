@@ -66,6 +66,7 @@ import { db } from "@/lib/db";
 import { getApiActor } from "@/lib/auth/authorization";
 import { withRateLimit } from "@/lib/rate-limit";
 import { GENERIC_INVITED_WELCOME_CONFIG } from "@/lib/assessments/invited-welcome-config";
+import { createMarketingCtaPreset } from "@/lib/assessments/marketing-cta";
 
 const adminActor = {
   userId: "u1",
@@ -1487,5 +1488,36 @@ describe("POST /api/admin/assessment-templates/[id]/versions/[versionId]/publish
     expect(res.status).toBe(422);
     const body = await res.json();
     expect(body.error).toBe("PUBLISH_VALIDATION_FAILED");
+  });
+
+  it("requires an action-ready CTA before publishing a public quiz", async () => {
+    process.env.WAVE_PUBLIC_MARKETING_CTA_ENABLED = "1";
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    (db.assessmentTemplateVersion.findUnique as jest.Mock).mockResolvedValue({
+      id: "ver-1",
+      templateId: "tpl-1",
+      publishedAt: null,
+      versionNumber: 1,
+      questions: [],
+      sections: [],
+      scoringConfig: { tiers: [] },
+      reportConfig: {
+        publicMarketing: {
+          marketingCta: createMarketingCtaPreset("BLANK"),
+        },
+      },
+      template: { deliveryType: "PUBLIC_MARKETING_QUIZ" },
+    });
+
+    const res = await publishPOST(pubReq() as never, publishParams);
+
+    expect(res.status).toBe(422);
+    const body = await res.json();
+    expect(body.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ message: expect.stringMatching(/button/i) }),
+      ]),
+    );
+    delete process.env.WAVE_PUBLIC_MARKETING_CTA_ENABLED;
   });
 });

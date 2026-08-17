@@ -53,6 +53,7 @@ jest.mock("@/lib/rate-limit", () => ({
 import { PATCH } from "@/app/api/admin/assessment-templates/[id]/versions/[versionId]/route";
 import { db } from "@/lib/db";
 import { getApiActor } from "@/lib/auth/authorization";
+import { createMarketingCtaPreset } from "@/lib/assessments/marketing-cta";
 
 const adminActor = {
   userId: "u1",
@@ -174,6 +175,77 @@ async function expect400(
 }
 
 describe("PATCH version — Wave T question validation", () => {
+  it("server-compiles public Marketing CTA HTML instead of trusting the client", async () => {
+    process.env.WAVE_PUBLIC_MARKETING_CTA_ENABLED = "1";
+    (db.assessmentTemplate.findUnique as jest.Mock).mockResolvedValue({
+      invitationSubject: "s",
+      invitationBodyMarkdown: "b",
+      deliveryType: "PUBLIC_MARKETING_QUIZ",
+    });
+    const cta = createMarketingCtaPreset("FULL_MARKETING");
+    const request = new Request("http://l", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        questions: mixedPayload,
+        sections: [],
+        scoringConfig: { tiers: [] },
+        reportConfig: {
+          publicMarketing: {
+            marketingCta: { ...cta, sanitizedHtml: "<iframe>forged</iframe>" },
+          },
+        },
+      }),
+    });
+
+    const res = await PATCH(request as never, versionParams);
+
+    expect(res.status).toBe(200);
+    const stored = (db.assessmentTemplateVersion.update as jest.Mock).mock
+      .calls[0][0].data.reportConfig;
+    expect(stored.publicMarketing.marketingCta.sanitizedHtml).toContain(
+      'class="marketing-cta"',
+    );
+    expect(stored.publicMarketing.marketingCta.sanitizedHtml).not.toContain(
+      "forged",
+    );
+    delete process.env.WAVE_PUBLIC_MARKETING_CTA_ENABLED;
+  });
+
+  it("rejects an unsafe public Marketing CTA destination", async () => {
+    process.env.WAVE_PUBLIC_MARKETING_CTA_ENABLED = "1";
+    (db.assessmentTemplate.findUnique as jest.Mock).mockResolvedValue({
+      invitationSubject: "s",
+      invitationBodyMarkdown: "b",
+      deliveryType: "PUBLIC_MARKETING_QUIZ",
+    });
+    const cta = createMarketingCtaPreset("SCALING_UP_QUICK");
+    const unsafe = {
+      ...cta,
+      blocks: cta.blocks.map((block) =>
+        block.type === "button"
+          ? { ...block, target: { kind: "url", href: "javascript:bad" } }
+          : block,
+      ),
+    };
+    const request = new Request("http://l", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        questions: mixedPayload,
+        sections: [],
+        scoringConfig: { tiers: [] },
+        reportConfig: { publicMarketing: { marketingCta: unsafe } },
+      }),
+    });
+
+    const res = await PATCH(request as never, versionParams);
+
+    expect(res.status).toBe(422);
+    expect(await res.json()).toMatchObject({ code: "INVALID_MARKETING_CTA" });
+    delete process.env.WAVE_PUBLIC_MARKETING_CTA_ENABLED;
+  });
+
   it("200 happy path: valid mixed-type payload persists the ORIGINAL payload (validate-don't-strip)", async () => {
     const res = await PATCH(patchReq(mixedPayload) as never, versionParams);
     expect(res.status).toBe(200);
