@@ -268,7 +268,7 @@ export function SuFullLandscapeReport({
   const questions = questionByKey(model);
 
   return (
-    <div className="su-full-landscape-report">
+    <div className="su-full-landscape-report" data-testid="su-full-landscape-report">
       {model.pages.map((page) => {
         switch (page.kind) {
           case "cover": return <CoverPage key={page.number} number={page.number} report={report} />;

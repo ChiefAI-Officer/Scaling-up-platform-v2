@@ -66,6 +66,10 @@ import {
   ReportComparisonContent,
 } from "@/components/assessments/ReportComparisonContent";
 import { SuFullPeerComparison } from "@/components/assessments/SuFullPeerComparison";
+import { SuFullLandscapeReport } from "@/components/assessments/su-full-landscape/SuFullLandscapeReport";
+import { buildSuFullLandscapeReportModel } from "@/lib/assessments/su-full-landscape-report";
+import { isSuFullLandscapeReportEnabled } from "@/lib/assessments/wave-su-full-landscape-flags";
+import { isSuFullPeerPresentation } from "@/lib/assessments/su-full-peer-presentation";
 import { SCALING_UP_FULL_TEMPLATE_ALIAS } from "@/lib/assessments/su-full-question-benchmarks";
 
 const LOGO_SRC = "/brand/su-logo-white.svg";
@@ -335,8 +339,25 @@ export function LegacyClassicReport({
 
   const suFullPeers =
     report.templateAlias === SCALING_UP_FULL_TEMPLATE_ALIAS
-      ? report.suFullPeerPresentation ?? null
+      && isSuFullPeerPresentation(report.suFullPeerPresentation)
+      ? report.suFullPeerPresentation
       : null;
+
+  if (isSuFullLandscapeReportEnabled() && suFullPeers) {
+    const landscapeModel = buildSuFullLandscapeReportModel({
+      report,
+      presentation: suFullPeers,
+    });
+    if (landscapeModel) {
+      return (
+        <SuFullLandscapeReport
+          report={report}
+          model={landscapeModel}
+          contactEmail={contactEmail}
+        />
+      );
+    }
+  }
 
   const result: ScoreResult = report.result ?? ({} as ScoreResult);
   const perQuestion: PerQuestionResult[] = Array.isArray(result.perQuestion)
