@@ -1,7 +1,7 @@
 # Scaling Up Full individual peer comparison design
 
 Date: 2026-08-17
-Status: Proposed - visual direction approved; written specification awaiting review
+Status: Accepted
 
 ## 1. Purpose
 
