@@ -8,9 +8,9 @@
  * also has a governed source snapshot (ADR-0019 amendment).
  *
  * This module is the single home for:
- *  - Separate editor/render alias gates. Scaling Up Full's verified values can
- *    be administered before its paired-bar report UI is released; report
- *    joins remain limited to aliases with a completed render path.
+ *  - Separate editor/render alias gates. Scaling Up Full and LVA both have
+ *    completed render paths; the lists remain separate so future benchmark
+ *    administration does not implicitly expose unfinished report UI.
  *  - `listRatingQuestionKeys` — the editor's row source: SLIDER_LIKERT
  *    questions of the published version, labelled the way the REPORT prints
  *    them (LVA report factor-label overrides, legacy-suffix strip).
@@ -43,12 +43,13 @@ import { SCALING_UP_FULL_TEMPLATE_ALIAS } from "@/lib/assessments/su-full-questi
  */
 export const PEER_RENDER_ENABLED_ALIASES: readonly string[] = [
   LVA_TEMPLATE_ALIAS,
+  SCALING_UP_FULL_TEMPLATE_ALIAS,
 ];
 
 /**
  * Template aliases whose per-question peer values can be administered.
- * Scaling Up Full is intentionally editor-only until its paired-bar report UI
- * ships; keeping these gates separate prevents unfinished report rendering.
+ * Keeping this gate separate prevents future editor-only datasets from
+ * implicitly becoming eligible for report rendering.
  */
 export const PEER_EDITOR_ENABLED_ALIASES: readonly string[] = [
   LVA_TEMPLATE_ALIAS,

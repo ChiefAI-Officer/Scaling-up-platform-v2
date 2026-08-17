@@ -6,6 +6,17 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="su-full-individual-peer-comparison-activation-ready"></a>
+### 2026-08-17 — Scaling Up Full individual peer comparison activation ready <!-- ENTRY_ISO:2026-08-17 ENTRY_SLUG:su-full-individual-peer-comparison-activation-ready -->
+
+**Status: ACTIVATION READY; PRODUCTION DATA VERIFIED READ-ONLY; MERGE AND FLAG ENABLEMENT PENDING.** Dark-foundation PR [#360](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/360) received independent approval, passed Build, Migration Safety Gate, Assessment Email Lease (PostgreSQL), Vercel, and Vercel Preview Comments, and squash-merged as `b9f447407c68a1abad577b5e8ef6131e4a7b82f9`. Ready Production deployment `dpl_GdyyrbLzdkqt9KvJAgn8hNz4pS2x` owns the canonical aliases while `scaling-up-full` remains absent from the render gate.
+
+**Production prerequisite receipt.** A newly committed read-only verifier resolved template `cmpkrg60q0003sbwzo491w1up`, active English Edition **4**, and exactly **61** active rating keys, governed snapshot keys, and stored `AssessmentBenchmark` QUESTION rows. All three sets are exactly `Q01`–`Q61`; every stored value is finite and inside `[0, 10]`; the greatest row `updatedAt` is `2026-08-14T11:57:04.945Z`. The verifier contains no Prisma mutation call, the governed refresh command was not run, and both one-use Production environment files were moved to Trash after the reads.
+
+**Activation and rollback.** The narrow release adds `SCALING_UP_FULL_TEMPLATE_ALIAS` to `PEER_RENDER_ENABLED_ALIASES`; the separate editor gate, benchmark values, reports for other styles, group reports, growth-phase survey, public mini-quiz, report email, assessment content, and persisted results remain unchanged. Production currently evaluates both `WAVE_S_PEER_BENCHMARKS_ENABLED` and `WAVE_S_PEER_BENCHMARKS_KILL` as off. After the protected activation merge, enabling the existing capability exposes eligible LVA and Classic Scaling Up Full peer surfaces; turning on the kill switch immediately restores the generic path without deleting benchmark rows.
+
+**Verification.** Test-first activation failed exactly because Scaling Up Full was absent from the render alias, then passed **2 suites / 85 tests** after the one-line gate change. The full focused matrix passed **6 suites / 145 tests**; the Source-of-Truth gate passed **1 suite / 4 tests**. Changed-path ESLint emitted no diagnostics, migration safety approved all **48 migrations**, and `git diff --check` passed. Repository-wide `tsc --noEmit` retains its established unrelated test-fixture baseline and is not the release gate. The authoritative Production-equivalent Turbopack build compiled, passed its TypeScript phase, and generated **94/94** pages; expected local missing-Inngest-key and missing-`DATABASE_URL` messages remained non-fatal. No Production benchmark, template, campaign, response, invitation, email, schema, migration, or other customer data was mutated.
+
 <a id="su-full-individual-peer-comparison-dark-verified"></a>
 ### 2026-08-17 — Scaling Up Full individual peer comparison dark implementation verified <!-- ENTRY_ISO:2026-08-17 ENTRY_SLUG:su-full-individual-peer-comparison-dark-verified -->
 
