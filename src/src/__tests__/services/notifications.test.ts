@@ -56,6 +56,7 @@ jest.mock("@/lib/utils", () => {
 import {
   prepareAssessmentInvitationEmail,
   sendCoachPasswordSetByAdminEmail,
+  sendCoachPasswordResetEmail,
   sendWorkshopDateChangeEmail,
 } from "@/services/notifications";
 import { db } from "@/lib/db";
@@ -122,6 +123,41 @@ describe("sendCoachPasswordSetByAdminEmail", () => {
       sendCoachPasswordSetByAdminEmail({
         coachEmail: "coach@example.com",
         coachName: "Casey Coach",
+      }),
+    ).rejects.toThrow("SMTP unavailable");
+  });
+});
+
+describe("sendCoachPasswordResetEmail", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockSendEmailViaSMTP.mockResolvedValue(undefined);
+  });
+
+  it("sends the actionable link with the stated 15-minute expiry", async () => {
+    await sendCoachPasswordResetEmail({
+      coachEmail: "coach@example.com",
+      coachName: "Casey Coach",
+      resetUrl: "https://platform.example/reset-password?token=signed&email=coach",
+      expiresInMinutes: 15,
+    });
+
+    const email = mockSendEmailViaSMTP.mock.calls[0][0];
+    expect(email.to).toBe("coach@example.com");
+    expect(email.subject).toMatch(/reset/i);
+    expect(email.html).toContain("https://platform.example/reset-password?token=signed&amp;email=coach");
+    expect(email.html).toMatch(/15 minutes/i);
+  });
+
+  it("propagates delivery failure to the reset endpoint", async () => {
+    mockSendEmailViaSMTP.mockRejectedValue(new Error("SMTP unavailable"));
+
+    await expect(
+      sendCoachPasswordResetEmail({
+        coachEmail: "coach@example.com",
+        coachName: "Casey Coach",
+        resetUrl: "https://platform.example/reset-password?token=signed",
+        expiresInMinutes: 15,
       }),
     ).rejects.toThrow("SMTP unavailable");
   });

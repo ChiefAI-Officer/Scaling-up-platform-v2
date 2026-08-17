@@ -99,6 +99,7 @@ export async function POST(request: NextRequest) {
           data: {
             deletedAt: null,
             passwordHash,
+            authVersion: { increment: 1 },
             // Role on revival = the invite's role (always ADMIN today) — the
             // inviting admin's explicit decision; the audit below records the
             // transition so a former-STAFF promotion is visible, not drift.

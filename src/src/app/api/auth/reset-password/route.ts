@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { resetPasswordSchema } from "@/lib/validations";
 import { verifyPasswordResetToken } from "@/lib/auth/password-reset";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
+import { rotateUserPassword } from "@/lib/auth/password-credentials";
 
 const INVALID_RESET_MESSAGE = "Reset link is invalid or has expired";
 
@@ -54,10 +55,15 @@ export async function POST(request: NextRequest) {
     }
 
     const nextPasswordHash = await bcrypt.hash(parsed.data.newPassword, 12);
-    await db.user.update({
-      where: { id: user.id },
-      data: { passwordHash: nextPasswordHash },
-    });
+    await db.$transaction((tx) =>
+      rotateUserPassword(tx, {
+        userId: user.id,
+        passwordHash: nextPasswordHash,
+        action: "PASSWORD_RESET",
+        performedBy: user.email,
+        changes: { mechanism: "RESET_LINK" },
+      }),
+    );
 
     return NextResponse.json(
       { success: true, message: "Password has been reset successfully." },

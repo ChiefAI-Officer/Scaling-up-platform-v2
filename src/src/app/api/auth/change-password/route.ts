@@ -4,6 +4,7 @@ import { getApiActor } from "@/lib/auth/authorization";
 import { db } from "@/lib/db";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
 import { changePasswordSchema } from "@/lib/validations";
+import { rotateUserPassword } from "@/lib/auth/password-credentials";
 
 export async function POST(request: NextRequest) {
   const rateLimit = await withRateLimit(request, RateLimits.auth);
@@ -72,23 +73,15 @@ export async function POST(request: NextRequest) {
 
     const passwordHash = await bcrypt.hash(newPassword, 12);
 
-    await db.$transaction([
-      db.user.update({
-        where: { id: user.id },
-        data: { passwordHash },
+    await db.$transaction((tx) =>
+      rotateUserPassword(tx, {
+        userId: user.id,
+        passwordHash,
+        action: "PASSWORD_CHANGE",
+        performedBy: actor.email,
+        changes: { role: actor.role, mechanism: "SELF_SERVICE" },
       }),
-      db.auditLog.create({
-        data: {
-          entityType: "User",
-          entityId: user.id,
-          action: "PASSWORD_CHANGE",
-          performedBy: actor.email,
-          changes: JSON.stringify({
-            role: actor.role,
-          }),
-        },
-      }),
-    ]);
+    );
 
     return NextResponse.json(
       { success: true, message: "Password updated successfully" },

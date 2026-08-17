@@ -31,6 +31,14 @@ jest.mock("@/lib/auth/password-reset", () => ({
   verifyPasswordResetToken: jest.fn(),
 }));
 
+jest.mock("@/lib/auth/password-credentials", () => ({
+  rotateUserPassword: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock("@/lib/auth/authorization", () => ({
+  getApiActor: jest.fn(),
+}));
+
 jest.mock("bcryptjs", () => ({
   hash: jest.fn().mockResolvedValue("$2a$12$hashedpassword"),
   compare: jest.fn(),
@@ -50,6 +58,7 @@ jest.mock("nodemailer", () => ({
 import { POST as forgotPasswordPOST } from "@/app/api/auth/forgot-password/route";
 import { POST as resetPasswordPOST } from "@/app/api/auth/reset-password/route";
 import { POST as coachSignupPOST } from "@/app/api/auth/coach-signup/route";
+import { POST as changePasswordPOST } from "@/app/api/auth/change-password/route";
 
 import { db } from "@/lib/db";
 import { withRateLimit } from "@/lib/rate-limit";
@@ -59,6 +68,8 @@ import {
 } from "@/lib/auth/password-reset";
 import bcrypt from "bcryptjs";
 import nodemailer from "nodemailer";
+import { rotateUserPassword } from "@/lib/auth/password-credentials";
+import { getApiActor } from "@/lib/auth/authorization";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -253,7 +264,8 @@ describe("POST /api/auth/reset-password", () => {
   it("resets password and returns success (happy path)", async () => {
     (db.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
     (verifyPasswordResetToken as jest.Mock).mockReturnValue(true);
-    (db.user.update as jest.Mock).mockResolvedValue({ ...mockUser, passwordHash: "$2a$12$hashedpassword" });
+    const tx = {};
+    (db.$transaction as jest.Mock).mockImplementation(async (callback) => callback(tx));
 
     const req = buildRequest(url, validBody);
     const res = await resetPasswordPOST(asNextRequest<typeof resetPasswordPOST>(req));
@@ -266,10 +278,12 @@ describe("POST /api/auth/reset-password", () => {
     // bcrypt should have hashed with 12 rounds
     expect(bcrypt.hash).toHaveBeenCalledWith(validBody.newPassword, 12);
 
-    // User should have been updated with the new hash
-    expect(db.user.update).toHaveBeenCalledWith({
-      where: { id: mockUser.id },
-      data: { passwordHash: "$2a$12$hashedpassword" },
+    expect(rotateUserPassword).toHaveBeenCalledWith(tx, {
+      userId: mockUser.id,
+      passwordHash: "$2a$12$hashedpassword",
+      action: "PASSWORD_RESET",
+      performedBy: "coach@example.com",
+      changes: { mechanism: "RESET_LINK" },
     });
   });
 
@@ -339,6 +353,44 @@ describe("POST /api/auth/reset-password", () => {
     const body = await parseJson(res);
     expect(res.status).toBe(400);
     expect(body.success).toBe(false);
+  });
+});
+
+describe("POST /api/auth/change-password", () => {
+  it("rotates the authenticated user's credential and revokes existing sessions", async () => {
+    const tx = {};
+    (getApiActor as jest.Mock).mockResolvedValue({
+      userId: "user-1",
+      email: "coach@example.com",
+      role: "COACH",
+      coachId: "coach-1",
+    });
+    (db.user.findUnique as jest.Mock).mockResolvedValue({
+      id: "user-1",
+      email: "coach@example.com",
+      passwordHash: "$2a$12$existinghash",
+    });
+    (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+    (db.$transaction as jest.Mock).mockImplementation(async (callback) => callback(tx));
+
+    const response = await changePasswordPOST(
+      asNextRequest<typeof changePasswordPOST>(
+        buildRequest("http://localhost/api/auth/change-password", {
+          currentPassword: "CurrentPass1!",
+          newPassword: "NewSecure1!Pass",
+          confirmNewPassword: "NewSecure1!Pass",
+        }),
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(rotateUserPassword).toHaveBeenCalledWith(tx, {
+      userId: "user-1",
+      passwordHash: "$2a$12$hashedpassword",
+      action: "PASSWORD_CHANGE",
+      performedBy: "coach@example.com",
+      changes: { role: "COACH", mechanism: "SELF_SERVICE" },
+    });
   });
 });
 
