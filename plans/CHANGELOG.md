@@ -6,6 +6,13 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="admin-coach-password-actions-launched"></a>
+### 2026-08-17 — Admin coach-password actions launched <!-- ENTRY_ISO:2026-08-17 ENTRY_SLUG:admin-coach-password-actions-launched -->
+
+**Status: LAUNCHED + GLOBALLY ENABLED + PRODUCTION-VERIFIED.** PR #358 passed Build, Migration Safety Gate, Assessment Email Lease (PostgreSQL), Vercel, and Vercel Preview Comments, then squash-merged as `b26dc685`. After `WAVE_COACH_PASSWORD_ACTIONS_ENABLED=1` was added to Production, the exact merged artifact was redeployed so the enabled environment was captured deterministically. Ready deployment `dpl_3rKZaLtqTcrWtCP7ckNJzcyZezao` owns `scaling-up-platform-v2.vercel.app` and `platformtest.scalingup.com`; the independent kill switch is absent.
+
+**Production receipt.** Both canonical `/api/health` endpoints returned HTTP `200` with healthy database and safe auth posture. Unauthenticated POSTs to Set Password, Send Password Reset, and Retry Notification were intercepted before handler execution with HTTP `307`, `Cache-Control: no-store`, and a sign-in redirect. The additive `authVersion` migration had already applied successfully ahead of code. No Production coach password, session, audit record, reset token, notification, or email was created or changed during smoke testing.
+
 <a id="admin-coach-password-actions-implemented"></a>
 ### 2026-08-17 — Admin coach-password actions implemented <!-- ENTRY_ISO:2026-08-17 ENTRY_SLUG:admin-coach-password-actions-implemented -->
 
