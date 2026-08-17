@@ -5,10 +5,13 @@ import { useRouter } from "next/navigation";
 import { Loader2, Plus, Trash2, ArrowUp, ArrowDown } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
+import { AssessmentDeliveryTypePicker } from "@/components/admin/AssessmentDeliveryTypePicker";
+import type { AssessmentTemplateDeliveryType } from "@prisma/client";
 
 export interface AssessmentTemplateFormProps {
   mode: "create";
   responsiveEnabled?: boolean;
+  deliveryTypeEnabled?: boolean;
 }
 
 // ────────────────────────────────────────────────────────────────────────
@@ -75,12 +78,17 @@ const DEFAULT_TIER: Omit<TierDraft, "uid"> = {
   message: "",
 };
 
-export function AssessmentTemplateForm({ responsiveEnabled = false }: AssessmentTemplateFormProps) {
+export function AssessmentTemplateForm({
+  responsiveEnabled = false,
+  deliveryTypeEnabled = false,
+}: AssessmentTemplateFormProps) {
   const router = useRouter();
   const { toast } = useToast();
 
   // ─── Metadata ─────────────────────────────────────────────────────────
   const [name, setName] = useState("");
+  const [deliveryType, setDeliveryType] =
+    useState<AssessmentTemplateDeliveryType | null>(null);
   const [alias, setAlias] = useState("");
   const [description, setDescription] = useState("");
   const [invitationSubject, setInvitationSubject] = useState(
@@ -257,6 +265,7 @@ export function AssessmentTemplateForm({ responsiveEnabled = false }: Assessment
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (submitting) return;
+    if (deliveryTypeEnabled && deliveryType === null) return;
     const payload = buildPayload();
     if (!payload) return;
     setSubmitting(true);
@@ -272,6 +281,7 @@ export function AssessmentTemplateForm({ responsiveEnabled = false }: Assessment
           invitationBodyMarkdown,
           aggregationMode,
           language,
+          ...(deliveryTypeEnabled && deliveryType ? { deliveryType } : {}),
           ...payload,
         }),
       });
@@ -310,6 +320,15 @@ export function AssessmentTemplateForm({ responsiveEnabled = false }: Assessment
 
   return (
     <form onSubmit={handleSubmit} className={cn("space-y-6", responsiveEnabled && "min-w-0 max-w-full [&_input]:min-h-11 [&_input]:min-w-0 [&_select]:min-h-11 [&_select]:min-w-0 [&_textarea]:min-h-11 [&_textarea]:min-w-0 [&_button]:min-h-11")}>
+      {deliveryTypeEnabled && (
+        <div className={cn("rounded-xl border border-border bg-card p-6", responsiveEnabled && "p-4 sm:p-6")}>
+          <AssessmentDeliveryTypePicker
+            value={deliveryType}
+            onChange={setDeliveryType}
+            disabled={submitting}
+          />
+        </div>
+      )}
       {/* ─── Metadata ─────────────────────────────────────────────── */}
       <div className={cn("bg-card border border-border rounded-xl p-6 space-y-4", responsiveEnabled && "min-w-0 max-w-full p-4 sm:p-6")}>
         <h2 className="text-sm font-semibold text-foreground">Metadata</h2>
@@ -921,7 +940,9 @@ export function AssessmentTemplateForm({ responsiveEnabled = false }: Assessment
         </button>
         <button
           type="submit"
-          disabled={submitting}
+          disabled={
+            submitting || (deliveryTypeEnabled && deliveryType === null)
+          }
           className={cn("inline-flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50", responsiveEnabled && "min-h-11 justify-center")}
           data-testid="template-submit"
         >

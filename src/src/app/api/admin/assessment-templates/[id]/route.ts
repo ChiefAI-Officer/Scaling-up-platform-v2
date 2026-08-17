@@ -13,7 +13,10 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { Prisma } from "@prisma/client";
+import {
+  Prisma,
+  type AssessmentTemplateDeliveryType,
+} from "@prisma/client";
 import { db } from "@/lib/db";
 import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import { logAudit } from "@/lib/audit";
@@ -32,6 +35,7 @@ import {
   resolveLegacyInvitedWelcomeConfig,
 } from "@/lib/assessments/invited-welcome-config";
 import { isAdminOwnedAssessmentPresentationEnabled } from "@/lib/assessments/wave-admin-owned-assessment-presentation-flags";
+import { isPublicMarketingCtaEnabled } from "@/lib/assessments/wave-public-marketing-cta-flags";
 
 function withoutInvitedWelcomeDefault<
   T extends { invitedWelcomeDefault?: unknown },
@@ -73,6 +77,7 @@ export async function GET(
         invitationSubject: true,
         invitationBodyMarkdown: true,
         aggregationMode: true,
+        deliveryType: true,
         ...(adminOwnedPresentationEnabled
           ? { invitedWelcomeDefault: true as const }
           : {}),
@@ -137,7 +142,17 @@ const PatchTemplateBodySchema = z.object({
   disabled: z.boolean().optional(),
   defaultReportStyle: z.enum(REPORT_STYLE_KEYS).optional(),
   invitedWelcomeDefault: invitedWelcomeAuthoringInputSchema.optional(),
+  deliveryType: z
+    .enum(["PUBLIC_MARKETING_QUIZ", "INVITED_ASSESSMENT"])
+    .optional(),
 });
+
+function isDeliveryTypeLockError(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const candidate = error as { code?: unknown; message?: unknown; meta?: unknown };
+  const text = `${String(candidate.message ?? "")} ${JSON.stringify(candidate.meta ?? {})}`;
+  return candidate.code === "P2004" && text.includes("deliveryType is locked");
+}
 
 function hasForbiddenInvitedWelcomeServerField(body: unknown): boolean {
   if (typeof body !== "object" || body === null || !("invitedWelcomeDefault" in body)) {
@@ -198,6 +213,16 @@ export async function PATCH(
     const data = parsed.data;
 
     if (
+      data.deliveryType !== undefined &&
+      !isPublicMarketingCtaEnabled()
+    ) {
+      return NextResponse.json(
+        { success: false, error: "PUBLIC_MARKETING_CTA_DISABLED" },
+        { status: 403 },
+      );
+    }
+
+    if (
       data.invitedWelcomeDefault !== undefined &&
       !isAdminOwnedAssessmentPresentationEnabled()
     ) {
@@ -248,6 +273,7 @@ export async function PATCH(
         sendResultsDefault: true,
         disabledAt: true,
         invitedWelcomeDefault: true,
+        deliveryType: true,
       },
     });
     if (!existing) {
@@ -272,6 +298,7 @@ export async function PATCH(
       disabledAt?: Date | null;
       defaultReportStyle?: ReportStyleKey;
       invitedWelcomeDefault?: Prisma.InputJsonValue;
+      deliveryType?: AssessmentTemplateDeliveryType;
     } = {};
     if (data.name !== undefined) updateData.name = data.name;
     if (data.description !== undefined) updateData.description = data.description;
@@ -281,6 +308,27 @@ export async function PATCH(
       updateData.invitationBodyMarkdown = data.invitationBodyMarkdown;
     if (data.aggregationMode !== undefined)
       updateData.aggregationMode = data.aggregationMode;
+    if (
+      data.deliveryType !== undefined &&
+      data.deliveryType !== existing.deliveryType
+    ) {
+      const publishedVersion =
+        await db.assessmentTemplateVersion.findFirst({
+          where: { templateId: id, publishedAt: { not: null } },
+          select: { id: true },
+        });
+      if (publishedVersion) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Assessment type is locked after first publication.",
+            code: "DELIVERY_TYPE_LOCKED",
+          },
+          { status: 409 },
+        );
+      }
+      updateData.deliveryType = data.deliveryType;
+    }
     if (data.defaultReportStyle !== undefined) {
       updateData.defaultReportStyle = data.defaultReportStyle;
     }
@@ -411,6 +459,16 @@ export async function PATCH(
         : withoutInvitedWelcomeDefault(template),
     });
   } catch (error) {
+    if (isDeliveryTypeLockError(error)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Assessment type is locked after first publication.",
+          code: "DELIVERY_TYPE_LOCKED",
+        },
+        { status: 409 },
+      );
+    }
     console.error("Error updating template:", error);
     return NextResponse.json(
       { success: false, error: "Failed to update template" },

@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { Prisma } from "@prisma/client";
+import { Prisma, type AssessmentTemplateDeliveryType } from "@prisma/client";
 import { db } from "@/lib/db";
 import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import { logAudit } from "@/lib/audit";
@@ -25,6 +25,7 @@ import {
   type InvitedWelcomeConfigV1,
 } from "@/lib/assessments/invited-welcome-config";
 import { isAdminOwnedAssessmentPresentationEnabled } from "@/lib/assessments/wave-admin-owned-assessment-presentation-flags";
+import { isPublicMarketingCtaEnabled } from "@/lib/assessments/wave-public-marketing-cta-flags";
 
 interface AdminTemplateSummary {
   id: string;
@@ -36,6 +37,7 @@ interface AdminTemplateSummary {
   disabledAt: Date | null;
   /** Wave Q (#1) — template-level default for "send results to respondent". */
   sendResultsDefault: boolean;
+  deliveryType: AssessmentTemplateDeliveryType;
 }
 
 export async function GET(request: NextRequest) {
@@ -66,6 +68,7 @@ export async function GET(request: NextRequest) {
         aggregationMode: true,
         disabledAt: true,
         sendResultsDefault: true,
+        deliveryType: true,
       },
       orderBy: { name: "asc" },
     });
@@ -82,6 +85,11 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+const DeliveryTypeSchema = z.enum([
+  "PUBLIC_MARKETING_QUIZ",
+  "INVITED_ASSESSMENT",
+]);
 
 const CreateTemplateBodySchema = z.object({
   name: z.string().min(1).max(200).trim(),
@@ -103,6 +111,7 @@ const CreateTemplateBodySchema = z.object({
   sections: z.array(z.unknown()),
   scoringConfig: z.unknown(),
   reportConfig: z.unknown().optional().nullable(),
+  deliveryType: DeliveryTypeSchema.optional(),
 });
 
 const InternalIdSchema = z
@@ -116,6 +125,7 @@ const SimplifiedCreateBodySchema = z
     creationMode: z.literal("simplified"),
     name: z.string().trim().min(1).max(200),
     internalId: InternalIdSchema.optional(),
+    deliveryType: DeliveryTypeSchema.optional(),
   })
   .strict();
 
@@ -155,7 +165,12 @@ const SIMPLIFIED_DEFAULTS = {
   reportConfig: null,
 };
 
-type NormalizedCreateData = z.infer<typeof CreateTemplateBodySchema>;
+type NormalizedCreateData = Omit<
+  z.infer<typeof CreateTemplateBodySchema>,
+  "deliveryType"
+> & {
+  deliveryType: AssessmentTemplateDeliveryType;
+};
 
 function isPrismaUniqueError(error: unknown): boolean {
   return (
@@ -192,6 +207,7 @@ export async function POST(request: NextRequest) {
     const actorUserId = actor.userId;
 
     const body = await request.json().catch(() => ({}));
+    const publicMarketingCtaEnabled = isPublicMarketingCtaEnabled();
     const simplified =
       typeof body === "object" &&
       body !== null &&
@@ -222,6 +238,19 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      if (!publicMarketingCtaEnabled && parsed.data.deliveryType !== undefined) {
+        return NextResponse.json(
+          { success: false, error: "Simplified creation is unavailable" },
+          { status: 400 },
+        );
+      }
+      if (publicMarketingCtaEnabled && parsed.data.deliveryType === undefined) {
+        return NextResponse.json(
+          { success: false, error: "DELIVERY_TYPE_REQUIRED" },
+          { status: 400 },
+        );
+      }
+
       if (
         welcomeAuthoringEnabled &&
         "invitedWelcomeDefault" in parsed.data &&
@@ -245,6 +274,8 @@ export async function POST(request: NextRequest) {
         name: parsed.data.name,
         alias: parsed.data.internalId ?? generatedBase,
         ...SIMPLIFIED_DEFAULTS,
+        deliveryType:
+          parsed.data.deliveryType ?? "INVITED_ASSESSMENT",
       };
       manualInternalId = parsed.data.internalId !== undefined;
     } else {
@@ -255,7 +286,18 @@ export async function POST(request: NextRequest) {
           { status: 400 },
         );
       }
-      data = parsed.data;
+      if (publicMarketingCtaEnabled && parsed.data.deliveryType === undefined) {
+        return NextResponse.json(
+          { success: false, error: "DELIVERY_TYPE_REQUIRED" },
+          { status: 400 },
+        );
+      }
+      data = {
+        ...parsed.data,
+        deliveryType: publicMarketingCtaEnabled
+          ? (parsed.data.deliveryType as AssessmentTemplateDeliveryType)
+          : "INVITED_ASSESSMENT",
+      };
     }
 
     async function createOnce(createData: NormalizedCreateData) {
@@ -277,6 +319,7 @@ export async function POST(request: NextRequest) {
             invitationSubject: createData.invitationSubject,
             invitationBodyMarkdown: createData.invitationBodyMarkdown,
             aggregationMode: createData.aggregationMode,
+            deliveryType: createData.deliveryType,
             invitedWelcomeDefault:
               effectiveWelcomeDefault as unknown as Prisma.InputJsonValue,
             createdBy: actorUserId,

@@ -11,6 +11,8 @@ import {
   type InvitedWelcomeAuthoringInputV1,
 } from "@/lib/assessments/invited-welcome-config";
 import { generateTemplateInternalId } from "@/lib/assessments/template-internal-id";
+import { AssessmentDeliveryTypePicker } from "@/components/admin/AssessmentDeliveryTypePicker";
+import type { AssessmentTemplateDeliveryType } from "@prisma/client";
 
 const NAME_ERROR_ID = "template-assessment-name-error";
 const INTERNAL_ID_ERROR_ID = "template-internal-id-error";
@@ -29,12 +31,16 @@ function initialWelcomeValues(): InvitedWelcomeAuthoringInputV1 {
 
 export function SimplifiedAssessmentTemplateForm({
   welcomeAuthoringEnabled = false,
+  deliveryTypeEnabled = false,
 }: {
   welcomeAuthoringEnabled?: boolean;
+  deliveryTypeEnabled?: boolean;
 }) {
   const router = useRouter();
   const internalIdRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState("");
+  const [deliveryType, setDeliveryType] =
+    useState<AssessmentTemplateDeliveryType | null>(null);
   const [internalId, setInternalId] = useState("");
   const [internalIdEdited, setInternalIdEdited] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -62,6 +68,7 @@ export function SimplifiedAssessmentTemplateForm({
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (submitting) return;
+    if (deliveryTypeEnabled && deliveryType === null) return;
 
     const trimmedName = name.trim();
     setNameError("");
@@ -122,11 +129,13 @@ export function SimplifiedAssessmentTemplateForm({
       name: string;
       internalId?: string;
       invitedWelcomeDefault?: InvitedWelcomeAuthoringInputV1;
+      deliveryType?: AssessmentTemplateDeliveryType;
     } = {
       creationMode: "simplified",
       name: trimmedName,
       ...(internalIdEdited ? { internalId } : {}),
       ...(invitedWelcomeDefault ? { invitedWelcomeDefault } : {}),
+      ...(deliveryTypeEnabled && deliveryType ? { deliveryType } : {}),
     };
 
     setSubmitting(true);
@@ -174,6 +183,15 @@ export function SimplifiedAssessmentTemplateForm({
 
   return (
     <form className="space-y-6" onSubmit={handleSubmit} noValidate>
+      {deliveryTypeEnabled && (
+        <div className="rounded-xl border border-border bg-card p-5 sm:p-6">
+          <AssessmentDeliveryTypePicker
+            value={deliveryType}
+            onChange={setDeliveryType}
+            disabled={submitting}
+          />
+        </div>
+      )}
       <div>
         <label
           className="mb-1 block text-sm font-medium text-foreground"
@@ -291,7 +309,9 @@ export function SimplifiedAssessmentTemplateForm({
         </Link>
         <button
           type="submit"
-          disabled={submitting}
+          disabled={
+            submitting || (deliveryTypeEnabled && deliveryType === null)
+          }
           aria-busy={submitting}
           className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
         >

@@ -28,6 +28,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { AssessmentTemplateDeliveryType } from "@prisma/client";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
 import { buildVersionScoringPayload } from "@/components/admin/template-editor/build-version-payload";
@@ -104,6 +105,7 @@ export interface UseTemplateEditorDraftArgs {
  * travels together so the server binds the SEC-H2 approval hash atomically.
  */
 export type TemplateRowPatch = Partial<{
+  deliveryType: AssessmentTemplateDeliveryType;
   aggregationMode: "FULL_VISIBILITY" | "CEO_ONLY";
   // ED10 (spec 19am-plan, Task 10) — widened to `string | null` so the
   // Settings-tab ResultsEmailCard can send a coerced-empty field as `null`
@@ -156,6 +158,7 @@ export function useTemplateEditorDraft({
     resultsEmailContentApproved:
       template.resultsEmailContentApproved ?? false,
     aggregationMode: template.aggregationMode,
+    deliveryType: template.deliveryType ?? "INVITED_ASSESSMENT",
     defaultReportStyle: template.defaultReportStyle ?? "CLASSIC",
   });
 

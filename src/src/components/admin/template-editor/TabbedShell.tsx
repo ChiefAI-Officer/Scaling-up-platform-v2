@@ -38,6 +38,7 @@ import React, {
   useMemo,
   useState,
 } from "react";
+import type { AssessmentTemplateDeliveryType } from "@prisma/client";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
@@ -161,6 +162,7 @@ export interface TemplateEditorTabbedTemplate {
   defaultReportStyle?: ReportStyleKey;
   aggregationMode: "FULL_VISIBILITY" | "CEO_ONLY";
   accessMode?: "INVITED" | "PUBLIC";
+  deliveryType?: AssessmentTemplateDeliveryType;
   invitedWelcomeDefault?: InvitedWelcomeConfigV1;
 }
 
@@ -355,6 +357,8 @@ export interface TabbedShellProps {
   activePreview?: ActivePreview | null;
   /** Peer benchmark rows resolved by the server for the Settings editor. */
   peerBenchmarkRows?: PeerBenchmarkRow[] | null;
+  /** Gates public/invited classification and the marketing CTA authoring surface. */
+  publicMarketingCtaEnabled?: boolean;
 }
 
 /**
@@ -467,6 +471,7 @@ export function TabbedShell({
   // flag is off). Threaded into PreviewTab below.
   activePreview = null,
   peerBenchmarkRows = null,
+  publicMarketingCtaEnabled = false,
   model,
 }: TabbedShellProps & {
   /**
@@ -1222,6 +1227,11 @@ export function TabbedShell({
                 reportStylesEnabled={reportStylesEnabled}
                 reportStylePreviewCapabilities={reportStylePreviewCapabilities}
                 peerBenchmarkRows={peerBenchmarkRows}
+                deliveryType={templateValues.deliveryType}
+                hasPublishedVersion={allVersions.some(
+                  (candidate) => candidate.publishedAt !== null,
+                )}
+                publicMarketingCtaEnabled={publicMarketingCtaEnabled}
               />
             </div>
           </TabsContent>
