@@ -16,6 +16,8 @@ import {
   completeSuFullLandscapeReport,
 } from "@/__tests__/fixtures/su-full-landscape";
 
+jest.setTimeout(60_000);
+
 const ENABLED = "NEXT_PUBLIC_WAVE_SU_FULL_LANDSCAPE_REPORT_ENABLED";
 const KILL = "NEXT_PUBLIC_WAVE_SU_FULL_LANDSCAPE_REPORT_KILL";
 
@@ -30,13 +32,80 @@ function routeMarkup(): { html: string; report: ReturnType<typeof completeSuFull
   const report = completeSuFullLandscapeReport();
   report.suFullPeerPresentation = completeSuFullLandscapePresentation(report);
   const html = renderToStaticMarkup(
-    <ReportStyleScope report={report} reportStylesAvailable>
-      <div className="su-report-page" data-testid="route-wrapper">
-        <BrandedReport report={report} reportStylesAvailable contactEmail="coach@example.com" />
-      </div>
-    </ReportStyleScope>,
+    <main className="su-public-brand su-report" data-testid="route-wrapper">
+      <ReportStyleScope report={report} reportStylesAvailable>
+        <div className="su-report-page">
+          <BrandedReport report={report} reportStylesAvailable contactEmail="coach@example.com" />
+        </div>
+      </ReportStyleScope>
+    </main>,
   );
   return { html, report };
+}
+
+async function labelFit(page: Page, pageNumbers: readonly number[]) {
+  return page.locator(
+    pageNumbers.map((number) => `[data-page-number="${number}"] .su-full-landscape-vertical-chart`).join(","),
+  ).evaluateAll((charts) => charts.flatMap((chart) =>
+    [...chart.querySelectorAll<HTMLElement>(".su-full-landscape-chart-row")].map((row) => {
+      const label = row.querySelector<HTMLElement>(".su-full-landscape-chart-question");
+      if (!label) throw new Error("Missing question label");
+      const rowRect = row.getBoundingClientRect();
+      const labelRect = label.getBoundingClientRect();
+      const style = getComputedStyle(label);
+      return {
+        page: chart.closest<HTMLElement>("[data-page-number]")?.dataset.pageNumber ?? "unknown",
+        label: label.textContent?.trim() ?? "",
+        rowTop: rowRect.top,
+        rowBottom: rowRect.bottom,
+        labelTop: labelRect.top,
+        labelBottom: labelRect.bottom,
+        scrollHeight: label.scrollHeight,
+        clientHeight: label.clientHeight,
+        overflow: style.overflow,
+        overflowY: style.overflowY,
+        textOverflow: style.textOverflow,
+        webkitLineClamp: style.webkitLineClamp,
+      };
+    }),
+  ));
+}
+
+function expectLabelsToFit(rows: Awaited<ReturnType<typeof labelFit>>) {
+  expect(rows.length).toBeGreaterThan(0);
+  expect(rows.filter((row) =>
+    row.label === ""
+    || row.scrollHeight > row.clientHeight + 1
+    || row.labelTop < row.rowTop - 1
+    || row.labelBottom > row.rowBottom + 1
+    || row.overflow === "hidden"
+    || row.overflowY === "hidden"
+    || row.textOverflow === "ellipsis"
+    || row.webkitLineClamp !== "none"
+  )).toEqual([]);
+}
+
+async function mobilePeerRows(page: Page, pageNumbers: readonly number[]) {
+  return page.locator(
+    pageNumbers.map((number) => `[data-page-number="${number}"] .su-full-landscape-chart-row`).join(","),
+  ).evaluateAll((rows) => rows.map((row) => {
+    const scale = row.querySelector<HTMLElement>(".su-full-landscape-mobile-peer-scale");
+    const fill = scale?.querySelector<HTMLElement>(".su-full-landscape-bar-fill--peers");
+    const label = row.querySelector<HTMLElement>(".su-full-landscape-mobile-peer-label");
+    const value = row.querySelector<HTMLElement>(".su-full-landscape-mobile-peer-value");
+    if (!scale || !fill || !label || !value) throw new Error("Missing mobile peer comparison");
+    const scaleRect = scale.getBoundingClientRect();
+    const fillRect = fill.getBoundingClientRect();
+    const expected = Number((row as HTMLElement).dataset.peerScore);
+    return {
+      expected,
+      labelVisible: getComputedStyle(label).display !== "none" && label.getBoundingClientRect().width > 0,
+      scaleVisible: getComputedStyle(scale).display !== "none" && scaleRect.width > 0,
+      valueVisible: getComputedStyle(value).display !== "none" && value.getBoundingClientRect().width > 0,
+      value: Number(value.textContent?.trim()),
+      widthError: Math.abs(fillRect.width - scaleRect.width * expected / 10),
+    };
+  }));
 }
 
 async function load(page: Page, html: string): Promise<void> {
@@ -115,7 +184,7 @@ describe("SU Full landscape browser and PDF contract", () => {
     const page = await browser.newPage({ viewport: { width: 1123, height: 794 } });
     try {
       await load(page, html);
-      await expect(page.locator("[data-testid='route-wrapper']").getAttribute("data-enabled-report-style"))
+      await expect(page.locator("[data-enabled-report-style]").getAttribute("data-enabled-report-style"))
         .resolves.toBe("CLASSIC");
       for (const pageNumber of [7, 11, 21]) {
         const charts = await geometry(page, pageNumber);
@@ -137,7 +206,9 @@ describe("SU Full landscape browser and PDF contract", () => {
         expect(chart.vectorEffect).toBe("non-scaling-stroke");
         expect(chart.rows.every((row) => row.xError <= 1 && row.yError <= 1)).toBe(true);
       }
-      await expect(page.locator("main").count()).resolves.toBe(0);
+      expectLabelsToFit(await labelFit(page, [7, 11, 14, 19, 21, 26]));
+      await expect(page.locator("main").count()).resolves.toBe(1);
+      await expect(page.locator("main[data-testid='route-wrapper']").count()).resolves.toBe(1);
       await expect(page.locator(".su-full-landscape-peer-contour").count()).resolves.toBe(10);
       await expect(page.locator(".su-full-landscape-peer-contour[stroke-dasharray]").count()).resolves.toBe(0);
     } finally {
@@ -163,12 +234,15 @@ describe("SU Full landscape browser and PDF contract", () => {
       }));
       expect(dimensions.offenders).toEqual([]);
       expect(dimensions.document).toBeLessThanOrEqual(dimensions.viewport + 1);
-      const charts = await geometry(page, 7);
-      expect(charts).toHaveLength(1);
-      expect(charts[0].display).not.toBe("none");
-      expect(charts[0].rows.every((row) => row.xError <= 1 && row.yError <= 1)).toBe(true);
+      await expect(page.locator("[data-page-number='7'] .su-full-landscape-peer-contour").isVisible())
+        .resolves.toBe(false);
+      const peerRows = await mobilePeerRows(page, [7, 11, 14, 19, 21, 26]);
+      expect(peerRows.length).toBeGreaterThanOrEqual(61);
+      expect(peerRows.every((row) => row.labelVisible && row.scaleVisible && row.valueVisible)).toBe(true);
+      expect(peerRows.every((row) => row.value === row.expected && row.widthError <= 1)).toBe(true);
       await expect(page.locator("[data-page-number='7'] .su-full-landscape-chart-legend").isVisible())
         .resolves.toBe(true);
+      expectLabelsToFit(await labelFit(page, [7, 11, 14, 19, 21, 26]));
     } finally {
       await page.close();
     }
@@ -242,4 +316,4 @@ describe("SU Full landscape browser and PDF contract", () => {
       rmSync(directory, { recursive: true, force: true });
     }
   });
-}, 60_000);
+});

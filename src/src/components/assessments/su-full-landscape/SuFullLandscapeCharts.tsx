@@ -114,6 +114,16 @@ export function SuFullVerticalPeerChart({
                 />
               </span>
               <strong className="su-full-landscape-bar-value">{formatValue(question.you)}</strong>
+              <span className="su-full-landscape-mobile-peer-label">Peers</span>
+              <span className="su-full-landscape-mobile-peer-scale" aria-hidden="true">
+                <span
+                  className={barFillClass("peers")}
+                  style={{ width: fillWidth(question.peers) }}
+                />
+              </span>
+              <strong className="su-full-landscape-mobile-peer-value">
+                {formatValue(question.peers)}
+              </strong>
               <span className="sr-only">
                 You {formatValue(question.you)}. Peers {formatValue(question.peers)}.
               </span>

@@ -173,8 +173,10 @@ test("keeps the landscape renderer's A4 print and responsive screen contract sco
   expect(stylesheet).toContain(".su-full-landscape-page--chapter .su-full-landscape-vertical-chart");
   expect(stylesheet).toContain(".su-full-landscape-page--detail .su-full-landscape-page-body > h2");
   expect(stylesheet).toContain(".su-full-landscape-page--appendix .su-full-landscape-chart-question { display: block;");
-  expect(stylesheet).toContain("grid-template-columns: 1.1fr .8fr 1.55fr 1.35fr;");
-  expect(stylesheet).toContain("font-size: 9px; line-height: 1.05;");
+  expect(stylesheet).toContain("grid-template-columns: 1.2fr 1fr 1.5fr 1fr 1.3fr;");
+  expect(stylesheet).toContain("font-size: 8px; line-height: 1.15;");
+  expect(stylesheet).toContain(".su-full-landscape-peer-contour { display: none; }");
+  expect(stylesheet).toContain(".su-full-landscape-mobile-peer-value { display: block; }");
   expect(stylesheet).toContain(".is-people { --chapter-color: #f7a600; --chapter-peer-color: #ffd37a; --chapter-line-color: #7a5000; }");
   expect(stylesheet).toMatch(/\.su-full-landscape-page-footer \.su-report-coach-name\s*\{[^}]*color: #6b6480;/);
   expect(stylesheet).not.toMatch(/\.su-full-landscape-page\s*\{[^}]*overflow:\s*hidden;/);

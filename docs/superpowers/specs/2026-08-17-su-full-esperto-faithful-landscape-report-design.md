@@ -201,7 +201,9 @@ assigned page, not by moving a question to another page at runtime.
 - White background, generous left/right whitespace, and dense but readable
   two-column content.
 - Screen view uses fluid page cards with the same hierarchy. Narrow screens
-  stack columns without changing print pagination.
+  stack columns without changing print pagination. At 760px and below, the
+  connected contour adapts to a visible, aligned `Peers` bar and numeric value
+  in every row so full labels can flow naturally without losing the comparison.
 
 ### Chapter colors
 
@@ -232,6 +234,11 @@ values. It performs no interpolation or scoring. The SVG is decorative to
 assistive technology because each row also exposes both numeric values in
 semantic text; the peer number may be visually hidden on the compact opener
 but remains available to screen readers.
+
+On narrow screens the contour is replaced by an explicit `Peers` row directly
+under the `You` row. Both bars retain the same 0–10 scale and show their numeric
+values. This responsive form is not a different calculation; it prevents label
+clipping while keeping the comparison visible to sighted and assistive users.
 
 The chapter opener combines subsections by domain:
 
@@ -405,6 +412,8 @@ answers or other PII.
 - Chapter color is never the sole carrier of meaning.
 - Page headings follow one logical hierarchy even though print pages are
   visually independent.
+- Standalone report routes expose exactly one route-level `main`; individual
+  physical page containers do not add nested main landmarks.
 - Detail columns preserve reading order.
 - Screen layouts reflow without horizontal scrolling at the report's supported
   responsive breakpoint.
@@ -447,7 +456,13 @@ answers or other PII.
 - no browser URL/date/title header or footer appears in the generated PDF;
 - Chromium PDF output contains exactly 26 physical pages; and
 - PDF text extraction finds Q01-Q61 labels in canonical order with no missing
-  feedback text.
+  feedback text;
+- real browser measurements prove each full canonical chart label's scroll and
+  visual bounds remain inside its row on all five opener pages and Appendix A;
+- print contours stay within 1px of their rendered 0–10 scales and row centers;
+  and
+- 375px and 760px views have no document overflow and show truth-scaled visible
+  `Peers` bars/values in every chart row.
 
 ### Required visual review
 
