@@ -2,8 +2,8 @@
  * Wave S — peer-benchmarks lib (spec 19s S-3 + S-5).
  *
  * Covers:
- *  - Separate editor/render alias gates: SU-Full can be configured before its
- *    paired-bar report UI is released, while LVA remains fully render-enabled.
+ *  - Separate editor/render alias gates: SU Full and LVA are both configured
+ *    and render-enabled after the paired-bar report release.
  *  - listRatingQuestionKeys (SLIDER_LIKERT filter, version order, LVA report
  *    label overrides, malformed-input safety)
  *  - reconcileQuestionBenchmarks (atomic full-set reconcile, D14 + C3:
@@ -14,6 +14,7 @@
  *    sign/rounding, label overrides, insertion order)
  */
 import { LVA_TEMPLATE_ALIAS } from "@/lib/assessments/lva-report-display";
+import { SCALING_UP_FULL_TEMPLATE_ALIAS } from "@/lib/assessments/su-full-question-benchmarks";
 import {
   PEER_EDITOR_ENABLED_ALIASES,
   PEER_RENDER_ENABLED_ALIASES,
@@ -155,11 +156,13 @@ const VALID_KEYS: ReadonlySet<string> = new Set([
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("PEER_RENDER_ENABLED_ALIASES", () => {
-  it("keeps report rendering limited to LVA", () => {
-    expect(PEER_RENDER_ENABLED_ALIASES).toEqual([LVA_TEMPLATE_ALIAS]);
+  it("enables report rendering for LVA and Scaling Up Full", () => {
+    expect(PEER_RENDER_ENABLED_ALIASES).toEqual([
+      LVA_TEMPLATE_ALIAS,
+      SCALING_UP_FULL_TEMPLATE_ALIAS,
+    ]);
   });
 });
-
 describe("PEER_EDITOR_ENABLED_ALIASES", () => {
   it("allows LVA and Scaling Up Full values to be administered", () => {
     expect(PEER_EDITOR_ENABLED_ALIASES).toEqual([
@@ -186,11 +189,14 @@ describe("isPeerEditorEnabledAlias", () => {
 });
 
 describe("isPeerRenderEnabledAlias", () => {
-  it("is true for the LVA alias", () => {
-    expect(isPeerRenderEnabledAlias(LVA_TEMPLATE_ALIAS)).toBe(true);
-  });
+  it.each([LVA_TEMPLATE_ALIAS, SCALING_UP_FULL_TEMPLATE_ALIAS])(
+    "is true for render-enabled alias %j",
+    (alias) => {
+      expect(isPeerRenderEnabledAlias(alias)).toBe(true);
+    },
+  );
 
-  it.each(["qsp-v1", "scaling-up-full", ""])(
+  it.each(["qsp-v1", ""])(
     "is false for non-enabled alias %j",
     (alias) => {
       expect(isPeerRenderEnabledAlias(alias)).toBe(false);
