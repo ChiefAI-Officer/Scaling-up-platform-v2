@@ -99,6 +99,7 @@ test("renders the complete Classic SU Full peer report as the landscape composit
 
   const landscape = screen.getByTestId("su-full-landscape-report");
   expect(landscape).toBeInTheDocument();
+  expect(landscape.closest(".su-public-brand.su-report.su-full-landscape")).toBeInTheDocument();
   expect(screen.queryByTestId("su-full-peer-sequence")).not.toBeInTheDocument();
   expect(screen.queryByTestId("report-sections")).not.toBeInTheDocument();
 

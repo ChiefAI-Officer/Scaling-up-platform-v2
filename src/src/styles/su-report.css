@@ -2599,11 +2599,11 @@
   border: 0;
 }
 
-.su-public-brand.su-report.su-full-landscape .su-full-landscape-report .is-people { --chapter-color: #f7a600; --chapter-peer-color: #a86e00; }
-.su-public-brand.su-report.su-full-landscape .su-full-landscape-report .is-strategy { --chapter-color: #008bd2; --chapter-peer-color: #006f9f; }
-.su-public-brand.su-report.su-full-landscape .su-full-landscape-report .is-execution { --chapter-color: #946b36; --chapter-peer-color: #65471f; }
-.su-public-brand.su-report.su-full-landscape .su-full-landscape-report .is-cash { --chapter-color: #95c11f; --chapter-peer-color: #5d7d10; }
-.su-public-brand.su-report.su-full-landscape .su-full-landscape-report .is-you { --chapter-color: #522583; --chapter-peer-color: #3f1c66; }
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-report .is-people { --chapter-color: #f7a600; --chapter-peer-color: #d99b43; }
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-report .is-strategy { --chapter-color: #008bd2; --chapter-peer-color: #63b5d9; }
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-report .is-execution { --chapter-color: #946b36; --chapter-peer-color: #c19a68; }
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-report .is-cash { --chapter-color: #95c11f; --chapter-peer-color: #b8d665; }
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-report .is-you { --chapter-color: #522583; --chapter-peer-color: #8f78ad; }
 
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-page {
   display: grid;
@@ -2632,8 +2632,57 @@
   min-width: 0;
   padding: 10mm 12mm 6mm;
 }
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-page--chapter .su-full-landscape-page-body,
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-page--detail .su-full-landscape-page-body {
+  display: grid;
+  align-content: start;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-page--chapter .su-full-landscape-page-body {
+  grid-template-columns: minmax(0, .4fr) minmax(0, .6fr);
+  column-gap: 12mm;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-chapter-copy {
+  grid-column: 1;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-page--chapter .su-full-landscape-vertical-chart {
+  grid-column: 2;
+  grid-row: 1;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-page--detail .su-full-landscape-page-body {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 12mm;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-page--detail .su-full-landscape-page-body > h2 {
+  grid-column: 1 / -1;
+}
 
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-page-body > :first-child { margin-top: 0; }
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-cover-brand {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: -10mm -12mm 16mm;
+  padding: 10px 12mm;
+  background: #522583;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-cover-mark {
+  display: block;
+  color: #ffffff;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: .04em;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-cover-brand .su-report-coach { color: #ffffff; }
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-chapter-kicker {
+  margin: 0 0 6px;
+  color: var(--chapter-color);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-page-body h1,
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-page-body h2,
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-page-body h3,
@@ -2788,6 +2837,12 @@
   }
 
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page-body { grid-template-columns: 1fr; padding: 24px 18px; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--chapter .su-full-landscape-vertical-chart,
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-chapter-copy,
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--detail .su-full-landscape-page-body > h2 {
+    grid-column: 1;
+    grid-row: auto;
+  }
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-chart-plot { width: 100%; }
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-chart-row { grid-template-columns: minmax(0, 1fr); gap: 3px; padding: 7px 0; }
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-chart-question { padding-right: 0; }
@@ -2820,7 +2875,7 @@
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page.is-you .su-full-landscape-chart-rows,
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page.is-you .su-full-landscape-peer-contour { transform: scaleY(.78); transform-origin: top left; }
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page.is-you .su-full-landscape-peer-contour { height: 704px; }
-  .su-public-brand.su-report.su-full-landscape [data-page-number="26"] .su-full-landscape-page-body {
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-page-body {
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
     column-gap: 2mm;
@@ -2828,14 +2883,14 @@
     align-items: start;
     padding: 5mm 6mm 3mm;
   }
-  .su-public-brand.su-report.su-full-landscape [data-page-number="26"] .su-full-landscape-page-body > h2 { grid-column: 1 / -1; font-size: 16px; margin-bottom: 1mm; }
-  .su-public-brand.su-report.su-full-landscape [data-page-number="26"] .su-full-landscape-chart-title { margin: 0 0 2px; font-size: 10px; }
-  .su-public-brand.su-report.su-full-landscape [data-page-number="26"] .su-full-landscape-chart-plot { width: 100%; }
-  .su-public-brand.su-report.su-full-landscape [data-page-number="26"] .su-full-landscape-chart-row { grid-template-columns: minmax(0, 1fr); min-height: 27px; }
-  .su-public-brand.su-report.su-full-landscape [data-page-number="26"] .su-full-landscape-chart-question,
-  .su-public-brand.su-report.su-full-landscape [data-page-number="26"] .su-full-landscape-bar-label { display: none; }
-  .su-public-brand.su-report.su-full-landscape [data-page-number="26"] .su-full-landscape-bar-measure { grid-template-columns: minmax(0, 1fr) 20px; gap: 3px; box-sizing: border-box; padding-left: 40%; }
-  .su-public-brand.su-report.su-full-landscape [data-page-number="26"] .su-full-landscape-bar-value { font-size: 8px; }
-  .su-public-brand.su-report.su-full-landscape [data-page-number="26"] .su-full-landscape-bar-track { height: 7px; }
-  .su-public-brand.su-report.su-full-landscape [data-page-number="26"] .su-full-landscape-chart-legend { justify-content: flex-start; margin-top: 2px; font-size: 8px; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-page-body > h2 { grid-column: 1 / -1; font-size: 16px; margin-bottom: 1mm; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-chart-title { margin: 0 0 2px; font-size: 10px; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-chart-plot { width: 100%; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-chart-row { grid-template-columns: minmax(0, 1fr); min-height: 27px; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-chart-question { display: block; padding: 0; font-size: 7px; line-height: 1.1; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-bar-label { display: none; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-bar-measure { grid-template-columns: minmax(0, 1fr) 20px; gap: 3px; box-sizing: border-box; padding-left: 0; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-bar-value { font-size: 8px; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-bar-track { height: 7px; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-chart-legend { justify-content: flex-start; margin-top: 2px; font-size: 8px; }
 }

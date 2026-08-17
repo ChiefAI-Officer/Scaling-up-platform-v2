@@ -1,7 +1,8 @@
 import type { RespondentReport } from "@/lib/assessments/respondent-report";
+import { CoachLogo } from "@/components/assessments/CoachLogo";
 import type {
   SuFullLandscapeChapter,
-  SuFullLandscapePage,
+  SuFullLandscapePage as SuFullLandscapePageDescriptor,
   SuFullLandscapeQuestion,
   SuFullLandscapeReportModel,
 } from "@/lib/assessments/su-full-landscape-report";
@@ -66,6 +67,10 @@ function questionByKey(model: SuFullLandscapeReportModel): ReadonlyMap<string, S
 function CoverPage({ report, number }: { report: RespondentReport; number: number }) {
   return (
     <SuFullLandscapePage number={number}>
+      <div className="su-full-landscape-cover-brand">
+        <span className="su-full-landscape-cover-mark">Scaling Up</span>
+        <CoachLogo url={report.coachLogoUrl} name={report.coachName} variant="cover" />
+      </div>
       <p>Scaling Up Assessment</p>
       <h1>{report.assessmentName}</h1>
       <p>Prepared for {report.respondentName}</p>
@@ -183,10 +188,13 @@ function PeerDashboardPage({ model, number }: { model: SuFullLandscapeReportMode
 
 function ChapterPage({ chapter, number }: { chapter: SuFullLandscapeChapter; number: number }) {
   return (
-    <SuFullLandscapePage number={number} chapterKey={chapter.key}>
-      <h2>{chapter.label}</h2>
-      <p>{CHAPTER_COPY[chapter.key]}</p>
-      <SuFullVerticalPeerChart chapterKey={chapter.key} questions={chapter.questions} title={`${chapter.label} comparison`} />
+    <SuFullLandscapePage number={number} chapterKey={chapter.key} variant="chapter">
+      <div className="su-full-landscape-chapter-copy">
+        <p className="su-full-landscape-chapter-kicker">{chapter.key}</p>
+        <h2>{chapter.label}</h2>
+        <p>{CHAPTER_COPY[chapter.key]}</p>
+      </div>
+      <SuFullVerticalPeerChart chapterKey={chapter.key} instanceId={`page-${number}-${chapter.key}`} questions={chapter.questions} title={`${chapter.label} comparison`} />
     </SuFullLandscapePage>
   );
 }
@@ -195,11 +203,11 @@ function DetailPage({
   page,
   questions,
 }: {
-  page: Extract<SuFullLandscapePage, { kind: "detail" }>;
+  page: Extract<SuFullLandscapePageDescriptor, { kind: "detail" }>;
   questions: ReadonlyMap<string, SuFullLandscapeQuestion>;
 }) {
   return (
-    <SuFullLandscapePage number={page.number} chapterKey={page.chapterKey}>
+    <SuFullLandscapePage number={page.number} chapterKey={page.chapterKey} variant="detail">
       <h2>Detailed comparison</h2>
       {page.questionKeys.map((key) => {
         const question = questions.get(key);
@@ -241,13 +249,14 @@ function ConclusionPage({ report, model, contactEmail, number }: {
 
 function AppendixPage({ model, number }: { model: SuFullLandscapeReportModel; number: number }) {
   return (
-    <SuFullLandscapePage number={number}>
+    <SuFullLandscapePage number={number} variant="appendix">
       <h2>Appendix A: chapter comparisons</h2>
       {model.chapters.map((chapter) => (
         <SuFullVerticalPeerChart
           chapterKey={chapter.key}
           key={chapter.key}
           questions={chapter.questions}
+          instanceId={`appendix-${chapter.key}`}
           title={`${chapter.label} comparison`}
         />
       ))}
@@ -268,8 +277,9 @@ export function SuFullLandscapeReport({
   const questions = questionByKey(model);
 
   return (
-    <div className="su-full-landscape-report" data-testid="su-full-landscape-report">
-      {model.pages.map((page) => {
+    <div className="su-public-brand su-report su-full-landscape">
+      <div className="su-full-landscape-report" data-testid="su-full-landscape-report">
+        {model.pages.map((page) => {
         switch (page.kind) {
           case "cover": return <CoverPage key={page.number} number={page.number} report={report} />;
           case "preface": return <PrefacePage key={page.number} number={page.number} />;
@@ -290,7 +300,8 @@ export function SuFullLandscapeReport({
             throw new Error(`Unsupported landscape page: ${JSON.stringify(impossible)}`);
           }
         }
-      })}
+        })}
+      </div>
     </div>
   );
 }

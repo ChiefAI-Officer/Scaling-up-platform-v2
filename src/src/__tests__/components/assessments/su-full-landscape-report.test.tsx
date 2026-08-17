@@ -58,7 +58,7 @@ test("renders the fixed 26-page landscape composition with truthful peer context
 
   render(
     <SuFullLandscapeReport
-      report={report}
+      report={{ ...report, coachLogoUrl: "https://images.example/coach.png", coachName: "Coach Example" }}
       model={model}
       contactEmail="coach@example.com"
     />,
@@ -75,6 +75,16 @@ test("renders the fixed 26-page landscape composition with truthful peer context
   }
   expect(screen.getByTestId("su-full-landscape-page-26").querySelectorAll("polyline"))
     .toHaveLength(5);
+  expect(document.querySelectorAll(".su-full-landscape-peer-contour")).toHaveLength(10);
+  expect(document.querySelectorAll(".su-full-landscape-peer-contour[stroke-dasharray]")).toHaveLength(0);
+  expect(screen.getByTestId("su-full-landscape-page-1")).toHaveTextContent("Coach Example");
+  const chartTitleIds = Array.from(
+    document.querySelectorAll<HTMLElement>("[aria-labelledby^=\"su-landscape-vertical-chart-title-\"]"),
+  ).map((chart) => chart.getAttribute("aria-labelledby"));
+  expect(new Set(chartTitleIds).size).toBe(chartTitleIds.length);
+  expect(screen.getByTestId("su-full-landscape-page-7")).toHaveClass("su-full-landscape-page--chapter");
+  expect(screen.getByTestId("su-full-landscape-page-8")).toHaveClass("su-full-landscape-page--detail");
+  expect(screen.getByTestId("su-full-landscape-page-26")).toHaveClass("su-full-landscape-page--appendix");
   expect(screen.getAllByTestId(/^su-full-landscape-detail-Q/)).toHaveLength(61);
 
   expect(screen.getByTestId("su-full-landscape-page-4")).toHaveTextContent(
@@ -98,6 +108,10 @@ test("renders the fixed 26-page landscape composition with truthful peer context
     expect(detail.textContent?.indexOf("You")).toBeLessThan(
       detail.textContent?.indexOf("Frozen feedback") ?? -1,
     );
+    const question = model.chapters.flatMap((chapter) => chapter.questions)
+      .find((candidate) => candidate.stableKey === detail.dataset.questionKey);
+    if (!question) throw new Error(`Missing fixture question ${detail.dataset.questionKey}`);
+    expect(detail).toHaveTextContent(question.recommendation!);
   }
 
   expect(screen.getByTestId("su-full-landscape-page-25")).toHaveTextContent("ScaleUp Score");
@@ -125,4 +139,8 @@ test("keeps the landscape renderer's A4 print and responsive screen contract sco
   expect(stylesheet).toContain("print-color-adjust: exact;");
   expect(stylesheet).toContain("@media screen and (max-width: 760px)");
   expect(stylesheet).toContain(".su-full-landscape-page-body { grid-template-columns: 1fr;");
+  expect(stylesheet).toContain(".su-full-landscape-page--chapter .su-full-landscape-vertical-chart");
+  expect(stylesheet).toContain(".su-full-landscape-page--detail .su-full-landscape-page-body > h2");
+  expect(stylesheet).toContain(".su-full-landscape-page--appendix .su-full-landscape-chart-question { display: block;");
+  expect(stylesheet).not.toContain(".su-full-landscape-page--appendix .su-full-landscape-chart-question,\n  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--appendix .su-full-landscape-bar-label { display: none;");
 });

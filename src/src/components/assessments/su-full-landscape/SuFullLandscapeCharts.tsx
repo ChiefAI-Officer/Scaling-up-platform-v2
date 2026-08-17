@@ -69,10 +69,12 @@ export function SuFullVerticalPeerChart({
   chapterKey,
   questions,
   title = "Section comparison",
+  instanceId = chapterKey,
 }: {
   chapterKey: SuFullLandscapeChapterKey;
   questions: readonly SuFullLandscapeQuestion[];
   title?: string;
+  instanceId?: string;
 }) {
   const plotHeight = Math.max(ROW_HEIGHT, questions.length * ROW_HEIGHT);
   const points = questions
@@ -83,11 +85,11 @@ export function SuFullVerticalPeerChart({
     <section
       className={`su-full-landscape-vertical-chart ${chapterColorClass(chapterKey)}`}
       data-testid={`su-landscape-vertical-chart-${chapterKey}`}
-      aria-labelledby={`su-landscape-vertical-chart-title-${chapterKey}`}
+      aria-labelledby={`su-landscape-vertical-chart-title-${instanceId}`}
     >
       <h3
         className="su-full-landscape-chart-title"
-        id={`su-landscape-vertical-chart-title-${chapterKey}`}
+        id={`su-landscape-vertical-chart-title-${instanceId}`}
       >
         {title}
       </h3>

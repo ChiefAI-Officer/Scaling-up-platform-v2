@@ -37,7 +37,9 @@ export function completeSuFullLandscapeReport(): RespondentReport {
         benchmark.stableKey,
         {
           type: "SLIDER_LIKERT",
-          label: `Canonical question ${index + 1}`,
+          label: index === 34
+            ? "Scalability, innovation and technology — the longest representative canonical question label"
+            : `Canonical question ${index + 1}`,
           sectionStableKey: section[0],
           max: 10,
         },
@@ -60,7 +62,9 @@ export function completeSuFullLandscapeReport(): RespondentReport {
         stableKey: benchmark.stableKey,
         value: index % 11,
         achieved: true,
-        recommendation: `Frozen feedback for ${benchmark.stableKey}. This deliberately long canonical recommendation exercises landscape print density without changing its fixed page allocation.`,
+        recommendation: benchmark.stableKey === "Q35"
+          ? `Frozen feedback for ${benchmark.stableKey}. ${"This deliberately long canonical recommendation exercises landscape print density with the representative maximum-content case, preserving the approved fixed page allocation while keeping the full recommendation readable for respondent review. ".repeat(6)}`.trim()
+          : `Frozen feedback for ${benchmark.stableKey}. This deliberately long canonical recommendation exercises landscape print density without changing its fixed page allocation.`,
       })),
       perSection: [],
     } as unknown as RespondentReport["result"],
@@ -72,7 +76,9 @@ export function completeSuFullLandscapeReport(): RespondentReport {
     questionByKey: Object.fromEntries(
       SU_FULL_QUESTION_BENCHMARKS.map((benchmark, index) => [
         benchmark.stableKey,
-        `Canonical question ${index + 1}`,
+        index === 34
+          ? "Scalability, innovation and technology — the longest representative canonical question label"
+          : `Canonical question ${index + 1}`,
       ]),
     ),
     questionsByKey,

@@ -5,15 +5,17 @@ import type { SuFullLandscapeChapterKey } from "@/lib/assessments/su-full-landsc
 export function SuFullLandscapePage({
   number,
   chapterKey,
+  variant,
   children,
 }: {
   number: number;
   chapterKey?: SuFullLandscapeChapterKey;
+  variant?: "chapter" | "detail" | "appendix";
   children: ReactNode;
 }) {
   return (
     <section
-      className={`su-full-landscape-page${chapterKey ? ` is-${chapterKey}` : ""}`}
+      className={`su-full-landscape-page${chapterKey ? ` is-${chapterKey}` : ""}${variant ? ` su-full-landscape-page--${variant}` : ""}`}
       data-testid={`su-full-landscape-page-${number}`}
       data-page-number={number}
     >
