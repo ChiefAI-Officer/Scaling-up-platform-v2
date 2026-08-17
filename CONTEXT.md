@@ -11,8 +11,20 @@ A named diagnostic instrument (e.g. "Rockefeller Habits Checklist"). Holds metad
 _Avoid_: quiz, survey, questionnaire (the public route is `/quiz/...` and the legacy survey tool is separate — neither is the canonical term here).
 
 **Template Version**:
-An immutable-once-published snapshot of a template's questions + sections + scoringConfig. A campaign pins exactly one version; editing published content requires a *new* version.
+An immutable-once-published snapshot of a template's questions + sections + scoringConfig + reportConfig, including any **Marketing CTA**. A campaign pins exactly one version; editing published content requires a *new* version.
 _Avoid_: revision, draft (a draft is just a version with `publishedAt = null`).
+
+**Assessment delivery type**:
+The template-level, required classification that separates a **Public marketing quiz** from an **Invited assessment**. It governs which campaign creator may select the template and whether Marketing CTA authoring/results are eligible. An admin may correct it only before the template's first version is published; after that it is permanently locked. Runtime logic reads this stored type and never infers it from aliases.
+_Avoid_: campaign access mode (that is the pinned campaign's `PUBLIC`/`INVITED` delivery); using a third type for Scaling Up Quick — it is a Public marketing quiz with different versioned content.
+
+**Marketing CTA**:
+Structured, version-owned public-result marketing content made from Text, Image, Button, and Divider blocks. Admins edit plain fields, never raw HTML; the server validates destinations and compiles an audit snapshot. It appears only after the interactive on-screen result of an eligible **Public Campaign** and is excluded from invited results, admin/coach report routes, email, PDF, and print. Publishing freezes it; a newer CTA requires a successor Template Version and affects only Campaigns created after that version becomes Active.
+_Avoid_: template-level live content (existing campaigns never follow later edits); custom HTML; invitation/result-email copy.
+
+**CTA preset**:
+A fixed starting snapshot copied into a draft Marketing CTA: **Full Marketing**, **Scaling Up Quick**, or **Start blank**. After selection the blocks are independent version content with no live dependency on the preset. Full Marketing includes the Scaling Up books and three approved actions; Scaling Up Quick uses its lighter resource/coach treatment.
+_Avoid_: a permanent CTA type or shared global record; assuming all Public marketing quizzes use the same preset.
 
 **Active version** (a.k.a. live version):
 Among a template's published versions, the **latest** one — the version a *new* **Campaign** automatically pins. Older published versions stay published only to keep serving the campaigns already sent with them. There is exactly one Active version per template+language, and correction is **forward-only**: publish a newer version to supersede — never resurrect an older one (that would break longitudinal comparability, see ADR-0016).
@@ -42,7 +54,7 @@ The template editor's landing tab (replaces the old **Metadata** tab). Renders a
 _Avoid_: "test" / "sandbox" (the Preview tab never takes answers — that's Test Mode); "the Metadata tab" (Metadata is retired; its settings moved to the **Settings tab**).
 
 **Settings tab** (Wave ED10, assessment-editor overhaul):
-The template editor's single home for everything that isn't a question: who can take it (**access**), who sees individual answers (**aggregation**), **language**, the **Invitation email** and **Results email** (with the results-email approval and the **Results-email default**), a link out to **Access groups**, and the read-only **alias**. Replaces the old **Metadata** tab's field wall and absorbs the standalone Access nav link. Plain-language presentation of existing fields — nothing here is a new field.
+The template editor's single home for everything that isn't a question: the locked **Assessment delivery type**, who sees individual answers (**aggregation**), **language**, public-only **Marketing CTA** authoring, the **Invitation email** and **Results email** (with the results-email approval and the **Results-email default**), a link out to **Access groups**, and the read-only **alias**. Replaces the old **Metadata** tab's field wall and absorbs the standalone Access nav link.
 _Avoid_: "Metadata tab" (retired); putting question/section editing here (that lives in the **Build** tab).
 
 **Domain** (Scaling Up Full only):
