@@ -2,7 +2,7 @@
 
 ## Purpose and operating boundary
 
-This is the single talking guide for the remaining question: whether the currently published Scaling Up Full **feedback text selected at each score** still matches current Esperto behavior. It is deliberately separate from the already-captured **Peers** benchmark snapshot.
+This is the single talking guide for the remaining question: whether the currently published Scaling Up Full **feedback text selected at each score** still matches current Esperto behavior. It is deliberately separate from the already-captured **Peers** benchmark snapshot. It is an internal evidence source of truth and is **not yet approved stakeholder copy**.
 
 The user approved the controlled current-Esperto audit on 2026-08-20. The audit used dedicated CEO-version test campaigns with automatic invitations, reminders, confirmations, and notifications disabled. It did not use or mutate Platform Production, refresh peer benchmarks, or send email, Slack, or any other external message. No Platform content change is authorized by this guide.
 
@@ -21,7 +21,7 @@ The second item is the **feedback-text concern** addressed here. It must not be 
 
 | Track | Done evidence | Current conclusion | Remaining action |
 | --- | --- | --- | --- |
-| Feedback text and score bands | Completed 11-report Management suite plus four current May-like Delegation controls: 915 rendered feedback observations | Score selects one of four visible groups (`0–4`, `5–6`, `7–8`, `9–10`), but wording is also profile-dependent: current Delegation vs current Management differs in 46/244 cells across 21 questions. Current Delegation score 5 exactly matches the May Delegation score-5 report at 61/61 rows. | Do not change Platform content yet. Run the narrow phase-isolation suite below before choosing a score-only or phase-aware content model. |
+| Feedback text and score bands | Completed 11-report Management suite, four May-like Delegation controls, and four one-variable 100-employee controls: 1,159 rendered feedback observations | Score selects one of four visible groups (`0–4`, `5–6`, `7–8`, `9–10`). Changing only employee count from 50/Management to 100/Delegation reproduces all 46 substantive Delegation-vs-Management differences and no others; isolated text equals May-like Delegation 244/244. | Do not change Platform content yet. Map the live Management/Delegation boundary and distinguish phase-band selection from finer headcount selection before designing feedback plumbing. |
 | Peer benchmarks | Controlled Q01 0–10 variation plus company-profile/phase controls; same ordered 61-value vector in the reported controls | Governed external snapshot, not current-team mean, within the tested source conditions | No peer re-test is part of Step 1; revisit only under a separately approved benchmark-refresh decision |
 | Platform behavior | Edition 4 receipt, code safeguards, and tests | Existing campaigns retain their pinned Edition 3; future campaigns resolve active Edition 4; stored submissions render from their frozen result and pinned version | Do not change Platform behavior based on audit observations without a new explicit decision gate |
 
@@ -119,7 +119,7 @@ At uniform score 0, Esperto conditionally hides four dependent input sliders—Q
 
 Under that word-preserving canonicalization, the current Management output exactly matched 177/305 historical source-stop cells. A similarity screen flagged 124/305 cells across 38 questions for substantive human review; the rest of the non-exact cells were closer wording/layout variants. This was a triage aid, not a content verdict, because the historical source stops used different profiles.
 
-There is no extraction discrepancy: all 671 Management cells and all 244 Delegation cells are present in their companion matrices. There is also no current-suite within-band inconsistency. The resolved provenance finding is that feedback is **not score-only**; at least one non-score profile input affects selected wording.
+There is no extraction discrepancy: all 671 Management cells, 244 May-like Delegation cells, and 244 isolated-100 cells are present in their companion matrices. There is also no current-suite within-band inconsistency. The resolved provenance finding is that feedback is **not score-only**; the phase-driving employee input affects selected wording.
 
 ## Approved Step 2 — current May-like Delegation control — completed
 
@@ -141,13 +141,43 @@ The strongest matched historical control is score 5. The current Delegation scor
 
 That result does **not yet prove phase is the only selector**. The May-like Delegation profile also differs from the Management control in company age, employee count, leadership roles, revenue history, entrepreneur age/experience, partners, and international inputs. The next experiment must change only the phase-driving input.
 
+## Approved Step 3 — one-variable employee/phase isolation — completed
+
+**Method:** clone the completed Management control and change only the employee input from `50` to `100`. Company age remained 10, the third employee/freelance input remained 0, all seven leadership roles remained filled, revenues remained `10 / 12 / 15 / 18 / 22`, estimated score remained 50, and every international/general control remained identical to Step 1. Four mail-disabled campaigns were completed at uniform scores `0`, `5`, `7`, and `9`. Every source interstitial and page-4 profile resolved to **phase 4 - Delegation**. The invitation, reminder, and participant-confirmation switches were re-read on every campaign after completion and all remained false.
+
+All four reports passed the 26-page personal-report, canonical Q01-Q61 order, 61/61 nonblank feedback, fixed-profile, and unique-fingerprint gates defined in the [phase-isolation control specification](esperto-feedback-phase-isolation-control-spec-2026-08-20.md). Source text is preserved in the [isolated live matrix](esperto-feedback-phase-isolation-live-matrix-2026-08-20.csv), and the complete three-way text/equality ledger is [the 244-cell comparison](esperto-feedback-phase-isolation-three-way-comparison-2026-08-20.csv).
+
+### Step 3 result
+
+| Uniform score | Campaign ID | Isolated rows | Exact lexical matches to Management | Substantive employee/phase-associated differences | Exact matches to May-like Delegation | PDF SHA-256 prefix |
+| ---: | --- | ---: | ---: | ---: | ---: | --- |
+| 0 | `eFZpROVhb9` | 61/61 | 42/61 | 19 | 61/61 | `f29b1726a948` |
+| 5 | `039GqTC7mW` | 61/61 | 50/61 | 11 | 61/61 | `81eed415394a` |
+| 7 | `pUTZjZszTk` | 61/61 | 55/61 | 6 | 61/61 | `4bb9aecf3ea9` |
+| 9 | `KDo05NjfaE` | 61/61 | 51/61 | 10 | 61/61 | `b0066bb7b107` |
+| **Total** | — | **244/244** | **198/244** | **46 across 21 questions** | **244/244** | — |
+
+The three-way result has only two lexical classifications:
+
+- `198` cells: `Management = isolated-100 = May-like Delegation`.
+- `46` cells: `isolated-100 = May-like Delegation ≠ Management`.
+- `0` cells: partial reproduction, isolated-only text, other-profile interaction, missing row, or structural failure.
+
+At print-exact level there are 47 differences; Q19 score 0 differs only because the Delegation text ends with a period while the Management extraction does not. Word-preserving comparison therefore correctly counts 46 substantive differences.
+
+This is a complete reproduction of the known difference inventory. Under the tested controls, changing only the employee input is sufficient to select the same feedback library as the much broader May-like Delegation profile. The precise safe conclusion is **headcount/phase-associated selection**. It is not yet proven whether Esperto keys directly on the derived phase, on a headcount band, or on a finer headcount rule.
+
+### Newly exposed Platform contradiction
+
+Current Esperto directly classifies the fixed 50-employee control as Management and the otherwise-identical 100-employee control as Delegation. The Platform helper currently maps `50` to Delegation ([phase helper](../../src/src/lib/assessments/su-full-phase.ts#L148-L158); [boundary test](../../src/src/__tests__/lib/assessments/su-full-phase.test.ts#L53-L71)). This is now a documented source-fidelity discrepancy. It is not authorization to change code: the exact current Esperto boundary must be measured first.
+
 ## Assessment and recommended next step
 
-1. **Completed evidence-quality gate.** Fifteen attributable reports, 915/915 nonblank feedback rows, exact Q01-Q61 order, expected 26-page structure, and distinct PDF fingerprints passed.
+1. **Completed evidence-quality gate.** Nineteen attributable reports, 1,159/1,159 nonblank feedback rows, exact Q01-Q61 order, expected 26-page structure, and distinct PDF fingerprints passed.
 2. **Completed historical-drift gate at the only valid matched stop.** Current May-like Delegation score 5 equals May Delegation score 5 at 61/61 feedback paragraphs. Do not describe the issue to Jeff as a simple stale-text refresh.
-3. **Recommended next action: four-report phase-isolation suite.** Clone the completed Management control and change only its phase-driving employee count from 50 to 100 (or the smallest value Esperto confirms as Delegation). Hold every other setup answer identical. Run the four visible stops `0`, `5`, `7`, and `9`; compare 244 cells to the existing Management matrix.
-4. **Decision after isolation.** If the isolated reports differ, feedback is phase-sensitive and the Platform needs a phase-aware feedback library—or an explicit, disclosed decision to use one canonical phase. If they do not differ, another May-profile field drives the wording and should be isolated one variable at a time, starting with company age and leadership configuration.
-5. **Only then scope implementation.** Do not overwrite Edition 4 or historical frozen reports. Bring Jeff the exact changed-question ledger and a recommendation for either a forward-only phase-aware edition or a deliberately canonical score-only edition. Peer benchmarks remain separate and unchanged.
+3. **Completed one-variable gate.** Changing only 50 → 100 employees reproduces all 46 substantive differences, introduces no additional text, and matches May-like Delegation 244/244.
+4. **Recommended next action: boundary plus same-phase sensitivity.** Locate the current live Management/Delegation boundary by changing only headcount and observing the phase interstitial. Then complete score-5 reports immediately below and above that boundary, plus the already-controlled 100-employee Delegation report. If the two Delegation values match, a `phase + score band` selector is supported; if they differ, the selector is finer than phase.
+5. **Reconcile Platform phase logic before content implementation.** The current `50 = Delegation` Platform rule conflicts with live Esperto's `50 = Management`. Do not build phase-aware feedback on an unverified boundary. After the boundary/sensitivity result, present Jeff with the exact 21-question ledger and a forward-only edition proposal that preserves frozen historical reports. Peer benchmarks remain separate and unchanged.
 
 ## Visual talking guide
 
@@ -170,8 +200,12 @@ Jeff's request (Aug 13)
         |                   |
         |                   +--> 46/244 cells differ from Management
         |                   +--> score-5 matches May Delegation 61/61
-        |                   +--> feedback is profile-dependent
-        |                   +--> next: change only employee/phase input
+        |                   +--> Completed employee-only isolation
+        |                         |
+        |                         +--> all 46 differences reproduced
+        |                         +--> isolated = May-like 244/244
+        |                         +--> feedback is headcount/phase-associated
+        |                         +--> next: map boundary + same-phase sensitivity
         |
         +--> “Where do Peers values come from?”
                 |
@@ -189,6 +223,8 @@ Jeff's request (Aug 13)
 - Independent historical-profile reconstruction and experimental cautions: [May-profile and Delegation-control audit](esperto-may-profile-and-delegation-control-audit-2026-08-20.md).
 - Current Delegation evidence: [61 × 4 matrix](esperto-feedback-delegation-live-matrix-2026-08-20.csv) and [244-cell comparison ledger](esperto-feedback-delegation-vs-management-comparison-2026-08-20.csv).
 - Current Delegation PDFs: `/Users/diushianstand/Downloads/ScalingUp_report_Wavex Verify_2026-08-20T07_34_24-04_00.pdf`, `...T07_35_47-04_00.pdf`, `...T07_36_52-04_00.pdf`, and `...T07_37_58-04_00.pdf`; the Step 2 table records score-specific fingerprints.
+- Phase-isolation evidence: [control specification](esperto-feedback-phase-isolation-control-spec-2026-08-20.md), [61 × 4 isolated matrix](esperto-feedback-phase-isolation-live-matrix-2026-08-20.csv), and [244-cell three-way text ledger](esperto-feedback-phase-isolation-three-way-comparison-2026-08-20.csv).
+- Phase-isolation PDFs: `/Users/diushianstand/Downloads/ScalingUp_report_Wavex Verify_2026-08-20T08_05_24-04_00.pdf`, `...T08_06_45-04_00.pdf`, `...T08_07_50-04_00.pdf`, and `...T08_08_52-04_00.pdf`; the Step 3 table records score-specific fingerprints.
 - Current live PDFs: `/Users/diushianstand/Downloads/ScalingUp_report_Wavex Verify_2026-08-20T03_07_13-04_00.pdf` through `/Users/diushianstand/Downloads/ScalingUp_report_Wavex Verify_2026-08-20T03_32_32-04_00.pdf`; the result table records per-score SHA-256 prefixes.
 - Peer research: [controlled-source findings](esperto-peer-benchmark-sources.md) and [snapshot/ledger](esperto-peer-benchmark-snapshot-2026-08-14.md).
 - Code/test evidence: [feedback-band guard](../../src/src/lib/assessments/su-full-feedback-bands.ts), [feedback-band tests](../../src/src/__tests__/lib/assessments/su-full-feedback-bands.test.ts), [benchmark snapshot](../../src/src/lib/assessments/su-full-question-benchmarks.ts), [benchmark tests](../../src/src/__tests__/lib/assessments/su-full-question-benchmarks.test.ts), [frozen report construction](../../src/src/lib/assessments/respondent-report.ts), and [change receipt](../../plans/CHANGELOG.md#su-full-feedback-bands-published).
