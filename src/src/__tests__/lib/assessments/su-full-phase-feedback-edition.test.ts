@@ -175,8 +175,14 @@ function makeDb(options: {
 
   const draftReceipt = {
     sourceId: "2026-08-20.esperto-five-phase-v1",
+    templateId: template.id,
+    templateAlias: "scaling-up-full",
+    language: "enUS",
     sourceVersionId: active.id,
     sourceVersionNumber: active.versionNumber,
+    sourcePublishedAt: active.publishedAt?.toISOString() ?? null,
+    sourcePublishedBy: active.publishedBy,
+    sourceArchivedAt: active.archivedAt?.toISOString() ?? null,
     beforeContentHash: active.contentHash,
     afterContentHash: desiredHash,
     questionCount: 61,
@@ -185,6 +191,9 @@ function makeDb(options: {
     historicRowsMutated: false,
     draftVersionId: draft.id,
     draftVersionNumber: draft.versionNumber,
+    draftPublishedAt: null,
+    draftPublishedBy: null,
+    draftArchivedAt: null,
   };
   const audits: AuditRow[] = [];
   if (options.includeDraftReceipt || options.latest === "matching-draft" || options.draftPublished) {
@@ -207,7 +216,9 @@ function makeDb(options: {
         ...draftReceipt,
         draftVersionId: draft.id,
         draftVersionNumber: draft.versionNumber,
-        publishedAt: draft.publishedAt?.toISOString(),
+        finalPublishedAt: draft.publishedAt?.toISOString(),
+        finalPublishedBy: draft.publishedBy,
+        finalArchivedAt: draft.archivedAt?.toISOString() ?? null,
         publishedByEmail: "admin@example.com",
         publishedByUserId: "admin-user",
         draftRowsPublished: 1,
@@ -242,9 +253,18 @@ function makeDb(options: {
     assessmentTemplateVersion: {
       findFirst: jest.fn(({ where }: { where: Record<string, unknown> }) => {
         if (typeof where.id === "string") {
-          return Promise.resolve(versions.find((version) => version.id === where.id) ?? draft);
+          return Promise.resolve(versions.find((version) => version.id === where.id) ?? null);
         }
-        if (where.publishedAt) return Promise.resolve(active);
+        if (where.publishedAt) {
+          return Promise.resolve(
+            [...versions]
+              .filter(
+                (version) =>
+                  version.publishedAt !== null && version.archivedAt === null,
+              )
+              .sort((a, b) => b.versionNumber - a.versionNumber)[0] ?? null,
+          );
+        }
         return Promise.resolve(
           [...versions].sort((a, b) => b.versionNumber - a.versionNumber)[0] ?? null,
         );
@@ -301,6 +321,7 @@ function makeDb(options: {
     template,
     active,
     draft,
+    versions,
     desiredHash,
     draftReceipt,
     audits,
@@ -361,13 +382,24 @@ describe("createScalingUpFullPhaseFeedbackDraft", () => {
     expect(JSON.parse(audit.changes)).toEqual(
       expect.objectContaining({
         sourceId: "2026-08-20.esperto-five-phase-v1",
+        templateId: template.id,
+        templateAlias: "scaling-up-full",
+        language: "enUS",
         sourceVersionId: active.id,
+        sourcePublishedAt: "2026-08-18T10:00:00.000Z",
+        sourcePublishedBy: "prior-admin",
+        sourceArchivedAt: null,
         beforeContentHash: active.contentHash,
         afterContentHash: desiredHash,
         questionCount: 61,
         phaseBandRecordCount: 1220,
         phaseBoundaries: PHASE_BOUNDARIES,
         historicRowsMutated: false,
+        draftVersionId: "version-created",
+        draftVersionNumber: 7,
+        draftPublishedAt: null,
+        draftPublishedBy: null,
+        draftArchivedAt: null,
       }),
     );
     expect(tx.assessmentTemplateVersion.updateMany).not.toHaveBeenCalled();
@@ -407,6 +439,14 @@ describe("createScalingUpFullPhaseFeedbackDraft", () => {
 
   it.each([
     ["draft identity", (receipt: Record<string, unknown>) => { receipt.draftVersionId = "other-draft"; }],
+    ["missing template identity", (receipt: Record<string, unknown>) => { delete receipt.templateId; }],
+    ["template identity", (receipt: Record<string, unknown>) => { receipt.templateId = "other-template"; }],
+    ["template alias", (receipt: Record<string, unknown>) => { receipt.templateAlias = "other-alias"; }],
+    ["language", (receipt: Record<string, unknown>) => { receipt.language = "nlNL"; }],
+    ["missing source lifecycle state", (receipt: Record<string, unknown>) => { delete receipt.sourcePublishedAt; }],
+    ["source lifecycle state", (receipt: Record<string, unknown>) => { receipt.sourcePublishedBy = "other-publisher"; }],
+    ["missing draft creation state", (receipt: Record<string, unknown>) => { delete receipt.draftArchivedAt; }],
+    ["draft creation state", (receipt: Record<string, unknown>) => { receipt.draftArchivedAt = "2026-08-20T08:00:00.000Z"; }],
     ["record count", (receipt: Record<string, unknown>) => { receipt.phaseBandRecordCount = 1219; }],
     ["phase boundaries", (receipt: Record<string, unknown>) => { receipt.phaseBoundaries = PHASE_BOUNDARIES.slice(0, 4); }],
   ])("refuses idempotence when the draft receipt has a wrong %s", async (_label, mutate) => {
@@ -595,13 +635,25 @@ describe("publishScalingUpFullPhaseFeedbackDraft", () => {
     });
     expect(JSON.parse(audit.changes)).toEqual(
       expect.objectContaining({
+        templateId: active.templateId,
+        templateAlias: "scaling-up-full",
+        language: "enUS",
         sourceVersionId: active.id,
+        sourcePublishedAt: "2026-08-18T10:00:00.000Z",
+        sourcePublishedBy: "prior-admin",
+        sourceArchivedAt: null,
         beforeContentHash: active.contentHash,
         afterContentHash: draft.contentHash,
         questionCount: 61,
         phaseBandRecordCount: 1220,
         phaseBoundaries: PHASE_BOUNDARIES,
         historicRowsMutated: false,
+        draftPublishedAt: null,
+        draftPublishedBy: null,
+        draftArchivedAt: null,
+        finalPublishedAt: expect.any(String),
+        finalPublishedBy: "admin-user",
+        finalArchivedAt: null,
         publishedByEmail: "admin@example.com",
         publishedByUserId: "admin-user",
         draftRowsPublished: 1,
@@ -650,8 +702,12 @@ describe("publishScalingUpFullPhaseFeedbackDraft", () => {
 
   it("refuses a stale predecessor when another active edition superseded the receipt source", async () => {
     const ctx = makeDb({ latest: "matching-draft", includeDraftReceipt: true });
-    ctx.active.id = "version-6-new-active";
-    ctx.active.versionNumber = 6;
+    ctx.versions.push({
+      ...clone(ctx.active),
+      id: "version-6-new-active",
+      versionNumber: 6,
+      publishedAt: new Date("2026-08-20T08:00:00.000Z"),
+    });
 
     await expect(
       publishScalingUpFullPhaseFeedbackDraft(
@@ -660,6 +716,29 @@ describe("publishScalingUpFullPhaseFeedbackDraft", () => {
         "admin@example.com",
       ),
     ).rejects.toThrow(/stale.*active|active.*predecessor/i);
+    expect(ctx.tx.assessmentTemplateVersion.updateMany).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["missing template identity", (receipt: Record<string, unknown>) => { delete receipt.templateId; }],
+    ["wrong template identity", (receipt: Record<string, unknown>) => { receipt.templateId = "other-template"; }],
+    ["missing source lifecycle state", (receipt: Record<string, unknown>) => { delete receipt.sourcePublishedAt; }],
+    ["wrong source lifecycle state", (receipt: Record<string, unknown>) => { receipt.sourcePublishedAt = "2026-08-17T10:00:00.000Z"; }],
+    ["missing draft creation state", (receipt: Record<string, unknown>) => { delete receipt.draftPublishedAt; }],
+    ["wrong draft creation state", (receipt: Record<string, unknown>) => { receipt.draftPublishedBy = "unexpected-user"; }],
+  ])("refuses to publish when the draft receipt has %s", async (_label, mutate) => {
+    const ctx = makeDb({ latest: "matching-draft", includeDraftReceipt: true });
+    const receipt = JSON.parse(ctx.audits[0].changes) as Record<string, unknown>;
+    mutate(receipt);
+    ctx.audits[0].changes = JSON.stringify(receipt);
+
+    await expect(
+      publishScalingUpFullPhaseFeedbackDraft(
+        ctx.db,
+        ctx.draft.id,
+        "admin@example.com",
+      ),
+    ).rejects.toThrow(/draft audit receipt/i);
     expect(ctx.tx.assessmentTemplateVersion.updateMany).not.toHaveBeenCalled();
   });
 
@@ -754,6 +833,119 @@ describe("publishScalingUpFullPhaseFeedbackDraft", () => {
       action: "noop",
       publishedBy: "admin@example.com",
     });
+  });
+
+  it("refuses coherent predecessor tampering across both receipts", async () => {
+    const ctx = makeDb({
+      latest: "matching-draft",
+      draftPublished: true,
+      includeDraftReceipt: true,
+      includePublishReceipt: true,
+    });
+    for (const audit of ctx.audits) {
+      const receipt = JSON.parse(audit.changes) as Record<string, unknown>;
+      receipt.sourceVersionId = "forged-predecessor";
+      receipt.sourceVersionNumber = 99;
+      receipt.beforeContentHash = "forged-content-hash";
+      receipt.sourcePublishedAt = "2026-08-17T10:00:00.000Z";
+      receipt.sourcePublishedBy = "forged-user";
+      receipt.sourceArchivedAt = null;
+      audit.changes = JSON.stringify(receipt);
+    }
+
+    await expect(
+      publishScalingUpFullPhaseFeedbackDraft(
+        ctx.db,
+        ctx.draft.id,
+        "admin@example.com",
+      ),
+    ).rejects.toThrow(/predecessor|audit receipt/i);
+    expect(ctx.tx.assessmentTemplateVersion.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("refuses coherent receipts that relabel the published draft as its own predecessor", async () => {
+    const ctx = makeDb({
+      latest: "matching-draft",
+      draftPublished: true,
+      includeDraftReceipt: true,
+      includePublishReceipt: true,
+    });
+    for (const audit of ctx.audits) {
+      const receipt = JSON.parse(audit.changes) as Record<string, unknown>;
+      receipt.sourceVersionId = ctx.draft.id;
+      receipt.sourceVersionNumber = ctx.draft.versionNumber;
+      receipt.beforeContentHash = ctx.draft.contentHash;
+      receipt.sourcePublishedAt = ctx.draft.publishedAt?.toISOString();
+      receipt.sourcePublishedBy = ctx.draft.publishedBy;
+      receipt.sourceArchivedAt = null;
+      audit.changes = JSON.stringify(receipt);
+    }
+
+    await expect(
+      publishScalingUpFullPhaseFeedbackDraft(
+        ctx.db,
+        ctx.draft.id,
+        "admin@example.com",
+      ),
+    ).rejects.toThrow(/predecessor/i);
+    expect(ctx.tx.assessmentTemplateVersion.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("refuses publisher-email tampering that disagrees with the durable audit actor", async () => {
+    const ctx = makeDb({
+      latest: "matching-draft",
+      draftPublished: true,
+      includeDraftReceipt: true,
+      includePublishReceipt: true,
+    });
+    const publishAudit = ctx.audits.find(
+      (audit) => audit.action === "SU_FULL_PHASE_FEEDBACK_DRAFT_PUBLISHED",
+    )!;
+    const receipt = JSON.parse(publishAudit.changes) as Record<string, unknown>;
+    receipt.publishedByEmail = "tampered@example.com";
+    publishAudit.changes = JSON.stringify(receipt);
+
+    await expect(
+      publishScalingUpFullPhaseFeedbackDraft(
+        ctx.db,
+        ctx.draft.id,
+        "retry-admin@example.com",
+      ),
+    ).rejects.toThrow(/publish audit receipt/i);
+    expect(ctx.tx.assessmentTemplateVersion.updateMany).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["missing template identity", (receipt: Record<string, unknown>) => { delete receipt.templateId; }],
+    ["wrong template identity", (receipt: Record<string, unknown>) => { receipt.templateId = "other-template"; }],
+    ["missing source lifecycle state", (receipt: Record<string, unknown>) => { delete receipt.sourcePublishedBy; }],
+    ["wrong source lifecycle state", (receipt: Record<string, unknown>) => { receipt.sourceArchivedAt = "2026-08-19T10:00:00.000Z"; }],
+    ["missing draft creation state", (receipt: Record<string, unknown>) => { delete receipt.draftPublishedAt; }],
+    ["wrong draft creation state", (receipt: Record<string, unknown>) => { receipt.draftPublishedAt = "2026-08-19T10:00:00.000Z"; }],
+    ["missing final publish state", (receipt: Record<string, unknown>) => { delete receipt.finalPublishedAt; }],
+    ["wrong final publish state", (receipt: Record<string, unknown>) => { receipt.finalArchivedAt = "2026-08-21T10:00:00.000Z"; }],
+  ])("refuses an already-published edition whose publish receipt has %s", async (_label, mutate) => {
+    const ctx = makeDb({
+      latest: "matching-draft",
+      draftPublished: true,
+      includeDraftReceipt: true,
+      includePublishReceipt: true,
+    });
+    const publishAudit = ctx.audits.find(
+      (audit) => audit.action === "SU_FULL_PHASE_FEEDBACK_DRAFT_PUBLISHED",
+    )!;
+    const receipt = JSON.parse(publishAudit.changes) as Record<string, unknown>;
+    mutate(receipt);
+    publishAudit.changes = JSON.stringify(receipt);
+
+    await expect(
+      publishScalingUpFullPhaseFeedbackDraft(
+        ctx.db,
+        ctx.draft.id,
+        "admin@example.com",
+      ),
+    ).rejects.toThrow(/publish audit receipt/i);
+    expect(ctx.tx.assessmentTemplateVersion.updateMany).not.toHaveBeenCalled();
   });
 
   it("refuses an already-published edition whose publish receipt has stale counts or boundaries", async () => {

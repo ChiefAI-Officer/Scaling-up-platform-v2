@@ -14,7 +14,7 @@ import {
   normalizeRole,
 } from "@/lib/auth/access-control";
 
-const TEMPLATE_ALIAS = "scaling-up-full";
+const TEMPLATE_ALIAS = "scaling-up-full" as const;
 const EXPECTED_QUESTION_COUNT = 61;
 const EXPECTED_PHASE_BAND_RECORD_COUNT = 1_220;
 const DRAFT_AUDIT_ACTION = "SU_FULL_PHASE_FEEDBACK_DRAFT_CREATED";
@@ -60,6 +60,7 @@ interface VersionRow {
 
 interface AuditRow {
   changes: string;
+  performedBy: string | null;
 }
 
 interface ActorRow {
@@ -102,28 +103,33 @@ export interface PhaseFeedbackEditionDb {
 
 export interface PhaseFeedbackDraftReceipt {
   sourceId: typeof SU_FULL_PHASE_FEEDBACK_SOURCE_ID;
+  templateId: string;
+  templateAlias: typeof TEMPLATE_ALIAS;
+  language: typeof DEFAULT_TEMPLATE_LANGUAGE;
   sourceVersionId: string;
   sourceVersionNumber: number;
+  sourcePublishedAt: string;
+  sourcePublishedBy: string | null;
+  sourceArchivedAt: null;
   beforeContentHash: string;
   afterContentHash: string;
   questionCount: number;
   phaseBandRecordCount: number;
   phaseBoundaries: typeof SU_FULL_PHASE_FEEDBACK_BOUNDARIES;
   historicRowsMutated: false;
+  draftVersionId: string;
+  draftVersionNumber: number;
+  draftPublishedAt: null;
+  draftPublishedBy: null;
+  draftArchivedAt: null;
 }
 
 export interface PhaseFeedbackDraftResult extends PhaseFeedbackDraftReceipt {
   action: "created" | "noop";
-  templateId: string;
-  draftVersionId: string;
-  draftVersionNumber: number;
 }
 
 export interface PhaseFeedbackPublishResult extends PhaseFeedbackDraftReceipt {
   action: "published" | "noop";
-  templateId: string;
-  draftVersionId: string;
-  draftVersionNumber: number;
   publishedAt: Date;
   publishedBy: string;
   campaignRowsRepinned: 0;
@@ -290,19 +296,35 @@ function hashVersion(template: TemplateRow, version: VersionRow): string {
 }
 
 function receiptFor(
+  template: TemplateRow,
   source: VersionRow,
+  draft: Pick<VersionRow, "id" | "versionNumber">,
   afterContentHash: string,
 ): PhaseFeedbackDraftReceipt {
+  if (source.publishedAt === null || source.archivedAt !== null) {
+    throw new Error("Scaling Up Full receipt source is not published and unarchived.");
+  }
   return {
     sourceId: SU_FULL_PHASE_FEEDBACK_SOURCE_ID,
+    templateId: template.id,
+    templateAlias: TEMPLATE_ALIAS,
+    language: DEFAULT_TEMPLATE_LANGUAGE,
     sourceVersionId: source.id,
     sourceVersionNumber: source.versionNumber,
+    sourcePublishedAt: source.publishedAt.toISOString(),
+    sourcePublishedBy: source.publishedBy,
+    sourceArchivedAt: null,
     beforeContentHash: source.contentHash,
     afterContentHash,
     questionCount: EXPECTED_QUESTION_COUNT,
     phaseBandRecordCount: EXPECTED_PHASE_BAND_RECORD_COUNT,
     phaseBoundaries: SU_FULL_PHASE_FEEDBACK_BOUNDARIES,
     historicRowsMutated: false,
+    draftVersionId: draft.id,
+    draftVersionNumber: draft.versionNumber,
+    draftPublishedAt: null,
+    draftPublishedBy: null,
+    draftArchivedAt: null,
   };
 }
 
@@ -320,21 +342,45 @@ function parseReceipt(changes: string, versionNumber: number): Record<string, un
   }
 }
 
+function receiptSourceVersionId(
+  raw: Record<string, unknown>,
+  versionNumber: number,
+): string {
+  if (typeof raw.sourceVersionId !== "string" || raw.sourceVersionId.trim() === "") {
+    throw new Error(
+      `Scaling Up Full version ${versionNumber} has an invalid predecessor in its phase-feedback draft audit receipt.`,
+    );
+  }
+  return raw.sourceVersionId;
+}
+
 function assertDraftReceipt(
   raw: Record<string, unknown>,
+  template: TemplateRow,
   source: VersionRow,
   draft: VersionRow,
 ): PhaseFeedbackDraftReceipt {
-  const expected = receiptFor(source, draft.contentHash);
+  const expected = receiptFor(template, source, draft, draft.contentHash);
   for (const key of [
     "sourceId",
+    "templateId",
+    "templateAlias",
+    "language",
     "sourceVersionId",
     "sourceVersionNumber",
+    "sourcePublishedAt",
+    "sourcePublishedBy",
+    "sourceArchivedAt",
     "beforeContentHash",
     "afterContentHash",
     "questionCount",
     "phaseBandRecordCount",
     "historicRowsMutated",
+    "draftVersionId",
+    "draftVersionNumber",
+    "draftPublishedAt",
+    "draftPublishedBy",
+    "draftArchivedAt",
   ] as const) {
     if (raw[key] !== expected[key]) {
       throw new Error(
@@ -347,14 +393,6 @@ function assertDraftReceipt(
       `Scaling Up Full version ${draft.versionNumber} does not match its phase-feedback draft audit receipt.`,
     );
   }
-  if (
-    raw.draftVersionId !== draft.id ||
-    raw.draftVersionNumber !== draft.versionNumber
-  ) {
-    throw new Error(
-      `Scaling Up Full version ${draft.versionNumber} does not match its phase-feedback draft audit receipt.`,
-    );
-  }
   return expected;
 }
 
@@ -362,16 +400,28 @@ function assertPublishReceipt(
   raw: Record<string, unknown>,
   receipt: PhaseFeedbackDraftReceipt,
   draft: VersionRow,
+  performedBy: string | null,
 ): { publishedByEmail: string; publishedByUserId: string } {
   for (const key of [
     "sourceId",
+    "templateId",
+    "templateAlias",
+    "language",
     "sourceVersionId",
     "sourceVersionNumber",
+    "sourcePublishedAt",
+    "sourcePublishedBy",
+    "sourceArchivedAt",
     "beforeContentHash",
     "afterContentHash",
     "questionCount",
     "phaseBandRecordCount",
     "historicRowsMutated",
+    "draftVersionId",
+    "draftVersionNumber",
+    "draftPublishedAt",
+    "draftPublishedBy",
+    "draftArchivedAt",
   ] as const) {
     if (raw[key] !== receipt[key]) {
       throw new Error(
@@ -381,11 +431,13 @@ function assertPublishReceipt(
   }
   if (
     JSON.stringify(raw.phaseBoundaries) !== JSON.stringify(receipt.phaseBoundaries) ||
-    raw.draftVersionId !== draft.id ||
-    raw.draftVersionNumber !== draft.versionNumber ||
-    raw.publishedAt !== draft.publishedAt?.toISOString() ||
+    raw.finalPublishedAt !== draft.publishedAt?.toISOString() ||
+    raw.finalPublishedBy !== draft.publishedBy ||
+    raw.finalArchivedAt !== (draft.archivedAt?.toISOString() ?? null) ||
     typeof raw.publishedByEmail !== "string" ||
     raw.publishedByEmail.trim() === "" ||
+    performedBy === null ||
+    raw.publishedByEmail !== performedBy ||
     typeof raw.publishedByUserId !== "string" ||
     raw.publishedByUserId !== draft.publishedBy ||
     raw.draftRowsPublished !== 1 ||
@@ -495,8 +547,6 @@ export async function createScalingUpFullPhaseFeedbackDraft(
         invitationSubject: template.invitationSubject,
         invitationBodyMarkdown: template.invitationBodyMarkdown,
       });
-      const receipt = receiptFor(activeVersion, afterContentHash);
-
       if (latestVersion.publishedAt === null) {
         assertExactUnpublishedDraftState(
           latestVersion,
@@ -510,12 +560,14 @@ export async function createScalingUpFullPhaseFeedbackDraft(
         assertCanonicalPhaseRecommendations(latestVersion.questions);
         assertVersionHash(template, latestVersion, "Existing Scaling Up Full draft");
         const rawReceipt = await findDraftAudit(tx, latestVersion);
-        assertDraftReceipt(rawReceipt, activeVersion, latestVersion);
+        const receipt = assertDraftReceipt(
+          rawReceipt,
+          template,
+          activeVersion,
+          latestVersion,
+        );
         return {
           action: "noop",
-          templateId: template.id,
-          draftVersionId: latestVersion.id,
-          draftVersionNumber: latestVersion.versionNumber,
           ...receipt,
         };
       }
@@ -541,6 +593,12 @@ export async function createScalingUpFullPhaseFeedbackDraft(
           publishedBy: null,
         },
       });
+      const receipt = receiptFor(
+        template,
+        activeVersion,
+        created,
+        afterContentHash,
+      );
 
       await tx.auditLog.create({
         data: {
@@ -548,19 +606,12 @@ export async function createScalingUpFullPhaseFeedbackDraft(
           entityId: created.id,
           action: DRAFT_AUDIT_ACTION,
           performedBy: actor.email,
-          changes: JSON.stringify({
-            ...receipt,
-            draftVersionId: created.id,
-            draftVersionNumber: created.versionNumber,
-          }),
+          changes: JSON.stringify(receipt),
         },
       });
 
       return {
         action: "created",
-        templateId: template.id,
-        draftVersionId: created.id,
-        draftVersionNumber: created.versionNumber,
         ...receipt,
       };
     },
@@ -622,25 +673,72 @@ export async function publishScalingUpFullPhaseFeedbackDraft(
       assertVersionHash(template, draft, `Scaling Up Full version ${draft.versionNumber}`);
 
       const rawReceipt = await findDraftAudit(tx, draft);
-      const source = await tx.assessmentTemplateVersion.findFirst({
-        where: {
-          templateId: template.id,
-          language: DEFAULT_TEMPLATE_LANGUAGE,
-          ...activePublishedWhere,
-        },
-        orderBy: { versionNumber: "desc" },
-        select: versionSelect,
-      });
-      assertEnglishVersion(source, "Active published Scaling Up Full predecessor");
-      assertActivePublishedVersion(
-        source,
-        "Active published Scaling Up Full predecessor",
+      const recordedSourceId = receiptSourceVersionId(
+        rawReceipt,
+        draft.versionNumber,
       );
-      if (source.templateId !== template.id) {
-        throw new Error("Active published predecessor is not a Scaling Up Full edition.");
+      const [recordedSource, activeVersion] = await Promise.all([
+        tx.assessmentTemplateVersion.findFirst({
+          where: { id: recordedSourceId },
+          select: versionSelect,
+        }),
+        tx.assessmentTemplateVersion.findFirst({
+          where: {
+            templateId: template.id,
+            language: DEFAULT_TEMPLATE_LANGUAGE,
+            ...activePublishedWhere,
+          },
+          orderBy: { versionNumber: "desc" },
+          select: versionSelect,
+        }),
+      ]);
+      assertEnglishVersion(
+        recordedSource,
+        "Recorded published Scaling Up Full predecessor",
+      );
+      assertActivePublishedVersion(
+        recordedSource,
+        "Recorded published Scaling Up Full predecessor",
+      );
+      if (recordedSource.templateId !== template.id) {
+        throw new Error("Recorded published predecessor is not a Scaling Up Full edition.");
       }
+      if (
+        recordedSource.id === draft.id ||
+        recordedSource.versionNumber >= draft.versionNumber
+      ) {
+        throw new Error(
+          `Scaling Up Full version ${recordedSource.versionNumber} is not a predecessor of draft ${draft.versionNumber}.`,
+        );
+      }
+      assertVersionHash(
+        template,
+        recordedSource,
+        "Recorded published Scaling Up Full predecessor",
+      );
+      const receipt = assertDraftReceipt(
+        rawReceipt,
+        template,
+        recordedSource,
+        draft,
+      );
+
+      assertEnglishVersion(activeVersion, "Active published Scaling Up Full edition");
+      assertActivePublishedVersion(
+        activeVersion,
+        "Active published Scaling Up Full edition",
+      );
+      if (activeVersion.templateId !== template.id) {
+        throw new Error("Active published version is not a Scaling Up Full edition.");
+      }
+      assertVersionHash(template, activeVersion, "Active published Scaling Up Full edition");
 
       if (draft.publishedAt !== null) {
+        if (activeVersion.id !== draft.id) {
+          throw new Error(
+            `Scaling Up Full version ${draft.versionNumber} is no longer the active published edition.`,
+          );
+        }
         const publishAudit = await tx.auditLog.findFirst({
           where: {
             entityType: "AssessmentTemplateVersion",
@@ -648,29 +746,22 @@ export async function publishScalingUpFullPhaseFeedbackDraft(
             action: PUBLISH_AUDIT_ACTION,
           },
           orderBy: { timestamp: "desc" },
-          select: { changes: true },
+          select: { changes: true, performedBy: true },
         });
         if (!publishAudit) {
           throw new Error(
             `Scaling Up Full version ${draft.versionNumber} has no publish audit receipt.`,
           );
         }
-        const creationSource = source.id === draft.id
-          ? {
-              ...source,
-              id: String(rawReceipt.sourceVersionId),
-              versionNumber: Number(rawReceipt.sourceVersionNumber),
-              contentHash: String(rawReceipt.beforeContentHash),
-            }
-          : source;
-        const receipt = assertDraftReceipt(rawReceipt, creationSource, draft);
         const publishedReceipt = parseReceipt(publishAudit.changes, draft.versionNumber);
-        const publisher = assertPublishReceipt(publishedReceipt, receipt, draft);
+        const publisher = assertPublishReceipt(
+          publishedReceipt,
+          receipt,
+          draft,
+          publishAudit.performedBy,
+        );
         return {
           action: "noop",
-          templateId: template.id,
-          draftVersionId: draft.id,
-          draftVersionNumber: draft.versionNumber,
           publishedAt: draft.publishedAt,
           publishedBy: publisher.publishedByEmail,
           campaignRowsRepinned: 0,
@@ -679,16 +770,14 @@ export async function publishScalingUpFullPhaseFeedbackDraft(
       }
 
       if (
-        rawReceipt.sourceVersionId !== source.id ||
-        rawReceipt.sourceVersionNumber !== source.versionNumber ||
-        rawReceipt.beforeContentHash !== source.contentHash
+        recordedSource.id !== activeVersion.id ||
+        recordedSource.versionNumber !== activeVersion.versionNumber ||
+        recordedSource.contentHash !== activeVersion.contentHash
       ) {
         throw new Error(
           `Scaling Up Full draft ${draft.versionNumber} has a stale active predecessor; refusing to publish.`,
         );
       }
-      const receipt = assertDraftReceipt(rawReceipt, source, draft);
-      assertVersionHash(template, source, "Active published Scaling Up Full predecessor");
 
       const publishIssues = getPublishValidationIssues({
         questions: draft.questions,
@@ -729,9 +818,9 @@ export async function publishScalingUpFullPhaseFeedbackDraft(
           performedBy: actor.email,
           changes: JSON.stringify({
             ...receipt,
-            draftVersionId: draft.id,
-            draftVersionNumber: draft.versionNumber,
-            publishedAt: publishedAt.toISOString(),
+            finalPublishedAt: publishedAt.toISOString(),
+            finalPublishedBy: actor.id,
+            finalArchivedAt: null,
             publishedByEmail: actor.email,
             publishedByUserId: actor.id,
             draftRowsPublished: 1,
@@ -742,9 +831,6 @@ export async function publishScalingUpFullPhaseFeedbackDraft(
 
       return {
         action: "published",
-        templateId: template.id,
-        draftVersionId: draft.id,
-        draftVersionNumber: draft.versionNumber,
         publishedAt,
         publishedBy: actor.email,
         campaignRowsRepinned: 0,
