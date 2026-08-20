@@ -311,7 +311,7 @@ git commit -m "docs: record phase-aware feedback dark release"
 
 ---
 
-### Task 7: Separate activation release after explicit approval
+### Task 7: Two-approval activation release — not approved or executed
 
 **Files:**
 - Modify: `CLAUDE.md`
@@ -319,16 +319,57 @@ git commit -m "docs: record phase-aware feedback dark release"
 - Modify: `docs/research/su-full-phase-feedback-implementation-receipt-2026-08-20.md`
 
 **Interfaces:**
-- Consumes the exact reviewed draft ID and content hash from Task 4.
+- Starts from the current dark state: `draft created: false`, `published: false`,
+  `deployed: false`, and `activated: false`.
+- Produces an unpublished draft and exact creation receipt only after a future
+  create authorization.
+- Consumes the independently reviewed draft ID, content hash, and named actor
+  only after a later, separate human publish approval.
 - Produces a published edition for future campaigns only; existing campaign pins and frozen submissions remain unchanged.
 
-- [ ] **Step 1: Re-run the exact pre-publish gates on the reviewed HEAD**
+- [ ] **Step 1: Obtain future authorization to begin the create-only stage**
 
-Use the Task-6 commands and require a clean worktree.
+Task 7 is **not approved and was not executed in the current run**. Do not run
+either lifecycle command from this plan's existing implementation approval.
+After a future human authorizes the activation process to begin, rerun the
+Task-6 commands on the exact reviewed HEAD and require a clean worktree before
+any database action.
 
-- [ ] **Step 2: Publish only the approved draft**
+- [ ] **Step 2: Create an unpublished draft only and capture its exact receipt**
 
-Load the exact reviewed values from the signed approval receipt into task-specific environment variables, then run:
+Set the authorized draft-creation actor, then run only the guarded create
+command:
+
+```bash
+test -n "$SU_FULL_PHASE_FEEDBACK_DRAFT_ACTOR"
+npx tsx scripts/create-scaling-up-full-phase-feedback-draft.ts --i-know-this-is-prod
+```
+
+Do not run the publisher in this stage. Persist the complete command receipt,
+including `action`, `draftVersionId`, `draftVersionNumber`, `afterContentHash`,
+`sourceVersionId`, `sourceVersionNumber`, `beforeContentHash`, source lifecycle
+state, creator identity, question/phase-band counts, phase boundaries, and
+`historicRowsMutated: false`. Verify read-only that the draft is unpublished,
+the source published row is unchanged, every pre-existing campaign retains its
+prior version pin, and no historic submission/response/answer row changed.
+
+- [ ] **Step 3: Independently review the exact draft, then stop**
+
+An independent reviewer must inspect the exact created draft and its creation
+receipt, reproduce the `afterContentHash`, verify the source binding and
+1,220-cell catalogue/driver/report boundaries, and rerun the release gates on
+the exact reviewed commit. Record the review evidence against the exact
+`draftVersionId` and `afterContentHash`.
+
+**STOP after review.** Obtain a new, separate, explicit human **PUBLISH**
+approval that names the exact draft ID, exact content hash, and approved actor.
+Create authorization does not authorize publish; never combine create and
+publish under one approval.
+
+- [ ] **Step 4: Publish only the separately approved exact draft**
+
+Only after the separate publish approval, load its exact values into the
+approval-scoped environment and run:
 
 ```bash
 test -n "$SU_FULL_PHASE_FEEDBACK_APPROVED_DRAFT_ID"
@@ -344,10 +385,14 @@ The script must reject blank, stale, or mismatched inputs and any ad-hoc
 `--draft-version-id`, `--content-hash`, `--approved-content-hash`, or `--actor`
 override.
 
-- [ ] **Step 3: Verify Production without mutating historic data**
+- [ ] **Step 5: Verify the published edition and a new campaign without mutating historic data**
 
 Create one new dedicated mail-disabled campaign pinned to the new edition, complete boundary/sentinel CEO cases, verify the landscape report paragraphs against the catalogue, verify all 61 Peers remain the governed snapshot, and re-open an old pinned report to prove its frozen feedback is unchanged.
 
-- [ ] **Step 4: Record the activation receipt**
+- [ ] **Step 6: Record the activation receipt**
 
-Document the published version ID/hash, new-campaign pin, old-campaign pin, sentinel results, 61-Peer parity, deployment URL/SHA, smoke timestamp, and rollback instruction (stop creating new campaigns on the edition; never rewrite submissions).
+Document the create authorization, complete draft-creation receipt, independent
+review, separate publish approval, published version ID/hash, publisher, new-
+campaign pin, old-campaign pin, sentinel results, 61-Peer parity, deployment
+URL/SHA, smoke timestamp, and rollback instruction (stop creating new campaigns
+on the edition; never rewrite submissions).

@@ -22,7 +22,7 @@
 
 No database lifecycle command was run. There is no draft version ID, draft content hash, publisher, deployment, campaign, or activation identifier to record. The create/publish scripts are guarded operator tools committed for a later approved release; their presence is not evidence that either operation occurred.
 
-Task 7 remains a separate approval gate. Before any publish, an authorized operator must first create and independently review a draft, record its exact ID/content hash, rerun the release gates on a clean reviewed HEAD, and then explicitly approve publication and activation. Existing campaign pins and frozen submissions must never be rewritten.
+Task 7 is not approved and was not executed in this run. A future authorization to begin activation permits only guarded draft creation. The operator must capture the exact draft/source receipt and content hash, verify no historic or campaign mutation, obtain an independent review of that exact draft, and then stop. Publishing requires a new, separate, explicit human approval naming the exact draft ID, content hash, and actor; create and publish must never share one approval. Existing campaign pins and frozen submissions must never be rewritten.
 
 ## Implemented boundary
 
@@ -93,4 +93,4 @@ The build retained expected non-fatal local diagnostics for the deprecated middl
 
 ## Explicit next gate
 
-This receipt authorizes no database write, draft creation, publication, deployment, campaign creation, assessment submission, Production/Esperto access, flag change, Slack/email message, push, merge, or activation. Task 7 may begin only after explicit approval and must produce its own forward-only activation receipt.
+This receipt authorizes no database write, draft creation, publication, deployment, campaign creation, assessment submission, Production/Esperto access, flag change, Slack/email message, push, merge, or activation. Task 7 may begin only after explicit create-stage approval; that stage must stop after independent draft review and obtain a separate exact-ID/hash/actor publish approval before publication. Task 7 must produce its own forward-only activation receipt.
