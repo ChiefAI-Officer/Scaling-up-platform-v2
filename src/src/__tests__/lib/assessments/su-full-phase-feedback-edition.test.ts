@@ -34,7 +34,7 @@ type AuditRow = {
   entityType: string;
   entityId: string;
   action: string;
-  performedBy: string;
+  performedBy: string | null;
   changes: string;
   timestamp: Date;
 };
@@ -49,6 +49,10 @@ const PHASE_BOUNDARIES = [
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function transactionConflict(code: "P2034" | "40001" = "P2034"): Error {
+  return Object.assign(new Error("Transaction serialization conflict"), { code });
 }
 
 function contentHash(
@@ -194,6 +198,8 @@ function makeDb(options: {
     draftPublishedAt: null,
     draftPublishedBy: null,
     draftArchivedAt: null,
+    createdByEmail: "creator@example.com",
+    createdByUserId: "creator@example.com-user",
   };
   const audits: AuditRow[] = [];
   if (options.includeDraftReceipt || options.latest === "matching-draft" || options.draftPublished) {
@@ -351,6 +357,13 @@ describe("createScalingUpFullPhaseFeedbackDraft", () => {
       phaseBandRecordCount: 1220,
       phaseBoundaries: PHASE_BOUNDARIES,
       historicRowsMutated: false,
+      createdByEmail: "creator@example.com",
+      createdByUserId: "creator@example.com-user",
+    });
+    expect(db.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: "Serializable",
+      maxWait: 10_000,
+      timeout: 55_000,
     });
     expect(tx.assessmentTemplateVersion.create).toHaveBeenCalledTimes(1);
     const created = tx.assessmentTemplateVersion.create.mock.calls[0][0].data as Version;
@@ -400,10 +413,59 @@ describe("createScalingUpFullPhaseFeedbackDraft", () => {
         draftPublishedAt: null,
         draftPublishedBy: null,
         draftArchivedAt: null,
+        createdByEmail: "creator@example.com",
+        createdByUserId: "creator@example.com-user",
       }),
     );
     expect(tx.assessmentTemplateVersion.updateMany).not.toHaveBeenCalled();
     expect(tx.assessmentCampaign.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("retries the whole Serializable creation transaction once after P2034", async () => {
+    const ctx = makeDb({ latest: "archived" });
+    const transaction = ctx.db.$transaction as jest.Mock;
+    const initialVersionCount = ctx.versions.length;
+    const initialAuditCount = ctx.audits.length;
+    transaction
+      .mockReset()
+      .mockImplementationOnce(
+        async (fn: (inner: typeof ctx.tx) => Promise<unknown>) => {
+          await fn(ctx.tx);
+          ctx.versions.splice(initialVersionCount);
+          ctx.audits.splice(initialAuditCount);
+          throw transactionConflict("P2034");
+        },
+      )
+      .mockImplementationOnce(
+        (fn: (inner: typeof ctx.tx) => Promise<unknown>) => fn(ctx.tx),
+      );
+
+    const result = await createScalingUpFullPhaseFeedbackDraft(
+      ctx.db,
+      "creator@example.com",
+    );
+
+    expect(result.action).toBe("created");
+    expect(transaction).toHaveBeenCalledTimes(2);
+    expect(ctx.tx.user.findUnique).toHaveBeenCalledTimes(2);
+    expect(ctx.tx.assessmentTemplate.findFirst).toHaveBeenCalledTimes(2);
+    expect(ctx.audits).toHaveLength(1);
+    for (const call of transaction.mock.calls) {
+      expect(call[1]).toEqual({
+        isolationLevel: "Serializable",
+        maxWait: 10_000,
+        timeout: 55_000,
+      });
+    }
+  });
+
+  it("does not retry a semantic creation validation failure", async () => {
+    const ctx = makeDb({ actorRole: "COACH" });
+
+    await expect(
+      createScalingUpFullPhaseFeedbackDraft(ctx.db, "creator@example.com"),
+    ).rejects.toThrow(/privileged actor/i);
+    expect(ctx.db.$transaction).toHaveBeenCalledTimes(1);
   });
 
   it("is idempotent only for the exact audited draft", async () => {
@@ -423,6 +485,11 @@ describe("createScalingUpFullPhaseFeedbackDraft", () => {
     expect(tx.assessmentTemplateVersion.create).not.toHaveBeenCalled();
     expect(tx.assessmentTemplateVersion.updateMany).not.toHaveBeenCalled();
     expect(tx.auditLog.create).not.toHaveBeenCalled();
+    expect(tx.auditLog.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: { changes: true, performedBy: true },
+      }),
+    );
   });
 
   it("does not misreport an already-published phase-aware edition as an idempotent draft", async () => {
@@ -458,6 +525,28 @@ describe("createScalingUpFullPhaseFeedbackDraft", () => {
     await expect(
       createScalingUpFullPhaseFeedbackDraft(ctx.db, "creator@example.com"),
     ).rejects.toThrow(/audit receipt/i);
+    expect(ctx.tx.assessmentTemplateVersion.create).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["null durable audit actor", (ctx: ReturnType<typeof makeDb>) => { ctx.audits[0].performedBy = null; }],
+    ["creator email mismatch", (ctx: ReturnType<typeof makeDb>) => {
+      const receipt = JSON.parse(ctx.audits[0].changes) as Record<string, unknown>;
+      receipt.createdByEmail = "tampered@example.com";
+      ctx.audits[0].changes = JSON.stringify(receipt);
+    }],
+    ["creator user-ID tampering", (ctx: ReturnType<typeof makeDb>) => {
+      const receipt = JSON.parse(ctx.audits[0].changes) as Record<string, unknown>;
+      receipt.createdByUserId = "tampered-user";
+      ctx.audits[0].changes = JSON.stringify(receipt);
+    }],
+  ])("refuses idempotent creation with %s", async (_label, mutate) => {
+    const ctx = makeDb({ latest: "matching-draft" });
+    mutate(ctx);
+
+    await expect(
+      createScalingUpFullPhaseFeedbackDraft(ctx.db, "creator@example.com"),
+    ).rejects.toThrow(/draft audit receipt|creator/i);
     expect(ctx.tx.assessmentTemplateVersion.create).not.toHaveBeenCalled();
   });
 
@@ -607,6 +696,13 @@ describe("publishScalingUpFullPhaseFeedbackDraft", () => {
       historicRowsMutated: false,
       campaignRowsRepinned: 0,
       publishedBy: "admin@example.com",
+      createdByEmail: "creator@example.com",
+      createdByUserId: "creator@example.com-user",
+    });
+    expect(db.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: "Serializable",
+      maxWait: 10_000,
+      timeout: 55_000,
     });
     expect(tx.assessmentTemplateVersion.updateMany).toHaveBeenCalledWith({
       where: {
@@ -654,6 +750,8 @@ describe("publishScalingUpFullPhaseFeedbackDraft", () => {
         finalPublishedAt: expect.any(String),
         finalPublishedBy: "admin-user",
         finalArchivedAt: null,
+        createdByEmail: "creator@example.com",
+        createdByUserId: "creator@example.com-user",
         publishedByEmail: "admin@example.com",
         publishedByUserId: "admin-user",
         draftRowsPublished: 1,
@@ -717,6 +815,101 @@ describe("publishScalingUpFullPhaseFeedbackDraft", () => {
       ),
     ).rejects.toThrow(/stale.*active|active.*predecessor/i);
     expect(ctx.tx.assessmentTemplateVersion.updateMany).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["null durable creation-audit actor", (ctx: ReturnType<typeof makeDb>) => { ctx.audits[0].performedBy = null; }],
+    ["creation-receipt email mismatch", (ctx: ReturnType<typeof makeDb>) => {
+      const receipt = JSON.parse(ctx.audits[0].changes) as Record<string, unknown>;
+      receipt.createdByEmail = "tampered@example.com";
+      ctx.audits[0].changes = JSON.stringify(receipt);
+    }],
+    ["creation-receipt user-ID tampering", (ctx: ReturnType<typeof makeDb>) => {
+      const receipt = JSON.parse(ctx.audits[0].changes) as Record<string, unknown>;
+      receipt.createdByUserId = "tampered-user";
+      ctx.audits[0].changes = JSON.stringify(receipt);
+    }],
+  ])("refuses publication with %s", async (_label, mutate) => {
+    const ctx = makeDb({ latest: "matching-draft", includeDraftReceipt: true });
+    mutate(ctx);
+
+    await expect(
+      publishScalingUpFullPhaseFeedbackDraft(
+        ctx.db,
+        ctx.draft.id,
+        "admin@example.com",
+      ),
+    ).rejects.toThrow(/draft audit receipt|creator/i);
+    expect(ctx.tx.assessmentTemplateVersion.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("retries the whole transaction and rejects a predecessor that became stale", async () => {
+    const ctx = makeDb({ latest: "matching-draft", includeDraftReceipt: true });
+    const transaction = ctx.db.$transaction as jest.Mock;
+    const originalPublishedAt = ctx.draft.publishedAt;
+    const originalPublishedBy = ctx.draft.publishedBy;
+    const initialAuditCount = ctx.audits.length;
+    transaction
+      .mockReset()
+      .mockImplementationOnce(
+        async (fn: (inner: typeof ctx.tx) => Promise<unknown>) => {
+          await fn(ctx.tx);
+          ctx.draft.publishedAt = originalPublishedAt;
+          ctx.draft.publishedBy = originalPublishedBy;
+          ctx.audits.splice(initialAuditCount);
+          ctx.versions.push({
+            ...clone(ctx.active),
+            id: "version-6-concurrent",
+            versionNumber: 6,
+            publishedAt: new Date("2026-08-20T11:00:00.000Z"),
+          });
+          throw transactionConflict("P2034");
+        },
+      )
+      .mockImplementationOnce(
+        (fn: (inner: typeof ctx.tx) => Promise<unknown>) => fn(ctx.tx),
+      );
+
+    await expect(
+      publishScalingUpFullPhaseFeedbackDraft(
+        ctx.db,
+        ctx.draft.id,
+        "admin@example.com",
+      ),
+    ).rejects.toThrow(/stale active predecessor/i);
+    expect(transaction).toHaveBeenCalledTimes(2);
+    expect(ctx.tx.user.findUnique).toHaveBeenCalledTimes(4);
+    expect(ctx.tx.assessmentTemplate.findFirst).toHaveBeenCalledTimes(2);
+    expect(ctx.tx.assessmentTemplateVersion.findFirst).toHaveBeenCalledTimes(6);
+    expect(ctx.tx.auditLog.findFirst).toHaveBeenCalledTimes(2);
+    for (const call of transaction.mock.calls) {
+      expect(call[1]).toEqual({
+        isolationLevel: "Serializable",
+        maxWait: 10_000,
+        timeout: 55_000,
+      });
+    }
+    expect(ctx.draft.publishedAt).toBeNull();
+    expect(
+      ctx.audits.some(
+        (audit) => audit.action === "SU_FULL_PHASE_FEEDBACK_DRAFT_PUBLISHED",
+      ),
+    ).toBe(false);
+  });
+
+  it("exhausts the bounded retry after two PostgreSQL 40001 conflicts", async () => {
+    const ctx = makeDb({ latest: "matching-draft", includeDraftReceipt: true });
+    const transaction = ctx.db.$transaction as jest.Mock;
+    transaction.mockReset().mockRejectedValue(transactionConflict("40001"));
+
+    await expect(
+      publishScalingUpFullPhaseFeedbackDraft(
+        ctx.db,
+        ctx.draft.id,
+        "admin@example.com",
+      ),
+    ).rejects.toMatchObject({ code: "40001" });
+    expect(transaction).toHaveBeenCalledTimes(2);
   });
 
   it.each([

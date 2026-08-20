@@ -19,6 +19,13 @@ const EXPECTED_QUESTION_COUNT = 61;
 const EXPECTED_PHASE_BAND_RECORD_COUNT = 1_220;
 const DRAFT_AUDIT_ACTION = "SU_FULL_PHASE_FEEDBACK_DRAFT_CREATED";
 const PUBLISH_AUDIT_ACTION = "SU_FULL_PHASE_FEEDBACK_DRAFT_PUBLISHED";
+const SERIALIZABLE_TRANSACTION_OPTIONS = {
+  isolationLevel: "Serializable" as const,
+  maxWait: 10_000,
+  timeout: 55_000,
+};
+const MAX_SERIALIZABLE_ATTEMPTS = 2;
+const SERIALIZATION_CONFLICT_CODES = new Set(["P2034", "40001"]);
 
 export const SU_FULL_PHASE_FEEDBACK_BOUNDARIES = CURRENT_GROWTH_PHASE_BANDS.map(
   (band) => ({
@@ -97,7 +104,11 @@ interface PhaseFeedbackEditionTx {
 export interface PhaseFeedbackEditionDb {
   $transaction<T>(
     fn: (tx: PhaseFeedbackEditionTx) => Promise<T>,
-    options: { maxWait: number; timeout: number },
+    options: {
+      isolationLevel: "Serializable";
+      maxWait: number;
+      timeout: number;
+    },
   ): Promise<T>;
 }
 
@@ -122,6 +133,8 @@ export interface PhaseFeedbackDraftReceipt {
   draftPublishedAt: null;
   draftPublishedBy: null;
   draftArchivedAt: null;
+  createdByEmail: string;
+  createdByUserId: string;
 }
 
 export interface PhaseFeedbackDraftResult extends PhaseFeedbackDraftReceipt {
@@ -141,6 +154,34 @@ function actorEmail(value: string): string {
     throw new Error("Scaling Up Full phase-feedback lifecycle requires an actor email.");
   }
   return email;
+}
+
+function hasSerializationConflictCode(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    typeof (error as { code?: unknown }).code === "string" &&
+    SERIALIZATION_CONFLICT_CODES.has((error as { code: string }).code)
+  );
+}
+
+async function runSerializableLifecycleTransaction<T>(
+  db: PhaseFeedbackEditionDb,
+  operation: (tx: PhaseFeedbackEditionTx) => Promise<T>,
+): Promise<T> {
+  for (let attempt = 1; attempt <= MAX_SERIALIZABLE_ATTEMPTS; attempt += 1) {
+    try {
+      return await db.$transaction(operation, SERIALIZABLE_TRANSACTION_OPTIONS);
+    } catch (error) {
+      if (
+        !hasSerializationConflictCode(error) ||
+        attempt === MAX_SERIALIZABLE_ATTEMPTS
+      ) {
+        throw error;
+      }
+    }
+  }
+  throw new Error("Scaling Up Full Serializable transaction retry exhausted.");
 }
 
 async function resolveActivePrivilegedActor(
@@ -300,6 +341,7 @@ function receiptFor(
   source: VersionRow,
   draft: Pick<VersionRow, "id" | "versionNumber">,
   afterContentHash: string,
+  creator: Pick<ActorRow, "id" | "email">,
 ): PhaseFeedbackDraftReceipt {
   if (source.publishedAt === null || source.archivedAt !== null) {
     throw new Error("Scaling Up Full receipt source is not published and unarchived.");
@@ -325,6 +367,8 @@ function receiptFor(
     draftPublishedAt: null,
     draftPublishedBy: null,
     draftArchivedAt: null,
+    createdByEmail: creator.email,
+    createdByUserId: creator.id,
   };
 }
 
@@ -359,8 +403,15 @@ function assertDraftReceipt(
   template: TemplateRow,
   source: VersionRow,
   draft: VersionRow,
+  creator: ActorRow,
 ): PhaseFeedbackDraftReceipt {
-  const expected = receiptFor(template, source, draft, draft.contentHash);
+  const expected = receiptFor(
+    template,
+    source,
+    draft,
+    draft.contentHash,
+    creator,
+  );
   for (const key of [
     "sourceId",
     "templateId",
@@ -381,6 +432,8 @@ function assertDraftReceipt(
     "draftPublishedAt",
     "draftPublishedBy",
     "draftArchivedAt",
+    "createdByEmail",
+    "createdByUserId",
   ] as const) {
     if (raw[key] !== expected[key]) {
       throw new Error(
@@ -422,6 +475,8 @@ function assertPublishReceipt(
     "draftPublishedAt",
     "draftPublishedBy",
     "draftArchivedAt",
+    "createdByEmail",
+    "createdByUserId",
   ] as const) {
     if (raw[key] !== receipt[key]) {
       throw new Error(
@@ -466,7 +521,7 @@ function assertVersionHash(
 async function findDraftAudit(
   tx: PhaseFeedbackEditionTx,
   version: VersionRow,
-): Promise<Record<string, unknown>> {
+): Promise<{ receipt: Record<string, unknown>; performedBy: string | null }> {
   const audit = await tx.auditLog.findFirst({
     where: {
       entityType: "AssessmentTemplateVersion",
@@ -474,14 +529,39 @@ async function findDraftAudit(
       action: DRAFT_AUDIT_ACTION,
     },
     orderBy: { timestamp: "desc" },
-    select: { changes: true },
+    select: { changes: true, performedBy: true },
   });
   if (!audit) {
     throw new Error(
       `Scaling Up Full version ${version.versionNumber} has no phase-feedback draft audit receipt.`,
     );
   }
-  return parseReceipt(audit.changes, version.versionNumber);
+  return {
+    receipt: parseReceipt(audit.changes, version.versionNumber),
+    performedBy: audit.performedBy,
+  };
+}
+
+async function resolveDraftReceiptCreator(
+  tx: PhaseFeedbackEditionTx,
+  audit: { performedBy: string | null },
+  version: VersionRow,
+): Promise<ActorRow> {
+  if (audit.performedBy === null || audit.performedBy.trim() === "") {
+    throw new Error(
+      `Scaling Up Full version ${version.versionNumber} has no durable creator on its phase-feedback draft audit receipt.`,
+    );
+  }
+  const creator = await tx.user.findUnique({
+    where: { email: audit.performedBy },
+    select: { id: true, email: true, role: true, deletedAt: true },
+  });
+  if (!creator || creator.email !== audit.performedBy) {
+    throw new Error(
+      `Scaling Up Full version ${version.versionNumber} has an invalid creator on its phase-feedback draft audit receipt.`,
+    );
+  }
+  return creator;
 }
 
 export async function createScalingUpFullPhaseFeedbackDraft(
@@ -490,7 +570,8 @@ export async function createScalingUpFullPhaseFeedbackDraft(
 ): Promise<PhaseFeedbackDraftResult> {
   const email = actorEmail(actorEmailInput);
 
-  return db.$transaction(
+  return runSerializableLifecycleTransaction(
+    db,
     async (tx) => {
       const [actor, template] = await Promise.all([
         resolveActivePrivilegedActor(tx, email),
@@ -559,12 +640,18 @@ export async function createScalingUpFullPhaseFeedbackDraft(
         }
         assertCanonicalPhaseRecommendations(latestVersion.questions);
         assertVersionHash(template, latestVersion, "Existing Scaling Up Full draft");
-        const rawReceipt = await findDraftAudit(tx, latestVersion);
+        const draftAudit = await findDraftAudit(tx, latestVersion);
+        const creator = await resolveDraftReceiptCreator(
+          tx,
+          draftAudit,
+          latestVersion,
+        );
         const receipt = assertDraftReceipt(
-          rawReceipt,
+          draftAudit.receipt,
           template,
           activeVersion,
           latestVersion,
+          creator,
         );
         return {
           action: "noop",
@@ -598,6 +685,7 @@ export async function createScalingUpFullPhaseFeedbackDraft(
         activeVersion,
         created,
         afterContentHash,
+        actor,
       );
 
       await tx.auditLog.create({
@@ -615,7 +703,6 @@ export async function createScalingUpFullPhaseFeedbackDraft(
         ...receipt,
       };
     },
-    { maxWait: 10_000, timeout: 55_000 },
   );
 }
 
@@ -630,7 +717,8 @@ export async function publishScalingUpFullPhaseFeedbackDraft(
   }
   const email = actorEmail(actorEmailInput);
 
-  return db.$transaction(
+  return runSerializableLifecycleTransaction(
+    db,
     async (tx) => {
       const [actor, template] = await Promise.all([
         resolveActivePrivilegedActor(tx, email),
@@ -672,7 +760,9 @@ export async function publishScalingUpFullPhaseFeedbackDraft(
       assertCanonicalPhaseRecommendations(draft.questions);
       assertVersionHash(template, draft, `Scaling Up Full version ${draft.versionNumber}`);
 
-      const rawReceipt = await findDraftAudit(tx, draft);
+      const draftAudit = await findDraftAudit(tx, draft);
+      const creator = await resolveDraftReceiptCreator(tx, draftAudit, draft);
+      const rawReceipt = draftAudit.receipt;
       const recordedSourceId = receiptSourceVersionId(
         rawReceipt,
         draft.versionNumber,
@@ -721,6 +811,7 @@ export async function publishScalingUpFullPhaseFeedbackDraft(
         template,
         recordedSource,
         draft,
+        creator,
       );
 
       assertEnglishVersion(activeVersion, "Active published Scaling Up Full edition");
@@ -837,7 +928,6 @@ export async function publishScalingUpFullPhaseFeedbackDraft(
         ...receipt,
       };
     },
-    { maxWait: 10_000, timeout: 55_000 },
   );
 }
 
