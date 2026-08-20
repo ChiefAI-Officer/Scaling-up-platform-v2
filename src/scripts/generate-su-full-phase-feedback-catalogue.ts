@@ -24,6 +24,7 @@ const EXPECTED_RANGES = [
   { bandId: "B3", minScore: 7, maxScore: 8 },
   { bandId: "B4", minScore: 9, maxScore: 10 },
 ] as const;
+type ExpectedRange = (typeof EXPECTED_RANGES)[number];
 
 const PHASES = [1, 2, 3, 4, 5] as const;
 const CANONICAL_STABLE_KEYS = Array.from(
@@ -107,9 +108,10 @@ export function parseAndValidateCatalogue(input: string): CatalogueRow[] {
   }
   const records: CatalogueRow[] = [];
   const seen = new Set<string>();
-  const expectedRangeByBandId = new Map(
-    EXPECTED_RANGES.map((range) => [range.bandId, range]),
-  );
+  const expectedRangeByBandId = new Map<string, ExpectedRange>();
+  for (const range of EXPECTED_RANGES) {
+    expectedRangeByBandId.set(range.bandId, range);
+  }
   for (const [index, row] of dataRows.entries()) {
     const recordNumber = index + 2;
     if (row.length !== EXPECTED_COLUMNS.length) {
