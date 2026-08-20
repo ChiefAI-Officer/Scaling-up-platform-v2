@@ -6,6 +6,15 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="coach-mobile-drawer-containment-fixed"></a>
+### 2026-08-20 — Coach mobile drawer containment fixed <!-- ENTRY_ISO:2026-08-20 ENTRY_SLUG:coach-mobile-drawer-containment-fixed -->
+
+**Status: IMPLEMENTED + LOCALLY VERIFIED + USER-AUTHORIZED FOR PRODUCTION; PR/MERGE/DEPLOYMENT PENDING.** The responsive Coach hamburger drawer was visually reproduced on the live site at **390 × 844**: its backdrop and panel reported only **63–64px** of fixed-position height, then the overflowing menu links appeared directly over dashboard text. The sticky Coach header's `backdrop-blur-sm` creates a fixed-position containing block, so the drawer's nested `fixed inset-0` layers were fixed to the filtered header instead of the viewport. The Admin mobile dropdown uses a different layout and was not implicated.
+
+**Narrow correction and compatibility boundary.** When the responsive mobile-navigation capability is active and the hamburger is opened, `CoachMobileNav` now portals the drawer layers to `document.body`. A dedicated drawer ref keeps pointer interactions inside the portalled panel open while the existing document-level outside-click dismissal still closes it. The flag-off legacy markup remains inline and byte-for-byte compatible; desktop navigation, route links, Escape dismissal, body scroll locking, print output, APIs, schemas, migrations, environment settings, and persisted data are unchanged. The fixed real-browser receipt at **390 × 844** measures an **844px** backdrop and panel, confirms the overlay is outside the header, and shows an opaque dark drawer with the dashboard correctly dimmed behind it.
+
+**Verification.** Test-first regressions failed against the nested drawer and its initial portalled outside-click interaction, then passed after the containment and event-boundary fixes. Focused navigation coverage passed **2 suites / 10 tests**; the complete repository suite passed **762/762 suites, 9,117/9,117 tests, and 16/16 snapshots**. Changed-file ESLint emitted no diagnostics, migration safety approved all **49 migrations**, and `git diff --check` passed. The Production-equivalent `CI=true npx next build --turbopack` compiled, passed TypeScript/static generation, and exited successfully with only the established local missing-Inngest-key, missing-`DATABASE_URL`, workspace-root, and middleware-deprecation diagnostics. No Production record or environment value was read or changed during diagnosis or local verification.
+
 <a id="su-full-esperto-landscape-production-accepted"></a>
 ### 2026-08-18 — Scaling Up Full Esperto-faithful landscape report Production accepted <!-- ENTRY_ISO:2026-08-18 ENTRY_SLUG:su-full-esperto-landscape-production-accepted -->
 
