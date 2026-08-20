@@ -62,14 +62,16 @@ interface AuditRow {
   changes: string;
 }
 
+interface ActorRow {
+  id: string;
+  email: string;
+  role: string;
+  deletedAt: Date | null;
+}
+
 interface PhaseFeedbackEditionTx {
   user: {
-    findUnique(args: unknown): Promise<{
-      id: string;
-      email: string;
-      role: string;
-      deletedAt: Date | null;
-    } | null>;
+    findUnique(args: unknown): Promise<ActorRow | null>;
   };
   assessmentTemplate: {
     findFirst(args: unknown): Promise<TemplateRow | null>;
@@ -135,6 +137,24 @@ function actorEmail(value: string): string {
   return email;
 }
 
+async function resolveActivePrivilegedActor(
+  tx: PhaseFeedbackEditionTx,
+  email: string,
+): Promise<ActorRow> {
+  const actor = await tx.user.findUnique({
+    where: { email },
+    select: { id: true, email: true, role: true, deletedAt: true },
+  });
+  if (
+    !actor ||
+    actor.deletedAt !== null ||
+    !isPrivilegedRole(normalizeRole(actor.role))
+  ) {
+    throw new Error(`Active privileged actor "${email}" was not found.`);
+  }
+  return actor;
+}
+
 function assertTemplate(template: TemplateRow | null): asserts template is TemplateRow {
   if (!template || template.alias !== TEMPLATE_ALIAS) {
     throw new Error(`Active template "${TEMPLATE_ALIAS}" was not found.`);
@@ -161,6 +181,36 @@ function assertActivePublishedVersion(
 ): void {
   if (version.publishedAt === null || version.archivedAt !== null) {
     throw new Error(`${description} is not an active published edition.`);
+  }
+}
+
+function assertExactUnpublishedDraftState(
+  version: VersionRow,
+  description: string,
+): void {
+  if (
+    version.publishedAt !== null ||
+    version.publishedBy !== null ||
+    version.archivedAt !== null
+  ) {
+    throw new Error(
+      `${description} is not in the exact unpublished draft state (publishedAt, publishedBy, and archivedAt must all be null).`,
+    );
+  }
+}
+
+function assertPublishedRetryState(
+  version: VersionRow,
+  description: string,
+): void {
+  if (
+    version.publishedAt === null ||
+    version.publishedBy === null ||
+    version.archivedAt !== null
+  ) {
+    throw new Error(
+      `${description} is not in a valid published retry state.`,
+    );
   }
 }
 
@@ -312,7 +362,7 @@ function assertPublishReceipt(
   raw: Record<string, unknown>,
   receipt: PhaseFeedbackDraftReceipt,
   draft: VersionRow,
-): void {
+): { publishedByEmail: string; publishedByUserId: string } {
   for (const key of [
     "sourceId",
     "sourceVersionId",
@@ -334,6 +384,10 @@ function assertPublishReceipt(
     raw.draftVersionId !== draft.id ||
     raw.draftVersionNumber !== draft.versionNumber ||
     raw.publishedAt !== draft.publishedAt?.toISOString() ||
+    typeof raw.publishedByEmail !== "string" ||
+    raw.publishedByEmail.trim() === "" ||
+    typeof raw.publishedByUserId !== "string" ||
+    raw.publishedByUserId !== draft.publishedBy ||
     raw.draftRowsPublished !== 1 ||
     raw.campaignRowsRepinned !== 0
   ) {
@@ -341,6 +395,10 @@ function assertPublishReceipt(
       `Scaling Up Full version ${draft.versionNumber} does not match its publish audit receipt.`,
     );
   }
+  return {
+    publishedByEmail: raw.publishedByEmail,
+    publishedByUserId: raw.publishedByUserId,
+  };
 }
 
 function assertVersionHash(
@@ -378,19 +436,22 @@ export async function createScalingUpFullPhaseFeedbackDraft(
   db: PhaseFeedbackEditionDb,
   actorEmailInput: string,
 ): Promise<PhaseFeedbackDraftResult> {
-  const performedBy = actorEmail(actorEmailInput);
+  const email = actorEmail(actorEmailInput);
 
   return db.$transaction(
     async (tx) => {
-      const template = await tx.assessmentTemplate.findFirst({
-        where: { alias: TEMPLATE_ALIAS, deletedAt: null },
-        select: {
-          id: true,
-          alias: true,
-          invitationSubject: true,
-          invitationBodyMarkdown: true,
-        },
-      });
+      const [actor, template] = await Promise.all([
+        resolveActivePrivilegedActor(tx, email),
+        tx.assessmentTemplate.findFirst({
+          where: { alias: TEMPLATE_ALIAS, deletedAt: null },
+          select: {
+            id: true,
+            alias: true,
+            invitationSubject: true,
+            invitationBodyMarkdown: true,
+          },
+        }),
+      ]);
       assertTemplate(template);
 
       const [latestVersion, activeVersion] = await Promise.all([
@@ -437,6 +498,10 @@ export async function createScalingUpFullPhaseFeedbackDraft(
       const receipt = receiptFor(activeVersion, afterContentHash);
 
       if (latestVersion.publishedAt === null) {
+        assertExactUnpublishedDraftState(
+          latestVersion,
+          `Scaling Up Full version ${latestVersion.versionNumber}`,
+        );
         if (latestVersion.contentHash !== afterContentHash) {
           throw new Error(
             `Template "${TEMPLATE_ALIAS}" already has unpublished draft version ${latestVersion.versionNumber}; refusing to supersede it.`,
@@ -457,13 +522,9 @@ export async function createScalingUpFullPhaseFeedbackDraft(
 
       if (activeVersion.contentHash === afterContentHash) {
         assertCanonicalPhaseRecommendations(activeVersion.questions);
-        return {
-          action: "noop",
-          templateId: template.id,
-          draftVersionId: activeVersion.id,
-          draftVersionNumber: activeVersion.versionNumber,
-          ...receipt,
-        };
+        throw new Error(
+          `Scaling Up Full phase feedback is already published in version ${activeVersion.versionNumber}; no unpublished draft exists.`,
+        );
       }
 
       const created = await tx.assessmentTemplateVersion.create({
@@ -486,7 +547,7 @@ export async function createScalingUpFullPhaseFeedbackDraft(
           entityType: "AssessmentTemplateVersion",
           entityId: created.id,
           action: DRAFT_AUDIT_ACTION,
-          performedBy,
+          performedBy: actor.email,
           changes: JSON.stringify({
             ...receipt,
             draftVersionId: created.id,
@@ -521,10 +582,7 @@ export async function publishScalingUpFullPhaseFeedbackDraft(
   return db.$transaction(
     async (tx) => {
       const [actor, template] = await Promise.all([
-        tx.user.findUnique({
-          where: { email },
-          select: { id: true, email: true, role: true, deletedAt: true },
-        }),
+        resolveActivePrivilegedActor(tx, email),
         tx.assessmentTemplate.findFirst({
           where: { alias: TEMPLATE_ALIAS, deletedAt: null },
           select: {
@@ -535,13 +593,6 @@ export async function publishScalingUpFullPhaseFeedbackDraft(
           },
         }),
       ]);
-      if (
-        !actor ||
-        actor.deletedAt !== null ||
-        !isPrivilegedRole(normalizeRole(actor.role))
-      ) {
-        throw new Error(`Active privileged actor "${email}" was not found.`);
-      }
       assertTemplate(template);
 
       const draft = await tx.assessmentTemplateVersion.findFirst({
@@ -555,6 +606,17 @@ export async function publishScalingUpFullPhaseFeedbackDraft(
       assertEnglishVersion(draft, `Scaling Up Full draft "${draftVersionId}"`);
       if (draft.templateId !== template.id) {
         throw new Error(`Scaling Up Full draft "${draftVersionId}" was not found.`);
+      }
+      if (draft.publishedAt === null) {
+        assertExactUnpublishedDraftState(
+          draft,
+          `Scaling Up Full version ${draft.versionNumber}`,
+        );
+      } else {
+        assertPublishedRetryState(
+          draft,
+          `Scaling Up Full version ${draft.versionNumber}`,
+        );
       }
       assertCanonicalPhaseRecommendations(draft.questions);
       assertVersionHash(template, draft, `Scaling Up Full version ${draft.versionNumber}`);
@@ -603,14 +665,14 @@ export async function publishScalingUpFullPhaseFeedbackDraft(
           : source;
         const receipt = assertDraftReceipt(rawReceipt, creationSource, draft);
         const publishedReceipt = parseReceipt(publishAudit.changes, draft.versionNumber);
-        assertPublishReceipt(publishedReceipt, receipt, draft);
+        const publisher = assertPublishReceipt(publishedReceipt, receipt, draft);
         return {
           action: "noop",
           templateId: template.id,
           draftVersionId: draft.id,
           draftVersionNumber: draft.versionNumber,
           publishedAt: draft.publishedAt,
-          publishedBy: actor.email,
+          publishedBy: publisher.publishedByEmail,
           campaignRowsRepinned: 0,
           ...receipt,
         };
@@ -648,6 +710,8 @@ export async function publishScalingUpFullPhaseFeedbackDraft(
           language: DEFAULT_TEMPLATE_LANGUAGE,
           contentHash: draft.contentHash,
           publishedAt: null,
+          publishedBy: null,
+          archivedAt: null,
         },
         data: { publishedAt, publishedBy: actor.id },
       });
@@ -668,6 +732,8 @@ export async function publishScalingUpFullPhaseFeedbackDraft(
             draftVersionId: draft.id,
             draftVersionNumber: draft.versionNumber,
             publishedAt: publishedAt.toISOString(),
+            publishedByEmail: actor.email,
+            publishedByUserId: actor.id,
             draftRowsPublished: 1,
             campaignRowsRepinned: 0,
           }),

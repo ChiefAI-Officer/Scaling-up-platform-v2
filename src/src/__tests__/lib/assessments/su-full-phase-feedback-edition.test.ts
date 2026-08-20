@@ -89,6 +89,10 @@ function makeDb(options: {
   includeDraftReceipt?: boolean;
   includePublishReceipt?: boolean;
   actorRole?: string;
+  actorMissing?: boolean;
+  actorDeletedAt?: Date | null;
+  draftPublishedBy?: string | null;
+  draftArchivedAt?: Date | null;
   publishCount?: number;
 } = {}) {
   const seed = buildScalingUpFullContent();
@@ -136,8 +140,13 @@ function makeDb(options: {
     publishedAt: options.draftPublished
       ? new Date("2026-08-20T10:00:00.000Z")
       : null,
-    publishedBy: options.draftPublished ? "admin-user" : null,
-    archivedAt: null,
+    publishedBy:
+      options.draftPublishedBy === undefined
+        ? options.draftPublished
+          ? "admin-user"
+          : null
+        : options.draftPublishedBy,
+    archivedAt: options.draftArchivedAt ?? null,
   };
   options.draftMutate?.(draft);
 
@@ -199,6 +208,8 @@ function makeDb(options: {
         draftVersionId: draft.id,
         draftVersionNumber: draft.versionNumber,
         publishedAt: draft.publishedAt?.toISOString(),
+        publishedByEmail: "admin@example.com",
+        publishedByUserId: "admin-user",
         draftRowsPublished: 1,
         campaignRowsRepinned: 0,
       }),
@@ -208,12 +219,22 @@ function makeDb(options: {
 
   const tx = {
     user: {
-      findUnique: jest.fn().mockResolvedValue({
-        id: "admin-user",
-        email: "admin@example.com",
-        role: options.actorRole ?? "ADMIN",
-        deletedAt: null,
-      }),
+      findUnique: jest.fn(
+        ({ where }: { where: { email: string } }) =>
+          Promise.resolve(
+            options.actorMissing
+              ? null
+              : {
+                  id:
+                    where.email === "admin@example.com"
+                      ? "admin-user"
+                      : `${where.email}-user`,
+                  email: where.email,
+                  role: options.actorRole ?? "ADMIN",
+                  deletedAt: options.actorDeletedAt ?? null,
+                },
+          ),
+      ),
     },
     assessmentTemplate: {
       findFirst: jest.fn().mockResolvedValue(template),
@@ -372,6 +393,18 @@ describe("createScalingUpFullPhaseFeedbackDraft", () => {
     expect(tx.auditLog.create).not.toHaveBeenCalled();
   });
 
+  it("does not misreport an already-published phase-aware edition as an idempotent draft", async () => {
+    const ctx = makeDb();
+    ctx.active.questions = phaseQuestions(ctx.active.questions);
+    ctx.active.contentHash = contentHash(ctx.template, ctx.active);
+
+    await expect(
+      createScalingUpFullPhaseFeedbackDraft(ctx.db, "creator@example.com"),
+    ).rejects.toThrow(/already published|no unpublished draft/i);
+    expect(ctx.tx.assessmentTemplateVersion.create).not.toHaveBeenCalled();
+    expect(ctx.tx.auditLog.create).not.toHaveBeenCalled();
+  });
+
   it.each([
     ["draft identity", (receipt: Record<string, unknown>) => { receipt.draftVersionId = "other-draft"; }],
     ["record count", (receipt: Record<string, unknown>) => { receipt.phaseBandRecordCount = 1219; }],
@@ -398,6 +431,19 @@ describe("createScalingUpFullPhaseFeedbackDraft", () => {
     expect(tx.auditLog.create).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ["pre-populated publishedBy", { draftPublishedBy: "unexpected-user" }],
+    ["archivedAt", { draftArchivedAt: new Date("2026-08-20T08:00:00.000Z") }],
+  ])("refuses idempotent creation for a draft with %s", async (_label, state) => {
+    const { db, tx } = makeDb({ latest: "matching-draft", ...state });
+
+    await expect(
+      createScalingUpFullPhaseFeedbackDraft(db, "creator@example.com"),
+    ).rejects.toThrow(/exact unpublished draft state/i);
+    expect(tx.assessmentTemplateVersion.create).not.toHaveBeenCalled();
+    expect(tx.auditLog.create).not.toHaveBeenCalled();
+  });
+
   it("requires an actor email before opening a transaction", async () => {
     const { db } = makeDb();
 
@@ -405,6 +451,20 @@ describe("createScalingUpFullPhaseFeedbackDraft", () => {
       /actor email/i,
     );
     expect(db.$transaction).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["unknown", { actorMissing: true }],
+    ["inactive", { actorDeletedAt: new Date("2026-08-20T08:00:00.000Z") }],
+    ["unprivileged", { actorRole: "COACH" }],
+  ])("rejects an %s draft-creation actor", async (_label, options) => {
+    const { db, tx } = makeDb(options);
+
+    await expect(
+      createScalingUpFullPhaseFeedbackDraft(db, "spoofed@example.com"),
+    ).rejects.toThrow(/privileged actor/i);
+    expect(tx.assessmentTemplateVersion.create).not.toHaveBeenCalled();
+    expect(tx.auditLog.create).not.toHaveBeenCalled();
   });
 
   it("refuses a non-SU-Full template even if the database adapter returns it", async () => {
@@ -516,6 +576,8 @@ describe("publishScalingUpFullPhaseFeedbackDraft", () => {
         language: "enUS",
         contentHash: draft.contentHash,
         publishedAt: null,
+        publishedBy: null,
+        archivedAt: null,
       },
       data: {
         publishedAt: expect.any(Date),
@@ -540,6 +602,8 @@ describe("publishScalingUpFullPhaseFeedbackDraft", () => {
         phaseBandRecordCount: 1220,
         phaseBoundaries: PHASE_BOUNDARIES,
         historicRowsMutated: false,
+        publishedByEmail: "admin@example.com",
+        publishedByUserId: "admin-user",
         draftRowsPublished: 1,
         campaignRowsRepinned: 0,
       }),
@@ -565,6 +629,23 @@ describe("publishScalingUpFullPhaseFeedbackDraft", () => {
       publishScalingUpFullPhaseFeedbackDraft(db, draft.id, "admin@example.com"),
     ).rejects.toThrow(/privileged actor/i);
     expect(tx.assessmentTemplateVersion.updateMany).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["pre-populated publishedBy", { draftPublishedBy: "unexpected-user" }],
+    ["archivedAt", { draftArchivedAt: new Date("2026-08-20T08:00:00.000Z") }],
+  ])("refuses to publish a draft with %s", async (_label, state) => {
+    const { db, tx, draft } = makeDb({
+      latest: "matching-draft",
+      includeDraftReceipt: true,
+      ...state,
+    });
+
+    await expect(
+      publishScalingUpFullPhaseFeedbackDraft(db, draft.id, "admin@example.com"),
+    ).rejects.toThrow(/exact unpublished draft state/i);
+    expect(tx.assessmentTemplateVersion.updateMany).not.toHaveBeenCalled();
+    expect(tx.auditLog.create).not.toHaveBeenCalled();
   });
 
   it("refuses a stale predecessor when another active edition superseded the receipt source", async () => {
@@ -653,6 +734,26 @@ describe("publishScalingUpFullPhaseFeedbackDraft", () => {
     expect(tx.assessmentTemplateVersion.updateMany).not.toHaveBeenCalled();
     expect(tx.assessmentCampaign.updateMany).not.toHaveBeenCalled();
     expect(tx.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it("attributes an already-published retry to the original receipt publisher", async () => {
+    const { db, draft } = makeDb({
+      latest: "matching-draft",
+      draftPublished: true,
+      includeDraftReceipt: true,
+      includePublishReceipt: true,
+    });
+
+    const result = await publishScalingUpFullPhaseFeedbackDraft(
+      db,
+      draft.id,
+      "retry-admin@example.com",
+    );
+
+    expect(result).toMatchObject({
+      action: "noop",
+      publishedBy: "admin@example.com",
+    });
   });
 
   it("refuses an already-published edition whose publish receipt has stale counts or boundaries", async () => {
