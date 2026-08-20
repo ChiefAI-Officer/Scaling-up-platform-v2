@@ -818,13 +818,17 @@ describe("Wave OSR — the report model is built only when a consumer wants it",
 
 // ─── Report-comparison CEO self-access delivery ───────────────────────────
 
-function mockCeoParticipant(phase1IsCeo: boolean, phase2IsCeo = phase1IsCeo) {
-  dbMock.assessmentCampaignParticipant.findUnique.mockResolvedValue({
-    isCEO: phase1IsCeo,
-  });
-  txMock.assessmentCampaignParticipant.findUnique.mockResolvedValue({
-    isCEO: phase2IsCeo,
-  });
+function mockCeoParticipant(
+  snapshotIsCeo: boolean,
+  finalIsCeo = snapshotIsCeo,
+) {
+  dbMock.assessmentCampaignParticipant.findUnique
+    .mockReset()
+    .mockResolvedValue({ isCEO: snapshotIsCeo });
+  txMock.assessmentCampaignParticipant.findUnique
+    .mockReset()
+    .mockResolvedValueOnce({ isCEO: snapshotIsCeo })
+    .mockResolvedValue({ isCEO: finalIsCeo });
 }
 
 describe("CEO self-access is delivered only through approved disclosures", () => {

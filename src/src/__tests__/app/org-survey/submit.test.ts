@@ -1584,6 +1584,7 @@ describe("#79 — SU-Full CEO-only S_BACKGROUND on submit", () => {
       },
       campaign: {
         id: "c1",
+        reportStyle: "MODERN_DASHBOARD",
         alias: "demo",
         deletedAt: null,
         status: "ACTIVE",
@@ -1622,6 +1623,7 @@ describe("#79 — SU-Full CEO-only S_BACKGROUND on submit", () => {
     txMock.assessmentInvitation.findUnique.mockResolvedValue(invitation);
     dbMock.assessmentCampaignParticipant.findUnique.mockResolvedValue({ isCEO });
     txMock.assessmentCampaignParticipant.findUnique.mockResolvedValue({ isCEO });
+    return invitation;
   }
 
   it("non-CEO submits WITHOUT the CEO-only S_BACKGROUND answer → 200 (#79)", async () => {
@@ -1709,13 +1711,41 @@ describe("#79 — SU-Full CEO-only S_BACKGROUND on submit", () => {
     );
   });
 
-  it("builds only the locked selected style and shares its frozen result with persistence and email", async () => {
+  it("renders only the snapshot-selected style lock-free and shares its frozen result with persistence and email", async () => {
     mockSuFullInvitation(true, { sendResultsToRespondent: true });
     const reportEmail = jest.requireMock(
       "@/lib/assessments/report-email",
     ) as {
       buildRespondentReportFromSubmission: jest.Mock;
+      buildReportEmailHtml: jest.Mock;
     };
+    const actualReportEmail = jest.requireActual(
+      "@/lib/assessments/report-email",
+    ) as {
+      buildRespondentReportFromSubmission: (input: unknown) => unknown;
+      buildReportEmailHtml: (input: unknown) => unknown;
+    };
+    const resultsEmail = jest.requireMock(
+      "@/lib/assessments/results-email",
+    ) as { buildResultsEmailHtml: jest.Mock };
+    const actualResultsEmail = jest.requireActual(
+      "@/lib/assessments/results-email",
+    ) as { buildResultsEmailHtml: (input: unknown) => unknown };
+    const renderTransactionStates: boolean[] = [];
+    reportEmail.buildRespondentReportFromSubmission.mockImplementation(
+      (input: unknown) => {
+        renderTransactionStates.push(transactionActive);
+        return actualReportEmail.buildRespondentReportFromSubmission(input);
+      },
+    );
+    reportEmail.buildReportEmailHtml.mockImplementation((input: unknown) => {
+      renderTransactionStates.push(transactionActive);
+      return actualReportEmail.buildReportEmailHtml(input);
+    });
+    resultsEmail.buildResultsEmailHtml.mockImplementation((input: unknown) => {
+      renderTransactionStates.push(transactionActive);
+      return actualResultsEmail.buildResultsEmailHtml(input);
+    });
 
     const res = await POST(
       jsonReq({
@@ -1728,7 +1758,19 @@ describe("#79 — SU-Full CEO-only S_BACKGROUND on submit", () => {
     );
 
     expect(res.status).toBe(200);
+    expect(renderTransactionStates).toEqual([false, false, false]);
     expect(reportEmail.buildRespondentReportFromSubmission).toHaveBeenCalledTimes(1);
+    expect(txMock.assessmentInvitation.findUnique).toHaveBeenCalledTimes(2);
+    expect(
+      txMock.assessmentInvitation.findUnique.mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      reportEmail.buildRespondentReportFromSubmission.mock.invocationCallOrder[0],
+    );
+    expect(
+      reportEmail.buildRespondentReportFromSubmission.mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      txMock.assessmentInvitation.findUnique.mock.invocationCallOrder[1],
+    );
     const renderInput = reportEmail.buildRespondentReportFromSubmission.mock.calls[0][0];
     const persistedResult = txMock.assessmentSubmission.create.mock.calls[0][0].data.result;
     expect(renderInput.reportStyle).toBe("MODERN_DASHBOARD");
@@ -1745,6 +1787,93 @@ describe("#79 — SU-Full CEO-only S_BACKGROUND on submit", () => {
         call[0].data.recipientRole === "RESPONDENT",
     );
     expect(respondentRows).toHaveLength(1);
+  });
+
+  it("rejects a pinned-version change between the snapshot and final lock", async () => {
+    const snapshot = mockSuFullInvitation(true, {
+      sendResultsToRespondent: true,
+    });
+    const repinned = {
+      ...snapshot,
+      campaign: {
+        ...snapshot.campaign,
+        version: { ...snapshot.campaign.version, id: "v2" },
+      },
+    };
+    txMock.assessmentInvitation.findUnique
+      .mockResolvedValueOnce(snapshot)
+      .mockResolvedValueOnce(repinned);
+
+    const res = await POST(
+      jsonReq({
+        answers: [
+          { stableKey: "q1", value: 4 },
+          { stableKey: "Q_FTE_CONTRACT", value: 8 },
+        ],
+      }) as never,
+      aliasParams("demo"),
+    );
+
+    expect(res.status).toBe(503);
+    expect(await res.json()).toMatchObject({
+      error: "Submission state changed. Please submit again.",
+    });
+    expect(txMock.assessmentSubmission.create).not.toHaveBeenCalled();
+    expect(txMock.assessmentEmailOutbox.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects a CEO designation change between the snapshot and final lock", async () => {
+    mockSuFullInvitation(true, { sendResultsToRespondent: true });
+    txMock.assessmentCampaignParticipant.findUnique
+      .mockResolvedValueOnce({ isCEO: true })
+      .mockResolvedValueOnce({ isCEO: false });
+
+    const res = await POST(
+      jsonReq({
+        answers: [
+          { stableKey: "q1", value: 4 },
+          { stableKey: "Q_FTE_CONTRACT", value: 8 },
+        ],
+      }) as never,
+      aliasParams("demo"),
+    );
+
+    expect(res.status).toBe(503);
+    expect(txMock.assessmentSubmission.create).not.toHaveBeenCalled();
+    expect(txMock.assessmentEmailOutbox.create).not.toHaveBeenCalled();
+  });
+
+  it("degrades a lock-free phase-aware report throw without failing submission", async () => {
+    mockSuFullInvitation(true, { sendResultsToRespondent: true });
+    const reportEmail = jest.requireMock(
+      "@/lib/assessments/report-email",
+    ) as { buildRespondentReportFromSubmission: jest.Mock };
+    const renderTransactionStates: boolean[] = [];
+    reportEmail.buildRespondentReportFromSubmission.mockImplementationOnce(() => {
+      renderTransactionStates.push(transactionActive);
+      throw new Error("phase-aware report failed");
+    });
+
+    const res = await POST(
+      jsonReq({
+        answers: [
+          { stableKey: "q1", value: 4 },
+          { stableKey: "Q_FTE_CONTRACT", value: 8 },
+        ],
+      }) as never,
+      aliasParams("demo"),
+    );
+
+    expect(res.status).toBe(200);
+    expect(renderTransactionStates).toEqual([false]);
+    expect(txMock.assessmentSubmission.create).toHaveBeenCalledTimes(1);
+    const frozen = txMock.assessmentSubmission.create.mock.calls[0][0].data.result;
+    expect(frozen.recommendationPhase).toBe(1);
+    const respondentRows = txMock.assessmentEmailOutbox.create.mock.calls.filter(
+      (call: Array<{ data: { recipientRole: string } }>) =>
+        call[0].data.recipientRole === "RESPONDENT",
+    );
+    expect(respondentRows).toHaveLength(0);
   });
 
   it.each(
