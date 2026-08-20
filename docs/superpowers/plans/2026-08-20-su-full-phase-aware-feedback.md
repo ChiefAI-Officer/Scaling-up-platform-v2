@@ -332,11 +332,17 @@ Load the exact reviewed values from the signed approval receipt into task-specif
 
 ```bash
 test -n "$SU_FULL_PHASE_FEEDBACK_APPROVED_DRAFT_ID"
+test -n "$SU_FULL_PHASE_FEEDBACK_APPROVED_CONTENT_HASH"
 test -n "$SU_FULL_PHASE_FEEDBACK_APPROVED_ACTOR"
-npx tsx scripts/publish-scaling-up-full-phase-feedback-draft.ts --draft-version-id "$SU_FULL_PHASE_FEEDBACK_APPROVED_DRAFT_ID" --actor "$SU_FULL_PHASE_FEEDBACK_APPROVED_ACTOR"
+npx tsx scripts/publish-scaling-up-full-phase-feedback-draft.ts --i-know-this-is-prod
 ```
 
-The script must reject blank, stale, or mismatched inputs.
+The approval must supply `SU_FULL_PHASE_FEEDBACK_APPROVED_DRAFT_ID`,
+`SU_FULL_PHASE_FEEDBACK_APPROVED_CONTENT_HASH`, and
+`SU_FULL_PHASE_FEEDBACK_APPROVED_ACTOR` through the approval-scoped environment.
+The script must reject blank, stale, or mismatched inputs and any ad-hoc
+`--draft-version-id`, `--content-hash`, `--approved-content-hash`, or `--actor`
+override.
 
 - [ ] **Step 3: Verify Production without mutating historic data**
 

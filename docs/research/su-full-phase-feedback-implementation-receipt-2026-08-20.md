@@ -83,13 +83,13 @@ The build retained expected non-fatal local diagnostics for the deprecated middl
 
 ## Branch risk review
 
-- **Benchmarks and Peers:** no diff exists in the governed Scaling Up Full benchmark snapshot, peer-presentation resolver, benchmark storage, or benchmark seed path. No benchmark refresh ran. Feedback text remains separate from Peers; `Peers changed: false`.
+- **Benchmarks and Peers:** no benchmark dataset, peer value, peer-presentation rule, or peer geometry changed, and no benchmark refresh ran. `su-full-landscape-report.ts` now prefers frozen `ScoreResult.recommendationPhase` for the growth-phase narrative; that model change does not alter Peers values or bars. `Peers changed: false`.
 - **Published editions and campaigns:** no draft/publish command ran, no published-version state changed, and no existing campaign was created or repinned. The guarded publish implementation updates only an exact audited draft and exposes no campaign mutation API.
 - **Submissions:** no historical submission, response, or answer was updated or backfilled. The submit-route change only freezes phase/recommendation fields while a future submission is being created from its already-pinned version.
 - **Configuration and data model:** no schema, migration, runtime rollout flag, or environment file was added or changed. The operator CLIs accept explicit task-scoped actor/draft inputs but are not application feature flags.
 - **Sensitive and binary artifacts:** added branch files contain no detected private key, database URL, provider token pattern, or credential artifact. No PDF or PNG was added by this branch or Task 6; the Chromium PDF stays in a temporary directory and is deleted.
 - **Integrated main receipt:** the Coach drawer component and test are byte-identical to `origin/main`; its launched Production receipt remains unmodified below the newer dark-release entry.
-- **Whitespace/scope:** the 45-file feature diff passes `git diff --check origin/main...HEAD`; the integrated tree contains no phase-branch diff in schema/migrations, benchmark/Peers paths, environment files, or tracked PDF/PNG artifacts.
+- **Whitespace/scope:** the 45-file feature diff passes `git diff --check origin/main...HEAD`; the integrated tree contains no schema/migration, environment-file, tracked PDF/PNG, benchmark-dataset, peer-value, peer-presentation, or peer-geometry change. The landscape model's frozen growth-phase narrative selection is the only Peers-adjacent report-path distinction noted above.
 
 ## Explicit next gate
 
