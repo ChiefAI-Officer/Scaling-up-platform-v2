@@ -21,9 +21,9 @@ The second item is the **feedback-text concern** addressed here. It must not be 
 
 | Track | Done evidence | Current conclusion | Remaining action |
 | --- | --- | --- | --- |
-| Feedback text and score bands | Completed 11-report Management suite, four May-like Delegation controls, and four one-variable 100-employee controls: 1,159 rendered feedback observations | Score selects one of four visible groups (`0–4`, `5–6`, `7–8`, `9–10`). Changing only employee count from 50/Management to 100/Delegation reproduces all 46 substantive Delegation-vs-Management differences and no others; isolated text equals May-like Delegation 244/244. | Do not change Platform content yet. Map the live Management/Delegation boundary and distinguish phase-band selection from finer headcount selection before designing feedback plumbing. |
+| Feedback text and score bands | Completed 55-report, five-phase, every-integer suite: 3,355/3,355 rendered feedback observations plus 12 live boundary probes | Every phase uses four visible groups (`0–4`, `5–6`, `7–8`, `9–10`) with zero violations. Wording is selected by `phase × score band × question`; 358/671 score/question positions are phase-sensitive. | Evidence work is complete. Seek approval for a forward-only phase-aware implementation plan; do not mutate or activate content yet. |
 | Peer benchmarks | Controlled Q01 0–10 variation plus company-profile/phase controls; same ordered 61-value vector in the reported controls | Governed external snapshot, not current-team mean, within the tested source conditions | No peer re-test is part of Step 1; revisit only under a separately approved benchmark-refresh decision |
-| Platform behavior | Edition 4 receipt, code safeguards, and tests | Existing campaigns retain their pinned Edition 3; future campaigns resolve active Edition 4; stored submissions render from their frozen result and pinned version | Do not change Platform behavior based on audit observations without a new explicit decision gate |
+| Platform behavior | Edition 4 receipt, code safeguards/tests, and adjacent live probes for all four phase transitions | Existing campaigns remain pinned/frozen. Current Platform phase bands change one employee too early at every transition versus live Esperto. | Correct phase logic and introduce the 1,220-record phase-band catalogue together in a reviewed, forward-only edition; Peers remain unchanged. |
 
 Primary evidence: [feedback methodology](esperto-feedback-text-and-thresholds-2026-08-14.md), [feedback catalogue](esperto-feedback-text-catalogue-2026-08-14.csv), [Edition 4 production receipt](esperto-feedback-band-production-receipt-2026-08-14.md), [peer controlled-source findings](esperto-peer-benchmark-sources.md), [peer snapshot and ledger](esperto-peer-benchmark-snapshot-2026-08-14.md), and [production changelog receipt](../../plans/CHANGELOG.md#su-full-feedback-bands-published).
 
@@ -192,19 +192,56 @@ Combined with accepted Management and Delegation controls, the completed Level-1
 
 This proves the canonical feedback catalogue is phase-aware, not globally score-only. It does not yet prove that every phase uses the same within-band integer grouping.
 
-## Approved Step 6 — every-integer five-phase closeout — in progress, browser-policy paused
+## Approved Step 6 — every-integer five-phase closeout — completed
 
-The remaining 28 mail-disabled campaigns were created for scores `1, 2, 3, 4, 6, 8, 10` in P1, P2, P4, and P5. P1 scores `1, 2, 3, 4, 6` were fully submitted with the fixed profile and expected Pioneering phase. Before P1 score 8 loaded, Esperto returned `ERR_EMPTY_RESPONSE`; the survey tab moved to its local `data:` error page, and the governed browser then refused further navigation from that blocked page. No bypass, fresh browser surface, direct network request, or token replay was attempted.
+All 28 remaining mail-disabled campaigns were resumed and completed at scores `1, 2, 3, 4, 6, 8, 10` in P1, P2, P4, and P5. Together with the 27 accepted reports already captured for P1/P2/P3/P4/P5 anchors and the Management every-integer suite, the final evidence set contains **55 unique 26-page reports and 3,355/3,355 nonblank feedback cells**.
 
-The exact resumption inventory and campaign IDs are recorded in the [boundary/full-closeout specification](esperto-feedback-boundary-and-closeout-spec-2026-08-20.md#level-2-started-then-paused-by-the-governed-browser-boundary). The strict `5 × 11 × 61 = 3,355`-cell claim remains open. The five submitted extra P1 runs still require PDF download/extraction; 23 created campaigns remain unsubmitted. Every created campaign was checked with mail automation disabled.
+Every report passed all structural gates: current `ScaleUp2` / `enUS` personal report, expected fixed headcount and phase on page 4, canonical Q01–Q61 order, requested uniform score on all 61 rows, unique SHA-256 fingerprint, and disabled invitation/reminder/confirmation switches after completion. Representative page-4 and page-8 renders from the newly completed P1, P2, P4, and P5 score-10 PDFs were also visually inspected; the printed phase, score bars, question labels, and feedback paragraphs were legible and consistent with the extracted rows.
+
+The full source evidence is split deliberately by purpose:
+
+- [55-report run manifest](esperto-feedback-five-phase-full-manifest-2026-08-20.csv): campaign IDs, aliases, local PDF paths, full SHA-256 values, page/row counts, phase headings, and mail receipts;
+- [3,355-cell full matrix](esperto-feedback-five-phase-full-matrix-2026-08-20.csv): phase, integer score, Q01–Q61 text, incidental Peer value, PDF fingerprint, and campaign ID;
+- [305-row band-validation summary](esperto-feedback-five-phase-band-summary-2026-08-20.csv): per-phase/per-question within-band equality, transition presence, and distinct-text count;
+- [1,220-row phase-band catalogue](esperto-feedback-five-phase-band-catalogue-2026-08-20.csv): implementation-ready current-source text for `5 phases × 4 visible bands × 61 questions`;
+- [Edition 4 impact summary](esperto-feedback-edition4-vs-five-phase-summary-2026-08-20.csv): lexical match/change counts for every phase and integer score.
+
+### Final every-integer result
+
+All five phases independently use the same four visible score groups, with **zero violations**:
+
+| Phase | `0–4` violations | `5–6` | `7–8` | `9–10` | Changes `4→5` | `6→7` | `8→9` | Distinct-text distribution across 61 questions |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| P1 — Pioneering | 0 | 0 | 0 | 0 | 52 | 61 | 59 | 51×4, 9×3, 1×2 |
+| P2 — Organization | 0 | 0 | 0 | 0 | 52 | 61 | 59 | 51×4, 9×3, 1×2 |
+| P3 — Management | 0 | 0 | 0 | 0 | 54 | 61 | 60 | 54×4, 6×3, 1×2 |
+| P4 — Delegation | 0 | 0 | 0 | 0 | 54 | 61 | 60 | 54×4, 6×3, 1×2 |
+| P5 — Standardization | 0 | 0 | 0 | 0 | 54 | 61 | 59 | 53×4, 7×3, 1×2 |
+
+Across all integer scores, 358/671 score/question positions are phase-sensitive and 42/61 questions are phase-sensitive at least once. The score-expanded current Edition 4 lookup differs lexically from current Esperto in 1,183/3,355 phase/score/question cells. At the deduplicated implementation level, 384/1,220 phase-band/question records differ. The target is therefore not a small threshold tweak: it is a phase-aware current-source content edition.
+
+## Approved Step 7 — exhaustive live phase-boundary closeout — completed
+
+Mail-disabled fixed-profile live probes established all four adjacent transitions. The durable no-secret receipt is [the live phase-boundary manifest](esperto-feedback-live-phase-boundary-manifest-2026-08-20.csv).
+
+| Current live Esperto band | Accepted adjacent observations | Current Platform band | Finding |
+| --- | --- | --- | --- |
+| P1 — Pioneering `1–8` | `8 = P1`, `9 = P2` | `1–7` | Platform changes one employee early |
+| P2 — Organization `9–25` | `25 = P2`, `26 = P3` | `8–24` | Platform changes one employee early |
+| P3 — Management `26–50` | `50 = P3`, `51 = P4` | `25–49` | Platform changes one employee early |
+| P4 — Delegation `51–150` | `150 = P4`, `151 = P5` | `50–149` | Platform changes one employee early |
+| P5 — Standardization `151+` | `151 = P5` | `150+` | Platform changes one employee early |
+
+The older workbook/source-extract assumption (`1–7 / 8–24 / 25–49 / 50–149 / 150+`) is stale relative to current live Esperto. All four transitions in the current Platform helper are off by one. The narrow claim remains versioned: these observations apply to the fixed current CEO/personal `ScaleUp2` / `enUS` flow on 2026-08-20.
 
 ## Assessment and recommended next step
 
 1. **Jeff's underlying concern is now resolved at the model level.** Feedback selection changes by both answer band and organizational phase. It is not AI-generated on report creation, not controlled by Peers, and not a single score-only lookup.
 2. **The P3/P4 boundary and same-phase concern are closed.** Current live Esperto changes from Management at 50 to Delegation at 51; 51 and 100 select identical score-5 feedback for all 61 questions.
 3. **All five phases are proven relevant.** The 1,220-cell anchor matrix finds phase-dependent text in 42 questions. Any implementation that omits Pioneering, Organization, or Standardization would be knowingly incomplete.
-4. **Next best foot forward:** resume the already-created campaigns in a policy-permitted authenticated browser session; complete P1 scores 8/10 first, download all seven P1 remainder reports, then complete P2, P4, and P5 remainders. This avoids duplicate campaigns and closes every integer without assuming shared thresholds.
-5. **Only after the 3,355-cell ledger is complete:** correct the Platform phase boundary and design a forward-only, versioned `phase × score band × question` feedback edition with frozen historical report regression coverage. Peer benchmarks remain separate and unchanged.
+4. **The every-integer evidence question is closed.** Every phase uses `0–4 / 5–6 / 7–8 / 9–10`, with zero within-band violations across 3,355 cells.
+5. **The phase-boundary evidence question is closed.** Current live bands are `1–8 / 9–25 / 26–50 / 51–150 / 151+`; every current Platform transition is one employee early.
+6. **Recommended next best foot forward:** approve a narrow implementation plan that changes the phase resolver and introduces a forward-only, versioned `phase × score band × question` feedback edition from the 1,220-row catalogue. Preserve all frozen historic results and campaign pinning, add exact-boundary and all-phase lookup tests, and keep Peers untouched. Do not publish or activate that edition until the implementation diff, migration/seed behavior, PDF rendering, and Production smoke plan have been reviewed.
 
 ## Visual talking guide
 
@@ -238,8 +275,13 @@ Jeff's request (Aug 13)
         |                               +--> 1,220 phase/anchor cells
         |                               +--> 122/244 positions phase-sensitive
         |                               +--> 42/61 questions phase-sensitive
-        |                               +--> strict every-integer closeout paused
-        |                                     by governed browser error-page policy
+        |                               +--> strict every-integer closeout completed
+        |                                     |
+        |                                     +--> 55 reports / 3,355 cells
+        |                                     +--> zero within-band violations
+        |                                     +--> selector = phase × score band × question
+        |                                     +--> live bands: 1–8 / 9–25 / 26–50 /
+        |                                           51–150 / 151+
         |
         +--> “Where do Peers values come from?”
                 |
@@ -260,6 +302,7 @@ Jeff's request (Aug 13)
 - Phase-isolation evidence: [control specification](esperto-feedback-phase-isolation-control-spec-2026-08-20.md), [61 × 4 isolated matrix](esperto-feedback-phase-isolation-live-matrix-2026-08-20.csv), and [244-cell three-way text ledger](esperto-feedback-phase-isolation-three-way-comparison-2026-08-20.csv).
 - Phase-isolation PDFs: `/Users/diushianstand/Downloads/ScalingUp_report_Wavex Verify_2026-08-20T08_05_24-04_00.pdf`, `...T08_06_45-04_00.pdf`, `...T08_07_50-04_00.pdf`, and `...T08_08_52-04_00.pdf`; the Step 3 table records score-specific fingerprints.
 - Boundary and five-phase anchor evidence: [experiment/closeout specification](esperto-feedback-boundary-and-closeout-spec-2026-08-20.md), [full-text anchor comparison](esperto-feedback-five-phase-anchor-comparison-2026-08-20.csv), and [campaign/PDF manifest](esperto-feedback-boundary-and-five-phase-anchor-manifest-2026-08-20.csv).
+- Exhaustive five-phase evidence: [55-report manifest](esperto-feedback-five-phase-full-manifest-2026-08-20.csv), [3,355-cell matrix](esperto-feedback-five-phase-full-matrix-2026-08-20.csv), [band-validation summary](esperto-feedback-five-phase-band-summary-2026-08-20.csv), [implementation-ready phase-band catalogue](esperto-feedback-five-phase-band-catalogue-2026-08-20.csv), [Edition 4 impact summary](esperto-feedback-edition4-vs-five-phase-summary-2026-08-20.csv), and [live phase-boundary manifest](esperto-feedback-live-phase-boundary-manifest-2026-08-20.csv).
 - Boundary PDF: `/Users/diushianstand/Downloads/ScalingUp_report_Wavex Verify_2026-08-20T08_40_58-04_00.pdf`; the manifest records all 12 additional anchor PDFs and full fingerprints.
 - Current live PDFs: `/Users/diushianstand/Downloads/ScalingUp_report_Wavex Verify_2026-08-20T03_07_13-04_00.pdf` through `/Users/diushianstand/Downloads/ScalingUp_report_Wavex Verify_2026-08-20T03_32_32-04_00.pdf`; the result table records per-score SHA-256 prefixes.
 - Peer research: [controlled-source findings](esperto-peer-benchmark-sources.md) and [snapshot/ledger](esperto-peer-benchmark-snapshot-2026-08-14.md).

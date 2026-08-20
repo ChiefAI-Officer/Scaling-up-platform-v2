@@ -1,0 +1,306 @@
+phase,phase_name,question_id,question,unique_texts,scores_0_4_equal,scores_5_6_equal,scores_7_8_equal,scores_9_10_equal,change_4_to_5,change_6_to_7,change_8_to_9
+P1,Pioneering,Q01,Effective recruitment process,4,true,true,true,true,true,true,true
+P1,Pioneering,Q02,High staff retention,4,true,true,true,true,true,true,true
+P1,Pioneering,Q03,Onboarding program,3,true,true,true,true,false,true,true
+P1,Pioneering,Q04,Measuring employee satisfaction,3,true,true,true,true,true,true,false
+P1,Pioneering,Q05,Positive about re-hiring employees,4,true,true,true,true,true,true,true
+P1,Pioneering,Q06,Every employee has a training plan,3,true,true,true,true,false,true,true
+P1,Pioneering,Q07,Outsourcing / Offshoring operations,4,true,true,true,true,true,true,true
+P1,Pioneering,Q08,We apply flat-management or self-steering/organizing teams,4,true,true,true,true,true,true,true
+P1,Pioneering,Q09,We have Core values,4,true,true,true,true,true,true,true
+P1,Pioneering,Q10,We have focus on customers' needs,3,true,true,true,true,false,true,true
+P1,Pioneering,Q11,Employees know core values,4,true,true,true,true,true,true,true
+P1,Pioneering,Q12,We are transparent,4,true,true,true,true,true,true,true
+P1,Pioneering,Q13,We have a positive and healthy culture,4,true,true,true,true,true,true,true
+P1,Pioneering,Q14,We have formulated a long term (non-financial) goal,4,true,true,true,true,true,true,true
+P1,Pioneering,Q15,We have formulated yearly goals,4,true,true,true,true,true,true,true
+P1,Pioneering,Q16,We have formulated quarterly/ monthly goals (other than financial goals),4,true,true,true,true,true,true,true
+P1,Pioneering,Q17,We work with a strategic plan,4,true,true,true,true,true,true,true
+P1,Pioneering,Q18,Each employee has personalized goals,4,true,true,true,true,true,true,true
+P1,Pioneering,Q19,We have implemented a growth methodology,4,true,true,true,true,true,true,true
+P1,Pioneering,Q20,We have an active acquisitions strategy,4,true,true,true,true,true,true,true
+P1,Pioneering,Q21,Tasks are properly allocated,4,true,true,true,true,true,true,true
+P1,Pioneering,Q22,We have weekly management meetings.,4,true,true,true,true,true,true,true
+P1,Pioneering,Q23,We have periodic strategic sessions.,4,true,true,true,true,true,true,true
+P1,Pioneering,Q24,Leadership team receives regular training,4,true,true,true,true,true,true,true
+P1,Pioneering,Q25,Our goals are translated into clear KPIs,4,true,true,true,true,true,true,true
+P1,Pioneering,Q26,We use real-time data to measure our performance,4,true,true,true,true,true,true,true
+P1,Pioneering,Q27,"We grow with limited mistakes, errors and problems",4,true,true,true,true,true,true,true
+P1,Pioneering,Q28,We measure customer satisfaction,4,true,true,true,true,true,true,true
+P1,Pioneering,Q29,We have systematic processes for continuous improvement,4,true,true,true,true,true,true,true
+P1,Pioneering,Q30,We have an effective lead generation process,4,true,true,true,true,true,true,true
+P1,Pioneering,Q31,Sales achievement,4,true,true,true,true,true,true,true
+P1,Pioneering,Q32,Weekly sales meeting,4,true,true,true,true,true,true,true
+P1,Pioneering,Q33,Head of sales is not the entrepreneur,3,true,true,true,true,false,true,true
+P1,Pioneering,Q34,We have an effective PR/communication strategy,4,true,true,true,true,true,true,true
+P1,Pioneering,Q35,Most processes are automated,3,true,true,true,true,false,true,true
+P1,Pioneering,Q36,Systems prepped for growth,4,true,true,true,true,true,true,true
+P1,Pioneering,Q37,Better systems than competitors,4,true,true,true,true,true,true,true
+P1,Pioneering,Q38,Knowledge on latest technology,4,true,true,true,true,true,true,true
+P1,Pioneering,Q39,We are more innovative than competitors,3,true,true,true,true,false,true,true
+P1,Pioneering,Q40,Our business model is disruptive,4,true,true,true,true,true,true,true
+P1,Pioneering,Q41,Real time financial insights,4,true,true,true,true,true,true,true
+P1,Pioneering,Q42,Up-to-date cashflow planning,4,true,true,true,true,true,true,true
+P1,Pioneering,Q43,Access to growth capital,4,true,true,true,true,true,true,true
+P1,Pioneering,Q44,Financial alert function,4,true,true,true,true,true,true,true
+P1,Pioneering,Q45,Leadership understands balance sheet,3,true,true,true,true,false,true,true
+P1,Pioneering,Q46,CEO works on the company and is able to remove from daily operations,4,true,true,true,true,true,true,true
+P1,Pioneering,Q47,Have a mentor,4,true,true,true,true,true,true,true
+P1,Pioneering,Q48,Have an entrepreneurial network,4,true,true,true,true,true,true,true
+P1,Pioneering,Q49,Enjoy management of company,4,true,true,true,true,true,true,true
+P1,Pioneering,Q50,Energized by team and company,2,true,true,true,true,false,true,false
+P1,Pioneering,Q51,Absence of CEO is possible,4,true,true,true,true,true,true,true
+P1,Pioneering,Q52,Read business books,4,true,true,true,true,true,true,true
+P1,Pioneering,Q53,Receives regular education,4,true,true,true,true,true,true,true
+P1,Pioneering,Q54,Healthy work - life balance,4,true,true,true,true,true,true,true
+P1,Pioneering,Q55,I am happy,4,true,true,true,true,true,true,true
+P1,Pioneering,Q56,Employees know long term goal,4,true,true,true,true,true,true,true
+P1,Pioneering,Q57,Employees know yearly goal,4,true,true,true,true,true,true,true
+P1,Pioneering,Q58,Employees know quarterly/monthly goals,4,true,true,true,true,true,true,true
+P1,Pioneering,Q59,Employees know vision and mission,4,true,true,true,true,true,true,true
+P1,Pioneering,Q60,Employees know elevator pitch,3,true,true,true,true,false,true,true
+P1,Pioneering,Q61,We frequently have company-wide meetings,4,true,true,true,true,true,true,true
+P2,Organization,Q01,Effective recruitment process,4,true,true,true,true,true,true,true
+P2,Organization,Q02,High staff retention,4,true,true,true,true,true,true,true
+P2,Organization,Q03,Onboarding program,3,true,true,true,true,false,true,true
+P2,Organization,Q04,Measuring employee satisfaction,3,true,true,true,true,true,true,false
+P2,Organization,Q05,Positive about re-hiring employees,4,true,true,true,true,true,true,true
+P2,Organization,Q06,Every employee has a training plan,4,true,true,true,true,true,true,true
+P2,Organization,Q07,Outsourcing / Offshoring operations,4,true,true,true,true,true,true,true
+P2,Organization,Q08,We apply flat-management or self-steering/organizing teams,4,true,true,true,true,true,true,true
+P2,Organization,Q09,We have Core values,4,true,true,true,true,true,true,true
+P2,Organization,Q10,We have focus on customers' needs,3,true,true,true,true,false,true,true
+P2,Organization,Q11,Employees know core values,4,true,true,true,true,true,true,true
+P2,Organization,Q12,We are transparent,4,true,true,true,true,true,true,true
+P2,Organization,Q13,We have a positive and healthy culture,3,true,true,true,true,false,true,true
+P2,Organization,Q14,We have formulated a long term (non-financial) goal,4,true,true,true,true,true,true,true
+P2,Organization,Q15,We have formulated yearly goals,4,true,true,true,true,true,true,true
+P2,Organization,Q16,We have formulated quarterly/ monthly goals (other than financial goals),4,true,true,true,true,true,true,true
+P2,Organization,Q17,We work with a strategic plan,4,true,true,true,true,true,true,true
+P2,Organization,Q18,Each employee has personalized goals,4,true,true,true,true,true,true,true
+P2,Organization,Q19,We have implemented a growth methodology,4,true,true,true,true,true,true,true
+P2,Organization,Q20,We have an active acquisitions strategy,4,true,true,true,true,true,true,true
+P2,Organization,Q21,Tasks are properly allocated,4,true,true,true,true,true,true,true
+P2,Organization,Q22,We have weekly management meetings.,4,true,true,true,true,true,true,true
+P2,Organization,Q23,We have periodic strategic sessions.,4,true,true,true,true,true,true,true
+P2,Organization,Q24,Leadership team receives regular training,4,true,true,true,true,true,true,true
+P2,Organization,Q25,Our goals are translated into clear KPIs,4,true,true,true,true,true,true,true
+P2,Organization,Q26,We use real-time data to measure our performance,4,true,true,true,true,true,true,true
+P2,Organization,Q27,"We grow with limited mistakes, errors and problems",4,true,true,true,true,true,true,true
+P2,Organization,Q28,We measure customer satisfaction,4,true,true,true,true,true,true,true
+P2,Organization,Q29,We have systematic processes for continuous improvement,4,true,true,true,true,true,true,true
+P2,Organization,Q30,We have an effective lead generation process,4,true,true,true,true,true,true,true
+P2,Organization,Q31,Sales achievement,4,true,true,true,true,true,true,true
+P2,Organization,Q32,Weekly sales meeting,4,true,true,true,true,true,true,true
+P2,Organization,Q33,Head of sales is not the entrepreneur,3,true,true,true,true,false,true,true
+P2,Organization,Q34,We have an effective PR/communication strategy,4,true,true,true,true,true,true,true
+P2,Organization,Q35,Most processes are automated,3,true,true,true,true,false,true,true
+P2,Organization,Q36,Systems prepped for growth,4,true,true,true,true,true,true,true
+P2,Organization,Q37,Better systems than competitors,4,true,true,true,true,true,true,true
+P2,Organization,Q38,Knowledge on latest technology,4,true,true,true,true,true,true,true
+P2,Organization,Q39,We are more innovative than competitors,3,true,true,true,true,false,true,true
+P2,Organization,Q40,Our business model is disruptive,4,true,true,true,true,true,true,true
+P2,Organization,Q41,Real time financial insights,4,true,true,true,true,true,true,true
+P2,Organization,Q42,Up-to-date cashflow planning,4,true,true,true,true,true,true,true
+P2,Organization,Q43,Access to growth capital,4,true,true,true,true,true,true,true
+P2,Organization,Q44,Financial alert function,4,true,true,true,true,true,true,true
+P2,Organization,Q45,Leadership understands balance sheet,3,true,true,true,true,false,true,true
+P2,Organization,Q46,CEO works on the company and is able to remove from daily operations,4,true,true,true,true,true,true,true
+P2,Organization,Q47,Have a mentor,4,true,true,true,true,true,true,true
+P2,Organization,Q48,Have an entrepreneurial network,4,true,true,true,true,true,true,true
+P2,Organization,Q49,Enjoy management of company,4,true,true,true,true,true,true,true
+P2,Organization,Q50,Energized by team and company,2,true,true,true,true,false,true,false
+P2,Organization,Q51,Absence of CEO is possible,4,true,true,true,true,true,true,true
+P2,Organization,Q52,Read business books,4,true,true,true,true,true,true,true
+P2,Organization,Q53,Receives regular education,4,true,true,true,true,true,true,true
+P2,Organization,Q54,Healthy work - life balance,4,true,true,true,true,true,true,true
+P2,Organization,Q55,I am happy,4,true,true,true,true,true,true,true
+P2,Organization,Q56,Employees know long term goal,4,true,true,true,true,true,true,true
+P2,Organization,Q57,Employees know yearly goal,4,true,true,true,true,true,true,true
+P2,Organization,Q58,Employees know quarterly/monthly goals,4,true,true,true,true,true,true,true
+P2,Organization,Q59,Employees know vision and mission,4,true,true,true,true,true,true,true
+P2,Organization,Q60,Employees know elevator pitch,3,true,true,true,true,false,true,true
+P2,Organization,Q61,We frequently have company-wide meetings,4,true,true,true,true,true,true,true
+P3,Management,Q01,Effective recruitment process,4,true,true,true,true,true,true,true
+P3,Management,Q02,High staff retention,4,true,true,true,true,true,true,true
+P3,Management,Q03,Onboarding program,4,true,true,true,true,true,true,true
+P3,Management,Q04,Measuring employee satisfaction,4,true,true,true,true,true,true,true
+P3,Management,Q05,Positive about re-hiring employees,4,true,true,true,true,true,true,true
+P3,Management,Q06,Every employee has a training plan,4,true,true,true,true,true,true,true
+P3,Management,Q07,Outsourcing / Offshoring operations,4,true,true,true,true,true,true,true
+P3,Management,Q08,We apply flat-management or self-steering/organizing teams,4,true,true,true,true,true,true,true
+P3,Management,Q09,We have Core values,4,true,true,true,true,true,true,true
+P3,Management,Q10,We have focus on customers' needs,3,true,true,true,true,false,true,true
+P3,Management,Q11,Employees know core values,4,true,true,true,true,true,true,true
+P3,Management,Q12,We are transparent,4,true,true,true,true,true,true,true
+P3,Management,Q13,We have a positive and healthy culture,4,true,true,true,true,true,true,true
+P3,Management,Q14,We have formulated a long term (non-financial) goal,4,true,true,true,true,true,true,true
+P3,Management,Q15,We have formulated yearly goals,4,true,true,true,true,true,true,true
+P3,Management,Q16,We have formulated quarterly/ monthly goals (other than financial goals),4,true,true,true,true,true,true,true
+P3,Management,Q17,We work with a strategic plan,4,true,true,true,true,true,true,true
+P3,Management,Q18,Each employee has personalized goals,4,true,true,true,true,true,true,true
+P3,Management,Q19,We have implemented a growth methodology,4,true,true,true,true,true,true,true
+P3,Management,Q20,We have an active acquisitions strategy,4,true,true,true,true,true,true,true
+P3,Management,Q21,Tasks are properly allocated,3,true,true,true,true,false,true,true
+P3,Management,Q22,We have weekly management meetings.,4,true,true,true,true,true,true,true
+P3,Management,Q23,We have periodic strategic sessions.,4,true,true,true,true,true,true,true
+P3,Management,Q24,Leadership team receives regular training,4,true,true,true,true,true,true,true
+P3,Management,Q25,Our goals are translated into clear KPIs,4,true,true,true,true,true,true,true
+P3,Management,Q26,We use real-time data to measure our performance,4,true,true,true,true,true,true,true
+P3,Management,Q27,"We grow with limited mistakes, errors and problems",4,true,true,true,true,true,true,true
+P3,Management,Q28,We measure customer satisfaction,4,true,true,true,true,true,true,true
+P3,Management,Q29,We have systematic processes for continuous improvement,4,true,true,true,true,true,true,true
+P3,Management,Q30,We have an effective lead generation process,4,true,true,true,true,true,true,true
+P3,Management,Q31,Sales achievement,4,true,true,true,true,true,true,true
+P3,Management,Q32,Weekly sales meeting,4,true,true,true,true,true,true,true
+P3,Management,Q33,Head of sales is not the entrepreneur,3,true,true,true,true,false,true,true
+P3,Management,Q34,We have an effective PR/communication strategy,4,true,true,true,true,true,true,true
+P3,Management,Q35,Most processes are automated,4,true,true,true,true,true,true,true
+P3,Management,Q36,Systems prepped for growth,4,true,true,true,true,true,true,true
+P3,Management,Q37,Better systems than competitors,4,true,true,true,true,true,true,true
+P3,Management,Q38,Knowledge on latest technology,4,true,true,true,true,true,true,true
+P3,Management,Q39,We are more innovative than competitors,3,true,true,true,true,false,true,true
+P3,Management,Q40,Our business model is disruptive,4,true,true,true,true,true,true,true
+P3,Management,Q41,Real time financial insights,4,true,true,true,true,true,true,true
+P3,Management,Q42,Up-to-date cashflow planning,4,true,true,true,true,true,true,true
+P3,Management,Q43,Access to growth capital,4,true,true,true,true,true,true,true
+P3,Management,Q44,Financial alert function,4,true,true,true,true,true,true,true
+P3,Management,Q45,Leadership understands balance sheet,3,true,true,true,true,false,true,true
+P3,Management,Q46,CEO works on the company and is able to remove from daily operations,4,true,true,true,true,true,true,true
+P3,Management,Q47,Have a mentor,4,true,true,true,true,true,true,true
+P3,Management,Q48,Have an entrepreneurial network,4,true,true,true,true,true,true,true
+P3,Management,Q49,Enjoy management of company,4,true,true,true,true,true,true,true
+P3,Management,Q50,Energized by team and company,2,true,true,true,true,false,true,false
+P3,Management,Q51,Absence of CEO is possible,4,true,true,true,true,true,true,true
+P3,Management,Q52,Read business books,4,true,true,true,true,true,true,true
+P3,Management,Q53,Receives regular education,4,true,true,true,true,true,true,true
+P3,Management,Q54,Healthy work - life balance,4,true,true,true,true,true,true,true
+P3,Management,Q55,I am happy,4,true,true,true,true,true,true,true
+P3,Management,Q56,Employees know long term goal,4,true,true,true,true,true,true,true
+P3,Management,Q57,Employees know yearly goal,4,true,true,true,true,true,true,true
+P3,Management,Q58,Employees know quarterly/monthly goals,4,true,true,true,true,true,true,true
+P3,Management,Q59,Employees know vision and mission,4,true,true,true,true,true,true,true
+P3,Management,Q60,Employees know elevator pitch,3,true,true,true,true,false,true,true
+P3,Management,Q61,We frequently have company-wide meetings,4,true,true,true,true,true,true,true
+P4,Delegation,Q01,Effective recruitment process,4,true,true,true,true,true,true,true
+P4,Delegation,Q02,High staff retention,4,true,true,true,true,true,true,true
+P4,Delegation,Q03,Onboarding program,4,true,true,true,true,true,true,true
+P4,Delegation,Q04,Measuring employee satisfaction,4,true,true,true,true,true,true,true
+P4,Delegation,Q05,Positive about re-hiring employees,4,true,true,true,true,true,true,true
+P4,Delegation,Q06,Every employee has a training plan,4,true,true,true,true,true,true,true
+P4,Delegation,Q07,Outsourcing / Offshoring operations,4,true,true,true,true,true,true,true
+P4,Delegation,Q08,We apply flat-management or self-steering/organizing teams,4,true,true,true,true,true,true,true
+P4,Delegation,Q09,We have Core values,4,true,true,true,true,true,true,true
+P4,Delegation,Q10,We have focus on customers' needs,3,true,true,true,true,false,true,true
+P4,Delegation,Q11,Employees know core values,4,true,true,true,true,true,true,true
+P4,Delegation,Q12,We are transparent,4,true,true,true,true,true,true,true
+P4,Delegation,Q13,We have a positive and healthy culture,4,true,true,true,true,true,true,true
+P4,Delegation,Q14,We have formulated a long term (non-financial) goal,4,true,true,true,true,true,true,true
+P4,Delegation,Q15,We have formulated yearly goals,4,true,true,true,true,true,true,true
+P4,Delegation,Q16,We have formulated quarterly/ monthly goals (other than financial goals),4,true,true,true,true,true,true,true
+P4,Delegation,Q17,We work with a strategic plan,4,true,true,true,true,true,true,true
+P4,Delegation,Q18,Each employee has personalized goals,4,true,true,true,true,true,true,true
+P4,Delegation,Q19,We have implemented a growth methodology,4,true,true,true,true,true,true,true
+P4,Delegation,Q20,We have an active acquisitions strategy,4,true,true,true,true,true,true,true
+P4,Delegation,Q21,Tasks are properly allocated,4,true,true,true,true,true,true,true
+P4,Delegation,Q22,We have weekly management meetings.,4,true,true,true,true,true,true,true
+P4,Delegation,Q23,We have periodic strategic sessions.,4,true,true,true,true,true,true,true
+P4,Delegation,Q24,Leadership team receives regular training,4,true,true,true,true,true,true,true
+P4,Delegation,Q25,Our goals are translated into clear KPIs,4,true,true,true,true,true,true,true
+P4,Delegation,Q26,We use real-time data to measure our performance,4,true,true,true,true,true,true,true
+P4,Delegation,Q27,"We grow with limited mistakes, errors and problems",4,true,true,true,true,true,true,true
+P4,Delegation,Q28,We measure customer satisfaction,4,true,true,true,true,true,true,true
+P4,Delegation,Q29,We have systematic processes for continuous improvement,4,true,true,true,true,true,true,true
+P4,Delegation,Q30,We have an effective lead generation process,4,true,true,true,true,true,true,true
+P4,Delegation,Q31,Sales achievement,4,true,true,true,true,true,true,true
+P4,Delegation,Q32,Weekly sales meeting,4,true,true,true,true,true,true,true
+P4,Delegation,Q33,Head of sales is not the entrepreneur,3,true,true,true,true,false,true,true
+P4,Delegation,Q34,We have an effective PR/communication strategy,4,true,true,true,true,true,true,true
+P4,Delegation,Q35,Most processes are automated,4,true,true,true,true,true,true,true
+P4,Delegation,Q36,Systems prepped for growth,4,true,true,true,true,true,true,true
+P4,Delegation,Q37,Better systems than competitors,4,true,true,true,true,true,true,true
+P4,Delegation,Q38,Knowledge on latest technology,4,true,true,true,true,true,true,true
+P4,Delegation,Q39,We are more innovative than competitors,3,true,true,true,true,false,true,true
+P4,Delegation,Q40,Our business model is disruptive,4,true,true,true,true,true,true,true
+P4,Delegation,Q41,Real time financial insights,4,true,true,true,true,true,true,true
+P4,Delegation,Q42,Up-to-date cashflow planning,4,true,true,true,true,true,true,true
+P4,Delegation,Q43,Access to growth capital,4,true,true,true,true,true,true,true
+P4,Delegation,Q44,Financial alert function,4,true,true,true,true,true,true,true
+P4,Delegation,Q45,Leadership understands balance sheet,3,true,true,true,true,false,true,true
+P4,Delegation,Q46,CEO works on the company and is able to remove from daily operations,4,true,true,true,true,true,true,true
+P4,Delegation,Q47,Have a mentor,4,true,true,true,true,true,true,true
+P4,Delegation,Q48,Have an entrepreneurial network,4,true,true,true,true,true,true,true
+P4,Delegation,Q49,Enjoy management of company,4,true,true,true,true,true,true,true
+P4,Delegation,Q50,Energized by team and company,2,true,true,true,true,false,true,false
+P4,Delegation,Q51,Absence of CEO is possible,4,true,true,true,true,true,true,true
+P4,Delegation,Q52,Read business books,4,true,true,true,true,true,true,true
+P4,Delegation,Q53,Receives regular education,4,true,true,true,true,true,true,true
+P4,Delegation,Q54,Healthy work - life balance,3,true,true,true,true,false,true,true
+P4,Delegation,Q55,I am happy,4,true,true,true,true,true,true,true
+P4,Delegation,Q56,Employees know long term goal,4,true,true,true,true,true,true,true
+P4,Delegation,Q57,Employees know yearly goal,4,true,true,true,true,true,true,true
+P4,Delegation,Q58,Employees know quarterly/monthly goals,4,true,true,true,true,true,true,true
+P4,Delegation,Q59,Employees know vision and mission,4,true,true,true,true,true,true,true
+P4,Delegation,Q60,Employees know elevator pitch,3,true,true,true,true,false,true,true
+P4,Delegation,Q61,We frequently have company-wide meetings,4,true,true,true,true,true,true,true
+P5,Standardization,Q01,Effective recruitment process,4,true,true,true,true,true,true,true
+P5,Standardization,Q02,High staff retention,4,true,true,true,true,true,true,true
+P5,Standardization,Q03,Onboarding program,4,true,true,true,true,true,true,true
+P5,Standardization,Q04,Measuring employee satisfaction,4,true,true,true,true,true,true,true
+P5,Standardization,Q05,Positive about re-hiring employees,4,true,true,true,true,true,true,true
+P5,Standardization,Q06,Every employee has a training plan,4,true,true,true,true,true,true,true
+P5,Standardization,Q07,Outsourcing / Offshoring operations,4,true,true,true,true,true,true,true
+P5,Standardization,Q08,We apply flat-management or self-steering/organizing teams,4,true,true,true,true,true,true,true
+P5,Standardization,Q09,We have Core values,4,true,true,true,true,true,true,true
+P5,Standardization,Q10,We have focus on customers' needs,3,true,true,true,true,false,true,true
+P5,Standardization,Q11,Employees know core values,4,true,true,true,true,true,true,true
+P5,Standardization,Q12,We are transparent,4,true,true,true,true,true,true,true
+P5,Standardization,Q13,We have a positive and healthy culture,3,true,true,true,true,true,true,false
+P5,Standardization,Q14,We have formulated a long term (non-financial) goal,4,true,true,true,true,true,true,true
+P5,Standardization,Q15,We have formulated yearly goals,4,true,true,true,true,true,true,true
+P5,Standardization,Q16,We have formulated quarterly/ monthly goals (other than financial goals),4,true,true,true,true,true,true,true
+P5,Standardization,Q17,We work with a strategic plan,4,true,true,true,true,true,true,true
+P5,Standardization,Q18,Each employee has personalized goals,4,true,true,true,true,true,true,true
+P5,Standardization,Q19,We have implemented a growth methodology,4,true,true,true,true,true,true,true
+P5,Standardization,Q20,We have an active acquisitions strategy,4,true,true,true,true,true,true,true
+P5,Standardization,Q21,Tasks are properly allocated,4,true,true,true,true,true,true,true
+P5,Standardization,Q22,We have weekly management meetings.,4,true,true,true,true,true,true,true
+P5,Standardization,Q23,We have periodic strategic sessions.,4,true,true,true,true,true,true,true
+P5,Standardization,Q24,Leadership team receives regular training,4,true,true,true,true,true,true,true
+P5,Standardization,Q25,Our goals are translated into clear KPIs,4,true,true,true,true,true,true,true
+P5,Standardization,Q26,We use real-time data to measure our performance,4,true,true,true,true,true,true,true
+P5,Standardization,Q27,"We grow with limited mistakes, errors and problems",4,true,true,true,true,true,true,true
+P5,Standardization,Q28,We measure customer satisfaction,4,true,true,true,true,true,true,true
+P5,Standardization,Q29,We have systematic processes for continuous improvement,4,true,true,true,true,true,true,true
+P5,Standardization,Q30,We have an effective lead generation process,4,true,true,true,true,true,true,true
+P5,Standardization,Q31,Sales achievement,4,true,true,true,true,true,true,true
+P5,Standardization,Q32,Weekly sales meeting,4,true,true,true,true,true,true,true
+P5,Standardization,Q33,Head of sales is not the entrepreneur,3,true,true,true,true,false,true,true
+P5,Standardization,Q34,We have an effective PR/communication strategy,4,true,true,true,true,true,true,true
+P5,Standardization,Q35,Most processes are automated,4,true,true,true,true,true,true,true
+P5,Standardization,Q36,Systems prepped for growth,4,true,true,true,true,true,true,true
+P5,Standardization,Q37,Better systems than competitors,4,true,true,true,true,true,true,true
+P5,Standardization,Q38,Knowledge on latest technology,4,true,true,true,true,true,true,true
+P5,Standardization,Q39,We are more innovative than competitors,3,true,true,true,true,false,true,true
+P5,Standardization,Q40,Our business model is disruptive,4,true,true,true,true,true,true,true
+P5,Standardization,Q41,Real time financial insights,4,true,true,true,true,true,true,true
+P5,Standardization,Q42,Up-to-date cashflow planning,4,true,true,true,true,true,true,true
+P5,Standardization,Q43,Access to growth capital,4,true,true,true,true,true,true,true
+P5,Standardization,Q44,Financial alert function,4,true,true,true,true,true,true,true
+P5,Standardization,Q45,Leadership understands balance sheet,3,true,true,true,true,false,true,true
+P5,Standardization,Q46,CEO works on the company and is able to remove from daily operations,4,true,true,true,true,true,true,true
+P5,Standardization,Q47,Have a mentor,4,true,true,true,true,true,true,true
+P5,Standardization,Q48,Have an entrepreneurial network,4,true,true,true,true,true,true,true
+P5,Standardization,Q49,Enjoy management of company,4,true,true,true,true,true,true,true
+P5,Standardization,Q50,Energized by team and company,2,true,true,true,true,false,true,false
+P5,Standardization,Q51,Absence of CEO is possible,4,true,true,true,true,true,true,true
+P5,Standardization,Q52,Read business books,4,true,true,true,true,true,true,true
+P5,Standardization,Q53,Receives regular education,4,true,true,true,true,true,true,true
+P5,Standardization,Q54,Healthy work - life balance,3,true,true,true,true,false,true,true
+P5,Standardization,Q55,I am happy,4,true,true,true,true,true,true,true
+P5,Standardization,Q56,Employees know long term goal,4,true,true,true,true,true,true,true
+P5,Standardization,Q57,Employees know yearly goal,4,true,true,true,true,true,true,true
+P5,Standardization,Q58,Employees know quarterly/monthly goals,4,true,true,true,true,true,true,true
+P5,Standardization,Q59,Employees know vision and mission,4,true,true,true,true,true,true,true
+P5,Standardization,Q60,Employees know elevator pitch,3,true,true,true,true,false,true,true
+P5,Standardization,Q61,We frequently have company-wide meetings,4,true,true,true,true,true,true,true

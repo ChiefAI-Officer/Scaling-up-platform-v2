@@ -1,0 +1,13 @@
+headcount,campaign_id,campaign_alias,observed_phase_heading,probe_role,created_at_local,mail_disabled,evidence
+7,AZMD7s5bgI,jeff_feedback_phase_boundary_7_20260820,You’ve reached phase 1 - Pioneering phase,supporting lower-P1 observation,"Aug 20, 2026 10:14 PM",true,live interstitial; fixed CEO/personal ScaleUp2 enUS profile
+8,2nm1cjXChj,jeff_feedback_phase_boundary_8_20260820,You’ve reached phase 1 - Pioneering phase,accepted P1 upper bound,"Aug 20, 2026 10:16 PM",true,live interstitial; fixed CEO/personal ScaleUp2 enUS profile
+9,0PAJmowo6Y,jeff_feedback_phase_boundary_9_20260820,You’ve reached phase 2 - Organization phase,accepted P2 lower bound,"Aug 20, 2026 10:20 PM",true,live interstitial; fixed CEO/personal ScaleUp2 enUS profile
+10,0pbrd2KNfk,jeff_feedback_phase_boundary_10_20260820,You’ve reached phase 2 - Organization phase,supporting P2 observation,"Aug 20, 2026 10:20 PM",true,live interstitial; fixed CEO/personal ScaleUp2 enUS profile
+12,UlweNb3eiO,jeff_feedback_phase_boundary_12_20260820,You’ve reached phase 2 - Organization phase,supporting P2 observation,"Aug 20, 2026 10:19 PM",true,live interstitial; fixed CEO/personal ScaleUp2 enUS profile
+24,O6oMlRlvSE,jeff_feedback_phase_boundary_24_20260820,You’ve reached phase 2 - Organization phase,supporting P2 observation,"Aug 20, 2026 10:22 PM",true,live interstitial; fixed CEO/personal ScaleUp2 enUS profile
+25,siTZcKbHYG,jeff_feedback_phase_boundary_25_20260820,You’ve reached phase 2 - Organization phase,accepted P2 upper bound,"Aug 20, 2026 10:23 PM",true,live interstitial; fixed CEO/personal ScaleUp2 enUS profile
+26,ZHEVmJl71g,jeff_feedback_phase_boundary_26_20260820,You’ve reached phase 3 - Management phase,accepted P3 lower bound,"Aug 20, 2026 10:23 PM",true,live interstitial; fixed CEO/personal ScaleUp2 enUS profile
+50,c4FusnRXJV,jeff_feedback_uniform_5_20260820,You’ve reached phase 3 - Management phase,accepted P3 upper bound; completed score-5 report,"Aug 20, 2026",true,live interstitial plus 26-page PDF; fixed CEO/personal ScaleUp2 enUS profile
+51,QHj5zMW6MA,,You’ve reached phase 4 - Delegation phase,accepted P4 lower bound; completed score-5 report,"Aug 20, 2026",true,live interstitial plus 26-page PDF; fixed CEO/personal ScaleUp2 enUS profile
+150,VMke73Uf03,jeff_feedback_phase_boundary_150_20260820,You’ve reached phase 4 - Delegation phase,accepted P4 upper bound,"Aug 20, 2026 10:24 PM",true,live interstitial; fixed CEO/personal ScaleUp2 enUS profile
+151,6A6HfDCPBN,jeff_feedback_phase_boundary_151_20260820,You’ve reached phase 5 - Standardization phase,accepted P5 lower bound,"Aug 20, 2026 10:25 PM",true,live interstitial; fixed CEO/personal ScaleUp2 enUS profile

@@ -194,36 +194,34 @@ Lexical results across the five phases:
 - P4 and P5 are similar but not interchangeable: they differ in 0, 1, 2, and 2 questions at scores 0, 5, 7, and 9 respectively.
 - This rejects both a global score-only catalogue and any shortcut that collapses P4/P5 merely because their score-0 text happens to match.
 
-### Level 2 started, then paused by the governed browser boundary
+### Level 2 completed — five phases × every integer score
 
-The 28 remaining mail-disabled campaigns were created for scores `1, 2, 3, 4, 6, 8, 10` in P1, P2, P4, and P5. P1 scores `1, 2, 3, 4, 6` were fully submitted and each resolved to Pioneering with all 61 scored questions exposed. Before P1 score 8 loaded, the controlled browser received `ERR_EMPTY_RESPONSE` from the respondent site and moved the survey tab onto its local `data:` network-error page. The browser policy then prohibited navigation or interaction from that blocked page. No fresh browser, alternate browser surface, raw network request, token replay, or other bypass was attempted.
+The 28 remaining mail-disabled campaigns were resumed and completed for scores `1, 2, 3, 4, 6, 8, 10` in P1, P2, P4, and P5. All PDFs were downloaded and rechecked after completion. Combined with the accepted controls, the final matrix contains **55 reports and 3,355/3,355 valid feedback cells**.
 
-The exact unfinished inventory is:
+Every report passed the 26-page, fixed-headcount/phase, canonical Q01–Q61, uniform-score, nonblank-feedback, unique-SHA-256, and post-completion no-mail gates. The durable evidence is the [55-report manifest](esperto-feedback-five-phase-full-manifest-2026-08-20.csv), [3,355-cell matrix](esperto-feedback-five-phase-full-matrix-2026-08-20.csv), and [305-row within-band summary](esperto-feedback-five-phase-band-summary-2026-08-20.csv).
 
-| Phase | Completed additional scores and campaign IDs | Created but not completed | Campaign IDs not yet completed |
-| --- | --- | --- | --- |
-| P1 | `1 p3y88CH2XP`; `2 nSC0kIRfUx`; `3 Y2sfI13nx6`; `4 hEE1gLJjJM`; `6 pfF5u2AnYh` | `8, 10` | `qNCM3fThF0`, `V7QHEfZHKJ` |
-| P2 | — | `1, 2, 3, 4, 6, 8, 10` | `KMXG3WKS3r`, `9UrS0h0Whg`, `NbeYm5mz2i`, `4zJVPctPTI`, `lj2Hy35IUR`, `bbKy4oFPpP`, `K6B6cqaBxV` |
-| P4 | — | `1, 2, 3, 4, 6, 8, 10` | `gucBvCYmve`, `amfk64DBEa`, `oGfIpYajSr`, `suH68b79wc`, `LSaJzW1uTA`, `a1zAcM0hSZ`, `b76s9yHijE` |
-| P5 | — | `1, 2, 3, 4, 6, 8, 10` | `wVzyttX5nn`, `HXHGfgeBzA`, `HqpWMWaqI6`, `Bxrh07QbEO`, `P68p4xR2ik`, `reB55VipnB`, `kpJwhro6iQ` |
+All five phases independently produced exact lexical equality inside `0–4`, `5–6`, `7–8`, and `9–10`; there were zero violations in any phase or question. Transition counts vary by phase because some questions reuse text across adjacent bands, but the band boundaries themselves do not vary. The evidence-complete selector is therefore **`phase × score band × question`**.
 
-All 28 campaigns inherited and were explicitly checked with mail automation disabled at creation. The five completed additional P1 submissions still require PDF download, post-submission mail recheck, and Q01–Q61 extraction. The evidence-complete `3,355`-cell claim therefore remains open; it must not be inferred from Level 1.
+The current-source payload is frozen in [the 1,220-row phase-band catalogue](esperto-feedback-five-phase-band-catalogue-2026-08-20.csv). Compared with current Edition 4 selection, 384/1,220 deduplicated phase-band/question records and 1,183/3,355 score-expanded cells change lexically; see [the Edition 4 impact summary](esperto-feedback-edition4-vs-five-phase-summary-2026-08-20.csv).
 
-### Next resumption order
+### All live phase boundaries completed
 
-1. Resume the existing P1 score-8 and score-10 campaigns in a safe, policy-permitted authenticated browser session; do not create replacements unless their respondent state is structurally invalid.
-2. Download and validate all seven additional P1 PDFs, including the five already submitted, and confirm `0–4`, `5–6`, `7–8`, and `9–10` equality inside P1.
-3. Complete/download P2, P4, and P5 scores `1, 2, 3, 4, 6, 8, 10`, rechecking all mail switches after completion.
-4. Freeze the complete 55-report, 3,355-cell phase × integer-score × question ledger and classify within-band violations, per-phase transition sets, and cross-phase equality.
-5. Only after that gate, specify the phase-aware forward-only feedback edition and correct the Platform's live phase boundary. Peers remain a separate governed dataset.
+Additional adjacent fixed-profile probes proved that the workbook/source-extract bands are stale by one employee at every transition:
+
+- `8 = P1`, `9 = P2`;
+- `25 = P2`, `26 = P3`;
+- `50 = P3`, `51 = P4`;
+- `150 = P4`, `151 = P5`.
+
+Thus current live Esperto uses `P1 1–8`, `P2 9–25`, `P3 26–50`, `P4 51–150`, and `P5 151+` under the fixed current CEO/personal `ScaleUp2` / `enUS` profile. Every probe campaign retained disabled invitation, reminder, and confirmation switches. Campaign IDs, aliases, local creation times, headings, and roles are in [the live boundary manifest](esperto-feedback-live-phase-boundary-manifest-2026-08-20.csv).
 
 ## Recommended dependency order
 
-1. Establish and document the exact live P3/P4 boundary.
-2. Complete the score-5 `M50 / B / A / D100` comparison and classify all 61 rows.
-3. If same-phase stability passes, capture the 12-report P1/P2/P5 four-anchor matrix.
-4. If no finer selector appears, finish the remaining 28 reports for an assumption-free five-phase, every-integer ledger.
-5. Only then design the phase-aware content schema and correct phase computation together; publish through a forward-only edition with frozen-report regression coverage.
+1. **Completed:** exact P3/P4 boundary and score-5 `M50 / B / A / D100` comparison.
+2. **Completed:** 12-report P1/P2/P5 anchor matrix.
+3. **Completed:** 55-report, 3,355-cell every-integer ledger and four-band proof for every phase.
+4. **Completed:** adjacent live observations at all four phase transitions; all current Platform boundaries are one employee early.
+5. **Next approval gate:** design the phase-aware content schema and correct phase computation together; publish only through a forward-only edition with frozen-report regression coverage and explicit default-OFF activation.
 6. Keep the completed Peers benchmark snapshot unchanged throughout. Any benchmark refresh is a separate research and approval track.
 
 ## Primary-source index
@@ -236,6 +234,12 @@ All 28 campaigns inherited and were explicitly checked with mail automation disa
 - [Current May-like Delegation matrix](esperto-feedback-delegation-live-matrix-2026-08-20.csv)
 - [Five-phase anchor comparison](esperto-feedback-five-phase-anchor-comparison-2026-08-20.csv)
 - [Boundary and anchor run manifest](esperto-feedback-boundary-and-five-phase-anchor-manifest-2026-08-20.csv)
+- [Full five-phase run manifest](esperto-feedback-five-phase-full-manifest-2026-08-20.csv)
+- [Full 3,355-cell matrix](esperto-feedback-five-phase-full-matrix-2026-08-20.csv)
+- [Five-phase band summary](esperto-feedback-five-phase-band-summary-2026-08-20.csv)
+- [Implementation-ready phase-band catalogue](esperto-feedback-five-phase-band-catalogue-2026-08-20.csv)
+- [Edition 4 impact summary](esperto-feedback-edition4-vs-five-phase-summary-2026-08-20.csv)
+- [Live phase-boundary manifest](esperto-feedback-live-phase-boundary-manifest-2026-08-20.csv)
 - [Scaling Up Full source extract](../specs/v7.6/18j-su-full-source-extract.md)
 - [Platform phase helper](../../src/src/lib/assessments/su-full-phase.ts) and [boundary tests](../../src/src/__tests__/lib/assessments/su-full-phase.test.ts)
 - [Platform feedback seed](../../src/prisma/seed-scaling-up-full-assessment.ts), [feedback-band guard](../../src/src/lib/assessments/su-full-feedback-bands.ts), and [score-only resolver](../../src/src/lib/assessments/scoring.ts)
