@@ -3,7 +3,9 @@
 - Receipt recorded: 2026-08-21
 - Implementation plan: 2026-08-20
 - Branch: `codex/su-full-esperto-landscape-closeout-wording`
-- Verified source HEAD before this receipt commit: `2d048bc922006e12036eea67536e1c95bb88f299`
+- Verified integrated source HEAD before this receipt refresh: `be74a67c6a9a03fcdf29c563a93938e9212f5b16`
+- Integrated `origin/main`: `21e1033710135fb4336bd201334e27406526118f`
+- Non-FF merge commit: `be74a67c6a9a03fcdf29c563a93938e9212f5b16` (parents `d7c9ba472ebd1e69c53ae0d154cf0ee15d3c06ff` and `21e1033710135fb4336bd201334e27406526118f`)
 
 ## Dark release result
 
@@ -31,13 +33,19 @@ Task 7 remains a separate approval gate. Before any publish, an authorized opera
 - Draft creation clones the active published edition forward and publication targets only an exact audited draft. Neither operation runs from deploy or ordinary seed paths.
 - The edition lifecycle contains no campaign update/repin operation and records `campaignRowsRepinned: 0`.
 
+## Whole-branch review fixes retained in the integrated tree
+
+- **Fix A — lock-free rendering and pinned snapshot:** phase-aware SU-Full scoring and report/email rendering run outside database locks after a short authoritative campaign/invitation/participant snapshot. The final transaction verifies the pinned version, CEO designation, and selected style before persistence. Those hard aborts apply only to phase-aware editions; legacy concurrent-repin behavior still commits the submission while dropping stale derived output.
+- **Fix B — exact driver and approval-bound publish:** lifecycle validation pins the exact `Q_FTE_CONTRACT` / `S_BACKGROUND` production contract, binds that contract into receipts, and requires the reviewed SHA-256 content hash. Draft ID, approved hash, and actor may come only from approval-scoped environment inputs; ad-hoc CLI overrides fail closed.
+- **Type cleanup:** the catalogue generator keeps untrusted band IDs typed as strings with a fail-closed lookup, while runtime consumers share `GrowthPhaseNumber` and `GrowthPhaseRecommendation` instead of duplicating phase unions/shapes. These changes do not alter catalogue bytes or runtime content.
+
 ## Report fidelity proof
 
 The report-model fixture freezes Q13 at score 7 for phases P1 through P5 using literal audited paragraphs. It asserts the rendered score remains 7, the frozen phase is preserved, each report emits the corresponding paragraph, and every adjacent phase output differs. A mutation that replaced the frozen paragraphs made this regression fail **1 of 15 tests** for the intended reason; restoring frozen propagation returned it to green.
 
 The browser fixture injects a representative 482-character Q35 paragraph into the frozen result and exercises the production report component and CSS in headless Chromium under print media. It verifies the paragraph has no hidden overflow, line clamp, scroll clipping, or footer overlap. Chromium then creates a temporary A4-landscape PDF; Poppler confirms **26 pages**, **61** `Frozen feedback` labels, and the complete normalized paragraph. The test removes its temporary PDF directory. A clipping mutation made the browser suite fail **1 of 4 tests** for hidden overflow; restoring the print CSS returned it to green.
 
-The final focused report/browser run passed **2/2 suites and 19/19 tests**. The post-generator-fix catalogue/report/browser matrix passed **3/3 suites and 23/23 tests**.
+The integrated focused report/browser run passed **2/2 suites and 19/19 tests**. The deterministic catalogue check plus report/browser tests passed **3/3 suites and 23/23 tests**.
 
 ## Catalogue parity
 
@@ -59,11 +67,17 @@ Run from `src/` unless otherwise stated.
 
 | Gate | Observed result |
 | --- | --- |
-| Exact nine-path ESLint command | Exit 0; zero diagnostics |
-| `npm test -- --runInBand` | **764/764 suites, 9,247/9,247 tests, 16/16 snapshots** |
+| Task 2 scoring matrix | **1/1 suite, 64/64 tests** |
+| Task 4 lifecycle matrix | **1/1 suite, 118/118 tests** |
+| Task 5 submission/report matrix | **5/5 suites, 151/151 tests** |
+| Task 6 browser/PDF matrix | **2/2 suites, 19/19 tests** |
+| Coach/Admin mobile-navigation matrix | **2/2 suites, 17/17 tests** |
+| Catalogue integrity/parity suite | **1/1 suite, 4/4 tests**; deterministic regeneration produced no diff |
+| Changed-path ESLint (25 TypeScript/TSX paths) | Exit 0; zero diagnostics |
+| `npm test -- --runInBand` | **764/764 suites, 9,296/9,296 tests, 16/16 snapshots** in 157.165s |
 | `node scripts/check-migration-safety.mjs` | **49 migrations** checked; no unapproved destructive operations |
-| `CI=true npx next build --turbopack` | Compiled; TypeScript passed; **95/95** static pages generated |
-| `git diff --check origin/main...HEAD` | Exit 0 after newline-only normalization of one research matrix |
+| `CI=true npx next build --turbopack` | Compiled in 16.4s; TypeScript passed; **95/95** static pages generated; exit 0 |
+| Branch diff/ancestry checks | `origin/main` is an ancestor; `git diff --check origin/main...HEAD` and `git show --check HEAD` exit 0 |
 
 The build retained expected non-fatal local diagnostics for the deprecated middleware convention, absent Inngest keys, and absent `DATABASE_URL` during static data collection.
 
@@ -74,7 +88,8 @@ The build retained expected non-fatal local diagnostics for the deprecated middl
 - **Submissions:** no historical submission, response, or answer was updated or backfilled. The submit-route change only freezes phase/recommendation fields while a future submission is being created from its already-pinned version.
 - **Configuration and data model:** no schema, migration, runtime rollout flag, or environment file was added or changed. The operator CLIs accept explicit task-scoped actor/draft inputs but are not application feature flags.
 - **Sensitive and binary artifacts:** added branch files contain no detected private key, database URL, provider token pattern, or credential artifact. No PDF or PNG was added by this branch or Task 6; the Chromium PDF stays in a temporary directory and is deleted.
-- **Whitespace/scope:** the whole branch passes `git diff --check origin/main...HEAD`. Task 6 changes only the two report tests, this receipt, `CLAUDE.md`, and `plans/CHANGELOG.md`.
+- **Integrated main receipt:** the Coach drawer component and test are byte-identical to `origin/main`; its launched Production receipt remains unmodified below the newer dark-release entry.
+- **Whitespace/scope:** the 45-file feature diff passes `git diff --check origin/main...HEAD`; the integrated tree contains no phase-branch diff in schema/migrations, benchmark/Peers paths, environment files, or tracked PDF/PNG artifacts.
 
 ## Explicit next gate
 
