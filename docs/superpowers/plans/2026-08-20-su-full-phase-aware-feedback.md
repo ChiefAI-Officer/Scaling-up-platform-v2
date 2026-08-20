@@ -16,6 +16,7 @@
 - Current live feedback bands are exactly `0–4`, `5–6`, `7–8`, and `9–10` in every phase; the 3,355-cell audit found zero within-band violations.
 - Canonical content is the 1,220-row `docs/research/esperto-feedback-five-phase-band-catalogue-2026-08-20.csv`; do not hand-edit or infer wording.
 - Preserve published versions, campaign version pins, submission answers, and frozen `ScoreResult.perQuestion[].recommendation` values byte-for-byte.
+- Preserve legacy phase rendering as well: old template versions and frozen results without a phase snapshot continue using the legacy `1–7 / 8–24 / 25–49 / 50–149 / 150+` helper contract; only the new phase-aware edition uses the current-live bands.
 - The phase-aware path is CEO-only today: `Q_FTE_CONTRACT` is CEO-only, respondent self-report access is CEO-only, and current group-report construction does not consume per-question recommendations.
 - A phase-aware question without a supplied phase must omit `recommendation`; it must never silently fall back to a possibly wrong phase.
 - Keep the governed Peers snapshot and every benchmark table/code path unchanged.
@@ -29,25 +30,26 @@
 **Files:**
 - Modify: `src/src/lib/assessments/su-full-phase.ts`
 - Modify: `src/src/__tests__/lib/assessments/su-full-phase.test.ts`
-- Modify: `src/src/__tests__/assessments/section-pager-phase-tile.test.tsx`
-- Modify: `src/src/__tests__/lib/assessments/su-full-landscape-report.test.ts`
 
 **Interfaces:**
 - Produces: `SU_FULL_PHASE_DRIVER_KEY = "Q_FTE_CONTRACT"`
-- Produces: `computeGrowthPhase(contractFte: number): GrowthPhase | null` with live bands `1–8 / 9–25 / 26–50 / 51–150 / 151+`
-- Produces: `growthPhaseFromAnswers(answers: readonly { stableKey: string; value: unknown }[]): GrowthPhase | null`
+- Preserves: `computeGrowthPhase(contractFte: number): GrowthPhase | null` with the legacy bands for pinned historic versions.
+- Produces: `computeCurrentGrowthPhase(contractFte: number): GrowthPhase | null` with live bands `1–8 / 9–25 / 26–50 / 51–150 / 151+`.
+- Produces: `currentGrowthPhaseFromAnswers(answers: readonly { stableKey: string; value: unknown }[]): GrowthPhase | null`.
 
 - [ ] **Step 1: Write the failing exact-boundary tests**
 
 ```ts
-expect(computeGrowthPhase(8)?.number).toBe(1);
-expect(computeGrowthPhase(9)?.number).toBe(2);
-expect(computeGrowthPhase(25)?.number).toBe(2);
-expect(computeGrowthPhase(26)?.number).toBe(3);
-expect(computeGrowthPhase(50)?.number).toBe(3);
-expect(computeGrowthPhase(51)?.number).toBe(4);
-expect(computeGrowthPhase(150)?.number).toBe(4);
-expect(computeGrowthPhase(151)?.number).toBe(5);
+expect(computeCurrentGrowthPhase(8)?.number).toBe(1);
+expect(computeCurrentGrowthPhase(9)?.number).toBe(2);
+expect(computeCurrentGrowthPhase(25)?.number).toBe(2);
+expect(computeCurrentGrowthPhase(26)?.number).toBe(3);
+expect(computeCurrentGrowthPhase(50)?.number).toBe(3);
+expect(computeCurrentGrowthPhase(51)?.number).toBe(4);
+expect(computeCurrentGrowthPhase(150)?.number).toBe(4);
+expect(computeCurrentGrowthPhase(151)?.number).toBe(5);
+expect(computeGrowthPhase(8)?.number).toBe(2);
+expect(computeGrowthPhase(50)?.number).toBe(4);
 ```
 
 - [ ] **Step 2: Run the focused tests and confirm the old assumptions fail**
@@ -55,17 +57,17 @@ expect(computeGrowthPhase(151)?.number).toBe(5);
 Run from `src/`:
 
 ```bash
-npx jest src/__tests__/lib/assessments/su-full-phase.test.ts src/__tests__/assessments/section-pager-phase-tile.test.tsx src/__tests__/lib/assessments/su-full-landscape-report.test.ts --runInBand
+npx jest src/__tests__/lib/assessments/su-full-phase.test.ts --runInBand
 ```
 
-Expected: failures at `8`, `25`, `50`, and `150` before implementation.
+Expected: `computeCurrentGrowthPhase` is absent before implementation; all existing legacy assertions remain green.
 
 - [ ] **Step 3: Update the bands, driver constant, answer resolver, and provenance comments**
 
 ```ts
 export const SU_FULL_PHASE_DRIVER_KEY = "Q_FTE_CONTRACT";
 
-export const GROWTH_PHASE_BANDS = [
+export const CURRENT_GROWTH_PHASE_BANDS = [
   { number: 1, name: "Pioneering", min: 1, max: 8 },
   { number: 2, name: "Organization", min: 9, max: 25 },
   { number: 3, name: "Management", min: 26, max: 50 },
@@ -74,13 +76,13 @@ export const GROWTH_PHASE_BANDS = [
 ] as const;
 ```
 
-`growthPhaseFromAnswers` must accept only a finite numeric value for the exact driver key and delegate to `computeGrowthPhase`.
+`currentGrowthPhaseFromAnswers` must accept only a finite numeric value for the exact driver key and delegate to `computeCurrentGrowthPhase`. Do not change the default behavior of `computeGrowthPhase`.
 
 - [ ] **Step 4: Run the focused tests and commit**
 
 ```bash
-npx jest src/__tests__/lib/assessments/su-full-phase.test.ts src/__tests__/assessments/section-pager-phase-tile.test.tsx src/__tests__/lib/assessments/su-full-landscape-report.test.ts --runInBand
-git add src/src/lib/assessments/su-full-phase.ts src/src/__tests__/lib/assessments/su-full-phase.test.ts src/src/__tests__/assessments/section-pager-phase-tile.test.tsx src/src/__tests__/lib/assessments/su-full-landscape-report.test.ts
+npx jest src/__tests__/lib/assessments/su-full-phase.test.ts --runInBand
+git add src/src/lib/assessments/su-full-phase.ts src/src/__tests__/lib/assessments/su-full-phase.test.ts
 git commit -m "fix: align Scaling Up growth phase boundaries"
 ```
 
@@ -96,6 +98,7 @@ git commit -m "fix: align Scaling Up growth phase boundaries"
 - Produces: `GrowthPhaseRecommendationSchema`
 - Produces on slider questions: `phaseRecommendations?: Array<{ phase: 1 | 2 | 3 | 4 | 5; bands: RecommendationBand[] }>`
 - Extends: `scoreSubmission(..., options?: { allowMissingRequired?: boolean; recommendationPhase?: 1 | 2 | 3 | 4 | 5 })`
+- Extends: `ScoreResult` with optional frozen `recommendationPhase?: 1 | 2 | 3 | 4 | 5`; emit it only when the option is supplied.
 
 - [ ] **Step 1: Write failing schema and resolution tests**
 
@@ -227,14 +230,19 @@ git commit -m "feat: add phase feedback edition lifecycle"
 **Files:**
 - Modify: `src/src/lib/assessments/compute-score-result.ts`
 - Modify: `src/src/app/(public)/org-survey/[campaignAlias]/submit/route.ts`
+- Modify: `src/src/components/assessments/section-pager.tsx`
+- Modify: `src/src/lib/assessments/su-full-landscape-report.ts`
 - Modify: `src/src/__tests__/app/org-survey/submit.test.ts`
 - Modify: `src/src/__tests__/lib/assessments/compute-score-result.test.ts`
 - Modify: `src/src/__tests__/lib/assessments/respondent-report.test.ts`
+- Modify: `src/src/__tests__/assessments/section-pager-phase-tile.test.tsx`
+- Modify: `src/src/__tests__/lib/assessments/su-full-landscape-report.test.ts`
 
 **Interfaces:**
 - Extends: `computeScoreResult(..., options?: { allowMissingRequired?: boolean; recommendationPhase?: GrowthPhaseNumber })`
-- Consumes: `growthPhaseFromAnswers(prunedAnswers)` and forwards `phase.number` only for an authorized SU-Full CEO.
+- Consumes: `currentGrowthPhaseFromAnswers(prunedAnswers)` and forwards `phase.number` only for an authorized SU-Full CEO on a phase-aware version.
 - Produces: frozen `ScoreResult.perQuestion[].recommendation`; report readers remain lookup-free.
+- Produces: frozen `ScoreResult.recommendationPhase`; new reports render that phase, while old results without it retain legacy phase computation.
 
 - [ ] **Step 1: Write failing submit-path tests**
 
@@ -246,13 +254,13 @@ Assert legacy versions still resolve legacy `recommendations`; an existing store
 
 - [ ] **Step 3: Pass the phase through the one scoring seam**
 
-Resolve from the pruned `Q_FTE_CONTRACT` answer only after the existing locked `isCEO` decision. Do not query another submission, the active template, mutable organization state, or current catalogue during report rendering.
+Resolve from the pruned `Q_FTE_CONTRACT` answer only after the existing locked `isCEO` decision and only when the pinned question payload contains `phaseRecommendations`. The survey phase tile must choose the current resolver only for that same phase-aware payload. The landscape report must prefer frozen `ScoreResult.recommendationPhase` and use the legacy helper only when the frozen field is absent. Do not query another submission, the active template, mutable organization state, or current catalogue during report rendering.
 
 - [ ] **Step 4: Run tests and commit**
 
 ```bash
-npx jest src/__tests__/app/org-survey/submit.test.ts src/__tests__/lib/assessments/compute-score-result.test.ts src/__tests__/lib/assessments/respondent-report.test.ts --runInBand
-git add src/src/lib/assessments/compute-score-result.ts src/src/app/'(public)'/org-survey/'[campaignAlias]'/submit/route.ts src/src/__tests__/app/org-survey/submit.test.ts src/src/__tests__/lib/assessments/compute-score-result.test.ts src/src/__tests__/lib/assessments/respondent-report.test.ts
+npx jest src/__tests__/app/org-survey/submit.test.ts src/__tests__/lib/assessments/compute-score-result.test.ts src/__tests__/lib/assessments/respondent-report.test.ts src/__tests__/assessments/section-pager-phase-tile.test.tsx src/__tests__/lib/assessments/su-full-landscape-report.test.ts --runInBand
+git add src/src/lib/assessments/compute-score-result.ts src/src/app/'(public)'/org-survey/'[campaignAlias]'/submit/route.ts src/src/components/assessments/section-pager.tsx src/src/lib/assessments/su-full-landscape-report.ts src/src/__tests__/app/org-survey/submit.test.ts src/src/__tests__/lib/assessments/compute-score-result.test.ts src/src/__tests__/lib/assessments/respondent-report.test.ts src/src/__tests__/assessments/section-pager-phase-tile.test.tsx src/src/__tests__/lib/assessments/su-full-landscape-report.test.ts
 git commit -m "feat: freeze phase-aware CEO feedback at submission"
 ```
 
