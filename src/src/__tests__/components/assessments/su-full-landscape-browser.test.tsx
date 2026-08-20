@@ -22,6 +22,7 @@ const ENABLED = "NEXT_PUBLIC_WAVE_SU_FULL_LANDSCAPE_REPORT_ENABLED";
 const KILL = "NEXT_PUBLIC_WAVE_SU_FULL_LANDSCAPE_REPORT_KILL";
 const OPENER_PAGES = [7, 11, 14, 19, 21] as const;
 const CHART_PAGES = [...OPENER_PAGES, 26] as const;
+const REPRESENTATIVE_482_CHARACTER_FEEDBACK = "In order to scale, smart application and linking of information technology is essential. Sales, marketing, project management, production,humanresources,reporting,etc.Thisgivesstructureand clarity, prevents mistakes and makes growing a lot easier. With the size of your company, a lot of systems likely still work independently of each other, or you primarily use Excel. This is customary, but in your next growth phase you will have to start thinking about smart solutions. Act now";
 
 function stylesheet(): string {
   return ["su-public-brand.css", "su-report.css"]
@@ -30,8 +31,9 @@ function stylesheet(): string {
     .replace(/@import[^;]+;\s*/g, "");
 }
 
-function routeMarkup(): { html: string; report: ReturnType<typeof completeSuFullLandscapeReport> } {
-  const report = completeSuFullLandscapeReport();
+function routeMarkup(
+  report = completeSuFullLandscapeReport(),
+): { html: string; report: ReturnType<typeof completeSuFullLandscapeReport> } {
   report.suFullPeerPresentation = completeSuFullLandscapePresentation(report);
   const html = renderToStaticMarkup(
     <main className="su-public-brand su-report" data-testid="route-wrapper">
@@ -43,6 +45,19 @@ function routeMarkup(): { html: string; report: ReturnType<typeof completeSuFull
     </main>,
   );
   return { html, report };
+}
+
+function reportWithRepresentativeDensityFeedback() {
+  const report = completeSuFullLandscapeReport();
+  return {
+    ...report,
+    result: {
+      ...report.result,
+      perQuestion: report.result.perQuestion.map((question) => question.stableKey === "Q35"
+        ? { ...question, recommendation: REPRESENTATIVE_482_CHARACTER_FEEDBACK }
+        : question),
+    },
+  };
 }
 
 async function labelFit(page: Page, pageNumbers: readonly number[]) {
@@ -290,7 +305,7 @@ describe("SU Full landscape browser and PDF contract", () => {
   });
 
   it("meets all five chapter contrast contracts and produces a complete 26-page A4 landscape PDF", async () => {
-    const { html, report } = routeMarkup();
+    const { html, report } = routeMarkup(reportWithRepresentativeDensityFeedback());
     const page = await browser.newPage({ viewport: { width: 1123, height: 794 } });
     const directory = mkdtempSync(join(tmpdir(), "su-full-landscape-browser-"));
     const pdfPath = join(directory, "report.pdf");
@@ -340,6 +355,34 @@ describe("SU Full landscape browser and PDF contract", () => {
       });
       expect(profileFit.count).toBe(15);
       expect(profileFit.lastRowBottom).toBeLessThan(profileFit.footerTop);
+      expect(REPRESENTATIVE_482_CHARACTER_FEEDBACK).toHaveLength(482);
+      const densityFit = await page.locator("[data-testid='su-full-landscape-detail-Q35']").evaluate((detail) => {
+        const paragraph = detail.querySelector<HTMLElement>("p");
+        const footer = detail.closest<HTMLElement>("[data-page-number]")
+          ?.querySelector<HTMLElement>(".su-full-landscape-page-footer");
+        if (!paragraph || !footer) throw new Error("Missing Q35 density targets");
+        const paragraphStyle = getComputedStyle(paragraph);
+        return {
+          characters: (paragraph.textContent ?? "").replace(/^Frozen feedback\s*/, "").length,
+          paragraphBottom: paragraph.getBoundingClientRect().bottom,
+          footerTop: footer.getBoundingClientRect().top,
+          scrollHeight: paragraph.scrollHeight,
+          clientHeight: paragraph.clientHeight,
+          overflow: paragraphStyle.overflow,
+          overflowY: paragraphStyle.overflowY,
+          textOverflow: paragraphStyle.textOverflow,
+          webkitLineClamp: paragraphStyle.webkitLineClamp,
+        };
+      });
+      expect(densityFit).toMatchObject({
+        characters: 482,
+        overflow: "visible",
+        overflowY: "visible",
+        textOverflow: "clip",
+        webkitLineClamp: "none",
+      });
+      expect(densityFit.scrollHeight).toBeLessThanOrEqual(densityFit.clientHeight + 1);
+      expect(densityFit.paragraphBottom).toBeLessThan(densityFit.footerTop);
       await page.pdf({
         path: pdfPath,
         format: "A4",
@@ -354,6 +397,7 @@ describe("SU Full landscape browser and PDF contract", () => {
       expect(text).toContain("ScaleUp Score 55 / 100");
       expect(text.match(/Frozen feedback/g)).toHaveLength(61);
       const searchableWords = normalizeWords(text);
+      expect(searchableWords).toContain(normalizeWords(REPRESENTATIVE_482_CHARACTER_FEEDBACK));
       for (const frozen of report.result.perQuestion) {
         expect(searchableWords).toContain(normalizeWords(report.questionByKey[frozen.stableKey]));
         expect(searchableWords).toContain(normalizeWords(frozen.recommendation ?? ""));

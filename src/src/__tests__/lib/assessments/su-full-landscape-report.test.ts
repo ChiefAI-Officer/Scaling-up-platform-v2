@@ -23,6 +23,29 @@ function keys(start: string, end: string): string[] {
   return Array.from({ length: last - first + 1 }, (_, index) => `Q${String(first + index).padStart(2, "0")}`);
 }
 
+const Q13_SCORE_7_AUDITED_PHASE_OUTPUTS = [
+  {
+    phase: 1,
+    text: '"Culture eats Strategy for breakfast" is a famous quote from management guru Peter Drucker. The outside world is changing rapidly, but a positive and healthy culture in which employees take responsibility, think along and always act in the interest of the company is therefore an enormous "asset". You still have a small business and you have made a good start with your culture, make sure you stick with it as you grow.',
+  },
+  {
+    phase: 2,
+    text: '"Culture eats Strategy for breakfast" is a famous quote from management guru Peter Drucker. The outside world is changing rapidly, but a positive and healthy culture in which employees take responsibility, think along and always act in the interest of the company is therefore an enormous "asset". You still have a clear company size, but it would already be good to start working on such a culture consciously.',
+  },
+  {
+    phase: 3,
+    text: '"Culture eats Strategy for breakfast" is a famous quote from management guru Peter Drucker. The outside world is changing rapidly, but a positive and healthy culture in which employees take responsibility, think along and always act in the interest of the company is therefore an enormous "asset". You already have a decent size and you have a fairly strong and healthy culture, but develop it further and make sure you hold on to it as you grow further.',
+  },
+  {
+    phase: 4,
+    text: '"Culture eats Strategy for breakfast" a famous quote from management guru Peter Drucker. The outside world is changing rapidly, but a positive and healthy culture in which employees take responsibility, think along and always act in the interest of the company is therefore an enormous "asset". You already have a decent size and you have a fairly strong and healthy culture, but develop it further and make sure you hold on to it as you grow further.',
+  },
+  {
+    phase: 5,
+    text: '"Culture eats Strategy for breakfast" is a famous quote from management guru Peter Drucker. The outside world is changing rapidly, but a positive and healthy culture in which employees take responsibility, think along and always act in the interest of the company is therefore an enormous "asset". You already have a decent size and you have a fairly strong and healthy culture, but develop it further and make sure you hold on to it as you grow further.',
+  },
+] as const;
+
 describe("buildSuFullLandscapeReportModel", () => {
   it("composes the canonical 26-page report with every detail question exactly once", () => {
     const report = completeSuFullLandscapeReport();
@@ -113,6 +136,41 @@ describe("buildSuFullLandscapeReportModel", () => {
       presentation,
       resolvedStyle: "CLASSIC",
     })!.growthPhase).toBeNull();
+  });
+
+  it("renders all five frozen Q13 phase outputs at the same score without re-resolving feedback", () => {
+    const actual = Q13_SCORE_7_AUDITED_PHASE_OUTPUTS.map(({ phase, text }) => {
+      const base = completeSuFullLandscapeReport();
+      const report = {
+        ...base,
+        result: {
+          ...base.result,
+          recommendationPhase: phase,
+          perQuestion: base.result.perQuestion.map((question) => question.stableKey === "Q13"
+            ? { ...question, value: 7, recommendation: text }
+            : question),
+        },
+      };
+      const presentation = completeSuFullLandscapePresentation(report);
+      const model = buildSuFullLandscapeReportModel({ report, presentation, resolvedStyle: "CLASSIC" });
+      const question = model?.chapters.flatMap((chapter) => chapter.questions)
+        .find(({ stableKey }) => stableKey === "Q13");
+
+      return {
+        phase: model?.growthPhase?.number,
+        score: question?.you,
+        recommendation: question?.recommendation,
+      };
+    });
+
+    expect(actual).toEqual(Q13_SCORE_7_AUDITED_PHASE_OUTPUTS.map(({ phase, text }) => ({
+      phase,
+      score: 7,
+      recommendation: text,
+    })));
+    expect(actual.slice(1).every((output, index) =>
+      output.recommendation !== actual[index].recommendation
+    )).toBe(true);
   });
 
   it("uses the resolved Classic style even when the stored unavailable style differs", () => {
