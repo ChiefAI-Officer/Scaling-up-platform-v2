@@ -11,6 +11,12 @@ export const SU_FULL_PHASE_FEEDBACK_SOURCE_ID =
   "2026-08-20.esperto-five-phase-v1";
 
 export interface RecommendationBand {
+  readonly minScore: number;
+  readonly maxScore: number;
+  readonly text: string;
+}
+
+interface MutableRecommendationBand {
   minScore: number;
   maxScore: number;
   text: string;
@@ -18,12 +24,26 @@ export interface RecommendationBand {
 
 export interface PhaseRecommendation {
   phase: GrowthPhaseNumber;
-  bands: RecommendationBand[];
+  bands: MutableRecommendationBand[];
 }
 
-export const SU_FULL_PHASE_FEEDBACK: Readonly<
+function freezeCatalogue(
+  catalogue: Record<GrowthPhaseNumber, Record<string, RecommendationBand[]>>,
+): Readonly<
   Record<GrowthPhaseNumber, Readonly<Record<string, readonly RecommendationBand[]>>>
-> = {
+> {
+  for (const phase of [1, 2, 3, 4, 5] as const) {
+    const questions = catalogue[phase];
+    for (const bands of Object.values(questions)) {
+      for (const band of bands) Object.freeze(band);
+      Object.freeze(bands);
+    }
+    Object.freeze(questions);
+  }
+  return Object.freeze(catalogue);
+}
+
+export const SU_FULL_PHASE_FEEDBACK = freezeCatalogue({
   1: {
     "Q01": [
       { minScore: 0, maxScore: 4, text: "In order to grow, you continuously need new - and good - people. This is often one of the most important challenges for a growth entrepreneur. You indicate that when it comes to finding new employees you find this very difficult. Ultimately, this is a matter of process, attention and time, often especially on the part of the entrepreneur. How much time do you spend on this? More than one day per week?" },
@@ -1864,7 +1884,7 @@ export const SU_FULL_PHASE_FEEDBACK: Readonly<
       { minScore: 9, maxScore: 10, text: "Research shows that it's crucial to communicate goals and performance to all employees, providing them with context regarding development. Face-to-face, with internal sessions works best. With internal sessions, in other words. You are already doing this, and frequently. Try to keep this up, even in the face of continued growth." },
     ],
   },
-};
+});
 
 /** Build a mutable version-payload shape without exposing the frozen catalogue arrays. */
 export function buildPhaseRecommendations(

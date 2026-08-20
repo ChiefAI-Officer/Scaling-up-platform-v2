@@ -77,13 +77,26 @@ describe("SU Full phase feedback catalogue", () => {
     });
   });
 
-  it("builds a detached five-phase recommendation payload for one canonical question", () => {
+  it("deeply freezes canonical content while building detached mutable recommendation payloads", () => {
+    expect(Object.isFrozen(SU_FULL_PHASE_FEEDBACK)).toBe(true);
+    expect(Object.isFrozen(SU_FULL_PHASE_FEEDBACK[1])).toBe(true);
+    expect(Object.isFrozen(SU_FULL_PHASE_FEEDBACK[1].Q01)).toBe(true);
+    expect(Object.isFrozen(SU_FULL_PHASE_FEEDBACK[1].Q01[0])).toBe(true);
+
     const result = buildPhaseRecommendations("Q01");
+    const secondResult = buildPhaseRecommendations("Q01");
+    const canonicalText = SU_FULL_PHASE_FEEDBACK[1].Q01[0].text;
 
     expect(result).toHaveLength(5);
     expect(result.map(({ phase }) => phase)).toEqual([1, 2, 3, 4, 5]);
+    expect(result).not.toBe(secondResult);
     expect(result[0].bands).toEqual(SU_FULL_PHASE_FEEDBACK[1].Q01);
     expect(result[0].bands).not.toBe(SU_FULL_PHASE_FEEDBACK[1].Q01);
+    expect(result[0].bands).not.toBe(secondResult[0].bands);
+    expect(result[0].bands[0]).not.toBe(SU_FULL_PHASE_FEEDBACK[1].Q01[0]);
+    expect(result[0].bands[0]).not.toBe(secondResult[0].bands[0]);
+    result[0].bands[0].text = "Mutable draft payload only";
+    expect(SU_FULL_PHASE_FEEDBACK[1].Q01[0].text).toBe(canonicalText);
     expect(() => buildPhaseRecommendations("Q62")).toThrow(/unknown canonical/i);
   });
 
