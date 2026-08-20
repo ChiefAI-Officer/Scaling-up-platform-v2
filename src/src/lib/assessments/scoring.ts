@@ -46,6 +46,21 @@ export const RecommendationBandSchema = z.object({
   text: z.string(),
 });
 
+export const GrowthPhaseSchema = z.union([
+  z.literal(1),
+  z.literal(2),
+  z.literal(3),
+  z.literal(4),
+  z.literal(5),
+]);
+export type GrowthPhase = z.infer<typeof GrowthPhaseSchema>;
+
+/** A recommendation-band set for one Scaling Up growth phase. */
+export const GrowthPhaseRecommendationSchema = z.object({
+  phase: GrowthPhaseSchema,
+  bands: z.array(RecommendationBandSchema),
+});
+
 // Wave W (spec 19w) — authored show-if: the question renders only while
 // `optionKey` is selected on the (earlier, MULTI_CHOICE) gate question.
 // Save tier validates SHAPE only; drafts may be referentially dangling —
@@ -69,6 +84,7 @@ export const SliderLikertQuestion = z.object({
   isRequired: z.boolean(),
   scale: SliderLikertScaleSchema,
   recommendations: z.array(RecommendationBandSchema).optional(),
+  phaseRecommendations: z.array(GrowthPhaseRecommendationSchema).optional(),
   showIf: ShowIfSchema.optional(),
 });
 export type SliderLikertQuestion = z.infer<typeof SliderLikertQuestion>;
@@ -235,6 +251,39 @@ function checkRecommendationsRuntime(
     }
   }
 
+  for (const { q, origIdx } of scoredWithIndex) {
+    for (let pi = 0; pi < (q.phaseRecommendations?.length ?? 0); pi++) {
+      const bands = q.phaseRecommendations![pi].bands;
+      for (let bi = 0; bi < bands.length; bi++) {
+        const band = bands[bi];
+        if (band.maxScore < band.minScore) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["questions", origIdx, "phaseRecommendations", pi, "bands", bi],
+            message: `Phase recommendation band ${bi}: maxScore < minScore`,
+          });
+        }
+        if (band.minScore < q.scale.min || band.maxScore > q.scale.max) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["questions", origIdx, "phaseRecommendations", pi, "bands", bi],
+            message: `Phase recommendation band ${bi} falls outside scale [${q.scale.min}, ${q.scale.max}]`,
+          });
+        }
+      }
+      const sorted = [...bands].sort((a, b) => a.minScore - b.minScore);
+      for (let bi = 0; bi < sorted.length - 1; bi++) {
+        if (sorted[bi + 1].minScore <= sorted[bi].maxScore) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["questions", origIdx, "phaseRecommendations", pi, "bands"],
+            message: `Phase recommendation bands overlap: [${sorted[bi].minScore}, ${sorted[bi].maxScore}] and [${sorted[bi + 1].minScore}, ${sorted[bi + 1].maxScore}]`,
+          });
+        }
+      }
+    }
+  }
+
   // Wave U (spec 19u U-2/D4) — NUMBER findings bands: max>=min + non-overlap.
   // NO scale-bounds or coverage check — the NUMBER domain is unbounded and
   // gaps are legal (a value in no band simply produces no finding).
@@ -332,6 +381,95 @@ function checkRecommendationsPublish(
       }
       // Wave U (D21) — length cap applies to ALL rule kinds at publish.
       checkFindingTextCap(txt, ["questions", origIdx, "recommendations", bi, "text"], ctx);
+    }
+  }
+
+  for (const { q, origIdx } of scoredWithIndex) {
+    const phaseRows = q.phaseRecommendations;
+    if (!phaseRows) continue;
+
+    const seenPhases = new Set<GrowthPhase>();
+    for (let pi = 0; pi < phaseRows.length; pi++) {
+      const phaseRow = phaseRows[pi];
+      if (seenPhases.has(phaseRow.phase)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["questions", origIdx, "phaseRecommendations", pi, "phase"],
+          message: `Duplicate phase recommendation for phase ${phaseRow.phase}`,
+        });
+      }
+      seenPhases.add(phaseRow.phase);
+
+      const bands = phaseRow.bands;
+      if (bands.length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["questions", origIdx, "phaseRecommendations", pi, "bands"],
+          message: `Phase ${phaseRow.phase} must define recommendation bands that tile 0-10`,
+        });
+        continue;
+      }
+
+      const sorted = [...bands].sort((a, b) => a.minScore - b.minScore);
+      if (sorted[0].minScore !== 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["questions", origIdx, "phaseRecommendations", pi, "bands"],
+          message: `Phase ${phaseRow.phase} first band must start at 0; got ${sorted[0].minScore}`,
+        });
+      }
+      if (sorted[sorted.length - 1].maxScore !== 10) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["questions", origIdx, "phaseRecommendations", pi, "bands"],
+          message: `Phase ${phaseRow.phase} last band must end at 10; got ${sorted[sorted.length - 1].maxScore}`,
+        });
+      }
+      for (let bi = 0; bi < sorted.length - 1; bi++) {
+        const expectedNext = sorted[bi].maxScore + 1;
+        if (sorted[bi + 1].minScore !== expectedNext) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["questions", origIdx, "phaseRecommendations", pi, "bands"],
+            message:
+              sorted[bi + 1].minScore > expectedNext
+                ? `Gap between phase recommendation bands at value ${expectedNext} (next band starts at ${sorted[bi + 1].minScore})`
+                : `Overlap or step misalignment between phase recommendation bands at ${sorted[bi].maxScore} / ${sorted[bi + 1].minScore}`,
+          });
+        }
+      }
+
+      for (let bi = 0; bi < bands.length; bi++) {
+        const text = bands[bi].text;
+        if (text.trim().length === 0) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["questions", origIdx, "phaseRecommendations", pi, "bands", bi, "text"],
+            message: "Phase recommendation text cannot be blank",
+          });
+        }
+        for (const sentinel of PLACEHOLDER_SENTINELS) {
+          if (text.includes(sentinel)) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ["questions", origIdx, "phaseRecommendations", pi, "bands", bi, "text"],
+              message: `Phase recommendation text contains placeholder sentinel "${sentinel}"`,
+            });
+            break;
+          }
+        }
+        checkFindingTextCap(text, ["questions", origIdx, "phaseRecommendations", pi, "bands", bi, "text"], ctx);
+      }
+    }
+
+    for (const phase of [1, 2, 3, 4, 5] as const) {
+      if (!seenPhases.has(phase)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["questions", origIdx, "phaseRecommendations"],
+          message: `Missing phase recommendation for phase ${phase}`,
+        });
+      }
     }
   }
 
@@ -984,6 +1122,8 @@ export interface ScoreResult {
    * (scored reports render sliders from the rows — no double display).
    */
   findings?: ResolvedFinding[];
+  /** The organizational phase used to resolve phase-aware recommendations. */
+  recommendationPhase?: GrowthPhase;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────
@@ -1351,7 +1491,10 @@ function resolveTier(tiers: Tier[], value: number): Tier | null {
 export function scoreSubmission(
   version: TemplateVersionForScoring,
   answers: Answer[],
-  options?: { allowMissingRequired?: boolean }
+  options?: {
+    allowMissingRequired?: boolean;
+    recommendationPhase?: GrowthPhase;
+  }
 ): ScoreResult {
   // 1) Validate the version shape with Zod first so downstream code can
   //    trust the shape.
@@ -1608,9 +1751,16 @@ export function scoreSubmission(
     if (achieved) countAchieved += 1;
     overallTotal += value;
     const row: PerQuestionResult = { stableKey: q.stableKey, value, achieved };
-    // D2 — recommendation band resolution. Runtime is lenient on gaps:
-    // when no band matches, simply omit `recommendation` (no throw).
-    if (q.recommendations && q.recommendations.length > 0) {
+    // Phase-aware recommendations take precedence. Runtime is lenient on gaps
+    // and unmatched/missing phases: omit `recommendation` rather than throw.
+    if (q.phaseRecommendations?.length) {
+      const phaseRow = q.phaseRecommendations.find(
+        (row) => row.phase === options?.recommendationPhase,
+      );
+      row.recommendation = phaseRow?.bands.find(
+        (band) => value >= band.minScore && value <= band.maxScore,
+      )?.text;
+    } else if (q.recommendations && q.recommendations.length > 0) {
       for (const band of q.recommendations) {
         if (value >= band.minScore && value <= band.maxScore) {
           row.recommendation = band.text;
@@ -1825,5 +1975,8 @@ export function scoreSubmission(
   };
   if (perDomain !== undefined) result.perDomain = perDomain;
   if (scaleUpScore !== undefined) result.scaleUpScore = scaleUpScore;
+  if (options?.recommendationPhase !== undefined) {
+    result.recommendationPhase = options.recommendationPhase;
+  }
   return result;
 }

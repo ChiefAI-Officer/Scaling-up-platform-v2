@@ -12,11 +12,13 @@
 import {
   scoreSubmission,
   ScoringValidationError,
+  GrowthPhaseRecommendationSchema,
   TemplateVersionForScoringSchema,
   TemplateVersionForPublishSchema,
   validateTierTiling,
   type TemplateVersionForScoring,
   type Answer,
+  type GrowthPhase,
 } from "@/lib/assessments/scoring";
 
 /**
@@ -909,6 +911,181 @@ describe("D2 — per-question recommendation bands", () => {
     ];
     const v3 = buildD2BaseVersion({ recommendations: loremBands });
     expect(TemplateVersionForPublishSchema.safeParse(v3).success).toBe(false);
+  });
+});
+
+describe("phase-aware slider recommendations", () => {
+  const phaseRecommendations: Array<{
+    phase: GrowthPhase;
+    bands: Array<{ minScore: number; maxScore: number; text: string }>;
+  }> = ([1, 2, 3, 4, 5] as GrowthPhase[]).map((phase) => ({
+    phase,
+    bands: [
+      { minScore: 0, maxScore: 4, text: `P${phase} low` },
+      { minScore: 5, maxScore: 7, text: `P${phase} middle` },
+      { minScore: 8, maxScore: 10, text: `P${phase} top` },
+    ],
+  }));
+
+  function scoreAt({ phase, value }: { phase: GrowthPhase; value: number }) {
+    const version = buildD2BaseVersion({
+      recommendations: [{ minScore: 0, maxScore: 10, text: "legacy" }],
+    });
+    for (const question of version.questions) {
+      Object.assign(question, { phaseRecommendations });
+    }
+    const result = scoreSubmission(
+      version,
+      version.questions.map((question) => ({ stableKey: question.stableKey, value })),
+      { recommendationPhase: phase },
+    );
+    return result.perQuestion[0];
+  }
+
+  function scoreWithoutPhase() {
+    const version = buildD2BaseVersion({
+      recommendations: [{ minScore: 0, maxScore: 10, text: "legacy" }],
+    });
+    for (const question of version.questions) {
+      Object.assign(question, { phaseRecommendations });
+    }
+    const result = scoreSubmission(
+      version,
+      version.questions.map((question) => ({ stableKey: question.stableKey, value: 5 })),
+    );
+    return result.perQuestion[0];
+  }
+
+  function legacyScoreOnlyQuestion() {
+    const version = buildD2BaseVersion({
+      recommendations: [{ minScore: 0, maxScore: 10, text: "legacy" }],
+    });
+    const result = scoreSubmission(
+      version,
+      version.questions.map((question) => ({ stableKey: question.stableKey, value: 5 })),
+    );
+    return result.perQuestion[0];
+  }
+
+  it("resolves the selected phase without falling back to legacy recommendations", () => {
+    expect(scoreAt({ phase: 1, value: 4 }).recommendation).toBe("P1 low");
+    expect(scoreAt({ phase: 2, value: 5 }).recommendation).toBe("P2 middle");
+    expect(scoreAt({ phase: 5, value: 10 }).recommendation).toBe("P5 top");
+    expect(scoreWithoutPhase().recommendation).toBeUndefined();
+    expect(legacyScoreOnlyQuestion().recommendation).toBe("legacy");
+  });
+
+  it("freezes a supplied recommendation phase but leaves omitted phases absent", () => {
+    const version = buildD2BaseVersion({
+      recommendations: [{ minScore: 0, maxScore: 10, text: "legacy" }],
+    });
+    for (const question of version.questions) {
+      Object.assign(question, { phaseRecommendations });
+    }
+    const answers = version.questions.map((question) => ({
+      stableKey: question.stableKey,
+      value: 5,
+    }));
+
+    const frozen = scoreSubmission(
+      version,
+      answers,
+      { recommendationPhase: 3 },
+    );
+    const unfrozen = scoreSubmission(version, answers);
+
+    expect(frozen.recommendationPhase).toBe(3);
+    expect(unfrozen.recommendationPhase).toBeUndefined();
+  });
+
+  it("rejects malformed or incomplete phase recommendations at publish", () => {
+    expect(GrowthPhaseRecommendationSchema.safeParse(phaseRecommendations[0]).success).toBe(true);
+
+    const phaseVersion = () => {
+      const version = buildD2BaseVersion({});
+      for (const question of version.questions) {
+        Object.assign(question, { phaseRecommendations });
+      }
+      return version;
+    };
+
+    const missingPhase = phaseVersion();
+    for (const question of missingPhase.questions) {
+      Object.assign(question, { phaseRecommendations: phaseRecommendations.slice(0, 4) });
+    }
+    expect(TemplateVersionForPublishSchema.safeParse(missingPhase).success).toBe(false);
+
+    const duplicatePhase = phaseVersion();
+    for (const question of duplicatePhase.questions) {
+      Object.assign(question, {
+        phaseRecommendations: [
+          ...phaseRecommendations.slice(0, 4),
+          phaseRecommendations[3],
+        ],
+      });
+    }
+    expect(TemplateVersionForPublishSchema.safeParse(duplicatePhase).success).toBe(false);
+
+    const gappedPhaseBands = phaseVersion();
+    for (const question of gappedPhaseBands.questions) {
+      Object.assign(question, {
+        phaseRecommendations: phaseRecommendations.map((row) =>
+          row.phase === 1
+            ? {
+                ...row,
+                bands: [
+                  { minScore: 0, maxScore: 4, text: "low" },
+                  { minScore: 6, maxScore: 10, text: "high" },
+                ],
+              }
+            : row,
+        ),
+      });
+    }
+    expect(TemplateVersionForPublishSchema.safeParse(gappedPhaseBands).success).toBe(false);
+
+    const overlappingPhaseBands = phaseVersion();
+    for (const question of overlappingPhaseBands.questions) {
+      Object.assign(question, {
+        phaseRecommendations: phaseRecommendations.map((row) =>
+          row.phase === 1
+            ? {
+                ...row,
+                bands: [
+                  { minScore: 0, maxScore: 5, text: "low" },
+                  { minScore: 5, maxScore: 10, text: "high" },
+                ],
+              }
+            : row,
+        ),
+      });
+    }
+    expect(TemplateVersionForPublishSchema.safeParse(overlappingPhaseBands).success).toBe(false);
+
+    for (const text of [" ", "TODO", "x".repeat(2001)]) {
+      const invalidText = phaseVersion();
+      for (const question of invalidText.questions) {
+        Object.assign(question, {
+          phaseRecommendations: phaseRecommendations.map((row) =>
+            row.phase === 1
+              ? { ...row, bands: [{ minScore: 0, maxScore: 10, text }] }
+              : row,
+          ),
+        });
+      }
+      expect(TemplateVersionForPublishSchema.safeParse(invalidText).success).toBe(false);
+    }
+
+    const mixedShapes = phaseVersion();
+    for (const question of mixedShapes.questions) {
+      Object.assign(question, {
+        phaseRecommendations: [
+          phaseRecommendations[0],
+          { minScore: 0, maxScore: 10, text: "legacy-shaped row" },
+        ],
+      });
+    }
+    expect(TemplateVersionForPublishSchema.safeParse(mixedShapes).success).toBe(false);
   });
 });
 
