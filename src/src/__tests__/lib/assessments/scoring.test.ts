@@ -18,8 +18,9 @@ import {
   validateTierTiling,
   type TemplateVersionForScoring,
   type Answer,
-  type GrowthPhase,
+  type GrowthPhaseRecommendation,
 } from "@/lib/assessments/scoring";
+import type { GrowthPhaseNumber } from "@/lib/assessments/su-full-phase";
 
 /**
  * Build the Rockefeller v1 template version structure.
@@ -915,10 +916,9 @@ describe("D2 — per-question recommendation bands", () => {
 });
 
 describe("phase-aware slider recommendations", () => {
-  const phaseRecommendations: Array<{
-    phase: GrowthPhase;
-    bands: Array<{ minScore: number; maxScore: number; text: string }>;
-  }> = ([1, 2, 3, 4, 5] as GrowthPhase[]).map((phase) => ({
+  const phaseRecommendations: GrowthPhaseRecommendation[] = (
+    [1, 2, 3, 4, 5] as GrowthPhaseNumber[]
+  ).map((phase) => ({
     phase,
     bands: [
       { minScore: 0, maxScore: 4, text: `P${phase} low` },
@@ -928,7 +928,7 @@ describe("phase-aware slider recommendations", () => {
     ],
   }));
 
-  function scoreAt({ phase, value }: { phase: GrowthPhase; value: number }) {
+  function scoreAt({ phase, value }: { phase: GrowthPhaseNumber; value: number }) {
     const version = buildD2BaseVersion({
       recommendations: [{ minScore: 0, maxScore: 10, text: "legacy" }],
     });

@@ -1,4 +1,6 @@
 // src/src/lib/assessments/section-pages.ts
+import type { GrowthPhaseRecommendation } from "./scoring";
+
 export interface PagerSection { stableKey: string; sortOrder: number; name: string; description?: string; partLabel?: string; domain?: string; }
 export interface PagerQuestion {
   stableKey: string; sortOrder: number; sectionStableKey?: string; type: string; label: string; isRequired: boolean;
@@ -6,10 +8,7 @@ export interface PagerQuestion {
   scale?: { min: number; max: number; step: number; anchorMin: string; anchorMax: string };
   options?: { key: string; label: string }[];
   maxChoices?: number;
-  phaseRecommendations?: Array<{
-    phase: 1 | 2 | 3 | 4 | 5;
-    bands: Array<{ minScore: number; maxScore: number; text: string }>;
-  }>;
+  phaseRecommendations?: GrowthPhaseRecommendation[];
   /** Wave W — authored show-if: visible only while `optionKey` is selected on the (earlier, MULTI_CHOICE) gate question. */
   showIf?: { questionKey: string; optionKey: string };
 }

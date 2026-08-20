@@ -26,6 +26,7 @@ import { z } from "zod";
 import { MAX_TEXT_ANSWER_LENGTH } from "./answer-limits";
 import { resolveFindings, type ResolvedFinding } from "./findings";
 import { canonicalQuestionOrderIndex } from "./section-pages";
+import type { GrowthPhaseNumber } from "./su-full-phase";
 
 // ─── Zod schemas (input validation) ──────────────────────────────────────
 
@@ -46,14 +47,13 @@ export const RecommendationBandSchema = z.object({
   text: z.string(),
 });
 
-export const GrowthPhaseSchema = z.union([
+export const GrowthPhaseSchema: z.ZodType<GrowthPhaseNumber> = z.union([
   z.literal(1),
   z.literal(2),
   z.literal(3),
   z.literal(4),
   z.literal(5),
 ]);
-export type GrowthPhase = z.infer<typeof GrowthPhaseSchema>;
 
 /** A recommendation-band set for one Scaling Up growth phase. */
 export const GrowthPhaseRecommendationSchema = z.object({
@@ -67,6 +67,9 @@ export const GrowthPhaseRecommendationSchema = z.object({
     }),
   ),
 });
+export type GrowthPhaseRecommendation = z.infer<
+  typeof GrowthPhaseRecommendationSchema
+>;
 
 // Wave W (spec 19w) — authored show-if: the question renders only while
 // `optionKey` is selected on the (earlier, MULTI_CHOICE) gate question.
@@ -395,7 +398,7 @@ function checkRecommendationsPublish(
     const phaseRows = q.phaseRecommendations;
     if (!phaseRows) continue;
 
-    const seenPhases = new Set<GrowthPhase>();
+    const seenPhases = new Set<GrowthPhaseNumber>();
     for (let pi = 0; pi < phaseRows.length; pi++) {
       const phaseRow = phaseRows[pi];
       if (seenPhases.has(phaseRow.phase)) {
@@ -1130,7 +1133,7 @@ export interface ScoreResult {
    */
   findings?: ResolvedFinding[];
   /** The organizational phase used to resolve phase-aware recommendations. */
-  recommendationPhase?: GrowthPhase;
+  recommendationPhase?: GrowthPhaseNumber;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────
@@ -1500,7 +1503,7 @@ export function scoreSubmission(
   answers: Answer[],
   options?: {
     allowMissingRequired?: boolean;
-    recommendationPhase?: GrowthPhase;
+    recommendationPhase?: GrowthPhaseNumber;
   }
 ): ScoreResult {
   // 1) Validate the version shape with Zod first so downstream code can
