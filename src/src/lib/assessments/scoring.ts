@@ -58,7 +58,14 @@ export type GrowthPhase = z.infer<typeof GrowthPhaseSchema>;
 /** A recommendation-band set for one Scaling Up growth phase. */
 export const GrowthPhaseRecommendationSchema = z.object({
   phase: GrowthPhaseSchema,
-  bands: z.array(RecommendationBandSchema),
+  // Slider answers are integers; integer endpoints guarantee every score in
+  // the required 0-10 publish range can be covered by a contiguous band set.
+  bands: z.array(
+    RecommendationBandSchema.extend({
+      minScore: z.number().int(),
+      maxScore: z.number().int(),
+    }),
+  ),
 });
 
 // Wave W (spec 19w) — authored show-if: the question renders only while
@@ -1753,7 +1760,7 @@ export function scoreSubmission(
     const row: PerQuestionResult = { stableKey: q.stableKey, value, achieved };
     // Phase-aware recommendations take precedence. Runtime is lenient on gaps
     // and unmatched/missing phases: omit `recommendation` rather than throw.
-    if (q.phaseRecommendations?.length) {
+    if (q.phaseRecommendations !== undefined) {
       const phaseRow = q.phaseRecommendations.find(
         (row) => row.phase === options?.recommendationPhase,
       );

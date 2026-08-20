@@ -922,8 +922,9 @@ describe("phase-aware slider recommendations", () => {
     phase,
     bands: [
       { minScore: 0, maxScore: 4, text: `P${phase} low` },
-      { minScore: 5, maxScore: 7, text: `P${phase} middle` },
-      { minScore: 8, maxScore: 10, text: `P${phase} top` },
+      { minScore: 5, maxScore: 6, text: `P${phase} middle` },
+      { minScore: 7, maxScore: 8, text: `P${phase} high` },
+      { minScore: 9, maxScore: 10, text: `P${phase} top` },
     ],
   }));
 
@@ -970,9 +971,27 @@ describe("phase-aware slider recommendations", () => {
   it("resolves the selected phase without falling back to legacy recommendations", () => {
     expect(scoreAt({ phase: 1, value: 4 }).recommendation).toBe("P1 low");
     expect(scoreAt({ phase: 2, value: 5 }).recommendation).toBe("P2 middle");
+    expect(scoreAt({ phase: 3, value: 7 }).recommendation).toBe("P3 high");
     expect(scoreAt({ phase: 5, value: 10 }).recommendation).toBe("P5 top");
     expect(scoreWithoutPhase().recommendation).toBeUndefined();
     expect(legacyScoreOnlyQuestion().recommendation).toBe("legacy");
+  });
+
+  it("does not fall back to legacy recommendations when phaseRecommendations is empty", () => {
+    const version = buildD2BaseVersion({
+      recommendations: [{ minScore: 0, maxScore: 10, text: "legacy" }],
+    });
+    for (const question of version.questions) {
+      Object.assign(question, { phaseRecommendations: [] });
+    }
+
+    const result = scoreSubmission(
+      version,
+      version.questions.map((question) => ({ stableKey: question.stableKey, value: 5 })),
+      { recommendationPhase: 1 },
+    );
+
+    expect(result.perQuestion[0].recommendation).toBeUndefined();
   });
 
   it("freezes a supplied recommendation phase but leaves omitted phases absent", () => {
@@ -1061,6 +1080,24 @@ describe("phase-aware slider recommendations", () => {
       });
     }
     expect(TemplateVersionForPublishSchema.safeParse(overlappingPhaseBands).success).toBe(false);
+
+    const fractionalPhaseBands = phaseVersion();
+    for (const question of fractionalPhaseBands.questions) {
+      Object.assign(question, {
+        phaseRecommendations: phaseRecommendations.map((row) =>
+          row.phase === 1
+            ? {
+                ...row,
+                bands: [
+                  { minScore: 0, maxScore: 4.5, text: "low" },
+                  { minScore: 5.5, maxScore: 10, text: "high" },
+                ],
+              }
+            : row,
+        ),
+      });
+    }
+    expect(TemplateVersionForPublishSchema.safeParse(fractionalPhaseBands).success).toBe(false);
 
     for (const text of [" ", "TODO", "x".repeat(2001)]) {
       const invalidText = phaseVersion();
