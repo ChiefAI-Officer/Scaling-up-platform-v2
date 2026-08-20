@@ -200,7 +200,7 @@ git commit -m "feat: add audited five-phase feedback catalogue"
 
 **Interfaces:**
 - Produces: `createScalingUpFullPhaseFeedbackDraft(db, actorEmail)`
-- Produces: `publishScalingUpFullPhaseFeedbackDraft(db, draftVersionId, actorEmail)`
+- Produces: `publishScalingUpFullPhaseFeedbackDraft(db, draftVersionId, approvedContentHash, actorEmail)`
 - Draft receipt must include source ID, before/after content hashes, 61 question count, 1,220 phase-band record count, phase boundaries, and `historicRowsMutated: false`.
 
 - [ ] **Step 1: Write failing draft/publish guard tests**
@@ -311,7 +311,7 @@ git commit -m "docs: record phase-aware feedback dark release"
 
 ---
 
-### Task 7: Two-approval activation release — not approved or executed
+### Task 7: Three-approval activation release — not approved or executed
 
 **Files:**
 - Modify: `CLAUDE.md`
@@ -323,8 +323,11 @@ git commit -m "docs: record phase-aware feedback dark release"
   `deployed: false`, and `activated: false`.
 - Produces an unpublished draft and exact creation receipt only after a future
   create authorization.
-- Consumes the independently reviewed draft ID, content hash, and named actor
-  only after a later, separate human publish approval.
+- Integrates and deploys the exact independently reviewed code only after a
+  separate code-integration/deploy approval, while the draft stays unpublished.
+- Consumes the independently reviewed draft ID/content hash, named actor, and
+  verified deployed SHA only after a third, separate human publish/activation
+  approval.
 - Produces a published edition for future campaigns only; existing campaign pins and frozen submissions remain unchanged.
 
 - [ ] **Step 1: Obtain future authorization to begin the create-only stage**
@@ -361,15 +364,42 @@ receipt, reproduce the `afterContentHash`, verify the source binding and
 the exact reviewed commit. Record the review evidence against the exact
 `draftVersionId` and `afterContentHash`.
 
-**STOP after review.** Obtain a new, separate, explicit human **PUBLISH**
-approval that names the exact draft ID, exact content hash, and approved actor.
-Create authorization does not authorize publish; never combine create and
-publish under one approval.
+**STOP after draft review.** Create authorization does not authorize code
+integration, Production deployment, or publish.
 
-- [ ] **Step 4: Publish only the separately approved exact draft**
+- [ ] **Step 4: Separately approve and deploy the exact reviewed code while the draft remains unpublished**
 
-Only after the separate publish approval, load its exact values into the
-approval-scoped environment and run:
+Obtain a separate explicit human approval naming the exact reviewed **code
+SHA** and authorizing its PR/integration, merge, and Production deployment only.
+Do not publish the draft in this stage. If the repository's approved integration
+method produces a distinct merge SHA, record both SHAs and prove the integrated
+tree contains the reviewed code without drift.
+
+Perform only the approved integration/deployment actions. Record the resulting
+Production deployment URL and deployed SHA, then require Vercel **Ready** (or
+the repository's canonical provider-ready evidence) and a successful canonical
+`/api/health` response for that exact deployed code. The health receipt must
+include HTTP status and the repository's healthy database/auth-posture fields.
+Read-only verify again that the reviewed draft is still unpublished and all
+pre-existing campaign pins are unchanged.
+
+If integration, deployment, provider readiness, SHA binding, or canonical
+health fails, **STOP and do not publish**.
+
+- [ ] **Step 5: Stop and obtain separate publish/activation approval**
+
+After Ready/healthy evidence exists, **STOP again**. Obtain a third, separate,
+explicit human **PUBLISH/ACTIVATION** approval naming the exact reviewed
+`draftVersionId`, exact `afterContentHash`, approved actor, and exact verified
+deployed SHA. Create authorization and code-deploy authorization do not
+authorize publish; create, deploy, and publish must never share one approval or
+receipt.
+
+- [ ] **Step 6: Publish only the exact draft approved against the healthy deployed SHA**
+
+Only after that publish/activation approval, confirm the current Ready/healthy
+Production deployment still matches the approved SHA, load the approved draft
+values into the approval-scoped environment, and run:
 
 ```bash
 test -n "$SU_FULL_PHASE_FEEDBACK_APPROVED_DRAFT_ID"
@@ -385,14 +415,21 @@ The script must reject blank, stale, or mismatched inputs and any ad-hoc
 `--draft-version-id`, `--content-hash`, `--approved-content-hash`, or `--actor`
 override.
 
-- [ ] **Step 5: Verify the published edition and a new campaign without mutating historic data**
+- [ ] **Step 7: Verify the publish receipt and campaign pins, then smoke a new campaign**
 
-Create one new dedicated mail-disabled campaign pinned to the new edition, complete boundary/sentinel CEO cases, verify the landscape report paragraphs against the catalogue, verify all 61 Peers remain the governed snapshot, and re-open an old pinned report to prove its frozen feedback is unchanged.
+First verify the publish receipt binds the exact approved draft ID/hash, actor,
+source receipt, final published lifecycle state, and zero campaign repins. Verify
+all pre-existing campaign pins remain unchanged. Only then create one new
+dedicated mail-disabled campaign pinned to the new edition, complete
+boundary/sentinel CEO cases, verify the end-to-end report paragraphs against the
+catalogue, verify all 61 Peers remain the governed snapshot, and re-open an old
+pinned report to prove its frozen feedback is unchanged.
 
-- [ ] **Step 6: Record the activation receipt**
+- [ ] **Step 8: Record the activation receipt**
 
 Document the create authorization, complete draft-creation receipt, independent
-review, separate publish approval, published version ID/hash, publisher, new-
-campaign pin, old-campaign pin, sentinel results, 61-Peer parity, deployment
-URL/SHA, smoke timestamp, and rollback instruction (stop creating new campaigns
-on the edition; never rewrite submissions).
+review, separate reviewed-code integration/deploy approval and receipt, Ready
+and canonical-health evidence, separate publish/activation approval, published
+version ID/hash, publisher, new-campaign pin, old-campaign pin, sentinel results,
+61-Peer parity, deployment URL/SHA, smoke timestamp, and rollback instruction
+(stop creating new campaigns on the edition; never rewrite submissions).
