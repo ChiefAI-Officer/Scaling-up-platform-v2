@@ -47,6 +47,31 @@ describe("CoachMobileNav", () => {
     expect(trigger).toHaveFocus();
   });
 
+  it("renders the responsive drawer outside a filtered header", () => {
+    const { container } = render(
+      <header className="backdrop-blur-sm">
+        <CoachMobileNav coachName="Alex" responsiveEnabled />
+      </header>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Open menu" }));
+
+    const header = container.querySelector("header");
+    const drawer = screen.getByTestId("coach-mobile-nav-backdrop").parentElement;
+    expect(header).not.toContainElement(drawer);
+    expect(document.body).toContainElement(drawer);
+  });
+
+  it("keeps the responsive drawer open for pointer interactions inside it", () => {
+    render(<CoachMobileNav coachName="Alex" responsiveEnabled />);
+    const trigger = screen.getByRole("button", { name: "Open menu" });
+    fireEvent.click(trigger);
+
+    fireEvent.pointerDown(screen.getByRole("link", { name: "Dashboard" }));
+
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+  });
+
   it("keeps the existing mobile destinations while the surface is disabled", () => {
     openNavigation(false);
 
