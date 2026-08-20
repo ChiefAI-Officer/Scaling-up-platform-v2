@@ -652,6 +652,35 @@ describe("Wave OSR — the decision is made under the Phase-2 lock", () => {
     expect(body.data?.report).toBeUndefined();
   });
 
+  it("commits a legacy repin while dropping the stale results row and payload", async () => {
+    const phase1 = invitationFixture({
+      showResultsOnScreen: true,
+      sendResultsToRespondent: true,
+      notifyCoachOnCompletion: false,
+    });
+    dbMock.assessmentInvitation.findUnique.mockResolvedValue(phase1);
+    txMock.assessmentInvitation.findUnique.mockResolvedValue({
+      ...phase1,
+      campaign: {
+        ...phase1.campaign,
+        version: { ...phase1.campaign.version, id: "v2" },
+      },
+    });
+
+    const response = await POST(
+      jsonReq(goodAnswers) as never,
+      aliasParams("demo"),
+    );
+    const body = (await response.json()) as SubmitBody;
+
+    expect(response.status).toBe(200);
+    expect(body.data?.submissionId).toBe("sub-1");
+    expect(body.data?.report).toBeUndefined();
+    expect(buildState.calls).toHaveLength(3);
+    expect(txMock.assessmentSubmission.create).toHaveBeenCalledTimes(1);
+    expect(txMock.assessmentEmailOutbox.create).not.toHaveBeenCalled();
+  });
+
   it("re-reads showResultsOnScreen inside the locked transaction", async () => {
     mockInvitation({ showResultsOnScreen: true });
     await POST(jsonReq(goodAnswers) as never, aliasParams("demo"));

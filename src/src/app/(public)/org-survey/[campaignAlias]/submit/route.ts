@@ -1340,7 +1340,10 @@ export async function POST(
           }
         }
 
-        if (locked.campaign.version.id !== scoringVersion.id) {
+        if (
+          phaseAwareVersion &&
+          locked.campaign.version.id !== scoringVersion.id
+        ) {
           throw new SubmissionTransactionAbort("stale-snapshot");
         }
         if (

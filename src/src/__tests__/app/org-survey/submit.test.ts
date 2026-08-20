@@ -1822,6 +1822,28 @@ describe("#79 — SU-Full CEO-only S_BACKGROUND on submit", () => {
     expect(txMock.assessmentEmailOutbox.create).not.toHaveBeenCalled();
   });
 
+  it("rejects a report-style change between the phase-aware snapshot and final lock", async () => {
+    mockSuFullInvitation(true, { sendResultsToRespondent: true });
+    reportStyleLockMock.mockResolvedValue("CLASSIC");
+
+    const res = await POST(
+      jsonReq({
+        answers: [
+          { stableKey: "q1", value: 4 },
+          { stableKey: "Q_FTE_CONTRACT", value: 8 },
+        ],
+      }) as never,
+      aliasParams("demo"),
+    );
+
+    expect(res.status).toBe(503);
+    expect(await res.json()).toMatchObject({
+      error: "Submission state changed. Please submit again.",
+    });
+    expect(txMock.assessmentSubmission.create).not.toHaveBeenCalled();
+    expect(txMock.assessmentEmailOutbox.create).not.toHaveBeenCalled();
+  });
+
   it("rejects a CEO designation change between the snapshot and final lock", async () => {
     mockSuFullInvitation(true, { sendResultsToRespondent: true });
     txMock.assessmentCampaignParticipant.findUnique
