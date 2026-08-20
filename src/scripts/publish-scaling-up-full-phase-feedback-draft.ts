@@ -6,8 +6,10 @@
  * only the unpublished draft row, and never repins campaigns.
  *
  * Usage (only after separate activation approval):
+ *   SU_FULL_PHASE_FEEDBACK_APPROVED_DRAFT_ID=<reviewed-id> \
+ *   SU_FULL_PHASE_FEEDBACK_APPROVED_CONTENT_HASH=<reviewed-sha256> \
+ *   SU_FULL_PHASE_FEEDBACK_APPROVED_ACTOR=<operator-email> \
  *   npx tsx scripts/publish-scaling-up-full-phase-feedback-draft.ts \
- *     --draft-version-id <id> --actor operator@example.com \
  *     --i-know-this-is-prod
  */
 
@@ -15,12 +17,53 @@ import { PrismaClient } from "@prisma/client";
 import { publishScalingUpFullPhaseFeedbackDraft } from "@/lib/assessments/su-full-phase-feedback-edition";
 import { checkGuard, OVERRIDE_FLAG } from "@/lib/scripts/safe-seed-guard";
 
-function argumentValue(name: string): string | undefined {
-  const index = process.argv.indexOf(name);
-  return index >= 0 ? process.argv[index + 1] : undefined;
+const APPROVAL_INPUT_KEYS = {
+  draftVersionId: "SU_FULL_PHASE_FEEDBACK_APPROVED_DRAFT_ID",
+  approvedContentHash: "SU_FULL_PHASE_FEEDBACK_APPROVED_CONTENT_HASH",
+  actor: "SU_FULL_PHASE_FEEDBACK_APPROVED_ACTOR",
+} as const;
+const FORBIDDEN_APPROVAL_OVERRIDE_FLAGS = [
+  "--draft-version-id",
+  "--content-hash",
+  "--approved-content-hash",
+  "--actor",
+] as const;
+
+export function resolveApprovedPublishInputs(
+  argv: readonly string[],
+  env: Readonly<Record<string, string | undefined>>,
+): {
+  draftVersionId: string;
+  approvedContentHash: string;
+  actor: string;
+} {
+  for (const argument of argv) {
+    if (
+      FORBIDDEN_APPROVAL_OVERRIDE_FLAGS.some(
+        (flag) => argument === flag || argument.startsWith(`${flag}=`),
+      )
+    ) {
+      throw new Error(
+        "Phase-feedback approval inputs must come from the approval-scoped environment; ad-hoc CLI overrides are forbidden.",
+      );
+    }
+  }
+
+  const draftVersionId = env[APPROVAL_INPUT_KEYS.draftVersionId]?.trim() ?? "";
+  const approvedContentHash =
+    env[APPROVAL_INPUT_KEYS.approvedContentHash]?.trim() ?? "";
+  const actor = env[APPROVAL_INPUT_KEYS.actor]?.trim() ?? "";
+  if (draftVersionId === "" || approvedContentHash === "" || actor === "") {
+    throw new Error(
+      "All phase-feedback approval inputs (draft ID, content hash, and actor) are required from the approval-scoped environment.",
+    );
+  }
+  return { draftVersionId, approvedContentHash, actor };
 }
 
 async function main(): Promise<void> {
+  const { draftVersionId, approvedContentHash, actor } =
+    resolveApprovedPublishInputs(process.argv.slice(2), process.env);
   const guard = checkGuard({
     url: process.env.DATABASE_URL ?? "",
     expectedHost: process.env.ASSESSMENT_PROD_EXPECTED_HOST,
@@ -30,19 +73,12 @@ async function main(): Promise<void> {
     throw new Error(guard.reason ?? "Production safety guard refused.");
   }
 
-  const draftVersionId =
-    argumentValue("--draft-version-id") ??
-    process.env.SU_FULL_PHASE_FEEDBACK_APPROVED_DRAFT_ID ??
-    "";
-  const actor =
-    argumentValue("--actor") ??
-    process.env.SU_FULL_PHASE_FEEDBACK_APPROVED_ACTOR ??
-    "";
   const db = new PrismaClient();
   try {
     const result = await publishScalingUpFullPhaseFeedbackDraft(
       db,
       draftVersionId,
+      approvedContentHash,
       actor,
     );
     console.log(

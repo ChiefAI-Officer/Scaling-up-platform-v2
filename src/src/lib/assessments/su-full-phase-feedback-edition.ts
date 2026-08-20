@@ -26,6 +26,29 @@ const SERIALIZABLE_TRANSACTION_OPTIONS = {
 };
 const MAX_SERIALIZABLE_ATTEMPTS = 2;
 const SERIALIZATION_CONFLICT_CODES = new Set(["P2034", "40001"]);
+const PHASE_DRIVER_CONTRACT = {
+  question: {
+    stableKey: "Q_FTE_CONTRACT",
+    sortOrder: 62,
+    type: "NUMBER",
+    label:
+      "Number of employees with a permanent or temporary contract (full-time equivalent)",
+    sectionStableKey: "S_BACKGROUND",
+    isRequired: true,
+  },
+  section: {
+    stableKey: "S_BACKGROUND",
+    sortOrder: 0,
+    name: "About your company",
+    description:
+      "A few quick numbers about your company. These help us place your company's growth phase — they are not scored.",
+    domain: "people",
+  },
+  // CEO-only visibility is the production survey contract for this template's
+  // S_BACKGROUND section. Keeping the policy explicit binds that routing
+  // invariant into both lifecycle receipts.
+  audiencePolicy: "SCALING_UP_FULL_S_BACKGROUND_CEO_ONLY",
+} as const;
 
 export const SU_FULL_PHASE_FEEDBACK_BOUNDARIES = CURRENT_GROWTH_PHASE_BANDS.map(
   (band) => ({
@@ -135,6 +158,7 @@ export interface PhaseFeedbackDraftReceipt {
   draftArchivedAt: null;
   createdByEmail: string;
   createdByUserId: string;
+  phaseDriverContract: typeof PHASE_DRIVER_CONTRACT;
 }
 
 export interface PhaseFeedbackDraftResult extends PhaseFeedbackDraftReceipt {
@@ -154,6 +178,16 @@ function actorEmail(value: string): string {
     throw new Error("Scaling Up Full phase-feedback lifecycle requires an actor email.");
   }
   return email;
+}
+
+function approvedContentHash(value: string): string {
+  const hash = value.trim();
+  if (!/^[a-f0-9]{64}$/.test(hash)) {
+    throw new Error(
+      "Scaling Up Full phase-feedback publish requires an approved content hash.",
+    );
+  }
+  return hash;
 }
 
 function hasSerializationConflictCode(error: unknown): boolean {
@@ -257,6 +291,49 @@ function assertPublishedRetryState(
   ) {
     throw new Error(
       `${description} is not in a valid published retry state.`,
+    );
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function matchesExactRecord(
+  value: unknown,
+  expected: Record<string, unknown>,
+): boolean {
+  if (!isRecord(value)) return false;
+  const actualKeys = Object.keys(value).sort();
+  const expectedKeys = Object.keys(expected).sort();
+  return (
+    JSON.stringify(actualKeys) === JSON.stringify(expectedKeys) &&
+    expectedKeys.every((key) => value[key] === expected[key])
+  );
+}
+
+function assertExactPhaseDriver(
+  questions: unknown,
+  sections: unknown,
+  description: string,
+): void {
+  if (!Array.isArray(questions) || !Array.isArray(sections)) {
+    throw new Error(`${description} has an invalid phase driver contract.`);
+  }
+  const drivers = questions.filter(
+    (question) => isRecord(question) && question.stableKey === "Q_FTE_CONTRACT",
+  );
+  const backgroundSections = sections.filter(
+    (section) => isRecord(section) && section.stableKey === "S_BACKGROUND",
+  );
+  if (
+    drivers.length !== 1 ||
+    backgroundSections.length !== 1 ||
+    !matchesExactRecord(drivers[0], PHASE_DRIVER_CONTRACT.question) ||
+    !matchesExactRecord(backgroundSections[0], PHASE_DRIVER_CONTRACT.section)
+  ) {
+    throw new Error(
+      `${description} must contain exactly the production Q_FTE_CONTRACT phase driver in the CEO-only S_BACKGROUND section.`,
     );
   }
 }
@@ -369,6 +446,7 @@ function receiptFor(
     draftArchivedAt: null,
     createdByEmail: creator.email,
     createdByUserId: creator.id,
+    phaseDriverContract: PHASE_DRIVER_CONTRACT,
   };
 }
 
@@ -446,6 +524,14 @@ function assertDraftReceipt(
       `Scaling Up Full version ${draft.versionNumber} does not match its phase-feedback draft audit receipt.`,
     );
   }
+  if (
+    JSON.stringify(raw.phaseDriverContract) !==
+    JSON.stringify(expected.phaseDriverContract)
+  ) {
+    throw new Error(
+      `Scaling Up Full version ${draft.versionNumber} does not match its phase-feedback draft audit receipt.`,
+    );
+  }
   return expected;
 }
 
@@ -454,6 +540,7 @@ function assertPublishReceipt(
   receipt: PhaseFeedbackDraftReceipt,
   draft: VersionRow,
   performedBy: string | null,
+  expectedApprovedContentHash: string,
 ): { publishedByEmail: string; publishedByUserId: string } {
   for (const key of [
     "sourceId",
@@ -486,6 +573,9 @@ function assertPublishReceipt(
   }
   if (
     JSON.stringify(raw.phaseBoundaries) !== JSON.stringify(receipt.phaseBoundaries) ||
+    JSON.stringify(raw.phaseDriverContract) !==
+      JSON.stringify(receipt.phaseDriverContract) ||
+    raw.approvedContentHash !== expectedApprovedContentHash ||
     raw.finalPublishedAt !== draft.publishedAt?.toISOString() ||
     raw.finalPublishedBy !== draft.publishedBy ||
     raw.finalArchivedAt !== (draft.archivedAt?.toISOString() ?? null) ||
@@ -616,6 +706,11 @@ export async function createScalingUpFullPhaseFeedbackDraft(
         throw new Error("Active published version is not a Scaling Up Full edition.");
       }
 
+      assertExactPhaseDriver(
+        activeVersion.questions,
+        activeVersion.sections,
+        "Active published Scaling Up Full edition",
+      );
       canonicalScoredQuestions(activeVersion.questions);
       assertVersionHash(template, activeVersion, "Active published Scaling Up Full edition");
       const questions = attachPhaseRecommendations(activeVersion.questions);
@@ -631,6 +726,11 @@ export async function createScalingUpFullPhaseFeedbackDraft(
       if (latestVersion.publishedAt === null) {
         assertExactUnpublishedDraftState(
           latestVersion,
+          `Scaling Up Full version ${latestVersion.versionNumber}`,
+        );
+        assertExactPhaseDriver(
+          latestVersion.questions,
+          latestVersion.sections,
           `Scaling Up Full version ${latestVersion.versionNumber}`,
         );
         if (latestVersion.contentHash !== afterContentHash) {
@@ -709,12 +809,16 @@ export async function createScalingUpFullPhaseFeedbackDraft(
 export async function publishScalingUpFullPhaseFeedbackDraft(
   db: PhaseFeedbackEditionDb,
   draftVersionIdInput: string,
+  expectedApprovedContentHashInput: string,
   actorEmailInput: string,
 ): Promise<PhaseFeedbackPublishResult> {
   const draftVersionId = draftVersionIdInput.trim();
   if (draftVersionId === "") {
     throw new Error("Scaling Up Full phase-feedback publish requires a draft version ID.");
   }
+  const expectedApprovedContentHash = approvedContentHash(
+    expectedApprovedContentHashInput,
+  );
   const email = actorEmail(actorEmailInput);
 
   return runSerializableLifecycleTransaction(
@@ -757,8 +861,18 @@ export async function publishScalingUpFullPhaseFeedbackDraft(
           `Scaling Up Full version ${draft.versionNumber}`,
         );
       }
+      assertExactPhaseDriver(
+        draft.questions,
+        draft.sections,
+        `Scaling Up Full version ${draft.versionNumber}`,
+      );
       assertCanonicalPhaseRecommendations(draft.questions);
       assertVersionHash(template, draft, `Scaling Up Full version ${draft.versionNumber}`);
+      if (draft.contentHash !== expectedApprovedContentHash) {
+        throw new Error(
+          `Scaling Up Full version ${draft.versionNumber} does not match the approved content hash.`,
+        );
+      }
 
       const draftAudit = await findDraftAudit(tx, draft);
       const creator = await resolveDraftReceiptCreator(tx, draftAudit, draft);
@@ -793,6 +907,11 @@ export async function publishScalingUpFullPhaseFeedbackDraft(
       if (recordedSource.templateId !== template.id) {
         throw new Error("Recorded published predecessor is not a Scaling Up Full edition.");
       }
+      assertExactPhaseDriver(
+        recordedSource.questions,
+        recordedSource.sections,
+        "Recorded published Scaling Up Full predecessor",
+      );
       if (
         recordedSource.id === draft.id ||
         recordedSource.versionNumber >= draft.versionNumber
@@ -813,6 +932,11 @@ export async function publishScalingUpFullPhaseFeedbackDraft(
         draft,
         creator,
       );
+      if (receipt.afterContentHash !== expectedApprovedContentHash) {
+        throw new Error(
+          `Scaling Up Full version ${draft.versionNumber} creation receipt does not match the approved content hash.`,
+        );
+      }
 
       assertEnglishVersion(activeVersion, "Active published Scaling Up Full edition");
       assertActivePublishedVersion(
@@ -822,6 +946,11 @@ export async function publishScalingUpFullPhaseFeedbackDraft(
       if (activeVersion.templateId !== template.id) {
         throw new Error("Active published version is not a Scaling Up Full edition.");
       }
+      assertExactPhaseDriver(
+        activeVersion.questions,
+        activeVersion.sections,
+        "Active published Scaling Up Full edition",
+      );
       assertVersionHash(template, activeVersion, "Active published Scaling Up Full edition");
 
       if (draft.publishedAt !== null) {
@@ -850,6 +979,7 @@ export async function publishScalingUpFullPhaseFeedbackDraft(
           receipt,
           draft,
           publishAudit.performedBy,
+          expectedApprovedContentHash,
         );
         return {
           action: "noop",
@@ -912,6 +1042,7 @@ export async function publishScalingUpFullPhaseFeedbackDraft(
             finalPublishedAt: publishedAt.toISOString(),
             finalPublishedBy: actor.id,
             finalArchivedAt: null,
+            approvedContentHash: expectedApprovedContentHash,
             publishedByEmail: actor.email,
             publishedByUserId: actor.id,
             draftRowsPublished: 1,

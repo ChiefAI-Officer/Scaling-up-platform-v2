@@ -6,6 +6,7 @@ import {
 } from "@/lib/assessments/su-full-phase-feedback-edition";
 import { buildPhaseRecommendations } from "@/lib/assessments/su-full-phase-feedback-catalogue";
 import { computeTemplateContentHash } from "@/lib/assessments/template-content-hash";
+import * as publishCli from "../../../../scripts/publish-scaling-up-full-phase-feedback-draft";
 
 type Question = Record<string, unknown> & {
   stableKey: string;
@@ -47,6 +48,27 @@ const PHASE_BOUNDARIES = [
   { phase: 5, name: "Standardization", minFte: 151, maxFte: null },
 ] as const;
 
+const PHASE_DRIVER_CONTRACT = {
+  question: {
+    stableKey: "Q_FTE_CONTRACT",
+    sortOrder: 62,
+    type: "NUMBER",
+    label:
+      "Number of employees with a permanent or temporary contract (full-time equivalent)",
+    sectionStableKey: "S_BACKGROUND",
+    isRequired: true,
+  },
+  section: {
+    stableKey: "S_BACKGROUND",
+    sortOrder: 0,
+    name: "About your company",
+    description:
+      "A few quick numbers about your company. These help us place your company's growth phase — they are not scored.",
+    domain: "people",
+  },
+  audiencePolicy: "SCALING_UP_FULL_S_BACKGROUND_CEO_ONLY",
+} as const;
+
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
@@ -79,6 +101,71 @@ function phaseQuestions(questions: Question[]): Question[] {
       : question,
   );
 }
+
+const PHASE_DRIVER_MUTATIONS: ReadonlyArray<[
+  string,
+  (version: Version) => void,
+]> = [
+  ["missing driver", (version) => {
+    version.questions = version.questions.filter(
+      (question) => question.stableKey !== "Q_FTE_CONTRACT",
+    );
+  }],
+  ["duplicate driver", (version) => {
+    const driver = version.questions.find(
+      (question) => question.stableKey === "Q_FTE_CONTRACT",
+    )!;
+    version.questions.push({ ...clone(driver), sortOrder: 64 });
+  }],
+  ["moved driver", (version) => {
+    const driver = version.questions.find(
+      (question) => question.stableKey === "Q_FTE_CONTRACT",
+    )!;
+    driver.sectionStableKey = "S_PEOPLE_YE";
+  }],
+  ["wrong driver type", (version) => {
+    const driver = version.questions.find(
+      (question) => question.stableKey === "Q_FTE_CONTRACT",
+    )!;
+    driver.type = "TEXT";
+  }],
+  ["wrong driver sort order", (version) => {
+    const driver = version.questions.find(
+      (question) => question.stableKey === "Q_FTE_CONTRACT",
+    )!;
+    driver.sortOrder = 64;
+  }],
+  ["wrong driver label", (version) => {
+    const driver = version.questions.find(
+      (question) => question.stableKey === "Q_FTE_CONTRACT",
+    )!;
+    driver.label = "Contract employees";
+  }],
+  ["optional driver", (version) => {
+    const driver = version.questions.find(
+      (question) => question.stableKey === "Q_FTE_CONTRACT",
+    )!;
+    driver.isRequired = false;
+  }],
+  ["extra driver field", (version) => {
+    const driver = version.questions.find(
+      (question) => question.stableKey === "Q_FTE_CONTRACT",
+    )!;
+    driver.audience = "CEO";
+  }],
+  ["wrong background section shape", (version) => {
+    const background = (version.sections as Array<Record<string, unknown>>).find(
+      (section) => section.stableKey === "S_BACKGROUND",
+    )!;
+    background.domain = "strategy";
+  }],
+  ["wrong audience driver", (version) => {
+    const background = (version.sections as Array<Record<string, unknown>>).find(
+      (section) => section.stableKey === "S_BACKGROUND",
+    )!;
+    background.audience = "ALL_RESPONDENTS";
+  }],
+];
 
 function makeDb(options: {
   templateAlias?: string;
@@ -200,6 +287,7 @@ function makeDb(options: {
     draftArchivedAt: null,
     createdByEmail: "creator@example.com",
     createdByUserId: "creator@example.com-user",
+    phaseDriverContract: PHASE_DRIVER_CONTRACT,
   };
   const audits: AuditRow[] = [];
   if (options.includeDraftReceipt || options.latest === "matching-draft" || options.draftPublished) {
@@ -225,6 +313,7 @@ function makeDb(options: {
         finalPublishedAt: draft.publishedAt?.toISOString(),
         finalPublishedBy: draft.publishedBy,
         finalArchivedAt: draft.archivedAt?.toISOString() ?? null,
+        approvedContentHash: draft.contentHash,
         publishedByEmail: "admin@example.com",
         publishedByUserId: "admin-user",
         draftRowsPublished: 1,
@@ -359,6 +448,7 @@ describe("createScalingUpFullPhaseFeedbackDraft", () => {
       historicRowsMutated: false,
       createdByEmail: "creator@example.com",
       createdByUserId: "creator@example.com-user",
+      phaseDriverContract: PHASE_DRIVER_CONTRACT,
     });
     expect(db.$transaction).toHaveBeenCalledWith(expect.any(Function), {
       isolationLevel: "Serializable",
@@ -415,6 +505,7 @@ describe("createScalingUpFullPhaseFeedbackDraft", () => {
         draftArchivedAt: null,
         createdByEmail: "creator@example.com",
         createdByUserId: "creator@example.com-user",
+        phaseDriverContract: PHASE_DRIVER_CONTRACT,
       }),
     );
     expect(tx.assessmentTemplateVersion.updateMany).not.toHaveBeenCalled();
@@ -504,6 +595,31 @@ describe("createScalingUpFullPhaseFeedbackDraft", () => {
     expect(ctx.tx.auditLog.create).not.toHaveBeenCalled();
   });
 
+  it.each(PHASE_DRIVER_MUTATIONS)(
+    "refuses draft creation with %s",
+    async (_label, mutate) => {
+      const ctx = makeDb({ activeMutate: mutate });
+
+      await expect(
+        createScalingUpFullPhaseFeedbackDraft(ctx.db, "creator@example.com"),
+      ).rejects.toThrow(/phase driver|Q_FTE_CONTRACT|S_BACKGROUND/i);
+      expect(ctx.tx.assessmentTemplateVersion.create).not.toHaveBeenCalled();
+      expect(ctx.tx.auditLog.create).not.toHaveBeenCalled();
+    },
+  );
+
+  it("refuses an idempotent create no-op when its phase driver is no longer exact", async () => {
+    const ctx = makeDb({
+      latest: "matching-draft",
+      activeMutate: PHASE_DRIVER_MUTATIONS[6][1],
+    });
+
+    await expect(
+      createScalingUpFullPhaseFeedbackDraft(ctx.db, "creator@example.com"),
+    ).rejects.toThrow(/phase driver|Q_FTE_CONTRACT/i);
+    expect(ctx.tx.assessmentTemplateVersion.create).not.toHaveBeenCalled();
+  });
+
   it.each([
     ["draft identity", (receipt: Record<string, unknown>) => { receipt.draftVersionId = "other-draft"; }],
     ["missing template identity", (receipt: Record<string, unknown>) => { delete receipt.templateId; }],
@@ -514,6 +630,8 @@ describe("createScalingUpFullPhaseFeedbackDraft", () => {
     ["source lifecycle state", (receipt: Record<string, unknown>) => { receipt.sourcePublishedBy = "other-publisher"; }],
     ["missing draft creation state", (receipt: Record<string, unknown>) => { delete receipt.draftArchivedAt; }],
     ["draft creation state", (receipt: Record<string, unknown>) => { receipt.draftArchivedAt = "2026-08-20T08:00:00.000Z"; }],
+    ["missing phase-driver contract", (receipt: Record<string, unknown>) => { delete receipt.phaseDriverContract; }],
+    ["phase-driver contract", (receipt: Record<string, unknown>) => { receipt.phaseDriverContract = { ...PHASE_DRIVER_CONTRACT, audiencePolicy: "ALL_RESPONDENTS" }; }],
     ["record count", (receipt: Record<string, unknown>) => { receipt.phaseBandRecordCount = 1219; }],
     ["phase boundaries", (receipt: Record<string, unknown>) => { receipt.phaseBoundaries = PHASE_BOUNDARIES.slice(0, 4); }],
   ])("refuses idempotence when the draft receipt has a wrong %s", async (_label, mutate) => {
@@ -678,6 +796,7 @@ describe("publishScalingUpFullPhaseFeedbackDraft", () => {
     const result = await publishScalingUpFullPhaseFeedbackDraft(
       db,
       draft.id,
+      draft.contentHash,
       " Admin@Example.com ",
     );
 
@@ -698,6 +817,7 @@ describe("publishScalingUpFullPhaseFeedbackDraft", () => {
       publishedBy: "admin@example.com",
       createdByEmail: "creator@example.com",
       createdByUserId: "creator@example.com-user",
+      phaseDriverContract: PHASE_DRIVER_CONTRACT,
     });
     expect(db.$transaction).toHaveBeenCalledWith(expect.any(Function), {
       isolationLevel: "Serializable",
@@ -752,6 +872,8 @@ describe("publishScalingUpFullPhaseFeedbackDraft", () => {
         finalArchivedAt: null,
         createdByEmail: "creator@example.com",
         createdByUserId: "creator@example.com-user",
+        phaseDriverContract: PHASE_DRIVER_CONTRACT,
+        approvedContentHash: draft.contentHash,
         publishedByEmail: "admin@example.com",
         publishedByUserId: "admin-user",
         draftRowsPublished: 1,
@@ -764,7 +886,7 @@ describe("publishScalingUpFullPhaseFeedbackDraft", () => {
     const { db, draft } = makeDb({ latest: "matching-draft" });
 
     await expect(
-      publishScalingUpFullPhaseFeedbackDraft(db, draft.id, "  "),
+      publishScalingUpFullPhaseFeedbackDraft(db, draft.id, draft.contentHash, "  "),
     ).rejects.toThrow(/actor email/i);
     expect(db.$transaction).not.toHaveBeenCalled();
   });
@@ -776,7 +898,12 @@ describe("publishScalingUpFullPhaseFeedbackDraft", () => {
     });
 
     await expect(
-      publishScalingUpFullPhaseFeedbackDraft(db, draft.id, "admin@example.com"),
+      publishScalingUpFullPhaseFeedbackDraft(
+        db,
+        draft.id,
+        draft.contentHash,
+        "admin@example.com",
+      ),
     ).rejects.toThrow(/privileged actor/i);
     expect(tx.assessmentTemplateVersion.updateMany).not.toHaveBeenCalled();
   });
@@ -792,7 +919,12 @@ describe("publishScalingUpFullPhaseFeedbackDraft", () => {
     });
 
     await expect(
-      publishScalingUpFullPhaseFeedbackDraft(db, draft.id, "admin@example.com"),
+      publishScalingUpFullPhaseFeedbackDraft(
+        db,
+        draft.id,
+        draft.contentHash,
+        "admin@example.com",
+      ),
     ).rejects.toThrow(/exact unpublished draft state/i);
     expect(tx.assessmentTemplateVersion.updateMany).not.toHaveBeenCalled();
     expect(tx.auditLog.create).not.toHaveBeenCalled();
@@ -811,9 +943,100 @@ describe("publishScalingUpFullPhaseFeedbackDraft", () => {
       publishScalingUpFullPhaseFeedbackDraft(
         ctx.db,
         ctx.draft.id,
+        ctx.draft.contentHash,
         "admin@example.com",
       ),
     ).rejects.toThrow(/stale.*active|active.*predecessor/i);
+    expect(ctx.tx.assessmentTemplateVersion.updateMany).not.toHaveBeenCalled();
+  });
+
+  it.each(PHASE_DRIVER_MUTATIONS)(
+    "refuses publication with %s",
+    async (_label, mutate) => {
+      const ctx = makeDb({
+        latest: "matching-draft",
+        includeDraftReceipt: true,
+        activeMutate: mutate,
+      });
+
+      await expect(
+        publishScalingUpFullPhaseFeedbackDraft(
+          ctx.db,
+          ctx.draft.id,
+          ctx.draft.contentHash,
+          "admin@example.com",
+        ),
+      ).rejects.toThrow(/phase driver|Q_FTE_CONTRACT|S_BACKGROUND/i);
+      expect(ctx.tx.assessmentTemplateVersion.updateMany).not.toHaveBeenCalled();
+      expect(ctx.tx.auditLog.create).not.toHaveBeenCalled();
+    },
+  );
+
+  it("refuses a published no-op when its phase driver is no longer exact", async () => {
+    const ctx = makeDb({
+      latest: "matching-draft",
+      draftPublished: true,
+      includeDraftReceipt: true,
+      includePublishReceipt: true,
+      activeMutate: PHASE_DRIVER_MUTATIONS[2][1],
+    });
+
+    await expect(
+      publishScalingUpFullPhaseFeedbackDraft(
+        ctx.db,
+        ctx.draft.id,
+        ctx.draft.contentHash,
+        "admin@example.com",
+      ),
+    ).rejects.toThrow(/phase driver|Q_FTE_CONTRACT/i);
+    expect(ctx.tx.assessmentTemplateVersion.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("requires an approved content hash before opening the publish transaction", async () => {
+    const ctx = makeDb({ latest: "matching-draft", includeDraftReceipt: true });
+
+    await expect(
+      publishScalingUpFullPhaseFeedbackDraft(
+        ctx.db,
+        ctx.draft.id,
+        "",
+        "admin@example.com",
+      ),
+    ).rejects.toThrow(/approved content hash/i);
+    expect(ctx.db.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("refuses a stale approved content hash before publish", async () => {
+    const ctx = makeDb({ latest: "matching-draft", includeDraftReceipt: true });
+
+    await expect(
+      publishScalingUpFullPhaseFeedbackDraft(
+        ctx.db,
+        ctx.draft.id,
+        "a".repeat(64),
+        "admin@example.com",
+      ),
+    ).rejects.toThrow(/approved content hash|approval/i);
+    expect(ctx.tx.assessmentTemplateVersion.updateMany).not.toHaveBeenCalled();
+    expect(ctx.tx.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it("refuses a stale approved content hash before a published no-op", async () => {
+    const ctx = makeDb({
+      latest: "matching-draft",
+      draftPublished: true,
+      includeDraftReceipt: true,
+      includePublishReceipt: true,
+    });
+
+    await expect(
+      publishScalingUpFullPhaseFeedbackDraft(
+        ctx.db,
+        ctx.draft.id,
+        "a".repeat(64),
+        "admin@example.com",
+      ),
+    ).rejects.toThrow(/approved content hash|approval/i);
     expect(ctx.tx.assessmentTemplateVersion.updateMany).not.toHaveBeenCalled();
   });
 
@@ -837,6 +1060,7 @@ describe("publishScalingUpFullPhaseFeedbackDraft", () => {
       publishScalingUpFullPhaseFeedbackDraft(
         ctx.db,
         ctx.draft.id,
+        ctx.draft.contentHash,
         "admin@example.com",
       ),
     ).rejects.toThrow(/draft audit receipt|creator/i);
@@ -874,6 +1098,7 @@ describe("publishScalingUpFullPhaseFeedbackDraft", () => {
       publishScalingUpFullPhaseFeedbackDraft(
         ctx.db,
         ctx.draft.id,
+        ctx.draft.contentHash,
         "admin@example.com",
       ),
     ).rejects.toThrow(/stale active predecessor/i);
@@ -906,6 +1131,7 @@ describe("publishScalingUpFullPhaseFeedbackDraft", () => {
       publishScalingUpFullPhaseFeedbackDraft(
         ctx.db,
         ctx.draft.id,
+        ctx.draft.contentHash,
         "admin@example.com",
       ),
     ).rejects.toMatchObject({ code: "40001" });
@@ -919,6 +1145,9 @@ describe("publishScalingUpFullPhaseFeedbackDraft", () => {
     ["wrong source lifecycle state", (receipt: Record<string, unknown>) => { receipt.sourcePublishedAt = "2026-08-17T10:00:00.000Z"; }],
     ["missing draft creation state", (receipt: Record<string, unknown>) => { delete receipt.draftPublishedAt; }],
     ["wrong draft creation state", (receipt: Record<string, unknown>) => { receipt.draftPublishedBy = "unexpected-user"; }],
+    ["missing phase-driver contract", (receipt: Record<string, unknown>) => { delete receipt.phaseDriverContract; }],
+    ["wrong phase-driver contract", (receipt: Record<string, unknown>) => { receipt.phaseDriverContract = { ...PHASE_DRIVER_CONTRACT, audiencePolicy: "ALL_RESPONDENTS" }; }],
+    ["wrong approved content-hash binding", (receipt: Record<string, unknown>) => { receipt.afterContentHash = "a".repeat(64); }],
   ])("refuses to publish when the draft receipt has %s", async (_label, mutate) => {
     const ctx = makeDb({ latest: "matching-draft", includeDraftReceipt: true });
     const receipt = JSON.parse(ctx.audits[0].changes) as Record<string, unknown>;
@@ -929,6 +1158,7 @@ describe("publishScalingUpFullPhaseFeedbackDraft", () => {
       publishScalingUpFullPhaseFeedbackDraft(
         ctx.db,
         ctx.draft.id,
+        ctx.draft.contentHash,
         "admin@example.com",
       ),
     ).rejects.toThrow(/draft audit receipt/i);
@@ -947,6 +1177,7 @@ describe("publishScalingUpFullPhaseFeedbackDraft", () => {
       publishScalingUpFullPhaseFeedbackDraft(
         ctx.db,
         ctx.draft.id,
+        ctx.draft.contentHash,
         "admin@example.com",
       ),
     ).rejects.toThrow(/phase|catalogue|content hash/i);
@@ -964,6 +1195,7 @@ describe("publishScalingUpFullPhaseFeedbackDraft", () => {
       publishScalingUpFullPhaseFeedbackDraft(
         ctx.db,
         ctx.draft.id,
+        ctx.draft.contentHash,
         "admin@example.com",
       ),
     ).rejects.toThrow(/canonical.*order/i);
@@ -982,6 +1214,7 @@ describe("publishScalingUpFullPhaseFeedbackDraft", () => {
       publishScalingUpFullPhaseFeedbackDraft(
         ctx.db,
         ctx.draft.id,
+        ctx.draft.contentHash,
         "admin@example.com",
       ),
     ).rejects.toThrow(/content hash/i);
@@ -999,6 +1232,7 @@ describe("publishScalingUpFullPhaseFeedbackDraft", () => {
     const result = await publishScalingUpFullPhaseFeedbackDraft(
       db,
       draft.id,
+      draft.contentHash,
       "admin@example.com",
     );
 
@@ -1019,6 +1253,7 @@ describe("publishScalingUpFullPhaseFeedbackDraft", () => {
     const result = await publishScalingUpFullPhaseFeedbackDraft(
       db,
       draft.id,
+      draft.contentHash,
       "retry-admin@example.com",
     );
 
@@ -1050,6 +1285,7 @@ describe("publishScalingUpFullPhaseFeedbackDraft", () => {
       publishScalingUpFullPhaseFeedbackDraft(
         ctx.db,
         ctx.draft.id,
+        ctx.draft.contentHash,
         "admin@example.com",
       ),
     ).rejects.toThrow(/predecessor|audit receipt/i);
@@ -1078,6 +1314,7 @@ describe("publishScalingUpFullPhaseFeedbackDraft", () => {
       publishScalingUpFullPhaseFeedbackDraft(
         ctx.db,
         ctx.draft.id,
+        ctx.draft.contentHash,
         "admin@example.com",
       ),
     ).rejects.toThrow(/predecessor/i);
@@ -1102,6 +1339,7 @@ describe("publishScalingUpFullPhaseFeedbackDraft", () => {
       publishScalingUpFullPhaseFeedbackDraft(
         ctx.db,
         ctx.draft.id,
+        ctx.draft.contentHash,
         "retry-admin@example.com",
       ),
     ).rejects.toThrow(/publish audit receipt/i);
@@ -1117,6 +1355,10 @@ describe("publishScalingUpFullPhaseFeedbackDraft", () => {
     ["wrong draft creation state", (receipt: Record<string, unknown>) => { receipt.draftPublishedAt = "2026-08-19T10:00:00.000Z"; }],
     ["missing final publish state", (receipt: Record<string, unknown>) => { delete receipt.finalPublishedAt; }],
     ["wrong final publish state", (receipt: Record<string, unknown>) => { receipt.finalArchivedAt = "2026-08-21T10:00:00.000Z"; }],
+    ["missing phase-driver contract", (receipt: Record<string, unknown>) => { delete receipt.phaseDriverContract; }],
+    ["wrong phase-driver contract", (receipt: Record<string, unknown>) => { receipt.phaseDriverContract = { ...PHASE_DRIVER_CONTRACT, audiencePolicy: "ALL_RESPONDENTS" }; }],
+    ["missing approved content hash", (receipt: Record<string, unknown>) => { delete receipt.approvedContentHash; }],
+    ["wrong approved content hash", (receipt: Record<string, unknown>) => { receipt.approvedContentHash = "a".repeat(64); }],
   ])("refuses an already-published edition whose publish receipt has %s", async (_label, mutate) => {
     const ctx = makeDb({
       latest: "matching-draft",
@@ -1135,6 +1377,7 @@ describe("publishScalingUpFullPhaseFeedbackDraft", () => {
       publishScalingUpFullPhaseFeedbackDraft(
         ctx.db,
         ctx.draft.id,
+        ctx.draft.contentHash,
         "admin@example.com",
       ),
     ).rejects.toThrow(/publish audit receipt/i);
@@ -1160,6 +1403,7 @@ describe("publishScalingUpFullPhaseFeedbackDraft", () => {
       publishScalingUpFullPhaseFeedbackDraft(
         ctx.db,
         ctx.draft.id,
+        ctx.draft.contentHash,
         "admin@example.com",
       ),
     ).rejects.toThrow(/publish audit receipt/i);
@@ -1175,7 +1419,12 @@ describe("publishScalingUpFullPhaseFeedbackDraft", () => {
     });
 
     await expect(
-      publishScalingUpFullPhaseFeedbackDraft(db, draft.id, "admin@example.com"),
+      publishScalingUpFullPhaseFeedbackDraft(
+        db,
+        draft.id,
+        draft.contentHash,
+        "admin@example.com",
+      ),
     ).rejects.toThrow(/publish audit receipt/i);
     expect(tx.assessmentTemplateVersion.updateMany).not.toHaveBeenCalled();
   });
@@ -1188,7 +1437,12 @@ describe("publishScalingUpFullPhaseFeedbackDraft", () => {
     });
 
     await expect(
-      publishScalingUpFullPhaseFeedbackDraft(db, draft.id, "admin@example.com"),
+      publishScalingUpFullPhaseFeedbackDraft(
+        db,
+        draft.id,
+        draft.contentHash,
+        "admin@example.com",
+      ),
     ).rejects.toThrow(/changed before publish/i);
     expect(tx.auditLog.create).not.toHaveBeenCalled();
     expect(tx.assessmentCampaign.updateMany).not.toHaveBeenCalled();
@@ -1202,9 +1456,69 @@ describe("publishScalingUpFullPhaseFeedbackDraft", () => {
       publishScalingUpFullPhaseFeedbackDraft(
         ctx.db,
         ctx.draft.id,
+        ctx.draft.contentHash,
         "admin@example.com",
       ),
     ).rejects.toThrow(/enUS|not found/i);
     expect(ctx.tx.assessmentTemplateVersion.updateMany).not.toHaveBeenCalled();
+  });
+});
+
+describe("phase-feedback publish CLI approval inputs", () => {
+  type ResolveApprovedPublishInputs = (
+    argv: string[],
+    env: Record<string, string | undefined>,
+  ) => {
+    draftVersionId: string;
+    approvedContentHash: string;
+    actor: string;
+  };
+
+  function resolver(): ResolveApprovedPublishInputs {
+    const candidate = (
+      publishCli as unknown as {
+        resolveApprovedPublishInputs?: ResolveApprovedPublishInputs;
+      }
+    ).resolveApprovedPublishInputs;
+    if (!candidate) throw new Error("CLI resolver unavailable");
+    return candidate;
+  }
+
+  const approvedEnv = {
+    SU_FULL_PHASE_FEEDBACK_APPROVED_DRAFT_ID: "version-5",
+    SU_FULL_PHASE_FEEDBACK_APPROVED_CONTENT_HASH: "b".repeat(64),
+    SU_FULL_PHASE_FEEDBACK_APPROVED_ACTOR: "admin@example.com",
+  };
+
+  it("loads draft ID, content hash, and actor from the approval-scoped environment", () => {
+    expect(resolver()(["--i-know-this-is-prod"], approvedEnv)).toEqual({
+      draftVersionId: "version-5",
+      approvedContentHash: "b".repeat(64),
+      actor: "admin@example.com",
+    });
+  });
+
+  it.each([
+    "--draft-version-id",
+    "--content-hash",
+    "--approved-content-hash",
+    "--actor",
+  ])("rejects the ad-hoc approval override %s", (flag) => {
+    expect(() => resolver()([flag, "attacker-value"], approvedEnv)).toThrow(
+      /approval-scoped environment|ad-hoc/i,
+    );
+  });
+
+  it.each([
+    "SU_FULL_PHASE_FEEDBACK_APPROVED_DRAFT_ID",
+    "SU_FULL_PHASE_FEEDBACK_APPROVED_CONTENT_HASH",
+    "SU_FULL_PHASE_FEEDBACK_APPROVED_ACTOR",
+  ])("rejects missing approval input %s", (missingKey) => {
+    expect(() =>
+      resolver()(["--i-know-this-is-prod"], {
+        ...approvedEnv,
+        [missingKey]: "  ",
+      }),
+    ).toThrow(/approval input/i);
   });
 });
