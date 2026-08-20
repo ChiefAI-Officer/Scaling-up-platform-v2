@@ -16,6 +16,7 @@ import {
   type PagerQuestion,
 } from "@/lib/assessments/section-pages";
 import { mergeCustomSlides, type SafeSlide } from "@/lib/assessments/custom-slides";
+import { buildPhaseRecommendations } from "@/lib/assessments/su-full-phase-feedback-catalogue";
 
 /** PagerPage[] for the SectionPager (no slides ⇒ section pages wrapped). */
 function makePages(secs: PagerSection[], qs: PagerQuestion[], slides: SafeSlide[] = []) {
@@ -102,10 +103,10 @@ describe("SectionPager — SU-Full growth-phase interstitial", () => {
       question.stableKey === "q1"
         ? {
             ...question,
-            phaseRecommendations: [],
+            phaseRecommendations: buildPhaseRecommendations("Q01"),
           }
         : question,
-    ) as PagerQuestion[];
+    );
 
     renderPager({
       templateAlias: "scaling-up-full",

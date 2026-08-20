@@ -491,6 +491,8 @@ describe("POST submit — strict v6.6 validation", () => {
       },
       campaign: {
         id: "c1",
+        templateId: "template-su-full",
+        organizationId: "org-1",
         alias: "demo",
         deletedAt: null,
         status: "ACTIVE",
@@ -1564,7 +1566,10 @@ describe("#79 — SU-Full CEO-only S_BACKGROUND on submit", () => {
     scoringConfig: goodVersion.scoringConfig,
   };
 
-  function mockSuFullInvitation(isCEO: boolean) {
+  function mockSuFullInvitation(
+    isCEO: boolean,
+    options: { sendResultsToRespondent?: boolean } = {},
+  ) {
     const invitation = {
       id: "inv-1",
       status: "VIEWED",
@@ -1585,17 +1590,25 @@ describe("#79 — SU-Full CEO-only S_BACKGROUND on submit", () => {
         accessMode: "INVITED",
         openAt: new Date(Date.now() - 1000),
         closeAt: null,
-        sendResultsToRespondent: false,
+        sendResultsToRespondent: options.sendResultsToRespondent ?? false,
         notifyCoachOnCompletion: false,
         createdByCoachId: "coach-1",
-        creatorCoach: { email: "coach@example.com" },
+        creatorCoach: {
+          email: "coach@example.com",
+          firstName: "Casey",
+          lastName: "Coach",
+          profileImage: null,
+        },
+        organization: { id: "org-1", name: "Example Organization" },
         version: {
           id: "v1",
+          templateId: "template-su-full",
           questions: suFullVersion.questions,
           sections: suFullVersion.sections,
           scoringConfig: suFullVersion.scoringConfig,
         },
         template: {
+          id: "template-su-full",
           name: "Scaling Up Full",
           alias: "scaling-up-full",
           resultsEmailSubject: "Your results",
@@ -1694,6 +1707,44 @@ describe("#79 — SU-Full CEO-only S_BACKGROUND on submit", () => {
     ).toBeLessThan(
       txMock.assessmentSubmission.create.mock.invocationCallOrder[0],
     );
+  });
+
+  it("builds only the locked selected style and shares its frozen result with persistence and email", async () => {
+    mockSuFullInvitation(true, { sendResultsToRespondent: true });
+    const reportEmail = jest.requireMock(
+      "@/lib/assessments/report-email",
+    ) as {
+      buildRespondentReportFromSubmission: jest.Mock;
+    };
+
+    const res = await POST(
+      jsonReq({
+        answers: [
+          { stableKey: "q1", value: 4 },
+          { stableKey: "Q_FTE_CONTRACT", value: 8 },
+        ],
+      }) as never,
+      aliasParams("demo"),
+    );
+
+    expect(res.status).toBe(200);
+    expect(reportEmail.buildRespondentReportFromSubmission).toHaveBeenCalledTimes(1);
+    const renderInput = reportEmail.buildRespondentReportFromSubmission.mock.calls[0][0];
+    const persistedResult = txMock.assessmentSubmission.create.mock.calls[0][0].data.result;
+    expect(renderInput.reportStyle).toBe("MODERN_DASHBOARD");
+    expect(renderInput.result).toBe(persistedResult);
+    expect(renderInput.result).toMatchObject({
+      recommendationPhase: 1,
+      perQuestion: [{
+        stableKey: "q1",
+        recommendation: SU_FULL_PHASE_FEEDBACK[1].Q01[0].text,
+      }],
+    });
+    const respondentRows = txMock.assessmentEmailOutbox.create.mock.calls.filter(
+      (call: Array<{ data: { recipientRole: string } }>) =>
+        call[0].data.recipientRole === "RESPONDENT",
+    );
+    expect(respondentRows).toHaveLength(1);
   });
 
   it.each(

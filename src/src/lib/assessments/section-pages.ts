@@ -6,6 +6,10 @@ export interface PagerQuestion {
   scale?: { min: number; max: number; step: number; anchorMin: string; anchorMax: string };
   options?: { key: string; label: string }[];
   maxChoices?: number;
+  phaseRecommendations?: Array<{
+    phase: 1 | 2 | 3 | 4 | 5;
+    bands: Array<{ minScore: number; maxScore: number; text: string }>;
+  }>;
   /** Wave W — authored show-if: visible only while `optionKey` is selected on the (earlier, MULTI_CHOICE) gate question. */
   showIf?: { questionKey: string; optionKey: string };
 }

@@ -1,10 +1,7 @@
 // src/src/components/assessments/section-pager.tsx
 "use client";
 import React from "react";
-import {
-  isAnswered,
-  type PagerQuestion,
-} from "@/lib/assessments/section-pages";
+import { isAnswered } from "@/lib/assessments/section-pages";
 import type { PagerPage } from "@/lib/assessments/custom-slides";
 import { QuestionInput } from "@/components/assessments/question-input";
 import { AssessmentShellHeader } from "@/components/assessments/AssessmentShellHeader";
@@ -199,10 +196,7 @@ export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitt
     const raw = answers[FTE_CONTRACT_KEY];
     const fte = typeof raw === "number" ? raw : Number(raw);
     const phaseAware = sectionQuestions(pages).some((question) =>
-      Array.isArray(
-        (question as PagerQuestion & { phaseRecommendations?: unknown })
-          .phaseRecommendations,
-      ),
+      Array.isArray(question.phaseRecommendations),
     );
     return phaseAware
       ? computeCurrentGrowthPhase(fte)

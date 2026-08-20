@@ -956,6 +956,74 @@ export async function POST(
 
       let respondentReport: RespondentReport | null = null;
 
+      const buildReportCandidate = (
+        frozenScoreResult: ScoreResult,
+        reportStyle: ReportStyleKey,
+        renderCache: SharedWaveDEmailRenderCache,
+      ): { report: RespondentReport | null; rows: PreparedDeliveryRow[] } => {
+        let report: RespondentReport | null = null;
+        let reportRenderInputHash = "";
+        if (mayNeedReport) {
+          const reportModelInput = {
+            result: frozenScoreResult as never,
+            publicTaker: {
+              firstName: invitation.respondent?.firstName ?? "",
+              lastName: invitation.respondent?.lastName ?? "",
+              email: invitation.respondent?.email ?? "",
+            },
+            assessmentName:
+              invitation.campaign.template?.name ?? "an assessment",
+            templateAlias: invitation.campaign.template?.alias ?? "",
+            reportStyle,
+            campaignLabel: null,
+            sections: invitation.campaign.version.sections,
+            questions: invitation.campaign.version.questions,
+            scoringConfig: invitation.campaign.version.scoringConfig,
+            rawAnswers,
+            submittedAt,
+            submissionId: "",
+            referringCoachEmail: null,
+            companyName: invitation.campaign.organization?.name ?? "",
+            jobTitle: invitation.respondent?.jobTitle ?? null,
+            coachLogoUrl:
+              invitation.campaign.creatorCoach?.profileImage ?? null,
+            coachName: coachBylineName(invitation.campaign.creatorCoach),
+            degraded: !isScoreResult(frozenScoreResult),
+          };
+          if (intentMode) {
+            reportRenderInputHash = stableInputHash(reportModelInput);
+          }
+          try {
+            report = buildRespondentReportFromSubmission(reportModelInput);
+          } catch (err) {
+            console.error(
+              "[assessment-submit] respondent report candidate build failed",
+              {
+                campaignId: invitation.campaign.id,
+                versionId: invitation.campaign.version.id,
+                reportStyle,
+                errorName: errorNameOnly(err),
+              },
+            );
+          }
+        }
+
+        return {
+          report,
+          rows: buildWaveDOutboxRows({
+            campaign: invitation.campaign,
+            respondent: invitation.respondent,
+            respondentId: invitation.respondentId,
+            report,
+            reportRenderInputHash,
+            respectGlobalPause: !intentMode,
+            prepareIntentMetadata: intentMode,
+            renderCache,
+            ceoSelfAccessUrl: preparedCeoSelfAccessUrl,
+          }),
+        };
+      };
+
       const buildReportCandidates = (frozenScoreResult: ScoreResult) => {
         const candidates = new Map<
           ReportStyleKey,
@@ -963,67 +1031,14 @@ export async function POST(
         >();
         const sharedEmailRenders: SharedWaveDEmailRenderCache = {};
         for (const reportStyle of REPORT_STYLE_KEYS) {
-          let report: RespondentReport | null = null;
-          let reportRenderInputHash = "";
-          if (mayNeedReport) {
-            const reportModelInput = {
-              result: frozenScoreResult as never,
-              publicTaker: {
-                firstName: invitation.respondent?.firstName ?? "",
-                lastName: invitation.respondent?.lastName ?? "",
-                email: invitation.respondent?.email ?? "",
-              },
-              assessmentName:
-                invitation.campaign.template?.name ?? "an assessment",
-              templateAlias: invitation.campaign.template?.alias ?? "",
+          candidates.set(
+            reportStyle,
+            buildReportCandidate(
+              frozenScoreResult,
               reportStyle,
-              campaignLabel: null,
-              sections: invitation.campaign.version.sections,
-              questions: invitation.campaign.version.questions,
-              scoringConfig: invitation.campaign.version.scoringConfig,
-              rawAnswers,
-              submittedAt,
-              submissionId: "",
-              referringCoachEmail: null,
-              companyName: invitation.campaign.organization?.name ?? "",
-              jobTitle: invitation.respondent?.jobTitle ?? null,
-              coachLogoUrl:
-                invitation.campaign.creatorCoach?.profileImage ?? null,
-              coachName: coachBylineName(invitation.campaign.creatorCoach),
-              degraded: !isScoreResult(frozenScoreResult),
-            };
-            if (intentMode) {
-              reportRenderInputHash = stableInputHash(reportModelInput);
-            }
-            try {
-              report = buildRespondentReportFromSubmission(reportModelInput);
-            } catch (err) {
-              console.error(
-                "[assessment-submit] respondent report candidate build failed",
-                {
-                  campaignId: invitation.campaign.id,
-                  versionId: invitation.campaign.version.id,
-                  reportStyle,
-                  errorName: errorNameOnly(err),
-                },
-              );
-            }
-          }
-
-          candidates.set(reportStyle, {
-            report,
-            rows: buildWaveDOutboxRows({
-              campaign: invitation.campaign,
-              respondent: invitation.respondent,
-              respondentId: invitation.respondentId,
-              report,
-              reportRenderInputHash,
-              respectGlobalPause: !intentMode,
-              prepareIntentMetadata: intentMode,
-              renderCache: sharedEmailRenders,
-              ceoSelfAccessUrl: preparedCeoSelfAccessUrl,
-            }),
-          });
+              sharedEmailRenders,
+            ),
+          );
         }
         return candidates;
       };
@@ -1031,7 +1046,7 @@ export async function POST(
       // Legacy editions keep the existing off-lock render path. A phase-aware
       // edition waits for the participant row lock below so no phase-specific
       // result or report is resolved before the authoritative CEO decision.
-      let reportCandidates = phaseAwareVersion
+      const reportCandidates = phaseAwareVersion
         ? null
         : buildReportCandidates(scoreResult);
 
@@ -1188,10 +1203,9 @@ export async function POST(
           ));
         }
 
-        if (reportCandidates === null) {
-          reportCandidates = buildReportCandidates(scoreResult);
-        }
-        const selectedCandidate = reportCandidates.get(reportStyle);
+        const selectedCandidate = reportCandidates === null
+          ? buildReportCandidate(scoreResult, reportStyle, {})
+          : reportCandidates.get(reportStyle);
         if (!selectedCandidate) {
           const candidateError = new Error(
             `Missing report candidate for ${reportStyle}`,
