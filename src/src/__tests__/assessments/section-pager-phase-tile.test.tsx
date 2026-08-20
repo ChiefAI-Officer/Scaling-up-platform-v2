@@ -48,8 +48,9 @@ const questions: PagerQuestion[] = [
 
 function renderPager(
   extra: Partial<React.ComponentProps<typeof SectionPager>> = {},
+  pagerQuestions: PagerQuestion[] = questions,
 ) {
-  const pages = makePages(sections, questions);
+  const pages = makePages(sections, pagerQuestions);
   return render(
     <SectionPager
       pages={pages}
@@ -93,6 +94,41 @@ describe("SectionPager — SU-Full growth-phase interstitial", () => {
     fireEvent.click(screen.getByRole("button", { name: /next/i }));
     expect(
       screen.getByRole("heading", { name: /phase 4 - Delegation phase/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("uses current-live boundaries only when the pinned question payload is phase-aware", () => {
+    const phaseAwareQuestions = questions.map((question) =>
+      question.stableKey === "q1"
+        ? {
+            ...question,
+            phaseRecommendations: [],
+          }
+        : question,
+    ) as PagerQuestion[];
+
+    renderPager({
+      templateAlias: "scaling-up-full",
+      isCEO: true,
+      answers: { Q_FTE_CONTRACT: 8 },
+    }, phaseAwareQuestions);
+    fireEvent.click(screen.getByRole("button", { name: /next/i }));
+
+    expect(
+      screen.getByRole("heading", { name: /phase 1 - Pioneering phase/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps legacy boundaries when the pinned question payload is not phase-aware", () => {
+    renderPager({
+      templateAlias: "scaling-up-full",
+      isCEO: true,
+      answers: { Q_FTE_CONTRACT: 8 },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /next/i }));
+
+    expect(
+      screen.getByRole("heading", { name: /phase 2 - Organization phase/i }),
     ).toBeInTheDocument();
   });
 

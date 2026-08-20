@@ -50,6 +50,9 @@ const txMock = {
   assessmentSubmission: {
     create: jest.fn().mockResolvedValue({ id: "sub-1" }),
   },
+  assessmentCampaignParticipant: {
+    findUnique: jest.fn(),
+  },
   assessmentEmailOutbox: {
     create: jest.fn().mockResolvedValue({}),
   },
@@ -142,6 +145,10 @@ import { parseAuthorizationSnapshot } from "@/lib/assessments/assessment-email-d
 import { lockReportStyleForFirstCompletion } from "@/lib/assessments/report-style-lock";
 import { assessmentEmailDeliveryIntentsEnabled } from "@/lib/assessments/wave-d-feature-flags";
 import { inngest } from "@/inngest/client";
+import {
+  SU_FULL_PHASE_FEEDBACK,
+  buildPhaseRecommendations,
+} from "@/lib/assessments/su-full-phase-feedback-catalogue";
 
 reportStyleLockMock = lockReportStyleForFirstCompletion as jest.Mock;
 
@@ -1537,7 +1544,9 @@ describe("#79 — SU-Full CEO-only S_BACKGROUND on submit", () => {
         label: "Q1",
         isRequired: true,
         sectionStableKey: "s1",
-        scale: { min: 0, max: 3, step: 1, anchorMin: "Lo", anchorMax: "Hi" },
+        scale: { min: 0, max: 10, step: 1, anchorMin: "Lo", anchorMax: "Hi" },
+        recommendations: [{ minScore: 0, maxScore: 10, text: "legacy fallback" }],
+        phaseRecommendations: buildPhaseRecommendations("Q01"),
       },
       {
         stableKey: "Q_FTE_CONTRACT",
@@ -1576,8 +1585,8 @@ describe("#79 — SU-Full CEO-only S_BACKGROUND on submit", () => {
         accessMode: "INVITED",
         openAt: new Date(Date.now() - 1000),
         closeAt: null,
-        sendResultsToRespondent: true,
-        notifyCoachOnCompletion: true,
+        sendResultsToRespondent: false,
+        notifyCoachOnCompletion: false,
         createdByCoachId: "coach-1",
         creatorCoach: { email: "coach@example.com" },
         version: {
@@ -1599,6 +1608,7 @@ describe("#79 — SU-Full CEO-only S_BACKGROUND on submit", () => {
     dbMock.assessmentInvitation.findUnique.mockResolvedValue(invitation);
     txMock.assessmentInvitation.findUnique.mockResolvedValue(invitation);
     dbMock.assessmentCampaignParticipant.findUnique.mockResolvedValue({ isCEO });
+    txMock.assessmentCampaignParticipant.findUnique.mockResolvedValue({ isCEO });
   }
 
   it("non-CEO submits WITHOUT the CEO-only S_BACKGROUND answer → 200 (#79)", async () => {
@@ -1608,6 +1618,9 @@ describe("#79 — SU-Full CEO-only S_BACKGROUND on submit", () => {
       aliasParams("demo"),
     );
     expect(res.status).toBe(200);
+    const frozen = txMock.assessmentSubmission.create.mock.calls[0][0].data.result;
+    expect(frozen.recommendationPhase).toBeUndefined();
+    expect(frozen.perQuestion[0].recommendation).toBeUndefined();
   });
 
   it("CEO still MUST answer the required S_BACKGROUND question → 400 MISSING_REQUIRED_KEY", async () => {
@@ -1619,5 +1632,101 @@ describe("#79 — SU-Full CEO-only S_BACKGROUND on submit", () => {
     expect(res.status).toBe(400);
     const body = (await res.json()) as { error: string };
     expect(body.error).toBe("MISSING_REQUIRED_KEY");
+  });
+
+  it("phase-aware CEO submission rejects an invalid required FTE instead of selecting a fallback", async () => {
+    mockSuFullInvitation(true);
+    const res = await POST(
+      jsonReq({
+        answers: [
+          { stableKey: "q1", value: 4 },
+          { stableKey: "Q_FTE_CONTRACT", value: "8" },
+        ],
+      }) as never,
+      aliasParams("demo"),
+    );
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ error: "INVALID_TYPE" });
+    expect(txMock.assessmentSubmission.create).not.toHaveBeenCalled();
+  });
+
+  it("phase-aware CEO submission rejects a non-phase FTE instead of selecting a fallback", async () => {
+    mockSuFullInvitation(true);
+    const res = await POST(
+      jsonReq({
+        answers: [
+          { stableKey: "q1", value: 4 },
+          { stableKey: "Q_FTE_CONTRACT", value: 0 },
+        ],
+      }) as never,
+      aliasParams("demo"),
+    );
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({
+      error: "OUT_OF_RANGE",
+      details: { stableKey: "Q_FTE_CONTRACT" },
+    });
+    expect(txMock.assessmentSubmission.create).not.toHaveBeenCalled();
+  });
+
+  it("does not freeze guessed phase feedback when the locked CEO authorization is revoked", async () => {
+    mockSuFullInvitation(true);
+    txMock.assessmentCampaignParticipant.findUnique.mockResolvedValue({ isCEO: false });
+
+    const res = await POST(
+      jsonReq({
+        answers: [
+          { stableKey: "q1", value: 4 },
+          { stableKey: "Q_FTE_CONTRACT", value: 8 },
+        ],
+      }) as never,
+      aliasParams("demo"),
+    );
+
+    expect(res.status).toBe(200);
+    const frozen = txMock.assessmentSubmission.create.mock.calls[0][0].data.result;
+    expect(frozen.recommendationPhase).toBeUndefined();
+    expect(frozen.perQuestion[0].recommendation).toBeUndefined();
+    expect(
+      txMock.assessmentCampaignParticipant.findUnique.mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      txMock.assessmentSubmission.create.mock.invocationCallOrder[0],
+    );
+  });
+
+  it.each(
+    ([
+      [8, 1],
+      [9, 2],
+      [26, 3],
+      [51, 4],
+      [151, 5],
+    ] as const).flatMap(([fte, phase]) =>
+      ([4, 5, 6, 7, 8, 9, 10] as const).map((score) => [fte, phase, score] as const),
+    ),
+  )("freezes pinned catalogue feedback for CEO FTE %i (P%i) at score %i", async (fte, phase, score) => {
+    mockSuFullInvitation(true);
+
+    const res = await POST(
+      jsonReq({
+        answers: [
+          { stableKey: "q1", value: score },
+          { stableKey: "Q_FTE_CONTRACT", value: fte },
+        ],
+      }) as never,
+      aliasParams("demo"),
+    );
+
+    expect(res.status).toBe(200);
+    const frozen = txMock.assessmentSubmission.create.mock.calls[0][0].data.result;
+    const expected = SU_FULL_PHASE_FEEDBACK[phase].Q01.find(
+      (band) => score >= band.minScore && score <= band.maxScore,
+    )?.text;
+    expect(expected).toEqual(expect.any(String));
+    expect(frozen.recommendationPhase).toBe(phase);
+    expect(frozen.perQuestion[0].recommendation).toBe(expected);
+    expect(frozen.perQuestion[0].recommendation).not.toBe("legacy fallback");
   });
 });

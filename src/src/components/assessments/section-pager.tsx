@@ -1,13 +1,19 @@
 // src/src/components/assessments/section-pager.tsx
 "use client";
 import React from "react";
-import { isAnswered } from "@/lib/assessments/section-pages";
+import {
+  isAnswered,
+  type PagerQuestion,
+} from "@/lib/assessments/section-pages";
 import type { PagerPage } from "@/lib/assessments/custom-slides";
 import { QuestionInput } from "@/components/assessments/question-input";
 import { AssessmentShellHeader } from "@/components/assessments/AssessmentShellHeader";
 import { domainColor } from "@/lib/assessments/report-presentation";
 import { PhaseTile } from "@/components/assessments/phase-tile";
-import { computeGrowthPhase } from "@/lib/assessments/su-full-phase";
+import {
+  computeCurrentGrowthPhase,
+  computeGrowthPhase,
+} from "@/lib/assessments/su-full-phase";
 import { QspStoryGroup } from "@/components/assessments/qsp-story-group";
 import { buildQuestionRenderUnits, questionProgress } from "@/lib/assessments/qsp-story-group";
 
@@ -192,7 +198,15 @@ export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitt
     if (!carriesFte) return null;
     const raw = answers[FTE_CONTRACT_KEY];
     const fte = typeof raw === "number" ? raw : Number(raw);
-    return computeGrowthPhase(fte);
+    const phaseAware = sectionQuestions(pages).some((question) =>
+      Array.isArray(
+        (question as PagerQuestion & { phaseRecommendations?: unknown })
+          .phaseRecommendations,
+      ),
+    );
+    return phaseAware
+      ? computeCurrentGrowthPhase(fte)
+      : computeGrowthPhase(fte);
   }
 
   function advance() {

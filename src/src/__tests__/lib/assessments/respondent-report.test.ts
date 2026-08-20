@@ -191,6 +191,48 @@ test("buildStoredRespondentReport exposes the shared pure frozen-report seam", (
   });
 });
 
+test("stored reports keep the submission-time paragraph without consulting later question content", () => {
+  const frozenResult: ScoreResult = {
+    ...GOOD_SCORE_RESULT,
+    recommendationPhase: 4,
+    perQuestion: [{
+      stableKey: "q1",
+      value: 3,
+      achieved: true,
+      recommendation: "Frozen submission-time phase paragraph",
+    }],
+  };
+  const report = buildStoredRespondentReport({
+    submission: {
+      id: GOOD_SUBMISSION.id,
+      submittedAt: GOOD_SUBMISSION.submittedAt,
+      answers: GOOD_SUBMISSION.answers,
+      result: frozenResult,
+    },
+    respondent: GOOD_SUBMISSION.respondent,
+    campaign: {
+      ...GOOD_SUBMISSION.campaign,
+      organizationName: GOOD_SUBMISSION.campaign.organization.name,
+      version: {
+        ...GOOD_VERSION,
+        questions: [{
+          ...GOOD_VERSION.questions[0],
+          phaseRecommendations: [{
+            phase: 4,
+            bands: [{ minScore: 0, maxScore: 10, text: "Later edition paragraph" }],
+          }],
+        }],
+      },
+    },
+  });
+
+  expect(report.result).toBe(frozenResult);
+  expect(report.result.recommendationPhase).toBe(4);
+  expect(report.result.perQuestion[0].recommendation).toBe(
+    "Frozen submission-time phase paragraph",
+  );
+});
+
 test("1. owning coach + submission → status:ok, all fields populated, provenance correct", async () => {
   mockCanManageCampaign.mockResolvedValue(true);
   const { $transaction } = makeMockDb(GOOD_SUBMISSION);

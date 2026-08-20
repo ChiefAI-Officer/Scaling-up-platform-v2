@@ -27,6 +27,7 @@ import { getInvitationSession } from "@/lib/assessments/invitation-cookie";
 import {
   ScoringValidationError,
   TemplateVersionForScoringSchema,
+  type ScoreResult,
 } from "@/lib/assessments/scoring";
 import { logAudit } from "@/lib/audit";
 import { computeScoreResult } from "@/lib/assessments/compute-score-result";
@@ -81,6 +82,10 @@ import { lockReportStyleForFirstCompletion } from "@/lib/assessments/report-styl
 import { isReportComparisonEnabled } from "@/lib/assessments/wave-report-comparison-flags";
 import { createCeoReportAccessToken } from "@/lib/assessments/ceo-report-access-token";
 import { resolvePeerReportEnhancements } from "@/lib/assessments/peer-report-resolver";
+import {
+  currentGrowthPhaseFromAnswers,
+  SU_FULL_PHASE_DRIVER_KEY,
+} from "@/lib/assessments/su-full-phase";
 
 const NO_STORE_HEADERS = { "Cache-Control": "no-store" } as const;
 
@@ -867,19 +872,28 @@ export async function POST(
       // Prune-then-score via the ONE shared seam (spec 19ac). rawAnswers stays
       // the PRUNED set (persisted + emitted downstream). May throw
       // ScoringValidationError → caught by outer catch.
-      const { result: scoreResult, prunedAnswers: rawAnswers } = computeScoreResult(
+      let { result: scoreResult, prunedAnswers: rawAnswers } = computeScoreResult(
         versionParsed.data,
         scoredQuestions as unknown as PagerQuestion[],
         answers.map((a) => ({ stableKey: a.stableKey, value: a.value })),
       );
+      const phaseAwareVersion =
+        invitation.campaign.template?.alias === SU_FULL_ALIAS &&
+        versionParsed.data.questions.some(
+          (question) =>
+            question.type === "SLIDER_LIKERT" &&
+            question.phaseRecommendations !== undefined,
+        );
 
       // Single instant shared by the report's submittedAt + the invitation's
       // SUBMITTED stamp, so the emailed report date matches the DB row.
       const submittedAt = new Date();
 
-      // Wave OSR (#71): prebuild one model per closed-catalog style outside the
-      // transaction. The final ordered style selects ONE model, shared between
-      // #15 results email and on-screen payload — see ADR-0027.
+      // Wave OSR (#71): build one model per closed-catalog style. Legacy
+      // editions retain the existing off-lock prebuild; phase-aware editions
+      // build only after the locked CEO decision finalizes the frozen score.
+      // The final ordered style selects ONE model, shared between #15 results
+      // email and on-screen payload — see ADR-0027.
       //
       // Each build is wrapped because a model failure must NEVER fail the
       // submission. A null selected candidate degrades to: no #15 email row,
@@ -942,78 +956,84 @@ export async function POST(
 
       let respondentReport: RespondentReport | null = null;
 
-      // Prebuild the closed style catalog outside the transaction. The lock
-      // later selects exactly one immutable candidate using the final ordered
-      // style, keeping CPU-heavy report/email rendering off the row lock while
-      // preserving atomic submission + delivery persistence.
-      const reportCandidates = new Map<
-        ReportStyleKey,
-        { report: RespondentReport | null; rows: PreparedDeliveryRow[] }
-      >();
-      const sharedEmailRenders: SharedWaveDEmailRenderCache = {};
-      for (const reportStyle of REPORT_STYLE_KEYS) {
-        let report: RespondentReport | null = null;
-        let reportRenderInputHash = "";
-        if (mayNeedReport) {
-          const reportModelInput = {
-            result: scoreResult as never,
-            publicTaker: {
-              firstName: invitation.respondent?.firstName ?? "",
-              lastName: invitation.respondent?.lastName ?? "",
-              email: invitation.respondent?.email ?? "",
-            },
-            assessmentName:
-              invitation.campaign.template?.name ?? "an assessment",
-            templateAlias: invitation.campaign.template?.alias ?? "",
-            reportStyle,
-            campaignLabel: null,
-            sections: invitation.campaign.version.sections,
-            questions: invitation.campaign.version.questions,
-            scoringConfig: invitation.campaign.version.scoringConfig,
-            rawAnswers,
-            submittedAt,
-            submissionId: "",
-            referringCoachEmail: null,
-            companyName: invitation.campaign.organization?.name ?? "",
-            jobTitle: invitation.respondent?.jobTitle ?? null,
-            coachLogoUrl:
-              invitation.campaign.creatorCoach?.profileImage ?? null,
-            coachName: coachBylineName(invitation.campaign.creatorCoach),
-            degraded: !isScoreResult(scoreResult),
-          };
-          if (intentMode) {
-            reportRenderInputHash = stableInputHash(reportModelInput);
-          }
-          try {
-            report = buildRespondentReportFromSubmission(reportModelInput);
-          } catch (err) {
-            console.error(
-              "[assessment-submit] respondent report candidate build failed",
-              {
-                campaignId: invitation.campaign.id,
-                versionId: invitation.campaign.version.id,
-                reportStyle,
-                errorName: errorNameOnly(err),
+      const buildReportCandidates = (frozenScoreResult: ScoreResult) => {
+        const candidates = new Map<
+          ReportStyleKey,
+          { report: RespondentReport | null; rows: PreparedDeliveryRow[] }
+        >();
+        const sharedEmailRenders: SharedWaveDEmailRenderCache = {};
+        for (const reportStyle of REPORT_STYLE_KEYS) {
+          let report: RespondentReport | null = null;
+          let reportRenderInputHash = "";
+          if (mayNeedReport) {
+            const reportModelInput = {
+              result: frozenScoreResult as never,
+              publicTaker: {
+                firstName: invitation.respondent?.firstName ?? "",
+                lastName: invitation.respondent?.lastName ?? "",
+                email: invitation.respondent?.email ?? "",
               },
-            );
+              assessmentName:
+                invitation.campaign.template?.name ?? "an assessment",
+              templateAlias: invitation.campaign.template?.alias ?? "",
+              reportStyle,
+              campaignLabel: null,
+              sections: invitation.campaign.version.sections,
+              questions: invitation.campaign.version.questions,
+              scoringConfig: invitation.campaign.version.scoringConfig,
+              rawAnswers,
+              submittedAt,
+              submissionId: "",
+              referringCoachEmail: null,
+              companyName: invitation.campaign.organization?.name ?? "",
+              jobTitle: invitation.respondent?.jobTitle ?? null,
+              coachLogoUrl:
+                invitation.campaign.creatorCoach?.profileImage ?? null,
+              coachName: coachBylineName(invitation.campaign.creatorCoach),
+              degraded: !isScoreResult(frozenScoreResult),
+            };
+            if (intentMode) {
+              reportRenderInputHash = stableInputHash(reportModelInput);
+            }
+            try {
+              report = buildRespondentReportFromSubmission(reportModelInput);
+            } catch (err) {
+              console.error(
+                "[assessment-submit] respondent report candidate build failed",
+                {
+                  campaignId: invitation.campaign.id,
+                  versionId: invitation.campaign.version.id,
+                  reportStyle,
+                  errorName: errorNameOnly(err),
+                },
+              );
+            }
           }
-        }
 
-        reportCandidates.set(reportStyle, {
-          report,
-          rows: buildWaveDOutboxRows({
-            campaign: invitation.campaign,
-            respondent: invitation.respondent,
-            respondentId: invitation.respondentId,
+          candidates.set(reportStyle, {
             report,
-            reportRenderInputHash,
-            respectGlobalPause: !intentMode,
-            prepareIntentMetadata: intentMode,
-            renderCache: sharedEmailRenders,
-            ceoSelfAccessUrl: preparedCeoSelfAccessUrl,
-          }),
-        });
-      }
+            rows: buildWaveDOutboxRows({
+              campaign: invitation.campaign,
+              respondent: invitation.respondent,
+              respondentId: invitation.respondentId,
+              report,
+              reportRenderInputHash,
+              respectGlobalPause: !intentMode,
+              prepareIntentMetadata: intentMode,
+              renderCache: sharedEmailRenders,
+              ceoSelfAccessUrl: preparedCeoSelfAccessUrl,
+            }),
+          });
+        }
+        return candidates;
+      };
+
+      // Legacy editions keep the existing off-lock render path. A phase-aware
+      // edition waits for the participant row lock below so no phase-specific
+      // result or report is resolved before the authoritative CEO decision.
+      let reportCandidates = phaseAwareVersion
+        ? null
+        : buildReportCandidates(scoreResult);
 
       // C-M2: capture the Phase-1 render-input fingerprint before opening the
       // transaction. Phase 2 re-reads the same fields UNDER the lock and drops
@@ -1119,6 +1139,58 @@ export async function POST(
           throw new SubmissionTransactionAbort("conflict");
         }
 
+        let ceoSelfAccessAuthorized = false;
+        let lockedParticipantIsCeo = false;
+        if (phaseAwareVersion || preparedCeoSelfAccessUrl !== null) {
+          // CEO is a campaign-participant designation, never a platform role.
+          // Lock its exact row before reading it: an isCEO revocation must queue
+          // behind this submit transaction instead of committing between the
+          // phase/capability authorization decision and submission persistence.
+          await tx.$executeRaw`SELECT "id" FROM "assessment_campaign_participants" WHERE "campaignId" = ${locked.campaignId} AND "respondentId" = ${locked.respondentId} FOR UPDATE`;
+          const lockedParticipant = await tx.assessmentCampaignParticipant.findUnique({
+            where: {
+              campaignId_respondentId: {
+                campaignId: locked.campaignId,
+                respondentId: locked.respondentId,
+              },
+            },
+            select: { isCEO: true },
+          });
+          lockedParticipantIsCeo = lockedParticipant?.isCEO === true;
+          if (preparedCeoSelfAccessUrl !== null) {
+            ceoSelfAccessAuthorized =
+              locked.campaign.template?.alias === SU_FULL_ALIAS &&
+              isReportComparisonEnabled({
+                organizationId: locked.campaign.organizationId,
+                templateId: locked.campaign.templateId,
+              }) &&
+              lockedParticipantIsCeo &&
+              locked.campaign.accessMode === "INVITED" &&
+              (locked.campaign.showResultsOnScreen ||
+                locked.campaign.sendResultsToRespondent);
+          }
+        }
+
+        if (phaseAwareVersion && lockedParticipantIsCeo) {
+          const phase = currentGrowthPhaseFromAnswers(rawAnswers);
+          if (!phase) {
+            throw new ScoringValidationError(
+              "OUT_OF_RANGE",
+              { stableKey: SU_FULL_PHASE_DRIVER_KEY },
+              "The required contract FTE must resolve to a growth phase",
+            );
+          }
+          ({ result: scoreResult, prunedAnswers: rawAnswers } = computeScoreResult(
+            versionParsed.data,
+            scoredQuestions as unknown as PagerQuestion[],
+            rawAnswers,
+            { recommendationPhase: phase.number },
+          ));
+        }
+
+        if (reportCandidates === null) {
+          reportCandidates = buildReportCandidates(scoreResult);
+        }
         const selectedCandidate = reportCandidates.get(reportStyle);
         if (!selectedCandidate) {
           const candidateError = new Error(
@@ -1129,36 +1201,6 @@ export async function POST(
         }
         respondentReport = selectedCandidate.report;
         const preparedRows = selectedCandidate.rows;
-
-        let ceoSelfAccessAuthorized = false;
-        if (preparedCeoSelfAccessUrl !== null) {
-          // CEO is a campaign-participant designation, never a platform role.
-          // Lock its exact row before reading it: an isCEO revocation must queue
-          // behind this submit transaction instead of committing between our
-          // authorization decision and the capability-bearing outbox INSERT.
-          await tx.$executeRaw`SELECT "id" FROM "assessment_campaign_participants" WHERE "campaignId" = ${locked.campaignId} AND "respondentId" = ${locked.respondentId} FOR UPDATE`;
-          // This current locked read is the authorization decision for every
-          // capability-bearing email row and the response disclosure below.
-          const lockedParticipant = await tx.assessmentCampaignParticipant.findUnique({
-            where: {
-              campaignId_respondentId: {
-                campaignId: locked.campaignId,
-                respondentId: locked.respondentId,
-              },
-            },
-            select: { isCEO: true },
-          });
-          ceoSelfAccessAuthorized =
-            locked.campaign.template?.alias === SU_FULL_ALIAS &&
-            isReportComparisonEnabled({
-              organizationId: locked.campaign.organizationId,
-              templateId: locked.campaign.templateId,
-            }) &&
-            lockedParticipant?.isCEO === true &&
-            locked.campaign.accessMode === "INVITED" &&
-            (locked.campaign.showResultsOnScreen ||
-              locked.campaign.sendResultsToRespondent);
-        }
 
         // One explicit ledger instant owns all intent lifecycle timestamps.
         // Report/invitation submittedAt remains the earlier disclosure instant;

@@ -95,11 +95,19 @@ describe("buildSuFullLandscapeReportModel", () => {
     );
   });
 
-  it("derives Phase 2 from the frozen FTE answer and omits an invalid FTE phase", () => {
+  it("prefers the frozen recommendation phase and keeps the legacy FTE fallback for old results", () => {
     const report = completeSuFullLandscapeReport();
     const presentation = completeSuFullLandscapePresentation(report);
 
     expect(buildSuFullLandscapeReportModel({ report, presentation, resolvedStyle: "CLASSIC" })!.growthPhase).toMatchObject({ number: 2 });
+    expect(buildSuFullLandscapeReportModel({
+      report: {
+        ...report,
+        result: { ...report.result, recommendationPhase: 3 },
+      },
+      presentation,
+      resolvedStyle: "CLASSIC",
+    })!.growthPhase).toMatchObject({ number: 3 });
     expect(buildSuFullLandscapeReportModel({
       report: { ...report, rawAnswers: [{ stableKey: "Q_FTE_CONTRACT", value: 0 }] },
       presentation,

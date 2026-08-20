@@ -61,4 +61,50 @@ describe("computeScoreResult", () => {
     const { result } = computeScoreResult(version, questions, partial, { allowMissingRequired: true });
     expect(result.unansweredKeys).toContain("S1_q2");
   });
+
+  it("forwards the selected growth phase through the prune→score seam", () => {
+    const phaseAwareVersion = {
+      ...version,
+      questions: version.questions.map((question, index) => index === 0
+        ? {
+            ...question,
+            phaseRecommendations: [1, 2, 3, 4, 5].map((phase) => ({
+              phase,
+              bands: [{ minScore: 0, maxScore: 3, text: `phase-${phase}` }],
+            })),
+          }
+        : question),
+    } as TemplateVersionForScoring;
+
+    const { result } = computeScoreResult(
+      phaseAwareVersion,
+      phaseAwareVersion.questions as unknown as PagerQuestion[],
+      answers,
+      { recommendationPhase: 4 },
+    );
+
+    expect(result.recommendationPhase).toBe(4);
+    expect(result.perQuestion[0].recommendation).toBe("phase-4");
+  });
+
+  it("keeps legacy score-only recommendations when no phase-aware payload is pinned", () => {
+    const legacyVersion = {
+      ...version,
+      questions: version.questions.map((question, index) => index === 0
+        ? {
+            ...question,
+            recommendations: [{ minScore: 0, maxScore: 3, text: "legacy frozen paragraph" }],
+          }
+        : question),
+    } as TemplateVersionForScoring;
+
+    const { result } = computeScoreResult(
+      legacyVersion,
+      legacyVersion.questions as unknown as PagerQuestion[],
+      answers,
+    );
+
+    expect(result.recommendationPhase).toBeUndefined();
+    expect(result.perQuestion[0].recommendation).toBe("legacy frozen paragraph");
+  });
 });
