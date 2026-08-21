@@ -50,6 +50,72 @@ describe("sanitizeReportHtmlFragment", () => {
     expect(result.html).toBe('<div style="color:red">Safe text</div>');
   });
 
+  it("unwraps preformatted exact-limit text so UA white-space cannot escape the page", () => {
+    const result = sanitizeReportHtmlFragment(
+      `<pre>${"x".repeat(limits.introduction.textCharacters)}</pre>`,
+      "introduction",
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.html).not.toContain("<pre");
+    expect(result.html).toBe("x".repeat(limits.introduction.textCharacters));
+    expect(result.didStripContent).toBe(true);
+  });
+
+  it.each(["introduction", "conclusion"] as const)(
+    "rejects the maximum accepted %s line-break composition with a plain issue",
+    (position) => {
+      const result = sanitizeReportHtmlFragment(
+        "<br>".repeat(limits[position].elements),
+        position,
+      );
+
+      expect(result.ok).toBe(false);
+      expect(result.html).toBe("");
+      expect(result.issue).toMatch(/line break/i);
+    },
+  );
+
+  it.each(["introduction", "conclusion"] as const)(
+    "rejects the maximum accepted %s heading composition with a plain issue",
+    (position) => {
+      const result = sanitizeReportHtmlFragment(
+        Array.from({ length: limits[position].elements }, () => "<h1>x</h1>").join(""),
+        position,
+      );
+
+      expect(result.ok).toBe(false);
+      expect(result.html).toBe("");
+      expect(result.issue).toMatch(/heading/i);
+    },
+  );
+
+  it.each([
+    ["introduction", 8, 4, 32],
+    ["conclusion", 4, 2, 16],
+  ] as const)(
+    "enforces exact %s semantic layout sublimits",
+    (position, lineBreaks, headings, estimatedLines) => {
+      expect(sanitizeReportHtmlFragment("<br>".repeat(lineBreaks), position).ok).toBe(true);
+      expect(sanitizeReportHtmlFragment("<br>".repeat(lineBreaks + 1), position)).toMatchObject({
+        ok: false,
+        issue: expect.stringContaining(`${lineBreaks} line breaks`),
+      });
+      expect(sanitizeReportHtmlFragment("<h6>x</h6>".repeat(headings), position).ok).toBe(true);
+      expect(sanitizeReportHtmlFragment("<h6>x</h6>".repeat(headings + 1), position)).toMatchObject({
+        ok: false,
+        issue: expect.stringContaining(`${headings} headings`),
+      });
+
+      const acceptedBlocks = "<div></div>".repeat(estimatedLines);
+      expect(sanitizeReportHtmlFragment(acceptedBlocks, position).ok).toBe(true);
+      expect(sanitizeReportHtmlFragment(`${acceptedBlocks}<div></div>`, position)).toMatchObject({
+        ok: false,
+        issue: expect.stringContaining(`${estimatedLines} estimated lines`),
+      });
+    },
+  );
+
   it("removes executable and interactive content", () => {
     const result = sanitizeReportHtmlFragment(
       '<style>body{display:none}</style><script>alert(1)</script><form><input></form><iframe src="https://evil.test"></iframe><a href="javascript:alert(1)" onclick="x()">x</a>',

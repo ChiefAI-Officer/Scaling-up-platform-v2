@@ -26,8 +26,8 @@ import {
 } from "../../../scripts/capture-report-html-peers-previews";
 
 describe("report HTML peers visual capture fixture contract", () => {
-  it("keeps the deterministic twelve-case matrix and its complete artifact set", () => {
-    expect(REPORT_HTML_PEER_FIXTURES).toHaveLength(12);
+  it("keeps the deterministic sixteen-case matrix and its complete artifact set", () => {
+    expect(REPORT_HTML_PEER_FIXTURES).toHaveLength(16);
     expect(REPORT_HTML_PEER_FIXTURES.map((fixture) => fixture.id)).toEqual([
       "default-current",
       "default-historical",
@@ -41,6 +41,10 @@ describe("report HTML peers visual capture fixture contract", () => {
       "long-historical",
       "adversarial-current",
       "adversarial-historical",
+      "semantic-budget-current",
+      "semantic-budget-historical",
+      "semantic-rich-current",
+      "semantic-rich-historical",
     ]);
 
     const long = REPORT_HTML_PEER_FIXTURES.filter((fixture) => fixture.authoringCase === "long");

@@ -40,6 +40,128 @@ const LEGACY_FALSE_FREEZE_CLAIM = /frozen governed snapshot|peer values[^.]{0,12
 const ENGINEERING_LANGUAGE = /governed|snapshot|sourceId|source id|catalogue|provenance|legacy baseline|phase-aware|frozen|esperto-five-phase-peers|esperto-controlled/i;
 const REPRESENTATIVE_482_CHARACTER_FEEDBACK = "In order to scale, smart application and linking of information technology is essential. Sales, marketing, project management, production,humanresources,reporting,etc.Thisgivesstructureand clarity, prevents mistakes and makes growing a lot easier. With the size of your company, a lot of systems likely still work independently of each other, or you primarily use Excel. This is customary, but in your next growth phase you will have to start thinking about smart solutions. Act now";
 
+const SEMANTIC_ESCAPE_CASES = [
+  {
+    id: "exact-limit-pre",
+    introductionHtml: `<pre>${"x".repeat(2_200)}</pre>`,
+    conclusionHtml: null,
+    rejectedIssue: /preformatted/i,
+  },
+  {
+    id: "maximum-line-breaks",
+    introductionHtml: "<br>".repeat(64),
+    conclusionHtml: null,
+    rejectedIssue: /line break/i,
+  },
+  {
+    id: "maximum-headings",
+    introductionHtml: null,
+    conclusionHtml: Array.from({ length: 36 }, () => "<h1>x</h1>").join(""),
+    rejectedIssue: /heading/i,
+  },
+] as const;
+
+type SemanticAuditPosition = "introduction" | "conclusion";
+
+const TALL_PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAA+gCAIAAAC0f+F8AAAALUlEQVR42u3DAQ0AAAgDoM8uFrKSxQ0ibGR6K4mqqqqqqqqqqqqqqqqqqqq/H9OeIDkSuu58AAAAAElFTkSuQmCC";
+const SEMANTIC_AUDIT_LIMITS = {
+  introduction: { elements: 64, text: 2_200, rows: 8 },
+  conclusion: { elements: 36, text: 900, rows: 6 },
+} as const;
+
+function auditTextChunks(
+  position: SemanticAuditPosition,
+  count: number,
+  totalText = SEMANTIC_AUDIT_LIMITS[position].text,
+): string[] {
+  const text = "x".repeat(totalText);
+  return Array.from({ length: count }, (_, index) => {
+    const start = Math.floor(index * text.length / count);
+    const end = Math.floor((index + 1) * text.length / count);
+    return text.slice(start, end);
+  });
+}
+
+function repeatedAuditTag(tag: string, position: SemanticAuditPosition): string {
+  return auditTextChunks(position, SEMANTIC_AUDIT_LIMITS[position].elements)
+    .map((text) => `<${tag}>${text}</${tag}>`)
+    .join("");
+}
+
+function voidAuditTag(tag: "br" | "hr", position: SemanticAuditPosition): string {
+  return auditTextChunks(position, SEMANTIC_AUDIT_LIMITS[position].elements)
+    .map((text) => `${text}<${tag}>`)
+    .join("");
+}
+
+function listAuditHtml(tag: "ul" | "ol", position: SemanticAuditPosition): string {
+  const items = SEMANTIC_AUDIT_LIMITS[position].elements - 1;
+  return `<${tag}>${auditTextChunks(position, items)
+    .map((text) => `<li>${text}</li>`)
+    .join("")}</${tag}>`;
+}
+
+function descriptionListAuditHtml(position: SemanticAuditPosition): string {
+  const items = SEMANTIC_AUDIT_LIMITS[position].elements - 1;
+  return `<dl>${auditTextChunks(position, items)
+    .map((text, index) => index % 2 === 0 ? `<dt>${text}</dt>` : `<dd>${text}</dd>`)
+    .join("")}</dl>`;
+}
+
+function figureAuditHtml(position: SemanticAuditPosition): string {
+  const figures = SEMANTIC_AUDIT_LIMITS[position].elements / 2;
+  return auditTextChunks(position, figures)
+    .map((text) => `<figure><figcaption>${text}</figcaption></figure>`)
+    .join("");
+}
+
+function imageAuditHtml(position: SemanticAuditPosition): string {
+  const spans = SEMANTIC_AUDIT_LIMITS[position].elements - 2;
+  return `<figure><img src="${TALL_PNG}" alt="Tall image">${auditTextChunks(position, spans)
+    .map((text) => `<span>${text}</span>`)
+    .join("")}</figure>`;
+}
+
+function tableAuditHtml(position: SemanticAuditPosition): string {
+  const { elements, rows } = SEMANTIC_AUDIT_LIMITS[position];
+  const structuralElements = 10 + rows;
+  const cells = elements - structuralElements;
+  const text = auditTextChunks(position, cells, SEMANTIC_AUDIT_LIMITS[position].text - "Audit".length);
+  let cellIndex = 0;
+  const rowHtml = Array.from({ length: rows }, (_, rowIndex) => {
+    const cellsInRow = Math.floor(cells / rows) + (rowIndex < cells % rows ? 1 : 0);
+    const tag = rowIndex === 0 ? "th" : "td";
+    const content = Array.from({ length: cellsInRow }, () => `<${tag}>${text[cellIndex++]}</${tag}>`).join("");
+    return `<tr>${content}</tr>`;
+  });
+  return `<table><caption>Audit</caption><colgroup><col><col><col><col></colgroup><thead>${rowHtml[0]}</thead><tbody>${rowHtml.slice(1, -1).join("")}</tbody><tfoot>${rowHtml.at(-1)}</tfoot></table>`;
+}
+
+const SEMANTIC_AUDIT_CASES = [
+  ...["section", "article", "header", "footer", "main", "aside", "div", "p", "blockquote", "pre", "code"]
+    .map((tag) => ({ id: tag, tags: [tag], html: (position: SemanticAuditPosition) => repeatedAuditTag(tag, position) })),
+  ...["span", "strong", "em", "b", "i", "u", "s", "small", "sup", "sub", "a"]
+    .map((tag) => ({ id: tag, tags: [tag], html: (position: SemanticAuditPosition) => repeatedAuditTag(tag, position) })),
+  ...(["br", "hr"] as const)
+    .map((tag) => ({ id: tag, tags: [tag], html: (position: SemanticAuditPosition) => voidAuditTag(tag, position) })),
+  ...["h1", "h2", "h3", "h4", "h5", "h6"]
+    .map((tag) => ({ id: tag, tags: [tag], html: (position: SemanticAuditPosition) => repeatedAuditTag(tag, position) })),
+  { id: "ul-li", tags: ["ul", "li"], html: (position: SemanticAuditPosition) => listAuditHtml("ul", position) },
+  { id: "ol-li", tags: ["ol", "li"], html: (position: SemanticAuditPosition) => listAuditHtml("ol", position) },
+  { id: "dl-dt-dd", tags: ["dl", "dt", "dd"], html: descriptionListAuditHtml },
+  { id: "figure-figcaption", tags: ["figure", "figcaption"], html: figureAuditHtml },
+  { id: "image", tags: ["img"], html: imageAuditHtml },
+  {
+    id: "table-family",
+    tags: ["table", "caption", "colgroup", "col", "thead", "tbody", "tfoot", "tr", "th", "td"],
+    html: tableAuditHtml,
+  },
+] as const;
+
+const EXPECTED_AUDITED_TAGS = [
+  "a", "article", "aside", "b", "blockquote", "br", "caption", "code", "col", "colgroup", "dd", "div", "dl", "dt", "em", "figcaption", "figure", "footer", "h1", "h2", "h3", "h4", "h5", "h6", "header", "hr", "i", "img", "li", "main", "ol", "p", "pre", "s", "section", "small", "span", "strong", "sub", "sup", "table", "tbody", "td", "tfoot", "th", "thead", "tr", "u", "ul",
+] as const;
+
 function stylesheet(): string {
   return ["su-public-brand.css", "su-report.css"]
     .map((name) => readFileSync(join(process.cwd(), "src", "styles", name), "utf8"))
@@ -155,6 +277,27 @@ async function authoredContentOutsidePhysicalPage(page: Page) {
   }));
 }
 
+async function authoredClipping(page: Page) {
+  return page.locator("[data-testid^='report-html-']").evaluateAll((sections) => sections.flatMap((section) =>
+    [section, ...section.querySelectorAll<HTMLElement>("*")].flatMap((element) => {
+      const style = getComputedStyle(element);
+      const clipsWidth = element.scrollWidth > element.clientWidth + 1
+        && style.overflowX !== "visible";
+      const clipsHeight = element.scrollHeight > element.clientHeight + 1
+        && style.overflowY !== "visible";
+      return clipsWidth || clipsHeight ? [{
+        tag: element.tagName,
+        clientWidth: element.clientWidth,
+        scrollWidth: element.scrollWidth,
+        clientHeight: element.clientHeight,
+        scrollHeight: element.scrollHeight,
+        overflowX: style.overflowX,
+        overflowY: style.overflowY,
+      }] : [];
+    }),
+  ));
+}
+
 function reportWithAuthoringCase(
   fixture: (typeof REPORT_HTML_PEER_FIXTURES)[number],
 ) {
@@ -169,6 +312,25 @@ function reportWithAuthoringCase(
     throw new Error(`${fixture.id} fixture must remain within the stored authoring limits`);
   }
   const report = fixture.peerReference === "current" ? reportForPhase(4) : historicalReport();
+  return {
+    ...report,
+    reportHtml: (prepared.reportConfig as { reportHtml: typeof report.reportHtml }).reportHtml,
+  };
+}
+
+function prepareSemanticEscapeReport(
+  fixture: (typeof SEMANTIC_ESCAPE_CASES)[number],
+  peerReference: "current" | "historical",
+) {
+  const prepared = prepareReportHtmlForStorage({
+    reportHtml: {
+      schemaVersion: 1,
+      introductionHtml: fixture.introductionHtml,
+      conclusionHtml: fixture.conclusionHtml,
+    },
+  });
+  if (!prepared.ok) return prepared;
+  const report = peerReference === "current" ? reportForPhase(4) : historicalReport();
   return {
     ...report,
     reportHtml: (prepared.reportConfig as { reportHtml: typeof report.reportHtml }).reportHtml,
@@ -805,5 +967,146 @@ describe("SU Full landscape browser and PDF contract", () => {
       await page.close();
       rmSync(directory, { recursive: true, force: true });
     }
+  });
+
+  it.each(SEMANTIC_ESCAPE_CASES.flatMap((fixture) => [
+    { ...fixture, peerReference: "current" as const },
+    { ...fixture, peerReference: "historical" as const },
+  ]))("rejects or physically contains $id/$peerReference semantic-limit content", async (fixture) => {
+    const prepared = prepareSemanticEscapeReport(fixture, fixture.peerReference);
+    if ("ok" in prepared && prepared.ok === false) {
+      expect(prepared.issues.map((issue) => issue.message).join(" ")).toMatch(fixture.rejectedIssue);
+      return;
+    }
+
+    const { html } = routeMarkup(prepared);
+    const directory = mkdtempSync(join(tmpdir(), "report-html-semantic-escape-"));
+    const pdfPath = join(directory, `${fixture.id}-${fixture.peerReference}.pdf`);
+    const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+    try {
+      await load(page, html);
+      const desktop = await horizontalOverflow(page);
+      await page.setViewportSize({ width: 390, height: 844 });
+      const mobile = await horizontalOverflow(page);
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await page.emulateMedia({ media: "print" });
+      const outside = await authoredContentOutsidePhysicalPage(page);
+      await page.pdf({
+        path: pdfPath,
+        format: "A4",
+        landscape: true,
+        preferCSSPageSize: true,
+        printBackground: true,
+      });
+      const pdfinfo = execFileSync("pdfinfo", [pdfPath], { encoding: "utf8" });
+      const pages = Number(pdfinfo.match(/^Pages:\s+(\d+)$/m)?.[1]);
+
+      expect({
+        desktopDocumentWidth: desktop.document,
+        desktopViewportWidth: desktop.viewport,
+        desktopOffenders: desktop.offenders,
+        mobileDocumentWidth: mobile.document,
+        mobileViewportWidth: mobile.viewport,
+        mobileOffenders: mobile.offenders,
+        authoredOutsidePhysicalPage: {
+          count: outside.length,
+          first: outside.at(0) ?? null,
+          last: outside.at(-1) ?? null,
+        },
+        physicalPdfPages: pages,
+      }).toEqual({
+        desktopDocumentWidth: 1280,
+        desktopViewportWidth: 1280,
+        desktopOffenders: [],
+        mobileDocumentWidth: 390,
+        mobileViewportWidth: 390,
+        mobileOffenders: [],
+        authoredOutsidePhysicalPage: {
+          count: 0,
+          first: null,
+          last: null,
+        },
+        physicalPdfPages: 26,
+      });
+    } finally {
+      await page.close();
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("audits every allowed semantic tag at maximum accepted composition", async () => {
+    expect([...new Set(SEMANTIC_AUDIT_CASES.flatMap((fixture) => fixture.tags))].sort())
+      .toEqual(EXPECTED_AUDITED_TAGS);
+
+    const unsafe: unknown[] = [];
+    const acceptedSafe: string[] = [];
+    const rejected: Array<{ id: string; issues: string[] }> = [];
+
+    for (const fixture of SEMANTIC_AUDIT_CASES) {
+      for (const position of ["introduction", "conclusion"] as const) {
+        const id = `${fixture.id}/${position}`;
+        const prepared = prepareReportHtmlForStorage({
+          reportHtml: {
+            schemaVersion: 1,
+            introductionHtml: position === "introduction" ? fixture.html(position) : null,
+            conclusionHtml: position === "conclusion" ? fixture.html(position) : null,
+          },
+        });
+        if (!prepared.ok) {
+          rejected.push({ id, issues: prepared.issues.map((issue) => issue.message) });
+          continue;
+        }
+
+        const source = reportForPhase(4);
+        const report = {
+          ...source,
+          reportHtml: (prepared.reportConfig as { reportHtml: typeof source.reportHtml }).reportHtml,
+        };
+        const { html } = routeMarkup(report);
+        const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+        try {
+          await load(page, html);
+          const desktop = await horizontalOverflow(page);
+          const desktopClipping = await authoredClipping(page);
+          await page.setViewportSize({ width: 390, height: 844 });
+          const mobile = await horizontalOverflow(page);
+          const mobileClipping = await authoredClipping(page);
+          await page.setViewportSize({ width: 1280, height: 720 });
+          await page.emulateMedia({ media: "print" });
+          const outside = await authoredContentOutsidePhysicalPage(page);
+          const isUnsafe = desktop.document > desktop.viewport + 1
+            || desktop.offenders.length > 0
+            || mobile.document > mobile.viewport + 1
+            || mobile.offenders.length > 0
+            || desktopClipping.length > 0
+            || mobileClipping.length > 0
+            || outside.length > 0;
+          if (isUnsafe) {
+            unsafe.push({
+              id,
+              desktop: { document: desktop.document, viewport: desktop.viewport, offenders: desktop.offenders.length },
+              mobile: { document: mobile.document, viewport: mobile.viewport, offenders: mobile.offenders.length },
+              desktopClipping: desktopClipping.slice(0, 2).map((item) => item.tag),
+              mobileClipping: mobileClipping.slice(0, 2).map((item) => item.tag),
+              authoredOutsidePhysicalPage: {
+                count: outside.length,
+                firstTag: outside.at(0)?.tag ?? null,
+                lastTag: outside.at(-1)?.tag ?? null,
+                lastBottom: outside.at(-1)?.bottom ?? null,
+              },
+            });
+          } else {
+            acceptedSafe.push(id);
+          }
+        } finally {
+          await page.close();
+        }
+      }
+    }
+
+    if (unsafe.length > 0) {
+      throw new Error(JSON.stringify({ unsafe, acceptedSafe, rejected }, null, 2));
+    }
+    expect(acceptedSafe.length + rejected.length).toBe(SEMANTIC_AUDIT_CASES.length * 2);
   });
 });

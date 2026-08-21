@@ -9,6 +9,9 @@ export const REPORT_HTML_LIMITS = {
     images: 1,
     tables: 1,
     tableRows: 8,
+    headings: 4,
+    lineBreaks: 8,
+    estimatedLines: 32,
   },
   conclusion: {
     rawCharacters: 12_000,
@@ -18,6 +21,9 @@ export const REPORT_HTML_LIMITS = {
     images: 1,
     tables: 1,
     tableRows: 6,
+    headings: 2,
+    lineBreaks: 4,
+    estimatedLines: 16,
   },
 } as const;
 
@@ -52,7 +58,6 @@ const ALLOWED_TAGS = [
   "dt",
   "dd",
   "blockquote",
-  "pre",
   "code",
   "strong",
   "em",
@@ -152,6 +157,36 @@ type ReportHtmlPosition = keyof typeof REPORT_HTML_LIMITS;
 
 const VOID_TAGS = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"]);
 const TAG_TOKEN = /<\/?([a-z][a-z0-9:-]*)(?:\s[^<>]*?)?\s*\/?>/gi;
+const HEADING_TAGS = new Set(["h1", "h2", "h3", "h4", "h5", "h6"]);
+const LAYOUT_WEIGHTS: Readonly<Record<string, number>> = {
+  section: 1,
+  article: 1,
+  header: 1,
+  footer: 1,
+  main: 1,
+  aside: 1,
+  div: 1,
+  p: 2,
+  br: 1,
+  hr: 2,
+  h1: 5,
+  h2: 4,
+  h3: 3,
+  h4: 3,
+  h5: 3,
+  h6: 3,
+  ul: 1,
+  ol: 1,
+  li: 1,
+  dl: 1,
+  dt: 1,
+  dd: 1,
+  blockquote: 3,
+  figure: 3,
+  table: 1,
+  tr: 1,
+  img: 6,
+};
 
 function measureStructure(html: string) {
   let elements = 0;
@@ -160,6 +195,9 @@ function measureStructure(html: string) {
   let images = 0;
   let tables = 0;
   let tableRows = 0;
+  let headings = 0;
+  let lineBreaks = 0;
+  let layoutWeight = 0;
   const stack: string[] = [];
 
   for (const token of html.matchAll(TAG_TOKEN)) {
@@ -178,6 +216,9 @@ function measureStructure(html: string) {
     if (tag === "img") images += 1;
     if (tag === "table") tables += 1;
     if (tag === "tr") tableRows += 1;
+    if (HEADING_TAGS.has(tag)) headings += 1;
+    if (tag === "br") lineBreaks += 1;
+    layoutWeight += LAYOUT_WEIGHTS[tag] ?? 0;
     if (!VOID_TAGS.has(tag) && !token[0].endsWith("/>")) {
       stack.push(tag);
       depth = stack.length;
@@ -190,12 +231,22 @@ function measureStructure(html: string) {
     allowedAttributes: {},
   }).replace(/\s+/g, " ").trim();
 
-  return { elements, depth: maximumDepth, images, tables, tableRows, text };
+  return {
+    elements,
+    depth: maximumDepth,
+    images,
+    tables,
+    tableRows,
+    headings,
+    lineBreaks,
+    estimatedLines: Math.ceil(text.length / 100) + layoutWeight,
+    text,
+  };
 }
 
 function issueForLimit(
   position: ReportHtmlPosition,
-  kind: "rawCharacters" | "textCharacters" | "elements" | "depth" | "images" | "tables" | "tableRows",
+  kind: "rawCharacters" | "textCharacters" | "elements" | "depth" | "images" | "tables" | "tableRows" | "headings" | "lineBreaks" | "estimatedLines",
 ): string {
   const field = position === "introduction" ? "Welcome section" : "Closing message";
   const limit = REPORT_HTML_LIMITS[position][kind];
@@ -207,6 +258,9 @@ function issueForLimit(
     images: `can contain ${limit} image or fewer.`,
     tables: `can contain ${limit} table or fewer.`,
     tableRows: `can contain ${limit} table rows or fewer.`,
+    headings: `can contain ${limit} headings or fewer.`,
+    lineBreaks: `can contain ${limit} line breaks or fewer.`,
+    estimatedLines: `must use ${limit} estimated lines or fewer after headings, blocks, lists, breaks, table rows, figures, and images are counted.`,
   } as const;
   return `${field} ${messages[kind]}`;
 }
@@ -286,6 +340,9 @@ export function sanitizeReportHtmlFragment(
     ["images", structure.images],
     ["tables", structure.tables],
     ["tableRows", structure.tableRows],
+    ["headings", structure.headings],
+    ["lineBreaks", structure.lineBreaks],
+    ["estimatedLines", structure.estimatedLines],
   ] as const) {
     if (value > limits[kind]) {
       return {

@@ -2959,6 +2959,12 @@
   height: auto;
 }
 
+.su-public-brand.su-report .su-report-custom-html img {
+  max-height: 160px;
+  width: auto;
+  object-fit: contain;
+}
+
 .su-public-brand.su-report .su-report-custom-html table {
   display: block;
   max-width: 100%;

@@ -30,7 +30,7 @@ export const LONG_CLOSING_VISIBLE_CHARACTERS = 850;
 const longWelcome = "W".repeat(LONG_WELCOME_VISIBLE_CHARACTERS);
 const longClosing = "C".repeat(LONG_CLOSING_VISIBLE_CHARACTERS);
 
-type AuthoringCase = "default" | "welcome-only" | "closing-only" | "both" | "long" | "adversarial";
+type AuthoringCase = "default" | "welcome-only" | "closing-only" | "both" | "long" | "adversarial" | "semantic-budget" | "semantic-rich";
 type PeerReference = "current" | "historical";
 
 type CaptureFixture = {
@@ -42,6 +42,12 @@ type CaptureFixture = {
   welcomeVisibleCharacters: number;
   closingVisibleCharacters: number;
 };
+
+const TALL_PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAA+gCAIAAAC0f+F8AAAALUlEQVR42u3DAQ0AAAgDoM8uFrKSxQ0ibGR6K4mqqqqqqqqqqqqqqqqqqqq/H9OeIDkSuu58AAAAAElFTkSuQmCC";
+const semanticBudgetWelcome = `${"<h6>H</h6>".repeat(4)}${"<br>".repeat(8)}<p>${"W".repeat(996)}</p>`;
+const semanticBudgetClosing = `${"<h6>H</h6>".repeat(2)}${"<br>".repeat(4)}<p>${"C".repeat(398)}</p>`;
+const semanticRichWelcome = `<figure><img src="${TALL_PNG}" alt="Tall report image"></figure><table><tbody>${"<tr><td></td></tr>".repeat(8)}</tbody></table><ul>${"<li></li>".repeat(3)}</ul><blockquote></blockquote><p><code></code><a href="https://scalingup.com">${"R".repeat(500)}</a></p>`;
+const semanticRichClosing = `<figure><img src="${TALL_PNG}" alt="Tall report image"></figure><table><tbody><tr><td><code></code><a href="https://scalingup.com">${"R".repeat(300)}</a></td></tr>${"<tr><td></td></tr>".repeat(2)}</tbody></table>`;
 
 const authoringCases: ReadonlyArray<Omit<CaptureFixture, "id" | "peerReference">> = [
   {
@@ -85,6 +91,20 @@ const authoringCases: ReadonlyArray<Omit<CaptureFixture, "id" | "peerReference">
     conclusionHtml: `<div class="su-full-landscape-page" id="authored-page" data-region="closing" role="status" aria-labelledby="report-style-actions-title" style="white-space:nowrap;font-size:9999px;line-height:9999px;letter-spacing:9999px;padding:9999px;margin:9999px;gap:9999px"><p>${"C".repeat(900)}</p></div>`,
     welcomeVisibleCharacters: 2_200,
     closingVisibleCharacters: 900,
+  },
+  {
+    authoringCase: "semantic-budget",
+    introductionHtml: semanticBudgetWelcome,
+    conclusionHtml: semanticBudgetClosing,
+    welcomeVisibleCharacters: 1_000,
+    closingVisibleCharacters: 400,
+  },
+  {
+    authoringCase: "semantic-rich",
+    introductionHtml: semanticRichWelcome,
+    conclusionHtml: semanticRichClosing,
+    welcomeVisibleCharacters: 500,
+    closingVisibleCharacters: 300,
   },
 ];
 
