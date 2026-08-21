@@ -354,6 +354,33 @@ test("an LVA benchmark DB failure retains the original report and logs only the 
   });
 });
 
+test("an adversarial DB Error.name cannot inject long identity data into telemetry", async () => {
+  const report = lvaReport();
+  const adversarial = new Error("message ari@example.com must never be logged");
+  adversarial.name = `${"SensitiveName".repeat(200)}ari@example.com`;
+  findMany.mockRejectedValue(adversarial);
+
+  const result = await resolvePeerReportEnhancements({
+    db,
+    report,
+    templateId: "tpl-lva",
+    reportStylesAvailable: true,
+    peerBenchmarksEnabled: true,
+    enabledAliases: [LVA_TEMPLATE_ALIAS],
+    logger: { warn },
+  });
+
+  expect(result.report).toBe(report);
+  expect(warn).toHaveBeenCalledWith("assessment.peer_benchmark.unavailable", {
+    reason: "DB_ERROR",
+    templateAlias: LVA_TEMPLATE_ALIAS,
+    errorName: "UnknownError",
+  });
+  const serializedWarning = JSON.stringify(warn.mock.calls[0][1]);
+  expect(serializedWarning).not.toContain("ari@example.com");
+  expect(serializedWarning.length).toBeLessThan(256);
+});
+
 test("an unexpected SU Full builder exception retains the original report with bounded telemetry", async () => {
   const report = completeSuFullPeerReport();
   findMany.mockResolvedValue(completeSuFullBenchmarkRows());

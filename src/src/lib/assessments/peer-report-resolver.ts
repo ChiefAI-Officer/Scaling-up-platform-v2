@@ -83,8 +83,29 @@ function logUnavailable(
   }
 }
 
+const SAFE_ERROR_NAMES = new Set([
+  "Error",
+  "TypeError",
+  "RangeError",
+  "ReferenceError",
+  "SyntaxError",
+  "URIError",
+  "EvalError",
+  "AggregateError",
+  "AbortError",
+  "TimeoutError",
+  "PrismaClientKnownRequestError",
+  "PrismaClientUnknownRequestError",
+  "PrismaClientRustPanicError",
+  "PrismaClientInitializationError",
+  "PrismaClientValidationError",
+]);
+
 function errorName(error: unknown): string {
-  return error instanceof Error ? error.name : "UnknownError";
+  if (!(error instanceof Error) || !SAFE_ERROR_NAMES.has(error.name)) {
+    return "UnknownError";
+  }
+  return error.name;
 }
 
 /**

@@ -260,6 +260,79 @@ export function isSuFullPeerPresentation(
     );
 }
 
+/**
+ * Binds an internally valid presentation to the frozen result it accompanies.
+ * This is used at untrusted JSON boundaries so a coherent presentation from a
+ * different result cannot be substituted. It validates only and never repairs.
+ */
+export function isSuFullPeerPresentationForReport(
+  value: unknown,
+  report: unknown,
+): value is SuFullPeerPresentation {
+  if (
+    !isSuFullPeerPresentation(value)
+    || !isRecord(report)
+    || report.templateAlias !== SCALING_UP_FULL_TEMPLATE_ALIAS
+    || !isRecord(report.result)
+    || !Array.isArray(report.result.perQuestion)
+  ) {
+    return false;
+  }
+
+  const result = report.result;
+  const scoreRows = result.perQuestion;
+  const frozenRows = scoreRows.filter(
+    (row) => isRecord(row) && row.peerValue !== undefined,
+  );
+  if (value.provenance.legacy) {
+    return result.peerBenchmarkSnapshot === undefined && frozenRows.length === 0;
+  }
+
+  if (
+    !isRecord(result.peerBenchmarkSnapshot)
+    || scoreRows.length !== EXPECTED_KEYS.length
+    || frozenRows.length !== EXPECTED_KEYS.length
+  ) {
+    return false;
+  }
+  const snapshot = result.peerBenchmarkSnapshot;
+  if (
+    snapshot.sourceId !== value.provenance.sourceId
+    || snapshot.contentHash !== value.provenance.contentHash
+    || snapshot.phase !== value.provenance.phase
+    || result.recommendationPhase !== value.provenance.phase
+  ) {
+    return false;
+  }
+
+  const resultPeersByKey = new Map<string, number>();
+  for (const row of frozenRows) {
+    if (
+      !isRecord(row)
+      || typeof row.stableKey !== "string"
+      || !isPeerValue(row.peerValue)
+      || resultPeersByKey.has(row.stableKey)
+    ) {
+      return false;
+    }
+    resultPeersByKey.set(row.stableKey, row.peerValue);
+  }
+  if (!hasExactlyExpectedKeys([...resultPeersByKey.keys()])) return false;
+
+  const presentationPeersByKey = new Map(
+    value.sections.flatMap((section) =>
+      section.questions.map((question) => [
+        question.stableKey,
+        question.peers,
+      ] as const),
+    ),
+  );
+  return EXPECTED_KEYS.every(
+    (stableKey) =>
+      resultPeersByKey.get(stableKey) === presentationPeersByKey.get(stableKey),
+  );
+}
+
 function buildPresentationFromValues(
   report: RespondentReport,
   sliderQuestionEntries: Array<[string, FrozenQuestionMeta]>,

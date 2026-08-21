@@ -54,20 +54,29 @@ function completePeerPresentation() {
 }
 
 function completePhaseFourPeerPresentation() {
+  return completeGovernedPeerPresentation(4);
+}
+
+function completeGovernedPeerReport(phase: 3 | 4) {
   const report = completeSuFullPeerReport();
   report.result = {
     ...report.result,
-    recommendationPhase: 4,
+    recommendationPhase: phase,
     peerBenchmarkSnapshot: {
       sourceId: SU_FULL_PHASE_PEER_SOURCE_ID,
-      contentHash: SU_FULL_PHASE_PEER_CONTENT_HASHES[4],
-      phase: 4,
+      contentHash: SU_FULL_PHASE_PEER_CONTENT_HASHES[phase],
+      phase,
     },
     perQuestion: report.result.perQuestion.map((row) => ({
       ...row,
-      peerValue: SU_FULL_PHASE_PEER_VECTORS[4][row.stableKey],
+      peerValue: SU_FULL_PHASE_PEER_VECTORS[phase][row.stableKey],
     })),
   };
+  return report;
+}
+
+function completeGovernedPeerPresentation(phase: 3 | 4) {
+  const report = completeGovernedPeerReport(phase);
   const built = buildSuFullPeerPresentationResult({ report });
   if (built.status !== "ready") throw new Error(built.reason);
   return built.presentation;
@@ -79,7 +88,7 @@ const sampleReport = {
   reportStyle: "CLASSIC",
   assessmentName: "Scaling Up Full",
   submittedAt: new Date("2026-07-29T10:30:00.000Z"),
-  result: { countAchieved: 12 },
+  result: completeSuFullPeerReport().result,
   degraded: false,
   suFullPeerPresentation: completePeerPresentation(),
 };
@@ -144,6 +153,71 @@ describe("round trip", () => {
       sampleReport.suFullPeerPresentation,
     );
     expect(revived?.submittedAt).toBeInstanceOf(Date);
+  });
+
+  it("preserves a governed presentation only when it matches the same frozen result", () => {
+    const report = completeGovernedPeerReport(4);
+    const presentation = completeGovernedPeerPresentation(4);
+
+    const revived = reviveOnScreenReport({
+      ...report,
+      suFullPeerPresentation: presentation,
+    });
+
+    expect(revived?.suFullPeerPresentation).toEqual(presentation);
+  });
+
+  it("discards an exact legacy presentation attached to a governed P4 result", () => {
+    const revived = reviveOnScreenReport({
+      ...completeGovernedPeerReport(4),
+      suFullPeerPresentation: completePeerPresentation(),
+    });
+
+    expect(revived?.suFullPeerPresentation).toBeUndefined();
+  });
+
+  it("discards a coherent P3 presentation attached to a governed P4 result", () => {
+    const revived = reviveOnScreenReport({
+      ...completeGovernedPeerReport(4),
+      suFullPeerPresentation: completeGovernedPeerPresentation(3),
+    });
+
+    expect(revived?.suFullPeerPresentation).toBeUndefined();
+  });
+
+  it("discards a governed presentation when one frozen result peer value was substituted", () => {
+    const report = completeGovernedPeerReport(4);
+    report.result.perQuestion[0].peerValue = 6.5;
+
+    const revived = reviveOnScreenReport({
+      ...report,
+      suFullPeerPresentation: completeGovernedPeerPresentation(4),
+    });
+
+    expect(revived?.suFullPeerPresentation).toBeUndefined();
+  });
+
+  it.each([
+    ["snapshot provenance", (report: ReturnType<typeof completeSuFullPeerReport>) => {
+      report.result.peerBenchmarkSnapshot = {
+        sourceId: SU_FULL_PHASE_PEER_SOURCE_ID,
+        contentHash: SU_FULL_PHASE_PEER_CONTENT_HASHES[4],
+        phase: 4,
+      };
+    }],
+    ["one frozen peer row", (report: ReturnType<typeof completeSuFullPeerReport>) => {
+      report.result.perQuestion[0].peerValue = 6.3;
+    }],
+  ])("discards a legacy presentation when its result declares %s", (_case, mutate) => {
+    const report = completeSuFullPeerReport();
+    mutate(report);
+
+    const revived = reviveOnScreenReport({
+      ...report,
+      suFullPeerPresentation: completePeerPresentation(),
+    });
+
+    expect(revived?.suFullPeerPresentation).toBeUndefined();
   });
 
   it("preserves the frozen peer snapshot and all values through native JSON plus report revival", () => {
