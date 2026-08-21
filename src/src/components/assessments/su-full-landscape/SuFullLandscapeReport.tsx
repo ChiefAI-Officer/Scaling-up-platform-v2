@@ -14,6 +14,7 @@ import {
   SuFullLandscapePage,
   type SuFullLandscapeFooterBrand,
 } from "@/components/assessments/su-full-landscape/SuFullLandscapePages";
+import { ReportHtmlSection } from "@/components/assessments/ReportHtmlSection";
 
 const PEER_DISCLOSURE = "Peers are a current benchmark reference. Values are not yet matched to company size, growth phase, geography, or industry.";
 
@@ -95,6 +96,24 @@ function PrefacePage({ number, footerBrand }: { number: number; footerBrand: SuF
         peer values are shown only as the current benchmark reference described
         in this report.
       </p>
+    </SuFullLandscapePage>
+  );
+}
+
+function CustomHtmlPage({
+  report,
+  position,
+  html,
+  number,
+}: {
+  report: RespondentReport;
+  position: "introduction" | "conclusion";
+  html: string;
+  number: number;
+}) {
+  return (
+    <SuFullLandscapePage number={number} footerBrand={report}>
+      <ReportHtmlSection position={position} html={html} />
     </SuFullLandscapePage>
   );
 }
@@ -303,7 +322,9 @@ export function SuFullLandscapeReport({
         {model.pages.map((page) => {
         switch (page.kind) {
           case "cover": return <CoverPage key={page.number} number={page.number} report={report} />;
-          case "preface": return <PrefacePage key={page.number} number={page.number} footerBrand={report} />;
+          case "preface": return report.reportHtml?.introductionHtml
+            ? <CustomHtmlPage key={page.number} number={page.number} report={report} position="introduction" html={report.reportHtml.introductionHtml} />
+            : <PrefacePage key={page.number} number={page.number} footerBrand={report} />;
           case "contents": return <ContentsPage key={page.number} number={page.number} footerBrand={report} />;
           case "introduction": return <IntroductionPage key={page.number} number={page.number} report={report} model={model} />;
           case "profile": return <ProfilePage key={page.number} number={page.number} model={model} footerBrand={report} />;
@@ -314,7 +335,9 @@ export function SuFullLandscapeReport({
             return <ChapterPage chapter={chapter} key={page.number} number={page.number} footerBrand={report} />;
           }
           case "detail": return <DetailPage key={page.number} page={page} questions={questions} footerBrand={report} />;
-          case "conclusion": return <ConclusionPage key={page.number} number={page.number} report={report} model={model} contactEmail={contactEmail} />;
+          case "conclusion": return report.reportHtml?.conclusionHtml
+            ? <CustomHtmlPage key={page.number} number={page.number} report={report} position="conclusion" html={report.reportHtml.conclusionHtml} />
+            : <ConclusionPage key={page.number} number={page.number} report={report} model={model} contactEmail={contactEmail} />;
           case "appendix": return <AppendixPage key={page.number} number={page.number} model={model} footerBrand={report} />;
           default: {
             const impossible: never = page;

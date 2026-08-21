@@ -16,6 +16,8 @@ import {
   ReportIdentityHeader,
   ReportProvenance,
 } from "@/components/assessments/report-styles/ReportSharedContent";
+import { ReportHtmlSection } from "@/components/assessments/ReportHtmlSection";
+import type { SafeReportHtml } from "@/lib/assessments/report-html";
 
 function comparisonLabels(
   presentation: IndividualReportPresentation,
@@ -45,13 +47,17 @@ function comparisonLabels(
 export function ModernDashboardReport({
   presentation,
   comparison,
+  reportHtml,
   responsiveEnabled = false,
 }: {
   presentation: IndividualReportPresentation;
   comparison?: ReportComparisonModel | null;
+  reportHtml?: SafeReportHtml;
   responsiveEnabled?: boolean;
 }) {
-  const { summary, detail } = partitionReportBlocks(presentation.blocks);
+  const { summary, detail } = partitionReportBlocks(presentation.blocks, {
+    replaceConclusion: Boolean(reportHtml?.conclusionHtml),
+  });
   const coverBlocks = summary.filter((block) => block.kind === "score-summary");
   const summaryBlocks = summary.filter((block) => block.kind !== "score-summary");
 
@@ -70,6 +76,12 @@ export function ModernDashboardReport({
         <ReportBlocks blocks={coverBlocks} />
         <ReportProvenance presentation={presentation} />
       </section>
+      {reportHtml?.introductionHtml ? (
+        <section className="report-page report-page--dashboard-introduction report-page-break">
+          <ReportHtmlSection position="introduction" html={reportHtml.introductionHtml} />
+          <ReportProvenance presentation={presentation} />
+        </section>
+      ) : null}
       {summaryBlocks.length > 0 ? (
         <section className="report-page report-page--dashboard-summary report-page-break">
           <ReportBlocks blocks={summaryBlocks} />
@@ -89,6 +101,12 @@ export function ModernDashboardReport({
       {detail.length > 0 ? (
         <section className="report-page report-page--dashboard-detail report-page-break">
           <ReportBlocks blocks={detail} />
+          <ReportProvenance presentation={presentation} />
+        </section>
+      ) : null}
+      {reportHtml?.conclusionHtml ? (
+        <section className="report-page report-page--dashboard-conclusion report-page-break">
+          <ReportHtmlSection position="conclusion" html={reportHtml.conclusionHtml} />
           <ReportProvenance presentation={presentation} />
         </section>
       ) : null}

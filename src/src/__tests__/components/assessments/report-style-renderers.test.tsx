@@ -334,6 +334,36 @@ function scalingUpFullReport(reportStyle: string): RespondentReport {
 }
 
 describe("adaptive alternate report renderers", () => {
+  it.each(renderers)(
+    "%s wraps generated detail with custom HTML and keeps provenance last",
+    (_, Renderer) => {
+      const { container } = render(
+        <Renderer
+          presentation={scoredPresentation}
+          reportHtml={{
+            introductionHtml: "<p>Alternate custom introduction</p>",
+            conclusionHtml: "<p>Alternate custom conclusion</p>",
+          }}
+        />,
+      );
+
+      expect(screen.getByText("Alternate custom introduction")).toBeInTheDocument();
+      expect(screen.getByText("Alternate custom conclusion")).toBeInTheDocument();
+      expect(container.querySelector('[data-report-block="coach-cta"]')).toBeNull();
+      expect(container.querySelector('[data-report-block="closing"]')).toBeNull();
+      const intro = screen.getByTestId("report-html-introduction");
+      const generated = screen.getByText("Operating rhythm");
+      const conclusion = screen.getByTestId("report-html-conclusion");
+      expect(intro.compareDocumentPosition(generated) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(generated.compareDocumentPosition(conclusion) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      const lastPage = container.querySelector(".report-page:last-child");
+      expect(lastPage?.lastElementChild).toHaveAttribute(
+        "data-testid",
+        "report-style-provenance",
+      );
+    },
+  );
+
   it.each([
     ["EXECUTIVE_BOARDROOM", "executive-boardroom-report"],
     ["MODERN_DASHBOARD", "modern-dashboard-report"],

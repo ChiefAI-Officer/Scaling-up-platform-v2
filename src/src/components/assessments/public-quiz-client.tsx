@@ -118,6 +118,8 @@ interface PublicQuizClientProps {
   marketingResultConfig?: PublicMarketingResultConfig | null;
   /** Server-resolved fragments from this campaign's pinned version. */
   reportHtml?: SafeReportHtml;
+  /** Composite successor decision resolved by the server page. */
+  reportHtmlExperienceActive?: boolean;
 }
 
 type Step = "intro" | "info" | "form" | "results" | "error";
@@ -139,6 +141,7 @@ export function PublicQuizClient({
   qspStoryGroupEnabled = false,
   marketingResultConfig = null,
   reportHtml = { introductionHtml: null, conclusionHtml: null },
+  reportHtmlExperienceActive = false,
 }: PublicQuizClientProps) {
   const sections = useMemo(() => toSections(rawSections), [rawSections]);
   const questions = useMemo(() => toQuestions(rawQuestions), [rawQuestions]);
@@ -489,7 +492,11 @@ export function PublicQuizClient({
                   Math.max(0, Math.min(100, results.overallAverage * 10))
                 }
                 scoreBands={marketingResultConfig.scoreBands}
-                marketingCta={marketingResultConfig.marketingCta}
+                marketingCta={
+                  reportHtmlExperienceActive
+                    ? null
+                    : marketingResultConfig.marketingCta
+                }
                 referringCoachEmail={verifiedCoachEmail}
               />
             )}

@@ -16,6 +16,8 @@ import {
   ReportIdentityHeader,
   ReportProvenance,
 } from "@/components/assessments/report-styles/ReportSharedContent";
+import { ReportHtmlSection } from "@/components/assessments/ReportHtmlSection";
+import type { SafeReportHtml } from "@/lib/assessments/report-html";
 
 function comparisonLabels(
   presentation: IndividualReportPresentation,
@@ -45,13 +47,17 @@ function comparisonLabels(
 export function ExecutiveBoardroomReport({
   presentation,
   comparison,
+  reportHtml,
   responsiveEnabled = false,
 }: {
   presentation: IndividualReportPresentation;
   comparison?: ReportComparisonModel | null;
+  reportHtml?: SafeReportHtml;
   responsiveEnabled?: boolean;
 }) {
-  const { summary, detail } = partitionReportBlocks(presentation.blocks);
+  const { summary, detail } = partitionReportBlocks(presentation.blocks, {
+    replaceConclusion: Boolean(reportHtml?.conclusionHtml),
+  });
 
   return (
     <article
@@ -67,6 +73,12 @@ export function ExecutiveBoardroomReport({
         <ComparisonCoverSubtitle comparison={comparison} />
         <ReportProvenance presentation={presentation} />
       </section>
+      {reportHtml?.introductionHtml ? (
+        <section className="report-page report-page--executive-introduction report-page-break">
+          <ReportHtmlSection position="introduction" html={reportHtml.introductionHtml} />
+          <ReportProvenance presentation={presentation} />
+        </section>
+      ) : null}
       {summary.length > 0 ? (
         <section className="report-page report-page--executive-summary report-page-break">
           <ReportBlocks blocks={summary} />
@@ -86,6 +98,12 @@ export function ExecutiveBoardroomReport({
       {detail.length > 0 ? (
         <section className="report-page report-page--executive-detail report-page-break">
           <ReportBlocks blocks={detail} />
+          <ReportProvenance presentation={presentation} />
+        </section>
+      ) : null}
+      {reportHtml?.conclusionHtml ? (
+        <section className="report-page report-page--executive-conclusion report-page-break">
+          <ReportHtmlSection position="conclusion" html={reportHtml.conclusionHtml} />
           <ReportProvenance presentation={presentation} />
         </section>
       ) : null}

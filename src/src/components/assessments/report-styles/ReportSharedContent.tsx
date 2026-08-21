@@ -355,6 +355,7 @@ export function ReportBlocks({
 
 export function partitionReportBlocks(
   blocks: readonly IndividualReportBlock[],
+  options: { replaceConclusion?: boolean } = {},
 ): {
   summary: IndividualReportBlock[];
   detail: IndividualReportBlock[];
@@ -363,6 +364,12 @@ export function partitionReportBlocks(
   const detail: IndividualReportBlock[] = [];
 
   for (const block of blocks) {
+    if (
+      options.replaceConclusion === true &&
+      (block.kind === "coach-cta" || block.kind === "closing")
+    ) {
+      continue;
+    }
     if (
       block.kind === "score-summary" ||
       (block.kind === "metric-group" && block.role === "domain")

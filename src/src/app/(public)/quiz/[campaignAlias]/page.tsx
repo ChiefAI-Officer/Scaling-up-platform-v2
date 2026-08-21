@@ -18,6 +18,7 @@ import { isQspStoryGroupEnabled } from "@/lib/assessments/wave-48-flags";
 import { isPublicMarketingCtaEnabled } from "@/lib/assessments/wave-public-marketing-cta-flags";
 import { loadPublicMarketingResultConfig } from "@/lib/assessments/public-marketing-result";
 import { resolveActiveReportHtml } from "@/lib/assessments/report-html";
+import { isReportHtmlExperienceEnabled } from "@/lib/assessments/wave-report-html-authoring-flags";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -91,6 +92,7 @@ export default async function PublicQuizPage({
     campaign.template.deliveryType === "PUBLIC_MARKETING_QUIZ"
       ? loadPublicMarketingResultConfig(version.reportConfig)
       : null;
+  const reportHtmlExperienceActive = isReportHtmlExperienceEnabled();
 
   // Render the client directly (no constrained wrapper) so the full-bleed
   // branded welcome shell matches the org-survey flow + the approved mockup.
@@ -110,6 +112,7 @@ export default async function PublicQuizPage({
       customSlides={customSlides}
       marketingResultConfig={marketingResultConfig}
       reportHtml={resolveActiveReportHtml(version.reportConfig)}
+      reportHtmlExperienceActive={reportHtmlExperienceActive}
       {...(isReferredResultsEnabled()
         ? { referredResultsEnabled: true }
         : {})}

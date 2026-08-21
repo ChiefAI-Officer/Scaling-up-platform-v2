@@ -12,6 +12,7 @@
 import React from "react";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import type { ScoreResult } from "@/lib/assessments/scoring";
+import { createMarketingCtaPreset } from "@/lib/assessments/marketing-cta";
 
 // ── crypto.randomUUID stub (jsdom ships without it) ──────────────────────
 Object.defineProperty(globalThis, "crypto", {
@@ -343,7 +344,9 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
   // vacuously. The third test covers the qualitative dispatch, which is the
   // starkest consequence (a wholly different renderer) and was otherwise
   // exercised by nothing.
-  async function submitAndRender(props: { templateAlias?: string } = {}) {
+  async function submitAndRender(
+    props: Partial<React.ComponentProps<typeof PublicQuizClient>> = {},
+  ) {
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -404,6 +407,26 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
       "href",
       "https://scalingup.com/book/",
     );
+  });
+
+  it("keeps score bands but suppresses the structured CTA in the successor experience", async () => {
+    await submitAndRender({
+      reportHtmlExperienceActive: true,
+      reportHtml: {
+        introductionHtml: null,
+        conclusionHtml: "<p>Canonical report conclusion</p>",
+      },
+      marketingResultConfig: {
+        scoreBands: [
+          { min: 0, max: 100, label: "Score guide", headline: "Your result", body: "Use the report." },
+        ],
+        marketingCta: createMarketingCtaPreset("FULL_MARKETING"),
+      },
+    });
+
+    expect(screen.getByText("Canonical report conclusion")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Score guide" })).toBeInTheDocument();
+    expect(document.querySelector(".public-marketing-cta-blocks")).toBeNull();
   });
 
   // ── T7-3: POST body includes idempotencyKey ──────────────────────────────

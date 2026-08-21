@@ -149,6 +149,35 @@ test("falls back to the frozen referring coach email when no explicit contact is
     .toHaveAttribute("href", "mailto:referrer@example.com");
 });
 
+test("replaces the landscape preface and conclusion pages with custom HTML", () => {
+  const report = {
+    ...completeSuFullLandscapeReport(),
+    reportHtml: {
+      introductionHtml: "<h2>Landscape custom introduction</h2>",
+      conclusionHtml: "<h2>Landscape custom conclusion</h2>",
+    },
+  };
+  const presentation = completeSuFullLandscapePresentation(report);
+  const model = buildSuFullLandscapeReportModel({ report, presentation, resolvedStyle: "CLASSIC" });
+  if (!model) throw new Error("The canonical landscape fixture must build");
+
+  render(<SuFullLandscapeReport report={report} model={model} />);
+
+  expect(screen.getByTestId("su-full-landscape-page-2")).toHaveTextContent(
+    "Landscape custom introduction",
+  );
+  expect(screen.getByTestId("su-full-landscape-page-2")).not.toHaveTextContent(
+    "This report turns your submitted assessment",
+  );
+  expect(screen.getByTestId("su-full-landscape-page-25")).toHaveTextContent(
+    "Landscape custom conclusion",
+  );
+  expect(screen.getByTestId("su-full-landscape-page-25")).not.toHaveTextContent(
+    "Choose one priority from the feedback",
+  );
+  expect(screen.getAllByTestId(/^su-full-landscape-page-/)).toHaveLength(26);
+});
+
 test("keeps the landscape renderer's A4 print and responsive screen contract scoped", () => {
   const stylesheet = readFileSync(
     join(process.cwd(), "src", "styles", "su-report.css"),

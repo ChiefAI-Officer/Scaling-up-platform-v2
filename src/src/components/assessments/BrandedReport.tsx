@@ -304,6 +304,7 @@ export function BrandedReport({
         <ExecutiveBoardroomReport
           presentation={presentation()}
           comparison={comparison}
+          reportHtml={report.reportHtml}
           responsiveEnabled={responsiveEnabled}
         />
       );
@@ -314,6 +315,7 @@ export function BrandedReport({
         <ModernDashboardReport
           presentation={presentation()}
           comparison={comparison}
+          reportHtml={report.reportHtml}
           responsiveEnabled={responsiveEnabled}
         />
       );
