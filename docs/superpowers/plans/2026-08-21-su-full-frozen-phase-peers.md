@@ -21,7 +21,7 @@
 - Historical results with neither a snapshot nor any `peerValue` use the executable `2026-08-14.esperto-controlled-v1` baseline without rewriting results or repinning campaigns.
 - A declared but incomplete, invalid, or hash-mismatched snapshot omits Peers and emits a structured reason; it must not fall back to baseline or query mutable rows.
 - LVA benchmark lookup and rendering remain byte-for-byte unchanged.
-- Layout A means question, clearly labelled You/Peers bars, then frozen feedback. Preserve Scaling Up branding, the landscape architecture, and the 26-page contract; the local prototype is not application code.
+- Layout A means question, clearly labelled You/Peers bars, then the selected Esperto feedback paragraph with no added heading. Preserve Scaling Up branding, the landscape architecture, and the 26-page contract; the local prototype is not application code.
 - The disclosure is exactly: `Peers are a governed benchmark snapshot selected by organizational phase and frozen when this result was scored. This is not an industry-, geography-, or cohort-matched comparison.`
 - Do not add a dependency or Prisma migration.
 - Draft creation, publication, push, PR, deploy, activation, production mutation, and external communications are separate approval gates. This implementation plan authorizes none of them.
@@ -529,10 +529,12 @@ expect(screen.getByText(question.label)).toBeVisible();
 const detail = screen.getByTestId(`su-full-detail-${question.stableKey}`);
 expect(within(detail).getByText("You")).toBeVisible();
 expect(within(detail).getByText("Peers")).toBeVisible();
-expect(within(detail).getByText("Frozen feedback")).toBeVisible();
-expect(within(detail).getByText("Frozen feedback").compareDocumentPosition(
-  within(detail).getByText("Peers"),
-) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+const paragraph = detail.querySelector(".su-full-landscape-feedback");
+expect(paragraph).toHaveTextContent(question.recommendation);
+expect(within(detail).queryByText("Frozen feedback", { selector: "strong" }))
+  .not.toBeInTheDocument();
+expect(within(detail).getByText("Peers").compareDocumentPosition(paragraph)
+  & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 ```
 
 Assert the exact disclosure string, `Phase P4` for a new P4 result, `Legacy baseline` for a historical result, omission of all Peer UI for an unavailable presentation, 26 pages in browser and PDF modes, no clipping at 1280×720 and 390×844, and identical numeric Peer values in on-screen and print markup.
@@ -553,9 +555,7 @@ Keep the current detail order and make it explicit:
 <article data-testid={`su-full-detail-${question.stableKey}`}>
   <h3>{question.label}</h3>
   <SuFullDetailPairedBars chapterKey={page.chapterKey} question={question} />
-  <p className="su-full-landscape-feedback">
-    <strong>Frozen feedback</strong> {question.recommendation}
-  </p>
+  <p className="su-full-landscape-feedback">{question.recommendation}</p>
 </article>
 ```
 

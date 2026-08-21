@@ -119,15 +119,16 @@ test("renders the fixed 26-page landscape composition with truthful peer context
     const bars = within(detail).getByTestId(
       `su-landscape-detail-bars-${detail.dataset.questionKey}`,
     );
+    const paragraph = detail.querySelector(".su-full-landscape-feedback");
     expect(
       detail.compareDocumentPosition(bars) & Node.DOCUMENT_POSITION_CONTAINED_BY,
     ).toBe(Node.DOCUMENT_POSITION_CONTAINED_BY);
-    expect(detail.textContent?.indexOf("You")).toBeLessThan(
-      detail.textContent?.indexOf("Frozen feedback") ?? -1,
-    );
+    expect(paragraph).toBeInTheDocument();
     expect(within(detail).getByText("Peers").compareDocumentPosition(
-      within(detail).getByText("Frozen feedback"),
+      paragraph!,
     ) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(detail).queryByText("Frozen feedback", { selector: "strong" }))
+      .not.toBeInTheDocument();
     const question = model.chapters.flatMap((chapter) => chapter.questions)
       .find((candidate) => candidate.stableKey === detail.dataset.questionKey);
     if (!question) throw new Error(`Missing fixture question ${detail.dataset.questionKey}`);

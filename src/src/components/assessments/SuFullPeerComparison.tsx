@@ -103,7 +103,6 @@ function SuFullPeerDetails({
                 className="su-peer-feedback"
                 data-testid={`su-full-peer-feedback-${question.stableKey}`}
               >
-                <h4 className="su-peer-feedback-title">Frozen feedback</h4>
                 <p>{question.recommendation}</p>
               </div>
             ) : null}

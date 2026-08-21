@@ -161,7 +161,7 @@ function IntroductionPage({ report, model, number }: {
           <p>{model.growthPhase.name}</p>
         </section>
       ) : null}
-      <p>Read each chapter as a focused conversation: compare the values, review the frozen feedback, then choose the next useful action.</p>
+      <p>Read each chapter as a focused conversation: compare the values, review your feedback, then choose the next useful action.</p>
     </SuFullLandscapePage>
   );
 }
@@ -255,7 +255,7 @@ function DetailPage({
           >
             <h3>{question.label}</h3>
             <SuFullDetailPairedBars chapterKey={page.chapterKey} question={question} />
-            <p className="su-full-landscape-feedback"><strong>Frozen feedback</strong> {question.recommendation}</p>
+            <p className="su-full-landscape-feedback">{question.recommendation}</p>
           </article>
         );
       })}

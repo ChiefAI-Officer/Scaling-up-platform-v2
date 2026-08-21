@@ -63,7 +63,7 @@ function renderLandscape(report = completeSuFullLandscapeReport()) {
   return model;
 }
 
-test("renders every detail card as question then explicit You/Peers bars then frozen feedback", () => {
+test("renders every detail card as question then You/Peers bars then the Esperto paragraph without an added heading", () => {
   const model = renderLandscape(reportForPhase(4));
   const question = model.chapters[0].questions[0];
   const detail = screen.getByTestId(`su-full-landscape-detail-${question.stableKey}`);
@@ -71,10 +71,13 @@ test("renders every detail card as question then explicit You/Peers bars then fr
   expect(within(detail).getByText(question.label)).toBeVisible();
   expect(within(detail).getByText("You")).toBeVisible();
   expect(within(detail).getByText("Peers")).toBeVisible();
-  expect(within(detail).getByText("Frozen feedback")).toBeVisible();
+  const paragraph = detail.querySelector(".su-full-landscape-feedback");
+  expect(paragraph).toHaveTextContent(question.recommendation!);
+  expect(within(detail).queryByText("Frozen feedback", { selector: "strong" }))
+    .not.toBeInTheDocument();
   expect(
     within(detail).getByText("Peers").compareDocumentPosition(
-      within(detail).getByText("Frozen feedback"),
+      paragraph!,
     ) & Node.DOCUMENT_POSITION_FOLLOWING,
   ).toBeTruthy();
   expect(within(detail).getByText("6.6")).toBeVisible();

@@ -702,7 +702,7 @@ describe("BrandedReport — recommendations", () => {
     expect(screen.getByTestId("report-recommendations")).toHaveTextContent(
       "Keep the non-slider finding visible.",
     );
-    expect(screen.getAllByText("Frozen feedback Q01")).toHaveLength(1);
+    expect(screen.getAllByText("Esperto feedback Q01")).toHaveLength(1);
   });
 });
 

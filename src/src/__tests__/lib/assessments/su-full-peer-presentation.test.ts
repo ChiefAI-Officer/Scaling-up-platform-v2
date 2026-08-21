@@ -75,7 +75,7 @@ test("renders all 61 frozen P4 peers with their stored provenance", () => {
   expect(result.presentation.sections[0].questions[0]).toMatchObject({
     stableKey: "Q01",
     peers: 6.6,
-    recommendation: "Frozen feedback Q01",
+    recommendation: "Esperto feedback Q01",
   });
   expect(result.presentation.provenance).toEqual({
     sourceId: "2026-08-20.esperto-five-phase-peers-v1",

@@ -183,7 +183,8 @@ Keep the Scaling Up Full question-detail sequence as:
 
 1. the question;
 2. clearly labelled **You** and **Peers** bars; and
-3. the frozen answer/feedback directly beneath the bars.
+3. the selected Esperto feedback paragraph directly beneath the bars, without an
+   added heading.
 
 This implements Jeff's specific August 13 direction to mimic that Esperto flow. It
 does not authorize a pixel-for-pixel clone or a wholesale Esperto restyle: on August

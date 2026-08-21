@@ -236,18 +236,45 @@ Standard PNG artifact names were produced under the temporary local path
 and `corrupt-{desktop,mobile,print}.png`. PDFs were created in a temporary
 `su-full-phase-peer-browser-*` directory as `{p3,p4,p5,historical}.pdf`.
 
-The inspected output retained the approved question -> You/Peers bars -> Frozen
-feedback order, had no horizontal overflow, used one mobile detail column, showed P4
-Q01 as 6.6 and P3/P5/historical Q01 as 6.3, and reported exactly 26 pages for all
-four valid PDFs. Corrupt input rendered the classic fallback with no landscape peer
-sequence, disclosure, or provenance. All 27 detail-card contrast samples met the
-test's 3:1 non-text and 4.5:1 numeric-value thresholds.
+The inspected output retained the approved question -> You/Peers bars -> selected
+Esperto paragraph order with no added heading, had no horizontal overflow, used one
+mobile detail column, showed P4 Q01 as 6.6 and P3/P5/historical Q01 as 6.3, and
+reported exactly 26 pages for all four valid PDFs. Corrupt input rendered the classic
+fallback with no landscape peer sequence, disclosure, or provenance. All 27
+detail-card contrast samples met the test's 3:1 non-text and 4.5:1 numeric-value
+thresholds.
 
-The PNGs and PDFs were inspection artifacts, removed after Task 6 review, and are
-not claimed as durable repository files. Durable evidence is the typed browser test,
-Task 6 report at
+The Task 6 PNGs and PDFs were inspection artifacts and were removed after that review.
+The final user-directed heading revision regenerated the standard PNGs locally for
+visual approval; they remain temporary and untracked and must be removed before any
+push or PR. Durable evidence is the typed browser test, Task 6 report at
 `.superpowers/sdd/2026-08-21-su-full-frozen-phase-peers/task-6-report.md`, and this
 receipt.
+
+## Final local preview fidelity revision
+
+Final user review established that `Frozen feedback` was platform-authored
+engineering terminology rather than Esperto report copy. Both Classic Scaling Up Full
+peer renderers now place the selected source paragraph directly beneath the You/Peers
+bars without an added heading. The landscape introduction says `review your feedback`;
+the stored-result immutability, phase/score lookup, Peer values, provenance, disclosure,
+and 26-page composition are unchanged.
+
+Strict TDD preceded the production edit. The focused RED run failed 3 tests for the
+intended existing `<h4>` / `<strong>` labels while 17 tests passed. After the minimal
+edit, the same two suites passed 20/20. The final local verification then passed:
+
+- affected component/model/browser matrix: **6/6 suites, 93/93 tests, 1/1 snapshot**;
+- changed TypeScript/TSX ESLint: exit `0`, zero diagnostics;
+- migration safety: exit `0`, all **49 migrations** approved;
+- changelog freshness: **1/1 suite, 4/4 tests**;
+- `git diff --check`: exit `0`; and
+- `CI=true npx next build --turbopack`: exit `0`, compiled in 19.0s, passed
+  TypeScript, and generated **95/95** static pages.
+
+The build retained only the established non-fatal local diagnostics. No lifecycle,
+database, push, PR, draft, publication, deployment, activation, Production mutation,
+or external communication occurred.
 
 ## Rulings and costs
 

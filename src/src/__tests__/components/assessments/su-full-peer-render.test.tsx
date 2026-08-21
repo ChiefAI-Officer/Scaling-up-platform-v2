@@ -88,11 +88,12 @@ test("keeps the shipped Classic SU Full peer sequence while the landscape gate i
   expect(
     bars.compareDocumentPosition(feedback) & Node.DOCUMENT_POSITION_FOLLOWING,
   ).toBeTruthy();
-  expect(feedback).toHaveTextContent("Frozen feedback Q01");
-  expect(within(feedback).getByText("Frozen feedback")).toBeVisible();
+  expect(feedback).toHaveTextContent("Esperto feedback Q01");
+  expect(within(feedback).queryByRole("heading")).not.toBeInTheDocument();
+  expect(feedback.querySelector("p")).toHaveTextContent("Esperto feedback Q01");
 
   expect(screen.queryByTestId("report-sections")).not.toBeInTheDocument();
-  expect(screen.getAllByText("Frozen feedback Q01")).toHaveLength(1);
+  expect(screen.getAllByText("Esperto feedback Q01")).toHaveLength(1);
 });
 
 test("renders the complete Classic SU Full peer report as the landscape composition when the gate is ON", () => {
@@ -120,8 +121,15 @@ test("renders the complete Classic SU Full peer report as the landscape composit
   const details = screen.getAllByTestId(/^su-full-landscape-detail-Q/);
   expect(details).toHaveLength(61);
   for (const detail of details) {
-    expect(within(detail).getByTestId(`su-landscape-detail-bars-${detail.dataset.questionKey}`)).toBeInTheDocument();
-    expect(detail).toHaveTextContent("Frozen feedback");
+    const bars = within(detail).getByTestId(`su-landscape-detail-bars-${detail.dataset.questionKey}`);
+    const paragraph = detail.querySelector(".su-full-landscape-feedback");
+    expect(bars).toBeInTheDocument();
+    expect(paragraph).toBeInTheDocument();
+    expect(
+      bars.compareDocumentPosition(paragraph!) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(within(detail).queryByText("Frozen feedback", { selector: "strong" }))
+      .not.toBeInTheDocument();
   }
 });
 
@@ -222,7 +230,7 @@ test("keeps every overview and detail comparison explicit, identical, and indepe
 
 });
 
-test("omits blank frozen feedback without inventing placeholder copy", () => {
+test("omits blank stored feedback without inventing placeholder copy", () => {
   const report = completeSuFullPeerReport();
   const q01 = report.result.perQuestion.find(
     (question) => question.stableKey === "Q01",
@@ -304,7 +312,7 @@ test.each([
 
     expect(screen.getByTestId("report-sections")).toBeInTheDocument();
     expect(screen.getByTestId("report-recommendations")).toHaveTextContent(
-      "Frozen feedback Q01",
+      "Esperto feedback Q01",
     );
     expect(screen.queryByTestId("su-full-peer-sequence")).not.toBeInTheDocument();
     expect(document.querySelector(".su-landscape-vertical-chart")).toBeNull();
@@ -326,7 +334,7 @@ test("an invalid revived peer presentation falls back to the unchanged Classic r
 
   expect(screen.getByTestId("report-sections")).toBeInTheDocument();
   expect(screen.getByTestId("report-recommendations")).toHaveTextContent(
-    "Frozen feedback Q01",
+    "Esperto feedback Q01",
   );
   expect(screen.queryByTestId("su-full-peer-sequence")).not.toBeInTheDocument();
   expect(document.querySelector(".su-landscape-vertical-chart")).toBeNull();

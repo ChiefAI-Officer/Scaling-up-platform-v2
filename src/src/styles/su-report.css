@@ -2512,14 +2512,6 @@
   line-height: 1.6;
 }
 
-.su-report .su-peer-feedback-title {
-  margin: 0 0 5px;
-  color: #522583;
-  font-size: 12px;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
 .su-report .su-peer-feedback p,
 .su-report .su-peer-disclosure {
   margin: 0;

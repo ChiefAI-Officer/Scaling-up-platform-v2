@@ -601,7 +601,7 @@ describe("SU Full landscape browser and PDF contract", () => {
         if (!paragraph || !footer) throw new Error("Missing Q35 density targets");
         const paragraphStyle = getComputedStyle(paragraph);
         return {
-          characters: (paragraph.textContent ?? "").replace(/^Frozen feedback\s*/, "").length,
+          characters: (paragraph.textContent ?? "").length,
           paragraphBottom: paragraph.getBoundingClientRect().bottom,
           footerTop: footer.getBoundingClientRect().top,
           scrollHeight: paragraph.scrollHeight,
@@ -633,7 +633,7 @@ describe("SU Full landscape browser and PDF contract", () => {
       expect(info).toMatch(/^Page size:\s+841\.9\d* x 594\.9\d* pts \(A4\)$/m);
       const text = normalize(execFileSync("pdftotext", [pdfPath, "-"], { encoding: "utf8", maxBuffer: 20 * 1024 * 1024 }));
       expect(text).toContain("ScaleUp Score 55 / 100");
-      expect(text.match(/Frozen feedback/g)).toHaveLength(61);
+      expect(text).not.toContain("Frozen feedback");
       const searchableWords = normalizeWords(text);
       expect(searchableWords).toContain(normalizeWords(REPRESENTATIVE_482_CHARACTER_FEEDBACK));
       for (const frozen of report.result.perQuestion) {
