@@ -147,6 +147,12 @@ The report should say:
 > when this result was scored. This is not an industry-, geography-, or cohort-matched
 > comparison.
 
+Historical reports must instead say:
+
+> Peers use the governed historical baseline for reports scored before phase-aware
+> peer snapshots were frozen. This is not an industry-, geography-, or cohort-matched
+> comparison.
+
 The display may additionally show a concise source date or catalogue edition. It must
 not claim a level of peer matching the evidence does not establish.
 
