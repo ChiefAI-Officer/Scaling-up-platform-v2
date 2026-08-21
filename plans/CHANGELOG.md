@@ -6,6 +6,17 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="report-html-peers-integration-verified"></a>
+### 2026-08-21 — Report HTML authoring plus phase-aware Peers locally verified <!-- ENTRY_ISO:2026-08-21 ENTRY_SLUG:report-html-peers-integration-verified -->
+
+**Status: IMPLEMENTED + LOCALLY VERIFIED + DEFAULT-OFF; NOT PUSHED, REVIEWED, DEPLOYED, ACTIVATED, OR PUBLISHED.** The complete admin preview remains representative-only and uses the saved sanitized Welcome/Closing fragments with the production report renderer. Scaling Up Full keeps the phase-aware current disclosure (`Phase 4 · Delegation`) or the truthful historical disclosure (`Historical benchmark`); no respondent, campaign, organization, submission, lifecycle, or Production state was read or changed.
+
+**Combined authoring/Peers matrix.** Real Chromium and Poppler cover exactly ten cases: default, Welcome-only, Closing-only, both, and bounded long content crossed with current and historical peers. The long fixture holds exactly **2,100** visible Welcome characters and **850** visible Closing characters. Every matrix case has exactly **26 DOM pages**, no desktop/mobile horizontal-overflow offenders, no authored element outside its physical page, and a **26-page A4-landscape PDF**. Page 25 always retains `ScaleUp Score 55 / 100` plus strongest/focus copy before any custom Closing content. Current/historical wording and PDF text reject internal engineering terms. The deterministic task-owned evidence has **40 PNGs plus 10 PDFs** under untracked `src/output/report-html-peers-integration/`; inspected cases were default/current, both/current, long/current, both/historical, and long/historical on desktop, 390px mobile, page 25, and rendered PDF pages.
+
+**Guardrail proof and gates.** The required `900 → 800` temporary Closing visible-character mutation made exactly long/current and long/historical fail (13 passing); `900` was restored immediately with `apply_patch`. The combined focused matrix passed **26/26 suites, 687/687 tests, and 1/1 snapshot**. Full Jest passed **774/774 suites, 9,497/9,497 tests, and 16/16 snapshots**. Deterministic phase-peer generation/diff passed; migration safety approved all **49** migrations; changed-path plus Task-4 ESLint had zero diagnostics; and `CI=true ./node_modules/.bin/next build --turbopack` compiled in **17.7s**, passed TypeScript, and generated **95/95** pages. Expected local workspace-root, middleware deprecation, and missing Inngest-key diagnostics were non-fatal.
+
+**Boundary.** No flags or environments were changed; no publication/lifecycle/campaign action, Production mutation, deployment, external communication, push, or PR occurred. Whole-branch review and any authorized PR remain separate controller work.
+
 <a id="report-html-authoring-dark-release"></a>
 ### 2026-08-21 — Assessment report HTML authoring dark release <!-- ENTRY_ISO:2026-08-21 ENTRY_SLUG:report-html-authoring-dark-release -->
 

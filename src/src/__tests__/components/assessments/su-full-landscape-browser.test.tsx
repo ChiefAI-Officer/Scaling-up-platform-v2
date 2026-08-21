@@ -9,6 +9,7 @@ import { chromium, type Browser, type Page } from "playwright";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
+import { REPORT_HTML_PEER_FIXTURES } from "../../../../scripts/capture-report-html-peers-previews";
 import { BrandedReport } from "@/components/assessments/BrandedReport";
 import { ReportStyleScope } from "@/components/assessments/ReportStyleScope";
 import {
@@ -20,6 +21,7 @@ import {
   SU_FULL_PHASE_PEER_SOURCE_ID,
   getGovernedPeerValue,
 } from "@/lib/assessments/su-full-phase-peer-catalogue";
+import { prepareReportHtmlForStorage } from "@/lib/assessments/report-html";
 import type { GrowthPhaseNumber } from "@/lib/assessments/su-full-phase";
 
 jest.setTimeout(60_000);
@@ -123,6 +125,50 @@ async function horizontalOverflow(page: Page) {
       .filter((item) => item.left < -1 || item.right > document.documentElement.clientWidth + 1)
       .slice(0, 10),
   }));
+}
+
+async function authoredContentOutsidePhysicalPage(page: Page) {
+  return page.locator("[data-testid^='report-html-']").evaluateAll((sections) => sections.flatMap((section) => {
+    const physicalPage = section.closest<HTMLElement>("[data-page-number]");
+    if (!physicalPage) throw new Error("Authored report content is missing its physical page");
+    const pageRect = physicalPage.getBoundingClientRect();
+    return [section, ...section.querySelectorAll<HTMLElement>("*")].flatMap((element) => {
+      const rect = element.getBoundingClientRect();
+      const outside = rect.left < pageRect.left - 1
+        || rect.right > pageRect.right + 1
+        || rect.top < pageRect.top - 1
+        || rect.bottom > pageRect.bottom + 1;
+      return outside ? [{
+        page: physicalPage.dataset.pageNumber,
+        tag: element.tagName,
+        className: element.className,
+        left: rect.left,
+        right: rect.right,
+        top: rect.top,
+        bottom: rect.bottom,
+      }] : [];
+    });
+  }));
+}
+
+function reportWithAuthoringCase(
+  fixture: (typeof REPORT_HTML_PEER_FIXTURES)[number],
+) {
+  const prepared = prepareReportHtmlForStorage({
+    reportHtml: {
+      schemaVersion: 1,
+      introductionHtml: fixture.introductionHtml,
+      conclusionHtml: fixture.conclusionHtml,
+    },
+  });
+  if (!prepared.ok) {
+    throw new Error(`${fixture.id} fixture must remain within the stored authoring limits`);
+  }
+  const report = fixture.peerReference === "current" ? reportForPhase(4) : historicalReport();
+  return {
+    ...report,
+    reportHtml: (prepared.reportConfig as { reportHtml: typeof report.reportHtml }).reportHtml,
+  };
 }
 
 async function q01PeerValue(page: Page): Promise<string> {
@@ -642,6 +688,56 @@ describe("SU Full landscape browser and PDF contract", () => {
         expect(searchableWords).toContain(normalizeWords(report.questionByKey[frozen.stableKey]));
         expect(searchableWords).toContain(normalizeWords(frozen.recommendation ?? ""));
       }
+    } finally {
+      await page.close();
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it.each(REPORT_HTML_PEER_FIXTURES)("keeps the $authoringCase/$peerReference authored-report matrix inside 26 physical pages", async (fixture) => {
+    const provenance = fixture.peerReference === "current" ? "Phase 4 · Delegation" : "Historical benchmark";
+    const report = reportWithAuthoringCase(fixture);
+    const { html } = routeMarkup(report);
+    const directory = mkdtempSync(join(tmpdir(), "report-html-peers-matrix-"));
+    const pdfPath = join(directory, `${fixture.id}.pdf`);
+    const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+    try {
+      await load(page, html);
+      expect(await page.locator("[data-testid^='su-full-landscape-page-']").count()).toBe(26);
+      await expect(page.locator("body").innerText()).resolves.toContain(provenance);
+      await expect(page.locator("body").innerText()).resolves.not.toMatch(ENGINEERING_LANGUAGE);
+
+      const desktop = await horizontalOverflow(page);
+      expect(desktop.offenders).toEqual([]);
+      expect(desktop.document).toBeLessThanOrEqual(desktop.viewport + 1);
+
+      await page.setViewportSize({ width: 390, height: 844 });
+      const mobile = await horizontalOverflow(page);
+      expect(mobile.offenders).toEqual([]);
+      expect(mobile.document).toBeLessThanOrEqual(mobile.viewport + 1);
+
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await page.emulateMedia({ media: "print" });
+      expect(await authoredContentOutsidePhysicalPage(page)).toEqual([]);
+      await expect(page.locator("[data-page-number='25']").innerText()).resolves.toContain("55 / 100");
+      await expect(page.locator("[data-page-number='25']").innerText()).resolves.toContain("Your strongest chapter is");
+      await expect(page.locator("[data-page-number='25']").innerText()).resolves.toContain("Your focus chapter is");
+
+      await page.pdf({
+        path: pdfPath,
+        format: "A4",
+        landscape: true,
+        preferCSSPageSize: true,
+        printBackground: true,
+      });
+      const pdfinfo = execFileSync("pdfinfo", [pdfPath], { encoding: "utf8" });
+      expect(pdfinfo).toMatch(/^Pages:\s+26$/m);
+      const pdfText = normalize(execFileSync("pdftotext", [pdfPath, "-"], { encoding: "utf8", maxBuffer: 20 * 1024 * 1024 }));
+      expect(pdfText).toContain(provenance);
+      expect(pdfText).toContain("ScaleUp Score 55 / 100");
+      expect(pdfText).toContain("Your strongest chapter is");
+      expect(pdfText).toContain("Your focus chapter is");
+      expect(pdfText).not.toMatch(ENGINEERING_LANGUAGE);
     } finally {
       await page.close();
       rmSync(directory, { recursive: true, force: true });
