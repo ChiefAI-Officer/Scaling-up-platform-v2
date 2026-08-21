@@ -5,7 +5,8 @@
 - Task 7 base commit: `88e85050c542a6da730624491567872b4a8b06ad`
 - Original Task 7 verified source commit: `58e919efe52bcfa30cb431619fcdc3233210170f`
 - Final-review remediation implementation commit: `3e18f25094e66dcf09f161b4f423565e98550b6b`
-- Final-review remediation verified source commit: `ae561d1ffdede205571017b198b16876a08d323f`
+- Final-review cycle-1 verified source commit: `ae561d1ffdede205571017b198b16876a08d323f`
+- Final-review verified source commit: `dc0c062b480963f01b2248252b80cdf4904d1a14`
 - Design: `docs/superpowers/specs/2026-08-21-su-full-frozen-phase-peers-design.md`
 - Plan: `docs/superpowers/plans/2026-08-21-su-full-frozen-phase-peers.md`
 
@@ -179,6 +180,43 @@ The successful remediation build retained only the same established non-fatal lo
 diagnostics recorded above. No lifecycle script, database action, push, PR, publish,
 deploy, activation, Production mutation, or external communication occurred during
 remediation.
+
+## Final standards cycle-2 remediation addendum
+
+Standards cycle 2 found one remaining unconditional landscape-preface claim that
+called peer values `the frozen governed snapshot`. That was inaccurate for historical
+reports using the legacy baseline. Commit
+`dc0c062b480963f01b2248252b80cdf4904d1a14` replaces it with the mode-neutral copy:
+
+> Your answers and feedback are preserved from the completed assessment; peer values
+> are shown only with the benchmark provenance described in this report.
+
+The exact governed disclosure remains unchanged. Historical DOM, real-browser, and
+extracted PDF-text regressions reject both `frozen governed snapshot` and equivalent
+claims that peer values were frozen when or at scoring.
+
+Strict TDD evidence preceded the final code. The DOM seam first failed one test while
+six passed. After the copy fix, it passed 7/7. The browser/PDF seam was mutation-
+checked by temporarily restoring the old copy and failed one test while four passed;
+the neutral copy then produced a focused **4/4 suites, 41/41 tests** result.
+
+The complete final chain ran from `src/` on
+`dc0c062b480963f01b2248252b80cdf4904d1a14`:
+
+- exact Task 7 Jest: exit `0`, **12/12 suites, 489/489 tests, 0 snapshots** in
+  8.875s;
+- deterministic generation and committed generated-module diff: both exit `0`;
+- ESLint across all 14 final remediation TypeScript/TSX paths: exit `0`, zero
+  diagnostics;
+- migration safety: exit `0`, all **49 migrations** approved;
+- `CI=true npx next build --turbopack`: exit `0`, compiled in 22.3s, passed
+  TypeScript, and generated **95/95** static pages; and
+- repository-wide Jest: exit `0`, **766/766 suites, 9,385/9,385 tests, and 16/16
+  snapshots** in 231.675s.
+
+The build retained only the established non-fatal local diagnostics. No lifecycle,
+database, push, PR, draft, publish, deployment, activation, Production, or external
+action occurred.
 
 ## Browser, PDF, and typed report evidence
 

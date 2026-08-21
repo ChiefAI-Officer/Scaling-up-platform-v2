@@ -2,14 +2,17 @@
 
 ## Status
 
-All final whole-branch review cycle-1 findings are remediated and committed locally.
+All final whole-branch review cycle-1 and standards cycle-2 findings are remediated
+and committed locally.
 No release, lifecycle, database, remote, deployment, Production, or communications
 action was performed.
 
 - Remediation base: `7010c528bddb670eca837d57b918da87ec390376`
 - Implementation commit: `3e18f25094e66dcf09f161b4f423565e98550b6b`
-- Verified source commit: `ae561d1ffdede205571017b198b16876a08d323f`
-- Subjects: `fix: close frozen peer review findings`; `test: use canonical peer report fixture`
+- Cycle-1 verified source commit: `ae561d1ffdede205571017b198b16876a08d323f`
+- Final verified source commit: `dc0c062b480963f01b2248252b80cdf4904d1a14`
+- Subjects: `fix: close frozen peer review findings`; `test: use canonical peer report fixture`;
+  `fix: make landscape peer preface neutral`
 - Branch: `codex/su-full-esperto-landscape-closeout-wording`
 
 ## Findings closed
@@ -86,6 +89,18 @@ The RED generator test renders a controlled vector with Q01 equal to zero and pr
 the generated helper uses the zero-safe guard. The CLI regenerated the checked-in
 module; repeated generation is byte-identical.
 
+### 6. Truthful landscape preface
+
+The unconditional preface now says:
+
+> Your answers and feedback are preserved from the completed assessment; peer values
+> are shown only with the benchmark provenance described in this report.
+
+It no longer characterizes legacy baseline values as a frozen governed snapshot.
+Historical DOM, real-browser, and extracted PDF-text assertions reject both that
+phrase and an equivalent claim that peer values were frozen when or at scoring. The
+exact governed disclosure elsewhere is unchanged.
+
 ## TDD evidence
 
 ### Cross-object integrity and disclosure RED
@@ -117,13 +132,22 @@ Before the generator change: exit `1`, **1 test failed and 91 passed**, because 
 rendered helper retained its truthiness check. After the fix and regeneration: exit
 `0`, **2/2 suites and 92/92 tests passed**.
 
+### Cycle-2 preface RED/GREEN
+
+The historical landscape DOM assertion first failed **1 test while 6 passed** on
+`frozen governed snapshot`. After the neutral copy change it passed **7/7**. The
+browser/PDF assertion was then mutation-checked by temporarily restoring the bad
+copy: **1 test failed while 4 passed** on the broader false-freeze matcher. Restoring
+the neutral copy produced a focused landscape/browser/model/disclosure result of
+**4/4 suites and 41/41 tests**.
+
 ## Integration evidence
 
 The Task 1-6 14-suite integration set passed **14/14 suites, 508/508 tests, 0
 snapshots**. This includes both generic and landscape component coverage in addition
 to the exact Task 7 list.
 
-## Final post-cast verification chain
+## Cycle-1 final post-cast verification chain
 
 An intermediate Turbopack run exposed one compile-only diagnostic at the untrusted
 report cast in `su-full-peer-presentation.ts`. The explicit `unknown` boundary was
@@ -180,6 +204,27 @@ rerun on the resulting commit as recorded above.
 
 The final post-fix repository-wide rerun then passed **766/766 suites,
 9,385/9,385 tests, and 16/16 snapshots** in 696.331s.
+
+## Final cycle-2 verification chain
+
+The complete requested chain was rerun from `src/` on final code commit
+`dc0c062b480963f01b2248252b80cdf4904d1a14`:
+
+- focused landscape/browser/model/disclosure tests: exit `0`, **4/4 suites and
+  41/41 tests**;
+- exact Task 7 set: exit `0`, **12/12 suites, 489/489 tests, 0 snapshots** in
+  8.875s;
+- deterministic catalogue generation and committed-module diff: both exit `0`;
+- ESLint across all 14 final remediation TypeScript/TSX paths: exit `0`, zero
+  diagnostics;
+- migration safety: exit `0`, all **49 migrations** approved;
+- `CI=true npx next build --turbopack`: exit `0`, compiled in 22.3s, passed
+  TypeScript, and generated **95/95** static pages; and
+- final repository-wide Jest: exit `0`, **766/766 suites, 9,385/9,385 tests, and
+  16/16 snapshots** in 231.675s.
+
+The build emitted only the established non-fatal workspace-root, middleware,
+missing local Inngest-key, and missing local `DATABASE_URL` diagnostics.
 
 ## Rulings and costs
 
