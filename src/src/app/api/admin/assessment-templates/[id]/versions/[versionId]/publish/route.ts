@@ -6,6 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import { logAudit } from "@/lib/audit";
@@ -16,6 +17,9 @@ import {
   extractMarketingCta,
   getMarketingCtaPublishIssues,
 } from "@/lib/assessments/marketing-cta";
+import { computeTemplateContentHash } from "@/lib/assessments/template-content-hash";
+import { isReportHtmlExperienceEnabled } from "@/lib/assessments/wave-report-html-authoring-flags";
+import { prepareReportHtmlForStorage } from "@/lib/assessments/report-html";
 
 export async function POST(
   request: NextRequest,
@@ -57,7 +61,13 @@ export async function POST(
         sections: true,
         scoringConfig: true,
         reportConfig: true,
-        template: { select: { deliveryType: true } },
+        template: {
+          select: {
+            deliveryType: true,
+            invitationSubject: true,
+            invitationBodyMarkdown: true,
+          },
+        },
       },
     });
     if (!version || version.templateId !== templateId) {
@@ -82,12 +92,31 @@ export async function POST(
       sections: version.sections,
       scoringConfig: version.scoringConfig,
     });
+    let preparedReportConfig: unknown = version.reportConfig;
+    const reportHtmlActive = isReportHtmlExperienceEnabled();
+    if (reportHtmlActive) {
+      const prepared = prepareReportHtmlForStorage(preparedReportConfig);
+      if (!prepared.ok) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Invalid report HTML",
+            code: "INVALID_REPORT_HTML",
+            issues: prepared.issues,
+          },
+          { status: 422 },
+        );
+      }
+      preparedReportConfig = prepared.reportConfig;
+    }
+
     const marketingIssues =
+      !reportHtmlActive &&
       isPublicMarketingCtaEnabled() &&
       version.template?.deliveryType === "PUBLIC_MARKETING_QUIZ"
         ? getMarketingCtaPublishIssues(
-          extractMarketingCta(version.reportConfig),
-        ).map((issue) => ({ path: issue.path, message: issue.message }))
+            extractMarketingCta(version.reportConfig),
+          ).map((issue) => ({ path: issue.path, message: issue.message }))
         : [];
     if (publishIssues.length > 0 || marketingIssues.length > 0) {
       return NextResponse.json(
@@ -101,9 +130,29 @@ export async function POST(
     }
 
     const now = new Date();
+    const updateData: {
+      publishedAt: Date;
+      publishedBy: string;
+      reportConfig?: Prisma.InputJsonValue | typeof Prisma.JsonNull;
+      contentHash?: string;
+    } = { publishedAt: now, publishedBy: actor.userId };
+    if (reportHtmlActive) {
+      updateData.reportConfig =
+        preparedReportConfig === null || preparedReportConfig === undefined
+          ? Prisma.JsonNull
+          : (preparedReportConfig as Prisma.InputJsonValue);
+      updateData.contentHash = computeTemplateContentHash({
+        questions: version.questions,
+        sections: version.sections,
+        scoringConfig: version.scoringConfig,
+        reportConfig: preparedReportConfig,
+        invitationSubject: version.template.invitationSubject,
+        invitationBodyMarkdown: version.template.invitationBodyMarkdown,
+      });
+    }
     await db.assessmentTemplateVersion.update({
       where: { id: versionId },
-      data: { publishedAt: now, publishedBy: actor.userId },
+      data: updateData,
     });
 
     await logAudit({

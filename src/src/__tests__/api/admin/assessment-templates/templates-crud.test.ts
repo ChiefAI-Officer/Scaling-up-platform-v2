@@ -98,6 +98,14 @@ beforeEach(() => {
   jest.clearAllMocks();
 });
 
+afterEach(() => {
+  delete process.env.WAVE_REPORT_HTML_AUTHORING_ENABLED;
+  delete process.env.WAVE_REPORT_HTML_AUTHORING_KILL;
+  delete process.env.WAVE_ED10_PREVIEW_SETTINGS_ENABLED;
+  delete process.env.WAVE_ED10_PREVIEW_SETTINGS_KILL;
+  delete process.env.WAVE_PUBLIC_MARKETING_CTA_ENABLED;
+});
+
 describe("POST /api/admin/assessment-templates (create)", () => {
   const simplifiedCreationEnvironment = [
     "WAVE_TEMPLATE_CREATION_SIMPLIFIED_ENABLED",
@@ -1383,6 +1391,33 @@ describe("POST /api/admin/assessment-templates/[id]/versions/[versionId]/publish
     );
   }
 
+  function enableReportHtmlExperience(): void {
+    process.env.WAVE_REPORT_HTML_AUTHORING_ENABLED = "1";
+    process.env.WAVE_ED10_PREVIEW_SETTINGS_ENABLED = "1";
+  }
+
+  function publishableContent() {
+    return {
+      questions: [
+        {
+          stableKey: "Q1",
+          sortOrder: 1,
+          type: "SLIDER_LIKERT",
+          label: "Q1",
+          isRequired: true,
+          sectionStableKey: "S1",
+          scale: { min: 0, max: 3, step: 1, anchorMin: "L", anchorMax: "H" },
+        },
+      ],
+      sections: [{ stableKey: "S1", sortOrder: 1, name: "S1" }],
+      scoringConfig: {
+        tierMetric: "overallTotal",
+        passThreshold: 2,
+        tiers: [{ minMetric: 0, maxMetric: 3, label: "X", message: "x" }],
+      },
+    };
+  }
+
   it("404 when version missing", async () => {
     (getApiActor as jest.Mock).mockResolvedValue(adminActor);
     (db.assessmentTemplateVersion.findUnique as jest.Mock).mockResolvedValue(null);
@@ -1452,6 +1487,79 @@ describe("POST /api/admin/assessment-templates/[id]/versions/[versionId]/publish
     expect(updateArgs.data.publishedAt).toBeInstanceOf(Date);
     expect(updateArgs.data.publishedBy).toBe("u1");
     expect(db.auditLog.create).toHaveBeenCalled();
+  });
+
+  it("canonicalizes report HTML and hashes it when publishing", async () => {
+    enableReportHtmlExperience();
+    process.env.WAVE_PUBLIC_MARKETING_CTA_ENABLED = "1";
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    (db.assessmentTemplateVersion.findUnique as jest.Mock).mockResolvedValue({
+      id: "ver-1",
+      templateId: "tpl-1",
+      publishedAt: null,
+      versionNumber: 1,
+      ...publishableContent(),
+      reportConfig: {
+        publicMarketing: {
+          marketingCta: createMarketingCtaPreset("BLANK"),
+        },
+        reportHtml: {
+          schemaVersion: 1,
+          introductionHtml: '<p onclick="bad()">Intro</p>',
+          conclusionHtml: "<p>CTA</p>",
+        },
+      },
+      template: {
+        deliveryType: "PUBLIC_MARKETING_QUIZ",
+        invitationSubject: "Subject",
+        invitationBodyMarkdown: "Body",
+      },
+    });
+    (db.assessmentTemplateVersion.update as jest.Mock).mockResolvedValue({});
+
+    const response = await publishPOST(pubReq() as never, publishParams);
+
+    expect(response.status).toBe(200);
+    const update = (db.assessmentTemplateVersion.update as jest.Mock).mock
+      .calls[0][0].data;
+    expect(update.reportConfig.reportHtml).toEqual({
+      schemaVersion: 1,
+      introductionHtml: "<p>Intro</p>",
+      conclusionHtml: "<p>CTA</p>",
+    });
+    expect(update.contentHash).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("rejects oversized report HTML when publishing", async () => {
+    enableReportHtmlExperience();
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    (db.assessmentTemplateVersion.findUnique as jest.Mock).mockResolvedValue({
+      id: "ver-1",
+      templateId: "tpl-1",
+      publishedAt: null,
+      versionNumber: 1,
+      ...publishableContent(),
+      reportConfig: {
+        reportHtml: {
+          schemaVersion: 1,
+          introductionHtml: "x".repeat(100_001),
+          conclusionHtml: null,
+        },
+      },
+      template: {
+        deliveryType: "INVITED_ASSESSMENT",
+        invitationSubject: "Subject",
+        invitationBodyMarkdown: "Body",
+      },
+    });
+
+    const response = await publishPOST(pubReq() as never, publishParams);
+
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      code: "INVALID_REPORT_HTML",
+    });
+    expect(db.assessmentTemplateVersion.update).not.toHaveBeenCalled();
   });
 
   it("422 PUBLISH_VALIDATION_FAILED when content has placeholder sentinel (D2.1)", async () => {
