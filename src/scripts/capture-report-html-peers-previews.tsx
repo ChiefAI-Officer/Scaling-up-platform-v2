@@ -5,7 +5,8 @@ import { chromium } from "playwright";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { SuFullLandscapeReport } from "@/components/assessments/su-full-landscape/SuFullLandscapeReport";
+import { BrandedReport } from "@/components/assessments/BrandedReport";
+import { ReportStyleScope } from "@/components/assessments/ReportStyleScope";
 import {
   completeSuFullLandscapePresentation,
   completeSuFullLandscapeReport,
@@ -16,10 +17,12 @@ import {
   SU_FULL_PHASE_PEER_SOURCE_ID,
   getGovernedPeerValue,
 } from "@/lib/assessments/su-full-phase-peer-catalogue";
-import { buildSuFullLandscapeReportModel } from "@/lib/assessments/su-full-landscape-report";
 
 const appRoot = process.cwd();
 export const REPORT_HTML_PEER_OUTPUT_DIRECTORY = join(appRoot, "output", "report-html-peers-integration");
+
+const SU_FULL_LANDSCAPE_ENABLED_ENV = "NEXT_PUBLIC_WAVE_SU_FULL_LANDSCAPE_REPORT_ENABLED";
+const SU_FULL_LANDSCAPE_KILL_ENV = "NEXT_PUBLIC_WAVE_SU_FULL_LANDSCAPE_REPORT_KILL";
 
 export const LONG_WELCOME_VISIBLE_CHARACTERS = 2_100;
 export const LONG_CLOSING_VISIBLE_CHARACTERS = 850;
@@ -138,7 +141,7 @@ function historicalReport() {
   };
 }
 
-function documentForFixture(fixture: CaptureFixture): string {
+export function renderCaptureMarkup(fixture: CaptureFixture): string {
   const prepared = prepareReportHtmlForStorage({
     reportHtml: {
       schemaVersion: 1,
@@ -154,20 +157,33 @@ function documentForFixture(fixture: CaptureFixture): string {
     reportHtml: loadSafeReportHtml(prepared.reportConfig),
   };
   const presentation = completeSuFullLandscapePresentation(report);
-  const model = buildSuFullLandscapeReportModel({ report, presentation, resolvedStyle: "CLASSIC" });
-  if (!model) throw new Error(`Fixture ${fixture.id} cannot build the production landscape model`);
+  report.suFullPeerPresentation = presentation;
 
-  return renderToStaticMarkup(
-    <main className="su-public-brand su-report" data-testid="route-wrapper">
-      <div className="su-report-page" data-enabled-report-style="CLASSIC">
-        <SuFullLandscapeReport
-          report={{ ...report, coachName: "Coach Example" }}
-          model={model}
-          contactEmail="coach@example.com"
-        />
-      </div>
-    </main>,
-  );
+  const previousEnabled = process.env[SU_FULL_LANDSCAPE_ENABLED_ENV];
+  const previousKill = process.env[SU_FULL_LANDSCAPE_KILL_ENV];
+  process.env[SU_FULL_LANDSCAPE_ENABLED_ENV] = "1";
+  delete process.env[SU_FULL_LANDSCAPE_KILL_ENV];
+  try {
+    return renderToStaticMarkup(
+      <main className="su-public-brand su-report" data-testid="route-wrapper">
+        <ReportStyleScope report={report} reportStylesAvailable>
+          <div className="su-report-page">
+            <BrandedReport
+              report={{ ...report, coachName: "Coach Example" }}
+              reportStylesAvailable
+              reportFindingsAvailable
+              contactEmail="coach@example.com"
+            />
+          </div>
+        </ReportStyleScope>
+      </main>,
+    );
+  } finally {
+    if (previousEnabled === undefined) delete process.env[SU_FULL_LANDSCAPE_ENABLED_ENV];
+    else process.env[SU_FULL_LANDSCAPE_ENABLED_ENV] = previousEnabled;
+    if (previousKill === undefined) delete process.env[SU_FULL_LANDSCAPE_KILL_ENV];
+    else process.env[SU_FULL_LANDSCAPE_KILL_ENV] = previousKill;
+  }
 }
 
 async function captureFixture(
@@ -180,7 +196,7 @@ async function captureFixture(
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
   try {
     await page.setContent(
-      `<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0}${css}</style></head><body>${documentForFixture(fixture)}</body></html>`,
+      `<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0}${css}</style></head><body>${renderCaptureMarkup(fixture)}</body></html>`,
       { waitUntil: "load" },
     );
     await page.evaluate(() => document.fonts.ready);

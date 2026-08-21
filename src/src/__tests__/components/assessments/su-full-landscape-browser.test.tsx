@@ -22,6 +22,10 @@ import {
   getGovernedPeerValue,
 } from "@/lib/assessments/su-full-phase-peer-catalogue";
 import { prepareReportHtmlForStorage } from "@/lib/assessments/report-html";
+import {
+  SU_FULL_GOVERNED_PEER_DISCLOSURE,
+  SU_FULL_LEGACY_PEER_DISCLOSURE,
+} from "@/lib/assessments/su-full-peer-disclosure";
 import type { GrowthPhaseNumber } from "@/lib/assessments/su-full-phase";
 
 jest.setTimeout(60_000);
@@ -696,6 +700,9 @@ describe("SU Full landscape browser and PDF contract", () => {
 
   it.each(REPORT_HTML_PEER_FIXTURES)("keeps the $authoringCase/$peerReference authored-report matrix inside 26 physical pages", async (fixture) => {
     const provenance = fixture.peerReference === "current" ? "Phase 4 · Delegation" : "Historical benchmark";
+    const disclosure = fixture.peerReference === "current"
+      ? SU_FULL_GOVERNED_PEER_DISCLOSURE
+      : SU_FULL_LEGACY_PEER_DISCLOSURE;
     const report = reportWithAuthoringCase(fixture);
     const { html } = routeMarkup(report);
     const directory = mkdtempSync(join(tmpdir(), "report-html-peers-matrix-"));
@@ -705,6 +712,7 @@ describe("SU Full landscape browser and PDF contract", () => {
       await load(page, html);
       expect(await page.locator("[data-testid^='su-full-landscape-page-']").count()).toBe(26);
       await expect(page.locator("body").innerText()).resolves.toContain(provenance);
+      await expect(page.getByText(disclosure, { exact: true }).count()).resolves.toBeGreaterThanOrEqual(2);
       await expect(page.locator("body").innerText()).resolves.not.toMatch(ENGINEERING_LANGUAGE);
 
       const desktop = await horizontalOverflow(page);
@@ -734,6 +742,7 @@ describe("SU Full landscape browser and PDF contract", () => {
       expect(pdfinfo).toMatch(/^Pages:\s+26$/m);
       const pdfText = normalize(execFileSync("pdftotext", [pdfPath, "-"], { encoding: "utf8", maxBuffer: 20 * 1024 * 1024 }));
       expect(pdfText).toContain(provenance);
+      expect(pdfText).toContain(disclosure);
       expect(pdfText).toContain("ScaleUp Score 55 / 100");
       expect(pdfText).toContain("Your strongest chapter is");
       expect(pdfText).toContain("Your focus chapter is");
