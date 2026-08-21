@@ -173,23 +173,17 @@ describe("buildSuFullLandscapeReportModel", () => {
         result: {
           ...base.result,
           recommendationPhase: phase,
-          perQuestion: base.result.perQuestion.map((question) => question.stableKey === "Q13"
-            ? { ...question, value: 7, recommendation: text }
-            : question),
-        },
-      };
-      const presentation = completeSuFullLandscapePresentation({
-        ...report,
-        result: {
-          ...report.result,
           peerBenchmarkSnapshot: undefined,
-          perQuestion: report.result.perQuestion.map((question) => {
-            const historicalQuestion = { ...question };
+          perQuestion: base.result.perQuestion.map((question) => {
+            const historicalQuestion = question.stableKey === "Q13"
+              ? { ...question, value: 7, recommendation: text }
+              : { ...question };
             delete historicalQuestion.peerValue;
             return historicalQuestion;
           }),
         },
-      });
+      };
+      const presentation = completeSuFullLandscapePresentation(report);
       const model = buildSuFullLandscapeReportModel({ report, presentation, resolvedStyle: "CLASSIC" });
       const question = model?.chapters.flatMap((chapter) => chapter.questions)
         .find(({ stableKey }) => stableKey === "Q13");
@@ -259,6 +253,26 @@ describe("buildSuFullLandscapeReportModel", () => {
             }
           : section),
       },
+      resolvedStyle: "CLASSIC",
+    })).toBeNull();
+  });
+
+  it("rejects a coherent presentation that is stale for the report's frozen peer rows", () => {
+    const report = completeSuFullLandscapeReport();
+    const presentation = completeSuFullLandscapePresentation(report);
+    const corruptedReport = {
+      ...report,
+      result: {
+        ...report.result,
+        perQuestion: report.result.perQuestion.map((question) => question.stableKey === "Q01"
+          ? { ...question, peerValue: 6.5 }
+          : question),
+      },
+    };
+
+    expect(buildSuFullLandscapeReportModel({
+      report: corruptedReport,
+      presentation,
       resolvedStyle: "CLASSIC",
     })).toBeNull();
   });

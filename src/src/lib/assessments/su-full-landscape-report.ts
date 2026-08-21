@@ -1,6 +1,6 @@
 import type { RespondentReport } from "@/lib/assessments/respondent-report";
 import {
-  isSuFullPeerPresentation,
+  isSuFullPeerPresentationForReport,
   type SuFullPeerPresentation,
   type SuFullPeerProvenance,
   type SuFullPeerQuestionComparison,
@@ -334,7 +334,7 @@ export function buildSuFullLandscapeReportModel(input: {
     || input.resolvedStyle !== "CLASSIC"
     || report.degraded
     || !presentation
-    || !isSuFullPeerPresentation(presentation)
+    || !isSuFullPeerPresentationForReport(presentation, report)
     || !validCanonicalDefinitions()
     || !validReportSectionMap(report)
     || !validPresentationSections(presentation)

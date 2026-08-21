@@ -92,15 +92,19 @@ function historicalReport() {
   };
 }
 
-function corruptReport() {
-  const report = reportForPhase(4);
+function corruptReportWithStalePresentation() {
+  const validReport = reportForPhase(4);
+  const presentation = completeSuFullLandscapePresentation(validReport);
   return {
-    ...report,
-    result: {
-      ...report.result,
-      perQuestion: report.result.perQuestion.map((question) => question.stableKey === "Q01"
-        ? { ...question, peerValue: 6.5 }
-        : question),
+    presentation,
+    report: {
+      ...validReport,
+      result: {
+        ...validReport.result,
+        perQuestion: validReport.result.perQuestion.map((question) => question.stableKey === "Q01"
+          ? { ...question, peerValue: 6.5 }
+          : question),
+      },
     },
   };
 }
@@ -467,8 +471,8 @@ describe("SU Full landscape browser and PDF contract", () => {
         }
       }
 
-      const corrupt = corruptReport();
-      const { html } = routeMarkup(corrupt, null);
+      const corrupt = corruptReportWithStalePresentation();
+      const { html } = routeMarkup(corrupt.report, corrupt.presentation);
       const corruptPage = await browser.newPage({ viewport: { width: 1280, height: 720 } });
       try {
         await load(corruptPage, html);

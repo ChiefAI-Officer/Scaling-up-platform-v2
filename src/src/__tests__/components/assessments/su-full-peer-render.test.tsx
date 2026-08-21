@@ -262,6 +262,27 @@ test("renders governed phase provenance in the shipped flag-off peer sequence", 
   expect(disclosure).toHaveTextContent(`Phase P4 · ${SU_FULL_PHASE_PEER_SOURCE_ID}`);
 });
 
+test("omits generic peer UI when a coherent presentation is stale for the frozen report", () => {
+  const report = completeSuFullLandscapeReport();
+  const presentation = completeSuFullLandscapePresentation(report);
+  const corruptedReport = {
+    ...report,
+    result: {
+      ...report.result,
+      perQuestion: report.result.perQuestion.map((question) => question.stableKey === "Q01"
+        ? { ...question, peerValue: 6.5 }
+        : question),
+    },
+    suFullPeerPresentation: presentation,
+  };
+
+  render(<BrandedReport report={corruptedReport} />);
+
+  expect(screen.queryByTestId("su-full-peer-sequence")).not.toBeInTheDocument();
+  expect(screen.queryByTestId("su-full-peer-disclosure")).not.toBeInTheDocument();
+  expect(screen.getByTestId("report-sections")).toBeInTheDocument();
+});
+
 test.each([
   ["absent", undefined],
   ["null", null],
