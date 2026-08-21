@@ -12,7 +12,12 @@ import {
   SU_FULL_QUESTION_BENCHMARKS,
 } from "@/lib/assessments/su-full-question-benchmarks";
 
-const EXPECTED_KEYS = SU_FULL_QUESTION_BENCHMARKS.map((row) => row.stableKey);
+const EXPECTED_KEYS = Object.freeze(
+  Array.from(
+    { length: 61 },
+    (_, index) => `Q${String(index + 1).padStart(2, "0")}`,
+  ),
+);
 const EXPECTED_KEY_SET = new Set<string>(EXPECTED_KEYS);
 const CONTENT_HASH_PATTERN = /^[a-f0-9]{64}$/;
 
@@ -64,7 +69,7 @@ export type SuFullPeerBuildResult =
       frozenCount: number;
       scoreCount: number;
       sourceId?: string;
-      phase?: unknown;
+      phase?: GrowthPhaseNumber;
       contentHash?: string;
     }>;
 
@@ -86,12 +91,19 @@ function unavailable(
   scoreCount: number,
   snapshot?: Record<string, unknown>,
 ): SuFullPeerBuildResult {
-  const sourceId = typeof snapshot?.sourceId === "string"
+  const sourceId = (
+    snapshot?.sourceId === SU_FULL_PHASE_PEER_SOURCE_ID
+    || snapshot?.sourceId === SU_FULL_LEGACY_PEER_SOURCE_ID
+  )
     ? snapshot.sourceId
     : undefined;
-  const contentHash = typeof snapshot?.contentHash === "string"
+  const contentHash = (
+    typeof snapshot?.contentHash === "string"
+    && CONTENT_HASH_PATTERN.test(snapshot.contentHash)
+  )
     ? snapshot.contentHash
     : undefined;
+  const phase = isGrowthPhase(snapshot?.phase) ? snapshot.phase : undefined;
   return {
     status: "unavailable",
     reason,
@@ -99,7 +111,7 @@ function unavailable(
     frozenCount,
     scoreCount,
     ...(sourceId === undefined ? {} : { sourceId }),
-    ...(snapshot && "phase" in snapshot ? { phase: snapshot.phase } : {}),
+    ...(phase === undefined ? {} : { phase }),
     ...(contentHash === undefined ? {} : { contentHash }),
   };
 }
@@ -172,6 +184,7 @@ export function isSuFullPeerPresentation(
 
   const sectionKeys = new Set<string>();
   const questionKeys: string[] = [];
+  const peerValuesByKey = new Map<string, number>();
 
   for (const section of value.sections) {
     if (
@@ -208,6 +221,7 @@ export function isSuFullPeerPresentation(
         return false;
       }
       questionKeys.push(question.stableKey);
+      peerValuesByKey.set(question.stableKey, question.peers);
       youValues.push(question.you);
       peerValues.push(question.peers);
     }
@@ -220,8 +234,30 @@ export function isSuFullPeerPresentation(
     }
   }
 
-  return questionKeys.length === EXPECTED_KEYS.length
+  const hasCanonicalQuestions = questionKeys.length === EXPECTED_KEYS.length
     && questionKeys.every((key, index) => key === EXPECTED_KEYS[index]);
+  if (!hasCanonicalQuestions) return false;
+
+  if (provenance.legacy) {
+    const legacyValues = new Map(
+      SU_FULL_QUESTION_BENCHMARKS.map((row) => [row.stableKey, row.value]),
+    );
+    return provenance.sourceId === SU_FULL_LEGACY_PEER_SOURCE_ID
+      && provenance.contentHash === SU_FULL_LEGACY_PEER_CONTENT_HASH
+      && hasExactlyExpectedKeys([...legacyValues.keys()])
+      && EXPECTED_KEYS.every(
+        (stableKey) => peerValuesByKey.get(stableKey) === legacyValues.get(stableKey),
+      );
+  }
+
+  const phase = provenance.phase;
+  return isGrowthPhase(phase)
+    && provenance.sourceId === SU_FULL_PHASE_PEER_SOURCE_ID
+    && provenance.contentHash === SU_FULL_PHASE_PEER_CONTENT_HASHES[phase]
+    && EXPECTED_KEYS.every(
+      (stableKey) =>
+        peerValuesByKey.get(stableKey) === getGovernedPeerValue(stableKey, phase),
+    );
 }
 
 function buildPresentationFromValues(
@@ -343,14 +379,19 @@ export function buildSuFullPeerPresentationResult(input: {
   if (!isRecord(questionsByKey)) {
     return unavailable("KEY_MISMATCH", frozenCount, scoreCount);
   }
-  const sliderQuestionEntries = Object.entries(questionsByKey).filter(
+  const unorderedSliderQuestionEntries = Object.entries(questionsByKey).filter(
     ([, question]) =>
       isRecord(question)
       && (question as FrozenQuestionMeta).type === "SLIDER_LIKERT",
   ) as Array<[string, FrozenQuestionMeta]>;
-  if (!hasExactlyExpectedKeys(sliderQuestionEntries.map(([key]) => key))) {
+  if (!hasExactlyExpectedKeys(unorderedSliderQuestionEntries.map(([key]) => key))) {
     return unavailable("KEY_MISMATCH", frozenCount, scoreCount);
   }
+  const sliderQuestionsByKey = new Map(unorderedSliderQuestionEntries);
+  const sliderQuestionEntries = EXPECTED_KEYS.map((stableKey) => [
+    stableKey,
+    sliderQuestionsByKey.get(stableKey) as FrozenQuestionMeta,
+  ] satisfies [string, FrozenQuestionMeta]);
 
   if (scoreCount < EXPECTED_KEYS.length) {
     return unavailable("MISSING_ROWS", frozenCount, scoreCount);

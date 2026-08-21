@@ -30,7 +30,11 @@ import {
 } from "@/lib/assessments/onscreen-result-store";
 import { completeSuFullPeerReport } from "@/__tests__/fixtures/su-full-peer";
 import { buildSuFullPeerPresentationResult } from "@/lib/assessments/su-full-peer-presentation";
-import { SU_FULL_PHASE_PEER_VECTORS } from "@/lib/assessments/su-full-phase-peer-catalogue";
+import {
+  SU_FULL_PHASE_PEER_CONTENT_HASHES,
+  SU_FULL_PHASE_PEER_SOURCE_ID,
+  SU_FULL_PHASE_PEER_VECTORS,
+} from "@/lib/assessments/su-full-phase-peer-catalogue";
 
 const ALIAS = "demo-campaign";
 
@@ -45,6 +49,26 @@ function completePeerPresentation() {
   const built = buildSuFullPeerPresentationResult({
     report: completeSuFullPeerReport(),
   });
+  if (built.status !== "ready") throw new Error(built.reason);
+  return built.presentation;
+}
+
+function completePhaseFourPeerPresentation() {
+  const report = completeSuFullPeerReport();
+  report.result = {
+    ...report.result,
+    recommendationPhase: 4,
+    peerBenchmarkSnapshot: {
+      sourceId: SU_FULL_PHASE_PEER_SOURCE_ID,
+      contentHash: SU_FULL_PHASE_PEER_CONTENT_HASHES[4],
+      phase: 4,
+    },
+    perQuestion: report.result.perQuestion.map((row) => ({
+      ...row,
+      peerValue: SU_FULL_PHASE_PEER_VECTORS[4][row.stableKey],
+    })),
+  };
+  const built = buildSuFullPeerPresentationResult({ report });
   if (built.status !== "ready") throw new Error(built.reason);
   return built.presentation;
 }
@@ -170,6 +194,7 @@ describe("round trip", () => {
   });
 
   const validPeerPresentation = completePeerPresentation();
+  const validPhaseFourPresentation = completePhaseFourPeerPresentation();
 
   it.each([
     ["a malformed", "not-an-object"],
@@ -211,6 +236,71 @@ describe("round trip", () => {
         provenance: {
           ...validPeerPresentation.provenance,
           contentHash: "not-a-governed-hash",
+        },
+      },
+    ],
+    [
+      "P4 values under the valid-looking baseline hash",
+      {
+        ...validPhaseFourPresentation,
+        provenance: {
+          ...validPhaseFourPresentation.provenance,
+          contentHash:
+            "fe63364e3b5e42897b3b3886135310f673e320b4a07b1453ad300a49a91b4dbd",
+        },
+      },
+    ],
+    [
+      "a changed governed P4 peer value under valid P4 provenance",
+      {
+        ...validPhaseFourPresentation,
+        sections: validPhaseFourPresentation.sections.map((section, index) =>
+          index === 0
+            ? {
+                ...section,
+                peersTotal: 46.9,
+                questions: section.questions.map((question, questionIndex) =>
+                  questionIndex === 0 ? { ...question, peers: 6.5 } : question,
+                ),
+              }
+            : section,
+        ),
+      },
+    ],
+    [
+      "a changed historical peer value under valid legacy provenance",
+      {
+        ...validPeerPresentation,
+        sections: validPeerPresentation.sections.map((section, index) =>
+          index === 0
+            ? {
+                ...section,
+                peersTotal: 45.8,
+                questions: section.questions.map((question, questionIndex) =>
+                  questionIndex === 0 ? { ...question, peers: 6.4 } : question,
+                ),
+              }
+            : section,
+        ),
+      },
+    ],
+    [
+      "a governed presentation with the legacy source",
+      {
+        ...validPhaseFourPresentation,
+        provenance: {
+          ...validPhaseFourPresentation.provenance,
+          sourceId: "2026-08-14.esperto-controlled-v1",
+        },
+      },
+    ],
+    [
+      "a legacy presentation with the governed source",
+      {
+        ...validPeerPresentation,
+        provenance: {
+          ...validPeerPresentation.provenance,
+          sourceId: SU_FULL_PHASE_PEER_SOURCE_ID,
         },
       },
     ],

@@ -294,6 +294,44 @@ test("an incomplete frozen SU snapshot retains the original report and logs boun
   expect(warn.mock.calls[0][1]).not.toHaveProperty("submissionId");
 });
 
+test("malformed snapshot provenance cannot inject nested report or identity data into telemetry", async () => {
+  const report = phaseFourReport();
+  report.result.peerBenchmarkSnapshot = {
+    sourceId: `${"x".repeat(2_048)}ari@example.com`,
+    contentHash: SU_FULL_PHASE_PEER_CONTENT_HASHES[4],
+    phase: {
+      respondentEmail: "ari@example.com",
+      answers: [{ stableKey: "Q01", value: 10 }],
+      result: report.result,
+    },
+  } as never;
+
+  const result = await resolvePeerReportEnhancements({
+    db,
+    report,
+    templateId: "tpl-su",
+    reportStylesAvailable: true,
+    peerBenchmarksEnabled: true,
+    enabledAliases: ["scaling-up-full"],
+    logger: { warn },
+  });
+
+  expect(result.report).toBe(report);
+  expect(findMany).not.toHaveBeenCalled();
+  expect(warn).toHaveBeenCalledWith("assessment.peer_benchmark.unavailable", {
+    reason: "SNAPSHOT_INCOMPLETE",
+    templateAlias: "scaling-up-full",
+    expectedCount: 61,
+    frozenCount: 61,
+    scoreCount: 61,
+    contentHash: SU_FULL_PHASE_PEER_CONTENT_HASHES[4],
+  });
+  const serializedWarning = JSON.stringify(warn.mock.calls[0][1]);
+  expect(serializedWarning).not.toContain("ari@example.com");
+  expect(serializedWarning).not.toContain("answers");
+  expect(serializedWarning).not.toContain("perQuestion");
+});
+
 test("an LVA benchmark DB failure retains the original report and logs only the error name", async () => {
   const report = lvaReport();
   findMany.mockRejectedValue(new TypeError("database credentials are secret"));

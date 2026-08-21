@@ -171,3 +171,52 @@ test("ignores a legitimate non-slider background question", () => {
 
   expect(buildSuFullPeerPresentationResult({ report }).status).toBe("ready");
 });
+
+test("renders questions in canonical Q01-Q61 order regardless of object insertion order", () => {
+  const report = phaseFourReport();
+  report.questionsByKey = Object.fromEntries(
+    Object.entries(report.questionsByKey).reverse(),
+  );
+
+  const result = buildSuFullPeerPresentationResult({ report });
+
+  expect(result.status).toBe("ready");
+  if (result.status !== "ready") throw new Error(result.reason);
+  expect(
+    result.presentation.sections.flatMap((section) =>
+      section.questions.map((question) => question.stableKey),
+    ),
+  ).toEqual(
+    Array.from({ length: 61 }, (_, index) =>
+      `Q${String(index + 1).padStart(2, "0")}`,
+    ),
+  );
+});
+
+test("classifies a malformed executable legacy baseline independently of its own keys", () => {
+  const report = completeSuFullPeerReport();
+  let isolatedResult: ReturnType<typeof buildSuFullPeerPresentationResult> | undefined;
+
+  jest.doMock("@/lib/assessments/su-full-question-benchmarks", () => {
+    const actual = jest.requireActual(
+      "@/lib/assessments/su-full-question-benchmarks",
+    ) as typeof import("@/lib/assessments/su-full-question-benchmarks");
+    return {
+      ...actual,
+      SU_FULL_QUESTION_BENCHMARKS: actual.SU_FULL_QUESTION_BENCHMARKS.slice(1),
+    };
+  });
+  jest.isolateModules(() => {
+    const isolated = jest.requireActual(
+      "@/lib/assessments/su-full-peer-presentation",
+    ) as typeof import("@/lib/assessments/su-full-peer-presentation");
+    isolatedResult = isolated.buildSuFullPeerPresentationResult({ report });
+  });
+  jest.dontMock("@/lib/assessments/su-full-question-benchmarks");
+
+  expect(isolatedResult).toMatchObject({
+    status: "unavailable",
+    reason: "LEGACY_BASELINE_INCOMPLETE",
+    expectedCount: 61,
+  });
+});
