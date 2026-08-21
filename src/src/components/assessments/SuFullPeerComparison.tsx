@@ -4,6 +4,8 @@ import type {
   SuFullPeerSectionComparison,
 } from "@/lib/assessments/su-full-peer-presentation";
 
+const PEER_DISCLOSURE = "Peers are a governed benchmark snapshot selected by organizational phase and frozen when this result was scored. This is not an industry-, geography-, or cohort-matched comparison.";
+
 function formatValue(value: number): string {
   return value.toFixed(1);
 }
@@ -12,13 +14,10 @@ function fillWidth(value: number): string {
   return `${Math.max(0, Math.min(10, value)) * 10}%`;
 }
 
-function formatBenchmarkDate(value: string): string {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(value));
+function provenanceLabel(presentation: SuFullPeerPresentation): string {
+  return presentation.provenance.legacy
+    ? `Legacy baseline · ${presentation.provenance.sourceId}`
+    : `Phase P${presentation.provenance.phase} · ${presentation.provenance.sourceId}`;
 }
 
 function PairedBars({
@@ -111,7 +110,7 @@ function SuFullPeerDetails({
                 className="su-peer-feedback"
                 data-testid={`su-full-peer-feedback-${question.stableKey}`}
               >
-                <h4 className="su-peer-feedback-title">Your feedback</h4>
+                <h4 className="su-peer-feedback-title">Frozen feedback</h4>
                 <p>{question.recommendation}</p>
               </div>
             ) : null}
@@ -136,9 +135,8 @@ export function SuFullPeerComparison({
         </section>
       ))}
       <p className="su-peer-disclosure" data-testid="su-full-peer-disclosure">
-        Peers are a current benchmark reference. Values are not yet matched to
-        company size, growth phase, geography, or industry. Last updated{" "}
-        {formatBenchmarkDate(presentation.benchmarkUpdatedAt)}.
+        <span>{PEER_DISCLOSURE}</span>
+        <span className="su-peer-provenance">{provenanceLabel(presentation)}</span>
       </p>
     </section>
   );

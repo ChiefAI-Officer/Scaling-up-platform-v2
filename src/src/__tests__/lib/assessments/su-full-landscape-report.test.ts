@@ -8,6 +8,10 @@ import {
   completeSuFullLandscapePresentation,
   completeSuFullLandscapeReport,
 } from "@/__tests__/fixtures/su-full-landscape";
+import {
+  SU_FULL_PHASE_PEER_CONTENT_HASHES,
+  SU_FULL_PHASE_PEER_SOURCE_ID,
+} from "@/lib/assessments/su-full-phase-peer-catalogue";
 
 function detailKeys(model: SuFullLandscapeReportModel): string[] {
   return model.pages.flatMap((page) => page.kind === "detail" ? page.questionKeys : []);
@@ -62,6 +66,12 @@ describe("buildSuFullLandscapeReportModel", () => {
     expect(new Set(detailKeys(model!)).size).toBe(61);
     expect(chapterPageNumbers(model!)).toEqual([7, 11, 14, 19, 21]);
     expect(model!.pages[25].kind).toBe("appendix");
+    expect(model!.peerProvenance).toEqual({
+      sourceId: SU_FULL_PHASE_PEER_SOURCE_ID,
+      contentHash: SU_FULL_PHASE_PEER_CONTENT_HASHES[4],
+      phase: 4,
+      legacy: false,
+    });
     expect(Object.isFrozen(model)).toBe(true);
     expect(Object.isFrozen(model!.pages)).toBe(true);
   });
@@ -106,10 +116,10 @@ describe("buildSuFullLandscapeReportModel", () => {
       chapterKey: "people",
       youAverage: 3.5,
     });
-    expect(model!.profileRows[0].peersAverage).toBeCloseTo(5.7125);
-    expect(model!.profileRows[0].deviation).toBeCloseTo(-2.2125);
-    expect(model!.chapters[0]).toMatchObject({ key: "people", youAverage: 56 / 13, peersAverage: 77.5 / 13 });
-    expect(model!.chapters[0].questions[0]).toMatchObject({ stableKey: "Q01", you: 0, peers: 6.3, gap: -6.3 });
+    expect(model!.profileRows[0].peersAverage).toBeCloseTo(5.875);
+    expect(model!.profileRows[0].deviation).toBeCloseTo(-2.375);
+    expect(model!.chapters[0]).toMatchObject({ key: "people", youAverage: 56 / 13, peersAverage: 79.6 / 13 });
+    expect(model!.chapters[0].questions[0]).toMatchObject({ stableKey: "Q01", you: 0, peers: 6.6, gap: -6.6 });
     expect(model!.closestQuestions.map((question) => Math.abs(question.gap))).toEqual(
       [...model!.closestQuestions].map((question) => Math.abs(question.gap)).sort((a, b) => a - b),
     );
@@ -121,19 +131,36 @@ describe("buildSuFullLandscapeReportModel", () => {
   it("prefers the frozen recommendation phase and keeps the legacy FTE fallback for old results", () => {
     const report = completeSuFullLandscapeReport();
     const presentation = completeSuFullLandscapePresentation(report);
+    const historical = {
+      ...report,
+      result: {
+        ...report.result,
+        peerBenchmarkSnapshot: undefined,
+        perQuestion: report.result.perQuestion.map((question) => {
+          const historicalQuestion = { ...question };
+          delete historicalQuestion.peerValue;
+          return historicalQuestion;
+        }),
+      },
+    };
 
-    expect(buildSuFullLandscapeReportModel({ report, presentation, resolvedStyle: "CLASSIC" })!.growthPhase).toMatchObject({ number: 2 });
+    expect(buildSuFullLandscapeReportModel({ report, presentation, resolvedStyle: "CLASSIC" })!.growthPhase).toMatchObject({ number: 4 });
     expect(buildSuFullLandscapeReportModel({
       report: {
-        ...report,
-        result: { ...report.result, recommendationPhase: 3 },
+        ...historical,
+        result: { ...historical.result, recommendationPhase: 3 },
       },
-      presentation,
+      presentation: completeSuFullLandscapePresentation(historical),
       resolvedStyle: "CLASSIC",
     })!.growthPhase).toMatchObject({ number: 3 });
+    const noFrozenPhase = {
+      ...historical,
+      result: { ...historical.result, recommendationPhase: undefined },
+      rawAnswers: [{ stableKey: "Q_FTE_CONTRACT", value: 0 }],
+    };
     expect(buildSuFullLandscapeReportModel({
-      report: { ...report, rawAnswers: [{ stableKey: "Q_FTE_CONTRACT", value: 0 }] },
-      presentation,
+      report: noFrozenPhase,
+      presentation: completeSuFullLandscapePresentation(noFrozenPhase),
       resolvedStyle: "CLASSIC",
     })!.growthPhase).toBeNull();
   });
@@ -151,7 +178,18 @@ describe("buildSuFullLandscapeReportModel", () => {
             : question),
         },
       };
-      const presentation = completeSuFullLandscapePresentation(report);
+      const presentation = completeSuFullLandscapePresentation({
+        ...report,
+        result: {
+          ...report.result,
+          peerBenchmarkSnapshot: undefined,
+          perQuestion: report.result.perQuestion.map((question) => {
+            const historicalQuestion = { ...question };
+            delete historicalQuestion.peerValue;
+            return historicalQuestion;
+          }),
+        },
+      });
       const model = buildSuFullLandscapeReportModel({ report, presentation, resolvedStyle: "CLASSIC" });
       const question = model?.chapters.flatMap((chapter) => chapter.questions)
         .find(({ stableKey }) => stableKey === "Q13");

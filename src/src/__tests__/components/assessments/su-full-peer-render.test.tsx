@@ -4,7 +4,6 @@ import { join } from "node:path";
 
 import { BrandedReport } from "@/components/assessments/BrandedReport";
 import {
-  completeSuFullBenchmarkRows,
   completeSuFullPeerReport,
 } from "@/__tests__/fixtures/su-full-peer";
 import {
@@ -13,10 +12,13 @@ import {
 } from "@/__tests__/fixtures/su-full-landscape";
 import { buildSuFullPeerPresentationResult } from "@/lib/assessments/su-full-peer-presentation";
 import { reviveOnScreenReport } from "@/lib/assessments/onscreen-result-store";
+import { SU_FULL_PHASE_PEER_SOURCE_ID } from "@/lib/assessments/su-full-phase-peer-catalogue";
+import { SU_FULL_LEGACY_PEER_SOURCE_ID } from "@/lib/assessments/su-full-question-benchmarks";
 
 const LANDSCAPE_ENABLED = "NEXT_PUBLIC_WAVE_SU_FULL_LANDSCAPE_REPORT_ENABLED";
 const LANDSCAPE_KILL = "NEXT_PUBLIC_WAVE_SU_FULL_LANDSCAPE_REPORT_KILL";
 const savedLandscapeEnv: Record<string, string | undefined> = {};
+const PEER_DISCLOSURE = "Peers are a governed benchmark snapshot selected by organizational phase and frozen when this result was scored. This is not an industry-, geography-, or cohort-matched comparison.";
 
 beforeEach(() => {
   for (const key of [LANDSCAPE_ENABLED, LANDSCAPE_KILL]) {
@@ -42,7 +44,6 @@ function suFullReportWithPeers() {
 
   const built = buildSuFullPeerPresentationResult({
     report,
-    benchmarks: completeSuFullBenchmarkRows(),
   });
   if (built.status !== "ready") throw new Error(built.reason);
   return { ...report, suFullPeerPresentation: built.presentation };
@@ -51,7 +52,6 @@ function suFullReportWithPeers() {
 function presentationFor(report = completeSuFullPeerReport()) {
   const built = buildSuFullPeerPresentationResult({
     report,
-    benchmarks: completeSuFullBenchmarkRows(),
   });
   if (built.status !== "ready") throw new Error(built.reason);
   return built.presentation;
@@ -88,6 +88,7 @@ test("keeps the shipped Classic SU Full peer sequence while the landscape gate i
     bars.compareDocumentPosition(feedback) & Node.DOCUMENT_POSITION_FOLLOWING,
   ).toBeTruthy();
   expect(feedback).toHaveTextContent("Frozen feedback Q01");
+  expect(within(feedback).getByText("Frozen feedback")).toBeVisible();
 
   expect(screen.queryByTestId("report-sections")).not.toBeInTheDocument();
   expect(screen.getAllByText("Frozen feedback Q01")).toHaveLength(1);
@@ -241,17 +242,24 @@ test("omits blank frozen feedback without inventing placeholder copy", () => {
   expect(detail).not.toHaveTextContent(/no feedback|not available/i);
 });
 
-test("renders one benchmark disclosure with the latest update date", () => {
+test("renders one exact governed disclosure with truthful legacy provenance", () => {
   render(<BrandedReport report={suFullReportWithPeers()} />);
 
   const disclosures = screen.getAllByTestId("su-full-peer-disclosure");
   expect(disclosures).toHaveLength(1);
+  expect(disclosures[0]).toHaveTextContent(PEER_DISCLOSURE);
   expect(disclosures[0]).toHaveTextContent(
-    "Last updated August 18, 2026.",
+    `Legacy baseline · ${SU_FULL_LEGACY_PEER_SOURCE_ID}`,
   );
-  expect(disclosures[0]).toHaveTextContent(
-    "not yet matched to company size, growth phase, geography, or industry",
-  );
+  expect(disclosures[0]).not.toHaveTextContent(/Phase P[1-5]/);
+});
+
+test("renders governed phase provenance in the shipped flag-off peer sequence", () => {
+  render(<BrandedReport report={suFullLandscapeReportWithPeers()} />);
+
+  const disclosure = screen.getByTestId("su-full-peer-disclosure");
+  expect(disclosure).toHaveTextContent(PEER_DISCLOSURE);
+  expect(disclosure).toHaveTextContent(`Phase P4 · ${SU_FULL_PHASE_PEER_SOURCE_ID}`);
 });
 
 test.each([

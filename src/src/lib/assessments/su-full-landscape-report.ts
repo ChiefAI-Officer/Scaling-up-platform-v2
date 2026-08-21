@@ -2,6 +2,7 @@ import type { RespondentReport } from "@/lib/assessments/respondent-report";
 import {
   isSuFullPeerPresentation,
   type SuFullPeerPresentation,
+  type SuFullPeerProvenance,
   type SuFullPeerQuestionComparison,
   type SuFullPeerSectionComparison,
 } from "@/lib/assessments/su-full-peer-presentation";
@@ -48,7 +49,7 @@ export type SuFullLandscapePage =
 
 export type SuFullLandscapeReportModel = Readonly<{
   scaleUpScore: number;
-  benchmarkUpdatedAt: string;
+  peerProvenance: SuFullPeerProvenance;
   growthPhase: GrowthPhase | null;
   chapters: readonly SuFullLandscapeChapter[];
   profileRows: readonly SuFullLandscapeProfileRow[];
@@ -414,7 +415,7 @@ export function buildSuFullLandscapeReportModel(input: {
 
   return deepFreeze({
     scaleUpScore: frozen.scaleUpScore,
-    benchmarkUpdatedAt: presentation.benchmarkUpdatedAt,
+    peerProvenance: { ...presentation.provenance },
     growthPhase: growthPhaseFromFrozenResult(report.result, report.rawAnswers),
     chapters,
     profileRows,
