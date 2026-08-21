@@ -2,18 +2,36 @@ import {
   buildSuFullPeerPresentation,
   buildSuFullPeerPresentationResult,
 } from "@/lib/assessments/su-full-peer-presentation";
-import type { RespondentReport } from "@/lib/assessments/respondent-report";
 import {
-  completeSuFullBenchmarkRows,
-  completeSuFullPeerReport,
-} from "@/__tests__/fixtures/su-full-peer";
+  SU_FULL_PHASE_PEER_CONTENT_HASHES,
+  SU_FULL_PHASE_PEER_SOURCE_ID,
+  SU_FULL_PHASE_PEER_VECTORS,
+} from "@/lib/assessments/su-full-phase-peer-catalogue";
+import type { RespondentReport } from "@/lib/assessments/respondent-report";
+import { completeSuFullPeerReport } from "@/__tests__/fixtures/su-full-peer";
 
-test("builds both sections in frozen order and joins all 61 rows by stable key", () => {
-  const benchmarks = completeSuFullBenchmarkRows().reverse();
-  const result = buildSuFullPeerPresentationResult({
-    report: completeSuFullPeerReport(),
-    benchmarks,
-  });
+function phaseFourReport(): RespondentReport {
+  const report = completeSuFullPeerReport();
+  return {
+    ...report,
+    result: {
+      ...report.result,
+      recommendationPhase: 4,
+      peerBenchmarkSnapshot: {
+        sourceId: SU_FULL_PHASE_PEER_SOURCE_ID,
+        contentHash: SU_FULL_PHASE_PEER_CONTENT_HASHES[4],
+        phase: 4,
+      },
+      perQuestion: report.result.perQuestion.map((row) => ({
+        ...row,
+        peerValue: SU_FULL_PHASE_PEER_VECTORS[4][row.stableKey],
+      })),
+    },
+  };
+}
+
+test("renders all 61 frozen P4 peers with their stored provenance", () => {
+  const result = buildSuFullPeerPresentationResult({ report: phaseFourReport() });
 
   expect(result.status).toBe("ready");
   if (result.status !== "ready") throw new Error(result.reason);
@@ -21,47 +39,53 @@ test("builds both sections in frozen order and joins all 61 rows by stable key",
   expect(result.presentation.sections[0].stableKey).toBe("S_PEOPLE_YE");
   expect(result.presentation.sections[0].questions[0]).toMatchObject({
     stableKey: "Q01",
-    peers: 6.3,
+    peers: 6.6,
     recommendation: "Frozen feedback Q01",
   });
-  expect(result.presentation.sections[0]).toMatchObject({
-    youTotal: 28,
-    peersTotal: 45.7,
+  expect(result.presentation.provenance).toEqual({
+    sourceId: "2026-08-20.esperto-five-phase-peers-v1",
+    contentHash: "ae9e9e2fbfc8525f4e6d8c3ca65775a50b85476371f29a74934dbe6dd3a965ff",
+    phase: 4,
+    legacy: false,
   });
-  expect(result.presentation.sections[1]).toMatchObject({
-    youTotal: 262,
-    peersTotal: 307.1,
-  });
-  expect(result.presentation.benchmarkUpdatedAt).toBe("2026-08-18T00:00:00.000Z");
   expect(Object.isFrozen(result.presentation)).toBe(true);
+  expect(Object.isFrozen(result.presentation.provenance)).toBe(true);
   expect(Object.isFrozen(result.presentation.sections[0].questions)).toBe(true);
+});
+
+test("strictly historical reports render the executable legacy baseline", () => {
+  const result = buildSuFullPeerPresentationResult({
+    report: completeSuFullPeerReport(),
+  });
+
+  expect(result.status).toBe("ready");
+  if (result.status !== "ready") throw new Error(result.reason);
+  expect(result.presentation.sections[0].questions[0].peers).toBe(6.3);
+  expect(result.presentation.provenance).toEqual({
+    sourceId: "2026-08-14.esperto-controlled-v1",
+    contentHash: "fe63364e3b5e42897b3b3886135310f673e320b4a07b1453ad300a49a91b4dbd",
+    phase: null,
+    legacy: true,
+  });
 });
 
 test.each([
   ["wrong alias", (report: RespondentReport) => ({ ...report, templateAlias: "qsp-v2" }), "WRONG_TEMPLATE"],
   ["degraded", (report: RespondentReport) => ({ ...report, degraded: true }), "DEGRADED_REPORT"],
 ])("%s fails closed", (_name, mutate, reason) => {
-  const result = buildSuFullPeerPresentationResult({
-    report: mutate(completeSuFullPeerReport()),
-    benchmarks: completeSuFullBenchmarkRows(),
-  });
+  const report = mutate(phaseFourReport());
+  const result = buildSuFullPeerPresentationResult({ report });
 
   expect(result).toMatchObject({ status: "unavailable", reason });
-  expect(buildSuFullPeerPresentation({
-    report: mutate(completeSuFullPeerReport()),
-    benchmarks: completeSuFullBenchmarkRows(),
-  })).toBeNull();
+  expect(buildSuFullPeerPresentation({ report })).toBeNull();
 });
 
 test("a blank frozen recommendation remains null and is never invented", () => {
-  const report = completeSuFullPeerReport();
+  const report = phaseFourReport();
   const q01 = report.result.perQuestion.find((row) => row.stableKey === "Q01");
   if (q01) q01.recommendation = "";
 
-  const result = buildSuFullPeerPresentationResult({
-    report,
-    benchmarks: completeSuFullBenchmarkRows(),
-  });
+  const result = buildSuFullPeerPresentationResult({ report });
 
   expect(result.status).toBe("ready");
   if (result.status === "ready") {
@@ -69,40 +93,81 @@ test("a blank frozen recommendation remains null and is never invented", () => {
   }
 });
 
+test("a snapshot with only 60 frozen values is unavailable", () => {
+  const report = phaseFourReport();
+  report.result.perQuestion[0].peerValue = undefined;
+
+  expect(buildSuFullPeerPresentationResult({ report })).toMatchObject({
+    status: "unavailable",
+    reason: "SNAPSHOT_INCOMPLETE",
+    expectedCount: 61,
+    frozenCount: 60,
+  });
+});
+
+test("frozen rows without snapshot provenance are unavailable, not historical", () => {
+  const report = phaseFourReport();
+  report.result.peerBenchmarkSnapshot = undefined;
+
+  expect(buildSuFullPeerPresentationResult({ report })).toMatchObject({
+    status: "unavailable",
+    reason: "SNAPSHOT_INCOMPLETE",
+    frozenCount: 61,
+  });
+});
+
+test("snapshot provenance without frozen rows is unavailable, not historical", () => {
+  const report = phaseFourReport();
+  report.result.perQuestion = report.result.perQuestion.map((row) => ({
+    ...row,
+    peerValue: undefined,
+  }));
+
+  expect(buildSuFullPeerPresentationResult({ report })).toMatchObject({
+    status: "unavailable",
+    reason: "SNAPSHOT_INCOMPLETE",
+    frozenCount: 0,
+  });
+});
+
 test.each([
-  ["a missing benchmark", (report: RespondentReport, benchmarks: ReturnType<typeof completeSuFullBenchmarkRows>) => ({ report, benchmarks: benchmarks.slice(1) }), "MISSING_ROWS"],
-  ["duplicate benchmark Q01", (report: RespondentReport, benchmarks: ReturnType<typeof completeSuFullBenchmarkRows>) => ({ report, benchmarks: [benchmarks[0], benchmarks[0], ...benchmarks.slice(1)] }), "DUPLICATE_ROWS"],
-  ["a NaN benchmark", (report: RespondentReport, benchmarks: ReturnType<typeof completeSuFullBenchmarkRows>) => ({ report, benchmarks: benchmarks.map((row, index) => index === 0 ? { ...row, value: Number.NaN } : row) }), "INVALID_BENCHMARK"],
-  ["an out-of-range benchmark", (report: RespondentReport, benchmarks: ReturnType<typeof completeSuFullBenchmarkRows>) => ({ report, benchmarks: benchmarks.map((row, index) => index === 0 ? { ...row, value: 10.1 } : row) }), "INVALID_BENCHMARK"],
-  ["a missing frozen score", (report: RespondentReport, benchmarks: ReturnType<typeof completeSuFullBenchmarkRows>) => ({ report: { ...report, result: { ...report.result, perQuestion: report.result.perQuestion.slice(1) } }, benchmarks }), "MISSING_ROWS"],
-  ["an invalid frozen score", (report: RespondentReport, benchmarks: ReturnType<typeof completeSuFullBenchmarkRows>) => ({ report: { ...report, result: { ...report.result, perQuestion: report.result.perQuestion.map((row, index) => index === 0 ? { ...row, value: -1 } : row) } }, benchmarks }), "INVALID_SCORE"],
-  ["a missing frozen question key", (report: RespondentReport, benchmarks: ReturnType<typeof completeSuFullBenchmarkRows>) => { const questionsByKey = { ...report.questionsByKey }; delete questionsByKey.Q01; return { report: { ...report, questionsByKey }, benchmarks }; }, "KEY_MISMATCH"],
-  ["an invalid benchmark timestamp", (report: RespondentReport, benchmarks: ReturnType<typeof completeSuFullBenchmarkRows>) => ({ report, benchmarks: benchmarks.map((row, index) => index === 0 ? { ...row, updatedAt: "not-a-date" } : row) }), "INVALID_UPDATED_AT"],
-  ["a parseable non-ISO benchmark timestamp", (report: RespondentReport, benchmarks: ReturnType<typeof completeSuFullBenchmarkRows>) => ({ report, benchmarks: benchmarks.map((row, index) => index === 0 ? { ...row, updatedAt: "08/18/2026 00:00:00 GMT" } : row) }), "INVALID_UPDATED_AT"],
-  ["an unexpected required slider key", (report: RespondentReport, benchmarks: ReturnType<typeof completeSuFullBenchmarkRows>) => ({ report: { ...report, questionsByKey: { ...report.questionsByKey, Q62: { type: "SLIDER_LIKERT", label: "Unexpected", max: 10 } } }, benchmarks }), "KEY_MISMATCH"],
+  ["a changed Q01 under valid P4 provenance", (report: RespondentReport) => { report.result.perQuestion[0].peerValue = 6.5; }],
+  ["baseline values under the P4 hash", (report: RespondentReport) => { report.result.perQuestion = report.result.perQuestion.map((row) => ({ ...row, peerValue: SU_FULL_PHASE_PEER_VECTORS[1][row.stableKey] })); }],
+  ["a different catalogue source", (report: RespondentReport) => { if (report.result.peerBenchmarkSnapshot) report.result.peerBenchmarkSnapshot.sourceId = "mutable-current-source"; }],
+  ["a baseline hash under P4", (report: RespondentReport) => { if (report.result.peerBenchmarkSnapshot) report.result.peerBenchmarkSnapshot.contentHash = SU_FULL_PHASE_PEER_CONTENT_HASHES[1]; }],
+  ["a snapshot phase that disagrees with the frozen recommendation phase", (report: RespondentReport) => { if (report.result.peerBenchmarkSnapshot) report.result.peerBenchmarkSnapshot.phase = 3; }],
+])("%s returns SNAPSHOT_HASH_MISMATCH", (_name, mutate) => {
+  const report = phaseFourReport();
+  mutate(report);
+
+  expect(buildSuFullPeerPresentationResult({ report })).toMatchObject({
+    status: "unavailable",
+    reason: "SNAPSHOT_HASH_MISMATCH",
+    frozenCount: 61,
+  });
+});
+
+test.each([
+  ["a missing frozen score", (report: RespondentReport) => { report.result.perQuestion = report.result.perQuestion.slice(1); }, "MISSING_ROWS"],
+  ["an invalid frozen score", (report: RespondentReport) => { report.result.perQuestion[0].value = -1; }, "INVALID_SCORE"],
+  ["a missing frozen question key", (report: RespondentReport) => { const questionsByKey = { ...report.questionsByKey }; delete questionsByKey.Q01; report.questionsByKey = questionsByKey; }, "KEY_MISMATCH"],
+  ["an unexpected required slider key", (report: RespondentReport) => { report.questionsByKey.Q62 = { type: "SLIDER_LIKERT", label: "Unexpected", max: 10 }; }, "KEY_MISMATCH"],
 ])("%s returns a bounded unavailable result", (_name, mutate, reason) => {
-  const { report, benchmarks } = mutate(
-    completeSuFullPeerReport(),
-    completeSuFullBenchmarkRows(),
-  );
-  const result = buildSuFullPeerPresentationResult({ report, benchmarks });
+  const report = phaseFourReport();
+  mutate(report);
+  const result = buildSuFullPeerPresentationResult({ report });
 
   expect(result).toMatchObject({ status: "unavailable", reason });
   expect(result).not.toHaveProperty("presentation");
 });
 
 test("ignores a legitimate non-slider background question", () => {
-  const report = completeSuFullPeerReport();
+  const report = phaseFourReport();
   report.questionsByKey.BACKGROUND_FTE = {
     type: "NUMBER",
     label: "How many employees?",
     sectionStableKey: "S_BACKGROUND",
   };
 
-  const result = buildSuFullPeerPresentationResult({
-    report,
-    benchmarks: completeSuFullBenchmarkRows(),
-  });
-
-  expect(result.status).toBe("ready");
+  expect(buildSuFullPeerPresentationResult({ report }).status).toBe("ready");
 });

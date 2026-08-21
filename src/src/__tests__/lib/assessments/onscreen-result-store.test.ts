@@ -28,10 +28,7 @@ import {
   writeOnScreenResult,
   clearOnScreenResult,
 } from "@/lib/assessments/onscreen-result-store";
-import {
-  completeSuFullBenchmarkRows,
-  completeSuFullPeerReport,
-} from "@/__tests__/fixtures/su-full-peer";
+import { completeSuFullPeerReport } from "@/__tests__/fixtures/su-full-peer";
 import { buildSuFullPeerPresentationResult } from "@/lib/assessments/su-full-peer-presentation";
 import { SU_FULL_PHASE_PEER_VECTORS } from "@/lib/assessments/su-full-phase-peer-catalogue";
 
@@ -47,7 +44,6 @@ const OTHER_KEY = "inv_respondent_b";
 function completePeerPresentation() {
   const built = buildSuFullPeerPresentationResult({
     report: completeSuFullPeerReport(),
-    benchmarks: completeSuFullBenchmarkRows(),
   });
   if (built.status !== "ready") throw new Error(built.reason);
   return built.presentation;
@@ -208,7 +204,16 @@ describe("round trip", () => {
         ),
       },
     ],
-    ["an invalid-date", { ...validPeerPresentation, benchmarkUpdatedAt: "2026-08-18" }],
+    [
+      "an invalid provenance hash",
+      {
+        ...validPeerPresentation,
+        provenance: {
+          ...validPeerPresentation.provenance,
+          contentHash: "not-a-governed-hash",
+        },
+      },
+    ],
     [
       "an out-of-range",
       {

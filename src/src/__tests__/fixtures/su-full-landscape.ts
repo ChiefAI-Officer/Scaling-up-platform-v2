@@ -6,6 +6,11 @@ import {
   SCALING_UP_FULL_TEMPLATE_ALIAS,
   SU_FULL_QUESTION_BENCHMARKS,
 } from "@/lib/assessments/su-full-question-benchmarks";
+import {
+  SU_FULL_PHASE_PEER_CONTENT_HASHES,
+  SU_FULL_PHASE_PEER_SOURCE_ID,
+  getGovernedPeerValue,
+} from "@/lib/assessments/su-full-phase-peer-catalogue";
 import type { RespondentReport } from "@/lib/assessments/respondent-report";
 import { buildTemplateContent } from "../../../prisma/seed-scaling-up-full-assessment";
 
@@ -67,6 +72,12 @@ export function completeSuFullLandscapeReport(): RespondentReport {
     submittedAt: new Date("2026-08-17T00:00:00Z"),
     result: {
       scaleUpScore: 55,
+      recommendationPhase: 4,
+      peerBenchmarkSnapshot: {
+        sourceId: SU_FULL_PHASE_PEER_SOURCE_ID,
+        contentHash: SU_FULL_PHASE_PEER_CONTENT_HASHES[4],
+        phase: 4,
+      },
       perQuestion: sliderQuestions.map((question, index) => {
         const value = index % 11;
         const selectedBand = question.recommendations.find(
@@ -78,6 +89,7 @@ export function completeSuFullLandscapeReport(): RespondentReport {
           value,
           achieved: true,
           recommendation: selectedBand.text,
+          peerValue: getGovernedPeerValue(question.stableKey, 4) ?? undefined,
         };
       }),
       perSection: [],
@@ -107,11 +119,6 @@ export function completeSuFullLandscapePresentation(
 ): SuFullPeerPresentation {
   const presentation = buildSuFullPeerPresentation({
     report,
-    benchmarks: SU_FULL_QUESTION_BENCHMARKS.map((benchmark) => ({
-      metricKey: benchmark.stableKey,
-      value: benchmark.value,
-      updatedAt: new Date("2026-08-18T00:00:00Z"),
-    })),
   });
   if (!presentation) throw new Error("Canonical landscape fixture must build a peer presentation");
   return presentation;

@@ -1,18 +1,20 @@
 import type { RespondentReport } from "@/lib/assessments/respondent-report";
 import {
+  SU_FULL_PHASE_PEER_CONTENT_HASHES,
+  SU_FULL_PHASE_PEER_SOURCE_ID,
+  getGovernedPeerValue,
+} from "@/lib/assessments/su-full-phase-peer-catalogue";
+import type { GrowthPhaseNumber } from "@/lib/assessments/su-full-phase";
+import {
   SCALING_UP_FULL_TEMPLATE_ALIAS,
+  SU_FULL_LEGACY_PEER_CONTENT_HASH,
+  SU_FULL_LEGACY_PEER_SOURCE_ID,
   SU_FULL_QUESTION_BENCHMARKS,
 } from "@/lib/assessments/su-full-question-benchmarks";
 
 const EXPECTED_KEYS = SU_FULL_QUESTION_BENCHMARKS.map((row) => row.stableKey);
 const EXPECTED_KEY_SET = new Set<string>(EXPECTED_KEYS);
-const ISO_TIMESTAMP_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
-
-export type SuFullPeerBenchmarkRow = Readonly<{
-  metricKey: string;
-  value: number;
-  updatedAt: Date | string;
-}>;
+const CONTENT_HASH_PATTERN = /^[a-f0-9]{64}$/;
 
 export type SuFullPeerQuestionComparison = Readonly<{
   stableKey: string;
@@ -31,8 +33,15 @@ export type SuFullPeerSectionComparison = Readonly<{
   questions: readonly SuFullPeerQuestionComparison[];
 }>;
 
+export type SuFullPeerProvenance = Readonly<{
+  sourceId: string;
+  contentHash: string;
+  phase: GrowthPhaseNumber | null;
+  legacy: boolean;
+}>;
+
 export type SuFullPeerPresentation = Readonly<{
-  benchmarkUpdatedAt: string;
+  provenance: SuFullPeerProvenance;
   sections: readonly SuFullPeerSectionComparison[];
 }>;
 
@@ -41,10 +50,10 @@ export type SuFullPeerBuildReason =
   | "DEGRADED_REPORT"
   | "KEY_MISMATCH"
   | "MISSING_ROWS"
-  | "DUPLICATE_ROWS"
-  | "INVALID_BENCHMARK"
   | "INVALID_SCORE"
-  | "INVALID_UPDATED_AT";
+  | "SNAPSHOT_INCOMPLETE"
+  | "SNAPSHOT_HASH_MISMATCH"
+  | "LEGACY_BASELINE_INCOMPLETE";
 
 export type SuFullPeerBuildResult =
   | Readonly<{ status: "ready"; presentation: SuFullPeerPresentation }>
@@ -52,8 +61,11 @@ export type SuFullPeerBuildResult =
       status: "unavailable";
       reason: SuFullPeerBuildReason;
       expectedCount: number;
-      benchmarkCount: number;
+      frozenCount: number;
       scoreCount: number;
+      sourceId?: string;
+      phase?: unknown;
+      contentHash?: string;
     }>;
 
 type FrozenQuestionMeta = Readonly<{
@@ -70,15 +82,25 @@ type FrozenSection = Readonly<{
 
 function unavailable(
   reason: SuFullPeerBuildReason,
-  benchmarkCount: number,
+  frozenCount: number,
   scoreCount: number,
+  snapshot?: Record<string, unknown>,
 ): SuFullPeerBuildResult {
+  const sourceId = typeof snapshot?.sourceId === "string"
+    ? snapshot.sourceId
+    : undefined;
+  const contentHash = typeof snapshot?.contentHash === "string"
+    ? snapshot.contentHash
+    : undefined;
   return {
     status: "unavailable",
     reason,
     expectedCount: EXPECTED_KEYS.length,
-    benchmarkCount,
+    frozenCount,
     scoreCount,
+    ...(sourceId === undefined ? {} : { sourceId }),
+    ...(snapshot && "phase" in snapshot ? { phase: snapshot.phase } : {}),
+    ...(contentHash === undefined ? {} : { contentHash }),
   };
 }
 
@@ -93,7 +115,9 @@ function hasExactlyExpectedKeys(keys: readonly string[]): boolean {
 }
 
 function roundedTotal(values: readonly number[]): number {
-  return Math.round((values.reduce((total, value) => total + value, 0) + Number.EPSILON) * 10) / 10;
+  return Math.round(
+    (values.reduce((total, value) => total + value, 0) + Number.EPSILON) * 10,
+  ) / 10;
 }
 
 function isNonBlankString(value: unknown): value is string {
@@ -107,16 +131,8 @@ function isPeerValue(value: unknown): value is number {
     && value <= 10;
 }
 
-function dateFromUpdatedAt(value: Date | string): Date | null {
-  if (typeof value === "string" && !ISO_TIMESTAMP_PATTERN.test(value)) {
-    return null;
-  }
-  const date = value instanceof Date
-    ? value
-    : typeof value === "string"
-      ? new Date(value)
-      : null;
-  return date && Number.isFinite(date.getTime()) ? date : null;
+function isGrowthPhase(value: unknown): value is GrowthPhaseNumber {
+  return value === 1 || value === 2 || value === 3 || value === 4 || value === 5;
 }
 
 function deepFreeze<T>(value: T, seen = new WeakSet<object>()): T {
@@ -136,10 +152,17 @@ function deepFreeze<T>(value: T, seen = new WeakSet<object>()): T {
 export function isSuFullPeerPresentation(
   value: unknown,
 ): value is SuFullPeerPresentation {
-  if (!isRecord(value)) return false;
+  if (!isRecord(value) || !isRecord(value.provenance)) return false;
+  const provenance = value.provenance;
   if (
-    typeof value.benchmarkUpdatedAt !== "string"
-    || dateFromUpdatedAt(value.benchmarkUpdatedAt) === null
+    !isNonBlankString(provenance.sourceId)
+    || typeof provenance.contentHash !== "string"
+    || !CONTENT_HASH_PATTERN.test(provenance.contentHash)
+    || typeof provenance.legacy !== "boolean"
+    || !(
+      (provenance.legacy && provenance.phase === null)
+      || (!provenance.legacy && isGrowthPhase(provenance.phase))
+    )
   ) {
     return false;
   }
@@ -156,10 +179,7 @@ export function isSuFullPeerPresentation(
       || !isNonBlankString(section.stableKey)
       || sectionKeys.has(section.stableKey)
       || !isNonBlankString(section.label)
-      || !(
-        section.domain === null
-        || isNonBlankString(section.domain)
-      )
+      || !(section.domain === null || isNonBlankString(section.domain))
       || typeof section.youTotal !== "number"
       || !Number.isFinite(section.youTotal)
       || typeof section.peersTotal !== "number"
@@ -204,116 +224,71 @@ export function isSuFullPeerPresentation(
     && questionKeys.every((key, index) => key === EXPECTED_KEYS[index]);
 }
 
-/**
- * Builds an all-or-nothing Scaling Up Full comparison from frozen submission
- * values and current template-level peer benchmark rows. It never re-scores or
- * re-resolves feedback.
- */
-export function buildSuFullPeerPresentationResult(input: {
-  report: RespondentReport;
-  benchmarks: readonly SuFullPeerBenchmarkRow[];
-}): SuFullPeerBuildResult {
-  const report = input?.report;
-  const benchmarks = Array.isArray(input?.benchmarks) ? input.benchmarks : [];
-  const benchmarkCount = benchmarks.length;
-  const scoreRows = Array.isArray(report?.result?.perQuestion)
-    ? report.result.perQuestion
-    : [];
-  const scoreCount = scoreRows.length;
-
-  if (!report || report.templateAlias !== SCALING_UP_FULL_TEMPLATE_ALIAS) {
-    return unavailable("WRONG_TEMPLATE", benchmarkCount, scoreCount);
-  }
-  if (report.degraded) {
-    return unavailable("DEGRADED_REPORT", benchmarkCount, scoreCount);
-  }
-
-  const questionsByKey = report.questionsByKey;
-  if (!isRecord(questionsByKey)) {
-    return unavailable("KEY_MISMATCH", benchmarkCount, scoreCount);
-  }
-  const sliderQuestionEntries = Object.entries(questionsByKey).filter(
-    ([, question]) => isRecord(question) && (question as FrozenQuestionMeta).type === "SLIDER_LIKERT",
-  ) as Array<[string, FrozenQuestionMeta]>;
-  if (!hasExactlyExpectedKeys(sliderQuestionEntries.map(([key]) => key))) {
-    return unavailable("KEY_MISMATCH", benchmarkCount, scoreCount);
-  }
-
-  if (scoreCount < EXPECTED_KEYS.length) {
-    return unavailable("MISSING_ROWS", benchmarkCount, scoreCount);
-  }
-  if (!hasExactlyExpectedKeys(scoreRows.map((row) => row?.stableKey))) {
-    return unavailable("KEY_MISMATCH", benchmarkCount, scoreCount);
-  }
-
-  const duplicateBenchmarkKey = new Set<string>();
-  for (const row of benchmarks) {
-    if (!row || typeof row.metricKey !== "string" || duplicateBenchmarkKey.has(row.metricKey)) {
-      return unavailable("DUPLICATE_ROWS", benchmarkCount, scoreCount);
-    }
-    duplicateBenchmarkKey.add(row.metricKey);
-  }
-  if (benchmarkCount < EXPECTED_KEYS.length) {
-    return unavailable("MISSING_ROWS", benchmarkCount, scoreCount);
-  }
-  if (!hasExactlyExpectedKeys(benchmarks.map((row) => row.metricKey))) {
-    return unavailable("KEY_MISMATCH", benchmarkCount, scoreCount);
-  }
-
-  for (const row of benchmarks) {
-    if (!Number.isFinite(row.value) || row.value < 0 || row.value > 10) {
-      return unavailable("INVALID_BENCHMARK", benchmarkCount, scoreCount);
-    }
-  }
-  for (const row of scoreRows) {
-    if (!Number.isFinite(row.value) || row.value < 0 || row.value > 10) {
-      return unavailable("INVALID_SCORE", benchmarkCount, scoreCount);
-    }
-  }
-
-  const datedBenchmarks = benchmarks.map((row) => ({
-    row,
-    updatedAt: dateFromUpdatedAt(row.updatedAt),
-  }));
-  if (datedBenchmarks.some(({ updatedAt }) => updatedAt === null)) {
-    return unavailable("INVALID_UPDATED_AT", benchmarkCount, scoreCount);
+function buildPresentationFromValues(
+  report: RespondentReport,
+  sliderQuestionEntries: Array<[string, FrozenQuestionMeta]>,
+  scoreRows: RespondentReport["result"]["perQuestion"],
+  valuesByKey: ReadonlyMap<string, number>,
+  provenance: SuFullPeerProvenance,
+  frozenCount: number,
+): SuFullPeerBuildResult {
+  if (
+    !hasExactlyExpectedKeys([...valuesByKey.keys()])
+    || [...valuesByKey.values()].some((value) => !isPeerValue(value))
+  ) {
+    return unavailable(
+      provenance.legacy
+        ? "LEGACY_BASELINE_INCOMPLETE"
+        : "SNAPSHOT_HASH_MISMATCH",
+      frozenCount,
+      scoreRows.length,
+    );
   }
 
   const sections = Array.isArray(report.sections)
     ? report.sections as FrozenSection[]
     : [];
   const scoreByKey = new Map(scoreRows.map((row) => [row.stableKey, row]));
-  const benchmarkByKey = new Map(benchmarks.map((row) => [row.metricKey, row]));
   const presentationSections: SuFullPeerSectionComparison[] = [];
   const emittedKeys: string[] = [];
 
   for (const section of sections) {
-    if (!isRecord(section) || typeof section.stableKey !== "string" || typeof section.name !== "string") {
-      return unavailable("KEY_MISMATCH", benchmarkCount, scoreCount);
-    }
-    if (section.domain !== undefined && section.domain !== null && typeof section.domain !== "string") {
-      return unavailable("KEY_MISMATCH", benchmarkCount, scoreCount);
+    if (
+      !isRecord(section)
+      || typeof section.stableKey !== "string"
+      || typeof section.name !== "string"
+      || (
+        section.domain !== undefined
+        && section.domain !== null
+        && typeof section.domain !== "string"
+      )
+    ) {
+      return unavailable("KEY_MISMATCH", frozenCount, scoreRows.length);
     }
     const questions = sliderQuestionEntries
       .filter(([, question]) => question.sectionStableKey === section.stableKey)
       .map(([stableKey, question]) => {
         const score = scoreByKey.get(stableKey);
-        const benchmark = benchmarkByKey.get(stableKey);
-        if (!score || !benchmark || typeof question.label !== "string") return null;
+        const peerValue = valuesByKey.get(stableKey);
+        if (!score || peerValue === undefined || typeof question.label !== "string") {
+          return null;
+        }
         emittedKeys.push(stableKey);
         return {
           stableKey,
           label: question.label,
           you: score.value,
-          peers: benchmark.value,
-          recommendation: typeof score.recommendation === "string" && score.recommendation.trim() !== ""
-            ? score.recommendation
-            : null,
+          peers: peerValue,
+          recommendation:
+            typeof score.recommendation === "string"
+            && score.recommendation.trim() !== ""
+              ? score.recommendation
+              : null,
         };
       });
 
     if (questions.some((question) => question === null)) {
-      return unavailable("KEY_MISMATCH", benchmarkCount, scoreCount);
+      return unavailable("KEY_MISMATCH", frozenCount, scoreRows.length);
     }
     if (questions.length > 0) {
       const comparisons = questions as SuFullPeerQuestionComparison[];
@@ -329,29 +304,142 @@ export function buildSuFullPeerPresentationResult(input: {
   }
 
   if (!hasExactlyExpectedKeys(emittedKeys)) {
-    return unavailable("KEY_MISMATCH", benchmarkCount, scoreCount);
-  }
-
-  const greatestUpdatedAt = datedBenchmarks.reduce(
-    (greatest, { updatedAt }) => greatest && updatedAt && updatedAt > greatest ? updatedAt : greatest,
-    datedBenchmarks[0]?.updatedAt,
-  );
-  if (!greatestUpdatedAt) {
-    return unavailable("INVALID_UPDATED_AT", benchmarkCount, scoreCount);
+    return unavailable("KEY_MISMATCH", frozenCount, scoreRows.length);
   }
 
   return {
     status: "ready",
     presentation: deepFreeze({
-      benchmarkUpdatedAt: greatestUpdatedAt.toISOString(),
+      provenance,
       sections: presentationSections,
     }),
   };
 }
 
+/**
+ * Builds Scaling Up Full Peers only from the result's frozen snapshot. Reports
+ * with neither snapshot provenance nor any frozen peer rows use the explicit
+ * historical baseline. Declared-but-invalid snapshots fail closed.
+ */
+export function buildSuFullPeerPresentationResult(input: {
+  report: RespondentReport;
+}): SuFullPeerBuildResult {
+  const report = input?.report;
+  const scoreRows = Array.isArray(report?.result?.perQuestion)
+    ? report.result.perQuestion
+    : [];
+  const scoreCount = scoreRows.length;
+  const frozenRows = scoreRows.filter((row) => row?.peerValue !== undefined);
+  const frozenCount = frozenRows.length;
+
+  if (!report || report.templateAlias !== SCALING_UP_FULL_TEMPLATE_ALIAS) {
+    return unavailable("WRONG_TEMPLATE", frozenCount, scoreCount);
+  }
+  if (report.degraded) {
+    return unavailable("DEGRADED_REPORT", frozenCount, scoreCount);
+  }
+
+  const questionsByKey = report.questionsByKey;
+  if (!isRecord(questionsByKey)) {
+    return unavailable("KEY_MISMATCH", frozenCount, scoreCount);
+  }
+  const sliderQuestionEntries = Object.entries(questionsByKey).filter(
+    ([, question]) =>
+      isRecord(question)
+      && (question as FrozenQuestionMeta).type === "SLIDER_LIKERT",
+  ) as Array<[string, FrozenQuestionMeta]>;
+  if (!hasExactlyExpectedKeys(sliderQuestionEntries.map(([key]) => key))) {
+    return unavailable("KEY_MISMATCH", frozenCount, scoreCount);
+  }
+
+  if (scoreCount < EXPECTED_KEYS.length) {
+    return unavailable("MISSING_ROWS", frozenCount, scoreCount);
+  }
+  if (!hasExactlyExpectedKeys(scoreRows.map((row) => row?.stableKey))) {
+    return unavailable("KEY_MISMATCH", frozenCount, scoreCount);
+  }
+  if (scoreRows.some((row) => !isPeerValue(row.value))) {
+    return unavailable("INVALID_SCORE", frozenCount, scoreCount);
+  }
+
+  const rawSnapshot: unknown = report.result.peerBenchmarkSnapshot;
+  const hasSnapshot = rawSnapshot !== undefined;
+  if (!hasSnapshot && frozenCount === 0) {
+    return buildPresentationFromValues(
+      report,
+      sliderQuestionEntries,
+      scoreRows,
+      new Map(
+        SU_FULL_QUESTION_BENCHMARKS.map((row) => [row.stableKey, row.value]),
+      ),
+      {
+        sourceId: SU_FULL_LEGACY_PEER_SOURCE_ID,
+        contentHash: SU_FULL_LEGACY_PEER_CONTENT_HASH,
+        phase: null,
+        legacy: true,
+      },
+      frozenCount,
+    );
+  }
+
+  if (
+    !isRecord(rawSnapshot)
+    || frozenCount !== EXPECTED_KEYS.length
+    || !isNonBlankString(rawSnapshot.sourceId)
+    || typeof rawSnapshot.contentHash !== "string"
+    || !CONTENT_HASH_PATTERN.test(rawSnapshot.contentHash)
+    || !isGrowthPhase(rawSnapshot.phase)
+    || !isGrowthPhase(report.result.recommendationPhase)
+  ) {
+    return unavailable(
+      "SNAPSHOT_INCOMPLETE",
+      frozenCount,
+      scoreCount,
+      isRecord(rawSnapshot) ? rawSnapshot : undefined,
+    );
+  }
+
+  const phase = rawSnapshot.phase;
+  const expectedHash = SU_FULL_PHASE_PEER_CONTENT_HASHES[phase];
+  const frozenValues = new Map(
+    frozenRows.map((row) => [row.stableKey, row.peerValue as number]),
+  );
+  const snapshotMatches =
+    rawSnapshot.sourceId === SU_FULL_PHASE_PEER_SOURCE_ID
+    && rawSnapshot.contentHash === expectedHash
+    && report.result.recommendationPhase === phase
+    && hasExactlyExpectedKeys([...frozenValues.keys()])
+    && EXPECTED_KEYS.every((stableKey) => {
+      const frozenValue = frozenValues.get(stableKey);
+      return isPeerValue(frozenValue)
+        && frozenValue === getGovernedPeerValue(stableKey, phase);
+    });
+  if (!snapshotMatches) {
+    return unavailable(
+      "SNAPSHOT_HASH_MISMATCH",
+      frozenCount,
+      scoreCount,
+      rawSnapshot,
+    );
+  }
+
+  return buildPresentationFromValues(
+    report,
+    sliderQuestionEntries,
+    scoreRows,
+    frozenValues,
+    {
+      sourceId: rawSnapshot.sourceId,
+      contentHash: rawSnapshot.contentHash,
+      phase,
+      legacy: false,
+    },
+    frozenCount,
+  );
+}
+
 export function buildSuFullPeerPresentation(input: {
   report: RespondentReport;
-  benchmarks: readonly SuFullPeerBenchmarkRow[];
 }): SuFullPeerPresentation | null {
   const result = buildSuFullPeerPresentationResult(input);
   return result.status === "ready" ? result.presentation : null;
