@@ -194,6 +194,70 @@ type ReportHtmlPosition = keyof typeof REPORT_HTML_LIMITS;
 const VOID_TAGS = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"]);
 const TAG_TOKEN = /<\/?([a-z][a-z0-9:-]*)(?:\s[^<>]*?)?\s*\/?>/gi;
 const HEADING_TAGS = new Set(["h1", "h2", "h3", "h4", "h5", "h6"]);
+const TABLE_ROW_GROUP_TAGS = new Set(["thead", "tbody", "tfoot"]);
+const TABLE_RESTRICTED_PARENT_TAGS = new Set(["table", "colgroup", "thead", "tbody", "tfoot", "tr"]);
+const TABLE_FAMILY_TAGS = new Set(["table", "caption", "colgroup", "col", "thead", "tbody", "tfoot", "tr", "th", "td"]);
+
+type TableGrammarState = {
+  phase: 0 | 1 | 2 | 3 | 4;
+  rowMode: null | "direct" | "grouped";
+  seenHead: boolean;
+  seenFoot: boolean;
+};
+
+function tableTagHasValidParent(
+  tag: string,
+  parent: string | undefined,
+  tableState: TableGrammarState | undefined,
+): boolean {
+  if (tag === "table") return tableState === undefined;
+  if (!TABLE_FAMILY_TAGS.has(tag)) {
+    return parent === undefined || !TABLE_RESTRICTED_PARENT_TAGS.has(parent);
+  }
+  if (!tableState) return false;
+
+  if (tag === "caption") {
+    if (parent !== "table" || tableState.phase !== 0) return false;
+    return true;
+  }
+  if (tag === "colgroup") {
+    if (parent !== "table" || tableState.phase > 1) return false;
+    tableState.phase = 1;
+    return true;
+  }
+  if (tag === "col") return parent === "colgroup";
+  if (tag === "thead") {
+    if (parent !== "table" || tableState.seenHead || tableState.phase > 2) return false;
+    tableState.seenHead = true;
+    tableState.rowMode = "grouped";
+    tableState.phase = 2;
+    return true;
+  }
+  if (tag === "tbody") {
+    if (parent !== "table" || tableState.seenFoot || tableState.rowMode === "direct" || tableState.phase > 3) return false;
+    tableState.rowMode = "grouped";
+    tableState.phase = 3;
+    return true;
+  }
+  if (tag === "tfoot") {
+    if (parent !== "table" || tableState.seenFoot || tableState.rowMode === "direct") return false;
+    tableState.seenFoot = true;
+    tableState.rowMode = "grouped";
+    tableState.phase = 4;
+    return true;
+  }
+  if (tag === "tr") {
+    if (parent === "table") {
+      if (tableState.rowMode === "grouped" || tableState.seenFoot || tableState.phase > 3) return false;
+      tableState.rowMode = "direct";
+      tableState.phase = 3;
+      return true;
+    }
+    return parent !== undefined && TABLE_ROW_GROUP_TAGS.has(parent);
+  }
+  if (tag === "th" || tag === "td") return parent === "tr";
+  return false;
+}
 
 function measureStructure(html: string) {
   let elements = 0;
@@ -211,24 +275,58 @@ function measureStructure(html: string) {
   let layoutWeight = 0;
   let cellsInCurrentRow = 0;
   let declaredColumns = 0;
+  let hasValidTableStructure = true;
   const stack: string[] = [];
+  const tableStates: TableGrammarState[] = [];
+  let cursor = 0;
 
   for (const token of html.matchAll(TAG_TOKEN)) {
     const tag = token[1].toLowerCase();
     const isClosing = token[0].startsWith("</");
+    const parent = stack.at(-1);
+    const precedingText = html.slice(cursor, token.index);
+    if (
+      parent
+      && TABLE_RESTRICTED_PARENT_TAGS.has(parent)
+      && visibleText(precedingText).length > 0
+    ) {
+      hasValidTableStructure = false;
+    }
+    cursor = (token.index ?? 0) + token[0].length;
     if (isClosing) {
       if (tag === "tr") {
         tableColumns = Math.max(tableColumns, cellsInCurrentRow);
         cellsInCurrentRow = 0;
       }
-      const index = stack.lastIndexOf(tag);
-      if (index !== -1) {
-        stack.length = index;
-        depth = stack.length;
+      if (VOID_TAGS.has(tag)) continue;
+      const expectedTag = stack.at(-1);
+      if (expectedTag !== tag) {
+        if (TABLE_FAMILY_TAGS.has(tag) || stack.some((openTag) => TABLE_FAMILY_TAGS.has(openTag))) {
+          hasValidTableStructure = false;
+        }
+        const index = stack.lastIndexOf(tag);
+        if (index !== -1) stack.length = index;
+      } else {
+        stack.pop();
       }
+      if (tag === "table") tableStates.pop();
+      depth = stack.length;
       continue;
     }
 
+    const currentTable = tableStates.at(-1);
+    if (!tableTagHasValidParent(tag, parent, currentTable)) {
+      hasValidTableStructure = false;
+    }
+    if (tag === "table") {
+      tableStates.push({
+        phase: 0,
+        rowMode: null,
+        seenHead: false,
+        seenFoot: false,
+      });
+      declaredColumns = 0;
+    }
     elements += 1;
     if (tag === "img") images += 1;
     if (tag === "table") tables += 1;
@@ -260,6 +358,16 @@ function measureStructure(html: string) {
     }
   }
 
+  const finalParent = stack.at(-1);
+  if (
+    finalParent
+    && TABLE_RESTRICTED_PARENT_TAGS.has(finalParent)
+    && visibleText(html.slice(cursor)).length > 0
+  ) {
+    hasValidTableStructure = false;
+  }
+  if (tableStates.length > 0) hasValidTableStructure = false;
+
   const text = visibleText(html);
   const headingText = visibleTextLengthWithinTags(html, ["h1", "h2", "h3", "h4", "h5", "h6"]);
   const tableCellText = visibleTextLengthWithinTags(html, ["th", "td"]);
@@ -285,8 +393,14 @@ function measureStructure(html: string) {
       + Math.ceil(tableCaptionText / 20)
       + Math.ceil(figureCaptionText / 60)
       + layoutWeight,
+    hasValidTableStructure,
     text,
   };
+}
+
+function issueForTableStructure(position: ReportHtmlPosition): string {
+  const field = position === "introduction" ? "Welcome section" : "Closing message";
+  return `${field} must use valid table structure with captions, columns, row groups, rows, and cells inside their required table parents.`;
 }
 
 function issueForLimit(
@@ -383,6 +497,14 @@ export function sanitizeReportHtmlFragment(
   });
 
   const structure = measureStructure(html);
+  if (!structure.hasValidTableStructure) {
+    return {
+      ok: false,
+      html: "",
+      didStripContent: html !== raw.trim(),
+      issue: issueForTableStructure(position),
+    };
+  }
   for (const [kind, value] of [
     ["textCharacters", structure.text.length],
     ["elements", structure.elements],

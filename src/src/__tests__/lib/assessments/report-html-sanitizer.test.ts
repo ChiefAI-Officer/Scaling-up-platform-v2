@@ -9,6 +9,31 @@ const limits = {
   conclusion: { rawCharacters: 12_000, textCharacters: 900, elements: 36, depth: 6, images: 1, tables: 1, tableRows: 6 },
 } as const;
 
+const malformedTableHtml = [
+  ["direct td children", `<table>${"<td>x</td>".repeat(24)}</table>`],
+  ["direct th children", `<table>${"<th>x</th>".repeat(24)}</table>`],
+  ["thead without tr", "<table><thead><th>x</th></thead></table>"],
+  ["tbody without tr", "<table><tbody><td>x</td></tbody></table>"],
+  ["tfoot without tr", "<table><tfoot><td>x</td></tfoot></table>"],
+  ["cells below a div inside table", "<table><div><td>x</td><th>y</th></div></table>"],
+  ["col directly below table", "<table><col><tr><td>x</td></tr></table>"],
+  ["mixed explicit and implicit cells", "<table><tr><td>x</td></tr><td>y</td></table>"],
+  ["case, attributes, and comments around direct cells", '<TABLE summary="Summary"><!-- comment --><TD title="Cell">x</TD></TABLE>'],
+  ["self-closing direct cell syntax", "<table><td/>x</table>"],
+  ["caption outside table", "<caption>x</caption><table><tr><td>y</td></tr></table>"],
+  ["tr outside table", "<tr><td>x</td></tr><table><tr><td>y</td></tr></table>"],
+  ["row group outside table", "<tbody><tr><td>x</td></tr></tbody>"],
+  ["colgroup outside table", "<colgroup><col></colgroup>"],
+  ["ordinary element directly under table", "<table><div>x</div></table>"],
+  ["visible text directly under table", "<table>x<tr><td>y</td></tr></table>"],
+  ["caption after rows", "<table><tbody><tr><td>x</td></tr></tbody><caption>Late</caption></table>"],
+  ["colgroup after rows", "<table><tbody><tr><td>x</td></tr></tbody><colgroup><col></colgroup></table>"],
+  ["duplicate thead", "<table><thead><tr><th>x</th></tr></thead><thead><tr><th>y</th></tr></thead></table>"],
+  ["duplicate tfoot", "<table><tfoot><tr><td>x</td></tr></tfoot><tfoot><tr><td>y</td></tr></tfoot></table>"],
+  ["mixed direct rows and row groups", "<table><tr><td>x</td></tr><tbody><tr><td>y</td></tr></tbody></table>"],
+  ["nested table", "<table><tr><td><table><tr><td>x</td></tr></table></td></tr></table>"],
+] as const;
+
 describe("sanitizeReportHtmlFragment", () => {
   it("classifies every allowed tag explicitly and gives every layout tag positive cost", () => {
     const expectedInline = ["a", "b", "code", "em", "i", "s", "small", "span", "strong", "sub", "sup", "u"];
@@ -199,6 +224,38 @@ describe("sanitizeReportHtmlFragment", () => {
     expect(result.ok).toBe(true);
     expect(result.html).not.toMatch(/(?:colspan|rowspan|<col[^>]+span)/i);
     expect(result.html).toContain("<th>Head</th><td>Cell</td>");
+  });
+
+  it.each(malformedTableHtml)("rejects malformed table grammar: %s", (_name, html) => {
+    expect(sanitizeReportHtmlFragment(html, "introduction")).toMatchObject({
+      ok: false,
+      html: "",
+      issue: expect.stringMatching(/valid table structure/i),
+    });
+  });
+
+  it.each([
+    [
+      "omitted cell and row closing tags",
+      "<table><tbody><tr><td>x<td>y<tr><td>z</table>",
+      "<table><tbody><tr><td>x</td><td>y</td></tr><tr><td>z</td></tr></tbody></table>",
+    ],
+    [
+      "case, comments, attributes, and self-closing cell syntax",
+      '<TABLE summary="Summary"><!-- comment --><TBODY><TR><TD title="Cell"/>x</TR></TBODY></TABLE>',
+      '<table summary="Summary"><tbody><tr><td title="Cell">x</td></tr></tbody></table>',
+    ],
+    [
+      "malformed close order canonicalized by sanitize-html",
+      "<table><tbody><tr><td>x</tbody></td></tr></table>",
+      "<table><tbody><tr><td>x</td></tr></tbody></table>",
+    ],
+  ] as const)("validates the canonical table produced from %s", (_name, raw, canonical) => {
+    expect(sanitizeReportHtmlFragment(raw, "introduction")).toMatchObject({
+      ok: true,
+      html: canonical,
+      didStripContent: true,
+    });
   });
 
   it("rejects a Closing table that combines a caption with all six rows", () => {

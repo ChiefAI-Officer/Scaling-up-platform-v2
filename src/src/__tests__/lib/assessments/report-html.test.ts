@@ -143,4 +143,35 @@ describe("report HTML configuration", () => {
     ).toEqual({ introductionHtml: null, conclusionHtml: "<p>CTA</p>" });
     expect(onDrift).toHaveBeenCalledWith("introductionHtml");
   });
+
+  it.each(["td", "th"] as const)(
+    "rejects direct table %s children on save and drops them on defensive load",
+    (cellTag) => {
+      const html = `<table>${`<${cellTag}>x</${cellTag}>`.repeat(24)}</table>`;
+      const reportConfig = {
+        reportHtml: {
+          schemaVersion: 1,
+          introductionHtml: html,
+          conclusionHtml: "<p>Safe closing</p>",
+        },
+      };
+      const prepared = prepareReportHtmlForStorage(reportConfig);
+
+      expect(prepared).toMatchObject({
+        ok: false,
+        reportConfig,
+        issues: [{
+          path: "reportHtml.introductionHtml",
+          message: expect.stringMatching(/valid table structure/i),
+        }],
+      });
+
+      const onDrift = jest.fn();
+      expect(loadSafeReportHtml(reportConfig, { onDrift })).toEqual({
+        introductionHtml: null,
+        conclusionHtml: "<p>Safe closing</p>",
+      });
+      expect(onDrift).toHaveBeenCalledWith("introductionHtml");
+    },
+  );
 });
