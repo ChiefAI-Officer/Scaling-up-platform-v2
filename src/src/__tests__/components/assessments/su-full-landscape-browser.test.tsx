@@ -704,6 +704,15 @@ describe("SU Full landscape browser and PDF contract", () => {
       ? SU_FULL_GOVERNED_PEER_DISCLOSURE
       : SU_FULL_LEGACY_PEER_DISCLOSURE;
     const report = reportWithAuthoringCase(fixture);
+    if (fixture.authoringCase === "adversarial") {
+      for (const storedHtml of [
+        report.reportHtml?.introductionHtml,
+        report.reportHtml?.conclusionHtml,
+      ]) {
+        expect(storedHtml).toBeTruthy();
+        expect(storedHtml).not.toMatch(/\s(?:class|id|data-[a-z0-9_-]+|role|aria-[a-z0-9_-]+|style)=/i);
+      }
+    }
     const { html } = routeMarkup(report);
     const directory = mkdtempSync(join(tmpdir(), "report-html-peers-matrix-"));
     const pdfPath = join(directory, `${fixture.id}.pdf`);
@@ -711,9 +720,54 @@ describe("SU Full landscape browser and PDF contract", () => {
     try {
       await load(page, html);
       expect(await page.locator("[data-testid^='su-full-landscape-page-']").count()).toBe(26);
+      expect(await page.locator(".su-full-landscape-page").count()).toBe(26);
       await expect(page.locator("body").innerText()).resolves.toContain(provenance);
       await expect(page.getByText(disclosure, { exact: true }).count()).resolves.toBeGreaterThanOrEqual(2);
       await expect(page.locator("body").innerText()).resolves.not.toMatch(ENGINEERING_LANGUAGE);
+
+      if (fixture.authoringCase === "adversarial") {
+        const authoredLayout = await page.locator("[data-testid^='report-html-']").evaluateAll((sections) =>
+          sections.map((section) => {
+            const authored = section.firstElementChild as HTMLElement | null;
+            if (!authored) throw new Error("Missing adversarial authored element");
+            const style = getComputedStyle(authored);
+            return {
+              selectorAttributes: [...authored.attributes]
+                .map((attribute) => attribute.name)
+                .filter((name) =>
+                  name === "class"
+                  || name === "id"
+                  || name === "role"
+                  || name.startsWith("data-")
+                  || name.startsWith("aria-"),
+                ),
+              whiteSpace: style.whiteSpace,
+              fontSize: style.fontSize,
+              letterSpacing: style.letterSpacing,
+              padding: style.padding,
+              margin: style.margin,
+            };
+          }),
+        );
+        expect(authoredLayout).toEqual([
+          {
+            selectorAttributes: [],
+            whiteSpace: "normal",
+            fontSize: "16px",
+            letterSpacing: "normal",
+            padding: "0px",
+            margin: "0px",
+          },
+          {
+            selectorAttributes: [],
+            whiteSpace: "normal",
+            fontSize: "16px",
+            letterSpacing: "normal",
+            padding: "0px",
+            margin: "0px",
+          },
+        ]);
+      }
 
       const desktop = await horizontalOverflow(page);
       expect(desktop.offenders).toEqual([]);

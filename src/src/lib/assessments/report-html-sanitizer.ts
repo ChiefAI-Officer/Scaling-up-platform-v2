@@ -80,20 +80,16 @@ const ALLOWED_TAGS = [
 ];
 
 const COMMON_ATTRIBUTES = [
-  "class",
-  "id",
   "title",
   "lang",
   "dir",
-  "role",
   "style",
-  "aria-*",
-  "data-*",
+  "aria-label",
 ];
 
 const ALLOWED_ATTRIBUTES: Record<string, string[]> = {
   "*": COMMON_ATTRIBUTES,
-  a: ["href", "name", "target", "rel", ...COMMON_ATTRIBUTES],
+  a: ["href", "target", "rel", ...COMMON_ATTRIBUTES],
   img: [
     "src",
     "alt",
@@ -108,19 +104,12 @@ const ALLOWED_ATTRIBUTES: Record<string, string[]> = {
   col: ["span", ...COMMON_ATTRIBUTES],
 };
 
-const LENGTH = "(?:0|\\d+(?:\\.\\d+)?(?:px|pt|em|rem|%|ex|ch))";
 const HEX_COLOR = "#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})";
 const RGB_COLOR = "rgba?\\(\\s*\\d+(?:\\.\\d+)?%?\\s*,\\s*\\d+(?:\\.\\d+)?%?\\s*,\\s*\\d+(?:\\.\\d+)?%?(?:\\s*,\\s*(?:0|1|0?\\.\\d+))?\\s*\\)";
 const NAMED_COLOR = "[a-z]+";
 const COLOR = `(?:${HEX_COLOR}|${RGB_COLOR}|${NAMED_COLOR})`;
 
-const lengthValue = new RegExp(`^${LENGTH}$`, "i");
 const colorValue = new RegExp(`^${COLOR}$`, "i");
-const spacingValue = new RegExp(`^${LENGTH}(?:\\s+${LENGTH}){0,3}$`, "i");
-const borderValue = new RegExp(
-  `^(?:${LENGTH}|thin|medium|thick)\\s+(?:none|solid|dashed|dotted|double)\\s+${COLOR}$`,
-  "i",
-);
 const fontFamilyValue = /^[a-z0-9 ,'"-]+$/i;
 
 const ALLOWED_STYLES = {
@@ -128,38 +117,11 @@ const ALLOWED_STYLES = {
     color: [colorValue],
     "background-color": [colorValue],
     "font-family": [fontFamilyValue],
-    "font-size": [lengthValue],
     "font-weight": [/^(?:normal|bold|lighter|bolder|[1-9]00)$/i],
     "font-style": [/^(?:normal|italic|oblique)$/i],
-    "line-height": [new RegExp(`^(?:normal|${LENGTH}|\\d+(?:\\.\\d+)?)$`, "i")],
-    "letter-spacing": [new RegExp(`^(?:normal|${LENGTH})$`, "i")],
     "text-align": [/^(?:left|right|center|justify|start|end)$/i],
     "text-decoration": [/^(?:none|underline|line-through|overline)$/i],
     "text-transform": [/^(?:none|uppercase|lowercase|capitalize)$/i],
-    "white-space": [/^(?:normal|nowrap|pre|pre-wrap|pre-line)$/i],
-    display: [/^(?:block|inline|inline-block|none)$/i],
-    "align-items": [/^(?:stretch|start|end|center|baseline)$/i],
-    "justify-content": [
-      /^(?:start|end|center|space-between|space-around|space-evenly)$/i,
-    ],
-    gap: [spacingValue],
-    padding: [spacingValue],
-    "padding-top": [lengthValue],
-    "padding-right": [lengthValue],
-    "padding-bottom": [lengthValue],
-    "padding-left": [lengthValue],
-    margin: [spacingValue],
-    "margin-top": [lengthValue],
-    "margin-right": [lengthValue],
-    "margin-bottom": [lengthValue],
-    "margin-left": [lengthValue],
-    border: [borderValue],
-    "border-top": [borderValue],
-    "border-right": [borderValue],
-    "border-bottom": [borderValue],
-    "border-left": [borderValue],
-    "border-color": [colorValue],
-    "border-radius": [spacingValue],
     "object-fit": [/^(?:contain|cover|fill|none|scale-down)$/i],
   },
 };

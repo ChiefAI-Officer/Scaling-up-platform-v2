@@ -30,7 +30,7 @@ export const LONG_CLOSING_VISIBLE_CHARACTERS = 850;
 const longWelcome = "W".repeat(LONG_WELCOME_VISIBLE_CHARACTERS);
 const longClosing = "C".repeat(LONG_CLOSING_VISIBLE_CHARACTERS);
 
-type AuthoringCase = "default" | "welcome-only" | "closing-only" | "both" | "long";
+type AuthoringCase = "default" | "welcome-only" | "closing-only" | "both" | "long" | "adversarial";
 type PeerReference = "current" | "historical";
 
 type CaptureFixture = {
@@ -78,6 +78,13 @@ const authoringCases: ReadonlyArray<Omit<CaptureFixture, "id" | "peerReference">
     conclusionHtml: `<p>${longClosing}</p>`,
     welcomeVisibleCharacters: LONG_WELCOME_VISIBLE_CHARACTERS,
     closingVisibleCharacters: LONG_CLOSING_VISIBLE_CHARACTERS,
+  },
+  {
+    authoringCase: "adversarial",
+    introductionHtml: `<div class="su-full-landscape-page" id="authored-page" data-region="welcome" role="status" aria-labelledby="report-style-actions-title" style="white-space:nowrap;font-size:9999px;line-height:9999px;letter-spacing:9999px;padding:9999px;margin:9999px;gap:9999px"><p>${"W".repeat(2_200)}</p></div>`,
+    conclusionHtml: `<div class="su-full-landscape-page" id="authored-page" data-region="closing" role="status" aria-labelledby="report-style-actions-title" style="white-space:nowrap;font-size:9999px;line-height:9999px;letter-spacing:9999px;padding:9999px;margin:9999px;gap:9999px"><p>${"C".repeat(900)}</p></div>`,
+    welcomeVisibleCharacters: 2_200,
+    closingVisibleCharacters: 900,
   },
 ];
 

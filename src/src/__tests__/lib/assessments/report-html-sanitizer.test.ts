@@ -6,17 +6,48 @@ const limits = {
 } as const;
 
 describe("sanitizeReportHtmlFragment", () => {
-  it("keeps report presentation markup and approved inline styles", () => {
+  it("keeps semantic report markup, accessibility attributes, and approved visual styles", () => {
     const result = sanitizeReportHtmlFragment(
-      '<section class="report-callout" aria-label="Next step" data-region="cta" style="padding:20px;background-color:#ffffff"><h2>Next step</h2><a href="https://scalingup.com">Continue</a></section>',
+      '<section aria-label="Next step" style="background-color:#ffffff;color:#522583"><h2>Next step</h2><a href="https://scalingup.com">Continue</a></section>',
       "introduction",
     );
 
-    expect(result.html).toContain('class="report-callout"');
     expect(result.html).toContain('aria-label="Next step"');
-    expect(result.html).toContain('data-region="cta"');
-    expect(result.html).toContain("padding:20px");
+    expect(result.html).toContain("background-color:#ffffff");
+    expect(result.html).toContain("color:#522583");
     expect(result.html).toContain('href="https://scalingup.com"');
+  });
+
+  it("strips selector-bearing attributes while retaining a plain accessible label", () => {
+    const result = sanitizeReportHtmlFragment(
+      '<section class="report-callout" id="custom-report" data-region="cta" data-testid="authored" role="status" aria-labelledby="report-style-actions-title" aria-label="Next step"><h2>Next step</h2></section>',
+      "introduction",
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.html).toBe('<section aria-label="Next step"><h2>Next step</h2></section>');
+    expect(result.didStripContent).toBe(true);
+  });
+
+  it("strips production page classes from authored content", () => {
+    const result = sanitizeReportHtmlFragment(
+      '<div class="su-full-landscape-page">Authored content</div>',
+      "conclusion",
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.html).toBe("<div>Authored content</div>");
+    expect(result.html).not.toContain("su-full-landscape-page");
+  });
+
+  it("removes page-breaking typography and spacing declarations", () => {
+    const result = sanitizeReportHtmlFragment(
+      '<div style="white-space:nowrap;font-size:9999px;line-height:9999px;letter-spacing:9999px;padding:9999px;margin:9999px;gap:9999px;border:9999px solid red;border-radius:9999px;color:red">Safe text</div>',
+      "conclusion",
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.html).toBe('<div style="color:red">Safe text</div>');
   });
 
   it("removes executable and interactive content", () => {
@@ -56,7 +87,7 @@ describe("sanitizeReportHtmlFragment", () => {
 
   it("is idempotent for an accepted fragment", () => {
     const once = sanitizeReportHtmlFragment(
-      '<section class="report-callout" style="color:#123456;padding:16px"><a href="https://scalingup.com">Continue</a></section>',
+      '<section aria-label="Report callout" style="color:#123456"><a href="https://scalingup.com">Continue</a></section>',
       "introduction",
     ).html;
 

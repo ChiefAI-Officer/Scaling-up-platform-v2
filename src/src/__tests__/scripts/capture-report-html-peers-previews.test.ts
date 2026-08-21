@@ -26,8 +26,8 @@ import {
 } from "../../../scripts/capture-report-html-peers-previews";
 
 describe("report HTML peers visual capture fixture contract", () => {
-  it("keeps the deterministic ten-case matrix and its complete artifact set", () => {
-    expect(REPORT_HTML_PEER_FIXTURES).toHaveLength(10);
+  it("keeps the deterministic twelve-case matrix and its complete artifact set", () => {
+    expect(REPORT_HTML_PEER_FIXTURES).toHaveLength(12);
     expect(REPORT_HTML_PEER_FIXTURES.map((fixture) => fixture.id)).toEqual([
       "default-current",
       "default-historical",
@@ -39,11 +39,17 @@ describe("report HTML peers visual capture fixture contract", () => {
       "both-historical",
       "long-current",
       "long-historical",
+      "adversarial-current",
+      "adversarial-historical",
     ]);
 
     const long = REPORT_HTML_PEER_FIXTURES.filter((fixture) => fixture.authoringCase === "long");
     expect(long.map((fixture) => fixture.welcomeVisibleCharacters)).toEqual([LONG_WELCOME_VISIBLE_CHARACTERS, LONG_WELCOME_VISIBLE_CHARACTERS]);
     expect(long.map((fixture) => fixture.closingVisibleCharacters)).toEqual([LONG_CLOSING_VISIBLE_CHARACTERS, LONG_CLOSING_VISIBLE_CHARACTERS]);
+
+    const adversarial = REPORT_HTML_PEER_FIXTURES.filter((fixture) => fixture.authoringCase === "adversarial");
+    expect(adversarial.map((fixture) => fixture.welcomeVisibleCharacters)).toEqual([2_200, 2_200]);
+    expect(adversarial.map((fixture) => fixture.closingVisibleCharacters)).toEqual([900, 900]);
 
     for (const fixture of REPORT_HTML_PEER_FIXTURES) {
       expect(artifactPathsFor(fixture)).toEqual({
