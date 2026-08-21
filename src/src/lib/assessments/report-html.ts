@@ -10,9 +10,16 @@ export interface ReportHtmlConfigV1 {
   conclusionHtml: string | null;
 }
 
+declare const safeReportHtmlFragmentBrand: unique symbol;
+
+/** HTML returned by the report sanitizer and safe for the sole render seam. */
+export type SafeReportHtmlFragment = string & {
+  readonly [safeReportHtmlFragmentBrand]: true;
+};
+
 export interface SafeReportHtml {
-  introductionHtml: string | null;
-  conclusionHtml: string | null;
+  introductionHtml: SafeReportHtmlFragment | null;
+  conclusionHtml: SafeReportHtmlFragment | null;
 }
 
 export type ReportHtmlIssue = {
@@ -190,7 +197,9 @@ export function loadSafeReportHtml(
     return { introductionHtml: null, conclusionHtml: null };
   }
 
-  const loadFragment = (field: keyof SafeReportHtml): string | null => {
+  const loadFragment = (
+    field: keyof SafeReportHtml,
+  ): SafeReportHtmlFragment | null => {
     const value = stored[field];
     if (value === null || value === undefined || value === "") return null;
     if (typeof value !== "string") {
@@ -209,7 +218,9 @@ export function loadSafeReportHtml(
       return null;
     }
     if (result.html !== value) emitCanonicalDrift(field, options.onDrift);
-    return result.html || null;
+    return result.html
+      ? (result.html as SafeReportHtmlFragment)
+      : null;
   };
 
   return {

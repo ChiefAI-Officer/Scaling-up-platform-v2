@@ -181,6 +181,7 @@ _Avoid_: "coach logo" and "coach photo" as general terms; "Circle avatar" for th
 
 **Results report email**:
 An email that carries the complete **Results report** inline. It includes invited-respondent delivery and public taker/referring-coach copies; it is distinct from the invited **Results Email** template setting and its authored copy, and from short completion or lead notifications.
+The initial report-HTML authoring successor deliberately leaves email composition unchanged: its optional custom introduction and conclusion are browser/print regions only until separately approved email work. "Complete" continues to mean the complete system-generated report; do not silently inject custom HTML into email.
 _Avoid_: "Results Email" for the delivered artifact, and the less precise "full-report email" or "complete-report email."
 
 **Coach byline**:

@@ -484,19 +484,28 @@ export function PublicQuizClient({
               contactEmail={verifiedCoachEmail}
               reportStylesAvailable={reportStylesAvailable}
               reportFindingsAvailable={reportFindingsAvailable}
+              beforeConclusion={
+                reportHtmlExperienceActive && marketingResultConfig ? (
+                  <PublicMarketingResult
+                    score={
+                      results.scaleUpScore ??
+                      Math.max(0, Math.min(100, results.overallAverage * 10))
+                    }
+                    scoreBands={marketingResultConfig.scoreBands}
+                    marketingCta={null}
+                    referringCoachEmail={verifiedCoachEmail}
+                  />
+                ) : undefined
+              }
             />
-            {marketingResultConfig && (
+            {marketingResultConfig && !reportHtmlExperienceActive && (
               <PublicMarketingResult
                 score={
                   results.scaleUpScore ??
                   Math.max(0, Math.min(100, results.overallAverage * 10))
                 }
                 scoreBands={marketingResultConfig.scoreBands}
-                marketingCta={
-                  reportHtmlExperienceActive
-                    ? null
-                    : marketingResultConfig.marketingCta
-                }
+                marketingCta={marketingResultConfig.marketingCta}
                 referringCoachEmail={verifiedCoachEmail}
               />
             )}

@@ -48,7 +48,7 @@ import { CoachLogo } from "@/components/assessments/CoachLogo";
 import { ReportFooter } from "@/components/assessments/ReportFooter";
 import { ImportedBadge } from "@/components/assessments/ImportedBadge";
 import { ReportNextSteps } from "@/components/assessments/ReportNextSteps";
-import { Fragment } from "react";
+import { Fragment, type ReactNode } from "react";
 import { ReportHtmlSection } from "@/components/assessments/ReportHtmlSection";
 
 const LOGO_SRC = "/brand/su-logo-white.svg";
@@ -411,6 +411,7 @@ export function QualitativeReport({
   contactEmail,
   reportFindingsAvailable,
   responsiveEnabled = false,
+  beforeConclusion,
 }: {
   report: RespondentReport;
   /** Server-verified current coach email for the contact link. */
@@ -428,6 +429,7 @@ export function QualitativeReport({
   /** Exact server-side Wave U decision; omission fails closed. */
   reportFindingsAvailable?: boolean;
   responsiveEnabled?: boolean;
+  beforeConclusion?: ReactNode;
 }) {
   const model = buildQualitativeModel({
     templateAlias: report.templateAlias,
@@ -556,6 +558,8 @@ export function QualitativeReport({
           shared with the respondent results email, which must never carry
           findings (D7; same isolation as Wave S peers). */}
       {findingsSection && <FindingsBlock section={findingsSection} />}
+
+      {beforeConclusion}
 
       {report.reportHtml?.conclusionHtml ? (
         <ReportHtmlSection

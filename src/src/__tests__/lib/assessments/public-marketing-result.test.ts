@@ -29,7 +29,7 @@ describe("public marketing result config", () => {
     expect(loadPublicMarketingResultConfig({ publicMarketing: { marketingCta: { bad: true }, scoreBands: [] } })).toBeNull();
   });
 
-  it("keeps valid score bands when the legacy structured CTA is malformed", () => {
+  it("keeps valid score bands when the structured CTA is malformed and the report successor is active", () => {
     expect(loadPublicMarketingResultConfig({
       publicMarketing: {
         marketingCta: { bad: true },
@@ -37,11 +37,22 @@ describe("public marketing result config", () => {
           { min: 0, max: 100, label: "All scores", headline: "Your score", body: "Read the guide." },
         ],
       },
-    })).toEqual({
+    }, true)).toEqual({
       scoreBands: [
         { min: 0, max: 100, label: "All scores", headline: "Your score", body: "Read the guide." },
       ],
       marketingCta: null,
     });
+  });
+
+  it("keeps legacy fail-closed behavior when the report successor is inactive", () => {
+    expect(loadPublicMarketingResultConfig({
+      publicMarketing: {
+        marketingCta: { bad: true },
+        scoreBands: [
+          { min: 0, max: 100, label: "All scores", headline: "Your score", body: "Read the guide." },
+        ],
+      },
+    })).toBeNull();
   });
 });

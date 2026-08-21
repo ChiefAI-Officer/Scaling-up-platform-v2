@@ -28,6 +28,7 @@ function asRecord(value: unknown): Record<string, unknown> {
 
 export function loadPublicMarketingResultConfig(
   reportConfig: unknown,
+  allowScoreBandsWithoutCta = false,
 ): PublicMarketingResultConfig | null {
   const publicMarketing = asRecord(asRecord(reportConfig).publicMarketing);
   const bands = z.array(publicMarketingScoreBandSchema).max(12).safeParse(
@@ -35,6 +36,7 @@ export function loadPublicMarketingResultConfig(
   );
   if (!bands.success) return null;
   const cta = loadSafeMarketingCta(reportConfig);
+  if (!cta && !allowScoreBandsWithoutCta) return null;
   if (!cta && bands.data.length === 0) return null;
   return { scoreBands: bands.data, marketingCta: cta };
 }

@@ -72,6 +72,7 @@ import { isSuFullLandscapeReportEnabled } from "@/lib/assessments/wave-su-full-l
 import { isSuFullPeerPresentation } from "@/lib/assessments/su-full-peer-presentation";
 import { SCALING_UP_FULL_TEMPLATE_ALIAS } from "@/lib/assessments/su-full-question-benchmarks";
 import { ReportHtmlSection } from "@/components/assessments/ReportHtmlSection";
+import type { ReactNode } from "react";
 
 const LOGO_SRC = "/brand/su-logo-white.svg";
 
@@ -210,6 +211,8 @@ export interface BrandedReportProps {
   comparison?: ReportComparisonModel | null;
   /** Enables the default-off responsive report containment pass. */
   responsiveEnabled?: boolean;
+  /** Generated result content that must remain before the conclusion/footer. */
+  beforeConclusion?: ReactNode;
 }
 
 export function BrandedReport({
@@ -222,6 +225,7 @@ export function BrandedReport({
   reportFindingsAvailable,
   comparison,
   responsiveEnabled = false,
+  beforeConclusion,
 }: BrandedReportProps) {
   // This component is imported by client result flows. Availability must arrive
   // from their server response; WAVE_REPORT_STYLES_* is never read here.
@@ -246,6 +250,7 @@ export function BrandedReport({
         contactEmail={contactEmail}
         reportFindingsAvailable={reportFindingsAvailable === true}
         responsiveEnabled={responsiveEnabled}
+        beforeConclusion={beforeConclusion}
       />
     ) : (
       <LegacyClassicReport
@@ -256,6 +261,7 @@ export function BrandedReport({
         reportFindingsAvailable={reportFindingsAvailable}
         comparison={comparison}
         responsiveEnabled={responsiveEnabled}
+        beforeConclusion={beforeConclusion}
       />
     );
 
@@ -306,6 +312,7 @@ export function BrandedReport({
           comparison={comparison}
           reportHtml={report.reportHtml}
           responsiveEnabled={responsiveEnabled}
+          beforeConclusion={beforeConclusion}
         />
       );
       return reportNode;
@@ -317,6 +324,7 @@ export function BrandedReport({
           comparison={comparison}
           reportHtml={report.reportHtml}
           responsiveEnabled={responsiveEnabled}
+          beforeConclusion={beforeConclusion}
         />
       );
       return dashboardNode;
@@ -338,6 +346,7 @@ export function LegacyClassicReport({
   reportFindingsAvailable,
   comparison,
   responsiveEnabled = false,
+  beforeConclusion,
 }: Omit<BrandedReportProps, "reportStylesAvailable" | "peerComparison">) {
 
   const suFullPeers =
@@ -358,6 +367,7 @@ export function LegacyClassicReport({
           report={report}
           model={landscapeModel}
           contactEmail={contactEmail}
+          beforeConclusion={beforeConclusion}
         />
       );
     }
@@ -983,6 +993,8 @@ export function LegacyClassicReport({
       )}
 
       {/* ── 7. Conclusion ───────────────────────────────────────────────── */}
+      {beforeConclusion}
+
       {report.reportHtml?.conclusionHtml ? (
         <ReportHtmlSection
           position="conclusion"

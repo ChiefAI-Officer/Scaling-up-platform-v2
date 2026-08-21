@@ -364,6 +364,51 @@ describe("adaptive alternate report renderers", () => {
     },
   );
 
+  it.each(renderers)(
+    "%s keeps generated add-ons before the custom conclusion and provenance",
+    (_, Renderer) => {
+      const { container } = render(
+        <Renderer
+          presentation={scoredPresentation}
+          reportHtml={{
+            introductionHtml: null,
+            conclusionHtml: "<p>Alternate custom conclusion</p>",
+          }}
+          beforeConclusion={<aside data-testid="generated-addon">Score guide</aside>}
+        />,
+      );
+
+      const addon = screen.getByTestId("generated-addon");
+      const conclusion = screen.getByTestId("report-html-conclusion");
+      expect(
+        addon.compareDocumentPosition(conclusion) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(container.querySelector(".report-page:last-child")?.lastElementChild)
+        .toHaveAttribute("data-testid", "report-style-provenance");
+    },
+  );
+
+  it.each(renderers)(
+    "%s keeps generated add-ons before the default conclusion",
+    (_, Renderer) => {
+      const { container } = render(
+        <Renderer
+          presentation={scoredPresentation}
+          beforeConclusion={<aside data-testid="generated-addon">Score guide</aside>}
+        />,
+      );
+
+      const addon = screen.getByTestId("generated-addon");
+      const closing = container.querySelector('[data-report-block="closing"]');
+      expect(closing).not.toBeNull();
+      expect(
+        addon.compareDocumentPosition(closing as Element) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    },
+  );
+
   it.each([
     ["EXECUTIVE_BOARDROOM", "executive-boardroom-report"],
     ["MODERN_DASHBOARD", "modern-dashboard-report"],

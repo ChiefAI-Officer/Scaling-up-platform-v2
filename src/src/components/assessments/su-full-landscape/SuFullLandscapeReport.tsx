@@ -15,6 +15,8 @@ import {
   type SuFullLandscapeFooterBrand,
 } from "@/components/assessments/su-full-landscape/SuFullLandscapePages";
 import { ReportHtmlSection } from "@/components/assessments/ReportHtmlSection";
+import type { SafeReportHtmlFragment } from "@/lib/assessments/report-html";
+import type { ReactNode } from "react";
 
 const PEER_DISCLOSURE = "Peers are a current benchmark reference. Values are not yet matched to company size, growth phase, geography, or industry.";
 
@@ -105,14 +107,17 @@ function CustomHtmlPage({
   position,
   html,
   number,
+  beforeConclusion,
 }: {
   report: RespondentReport;
   position: "introduction" | "conclusion";
-  html: string;
+  html: SafeReportHtmlFragment;
   number: number;
+  beforeConclusion?: ReactNode;
 }) {
   return (
     <SuFullLandscapePage number={number} footerBrand={report}>
+      {beforeConclusion}
       <ReportHtmlSection position={position} html={html} />
     </SuFullLandscapePage>
   );
@@ -267,14 +272,16 @@ function DetailPage({
   );
 }
 
-function ConclusionPage({ report, model, contactEmail, number }: {
+function ConclusionPage({ report, model, contactEmail, number, beforeConclusion }: {
   report: RespondentReport;
   model: SuFullLandscapeReportModel;
   contactEmail?: string | null;
   number: number;
+  beforeConclusion?: ReactNode;
 }) {
   return (
     <SuFullLandscapePage number={number} footerBrand={report}>
+      {beforeConclusion}
       <h2>Conclusion</h2>
       <p><strong>ScaleUp Score</strong> {scaleUpScore(model.scaleUpScore)}</p>
       <p>Your strongest chapter is {model.strongestChapter.label}; your focus chapter is {model.weakestChapter.label}.</p>
@@ -308,10 +315,12 @@ export function SuFullLandscapeReport({
   report,
   model,
   contactEmail,
+  beforeConclusion,
 }: {
   report: RespondentReport;
   model: SuFullLandscapeReportModel;
   contactEmail?: string | null;
+  beforeConclusion?: ReactNode;
 }) {
   const chapters = new Map(model.chapters.map((chapter) => [chapter.key, chapter]));
   const questions = questionByKey(model);
@@ -336,8 +345,8 @@ export function SuFullLandscapeReport({
           }
           case "detail": return <DetailPage key={page.number} page={page} questions={questions} footerBrand={report} />;
           case "conclusion": return report.reportHtml?.conclusionHtml
-            ? <CustomHtmlPage key={page.number} number={page.number} report={report} position="conclusion" html={report.reportHtml.conclusionHtml} />
-            : <ConclusionPage key={page.number} number={page.number} report={report} model={model} contactEmail={contactEmail} />;
+            ? <CustomHtmlPage key={page.number} number={page.number} report={report} position="conclusion" html={report.reportHtml.conclusionHtml} beforeConclusion={beforeConclusion} />
+            : <ConclusionPage key={page.number} number={page.number} report={report} model={model} contactEmail={contactEmail} beforeConclusion={beforeConclusion} />;
           case "appendix": return <AppendixPage key={page.number} number={page.number} model={model} footerBrand={report} />;
           default: {
             const impossible: never = page;

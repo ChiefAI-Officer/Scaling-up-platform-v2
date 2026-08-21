@@ -87,12 +87,15 @@ export default async function PublicQuizPage({
   const customSlides = isCustomSlidesEnabled(campaign.id)
     ? loadSafeSlides(campaign.customSlides)
     : [];
+  const reportHtmlExperienceActive = isReportHtmlExperienceEnabled();
   const marketingResultConfig =
     isPublicMarketingCtaEnabled() &&
     campaign.template.deliveryType === "PUBLIC_MARKETING_QUIZ"
-      ? loadPublicMarketingResultConfig(version.reportConfig)
+      ? loadPublicMarketingResultConfig(
+          version.reportConfig,
+          reportHtmlExperienceActive,
+        )
       : null;
-  const reportHtmlExperienceActive = isReportHtmlExperienceEnabled();
 
   // Render the client directly (no constrained wrapper) so the full-bleed
   // branded welcome shell matches the org-survey flow + the approved mockup.

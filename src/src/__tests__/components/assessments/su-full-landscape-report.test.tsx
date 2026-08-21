@@ -178,6 +178,36 @@ test("replaces the landscape preface and conclusion pages with custom HTML", () 
   expect(screen.getAllByTestId(/^su-full-landscape-page-/)).toHaveLength(26);
 });
 
+test("keeps generated add-ons before the landscape conclusion without adding a page", () => {
+  const report = {
+    ...completeSuFullLandscapeReport(),
+    reportHtml: {
+      introductionHtml: null,
+      conclusionHtml: "<h2>Landscape custom conclusion</h2>",
+    },
+  };
+  const presentation = completeSuFullLandscapePresentation(report);
+  const model = buildSuFullLandscapeReportModel({ report, presentation, resolvedStyle: "CLASSIC" });
+  if (!model) throw new Error("The canonical landscape fixture must build");
+
+  render(
+    <SuFullLandscapeReport
+      report={report}
+      model={model}
+      beforeConclusion={<aside data-testid="generated-addon">Score guide</aside>}
+    />,
+  );
+
+  const page = screen.getByTestId("su-full-landscape-page-25");
+  const addon = screen.getByTestId("generated-addon");
+  const conclusion = screen.getByTestId("report-html-conclusion");
+  expect(page).toContainElement(addon);
+  expect(
+    addon.compareDocumentPosition(conclusion) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+  expect(screen.getAllByTestId(/^su-full-landscape-page-/)).toHaveLength(26);
+});
+
 test("keeps the landscape renderer's A4 print and responsive screen contract scoped", () => {
   const stylesheet = readFileSync(
     join(process.cwd(), "src", "styles", "su-report.css"),
