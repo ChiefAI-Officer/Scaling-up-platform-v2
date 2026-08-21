@@ -6,10 +6,12 @@ function renderSettings({
   deliveryType = "INVITED_ASSESSMENT",
   hasPublishedVersion = false,
   publicMarketingCtaEnabled = true,
+  reportsActive = false,
 }: {
   deliveryType?: "PUBLIC_MARKETING_QUIZ" | "INVITED_ASSESSMENT";
   hasPublishedVersion?: boolean;
   publicMarketingCtaEnabled?: boolean;
+  reportsActive?: boolean;
 } = {}) {
   const handleTemplateRowSave = jest.fn().mockResolvedValue(undefined);
   render(
@@ -45,6 +47,7 @@ function renderSettings({
       deliveryType={deliveryType}
       hasPublishedVersion={hasPublishedVersion}
       publicMarketingCtaEnabled={publicMarketingCtaEnabled}
+      reportsActive={reportsActive}
     />,
   );
   return { handleTemplateRowSave };
@@ -84,5 +87,29 @@ describe("Settings assessment delivery type", () => {
 
     expect(screen.getByText(/invited only/i)).toBeInTheDocument();
     expect(screen.queryByText("Assessment type")).not.toBeInTheDocument();
+  });
+
+  it.each(["PUBLIC_MARKETING_QUIZ", "INVITED_ASSESSMENT"] as const)(
+    "does not render the structured CTA editor for legacy %s data in the Reports successor",
+    (deliveryType) => {
+      renderSettings({ deliveryType, reportsActive: true });
+
+      expect(screen.queryByText("Marketing call to action")).not.toBeInTheDocument();
+      expect(screen.queryByText("Full Marketing")).not.toBeInTheDocument();
+      expect(screen.queryByText("Scaling Up Quick")).not.toBeInTheDocument();
+      expect(screen.queryByText("Start blank")).not.toBeInTheDocument();
+    },
+  );
+
+  it("keeps the public structured CTA editor available for exact rollback", () => {
+    renderSettings({
+      deliveryType: "PUBLIC_MARKETING_QUIZ",
+      reportsActive: false,
+    });
+
+    expect(screen.getByText("Marketing call to action")).toBeInTheDocument();
+    expect(screen.getByText("Full Marketing")).toBeInTheDocument();
+    expect(screen.getByText("Scaling Up Quick")).toBeInTheDocument();
+    expect(screen.getByText("Start blank")).toBeInTheDocument();
   });
 });

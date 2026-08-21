@@ -1288,6 +1288,7 @@ export function TabbedShell({
                 marketingCta={extractMarketingCta(reportConfig)}
                 onMarketingCtaChange={handleMarketingCtaChange}
                 marketingCtaDirty={Boolean(dirtyFlags.reportConfig)}
+                reportsActive={reportsActive}
               />
             </div>
           </TabsContent>

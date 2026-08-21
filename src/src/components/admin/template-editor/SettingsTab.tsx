@@ -130,6 +130,8 @@ export interface SettingsTabProps {
   marketingCta?: MarketingCtaConfigV1 | null;
   onMarketingCtaChange?: (next: MarketingCtaConfigV1) => void;
   marketingCtaDirty?: boolean;
+  /** Successor Reports experience owns the canonical report conclusion. */
+  reportsActive?: boolean;
 }
 
 // ────────────────────────────────────────────────────────────────────────
@@ -187,6 +189,7 @@ export function SettingsTab({
   marketingCta = null,
   onMarketingCtaChange = () => {},
   marketingCtaDirty = false,
+  reportsActive = false,
 }: SettingsTabProps) {
   return (
     <div className="space-y-6 max-w-2xl">
@@ -217,7 +220,8 @@ export function SettingsTab({
         onVersionFieldChange={onVersionFieldChange}
         isReadOnly={isReadOnly}
       />
-      {publicMarketingCtaEnabled &&
+      {!reportsActive &&
+        publicMarketingCtaEnabled &&
         deliveryType === "PUBLIC_MARKETING_QUIZ" && (
           <MarketingCtaEditor
             templateId={templateId}
