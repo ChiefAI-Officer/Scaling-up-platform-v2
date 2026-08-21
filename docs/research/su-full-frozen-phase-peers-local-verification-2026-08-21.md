@@ -169,6 +169,12 @@ was rerun from `src/` on `ae561d1f9e59e10f13e002615dc6564722cc8e8d`:
 - `CI=true npx next build --turbopack`: exit `0`, compiled in 83s, passed
   TypeScript, and generated **95/95** static pages.
 
+An additional post-fix repository-wide Jest run passed **766/766 suites,
+9,385/9,385 tests, and 16/16 snapshots** in 696.331s. The preceding run had exposed
+only the older partial component fixture described above: **765/766 suites and
+9,384/9,385 tests** passed. Its focused canonical-fixture rerun passed **28/28**
+before the complete required chain and repository-wide suite were repeated.
+
 The successful remediation build retained only the same established non-fatal local
 diagnostics recorded above. No lifecycle script, database action, push, PR, publish,
 deploy, activation, Production mutation, or external communication occurred during

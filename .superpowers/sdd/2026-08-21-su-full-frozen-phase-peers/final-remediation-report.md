@@ -178,6 +178,9 @@ Full report fixture and then passed **1/1 suite, 28/28 tests**. Because the find
 was in test setup rather than production code, the complete required final chain was
 rerun on the resulting commit as recorded above.
 
+The final post-fix repository-wide rerun then passed **766/766 suites,
+9,385/9,385 tests, and 16/16 snapshots** in 696.331s.
+
 ## Rulings and costs
 
 - Rebuilding the expected presentation avoids a second manually maintained binding
