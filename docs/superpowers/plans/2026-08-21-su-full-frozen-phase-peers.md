@@ -22,7 +22,8 @@
 - A declared but incomplete, invalid, or hash-mismatched snapshot omits Peers and emits a structured reason; it must not fall back to baseline or query mutable rows.
 - LVA benchmark lookup and rendering remain byte-for-byte unchanged.
 - Layout A means question, clearly labelled You/Peers bars, then the selected Esperto feedback paragraph with no added heading. Preserve Scaling Up branding, the landscape architecture, and the 26-page contract; the local prototype is not application code.
-- The disclosure is exactly: `Peers are a governed benchmark snapshot selected by organizational phase and frozen when this result was scored. This is not an industry-, geography-, or cohort-matched comparison.`
+- The current-report disclosure is exactly: `Peers shows the benchmark associated with your organizational phase when you completed this assessment. It is not matched by industry, geography, or a custom peer group.` Historical reports instead say: `Peers shows the historical benchmark used for this report. It is not matched by industry, geography, or a custom peer group.`
+- Report labels use plain language (`Phase 4 · Delegation` or `Historical benchmark`); internal source IDs, hashes, catalogue details, snapshot mechanics, and engineering provenance are not rendered.
 - Do not add a dependency or Prisma migration.
 - Draft creation, publication, push, PR, deploy, activation, production mutation, and external communications are separate approval gates. This implementation plan authorizes none of them.
 
@@ -507,7 +508,7 @@ git commit -m "fix: render Scaling Up peers from frozen results"
 
 ---
 
-### Task 6: Implement Approved Layout A and Truthful Provenance
+### Task 6: Implement Approved Layout A and Truthful Peer Context
 
 **Files:**
 - Modify: `src/src/components/assessments/su-full-landscape/SuFullLandscapeReport.tsx:16-250`
@@ -520,7 +521,7 @@ git commit -m "fix: render Scaling Up peers from frozen results"
 **Interfaces:**
 - Consumes: `SuFullPeerPresentation.provenance` from Task 5.
 - Preserves: `SuFullDetailPairedBars({ chapterKey, question })` with explicit `You` and `Peers` labels.
-- Produces: `PeerSnapshotDisclosure({ provenance })` with the exact governed disclosure and a concise `Phase P<n> · <sourceId>` or `Legacy baseline · <sourceId>` provenance line.
+- Produces: `PeerSnapshotDisclosure({ provenance })` with the exact plain-language disclosure and a concise `Phase <n> · <phase name>` or `Historical benchmark` line. Internal source IDs and snapshot mechanics are retained for validation but not rendered.
 
 - [ ] **Step 1: Write failing component and browser-contract tests**
 
@@ -537,7 +538,7 @@ expect(within(detail).getByText("Peers").compareDocumentPosition(paragraph)
   & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 ```
 
-Assert the exact disclosure string, `Phase P4` for a new P4 result, `Legacy baseline` for a historical result, omission of all Peer UI for an unavailable presentation, 26 pages in browser and PDF modes, no clipping at 1280×720 and 390×844, and identical numeric Peer values in on-screen and print markup.
+Assert the exact disclosure string, `Phase 4 · Delegation` for a new P4 result, `Historical benchmark` for a historical result, no rendered engineering language or source IDs, omission of all Peer UI for an unavailable presentation, 26 pages in browser and PDF modes, no clipping at 1280×720 and 390×844, and identical numeric Peer values in on-screen and print markup.
 
 - [ ] **Step 2: Run focused report tests and verify RED**
 
@@ -561,14 +562,14 @@ Keep the current detail order and make it explicit:
 
 Do not copy HTML or CSS from `src/public/prototypes/su-full-phase-peers-prototype.html`. Adjust only existing landscape selectors so labels are unambiguous, bar/value contrast passes current accessibility tests, long feedback wraps, and print page breaks remain stable.
 
-- [ ] **Step 4: Replace the disclosure and show provenance**
+- [ ] **Step 4: Replace the disclosure and show plain-language peer context**
 
 ```ts
 const PEER_DISCLOSURE =
-  "Peers are a governed benchmark snapshot selected by organizational phase and frozen when this result was scored. This is not an industry-, geography-, or cohort-matched comparison.";
+  "Peers shows the benchmark associated with your organizational phase when you completed this assessment. It is not matched by industry, geography, or a custom peer group.";
 ```
 
-Render it on the peer dashboard and question-detail section. Show source/phase as subordinate provenance, not a marketing claim. Do not show phase provenance when Peers was omitted because of corruption.
+Render it on the peer dashboard and question-detail section. Show the phase name as subordinate context, not a marketing claim. Do not render source IDs or other engineering language, and do not show phase context when Peers was omitted because of corruption.
 
 - [ ] **Step 5: Run report tests and perform local visual verification**
 

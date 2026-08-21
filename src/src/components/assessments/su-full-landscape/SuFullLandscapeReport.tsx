@@ -70,7 +70,7 @@ export function PeerSnapshotDisclosure({
 }) {
   const disclosure = buildSuFullPeerDisclosureModel(provenance);
   return (
-    <aside className="su-full-landscape-peer-disclosure" aria-label="Peer benchmark provenance">
+    <aside className="su-full-landscape-peer-disclosure" aria-label="Peer benchmark information">
       <p>{disclosure.disclosure}</p>
       <p className="su-full-landscape-peer-provenance">{disclosure.provenanceLabel}</p>
     </aside>
@@ -105,8 +105,7 @@ function PrefacePage({ number, footerBrand }: { number: number; footerBrand: SuF
       </p>
       <p>
         Your answers and feedback are preserved from the completed assessment;
-        peer values are shown only with the benchmark provenance described in this
-        report.
+        peer values are explained wherever they appear.
       </p>
     </SuFullLandscapePage>
   );

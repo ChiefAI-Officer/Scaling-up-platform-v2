@@ -143,18 +143,20 @@ peer snapshot rather than making submission impossible.
 
 The report should say:
 
-> Peers are a governed benchmark snapshot selected by organizational phase and frozen
-> when this result was scored. This is not an industry-, geography-, or cohort-matched
-> comparison.
+> Peers shows the benchmark associated with your organizational phase when you
+> completed this assessment. It is not matched by industry, geography, or a custom
+> peer group.
 
 Historical reports must instead say:
 
-> Peers use the governed historical baseline for reports scored before phase-aware
-> peer snapshots were frozen. This is not an industry-, geography-, or cohort-matched
-> comparison.
+> Peers shows the historical benchmark used for this report. It is not matched by
+> industry, geography, or a custom peer group.
 
-The display may additionally show a concise source date or catalogue edition. It must
-not claim a level of peer matching the evidence does not establish.
+Current reports show the plain-language organizational phase label, for example
+`Phase 4 · Delegation`; historical reports show `Historical benchmark`. Source IDs,
+hashes, catalogue details, snapshot mechanics, and other engineering provenance remain
+internal and must not appear in the report. The display must not claim a level of peer
+matching the evidence does not establish.
 
 ### D9 — Ship as one forward-only governed edition
 

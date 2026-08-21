@@ -38,12 +38,19 @@ export type SuFullPeerSectionComparison = Readonly<{
   questions: readonly SuFullPeerQuestionComparison[];
 }>;
 
-export type SuFullPeerProvenance = Readonly<{
-  sourceId: string;
-  contentHash: string;
-  phase: GrowthPhaseNumber | null;
-  legacy: boolean;
-}>;
+export type SuFullPeerProvenance =
+  | Readonly<{
+      sourceId: string;
+      contentHash: string;
+      phase: GrowthPhaseNumber;
+      legacy: false;
+    }>
+  | Readonly<{
+      sourceId: string;
+      contentHash: string;
+      phase: null;
+      legacy: true;
+    }>;
 
 export type SuFullPeerPresentation = Readonly<{
   provenance: SuFullPeerProvenance;

@@ -109,11 +109,15 @@ test("renders the fixed 26-page landscape composition with truthful peer context
   expect(screen.getByTestId("su-full-landscape-page-5").querySelectorAll(".su-full-landscape-profile-row--chapter")).toHaveLength(5);
   expect(screen.getByTestId("su-full-landscape-page-5").querySelectorAll(".su-full-landscape-profile-row--subsection")).toHaveLength(10);
   expect(screen.getByTestId("su-full-landscape-page-6")).toHaveTextContent(
-    "Peers are a governed benchmark snapshot selected by organizational phase and frozen when this result was scored. This is not an industry-, geography-, or cohort-matched comparison.",
+    "Peers shows the benchmark associated with your organizational phase when you completed this assessment. It is not matched by industry, geography, or a custom peer group.",
   );
   expect(screen.getByTestId("su-full-landscape-page-6")).toHaveTextContent(
-    "Phase P4 · 2026-08-20.esperto-five-phase-peers-v1",
+    "Phase 4 · Delegation",
   );
+  expect(screen.getByTestId("su-full-landscape-page-6")).not.toHaveTextContent(
+    /governed|snapshot|sourceId|source id|catalogue|provenance|legacy baseline|phase-aware|frozen|esperto-five-phase-peers/i,
+  );
+  expect(screen.getAllByLabelText("Peer benchmark information").length).toBeGreaterThanOrEqual(2);
 
   for (const detail of screen.getAllByTestId(/^su-full-landscape-detail-Q/)) {
     const bars = within(detail).getByTestId(

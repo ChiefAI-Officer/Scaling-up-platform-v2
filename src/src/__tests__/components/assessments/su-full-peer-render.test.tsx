@@ -12,14 +12,12 @@ import {
 } from "@/__tests__/fixtures/su-full-landscape";
 import { buildSuFullPeerPresentationResult } from "@/lib/assessments/su-full-peer-presentation";
 import { reviveOnScreenReport } from "@/lib/assessments/onscreen-result-store";
-import { SU_FULL_PHASE_PEER_SOURCE_ID } from "@/lib/assessments/su-full-phase-peer-catalogue";
-import { SU_FULL_LEGACY_PEER_SOURCE_ID } from "@/lib/assessments/su-full-question-benchmarks";
-
 const LANDSCAPE_ENABLED = "NEXT_PUBLIC_WAVE_SU_FULL_LANDSCAPE_REPORT_ENABLED";
 const LANDSCAPE_KILL = "NEXT_PUBLIC_WAVE_SU_FULL_LANDSCAPE_REPORT_KILL";
 const savedLandscapeEnv: Record<string, string | undefined> = {};
-const PEER_DISCLOSURE = "Peers are a governed benchmark snapshot selected by organizational phase and frozen when this result was scored. This is not an industry-, geography-, or cohort-matched comparison.";
-const LEGACY_PEER_DISCLOSURE = "Peers use the governed historical baseline for reports scored before phase-aware peer snapshots were frozen. This is not an industry-, geography-, or cohort-matched comparison.";
+const PEER_DISCLOSURE = "Peers shows the benchmark associated with your organizational phase when you completed this assessment. It is not matched by industry, geography, or a custom peer group.";
+const HISTORICAL_PEER_DISCLOSURE = "Peers shows the historical benchmark used for this report. It is not matched by industry, geography, or a custom peer group.";
+const ENGINEERING_LANGUAGE = /governed|snapshot|sourceId|source id|catalogue|provenance|legacy baseline|phase-aware|frozen|esperto-five-phase-peers|esperto-controlled/i;
 
 beforeEach(() => {
   for (const key of [LANDSCAPE_ENABLED, LANDSCAPE_KILL]) {
@@ -251,26 +249,25 @@ test("omits blank stored feedback without inventing placeholder copy", () => {
   expect(detail).not.toHaveTextContent(/no feedback|not available/i);
 });
 
-test("renders truthful legacy disclosure and provenance without a phase-selected or frozen-scoring claim", () => {
+test("renders historical benchmark context without internal provenance language", () => {
   render(<BrandedReport report={suFullReportWithPeers()} />);
 
   const disclosures = screen.getAllByTestId("su-full-peer-disclosure");
   expect(disclosures).toHaveLength(1);
-  expect(disclosures[0]).toHaveTextContent(LEGACY_PEER_DISCLOSURE);
-  expect(disclosures[0]).toHaveTextContent(
-    `Legacy baseline · ${SU_FULL_LEGACY_PEER_SOURCE_ID}`,
-  );
+  expect(disclosures[0]).toHaveTextContent(HISTORICAL_PEER_DISCLOSURE);
+  expect(disclosures[0]).toHaveTextContent("Historical benchmark");
   expect(disclosures[0]).not.toHaveTextContent(PEER_DISCLOSURE);
-  expect(disclosures[0]).not.toHaveTextContent(/selected by organizational phase|frozen when this result was scored/i);
-  expect(disclosures[0]).not.toHaveTextContent(/Phase P[1-5]/);
+  expect(disclosures[0]).not.toHaveTextContent(/selected by organizational phase|Phase [1-5]/i);
+  expect(disclosures[0]).not.toHaveTextContent(ENGINEERING_LANGUAGE);
 });
 
-test("renders governed phase provenance in the shipped flag-off peer sequence", () => {
+test("renders plain-language phase context in the shipped flag-off peer sequence", () => {
   render(<BrandedReport report={suFullLandscapeReportWithPeers()} />);
 
   const disclosure = screen.getByTestId("su-full-peer-disclosure");
   expect(disclosure).toHaveTextContent(PEER_DISCLOSURE);
-  expect(disclosure).toHaveTextContent(`Phase P4 · ${SU_FULL_PHASE_PEER_SOURCE_ID}`);
+  expect(disclosure).toHaveTextContent("Phase 4 · Delegation");
+  expect(disclosure).not.toHaveTextContent(ENGINEERING_LANGUAGE);
 });
 
 test("omits generic peer UI when a coherent presentation is stale for the frozen report", () => {
