@@ -28,6 +28,7 @@ describe("report HTML full preview page", () => {
     expect(html).toContain('data-print-hidden');
     expect(html).toContain('data-testid="branded-report"');
     expect(html).toContain("Saved welcome");
+    expect(html).toContain('data-enabled-report-style="CLASSIC"');
   });
 
   it("rejects a version that is not owned by the requested template", async () => {

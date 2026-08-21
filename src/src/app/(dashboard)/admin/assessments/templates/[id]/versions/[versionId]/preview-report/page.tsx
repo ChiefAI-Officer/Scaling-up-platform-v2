@@ -59,7 +59,13 @@ export default async function ReportHtmlPreviewPage({
         Representative preview content
       </aside>
       <ReportStyleScope report={report} reportStylesAvailable>
-        <BrandedReport report={report} reportStylesAvailable reportFindingsAvailable />
+        <div className="su-report-page">
+          <BrandedReport
+            report={report}
+            reportStylesAvailable
+            reportFindingsAvailable
+          />
+        </div>
       </ReportStyleScope>
     </main>
   );
