@@ -626,7 +626,6 @@ export function TabbedShell({
     rawSections,
     scoringConfig,
     reportConfig,
-    reportHtmlPreview,
     handleScoringConfigChange,
     handleMarketingCtaChange,
     handleReportHtmlChange,
@@ -1255,7 +1254,9 @@ export function TabbedShell({
             <div data-testid="tab-panel-reports">
               <ReportsTab
                 value={extractReportHtml(reportConfig)}
-                previewValue={reportHtmlPreview}
+                previewHref={`/admin/assessments/templates/${template.id}/versions/${version.id}/preview-report`}
+                historicalPreviewHref={template.alias === "scaling-up-full" ? `/admin/assessments/templates/${template.id}/versions/${version.id}/preview-report?peerReference=historical` : null}
+                previewDisabled={Boolean(dirtyFlags.reportConfig)}
                 onChange={handleReportHtmlChange}
                 isReadOnly={isPublished}
               />

@@ -156,6 +156,29 @@ describe("TabbedShell seam — ed10Active (Preview + Settings)", () => {
     },
   );
 
+  it("threads saved-only Scaling Up Full preview links and the report-content dirty state", () => {
+    mockSearchParams = new URLSearchParams("tab=reports");
+    const props = shellProps(true);
+    render(
+      <TemplateEditorTabbed
+        {...props}
+        reportsActive
+        initialDirtyFlags={{ reportConfig: true }}
+        template={{ ...props.template, alias: "scaling-up-full" }}
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: "Open full report preview" })).toHaveAttribute(
+      "href",
+      "/admin/assessments/templates/tpl_1/versions/ver_2/preview-report",
+    );
+    expect(screen.getByRole("link", { name: "Open historical report preview" })).toHaveAttribute(
+      "href",
+      "/admin/assessments/templates/tpl_1/versions/ver_2/preview-report?peerReference=historical",
+    );
+    expect(screen.getByRole("link", { name: "Open full report preview" })).toHaveAttribute("aria-disabled", "true");
+  });
+
   it("tab bar: Preview + Settings triggers, NO Metadata trigger, NO Access link", () => {
     render(<TemplateEditorTabbed {...shellProps(true)} />);
 

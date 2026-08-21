@@ -1,7 +1,6 @@
 import React from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { ReportsTab } from "@/components/admin/template-editor/ReportsTab";
-import { loadSafeReportHtml } from "@/lib/assessments/report-html";
 
 const value = {
   schemaVersion: 1 as const,
@@ -9,14 +8,14 @@ const value = {
   conclusionHtml: "<p>CTA</p>",
 };
 
-const previewValue = loadSafeReportHtml({ reportHtml: value });
-
 describe("ReportsTab", () => {
   it("describes the protected Welcome and Closing regions accurately", () => {
     render(
       <ReportsTab
         value={value}
-        previewValue={previewValue}
+        previewHref="/admin/assessments/templates/tpl_1/versions/ver_2/preview-report"
+        historicalPreviewHref="/admin/assessments/templates/tpl_1/versions/ver_2/preview-report?peerReference=historical"
+        previewDisabled={false}
         onChange={jest.fn()}
         isReadOnly={false}
       />,
@@ -46,7 +45,9 @@ describe("ReportsTab", () => {
     render(
       <ReportsTab
         value={value}
-        previewValue={previewValue}
+        previewHref="/admin/assessments/templates/tpl_1/versions/ver_2/preview-report"
+        historicalPreviewHref={null}
+        previewDisabled={false}
         onChange={onChange}
         isReadOnly={false}
       />,
@@ -63,33 +64,34 @@ describe("ReportsTab", () => {
     });
   });
 
-  it("renders only the server-canonical preview while the draft is unsafe", () => {
-    const unsafeDraft = {
-      ...value,
-      introductionHtml: '<script>bad()</script><p onclick="bad()">Draft</p>',
-    };
+  it("offers only saved full-report previews and disables them while report content is dirty", () => {
     render(
       <ReportsTab
-        value={unsafeDraft}
-        previewValue={previewValue}
+        value={value}
+        previewHref="/admin/assessments/templates/tpl_1/versions/ver_2/preview-report"
+        historicalPreviewHref="/admin/assessments/templates/tpl_1/versions/ver_2/preview-report?peerReference=historical"
+        previewDisabled
         onChange={jest.fn()}
         isReadOnly={false}
       />,
     );
 
-    const preview = screen.getByTestId("report-html-preview-introduction");
-    expect(preview).toHaveTextContent("Intro");
-    expect(preview).not.toHaveTextContent("Draft");
-    expect(preview.querySelector("script")).toBeNull();
-    expect(screen.queryByTitle("Introduction HTML preview")).toBeNull();
-    expect(screen.getAllByText("Preview updates after you save the draft.")).toHaveLength(2);
+    expect(screen.getByText("Full report preview")).toBeInTheDocument();
+    expect(screen.getByText("Preview uses the last saved content and the exact report styling.")).toBeInTheDocument();
+    expect(screen.getByText("Save the draft to preview your latest changes.")).toBeInTheDocument();
+    expect(screen.queryByTestId("report-html-preview-introduction")).toBeNull();
+    expect(screen.queryByTestId("report-html-preview-conclusion")).toBeNull();
+    expect(screen.getByRole("link", { name: "Open full report preview" })).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByRole("link", { name: "Open historical report preview" })).toHaveAttribute("aria-disabled", "true");
   });
 
   it("disables both fields for a published version", () => {
     render(
       <ReportsTab
         value={value}
-        previewValue={previewValue}
+        previewHref="/admin/assessments/templates/tpl_1/versions/ver_2/preview-report"
+        historicalPreviewHref={null}
+        previewDisabled={false}
         onChange={jest.fn()}
         isReadOnly
       />,

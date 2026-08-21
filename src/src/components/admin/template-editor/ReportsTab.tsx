@@ -1,11 +1,8 @@
 "use client";
 
 import React from "react";
-import { ReportHtmlSection } from "@/components/assessments/ReportHtmlSection";
 import type {
   ReportHtmlConfigV1,
-  SafeReportHtml,
-  SafeReportHtmlFragment,
 } from "@/lib/assessments/report-html";
 import { REPORT_HTML_LIMITS } from "@/lib/assessments/report-html-sanitizer";
 
@@ -15,7 +12,6 @@ function HtmlRegion({
   label,
   helper,
   value,
-  previewHtml,
   position,
   onChange,
   isReadOnly,
@@ -25,7 +21,6 @@ function HtmlRegion({
   label: string;
   helper: string;
   value: string | null;
-  previewHtml: SafeReportHtmlFragment | null;
   position: "introduction" | "conclusion";
   onChange: (value: string) => void;
   isReadOnly: boolean;
@@ -33,8 +28,7 @@ function HtmlRegion({
   const html = value ?? "";
   return (
     <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-      <div className="grid min-h-[280px] gap-0 lg:grid-cols-2">
-        <div className="border-b border-border p-5 lg:border-b-0 lg:border-r">
+      <div className="p-5">
           <div className="mb-4">
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-base font-semibold text-foreground">{title}</h3>
@@ -65,38 +59,45 @@ function HtmlRegion({
               {html.length.toLocaleString()} / {REPORT_HTML_LIMITS[position].rawCharacters.toLocaleString()}
             </span>
           </div>
-        </div>
-        <div className="bg-muted/30 p-5">
-          <div className="mb-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-            Preview
-          </div>
-          <div
-            className="min-h-[210px] overflow-hidden rounded-lg border border-border bg-white p-5 text-slate-900"
-            data-testid={`report-html-preview-${position}`}
-          >
-            {previewHtml ? (
-              <ReportHtmlSection position={position} html={previewHtml} />
-            ) : (
-              <p className="text-sm text-slate-500">No saved HTML yet.</p>
-            )}
-          </div>
-          <p className="mt-2 text-[11px] text-muted-foreground">
-            Preview updates after you save the draft.
-          </p>
-        </div>
       </div>
     </section>
   );
 }
 
+function PreviewLink({
+  href,
+  children,
+  disabled,
+}: {
+  href: string;
+  children: React.ReactNode;
+  disabled: boolean;
+}) {
+  return (
+    <a
+      href={href}
+      aria-disabled={disabled || undefined}
+      tabIndex={disabled ? -1 : undefined}
+      onClick={disabled ? (event) => event.preventDefault() : undefined}
+      className={disabled ? "pointer-events-none opacity-50" : undefined}
+    >
+      {children}
+    </a>
+  );
+}
+
 export function ReportsTab({
   value,
-  previewValue = { introductionHtml: null, conclusionHtml: null },
+  previewHref,
+  historicalPreviewHref,
+  previewDisabled,
   onChange,
   isReadOnly,
 }: {
   value: ReportHtmlConfigV1;
-  previewValue?: SafeReportHtml;
+  previewHref: string;
+  historicalPreviewHref: string | null;
+  previewDisabled: boolean;
   onChange: (next: ReportHtmlConfigV1) => void;
   isReadOnly: boolean;
 }) {
@@ -115,13 +116,30 @@ export function ReportsTab({
         label="Introduction / preface HTML"
         helper="Replaces the default Welcome content on page 2."
         value={value.introductionHtml}
-        previewHtml={previewValue.introductionHtml}
         position="introduction"
         onChange={(introductionHtml) =>
           onChange({ ...value, introductionHtml })
         }
         isReadOnly={isReadOnly}
       />
+
+      <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
+        <h3 className="text-base font-semibold text-foreground">Full report preview</h3>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Preview uses the last saved content and the exact report styling.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <PreviewLink href={previewHref} disabled={previewDisabled}>
+            Open full report preview
+          </PreviewLink>
+          {historicalPreviewHref ? (
+            <PreviewLink href={historicalPreviewHref} disabled={previewDisabled}>
+              Open historical report preview
+            </PreviewLink>
+          ) : null}
+        </div>
+        {previewDisabled ? <p className="mt-3 text-xs text-muted-foreground">Save the draft to preview your latest changes.</p> : null}
+      </section>
 
       <section className="flex items-center gap-4 rounded-xl border border-dashed border-border bg-muted/30 px-5 py-4">
         <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-border bg-background text-muted-foreground">
@@ -141,7 +159,6 @@ export function ReportsTab({
         label="Conclusion / call-to-action HTML"
         helper="Appears after the respondent's score and strongest/focus summary on page 25. It replaces only the default next steps and coach link."
         value={value.conclusionHtml}
-        previewHtml={previewValue.conclusionHtml}
         position="conclusion"
         onChange={(conclusionHtml) => onChange({ ...value, conclusionHtml })}
         isReadOnly={isReadOnly}
