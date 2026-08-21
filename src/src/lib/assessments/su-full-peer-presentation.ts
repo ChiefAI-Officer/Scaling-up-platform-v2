@@ -239,7 +239,7 @@ export function isSuFullPeerPresentation(
   if (!hasCanonicalQuestions) return false;
 
   if (provenance.legacy) {
-    const legacyValues = new Map(
+    const legacyValues = new Map<string, number>(
       SU_FULL_QUESTION_BENCHMARKS.map((row) => [row.stableKey, row.value]),
     );
     return provenance.sourceId === SU_FULL_LEGACY_PEER_SOURCE_ID
@@ -274,13 +274,13 @@ export function isSuFullPeerPresentationForReport(
     || !isRecord(report)
     || report.templateAlias !== SCALING_UP_FULL_TEMPLATE_ALIAS
     || !isRecord(report.result)
-    || !Array.isArray(report.result.perQuestion)
   ) {
     return false;
   }
 
   const result = report.result;
   const scoreRows = result.perQuestion;
+  if (!Array.isArray(scoreRows)) return false;
   const frozenRows = scoreRows.filter(
     (row) => isRecord(row) && row.peerValue !== undefined,
   );
