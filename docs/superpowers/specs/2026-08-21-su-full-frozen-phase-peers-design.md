@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-21
 
-**Status:** Approved direction; written review pending; implementation not started
+**Status:** Architecture and Layout A approved; implementation plan in review; implementation not started
 
 **Scope:** Scaling Up Full assessment only
 
@@ -13,7 +13,8 @@
 Make the Scaling Up Full **Peers** comparison truthful, phase-aware, reproducible,
 and distinct from personalized Feedback.
 
-For every newly scored result on the new governed template version, the platform
+For every newly scored, report-eligible CEO result on the new governed template
+version, the platform
 must:
 
 1. select one governed peer value per scored question using the same organizational
@@ -21,7 +22,7 @@ must:
 2. freeze all selected peer values and their catalogue provenance into the score
    result;
 3. render Peers from that frozen result without consulting mutable benchmark rows;
-4. retain the existing baseline meaning for historical results without rewriting,
+4. retain the existing baseline meaning for historical reports without rewriting,
    backfilling, or repinning them; and
 5. fail closed when a phase-aware peer catalogue or frozen snapshot is incomplete.
 
@@ -46,6 +47,7 @@ The governing evidence and checksums are recorded in:
 - `docs/research/esperto-peer-vector-boundary-report-manifest-2026-08-21.csv`
 - `docs/research/esperto-feedback-five-phase-full-matrix-2026-08-20.csv`
 - `docs/research/esperto-peer-benchmark-sources.md`
+- `docs/research/jeff-esperto-report-fidelity-meeting-evidence-2026-08-21.md`
 
 The evidence proves a **phase-selected governed reference**. It does not prove an
 industry-, geography-, campaign-, or cohort-matched benchmark.
@@ -132,6 +134,11 @@ declares a frozen snapshot but has missing/corrupt peer values must omit the Pee
 enhancement and emit a structured diagnostic; it must never query mutable rows or
 substitute the baseline.
 
+The CEO-only report path must also reject a governed result when the required phase
+cannot be resolved. Non-CEO submissions intentionally lack the CEO-only FTE driver and
+do not receive an individual report; their generic scoring path therefore omits the
+peer snapshot rather than making submission impossible.
+
 ### D8 — The report disclosure states what is actually matched
 
 The report should say:
@@ -163,6 +170,25 @@ remain separate approval gates. This design does not authorize any of them.
 The local visual guide and this design document are review artifacts only. Do not
 push, create a PR, deploy, activate flags, mutate Platform Production, or send external
 mail/Slack from this stage.
+
+### D11 — Layout A is the approved question-detail presentation
+
+Keep the Scaling Up Full question-detail sequence as:
+
+1. the question;
+2. clearly labelled **You** and **Peers** bars; and
+3. the frozen answer/feedback directly beneath the bars.
+
+This implements Jeff's specific August 13 direction to mimic that Esperto flow. It
+does not authorize a pixel-for-pixel clone or a wholesale Esperto restyle: on August
+13 Jeff also said the broader Peers view did not need to mimic the whole thing, and on
+August 20 he accepted report data being laid out differently. Preserve the Scaling Up
+brand, current landscape report architecture, readability, and 26-page contract.
+
+The local Layout A HTML prototype is a decision aid only. Production work must be
+implemented through the existing typed report model and components, then verified in
+browser and PDF rendering; the prototype itself must not be promoted into application
+code.
 
 ## 4. Planned data contract
 
@@ -235,7 +261,7 @@ phase and question to scoring; runtime code must not infer phase equivalence.
 | `src/src/lib/assessments/su-full-question-benchmarks.ts` | Become the explicit legacy baseline, with stale “phase invariant” claims removed |
 | `src/src/lib/assessments/su-full-peer-presentation.ts` | Build from frozen per-question peers; use legacy baseline only for genuinely old results |
 | `src/src/lib/assessments/peer-report-resolver.ts` | Bypass database benchmark lookup for Scaling Up Full; leave LVA unchanged |
-| Scaling Up Full report components | Render the precise phase-snapshot disclosure and omit invalid peer enhancements safely |
+| Scaling Up Full report components | Preserve Layout A's question → You/Peers bars → feedback flow, render precise phase-snapshot provenance, and omit invalid peer enhancements safely |
 | Tests and fixtures | Prove all phases, boundaries, hashes, legacy immutability, tamper behavior, and PDF parity |
 
 The exact submit-route and component paths must be resolved and pinned in the
