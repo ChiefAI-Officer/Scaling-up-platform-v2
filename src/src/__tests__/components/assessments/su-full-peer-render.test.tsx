@@ -19,6 +19,7 @@ const LANDSCAPE_ENABLED = "NEXT_PUBLIC_WAVE_SU_FULL_LANDSCAPE_REPORT_ENABLED";
 const LANDSCAPE_KILL = "NEXT_PUBLIC_WAVE_SU_FULL_LANDSCAPE_REPORT_KILL";
 const savedLandscapeEnv: Record<string, string | undefined> = {};
 const PEER_DISCLOSURE = "Peers are a governed benchmark snapshot selected by organizational phase and frozen when this result was scored. This is not an industry-, geography-, or cohort-matched comparison.";
+const LEGACY_PEER_DISCLOSURE = "Peers use the governed historical baseline for reports scored before phase-aware peer snapshots were frozen. This is not an industry-, geography-, or cohort-matched comparison.";
 
 beforeEach(() => {
   for (const key of [LANDSCAPE_ENABLED, LANDSCAPE_KILL]) {
@@ -242,15 +243,17 @@ test("omits blank frozen feedback without inventing placeholder copy", () => {
   expect(detail).not.toHaveTextContent(/no feedback|not available/i);
 });
 
-test("renders one exact governed disclosure with truthful legacy provenance", () => {
+test("renders truthful legacy disclosure and provenance without a phase-selected or frozen-scoring claim", () => {
   render(<BrandedReport report={suFullReportWithPeers()} />);
 
   const disclosures = screen.getAllByTestId("su-full-peer-disclosure");
   expect(disclosures).toHaveLength(1);
-  expect(disclosures[0]).toHaveTextContent(PEER_DISCLOSURE);
+  expect(disclosures[0]).toHaveTextContent(LEGACY_PEER_DISCLOSURE);
   expect(disclosures[0]).toHaveTextContent(
     `Legacy baseline · ${SU_FULL_LEGACY_PEER_SOURCE_ID}`,
   );
+  expect(disclosures[0]).not.toHaveTextContent(PEER_DISCLOSURE);
+  expect(disclosures[0]).not.toHaveTextContent(/selected by organizational phase|frozen when this result was scored/i);
   expect(disclosures[0]).not.toHaveTextContent(/Phase P[1-5]/);
 });
 

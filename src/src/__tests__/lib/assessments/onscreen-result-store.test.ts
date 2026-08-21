@@ -30,6 +30,7 @@ import {
 } from "@/lib/assessments/onscreen-result-store";
 import { completeSuFullPeerReport } from "@/__tests__/fixtures/su-full-peer";
 import { buildSuFullPeerPresentationResult } from "@/lib/assessments/su-full-peer-presentation";
+import type { SuFullPeerPresentation } from "@/lib/assessments/su-full-peer-presentation";
 import {
   SU_FULL_PHASE_PEER_CONTENT_HASHES,
   SU_FULL_PHASE_PEER_SOURCE_ID,
@@ -82,14 +83,42 @@ function completeGovernedPeerPresentation(phase: 3 | 4) {
   return built.presentation;
 }
 
+function mutablePresentation(
+  presentation: SuFullPeerPresentation,
+): SuFullPeerPresentation {
+  return JSON.parse(JSON.stringify(presentation)) as SuFullPeerPresentation;
+}
+
+const coherentCrossObjectForgeries = [
+  ["Q01 You value", (presentation: SuFullPeerPresentation) => {
+    const firstSection = presentation.sections[0] as {
+      youTotal: number;
+      questions: Array<{ you: number }>;
+    };
+    firstSection.questions[0].you += 1;
+    firstSection.youTotal += 1;
+  }],
+  ["Q01 recommendation", (presentation: SuFullPeerPresentation) => {
+    const firstSection = presentation.sections[0] as {
+      questions: Array<{ recommendation: string | null }>;
+    };
+    firstSection.questions[0].recommendation = "Forged feedback";
+  }],
+  ["Q01 label", (presentation: SuFullPeerPresentation) => {
+    const firstSection = presentation.sections[0] as {
+      questions: Array<{ label: string }>;
+    };
+    firstSection.questions[0].label = "Forged question label";
+  }],
+  ["section metadata", (presentation: SuFullPeerPresentation) => {
+    (presentation.sections[0] as { domain: string | null }).domain = "cash";
+  }],
+] as const;
+
 const sampleReport = {
+  ...completeSuFullPeerReport(),
   respondentName: "Resp Ondent",
-  templateAlias: "scaling-up-full",
-  reportStyle: "CLASSIC",
-  assessmentName: "Scaling Up Full",
   submittedAt: new Date("2026-07-29T10:30:00.000Z"),
-  result: completeSuFullPeerReport().result,
-  degraded: false,
   suFullPeerPresentation: completePeerPresentation(),
 };
 
@@ -196,6 +225,22 @@ describe("round trip", () => {
 
     expect(revived?.suFullPeerPresentation).toBeUndefined();
   });
+
+  it.each(coherentCrossObjectForgeries)(
+    "discards a governed presentation with forged %s instead of repairing it",
+    (_case, mutate) => {
+      const report = completeGovernedPeerReport(4);
+      const forged = mutablePresentation(completeGovernedPeerPresentation(4));
+      mutate(forged);
+
+      const revived = reviveOnScreenReport({
+        ...report,
+        suFullPeerPresentation: forged,
+      });
+
+      expect(revived?.suFullPeerPresentation).toBeUndefined();
+    },
+  );
 
   it.each([
     ["snapshot provenance", (report: ReturnType<typeof completeSuFullPeerReport>) => {

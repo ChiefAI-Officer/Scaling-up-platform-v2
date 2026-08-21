@@ -26,6 +26,7 @@ import {
   buildPhasePeerBenchmarks,
   SU_FULL_PHASE_PEER_CONTENT_HASHES,
   SU_FULL_PHASE_PEER_SOURCE_ID,
+  SU_FULL_PHASE_PEER_VECTORS,
 } from "@/lib/assessments/su-full-phase-peer-catalogue";
 import type { GrowthPhaseNumber } from "@/lib/assessments/su-full-phase";
 
@@ -1229,6 +1230,11 @@ describe("phase-aware peer benchmark freezing", () => {
     });
 
     expect(result.perQuestion.find((row) => row.stableKey === "Q01")?.peerValue).toBe(q01Peer);
+    expect(
+      Object.fromEntries(
+        result.perQuestion.map((row) => [row.stableKey, row.peerValue]),
+      ),
+    ).toEqual(SU_FULL_PHASE_PEER_VECTORS[phase]);
     expect(result.peerBenchmarkSnapshot).toEqual({
       sourceId: "2026-08-20.esperto-five-phase-peers-v1",
       contentHash,

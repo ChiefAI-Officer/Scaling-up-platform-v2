@@ -3,8 +3,7 @@ import type {
   SuFullPeerQuestionComparison,
   SuFullPeerSectionComparison,
 } from "@/lib/assessments/su-full-peer-presentation";
-
-const PEER_DISCLOSURE = "Peers are a governed benchmark snapshot selected by organizational phase and frozen when this result was scored. This is not an industry-, geography-, or cohort-matched comparison.";
+import { buildSuFullPeerDisclosureModel } from "@/lib/assessments/su-full-peer-disclosure";
 
 function formatValue(value: number): string {
   return value.toFixed(1);
@@ -12,12 +11,6 @@ function formatValue(value: number): string {
 
 function fillWidth(value: number): string {
   return `${Math.max(0, Math.min(10, value)) * 10}%`;
-}
-
-function provenanceLabel(presentation: SuFullPeerPresentation): string {
-  return presentation.provenance.legacy
-    ? `Legacy baseline · ${presentation.provenance.sourceId}`
-    : `Phase P${presentation.provenance.phase} · ${presentation.provenance.sourceId}`;
 }
 
 function PairedBars({
@@ -126,6 +119,7 @@ export function SuFullPeerComparison({
 }: {
   presentation: SuFullPeerPresentation;
 }) {
+  const disclosure = buildSuFullPeerDisclosureModel(presentation.provenance);
   return (
     <section className="su-peer-sequence" data-testid="su-full-peer-sequence">
       {presentation.sections.map((section) => (
@@ -135,8 +129,8 @@ export function SuFullPeerComparison({
         </section>
       ))}
       <p className="su-peer-disclosure" data-testid="su-full-peer-disclosure">
-        <span>{PEER_DISCLOSURE}</span>
-        <span className="su-peer-provenance">{provenanceLabel(presentation)}</span>
+        <span>{disclosure.disclosure}</span>
+        <span className="su-peer-provenance">{disclosure.provenanceLabel}</span>
       </p>
     </section>
   );

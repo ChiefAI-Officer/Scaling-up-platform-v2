@@ -156,6 +156,22 @@ function deepFreeze<T>(value: T, seen = new WeakSet<object>()): T {
   return Object.freeze(value);
 }
 
+function structurallyEqual(actual: unknown, expected: unknown): boolean {
+  if (Object.is(actual, expected)) return true;
+  if (Array.isArray(actual) || Array.isArray(expected)) {
+    return Array.isArray(actual)
+      && Array.isArray(expected)
+      && actual.length === expected.length
+      && actual.every((value, index) => structurallyEqual(value, expected[index]));
+  }
+  if (!isRecord(actual) || !isRecord(expected)) return false;
+  const actualKeys = Object.keys(actual).sort();
+  const expectedKeys = Object.keys(expected).sort();
+  return actualKeys.length === expectedKeys.length
+    && actualKeys.every((key, index) => key === expectedKeys[index])
+    && actualKeys.every((key) => structurallyEqual(actual[key], expected[key]));
+}
+
 /**
  * Validates the optional presentation after an untrusted JSON round trip.
  * Invalid enhancement data is discarded by the caller; the base report stays
@@ -277,60 +293,11 @@ export function isSuFullPeerPresentationForReport(
   ) {
     return false;
   }
-
-  const result = report.result;
-  const scoreRows = result.perQuestion;
-  if (!Array.isArray(scoreRows)) return false;
-  const frozenRows = scoreRows.filter(
-    (row) => isRecord(row) && row.peerValue !== undefined,
-  );
-  if (value.provenance.legacy) {
-    return result.peerBenchmarkSnapshot === undefined && frozenRows.length === 0;
-  }
-
-  if (
-    !isRecord(result.peerBenchmarkSnapshot)
-    || scoreRows.length !== EXPECTED_KEYS.length
-    || frozenRows.length !== EXPECTED_KEYS.length
-  ) {
-    return false;
-  }
-  const snapshot = result.peerBenchmarkSnapshot;
-  if (
-    snapshot.sourceId !== value.provenance.sourceId
-    || snapshot.contentHash !== value.provenance.contentHash
-    || snapshot.phase !== value.provenance.phase
-    || result.recommendationPhase !== value.provenance.phase
-  ) {
-    return false;
-  }
-
-  const resultPeersByKey = new Map<string, number>();
-  for (const row of frozenRows) {
-    if (
-      !isRecord(row)
-      || typeof row.stableKey !== "string"
-      || !isPeerValue(row.peerValue)
-      || resultPeersByKey.has(row.stableKey)
-    ) {
-      return false;
-    }
-    resultPeersByKey.set(row.stableKey, row.peerValue);
-  }
-  if (!hasExactlyExpectedKeys([...resultPeersByKey.keys()])) return false;
-
-  const presentationPeersByKey = new Map(
-    value.sections.flatMap((section) =>
-      section.questions.map((question) => [
-        question.stableKey,
-        question.peers,
-      ] as const),
-    ),
-  );
-  return EXPECTED_KEYS.every(
-    (stableKey) =>
-      resultPeersByKey.get(stableKey) === presentationPeersByKey.get(stableKey),
-  );
+  const expected = buildSuFullPeerPresentationResult({
+    report: report as unknown as RespondentReport,
+  });
+  return expected.status === "ready"
+    && structurallyEqual(value, expected.presentation);
 }
 
 function buildPresentationFromValues(

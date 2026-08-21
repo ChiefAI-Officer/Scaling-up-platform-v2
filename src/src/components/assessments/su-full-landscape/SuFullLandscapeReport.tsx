@@ -14,8 +14,7 @@ import {
   SuFullLandscapePage,
   type SuFullLandscapeFooterBrand,
 } from "@/components/assessments/su-full-landscape/SuFullLandscapePages";
-
-const PEER_DISCLOSURE = "Peers are a governed benchmark snapshot selected by organizational phase and frozen when this result was scored. This is not an industry-, geography-, or cohort-matched comparison.";
+import { buildSuFullPeerDisclosureModel } from "@/lib/assessments/su-full-peer-disclosure";
 
 const CHAPTER_COPY: Readonly<Record<SuFullLandscapeChapter["key"], string>> = {
   people: "The People chapter reviews the employee and culture foundations that support sustainable growth.",
@@ -69,13 +68,11 @@ export function PeerSnapshotDisclosure({
 }: {
   provenance: SuFullLandscapeReportModel["peerProvenance"];
 }) {
-  const provenanceLabel = provenance.legacy
-    ? `Legacy baseline · ${provenance.sourceId}`
-    : `Phase P${provenance.phase} · ${provenance.sourceId}`;
+  const disclosure = buildSuFullPeerDisclosureModel(provenance);
   return (
     <aside className="su-full-landscape-peer-disclosure" aria-label="Peer benchmark provenance">
-      <p>{PEER_DISCLOSURE}</p>
-      <p className="su-full-landscape-peer-provenance">{provenanceLabel}</p>
+      <p>{disclosure.disclosure}</p>
+      <p className="su-full-landscape-peer-provenance">{disclosure.provenanceLabel}</p>
     </aside>
   );
 }

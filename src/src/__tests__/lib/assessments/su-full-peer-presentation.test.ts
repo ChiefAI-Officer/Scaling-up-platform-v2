@@ -1,6 +1,9 @@
 import {
   buildSuFullPeerPresentation,
   buildSuFullPeerPresentationResult,
+  isSuFullPeerPresentation,
+  isSuFullPeerPresentationForReport,
+  type SuFullPeerPresentation,
 } from "@/lib/assessments/su-full-peer-presentation";
 import {
   SU_FULL_PHASE_PEER_CONTENT_HASHES,
@@ -29,6 +32,38 @@ function phaseFourReport(): RespondentReport {
     },
   };
 }
+
+function mutablePresentation(
+  presentation: SuFullPeerPresentation,
+): SuFullPeerPresentation {
+  return JSON.parse(JSON.stringify(presentation)) as SuFullPeerPresentation;
+}
+
+const coherentCrossObjectForgeries = [
+  ["Q01 You value", (presentation: SuFullPeerPresentation) => {
+    const firstSection = presentation.sections[0] as {
+      youTotal: number;
+      questions: Array<{ you: number }>;
+    };
+    firstSection.questions[0].you += 1;
+    firstSection.youTotal += 1;
+  }],
+  ["Q01 recommendation", (presentation: SuFullPeerPresentation) => {
+    const firstSection = presentation.sections[0] as {
+      questions: Array<{ recommendation: string | null }>;
+    };
+    firstSection.questions[0].recommendation = "Forged feedback";
+  }],
+  ["Q01 label", (presentation: SuFullPeerPresentation) => {
+    const firstSection = presentation.sections[0] as {
+      questions: Array<{ label: string }>;
+    };
+    firstSection.questions[0].label = "Forged question label";
+  }],
+  ["section metadata", (presentation: SuFullPeerPresentation) => {
+    (presentation.sections[0] as { domain: string | null }).domain = "cash";
+  }],
+] as const;
 
 test("renders all 61 frozen P4 peers with their stored provenance", () => {
   const result = buildSuFullPeerPresentationResult({ report: phaseFourReport() });
@@ -68,6 +103,20 @@ test("strictly historical reports render the executable legacy baseline", () => 
     legacy: true,
   });
 });
+
+test.each(coherentCrossObjectForgeries)(
+  "same-report validation rejects an internally valid presentation with forged %s",
+  (_case, mutate) => {
+    const report = phaseFourReport();
+    const result = buildSuFullPeerPresentationResult({ report });
+    if (result.status !== "ready") throw new Error(result.reason);
+    const forged = mutablePresentation(result.presentation);
+    mutate(forged);
+
+    expect(isSuFullPeerPresentation(forged)).toBe(true);
+    expect(isSuFullPeerPresentationForReport(forged, report)).toBe(false);
+  },
+);
 
 test.each([
   ["wrong alias", (report: RespondentReport) => ({ ...report, templateAlias: "qsp-v2" }), "WRONG_TEMPLATE"],

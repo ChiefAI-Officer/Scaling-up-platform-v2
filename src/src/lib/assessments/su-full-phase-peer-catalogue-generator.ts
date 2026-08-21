@@ -231,7 +231,7 @@ export const SU_FULL_PHASE_PEER_VECTORS: Readonly<
 export function buildPhasePeerBenchmarks(
   stableKey: string,
 ): readonly PhasePeerBenchmark[] {
-  if (!SU_FULL_PHASE_PEER_VECTORS[1][stableKey]) {
+  if (SU_FULL_PHASE_PEER_VECTORS[1][stableKey] === undefined) {
     throw new Error(
       \`Unknown canonical Scaling Up Full question key: \${JSON.stringify(stableKey)}.\`,
     );
