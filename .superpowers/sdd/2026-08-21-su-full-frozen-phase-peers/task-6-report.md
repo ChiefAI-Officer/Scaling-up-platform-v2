@@ -10,6 +10,38 @@ composition.
 - Base commit: `97b7710154e0a4214a24c48db6aa9a79f7c2552c`
 - Implementation commit: `2a29384dd2920226cf336c3847a67d0be8f9f4c3`
 - Commit subject: `feat: apply approved phase peer report layout`
+- Review-cycle-1 fix commit: `efdbe0d3cb713e9837303bbaa627809567745639`
+- Fix subject: `fix: bind peer presentations to frozen reports`
+
+## Review cycle 1 — report binding
+
+Cycle 1 found that the two UI boundaries validated a presentation's internal shape
+but did not bind it to the frozen report being rendered. A coherent P4 presentation
+could therefore be paired with a report whose frozen Q01 peer value had changed to
+6.5 and still reach peer UI.
+
+RED added the same stale-presentation scenario at three levels:
+
+- the landscape model returned a non-null peer model;
+- the generic `BrandedReport` path rendered `su-full-peer-sequence`;
+- the browser path rendered `su-full-landscape-report` instead of the classic
+  no-peer fallback.
+
+The focused RED command failed 3 suites and 3 tests for those exact reasons. Both
+production boundaries now use Task 5's
+`isSuFullPeerPresentationForReport(presentation, report)` validator. They validate
+only and never repair from the catalogue or presentation. The identical focused
+command then passed all 3 regressions.
+
+The complete Task 6 component/model/browser set passed 5 suites and 47 tests. The
+Task 1–6 integration set passed 14 suites and 498 tests. Targeted ESLint and
+`git diff --check` also passed.
+
+The artifact-enabled browser test was rerun for the corrupt binding path. Desktop,
+mobile, and print screenshots were inspected and showed the classic fallback with
+no peer sequence, disclosure, provenance, or landscape composition. DOM/CSS for
+valid reports was unchanged, so the already-approved valid-report screenshots did
+not require another visual ruling. Temporary artifacts were removed after review.
 
 ## RED evidence
 
@@ -106,7 +138,7 @@ Observations:
   `pdfinfo`.
 - Provenance renders as `Phase P<n> · 2026-08-20.esperto-five-phase-peers-v1`
   for governed snapshots and
-  `Legacy baseline · su-full-benchmarks-2026-08-14-v1` for historical fallback.
+  `Legacy baseline · 2026-08-14.esperto-controlled-v1` for historical fallback.
 - Corrupt/unavailable presentation renders the classic fallback with no peer UI,
   disclosure, or provenance in desktop, mobile, or print modes.
 - Browser contrast checks require at least 3:1 for both bar fills against their
