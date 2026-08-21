@@ -175,6 +175,10 @@ describe("useTemplateEditorDraft — Save-Draft metadata body (ED10 trim)", () =
         conclusionHtml: "<p>CTA</p>",
       },
     });
+    expect(result.current.reportHtmlPreview).toEqual({
+      introductionHtml: "<p>Safe intro</p>",
+      conclusionHtml: "<p>CTA</p>",
+    });
     expect(result.current.dirtyFlags.reportConfig).toBeUndefined();
     expect(toastMock).toHaveBeenCalledWith(
       expect.objectContaining({ title: "Unsafe report HTML was removed" }),

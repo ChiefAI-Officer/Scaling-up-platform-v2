@@ -56,7 +56,8 @@ import { inngest } from "@/inngest/client";
 // Import the event name from the side-effect-free constants module (NOT the
 // fan-out function module) so the route never evaluates inngest.createFunction.
 import { ASSESSMENT_SEND_INVITES_EVENT } from "@/inngest/functions/assessment-invite-fanout-event";
-import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
+import { isReportStyleSelectionEnabled } from "@/lib/assessments/wave-report-styles-flags";
+import { isReportHtmlExperienceEnabled } from "@/lib/assessments/wave-report-html-authoring-flags";
 import {
   resolveCampaignReportStyle,
   type CampaignReportStyleResolution,
@@ -192,11 +193,19 @@ export async function POST(request: NextRequest) {
 
     const adminOwnedPresentationEnabled =
       isAdminOwnedAssessmentPresentationEnabled();
-    if (
-      adminOwnedPresentationEnabled &&
+    const includesReportStyle =
       typeof body === "object" &&
       body !== null &&
-      Object.prototype.hasOwnProperty.call(body, "reportStyle")
+      Object.prototype.hasOwnProperty.call(body, "reportStyle");
+    if (isReportHtmlExperienceEnabled() && includesReportStyle) {
+      return NextResponse.json(
+        { success: false, error: "REPORT_STYLE_UNAVAILABLE" },
+        { status: 400 },
+      );
+    }
+    if (
+      adminOwnedPresentationEnabled &&
+      includesReportStyle
     ) {
       return NextResponse.json(
         { success: false, error: "REPORT_STYLE_ADMIN_OWNED" },
@@ -357,7 +366,7 @@ export async function POST(request: NextRequest) {
 
     // A flag-off request is deliberately harmless: it falls back to Classic
     // below rather than persisting a hidden opt-in.
-    const reportStylesAvailable = isReportStylesEnabled({ templateId: template.id });
+    const reportStylesAvailable = isReportStyleSelectionEnabled({ templateId: template.id });
     const reportStylePolicy = resolveCampaignReportStyle(
       reportStylesAvailable ? data.reportStyle : undefined,
       reportStylesAvailable ? template.defaultReportStyle : "CLASSIC",

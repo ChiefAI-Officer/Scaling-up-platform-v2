@@ -314,4 +314,26 @@ describe("POST /api/quiz/[campaignAlias]/submit", () => {
       }),
     );
   });
+
+  it("omits report HTML from immediate report models while the successor is off", async () => {
+    (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValue(
+      activeOpenCampaign,
+    );
+    (db.assessmentTemplateVersion.findUnique as jest.Mock).mockResolvedValue(
+      validVersion,
+    );
+    (db.assessmentSubmission.create as jest.Mock).mockResolvedValue({
+      id: "sub-no-html",
+    });
+
+    const res = await POST(jsonReq(validBody) as never, aliasParams);
+
+    expect(res.status).toBe(200);
+    expect(reportBuildInputs).not.toHaveLength(0);
+    expect(
+      reportBuildInputs.every(
+        (input) => !Object.prototype.hasOwnProperty.call(input, "reportHtml"),
+      ),
+    ).toBe(true);
+  });
 });

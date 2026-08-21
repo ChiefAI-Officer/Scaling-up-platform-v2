@@ -48,6 +48,10 @@ import PublicQuizPage from "@/app/(public)/quiz/[campaignAlias]/page";
 
 beforeEach(() => {
   jest.clearAllMocks();
+  delete process.env.WAVE_ED10_PREVIEW_SETTINGS_ENABLED;
+  delete process.env.WAVE_ED10_PREVIEW_SETTINGS_KILL;
+  delete process.env.WAVE_REPORT_HTML_AUTHORING_ENABLED;
+  delete process.env.WAVE_REPORT_HTML_AUTHORING_KILL;
   mockIsReferredResultsEnabled.mockReturnValue(false);
   mockCampaignFindUnique.mockResolvedValue({
     id: "campaign-83",
@@ -94,5 +98,37 @@ describe("PublicQuizPage referred-results disclosure boundary", () => {
     const props = await renderPage();
 
     expect(props).toHaveProperty("referredResultsEnabled", true);
+  });
+
+  it("omits report HTML props while the successor experience is off", async () => {
+    const props = await renderPage();
+
+    expect(props).not.toHaveProperty("reportHtmlExperienceActive");
+    expect(props).not.toHaveProperty("reportHtml");
+  });
+
+  it("passes safe report HTML props while the successor experience is active", async () => {
+    process.env.WAVE_ED10_PREVIEW_SETTINGS_ENABLED = "1";
+    process.env.WAVE_REPORT_HTML_AUTHORING_ENABLED = "1";
+    mockVersionFindUnique.mockResolvedValue({
+      questions: [],
+      sections: [],
+      publishedAt: new Date("2026-06-01T00:00:00Z"),
+      reportConfig: {
+        reportHtml: {
+          schemaVersion: 1,
+          introductionHtml: '<p onclick="bad()">Intro</p>',
+          conclusionHtml: "<p>Conclusion</p>",
+        },
+      },
+    });
+
+    const props = await renderPage();
+
+    expect(props).toHaveProperty("reportHtmlExperienceActive", true);
+    expect(props).toHaveProperty("reportHtml", {
+      introductionHtml: "<p>Intro</p>",
+      conclusionHtml: "<p>Conclusion</p>",
+    });
   });
 });

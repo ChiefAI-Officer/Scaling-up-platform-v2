@@ -240,15 +240,12 @@ describe("pinned report HTML", () => {
     ["report flag off", { ed10: "1", report: undefined, kill: undefined }],
     ["ED10 off", { ed10: undefined, report: "1", kill: undefined }],
     ["report kill on", { ed10: "1", report: "1", kill: "1" }],
-  ])("returns empty fragments when %s", (_label, flags) => {
+  ])("omits report HTML when %s", (_label, flags) => {
     if (flags.ed10) process.env.WAVE_ED10_PREVIEW_SETTINGS_ENABLED = flags.ed10;
     if (flags.report) process.env.WAVE_REPORT_HTML_AUTHORING_ENABLED = flags.report;
     if (flags.kill) process.env.WAVE_REPORT_HTML_AUTHORING_KILL = flags.kill;
 
-    expect(buildWithVersion().reportHtml).toEqual({
-      introductionHtml: null,
-      conclusionHtml: null,
-    });
+    expect(buildWithVersion()).not.toHaveProperty("reportHtml");
   });
 
   test("recovers valid fragments independently from malformed stored HTML", () => {

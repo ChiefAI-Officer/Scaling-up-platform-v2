@@ -434,6 +434,7 @@ export async function POST(
     // Build the report from data already held by this request (no DB round-trip).
     // Keeping referral identity as an argument lets a concurrent Coach deletion
     // retry produce a genuinely Scaling Up-only taker copy.
+    const reportHtml = resolveActiveReportHtml(version.reportConfig);
     const buildRespondentReport = (
       reportStyle: ReportStyleKey,
       verifiedCoach: typeof coach | null,
@@ -448,7 +449,7 @@ export async function POST(
         sections: version.sections,
         questions: allQuestions,
         scoringConfig: version.scoringConfig,
-        reportHtml: resolveActiveReportHtml(version.reportConfig),
+        ...(reportHtml ? { reportHtml } : {}),
         rawAnswers: submittedAnswers, // the same answers persisted to submission.answers
         submittedAt: now,
         // submissionId is only known after the submission is persisted (below).

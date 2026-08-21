@@ -30,7 +30,7 @@ import { isVersionLifecycleEnabled } from "@/lib/assessments/wave-ed8-flags";
 import { isFormsBuildEnabled } from "@/lib/assessments/wave-ed9-flags";
 import { isPreviewSettingsEnabled } from "@/lib/assessments/wave-ed10-flags";
 import { isQspStoryGroupEnabled } from "@/lib/assessments/wave-48-flags";
-import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
+import { isReportStyleSelectionEnabled } from "@/lib/assessments/wave-report-styles-flags";
 import { isTemplateCreationSimplifiedEnabled } from "@/lib/assessments/wave-template-creation-flags";
 import { isAdminOwnedAssessmentPresentationEnabled } from "@/lib/assessments/wave-admin-owned-assessment-presentation-flags";
 import {
@@ -53,6 +53,7 @@ import {
 import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 import { isPublicMarketingCtaEnabled } from "@/lib/assessments/wave-public-marketing-cta-flags";
 import { isReportHtmlExperienceEnabled } from "@/lib/assessments/wave-report-html-authoring-flags";
+import { loadSafeReportHtml } from "@/lib/assessments/report-html";
 
 export default async function AdminAssessmentVersionEditPage({
   params,
@@ -71,6 +72,7 @@ export default async function AdminAssessmentVersionEditPage({
   const { id, versionId } = await params;
   const adminOwnedPresentationEnabled =
     isAdminOwnedAssessmentPresentationEnabled();
+  const reportsActive = isReportHtmlExperienceEnabled();
 
   const [template, version, allVersions, publishedVersions] = await Promise.all([
     db.assessmentTemplate.findUnique({
@@ -272,6 +274,9 @@ export default async function AdminAssessmentVersionEditPage({
           sections: version.sections,
           scoringConfig: version.scoringConfig,
           reportConfig: version.reportConfig,
+          ...(reportsActive
+            ? { reportHtmlPreview: loadSafeReportHtml(version.reportConfig) }
+            : {}),
           publishedAt:
             version.publishedAt instanceof Date
               ? version.publishedAt.toISOString()
@@ -333,12 +338,12 @@ export default async function AdminAssessmentVersionEditPage({
         // yet. Default false ⇒ byte-identical ED9 shell. Presentation-only,
         // kill = flag off + redeploy.
         previewSettingsEnabled={isPreviewSettingsEnabled()}
-        reportsActive={isReportHtmlExperienceEnabled()}
+        reportsActive={reportsActive}
         mobileResponsiveEnabled={mobileResponsiveEnabled}
         // Template-creation simplification — resolved on this server page and
         // forwarded solely to the existing Scoring & Tiers presentation.
         plainLanguageScoringEnabled={isTemplateCreationSimplifiedEnabled()}
-        reportStylesEnabled={isReportStylesEnabled({ templateId: template.id })}
+        reportStylesEnabled={isReportStyleSelectionEnabled({ templateId: template.id })}
         adminOwnedPresentationEnabled={adminOwnedPresentationEnabled}
         qspStoryGroupEnabled={isQspStoryGroupEnabled()}
         // Wave ED10 (spec 19am-plan, Task 5) — the Active published version

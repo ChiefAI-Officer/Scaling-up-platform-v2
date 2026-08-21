@@ -7,7 +7,7 @@ import {
   type ReportStyleKey,
   type ReportStylePreviewCapabilities,
 } from "@/lib/assessments/report-style-registry";
-import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
+import { isReportStyleSelectionEnabled } from "@/lib/assessments/wave-report-styles-flags";
 
 export interface PublicCampaignCreateOption {
   id: string;
@@ -102,7 +102,7 @@ export async function listPublicCampaignCreateOptions(
   });
 
   return rows.map((row) => {
-    const reportStylesEnabled = isReportStylesEnabled({ templateId: row.id });
+    const reportStylesEnabled = isReportStyleSelectionEnabled({ templateId: row.id });
     return {
       id: row.id,
       name: row.name,

@@ -5,7 +5,7 @@ import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import { logAudit } from "@/lib/audit";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
 import { REPORT_STYLE_KEYS } from "@/lib/assessments/report-style-registry";
-import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
+import { isReportStyleSelectionEnabled } from "@/lib/assessments/wave-report-styles-flags";
 
 const REPORT_STYLE_LOCKED_MESSAGE =
   "Report appearance was locked when the first response completed. Refresh to see the final style.";
@@ -117,7 +117,7 @@ export async function PATCH(
       return lockedResponse(campaign);
     }
     if (
-      !isReportStylesEnabled({
+      !isReportStyleSelectionEnabled({
         templateId: campaign.templateId,
         campaignId: campaign.id,
       })

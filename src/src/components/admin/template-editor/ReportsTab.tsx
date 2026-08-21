@@ -1,10 +1,12 @@
 "use client";
 
 import React from "react";
-import type { ReportHtmlConfigV1 } from "@/lib/assessments/report-html";
-
-const PREVIEW_HEAD = `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src https: data:; style-src 'unsafe-inline'; font-src https: data:"><style>body{margin:0;padding:20px;color:#0f172a;font-family:Inter,system-ui,sans-serif;font-size:14px;line-height:1.5;overflow-wrap:anywhere}img{max-width:100%;height:auto}table{max-width:100%;border-collapse:collapse}</style></head><body>`;
-const PREVIEW_FOOT = "</body></html>";
+import { ReportHtmlSection } from "@/components/assessments/ReportHtmlSection";
+import type {
+  ReportHtmlConfigV1,
+  SafeReportHtml,
+  SafeReportHtmlFragment,
+} from "@/lib/assessments/report-html";
 
 function HtmlRegion({
   id,
@@ -12,7 +14,8 @@ function HtmlRegion({
   label,
   helper,
   value,
-  previewTitle,
+  previewHtml,
+  position,
   onChange,
   isReadOnly,
 }: {
@@ -21,7 +24,8 @@ function HtmlRegion({
   label: string;
   helper: string;
   value: string | null;
-  previewTitle: string;
+  previewHtml: SafeReportHtmlFragment | null;
+  position: "introduction" | "conclusion";
   onChange: (value: string) => void;
   isReadOnly: boolean;
 }) {
@@ -63,12 +67,19 @@ function HtmlRegion({
           <div className="mb-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
             Preview
           </div>
-          <iframe
-            title={previewTitle}
-            sandbox=""
-            srcDoc={`${PREVIEW_HEAD}${html}${PREVIEW_FOOT}`}
-            className="h-[210px] w-full rounded-lg border border-border bg-white"
-          />
+          <div
+            className="min-h-[210px] overflow-hidden rounded-lg border border-border bg-white p-5 text-slate-900"
+            data-testid={`report-html-preview-${position}`}
+          >
+            {previewHtml ? (
+              <ReportHtmlSection position={position} html={previewHtml} />
+            ) : (
+              <p className="text-sm text-slate-500">No saved HTML yet.</p>
+            )}
+          </div>
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            Preview updates after you save the draft.
+          </p>
         </div>
       </div>
     </section>
@@ -77,10 +88,12 @@ function HtmlRegion({
 
 export function ReportsTab({
   value,
+  previewValue = { introductionHtml: null, conclusionHtml: null },
   onChange,
   isReadOnly,
 }: {
   value: ReportHtmlConfigV1;
+  previewValue?: SafeReportHtml;
   onChange: (next: ReportHtmlConfigV1) => void;
   isReadOnly: boolean;
 }) {
@@ -99,7 +112,8 @@ export function ReportsTab({
         label="Introduction / preface HTML"
         helper="Appears after the report cover and before generated results."
         value={value.introductionHtml}
-        previewTitle="Introduction HTML preview"
+        previewHtml={previewValue.introductionHtml}
+        position="introduction"
         onChange={(introductionHtml) =>
           onChange({ ...value, introductionHtml })
         }
@@ -124,7 +138,8 @@ export function ReportsTab({
         label="Conclusion / call-to-action HTML"
         helper="Appears after generated results and before the report footer."
         value={value.conclusionHtml}
-        previewTitle="Conclusion HTML preview"
+        previewHtml={previewValue.conclusionHtml}
+        position="conclusion"
         onChange={(conclusionHtml) => onChange({ ...value, conclusionHtml })}
         isReadOnly={isReadOnly}
       />

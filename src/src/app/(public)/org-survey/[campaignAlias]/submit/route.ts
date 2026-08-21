@@ -953,6 +953,9 @@ export async function POST(
         { report: RespondentReport | null; rows: PreparedDeliveryRow[] }
       >();
       const sharedEmailRenders: SharedWaveDEmailRenderCache = {};
+      const reportHtml = resolveActiveReportHtml(
+        invitation.campaign.version.reportConfig,
+      );
       for (const reportStyle of REPORT_STYLE_KEYS) {
         let report: RespondentReport | null = null;
         let reportRenderInputHash = "";
@@ -972,9 +975,7 @@ export async function POST(
             sections: invitation.campaign.version.sections,
             questions: invitation.campaign.version.questions,
             scoringConfig: invitation.campaign.version.scoringConfig,
-            reportHtml: resolveActiveReportHtml(
-              invitation.campaign.version.reportConfig,
-            ),
+            ...(reportHtml ? { reportHtml } : {}),
             rawAnswers,
             submittedAt,
             submissionId: "",

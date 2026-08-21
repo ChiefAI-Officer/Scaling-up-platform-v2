@@ -82,6 +82,10 @@ beforeEach(() => {
   delete process.env.WAVE_REPORT_STYLES_ENABLED;
   delete process.env.WAVE_REPORT_STYLES_KILL;
   delete process.env.WAVE_REPORT_STYLES_CANARY;
+  delete process.env.WAVE_REPORT_HTML_AUTHORING_ENABLED;
+  delete process.env.WAVE_REPORT_HTML_AUTHORING_KILL;
+  delete process.env.WAVE_ED10_PREVIEW_SETTINGS_ENABLED;
+  delete process.env.WAVE_ED10_PREVIEW_SETTINGS_KILL;
   delete process.env.WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_ENABLED;
   delete process.env.WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_KILL;
   // Default access-group state: coach in 1 group that grants the template.
@@ -435,6 +439,50 @@ describe("POST /api/assessment-campaigns", () => {
         }),
       }),
     );
+  });
+
+  it("uses Classic instead of a template style default during the successor HTML experience", async () => {
+    process.env.WAVE_REPORT_STYLES_ENABLED = "1";
+    process.env.WAVE_REPORT_HTML_AUTHORING_ENABLED = "1";
+    process.env.WAVE_ED10_PREVIEW_SETTINGS_ENABLED = "1";
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    (db.assessmentTemplate.findUnique as jest.Mock).mockResolvedValue({
+      id: "tpl-1",
+      alias: "scaling-up-full",
+      disabledAt: null,
+      defaultReportStyle: "MODERN_DASHBOARD",
+    });
+    (db.assessmentCampaign.create as jest.Mock).mockResolvedValue({ id: "c1" });
+
+    const res = await POST(jsonReq(validBody) as never);
+
+    expect(res.status).toBe(201);
+    expect(db.assessmentCampaign.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          reportStyle: "CLASSIC",
+          reportStyleSource: "TEMPLATE_DEFAULT",
+        }),
+      }),
+    );
+  });
+
+  it("rejects an explicit style during the successor HTML experience", async () => {
+    process.env.WAVE_REPORT_STYLES_ENABLED = "1";
+    process.env.WAVE_REPORT_HTML_AUTHORING_ENABLED = "1";
+    process.env.WAVE_ED10_PREVIEW_SETTINGS_ENABLED = "1";
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+
+    const res = await POST(
+      jsonReq({ ...validBody, reportStyle: "EXECUTIVE_BOARDROOM" }) as never,
+    );
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      success: false,
+      error: "REPORT_STYLE_UNAVAILABLE",
+    });
+    expect(db.assessmentCampaign.create).not.toHaveBeenCalled();
   });
 
   it("records CAMPAIGN_OVERRIDE when the explicit style equals the current template default", async () => {

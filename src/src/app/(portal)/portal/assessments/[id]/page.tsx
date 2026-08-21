@@ -37,7 +37,7 @@ import {
 } from "@/lib/assessments/wave-f-flags";
 import { isCustomSlidesEnabled } from "@/lib/assessments/wave-m-flags";
 import { isOnScreenResultsEnabled } from "@/lib/assessments/wave-osr-flags";
-import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
+import { isReportStyleSelectionEnabled } from "@/lib/assessments/wave-report-styles-flags";
 import { deriveReportStylePreviewCapabilities } from "@/lib/assessments/report-style-registry";
 import { isAdminOwnedAssessmentPresentationEnabled } from "@/lib/assessments/wave-admin-owned-assessment-presentation-flags";
 import { isInvitationBannerEnabled } from "@/lib/assessments/wave-invitation-banner-flags";
@@ -172,7 +172,7 @@ export default async function CampaignDetailPage({ params }: PageProps) {
   const reportStylesAvailable =
     !adminOwnedPresentation &&
     campaignForFlag !== null &&
-    isReportStylesEnabled({ templateId: overview.campaign.templateId, campaignId: id });
+    isReportStyleSelectionEnabled({ templateId: overview.campaign.templateId, campaignId: id });
   const hasCurrentWriteAccess =
     reportStylesAvailable &&
     campaignForFlag !== null &&

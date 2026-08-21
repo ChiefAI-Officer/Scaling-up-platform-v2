@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 
 import { WelcomeScreenCard, type WelcomeFieldErrors } from "@/components/admin/template-editor/WelcomeScreenCard";
 import {
@@ -55,6 +55,8 @@ export function SimplifiedAssessmentTemplateForm({
     keyof InvitedWelcomeAuthoringInputV1 | null
   >(null);
   const [welcomeFocusRequestToken, setWelcomeFocusRequestToken] = useState(0);
+  const [internalIdFocusRequestToken, setInternalIdFocusRequestToken] =
+    useState(0);
 
   const generatedInternalId = generateTemplateInternalId(name);
   const displayedInternalId = internalIdEdited
@@ -62,8 +64,13 @@ export function SimplifiedAssessmentTemplateForm({
     : generatedInternalId;
 
   function focusInternalId() {
-    requestAnimationFrame(() => internalIdRef.current?.focus());
+    setInternalIdFocusRequestToken((token) => token + 1);
   }
+
+  useEffect(() => {
+    if (!advancedOpen || internalIdFocusRequestToken === 0) return;
+    internalIdRef.current?.focus();
+  }, [advancedOpen, internalIdFocusRequestToken]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

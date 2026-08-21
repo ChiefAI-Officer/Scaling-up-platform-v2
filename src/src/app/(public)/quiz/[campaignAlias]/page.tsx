@@ -88,6 +88,7 @@ export default async function PublicQuizPage({
     ? loadSafeSlides(campaign.customSlides)
     : [];
   const reportHtmlExperienceActive = isReportHtmlExperienceEnabled();
+  const reportHtml = resolveActiveReportHtml(version.reportConfig);
   const marketingResultConfig =
     isPublicMarketingCtaEnabled() &&
     campaign.template.deliveryType === "PUBLIC_MARKETING_QUIZ"
@@ -114,8 +115,9 @@ export default async function PublicQuizPage({
       questions={version.questions as unknown}
       customSlides={customSlides}
       marketingResultConfig={marketingResultConfig}
-      reportHtml={resolveActiveReportHtml(version.reportConfig)}
-      reportHtmlExperienceActive={reportHtmlExperienceActive}
+      {...(reportHtmlExperienceActive && reportHtml
+        ? { reportHtmlExperienceActive: true, reportHtml }
+        : {})}
       {...(isReferredResultsEnabled()
         ? { referredResultsEnabled: true }
         : {})}

@@ -67,6 +67,7 @@ import {
 import {
   mergeReportHtml,
   type ReportHtmlConfigV1,
+  type SafeReportHtml,
 } from "@/lib/assessments/report-html";
 
 export interface UseTemplateEditorDraftArgs {
@@ -231,6 +232,13 @@ export function useTemplateEditorDraft({
     version.reportConfig ?? null,
   );
   const reportConfigRef = useRef<unknown>(version.reportConfig ?? null);
+  const [reportHtmlPreview, setReportHtmlPreview] = useState<SafeReportHtml>(
+    () =>
+      version.reportHtmlPreview ?? {
+        introductionHtml: null,
+        conclusionHtml: null,
+      },
+  );
 
   // F4 — Scoring & Tiers tab state. Hydrate from version.scoringConfig.
   // On any edit, update scoringConfigRef.current (so Save Draft serializes
@@ -1121,7 +1129,7 @@ export function useTemplateEditorDraft({
       const versionBody = versionResult?.body as
         | {
             data?: {
-              reportHtml?: ReportHtmlConfigV1;
+              reportHtml?: ReportHtmlConfigV1 & SafeReportHtml;
               didStripContent?: boolean;
             };
           }
@@ -1133,6 +1141,10 @@ export function useTemplateEditorDraft({
         );
         reportConfigRef.current = canonical;
         setReportConfig(canonical);
+        setReportHtmlPreview({
+          introductionHtml: versionBody.data.reportHtml.introductionHtml,
+          conclusionHtml: versionBody.data.reportHtml.conclusionHtml,
+        });
         if (versionBody.data.didStripContent) {
           toast({
             title: "Unsafe report HTML was removed",
@@ -1236,6 +1248,7 @@ export function useTemplateEditorDraft({
     questions,
     scoringConfigState,
     reportConfig,
+    reportHtmlPreview,
     dirtyFlags,
     isAnyDirty,
     savingDraft,

@@ -278,6 +278,9 @@ export function buildStoredRespondentReport(
   }
 
   const creatorCoach = input.campaign.creatorCoach;
+  const reportHtml = resolveActiveReportHtml(
+    input.campaign.version.reportConfig,
+  );
 
   return {
     respondentName: respondentDisplayName(
@@ -302,7 +305,7 @@ export function buildStoredRespondentReport(
     questionsByKey,
     rawAnswers: input.submission.answers,
     scoringConfig: input.campaign.version.scoringConfig,
-    reportHtml: resolveActiveReportHtml(input.campaign.version.reportConfig),
+    ...(reportHtml ? { reportHtml } : {}),
     provenance: {
       submissionId: input.submission.id,
       versionId: input.campaign.version.id,

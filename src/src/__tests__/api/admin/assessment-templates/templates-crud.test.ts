@@ -838,6 +838,10 @@ describe("PATCH /api/admin/assessment-templates/[id]", () => {
       delete process.env.WAVE_REPORT_STYLES_ENABLED;
       delete process.env.WAVE_REPORT_STYLES_KILL;
       delete process.env.WAVE_REPORT_STYLES_CANARY;
+      delete process.env.WAVE_REPORT_HTML_AUTHORING_ENABLED;
+      delete process.env.WAVE_REPORT_HTML_AUTHORING_KILL;
+      delete process.env.WAVE_ED10_PREVIEW_SETTINGS_ENABLED;
+      delete process.env.WAVE_ED10_PREVIEW_SETTINGS_KILL;
       (getApiActor as jest.Mock).mockResolvedValue(adminActor);
       (db.assessmentTemplate.findFirst as jest.Mock).mockResolvedValue(
         existingReportStyleTemplate(),
@@ -927,6 +931,21 @@ describe("PATCH /api/admin/assessment-templates/[id]", () => {
           data: expect.objectContaining({ defaultReportStyle: "EXECUTIVE_BOARDROOM" }),
         }),
       );
+    });
+
+    it("rejects template style defaults during the successor HTML report experience", async () => {
+      process.env.WAVE_REPORT_STYLES_ENABLED = "1";
+      process.env.WAVE_REPORT_HTML_AUTHORING_ENABLED = "1";
+      process.env.WAVE_ED10_PREVIEW_SETTINGS_ENABLED = "1";
+
+      const res = await detailPATCH(
+        patchReq({ defaultReportStyle: "EXECUTIVE_BOARDROOM" }) as never,
+        detailParams,
+      );
+
+      expect(res.status).toBe(400);
+      await expect(res.json()).resolves.toEqual({ error: "REPORT_STYLE_UNAVAILABLE" });
+      expect(db.assessmentTemplate.update).not.toHaveBeenCalled();
     });
 
     it("allows Classic reset for any template when report styles are available", async () => {

@@ -1,3 +1,5 @@
+import { isReportHtmlExperienceEnabled } from "@/lib/assessments/wave-report-html-authoring-flags";
+
 function isOn(value: string | undefined): boolean {
   return value === "1" || value === "true" || value === "TRUE" || value === "yes";
 }
@@ -35,4 +37,17 @@ export function isReportStylesEnabled(opts?: {
       opts?.campaignId,
     )
   );
+}
+
+/**
+ * New report-style choices retire when the successor HTML report experience
+ * is active. Historical renderers keep using `isReportStylesEnabled` so a
+ * stored campaign appearance does not change merely because authoring moved
+ * to HTML.
+ */
+export function isReportStyleSelectionEnabled(opts?: {
+  templateId?: string;
+  campaignId?: string;
+}): boolean {
+  return !isReportHtmlExperienceEnabled() && isReportStylesEnabled(opts);
 }

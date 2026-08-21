@@ -83,7 +83,10 @@ import {
 } from "@/lib/assessments/report-style-registry";
 import type { InvitedWelcomeConfigV1 } from "@/lib/assessments/invited-welcome-config";
 import { extractMarketingCta } from "@/lib/assessments/marketing-cta";
-import { extractReportHtml } from "@/lib/assessments/report-html";
+import {
+  extractReportHtml,
+  type SafeReportHtml,
+} from "@/lib/assessments/report-html";
 
 // ────────────────────────────────────────────────────────────────────────
 // Tab definitions
@@ -192,6 +195,8 @@ export interface TemplateEditorTabbedVersion {
   sections?: unknown;
   scoringConfig?: unknown;
   reportConfig?: unknown;
+  /** Server-canonical bytes used by the audited Reports-tab preview seam. */
+  reportHtmlPreview?: SafeReportHtml;
 }
 
 export interface TemplateEditorTabbedVersionMeta {
@@ -621,6 +626,7 @@ export function TabbedShell({
     rawSections,
     scoringConfig,
     reportConfig,
+    reportHtmlPreview,
     handleScoringConfigChange,
     handleMarketingCtaChange,
     handleReportHtmlChange,
@@ -1249,6 +1255,7 @@ export function TabbedShell({
             <div data-testid="tab-panel-reports">
               <ReportsTab
                 value={extractReportHtml(reportConfig)}
+                previewValue={reportHtmlPreview}
                 onChange={handleReportHtmlChange}
                 isReadOnly={isPublished}
               />

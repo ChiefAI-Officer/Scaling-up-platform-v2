@@ -113,9 +113,8 @@ export interface SettingsTabProps {
   onSendResultsDefaultChange: (next: boolean) => void;
   savingSendResultsDefault: boolean;
   waveQEnabled: boolean;
-  /** Server-computed; the client still checks the exact eligible alias. */
+  /** Legacy picker only; successor HTML reports retire new style choices. */
   reportStylesEnabled?: boolean;
-  /** Canonical report family + stored version-question capabilities. */
   reportStylePreviewCapabilities: ReportStylePreviewCapabilities;
   /**
    * Server-resolved peer benchmark rows. Null/omitted means the capability is
@@ -202,7 +201,7 @@ export function SettingsTab({
         templateRowSaving={templateRowSaving}
         templateRowError={templateRowError}
       />
-      {reportStylesEnabled && (
+      {!reportsActive && reportStylesEnabled && (
         <DefaultReportAppearanceCard
           templateAlias={templateValues.alias}
           previewCapabilities={reportStylePreviewCapabilities}

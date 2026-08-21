@@ -229,9 +229,11 @@ export function loadSafeReportHtml(
   };
 }
 
-export function resolveActiveReportHtml(reportConfig: unknown): SafeReportHtml {
+export function resolveActiveReportHtml(
+  reportConfig: unknown,
+): SafeReportHtml | undefined {
   if (!isReportHtmlExperienceEnabled()) {
-    return { introductionHtml: null, conclusionHtml: null };
+    return undefined;
   }
   return loadSafeReportHtml(reportConfig);
 }
