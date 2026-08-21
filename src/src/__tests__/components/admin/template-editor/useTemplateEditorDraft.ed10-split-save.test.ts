@@ -43,10 +43,12 @@ interface FetchCall {
 }
 let fetchCalls: FetchCall[];
 let patchStatus: number;
+let patchResponseBody: unknown;
 
 function installFetch() {
   fetchCalls = [];
   patchStatus = 200;
+  patchResponseBody = { success: true };
   global.fetch = jest.fn(
     async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : String(input);
@@ -65,7 +67,7 @@ function installFetch() {
         status: patchStatus,
         json: async () =>
           patchStatus >= 200 && patchStatus < 300
-            ? { success: true }
+            ? patchResponseBody
             : { success: false, error: "BOOM" },
       } as unknown as Response;
     },
@@ -139,6 +141,46 @@ afterEach(() => {
 // Lane 1 — Save-Draft metadata PATCH body (the flag-OFF trap)
 // ════════════════════════════════════════════════════════════════════════
 describe("useTemplateEditorDraft — Save-Draft metadata body (ED10 trim)", () => {
+  it("rehydrates canonical report HTML before clearing its dirty state", async () => {
+    const { result } = renderDraft({ ed10Active: true });
+    patchResponseBody = {
+      success: true,
+      data: {
+        reportHtml: {
+          schemaVersion: 1,
+          introductionHtml: "<p>Safe intro</p>",
+          conclusionHtml: "<p>CTA</p>",
+        },
+        didStripContent: true,
+      },
+    };
+
+    act(() => {
+      result.current.handleReportHtmlChange({
+        schemaVersion: 1,
+        introductionHtml: '<p onclick="bad()">Safe intro</p>',
+        conclusionHtml: "<p>CTA</p>",
+      });
+    });
+    expect(result.current.dirtyFlags.reportConfig).toBe(true);
+
+    await act(async () => {
+      await result.current.handleSaveDraft();
+    });
+
+    expect(result.current.reportConfig).toMatchObject({
+      reportHtml: {
+        schemaVersion: 1,
+        introductionHtml: "<p>Safe intro</p>",
+        conclusionHtml: "<p>CTA</p>",
+      },
+    });
+    expect(result.current.dirtyFlags.reportConfig).toBeUndefined();
+    expect(toastMock).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Unsafe report HTML was removed" }),
+    );
+  });
+
   it("ed10Active=false (default): body INCLUDES aggregationMode + results-email fields (byte-identical to today)", async () => {
     const { result } = renderDraft({ ed10Active: false });
 

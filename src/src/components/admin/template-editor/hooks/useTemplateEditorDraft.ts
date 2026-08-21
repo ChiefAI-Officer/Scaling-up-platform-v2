@@ -64,6 +64,10 @@ import {
   mergeMarketingCta,
   type MarketingCtaConfigV1,
 } from "@/lib/assessments/marketing-cta";
+import {
+  mergeReportHtml,
+  type ReportHtmlConfigV1,
+} from "@/lib/assessments/report-html";
 
 export interface UseTemplateEditorDraftArgs {
   template: TemplateEditorTabbedTemplate;
@@ -304,6 +308,18 @@ export function useTemplateEditorDraft({
     },
     [],
   );
+  const handleReportHtmlChange = useCallback((next: ReportHtmlConfigV1) => {
+    setReportConfig((current: unknown) => {
+      const merged = mergeReportHtml(current, next);
+      reportConfigRef.current = merged;
+      return merged;
+    });
+    setDirtyFlags((current) =>
+      current.reportConfig
+        ? current
+        : { ...current, reportConfig: true },
+    );
+  }, []);
 
   const handleTemplateFieldChange = useCallback(
     (patch: Partial<Omit<MetadataTabValues, "language">>) => {
@@ -997,7 +1013,14 @@ export function useTemplateEditorDraft({
         }
       }
 
-      const ops: Array<Promise<{ ok: boolean; status: number; surface: string }>> = [];
+      const ops: Array<
+        Promise<{
+          ok: boolean;
+          status: number;
+          surface: string;
+          body?: unknown;
+        }>
+      > = [];
 
       if (dirtyFlags.metadata || dirtyFlags.welcome) {
         // ED10 split-save (Task 7): the per-card Settings tab owns
@@ -1072,10 +1095,11 @@ export function useTemplateEditorDraft({
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(body),
             },
-          ).then((r) => ({
+          ).then(async (r) => ({
             ok: r.ok,
             status: r.status,
             surface: "version",
+            body: await r.json().catch(() => ({})),
           })),
         );
       }
@@ -1089,6 +1113,32 @@ export function useTemplateEditorDraft({
           variant: "destructive",
         });
         return;
+      }
+
+      const versionResult = results.find(
+        (result) => result.surface === "version",
+      );
+      const versionBody = versionResult?.body as
+        | {
+            data?: {
+              reportHtml?: ReportHtmlConfigV1;
+              didStripContent?: boolean;
+            };
+          }
+        | undefined;
+      if (dirtyFlags.reportConfig && versionBody?.data?.reportHtml) {
+        const canonical = mergeReportHtml(
+          reportConfigRef.current,
+          versionBody.data.reportHtml,
+        );
+        reportConfigRef.current = canonical;
+        setReportConfig(canonical);
+        if (versionBody.data.didStripContent) {
+          toast({
+            title: "Unsafe report HTML was removed",
+            description: "The saved source and preview now show the safe version.",
+          });
+        }
       }
 
       // Optional test/observability hook.
@@ -1211,6 +1261,7 @@ export function useTemplateEditorDraft({
     // ─── Change handlers ───
     handleScoringConfigChange,
     handleMarketingCtaChange,
+    handleReportHtmlChange,
     handleTemplateFieldChange,
     handleWelcomeFieldChange,
     handleVersionFieldChange,

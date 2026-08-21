@@ -52,6 +52,7 @@ import {
 } from "@/components/assessments/PeerBenchmarksPanel";
 import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 import { isPublicMarketingCtaEnabled } from "@/lib/assessments/wave-public-marketing-cta-flags";
+import { isReportHtmlExperienceEnabled } from "@/lib/assessments/wave-report-html-authoring-flags";
 
 export default async function AdminAssessmentVersionEditPage({
   params,
@@ -332,6 +333,7 @@ export default async function AdminAssessmentVersionEditPage({
         // yet. Default false ⇒ byte-identical ED9 shell. Presentation-only,
         // kill = flag off + redeploy.
         previewSettingsEnabled={isPreviewSettingsEnabled()}
+        reportsActive={isReportHtmlExperienceEnabled()}
         mobileResponsiveEnabled={mobileResponsiveEnabled}
         // Template-creation simplification — resolved on this server page and
         // forwarded solely to the existing Scoring & Tiers presentation.

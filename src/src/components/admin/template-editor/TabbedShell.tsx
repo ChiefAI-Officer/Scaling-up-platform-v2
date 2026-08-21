@@ -56,6 +56,7 @@ import { ThreePaneWorkspace } from "@/components/admin/template-editor/ThreePane
 import { SingleColumnFormBuilder } from "@/components/admin/template-editor/SingleColumnFormBuilder";
 import { FormsBuilder } from "@/components/admin/template-editor/FormsBuilder";
 import { PreviewTab } from "@/components/admin/template-editor/PreviewTab";
+import { ReportsTab } from "@/components/admin/template-editor/ReportsTab";
 import { SettingsTab } from "@/components/admin/template-editor/SettingsTab";
 import type { PeerBenchmarkRow } from "@/components/assessments/PeerBenchmarksPanel";
 import type { TemplateEditorModel } from "@/components/admin/template-editor/hooks/useTemplateEditorModel";
@@ -82,6 +83,7 @@ import {
 } from "@/lib/assessments/report-style-registry";
 import type { InvitedWelcomeConfigV1 } from "@/lib/assessments/invited-welcome-config";
 import { extractMarketingCta } from "@/lib/assessments/marketing-cta";
+import { extractReportHtml } from "@/lib/assessments/report-html";
 
 // ────────────────────────────────────────────────────────────────────────
 // Tab definitions
@@ -95,6 +97,7 @@ type TabId =
   // ED10 (spec 19am-plan, T3) — the Preview + Settings tabs. Valid ids ONLY
   // when ed10Active (see editorTabConfig); the triggers/panels render in T10.
   | "preview"
+  | "reports"
   | "settings";
 
 const VALID_TAB_IDS: TabId[] = [
@@ -115,6 +118,14 @@ const ED10_VALID_TAB_IDS: TabId[] = [
   "settings",
   "versions",
 ];
+const ED10_REPORTS_VALID_TAB_IDS: TabId[] = [
+  "preview",
+  "questions",
+  "scoring",
+  "reports",
+  "settings",
+  "versions",
+];
 // NOTE (Wave W, spec 19w D5): the disabled "Conditional Logic" ghost tab is
 // GONE. Its WF18 copy ("renderer-side conditionalSections evaluation ships
 // in v1") was never true in this codebase, and its conditional-REPORT-
@@ -132,6 +143,7 @@ const TAB_LABELS: Record<TabId, string> = {
   // ED10 (T3) — labels exist so Record<TabId, string> stays total; the
   // triggers that render them are wired in T10 (dark until launch).
   preview: "Preview",
+  reports: "Reports",
   settings: "Settings",
 };
 
@@ -361,6 +373,8 @@ export interface TabbedShellProps {
   peerBenchmarkRows?: PeerBenchmarkRow[] | null;
   /** Gates public/invited classification and the marketing CTA authoring surface. */
   publicMarketingCtaEnabled?: boolean;
+  /** Server-resolved composite gate for report HTML authoring and rendering. */
+  reportsActive?: boolean;
 }
 
 /**
@@ -393,9 +407,15 @@ type AuthoringMode = "single" | "three" | "legacy";
 export function editorTabConfig(
   activeAuthoringMode: AuthoringMode,
   ed10Active: boolean,
+  reportsActive = false,
 ): { defaultTab: TabId; validTabIds: readonly TabId[] } {
   if (ed10Active) {
-    return { defaultTab: "preview", validTabIds: ED10_VALID_TAB_IDS };
+    return {
+      defaultTab: "preview",
+      validTabIds: reportsActive
+        ? ED10_REPORTS_VALID_TAB_IDS
+        : ED10_VALID_TAB_IDS,
+    };
   }
   return {
     defaultTab: activeAuthoringMode !== "legacy" ? "questions" : "metadata",
@@ -423,10 +443,12 @@ export function resolveEditorTab(
   param: string | null,
   activeAuthoringMode: AuthoringMode,
   ed10Active: boolean,
+  reportsActive = false,
 ): TabId {
   const { defaultTab, validTabIds } = editorTabConfig(
     activeAuthoringMode,
     ed10Active,
+    reportsActive,
   );
   if (activeAuthoringMode === "single" && param === "sections") {
     return "questions";
@@ -474,6 +496,7 @@ export function TabbedShell({
   activePreview = null,
   peerBenchmarkRows = null,
   publicMarketingCtaEnabled = false,
+  reportsActive = false,
   model,
 }: TabbedShellProps & {
   /**
@@ -534,11 +557,13 @@ export function TabbedShell({
   const { defaultTab, validTabIds } = editorTabConfig(
     activeAuthoringMode,
     ed10Active,
+    reportsActive,
   );
   const tabFromUrl = resolveEditorTab(
     searchParams.get("tab"),
     activeAuthoringMode,
     ed10Active,
+    reportsActive,
   );
   const [activeTab, setActiveTab] = useState<TabId>(tabFromUrl);
 
@@ -548,6 +573,7 @@ export function TabbedShell({
       searchParams.get("tab"),
       activeAuthoringMode,
       ed10Active,
+      reportsActive,
     );
     // Intentional external-store sync: mirror the ?tab= URL param into local
     // tab state on external navigation (pre-ED3 behavior, byte-identical —
@@ -555,7 +581,7 @@ export function TabbedShell({
     // because handleTabChange also drives activeTab on user clicks.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setActiveTab((prev) => (prev === next ? prev : next));
-  }, [searchParams, activeAuthoringMode, ed10Active]);
+  }, [searchParams, activeAuthoringMode, ed10Active, reportsActive]);
 
   const handleTabChange = useCallback(
     (next: string) => {
@@ -597,6 +623,7 @@ export function TabbedShell({
     reportConfig,
     handleScoringConfigChange,
     handleMarketingCtaChange,
+    handleReportHtmlChange,
     handleTemplateFieldChange,
     handleVersionFieldChange,
     handleSendResultsDefaultChange,
@@ -974,6 +1001,16 @@ export function TabbedShell({
           >
             {TAB_LABELS.scoring}
           </TabsTrigger>
+          {ed10Active && reportsActive && (
+            <TabsTrigger
+              value="reports"
+              {...(mobileResponsiveEnabled
+                ? { className: "min-h-11 min-w-11" }
+                : {})}
+            >
+              {TAB_LABELS.reports}
+            </TabsTrigger>
+          )}
           {/* ED10 (spec 19am-plan, T10) — the Settings tab takes the Access
               slot when active; Access management moves inside Settings
               (the AccessGroupsRow "Manage" link). Flag OFF ⇒ the Access
@@ -1207,6 +1244,17 @@ export function TabbedShell({
             />
           </div>
         </TabsContent>
+        {ed10Active && reportsActive && (
+          <TabsContent value="reports">
+            <div data-testid="tab-panel-reports">
+              <ReportsTab
+                value={extractReportHtml(reportConfig)}
+                onChange={handleReportHtmlChange}
+                isReadOnly={isPublished}
+              />
+            </div>
+          </TabsContent>
+        )}
         {/* ED10 (spec 19am-plan, T10) — Settings tab (the Metadata field wall
             rebuilt as one plain-language column). Mounted ONLY when ed10Active;
             it takes the Access slot in the bar. No onSections* threading — the
