@@ -18,6 +18,11 @@ import {
   getRespondentReport,
 } from "@/lib/assessments/respondent-report";
 import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
+import {
+  SU_FULL_PHASE_PEER_CONTENT_HASHES,
+  SU_FULL_PHASE_PEER_SOURCE_ID,
+  SU_FULL_PHASE_PEER_VECTORS,
+} from "@/lib/assessments/su-full-phase-peer-catalogue";
 
 const mockRevalidateCeoReportAccessInTransaction = jest.fn();
 
@@ -230,6 +235,53 @@ test("stored reports keep the submission-time paragraph without consulting later
   expect(report.result.recommendationPhase).toBe(4);
   expect(report.result.perQuestion[0].recommendation).toBe(
     "Frozen submission-time phase paragraph",
+  );
+});
+
+test("stored reports preserve the frozen peer snapshot and all 61 peer values", () => {
+  const frozenPeerRows = Object.entries(SU_FULL_PHASE_PEER_VECTORS[4]).map(
+    ([stableKey, peerValue]) => ({
+      stableKey,
+      value: 4,
+      achieved: false,
+      peerValue,
+    }),
+  );
+  const frozenResult: ScoreResult = {
+    ...GOOD_SCORE_RESULT,
+    recommendationPhase: 4,
+    peerBenchmarkSnapshot: {
+      sourceId: SU_FULL_PHASE_PEER_SOURCE_ID,
+      contentHash: SU_FULL_PHASE_PEER_CONTENT_HASHES[4],
+      phase: 4,
+    },
+    perQuestion: frozenPeerRows,
+  };
+
+  const report = buildStoredRespondentReport({
+    submission: {
+      id: GOOD_SUBMISSION.id,
+      submittedAt: GOOD_SUBMISSION.submittedAt,
+      answers: GOOD_SUBMISSION.answers,
+      result: frozenResult,
+    },
+    respondent: GOOD_SUBMISSION.respondent,
+    campaign: {
+      ...GOOD_SUBMISSION.campaign,
+      organizationName: GOOD_SUBMISSION.campaign.organization.name,
+    },
+  });
+  const serialized = JSON.parse(JSON.stringify(report)) as typeof report;
+
+  expect(serialized.result.peerBenchmarkSnapshot).toEqual({
+    sourceId: "2026-08-20.esperto-five-phase-peers-v1",
+    contentHash:
+      "ae9e9e2fbfc8525f4e6d8c3ca65775a50b85476371f29a74934dbe6dd3a965ff",
+    phase: 4,
+  });
+  expect(serialized.result.perQuestion).toHaveLength(61);
+  expect(serialized.result.perQuestion.map((row) => row.peerValue)).toEqual(
+    frozenPeerRows.map((row) => row.peerValue),
   );
 });
 

@@ -139,6 +139,13 @@ jest.mock("@/lib/assessments/results-email", () => {
     buildCoachNotifyEmail: jest.fn(actual.buildCoachNotifyEmail),
   };
 });
+jest.mock("@/lib/assessments/compute-score-result", () => {
+  const actual = jest.requireActual("@/lib/assessments/compute-score-result");
+  return {
+    ...actual,
+    computeScoreResult: jest.fn(actual.computeScoreResult),
+  };
+});
 
 import { POST } from "@/app/(public)/org-survey/[campaignAlias]/submit/route";
 import { parseAuthorizationSnapshot } from "@/lib/assessments/assessment-email-delivery-intents";
@@ -149,6 +156,12 @@ import {
   SU_FULL_PHASE_FEEDBACK,
   buildPhaseRecommendations,
 } from "@/lib/assessments/su-full-phase-feedback-catalogue";
+import { computeScoreResult } from "@/lib/assessments/compute-score-result";
+import {
+  SU_FULL_PHASE_PEER_CONTENT_HASHES,
+  SU_FULL_PHASE_PEER_SOURCE_ID,
+  buildPhasePeerBenchmarks,
+} from "@/lib/assessments/su-full-phase-peer-catalogue";
 
 reportStyleLockMock = lockReportStyleForFirstCompletion as jest.Mock;
 
@@ -281,6 +294,12 @@ const originalWave228Env = {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  const actualComputeScoreResult = jest.requireActual(
+    "@/lib/assessments/compute-score-result",
+  ) as { computeScoreResult: typeof computeScoreResult };
+  (computeScoreResult as jest.Mock).mockImplementation(
+    actualComputeScoreResult.computeScoreResult,
+  );
   const reportEmail = jest.requireMock(
     "@/lib/assessments/report-email",
   ) as { buildReportEmailHtml: jest.Mock };
@@ -1566,9 +1585,68 @@ describe("#79 — SU-Full CEO-only S_BACKGROUND on submit", () => {
     scoringConfig: goodVersion.scoringConfig,
   };
 
+  const governedPeerQuestions = Array.from({ length: 61 }, (_, index) => {
+    const stableKey = `Q${String(index + 1).padStart(2, "0")}`;
+    return {
+      stableKey,
+      sortOrder: index + 1,
+      type: "SLIDER_LIKERT" as const,
+      label: stableKey,
+      isRequired: true,
+      sectionStableKey: "s1",
+      scale: { min: 0, max: 10, step: 1, anchorMin: "Lo", anchorMax: "Hi" },
+      phasePeerBenchmarks: [...buildPhasePeerBenchmarks(stableKey)],
+    };
+  });
+  const governedPeerVersion = {
+    questions: [
+      ...governedPeerQuestions,
+      {
+        stableKey: "Q_FTE_CONTRACT",
+        sortOrder: 62,
+        type: "NUMBER" as const,
+        label: "Full-time employees",
+        isRequired: true,
+        sectionStableKey: "S_BACKGROUND",
+      },
+    ],
+    sections: [
+      { stableKey: "s1", sortOrder: 1, name: "S1" },
+      { stableKey: "S_BACKGROUND", sortOrder: 2, name: "About your company" },
+    ],
+    scoringConfig: {
+      ...goodVersion.scoringConfig,
+      phasePeerBenchmarkCatalogue: {
+        sourceId: SU_FULL_PHASE_PEER_SOURCE_ID,
+        phases: ([1, 2, 3, 4, 5] as const).map((phase) => ({
+          phase,
+          contentHash: SU_FULL_PHASE_PEER_CONTENT_HASHES[phase],
+        })),
+      },
+    },
+  };
+
+  function governedPeerAnswers(fte?: number, includeQ61 = true) {
+    return [
+      ...governedPeerQuestions
+        .filter((question) => includeQ61 || question.stableKey !== "Q61")
+        .map((question) => ({ stableKey: question.stableKey, value: 4 })),
+      ...(fte === undefined
+        ? []
+        : [{ stableKey: "Q_FTE_CONTRACT", value: fte }]),
+    ];
+  }
+
   function mockSuFullInvitation(
     isCEO: boolean,
-    options: { sendResultsToRespondent?: boolean } = {},
+    options: {
+      sendResultsToRespondent?: boolean;
+      version?: {
+        questions: Array<Record<string, unknown>>;
+        sections: Array<Record<string, unknown>>;
+        scoringConfig: Record<string, unknown>;
+      };
+    } = {},
   ) {
     const invitation = {
       id: "inv-1",
@@ -1604,9 +1682,10 @@ describe("#79 — SU-Full CEO-only S_BACKGROUND on submit", () => {
         version: {
           id: "v1",
           templateId: "template-su-full",
-          questions: suFullVersion.questions,
-          sections: suFullVersion.sections,
-          scoringConfig: suFullVersion.scoringConfig,
+          questions: options.version?.questions ?? suFullVersion.questions,
+          sections: options.version?.sections ?? suFullVersion.sections,
+          scoringConfig:
+            options.version?.scoringConfig ?? suFullVersion.scoringConfig,
         },
         template: {
           id: "template-su-full",
@@ -1625,6 +1704,205 @@ describe("#79 — SU-Full CEO-only S_BACKGROUND on submit", () => {
     txMock.assessmentCampaignParticipant.findUnique.mockResolvedValue({ isCEO });
     return invitation;
   }
+
+  it.each([
+    [50, 3, 6.3, SU_FULL_PHASE_PEER_CONTENT_HASHES[3]],
+    [51, 4, 6.6, SU_FULL_PHASE_PEER_CONTENT_HASHES[4]],
+    [151, 5, 6.3, SU_FULL_PHASE_PEER_CONTENT_HASHES[5]],
+  ] as const)(
+    "freezes all governed peers for CEO FTE %i at P%i",
+    async (fte, phase, q01Peer, contentHash) => {
+      mockSuFullInvitation(true, { version: governedPeerVersion });
+
+      const res = await POST(
+        jsonReq({ answers: governedPeerAnswers(fte) }) as never,
+        aliasParams("demo"),
+      );
+
+      expect(res.status).toBe(200);
+      const savedResult = txMock.assessmentSubmission.create.mock.calls[0][0]
+        .data.result;
+      expect(savedResult.recommendationPhase).toBe(phase);
+      expect(savedResult.peerBenchmarkSnapshot).toEqual({
+        sourceId: SU_FULL_PHASE_PEER_SOURCE_ID,
+        contentHash,
+        phase,
+      });
+      expect(savedResult.perQuestion).toHaveLength(61);
+      expect(
+        savedResult.perQuestion.every((row: { peerValue?: number }) =>
+          Number.isFinite(row.peerValue),
+        ),
+      ).toBe(true);
+      expect(savedResult.perQuestion[0].peerValue).toBe(q01Peer);
+    },
+  );
+
+  it("lets a non-CEO submit a governed peer version without freezing a CEO-only snapshot", async () => {
+    mockSuFullInvitation(false, { version: governedPeerVersion });
+
+    const res = await POST(
+      jsonReq({ answers: governedPeerAnswers() }) as never,
+      aliasParams("demo"),
+    );
+
+    expect(res.status).toBe(200);
+    const savedResult = txMock.assessmentSubmission.create.mock.calls[0][0]
+      .data.result;
+    expect(savedResult.recommendationPhase).toBeUndefined();
+    expect(savedResult.peerBenchmarkSnapshot).toBeUndefined();
+    expect(
+      savedResult.perQuestion.every(
+        (row: { peerValue?: number }) => row.peerValue === undefined,
+      ),
+    ).toBe(true);
+  });
+
+  it("rejects a governed peer CEO submission when FTE cannot resolve a frozen phase", async () => {
+    mockSuFullInvitation(true, { version: governedPeerVersion });
+
+    const res = await POST(
+      jsonReq({ answers: governedPeerAnswers(0) }) as never,
+      aliasParams("demo"),
+    );
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({
+      error: "OUT_OF_RANGE",
+      details: { stableKey: "Q_FTE_CONTRACT" },
+    });
+    expect(txMock.assessmentSubmission.create).not.toHaveBeenCalled();
+  });
+
+  it("fails closed before persistence when a governed CEO result has only 60 peer rows", async () => {
+    const incompleteVersion = {
+      ...governedPeerVersion,
+      questions: governedPeerVersion.questions.map((question) =>
+        question.stableKey === "Q61"
+          ? { ...question, isRequired: false }
+          : question,
+      ),
+    };
+    mockSuFullInvitation(true, { version: incompleteVersion });
+
+    const res = await POST(
+      jsonReq({ answers: governedPeerAnswers(51, false) }) as never,
+      aliasParams("demo"),
+    );
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({
+      error: "SU_FULL_PHASE_PEERS_RESULT_INCOMPLETE",
+    });
+    expect(txMock.assessmentSubmission.create).not.toHaveBeenCalled();
+  });
+
+  it("fails closed before persistence when a governed CEO result contains a non-finite peer value", async () => {
+    const actualComputeScoreResult = jest.requireActual(
+      "@/lib/assessments/compute-score-result",
+    ) as { computeScoreResult: typeof computeScoreResult };
+    (computeScoreResult as jest.Mock).mockImplementation(
+      (version, questions, submittedAnswers, options) => {
+        const scored = actualComputeScoreResult.computeScoreResult(
+          version,
+          questions,
+          submittedAnswers,
+          options,
+        );
+        if (options?.recommendationPhase !== undefined) {
+          scored.result.perQuestion[0] = {
+            ...scored.result.perQuestion[0],
+            peerValue: Number.NaN,
+          };
+        }
+        return scored;
+      },
+    );
+    mockSuFullInvitation(true, { version: governedPeerVersion });
+
+    const res = await POST(
+      jsonReq({ answers: governedPeerAnswers(51) }) as never,
+      aliasParams("demo"),
+    );
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({
+      error: "SU_FULL_PHASE_PEERS_RESULT_INCOMPLETE",
+    });
+    expect(txMock.assessmentSubmission.create).not.toHaveBeenCalled();
+  });
+
+  it("fails closed before persistence when peer snapshot phase disagrees with the recommendation phase", async () => {
+    const actualComputeScoreResult = jest.requireActual(
+      "@/lib/assessments/compute-score-result",
+    ) as { computeScoreResult: typeof computeScoreResult };
+    (computeScoreResult as jest.Mock).mockImplementation(
+      (version, questions, submittedAnswers, options) => {
+        const scored = actualComputeScoreResult.computeScoreResult(
+          version,
+          questions,
+          submittedAnswers,
+          options,
+        );
+        if (
+          options?.recommendationPhase !== undefined &&
+          scored.result.peerBenchmarkSnapshot
+        ) {
+          scored.result.peerBenchmarkSnapshot = {
+            ...scored.result.peerBenchmarkSnapshot,
+            phase: 3,
+          };
+        }
+        return scored;
+      },
+    );
+    mockSuFullInvitation(true, { version: governedPeerVersion });
+
+    const res = await POST(
+      jsonReq({ answers: governedPeerAnswers(51) }) as never,
+      aliasParams("demo"),
+    );
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({
+      error: "SU_FULL_PHASE_PEERS_RESULT_INCOMPLETE",
+    });
+    expect(txMock.assessmentSubmission.create).not.toHaveBeenCalled();
+  });
+
+  it("keeps duplicate-submit protection ahead of scoring for a governed peer version", async () => {
+    const invitation = mockSuFullInvitation(true, {
+      version: governedPeerVersion,
+    });
+
+    const first = await POST(
+      jsonReq({ answers: governedPeerAnswers(51) }) as never,
+      aliasParams("demo"),
+    );
+    expect(first.status).toBe(200);
+    const persistedResult = txMock.assessmentSubmission.create.mock.calls[0][0]
+      .data.result;
+    const scoringCallsBeforeDuplicate = (computeScoreResult as jest.Mock).mock
+      .calls.length;
+    dbMock.assessmentInvitation.findUnique.mockResolvedValue({
+      ...invitation,
+      status: "SUBMITTED",
+    });
+
+    const res = await POST(
+      jsonReq({ answers: governedPeerAnswers(51) }) as never,
+      aliasParams("demo"),
+    );
+
+    expect(res.status).toBe(409);
+    expect((computeScoreResult as jest.Mock).mock.calls).toHaveLength(
+      scoringCallsBeforeDuplicate,
+    );
+    expect(txMock.assessmentSubmission.create).toHaveBeenCalledTimes(1);
+    expect(
+      txMock.assessmentSubmission.create.mock.calls[0][0].data.result,
+    ).toBe(persistedResult);
+  });
 
   it("non-CEO submits WITHOUT the CEO-only S_BACKGROUND answer → 200 (#79)", async () => {
     mockSuFullInvitation(false);

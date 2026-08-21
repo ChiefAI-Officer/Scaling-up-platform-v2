@@ -1006,7 +1006,15 @@ export async function POST(
         versionParsed.data.questions.some(
           (question) =>
             question.type === "SLIDER_LIKERT" &&
-            question.phaseRecommendations !== undefined,
+            (question.phaseRecommendations !== undefined ||
+              question.phasePeerBenchmarks !== undefined),
+        );
+      const governedPeerVersion =
+        invitation.campaign.template?.alias === SU_FULL_ALIAS &&
+        versionParsed.data.questions.some(
+          (question) =>
+            question.type === "SLIDER_LIKERT" &&
+            question.phasePeerBenchmarks !== undefined,
         );
       if (phaseAwareVersion && phaseSnapshot === null) {
         throw new Error("Phase-aware SU-Full scoring requires a locked snapshot");
@@ -1026,6 +1034,31 @@ export async function POST(
           rawAnswers,
           { recommendationPhase: phase.number },
         ));
+        if (governedPeerVersion) {
+          const finitePeerRowCount = scoreResult.perQuestion.filter((row) =>
+            Number.isFinite(row.peerValue),
+          ).length;
+          const snapshotPhase = scoreResult.peerBenchmarkSnapshot?.phase;
+          if (
+            scoreResult.perQuestion.length !== 61 ||
+            finitePeerRowCount !== 61 ||
+            scoreResult.recommendationPhase !== phase.number ||
+            snapshotPhase !== phase.number
+          ) {
+            throw new ScoringValidationError(
+              "SU_FULL_PHASE_PEERS_RESULT_INCOMPLETE",
+              {
+                expectedPeerRowCount: 61,
+                peerRowCount: scoreResult.perQuestion.length,
+                finitePeerRowCount,
+                expectedPhase: phase.number,
+                recommendationPhase:
+                  scoreResult.recommendationPhase ?? null,
+                peerBenchmarkPhase: snapshotPhase ?? null,
+              },
+            );
+          }
+        }
       }
 
       // Single instant shared by the report's submittedAt + the invitation's

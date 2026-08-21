@@ -33,6 +33,7 @@ import {
   completeSuFullPeerReport,
 } from "@/__tests__/fixtures/su-full-peer";
 import { buildSuFullPeerPresentationResult } from "@/lib/assessments/su-full-peer-presentation";
+import { SU_FULL_PHASE_PEER_VECTORS } from "@/lib/assessments/su-full-phase-peer-catalogue";
 
 const ALIAS = "demo-campaign";
 
@@ -121,6 +122,53 @@ describe("round trip", () => {
 
     expect(revived?.suFullPeerPresentation).toEqual(
       sampleReport.suFullPeerPresentation,
+    );
+    expect(revived?.submittedAt).toBeInstanceOf(Date);
+  });
+
+  it("preserves the frozen peer snapshot and all values through native JSON plus report revival", () => {
+    const frozenRows = Object.entries(SU_FULL_PHASE_PEER_VECTORS[4]).map(
+      ([stableKey, peerValue]) => ({
+        stableKey,
+        value: 4,
+        achieved: false,
+        peerValue,
+      }),
+    );
+    const serialized = JSON.parse(
+      JSON.stringify({
+        ...sampleReport,
+        result: {
+          perQuestion: frozenRows,
+          perSection: [],
+          overallTotal: 244,
+          overallAverage: 4,
+          countAchieved: 0,
+          tier: null,
+          tierMetricValue: 0,
+          unansweredKeys: [],
+          recommendationPhase: 4,
+          peerBenchmarkSnapshot: {
+            sourceId: "2026-08-20.esperto-five-phase-peers-v1",
+            contentHash:
+              "ae9e9e2fbfc8525f4e6d8c3ca65775a50b85476371f29a74934dbe6dd3a965ff",
+            phase: 4,
+          },
+        },
+      }),
+    ) as unknown;
+
+    const revived = reviveOnScreenReport(serialized);
+
+    expect(revived?.result.peerBenchmarkSnapshot).toEqual({
+      sourceId: "2026-08-20.esperto-five-phase-peers-v1",
+      contentHash:
+        "ae9e9e2fbfc8525f4e6d8c3ca65775a50b85476371f29a74934dbe6dd3a965ff",
+      phase: 4,
+    });
+    expect(revived?.result.perQuestion).toHaveLength(61);
+    expect(revived?.result.perQuestion.map((row) => row.peerValue)).toEqual(
+      frozenRows.map((row) => row.peerValue),
     );
     expect(revived?.submittedAt).toBeInstanceOf(Date);
   });

@@ -1065,7 +1065,8 @@ export type ScoringValidationCode =
   | "TOO_MANY_CHOICES"
   | "SU_FULL_PHASE_PEERS_CATALOGUE_INCOMPLETE"
   | "SU_FULL_PHASE_PEERS_PHASE_MISSING"
-  | "SU_FULL_PHASE_PEERS_HASH_MISMATCH";
+  | "SU_FULL_PHASE_PEERS_HASH_MISMATCH"
+  | "SU_FULL_PHASE_PEERS_RESULT_INCOMPLETE";
 
 export class ScoringValidationError extends Error {
   constructor(
