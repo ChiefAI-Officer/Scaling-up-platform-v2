@@ -181,9 +181,16 @@ Draft creation/publication: not executed
 Deploy/activation/production mutation: not executed
 ```
 
-Neither guarded lifecycle script ran. No database, assessment version, published
-edition, campaign pin, historical result, Production or Esperto record, deployment,
-environment value, Slack message, or email was read, created, sent, or changed.
+During Task 7 final verification and closeout, neither guarded lifecycle script ran.
+Task 7 read no database, assessment version, published edition, campaign pin,
+historical result, Production/Esperto record or state, deployment, environment value,
+Slack message, or email, and it created, sent, or changed none of them. Earlier
+same-mission research used the already-recorded live, mail-disabled Esperto/Production
+boundary evidence in
+`docs/research/esperto-peer-vector-five-phase-csv-audit-2026-08-21.md` and
+`docs/research/esperto-peer-vector-boundary-report-manifest-2026-08-21.csv`; Task 7
+neither repeated nor erased that evidence. Task 7 performed no remote write or
+mutation.
 
 ## Remaining stop conditions
 
