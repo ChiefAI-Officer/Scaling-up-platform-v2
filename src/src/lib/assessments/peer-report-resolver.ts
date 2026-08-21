@@ -55,7 +55,7 @@ interface ResolverInput {
   logger?: Pick<Console, "warn">;
   /** Narrow seam for proving wrapper-level fail-soft behavior. */
   resolveEnhancements?: (
-    input: ResolverInput & { templateId: string },
+    input: ResolverInput & { templateId?: string },
   ) => Promise<PeerReportEnhancements>;
 }
 
@@ -70,15 +70,12 @@ function unchanged(report: RespondentReport): PeerReportEnhancements {
 
 function logUnavailable(
   logger: Pick<Console, "warn">,
-  input: { report: RespondentReport; templateId?: string },
+  input: { report: RespondentReport },
   details: Record<string, unknown>,
 ): void {
   try {
     logger.warn("assessment.peer_benchmark.unavailable", {
       templateAlias: input.report.templateAlias,
-      templateId: input.templateId,
-      submissionId: input.report.provenance.submissionId,
-      versionId: input.report.provenance.versionId,
       ...details,
     });
   } catch {
@@ -86,8 +83,29 @@ function logUnavailable(
   }
 }
 
+const SAFE_ERROR_NAMES = new Set([
+  "Error",
+  "TypeError",
+  "RangeError",
+  "ReferenceError",
+  "SyntaxError",
+  "URIError",
+  "EvalError",
+  "AggregateError",
+  "AbortError",
+  "TimeoutError",
+  "PrismaClientKnownRequestError",
+  "PrismaClientUnknownRequestError",
+  "PrismaClientRustPanicError",
+  "PrismaClientInitializationError",
+  "PrismaClientValidationError",
+]);
+
 function errorName(error: unknown): string {
-  return error instanceof Error ? error.name : "UnknownError";
+  if (!(error instanceof Error) || !SAFE_ERROR_NAMES.has(error.name)) {
+    return "UnknownError";
+  }
+  return error.name;
 }
 
 /**
@@ -127,14 +145,50 @@ function resolvePeerReportPreflight(input: ResolverInput): PeerReportPreflight |
 
 /**
  * Adds the currently applicable peer reference data to one frozen report.
- * All gates run before the single template-level QUESTION benchmark query.
+ * Scaling Up Full builds before any template-level benchmark lookup. LVA keeps
+ * the existing single QUESTION benchmark query.
  */
 export async function resolvePeerReportEnhancements(
-  input: ResolverInput & { templateId: string },
+  input: ResolverInput & { templateId?: string },
 ): Promise<PeerReportEnhancements> {
   const logger = input.logger ?? console;
   const preflight = resolvePeerReportPreflight(input);
   if (!preflight) return unchanged(input.report);
+
+  if (!preflight.isLva) {
+    try {
+      const result = buildSuFullPeerPresentationResult({ report: input.report });
+      if (result.status === "unavailable") {
+        logUnavailable(logger, input, {
+          reason: result.reason,
+          expectedCount: result.expectedCount,
+          frozenCount: result.frozenCount,
+          scoreCount: result.scoreCount,
+          ...(result.sourceId === undefined ? {} : { sourceId: result.sourceId }),
+          ...(result.phase === undefined ? {} : { phase: result.phase }),
+          ...(result.contentHash === undefined
+            ? {}
+            : { contentHash: result.contentHash }),
+        });
+        return unchanged(input.report);
+      }
+      return {
+        report: { ...input.report, suFullPeerPresentation: result.presentation },
+        lvaPeerComparison: null,
+      };
+    } catch (error) {
+      logUnavailable(logger, input, {
+        reason: "BUILD_ERROR",
+        errorName: errorName(error),
+      });
+      return unchanged(input.report);
+    }
+  }
+
+  if (!input.templateId) {
+    logUnavailable(logger, input, { reason: "TEMPLATE_NOT_FOUND" });
+    return unchanged(input.report);
+  }
 
   let rows: BenchmarkRow[];
   try {
@@ -148,35 +202,14 @@ export async function resolvePeerReportEnhancements(
   }
 
   try {
-    if (preflight.isLva) {
-      return {
-        report: input.report,
-        lvaPeerComparison: buildPeerComparisonSection({
-          questionsByKey: input.report.questionsByKey,
-          rawAnswers: input.report.rawAnswers,
-          benchmarks: new Map(rows.map((row) => [row.metricKey, row.value])),
-          templateAlias: preflight.templateAlias,
-        }),
-      };
-    }
-
-    const result = buildSuFullPeerPresentationResult({
-      report: input.report,
-      benchmarks: rows,
-    });
-    if (result.status === "unavailable") {
-      logUnavailable(logger, input, {
-        reason: result.reason,
-        expectedCount: result.expectedCount,
-        benchmarkCount: result.benchmarkCount,
-        scoreCount: result.scoreCount,
-      });
-      return unchanged(input.report);
-    }
-
     return {
-      report: { ...input.report, suFullPeerPresentation: result.presentation },
-      lvaPeerComparison: null,
+      report: input.report,
+      lvaPeerComparison: buildPeerComparisonSection({
+        questionsByKey: input.report.questionsByKey,
+        rawAnswers: input.report.rawAnswers,
+        benchmarks: new Map(rows.map((row) => [row.metricKey, row.value])),
+        templateAlias: preflight.templateAlias,
+      }),
     };
   } catch (error) {
     logUnavailable(logger, input, {
@@ -191,7 +224,21 @@ export async function resolvePeerReportEnhancementsForCampaign(
   input: ResolverInput & { campaignId: string },
 ): Promise<PeerReportEnhancements> {
   const logger = input.logger ?? console;
-  if (!resolvePeerReportPreflight(input)) return unchanged(input.report);
+  const preflight = resolvePeerReportPreflight(input);
+  if (!preflight) return unchanged(input.report);
+  if (!preflight.isLva) {
+    try {
+      const resolveEnhancements = input.resolveEnhancements
+        ?? resolvePeerReportEnhancements;
+      return await resolveEnhancements(input);
+    } catch (error) {
+      logUnavailable(logger, input, {
+        reason: "RESOLVER_ERROR",
+        errorName: errorName(error),
+      });
+      return unchanged(input.report);
+    }
+  }
   let campaign: { templateId: string } | null | undefined;
   try {
     campaign = await input.db.assessmentCampaign?.findFirst({
@@ -216,7 +263,7 @@ export async function resolvePeerReportEnhancementsForCampaign(
   } catch (error) {
     logUnavailable(
       logger,
-      { report: input.report, templateId: campaign.templateId },
+      input,
       { reason: "RESOLVER_ERROR", errorName: errorName(error) },
     );
     return unchanged(input.report);
@@ -227,7 +274,21 @@ export async function resolvePeerReportEnhancementsForSubmission(
   input: ResolverInput,
 ): Promise<PeerReportEnhancements> {
   const logger = input.logger ?? console;
-  if (!resolvePeerReportPreflight(input)) return unchanged(input.report);
+  const preflight = resolvePeerReportPreflight(input);
+  if (!preflight) return unchanged(input.report);
+  if (!preflight.isLva) {
+    try {
+      const resolveEnhancements = input.resolveEnhancements
+        ?? resolvePeerReportEnhancements;
+      return await resolveEnhancements(input);
+    } catch (error) {
+      logUnavailable(logger, input, {
+        reason: "RESOLVER_ERROR",
+        errorName: errorName(error),
+      });
+      return unchanged(input.report);
+    }
+  }
   let submission: { campaign: { templateId: string } } | null | undefined;
   try {
     submission = await input.db.assessmentSubmission?.findFirst({
@@ -252,7 +313,7 @@ export async function resolvePeerReportEnhancementsForSubmission(
   } catch (error) {
     logUnavailable(
       logger,
-      { report: input.report, templateId: submission.campaign.templateId },
+      input,
       { reason: "RESOLVER_ERROR", errorName: errorName(error) },
     );
     return unchanged(input.report);

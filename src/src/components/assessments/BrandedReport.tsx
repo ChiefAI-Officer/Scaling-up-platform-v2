@@ -69,7 +69,7 @@ import { SuFullPeerComparison } from "@/components/assessments/SuFullPeerCompari
 import { SuFullLandscapeReport } from "@/components/assessments/su-full-landscape/SuFullLandscapeReport";
 import { buildSuFullLandscapeReportModel } from "@/lib/assessments/su-full-landscape-report";
 import { isSuFullLandscapeReportEnabled } from "@/lib/assessments/wave-su-full-landscape-flags";
-import { isSuFullPeerPresentation } from "@/lib/assessments/su-full-peer-presentation";
+import { isSuFullPeerPresentationForReport } from "@/lib/assessments/su-full-peer-presentation";
 import { SCALING_UP_FULL_TEMPLATE_ALIAS } from "@/lib/assessments/su-full-question-benchmarks";
 import { ReportHtmlSection } from "@/components/assessments/ReportHtmlSection";
 import type { ReactNode } from "react";
@@ -351,7 +351,7 @@ export function LegacyClassicReport({
 
   const suFullPeers =
     report.templateAlias === SCALING_UP_FULL_TEMPLATE_ALIAS
-      && isSuFullPeerPresentation(report.suFullPeerPresentation)
+      && isSuFullPeerPresentationForReport(report.suFullPeerPresentation, report)
       ? report.suFullPeerPresentation
       : null;
 

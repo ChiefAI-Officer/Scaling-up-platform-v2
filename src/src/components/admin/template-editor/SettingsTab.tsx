@@ -48,6 +48,7 @@ import {
   type ReportStyleKey,
   type ReportStylePreviewCapabilities,
 } from "@/lib/assessments/report-style-registry";
+import { SCALING_UP_FULL_TEMPLATE_ALIAS } from "@/lib/assessments/su-full-question-benchmarks";
 
 // ────────────────────────────────────────────────────────────────────────
 // Props
@@ -212,7 +213,17 @@ export function SettingsTab({
         />
       )}
       {peerBenchmarkRows && (
-        <PeerBenchmarksPanel templateId={templateId} rows={peerBenchmarkRows} />
+        templateValues.alias === SCALING_UP_FULL_TEMPLATE_ALIAS ? (
+          <section className="wf-card space-y-2" style={{ padding: "1.5rem" }}>
+            <h2 className="wf-card-title">Peer comparisons</h2>
+            <p className="text-sm text-muted-foreground">
+              Peer comparisons for Scaling Up Full are selected automatically
+              for each report based on the phase shown in that report.
+            </p>
+          </section>
+        ) : (
+          <PeerBenchmarksPanel templateId={templateId} rows={peerBenchmarkRows} />
+        )
       )}
       <LanguageCard
         language={language}

@@ -17,8 +17,7 @@ import {
 import { ReportHtmlSection } from "@/components/assessments/ReportHtmlSection";
 import type { SafeReportHtmlFragment } from "@/lib/assessments/report-html";
 import type { ReactNode } from "react";
-
-const PEER_DISCLOSURE = "Peers are a current benchmark reference. Values are not yet matched to company size, growth phase, geography, or industry.";
+import { buildSuFullPeerDisclosureModel } from "@/lib/assessments/su-full-peer-disclosure";
 
 const CHAPTER_COPY: Readonly<Record<SuFullLandscapeChapter["key"], string>> = {
   people: "The People chapter reviews the employee and culture foundations that support sustainable growth.",
@@ -67,6 +66,20 @@ function questionByKey(model: SuFullLandscapeReportModel): ReadonlyMap<string, S
   );
 }
 
+export function PeerSnapshotDisclosure({
+  provenance,
+}: {
+  provenance: SuFullLandscapeReportModel["peerProvenance"];
+}) {
+  const disclosure = buildSuFullPeerDisclosureModel(provenance);
+  return (
+    <aside className="su-full-landscape-peer-disclosure" aria-label="Peer benchmark information">
+      <p>{disclosure.disclosure}</p>
+      <p className="su-full-landscape-peer-provenance">{disclosure.provenanceLabel}</p>
+    </aside>
+  );
+}
+
 function CoverPage({ report, number }: { report: RespondentReport; number: number }) {
   return (
     <SuFullLandscapePage number={number} footerBrand={report}>
@@ -95,8 +108,7 @@ function PrefacePage({ number, footerBrand }: { number: number; footerBrand: SuF
       </p>
       <p>
         Your answers and feedback are preserved from the completed assessment;
-        peer values are shown only as the current benchmark reference described
-        in this report.
+        peer values are explained wherever they appear.
       </p>
     </SuFullLandscapePage>
   );
@@ -165,14 +177,14 @@ function IntroductionPage({ report, model, number }: {
     <SuFullLandscapePage number={number} footerBrand={report}>
       <h2>Introduction</h2>
       <p><strong>ScaleUp Score</strong> {scaleUpScore(model.scaleUpScore)}</p>
-      <p>{PEER_DISCLOSURE}</p>
+      <PeerSnapshotDisclosure provenance={model.peerProvenance} />
       {model.growthPhase && fte !== null ? (
         <section aria-label="Growth phase">
           <h3>Phase {model.growthPhase.number} from FTE {fte}</h3>
           <p>{model.growthPhase.name}</p>
         </section>
       ) : null}
-      <p>Read each chapter as a focused conversation: compare the values, review the frozen feedback, then choose the next useful action.</p>
+      <p>Read each chapter as a focused conversation: compare the values, review your feedback, then choose the next useful action.</p>
     </SuFullLandscapePage>
   );
 }
@@ -213,7 +225,7 @@ function PeerDashboardPage({ model, number, footerBrand }: { model: SuFullLandsc
   return (
     <SuFullLandscapePage number={number} footerBrand={footerBrand}>
       <h2>Peers and comparisons</h2>
-      <p>Benchmark reference updated {formatDate(model.benchmarkUpdatedAt)}.</p>
+      <PeerSnapshotDisclosure provenance={model.peerProvenance} />
       <table>
         <thead><tr><th>Chapter</th><th>You</th><th>Peers</th></tr></thead>
         <tbody>{model.chapters.map((chapter) => (
@@ -222,7 +234,6 @@ function PeerDashboardPage({ model, number, footerBrand }: { model: SuFullLandsc
       </table>
       <p>Closest comparisons: {model.closestQuestions.map((question) => question.label).join("; ")}.</p>
       <p>Largest gaps: {model.largestGapQuestions.map((question) => question.label).join("; ")}.</p>
-      <p>{PEER_DISCLOSURE}</p>
     </SuFullLandscapePage>
   );
 }
@@ -243,15 +254,18 @@ function ChapterPage({ chapter, number, footerBrand }: { chapter: SuFullLandscap
 function DetailPage({
   page,
   questions,
+  peerProvenance,
   footerBrand,
 }: {
   page: Extract<SuFullLandscapePageDescriptor, { kind: "detail" }>;
   questions: ReadonlyMap<string, SuFullLandscapeQuestion>;
+  peerProvenance: SuFullLandscapeReportModel["peerProvenance"];
   footerBrand: SuFullLandscapeFooterBrand;
 }) {
   return (
     <SuFullLandscapePage number={page.number} chapterKey={page.chapterKey} variant="detail" footerBrand={footerBrand}>
       <h2>Detailed comparison</h2>
+      <PeerSnapshotDisclosure provenance={peerProvenance} />
       {page.questionKeys.map((key) => {
         const question = questions.get(key);
         if (!question) throw new Error(`Landscape detail page ${page.number} is missing ${key}`);
@@ -264,7 +278,7 @@ function DetailPage({
           >
             <h3>{question.label}</h3>
             <SuFullDetailPairedBars chapterKey={page.chapterKey} question={question} />
-            <p><strong>Frozen feedback</strong> {question.recommendation}</p>
+            <p className="su-full-landscape-feedback">{question.recommendation}</p>
           </article>
         );
       })}
@@ -343,7 +357,7 @@ export function SuFullLandscapeReport({
             if (!chapter) throw new Error(`Landscape chapter page ${page.number} is missing ${page.chapterKey}`);
             return <ChapterPage chapter={chapter} key={page.number} number={page.number} footerBrand={report} />;
           }
-          case "detail": return <DetailPage key={page.number} page={page} questions={questions} footerBrand={report} />;
+          case "detail": return <DetailPage key={page.number} page={page} questions={questions} peerProvenance={model.peerProvenance} footerBrand={report} />;
           case "conclusion": return report.reportHtml?.conclusionHtml
             ? <CustomHtmlPage key={page.number} number={page.number} report={report} position="conclusion" html={report.reportHtml.conclusionHtml} beforeConclusion={beforeConclusion} />
             : <ConclusionPage key={page.number} number={page.number} report={report} model={model} contactEmail={contactEmail} beforeConclusion={beforeConclusion} />;

@@ -1,0 +1,245 @@
+question_id,question,score,current_delegation_equals_current_management,current_delegation_equals_may_delegation_score5
+Q01,Effective recruitment process,0,True,
+Q01,Effective recruitment process,5,True,True
+Q01,Effective recruitment process,7,True,
+Q01,Effective recruitment process,9,True,
+Q02,High staff retention,0,True,
+Q02,High staff retention,5,True,True
+Q02,High staff retention,7,True,
+Q02,High staff retention,9,True,
+Q03,Onboarding program,0,True,
+Q03,Onboarding program,5,True,True
+Q03,Onboarding program,7,True,
+Q03,Onboarding program,9,True,
+Q04,Measuring employee satisfaction,0,False,
+Q04,Measuring employee satisfaction,5,False,True
+Q04,Measuring employee satisfaction,7,True,
+Q04,Measuring employee satisfaction,9,True,
+Q05,Positive about re-hiring employees,0,True,
+Q05,Positive about re-hiring employees,5,True,True
+Q05,Positive about re-hiring employees,7,True,
+Q05,Positive about re-hiring employees,9,True,
+Q06,Every employee has a training plan,0,True,
+Q06,Every employee has a training plan,5,True,True
+Q06,Every employee has a training plan,7,True,
+Q06,Every employee has a training plan,9,False,
+Q07,Outsourcing / Offshoring operations,0,True,
+Q07,Outsourcing / Offshoring operations,5,True,True
+Q07,Outsourcing / Offshoring operations,7,True,
+Q07,Outsourcing / Offshoring operations,9,True,
+Q08,We apply flat-management or self-steering/organizing teams,0,True,
+Q08,We apply flat-management or self-steering/organizing teams,5,True,True
+Q08,We apply flat-management or self-steering/organizing teams,7,True,
+Q08,We apply flat-management or self-steering/organizing teams,9,True,
+Q09,We have Core values,0,True,
+Q09,We have Core values,5,True,True
+Q09,We have Core values,7,True,
+Q09,We have Core values,9,True,
+Q10,We have focus on customers' needs,0,True,
+Q10,We have focus on customers' needs,5,True,True
+Q10,We have focus on customers' needs,7,True,
+Q10,We have focus on customers' needs,9,True,
+Q11,Employees know core values,0,False,
+Q11,Employees know core values,5,True,True
+Q11,Employees know core values,7,True,
+Q11,Employees know core values,9,False,
+Q12,We are transparent,0,True,
+Q12,We are transparent,5,True,True
+Q12,We are transparent,7,True,
+Q12,We are transparent,9,True,
+Q13,We have a positive and healthy culture,0,False,
+Q13,We have a positive and healthy culture,5,False,True
+Q13,We have a positive and healthy culture,7,False,
+Q13,We have a positive and healthy culture,9,False,
+Q14,We have formulated a long term (non-financial) goal,0,True,
+Q14,We have formulated a long term (non-financial) goal,5,True,True
+Q14,We have formulated a long term (non-financial) goal,7,True,
+Q14,We have formulated a long term (non-financial) goal,9,True,
+Q15,We have formulated yearly goals,0,False,
+Q15,We have formulated yearly goals,5,False,True
+Q15,We have formulated yearly goals,7,True,
+Q15,We have formulated yearly goals,9,True,
+Q16,We have formulated quarterly/ monthly goals (other than financial goals),0,False,
+Q16,We have formulated quarterly/ monthly goals (other than financial goals),5,False,True
+Q16,We have formulated quarterly/ monthly goals (other than financial goals),7,False,
+Q16,We have formulated quarterly/ monthly goals (other than financial goals),9,True,
+Q17,We work with a strategic plan,0,True,
+Q17,We work with a strategic plan,5,True,True
+Q17,We work with a strategic plan,7,True,
+Q17,We work with a strategic plan,9,True,
+Q18,Each employee has personalized goals,0,True,
+Q18,Each employee has personalized goals,5,True,True
+Q18,Each employee has personalized goals,7,True,
+Q18,Each employee has personalized goals,9,True,
+Q19,We have implemented a growth methodology,0,True,
+Q19,We have implemented a growth methodology,5,True,True
+Q19,We have implemented a growth methodology,7,True,
+Q19,We have implemented a growth methodology,9,True,
+Q20,We have an active acquisitions strategy,0,True,
+Q20,We have an active acquisitions strategy,5,True,True
+Q20,We have an active acquisitions strategy,7,True,
+Q20,We have an active acquisitions strategy,9,True,
+Q21,Tasks are properly allocated,0,False,
+Q21,Tasks are properly allocated,5,True,True
+Q21,Tasks are properly allocated,7,True,
+Q21,Tasks are properly allocated,9,False,
+Q22,We have weekly management meetings.,0,False,
+Q22,We have weekly management meetings.,5,False,True
+Q22,We have weekly management meetings.,7,True,
+Q22,We have weekly management meetings.,9,True,
+Q23,We have periodic strategic sessions.,0,True,
+Q23,We have periodic strategic sessions.,5,True,True
+Q23,We have periodic strategic sessions.,7,True,
+Q23,We have periodic strategic sessions.,9,True,
+Q24,Leadership team receives regular training,0,False,
+Q24,Leadership team receives regular training,5,True,True
+Q24,Leadership team receives regular training,7,True,
+Q24,Leadership team receives regular training,9,True,
+Q25,Our goals are translated into clear KPIs,0,False,
+Q25,Our goals are translated into clear KPIs,5,True,True
+Q25,Our goals are translated into clear KPIs,7,False,
+Q25,Our goals are translated into clear KPIs,9,False,
+Q26,We use real-time data to measure our performance,0,False,
+Q26,We use real-time data to measure our performance,5,False,True
+Q26,We use real-time data to measure our performance,7,True,
+Q26,We use real-time data to measure our performance,9,False,
+Q27,"We grow with limited mistakes, errors and problems",0,True,
+Q27,"We grow with limited mistakes, errors and problems",5,True,True
+Q27,"We grow with limited mistakes, errors and problems",7,True,
+Q27,"We grow with limited mistakes, errors and problems",9,False,
+Q28,We measure customer satisfaction,0,True,
+Q28,We measure customer satisfaction,5,True,True
+Q28,We measure customer satisfaction,7,True,
+Q28,We measure customer satisfaction,9,True,
+Q29,We have systematic processes for continuous improvement,0,False,
+Q29,We have systematic processes for continuous improvement,5,False,True
+Q29,We have systematic processes for continuous improvement,7,True,
+Q29,We have systematic processes for continuous improvement,9,True,
+Q30,We have an effective lead generation process,0,True,
+Q30,We have an effective lead generation process,5,True,True
+Q30,We have an effective lead generation process,7,True,
+Q30,We have an effective lead generation process,9,True,
+Q31,Sales achievement,0,True,
+Q31,Sales achievement,5,True,True
+Q31,Sales achievement,7,True,
+Q31,Sales achievement,9,True,
+Q32,Weekly sales meeting,0,True,
+Q32,Weekly sales meeting,5,True,True
+Q32,Weekly sales meeting,7,True,
+Q32,Weekly sales meeting,9,True,
+Q33,Head of sales is not the entrepreneur,0,True,
+Q33,Head of sales is not the entrepreneur,5,True,True
+Q33,Head of sales is not the entrepreneur,7,True,
+Q33,Head of sales is not the entrepreneur,9,True,
+Q34,We have an effective PR/communication strategy,0,True,
+Q34,We have an effective PR/communication strategy,5,True,True
+Q34,We have an effective PR/communication strategy,7,True,
+Q34,We have an effective PR/communication strategy,9,True,
+Q35,Most processes are automated,0,False,
+Q35,Most processes are automated,5,False,True
+Q35,Most processes are automated,7,False,
+Q35,Most processes are automated,9,True,
+Q36,Systems prepped for growth,0,True,
+Q36,Systems prepped for growth,5,True,True
+Q36,Systems prepped for growth,7,True,
+Q36,Systems prepped for growth,9,True,
+Q37,Better systems than competitors,0,True,
+Q37,Better systems than competitors,5,True,True
+Q37,Better systems than competitors,7,True,
+Q37,Better systems than competitors,9,True,
+Q38,Knowledge on latest technology,0,True,
+Q38,Knowledge on latest technology,5,True,True
+Q38,Knowledge on latest technology,7,True,
+Q38,Knowledge on latest technology,9,True,
+Q39,We are more innovative than competitors,0,True,
+Q39,We are more innovative than competitors,5,True,True
+Q39,We are more innovative than competitors,7,True,
+Q39,We are more innovative than competitors,9,True,
+Q40,Our business model is disruptive,0,True,
+Q40,Our business model is disruptive,5,True,True
+Q40,Our business model is disruptive,7,True,
+Q40,Our business model is disruptive,9,True,
+Q41,Real time financial insights,0,True,
+Q41,Real time financial insights,5,True,True
+Q41,Real time financial insights,7,True,
+Q41,Real time financial insights,9,True,
+Q42,Up-to-date cashflow planning,0,False,
+Q42,Up-to-date cashflow planning,5,True,True
+Q42,Up-to-date cashflow planning,7,True,
+Q42,Up-to-date cashflow planning,9,True,
+Q43,Access to growth capital,0,False,
+Q43,Access to growth capital,5,True,True
+Q43,Access to growth capital,7,True,
+Q43,Access to growth capital,9,True,
+Q44,Financial alert function,0,True,
+Q44,Financial alert function,5,True,True
+Q44,Financial alert function,7,True,
+Q44,Financial alert function,9,True,
+Q45,Leadership understands balance sheet,0,True,
+Q45,Leadership understands balance sheet,5,True,True
+Q45,Leadership understands balance sheet,7,True,
+Q45,Leadership understands balance sheet,9,True,
+Q46,CEO works on the company and is able to remove from daily operations,0,False,
+Q46,CEO works on the company and is able to remove from daily operations,5,True,True
+Q46,CEO works on the company and is able to remove from daily operations,7,True,
+Q46,CEO works on the company and is able to remove from daily operations,9,False,
+Q47,Have a mentor,0,True,
+Q47,Have a mentor,5,True,True
+Q47,Have a mentor,7,True,
+Q47,Have a mentor,9,True,
+Q48,Have an entrepreneurial network,0,True,
+Q48,Have an entrepreneurial network,5,True,True
+Q48,Have an entrepreneurial network,7,True,
+Q48,Have an entrepreneurial network,9,True,
+Q49,Enjoy management of company,0,False,
+Q49,Enjoy management of company,5,False,True
+Q49,Enjoy management of company,7,False,
+Q49,Enjoy management of company,9,False,
+Q50,Energized by team and company,0,True,
+Q50,Energized by team and company,5,True,True
+Q50,Energized by team and company,7,True,
+Q50,Energized by team and company,9,True,
+Q51,Absence of CEO is possible,0,False,
+Q51,Absence of CEO is possible,5,False,True
+Q51,Absence of CEO is possible,7,False,
+Q51,Absence of CEO is possible,9,False,
+Q52,Read business books,0,True,
+Q52,Read business books,5,True,True
+Q52,Read business books,7,True,
+Q52,Read business books,9,True,
+Q53,Receives regular education,0,True,
+Q53,Receives regular education,5,True,True
+Q53,Receives regular education,7,True,
+Q53,Receives regular education,9,True,
+Q54,Healthy work - life balance,0,False,
+Q54,Healthy work - life balance,5,True,True
+Q54,Healthy work - life balance,7,True,
+Q54,Healthy work - life balance,9,True,
+Q55,I am happy,0,True,
+Q55,I am happy,5,True,True
+Q55,I am happy,7,True,
+Q55,I am happy,9,True,
+Q56,Employees know long term goal,0,True,
+Q56,Employees know long term goal,5,True,True
+Q56,Employees know long term goal,7,True,
+Q56,Employees know long term goal,9,True,
+Q57,Employees know yearly goal,0,True,
+Q57,Employees know yearly goal,5,True,True
+Q57,Employees know yearly goal,7,True,
+Q57,Employees know yearly goal,9,True,
+Q58,Employees know quarterly/monthly goals,0,True,
+Q58,Employees know quarterly/monthly goals,5,True,True
+Q58,Employees know quarterly/monthly goals,7,True,
+Q58,Employees know quarterly/monthly goals,9,True,
+Q59,Employees know vision and mission,0,False,
+Q59,Employees know vision and mission,5,False,True
+Q59,Employees know vision and mission,7,True,
+Q59,Employees know vision and mission,9,True,
+Q60,Employees know elevator pitch,0,True,
+Q60,Employees know elevator pitch,5,True,True
+Q60,Employees know elevator pitch,7,True,
+Q60,Employees know elevator pitch,9,True,
+Q61,We frequently have company-wide meetings,0,True,
+Q61,We frequently have company-wide meetings,5,True,True
+Q61,We frequently have company-wide meetings,7,True,
+Q61,We frequently have company-wide meetings,9,True,

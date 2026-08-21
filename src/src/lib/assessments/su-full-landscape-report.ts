@@ -1,12 +1,17 @@
 import type { RespondentReport } from "@/lib/assessments/respondent-report";
 import {
-  isSuFullPeerPresentation,
+  isSuFullPeerPresentationForReport,
   type SuFullPeerPresentation,
+  type SuFullPeerProvenance,
   type SuFullPeerQuestionComparison,
   type SuFullPeerSectionComparison,
 } from "@/lib/assessments/su-full-peer-presentation";
 import { SCALING_UP_FULL_TEMPLATE_ALIAS } from "@/lib/assessments/su-full-question-benchmarks";
-import { computeGrowthPhase, type GrowthPhase } from "@/lib/assessments/su-full-phase";
+import {
+  computeGrowthPhase,
+  GROWTH_PHASE_NARRATIVES,
+  type GrowthPhase,
+} from "@/lib/assessments/su-full-phase";
 import type { ReportStyleKey } from "@/lib/assessments/report-style-registry";
 
 export type SuFullLandscapeChapterKey =
@@ -44,7 +49,7 @@ export type SuFullLandscapePage =
 
 export type SuFullLandscapeReportModel = Readonly<{
   scaleUpScore: number;
-  benchmarkUpdatedAt: string;
+  peerProvenance: SuFullPeerProvenance;
   growthPhase: GrowthPhase | null;
   chapters: readonly SuFullLandscapeChapter[];
   profileRows: readonly SuFullLandscapeProfileRow[];
@@ -269,6 +274,16 @@ function growthPhaseFromRawAnswers(rawAnswers: unknown): GrowthPhase | null {
     : null;
 }
 
+function growthPhaseFromFrozenResult(
+  result: RespondentReport["result"],
+  rawAnswers: unknown,
+): GrowthPhase | null {
+  if (result.recommendationPhase === undefined) {
+    return growthPhaseFromRawAnswers(rawAnswers);
+  }
+  return GROWTH_PHASE_NARRATIVES[result.recommendationPhase] ?? null;
+}
+
 function pages(): readonly SuFullLandscapePage[] {
   const chapterPageByKey: Readonly<Record<SuFullLandscapeChapterKey, number>> = {
     people: 7,
@@ -319,7 +334,7 @@ export function buildSuFullLandscapeReportModel(input: {
     || input.resolvedStyle !== "CLASSIC"
     || report.degraded
     || !presentation
-    || !isSuFullPeerPresentation(presentation)
+    || !isSuFullPeerPresentationForReport(presentation, report)
     || !validCanonicalDefinitions()
     || !validReportSectionMap(report)
     || !validPresentationSections(presentation)
@@ -400,8 +415,8 @@ export function buildSuFullLandscapeReportModel(input: {
 
   return deepFreeze({
     scaleUpScore: frozen.scaleUpScore,
-    benchmarkUpdatedAt: presentation.benchmarkUpdatedAt,
-    growthPhase: growthPhaseFromRawAnswers(report.rawAnswers),
+    peerProvenance: { ...presentation.provenance },
+    growthPhase: growthPhaseFromFrozenResult(report.result, report.rawAnswers),
     chapters,
     profileRows,
     pages: orderedPages,

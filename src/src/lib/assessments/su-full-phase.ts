@@ -5,14 +5,15 @@
  * shows a mid-survey interstitial tile ("You've reached phase N - <Name> phase")
  * with a verbatim narrative. This module is the pure foundation for that feature:
  *
- *   - `computeGrowthPhase(contractFte)` resolves the phase band. Driver = the
- *     single "permanent or temporary contract" FTE figure (the verbatim Esperto
- *     survey field). Freelancers/contractors are EXCLUDED (captured in the seed
- *     for fidelity but never fed into the calc).
+ *   - `computeGrowthPhase(contractFte)` resolves the historic phase band used
+ *     by pinned reports. Its legacy boundaries must remain stable.
+ *   - `computeCurrentGrowthPhase(contractFte)` and
+ *     `currentGrowthPhaseFromAnswers(answers)` resolve the current-live edition
+ *     using the same "permanent or temporary contract" FTE driver.
  *   - `GROWTH_PHASE_BANDS` + `GROWTH_PHASE_NARRATIVES` are exported so the survey
  *     plumbing (Task B) and the interstitial UI (Task C) can import them directly.
  *
- * Phase bands (source: docs/specs/v7.6/18j-su-full-source-extract.md §8–19):
+ * Legacy phase bands (source: docs/specs/v7.6/18j-su-full-source-extract.md §8–19):
  *   1–7    → Phase 1  Pioneering
  *   8–24   → Phase 2  Organization
  *   25–49  → Phase 3  Management
@@ -103,6 +104,21 @@ export const GROWTH_PHASE_BANDS: readonly GrowthPhaseBand[] = [
   { number: 5, name: "Standardization", min: 150, max: null },
 ] as const;
 
+/** Stable answer key for the combined permanent-or-temporary contract FTE driver. */
+export const SU_FULL_PHASE_DRIVER_KEY = "Q_FTE_CONTRACT";
+
+/**
+ * Current-live edition bands. Keep this separate from GROWTH_PHASE_BANDS:
+ * pinned historic reports use the legacy boundaries above.
+ */
+export const CURRENT_GROWTH_PHASE_BANDS = [
+  { number: 1, name: "Pioneering", min: 1, max: 8 },
+  { number: 2, name: "Organization", min: 9, max: 25 },
+  { number: 3, name: "Management", min: 26, max: 50 },
+  { number: 4, name: "Delegation", min: 51, max: 150 },
+  { number: 5, name: "Standardization", min: 151, max: null },
+] as const;
+
 function headingFor(number: GrowthPhaseNumber, name: string): string {
   return `You've reached phase ${number} - ${name} phase`;
 }
@@ -156,4 +172,39 @@ export function computeGrowthPhase(contractFte: number): GrowthPhase | null {
   if (!band) return null;
 
   return GROWTH_PHASE_NARRATIVES[band.number];
+}
+
+/** Resolve a phase using the current-live edition's phase boundaries. */
+export function computeCurrentGrowthPhase(contractFte: number): GrowthPhase | null {
+  if (!Number.isFinite(contractFte) || contractFte <= 0) {
+    return null;
+  }
+
+  const band = CURRENT_GROWTH_PHASE_BANDS.find(
+    (b) => contractFte >= b.min && (b.max === null || contractFte <= b.max)
+  );
+  if (!band) return null;
+
+  return GROWTH_PHASE_NARRATIVES[band.number];
+}
+
+/**
+ * Resolve the current-live phase from survey answers, using only the exact
+ * combined contract-FTE driver and finite numeric values.
+ */
+export function currentGrowthPhaseFromAnswers(
+  answers: readonly { stableKey: string; value: unknown }[]
+): GrowthPhase | null {
+  const driverAnswer = answers.find(
+    (answer) => answer.stableKey === SU_FULL_PHASE_DRIVER_KEY
+  );
+  if (!driverAnswer || typeof driverAnswer.value !== "number") {
+    return null;
+  }
+
+  if (!Number.isFinite(driverAnswer.value)) {
+    return null;
+  }
+
+  return computeCurrentGrowthPhase(driverAnswer.value);
 }

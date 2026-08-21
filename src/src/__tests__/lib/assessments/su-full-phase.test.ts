@@ -18,10 +18,56 @@
 
 import {
   computeGrowthPhase,
+  computeCurrentGrowthPhase,
+  currentGrowthPhaseFromAnswers,
   GROWTH_PHASE_BANDS,
   GROWTH_PHASE_NARRATIVES,
+  SU_FULL_PHASE_DRIVER_KEY,
   type GrowthPhase,
 } from "../../../lib/assessments/su-full-phase";
+
+describe("computeCurrentGrowthPhase — live edition boundaries", () => {
+  it("resolves each inclusive live band boundary", () => {
+    expect(computeCurrentGrowthPhase(8)?.number).toBe(1);
+    expect(computeCurrentGrowthPhase(9)?.number).toBe(2);
+    expect(computeCurrentGrowthPhase(25)?.number).toBe(2);
+    expect(computeCurrentGrowthPhase(26)?.number).toBe(3);
+    expect(computeCurrentGrowthPhase(50)?.number).toBe(3);
+    expect(computeCurrentGrowthPhase(51)?.number).toBe(4);
+    expect(computeCurrentGrowthPhase(150)?.number).toBe(4);
+    expect(computeCurrentGrowthPhase(151)?.number).toBe(5);
+  });
+
+  it("keeps the legacy resolver on its historic boundaries", () => {
+    expect(computeGrowthPhase(8)?.number).toBe(2);
+    expect(computeGrowthPhase(50)?.number).toBe(4);
+  });
+});
+
+describe("currentGrowthPhaseFromAnswers — live driver provenance", () => {
+  it("resolves only a finite numeric value from the exact driver key", () => {
+    expect(
+      currentGrowthPhaseFromAnswers([
+        { stableKey: SU_FULL_PHASE_DRIVER_KEY, value: 26 },
+      ])?.number
+    ).toBe(3);
+    expect(
+      currentGrowthPhaseFromAnswers([
+        { stableKey: "Q_FTE_PERMANENT", value: 26 },
+      ])
+    ).toBeNull();
+    expect(
+      currentGrowthPhaseFromAnswers([
+        { stableKey: SU_FULL_PHASE_DRIVER_KEY, value: "26" },
+      ])
+    ).toBeNull();
+    expect(
+      currentGrowthPhaseFromAnswers([
+        { stableKey: SU_FULL_PHASE_DRIVER_KEY, value: Infinity },
+      ])
+    ).toBeNull();
+  });
+});
 
 describe("computeGrowthPhase — band worked examples", () => {
   const cases: Array<[number, 1 | 2 | 3 | 4 | 5]> = [

@@ -1,21 +1,25 @@
 /**
- * Verified Esperto per-question peer snapshot for Scaling Up Full.
+ * Historical Esperto per-question peer baseline for Scaling Up Full.
  *
  * The values were captured on 2026-08-14 from controlled Esperto reports.
- * Eleven assessments varied Q01 across every answer from 0 through 10 while
- * two additional controls varied company size and organizational phase. All
- * 61 peer values stayed fixed by question across the controlled set.
+ * Eleven assessments varied Q01 across every answer from 0 through 10. Later
+ * five-phase evidence superseded the phase-control conclusion for newly scored
+ * results, while these values remain the executable historical baseline.
  *
- * This is the canonical question-value source for both the existing static
- * report benchmark and explicit `AssessmentBenchmark` table refreshes. It
- * contains data only, not presentation logic. DB-row changes remain possible
- * through the benchmark editor.
+ * These values are not a mutable current reference. New governed reports use
+ * peer values frozen into their score result; only reports with neither frozen
+ * rows nor snapshot provenance render this baseline.
  */
 
 export const SCALING_UP_FULL_TEMPLATE_ALIAS = "scaling-up-full";
 
-export const SU_FULL_QUESTION_BENCHMARKS_VERSION =
+export const SU_FULL_LEGACY_PEER_SOURCE_ID =
   "2026-08-14.esperto-controlled-v1";
+export const SU_FULL_LEGACY_PEER_CONTENT_HASH =
+  "fe63364e3b5e42897b3b3886135310f673e320b4a07b1453ad300a49a91b4dbd";
+
+export const SU_FULL_QUESTION_BENCHMARKS_VERSION =
+  SU_FULL_LEGACY_PEER_SOURCE_ID;
 export const SU_FULL_QUESTION_BENCHMARKS_EFFECTIVE_DATE = "2026-08-14";
 export const SU_FULL_QUESTION_BENCHMARKS_SOURCE =
   "Esperto controlled reports: 11 answer-level variants plus company-size and organizational-phase controls";

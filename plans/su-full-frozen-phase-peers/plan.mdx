@@ -1,0 +1,439 @@
+---
+title: "Scaling Up Full: Frozen Phase Peers"
+description: "Evidence-backed architecture for selecting phase-aware peer benchmarks at scoring time and freezing them into each result. Local review artifact only; not deployed."
+---
+
+# Scaling Up Full: Frozen Phase Peers
+
+<Callout tone="warning">
+  **Not deployed.** This is a local architecture talking guide, not a live product
+  preview and not something a respondent can test. It does not authorize a push,
+  PR, publication, deployment, feature activation, production mutation, or external
+  communication.
+</Callout>
+
+## The decision in one sentence
+
+Select Peers from an explicit five-phase catalogue **when the assessment is scored**,
+freeze all 61 selected values and their provenance into the result, and render only
+that frozen snapshot.
+
+<Callout tone="decision">
+  The hard-to-reverse architecture bet is intentionally small: use the immutable
+  assessment-version JSON and the already persisted score result. Do not introduce a
+  new benchmark-snapshot database subsystem.
+</Callout>
+
+## What the evidence proved
+
+<Diagram id="phase-vector-map" title="Five explicit phases, two unique peer vectors" summary="P1, P2, P3, and P5 use the audited baseline vector. P4 uses the audited delegation vector. The P5 return to baseline is explicit, not a fallback.">
+
+```html
+<div class="phase-map">
+  <div class="phase-card baseline"><strong>P1</strong><span>Baseline</span></div>
+  <div class="phase-arrow">→</div>
+  <div class="phase-card baseline"><strong>P2</strong><span>Baseline</span></div>
+  <div class="phase-arrow">→</div>
+  <div class="phase-card baseline"><strong>P3</strong><span>Baseline</span></div>
+  <div class="phase-arrow change">56 / 61 change</div>
+  <div class="phase-card delegation"><strong>P4</strong><span>Delegation</span></div>
+  <div class="phase-arrow change">56 / 61 revert</div>
+  <div class="phase-card baseline"><strong>P5</strong><span>Baseline</span></div>
+</div>
+<div class="phase-note">
+  Same phase, score 0–10: Peers stay fixed. Five keys stay unchanged across P3 → P4:
+  Q27, Q30, Q38, Q41, Q57.
+</div>
+```
+
+```css
+.phase-map {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.phase-card {
+  display: flex;
+  min-width: 104px;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  border-radius: 14px;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+}
+.phase-card strong { font-size: 20px; }
+.phase-card span { font-size: 12px; opacity: .78; }
+.phase-card.baseline { background: rgba(56, 189, 248, .11); }
+.phase-card.delegation { background: rgba(251, 146, 60, .16); }
+.phase-arrow { opacity: .62; text-align: center; }
+.phase-arrow.change { font-size: 12px; max-width: 82px; }
+.phase-note {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(148, 163, 184, .10);
+  text-align: center;
+  font-size: 13px;
+}
+```
+
+</Diagram>
+
+| Evidence check | Result |
+| --- | --- |
+| Complete source matrix | 55 reports × 61 questions = 3,355 rows |
+| Score invariance | One stable 61-value peer vector per phase across scores 0–10 |
+| Baseline phases | P1, P2, P3, P5 share fingerprint `fe63364e…4dbd` |
+| Delegation phase | P4 fingerprint `ae9e9e2f…65ff` |
+| Boundary reports | Headcounts 8, 9, 25, 26, 150, 151 independently verified |
+| Example | Q01 is 6.3 in baseline phases and 6.6 in P4 |
+
+## What changes for a respondent
+
+<Diagram id="concept-separation" title="You, Feedback, and Peers answer different questions" summary="The design preserves three separate concepts. Feedback can vary by both phase and score, while Peers varies by phase only.">
+
+```html
+<div class="three-concepts">
+  <div class="concept you">
+    <strong>You</strong>
+    <span>Your answer and resulting score</span>
+    <small>Changes when your answers change</small>
+  </div>
+  <div class="concept feedback">
+    <strong>Feedback</strong>
+    <span>Authored guidance for phase + score</span>
+    <small>Can change within the same phase</small>
+  </div>
+  <div class="concept peers">
+    <strong>Peers</strong>
+    <span>Governed reference selected by phase</span>
+    <small>Fixed across scores inside that phase</small>
+  </div>
+</div>
+```
+
+```css
+.three-concepts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+  gap: 14px;
+}
+.concept {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 18px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+}
+.concept strong { font-size: 18px; }
+.concept span { line-height: 1.35; }
+.concept small { opacity: .68; }
+.concept.you { background: rgba(167, 139, 250, .10); }
+.concept.feedback { background: rgba(52, 211, 153, .10); }
+.concept.peers { background: rgba(56, 189, 248, .10); }
+@media (max-width: 720px) {
+  .three-concepts { grid-template-columns: 1fr; }
+}
+```
+
+</Diagram>
+
+| Scenario | Feedback | Peers |
+| --- | --- | --- |
+| Same phase, different score | May change | Does not change |
+| Same score, P3 → P4 | Changes to P4 content | Changes to P4 vector |
+| Same score, P4 → P5 | Changes to P5 content | Returns to baseline vector |
+
+## Proposed data flow
+
+<Diagram id="frozen-data-flow" title="Resolve once, freeze once, render repeatedly" summary="The immutable version is the scoring input. The result becomes the reporting source of truth. Renderers never ask mutable benchmark rows what the peer values are now.">
+
+```html
+<div class="flow">
+  <div class="flow-node source">
+    <strong>Immutable template version</strong>
+    <small>Five explicit phase mappings<br />Feedback + Peers<br />catalogue hash</small>
+  </div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-node score">
+    <strong>Score once</strong>
+    <small>Resolve frozen phase<br />select 61 exact peer values<br />validate completeness</small>
+  </div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-node frozen">
+    <strong>Frozen result</strong>
+    <small>answers + scores<br />61 peer values<br />phase + source ID + hash</small>
+  </div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-node render">
+    <strong>Every renderer</strong>
+    <small>on-screen report<br />PDF<br />revived session</small>
+  </div>
+</div>
+<div class="blocked-path">
+  <span>Mutable AssessmentBenchmark rows</span>
+  <strong>× not consulted for phase-aware Scaling Up Full reports</strong>
+</div>
+```
+
+```css
+.flow {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.flow-node {
+  display: flex;
+  flex: 1;
+  min-width: 180px;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+}
+.flow-node small { line-height: 1.5; opacity: .74; }
+.flow-node.source { background: rgba(56, 189, 248, .10); }
+.flow-node.score { background: rgba(251, 191, 36, .10); }
+.flow-node.frozen { background: rgba(52, 211, 153, .11); }
+.flow-node.render { background: rgba(167, 139, 250, .10); }
+.flow-arrow { align-self: center; font-size: 22px; opacity: .55; }
+.blocked-path {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+  padding: 11px 14px;
+  border: 1px dashed rgba(248, 113, 113, .55);
+  border-radius: 10px;
+  color: rgb(248, 113, 113);
+  text-align: center;
+}
+```
+
+</Diagram>
+
+### Why freeze the values?
+
+- A report means the same thing tomorrow as it did when scored.
+- Changing an admin benchmark row cannot silently rewrite a historical report.
+- On-screen, PDF, and revived-session views consume one source of truth.
+- The selected phase and catalogue edition are auditable without reconstructing state.
+
+## Historical results stay historical
+
+<Diagram id="legacy-split" title="Forward-only adoption, no historical rewrite" summary="New results use the phase-aware frozen snapshot. Existing results keep the legacy baseline behavior through an executable constant; no records or campaign pins are modified.">
+
+```html
+<div class="legacy-grid">
+  <div class="legacy-card new">
+    <span class="label">NEW GOVERNED VERSION</span>
+    <strong>Phase-aware frozen Peers</strong>
+    <ul>
+      <li>Exact P1–P5 selection</li>
+      <li>61 values stored with result</li>
+      <li>Source ID + content hash</li>
+    </ul>
+  </div>
+  <div class="legacy-card old">
+    <span class="label">EXISTING RESULTS</span>
+    <strong>Legacy 2026-08-14 baseline</strong>
+    <ul>
+      <li>No result rewrite</li>
+      <li>No campaign repin</li>
+      <li>No silent upgrade to P4 values</li>
+    </ul>
+  </div>
+</div>
+```
+
+```css
+.legacy-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(240px, 1fr));
+  gap: 16px;
+}
+.legacy-card {
+  padding: 18px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+}
+.legacy-card .label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 11px;
+  letter-spacing: .08em;
+  opacity: .65;
+}
+.legacy-card ul { margin-bottom: 0; padding-left: 20px; }
+.legacy-card.new { background: rgba(52, 211, 153, .10); }
+.legacy-card.old { background: rgba(148, 163, 184, .10); }
+@media (max-width: 650px) {
+  .legacy-grid { grid-template-columns: 1fr; }
+}
+```
+
+</Diagram>
+
+## Failure behavior
+
+<Callout tone="warning">
+  Missing P4 must never mean “use baseline.” Phase-aware data is all-or-nothing.
+</Callout>
+
+| Boundary | Failure behavior |
+| --- | --- |
+| Draft/publish validation | Reject missing/duplicate phases, incomplete keys, invalid values, unresolved references, or hash mismatch |
+| Scoring | Fail closed if the exact frozen phase cannot resolve all 61 peer values |
+| Rendering a declared frozen result | If corrupt/incomplete, omit Peers and emit a structured diagnostic; never query mutable rows or substitute baseline |
+| Rendering a genuinely historical result | Use the explicit legacy baseline constant and record legacy-fallback telemetry |
+
+## Planned code ownership
+
+<FileTree
+  id="planned-code-map"
+  title="Proposed implementation surface"
+  entries={[
+    {
+      path: "src/src/lib/assessments/su-full-phase-peer-catalogue.ts",
+      change: "add",
+      note: "generated governed phase catalogue, source ID, and hashes",
+    },
+    {
+      path: "src/scripts/<phase-peer-generator>.ts",
+      change: "add",
+      note: "deterministically generate and validate the catalogue from the audited CSV",
+    },
+    {
+      path: "src/src/lib/assessments/scoring.ts",
+      change: "modify",
+      note: "validate exact phase rows and freeze peerValue plus snapshot provenance",
+    },
+    {
+      path: "src/src/lib/assessments/compute-score-result.ts",
+      change: "modify",
+      note: "carry the already resolved organizational phase through scoring",
+    },
+    {
+      path: "src/src/lib/assessments/su-full-phase-feedback-edition.ts",
+      change: "modify",
+      note: "build one forward-only version containing phase Feedback and phase Peers",
+    },
+    {
+      path: "src/src/lib/assessments/su-full-question-benchmarks.ts",
+      change: "modify",
+      note: "retain as explicit legacy baseline; remove stale phase-invariance claim",
+    },
+    {
+      path: "src/src/lib/assessments/su-full-peer-presentation.ts",
+      change: "modify",
+      note: "render frozen peers; use legacy constant only for old results",
+    },
+    {
+      path: "src/src/lib/assessments/peer-report-resolver.ts",
+      change: "modify",
+      note: "stop DB benchmark lookup for Scaling Up Full; preserve LVA behavior",
+    },
+  ]}
+/>
+
+The exact submit-route, admin-editor, and report-component paths will be resolved in
+the implementation plan before any feature code changes.
+
+## Report wording
+
+> **Peers** are a governed benchmark snapshot selected by organizational phase and
+> frozen when this result was scored. This is not an industry-, geography-, or
+> cohort-matched comparison.
+
+This replaces the inaccurate implication that one current mutable reference is good
+for every phase. It also avoids overstating what the Esperto evidence proves.
+
+## Verification and release gates
+
+<Checklist
+  id="verification-gates"
+  items={[
+    {
+      id: "evidence",
+      label: "Evidence matrix and six boundary reports reconciled",
+      checked: true,
+      note: "Completed locally; source reports were mail-disabled.",
+    },
+    {
+      id: "architecture",
+      label: "Recommended architecture approved in conversation",
+      checked: true,
+      note: "Frozen result, explicit phase mapping, legacy no-rewrite path.",
+    },
+    {
+      id: "visual-review",
+      label: "User reviews this local talking guide",
+      checked: false,
+      note: "Current gate. This is design review, not product testing.",
+    },
+    {
+      id: "implementation-plan",
+      label: "File-specific implementation plan and test matrix approved",
+      checked: false,
+    },
+    {
+      id: "implementation",
+      label: "Implementation and independent code/spec reviews complete",
+      checked: false,
+    },
+    {
+      id: "push-pr",
+      label: "Explicit authorization for push and PR",
+      checked: false,
+    },
+    {
+      id: "publish-deploy",
+      label: "Separate publish, deploy, and activation approvals",
+      checked: false,
+    },
+  ]}
+/>
+
+### Required implementation proof
+
+- P1–P5 exact-vector and completeness tests.
+- P3 → P4 56-change proof and P4 → P5 56-reversion proof.
+- Same-phase score invariance.
+- Frozen serialization and session-revival parity.
+- Mutable-row tamper test: new reports cannot change.
+- Legacy immutability and no-backfill proof.
+- Corrupt snapshot fail-closed behavior.
+- On-screen/PDF agreement and stable 26-page report shape.
+- LVA regression coverage.
+- Changed-file ESLint, targeted Jest, migration safety, and Turbopack build gate before any push.
+
+## Alternatives rejected
+
+| Alternative | Why it was rejected |
+| --- | --- |
+| New database snapshot subsystem | Adds schema, lifecycle, and migration complexity when immutable version JSON plus the score result already provide the right boundaries |
+| Resolve peers from headcount at render time | Makes reports mutable, duplicates phase logic, and can disagree with the phase frozen during scoring |
+| Keep using current `AssessmentBenchmark` rows | Cannot represent the proven phase split safely and lets later edits reinterpret historical reports |
+| Default every unmapped phase to baseline | Would hide a missing P4 mapping—the most important observed exception |
+| Rewrite historical results | Changes historical meaning and requires unnecessary high-risk production mutation |
+
+## Review focus
+
+Please review these three points before implementation planning:
+
+1. Does the distinction between **You**, **Feedback**, and **Peers** match how you want
+   the report explained?
+2. Is the forward-only legacy treatment acceptable: old results remain baseline and
+   are not upgraded to phase-aware Peers?
+3. Is the proposed disclosure precise enough without overstating the benchmark?
+
+The full standalone design is in
+`docs/superpowers/specs/2026-08-21-su-full-frozen-phase-peers-design.md`.

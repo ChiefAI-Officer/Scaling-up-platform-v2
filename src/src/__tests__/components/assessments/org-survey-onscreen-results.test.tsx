@@ -88,8 +88,9 @@ const EMPTY_CANONICAL_RESULT = {
   unansweredKeys: [],
 };
 
+const COMPLETE_SU_FULL_REPORT = completeSuFullPeerReport();
 const builtPeerPresentation = buildSuFullPeerPresentationResult({
-  report: completeSuFullPeerReport(),
+  report: COMPLETE_SU_FULL_REPORT,
   benchmarks: completeSuFullBenchmarkRows(),
 });
 if (builtPeerPresentation.status !== "ready") {
@@ -235,9 +236,7 @@ describe("the rendered report", () => {
     writeOnScreenResult(
       ALIAS,
       {
-        ...(REPORT as unknown as Record<string, unknown>),
-        templateAlias: "scaling-up-full",
-        reportStyle: "CLASSIC",
+        ...COMPLETE_SU_FULL_REPORT,
         suFullPeerPresentation: PEER_PRESENTATION,
       } as never,
       KEY,

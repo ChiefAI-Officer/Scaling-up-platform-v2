@@ -90,7 +90,7 @@ function renderTab(overrides: Partial<SettingsTabProps> = {}) {
   return props;
 }
 
-describe("SettingsTab — LVA peer averages", () => {
+describe("SettingsTab — peer comparison settings", () => {
   const peerRows: PeerBenchmarkRow[] = [
     {
       stableKey: "lva-people-leadership-team",
@@ -104,6 +104,10 @@ describe("SettingsTab — LVA peer averages", () => {
       <SettingsTab
         {...makeProps()}
         templateId="lva-template"
+        templateValues={{
+          ...makeProps().templateValues,
+          alias: "leadership-vision-alignment",
+        }}
         peerBenchmarkRows={peerRows}
       />,
     );
@@ -114,6 +118,21 @@ describe("SettingsTab — LVA peer averages", () => {
     expect(
       within(panel).getByLabelText("The Leadership Team"),
     ).toHaveValue(6.3);
+  });
+
+  it("explains phase-selected peers instead of exposing editable Scaling Up Full values", () => {
+    renderTab({ peerBenchmarkRows: peerRows });
+
+    expect(screen.queryByTestId("peer-benchmarks-panel")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Peer comparisons" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Peer comparisons for Scaling Up Full are selected automatically for each report based on the phase shown in that report.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
   });
 
   it("does not render the peer editor when the server supplies no rows", () => {

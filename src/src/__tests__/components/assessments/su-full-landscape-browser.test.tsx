@@ -1,7 +1,7 @@
 /** @jest-environment node */
 
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -15,6 +15,12 @@ import {
   completeSuFullLandscapePresentation,
   completeSuFullLandscapeReport,
 } from "@/__tests__/fixtures/su-full-landscape";
+import {
+  SU_FULL_PHASE_PEER_CONTENT_HASHES,
+  SU_FULL_PHASE_PEER_SOURCE_ID,
+  getGovernedPeerValue,
+} from "@/lib/assessments/su-full-phase-peer-catalogue";
+import type { GrowthPhaseNumber } from "@/lib/assessments/su-full-phase";
 
 jest.setTimeout(60_000);
 
@@ -22,6 +28,11 @@ const ENABLED = "NEXT_PUBLIC_WAVE_SU_FULL_LANDSCAPE_REPORT_ENABLED";
 const KILL = "NEXT_PUBLIC_WAVE_SU_FULL_LANDSCAPE_REPORT_KILL";
 const OPENER_PAGES = [7, 11, 14, 19, 21] as const;
 const CHART_PAGES = [...OPENER_PAGES, 26] as const;
+const PEER_DISCLOSURE = "Peers shows the benchmark associated with your organizational phase when you completed this assessment. It is not matched by industry, geography, or a custom peer group.";
+const HISTORICAL_PEER_DISCLOSURE = "Peers shows the historical benchmark used for this report. It is not matched by industry, geography, or a custom peer group.";
+const LEGACY_FALSE_FREEZE_CLAIM = /frozen governed snapshot|peer values[^.]{0,120}frozen (?:when|at) (?:this result was )?scored/i;
+const ENGINEERING_LANGUAGE = /governed|snapshot|sourceId|source id|catalogue|provenance|legacy baseline|phase-aware|frozen|esperto-five-phase-peers|esperto-controlled/i;
+const REPRESENTATIVE_482_CHARACTER_FEEDBACK = "In order to scale, smart application and linking of information technology is essential. Sales, marketing, project management, production,humanresources,reporting,etc.Thisgivesstructureand clarity, prevents mistakes and makes growing a lot easier. With the size of your company, a lot of systems likely still work independently of each other, or you primarily use Excel. This is customary, but in your next growth phase you will have to start thinking about smart solutions. Act now";
 
 function stylesheet(): string {
   return ["su-public-brand.css", "su-report.css"]
@@ -30,9 +41,11 @@ function stylesheet(): string {
     .replace(/@import[^;]+;\s*/g, "");
 }
 
-function routeMarkup(): { html: string; report: ReturnType<typeof completeSuFullLandscapeReport> } {
-  const report = completeSuFullLandscapeReport();
-  report.suFullPeerPresentation = completeSuFullLandscapePresentation(report);
+function routeMarkup(
+  report = completeSuFullLandscapeReport(),
+  presentation: ReturnType<typeof completeSuFullLandscapePresentation> | null = completeSuFullLandscapePresentation(report),
+): { html: string; report: ReturnType<typeof completeSuFullLandscapeReport> } {
+  report.suFullPeerPresentation = presentation;
   const html = renderToStaticMarkup(
     <main className="su-public-brand su-report" data-testid="route-wrapper">
       <ReportStyleScope report={report} reportStylesAvailable>
@@ -43,6 +56,103 @@ function routeMarkup(): { html: string; report: ReturnType<typeof completeSuFull
     </main>,
   );
   return { html, report };
+}
+
+function reportForPhase(phase: GrowthPhaseNumber) {
+  const report = completeSuFullLandscapeReport();
+  return {
+    ...report,
+    result: {
+      ...report.result,
+      recommendationPhase: phase,
+      peerBenchmarkSnapshot: {
+        sourceId: SU_FULL_PHASE_PEER_SOURCE_ID,
+        contentHash: SU_FULL_PHASE_PEER_CONTENT_HASHES[phase],
+        phase,
+      },
+      perQuestion: report.result.perQuestion.map((question) => ({
+        ...question,
+        peerValue: getGovernedPeerValue(question.stableKey, phase) ?? undefined,
+      })),
+    },
+  };
+}
+
+function historicalReport() {
+  const report = completeSuFullLandscapeReport();
+  return {
+    ...report,
+    result: {
+      ...report.result,
+      peerBenchmarkSnapshot: undefined,
+      perQuestion: report.result.perQuestion.map((question) => {
+        const historicalQuestion = { ...question };
+        delete historicalQuestion.peerValue;
+        return historicalQuestion;
+      }),
+    },
+  };
+}
+
+function corruptReportWithStalePresentation() {
+  const validReport = reportForPhase(4);
+  const presentation = completeSuFullLandscapePresentation(validReport);
+  return {
+    presentation,
+    report: {
+      ...validReport,
+      result: {
+        ...validReport.result,
+        perQuestion: validReport.result.perQuestion.map((question) => question.stableKey === "Q01"
+          ? { ...question, peerValue: 6.5 }
+          : question),
+      },
+    },
+  };
+}
+
+async function horizontalOverflow(page: Page) {
+  return page.evaluate(() => ({
+    viewport: document.documentElement.clientWidth,
+    document: document.documentElement.scrollWidth,
+    offenders: [...document.querySelectorAll("body *")]
+      .map((element) => {
+        const rect = element.getBoundingClientRect();
+        return { selector: `${element.tagName}.${element.className}`, left: rect.left, right: rect.right };
+      })
+      .filter((item) => item.left < -1 || item.right > document.documentElement.clientWidth + 1)
+      .slice(0, 10),
+  }));
+}
+
+async function q01PeerValue(page: Page): Promise<string> {
+  return page.locator("[data-testid='su-landscape-detail-bars-Q01'] .su-full-landscape-bar-measure")
+    .filter({ hasText: "Peers" })
+    .locator(".su-full-landscape-bar-value")
+    .innerText();
+}
+
+async function saveVisualArtifact(page: Page, name: string, selector: string): Promise<void> {
+  if (process.env.SU_FULL_LANDSCAPE_VISUAL_ARTIFACTS !== "1") return;
+  const directory = join(process.cwd(), "tmp", "screenshots", "su-full-phase-peers");
+  mkdirSync(directory, { recursive: true });
+  await page.locator(selector).screenshot({
+    path: join(directory, `${name}.png`),
+    animations: "disabled",
+  });
+}
+
+function reportWithRepresentativeDensityFeedback() {
+  const report = completeSuFullLandscapeReport();
+  return {
+    ...report,
+    result: {
+      ...report.result,
+      perQuestion: report.result.perQuestion.map((question) => question.stableKey === "Q35"
+        ? { ...question, recommendation: REPRESENTATIVE_482_CHARACTER_FEEDBACK }
+        : question),
+    },
+  };
 }
 
 async function labelFit(page: Page, pageNumbers: readonly number[]) {
@@ -289,8 +399,120 @@ describe("SU Full landscape browser and PDF contract", () => {
     }
   });
 
+  it("keeps P3, P4, P5, and historical peer provenance, values, layout, and PDF pages stable while corrupt peers stay omitted", async () => {
+    const cases = [
+      { name: "p3", report: reportForPhase(3), provenance: "Phase 3 · Management", disclosure: PEER_DISCLOSURE, q01: "6.3" },
+      { name: "p4", report: reportForPhase(4), provenance: "Phase 4 · Delegation", disclosure: PEER_DISCLOSURE, q01: "6.6" },
+      { name: "p5", report: reportForPhase(5), provenance: "Phase 5 · Standardization", disclosure: PEER_DISCLOSURE, q01: "6.3" },
+      { name: "historical", report: historicalReport(), provenance: "Historical benchmark", disclosure: HISTORICAL_PEER_DISCLOSURE, q01: "6.3" },
+    ] as const;
+    const directory = mkdtempSync(join(tmpdir(), "su-full-phase-peer-browser-"));
+
+    try {
+      for (const fixture of cases) {
+        const { html } = routeMarkup(fixture.report);
+        const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+        try {
+          await load(page, html);
+          await expect(page.locator("[data-testid^='su-full-landscape-page-']").count()).resolves.toBe(26);
+          await expect(page.getByText(fixture.disclosure).count()).resolves.toBeGreaterThanOrEqual(2);
+          await expect(page.locator("body").innerText()).resolves.not.toMatch(ENGINEERING_LANGUAGE);
+          if (fixture.name === "historical") {
+            await expect(page.getByText(PEER_DISCLOSURE).count()).resolves.toBe(0);
+            await expect(page.getByText(/selected by organizational phase|frozen when this result was scored/i).count()).resolves.toBe(0);
+            await expect(page.locator("body").innerText()).resolves.not.toMatch(LEGACY_FALSE_FREEZE_CLAIM);
+          }
+          await expect(page.locator("[data-page-number='6']").innerText()).resolves.toContain(fixture.provenance);
+          await expect(page.locator("[data-page-number='8']").innerText()).resolves.toContain(fixture.provenance);
+          await expect(q01PeerValue(page)).resolves.toBe(fixture.q01);
+          const desktop = await horizontalOverflow(page);
+          expect(desktop.offenders).toEqual([]);
+          expect(desktop.document).toBeLessThanOrEqual(desktop.viewport + 1);
+          await saveVisualArtifact(page, `${fixture.name}-desktop-page-6`, "[data-page-number='6']");
+          await saveVisualArtifact(page, `${fixture.name}-desktop-page-8`, "[data-page-number='8']");
+
+          await page.setViewportSize({ width: 390, height: 844 });
+          const mobile = await horizontalOverflow(page);
+          expect(mobile.offenders).toEqual([]);
+          expect(mobile.document).toBeLessThanOrEqual(mobile.viewport + 1);
+          const mobileDetailColumns = await page.locator("[data-page-number='8'] .su-full-landscape-page-body")
+            .evaluate((body) => getComputedStyle(body).gridTemplateColumns.split(" ").filter(Boolean).length);
+          expect(mobileDetailColumns).toBe(1);
+          await expect(q01PeerValue(page)).resolves.toBe(fixture.q01);
+          await saveVisualArtifact(page, `${fixture.name}-mobile-page-8`, "[data-page-number='8']");
+
+          await page.setViewportSize({ width: 1280, height: 720 });
+          await page.emulateMedia({ media: "print" });
+          await expect(q01PeerValue(page)).resolves.toBe(fixture.q01);
+          const printDetail = await page.locator("[data-page-number='8']").evaluate((detail) => {
+            const pageRect = detail.getBoundingClientRect();
+            const feedback = [...detail.querySelectorAll<HTMLElement>(".su-full-landscape-feedback")];
+            return {
+              scrollWidth: (detail as HTMLElement).scrollWidth,
+              clientWidth: (detail as HTMLElement).clientWidth,
+              feedbackOutside: feedback.filter((paragraph) => {
+                const rect = paragraph.getBoundingClientRect();
+                return rect.left < pageRect.left - 1
+                  || rect.right > pageRect.right + 1
+                  || rect.bottom > pageRect.bottom + 1;
+              }).length,
+            };
+          });
+          expect(printDetail.scrollWidth).toBeLessThanOrEqual(printDetail.clientWidth + 1);
+          expect(printDetail.feedbackOutside).toBe(0);
+          await saveVisualArtifact(page, `${fixture.name}-print-page-8`, "[data-page-number='8']");
+
+          const pdfPath = join(directory, `${fixture.name}.pdf`);
+          await page.pdf({
+            path: pdfPath,
+            format: "A4",
+            landscape: true,
+            preferCSSPageSize: true,
+            printBackground: true,
+          });
+          expect(execFileSync("pdfinfo", [pdfPath], { encoding: "utf8" })).toMatch(/^Pages:\s+26$/m);
+          const pdfText = normalize(execFileSync("pdftotext", [pdfPath, "-"], { encoding: "utf8", maxBuffer: 20 * 1024 * 1024 }));
+          expect(pdfText).toContain(fixture.provenance);
+          expect(pdfText).toContain(fixture.disclosure);
+          expect(pdfText).not.toMatch(ENGINEERING_LANGUAGE);
+          if (fixture.name === "historical") {
+            expect(pdfText).not.toContain(PEER_DISCLOSURE);
+            expect(pdfText).not.toMatch(LEGACY_FALSE_FREEZE_CLAIM);
+          }
+        } finally {
+          await page.close();
+        }
+      }
+
+      const corrupt = corruptReportWithStalePresentation();
+      const { html } = routeMarkup(corrupt.report, corrupt.presentation);
+      const corruptPage = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+      try {
+        await load(corruptPage, html);
+        await expect(corruptPage.locator("[data-testid='su-full-landscape-report']").count()).resolves.toBe(0);
+        await expect(corruptPage.locator("[data-testid='su-full-peer-sequence']").count()).resolves.toBe(0);
+        await expect(corruptPage.getByText(PEER_DISCLOSURE).count()).resolves.toBe(0);
+        await expect(corruptPage.getByText(/Phase [1-5] ·|Historical benchmark/).count()).resolves.toBe(0);
+        await saveVisualArtifact(corruptPage, "corrupt-desktop", ".su-report-page");
+        await corruptPage.setViewportSize({ width: 390, height: 844 });
+        const mobile = await horizontalOverflow(corruptPage);
+        expect(mobile.offenders).toEqual([]);
+        expect(mobile.document).toBeLessThanOrEqual(mobile.viewport + 1);
+        await saveVisualArtifact(corruptPage, "corrupt-mobile", ".su-report-page");
+        await corruptPage.setViewportSize({ width: 1280, height: 720 });
+        await corruptPage.emulateMedia({ media: "print" });
+        await saveVisualArtifact(corruptPage, "corrupt-print", ".su-report-page");
+        await expect(corruptPage.getByText(PEER_DISCLOSURE).count()).resolves.toBe(0);
+      } finally {
+        await corruptPage.close();
+      }
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it("meets all five chapter contrast contracts and produces a complete 26-page A4 landscape PDF", async () => {
-    const { html, report } = routeMarkup();
+    const { html, report } = routeMarkup(reportWithRepresentativeDensityFeedback());
     const page = await browser.newPage({ viewport: { width: 1123, height: 794 } });
     const directory = mkdtempSync(join(tmpdir(), "su-full-landscape-browser-"));
     const pdfPath = join(directory, "report.pdf");
@@ -328,6 +550,39 @@ describe("SU Full landscape browser and PDF contract", () => {
       expect(contrast.every((chapter) => chapter.kicker >= 4.5)).toBe(true);
       expect(contrast.every((chapter) => chapter.contour >= 3)).toBe(true);
 
+      const barContrast = await page.locator(
+        [8, 12, 15, 20, 22].map((number) => `[data-page-number="${number}"] .su-full-landscape-detail`).join(","),
+      ).evaluateAll((details) => {
+        const rgb = (value: string) => (value.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
+        const luminance = (value: string) => {
+          const [red, green, blue] = rgb(value).map((channel) => {
+            const normalized = channel / 255;
+            return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+          });
+          return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+        };
+        const ratio = (firstColor: string, secondColor: string) => {
+          const first = luminance(firstColor);
+          const second = luminance(secondColor);
+          return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
+        };
+        return details.map((detail) => {
+          const track = detail.querySelector<HTMLElement>(".su-full-landscape-bar-track");
+          const you = detail.querySelector<HTMLElement>(".su-full-landscape-bar-fill--you");
+          const peers = detail.querySelector<HTMLElement>(".su-full-landscape-bar-fill--peers");
+          const value = detail.querySelector<HTMLElement>(".su-full-landscape-bar-value");
+          if (!track || !you || !peers || !value) throw new Error("Missing detail contrast targets");
+          const trackColor = getComputedStyle(track).backgroundColor;
+          return {
+            you: ratio(getComputedStyle(you).backgroundColor, trackColor),
+            peers: ratio(getComputedStyle(peers).backgroundColor, trackColor),
+            value: ratio(getComputedStyle(value).color, "rgb(255, 255, 255)"),
+          };
+        });
+      });
+      expect(barContrast).toHaveLength(27);
+      expect(barContrast.every((row) => row.you >= 3 && row.peers >= 3 && row.value >= 4.5)).toBe(true);
+
       const profileFit = await page.locator("[data-page-number='5']").evaluate((profile) => {
         const footer = profile.querySelector<HTMLElement>(".su-full-landscape-page-footer");
         const rows = [...profile.querySelectorAll<HTMLElement>("tbody tr")];
@@ -340,6 +595,34 @@ describe("SU Full landscape browser and PDF contract", () => {
       });
       expect(profileFit.count).toBe(15);
       expect(profileFit.lastRowBottom).toBeLessThan(profileFit.footerTop);
+      expect(REPRESENTATIVE_482_CHARACTER_FEEDBACK).toHaveLength(482);
+      const densityFit = await page.locator("[data-testid='su-full-landscape-detail-Q35']").evaluate((detail) => {
+        const paragraph = detail.querySelector<HTMLElement>("p");
+        const footer = detail.closest<HTMLElement>("[data-page-number]")
+          ?.querySelector<HTMLElement>(".su-full-landscape-page-footer");
+        if (!paragraph || !footer) throw new Error("Missing Q35 density targets");
+        const paragraphStyle = getComputedStyle(paragraph);
+        return {
+          characters: (paragraph.textContent ?? "").length,
+          paragraphBottom: paragraph.getBoundingClientRect().bottom,
+          footerTop: footer.getBoundingClientRect().top,
+          scrollHeight: paragraph.scrollHeight,
+          clientHeight: paragraph.clientHeight,
+          overflow: paragraphStyle.overflow,
+          overflowY: paragraphStyle.overflowY,
+          textOverflow: paragraphStyle.textOverflow,
+          webkitLineClamp: paragraphStyle.webkitLineClamp,
+        };
+      });
+      expect(densityFit).toMatchObject({
+        characters: 482,
+        overflow: "visible",
+        overflowY: "visible",
+        textOverflow: "clip",
+        webkitLineClamp: "none",
+      });
+      expect(densityFit.scrollHeight).toBeLessThanOrEqual(densityFit.clientHeight + 1);
+      expect(densityFit.paragraphBottom).toBeLessThan(densityFit.footerTop);
       await page.pdf({
         path: pdfPath,
         format: "A4",
@@ -352,8 +635,9 @@ describe("SU Full landscape browser and PDF contract", () => {
       expect(info).toMatch(/^Page size:\s+841\.9\d* x 594\.9\d* pts \(A4\)$/m);
       const text = normalize(execFileSync("pdftotext", [pdfPath, "-"], { encoding: "utf8", maxBuffer: 20 * 1024 * 1024 }));
       expect(text).toContain("ScaleUp Score 55 / 100");
-      expect(text.match(/Frozen feedback/g)).toHaveLength(61);
+      expect(text).not.toContain("Frozen feedback");
       const searchableWords = normalizeWords(text);
+      expect(searchableWords).toContain(normalizeWords(REPRESENTATIVE_482_CHARACTER_FEEDBACK));
       for (const frozen of report.result.perQuestion) {
         expect(searchableWords).toContain(normalizeWords(report.questionByKey[frozen.stableKey]));
         expect(searchableWords).toContain(normalizeWords(frozen.recommendation ?? ""));

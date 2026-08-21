@@ -74,7 +74,7 @@
 
 import type { RespondentReport } from "./respondent-report";
 import { isReportStyleKey } from "./report-style-registry";
-import { isSuFullPeerPresentation } from "./su-full-peer-presentation";
+import { isSuFullPeerPresentationForReport } from "./su-full-peer-presentation";
 
 const PREFIX = "su-onscreen-result:";
 
@@ -266,10 +266,12 @@ export function reviveOnScreenReport(
       ? serialized.reportStyle
       : "CLASSIC",
     // Enhancement data is untrusted after session JSON revival. Keep only a
-    // complete canonical Q01-Q61 presentation; otherwise Classic uses the
-    // untouched generic report content. benchmarkUpdatedAt stays an ISO string.
-    suFullPeerPresentation: isSuFullPeerPresentation(
+    // complete canonical Q01-Q61 presentation whose plain-scalar provenance
+    // and peer values match this same frozen result; otherwise Classic uses
+    // the untouched generic report content.
+    suFullPeerPresentation: isSuFullPeerPresentationForReport(
       serialized.suFullPeerPresentation,
+      serialized,
     )
       ? serialized.suFullPeerPresentation
       : undefined,

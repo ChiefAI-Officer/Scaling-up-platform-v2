@@ -16,12 +16,16 @@ import {
 } from "@/lib/assessments/scoring";
 import { pruneHiddenAnswers } from "@/lib/assessments/form-visibility";
 import type { PagerQuestion } from "@/lib/assessments/section-pages";
+import type { GrowthPhaseNumber } from "@/lib/assessments/su-full-phase";
 
 export function computeScoreResult(
   version: TemplateVersionForScoring,
   questions: PagerQuestion[],
   answers: Answer[],
-  options?: { allowMissingRequired?: boolean },
+  options?: {
+    allowMissingRequired?: boolean;
+    recommendationPhase?: GrowthPhaseNumber;
+  },
 ): { result: ScoreResult; prunedAnswers: Answer[] } {
   const prunedAnswers = pruneHiddenAnswers(answers, questions);
   const result = scoreSubmission(version, prunedAnswers, options);

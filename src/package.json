@@ -45,6 +45,7 @@
     "seed:qsp-v2": "npx tsx prisma/seed-qsp-v2-assessment.ts",
     "seed:scaling-up-full": "npx tsx prisma/seed-scaling-up-full-assessment.ts",
     "seed:scaling-up-full-peers": "npx tsx prisma/seed-scaling-up-full-question-benchmarks.ts",
+    "generate:scaling-up-full-phase-peers": "npx tsx scripts/generate-su-full-phase-peer-catalogue.ts",
     "seed:public-marketing-cta-successors": "npx tsx scripts/seed-public-marketing-cta-successors.ts",
     "patch:scaling-up-full-feedback-bands": "npx tsx scripts/patch-scaling-up-full-feedback-bands.ts",
     "publish:scaling-up-full-feedback-bands": "npx tsx scripts/publish-scaling-up-full-feedback-bands.ts",
