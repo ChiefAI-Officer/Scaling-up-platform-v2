@@ -49,6 +49,7 @@ import { ReportFooter } from "@/components/assessments/ReportFooter";
 import { ImportedBadge } from "@/components/assessments/ImportedBadge";
 import { ReportNextSteps } from "@/components/assessments/ReportNextSteps";
 import { Fragment } from "react";
+import { ReportHtmlSection } from "@/components/assessments/ReportHtmlSection";
 
 const LOGO_SRC = "/brand/su-logo-white.svg";
 
@@ -502,18 +503,25 @@ export function QualitativeReport({
       </section>
 
       {/* ── 2. Preface (text-only — no photo / signature) ──────────────────── */}
-      <section className="su-section su-preface" data-testid="qual-preface">
-        <p className="su-section-eyebrow">Preface</p>
-        <h2 className="su-section-title su-h2">Dear {firstName},</h2>
-        <div className="su-preface-body">
-          <p>
-            This is your report from the {report.assessmentName}. It lists your
-            own answers, organized by theme — great for preparing your strategy
-            sessions and priority-making.
-          </p>
-          <p>We wish you many great insights.</p>
-        </div>
-      </section>
+      {report.reportHtml?.introductionHtml ? (
+        <ReportHtmlSection
+          position="introduction"
+          html={report.reportHtml.introductionHtml}
+        />
+      ) : (
+        <section className="su-section su-preface" data-testid="qual-preface">
+          <p className="su-section-eyebrow">Preface</p>
+          <h2 className="su-section-title su-h2">Dear {firstName},</h2>
+          <div className="su-preface-body">
+            <p>
+              This is your report from the {report.assessmentName}. It lists your
+              own answers, organized by theme — great for preparing your strategy
+              sessions and priority-making.
+            </p>
+            <p>We wish you many great insights.</p>
+          </div>
+        </section>
+      )}
 
       {/* ── 3. Per-section blocks ──────────────────────────────────────────── */}
       {/* Wave S (D13): the peer-comparison section renders in S3's natural
@@ -549,22 +557,29 @@ export function QualitativeReport({
           findings (D7; same isolation as Wave S peers). */}
       {findingsSection && <FindingsBlock section={findingsSection} />}
 
-      <section
-        className="su-report-conclusion"
-        data-testid="report-conclusion"
-      >
-        <h3 className="su-h2 su-report-conclude-title">What&apos;s next?</h3>
-        <p>
-          Learn more about Scaling Up or connect with a coach to turn these
-          answers into action.
-        </p>
-        <ReportNextSteps
-          contactEmail={contactEmail ?? report.referringCoachEmail}
-          showCoachLink={
-            reportConfigFor(report.templateAlias).showCoachCta !== false
-          }
+      {report.reportHtml?.conclusionHtml ? (
+        <ReportHtmlSection
+          position="conclusion"
+          html={report.reportHtml.conclusionHtml}
         />
-      </section>
+      ) : (
+        <section
+          className="su-report-conclusion"
+          data-testid="report-conclusion"
+        >
+          <h3 className="su-h2 su-report-conclude-title">What&apos;s next?</h3>
+          <p>
+            Learn more about Scaling Up or connect with a coach to turn these
+            answers into action.
+          </p>
+          <ReportNextSteps
+            contactEmail={contactEmail ?? report.referringCoachEmail}
+            showCoachLink={
+              reportConfigFor(report.templateAlias).showCoachCta !== false
+            }
+          />
+        </section>
+      )}
 
       {/* ── 4. Footer (matches the cleaned BrandedReport footer) ───────────── */}
       <ReportFooter

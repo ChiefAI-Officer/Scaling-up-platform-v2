@@ -2914,7 +2914,37 @@
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-detail p { margin: 7px 0 0; }
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-detail-bars { display: grid; gap: 5px; max-width: 500px; }
 
+.su-public-brand.su-report .su-report-custom-html {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  padding: 44px 48px;
+  overflow-wrap: anywhere;
+}
+
+.su-public-brand.su-report .su-report-custom-html img,
+.su-public-brand.su-report .su-report-custom-html video,
+.su-public-brand.su-report .su-report-custom-html svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.su-public-brand.su-report .su-report-custom-html table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.su-public-brand.su-report .su-report-custom-html :focus-visible {
+  outline: 3px solid #522583;
+  outline-offset: 3px;
+}
+
 @media screen and (max-width: 760px) {
+  .su-public-brand.su-report .su-report-custom-html {
+    padding: 28px 20px;
+  }
+
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page {
     width: 100%;
     min-height: auto;
@@ -2988,6 +3018,19 @@
 @page suFullLandscape { size: A4 landscape; margin: 0; }
 
 @media print {
+  .su-public-brand.su-report .su-report-custom-html {
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
+  .su-public-brand.su-report .su-report-custom-html img,
+  .su-public-brand.su-report .su-report-custom-html table,
+  .su-public-brand.su-report .su-report-custom-html blockquote,
+  .su-public-brand.su-report .su-report-custom-html pre {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
   .su-public-brand.su-report.su-full-landscape {
     page: suFullLandscape;
     width: 297mm;

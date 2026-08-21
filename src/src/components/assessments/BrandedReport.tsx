@@ -71,6 +71,7 @@ import { buildSuFullLandscapeReportModel } from "@/lib/assessments/su-full-lands
 import { isSuFullLandscapeReportEnabled } from "@/lib/assessments/wave-su-full-landscape-flags";
 import { isSuFullPeerPresentation } from "@/lib/assessments/su-full-peer-presentation";
 import { SCALING_UP_FULL_TEMPLATE_ALIAS } from "@/lib/assessments/su-full-question-benchmarks";
+import { ReportHtmlSection } from "@/components/assessments/ReportHtmlSection";
 
 const LOGO_SRC = "/brand/su-logo-white.svg";
 
@@ -627,6 +628,13 @@ export function LegacyClassicReport({
         </div>
       </section>
 
+      {report.reportHtml?.introductionHtml ? (
+        <ReportHtmlSection
+          position="introduction"
+          html={report.reportHtml.introductionHtml}
+        />
+      ) : null}
+
       {/* ── 2. Overall ──────────────────────────────────────────────────── */}
       <section className="su-report-overall" data-testid="report-overall">
         <div className="su-report-eyebrow">Overall result</div>
@@ -973,28 +981,35 @@ export function LegacyClassicReport({
       )}
 
       {/* ── 7. Conclusion ───────────────────────────────────────────────── */}
-      <section className="su-report-conclusion" data-testid="report-conclusion">
-        <h3 className="su-h2 su-report-conclude-title">
-          {/* Wave P (Jeff #5): greetingName — never greet with the email
-              fallback ("Keep Scaling, jane@example.com" → "…, there"). */}
-          Keep Scaling, {greetingName(report.respondentName)}.
-        </h3>
-        <p>
-          You&apos;ve completed your assessment. Turn these results into a
-          90-day plan with your coach.
-        </p>
-        <ReportNextSteps
-          contactEmail={contactEmail ?? report.referringCoachEmail}
-          showCoachLink={
-            reportConfigFor(report.templateAlias).showCoachCta !== false
-          }
-          publicResultActions={
-            report.publicLeadActions
-              ? reportConfigFor(report.templateAlias).publicResultActions
-              : undefined
-          }
+      {report.reportHtml?.conclusionHtml ? (
+        <ReportHtmlSection
+          position="conclusion"
+          html={report.reportHtml.conclusionHtml}
         />
-      </section>
+      ) : (
+        <section className="su-report-conclusion" data-testid="report-conclusion">
+          <h3 className="su-h2 su-report-conclude-title">
+            {/* Wave P (Jeff #5): greetingName — never greet with the email
+                fallback ("Keep Scaling, jane@example.com" → "…, there"). */}
+            Keep Scaling, {greetingName(report.respondentName)}.
+          </h3>
+          <p>
+            You&apos;ve completed your assessment. Turn these results into a
+            90-day plan with your coach.
+          </p>
+          <ReportNextSteps
+            contactEmail={contactEmail ?? report.referringCoachEmail}
+            showCoachLink={
+              reportConfigFor(report.templateAlias).showCoachCta !== false
+            }
+            publicResultActions={
+              report.publicLeadActions
+                ? reportConfigFor(report.templateAlias).publicResultActions
+                : undefined
+            }
+          />
+        </section>
+      )}
 
       {/* ── 8. Footer ───────────────────────────────────────────────────── */}
       <ReportFooter
