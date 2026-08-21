@@ -94,3 +94,17 @@ The build retained expected non-fatal local diagnostics for the deprecated middl
 ## Explicit next gate
 
 This receipt authorizes no database write, draft creation, publication, deployment, campaign creation, assessment submission, Production/Esperto access, flag change, Slack/email message, push, merge, or activation. Task 7 may begin only after explicit create-stage approval; after independent draft review it must obtain a separate exact-code-SHA integration/deploy approval, retain the draft as unpublished, and prove the deployed SHA is provider-Ready and canonical-health green. It must then stop again for a third exact-draft-ID/hash/actor/deployed-SHA publish/activation approval before publication. Task 7 must produce separate create, deploy, and publish receipts in its own forward-only activation receipt.
+
+## 2026-08-21 Peers evidence correction
+
+`Peers changed: false` above remains an accurate statement about what this
+branch changed. It is not evidence that the retained single static vector is a
+complete current-source match. The later five-phase Peers audit found that P4
+Delegation uses a second vector changing 56/61 question values, while
+P1/P2/P3/P5 use the retained baseline vector. Therefore this dark feedback
+implementation is not yet sufficient to claim full current Esperto report
+fidelity for P4. See
+[`esperto-peer-vector-five-phase-csv-audit-2026-08-21.md`](esperto-peer-vector-five-phase-csv-audit-2026-08-21.md).
+
+No peer implementation, draft, publish, deploy, activation, Platform
+Production mutation, Slack, or email action was performed by this correction.
