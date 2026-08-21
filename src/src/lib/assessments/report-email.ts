@@ -65,6 +65,7 @@ import { isEmailFindingsEnabled } from "@/lib/assessments/wave-u3-flags";
 import { buildReportEmailChrome } from "@/lib/assessments/report-email-chrome";
 import type { ReportEmailChrome } from "@/lib/assessments/wave-228-flags";
 import type { ReportStyleKey } from "@/lib/assessments/report-style-registry";
+import type { SafeReportHtml } from "@/lib/assessments/report-html";
 
 export type ReportEmailRecipientRole = "TAKER_COPY" | "REFERRING_COACH";
 
@@ -155,6 +156,8 @@ export interface BuildRespondentReportArgs {
   coachName?: string | null;
   /** True when the frozen result is not ScoreResult-shaped → renders the notice. */
   degraded?: boolean;
+  /** Already-resolved pinned fragments for web reports. Email ignores them. */
+  reportHtml?: SafeReportHtml;
 }
 
 /**
@@ -201,6 +204,7 @@ export function buildRespondentReportFromSubmission(
     questionsByKey,
     rawAnswers: args.rawAnswers,
     scoringConfig: args.scoringConfig,
+    ...(args.reportHtml ? { reportHtml: args.reportHtml } : {}),
     provenance: {
       submissionId: args.submissionId,
       versionId: "",

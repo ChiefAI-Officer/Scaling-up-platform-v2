@@ -75,6 +75,13 @@ const GOOD_SCORE_RESULT: ScoreResult = {
 const GOOD_VERSION = {
   id: "ver-1",
   contentHash: "abc123",
+  reportConfig: {
+    reportHtml: {
+      schemaVersion: 1,
+      introductionHtml: "<p>Published intro</p>",
+      conclusionHtml: "<p>Published CTA</p>",
+    },
+  },
   sections: [{ stableKey: "s1", name: "Section One" }],
   questions: [
     {
@@ -155,6 +162,10 @@ function makeMockDb(submission: typeof GOOD_SUBMISSION | null) {
 beforeEach(() => {
   jest.clearAllMocks();
   mockReportStylesEnabled.mockReturnValue(true);
+  delete process.env.WAVE_ED10_PREVIEW_SETTINGS_ENABLED;
+  delete process.env.WAVE_ED10_PREVIEW_SETTINGS_KILL;
+  delete process.env.WAVE_REPORT_HTML_AUTHORING_ENABLED;
+  delete process.env.WAVE_REPORT_HTML_AUTHORING_KILL;
 });
 
 test("buildStoredRespondentReport exposes the shared pure frozen-report seam", () => {
@@ -188,6 +199,75 @@ test("buildStoredRespondentReport exposes the shared pure frozen-report seam", (
     versionId: "ver-1",
     contentHash: "abc123",
     templateName: "Rockefeller",
+  });
+});
+
+describe("pinned report HTML", () => {
+  function enableReportHtml(): void {
+    process.env.WAVE_ED10_PREVIEW_SETTINGS_ENABLED = "1";
+    process.env.WAVE_REPORT_HTML_AUTHORING_ENABLED = "1";
+  }
+
+  function buildWithVersion(version = GOOD_VERSION) {
+    return buildStoredRespondentReport({
+      submission: {
+        id: GOOD_SUBMISSION.id,
+        submittedAt: GOOD_SUBMISSION.submittedAt,
+        answers: GOOD_SUBMISSION.answers,
+        result: GOOD_SCORE_RESULT,
+      },
+      respondent: GOOD_SUBMISSION.respondent,
+      campaign: {
+        ...GOOD_SUBMISSION.campaign,
+        organizationName: GOOD_SUBMISSION.campaign.organization.name,
+        version,
+      },
+    });
+  }
+
+  test("uses safe fragments from the campaign's pinned published version", () => {
+    enableReportHtml();
+    const report = buildWithVersion();
+
+    expect(report.reportHtml).toEqual({
+      introductionHtml: "<p>Published intro</p>",
+      conclusionHtml: "<p>Published CTA</p>",
+    });
+    expect(report.provenance.versionId).toBe("ver-1");
+  });
+
+  test.each([
+    ["report flag off", { ed10: "1", report: undefined, kill: undefined }],
+    ["ED10 off", { ed10: undefined, report: "1", kill: undefined }],
+    ["report kill on", { ed10: "1", report: "1", kill: "1" }],
+  ])("returns empty fragments when %s", (_label, flags) => {
+    if (flags.ed10) process.env.WAVE_ED10_PREVIEW_SETTINGS_ENABLED = flags.ed10;
+    if (flags.report) process.env.WAVE_REPORT_HTML_AUTHORING_ENABLED = flags.report;
+    if (flags.kill) process.env.WAVE_REPORT_HTML_AUTHORING_KILL = flags.kill;
+
+    expect(buildWithVersion().reportHtml).toEqual({
+      introductionHtml: null,
+      conclusionHtml: null,
+    });
+  });
+
+  test("recovers valid fragments independently from malformed stored HTML", () => {
+    enableReportHtml();
+    const report = buildWithVersion({
+      ...GOOD_VERSION,
+      reportConfig: {
+        reportHtml: {
+          schemaVersion: 1,
+          introductionHtml: 42,
+          conclusionHtml: "<p>Still safe</p>",
+        },
+      },
+    });
+
+    expect(report.reportHtml).toEqual({
+      introductionHtml: null,
+      conclusionHtml: "<p>Still safe</p>",
+    });
   });
 });
 
@@ -663,6 +743,26 @@ test("Wave K: select includes campaign.creatorCoach.profileImage (+ name for alt
       lastName: true,
     }),
   );
+});
+
+test("report HTML select is pinned to campaign.version.reportConfig", async () => {
+  mockCanManageCampaign.mockResolvedValue(true);
+  const { $transaction, _txFindFirst } = makeMockDb(GOOD_SUBMISSION);
+
+  await getRespondentReport(
+    { $transaction } as unknown as Parameters<typeof getRespondentReport>[0],
+    makeActor(),
+    "camp-1",
+    "resp-1",
+  );
+
+  const selectArg = _txFindFirst.mock.calls[0][0].select;
+  expect(selectArg.campaign.select.version.select.reportConfig).toBe(true);
+  expect(selectArg.campaign.select.template.select).toEqual({
+    id: true,
+    name: true,
+    alias: true,
+  });
 });
 
 test("Wave K: coachLogoUrl + coachName surface from campaign.creatorCoach", async () => {

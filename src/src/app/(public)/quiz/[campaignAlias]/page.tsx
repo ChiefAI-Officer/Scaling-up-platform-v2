@@ -17,6 +17,7 @@ import { isReferredResultsEnabled } from "@/lib/assessments/wave-83-flags";
 import { isQspStoryGroupEnabled } from "@/lib/assessments/wave-48-flags";
 import { isPublicMarketingCtaEnabled } from "@/lib/assessments/wave-public-marketing-cta-flags";
 import { loadPublicMarketingResultConfig } from "@/lib/assessments/public-marketing-result";
+import { resolveActiveReportHtml } from "@/lib/assessments/report-html";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -108,6 +109,7 @@ export default async function PublicQuizPage({
       questions={version.questions as unknown}
       customSlides={customSlides}
       marketingResultConfig={marketingResultConfig}
+      reportHtml={resolveActiveReportHtml(version.reportConfig)}
       {...(isReferredResultsEnabled()
         ? { referredResultsEnabled: true }
         : {})}

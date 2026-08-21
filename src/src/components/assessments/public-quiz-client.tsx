@@ -43,6 +43,7 @@ import {
 } from "@/lib/assessments/report-style-registry";
 import { PublicMarketingResult } from "@/components/assessments/PublicMarketingResult";
 import type { PublicMarketingResultConfig } from "@/lib/assessments/public-marketing-result";
+import type { SafeReportHtml } from "@/lib/assessments/report-html";
 
 interface SectionDef {
   stableKey: string;
@@ -115,6 +116,8 @@ interface PublicQuizClientProps {
    */
   customSlides?: SafeSlide[];
   marketingResultConfig?: PublicMarketingResultConfig | null;
+  /** Server-resolved fragments from this campaign's pinned version. */
+  reportHtml?: SafeReportHtml;
 }
 
 type Step = "intro" | "info" | "form" | "results" | "error";
@@ -135,6 +138,7 @@ export function PublicQuizClient({
   referredResultsEnabled = false,
   qspStoryGroupEnabled = false,
   marketingResultConfig = null,
+  reportHtml = { introductionHtml: null, conclusionHtml: null },
 }: PublicQuizClientProps) {
   const sections = useMemo(() => toSections(rawSections), [rawSections]);
   const questions = useMemo(() => toQuestions(rawQuestions), [rawQuestions]);
@@ -448,6 +452,7 @@ export function PublicQuizClient({
       ),
       rawAnswers: Object.entries(answers).map(([stableKey, value]) => ({ stableKey, value })),
       scoringConfig: undefined,
+      reportHtml,
       provenance: {
         submissionId: submittedId,
         versionId: "",

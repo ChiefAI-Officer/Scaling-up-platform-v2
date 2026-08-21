@@ -2,6 +2,7 @@ import {
   sanitizeReportHtmlFragment,
   type SanitizeReportHtmlResult,
 } from "@/lib/assessments/report-html-sanitizer";
+import { isReportHtmlExperienceEnabled } from "@/lib/assessments/wave-report-html-authoring-flags";
 
 export interface ReportHtmlConfigV1 {
   schemaVersion: 1;
@@ -215,4 +216,11 @@ export function loadSafeReportHtml(
     introductionHtml: loadFragment("introductionHtml"),
     conclusionHtml: loadFragment("conclusionHtml"),
   };
+}
+
+export function resolveActiveReportHtml(reportConfig: unknown): SafeReportHtml {
+  if (!isReportHtmlExperienceEnabled()) {
+    return { introductionHtml: null, conclusionHtml: null };
+  }
+  return loadSafeReportHtml(reportConfig);
 }

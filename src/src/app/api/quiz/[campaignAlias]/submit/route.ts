@@ -67,6 +67,7 @@ import {
 } from "@/lib/assessments/report-style-registry";
 import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
 import { isFindingsLogicEnabled } from "@/lib/assessments/wave-u-flags";
+import { resolveActiveReportHtml } from "@/lib/assessments/report-html";
 
 // ---------------------------------------------------------------------------
 // Request body schema
@@ -334,6 +335,7 @@ export async function POST(
         questions: true,
         sections: true,
         scoringConfig: true,
+        reportConfig: true,
         publishedAt: true,
       },
     });
@@ -446,6 +448,7 @@ export async function POST(
         sections: version.sections,
         questions: allQuestions,
         scoringConfig: version.scoringConfig,
+        reportHtml: resolveActiveReportHtml(version.reportConfig),
         rawAnswers: submittedAnswers, // the same answers persisted to submission.answers
         submittedAt: now,
         // submissionId is only known after the submission is persisted (below).

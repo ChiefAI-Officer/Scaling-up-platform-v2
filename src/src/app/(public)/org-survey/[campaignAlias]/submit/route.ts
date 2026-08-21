@@ -81,6 +81,7 @@ import { lockReportStyleForFirstCompletion } from "@/lib/assessments/report-styl
 import { isReportComparisonEnabled } from "@/lib/assessments/wave-report-comparison-flags";
 import { createCeoReportAccessToken } from "@/lib/assessments/ceo-report-access-token";
 import { resolvePeerReportEnhancements } from "@/lib/assessments/peer-report-resolver";
+import { resolveActiveReportHtml } from "@/lib/assessments/report-html";
 
 const NO_STORE_HEADERS = { "Cache-Control": "no-store" } as const;
 
@@ -760,6 +761,7 @@ export async function POST(
                   questions: true,
                   sections: true,
                   scoringConfig: true,
+                  reportConfig: true,
                 },
               },
               // Wave D #15: admin-authored results email + approval gate.
@@ -970,6 +972,9 @@ export async function POST(
             sections: invitation.campaign.version.sections,
             questions: invitation.campaign.version.questions,
             scoringConfig: invitation.campaign.version.scoringConfig,
+            reportHtml: resolveActiveReportHtml(
+              invitation.campaign.version.reportConfig,
+            ),
             rawAnswers,
             submittedAt,
             submissionId: "",
