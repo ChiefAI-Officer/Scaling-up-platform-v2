@@ -8,7 +8,7 @@ action was performed.
 
 - Remediation base: `7010c528bddb670eca837d57b918da87ec390376`
 - Implementation commit: `3e18f25094e66dcf09f161b4f423565e98550b6b`
-- Verified source commit: `ae561d1f9e59e10f13e002615dc6564722cc8e8d`
+- Verified source commit: `ae561d1ffdede205571017b198b16876a08d323f`
 - Subjects: `fix: close frozen peer review findings`; `test: use canonical peer report fixture`
 - Branch: `codex/su-full-esperto-landscape-closeout-wording`
 
@@ -128,7 +128,7 @@ to the exact Task 7 list.
 An intermediate Turbopack run exposed one compile-only diagnostic at the untrusted
 report cast in `su-full-peer-presentation.ts`. The explicit `unknown` boundary was
 added and committed. The complete required chain was then rerun from `src/` on the
-final code tree at `ae561d1f9e59e10f13e002615dc6564722cc8e8d`.
+final code tree at `ae561d1ffdede205571017b198b16876a08d323f`.
 
 ### Exact Task 7 test set
 
