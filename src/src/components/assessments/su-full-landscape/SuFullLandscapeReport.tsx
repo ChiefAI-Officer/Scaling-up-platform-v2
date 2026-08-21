@@ -105,8 +105,8 @@ function PrefacePage({ number, footerBrand }: { number: number; footerBrand: SuF
       </p>
       <p>
         Your answers and feedback are preserved from the completed assessment;
-        peer values are shown only as the frozen governed snapshot described in
-        this report.
+        peer values are shown only with the benchmark provenance described in this
+        report.
       </p>
     </SuFullLandscapePage>
   );

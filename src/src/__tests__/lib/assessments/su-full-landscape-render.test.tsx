@@ -17,6 +17,7 @@ import { SU_FULL_LEGACY_PEER_SOURCE_ID } from "@/lib/assessments/su-full-questio
 
 const PEER_DISCLOSURE = "Peers are a governed benchmark snapshot selected by organizational phase and frozen when this result was scored. This is not an industry-, geography-, or cohort-matched comparison.";
 const LEGACY_PEER_DISCLOSURE = "Peers use the governed historical baseline for reports scored before phase-aware peer snapshots were frozen. This is not an industry-, geography-, or cohort-matched comparison.";
+const LEGACY_FALSE_FREEZE_CLAIM = /frozen governed snapshot|peer values[^.]{0,120}frozen (?:when|at) (?:this result was )?scored/i;
 
 function reportForPhase(phase: GrowthPhaseNumber) {
   const report = completeSuFullLandscapeReport();
@@ -102,6 +103,7 @@ test("renders legacy provenance truthfully without a phase claim", () => {
   expect(dashboard).not.toHaveTextContent(/selected by organizational phase|frozen when this result was scored/i);
   expect(dashboard).toHaveTextContent(`Legacy baseline · ${SU_FULL_LEGACY_PEER_SOURCE_ID}`);
   expect(dashboard).not.toHaveTextContent(/Phase P[1-5]/);
+  expect(document.body).not.toHaveTextContent(LEGACY_FALSE_FREEZE_CLAIM);
 });
 
 test.each([

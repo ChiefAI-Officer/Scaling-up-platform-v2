@@ -31,6 +31,7 @@ const OPENER_PAGES = [7, 11, 14, 19, 21] as const;
 const CHART_PAGES = [...OPENER_PAGES, 26] as const;
 const PEER_DISCLOSURE = "Peers are a governed benchmark snapshot selected by organizational phase and frozen when this result was scored. This is not an industry-, geography-, or cohort-matched comparison.";
 const LEGACY_PEER_DISCLOSURE = "Peers use the governed historical baseline for reports scored before phase-aware peer snapshots were frozen. This is not an industry-, geography-, or cohort-matched comparison.";
+const LEGACY_FALSE_FREEZE_CLAIM = /frozen governed snapshot|peer values[^.]{0,120}frozen (?:when|at) (?:this result was )?scored/i;
 const REPRESENTATIVE_482_CHARACTER_FEEDBACK = "In order to scale, smart application and linking of information technology is essential. Sales, marketing, project management, production,humanresources,reporting,etc.Thisgivesstructureand clarity, prevents mistakes and makes growing a lot easier. With the size of your company, a lot of systems likely still work independently of each other, or you primarily use Excel. This is customary, but in your next growth phase you will have to start thinking about smart solutions. Act now";
 
 function stylesheet(): string {
@@ -418,6 +419,7 @@ describe("SU Full landscape browser and PDF contract", () => {
           if (fixture.name === "historical") {
             await expect(page.getByText(PEER_DISCLOSURE).count()).resolves.toBe(0);
             await expect(page.getByText(/selected by organizational phase|frozen when this result was scored/i).count()).resolves.toBe(0);
+            await expect(page.locator("body").innerText()).resolves.not.toMatch(LEGACY_FALSE_FREEZE_CLAIM);
           }
           await expect(page.locator("[data-page-number='6']").innerText()).resolves.toContain(fixture.provenance);
           await expect(page.locator("[data-page-number='8']").innerText()).resolves.toContain(fixture.provenance);
@@ -471,7 +473,10 @@ describe("SU Full landscape browser and PDF contract", () => {
           const pdfText = normalize(execFileSync("pdftotext", [pdfPath, "-"], { encoding: "utf8", maxBuffer: 20 * 1024 * 1024 }));
           expect(pdfText).toContain(fixture.provenance);
           expect(pdfText).toContain(fixture.disclosure);
-          if (fixture.name === "historical") expect(pdfText).not.toContain(PEER_DISCLOSURE);
+          if (fixture.name === "historical") {
+            expect(pdfText).not.toContain(PEER_DISCLOSURE);
+            expect(pdfText).not.toMatch(LEGACY_FALSE_FREEZE_CLAIM);
+          }
         } finally {
           await page.close();
         }
