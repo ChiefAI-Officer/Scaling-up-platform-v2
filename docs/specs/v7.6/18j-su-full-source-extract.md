@@ -7,6 +7,8 @@
 
 ## Growth phases (J-1) — verbatim
 
+> **Current-live correction — 2026-08-20:** the workbook-derived bands below are historical source evidence, not the current Esperto rule. Adjacent, fixed-profile live `ScaleUp2` / `enUS` probes established `P1 1–8`, `P2 9–25`, `P3 26–50`, `P4 51–150`, and `P5 151+`. Every current Platform transition is therefore one employee early. See the [live boundary manifest](../../research/esperto-feedback-live-phase-boundary-manifest-2026-08-20.csv) and [closeout](../../research/jeff-feedback-response-change-closeout-2026-08-20.md#approved-step-7--exhaustive-live-phase-boundary-closeout--completed). Preserve the table below as workbook provenance; do not use it as current implementation truth.
+
 | Phase | Name | Band (perm/temp FTE) |
 |------:|------|----------------------|
 | 1 | Pioneering | 1–7 |

@@ -2,6 +2,20 @@
 
 Date: 2026-08-14
 
+## 2026-08-21 scope correction
+
+The static-vector conclusion below is valid for the profiles observed on
+2026-08-14, but it is not the current global conclusion. The later five-phase
+suite and adjacent boundary reports found a second vector in P4 Delegation:
+P1/P2/P3/P5 share the baseline vector, while P4 changes 56/61 values and P5
+returns to baseline. The earlier very-small, baseline, and very-large controls
+sampled baseline-vector phases and therefore could not expose this P4 cohort.
+
+The current source of truth is
+[`esperto-peer-vector-five-phase-csv-audit-2026-08-21.md`](esperto-peer-vector-five-phase-csv-audit-2026-08-21.md).
+Keep this note as the historical receipt for the 2026-08-14 snapshot; do not
+use its global-static wording as a current product-fidelity claim.
+
 ## Conclusion
 
 Esperto describes `Peers` as an external benchmark derived from companies that

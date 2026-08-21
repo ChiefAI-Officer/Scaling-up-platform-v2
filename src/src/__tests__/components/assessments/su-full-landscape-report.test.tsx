@@ -33,7 +33,7 @@ test("renders one accessible semantic row and one decorative peer contour per ch
   expect(within(vertical).getByText("Score of Peers")).toBeVisible();
   const q01Row = within(vertical).getByTestId("su-landscape-vertical-row-Q01");
   expect(within(q01Row).getByText("0.0")).toBeVisible();
-  expect(within(vertical).getByText(/You 0\.0\. Peers 6\.3\./)).toBeInTheDocument();
+  expect(within(vertical).getByText(/You 0\.0\. Peers 6\.6\./)).toBeInTheDocument();
 });
 
 test("renders detail paired bars in You then Peers order with visible values", () => {
@@ -47,7 +47,7 @@ test("renders detail paired bars in You then Peers order with visible values", (
   expect(detail.querySelectorAll(".su-full-landscape-bar-fill")).toHaveLength(2);
   expect(detail.textContent?.indexOf("You")).toBeLessThan(detail.textContent?.indexOf("Peers") ?? -1);
   expect(detail).toHaveTextContent("0.0");
-  expect(detail).toHaveTextContent("6.3");
+  expect(detail).toHaveTextContent("6.6");
 });
 
 test("renders the fixed 26-page landscape composition with truthful peer context", () => {
@@ -100,7 +100,7 @@ test("renders the fixed 26-page landscape composition with truthful peer context
   expect(screen.getAllByTestId(/^su-full-landscape-detail-Q/)).toHaveLength(61);
 
   expect(screen.getByTestId("su-full-landscape-page-4")).toHaveTextContent(
-    "Phase 2 from FTE 12",
+    "Phase 4 from FTE 12",
   );
   expect(screen.getByTestId("su-full-landscape-page-5")).toHaveTextContent("You");
   expect(screen.getByTestId("su-full-landscape-page-5")).toHaveTextContent("Peers");
@@ -109,20 +109,30 @@ test("renders the fixed 26-page landscape composition with truthful peer context
   expect(screen.getByTestId("su-full-landscape-page-5").querySelectorAll(".su-full-landscape-profile-row--chapter")).toHaveLength(5);
   expect(screen.getByTestId("su-full-landscape-page-5").querySelectorAll(".su-full-landscape-profile-row--subsection")).toHaveLength(10);
   expect(screen.getByTestId("su-full-landscape-page-6")).toHaveTextContent(
-    "Peers are a current benchmark reference. Values are not yet matched to company size, growth phase, geography, or industry.",
+    "Peers shows the benchmark associated with your organizational phase when you completed this assessment. It is not matched by industry, geography, or a custom peer group.",
   );
-  expect(screen.getByTestId("su-full-landscape-page-6")).toHaveTextContent("18 August 2026");
+  expect(screen.getByTestId("su-full-landscape-page-6")).toHaveTextContent(
+    "Phase 4 · Delegation",
+  );
+  expect(screen.getByTestId("su-full-landscape-page-6")).not.toHaveTextContent(
+    /governed|snapshot|sourceId|source id|catalogue|provenance|legacy baseline|phase-aware|frozen|esperto-five-phase-peers/i,
+  );
+  expect(screen.getAllByLabelText("Peer benchmark information").length).toBeGreaterThanOrEqual(2);
 
   for (const detail of screen.getAllByTestId(/^su-full-landscape-detail-Q/)) {
     const bars = within(detail).getByTestId(
       `su-landscape-detail-bars-${detail.dataset.questionKey}`,
     );
+    const paragraph = detail.querySelector(".su-full-landscape-feedback");
     expect(
       detail.compareDocumentPosition(bars) & Node.DOCUMENT_POSITION_CONTAINED_BY,
     ).toBe(Node.DOCUMENT_POSITION_CONTAINED_BY);
-    expect(detail.textContent?.indexOf("You")).toBeLessThan(
-      detail.textContent?.indexOf("Frozen feedback") ?? -1,
-    );
+    expect(paragraph).toBeInTheDocument();
+    expect(within(detail).getByText("Peers").compareDocumentPosition(
+      paragraph!,
+    ) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(detail).queryByText("Frozen feedback", { selector: "strong" }))
+      .not.toBeInTheDocument();
     const question = model.chapters.flatMap((chapter) => chapter.questions)
       .find((candidate) => candidate.stableKey === detail.dataset.questionKey);
     if (!question) throw new Error(`Missing fixture question ${detail.dataset.questionKey}`);
@@ -134,7 +144,7 @@ test("renders the fixed 26-page landscape composition with truthful peer context
   expect(screen.getByTestId("su-full-landscape-page-25")).toHaveTextContent("55 / 100");
   expect(screen.getByRole("link", { name: "Contact your coach" })).toHaveAttribute("href", "mailto:coach@example.com");
   expect(screen.getByTestId("su-full-landscape-page-25")).toHaveTextContent("Next steps");
-  expect(document.body.textContent).not.toMatch(/Esperto|TCPDF/i);
+  expect(document.body.textContent).not.toMatch(/TCPDF/i);
 });
 
 test("falls back to the frozen referring coach email when no explicit contact is supplied", () => {

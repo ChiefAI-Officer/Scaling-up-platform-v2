@@ -8,6 +8,10 @@ import {
   completeSuFullLandscapePresentation,
   completeSuFullLandscapeReport,
 } from "@/__tests__/fixtures/su-full-landscape";
+import {
+  SU_FULL_PHASE_PEER_CONTENT_HASHES,
+  SU_FULL_PHASE_PEER_SOURCE_ID,
+} from "@/lib/assessments/su-full-phase-peer-catalogue";
 
 function detailKeys(model: SuFullLandscapeReportModel): string[] {
   return model.pages.flatMap((page) => page.kind === "detail" ? page.questionKeys : []);
@@ -22,6 +26,29 @@ function keys(start: string, end: string): string[] {
   const last = Number(end.slice(1));
   return Array.from({ length: last - first + 1 }, (_, index) => `Q${String(first + index).padStart(2, "0")}`);
 }
+
+const Q13_SCORE_7_AUDITED_PHASE_OUTPUTS = [
+  {
+    phase: 1,
+    text: '"Culture eats Strategy for breakfast" is a famous quote from management guru Peter Drucker. The outside world is changing rapidly, but a positive and healthy culture in which employees take responsibility, think along and always act in the interest of the company is therefore an enormous "asset". You still have a small business and you have made a good start with your culture, make sure you stick with it as you grow.',
+  },
+  {
+    phase: 2,
+    text: '"Culture eats Strategy for breakfast" is a famous quote from management guru Peter Drucker. The outside world is changing rapidly, but a positive and healthy culture in which employees take responsibility, think along and always act in the interest of the company is therefore an enormous "asset". You still have a clear company size, but it would already be good to start working on such a culture consciously.',
+  },
+  {
+    phase: 3,
+    text: '"Culture eats Strategy for breakfast" is a famous quote from management guru Peter Drucker. The outside world is changing rapidly, but a positive and healthy culture in which employees take responsibility, think along and always act in the interest of the company is therefore an enormous "asset". You already have a decent size and you have a fairly strong and healthy culture, but develop it further and make sure you hold on to it as you grow further.',
+  },
+  {
+    phase: 4,
+    text: '"Culture eats Strategy for breakfast" a famous quote from management guru Peter Drucker. The outside world is changing rapidly, but a positive and healthy culture in which employees take responsibility, think along and always act in the interest of the company is therefore an enormous "asset". You already have a decent size and you have a fairly strong and healthy culture, but develop it further and make sure you hold on to it as you grow further.',
+  },
+  {
+    phase: 5,
+    text: '"Culture eats Strategy for breakfast" is a famous quote from management guru Peter Drucker. The outside world is changing rapidly, but a positive and healthy culture in which employees take responsibility, think along and always act in the interest of the company is therefore an enormous "asset". You already have a decent size and you have a fairly strong and healthy culture, but develop it further and make sure you hold on to it as you grow further.',
+  },
+] as const;
 
 describe("buildSuFullLandscapeReportModel", () => {
   it("composes the canonical 26-page report with every detail question exactly once", () => {
@@ -39,6 +66,12 @@ describe("buildSuFullLandscapeReportModel", () => {
     expect(new Set(detailKeys(model!)).size).toBe(61);
     expect(chapterPageNumbers(model!)).toEqual([7, 11, 14, 19, 21]);
     expect(model!.pages[25].kind).toBe("appendix");
+    expect(model!.peerProvenance).toEqual({
+      sourceId: SU_FULL_PHASE_PEER_SOURCE_ID,
+      contentHash: SU_FULL_PHASE_PEER_CONTENT_HASHES[4],
+      phase: 4,
+      legacy: false,
+    });
     expect(Object.isFrozen(model)).toBe(true);
     expect(Object.isFrozen(model!.pages)).toBe(true);
   });
@@ -83,10 +116,10 @@ describe("buildSuFullLandscapeReportModel", () => {
       chapterKey: "people",
       youAverage: 3.5,
     });
-    expect(model!.profileRows[0].peersAverage).toBeCloseTo(5.7125);
-    expect(model!.profileRows[0].deviation).toBeCloseTo(-2.2125);
-    expect(model!.chapters[0]).toMatchObject({ key: "people", youAverage: 56 / 13, peersAverage: 77.5 / 13 });
-    expect(model!.chapters[0].questions[0]).toMatchObject({ stableKey: "Q01", you: 0, peers: 6.3, gap: -6.3 });
+    expect(model!.profileRows[0].peersAverage).toBeCloseTo(5.875);
+    expect(model!.profileRows[0].deviation).toBeCloseTo(-2.375);
+    expect(model!.chapters[0]).toMatchObject({ key: "people", youAverage: 56 / 13, peersAverage: 79.6 / 13 });
+    expect(model!.chapters[0].questions[0]).toMatchObject({ stableKey: "Q01", you: 0, peers: 6.6, gap: -6.6 });
     expect(model!.closestQuestions.map((question) => Math.abs(question.gap))).toEqual(
       [...model!.closestQuestions].map((question) => Math.abs(question.gap)).sort((a, b) => a - b),
     );
@@ -95,16 +128,81 @@ describe("buildSuFullLandscapeReportModel", () => {
     );
   });
 
-  it("derives Phase 2 from the frozen FTE answer and omits an invalid FTE phase", () => {
+  it("prefers the frozen recommendation phase and keeps the legacy FTE fallback for old results", () => {
     const report = completeSuFullLandscapeReport();
     const presentation = completeSuFullLandscapePresentation(report);
+    const historical = {
+      ...report,
+      result: {
+        ...report.result,
+        peerBenchmarkSnapshot: undefined,
+        perQuestion: report.result.perQuestion.map((question) => {
+          const historicalQuestion = { ...question };
+          delete historicalQuestion.peerValue;
+          return historicalQuestion;
+        }),
+      },
+    };
 
-    expect(buildSuFullLandscapeReportModel({ report, presentation, resolvedStyle: "CLASSIC" })!.growthPhase).toMatchObject({ number: 2 });
+    expect(buildSuFullLandscapeReportModel({ report, presentation, resolvedStyle: "CLASSIC" })!.growthPhase).toMatchObject({ number: 4 });
     expect(buildSuFullLandscapeReportModel({
-      report: { ...report, rawAnswers: [{ stableKey: "Q_FTE_CONTRACT", value: 0 }] },
-      presentation,
+      report: {
+        ...historical,
+        result: { ...historical.result, recommendationPhase: 3 },
+      },
+      presentation: completeSuFullLandscapePresentation(historical),
+      resolvedStyle: "CLASSIC",
+    })!.growthPhase).toMatchObject({ number: 3 });
+    const noFrozenPhase = {
+      ...historical,
+      result: { ...historical.result, recommendationPhase: undefined },
+      rawAnswers: [{ stableKey: "Q_FTE_CONTRACT", value: 0 }],
+    };
+    expect(buildSuFullLandscapeReportModel({
+      report: noFrozenPhase,
+      presentation: completeSuFullLandscapePresentation(noFrozenPhase),
       resolvedStyle: "CLASSIC",
     })!.growthPhase).toBeNull();
+  });
+
+  it("renders all five frozen Q13 phase outputs at the same score without re-resolving feedback", () => {
+    const actual = Q13_SCORE_7_AUDITED_PHASE_OUTPUTS.map(({ phase, text }) => {
+      const base = completeSuFullLandscapeReport();
+      const report = {
+        ...base,
+        result: {
+          ...base.result,
+          recommendationPhase: phase,
+          peerBenchmarkSnapshot: undefined,
+          perQuestion: base.result.perQuestion.map((question) => {
+            const historicalQuestion = question.stableKey === "Q13"
+              ? { ...question, value: 7, recommendation: text }
+              : { ...question };
+            delete historicalQuestion.peerValue;
+            return historicalQuestion;
+          }),
+        },
+      };
+      const presentation = completeSuFullLandscapePresentation(report);
+      const model = buildSuFullLandscapeReportModel({ report, presentation, resolvedStyle: "CLASSIC" });
+      const question = model?.chapters.flatMap((chapter) => chapter.questions)
+        .find(({ stableKey }) => stableKey === "Q13");
+
+      return {
+        phase: model?.growthPhase?.number,
+        score: question?.you,
+        recommendation: question?.recommendation,
+      };
+    });
+
+    expect(actual).toEqual(Q13_SCORE_7_AUDITED_PHASE_OUTPUTS.map(({ phase, text }) => ({
+      phase,
+      score: 7,
+      recommendation: text,
+    })));
+    expect(actual.slice(1).every((output, index) =>
+      output.recommendation !== actual[index].recommendation
+    )).toBe(true);
   });
 
   it("uses the resolved Classic style even when the stored unavailable style differs", () => {
@@ -155,6 +253,26 @@ describe("buildSuFullLandscapeReportModel", () => {
             }
           : section),
       },
+      resolvedStyle: "CLASSIC",
+    })).toBeNull();
+  });
+
+  it("rejects a coherent presentation that is stale for the report's frozen peer rows", () => {
+    const report = completeSuFullLandscapeReport();
+    const presentation = completeSuFullLandscapePresentation(report);
+    const corruptedReport = {
+      ...report,
+      result: {
+        ...report.result,
+        perQuestion: report.result.perQuestion.map((question) => question.stableKey === "Q01"
+          ? { ...question, peerValue: 6.5 }
+          : question),
+      },
+    };
+
+    expect(buildSuFullLandscapeReportModel({
+      report: corruptedReport,
+      presentation,
       resolvedStyle: "CLASSIC",
     })).toBeNull();
   });

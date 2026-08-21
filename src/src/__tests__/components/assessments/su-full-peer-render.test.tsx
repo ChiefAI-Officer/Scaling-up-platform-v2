@@ -4,7 +4,6 @@ import { join } from "node:path";
 
 import { BrandedReport } from "@/components/assessments/BrandedReport";
 import {
-  completeSuFullBenchmarkRows,
   completeSuFullPeerReport,
 } from "@/__tests__/fixtures/su-full-peer";
 import {
@@ -13,10 +12,12 @@ import {
 } from "@/__tests__/fixtures/su-full-landscape";
 import { buildSuFullPeerPresentationResult } from "@/lib/assessments/su-full-peer-presentation";
 import { reviveOnScreenReport } from "@/lib/assessments/onscreen-result-store";
-
 const LANDSCAPE_ENABLED = "NEXT_PUBLIC_WAVE_SU_FULL_LANDSCAPE_REPORT_ENABLED";
 const LANDSCAPE_KILL = "NEXT_PUBLIC_WAVE_SU_FULL_LANDSCAPE_REPORT_KILL";
 const savedLandscapeEnv: Record<string, string | undefined> = {};
+const PEER_DISCLOSURE = "Peers shows the benchmark associated with your organizational phase when you completed this assessment. It is not matched by industry, geography, or a custom peer group.";
+const HISTORICAL_PEER_DISCLOSURE = "Peers shows the historical benchmark used for this report. It is not matched by industry, geography, or a custom peer group.";
+const ENGINEERING_LANGUAGE = /governed|snapshot|sourceId|source id|catalogue|provenance|legacy baseline|phase-aware|frozen|esperto-five-phase-peers|esperto-controlled/i;
 
 beforeEach(() => {
   for (const key of [LANDSCAPE_ENABLED, LANDSCAPE_KILL]) {
@@ -42,7 +43,6 @@ function suFullReportWithPeers() {
 
   const built = buildSuFullPeerPresentationResult({
     report,
-    benchmarks: completeSuFullBenchmarkRows(),
   });
   if (built.status !== "ready") throw new Error(built.reason);
   return { ...report, suFullPeerPresentation: built.presentation };
@@ -51,7 +51,6 @@ function suFullReportWithPeers() {
 function presentationFor(report = completeSuFullPeerReport()) {
   const built = buildSuFullPeerPresentationResult({
     report,
-    benchmarks: completeSuFullBenchmarkRows(),
   });
   if (built.status !== "ready") throw new Error(built.reason);
   return built.presentation;
@@ -87,10 +86,12 @@ test("keeps the shipped Classic SU Full peer sequence while the landscape gate i
   expect(
     bars.compareDocumentPosition(feedback) & Node.DOCUMENT_POSITION_FOLLOWING,
   ).toBeTruthy();
-  expect(feedback).toHaveTextContent("Frozen feedback Q01");
+  expect(feedback).toHaveTextContent("Esperto feedback Q01");
+  expect(within(feedback).queryByRole("heading")).not.toBeInTheDocument();
+  expect(feedback.querySelector("p")).toHaveTextContent("Esperto feedback Q01");
 
   expect(screen.queryByTestId("report-sections")).not.toBeInTheDocument();
-  expect(screen.getAllByText("Frozen feedback Q01")).toHaveLength(1);
+  expect(screen.getAllByText("Esperto feedback Q01")).toHaveLength(1);
 });
 
 test("renders the complete Classic SU Full peer report as the landscape composition when the gate is ON", () => {
@@ -118,8 +119,15 @@ test("renders the complete Classic SU Full peer report as the landscape composit
   const details = screen.getAllByTestId(/^su-full-landscape-detail-Q/);
   expect(details).toHaveLength(61);
   for (const detail of details) {
-    expect(within(detail).getByTestId(`su-landscape-detail-bars-${detail.dataset.questionKey}`)).toBeInTheDocument();
-    expect(detail).toHaveTextContent("Frozen feedback");
+    const bars = within(detail).getByTestId(`su-landscape-detail-bars-${detail.dataset.questionKey}`);
+    const paragraph = detail.querySelector(".su-full-landscape-feedback");
+    expect(bars).toBeInTheDocument();
+    expect(paragraph).toBeInTheDocument();
+    expect(
+      bars.compareDocumentPosition(paragraph!) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(within(detail).queryByText("Frozen feedback", { selector: "strong" }))
+      .not.toBeInTheDocument();
   }
 });
 
@@ -220,7 +228,7 @@ test("keeps every overview and detail comparison explicit, identical, and indepe
 
 });
 
-test("omits blank frozen feedback without inventing placeholder copy", () => {
+test("omits blank stored feedback without inventing placeholder copy", () => {
   const report = completeSuFullPeerReport();
   const q01 = report.result.perQuestion.find(
     (question) => question.stableKey === "Q01",
@@ -241,17 +249,46 @@ test("omits blank frozen feedback without inventing placeholder copy", () => {
   expect(detail).not.toHaveTextContent(/no feedback|not available/i);
 });
 
-test("renders one benchmark disclosure with the latest update date", () => {
+test("renders historical benchmark context without internal provenance language", () => {
   render(<BrandedReport report={suFullReportWithPeers()} />);
 
   const disclosures = screen.getAllByTestId("su-full-peer-disclosure");
   expect(disclosures).toHaveLength(1);
-  expect(disclosures[0]).toHaveTextContent(
-    "Last updated August 18, 2026.",
-  );
-  expect(disclosures[0]).toHaveTextContent(
-    "not yet matched to company size, growth phase, geography, or industry",
-  );
+  expect(disclosures[0]).toHaveTextContent(HISTORICAL_PEER_DISCLOSURE);
+  expect(disclosures[0]).toHaveTextContent("Historical benchmark");
+  expect(disclosures[0]).not.toHaveTextContent(PEER_DISCLOSURE);
+  expect(disclosures[0]).not.toHaveTextContent(/selected by organizational phase|Phase [1-5]/i);
+  expect(disclosures[0]).not.toHaveTextContent(ENGINEERING_LANGUAGE);
+});
+
+test("renders plain-language phase context in the shipped flag-off peer sequence", () => {
+  render(<BrandedReport report={suFullLandscapeReportWithPeers()} />);
+
+  const disclosure = screen.getByTestId("su-full-peer-disclosure");
+  expect(disclosure).toHaveTextContent(PEER_DISCLOSURE);
+  expect(disclosure).toHaveTextContent("Phase 4 · Delegation");
+  expect(disclosure).not.toHaveTextContent(ENGINEERING_LANGUAGE);
+});
+
+test("omits generic peer UI when a coherent presentation is stale for the frozen report", () => {
+  const report = completeSuFullLandscapeReport();
+  const presentation = completeSuFullLandscapePresentation(report);
+  const corruptedReport = {
+    ...report,
+    result: {
+      ...report.result,
+      perQuestion: report.result.perQuestion.map((question) => question.stableKey === "Q01"
+        ? { ...question, peerValue: 6.5 }
+        : question),
+    },
+    suFullPeerPresentation: presentation,
+  };
+
+  render(<BrandedReport report={corruptedReport} />);
+
+  expect(screen.queryByTestId("su-full-peer-sequence")).not.toBeInTheDocument();
+  expect(screen.queryByTestId("su-full-peer-disclosure")).not.toBeInTheDocument();
+  expect(screen.getByTestId("report-sections")).toBeInTheDocument();
 });
 
 test.each([
@@ -272,7 +309,7 @@ test.each([
 
     expect(screen.getByTestId("report-sections")).toBeInTheDocument();
     expect(screen.getByTestId("report-recommendations")).toHaveTextContent(
-      "Frozen feedback Q01",
+      "Esperto feedback Q01",
     );
     expect(screen.queryByTestId("su-full-peer-sequence")).not.toBeInTheDocument();
     expect(document.querySelector(".su-landscape-vertical-chart")).toBeNull();
@@ -294,7 +331,7 @@ test("an invalid revived peer presentation falls back to the unchanged Classic r
 
   expect(screen.getByTestId("report-sections")).toBeInTheDocument();
   expect(screen.getByTestId("report-recommendations")).toHaveTextContent(
-    "Frozen feedback Q01",
+    "Esperto feedback Q01",
   );
   expect(screen.queryByTestId("su-full-peer-sequence")).not.toBeInTheDocument();
   expect(document.querySelector(".su-landscape-vertical-chart")).toBeNull();

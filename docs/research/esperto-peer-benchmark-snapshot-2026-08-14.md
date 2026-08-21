@@ -3,6 +3,13 @@
 Date captured: 2026-08-14
 Assessment: Scaling Up Assessment (`ScaleUp2`, `enUS`)
 
+## 2026-08-21 scope correction
+
+This remains the governed historical baseline payload. It is not the complete
+current five-phase mapping. Later controlled evidence found that P4 Delegation
+uses a second 61-value vector while P1/P2/P3/P5 use this baseline. See
+[`esperto-peer-vector-five-phase-csv-audit-2026-08-21.md`](esperto-peer-vector-five-phase-csv-audit-2026-08-21.md).
+
 ## Experimental result
 
 Eleven otherwise-identical CEO reports set `Effective recruitment process`

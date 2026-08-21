@@ -34,7 +34,7 @@ export function completeSuFullPeerReport(): RespondentReport {
         stableKey,
         value: index % 11,
         achieved: true,
-        recommendation: `Frozen feedback ${stableKey}`,
+        recommendation: `Esperto feedback ${stableKey}`,
       })),
       perSection: [],
     } as unknown as RespondentReport["result"],

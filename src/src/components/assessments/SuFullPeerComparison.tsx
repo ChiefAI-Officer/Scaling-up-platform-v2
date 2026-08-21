@@ -3,6 +3,7 @@ import type {
   SuFullPeerQuestionComparison,
   SuFullPeerSectionComparison,
 } from "@/lib/assessments/su-full-peer-presentation";
+import { buildSuFullPeerDisclosureModel } from "@/lib/assessments/su-full-peer-disclosure";
 
 function formatValue(value: number): string {
   return value.toFixed(1);
@@ -10,15 +11,6 @@ function formatValue(value: number): string {
 
 function fillWidth(value: number): string {
   return `${Math.max(0, Math.min(10, value)) * 10}%`;
-}
-
-function formatBenchmarkDate(value: string): string {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(value));
 }
 
 function PairedBars({
@@ -111,7 +103,6 @@ function SuFullPeerDetails({
                 className="su-peer-feedback"
                 data-testid={`su-full-peer-feedback-${question.stableKey}`}
               >
-                <h4 className="su-peer-feedback-title">Your feedback</h4>
                 <p>{question.recommendation}</p>
               </div>
             ) : null}
@@ -127,6 +118,7 @@ export function SuFullPeerComparison({
 }: {
   presentation: SuFullPeerPresentation;
 }) {
+  const disclosure = buildSuFullPeerDisclosureModel(presentation.provenance);
   return (
     <section className="su-peer-sequence" data-testid="su-full-peer-sequence">
       {presentation.sections.map((section) => (
@@ -136,9 +128,8 @@ export function SuFullPeerComparison({
         </section>
       ))}
       <p className="su-peer-disclosure" data-testid="su-full-peer-disclosure">
-        Peers are a current benchmark reference. Values are not yet matched to
-        company size, growth phase, geography, or industry. Last updated{" "}
-        {formatBenchmarkDate(presentation.benchmarkUpdatedAt)}.
+        <span>{disclosure.disclosure}</span>
+        <span className="su-peer-provenance">{disclosure.provenanceLabel}</span>
       </p>
     </section>
   );

@@ -27,6 +27,7 @@ import { getInvitationSession } from "@/lib/assessments/invitation-cookie";
 import {
   ScoringValidationError,
   TemplateVersionForScoringSchema,
+  type ScoreResult,
 } from "@/lib/assessments/scoring";
 import { logAudit } from "@/lib/audit";
 import { computeScoreResult } from "@/lib/assessments/compute-score-result";
@@ -81,6 +82,10 @@ import { lockReportStyleForFirstCompletion } from "@/lib/assessments/report-styl
 import { isReportComparisonEnabled } from "@/lib/assessments/wave-report-comparison-flags";
 import { createCeoReportAccessToken } from "@/lib/assessments/ceo-report-access-token";
 import { resolvePeerReportEnhancements } from "@/lib/assessments/peer-report-resolver";
+import {
+  currentGrowthPhaseFromAnswers,
+  SU_FULL_PHASE_DRIVER_KEY,
+} from "@/lib/assessments/su-full-phase";
 
 const NO_STORE_HEADERS = { "Cache-Control": "no-store" } as const;
 
@@ -124,7 +129,11 @@ function gateFailed(): NextResponse {
   );
 }
 
-type SubmissionTransactionAbortKind = "not-found" | "gate" | "conflict";
+type SubmissionTransactionAbortKind =
+  | "not-found"
+  | "gate"
+  | "conflict"
+  | "stale-snapshot";
 
 class SubmissionTransactionAbort extends Error {
   constructor(readonly kind: SubmissionTransactionAbortKind) {
@@ -718,10 +727,10 @@ export async function POST(
     const invitationId = session.invitationId;
 
     try {
-      // ── Phase 1 (no lock, no tx): read → gate → score → render candidates ─
-      // The tx below locks, re-validates the gates/conflict, freezes the final
-      // appearance, and selects one prebuilt candidate. Versions are immutable
-      // once published, so the ScoreResult here is safe to re-use.
+      // ── Phase 1: unlocked read and fast-fail gates ────────────────────────
+      // SU-Full adds a short lock-backed snapshot below, but all scoring and
+      // report/email rendering remains outside every transaction. The final
+      // transaction revalidates before persisting the frozen result.
       const invitation = await db.assessmentInvitation.findUnique({
         where: { id: invitationId },
         include: {
@@ -808,9 +817,120 @@ export async function POST(
         );
       }
 
+      // SU-Full scoring depends on a campaign-participant designation and may
+      // depend on phase-aware content from the pinned version. Capture both
+      // facts under short-lived locks, then release every lock before scoring
+      // or report/email rendering. The final transaction verifies this exact
+      // snapshot again before it persists anything.
+      const phaseSnapshotResult =
+        invitation.campaign.template?.alias === SU_FULL_ALIAS
+          ? await db
+              .$transaction(async (tx) => {
+                // Keep the same campaign → invitation → participant lock order
+                // as the final transaction. Locking the campaign makes its
+                // pinned version and report style authoritative for this
+                // snapshot without freezing the report style early.
+                await tx.$executeRaw`SELECT "id" FROM "assessment_campaigns" WHERE "id" = ${invitation.campaignId} FOR UPDATE`;
+                await tx.$executeRaw`SELECT id FROM assessment_invitations WHERE id = ${invitationId} FOR UPDATE`;
+                const lockedSnapshot = await tx.assessmentInvitation.findUnique({
+                  where: { id: invitationId },
+                  select: {
+                    status: true,
+                    revokedAt: true,
+                    expiresAt: true,
+                    campaignId: true,
+                    respondentId: true,
+                    campaign: {
+                      select: {
+                        alias: true,
+                        organizationId: true,
+                        deletedAt: true,
+                        status: true,
+                        openAt: true,
+                        closeAt: true,
+                        reportStyle: true,
+                        version: {
+                          select: {
+                            id: true,
+                            templateId: true,
+                            questions: true,
+                            sections: true,
+                            scoringConfig: true,
+                          },
+                        },
+                      },
+                    },
+                  },
+                });
+
+                if (
+                  !lockedSnapshot ||
+                  lockedSnapshot.campaign.alias !== campaignAlias ||
+                  lockedSnapshot.campaign.organizationId === null
+                ) {
+                  throw new SubmissionTransactionAbort("not-found");
+                }
+                const snapshotNow = new Date();
+                if (
+                  lockedSnapshot.campaign.deletedAt !== null ||
+                  lockedSnapshot.revokedAt !== null ||
+                  snapshotNow >= lockedSnapshot.expiresAt ||
+                  lockedSnapshot.campaign.status !== "ACTIVE" ||
+                  snapshotNow < lockedSnapshot.campaign.openAt ||
+                  (lockedSnapshot.campaign.closeAt !== null &&
+                    snapshotNow >= lockedSnapshot.campaign.closeAt)
+                ) {
+                  throw new SubmissionTransactionAbort("gate");
+                }
+                if (lockedSnapshot.status === "SUBMITTED") {
+                  throw new SubmissionTransactionAbort("conflict");
+                }
+
+                await tx.$executeRaw`SELECT "id" FROM "assessment_campaign_participants" WHERE "campaignId" = ${lockedSnapshot.campaignId} AND "respondentId" = ${lockedSnapshot.respondentId} FOR UPDATE`;
+                const lockedParticipant =
+                  await tx.assessmentCampaignParticipant.findUnique({
+                    where: {
+                      campaignId_respondentId: {
+                        campaignId: lockedSnapshot.campaignId,
+                        respondentId: lockedSnapshot.respondentId,
+                      },
+                    },
+                    select: { isCEO: true },
+                  });
+
+                return {
+                  kind: "ok" as const,
+                  isCEO: lockedParticipant?.isCEO === true,
+                  version: lockedSnapshot.campaign.version,
+                  reportStyle: lockedSnapshot.campaign.reportStyle,
+                };
+              })
+              .catch((error) => {
+                if (!(error instanceof SubmissionTransactionAbort)) throw error;
+                return { kind: error.kind } as const;
+              })
+          : null;
+
+      if (phaseSnapshotResult?.kind === "not-found") {
+        return NextResponse.json(
+          { success: false, error: "Invitation not found" },
+          { status: 404, headers: NO_STORE_HEADERS },
+        );
+      }
+      if (phaseSnapshotResult?.kind === "gate") return gateFailed();
+      if (phaseSnapshotResult?.kind === "conflict") {
+        return NextResponse.json(
+          { success: false, error: "Already submitted" },
+          { status: 409, headers: NO_STORE_HEADERS },
+        );
+      }
+      const phaseSnapshot =
+        phaseSnapshotResult?.kind === "ok" ? phaseSnapshotResult : null;
+      const scoringVersion = phaseSnapshot?.version ?? invitation.campaign.version;
+
       // Build the scoring input — pass ALL question types; Phase B
       // scoreSubmission skips non-SLIDER_LIKERT answers gracefully.
-      const allQuestions = invitation.campaign.version.questions as Array<
+      const allQuestions = scoringVersion.questions as Array<
         Record<string, unknown>
       >;
 
@@ -823,21 +943,11 @@ export async function POST(
       // MISSING_REQUIRED_KEY and can never submit. Only SU-Full needs the
       // participant lookup — every other template scores the full set unchanged.
       let scoredQuestions = allQuestions;
-      let scoredSections = invitation.campaign.version.sections as Array<
+      let scoredSections = scoringVersion.sections as Array<
         Record<string, unknown>
       >;
-      let phase1IsCeo = false;
+      const phase1IsCeo = phaseSnapshot?.isCEO === true;
       if (invitation.campaign.template?.alias === SU_FULL_ALIAS) {
-        const participant = await db.assessmentCampaignParticipant.findUnique({
-          where: {
-            campaignId_respondentId: {
-              campaignId: invitation.campaignId,
-              respondentId: invitation.respondentId,
-            },
-          },
-          select: { isCEO: true },
-        });
-        phase1IsCeo = participant?.isCEO === true;
         // Fail-safe: no participant row → treat as non-CEO (drop the section),
         // matching the survey-render policy (me/route.ts + org-survey-client).
         if (!phase1IsCeo) {
@@ -856,7 +966,7 @@ export async function POST(
       const versionParsed = TemplateVersionForScoringSchema.safeParse({
         questions: scoredQuestions,
         sections: scoredSections,
-        scoringConfig: invitation.campaign.version.scoringConfig,
+        scoringConfig: scoringVersion.scoringConfig,
       });
       if (!versionParsed.success) {
         return NextResponse.json(
@@ -864,22 +974,107 @@ export async function POST(
           { status: 500, headers: NO_STORE_HEADERS }
         );
       }
+      const excludedBackgroundKeys =
+        invitation.campaign.template?.alias === SU_FULL_ALIAS && !phase1IsCeo
+        ? new Set(
+            allQuestions
+              .filter(
+                (question) =>
+                  question.sectionStableKey === SU_FULL_BACKGROUND_SECTION,
+              )
+              .map((question) => question.stableKey),
+          )
+        : null;
+      const submittedAnswersForScoring = answers
+        .filter(
+          (answer) => !excludedBackgroundKeys?.has(answer.stableKey),
+        )
+        .map((answer) => ({
+          stableKey: answer.stableKey,
+          value: answer.value,
+        }));
       // Prune-then-score via the ONE shared seam (spec 19ac). rawAnswers stays
       // the PRUNED set (persisted + emitted downstream). May throw
       // ScoringValidationError → caught by outer catch.
-      const { result: scoreResult, prunedAnswers: rawAnswers } = computeScoreResult(
+      let { result: scoreResult, prunedAnswers: rawAnswers } = computeScoreResult(
         versionParsed.data,
         scoredQuestions as unknown as PagerQuestion[],
-        answers.map((a) => ({ stableKey: a.stableKey, value: a.value })),
+        submittedAnswersForScoring,
       );
+      const phaseAwareVersion =
+        invitation.campaign.template?.alias === SU_FULL_ALIAS &&
+        versionParsed.data.questions.some(
+          (question) =>
+            question.type === "SLIDER_LIKERT" &&
+            (question.phaseRecommendations !== undefined ||
+              question.phasePeerBenchmarks !== undefined),
+        );
+      const governedPeerVersion =
+        invitation.campaign.template?.alias === SU_FULL_ALIAS &&
+        versionParsed.data.questions.some(
+          (question) =>
+            question.type === "SLIDER_LIKERT" &&
+            question.phasePeerBenchmarks !== undefined,
+        );
+      if (phaseAwareVersion && phaseSnapshot === null) {
+        throw new Error("Phase-aware SU-Full scoring requires a locked snapshot");
+      }
+      if (phaseAwareVersion && phase1IsCeo) {
+        const phase = currentGrowthPhaseFromAnswers(rawAnswers);
+        if (!phase) {
+          throw new ScoringValidationError(
+            "OUT_OF_RANGE",
+            { stableKey: SU_FULL_PHASE_DRIVER_KEY },
+            "The required contract FTE must resolve to a growth phase",
+          );
+        }
+        ({ result: scoreResult, prunedAnswers: rawAnswers } = computeScoreResult(
+          versionParsed.data,
+          scoredQuestions as unknown as PagerQuestion[],
+          rawAnswers,
+          { recommendationPhase: phase.number },
+        ));
+        if (governedPeerVersion) {
+          const finitePeerRowCount = scoreResult.perQuestion.filter((row) =>
+            Number.isFinite(row.peerValue),
+          ).length;
+          const snapshotPhase = scoreResult.peerBenchmarkSnapshot?.phase;
+          if (
+            scoreResult.perQuestion.length !== 61 ||
+            finitePeerRowCount !== 61 ||
+            scoreResult.recommendationPhase !== phase.number ||
+            snapshotPhase !== phase.number
+          ) {
+            throw new ScoringValidationError(
+              "SU_FULL_PHASE_PEERS_RESULT_INCOMPLETE",
+              {
+                expectedPeerRowCount: 61,
+                peerRowCount: scoreResult.perQuestion.length,
+                finitePeerRowCount,
+                expectedPhase: phase.number,
+                recommendationPhase:
+                  scoreResult.recommendationPhase ?? null,
+                peerBenchmarkPhase: snapshotPhase ?? null,
+              },
+            );
+          }
+        }
+      }
 
       // Single instant shared by the report's submittedAt + the invitation's
       // SUBMITTED stamp, so the emailed report date matches the DB row.
       const submittedAt = new Date();
+      const renderCampaign = {
+        ...invitation.campaign,
+        version: scoringVersion,
+      };
 
-      // Wave OSR (#71): prebuild one model per closed-catalog style outside the
-      // transaction. The final ordered style selects ONE model, shared between
-      // #15 results email and on-screen payload — see ADR-0027.
+      // Wave OSR (#71): build one model per closed-catalog style. Legacy
+      // editions retain the existing off-lock prebuild; phase-aware editions
+      // build one selected-style candidate after the snapshot transaction has
+      // committed and released every lock.
+      // The final ordered style selects ONE model, shared between #15 results
+      // email and on-screen payload — see ADR-0027.
       //
       // Each build is wrapped because a model failure must NEVER fail the
       // submission. A null selected candidate degrades to: no #15 email row,
@@ -942,44 +1137,39 @@ export async function POST(
 
       let respondentReport: RespondentReport | null = null;
 
-      // Prebuild the closed style catalog outside the transaction. The lock
-      // later selects exactly one immutable candidate using the final ordered
-      // style, keeping CPU-heavy report/email rendering off the row lock while
-      // preserving atomic submission + delivery persistence.
-      const reportCandidates = new Map<
-        ReportStyleKey,
-        { report: RespondentReport | null; rows: PreparedDeliveryRow[] }
-      >();
-      const sharedEmailRenders: SharedWaveDEmailRenderCache = {};
-      for (const reportStyle of REPORT_STYLE_KEYS) {
+      const buildReportCandidate = (
+        frozenScoreResult: ScoreResult,
+        reportStyle: ReportStyleKey,
+        renderCache: SharedWaveDEmailRenderCache,
+      ): { report: RespondentReport | null; rows: PreparedDeliveryRow[] } => {
         let report: RespondentReport | null = null;
         let reportRenderInputHash = "";
         if (mayNeedReport) {
           const reportModelInput = {
-            result: scoreResult as never,
+            result: frozenScoreResult as never,
             publicTaker: {
               firstName: invitation.respondent?.firstName ?? "",
               lastName: invitation.respondent?.lastName ?? "",
               email: invitation.respondent?.email ?? "",
             },
             assessmentName:
-              invitation.campaign.template?.name ?? "an assessment",
-            templateAlias: invitation.campaign.template?.alias ?? "",
+              renderCampaign.template?.name ?? "an assessment",
+            templateAlias: renderCampaign.template?.alias ?? "",
             reportStyle,
             campaignLabel: null,
-            sections: invitation.campaign.version.sections,
-            questions: invitation.campaign.version.questions,
-            scoringConfig: invitation.campaign.version.scoringConfig,
+            sections: renderCampaign.version.sections,
+            questions: renderCampaign.version.questions,
+            scoringConfig: renderCampaign.version.scoringConfig,
             rawAnswers,
             submittedAt,
             submissionId: "",
             referringCoachEmail: null,
-            companyName: invitation.campaign.organization?.name ?? "",
+            companyName: renderCampaign.organization?.name ?? "",
             jobTitle: invitation.respondent?.jobTitle ?? null,
             coachLogoUrl:
-              invitation.campaign.creatorCoach?.profileImage ?? null,
-            coachName: coachBylineName(invitation.campaign.creatorCoach),
-            degraded: !isScoreResult(scoreResult),
+              renderCampaign.creatorCoach?.profileImage ?? null,
+            coachName: coachBylineName(renderCampaign.creatorCoach),
+            degraded: !isScoreResult(frozenScoreResult),
           };
           if (intentMode) {
             reportRenderInputHash = stableInputHash(reportModelInput);
@@ -990,8 +1180,8 @@ export async function POST(
             console.error(
               "[assessment-submit] respondent report candidate build failed",
               {
-                campaignId: invitation.campaign.id,
-                versionId: invitation.campaign.version.id,
+                campaignId: renderCampaign.id,
+                versionId: renderCampaign.version.id,
                 reportStyle,
                 errorName: errorNameOnly(err),
               },
@@ -999,21 +1189,53 @@ export async function POST(
           }
         }
 
-        reportCandidates.set(reportStyle, {
+        return {
           report,
           rows: buildWaveDOutboxRows({
-            campaign: invitation.campaign,
+            campaign: renderCampaign,
             respondent: invitation.respondent,
             respondentId: invitation.respondentId,
             report,
             reportRenderInputHash,
             respectGlobalPause: !intentMode,
             prepareIntentMetadata: intentMode,
-            renderCache: sharedEmailRenders,
+            renderCache,
             ceoSelfAccessUrl: preparedCeoSelfAccessUrl,
           }),
-        });
-      }
+        };
+      };
+
+      const buildReportCandidates = (frozenScoreResult: ScoreResult) => {
+        const candidates = new Map<
+          ReportStyleKey,
+          { report: RespondentReport | null; rows: PreparedDeliveryRow[] }
+        >();
+        const sharedEmailRenders: SharedWaveDEmailRenderCache = {};
+        for (const reportStyle of REPORT_STYLE_KEYS) {
+          candidates.set(
+            reportStyle,
+            buildReportCandidate(
+              frozenScoreResult,
+              reportStyle,
+              sharedEmailRenders,
+            ),
+          );
+        }
+        return candidates;
+      };
+
+      // Every render stays outside both transactions. Legacy editions keep the
+      // existing all-style candidate set; phase-aware editions render only the
+      // style captured beside the authoritative CEO/version snapshot.
+      const reportCandidates = phaseAwareVersion
+        ? null
+        : buildReportCandidates(scoreResult);
+      const phaseAwareCandidateStyle = phaseAwareVersion
+        ? (phaseSnapshot!.reportStyle as ReportStyleKey)
+        : null;
+      const phaseAwareCandidate = phaseAwareCandidateStyle
+        ? buildReportCandidate(scoreResult, phaseAwareCandidateStyle, {})
+        : null;
 
       // C-M2: capture the Phase-1 render-input fingerprint before opening the
       // transaction. Phase 2 re-reads the same fields UNDER the lock and drops
@@ -1022,11 +1244,11 @@ export async function POST(
       // swapped). The submission still commits — only the stale email row is
       // skipped.
       const phase1Fingerprint = emailRenderFingerprint(
-        invitation.campaign,
+        renderCampaign,
         invitation.respondent?.firstName ?? null,
       );
 
-      // ── Phase 2 (locked tx): re-validate → freeze → create submission ─────
+      // ── Final locked tx: re-validate → freeze → create submission ─────────
       const result = await db.$transaction(async (tx) => {
         // Lock the campaign row before any other transactional operation, so a
         // concurrent report-style update deterministically orders with this
@@ -1119,26 +1341,14 @@ export async function POST(
           throw new SubmissionTransactionAbort("conflict");
         }
 
-        const selectedCandidate = reportCandidates.get(reportStyle);
-        if (!selectedCandidate) {
-          const candidateError = new Error(
-            `Missing report candidate for ${reportStyle}`,
-          );
-          candidateError.name = "MissingReportCandidateError";
-          throw candidateError;
-        }
-        respondentReport = selectedCandidate.report;
-        const preparedRows = selectedCandidate.rows;
-
         let ceoSelfAccessAuthorized = false;
-        if (preparedCeoSelfAccessUrl !== null) {
+        let lockedParticipantIsCeo = false;
+        if (phaseAwareVersion || preparedCeoSelfAccessUrl !== null) {
           // CEO is a campaign-participant designation, never a platform role.
           // Lock its exact row before reading it: an isCEO revocation must queue
-          // behind this submit transaction instead of committing between our
-          // authorization decision and the capability-bearing outbox INSERT.
+          // behind this submit transaction instead of committing between the
+          // phase/capability authorization decision and submission persistence.
           await tx.$executeRaw`SELECT "id" FROM "assessment_campaign_participants" WHERE "campaignId" = ${locked.campaignId} AND "respondentId" = ${locked.respondentId} FOR UPDATE`;
-          // This current locked read is the authorization decision for every
-          // capability-bearing email row and the response disclosure below.
           const lockedParticipant = await tx.assessmentCampaignParticipant.findUnique({
             where: {
               campaignId_respondentId: {
@@ -1148,17 +1358,52 @@ export async function POST(
             },
             select: { isCEO: true },
           });
-          ceoSelfAccessAuthorized =
-            locked.campaign.template?.alias === SU_FULL_ALIAS &&
-            isReportComparisonEnabled({
-              organizationId: locked.campaign.organizationId,
-              templateId: locked.campaign.templateId,
-            }) &&
-            lockedParticipant?.isCEO === true &&
-            locked.campaign.accessMode === "INVITED" &&
-            (locked.campaign.showResultsOnScreen ||
-              locked.campaign.sendResultsToRespondent);
+          lockedParticipantIsCeo = lockedParticipant?.isCEO === true;
+          if (preparedCeoSelfAccessUrl !== null) {
+            ceoSelfAccessAuthorized =
+              locked.campaign.template?.alias === SU_FULL_ALIAS &&
+              isReportComparisonEnabled({
+                organizationId: locked.campaign.organizationId,
+                templateId: locked.campaign.templateId,
+              }) &&
+              lockedParticipantIsCeo &&
+              locked.campaign.accessMode === "INVITED" &&
+              (locked.campaign.showResultsOnScreen ||
+                locked.campaign.sendResultsToRespondent);
+          }
         }
+
+        if (
+          phaseAwareVersion &&
+          locked.campaign.version.id !== scoringVersion.id
+        ) {
+          throw new SubmissionTransactionAbort("stale-snapshot");
+        }
+        if (
+          phaseAwareVersion &&
+          lockedParticipantIsCeo !== phaseSnapshot!.isCEO
+        ) {
+          throw new SubmissionTransactionAbort("stale-snapshot");
+        }
+        if (
+          phaseAwareVersion &&
+          reportStyle !== phaseAwareCandidateStyle
+        ) {
+          throw new SubmissionTransactionAbort("stale-snapshot");
+        }
+
+        const selectedCandidate = reportCandidates === null
+          ? phaseAwareCandidate
+          : reportCandidates.get(reportStyle);
+        if (!selectedCandidate) {
+          const candidateError = new Error(
+            `Missing report candidate for ${reportStyle}`,
+          );
+          candidateError.name = "MissingReportCandidateError";
+          throw candidateError;
+        }
+        respondentReport = selectedCandidate.report;
+        const preparedRows = selectedCandidate.rows;
 
         // One explicit ledger instant owns all intent lifecycle timestamps.
         // Report/invitation submittedAt remains the earlier disclosure instant;
@@ -1178,8 +1423,8 @@ export async function POST(
         });
 
         // Capture the final gate/render fingerprint while the invitation and
-        // campaign state are locked. Post-commit rendering uses this immutable
-        // decision snapshot without extending the row-lock duration.
+        // campaign state are locked. The already-rendered candidate is accepted
+        // only against this immutable decision snapshot.
         const phase2Fingerprint = emailRenderFingerprint(
           locked.campaign,
           locked.respondent?.firstName ?? null,
@@ -1348,6 +1593,8 @@ export async function POST(
             return { kind: "gate" as const };
           case "conflict":
             return { kind: "conflict" as const };
+          case "stale-snapshot":
+            return { kind: "stale-snapshot" as const };
         }
       });
 
@@ -1362,6 +1609,15 @@ export async function POST(
         return NextResponse.json(
           { success: false, error: "Already submitted" },
           { status: 409, headers: NO_STORE_HEADERS }
+        );
+      }
+      if (result.kind === "stale-snapshot") {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Submission state changed. Please submit again.",
+          },
+          { status: 503, headers: NO_STORE_HEADERS },
         );
       }
 

@@ -28,11 +28,14 @@ import {
   writeOnScreenResult,
   clearOnScreenResult,
 } from "@/lib/assessments/onscreen-result-store";
-import {
-  completeSuFullBenchmarkRows,
-  completeSuFullPeerReport,
-} from "@/__tests__/fixtures/su-full-peer";
+import { completeSuFullPeerReport } from "@/__tests__/fixtures/su-full-peer";
 import { buildSuFullPeerPresentationResult } from "@/lib/assessments/su-full-peer-presentation";
+import type { SuFullPeerPresentation } from "@/lib/assessments/su-full-peer-presentation";
+import {
+  SU_FULL_PHASE_PEER_CONTENT_HASHES,
+  SU_FULL_PHASE_PEER_SOURCE_ID,
+  SU_FULL_PHASE_PEER_VECTORS,
+} from "@/lib/assessments/su-full-phase-peer-catalogue";
 
 const ALIAS = "demo-campaign";
 
@@ -46,20 +49,76 @@ const OTHER_KEY = "inv_respondent_b";
 function completePeerPresentation() {
   const built = buildSuFullPeerPresentationResult({
     report: completeSuFullPeerReport(),
-    benchmarks: completeSuFullBenchmarkRows(),
   });
   if (built.status !== "ready") throw new Error(built.reason);
   return built.presentation;
 }
 
+function completePhaseFourPeerPresentation() {
+  return completeGovernedPeerPresentation(4);
+}
+
+function completeGovernedPeerReport(phase: 3 | 4) {
+  const report = completeSuFullPeerReport();
+  report.result = {
+    ...report.result,
+    recommendationPhase: phase,
+    peerBenchmarkSnapshot: {
+      sourceId: SU_FULL_PHASE_PEER_SOURCE_ID,
+      contentHash: SU_FULL_PHASE_PEER_CONTENT_HASHES[phase],
+      phase,
+    },
+    perQuestion: report.result.perQuestion.map((row) => ({
+      ...row,
+      peerValue: SU_FULL_PHASE_PEER_VECTORS[phase][row.stableKey],
+    })),
+  };
+  return report;
+}
+
+function completeGovernedPeerPresentation(phase: 3 | 4) {
+  const report = completeGovernedPeerReport(phase);
+  const built = buildSuFullPeerPresentationResult({ report });
+  if (built.status !== "ready") throw new Error(built.reason);
+  return built.presentation;
+}
+
+function mutablePresentation(
+  presentation: SuFullPeerPresentation,
+): SuFullPeerPresentation {
+  return JSON.parse(JSON.stringify(presentation)) as SuFullPeerPresentation;
+}
+
+const coherentCrossObjectForgeries = [
+  ["Q01 You value", (presentation: SuFullPeerPresentation) => {
+    const firstSection = presentation.sections[0] as {
+      youTotal: number;
+      questions: Array<{ you: number }>;
+    };
+    firstSection.questions[0].you += 1;
+    firstSection.youTotal += 1;
+  }],
+  ["Q01 recommendation", (presentation: SuFullPeerPresentation) => {
+    const firstSection = presentation.sections[0] as {
+      questions: Array<{ recommendation: string | null }>;
+    };
+    firstSection.questions[0].recommendation = "Forged feedback";
+  }],
+  ["Q01 label", (presentation: SuFullPeerPresentation) => {
+    const firstSection = presentation.sections[0] as {
+      questions: Array<{ label: string }>;
+    };
+    firstSection.questions[0].label = "Forged question label";
+  }],
+  ["section metadata", (presentation: SuFullPeerPresentation) => {
+    (presentation.sections[0] as { domain: string | null }).domain = "cash";
+  }],
+] as const;
+
 const sampleReport = {
+  ...completeSuFullPeerReport(),
   respondentName: "Resp Ondent",
-  templateAlias: "scaling-up-full",
-  reportStyle: "CLASSIC",
-  assessmentName: "Scaling Up Full",
   submittedAt: new Date("2026-07-29T10:30:00.000Z"),
-  result: { countAchieved: 12 },
-  degraded: false,
   suFullPeerPresentation: completePeerPresentation(),
 };
 
@@ -125,7 +184,136 @@ describe("round trip", () => {
     expect(revived?.submittedAt).toBeInstanceOf(Date);
   });
 
+  it("preserves a governed presentation only when it matches the same frozen result", () => {
+    const report = completeGovernedPeerReport(4);
+    const presentation = completeGovernedPeerPresentation(4);
+
+    const revived = reviveOnScreenReport({
+      ...report,
+      suFullPeerPresentation: presentation,
+    });
+
+    expect(revived?.suFullPeerPresentation).toEqual(presentation);
+  });
+
+  it("discards an exact legacy presentation attached to a governed P4 result", () => {
+    const revived = reviveOnScreenReport({
+      ...completeGovernedPeerReport(4),
+      suFullPeerPresentation: completePeerPresentation(),
+    });
+
+    expect(revived?.suFullPeerPresentation).toBeUndefined();
+  });
+
+  it("discards a coherent P3 presentation attached to a governed P4 result", () => {
+    const revived = reviveOnScreenReport({
+      ...completeGovernedPeerReport(4),
+      suFullPeerPresentation: completeGovernedPeerPresentation(3),
+    });
+
+    expect(revived?.suFullPeerPresentation).toBeUndefined();
+  });
+
+  it("discards a governed presentation when one frozen result peer value was substituted", () => {
+    const report = completeGovernedPeerReport(4);
+    report.result.perQuestion[0].peerValue = 6.5;
+
+    const revived = reviveOnScreenReport({
+      ...report,
+      suFullPeerPresentation: completeGovernedPeerPresentation(4),
+    });
+
+    expect(revived?.suFullPeerPresentation).toBeUndefined();
+  });
+
+  it.each(coherentCrossObjectForgeries)(
+    "discards a governed presentation with forged %s instead of repairing it",
+    (_case, mutate) => {
+      const report = completeGovernedPeerReport(4);
+      const forged = mutablePresentation(completeGovernedPeerPresentation(4));
+      mutate(forged);
+
+      const revived = reviveOnScreenReport({
+        ...report,
+        suFullPeerPresentation: forged,
+      });
+
+      expect(revived?.suFullPeerPresentation).toBeUndefined();
+    },
+  );
+
+  it.each([
+    ["snapshot provenance", (report: ReturnType<typeof completeSuFullPeerReport>) => {
+      report.result.peerBenchmarkSnapshot = {
+        sourceId: SU_FULL_PHASE_PEER_SOURCE_ID,
+        contentHash: SU_FULL_PHASE_PEER_CONTENT_HASHES[4],
+        phase: 4,
+      };
+    }],
+    ["one frozen peer row", (report: ReturnType<typeof completeSuFullPeerReport>) => {
+      report.result.perQuestion[0].peerValue = 6.3;
+    }],
+  ])("discards a legacy presentation when its result declares %s", (_case, mutate) => {
+    const report = completeSuFullPeerReport();
+    mutate(report);
+
+    const revived = reviveOnScreenReport({
+      ...report,
+      suFullPeerPresentation: completePeerPresentation(),
+    });
+
+    expect(revived?.suFullPeerPresentation).toBeUndefined();
+  });
+
+  it("preserves the frozen peer snapshot and all values through native JSON plus report revival", () => {
+    const frozenRows = Object.entries(SU_FULL_PHASE_PEER_VECTORS[4]).map(
+      ([stableKey, peerValue]) => ({
+        stableKey,
+        value: 4,
+        achieved: false,
+        peerValue,
+      }),
+    );
+    const serialized = JSON.parse(
+      JSON.stringify({
+        ...sampleReport,
+        result: {
+          perQuestion: frozenRows,
+          perSection: [],
+          overallTotal: 244,
+          overallAverage: 4,
+          countAchieved: 0,
+          tier: null,
+          tierMetricValue: 0,
+          unansweredKeys: [],
+          recommendationPhase: 4,
+          peerBenchmarkSnapshot: {
+            sourceId: "2026-08-20.esperto-five-phase-peers-v1",
+            contentHash:
+              "ae9e9e2fbfc8525f4e6d8c3ca65775a50b85476371f29a74934dbe6dd3a965ff",
+            phase: 4,
+          },
+        },
+      }),
+    ) as unknown;
+
+    const revived = reviveOnScreenReport(serialized);
+
+    expect(revived?.result.peerBenchmarkSnapshot).toEqual({
+      sourceId: "2026-08-20.esperto-five-phase-peers-v1",
+      contentHash:
+        "ae9e9e2fbfc8525f4e6d8c3ca65775a50b85476371f29a74934dbe6dd3a965ff",
+      phase: 4,
+    });
+    expect(revived?.result.perQuestion).toHaveLength(61);
+    expect(revived?.result.perQuestion.map((row) => row.peerValue)).toEqual(
+      frozenRows.map((row) => row.peerValue),
+    );
+    expect(revived?.submittedAt).toBeInstanceOf(Date);
+  });
+
   const validPeerPresentation = completePeerPresentation();
+  const validPhaseFourPresentation = completePhaseFourPeerPresentation();
 
   it.each([
     ["a malformed", "not-an-object"],
@@ -160,7 +348,81 @@ describe("round trip", () => {
         ),
       },
     ],
-    ["an invalid-date", { ...validPeerPresentation, benchmarkUpdatedAt: "2026-08-18" }],
+    [
+      "an invalid provenance hash",
+      {
+        ...validPeerPresentation,
+        provenance: {
+          ...validPeerPresentation.provenance,
+          contentHash: "not-a-governed-hash",
+        },
+      },
+    ],
+    [
+      "P4 values under the valid-looking baseline hash",
+      {
+        ...validPhaseFourPresentation,
+        provenance: {
+          ...validPhaseFourPresentation.provenance,
+          contentHash:
+            "fe63364e3b5e42897b3b3886135310f673e320b4a07b1453ad300a49a91b4dbd",
+        },
+      },
+    ],
+    [
+      "a changed governed P4 peer value under valid P4 provenance",
+      {
+        ...validPhaseFourPresentation,
+        sections: validPhaseFourPresentation.sections.map((section, index) =>
+          index === 0
+            ? {
+                ...section,
+                peersTotal: 46.9,
+                questions: section.questions.map((question, questionIndex) =>
+                  questionIndex === 0 ? { ...question, peers: 6.5 } : question,
+                ),
+              }
+            : section,
+        ),
+      },
+    ],
+    [
+      "a changed historical peer value under valid legacy provenance",
+      {
+        ...validPeerPresentation,
+        sections: validPeerPresentation.sections.map((section, index) =>
+          index === 0
+            ? {
+                ...section,
+                peersTotal: 45.8,
+                questions: section.questions.map((question, questionIndex) =>
+                  questionIndex === 0 ? { ...question, peers: 6.4 } : question,
+                ),
+              }
+            : section,
+        ),
+      },
+    ],
+    [
+      "a governed presentation with the legacy source",
+      {
+        ...validPhaseFourPresentation,
+        provenance: {
+          ...validPhaseFourPresentation.provenance,
+          sourceId: "2026-08-14.esperto-controlled-v1",
+        },
+      },
+    ],
+    [
+      "a legacy presentation with the governed source",
+      {
+        ...validPeerPresentation,
+        provenance: {
+          ...validPeerPresentation.provenance,
+          sourceId: SU_FULL_PHASE_PEER_SOURCE_ID,
+        },
+      },
+    ],
     [
       "an out-of-range",
       {

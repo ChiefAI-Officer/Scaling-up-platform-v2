@@ -31,6 +31,11 @@ import { hasSourcePublicResult } from "@/lib/assessments/report-config";
 import { LVA_TEMPLATE_ALIAS } from "@/lib/assessments/lva-report-display";
 import { PEER_RENDER_ENABLED_ALIASES } from "@/lib/assessments/peer-benchmarks";
 import { SCALING_UP_FULL_TEMPLATE_ALIAS } from "@/lib/assessments/su-full-question-benchmarks";
+import {
+  SU_FULL_PHASE_PEER_CONTENT_HASHES,
+  SU_FULL_PHASE_PEER_SOURCE_ID,
+  SU_FULL_PHASE_PEER_VECTORS,
+} from "@/lib/assessments/su-full-phase-peer-catalogue";
 import * as peerBenchmarksModule from "@/lib/assessments/peer-benchmarks";
 import * as suFullPeerPresentationModule from "@/lib/assessments/su-full-peer-presentation";
 import type { RespondentReport } from "@/lib/assessments/respondent-report";
@@ -70,6 +75,26 @@ function lvaReport(): RespondentReport {
   };
 }
 
+function phaseFourReport(): RespondentReport {
+  const report = completeSuFullPeerReport();
+  return {
+    ...report,
+    result: {
+      ...report.result,
+      recommendationPhase: 4,
+      peerBenchmarkSnapshot: {
+        sourceId: SU_FULL_PHASE_PEER_SOURCE_ID,
+        contentHash: SU_FULL_PHASE_PEER_CONTENT_HASHES[4],
+        phase: 4,
+      },
+      perQuestion: report.result.perQuestion.map((row) => ({
+        ...row,
+        peerValue: SU_FULL_PHASE_PEER_VECTORS[4][row.stableKey],
+      })),
+    },
+  };
+}
+
 test("flag off returns the original report without a DB read", async () => {
   const report = completeSuFullPeerReport();
 
@@ -87,12 +112,14 @@ test("flag off returns the original report without a DB read", async () => {
   expect(result.lvaPeerComparison).toBeNull();
 });
 
-test("eligible Classic SU Full performs one query and attaches the ready model", async () => {
-  findMany.mockResolvedValue(completeSuFullBenchmarkRows());
+test("eligible Classic SU Full attaches the frozen model without a benchmark query", async () => {
+  findMany.mockResolvedValue(
+    completeSuFullBenchmarkRows().map((row) => ({ ...row, value: 0 })),
+  );
 
   const result = await resolvePeerReportEnhancements({
     db,
-    report: completeSuFullPeerReport(),
+    report: phaseFourReport(),
     templateId: "tpl-su",
     reportStylesAvailable: true,
     peerBenchmarksEnabled: true,
@@ -100,16 +127,13 @@ test("eligible Classic SU Full performs one query and attaches the ready model",
     logger: { warn },
   });
 
-  expect(findMany).toHaveBeenCalledTimes(1);
-  expect(findMany).toHaveBeenCalledWith({
-    where: { templateId: "tpl-su", metricKind: "QUESTION" },
-    select: { metricKey: true, value: true, updatedAt: true },
-  });
+  expect(findMany).not.toHaveBeenCalled();
   expect(
     result.report.suFullPeerPresentation?.sections.flatMap(
       (section) => section.questions,
     ),
   ).toHaveLength(61);
+  expect(result.report.suFullPeerPresentation?.sections[0].questions[0].peers).toBe(6.6);
 });
 
 test("an absent render alias skips the benchmark query", async () => {
@@ -135,8 +159,7 @@ test("the default render aliases enable SU Full and LVA", async () => {
     SCALING_UP_FULL_TEMPLATE_ALIAS,
   ]);
 
-  findMany.mockResolvedValueOnce(completeSuFullBenchmarkRows());
-  const suFullReport = completeSuFullPeerReport();
+  const suFullReport = phaseFourReport();
   const suFullResult = await resolvePeerReportEnhancements({
     db,
     report: suFullReport,
@@ -146,7 +169,7 @@ test("the default render aliases enable SU Full and LVA", async () => {
     logger: { warn },
   });
 
-  expect(findMany).toHaveBeenCalledTimes(1);
+  expect(findMany).not.toHaveBeenCalled();
   expect(suFullResult.report.suFullPeerPresentation).toBeDefined();
 
   findMany.mockResolvedValue([
@@ -166,7 +189,11 @@ test("the default render aliases enable SU Full and LVA", async () => {
     logger: { warn },
   });
 
-  expect(findMany).toHaveBeenCalledTimes(2);
+  expect(findMany).toHaveBeenCalledTimes(1);
+  expect(findMany).toHaveBeenCalledWith({
+    where: { templateId: "tpl-lva", metricKind: "QUESTION" },
+    select: { metricKey: true, value: true, updatedAt: true },
+  });
   expect(lvaResult.lvaPeerComparison?.items).toEqual([
     expect.objectContaining({ stableKey: "S3_culture", peers: 6.3 }),
   ]);
@@ -191,7 +218,7 @@ test.each(["EXECUTIVE_BOARDROOM", "MODERN_DASHBOARD"])(
     expect(result.report).toBe(report);
   },
 );
-test("unavailable report styles fall back to Classic and query", async () => {
+test("unavailable report styles fall back to Classic without querying", async () => {
   findMany.mockResolvedValue(completeSuFullBenchmarkRows());
   const report = {
     ...completeSuFullPeerReport(),
@@ -208,11 +235,11 @@ test("unavailable report styles fall back to Classic and query", async () => {
     logger: { warn },
   });
 
-  expect(findMany).toHaveBeenCalledTimes(1);
+  expect(findMany).not.toHaveBeenCalled();
   expect(result.report.suFullPeerPresentation).toBeDefined();
 });
 
-test("a source-owned result resolves to Classic before querying", async () => {
+test("a source-owned result resolves to Classic without querying", async () => {
   mockHasSourcePublicResult.mockReturnValue(true);
   findMany.mockResolvedValue(completeSuFullBenchmarkRows());
   const report = {
@@ -231,13 +258,13 @@ test("a source-owned result resolves to Classic before querying", async () => {
     logger: { warn },
   });
 
-  expect(findMany).toHaveBeenCalledTimes(1);
+  expect(findMany).not.toHaveBeenCalled();
   expect(result.report.suFullPeerPresentation).toBeDefined();
 });
 
-test("incomplete SU benchmark rows retain the original report and log a bounded warning", async () => {
-  const report = completeSuFullPeerReport();
-  findMany.mockResolvedValue(completeSuFullBenchmarkRows().slice(1));
+test("an incomplete frozen SU snapshot retains the original report and logs bounded provenance", async () => {
+  const report = phaseFourReport();
+  report.result.perQuestion[0].peerValue = undefined;
 
   const result = await resolvePeerReportEnhancements({
     db,
@@ -252,20 +279,32 @@ test("incomplete SU benchmark rows retain the original report and log a bounded 
   expect(result.report).toBe(report);
   expect(warn).toHaveBeenCalledTimes(1);
   expect(warn).toHaveBeenCalledWith("assessment.peer_benchmark.unavailable", {
-    reason: "MISSING_ROWS",
+    reason: "SNAPSHOT_INCOMPLETE",
     templateAlias: "scaling-up-full",
-    templateId: "tpl-su",
-    submissionId: "sub-1",
-    versionId: "ver-4",
     expectedCount: 61,
-    benchmarkCount: 60,
+    frozenCount: 60,
     scoreCount: 61,
+    sourceId: SU_FULL_PHASE_PEER_SOURCE_ID,
+    phase: 4,
+    contentHash: SU_FULL_PHASE_PEER_CONTENT_HASHES[4],
   });
+  expect(warn.mock.calls[0][1]).not.toHaveProperty("result");
+  expect(warn.mock.calls[0][1]).not.toHaveProperty("respondentName");
+  expect(warn.mock.calls[0][1]).not.toHaveProperty("respondentEmail");
+  expect(warn.mock.calls[0][1]).not.toHaveProperty("submissionId");
 });
 
-test("a benchmark DB failure retains the original report and logs only the error name", async () => {
-  const report = completeSuFullPeerReport();
-  findMany.mockRejectedValue(new TypeError("database credentials are secret"));
+test("malformed snapshot provenance cannot inject nested report or identity data into telemetry", async () => {
+  const report = phaseFourReport();
+  report.result.peerBenchmarkSnapshot = {
+    sourceId: `${"x".repeat(2_048)}ari@example.com`,
+    contentHash: SU_FULL_PHASE_PEER_CONTENT_HASHES[4],
+    phase: {
+      respondentEmail: "ari@example.com",
+      answers: [{ stableKey: "Q01", value: 10 }],
+      result: report.result,
+    },
+  } as never;
 
   const result = await resolvePeerReportEnhancements({
     db,
@@ -278,14 +317,68 @@ test("a benchmark DB failure retains the original report and logs only the error
   });
 
   expect(result.report).toBe(report);
+  expect(findMany).not.toHaveBeenCalled();
+  expect(warn).toHaveBeenCalledWith("assessment.peer_benchmark.unavailable", {
+    reason: "SNAPSHOT_INCOMPLETE",
+    templateAlias: "scaling-up-full",
+    expectedCount: 61,
+    frozenCount: 61,
+    scoreCount: 61,
+    contentHash: SU_FULL_PHASE_PEER_CONTENT_HASHES[4],
+  });
+  const serializedWarning = JSON.stringify(warn.mock.calls[0][1]);
+  expect(serializedWarning).not.toContain("ari@example.com");
+  expect(serializedWarning).not.toContain("answers");
+  expect(serializedWarning).not.toContain("perQuestion");
+});
+
+test("an LVA benchmark DB failure retains the original report and logs only the error name", async () => {
+  const report = lvaReport();
+  findMany.mockRejectedValue(new TypeError("database credentials are secret"));
+
+  const result = await resolvePeerReportEnhancements({
+    db,
+    report,
+    templateId: "tpl-lva",
+    reportStylesAvailable: true,
+    peerBenchmarksEnabled: true,
+    enabledAliases: [LVA_TEMPLATE_ALIAS],
+    logger: { warn },
+  });
+
+  expect(result.report).toBe(report);
   expect(warn).toHaveBeenCalledWith("assessment.peer_benchmark.unavailable", {
     reason: "DB_ERROR",
-    templateAlias: "scaling-up-full",
-    templateId: "tpl-su",
-    submissionId: "sub-1",
-    versionId: "ver-4",
+    templateAlias: LVA_TEMPLATE_ALIAS,
     errorName: "TypeError",
   });
+});
+
+test("an adversarial DB Error.name cannot inject long identity data into telemetry", async () => {
+  const report = lvaReport();
+  const adversarial = new Error("message ari@example.com must never be logged");
+  adversarial.name = `${"SensitiveName".repeat(200)}ari@example.com`;
+  findMany.mockRejectedValue(adversarial);
+
+  const result = await resolvePeerReportEnhancements({
+    db,
+    report,
+    templateId: "tpl-lva",
+    reportStylesAvailable: true,
+    peerBenchmarksEnabled: true,
+    enabledAliases: [LVA_TEMPLATE_ALIAS],
+    logger: { warn },
+  });
+
+  expect(result.report).toBe(report);
+  expect(warn).toHaveBeenCalledWith("assessment.peer_benchmark.unavailable", {
+    reason: "DB_ERROR",
+    templateAlias: LVA_TEMPLATE_ALIAS,
+    errorName: "UnknownError",
+  });
+  const serializedWarning = JSON.stringify(warn.mock.calls[0][1]);
+  expect(serializedWarning).not.toContain("ari@example.com");
+  expect(serializedWarning.length).toBeLessThan(256);
 });
 
 test("an unexpected SU Full builder exception retains the original report with bounded telemetry", async () => {
@@ -316,9 +409,6 @@ test("an unexpected SU Full builder exception retains the original report with b
   expect(warn).toHaveBeenCalledWith("assessment.peer_benchmark.unavailable", {
     reason: "BUILD_ERROR",
     templateAlias: "scaling-up-full",
-    templateId: "tpl-su",
-    submissionId: "sub-1",
-    versionId: "ver-4",
     errorName: "EvalError",
   });
   expect(warn.mock.calls[0][1]).not.toHaveProperty("message");
@@ -355,9 +445,6 @@ test("an unexpected LVA builder exception retains the original report with bound
   expect(warn).toHaveBeenCalledWith("assessment.peer_benchmark.unavailable", {
     reason: "BUILD_ERROR",
     templateAlias: LVA_TEMPLATE_ALIAS,
-    templateId: "tpl-lva",
-    submissionId: "sub-1",
-    versionId: "ver-4",
     errorName: "RangeError",
   });
   expect(warn.mock.calls[0][1]).not.toHaveProperty("message");
@@ -386,33 +473,25 @@ test("LVA preserves its existing PeerComparisonSection builder behavior", async 
   ]);
 });
 
-test("the submission wrapper performs one template lookup then one benchmark query", async () => {
-  findSubmission.mockResolvedValue({ campaign: { templateId: "tpl-su" } });
-  findMany.mockResolvedValue(completeSuFullBenchmarkRows());
-
-  await resolvePeerReportEnhancementsForSubmission({
+test("the submission wrapper renders SU Full before any template or benchmark lookup", async () => {
+  const result = await resolvePeerReportEnhancementsForSubmission({
     db,
-    report: completeSuFullPeerReport(),
+    report: phaseFourReport(),
     reportStylesAvailable: true,
     peerBenchmarksEnabled: true,
     enabledAliases: ["scaling-up-full"],
     logger: { warn },
   });
 
-  expect(findSubmission).toHaveBeenCalledWith({
-    where: { id: "sub-1" },
-    select: { campaign: { select: { templateId: true } } },
-  });
-  expect(findMany).toHaveBeenCalledTimes(1);
+  expect(findSubmission).not.toHaveBeenCalled();
+  expect(findMany).not.toHaveBeenCalled();
+  expect(result.report.suFullPeerPresentation?.provenance.phase).toBe(4);
 });
 
-test("the campaign wrapper performs one template lookup then one benchmark query", async () => {
-  findCampaign.mockResolvedValue({ templateId: "tpl-su" });
-  findMany.mockResolvedValue(completeSuFullBenchmarkRows());
-
-  await resolvePeerReportEnhancementsForCampaign({
+test("the campaign wrapper renders SU Full before any template or benchmark lookup", async () => {
+  const result = await resolvePeerReportEnhancementsForCampaign({
     db,
-    report: completeSuFullPeerReport(),
+    report: phaseFourReport(),
     campaignId: "camp-1",
     reportStylesAvailable: true,
     peerBenchmarksEnabled: true,
@@ -420,11 +499,62 @@ test("the campaign wrapper performs one template lookup then one benchmark query
     logger: { warn },
   });
 
+  expect(findCampaign).not.toHaveBeenCalled();
+  expect(findMany).not.toHaveBeenCalled();
+  expect(result.report.suFullPeerPresentation?.provenance.phase).toBe(4);
+});
+
+test("the submission wrapper preserves the LVA template lookup and benchmark query", async () => {
+  findSubmission.mockResolvedValue({ campaign: { templateId: "tpl-lva" } });
+  findMany.mockResolvedValue([
+    { metricKey: "S3_culture", value: 6.3, updatedAt: new Date("2026-08-14T00:00:00Z") },
+  ]);
+
+  const result = await resolvePeerReportEnhancementsForSubmission({
+    db,
+    report: lvaReport(),
+    reportStylesAvailable: true,
+    peerBenchmarksEnabled: true,
+    enabledAliases: [LVA_TEMPLATE_ALIAS],
+    logger: { warn },
+  });
+
+  expect(findSubmission).toHaveBeenCalledWith({
+    where: { id: "sub-1" },
+    select: { campaign: { select: { templateId: true } } },
+  });
+  expect(findMany).toHaveBeenCalledWith({
+    where: { templateId: "tpl-lva", metricKind: "QUESTION" },
+    select: { metricKey: true, value: true, updatedAt: true },
+  });
+  expect(result.lvaPeerComparison?.items[0]).toMatchObject({ peers: 6.3 });
+});
+
+test("the campaign wrapper preserves the LVA template lookup and benchmark query", async () => {
+  findCampaign.mockResolvedValue({ templateId: "tpl-lva" });
+  findMany.mockResolvedValue([
+    { metricKey: "S3_culture", value: 6.3, updatedAt: new Date("2026-08-14T00:00:00Z") },
+  ]);
+
+  const result = await resolvePeerReportEnhancementsForCampaign({
+    db,
+    report: lvaReport(),
+    campaignId: "camp-1",
+    reportStylesAvailable: true,
+    peerBenchmarksEnabled: true,
+    enabledAliases: [LVA_TEMPLATE_ALIAS],
+    logger: { warn },
+  });
+
   expect(findCampaign).toHaveBeenCalledWith({
     where: { id: "camp-1", deletedAt: null },
     select: { templateId: true },
   });
-  expect(findMany).toHaveBeenCalledTimes(1);
+  expect(findMany).toHaveBeenCalledWith({
+    where: { templateId: "tpl-lva", metricKind: "QUESTION" },
+    select: { metricKey: true, value: true, updatedAt: true },
+  });
+  expect(result.lvaPeerComparison?.items[0]).toMatchObject({ peers: 6.3 });
 });
 
 const wrapperGateCases: Array<[
@@ -490,7 +620,7 @@ test.each(wrapperGateCases)(
 );
 
 test("a missing submission retains the original report without a benchmark query", async () => {
-  const report = completeSuFullPeerReport();
+  const report = lvaReport();
   findSubmission.mockResolvedValue(null);
 
   const result = await resolvePeerReportEnhancementsForSubmission({
@@ -498,7 +628,7 @@ test("a missing submission retains the original report without a benchmark query
     report,
     reportStylesAvailable: true,
     peerBenchmarksEnabled: true,
-    enabledAliases: ["scaling-up-full"],
+    enabledAliases: [LVA_TEMPLATE_ALIAS],
     logger: { warn },
   });
 
@@ -506,17 +636,14 @@ test("a missing submission retains the original report without a benchmark query
   expect(result.report).toBe(report);
   expect(warn).toHaveBeenCalledWith("assessment.peer_benchmark.unavailable", {
     reason: "SUBMISSION_TEMPLATE_NOT_FOUND",
-    templateAlias: "scaling-up-full",
-    templateId: undefined,
-    submissionId: "sub-1",
-    versionId: "ver-4",
+    templateAlias: LVA_TEMPLATE_ALIAS,
   });
 });
 
 test.each(["campaign", "submission"] as const)(
   "the %s wrapper intercepts an unexpected delegated rejection",
   async (wrapperKind) => {
-    const report = completeSuFullPeerReport();
+    const report = lvaReport();
     findCampaign.mockResolvedValue({ templateId: "tpl-su" });
     findSubmission.mockResolvedValue({ campaign: { templateId: "tpl-su" } });
     findMany.mockResolvedValue(completeSuFullBenchmarkRows());
@@ -528,7 +655,7 @@ test.each(["campaign", "submission"] as const)(
       report,
       reportStylesAvailable: true,
       peerBenchmarksEnabled: true,
-      enabledAliases: ["scaling-up-full"],
+      enabledAliases: [LVA_TEMPLATE_ALIAS],
       logger: { warn },
       resolveEnhancements,
     };
@@ -545,10 +672,7 @@ test.each(["campaign", "submission"] as const)(
     expect(resolveEnhancements).toHaveBeenCalledTimes(1);
     expect(warn).toHaveBeenCalledWith("assessment.peer_benchmark.unavailable", {
       reason: "RESOLVER_ERROR",
-      templateAlias: "scaling-up-full",
-      templateId: "tpl-su",
-      submissionId: "sub-1",
-      versionId: "ver-4",
+      templateAlias: LVA_TEMPLATE_ALIAS,
       errorName: "URIError",
     });
     expect(warn.mock.calls[0][1]).not.toHaveProperty("message");
