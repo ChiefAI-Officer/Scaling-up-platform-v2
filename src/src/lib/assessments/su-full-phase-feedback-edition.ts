@@ -6,7 +6,14 @@ import {
   buildPhaseRecommendations,
   SU_FULL_PHASE_FEEDBACK_SOURCE_ID,
 } from "@/lib/assessments/su-full-phase-feedback-catalogue";
+import {
+  buildPhasePeerBenchmarks,
+  SU_FULL_PHASE_PEER_CONTENT_HASHES,
+  SU_FULL_PHASE_PEER_SOURCE_ID,
+} from "@/lib/assessments/su-full-phase-peer-catalogue";
+import { hashPhasePeerVector } from "@/lib/assessments/su-full-phase-peer-catalogue-generator";
 import { CURRENT_GROWTH_PHASE_BANDS } from "@/lib/assessments/su-full-phase";
+import type { GrowthPhaseNumber } from "@/lib/assessments/su-full-phase";
 import { computeTemplateContentHash } from "@/lib/assessments/template-content-hash";
 import { getPublishValidationIssues } from "@/lib/assessments/scoring";
 import {
@@ -17,6 +24,8 @@ import {
 const TEMPLATE_ALIAS = "scaling-up-full" as const;
 const EXPECTED_QUESTION_COUNT = 61;
 const EXPECTED_PHASE_BAND_RECORD_COUNT = 1_220;
+const EXPECTED_PHASE_PEER_RECORD_COUNT = 305;
+const PEER_PHASES = [1, 2, 3, 4, 5] as const satisfies readonly GrowthPhaseNumber[];
 const DRAFT_AUDIT_ACTION = "SU_FULL_PHASE_FEEDBACK_DRAFT_CREATED";
 const PUBLISH_AUDIT_ACTION = "SU_FULL_PHASE_FEEDBACK_DRAFT_PUBLISHED";
 const SERIALIZABLE_TRANSACTION_OPTIONS = {
@@ -64,6 +73,7 @@ type QuestionRecord = Record<string, unknown> & {
   sortOrder?: unknown;
   type?: unknown;
   phaseRecommendations?: unknown;
+  phasePeerBenchmarks?: unknown;
 };
 
 interface TemplateRow {
@@ -109,6 +119,7 @@ interface PhaseFeedbackEditionTx {
   };
   assessmentTemplateVersion: {
     findFirst(args: unknown): Promise<VersionRow | null>;
+    findMany(args: unknown): Promise<VersionRow[]>;
     create(args: { data: Record<string, unknown> }): Promise<{
       id: string;
       versionNumber: number;
@@ -149,6 +160,9 @@ export interface PhaseFeedbackDraftReceipt {
   afterContentHash: string;
   questionCount: number;
   phaseBandRecordCount: number;
+  peerSourceId: typeof SU_FULL_PHASE_PEER_SOURCE_ID;
+  peerPhaseContentHashes: typeof SU_FULL_PHASE_PEER_CONTENT_HASHES;
+  phasePeerRecordCount: 305;
   phaseBoundaries: typeof SU_FULL_PHASE_FEEDBACK_BOUNDARIES;
   historicRowsMutated: false;
   draftVersionId: string;
@@ -368,7 +382,17 @@ function canonicalScoredQuestions(questions: unknown): QuestionRecord[] {
   return scored;
 }
 
-function attachPhaseRecommendations(questions: unknown): unknown[] {
+function peerCatalogueMetadata(): Record<string, unknown> {
+  return {
+    sourceId: SU_FULL_PHASE_PEER_SOURCE_ID,
+    phases: PEER_PHASES.map((phase) => ({
+      phase,
+      contentHash: SU_FULL_PHASE_PEER_CONTENT_HASHES[phase],
+    })),
+  };
+}
+
+function attachPhaseAwareContent(questions: unknown): unknown[] {
   const scored = canonicalScoredQuestions(questions);
   const scoredSet = new Set(scored);
   return (questions as unknown[]).map((rawQuestion) => {
@@ -378,27 +402,92 @@ function attachPhaseRecommendations(questions: unknown): unknown[] {
     return {
       ...question,
       phaseRecommendations: buildPhaseRecommendations(stableKey),
+      phasePeerBenchmarks: buildPhasePeerBenchmarks(stableKey),
     };
   });
 }
 
-function assertCanonicalPhaseRecommendations(questions: unknown): void {
+function attachPhasePeerCatalogue(scoringConfig: unknown): Record<string, unknown> {
+  if (!isRecord(scoringConfig)) {
+    throw new Error("Scaling Up Full scoring config must be an object.");
+  }
+  return {
+    ...scoringConfig,
+    phasePeerBenchmarkCatalogue: peerCatalogueMetadata(),
+  };
+}
+
+function assertCanonicalPhaseAwareContent(
+  questions: unknown,
+  scoringConfig: unknown,
+): void {
   const scored = canonicalScoredQuestions(questions);
-  let recordCount = 0;
+  let phaseBandRecordCount = 0;
+  let phasePeerRecordCount = 0;
+  const phaseVectors = Object.fromEntries(
+    PEER_PHASES.map((phase) => [phase, {} as Record<string, number>]),
+  ) as Record<GrowthPhaseNumber, Record<string, number>>;
   for (const question of scored) {
     const stableKey = String(question.stableKey);
-    const expected = buildPhaseRecommendations(stableKey);
-    if (JSON.stringify(question.phaseRecommendations) !== JSON.stringify(expected)) {
+    const expectedRecommendations = buildPhaseRecommendations(stableKey);
+    if (
+      JSON.stringify(question.phaseRecommendations) !==
+      JSON.stringify(expectedRecommendations)
+    ) {
       throw new Error(
         `Scaling Up Full question ${stableKey} does not match the audited phase-feedback catalogue.`,
       );
     }
-    recordCount += expected.reduce((count, row) => count + row.bands.length, 0);
-  }
-  if (recordCount !== EXPECTED_PHASE_BAND_RECORD_COUNT) {
-    throw new Error(
-      `Scaling Up Full expected ${EXPECTED_PHASE_BAND_RECORD_COUNT} phase-band records, found ${recordCount}.`,
+    phaseBandRecordCount += expectedRecommendations.reduce(
+      (count, row) => count + row.bands.length,
+      0,
     );
+
+    const expectedPeers = buildPhasePeerBenchmarks(stableKey);
+    if (
+      JSON.stringify(question.phasePeerBenchmarks) !== JSON.stringify(expectedPeers)
+    ) {
+      throw new Error(
+        `Scaling Up Full question ${stableKey} does not match the audited phase-peer catalogue.`,
+      );
+    }
+    for (const row of question.phasePeerBenchmarks as Array<{
+      phase: GrowthPhaseNumber;
+      value: number;
+    }>) {
+      phaseVectors[row.phase][stableKey] = row.value;
+      phasePeerRecordCount += 1;
+    }
+  }
+  if (phaseBandRecordCount !== EXPECTED_PHASE_BAND_RECORD_COUNT) {
+    throw new Error(
+      `Scaling Up Full expected ${EXPECTED_PHASE_BAND_RECORD_COUNT} phase-band records, found ${phaseBandRecordCount}.`,
+    );
+  }
+  if (phasePeerRecordCount !== EXPECTED_PHASE_PEER_RECORD_COUNT) {
+    throw new Error(
+      `Scaling Up Full expected ${EXPECTED_PHASE_PEER_RECORD_COUNT} phase-peer records, found ${phasePeerRecordCount}.`,
+    );
+  }
+
+  if (!isRecord(scoringConfig)) {
+    throw new Error("Scaling Up Full scoring config must be an object.");
+  }
+  if (
+    JSON.stringify(scoringConfig.phasePeerBenchmarkCatalogue) !==
+    JSON.stringify(peerCatalogueMetadata())
+  ) {
+    throw new Error(
+      "Scaling Up Full scoring config does not match the audited phase-peer catalogue metadata or content hash.",
+    );
+  }
+  for (const phase of PEER_PHASES) {
+    const actualHash = hashPhasePeerVector(phaseVectors[phase]);
+    if (actualHash !== SU_FULL_PHASE_PEER_CONTENT_HASHES[phase]) {
+      throw new Error(
+        `Scaling Up Full phase P${phase} peer vector does not match its audited content hash.`,
+      );
+    }
   }
 }
 
@@ -437,6 +526,9 @@ function receiptFor(
     afterContentHash,
     questionCount: EXPECTED_QUESTION_COUNT,
     phaseBandRecordCount: EXPECTED_PHASE_BAND_RECORD_COUNT,
+    peerSourceId: SU_FULL_PHASE_PEER_SOURCE_ID,
+    peerPhaseContentHashes: SU_FULL_PHASE_PEER_CONTENT_HASHES,
+    phasePeerRecordCount: EXPECTED_PHASE_PEER_RECORD_COUNT,
     phaseBoundaries: SU_FULL_PHASE_FEEDBACK_BOUNDARIES,
     historicRowsMutated: false,
     draftVersionId: draft.id,
@@ -504,6 +596,8 @@ function assertDraftReceipt(
     "afterContentHash",
     "questionCount",
     "phaseBandRecordCount",
+    "peerSourceId",
+    "phasePeerRecordCount",
     "historicRowsMutated",
     "draftVersionId",
     "draftVersionNumber",
@@ -519,7 +613,11 @@ function assertDraftReceipt(
       );
     }
   }
-  if (JSON.stringify(raw.phaseBoundaries) !== JSON.stringify(expected.phaseBoundaries)) {
+  if (
+    JSON.stringify(raw.phaseBoundaries) !== JSON.stringify(expected.phaseBoundaries) ||
+    JSON.stringify(raw.peerPhaseContentHashes) !==
+      JSON.stringify(expected.peerPhaseContentHashes)
+  ) {
     throw new Error(
       `Scaling Up Full version ${draft.versionNumber} does not match its phase-feedback draft audit receipt.`,
     );
@@ -556,6 +654,8 @@ function assertPublishReceipt(
     "afterContentHash",
     "questionCount",
     "phaseBandRecordCount",
+    "peerSourceId",
+    "phasePeerRecordCount",
     "historicRowsMutated",
     "draftVersionId",
     "draftVersionNumber",
@@ -573,6 +673,8 @@ function assertPublishReceipt(
   }
   if (
     JSON.stringify(raw.phaseBoundaries) !== JSON.stringify(receipt.phaseBoundaries) ||
+    JSON.stringify(raw.peerPhaseContentHashes) !==
+      JSON.stringify(receipt.peerPhaseContentHashes) ||
     JSON.stringify(raw.phaseDriverContract) !==
       JSON.stringify(receipt.phaseDriverContract) ||
     raw.approvedContentHash !== expectedApprovedContentHash ||
@@ -677,7 +779,7 @@ export async function createScalingUpFullPhaseFeedbackDraft(
       ]);
       assertTemplate(template);
 
-      const [latestVersion, activeVersion] = await Promise.all([
+      const [latestVersion, activeVersion, unpublishedVersions] = await Promise.all([
         tx.assessmentTemplateVersion.findFirst({
           where: {
             templateId: template.id,
@@ -695,6 +797,15 @@ export async function createScalingUpFullPhaseFeedbackDraft(
           orderBy: { versionNumber: "desc" },
           select: versionSelect,
         }),
+        tx.assessmentTemplateVersion.findMany({
+          where: {
+            templateId: template.id,
+            language: DEFAULT_TEMPLATE_LANGUAGE,
+            publishedAt: null,
+            archivedAt: null,
+          },
+          select: versionSelect,
+        }),
       ]);
       assertEnglishVersion(latestVersion, "Latest Scaling Up Full English edition");
       assertEnglishVersion(activeVersion, "Active published Scaling Up Full English edition");
@@ -705,6 +816,15 @@ export async function createScalingUpFullPhaseFeedbackDraft(
       if (activeVersion.templateId !== template.id) {
         throw new Error("Active published version is not a Scaling Up Full edition.");
       }
+      if (
+        unpublishedVersions.length > 1 ||
+        (unpublishedVersions.length === 1 &&
+          unpublishedVersions[0].id !== latestVersion.id)
+      ) {
+        throw new Error(
+          `Template "${TEMPLATE_ALIAS}" has a competing unpublished draft; refusing to create or reuse another edition.`,
+        );
+      }
 
       assertExactPhaseDriver(
         activeVersion.questions,
@@ -713,12 +833,13 @@ export async function createScalingUpFullPhaseFeedbackDraft(
       );
       canonicalScoredQuestions(activeVersion.questions);
       assertVersionHash(template, activeVersion, "Active published Scaling Up Full edition");
-      const questions = attachPhaseRecommendations(activeVersion.questions);
-      assertCanonicalPhaseRecommendations(questions);
+      const questions = attachPhaseAwareContent(activeVersion.questions);
+      const scoringConfig = attachPhasePeerCatalogue(activeVersion.scoringConfig);
+      assertCanonicalPhaseAwareContent(questions, scoringConfig);
       const afterContentHash = computeTemplateContentHash({
         questions,
         sections: activeVersion.sections,
-        scoringConfig: activeVersion.scoringConfig,
+        scoringConfig,
         reportConfig: activeVersion.reportConfig ?? null,
         invitationSubject: template.invitationSubject,
         invitationBodyMarkdown: template.invitationBodyMarkdown,
@@ -738,7 +859,10 @@ export async function createScalingUpFullPhaseFeedbackDraft(
             `Template "${TEMPLATE_ALIAS}" already has unpublished draft version ${latestVersion.versionNumber}; refusing to supersede it.`,
           );
         }
-        assertCanonicalPhaseRecommendations(latestVersion.questions);
+        assertCanonicalPhaseAwareContent(
+          latestVersion.questions,
+          latestVersion.scoringConfig,
+        );
         assertVersionHash(template, latestVersion, "Existing Scaling Up Full draft");
         const draftAudit = await findDraftAudit(tx, latestVersion);
         const creator = await resolveDraftReceiptCreator(
@@ -760,7 +884,10 @@ export async function createScalingUpFullPhaseFeedbackDraft(
       }
 
       if (activeVersion.contentHash === afterContentHash) {
-        assertCanonicalPhaseRecommendations(activeVersion.questions);
+        assertCanonicalPhaseAwareContent(
+          activeVersion.questions,
+          activeVersion.scoringConfig,
+        );
         throw new Error(
           `Scaling Up Full phase feedback is already published in version ${activeVersion.versionNumber}; no unpublished draft exists.`,
         );
@@ -773,7 +900,7 @@ export async function createScalingUpFullPhaseFeedbackDraft(
           language: DEFAULT_TEMPLATE_LANGUAGE,
           questions,
           sections: activeVersion.sections,
-          scoringConfig: activeVersion.scoringConfig,
+          scoringConfig,
           reportConfig: activeVersion.reportConfig ?? null,
           contentHash: afterContentHash,
           publishedAt: null,
@@ -866,7 +993,7 @@ export async function publishScalingUpFullPhaseFeedbackDraft(
         draft.sections,
         `Scaling Up Full version ${draft.versionNumber}`,
       );
-      assertCanonicalPhaseRecommendations(draft.questions);
+      assertCanonicalPhaseAwareContent(draft.questions, draft.scoringConfig);
       assertVersionHash(template, draft, `Scaling Up Full version ${draft.versionNumber}`);
       if (draft.contentHash !== expectedApprovedContentHash) {
         throw new Error(

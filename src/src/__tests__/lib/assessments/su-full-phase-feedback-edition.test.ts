@@ -5,6 +5,11 @@ import {
   type PhaseFeedbackEditionDb,
 } from "@/lib/assessments/su-full-phase-feedback-edition";
 import { buildPhaseRecommendations } from "@/lib/assessments/su-full-phase-feedback-catalogue";
+import {
+  buildPhasePeerBenchmarks,
+  SU_FULL_PHASE_PEER_CONTENT_HASHES,
+  SU_FULL_PHASE_PEER_SOURCE_ID,
+} from "@/lib/assessments/su-full-phase-peer-catalogue";
 import { computeTemplateContentHash } from "@/lib/assessments/template-content-hash";
 import * as publishCli from "../../../../scripts/publish-scaling-up-full-phase-feedback-draft";
 
@@ -14,6 +19,7 @@ type Question = Record<string, unknown> & {
   type: string;
   recommendations?: unknown[];
   phaseRecommendations?: unknown[];
+  phasePeerBenchmarks?: Array<{ phase: number; value: number }>;
 };
 
 type Version = {
@@ -47,6 +53,23 @@ const PHASE_BOUNDARIES = [
   { phase: 4, name: "Delegation", minFte: 51, maxFte: 150 },
   { phase: 5, name: "Standardization", minFte: 151, maxFte: null },
 ] as const;
+
+const PEER_PHASE_CONTENT_HASHES = {
+  1: "fe63364e3b5e42897b3b3886135310f673e320b4a07b1453ad300a49a91b4dbd",
+  2: "fe63364e3b5e42897b3b3886135310f673e320b4a07b1453ad300a49a91b4dbd",
+  3: "fe63364e3b5e42897b3b3886135310f673e320b4a07b1453ad300a49a91b4dbd",
+  4: "ae9e9e2fbfc8525f4e6d8c3ca65775a50b85476371f29a74934dbe6dd3a965ff",
+  5: "fe63364e3b5e42897b3b3886135310f673e320b4a07b1453ad300a49a91b4dbd",
+} as const;
+
+const PEER_CATALOGUE_METADATA = {
+  sourceId: "2026-08-20.esperto-five-phase-peers-v1",
+  phases: [1, 2, 3, 4, 5].map((phase) => ({
+    phase,
+    contentHash:
+      PEER_PHASE_CONTENT_HASHES[phase as keyof typeof PEER_PHASE_CONTENT_HASHES],
+  })),
+};
 
 const PHASE_DRIVER_CONTRACT = {
   question: {
@@ -91,15 +114,25 @@ function contentHash(
   });
 }
 
-function phaseQuestions(questions: Question[]): Question[] {
+function phaseAwareQuestions(questions: Question[]): Question[] {
   return clone(questions).map((question) =>
     question.type === "SLIDER_LIKERT"
       ? {
           ...question,
           phaseRecommendations: buildPhaseRecommendations(question.stableKey),
+          phasePeerBenchmarks: buildPhasePeerBenchmarks(question.stableKey).map(
+            (row) => ({ ...row }),
+          ),
         }
       : question,
   );
+}
+
+function phaseAwareScoringConfig(scoringConfig: unknown): unknown {
+  return {
+    ...(clone(scoringConfig) as Record<string, unknown>),
+    phasePeerBenchmarkCatalogue: clone(PEER_CATALOGUE_METADATA),
+  };
 }
 
 const PHASE_DRIVER_MUTATIONS: ReadonlyArray<[
@@ -213,11 +246,12 @@ function makeDb(options: {
   options.activeMutate?.(active);
   active.contentHash = options.activeStoredHash ?? contentHash(template, active);
 
-  const desiredQuestions = phaseQuestions(active.questions);
+  const desiredQuestions = phaseAwareQuestions(active.questions);
+  const desiredScoringConfig = phaseAwareScoringConfig(active.scoringConfig);
   const desiredHash = computeTemplateContentHash({
     questions: desiredQuestions,
     sections: active.sections,
-    scoringConfig: active.scoringConfig,
+    scoringConfig: desiredScoringConfig,
     reportConfig: active.reportConfig,
     invitationSubject: template.invitationSubject,
     invitationBodyMarkdown: template.invitationBodyMarkdown,
@@ -227,6 +261,7 @@ function makeDb(options: {
     id: "version-5",
     versionNumber: 5,
     questions: desiredQuestions,
+    scoringConfig: desiredScoringConfig,
     contentHash: desiredHash,
     publishedAt: options.draftPublished
       ? new Date("2026-08-20T10:00:00.000Z")
@@ -278,6 +313,9 @@ function makeDb(options: {
     afterContentHash: desiredHash,
     questionCount: 61,
     phaseBandRecordCount: 1220,
+    peerSourceId: SU_FULL_PHASE_PEER_SOURCE_ID,
+    peerPhaseContentHashes: SU_FULL_PHASE_PEER_CONTENT_HASHES,
+    phasePeerRecordCount: 305,
     phaseBoundaries: PHASE_BOUNDARIES,
     historicRowsMutated: false,
     draftVersionId: draft.id,
@@ -364,6 +402,17 @@ function makeDb(options: {
           [...versions].sort((a, b) => b.versionNumber - a.versionNumber)[0] ?? null,
         );
       }),
+      findMany: jest.fn(({ where }: { where: Record<string, unknown> }) =>
+        Promise.resolve(
+          versions.filter(
+            (version) =>
+              version.templateId === where.templateId &&
+              version.language === where.language &&
+              version.publishedAt === null &&
+              version.archivedAt === null,
+          ),
+        ),
+      ),
       create: jest.fn(({ data }: { data: Record<string, unknown> }) => {
         const created = {
           ...(data as unknown as Version),
@@ -423,6 +472,17 @@ function makeDb(options: {
   };
 }
 
+function rebindDraftHashAndCreationReceipt(ctx: ReturnType<typeof makeDb>): void {
+  ctx.draft.contentHash = contentHash(ctx.template, ctx.draft);
+  const audit = ctx.audits.find(
+    (candidate) => candidate.action === "SU_FULL_PHASE_FEEDBACK_DRAFT_CREATED",
+  );
+  if (!audit) throw new Error("draft creation receipt fixture is missing");
+  const receipt = JSON.parse(audit.changes) as Record<string, unknown>;
+  receipt.afterContentHash = ctx.draft.contentHash;
+  audit.changes = JSON.stringify(receipt);
+}
+
 describe("createScalingUpFullPhaseFeedbackDraft", () => {
   it("clones the exact active published English edition into an audited forward-only draft", async () => {
     const { db, tx, active, template, desiredHash } = makeDb({ latest: "archived" });
@@ -444,6 +504,9 @@ describe("createScalingUpFullPhaseFeedbackDraft", () => {
       afterContentHash: desiredHash,
       questionCount: 61,
       phaseBandRecordCount: 1220,
+      peerSourceId: SU_FULL_PHASE_PEER_SOURCE_ID,
+      peerPhaseContentHashes: PEER_PHASE_CONTENT_HASHES,
+      phasePeerRecordCount: 305,
       phaseBoundaries: PHASE_BOUNDARIES,
       historicRowsMutated: false,
       createdByEmail: "creator@example.com",
@@ -462,7 +525,7 @@ describe("createScalingUpFullPhaseFeedbackDraft", () => {
       versionNumber: 7,
       language: "enUS",
       sections: active.sections,
-      scoringConfig: active.scoringConfig,
+      scoringConfig: phaseAwareScoringConfig(active.scoringConfig),
       reportConfig: active.reportConfig,
       contentHash: desiredHash,
       publishedAt: null,
@@ -473,7 +536,15 @@ describe("createScalingUpFullPhaseFeedbackDraft", () => {
     expect(created.questions[0].phaseRecommendations).toEqual(
       buildPhaseRecommendations("Q01"),
     );
+    expect(created.questions[0].phasePeerBenchmarks).toEqual([
+      { phase: 1, value: 6.3 },
+      { phase: 2, value: 6.3 },
+      { phase: 3, value: 6.3 },
+      { phase: 4, value: 6.6 },
+      { phase: 5, value: 6.3 },
+    ]);
     expect(active.questions[0].phaseRecommendations).toBeUndefined();
+    expect(active.questions[0].phasePeerBenchmarks).toBeUndefined();
     expect(tx.auditLog.create).toHaveBeenCalledTimes(1);
     const audit = tx.auditLog.create.mock.calls[0][0].data;
     expect(audit).toMatchObject({
@@ -496,6 +567,9 @@ describe("createScalingUpFullPhaseFeedbackDraft", () => {
         afterContentHash: desiredHash,
         questionCount: 61,
         phaseBandRecordCount: 1220,
+        peerSourceId: SU_FULL_PHASE_PEER_SOURCE_ID,
+        peerPhaseContentHashes: PEER_PHASE_CONTENT_HASHES,
+        phasePeerRecordCount: 305,
         phaseBoundaries: PHASE_BOUNDARIES,
         historicRowsMutated: false,
         draftVersionId: "version-created",
@@ -583,9 +657,26 @@ describe("createScalingUpFullPhaseFeedbackDraft", () => {
     );
   });
 
+  it("refuses idempotence when a second competing unpublished draft exists", async () => {
+    const ctx = makeDb({ latest: "matching-draft" });
+    ctx.versions.push({
+      ...clone(ctx.draft),
+      id: "version-3-competing-draft",
+      versionNumber: 3,
+      contentHash: "competing-content-hash",
+    });
+
+    await expect(
+      createScalingUpFullPhaseFeedbackDraft(ctx.db, "creator@example.com"),
+    ).rejects.toThrow(/competing|unpublished draft/i);
+    expect(ctx.tx.assessmentTemplateVersion.create).not.toHaveBeenCalled();
+    expect(ctx.tx.auditLog.create).not.toHaveBeenCalled();
+  });
+
   it("does not misreport an already-published phase-aware edition as an idempotent draft", async () => {
     const ctx = makeDb();
-    ctx.active.questions = phaseQuestions(ctx.active.questions);
+    ctx.active.questions = phaseAwareQuestions(ctx.active.questions);
+    ctx.active.scoringConfig = phaseAwareScoringConfig(ctx.active.scoringConfig);
     ctx.active.contentHash = contentHash(ctx.template, ctx.active);
 
     await expect(
@@ -633,6 +724,9 @@ describe("createScalingUpFullPhaseFeedbackDraft", () => {
     ["missing phase-driver contract", (receipt: Record<string, unknown>) => { delete receipt.phaseDriverContract; }],
     ["phase-driver contract", (receipt: Record<string, unknown>) => { receipt.phaseDriverContract = { ...PHASE_DRIVER_CONTRACT, audiencePolicy: "ALL_RESPONDENTS" }; }],
     ["record count", (receipt: Record<string, unknown>) => { receipt.phaseBandRecordCount = 1219; }],
+    ["peer record count", (receipt: Record<string, unknown>) => { receipt.phasePeerRecordCount = 304; }],
+    ["peer source", (receipt: Record<string, unknown>) => { receipt.peerSourceId = "other-peer-source"; }],
+    ["peer phase hashes", (receipt: Record<string, unknown>) => { receipt.peerPhaseContentHashes = { ...PEER_PHASE_CONTENT_HASHES, 4: "a".repeat(64) }; }],
     ["phase boundaries", (receipt: Record<string, unknown>) => { receipt.phaseBoundaries = PHASE_BOUNDARIES.slice(0, 4); }],
   ])("refuses idempotence when the draft receipt has a wrong %s", async (_label, mutate) => {
     const ctx = makeDb({ latest: "matching-draft" });
@@ -760,6 +854,22 @@ describe("createScalingUpFullPhaseFeedbackDraft", () => {
     expect(tx.assessmentTemplateVersion.create).not.toHaveBeenCalled();
   });
 
+  it("refuses a source missing the governed Q61 slider", async () => {
+    const ctx = makeDb({
+      activeMutate(version) {
+        version.questions = version.questions.filter(
+          (question) => question.stableKey !== "Q61",
+        );
+      },
+    });
+
+    await expect(
+      createScalingUpFullPhaseFeedbackDraft(ctx.db, "creator@example.com"),
+    ).rejects.toThrow(/61 scored questions|Q61|canonical/i);
+    expect(ctx.tx.assessmentTemplateVersion.create).not.toHaveBeenCalled();
+    expect(ctx.tx.auditLog.create).not.toHaveBeenCalled();
+  });
+
   it("refuses a source with a scored key absent from the audited catalogue", async () => {
     const { db, tx, active, template } = makeDb();
     active.questions[30].stableKey = "Q62";
@@ -811,6 +921,9 @@ describe("publishScalingUpFullPhaseFeedbackDraft", () => {
       afterContentHash: draft.contentHash,
       questionCount: 61,
       phaseBandRecordCount: 1220,
+      peerSourceId: SU_FULL_PHASE_PEER_SOURCE_ID,
+      peerPhaseContentHashes: PEER_PHASE_CONTENT_HASHES,
+      phasePeerRecordCount: 305,
       phaseBoundaries: PHASE_BOUNDARIES,
       historicRowsMutated: false,
       campaignRowsRepinned: 0,
@@ -862,6 +975,9 @@ describe("publishScalingUpFullPhaseFeedbackDraft", () => {
         afterContentHash: draft.contentHash,
         questionCount: 61,
         phaseBandRecordCount: 1220,
+        peerSourceId: SU_FULL_PHASE_PEER_SOURCE_ID,
+        peerPhaseContentHashes: PEER_PHASE_CONTENT_HASHES,
+        phasePeerRecordCount: 305,
         phaseBoundaries: PHASE_BOUNDARIES,
         historicRowsMutated: false,
         draftPublishedAt: null,
@@ -1148,6 +1264,9 @@ describe("publishScalingUpFullPhaseFeedbackDraft", () => {
     ["missing phase-driver contract", (receipt: Record<string, unknown>) => { delete receipt.phaseDriverContract; }],
     ["wrong phase-driver contract", (receipt: Record<string, unknown>) => { receipt.phaseDriverContract = { ...PHASE_DRIVER_CONTRACT, audiencePolicy: "ALL_RESPONDENTS" }; }],
     ["wrong approved content-hash binding", (receipt: Record<string, unknown>) => { receipt.afterContentHash = "a".repeat(64); }],
+    ["wrong peer record count", (receipt: Record<string, unknown>) => { receipt.phasePeerRecordCount = 304; }],
+    ["wrong peer source", (receipt: Record<string, unknown>) => { receipt.peerSourceId = "other-peer-source"; }],
+    ["wrong peer phase hashes", (receipt: Record<string, unknown>) => { receipt.peerPhaseContentHashes = { ...PEER_PHASE_CONTENT_HASHES, 4: "a".repeat(64) }; }],
   ])("refuses to publish when the draft receipt has %s", async (_label, mutate) => {
     const ctx = makeDb({ latest: "matching-draft", includeDraftReceipt: true });
     const receipt = JSON.parse(ctx.audits[0].changes) as Record<string, unknown>;
@@ -1182,6 +1301,48 @@ describe("publishScalingUpFullPhaseFeedbackDraft", () => {
       ),
     ).rejects.toThrow(/phase|catalogue|content hash/i);
     expect(ctx.tx.assessmentTemplateVersion.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("refuses a rehashed draft whose governed peer value was modified", async () => {
+    const ctx = makeDb({ latest: "matching-draft", includeDraftReceipt: true });
+    const q01 = ctx.draft.questions.find(
+      (question) => question.stableKey === "Q01",
+    )!;
+    q01.phasePeerBenchmarks![3].value = 6.5;
+    rebindDraftHashAndCreationReceipt(ctx);
+
+    await expect(
+      publishScalingUpFullPhaseFeedbackDraft(
+        ctx.db,
+        ctx.draft.id,
+        ctx.draft.contentHash,
+        "admin@example.com",
+      ),
+    ).rejects.toThrow(/peer|catalogue|hash/i);
+    expect(ctx.tx.assessmentTemplateVersion.updateMany).not.toHaveBeenCalled();
+    expect(ctx.tx.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it("refuses a rehashed draft whose declared phase peer hash was modified", async () => {
+    const ctx = makeDb({ latest: "matching-draft", includeDraftReceipt: true });
+    const scoringConfig = ctx.draft.scoringConfig as {
+      phasePeerBenchmarkCatalogue: {
+        phases: Array<{ phase: number; contentHash: string }>;
+      };
+    };
+    scoringConfig.phasePeerBenchmarkCatalogue.phases[3].contentHash = "a".repeat(64);
+    rebindDraftHashAndCreationReceipt(ctx);
+
+    await expect(
+      publishScalingUpFullPhaseFeedbackDraft(
+        ctx.db,
+        ctx.draft.id,
+        ctx.draft.contentHash,
+        "admin@example.com",
+      ),
+    ).rejects.toThrow(/peer|catalogue|hash/i);
+    expect(ctx.tx.assessmentTemplateVersion.updateMany).not.toHaveBeenCalled();
+    expect(ctx.tx.auditLog.create).not.toHaveBeenCalled();
   });
 
   it("revalidates canonical scored-question order at publish time", async () => {

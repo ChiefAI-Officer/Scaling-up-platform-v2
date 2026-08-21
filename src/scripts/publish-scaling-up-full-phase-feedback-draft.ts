@@ -1,5 +1,5 @@
 /**
- * Publish one exact, audited Scaling Up Full phase-feedback draft.
+ * Publish one exact, audited Scaling Up Full phase-aware Feedback + Peers draft.
  *
  * This command is intentionally separate from draft creation. It validates
  * the draft and its predecessor again inside the publish transaction, updates

@@ -1,9 +1,10 @@
 /**
- * Create the forward-only Scaling Up Full phase-feedback draft.
+ * Create the forward-only Scaling Up Full phase-aware Feedback + Peers draft.
  *
  * This command never publishes a version, updates a published version, or
  * repins a campaign. The lifecycle function clones the exact active enUS
- * edition and writes its creation receipt atomically with the new draft.
+ * edition, attaches both governed catalogues, and writes its creation receipt
+ * atomically with the new draft.
  *
  * Usage:
  *   npx tsx scripts/create-scaling-up-full-phase-feedback-draft.ts \
