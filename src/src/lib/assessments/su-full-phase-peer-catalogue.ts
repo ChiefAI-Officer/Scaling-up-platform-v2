@@ -5,15 +5,13 @@
  * Regenerate: npm run generate:scaling-up-full-phase-peers
  */
 
+import type { PhasePeerBenchmark } from "./scoring";
 import type { GrowthPhaseNumber } from "./su-full-phase";
+
+export type { PhasePeerBenchmark } from "./scoring";
 
 export const SU_FULL_PHASE_PEER_SOURCE_ID =
   "2026-08-20.esperto-five-phase-peers-v1";
-
-export interface PhasePeerBenchmark {
-  readonly phase: GrowthPhaseNumber;
-  readonly value: number;
-}
 
 const P1_P2_P3_P5_VECTOR: Readonly<Record<string, number>> = Object.freeze({
   "Q01": 6.3,

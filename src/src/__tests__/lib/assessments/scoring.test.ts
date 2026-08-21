@@ -13,13 +13,20 @@ import {
   scoreSubmission,
   ScoringValidationError,
   GrowthPhaseRecommendationSchema,
+  PhasePeerBenchmarkSchema,
   TemplateVersionForScoringSchema,
   TemplateVersionForPublishSchema,
   validateTierTiling,
   type TemplateVersionForScoring,
   type Answer,
   type GrowthPhaseRecommendation,
+  type PhasePeerBenchmark,
 } from "@/lib/assessments/scoring";
+import {
+  buildPhasePeerBenchmarks,
+  SU_FULL_PHASE_PEER_CONTENT_HASHES,
+  SU_FULL_PHASE_PEER_SOURCE_ID,
+} from "@/lib/assessments/su-full-phase-peer-catalogue";
 import type { GrowthPhaseNumber } from "@/lib/assessments/su-full-phase";
 
 /**
@@ -1123,6 +1130,212 @@ describe("phase-aware slider recommendations", () => {
       });
     }
     expect(TemplateVersionForPublishSchema.safeParse(mixedShapes).success).toBe(false);
+  });
+});
+
+describe("phase-aware peer benchmark freezing", () => {
+  const phases = [1, 2, 3, 4, 5] as const satisfies readonly GrowthPhaseNumber[];
+
+  function phasePeerVersion(): TemplateVersionForScoring {
+    const questions = Array.from({ length: 61 }, (_, index) => {
+      const stableKey = `Q${String(index + 1).padStart(2, "0")}`;
+      return {
+        stableKey,
+        sortOrder: index + 1,
+        type: "SLIDER_LIKERT" as const,
+        label: stableKey,
+        sectionStableKey: "S1",
+        isRequired: true,
+        scale: {
+          min: 0,
+          max: 10,
+          step: 1,
+          anchorMin: "Low",
+          anchorMax: "High",
+        },
+        phasePeerBenchmarks: [...buildPhasePeerBenchmarks(stableKey)],
+      };
+    });
+
+    return {
+      questions,
+      sections: [{ stableKey: "S1", sortOrder: 1, name: "Section 1" }],
+      scoringConfig: {
+        tierMetric: "countAchieved",
+        passThreshold: 7,
+        tiers: [{ minMetric: 0, maxMetric: 61, label: "All", message: "All" }],
+        phasePeerBenchmarkCatalogue: {
+          sourceId: SU_FULL_PHASE_PEER_SOURCE_ID,
+          phases: phases.map((phase) => ({
+            phase,
+            contentHash: SU_FULL_PHASE_PEER_CONTENT_HASHES[phase],
+          })),
+        },
+      },
+    };
+  }
+
+  function completeAnswers(value = 5): Answer[] {
+    return Array.from({ length: 61 }, (_, index) => ({
+      stableKey: `Q${String(index + 1).padStart(2, "0")}`,
+      value,
+    }));
+  }
+
+  function expectPeerError(
+    version: TemplateVersionForScoring,
+    code:
+      | "SU_FULL_PHASE_PEERS_CATALOGUE_INCOMPLETE"
+      | "SU_FULL_PHASE_PEERS_PHASE_MISSING"
+      | "SU_FULL_PHASE_PEERS_HASH_MISMATCH",
+    recommendationPhase: GrowthPhaseNumber = 4,
+  ): void {
+    try {
+      scoreSubmission(version, completeAnswers(), { recommendationPhase });
+      throw new Error("expected scoreSubmission to reject malformed phase peers");
+    } catch (error) {
+      expect(error).toBeInstanceOf(ScoringValidationError);
+      expect((error as ScoringValidationError).code).toBe(code);
+    }
+  }
+
+  it("accepts the generic phase-peer schema and freezes the exact P4 row and provenance", () => {
+    expect(
+      PhasePeerBenchmarkSchema.safeParse({ phase: 4, value: 6.6 }).success,
+    ).toBe(true);
+    const result = scoreSubmission(phasePeerVersion(), completeAnswers(), {
+      recommendationPhase: 4,
+    });
+
+    expect(result.perQuestion.find((row) => row.stableKey === "Q01")?.peerValue).toBe(6.6);
+    expect(result.peerBenchmarkSnapshot).toEqual({
+      sourceId: "2026-08-20.esperto-five-phase-peers-v1",
+      contentHash: "ae9e9e2fbfc8525f4e6d8c3ca65775a50b85476371f29a74934dbe6dd3a965ff",
+      phase: 4,
+    });
+    expect(result.perQuestion).toHaveLength(61);
+    expect(result.perQuestion.every((row) => Number.isFinite(row.peerValue))).toBe(true);
+  });
+
+  it.each([
+    [1, 6.3, "fe63364e3b5e42897b3b3886135310f673e320b4a07b1453ad300a49a91b4dbd"],
+    [2, 6.3, "fe63364e3b5e42897b3b3886135310f673e320b4a07b1453ad300a49a91b4dbd"],
+    [3, 6.3, "fe63364e3b5e42897b3b3886135310f673e320b4a07b1453ad300a49a91b4dbd"],
+    [4, 6.6, "ae9e9e2fbfc8525f4e6d8c3ca65775a50b85476371f29a74934dbe6dd3a965ff"],
+    [5, 6.3, "fe63364e3b5e42897b3b3886135310f673e320b4a07b1453ad300a49a91b4dbd"],
+  ] as const)("selects the explicit P%s peer vector", (phase, q01Peer, contentHash) => {
+    const result = scoreSubmission(phasePeerVersion(), completeAnswers(), {
+      recommendationPhase: phase,
+    });
+
+    expect(result.perQuestion.find((row) => row.stableKey === "Q01")?.peerValue).toBe(q01Peer);
+    expect(result.peerBenchmarkSnapshot).toEqual({
+      sourceId: "2026-08-20.esperto-five-phase-peers-v1",
+      contentHash,
+      phase,
+    });
+  });
+
+  it("keeps P4 peers score-invariant while P3 differs and P5 returns to baseline", () => {
+    const p4Low = scoreSubmission(phasePeerVersion(), completeAnswers(0), {
+      recommendationPhase: 4,
+    });
+    const p4High = scoreSubmission(phasePeerVersion(), completeAnswers(10), {
+      recommendationPhase: 4,
+    });
+    const p3 = scoreSubmission(phasePeerVersion(), completeAnswers(10), {
+      recommendationPhase: 3,
+    });
+    const p5 = scoreSubmission(phasePeerVersion(), completeAnswers(10), {
+      recommendationPhase: 5,
+    });
+
+    expect(p4Low.perQuestion.map((row) => row.peerValue)).toEqual(
+      p4High.perQuestion.map((row) => row.peerValue),
+    );
+    expect(p3.perQuestion[0].peerValue).toBe(6.3);
+    expect(p4High.perQuestion[0].peerValue).toBe(6.6);
+    expect(p5.perQuestion[0].peerValue).toBe(6.3);
+  });
+
+  it("preserves non-CEO scoring when recommendationPhase is absent", () => {
+    const result = scoreSubmission(phasePeerVersion(), completeAnswers());
+
+    expect(result.peerBenchmarkSnapshot).toBeUndefined();
+    expect(result.perQuestion.every((row) => row.peerValue === undefined)).toBe(true);
+  });
+
+  it("omits snapshot provenance until every scorable peer value is frozen", () => {
+    const result = scoreSubmission(
+      phasePeerVersion(),
+      completeAnswers().slice(0, 60),
+      { allowMissingRequired: true, recommendationPhase: 4 },
+    );
+
+    expect(result.perQuestion).toHaveLength(60);
+    expect(result.perQuestion.every((row) => Number.isFinite(row.peerValue))).toBe(true);
+    expect(result.peerBenchmarkSnapshot).toBeUndefined();
+  });
+
+  it("rejects duplicate catalogue phases as incomplete governed metadata", () => {
+    const version = phasePeerVersion();
+    const catalogue = version.scoringConfig.phasePeerBenchmarkCatalogue!;
+    catalogue.phases[4] = { ...catalogue.phases[3] };
+
+    expectPeerError(version, "SU_FULL_PHASE_PEERS_CATALOGUE_INCOMPLETE", 1);
+    expect(TemplateVersionForScoringSchema.safeParse(version).success).toBe(false);
+    expect(TemplateVersionForPublishSchema.safeParse(version).success).toBe(false);
+  });
+
+  it("rejects a catalogue attached to only 60 of 61 scorable questions", () => {
+    const version = phasePeerVersion();
+    delete (version.questions[60] as { phasePeerBenchmarks?: PhasePeerBenchmark[] })
+      .phasePeerBenchmarks;
+
+    expectPeerError(version, "SU_FULL_PHASE_PEERS_CATALOGUE_INCOMPLETE");
+  });
+
+  it("rejects question peer rows without their catalogue metadata", () => {
+    const version = phasePeerVersion();
+    delete version.scoringConfig.phasePeerBenchmarkCatalogue;
+
+    expectPeerError(version, "SU_FULL_PHASE_PEERS_CATALOGUE_INCOMPLETE");
+  });
+
+  it.each([Number.NaN, Number.POSITIVE_INFINITY, -0.1, 10.1])(
+    "rejects a non-finite or out-of-range peer value %s",
+    (value) => {
+      const version = phasePeerVersion();
+      const question = version.questions[0] as {
+        phasePeerBenchmarks: PhasePeerBenchmark[];
+      };
+      question.phasePeerBenchmarks[3] = { phase: 4, value };
+
+      expectPeerError(version, "SU_FULL_PHASE_PEERS_CATALOGUE_INCOMPLETE");
+    },
+  );
+
+  it("rejects a missing explicitly selected catalogue phase", () => {
+    const version = phasePeerVersion();
+    version.scoringConfig.phasePeerBenchmarkCatalogue!.phases =
+      version.scoringConfig.phasePeerBenchmarkCatalogue!.phases.filter(
+        (row) => row.phase !== 4,
+      );
+
+    expectPeerError(version, "SU_FULL_PHASE_PEERS_PHASE_MISSING");
+  });
+
+  it("rejects a selected question row whose declared phase disagrees", () => {
+    const version = phasePeerVersion();
+    const question = version.questions[0] as {
+      phasePeerBenchmarks: PhasePeerBenchmark[];
+    };
+    question.phasePeerBenchmarks[3] = {
+      ...question.phasePeerBenchmarks[3],
+      phase: 3,
+    };
+
+    expectPeerError(version, "SU_FULL_PHASE_PEERS_HASH_MISMATCH");
   });
 });
 

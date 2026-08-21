@@ -71,6 +71,12 @@ export type GrowthPhaseRecommendation = z.infer<
   typeof GrowthPhaseRecommendationSchema
 >;
 
+export const PhasePeerBenchmarkSchema = z.object({
+  phase: GrowthPhaseSchema,
+  value: z.number().finite().min(0).max(10),
+});
+export type PhasePeerBenchmark = z.infer<typeof PhasePeerBenchmarkSchema>;
+
 // Wave W (spec 19w) — authored show-if: the question renders only while
 // `optionKey` is selected on the (earlier, MULTI_CHOICE) gate question.
 // Save tier validates SHAPE only; drafts may be referentially dangling —
@@ -95,6 +101,7 @@ export const SliderLikertQuestion = z.object({
   scale: SliderLikertScaleSchema,
   recommendations: z.array(RecommendationBandSchema).optional(),
   phaseRecommendations: z.array(GrowthPhaseRecommendationSchema).optional(),
+  phasePeerBenchmarks: z.array(PhasePeerBenchmarkSchema).optional(),
   showIf: ShowIfSchema.optional(),
 });
 export type SliderLikertQuestion = z.infer<typeof SliderLikertQuestion>;
@@ -194,6 +201,16 @@ const RollupSchema = z.object({
   overall: z.enum(["meanOfQuestions", "meanOfSections", "meanOfDomains"]),
 });
 
+const PhasePeerBenchmarkCatalogueSchema = z.object({
+  sourceId: z.string().min(1),
+  phases: z
+    .array(z.object({
+      phase: GrowthPhaseSchema,
+      contentHash: z.string().regex(/^[a-f0-9]{64}$/),
+    }))
+    .length(5),
+});
+
 const ScoringConfigBase = z.object({
   tierMetric: z.enum(["countAchieved", "overallTotal", "overallAvg"]),
   passThreshold: z.number(),
@@ -201,6 +218,7 @@ const ScoringConfigBase = z.object({
   rollup: RollupSchema.optional(),
   domains: z.array(DomainDefSchema).optional(),
   scaleUpScore: z.boolean().optional(),
+  phasePeerBenchmarkCatalogue: PhasePeerBenchmarkCatalogueSchema.optional(),
 });
 
 export const ScoringConfigSchema = ScoringConfigBase;
@@ -211,6 +229,96 @@ export const ScoringConfigSchema = ScoringConfigBase;
 // here keeps the runtime + publish schemas in lock-step.
 
 const PLACEHOLDER_SENTINELS = ["TODO", "PLACEHOLDER", "Lorem"] as const;
+const GROWTH_PHASES = [1, 2, 3, 4, 5] as const satisfies readonly GrowthPhaseNumber[];
+
+function checkPhasePeerCatalogue(
+  questions: Array<z.infer<typeof QuestionBase>>,
+  cfg: z.infer<typeof ScoringConfigBase>,
+  ctx: z.RefinementCtx,
+): void {
+  const scorableWithIndex = questions
+    .map((question, index) => ({ question, index }))
+    .filter((row): row is { question: SliderLikertQuestion; index: number } =>
+      row.question.type === "SLIDER_LIKERT"
+    );
+  const catalogue = cfg.phasePeerBenchmarkCatalogue;
+  const questionsWithPeers = scorableWithIndex.filter(
+    ({ question }) => question.phasePeerBenchmarks !== undefined,
+  );
+
+  if (!catalogue && questionsWithPeers.length > 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["scoringConfig", "phasePeerBenchmarkCatalogue"],
+      message: "Phase peer question rows require catalogue metadata",
+    });
+    return;
+  }
+  if (!catalogue) return;
+
+  if (questionsWithPeers.length !== scorableWithIndex.length) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["questions"],
+      message: `Phase peer catalogue requires every scorable question to carry five rows; found ${questionsWithPeers.length} of ${scorableWithIndex.length}`,
+    });
+  }
+
+  const metadataPhases = new Set<GrowthPhaseNumber>();
+  for (let index = 0; index < catalogue.phases.length; index += 1) {
+    const row = catalogue.phases[index];
+    if (metadataPhases.has(row.phase)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["scoringConfig", "phasePeerBenchmarkCatalogue", "phases", index, "phase"],
+        message: `Duplicate phase peer catalogue metadata for phase ${row.phase}`,
+      });
+    }
+    metadataPhases.add(row.phase);
+  }
+  for (const phase of GROWTH_PHASES) {
+    if (!metadataPhases.has(phase)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["scoringConfig", "phasePeerBenchmarkCatalogue", "phases"],
+        message: `Missing phase peer catalogue metadata for phase ${phase}`,
+      });
+    }
+  }
+
+  for (const { question, index: questionIndex } of scorableWithIndex) {
+    const rows = question.phasePeerBenchmarks;
+    if (!rows) continue;
+    if (rows.length !== GROWTH_PHASES.length) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["questions", questionIndex, "phasePeerBenchmarks"],
+        message: `Question ${question.stableKey} must carry exactly five phase peer rows`,
+      });
+    }
+    const rowPhases = new Set<GrowthPhaseNumber>();
+    for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
+      const row = rows[rowIndex];
+      if (rowPhases.has(row.phase)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["questions", questionIndex, "phasePeerBenchmarks", rowIndex, "phase"],
+          message: `Duplicate phase peer row for phase ${row.phase}`,
+        });
+      }
+      rowPhases.add(row.phase);
+    }
+    for (const phase of GROWTH_PHASES) {
+      if (!rowPhases.has(phase)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["questions", questionIndex, "phasePeerBenchmarks"],
+          message: `Question ${question.stableKey} is missing phase peer row ${phase}`,
+        });
+      }
+    }
+  }
+}
 
 function checkRecommendationsRuntime(
   questions: Array<z.infer<typeof QuestionBase>>,
@@ -697,6 +805,7 @@ export const TemplateVersionForScoringSchema = z
   .superRefine((data, ctx) => {
     checkRecommendationsRuntime(data.questions, ctx);
     checkScaleUpScoreOptIn(data.scoringConfig, data.questions, ctx);
+    checkPhasePeerCatalogue(data.questions, data.scoringConfig, ctx);
   });
 
 export type TemplateVersionForScoring = z.infer<
@@ -944,7 +1053,10 @@ export type ScoringValidationCode =
   | "ANSWER_TOO_LONG"
   | "INVALID_OPTION_KEY"
   | "DUPLICATE_OPTION_KEY"
-  | "TOO_MANY_CHOICES";
+  | "TOO_MANY_CHOICES"
+  | "SU_FULL_PHASE_PEERS_CATALOGUE_INCOMPLETE"
+  | "SU_FULL_PHASE_PEERS_PHASE_MISSING"
+  | "SU_FULL_PHASE_PEERS_HASH_MISMATCH";
 
 export class ScoringValidationError extends Error {
   constructor(
@@ -1080,6 +1192,8 @@ export interface PerQuestionResult {
   /** D2 — matched recommendation band text; undefined when no band matches or
    *  the question defines no `recommendations`. Runtime is lenient on gaps. */
   recommendation?: string;
+  /** Governed peer value selected from the same frozen organizational phase. */
+  peerValue?: number;
 }
 
 export interface PerSectionResult {
@@ -1134,6 +1248,12 @@ export interface ScoreResult {
   findings?: ResolvedFinding[];
   /** The organizational phase used to resolve phase-aware recommendations. */
   recommendationPhase?: GrowthPhaseNumber;
+  /** Provenance for the governed peer vector frozen into perQuestion rows. */
+  peerBenchmarkSnapshot?: {
+    sourceId: string;
+    contentHash: string;
+    phase: GrowthPhaseNumber;
+  };
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────
@@ -1496,6 +1616,59 @@ function resolveTier(tiers: Tier[], value: number): Tier | null {
   return null;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function assertSelectedPhasePeerMetadata(
+  version: TemplateVersionForScoring,
+  selectedPhase: GrowthPhaseNumber | undefined,
+): void {
+  if (selectedPhase === undefined) return;
+  const scoringConfig = isRecord(version.scoringConfig)
+    ? version.scoringConfig
+    : undefined;
+  const catalogue = scoringConfig?.phasePeerBenchmarkCatalogue;
+  if (!isRecord(catalogue)) return;
+  if (!Array.isArray(catalogue.phases)) return;
+  const phases = catalogue.phases;
+  const selectedMetadata = phases.find(
+    (row) => isRecord(row) && row.phase === selectedPhase,
+  );
+  if (!selectedMetadata) {
+    throw new ScoringValidationError("SU_FULL_PHASE_PEERS_PHASE_MISSING", {
+      phase: selectedPhase,
+    });
+  }
+
+  if (!Array.isArray(version.questions)) return;
+  for (const rawQuestion of version.questions) {
+    if (!isRecord(rawQuestion) || rawQuestion.type !== "SLIDER_LIKERT") continue;
+    const rows = rawQuestion.phasePeerBenchmarks;
+    if (rows === undefined || !Array.isArray(rows)) continue;
+    const selectedRows = rows.filter(
+      (row) => isRecord(row) && row.phase === selectedPhase,
+    );
+    if (selectedRows.length !== 1) {
+      throw new ScoringValidationError("SU_FULL_PHASE_PEERS_HASH_MISMATCH", {
+        stableKey: rawQuestion.stableKey,
+        phase: selectedPhase,
+      });
+    }
+  }
+}
+
+function hasPhasePeerValidationIssue(issues: z.ZodIssue[]): boolean {
+  return issues.some(
+    (issue) =>
+      issue.path.includes("phasePeerBenchmarks") ||
+      issue.path.includes("phasePeerBenchmarkCatalogue") ||
+      issue.message.startsWith(
+        "Phase peer catalogue requires every scorable question",
+      ),
+  );
+}
+
 // ─── Main entry point ────────────────────────────────────────────────────
 
 export function scoreSubmission(
@@ -1506,10 +1679,18 @@ export function scoreSubmission(
     recommendationPhase?: GrowthPhaseNumber;
   }
 ): ScoreResult {
+  assertSelectedPhasePeerMetadata(version, options?.recommendationPhase);
+
   // 1) Validate the version shape with Zod first so downstream code can
   //    trust the shape.
   const parsed = TemplateVersionForScoringSchema.safeParse(version);
   if (!parsed.success) {
+    if (hasPhasePeerValidationIssue(parsed.error.issues)) {
+      throw new ScoringValidationError(
+        "SU_FULL_PHASE_PEERS_CATALOGUE_INCOMPLETE",
+        { issues: parsed.error.issues },
+      );
+    }
     throw new ScoringValidationError(
       "INVALID_SCORING_CONFIG",
       { issues: parsed.error.issues },
@@ -1517,6 +1698,17 @@ export function scoreSubmission(
     );
   }
   const v = parsed.data;
+  const peerCatalogue = v.scoringConfig.phasePeerBenchmarkCatalogue;
+  const selectedPeerPhase = options?.recommendationPhase;
+  const selectedPeerMetadata = peerCatalogue?.phases.find(
+    (row) => row.phase === selectedPeerPhase,
+  );
+
+  if (peerCatalogue && selectedPeerPhase !== undefined && !selectedPeerMetadata) {
+    throw new ScoringValidationError("SU_FULL_PHASE_PEERS_PHASE_MISSING", {
+      phase: selectedPeerPhase,
+    });
+  }
 
   // Filter to SLIDER_LIKERT questions only — all scoring math operates on
   // these. TEXT / NUMBER / MULTI_CHOICE questions are stored in the template
@@ -1778,6 +1970,18 @@ export function scoreSubmission(
         }
       }
     }
+    if (selectedPeerPhase !== undefined && q.phasePeerBenchmarks !== undefined) {
+      const peerRow = q.phasePeerBenchmarks.find(
+        (candidate) => candidate.phase === selectedPeerPhase,
+      );
+      if (!peerRow) {
+        throw new ScoringValidationError("SU_FULL_PHASE_PEERS_HASH_MISMATCH", {
+          stableKey: q.stableKey,
+          phase: selectedPeerPhase,
+        });
+      }
+      row.peerValue = peerRow.value;
+    }
     perQuestion.push(row);
   }
 
@@ -1987,6 +2191,19 @@ export function scoreSubmission(
   if (scaleUpScore !== undefined) result.scaleUpScore = scaleUpScore;
   if (options?.recommendationPhase !== undefined) {
     result.recommendationPhase = options.recommendationPhase;
+  }
+  if (
+    peerCatalogue &&
+    selectedPeerPhase !== undefined &&
+    selectedPeerMetadata &&
+    perQuestion.length === scorableQuestions.length &&
+    perQuestion.every((row) => Number.isFinite(row.peerValue))
+  ) {
+    result.peerBenchmarkSnapshot = {
+      sourceId: peerCatalogue.sourceId,
+      contentHash: selectedPeerMetadata.contentHash,
+      phase: selectedPeerPhase,
+    };
   }
   return result;
 }

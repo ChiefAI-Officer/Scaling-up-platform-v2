@@ -6,6 +6,10 @@ import {
 } from "@/lib/assessments/scoring";
 import { pruneHiddenAnswers } from "@/lib/assessments/form-visibility";
 import type { PagerQuestion } from "@/lib/assessments/section-pages";
+import {
+  SU_FULL_PHASE_PEER_CONTENT_HASHES,
+  SU_FULL_PHASE_PEER_SOURCE_ID,
+} from "@/lib/assessments/su-full-phase-peer-catalogue";
 
 // Minimal 2-slider scored version (tierMetric overallAvg, single full-span tier).
 const version: TemplateVersionForScoring = {
@@ -65,15 +69,30 @@ describe("computeScoreResult", () => {
   it("forwards the selected growth phase through the prune→score seam", () => {
     const phaseAwareVersion = {
       ...version,
-      questions: version.questions.map((question, index) => index === 0
-        ? {
-            ...question,
-            phaseRecommendations: [1, 2, 3, 4, 5].map((phase) => ({
-              phase,
-              bands: [{ minScore: 0, maxScore: 3, text: `phase-${phase}` }],
-            })),
-          }
-        : question),
+      questions: version.questions.map((question) => ({
+        ...question,
+        phaseRecommendations: [1, 2, 3, 4, 5].map((phase) => ({
+          phase,
+          bands: [{ minScore: 0, maxScore: 3, text: `phase-${phase}` }],
+        })),
+        phasePeerBenchmarks: [1, 2, 3, 4, 5].map((phase) => ({
+          phase,
+          value: phase === 4 ? 6.6 : 6.3,
+        })),
+      })),
+      scoringConfig: {
+        ...version.scoringConfig,
+        phasePeerBenchmarkCatalogue: {
+          sourceId: SU_FULL_PHASE_PEER_SOURCE_ID,
+          phases: [1, 2, 3, 4, 5].map((phase) => ({
+            phase,
+            contentHash:
+              SU_FULL_PHASE_PEER_CONTENT_HASHES[
+                phase as keyof typeof SU_FULL_PHASE_PEER_CONTENT_HASHES
+              ],
+          })),
+        },
+      },
     } as TemplateVersionForScoring;
 
     const { result } = computeScoreResult(
@@ -85,6 +104,47 @@ describe("computeScoreResult", () => {
 
     expect(result.recommendationPhase).toBe(4);
     expect(result.perQuestion[0].recommendation).toBe("phase-4");
+    expect(result.perQuestion.map((row) => row.peerValue)).toEqual([6.6, 6.6]);
+    expect(result.peerBenchmarkSnapshot).toEqual({
+      sourceId: "2026-08-20.esperto-five-phase-peers-v1",
+      contentHash: "ae9e9e2fbfc8525f4e6d8c3ca65775a50b85476371f29a74934dbe6dd3a965ff",
+      phase: 4,
+    });
+  });
+
+  it("omits governed peer fields when no growth phase is supplied", () => {
+    const governedVersion = {
+      ...version,
+      questions: version.questions.map((question) => ({
+        ...question,
+        phasePeerBenchmarks: [1, 2, 3, 4, 5].map((phase) => ({
+          phase,
+          value: phase === 4 ? 6.6 : 6.3,
+        })),
+      })),
+      scoringConfig: {
+        ...version.scoringConfig,
+        phasePeerBenchmarkCatalogue: {
+          sourceId: SU_FULL_PHASE_PEER_SOURCE_ID,
+          phases: [1, 2, 3, 4, 5].map((phase) => ({
+            phase,
+            contentHash:
+              SU_FULL_PHASE_PEER_CONTENT_HASHES[
+                phase as keyof typeof SU_FULL_PHASE_PEER_CONTENT_HASHES
+              ],
+          })),
+        },
+      },
+    } as TemplateVersionForScoring;
+
+    const { result } = computeScoreResult(
+      governedVersion,
+      governedVersion.questions as unknown as PagerQuestion[],
+      answers,
+    );
+
+    expect(result.peerBenchmarkSnapshot).toBeUndefined();
+    expect(result.perQuestion.every((row) => row.peerValue === undefined)).toBe(true);
   });
 
   it("keeps legacy score-only recommendations when no phase-aware payload is pinned", () => {
