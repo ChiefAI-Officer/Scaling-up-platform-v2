@@ -1302,6 +1302,38 @@ describe("phase-aware peer benchmark freezing", () => {
     expectPeerError(version, "SU_FULL_PHASE_PEERS_CATALOGUE_INCOMPLETE");
   });
 
+  it("rejects catalogue metadata on a version with no peer-bearing scorable questions", () => {
+    const version = {
+      questions: [{
+        stableKey: "TEXT_1",
+        sortOrder: 1,
+        type: "TEXT",
+        label: "Context",
+        isRequired: true,
+      }],
+      sections: [],
+      scoringConfig: {
+        tierMetric: "countAchieved",
+        passThreshold: 7,
+        tiers: [{ minMetric: 0, maxMetric: 0, label: "None", message: "None" }],
+        phasePeerBenchmarkCatalogue: phasePeerVersion().scoringConfig
+          .phasePeerBenchmarkCatalogue,
+      },
+    } as TemplateVersionForScoring;
+
+    try {
+      scoreSubmission(version, [{ stableKey: "TEXT_1", value: "answer" }], {
+        recommendationPhase: 4,
+      });
+      throw new Error("expected empty governed peer catalogue to be rejected");
+    } catch (error) {
+      expect(error).toBeInstanceOf(ScoringValidationError);
+      expect((error as ScoringValidationError).code).toBe(
+        "SU_FULL_PHASE_PEERS_CATALOGUE_INCOMPLETE",
+      );
+    }
+  });
+
   it.each([Number.NaN, Number.POSITIVE_INFINITY, -0.1, 10.1])(
     "rejects a non-finite or out-of-range peer value %s",
     (value) => {

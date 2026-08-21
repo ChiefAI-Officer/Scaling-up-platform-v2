@@ -256,6 +256,15 @@ function checkPhasePeerCatalogue(
   }
   if (!catalogue) return;
 
+  if (questionsWithPeers.length === 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["scoringConfig", "phasePeerBenchmarkCatalogue"],
+      message: "Phase peer catalogue requires at least one peer-bearing scorable question",
+    });
+    return;
+  }
+
   if (questionsWithPeers.length !== scorableWithIndex.length) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -2196,6 +2205,7 @@ export function scoreSubmission(
     peerCatalogue &&
     selectedPeerPhase !== undefined &&
     selectedPeerMetadata &&
+    scorableQuestions.length > 0 &&
     perQuestion.length === scorableQuestions.length &&
     perQuestion.every((row) => Number.isFinite(row.peerValue))
   ) {
