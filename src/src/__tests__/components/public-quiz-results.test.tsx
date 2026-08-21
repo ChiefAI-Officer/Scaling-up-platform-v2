@@ -12,6 +12,7 @@
 import React from "react";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import type { ScoreResult } from "@/lib/assessments/scoring";
+import { createMarketingCtaPreset } from "@/lib/assessments/marketing-cta";
 
 // ── crypto.randomUUID stub (jsdom ships without it) ──────────────────────
 Object.defineProperty(globalThis, "crypto", {
@@ -343,7 +344,9 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
   // vacuously. The third test covers the qualitative dispatch, which is the
   // starkest consequence (a wholly different renderer) and was otherwise
   // exercised by nothing.
-  async function submitAndRender(props: { templateAlias?: string } = {}) {
+  async function submitAndRender(
+    props: Partial<React.ComponentProps<typeof PublicQuizClient>> = {},
+  ) {
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -404,6 +407,84 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
       "href",
       "https://scalingup.com/book/",
     );
+  });
+
+  it("keeps score bands but suppresses the structured CTA in the successor experience", async () => {
+    await submitAndRender({
+      reportHtmlExperienceActive: true,
+      reportHtml: {
+        introductionHtml: null,
+        conclusionHtml: "<p>Canonical report conclusion</p>",
+      },
+      marketingResultConfig: {
+        scoreBands: [
+          { min: 0, max: 100, label: "Score guide", headline: "Your result", body: "Use the report." },
+        ],
+        marketingCta: createMarketingCtaPreset("FULL_MARKETING"),
+      },
+    });
+
+    expect(screen.getByText("Canonical report conclusion")).toBeInTheDocument();
+    const scoreGuide = screen.getByRole("region", { name: "Score guide" });
+    const conclusion = screen.getByTestId("report-html-conclusion");
+    const footer = screen.getByTestId("report-footer");
+    const report = screen.getByTestId("branded-report");
+    expect(report).toContainElement(scoreGuide);
+    expect(
+      scoreGuide.compareDocumentPosition(conclusion) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      conclusion.compareDocumentPosition(footer) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(document.querySelector(".public-marketing-cta-blocks")).toBeNull();
+  });
+
+  it("keeps successor score bands inside an alternate report style", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        success: true,
+        data: {
+          submissionId: "sub_alt",
+          reportStyle: "MODERN_DASHBOARD",
+          reportStylesAvailable: true,
+          scoreResult: scoreResultFixture,
+          redirectUrl: `/quiz/${ALIAS}/thank-you`,
+        },
+      }),
+    });
+    render(
+      <PublicQuizClient
+        {...baseProps}
+        templateAlias="scaling-up-full"
+        reportHtmlExperienceActive
+        reportHtml={{
+          introductionHtml: null,
+          conclusionHtml: "<p>Alternate report conclusion</p>",
+        }}
+        marketingResultConfig={{
+          scoreBands: [
+            { min: 0, max: 100, label: "Score guide", headline: "Your result", body: "Use the report." },
+          ],
+          marketingCta: createMarketingCtaPreset("FULL_MARKETING"),
+        }}
+      />,
+    );
+    reachFormStep();
+    fireEvent.change(screen.getByRole("slider"), { target: { value: "6" } });
+    fireEvent.click(screen.getByRole("button", { name: /submit/i }));
+
+    const report = await screen.findByTestId("modern-dashboard-report");
+    const scoreGuide = screen.getByRole("region", { name: "Score guide" });
+    const conclusion = screen.getByTestId("report-html-conclusion");
+    expect(report).toContainElement(scoreGuide);
+    expect(
+      scoreGuide.compareDocumentPosition(conclusion) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   // ── T7-3: POST body includes idempotencyKey ──────────────────────────────

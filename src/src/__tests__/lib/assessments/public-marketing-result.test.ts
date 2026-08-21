@@ -28,4 +28,31 @@ describe("public marketing result config", () => {
   it("fails closed when the stored CTA is malformed", () => {
     expect(loadPublicMarketingResultConfig({ publicMarketing: { marketingCta: { bad: true }, scoreBands: [] } })).toBeNull();
   });
+
+  it("keeps valid score bands when the structured CTA is malformed and the report successor is active", () => {
+    expect(loadPublicMarketingResultConfig({
+      publicMarketing: {
+        marketingCta: { bad: true },
+        scoreBands: [
+          { min: 0, max: 100, label: "All scores", headline: "Your score", body: "Read the guide." },
+        ],
+      },
+    }, true)).toEqual({
+      scoreBands: [
+        { min: 0, max: 100, label: "All scores", headline: "Your score", body: "Read the guide." },
+      ],
+      marketingCta: null,
+    });
+  });
+
+  it("keeps legacy fail-closed behavior when the report successor is inactive", () => {
+    expect(loadPublicMarketingResultConfig({
+      publicMarketing: {
+        marketingCta: { bad: true },
+        scoreBands: [
+          { min: 0, max: 100, label: "All scores", headline: "Your score", body: "Read the guide." },
+        ],
+      },
+    })).toBeNull();
+  });
 });

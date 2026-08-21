@@ -26,7 +26,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import { isResultsEmailApproved } from "@/lib/assessments/results-email-approval";
-import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
+import { isReportStyleSelectionEnabled } from "@/lib/assessments/wave-report-styles-flags";
 import {
   deriveReportStylePreviewCapabilities,
   type ReportStyleKey,
@@ -114,7 +114,7 @@ export async function GET(request: NextRequest) {
       const availability = new Map(
         templates.map((template) => [
           template.id,
-          isReportStylesEnabled({ templateId: template.id }),
+          isReportStyleSelectionEnabled({ templateId: template.id }),
         ]),
       );
       const availableTemplateIds = templates
@@ -198,7 +198,7 @@ export async function GET(request: NextRequest) {
         ? []
         : templates.map((template) => [
             template.id,
-            isReportStylesEnabled({ templateId: template.id }),
+            isReportStyleSelectionEnabled({ templateId: template.id }),
           ]),
     );
     const availableTemplateIds = templates

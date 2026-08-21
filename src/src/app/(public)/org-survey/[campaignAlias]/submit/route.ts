@@ -82,6 +82,7 @@ import { lockReportStyleForFirstCompletion } from "@/lib/assessments/report-styl
 import { isReportComparisonEnabled } from "@/lib/assessments/wave-report-comparison-flags";
 import { createCeoReportAccessToken } from "@/lib/assessments/ceo-report-access-token";
 import { resolvePeerReportEnhancements } from "@/lib/assessments/peer-report-resolver";
+import { resolveActiveReportHtml } from "@/lib/assessments/report-html";
 import {
   currentGrowthPhaseFromAnswers,
   SU_FULL_PHASE_DRIVER_KEY,
@@ -769,6 +770,7 @@ export async function POST(
                   questions: true,
                   sections: true,
                   scoringConfig: true,
+                  reportConfig: true,
                 },
               },
               // Wave D #15: admin-authored results email + approval gate.
@@ -1137,6 +1139,9 @@ export async function POST(
 
       let respondentReport: RespondentReport | null = null;
 
+      const reportHtml = resolveActiveReportHtml(
+        invitation.campaign.version.reportConfig,
+      );
       const buildReportCandidate = (
         frozenScoreResult: ScoreResult,
         reportStyle: ReportStyleKey,
@@ -1160,6 +1165,7 @@ export async function POST(
             sections: renderCampaign.version.sections,
             questions: renderCampaign.version.questions,
             scoringConfig: renderCampaign.version.scoringConfig,
+            ...(reportHtml ? { reportHtml } : {}),
             rawAnswers,
             submittedAt,
             submissionId: "",

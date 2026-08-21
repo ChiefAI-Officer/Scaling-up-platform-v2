@@ -46,7 +46,7 @@ import {
   isGroupReportAlias,
   groupReportRequiresPublishedVersion,
 } from "@/lib/assessments/wave-f-flags";
-import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
+import { isReportStyleSelectionEnabled } from "@/lib/assessments/wave-report-styles-flags";
 import { deriveReportStylePreviewCapabilities } from "@/lib/assessments/report-style-registry";
 import { isInvitationBannerEnabled } from "@/lib/assessments/wave-invitation-banner-flags";
 import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
@@ -124,7 +124,7 @@ export default async function AdminCampaignDetailPage({ params }: PageProps) {
     (await canViewGroupReport(asAccessDb(db), actor, id));
   const reportStylesAvailable =
     campaignForFlag !== null &&
-    isReportStylesEnabled({
+    isReportStyleSelectionEnabled({
       templateId: overview.campaign.templateId,
       campaignId: id,
     });

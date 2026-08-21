@@ -159,6 +159,66 @@ test("falls back to the frozen referring coach email when no explicit contact is
     .toHaveAttribute("href", "mailto:referrer@example.com");
 });
 
+test("replaces Welcome but protects the respondent summary before a custom closing message", () => {
+  const report = {
+    ...completeSuFullLandscapeReport(),
+    reportHtml: {
+      introductionHtml: "<h2>Landscape custom introduction</h2>",
+    conclusionHtml: "<h2>Custom closing message</h2>",
+    },
+  };
+  const presentation = completeSuFullLandscapePresentation(report);
+  const model = buildSuFullLandscapeReportModel({ report, presentation, resolvedStyle: "CLASSIC" });
+  if (!model) throw new Error("The canonical landscape fixture must build");
+
+  render(<SuFullLandscapeReport report={report} model={model} />);
+
+  expect(screen.getByTestId("su-full-landscape-page-2")).toHaveTextContent(
+    "Landscape custom introduction",
+  );
+  expect(screen.getByTestId("su-full-landscape-page-2")).not.toHaveTextContent(
+    "This report turns your submitted assessment",
+  );
+  const page25 = screen.getByTestId("su-full-landscape-page-25");
+  expect(page25).toHaveTextContent("ScaleUp Score");
+  expect(page25).toHaveTextContent("55 / 100");
+  expect(page25).toHaveTextContent("Your strongest chapter is");
+  expect(page25).toHaveTextContent("Your focus chapter is");
+  expect(page25).toHaveTextContent("Custom closing message");
+  expect(page25).not.toHaveTextContent("Choose one priority from the feedback");
+  expect(screen.getAllByTestId(/^su-full-landscape-page-/)).toHaveLength(26);
+});
+
+test("keeps generated add-ons before the landscape conclusion without adding a page", () => {
+  const report = {
+    ...completeSuFullLandscapeReport(),
+    reportHtml: {
+      introductionHtml: null,
+      conclusionHtml: "<h2>Landscape custom conclusion</h2>",
+    },
+  };
+  const presentation = completeSuFullLandscapePresentation(report);
+  const model = buildSuFullLandscapeReportModel({ report, presentation, resolvedStyle: "CLASSIC" });
+  if (!model) throw new Error("The canonical landscape fixture must build");
+
+  render(
+    <SuFullLandscapeReport
+      report={report}
+      model={model}
+      beforeConclusion={<aside data-testid="generated-addon">Score guide</aside>}
+    />,
+  );
+
+  const page = screen.getByTestId("su-full-landscape-page-25");
+  const addon = screen.getByTestId("generated-addon");
+  const conclusion = screen.getByTestId("report-html-conclusion");
+  expect(page).toContainElement(addon);
+  expect(
+    addon.compareDocumentPosition(conclusion) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+  expect(screen.getAllByTestId(/^su-full-landscape-page-/)).toHaveLength(26);
+});
+
 test("keeps the landscape renderer's A4 print and responsive screen contract scoped", () => {
   const stylesheet = readFileSync(
     join(process.cwd(), "src", "styles", "su-report.css"),

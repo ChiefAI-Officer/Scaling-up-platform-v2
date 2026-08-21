@@ -69,6 +69,10 @@ beforeEach(() => {
   delete process.env.WAVE_REPORT_STYLES_ENABLED;
   delete process.env.WAVE_REPORT_STYLES_KILL;
   delete process.env.WAVE_REPORT_STYLES_CANARY;
+  delete process.env.WAVE_REPORT_HTML_AUTHORING_ENABLED;
+  delete process.env.WAVE_REPORT_HTML_AUTHORING_KILL;
+  delete process.env.WAVE_ED10_PREVIEW_SETTINGS_ENABLED;
+  delete process.env.WAVE_ED10_PREVIEW_SETTINGS_KILL;
   delete process.env.WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_ENABLED;
   delete process.env.WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_KILL;
   (db.accessGroupCoach.findMany as jest.Mock).mockResolvedValue([
@@ -298,6 +302,24 @@ describe("PATCH /api/assessment-campaigns/[id]", () => {
         },
       });
       expect(db.assessmentCampaign.update).not.toHaveBeenCalled();
+    });
+
+    it("rejects new style choices during the successor HTML report experience", async () => {
+      process.env.WAVE_REPORT_STYLES_ENABLED = "1";
+      process.env.WAVE_REPORT_HTML_AUTHORING_ENABLED = "1";
+      process.env.WAVE_ED10_PREVIEW_SETTINGS_ENABLED = "1";
+      (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+      (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValue(
+        reportStyleCampaign(),
+      );
+
+      const res = await PATCH(
+        patchReq({ reportStyle: "MODERN_DASHBOARD" }) as never,
+        detailParams("c1"),
+      );
+
+      expect(res.status).toBe(400);
+      expect(db.assessmentCampaign.updateMany).not.toHaveBeenCalled();
     });
 
     it("lets the owner update a closed campaign that has no completed-response lock", async () => {

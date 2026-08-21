@@ -28,6 +28,11 @@ import { QuestionSchema } from "@/lib/assessments/scoring";
 import { isVersionLifecycleEnabled } from "@/lib/assessments/wave-ed8-flags";
 import { isPublicMarketingCtaEnabled } from "@/lib/assessments/wave-public-marketing-cta-flags";
 import { prepareMarketingCtaForStorage } from "@/lib/assessments/marketing-cta-compiler";
+import { isReportHtmlExperienceEnabled } from "@/lib/assessments/wave-report-html-authoring-flags";
+import {
+  extractReportHtml,
+  prepareReportHtmlForStorage,
+} from "@/lib/assessments/report-html";
 
 export async function GET(
   _request: NextRequest,
@@ -329,7 +334,31 @@ export async function PATCH(
 
     const data = parsed.data;
     let preparedReportConfig: unknown = data.reportConfig ?? null;
-    if (
+    let reportHtmlResponse:
+      | {
+          reportHtml: ReturnType<typeof extractReportHtml>;
+          didStripContent: boolean;
+        }
+      | undefined;
+    if (isReportHtmlExperienceEnabled()) {
+      const prepared = prepareReportHtmlForStorage(preparedReportConfig);
+      if (!prepared.ok) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Invalid report HTML",
+            code: "INVALID_REPORT_HTML",
+            issues: prepared.issues,
+          },
+          { status: 422 },
+        );
+      }
+      preparedReportConfig = prepared.reportConfig;
+      reportHtmlResponse = {
+        reportHtml: extractReportHtml(preparedReportConfig),
+        didStripContent: prepared.didStripContent,
+      };
+    } else if (
       isPublicMarketingCtaEnabled() &&
       template.deliveryType === "PUBLIC_MARKETING_QUIZ"
     ) {
@@ -437,7 +466,11 @@ export async function PATCH(
       changes: { contentEdited: true, contentHash },
     });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json(
+      reportHtmlResponse
+        ? { success: true, data: reportHtmlResponse }
+        : { success: true },
+    );
   } catch (error) {
     console.error("Error updating template version:", error);
     return NextResponse.json(

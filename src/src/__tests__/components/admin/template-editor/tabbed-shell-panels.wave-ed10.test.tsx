@@ -117,6 +117,68 @@ function shellProps(
 // ed10Active — Preview + Settings replace Metadata + Access
 // ════════════════════════════════════════════════════════════════════════
 describe("TabbedShell seam — ed10Active (Preview + Settings)", () => {
+  it("adds Reports in production order only when the successor is active", () => {
+    render(<TemplateEditorTabbed {...shellProps(true)} reportsActive />);
+
+    expect(
+      screen.getAllByRole("tab").map((tab) => tab.textContent?.trim()),
+    ).toEqual([
+      "Preview",
+      "Build",
+      "Scoring & Tiers",
+      "Reports",
+      "Settings",
+      "Versions",
+    ]);
+  });
+
+  it.each(["PUBLIC_MARKETING_QUIZ", "INVITED_ASSESSMENT"] as const)(
+    "?tab=reports mounts the raw HTML panel for %s",
+    (deliveryType) => {
+      mockSearchParams = new URLSearchParams("tab=reports");
+      const props = shellProps(true);
+      render(
+        <TemplateEditorTabbed
+          {...props}
+          reportsActive
+          template={{ ...props.template, deliveryType }}
+        />,
+      );
+
+      expect(screen.getByRole("tab", { name: "Reports" })).toHaveAttribute(
+        "data-state",
+        "active",
+      );
+      expect(screen.getByTestId("tab-panel-reports")).toBeInTheDocument();
+      expect(
+        screen.getByLabelText("Introduction / preface HTML"),
+      ).toBeInTheDocument();
+    },
+  );
+
+  it("threads saved-only Scaling Up Full preview links and the report-content dirty state", () => {
+    mockSearchParams = new URLSearchParams("tab=reports");
+    const props = shellProps(true);
+    render(
+      <TemplateEditorTabbed
+        {...props}
+        reportsActive
+        initialDirtyFlags={{ reportConfig: true }}
+        template={{ ...props.template, alias: "scaling-up-full" }}
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: "Open full report preview" })).toHaveAttribute(
+      "href",
+      "/admin/assessments/templates/tpl_1/versions/ver_2/preview-report",
+    );
+    expect(screen.getByRole("link", { name: "Open historical report preview" })).toHaveAttribute(
+      "href",
+      "/admin/assessments/templates/tpl_1/versions/ver_2/preview-report?peerReference=historical",
+    );
+    expect(screen.getByRole("link", { name: "Open full report preview" })).toHaveAttribute("aria-disabled", "true");
+  });
+
   it("tab bar: Preview + Settings triggers, NO Metadata trigger, NO Access link", () => {
     render(<TemplateEditorTabbed {...shellProps(true)} />);
 
@@ -239,6 +301,7 @@ describe("TabbedShell seam — flag OFF (Metadata + Access preserved)", () => {
     ).toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Preview" })).toBeNull();
     expect(screen.queryByRole("tab", { name: "Settings" })).toBeNull();
+    expect(screen.queryByRole("tab", { name: "Reports" })).toBeNull();
   });
 
   it("no Preview / Settings panels are mounted in any tab (flag OFF)", () => {

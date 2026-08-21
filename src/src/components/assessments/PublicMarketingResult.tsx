@@ -25,7 +25,7 @@ export function PublicMarketingResult({
 }: {
   score: number;
   scoreBands: PublicMarketingScoreBand[];
-  marketingCta: MarketingCtaConfigV1;
+  marketingCta: MarketingCtaConfigV1 | null;
   referringCoachEmail: string | null;
 }) {
   const roundedScore = Math.max(0, Math.min(100, Math.round(score)));
@@ -51,7 +51,7 @@ export function PublicMarketingResult({
           </ol>
         </section>
       )}
-      <section className="public-marketing-cta-blocks">
+      {marketingCta ? <section className="public-marketing-cta-blocks">
         {marketingCta.blocks.map((block) => {
           if (block.type === "text") {
             return (
@@ -86,7 +86,7 @@ export function PublicMarketingResult({
             </a>
           );
         })}
-      </section>
+      </section> : null}
     </aside>
   );
 }

@@ -17,7 +17,7 @@ export type PublicMarketingScoreBand = z.infer<
 
 export interface PublicMarketingResultConfig {
   scoreBands: PublicMarketingScoreBand[];
-  marketingCta: MarketingCtaConfigV1;
+  marketingCta: MarketingCtaConfigV1 | null;
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -28,13 +28,15 @@ function asRecord(value: unknown): Record<string, unknown> {
 
 export function loadPublicMarketingResultConfig(
   reportConfig: unknown,
+  allowScoreBandsWithoutCta = false,
 ): PublicMarketingResultConfig | null {
-  const cta = loadSafeMarketingCta(reportConfig);
-  if (!cta) return null;
   const publicMarketing = asRecord(asRecord(reportConfig).publicMarketing);
   const bands = z.array(publicMarketingScoreBandSchema).max(12).safeParse(
     publicMarketing.scoreBands ?? [],
   );
   if (!bands.success) return null;
+  const cta = loadSafeMarketingCta(reportConfig);
+  if (!cta && !allowScoreBandsWithoutCta) return null;
+  if (!cta && bands.data.length === 0) return null;
   return { scoreBands: bands.data, marketingCta: cta };
 }

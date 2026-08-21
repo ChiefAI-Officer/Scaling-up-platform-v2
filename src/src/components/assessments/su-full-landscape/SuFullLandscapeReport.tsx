@@ -14,6 +14,9 @@ import {
   SuFullLandscapePage,
   type SuFullLandscapeFooterBrand,
 } from "@/components/assessments/su-full-landscape/SuFullLandscapePages";
+import { ReportHtmlSection } from "@/components/assessments/ReportHtmlSection";
+import type { SafeReportHtmlFragment } from "@/lib/assessments/report-html";
+import type { ReactNode } from "react";
 import { buildSuFullPeerDisclosureModel } from "@/lib/assessments/su-full-peer-disclosure";
 
 const CHAPTER_COPY: Readonly<Record<SuFullLandscapeChapter["key"], string>> = {
@@ -107,6 +110,24 @@ function PrefacePage({ number, footerBrand }: { number: number; footerBrand: SuF
         Your answers and feedback are preserved from the completed assessment;
         peer values are explained wherever they appear.
       </p>
+    </SuFullLandscapePage>
+  );
+}
+
+function CustomHtmlPage({
+  report,
+  html,
+  number,
+}: {
+  report: RespondentReport;
+  html: SafeReportHtmlFragment;
+  number: number;
+}) {
+  return (
+    <SuFullLandscapePage number={number} footerBrand={report}>
+      <div className="su-full-landscape-custom-content">
+        <ReportHtmlSection position="introduction" html={html} />
+      </div>
     </SuFullLandscapePage>
   );
 }
@@ -262,23 +283,43 @@ function DetailPage({
   );
 }
 
-function ConclusionPage({ report, model, contactEmail, number }: {
+function ConclusionPage({ report, model, contactEmail, number, beforeConclusion, conclusionHtml }: {
   report: RespondentReport;
   model: SuFullLandscapeReportModel;
   contactEmail?: string | null;
   number: number;
+  beforeConclusion?: ReactNode;
+  conclusionHtml?: SafeReportHtmlFragment | null;
 }) {
   return (
     <SuFullLandscapePage number={number} footerBrand={report}>
+      {beforeConclusion}
       <h2>Conclusion</h2>
       <p><strong>ScaleUp Score</strong> {scaleUpScore(model.scaleUpScore)}</p>
-      <p>Your strongest chapter is {model.strongestChapter.label}; your focus chapter is {model.weakestChapter.label}.</p>
+      <p>Your strongest chapter is {model.strongestChapter.label}; Your focus chapter is {model.weakestChapter.label}.</p>
+      {conclusionHtml ? (
+        <div className="su-full-landscape-custom-content">
+          <ReportHtmlSection position="conclusion" html={conclusionHtml} />
+        </div>
+      ) : (
+        <DefaultNextSteps report={report} contactEmail={contactEmail} />
+      )}
+    </SuFullLandscapePage>
+  );
+}
+
+function DefaultNextSteps({ report, contactEmail }: {
+  report: RespondentReport;
+  contactEmail?: string | null;
+}) {
+  return (
+    <>
       <h3>Next steps</h3>
       <p>Choose one priority from the feedback, agree a concrete owner and review date, and return to the remaining findings in your next planning cycle.</p>
       {(contactEmail ?? report.referringCoachEmail) ? (
         <p><a href={`mailto:${contactEmail ?? report.referringCoachEmail}`}>Contact your coach</a></p>
       ) : null}
-    </SuFullLandscapePage>
+    </>
   );
 }
 
@@ -303,10 +344,12 @@ export function SuFullLandscapeReport({
   report,
   model,
   contactEmail,
+  beforeConclusion,
 }: {
   report: RespondentReport;
   model: SuFullLandscapeReportModel;
   contactEmail?: string | null;
+  beforeConclusion?: ReactNode;
 }) {
   const chapters = new Map(model.chapters.map((chapter) => [chapter.key, chapter]));
   const questions = questionByKey(model);
@@ -317,7 +360,9 @@ export function SuFullLandscapeReport({
         {model.pages.map((page) => {
         switch (page.kind) {
           case "cover": return <CoverPage key={page.number} number={page.number} report={report} />;
-          case "preface": return <PrefacePage key={page.number} number={page.number} footerBrand={report} />;
+          case "preface": return report.reportHtml?.introductionHtml
+            ? <CustomHtmlPage key={page.number} number={page.number} report={report} html={report.reportHtml.introductionHtml} />
+            : <PrefacePage key={page.number} number={page.number} footerBrand={report} />;
           case "contents": return <ContentsPage key={page.number} number={page.number} footerBrand={report} />;
           case "introduction": return <IntroductionPage key={page.number} number={page.number} report={report} model={model} />;
           case "profile": return <ProfilePage key={page.number} number={page.number} model={model} footerBrand={report} />;
@@ -328,7 +373,7 @@ export function SuFullLandscapeReport({
             return <ChapterPage chapter={chapter} key={page.number} number={page.number} footerBrand={report} />;
           }
           case "detail": return <DetailPage key={page.number} page={page} questions={questions} peerProvenance={model.peerProvenance} footerBrand={report} />;
-          case "conclusion": return <ConclusionPage key={page.number} number={page.number} report={report} model={model} contactEmail={contactEmail} />;
+          case "conclusion": return <ConclusionPage key={page.number} number={page.number} report={report} model={model} contactEmail={contactEmail} beforeConclusion={beforeConclusion} conclusionHtml={report.reportHtml?.conclusionHtml} />;
           case "appendix": return <AppendixPage key={page.number} number={page.number} model={model} footerBrand={report} />;
           default: {
             const impossible: never = page;

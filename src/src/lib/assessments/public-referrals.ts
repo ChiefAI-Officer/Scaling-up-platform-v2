@@ -855,6 +855,7 @@ export async function getPublicReferralReport(
                   id: true,
                   contentHash: true,
                   publishedAt: true,
+                  reportConfig: true,
                   sections: true,
                   questions: true,
                   scoringConfig: true,

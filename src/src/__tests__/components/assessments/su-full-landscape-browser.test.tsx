@@ -9,6 +9,7 @@ import { chromium, type Browser, type Page } from "playwright";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
+import { REPORT_HTML_PEER_FIXTURES } from "../../../../scripts/capture-report-html-peers-previews";
 import { BrandedReport } from "@/components/assessments/BrandedReport";
 import { ReportStyleScope } from "@/components/assessments/ReportStyleScope";
 import {
@@ -20,6 +21,11 @@ import {
   SU_FULL_PHASE_PEER_SOURCE_ID,
   getGovernedPeerValue,
 } from "@/lib/assessments/su-full-phase-peer-catalogue";
+import { prepareReportHtmlForStorage } from "@/lib/assessments/report-html";
+import {
+  SU_FULL_GOVERNED_PEER_DISCLOSURE,
+  SU_FULL_LEGACY_PEER_DISCLOSURE,
+} from "@/lib/assessments/su-full-peer-disclosure";
 import type { GrowthPhaseNumber } from "@/lib/assessments/su-full-phase";
 
 jest.setTimeout(60_000);
@@ -33,6 +39,225 @@ const HISTORICAL_PEER_DISCLOSURE = "Peers shows the historical benchmark used fo
 const LEGACY_FALSE_FREEZE_CLAIM = /frozen governed snapshot|peer values[^.]{0,120}frozen (?:when|at) (?:this result was )?scored/i;
 const ENGINEERING_LANGUAGE = /governed|snapshot|sourceId|source id|catalogue|provenance|legacy baseline|phase-aware|frozen|esperto-five-phase-peers|esperto-controlled/i;
 const REPRESENTATIVE_482_CHARACTER_FEEDBACK = "In order to scale, smart application and linking of information technology is essential. Sales, marketing, project management, production,humanresources,reporting,etc.Thisgivesstructureand clarity, prevents mistakes and makes growing a lot easier. With the size of your company, a lot of systems likely still work independently of each other, or you primarily use Excel. This is customary, but in your next growth phase you will have to start thinking about smart solutions. Act now";
+
+const SEMANTIC_ESCAPE_CASES = [
+  {
+    id: "exact-limit-pre",
+    introductionHtml: `<pre>${"x".repeat(2_200)}</pre>`,
+    conclusionHtml: null,
+    rejectedIssue: /preformatted/i,
+  },
+  {
+    id: "maximum-line-breaks",
+    introductionHtml: "<br>".repeat(64),
+    conclusionHtml: null,
+    rejectedIssue: /line break/i,
+  },
+  {
+    id: "maximum-headings",
+    introductionHtml: null,
+    conclusionHtml: Array.from({ length: 36 }, () => "<h1>x</h1>").join(""),
+    rejectedIssue: /heading/i,
+  },
+  {
+    id: "maximum-welcome-figcaptions",
+    introductionHtml: "<figcaption>x</figcaption>".repeat(64),
+    conclusionHtml: null,
+    rejectedIssue: /figure caption/i,
+  },
+  {
+    id: "maximum-closing-figcaptions",
+    introductionHtml: null,
+    conclusionHtml: "<figcaption>x</figcaption>".repeat(36),
+    rejectedIssue: /figure caption/i,
+  },
+  {
+    id: "maximum-table-cells",
+    introductionHtml: `<table><tbody>${Array.from({ length: 8 }, (_, rowIndex) => `<tr>${"<td>x</td>".repeat(rowIndex === 0 ? 47 : 1)}</tr>`).join("")}</tbody></table>`,
+    conclusionHtml: null,
+    rejectedIssue: /table (?:column|cell)/i,
+  },
+  {
+    id: "maximum-table-captions",
+    introductionHtml: `<table>${"<caption>x</caption>".repeat(63)}</table>`,
+    conclusionHtml: null,
+    rejectedIssue: /table caption/i,
+  },
+  {
+    id: "direct-table-td-children",
+    introductionHtml: `<table>${"<td>x</td>".repeat(24)}</table>`,
+    conclusionHtml: null,
+    rejectedIssue: /valid table structure/i,
+  },
+  {
+    id: "direct-table-th-children",
+    introductionHtml: `<table>${"<th>x</th>".repeat(24)}</table>`,
+    conclusionHtml: null,
+    rejectedIssue: /valid table structure/i,
+  },
+] as const;
+
+type SemanticAuditPosition = "introduction" | "conclusion";
+
+const TALL_PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAA+gCAIAAAC0f+F8AAAALUlEQVR42u3DAQ0AAAgDoM8uFrKSxQ0ibGR6K4mqqqqqqqqqqqqqqqqqqqq/H9OeIDkSuu58AAAAAElFTkSuQmCC";
+const SEMANTIC_AUDIT_LIMITS = {
+  introduction: { elements: 64, text: 2_200, rows: 8, columns: 4, cells: 24, headings: 4, breaks: 8, lines: 32 },
+  conclusion: { elements: 36, text: 900, rows: 6, columns: 3, cells: 12, headings: 2, breaks: 4, lines: 16 },
+} as const;
+
+function auditTextChunks(
+  position: SemanticAuditPosition,
+  count: number,
+  totalText = SEMANTIC_AUDIT_LIMITS[position].text,
+): string[] {
+  const text = "x".repeat(totalText);
+  return Array.from({ length: count }, (_, index) => {
+    const start = Math.floor(index * text.length / count);
+    const end = Math.floor((index + 1) * text.length / count);
+    return text.slice(start, end);
+  });
+}
+
+function repeatedInlineAuditTag(tag: string, position: SemanticAuditPosition): string {
+  return auditTextChunks(position, SEMANTIC_AUDIT_LIMITS[position].elements)
+    .map((text) => `<${tag}>${text}</${tag}>`)
+    .join("");
+}
+
+function weightedAuditTag(tag: string, weight: number, position: SemanticAuditPosition): string {
+  const { elements, lines } = SEMANTIC_AUDIT_LIMITS[position];
+  const count = Math.min(elements, Math.floor(lines / (weight + 1)));
+  const textLines = lines - count * weight;
+  return auditTextChunks(position, count, textLines * 100)
+    .map((text) => `<${tag}>${text}</${tag}>`)
+    .join("");
+}
+
+function headingAuditHtml(tag: string, weight: number, position: SemanticAuditPosition): string {
+  const { headings } = SEMANTIC_AUDIT_LIMITS[position];
+  const textCharacters = position === "introduction"
+    ? (weight === 5 ? 400 : weight === 4 ? 500 : 650)
+    : (weight === 5 ? 200 : weight === 4 ? 250 : 300);
+  return auditTextChunks(position, headings, textCharacters)
+    .map((text) => `<${tag}>${text}</${tag}>`)
+    .join("");
+}
+
+function listAuditHtml(tag: "ul" | "ol", position: SemanticAuditPosition): string {
+  const { lines } = SEMANTIC_AUDIT_LIMITS[position];
+  const items = Math.floor((lines - 1) / 2);
+  const textLines = lines - 1 - items;
+  return `<${tag}>${auditTextChunks(position, items, textLines * 100)
+    .map((text) => `<li>${text}</li>`)
+    .join("")}</${tag}>`;
+}
+
+function descriptionListAuditHtml(position: SemanticAuditPosition): string {
+  const { lines } = SEMANTIC_AUDIT_LIMITS[position];
+  const items = Math.floor((lines - 1) / 2);
+  const textLines = lines - 1 - items;
+  return `<dl>${auditTextChunks(position, items, textLines * 100)
+    .map((text, index) => index % 2 === 0 ? `<dt>${text}</dt>` : `<dd>${text}</dd>`)
+    .join("")}</dl>`;
+}
+
+function figureCaptionAuditHtml(position: SemanticAuditPosition): string {
+  const textLength = position === "introduction" ? 1_100 : 500;
+  return `<figcaption>${"x".repeat(textLength)}</figcaption>`;
+}
+
+function figureImageAuditHtml(position: SemanticAuditPosition): string {
+  const textLength = position === "introduction" ? 700 : 150;
+  return `<figure><img src="${TALL_PNG}" alt="Tall image"><figcaption>${"x".repeat(textLength)}</figcaption></figure>`;
+}
+
+function imageAuditHtml(position: SemanticAuditPosition): string {
+  return `<img src="${TALL_PNG}" alt="Tall image">${"x".repeat(SEMANTIC_AUDIT_LIMITS[position].text)}`;
+}
+
+function tableAuditHtml(position: SemanticAuditPosition): string {
+  const limits = SEMANTIC_AUDIT_LIMITS[position];
+  const rowColumns = position === "introduction" ? 3 : 2;
+  const cellTextLength = position === "introduction" ? 300 : 40;
+  const chunks = auditTextChunks(position, limits.cells, cellTextLength);
+  let cellIndex = 0;
+  const rows = Array.from({ length: limits.rows }, (_, rowIndex) => {
+    const tag = rowIndex === 0 ? "th" : "td";
+    return `<tr>${Array.from({ length: rowColumns }, () => `<${tag}>${chunks[cellIndex++] ?? ""}</${tag}>`).join("")}</tr>`;
+  });
+  const head = rows.shift() ?? "";
+  const foot = rows.pop() ?? "";
+  const caption = position === "introduction" ? "<caption>Cap</caption>" : "";
+  return `<table>${caption}<colgroup>${"<col>".repeat(limits.columns)}</colgroup><thead>${head}</thead><tbody>${rows.join("")}</tbody><tfoot>${foot}</tfoot></table>`;
+}
+
+function tableCaptionAuditHtml(): string {
+  const text = "C".repeat(60);
+  return `<table><caption>${text}</caption><tbody><tr><td>x</td></tr></tbody></table>`;
+}
+
+const SAFE_INLINE_TAGS = ["span", "code", "strong", "em", "b", "i", "u", "s", "small", "sup", "sub", "a"] as const;
+const POSITIVE_LAYOUT_TAGS = [
+  "section", "article", "header", "main", "aside", "div", "p", "br", "hr", "h1", "h2", "h3", "h4", "h5", "h6",
+  "ul", "ol", "li", "dl", "dt", "dd", "blockquote", "figure", "figcaption", "table", "caption", "thead", "tbody",
+  "tfoot", "tr", "th", "td", "colgroup", "col", "img",
+] as const;
+
+const SEMANTIC_ACCEPTED_CAP_CASES = [
+  ...SAFE_INLINE_TAGS.map((tag) => ({ id: `inline-${tag}`, tags: [tag], html: (position: SemanticAuditPosition) => repeatedInlineAuditTag(tag, position) })),
+  ...[
+    ["section", 1], ["article", 1], ["header", 1], ["main", 1], ["aside", 1], ["div", 1], ["p", 2], ["blockquote", 3], ["figure", 3],
+  ].map(([tag, weight]) => ({ id: `weighted-${tag}`, tags: [tag as string], html: (position: SemanticAuditPosition) => weightedAuditTag(tag as string, weight as number, position) })),
+  { id: "break-cap", tags: ["br"], html: (position: SemanticAuditPosition) => `${"x".repeat(SEMANTIC_AUDIT_LIMITS[position].text)}${"<br>".repeat(SEMANTIC_AUDIT_LIMITS[position].breaks)}` },
+  { id: "rule-budget", tags: ["hr"], html: (position: SemanticAuditPosition) => "<hr>".repeat(SEMANTIC_AUDIT_LIMITS[position].lines / 2) },
+  ...[["h1", 5], ["h2", 4], ["h3", 3], ["h4", 3], ["h5", 3], ["h6", 3]]
+    .map(([tag, weight]) => ({ id: `heading-${tag}`, tags: [tag as string], html: (position: SemanticAuditPosition) => headingAuditHtml(tag as string, weight as number, position) })),
+  { id: "unordered-list", tags: ["ul", "li"], html: (position: SemanticAuditPosition) => listAuditHtml("ul", position) },
+  { id: "ordered-list", tags: ["ol", "li"], html: (position: SemanticAuditPosition) => listAuditHtml("ol", position) },
+  { id: "description-list", tags: ["dl", "dt", "dd"], html: descriptionListAuditHtml },
+  { id: "figure-caption-cap", tags: ["figcaption"], html: figureCaptionAuditHtml },
+  { id: "figure-image-nesting", tags: ["figure", "figcaption", "img"], html: figureImageAuditHtml },
+  { id: "image-text-cap", tags: ["img"], html: imageAuditHtml },
+  { id: "table-maxima", tags: ["table", "caption", "colgroup", "col", "thead", "tbody", "tfoot", "tr", "th", "td"], html: tableAuditHtml },
+  { id: "table-caption", tags: ["caption"], html: tableCaptionAuditHtml },
+] as const;
+
+const SEMANTIC_REJECTED_CASES = [
+  { id: "maximum-line-breaks", position: "introduction", html: "<br>".repeat(64), issue: /line break/i },
+  { id: "maximum-headings", position: "conclusion", html: "<h1>x</h1>".repeat(36), issue: /heading/i },
+  { id: "maximum-welcome-figcaptions", position: "introduction", html: "<figcaption>x</figcaption>".repeat(64), issue: /figure caption/i },
+  { id: "maximum-closing-figcaptions", position: "conclusion", html: "<figcaption>x</figcaption>".repeat(36), issue: /figure caption/i },
+  { id: "maximum-table-cells", position: "introduction", html: `<table><tbody>${Array.from({ length: 8 }, (_, rowIndex) => `<tr>${"<td>x</td>".repeat(rowIndex === 0 ? 47 : 1)}</tr>`).join("")}</tbody></table>`, issue: /table columns/i },
+  { id: "maximum-table-captions", position: "introduction", html: `<table>${"<caption>x</caption>".repeat(63)}</table>`, issue: /table caption/i },
+  { id: "closing-caption-with-max-rows", position: "conclusion", html: `<table><caption>Cap</caption><tbody>${"<tr><td>x</td><td>x</td></tr>".repeat(6)}</tbody></table>`, issue: /estimated lines/i },
+  { id: "table-direct-td", position: "introduction", html: `<table>${"<td>x</td>".repeat(24)}</table>`, issue: /valid table structure/i },
+  { id: "table-direct-th", position: "introduction", html: `<table>${"<th>x</th>".repeat(24)}</table>`, issue: /valid table structure/i },
+  { id: "thead-without-tr", position: "introduction", html: "<table><thead><th>x</th></thead></table>", issue: /valid table structure/i },
+  { id: "tbody-without-tr", position: "introduction", html: "<table><tbody><td>x</td></tbody></table>", issue: /valid table structure/i },
+  { id: "tfoot-without-tr", position: "introduction", html: "<table><tfoot><td>x</td></tfoot></table>", issue: /valid table structure/i },
+  { id: "table-div-cells", position: "introduction", html: "<table><div><td>x</td><th>y</th></div></table>", issue: /valid table structure/i },
+  { id: "direct-col", position: "introduction", html: "<table><col><tr><td>x</td></tr></table>", issue: /valid table structure/i },
+  { id: "mixed-explicit-implicit-cells", position: "introduction", html: "<table><tr><td>x</td></tr><td>y</td></table>", issue: /valid table structure/i },
+  { id: "case-attribute-comment-direct-cell", position: "introduction", html: '<TABLE summary="Summary"><!-- comment --><TD title="Cell">x</TD></TABLE>', issue: /valid table structure/i },
+  { id: "self-closing-direct-cell", position: "introduction", html: "<table><td/>x</table>", issue: /valid table structure/i },
+  { id: "caption-outside-table", position: "introduction", html: "<caption>x</caption><table><tr><td>y</td></tr></table>", issue: /valid table structure/i },
+  { id: "tr-outside-table", position: "introduction", html: "<tr><td>x</td></tr><table><tr><td>y</td></tr></table>", issue: /valid table structure/i },
+  { id: "row-group-outside-table", position: "introduction", html: "<tbody><tr><td>x</td></tr></tbody>", issue: /valid table structure/i },
+  { id: "colgroup-outside-table", position: "introduction", html: "<colgroup><col></colgroup>", issue: /valid table structure/i },
+  { id: "direct-table-div", position: "introduction", html: "<table><div>x</div></table>", issue: /valid table structure/i },
+  { id: "direct-table-text", position: "introduction", html: "<table>x<tr><td>y</td></tr></table>", issue: /valid table structure/i },
+  { id: "late-caption", position: "introduction", html: "<table><tbody><tr><td>x</td></tr></tbody><caption>Late</caption></table>", issue: /valid table structure/i },
+  { id: "late-colgroup", position: "introduction", html: "<table><tbody><tr><td>x</td></tr></tbody><colgroup><col></colgroup></table>", issue: /valid table structure/i },
+  { id: "duplicate-thead", position: "introduction", html: "<table><thead><tr><th>x</th></tr></thead><thead><tr><th>y</th></tr></thead></table>", issue: /valid table structure/i },
+  { id: "duplicate-tfoot", position: "introduction", html: "<table><tfoot><tr><td>x</td></tr></tfoot><tfoot><tr><td>y</td></tr></tfoot></table>", issue: /valid table structure/i },
+  { id: "mixed-direct-group-rows", position: "introduction", html: "<table><tr><td>x</td></tr><tbody><tr><td>y</td></tr></tbody></table>", issue: /valid table structure/i },
+  { id: "nested-table", position: "introduction", html: "<table><tr><td><table><tr><td>x</td></tr></table></td></tr></table>", issue: /valid table structure/i },
+  ...(["introduction", "conclusion"] as const).flatMap((position) => [
+    { id: `over-figure-caption-cap-${position}`, position, html: "<figcaption>One</figcaption><figcaption>Two</figcaption>", issue: /figure caption/i },
+    { id: `over-table-caption-cap-${position}`, position, html: "<table><caption>One</caption><caption>Two</caption></table>", issue: /table caption/i },
+    { id: `over-table-columns-${position}`, position, html: `<table><tbody><tr>${"<td>x</td>".repeat(SEMANTIC_AUDIT_LIMITS[position].columns + 1)}</tr></tbody></table>`, issue: /table columns/i },
+  ]),
+] as const;
 
 function stylesheet(): string {
   return ["su-public-brand.css", "su-report.css"]
@@ -123,6 +348,90 @@ async function horizontalOverflow(page: Page) {
       .filter((item) => item.left < -1 || item.right > document.documentElement.clientWidth + 1)
       .slice(0, 10),
   }));
+}
+
+async function authoredContentOutsidePhysicalPage(page: Page) {
+  return page.locator("[data-testid^='report-html-']").evaluateAll((sections) => sections.flatMap((section) => {
+    const physicalPage = section.closest<HTMLElement>("[data-page-number]");
+    if (!physicalPage) throw new Error("Authored report content is missing its physical page");
+    const pageRect = physicalPage.getBoundingClientRect();
+    return [section, ...section.querySelectorAll<HTMLElement>("*")].flatMap((element) => {
+      const rect = element.getBoundingClientRect();
+      const outside = rect.left < pageRect.left - 1
+        || rect.right > pageRect.right + 1
+        || rect.top < pageRect.top - 1
+        || rect.bottom > pageRect.bottom + 1;
+      return outside ? [{
+        page: physicalPage.dataset.pageNumber,
+        tag: element.tagName,
+        className: element.className,
+        left: rect.left,
+        right: rect.right,
+        top: rect.top,
+        bottom: rect.bottom,
+      }] : [];
+    });
+  }));
+}
+
+async function authoredClipping(page: Page) {
+  return page.locator("[data-testid^='report-html-']").evaluateAll((sections) => sections.flatMap((section) =>
+    [section, ...section.querySelectorAll<HTMLElement>("*")].flatMap((element) => {
+      const style = getComputedStyle(element);
+      const clipsWidth = element.scrollWidth > element.clientWidth + 1
+        && style.overflowX !== "visible";
+      const clipsHeight = element.scrollHeight > element.clientHeight + 1
+        && style.overflowY !== "visible";
+      return clipsWidth || clipsHeight ? [{
+        tag: element.tagName,
+        clientWidth: element.clientWidth,
+        scrollWidth: element.scrollWidth,
+        clientHeight: element.clientHeight,
+        scrollHeight: element.scrollHeight,
+        overflowX: style.overflowX,
+        overflowY: style.overflowY,
+      }] : [];
+    }),
+  ));
+}
+
+function reportWithAuthoringCase(
+  fixture: (typeof REPORT_HTML_PEER_FIXTURES)[number],
+) {
+  const prepared = prepareReportHtmlForStorage({
+    reportHtml: {
+      schemaVersion: 1,
+      introductionHtml: fixture.introductionHtml,
+      conclusionHtml: fixture.conclusionHtml,
+    },
+  });
+  if (!prepared.ok) {
+    throw new Error(`${fixture.id} fixture must remain within the stored authoring limits`);
+  }
+  const report = fixture.peerReference === "current" ? reportForPhase(4) : historicalReport();
+  return {
+    ...report,
+    reportHtml: (prepared.reportConfig as { reportHtml: typeof report.reportHtml }).reportHtml,
+  };
+}
+
+function prepareSemanticEscapeReport(
+  fixture: (typeof SEMANTIC_ESCAPE_CASES)[number],
+  peerReference: "current" | "historical",
+) {
+  const prepared = prepareReportHtmlForStorage({
+    reportHtml: {
+      schemaVersion: 1,
+      introductionHtml: fixture.introductionHtml,
+      conclusionHtml: fixture.conclusionHtml,
+    },
+  });
+  if (!prepared.ok) return prepared;
+  const report = peerReference === "current" ? reportForPhase(4) : historicalReport();
+  return {
+    ...report,
+    reportHtml: (prepared.reportConfig as { reportHtml: typeof report.reportHtml }).reportHtml,
+  };
 }
 
 async function q01PeerValue(page: Page): Promise<string> {
@@ -646,5 +955,286 @@ describe("SU Full landscape browser and PDF contract", () => {
       await page.close();
       rmSync(directory, { recursive: true, force: true });
     }
+  });
+
+  it.each(REPORT_HTML_PEER_FIXTURES)("keeps the $authoringCase/$peerReference authored-report matrix inside 26 physical pages", async (fixture) => {
+    const provenance = fixture.peerReference === "current" ? "Phase 4 · Delegation" : "Historical benchmark";
+    const disclosure = fixture.peerReference === "current"
+      ? SU_FULL_GOVERNED_PEER_DISCLOSURE
+      : SU_FULL_LEGACY_PEER_DISCLOSURE;
+    const report = reportWithAuthoringCase(fixture);
+    if (fixture.authoringCase === "adversarial") {
+      for (const storedHtml of [
+        report.reportHtml?.introductionHtml,
+        report.reportHtml?.conclusionHtml,
+      ]) {
+        expect(storedHtml).toBeTruthy();
+        expect(storedHtml).not.toMatch(/\s(?:class|id|data-[a-z0-9_-]+|role|aria-[a-z0-9_-]+|style)=/i);
+      }
+    }
+    if (fixture.authoringCase === "table-max") {
+      for (const storedHtml of [report.reportHtml?.introductionHtml, report.reportHtml?.conclusionHtml]) {
+        expect(storedHtml).toBeTruthy();
+        expect(storedHtml).not.toMatch(/(?:colspan|rowspan|<col[^>]+span)/i);
+      }
+    }
+    const { html } = routeMarkup(report);
+    const directory = mkdtempSync(join(tmpdir(), "report-html-peers-matrix-"));
+    const pdfPath = join(directory, `${fixture.id}.pdf`);
+    const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+    try {
+      await load(page, html);
+      expect(await page.locator("[data-testid^='su-full-landscape-page-']").count()).toBe(26);
+      expect(await page.locator(".su-full-landscape-page").count()).toBe(26);
+      await expect(page.locator("body").innerText()).resolves.toContain(provenance);
+      await expect(page.getByText(disclosure, { exact: true }).count()).resolves.toBeGreaterThanOrEqual(2);
+      await expect(page.locator("body").innerText()).resolves.not.toMatch(ENGINEERING_LANGUAGE);
+
+      if (fixture.authoringCase === "adversarial") {
+        const authoredLayout = await page.locator("[data-testid^='report-html-']").evaluateAll((sections) =>
+          sections.map((section) => {
+            const authored = section.firstElementChild as HTMLElement | null;
+            if (!authored) throw new Error("Missing adversarial authored element");
+            const style = getComputedStyle(authored);
+            return {
+              selectorAttributes: [...authored.attributes]
+                .map((attribute) => attribute.name)
+                .filter((name) =>
+                  name === "class"
+                  || name === "id"
+                  || name === "role"
+                  || name.startsWith("data-")
+                  || name.startsWith("aria-"),
+                ),
+              whiteSpace: style.whiteSpace,
+              fontSize: style.fontSize,
+              letterSpacing: style.letterSpacing,
+              padding: style.padding,
+              margin: style.margin,
+            };
+          }),
+        );
+        expect(authoredLayout).toEqual([
+          {
+            selectorAttributes: [],
+            whiteSpace: "normal",
+            fontSize: "16px",
+            letterSpacing: "normal",
+            padding: "0px",
+            margin: "0px",
+          },
+          {
+            selectorAttributes: [],
+            whiteSpace: "normal",
+            fontSize: "16px",
+            letterSpacing: "normal",
+            padding: "0px",
+            margin: "0px",
+          },
+        ]);
+      }
+
+      const desktop = await horizontalOverflow(page);
+      expect(desktop.offenders).toEqual([]);
+      expect(desktop.document).toBeLessThanOrEqual(desktop.viewport + 1);
+
+      await page.setViewportSize({ width: 390, height: 844 });
+      const mobile = await horizontalOverflow(page);
+      expect(mobile.offenders).toEqual([]);
+      expect(mobile.document).toBeLessThanOrEqual(mobile.viewport + 1);
+
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await page.emulateMedia({ media: "print" });
+      expect(await authoredContentOutsidePhysicalPage(page)).toEqual([]);
+      await expect(page.locator("[data-page-number='25']").innerText()).resolves.toContain("55 / 100");
+      await expect(page.locator("[data-page-number='25']").innerText()).resolves.toContain("Your strongest chapter is");
+      await expect(page.locator("[data-page-number='25']").innerText()).resolves.toContain("Your focus chapter is");
+
+      await page.pdf({
+        path: pdfPath,
+        format: "A4",
+        landscape: true,
+        preferCSSPageSize: true,
+        printBackground: true,
+      });
+      const pdfinfo = execFileSync("pdfinfo", [pdfPath], { encoding: "utf8" });
+      expect(pdfinfo).toMatch(/^Pages:\s+26$/m);
+      const pdfText = normalize(execFileSync("pdftotext", [pdfPath, "-"], { encoding: "utf8", maxBuffer: 20 * 1024 * 1024 }));
+      expect(pdfText).toContain(provenance);
+      expect(pdfText).toContain(disclosure);
+      expect(pdfText).toContain("ScaleUp Score 55 / 100");
+      expect(pdfText).toContain("Your strongest chapter is");
+      expect(pdfText).toContain("Your focus chapter is");
+      expect(pdfText).not.toMatch(ENGINEERING_LANGUAGE);
+    } finally {
+      await page.close();
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it.each(SEMANTIC_ESCAPE_CASES.flatMap((fixture) => [
+    { ...fixture, peerReference: "current" as const },
+    { ...fixture, peerReference: "historical" as const },
+  ]))("rejects or physically contains $id/$peerReference semantic-limit content", async (fixture) => {
+    const prepared = prepareSemanticEscapeReport(fixture, fixture.peerReference);
+    if ("ok" in prepared && prepared.ok === false) {
+      expect(prepared.issues.map((issue) => issue.message).join(" ")).toMatch(fixture.rejectedIssue);
+      return;
+    }
+
+    const { html } = routeMarkup(prepared);
+    const directory = mkdtempSync(join(tmpdir(), "report-html-semantic-escape-"));
+    const pdfPath = join(directory, `${fixture.id}-${fixture.peerReference}.pdf`);
+    const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+    try {
+      await load(page, html);
+      const desktop = await horizontalOverflow(page);
+      const desktopClipping = await authoredClipping(page);
+      await page.setViewportSize({ width: 390, height: 844 });
+      const mobile = await horizontalOverflow(page);
+      const mobileClipping = await authoredClipping(page);
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await page.emulateMedia({ media: "print" });
+      const outside = await authoredContentOutsidePhysicalPage(page);
+      await page.pdf({
+        path: pdfPath,
+        format: "A4",
+        landscape: true,
+        preferCSSPageSize: true,
+        printBackground: true,
+      });
+      const pdfinfo = execFileSync("pdfinfo", [pdfPath], { encoding: "utf8" });
+      const pages = Number(pdfinfo.match(/^Pages:\s+(\d+)$/m)?.[1]);
+
+      expect({
+        desktopDocumentWidth: desktop.document,
+        desktopViewportWidth: desktop.viewport,
+        desktopOffenders: desktop.offenders,
+        desktopClipping,
+        mobileDocumentWidth: mobile.document,
+        mobileViewportWidth: mobile.viewport,
+        mobileOffenders: mobile.offenders,
+        mobileClipping,
+        authoredOutsidePhysicalPage: {
+          count: outside.length,
+          first: outside.at(0) ?? null,
+          last: outside.at(-1) ?? null,
+        },
+        physicalPdfPages: pages,
+      }).toEqual({
+        desktopDocumentWidth: 1280,
+        desktopViewportWidth: 1280,
+        desktopOffenders: [],
+        desktopClipping: [],
+        mobileDocumentWidth: 390,
+        mobileViewportWidth: 390,
+        mobileOffenders: [],
+        mobileClipping: [],
+        authoredOutsidePhysicalPage: {
+          count: 0,
+          first: null,
+          last: null,
+        },
+        physicalPdfPages: 26,
+      });
+    } finally {
+      await page.close();
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("renders every allowed semantic tag at an accepted boundary without counting rejections as coverage", async () => {
+    expect([...new Set(SEMANTIC_ACCEPTED_CAP_CASES.flatMap((fixture) => fixture.tags))].sort())
+      .toEqual([...SAFE_INLINE_TAGS, ...POSITIVE_LAYOUT_TAGS].sort());
+
+    const unsafe: unknown[] = [];
+    const acceptedSafe: string[] = [];
+    const unexpectedlyRejected: Array<{ id: string; issues: string[] }> = [];
+
+    for (const fixture of SEMANTIC_ACCEPTED_CAP_CASES) {
+      for (const position of ["introduction", "conclusion"] as const) {
+        const id = `${fixture.id}/${position}`;
+        const prepared = prepareReportHtmlForStorage({
+          reportHtml: {
+            schemaVersion: 1,
+            introductionHtml: position === "introduction" ? fixture.html(position) : null,
+            conclusionHtml: position === "conclusion" ? fixture.html(position) : null,
+          },
+        });
+        if (!prepared.ok) {
+          unexpectedlyRejected.push({ id, issues: prepared.issues.map((issue) => issue.message) });
+          continue;
+        }
+
+        const source = reportForPhase(4);
+        const report = {
+          ...source,
+          reportHtml: (prepared.reportConfig as { reportHtml: typeof source.reportHtml }).reportHtml,
+        };
+        const { html } = routeMarkup(report);
+        const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+        try {
+          await load(page, html);
+          const desktop = await horizontalOverflow(page);
+          const desktopClipping = await authoredClipping(page);
+          await page.setViewportSize({ width: 390, height: 844 });
+          const mobile = await horizontalOverflow(page);
+          const mobileClipping = await authoredClipping(page);
+          await page.setViewportSize({ width: 1280, height: 720 });
+          await page.emulateMedia({ media: "print" });
+          const outside = await authoredContentOutsidePhysicalPage(page);
+          const isUnsafe = desktop.document > desktop.viewport + 1
+            || desktop.offenders.length > 0
+            || mobile.document > mobile.viewport + 1
+            || mobile.offenders.length > 0
+            || desktopClipping.length > 0
+            || mobileClipping.length > 0
+            || outside.length > 0;
+          if (isUnsafe) {
+            unsafe.push({
+              id,
+              desktop: { document: desktop.document, viewport: desktop.viewport, offenders: desktop.offenders.length },
+              mobile: { document: mobile.document, viewport: mobile.viewport, offenders: mobile.offenders.length },
+              desktopClipping: desktopClipping.slice(0, 2).map((item) => item.tag),
+              mobileClipping: mobileClipping.slice(0, 2).map((item) => item.tag),
+              authoredOutsidePhysicalPage: {
+                count: outside.length,
+                firstTag: outside.at(0)?.tag ?? null,
+                lastTag: outside.at(-1)?.tag ?? null,
+                lastBottom: outside.at(-1)?.bottom ?? null,
+              },
+            });
+          } else {
+            acceptedSafe.push(id);
+          }
+        } finally {
+          await page.close();
+        }
+      }
+    }
+
+    if (unsafe.length > 0 || unexpectedlyRejected.length > 0) {
+      throw new Error(JSON.stringify({ unsafe, acceptedSafe, unexpectedlyRejected }, null, 2));
+    }
+    expect(acceptedSafe).toHaveLength(SEMANTIC_ACCEPTED_CAP_CASES.length * 2);
+  });
+
+  it("rejects every former escape and explicit over-cap semantic composition with a plain issue", () => {
+    const accepted: string[] = [];
+    for (const fixture of SEMANTIC_REJECTED_CASES) {
+      const prepared = prepareReportHtmlForStorage({
+        reportHtml: {
+          schemaVersion: 1,
+          introductionHtml: fixture.position === "introduction" ? fixture.html : null,
+          conclusionHtml: fixture.position === "conclusion" ? fixture.html : null,
+        },
+      });
+      if (prepared.ok) {
+        accepted.push(fixture.id);
+        continue;
+      }
+      expect(prepared.issues.map((issue) => issue.message).join(" ")).toMatch(fixture.issue);
+    }
+    expect(accepted).toEqual([]);
   });
 });

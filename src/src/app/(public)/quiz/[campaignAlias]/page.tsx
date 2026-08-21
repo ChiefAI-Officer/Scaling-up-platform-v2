@@ -17,6 +17,8 @@ import { isReferredResultsEnabled } from "@/lib/assessments/wave-83-flags";
 import { isQspStoryGroupEnabled } from "@/lib/assessments/wave-48-flags";
 import { isPublicMarketingCtaEnabled } from "@/lib/assessments/wave-public-marketing-cta-flags";
 import { loadPublicMarketingResultConfig } from "@/lib/assessments/public-marketing-result";
+import { resolveActiveReportHtml } from "@/lib/assessments/report-html";
+import { isReportHtmlExperienceEnabled } from "@/lib/assessments/wave-report-html-authoring-flags";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -85,10 +87,15 @@ export default async function PublicQuizPage({
   const customSlides = isCustomSlidesEnabled(campaign.id)
     ? loadSafeSlides(campaign.customSlides)
     : [];
+  const reportHtmlExperienceActive = isReportHtmlExperienceEnabled();
+  const reportHtml = resolveActiveReportHtml(version.reportConfig);
   const marketingResultConfig =
     isPublicMarketingCtaEnabled() &&
     campaign.template.deliveryType === "PUBLIC_MARKETING_QUIZ"
-      ? loadPublicMarketingResultConfig(version.reportConfig)
+      ? loadPublicMarketingResultConfig(
+          version.reportConfig,
+          reportHtmlExperienceActive,
+        )
       : null;
 
   // Render the client directly (no constrained wrapper) so the full-bleed
@@ -108,6 +115,9 @@ export default async function PublicQuizPage({
       questions={version.questions as unknown}
       customSlides={customSlides}
       marketingResultConfig={marketingResultConfig}
+      {...(reportHtmlExperienceActive && reportHtml
+        ? { reportHtmlExperienceActive: true, reportHtml }
+        : {})}
       {...(isReferredResultsEnabled()
         ? { referredResultsEnabled: true }
         : {})}

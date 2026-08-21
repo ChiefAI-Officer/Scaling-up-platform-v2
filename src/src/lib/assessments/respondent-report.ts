@@ -32,6 +32,10 @@ import {
 } from "@/lib/assessments/ceo-report-access";
 import type { CeoReportSessionPayload } from "@/lib/assessments/ceo-report-access-cookie";
 import type { SuFullPeerPresentation } from "@/lib/assessments/su-full-peer-presentation";
+import {
+  resolveActiveReportHtml,
+  type SafeReportHtml,
+} from "@/lib/assessments/report-html";
 
 // Re-export so existing `import { QuestionMeta } from "respondent-report"`
 // consumers keep working after the shared builder extraction.
@@ -67,6 +71,7 @@ interface ReportDb {
 export interface StoredReportVersion {
   id: string;
   contentHash: string;
+  reportConfig: unknown;
   sections: unknown;
   questions: unknown;
   scoringConfig: unknown;
@@ -161,6 +166,8 @@ export interface RespondentReport {
   rawAnswers: unknown;
   /** version.scoringConfig (raw) */
   scoringConfig: unknown;
+  /** Safe web-only fragments resolved from the campaign's pinned version. */
+  reportHtml?: SafeReportHtml;
   provenance: ReportProvenance;
   /**
    * true when submission.result doesn't look like a valid ScoreResult
@@ -271,6 +278,9 @@ export function buildStoredRespondentReport(
   }
 
   const creatorCoach = input.campaign.creatorCoach;
+  const reportHtml = resolveActiveReportHtml(
+    input.campaign.version.reportConfig,
+  );
 
   return {
     respondentName: respondentDisplayName(
@@ -295,6 +305,7 @@ export function buildStoredRespondentReport(
     questionsByKey,
     rawAnswers: input.submission.answers,
     scoringConfig: input.campaign.version.scoringConfig,
+    ...(reportHtml ? { reportHtml } : {}),
     provenance: {
       submissionId: input.submission.id,
       versionId: input.campaign.version.id,
@@ -356,7 +367,7 @@ const respondentReportSelect = {
       template: { select: { id: true, name: true, alias: true } },
       organization: { select: { name: true } },
       creatorCoach: { select: { profileImage: true, firstName: true, lastName: true } },
-      version: { select: { id: true, contentHash: true, sections: true, questions: true, scoringConfig: true } },
+      version: { select: { id: true, contentHash: true, reportConfig: true, sections: true, questions: true, scoringConfig: true } },
     },
   },
 } as const;

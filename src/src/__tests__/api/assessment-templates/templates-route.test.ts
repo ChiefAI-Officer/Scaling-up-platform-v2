@@ -48,6 +48,10 @@ beforeEach(() => {
   delete process.env.WAVE_REPORT_STYLES_ENABLED;
   delete process.env.WAVE_REPORT_STYLES_CANARY;
   delete process.env.WAVE_REPORT_STYLES_KILL;
+  delete process.env.WAVE_REPORT_HTML_AUTHORING_ENABLED;
+  delete process.env.WAVE_REPORT_HTML_AUTHORING_KILL;
+  delete process.env.WAVE_ED10_PREVIEW_SETTINGS_ENABLED;
+  delete process.env.WAVE_ED10_PREVIEW_SETTINGS_KILL;
   delete process.env.WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_ENABLED;
   delete process.env.WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_KILL;
 });
@@ -176,6 +180,39 @@ describe("GET /api/assessment-templates", () => {
         ],
       }),
     );
+  });
+
+  it("retires picker metadata when the successor HTML report experience is active", async () => {
+    process.env.WAVE_REPORT_STYLES_ENABLED = "1";
+    process.env.WAVE_REPORT_HTML_AUTHORING_ENABLED = "1";
+    process.env.WAVE_ED10_PREVIEW_SETTINGS_ENABLED = "1";
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    (db.assessmentTemplate.findMany as jest.Mock).mockResolvedValue([
+      {
+        id: "t1",
+        name: "Rockefeller",
+        alias: "rockefeller",
+        description: null,
+        aggregationMode: "FULL_VISIBILITY",
+        defaultReportStyle: "MODERN_DASHBOARD",
+        sendResultsDefault: false,
+        resultsEmailContentApproved: false,
+        resultsEmailContentApprovedHash: null,
+        resultsEmailSubject: null,
+        resultsEmailBodyMarkdown: null,
+      },
+    ]);
+
+    const res = await GET(
+      new Request("http://localhost/api/assessment-templates") as never,
+    );
+    const body = await res.json();
+
+    expect(db.assessmentTemplate.findMany).toHaveBeenCalledTimes(1);
+    expect(body.data[0]).toEqual(
+      expect.objectContaining({ reportStylesEnabled: false }),
+    );
+    expect(body.data[0]).not.toHaveProperty("reportStylePreviewCapabilities");
   });
 
   it("keeps report appearance metadata for admins when admin-owned presentation is active", async () => {

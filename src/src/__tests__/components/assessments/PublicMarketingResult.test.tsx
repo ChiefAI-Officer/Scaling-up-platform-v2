@@ -31,4 +31,21 @@ describe("PublicMarketingResult", () => {
     rerender(<PublicMarketingResult score={50} scoreBands={[]} marketingCta={createMarketingCtaPreset("SCALING_UP_QUICK")} referringCoachEmail={null} />);
     expect(screen.getByRole("link", { name: /talk to a coach/i })).toHaveAttribute("href", "https://scalingup.com/coaches");
   });
+
+  it("renders score bands without legacy structured CTA blocks", () => {
+    render(
+      <PublicMarketingResult
+        score={60}
+        scoreBands={[
+          { min: 0, max: 100, label: "Score guide", headline: "Keep going", body: "Use your report." },
+        ]}
+        marketingCta={null}
+        referringCoachEmail={null}
+      />,
+    );
+
+    expect(screen.getByRole("region", { name: "Score guide" })).toBeInTheDocument();
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    expect(document.querySelector(".public-marketing-cta-blocks")).toBeNull();
+  });
 });

@@ -22,6 +22,7 @@ import { PublicCampaignList } from "@/components/admin/public-campaigns/PublicCa
 import { isPublicCampaignsSimpleUiEnabled } from "@/lib/assessments/wave-public-campaigns-simple-ui-flags";
 import { PageHeader } from "@/components/ui/page-header";
 import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
+import { isReportHtmlExperienceEnabled } from "@/lib/assessments/wave-report-html-authoring-flags";
 
 interface PublicCampaignsPageProps {
   searchParams: Promise<{ created?: string | string[] }>;
@@ -31,6 +32,7 @@ export default async function AdminPublicCampaignsPage({
   searchParams,
 }: PublicCampaignsPageProps) {
   const mobileResponsiveEnabled = isMobileResponsiveEnabled();
+  const reportHtmlExperienceActive = isReportHtmlExperienceEnabled();
   const session = await getServerSession(authOptions);
   if (!session) {
     redirect("/login");
@@ -120,8 +122,12 @@ export default async function AdminPublicCampaignsPage({
               Create and publish{" "}
               <code>accessMode=&quot;PUBLIC&quot;</code> assessment campaigns.
               Respondents self-enroll — no invitation required.
-              When report appearances are available, Admin and STAFF can choose
-              one until the first response is completed.
+              {!reportHtmlExperienceActive && (
+                <>
+                  {" "}When report appearances are available, Admin and STAFF can
+                  choose one until the first response is completed.
+                </>
+              )}
             </p>
           </div>
         </div>
@@ -133,8 +139,10 @@ export default async function AdminPublicCampaignsPage({
         <code>organizationId</code> is required (NOT NULL FK — no synthetic
         rows). Each PUBLIC campaign attaches to a real organization supplied
         by the admin. <code>createdByCoachId</code> is null for all PUBLIC
-        campaigns. Report appearance is then fixed by the first completed
-        response.
+        campaigns.
+        {!reportHtmlExperienceActive && (
+          <> Report appearance is then fixed by the first completed response.</>
+        )}
       </div>
 
       <PublicCampaignsManager responsiveEnabled={mobileResponsiveEnabled} />

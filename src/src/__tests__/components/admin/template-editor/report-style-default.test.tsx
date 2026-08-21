@@ -24,6 +24,7 @@ function shellProps(overrides: {
   reportStylesEnabled?: boolean;
   defaultReportStyle?: "CLASSIC" | "EXECUTIVE_BOARDROOM" | "MODERN_DASHBOARD";
   questions?: unknown[];
+  reportsActive?: boolean;
 } = {}) {
   return {
     template: {
@@ -57,6 +58,7 @@ function shellProps(overrides: {
     singleColumnEnabled: true,
     formsBuildEnabled: true,
     previewSettingsEnabled: overrides.previewSettingsEnabled ?? true,
+    reportsActive: overrides.reportsActive ?? false,
     reportStylesEnabled: overrides.reportStylesEnabled ?? true,
   };
 }
@@ -70,28 +72,37 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe("admin default report appearance", () => {
-  it("appears after Audience for every template when ED10 and report styles are available", () => {
-    render(<TemplateEditorTabbed {...shellProps()} />);
+  it("is absent from both Reports and Settings during the successor HTML experience", () => {
+    mockSearchParams = new URLSearchParams("tab=reports");
+    render(<TemplateEditorTabbed {...shellProps({ reportsActive: true })} />);
 
-    const audience = screen.getByTestId("settings-audience-card");
-    const defaultAppearance = screen.getByTestId("settings-default-report-style-card");
-    expect(audience.compareDocumentPosition(defaultAppearance)).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING,
+    expect(screen.getByRole("tab", { name: "Reports" })).toHaveAttribute(
+      "data-state",
+      "active",
     );
-    expect(within(defaultAppearance).getByText("Default report appearance")).toBeInTheDocument();
-    expect(within(defaultAppearance).getByText(/future campaigns only/i)).toBeInTheDocument();
-    expect(within(defaultAppearance).getByRole("button", { name: "Save default" })).toBeInTheDocument();
-    expect(within(defaultAppearance).getByRole("button", { name: "Show preview" })).toHaveAttribute(
-      "aria-expanded",
-      "false",
-    );
-    expect(within(defaultAppearance).queryByRole("img", { name: /preview/i })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("settings-default-report-style-card")).toBeNull();
+    expect(screen.getByLabelText("Introduction / preface HTML")).toBeInTheDocument();
 
     expect(screen.getByRole("tab", { name: "Preview" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Settings" })).toBeInTheDocument();
     expect(screen.getAllByRole("tablist")[0].className).toContain(
       "flex items-center gap-5 border-b border-border overflow-x-auto mb-6",
     );
+
+    cleanup();
+    mockSearchParams = new URLSearchParams("tab=settings");
+    render(<TemplateEditorTabbed {...shellProps({ reportsActive: true })} />);
+    expect(screen.getByTestId("settings-audience-card")).toBeInTheDocument();
+    expect(screen.queryByTestId("settings-default-report-style-card")).toBeNull();
+  });
+
+  it("preserves the legacy Settings picker while the successor experience is inactive", () => {
+    render(<TemplateEditorTabbed {...shellProps()} />);
+
+    const card = screen.getByTestId("settings-default-report-style-card");
+    expect(within(card).getByText("Default report appearance")).toBeInTheDocument();
+    expect(within(card).getByText(/future campaigns only/i)).toBeInTheDocument();
+    expect(within(card).getByRole("button", { name: "Save default" })).toBeInTheDocument();
   });
 
   it.each([

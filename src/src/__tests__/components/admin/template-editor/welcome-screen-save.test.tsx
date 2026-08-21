@@ -98,7 +98,11 @@ describe("Welcome screen Save Draft", () => {
   it("does not report success when the version succeeds but Welcome fails", async () => {
     global.fetch = jest.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
-      return { ok: url.includes("/versions/") , status: url.includes("/versions/") ? 200 : 500 } as Response;
+      return {
+        ok: url.includes("/versions/"),
+        status: url.includes("/versions/") ? 200 : 500,
+        json: async () => ({}),
+      } as Response;
     });
     const { result } = renderDraft();
     act(() => {

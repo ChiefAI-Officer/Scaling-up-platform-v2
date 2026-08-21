@@ -16,6 +16,9 @@ import {
   ReportIdentityHeader,
   ReportProvenance,
 } from "@/components/assessments/report-styles/ReportSharedContent";
+import { ReportHtmlSection } from "@/components/assessments/ReportHtmlSection";
+import type { SafeReportHtml } from "@/lib/assessments/report-html";
+import type { ReactNode } from "react";
 
 function comparisonLabels(
   presentation: IndividualReportPresentation,
@@ -45,13 +48,29 @@ function comparisonLabels(
 export function ModernDashboardReport({
   presentation,
   comparison,
+  reportHtml,
   responsiveEnabled = false,
+  beforeConclusion,
 }: {
   presentation: IndividualReportPresentation;
   comparison?: ReportComparisonModel | null;
+  reportHtml?: SafeReportHtml;
   responsiveEnabled?: boolean;
+  beforeConclusion?: ReactNode;
 }) {
-  const { summary, detail } = partitionReportBlocks(presentation.blocks);
+  const { summary, detail } = partitionReportBlocks(presentation.blocks, {
+    replaceConclusion: Boolean(reportHtml?.conclusionHtml),
+  });
+  const conclusionBlocks = beforeConclusion && !reportHtml?.conclusionHtml
+    ? detail.filter(
+        (block) => block.kind === "coach-cta" || block.kind === "closing",
+      )
+    : [];
+  const detailBlocks = beforeConclusion
+    ? detail.filter(
+        (block) => block.kind !== "coach-cta" && block.kind !== "closing",
+      )
+    : detail;
   const coverBlocks = summary.filter((block) => block.kind === "score-summary");
   const summaryBlocks = summary.filter((block) => block.kind !== "score-summary");
 
@@ -70,6 +89,12 @@ export function ModernDashboardReport({
         <ReportBlocks blocks={coverBlocks} />
         <ReportProvenance presentation={presentation} />
       </section>
+      {reportHtml?.introductionHtml ? (
+        <section className="report-page report-page--dashboard-introduction report-page-break">
+          <ReportHtmlSection position="introduction" html={reportHtml.introductionHtml} />
+          <ReportProvenance presentation={presentation} />
+        </section>
+      ) : null}
       {summaryBlocks.length > 0 ? (
         <section className="report-page report-page--dashboard-summary report-page-break">
           <ReportBlocks blocks={summaryBlocks} />
@@ -86,9 +111,27 @@ export function ModernDashboardReport({
           <ReportProvenance presentation={presentation} />
         </section>
       ) : null}
-      {detail.length > 0 ? (
+      {detailBlocks.length > 0 ? (
         <section className="report-page report-page--dashboard-detail report-page-break">
-          <ReportBlocks blocks={detail} />
+          <ReportBlocks blocks={detailBlocks} />
+          <ReportProvenance presentation={presentation} />
+        </section>
+      ) : null}
+      {beforeConclusion ? (
+        <section className="report-page report-page--dashboard-generated-addon report-page-break">
+          {beforeConclusion}
+          <ReportProvenance presentation={presentation} />
+        </section>
+      ) : null}
+      {conclusionBlocks.length > 0 ? (
+        <section className="report-page report-page--dashboard-conclusion report-page-break">
+          <ReportBlocks blocks={conclusionBlocks} />
+          <ReportProvenance presentation={presentation} />
+        </section>
+      ) : null}
+      {reportHtml?.conclusionHtml ? (
+        <section className="report-page report-page--dashboard-conclusion report-page-break">
+          <ReportHtmlSection position="conclusion" html={reportHtml.conclusionHtml} />
           <ReportProvenance presentation={presentation} />
         </section>
       ) : null}

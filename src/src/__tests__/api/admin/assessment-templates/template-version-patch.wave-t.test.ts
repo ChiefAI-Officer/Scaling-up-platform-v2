@@ -161,6 +161,19 @@ beforeEach(() => {
   (db.assessmentTemplateVersion.update as jest.Mock).mockResolvedValue({});
 });
 
+afterEach(() => {
+  delete process.env.WAVE_REPORT_HTML_AUTHORING_ENABLED;
+  delete process.env.WAVE_REPORT_HTML_AUTHORING_KILL;
+  delete process.env.WAVE_ED10_PREVIEW_SETTINGS_ENABLED;
+  delete process.env.WAVE_ED10_PREVIEW_SETTINGS_KILL;
+  delete process.env.WAVE_PUBLIC_MARKETING_CTA_ENABLED;
+});
+
+function enableReportHtmlExperience(): void {
+  process.env.WAVE_REPORT_HTML_AUTHORING_ENABLED = "1";
+  process.env.WAVE_ED10_PREVIEW_SETTINGS_ENABLED = "1";
+}
+
 async function expect400(
   questions: unknown[],
   code: string,
@@ -175,6 +188,83 @@ async function expect400(
 }
 
 describe("PATCH version — Wave T question validation", () => {
+  it.each(["PUBLIC_MARKETING_QUIZ", "INVITED_ASSESSMENT"])(
+    "stores and returns canonical report HTML for legacy %s templates",
+    async (deliveryType) => {
+      enableReportHtmlExperience();
+      (db.assessmentTemplate.findUnique as jest.Mock).mockResolvedValue({
+        invitationSubject: "s",
+        invitationBodyMarkdown: "b",
+        deliveryType,
+      });
+      const request = new Request("http://l", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          questions: mixedPayload,
+          sections: [],
+          scoringConfig: { tiers: [] },
+          reportConfig: {
+            reportHtml: {
+              schemaVersion: 1,
+              introductionHtml: '<p onclick="bad()">Intro</p>',
+              conclusionHtml: "<p>CTA</p>",
+            },
+          },
+        }),
+      });
+
+      const response = await PATCH(request as never, versionParams);
+
+      expect(response.status).toBe(200);
+      const stored = (db.assessmentTemplateVersion.update as jest.Mock).mock
+        .calls[0][0].data.reportConfig;
+      expect(stored.reportHtml).toEqual({
+        schemaVersion: 1,
+        introductionHtml: "<p>Intro</p>",
+        conclusionHtml: "<p>CTA</p>",
+      });
+      await expect(response.json()).resolves.toEqual({
+        success: true,
+        data: {
+          reportHtml: stored.reportHtml,
+          didStripContent: true,
+        },
+      });
+    },
+  );
+
+  it("returns 422 without storing oversized report HTML", async () => {
+    enableReportHtmlExperience();
+    const request = new Request("http://l", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        questions: mixedPayload,
+        sections: [],
+        scoringConfig: { tiers: [] },
+        reportConfig: {
+          reportHtml: {
+            schemaVersion: 1,
+            introductionHtml: "x".repeat(100_001),
+            conclusionHtml: null,
+          },
+        },
+      }),
+    });
+
+    const response = await PATCH(request as never, versionParams);
+
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      code: "INVALID_REPORT_HTML",
+      issues: [
+        expect.objectContaining({ path: "reportHtml.introductionHtml" }),
+      ],
+    });
+    expect(db.assessmentTemplateVersion.update).not.toHaveBeenCalled();
+  });
+
   it("server-compiles public Marketing CTA HTML instead of trusting the client", async () => {
     process.env.WAVE_PUBLIC_MARKETING_CTA_ENABLED = "1";
     (db.assessmentTemplate.findUnique as jest.Mock).mockResolvedValue({

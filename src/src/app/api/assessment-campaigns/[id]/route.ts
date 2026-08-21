@@ -37,7 +37,7 @@ import {
 } from "@/lib/assessments/email-html-sanitizer";
 import { isCustomSlidesEnabled } from "@/lib/assessments/wave-m-flags";
 import { isOnScreenResultsEnabled } from "@/lib/assessments/wave-osr-flags";
-import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
+import { isReportStyleSelectionEnabled } from "@/lib/assessments/wave-report-styles-flags";
 import { isAdminOwnedAssessmentPresentationEnabled } from "@/lib/assessments/wave-admin-owned-assessment-presentation-flags";
 import type { ReportStyleKey } from "@/lib/assessments/report-style-registry";
 import { isExactCoachReportAppearanceOwner } from "@/lib/assessments/campaign-detail";
@@ -216,7 +216,7 @@ async function patchReportAppearance(
   }
 
   const reportStylesAvailable =
-    isReportStylesEnabled({ templateId: campaign.templateId, campaignId: id });
+    isReportStyleSelectionEnabled({ templateId: campaign.templateId, campaignId: id });
   if (!reportStylesAvailable) {
     return NextResponse.json(
       {

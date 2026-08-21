@@ -30,7 +30,7 @@ import {
   type ReportStyleKey,
 } from "@/lib/assessments/report-style-registry";
 import { resolveCampaignReportStyle } from "@/lib/assessments/report-style-policy";
-import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
+import { isReportStyleSelectionEnabled } from "@/lib/assessments/wave-report-styles-flags";
 import { isPublicCampaignsSimpleUiEnabled } from "@/lib/assessments/wave-public-campaigns-simple-ui-flags";
 
 function withoutInvitedWelcomeSnapshot<
@@ -118,7 +118,7 @@ export async function GET() {
     const availability = new Map(
       campaigns.map((campaign) => [
         campaign.id,
-        isReportStylesEnabled({
+        isReportStyleSelectionEnabled({
           templateId: campaign.templateId,
           campaignId: campaign.id,
         }),
@@ -348,7 +348,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const reportStylesAvailable = isReportStylesEnabled({
+    const reportStylesAvailable = isReportStyleSelectionEnabled({
       templateId: template.id,
     });
     if (

@@ -61,6 +61,7 @@ jest.mock("@/lib/assessments/wave-f-flags", () => ({
 }));
 jest.mock("@/lib/assessments/wave-report-styles-flags", () => ({
   isReportStylesEnabled: () => true,
+  isReportStyleSelectionEnabled: () => true,
 }));
 
 let detailProps: Record<string, unknown> | null = null;

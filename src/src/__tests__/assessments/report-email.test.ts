@@ -600,6 +600,25 @@ describe("buildRespondentReportFromSubmission — templateAlias", () => {
     expect(Object.getOwnPropertyDescriptor(report, "reportStyle")?.value).toBe("MODERN_DASHBOARD");
   });
 
+  it("does not render web-only report HTML into email", () => {
+    const report = buildRespondentReportFromSubmission(
+      submissionArgs({
+        reportHtml: {
+          introductionHtml: "<p>WEB INTRO SENTINEL</p>",
+          conclusionHtml: "<p>WEB CTA SENTINEL</p>",
+        },
+      }),
+    );
+    const html = buildReportEmailHtml({
+      report,
+      recipientRole: "TAKER_COPY",
+    }).bodyHtml;
+
+    expect(report.reportHtml?.introductionHtml).toContain("WEB INTRO SENTINEL");
+    expect(html).not.toContain("WEB INTRO SENTINEL");
+    expect(html).not.toContain("WEB CTA SENTINEL");
+  });
+
   it("threads the public-lead result marker without inferring it for invited reports", () => {
     const publicReport = buildRespondentReportFromSubmission(
       submissionArgs({ publicLeadActions: true }),
@@ -641,6 +660,7 @@ describe("buildRespondentReportFromSubmission — templateAlias", () => {
           version: {
             id: "version-1",
             contentHash: "hash-1",
+            reportConfig: null,
             sections: [],
             questions: [],
             scoringConfig: {},

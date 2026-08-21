@@ -104,6 +104,13 @@ const validBody = {
 const validVersion = {
   id: "ver-1",
   publishedAt: new Date(),
+  reportConfig: {
+    reportHtml: {
+      schemaVersion: 1,
+      introductionHtml: "<p>Published intro</p>",
+      conclusionHtml: "<p>Published conclusion</p>",
+    },
+  },
   questions: [
     {
       stableKey: "S1_Q1",
@@ -162,6 +169,10 @@ beforeEach(() => {
   reportBuildInputs = [];
   reportBuildTransactionStates = [];
   mockSubmitPostTransactionActive = false;
+  delete process.env.WAVE_ED10_PREVIEW_SETTINGS_ENABLED;
+  delete process.env.WAVE_ED10_PREVIEW_SETTINGS_KILL;
+  delete process.env.WAVE_REPORT_HTML_AUTHORING_ENABLED;
+  delete process.env.WAVE_REPORT_HTML_AUTHORING_KILL;
   (db as unknown as { $queryRaw: jest.Mock }).$queryRaw.mockResolvedValue([
     { reportStyle: "CLASSIC" },
   ]);
@@ -271,5 +282,58 @@ describe("POST /api/quiz/[campaignAlias]/submit", () => {
       reportBuildInputs.every((input) => input.publicLeadActions === true),
     ).toBe(true);
     expect(reportBuildTransactionStates).toEqual([false, false, false]);
+  });
+
+  it("threads safe report HTML from the pinned version into immediate report models", async () => {
+    process.env.WAVE_ED10_PREVIEW_SETTINGS_ENABLED = "1";
+    process.env.WAVE_REPORT_HTML_AUTHORING_ENABLED = "1";
+    (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValue(
+      activeOpenCampaign,
+    );
+    (db.assessmentTemplateVersion.findUnique as jest.Mock).mockResolvedValue(
+      validVersion,
+    );
+    (db.assessmentSubmission.create as jest.Mock).mockResolvedValue({
+      id: "sub-html",
+    });
+
+    const res = await POST(jsonReq(validBody) as never, aliasParams);
+
+    expect(res.status).toBe(200);
+    expect(reportBuildInputs).not.toHaveLength(0);
+    expect(reportBuildInputs.every((input) =>
+      JSON.stringify(input.reportHtml) === JSON.stringify({
+        introductionHtml: "<p>Published intro</p>",
+        conclusionHtml: "<p>Published conclusion</p>",
+      }),
+    )).toBe(true);
+    expect(db.assessmentTemplateVersion.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "ver-1" },
+        select: expect.objectContaining({ reportConfig: true }),
+      }),
+    );
+  });
+
+  it("omits report HTML from immediate report models while the successor is off", async () => {
+    (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValue(
+      activeOpenCampaign,
+    );
+    (db.assessmentTemplateVersion.findUnique as jest.Mock).mockResolvedValue(
+      validVersion,
+    );
+    (db.assessmentSubmission.create as jest.Mock).mockResolvedValue({
+      id: "sub-no-html",
+    });
+
+    const res = await POST(jsonReq(validBody) as never, aliasParams);
+
+    expect(res.status).toBe(200);
+    expect(reportBuildInputs).not.toHaveLength(0);
+    expect(
+      reportBuildInputs.every(
+        (input) => !Object.prototype.hasOwnProperty.call(input, "reportHtml"),
+      ),
+    ).toBe(true);
   });
 });

@@ -164,6 +164,20 @@ describe("reportStyle", () => {
   });
 });
 
+describe("reportHtml", () => {
+  it("carries only the already-resolved safe pinned fragments", () => {
+    expect(build({
+      reportHtml: {
+        introductionHtml: "<p>Published intro</p>",
+        conclusionHtml: "<p>Published conclusion</p>",
+      },
+    }).reportHtml).toEqual({
+      introductionHtml: "<p>Published intro</p>",
+      conclusionHtml: "<p>Published conclusion</p>",
+    });
+  });
+});
+
 // ─── the JSON boundary the on-screen payload crosses ───────────────────────
 
 describe("JSON round trip (the server -> client boundary)", () => {

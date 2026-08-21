@@ -175,6 +175,10 @@ beforeEach(() => {
   delete process.env.WAVE_REPORT_STYLES_ENABLED;
   delete process.env.WAVE_REPORT_STYLES_CANARY;
   delete process.env.WAVE_REPORT_STYLES_KILL;
+  delete process.env.WAVE_REPORT_HTML_AUTHORING_ENABLED;
+  delete process.env.WAVE_REPORT_HTML_AUTHORING_KILL;
+  delete process.env.WAVE_ED10_PREVIEW_SETTINGS_ENABLED;
+  delete process.env.WAVE_ED10_PREVIEW_SETTINGS_KILL;
   delete process.env.WAVE_INVITATION_BANNER_ENABLED;
   delete process.env.WAVE_INVITATION_BANNER_CANARY;
   delete process.env.WAVE_INVITATION_BANNER_KILL;
@@ -588,6 +592,24 @@ describe("POST /api/admin/public-campaigns — CREATE", () => {
         expect.objectContaining({
           data: expect.objectContaining({
             reportStyle: "MODERN_DASHBOARD",
+            reportStyleSource: "TEMPLATE_DEFAULT",
+            reportStyleLockedAt: null,
+          }),
+        }),
+      );
+    });
+
+    it("snapshots Classic during the successor HTML report experience", async () => {
+      process.env.WAVE_REPORT_STYLES_ENABLED = "1";
+      process.env.WAVE_REPORT_HTML_AUTHORING_ENABLED = "1";
+      process.env.WAVE_ED10_PREVIEW_SETTINGS_ENABLED = "1";
+
+      await createPost(makeCreateRequest(validBody) as never);
+
+      expect(db.assessmentCampaign.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            reportStyle: "CLASSIC",
             reportStyleSource: "TEMPLATE_DEFAULT",
             reportStyleLockedAt: null,
           }),

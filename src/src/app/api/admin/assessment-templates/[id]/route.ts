@@ -27,7 +27,7 @@ import {
   REPORT_STYLE_KEYS,
   type ReportStyleKey,
 } from "@/lib/assessments/report-style-registry";
-import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
+import { isReportStyleSelectionEnabled } from "@/lib/assessments/wave-report-styles-flags";
 import {
   buildInvitedWelcomeConfig,
   invitedWelcomeAuthoringInputSchema,
@@ -255,7 +255,7 @@ export async function PATCH(
     // silently mutate stored report-style intent.
     if (
       data.defaultReportStyle !== undefined &&
-      !isReportStylesEnabled({ templateId: id })
+      !isReportStyleSelectionEnabled({ templateId: id })
     ) {
       return NextResponse.json(
         { error: "REPORT_STYLE_UNAVAILABLE" },
