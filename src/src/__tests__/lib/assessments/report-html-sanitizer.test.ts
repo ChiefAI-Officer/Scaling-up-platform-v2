@@ -1,4 +1,8 @@
-import { sanitizeReportHtmlFragment } from "@/lib/assessments/report-html-sanitizer";
+import {
+  REPORT_HTML_ALLOWED_TAGS,
+  REPORT_HTML_TAG_POLICY,
+  sanitizeReportHtmlFragment,
+} from "@/lib/assessments/report-html-sanitizer";
 
 const limits = {
   introduction: { rawCharacters: 12_000, textCharacters: 2_200, elements: 64, depth: 8, images: 1, tables: 1, tableRows: 8 },
@@ -6,6 +10,26 @@ const limits = {
 } as const;
 
 describe("sanitizeReportHtmlFragment", () => {
+  it("classifies every allowed tag explicitly and gives every layout tag positive cost", () => {
+    const expectedInline = ["a", "b", "code", "em", "i", "s", "small", "span", "strong", "sub", "sup", "u"];
+    const expectedUnwrapped = ["footer", "pre"];
+    const expectedWeighted = [
+      "article", "aside", "blockquote", "br", "caption", "col", "colgroup", "dd", "div", "dl", "dt",
+      "figcaption", "figure", "h1", "h2", "h3", "h4", "h5", "h6", "header", "hr", "img", "li", "main",
+      "ol", "p", "section", "table", "tbody", "td", "tfoot", "th", "thead", "tr", "ul",
+    ];
+    const entries = Object.entries(REPORT_HTML_TAG_POLICY);
+    const inline = entries.filter(([, policy]) => policy.classification === "safe-inline-zero-cost").map(([tag]) => tag).sort();
+    const unwrapped = entries.filter(([, policy]) => policy.classification === "unwrapped-or-disallowed").map(([tag]) => tag).sort();
+    const weighted = entries.filter(([, policy]) => policy.classification === "positive-weighted-or-limited");
+
+    expect(inline).toEqual(expectedInline);
+    expect(unwrapped).toEqual(expectedUnwrapped);
+    expect(weighted.map(([tag]) => tag).sort()).toEqual(expectedWeighted);
+    expect(weighted.every(([, policy]) => "weight" in policy && policy.weight > 0)).toBe(true);
+    expect([...REPORT_HTML_ALLOWED_TAGS].sort()).toEqual([...expectedInline, ...expectedWeighted].sort());
+  });
+
   it("keeps semantic report markup, accessibility attributes, and approved visual styles", () => {
     const result = sanitizeReportHtmlFragment(
       '<section aria-label="Next step" style="background-color:#ffffff;color:#522583"><h2>Next step</h2><a href="https://scalingup.com">Continue</a></section>',
@@ -89,6 +113,113 @@ describe("sanitizeReportHtmlFragment", () => {
       expect(result.issue).toMatch(/heading/i);
     },
   );
+
+  it.each(["introduction", "conclusion"] as const)(
+    "rejects the former maximum accepted %s standalone figcaption composition",
+    (position) => {
+      const result = sanitizeReportHtmlFragment(
+        "<figcaption>x</figcaption>".repeat(limits[position].elements),
+        position,
+      );
+
+      expect(result.ok).toBe(false);
+      expect(result.html).toBe("");
+      expect(result.issue).toMatch(/figure caption/i);
+    },
+  );
+
+  it("rejects the former exact-element Welcome table with eight rows and 54 cells", () => {
+    const rows = Array.from({ length: 8 }, (_, rowIndex) => {
+      const cells = rowIndex === 0 ? 47 : 1;
+      return `<tr>${"<td>x</td>".repeat(cells)}</tr>`;
+    }).join("");
+    const result = sanitizeReportHtmlFragment(`<table><tbody>${rows}</tbody></table>`, "introduction");
+
+    expect(result.ok).toBe(false);
+    expect(result.html).toBe("");
+    expect(result.issue).toMatch(/table (?:column|cell)/i);
+  });
+
+  it("rejects one table containing the former exact-element 63 captions", () => {
+    const result = sanitizeReportHtmlFragment(
+      `<table>${"<caption>x</caption>".repeat(63)}</table>`,
+      "introduction",
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.html).toBe("");
+    expect(result.issue).toMatch(/table caption/i);
+  });
+
+  it.each([
+    ["introduction", 4, 24],
+    ["conclusion", 3, 12],
+  ] as const)("enforces exact %s table column and cell caps", (position, columns, cells) => {
+    const exactColumnTable = `<table><tbody><tr>${"<td>x</td>".repeat(columns)}</tr></tbody></table>`;
+    const overColumnTable = `<table><tbody><tr>${"<td>x</td>".repeat(columns + 1)}</tr></tbody></table>`;
+    const fullRows = Math.floor(cells / columns);
+    const remainder = cells % columns;
+    const exactCellRows = `${`<tr>${"<td>x</td>".repeat(columns)}</tr>`.repeat(fullRows)}${remainder ? `<tr>${"<td>x</td>".repeat(remainder)}</tr>` : ""}`;
+    const overCellRows = `${exactCellRows}<tr><td>x</td></tr>`;
+
+    expect(sanitizeReportHtmlFragment(exactColumnTable, position).ok).toBe(true);
+    expect(sanitizeReportHtmlFragment(overColumnTable, position)).toMatchObject({
+      ok: false,
+      issue: expect.stringContaining(`${columns} table columns`),
+    });
+    expect(sanitizeReportHtmlFragment(`<table><tbody>${exactCellRows}</tbody></table>`, position).ok).toBe(true);
+    expect(sanitizeReportHtmlFragment(`<table><tbody>${overCellRows}</tbody></table>`, position)).toMatchObject({
+      ok: false,
+      issue: expect.stringContaining(`${cells} table cells`),
+    });
+  });
+
+  it.each(["introduction", "conclusion"] as const)(
+    "enforces one figure caption and one table caption in %s",
+    (position) => {
+      expect(sanitizeReportHtmlFragment("<figcaption>One</figcaption>", position).ok).toBe(true);
+      expect(sanitizeReportHtmlFragment("<figcaption>One</figcaption><figcaption>Two</figcaption>", position)).toMatchObject({
+        ok: false,
+        issue: expect.stringMatching(/1 figure caption/),
+      });
+      expect(sanitizeReportHtmlFragment("<table><caption>One</caption></table>", position).ok).toBe(true);
+      expect(sanitizeReportHtmlFragment("<table><caption>One</caption><caption>Two</caption></table>", position)).toMatchObject({
+        ok: false,
+        issue: expect.stringMatching(/1 table caption/),
+      });
+    },
+  );
+
+  it("strips table span attributes so column and cell counts stay literal", () => {
+    const result = sanitizeReportHtmlFragment(
+      '<table><colgroup><col span="4"></colgroup><tbody><tr><th colspan="3" rowspan="2">Head</th><td colspan="2">Cell</td></tr></tbody></table>',
+      "introduction",
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.html).not.toMatch(/(?:colspan|rowspan|<col[^>]+span)/i);
+    expect(result.html).toContain("<th>Head</th><td>Cell</td>");
+  });
+
+  it("rejects a Closing table that combines a caption with all six rows", () => {
+    const rows = `<tr><td>x</td><td>x</td></tr>`.repeat(6);
+    const withoutCaption = sanitizeReportHtmlFragment(`<table><tbody>${rows}</tbody></table>`, "conclusion");
+    const withCaption = sanitizeReportHtmlFragment(`<table><caption>Cap</caption><tbody>${rows}</tbody></table>`, "conclusion");
+
+    expect(withoutCaption.ok).toBe(true);
+    expect(withCaption).toMatchObject({
+      ok: false,
+      issue: expect.stringContaining("16 estimated lines"),
+    });
+  });
+
+  it.each(["introduction", "conclusion"] as const)("caps %s table-caption text at 60 visible characters", (position) => {
+    expect(sanitizeReportHtmlFragment(`<table><caption>${"x".repeat(60)}</caption></table>`, position).ok).toBe(true);
+    expect(sanitizeReportHtmlFragment(`<table><caption>${"x".repeat(61)}</caption></table>`, position)).toMatchObject({
+      ok: false,
+      issue: expect.stringContaining("60 visible table-caption characters"),
+    });
+  });
 
   it.each([
     ["introduction", 8, 4, 32],

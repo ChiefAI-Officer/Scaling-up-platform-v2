@@ -59,14 +59,38 @@ const SEMANTIC_ESCAPE_CASES = [
     conclusionHtml: Array.from({ length: 36 }, () => "<h1>x</h1>").join(""),
     rejectedIssue: /heading/i,
   },
+  {
+    id: "maximum-welcome-figcaptions",
+    introductionHtml: "<figcaption>x</figcaption>".repeat(64),
+    conclusionHtml: null,
+    rejectedIssue: /figure caption/i,
+  },
+  {
+    id: "maximum-closing-figcaptions",
+    introductionHtml: null,
+    conclusionHtml: "<figcaption>x</figcaption>".repeat(36),
+    rejectedIssue: /figure caption/i,
+  },
+  {
+    id: "maximum-table-cells",
+    introductionHtml: `<table><tbody>${Array.from({ length: 8 }, (_, rowIndex) => `<tr>${"<td>x</td>".repeat(rowIndex === 0 ? 47 : 1)}</tr>`).join("")}</tbody></table>`,
+    conclusionHtml: null,
+    rejectedIssue: /table (?:column|cell)/i,
+  },
+  {
+    id: "maximum-table-captions",
+    introductionHtml: `<table>${"<caption>x</caption>".repeat(63)}</table>`,
+    conclusionHtml: null,
+    rejectedIssue: /table caption/i,
+  },
 ] as const;
 
 type SemanticAuditPosition = "introduction" | "conclusion";
 
 const TALL_PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAA+gCAIAAAC0f+F8AAAALUlEQVR42u3DAQ0AAAgDoM8uFrKSxQ0ibGR6K4mqqqqqqqqqqqqqqqqqqqq/H9OeIDkSuu58AAAAAElFTkSuQmCC";
 const SEMANTIC_AUDIT_LIMITS = {
-  introduction: { elements: 64, text: 2_200, rows: 8 },
-  conclusion: { elements: 36, text: 900, rows: 6 },
+  introduction: { elements: 64, text: 2_200, rows: 8, columns: 4, cells: 24, headings: 4, breaks: 8, lines: 32 },
+  conclusion: { elements: 36, text: 900, rows: 6, columns: 3, cells: 12, headings: 2, breaks: 4, lines: 16 },
 } as const;
 
 function auditTextChunks(
@@ -82,84 +106,123 @@ function auditTextChunks(
   });
 }
 
-function repeatedAuditTag(tag: string, position: SemanticAuditPosition): string {
+function repeatedInlineAuditTag(tag: string, position: SemanticAuditPosition): string {
   return auditTextChunks(position, SEMANTIC_AUDIT_LIMITS[position].elements)
     .map((text) => `<${tag}>${text}</${tag}>`)
     .join("");
 }
 
-function voidAuditTag(tag: "br" | "hr", position: SemanticAuditPosition): string {
-  return auditTextChunks(position, SEMANTIC_AUDIT_LIMITS[position].elements)
-    .map((text) => `${text}<${tag}>`)
+function weightedAuditTag(tag: string, weight: number, position: SemanticAuditPosition): string {
+  const { elements, lines } = SEMANTIC_AUDIT_LIMITS[position];
+  const count = Math.min(elements, Math.floor(lines / (weight + 1)));
+  const textLines = lines - count * weight;
+  return auditTextChunks(position, count, textLines * 100)
+    .map((text) => `<${tag}>${text}</${tag}>`)
+    .join("");
+}
+
+function headingAuditHtml(tag: string, weight: number, position: SemanticAuditPosition): string {
+  const { headings } = SEMANTIC_AUDIT_LIMITS[position];
+  const textCharacters = position === "introduction"
+    ? (weight === 5 ? 400 : weight === 4 ? 500 : 650)
+    : (weight === 5 ? 200 : weight === 4 ? 250 : 300);
+  return auditTextChunks(position, headings, textCharacters)
+    .map((text) => `<${tag}>${text}</${tag}>`)
     .join("");
 }
 
 function listAuditHtml(tag: "ul" | "ol", position: SemanticAuditPosition): string {
-  const items = SEMANTIC_AUDIT_LIMITS[position].elements - 1;
-  return `<${tag}>${auditTextChunks(position, items)
+  const { lines } = SEMANTIC_AUDIT_LIMITS[position];
+  const items = Math.floor((lines - 1) / 2);
+  const textLines = lines - 1 - items;
+  return `<${tag}>${auditTextChunks(position, items, textLines * 100)
     .map((text) => `<li>${text}</li>`)
     .join("")}</${tag}>`;
 }
 
 function descriptionListAuditHtml(position: SemanticAuditPosition): string {
-  const items = SEMANTIC_AUDIT_LIMITS[position].elements - 1;
-  return `<dl>${auditTextChunks(position, items)
+  const { lines } = SEMANTIC_AUDIT_LIMITS[position];
+  const items = Math.floor((lines - 1) / 2);
+  const textLines = lines - 1 - items;
+  return `<dl>${auditTextChunks(position, items, textLines * 100)
     .map((text, index) => index % 2 === 0 ? `<dt>${text}</dt>` : `<dd>${text}</dd>`)
     .join("")}</dl>`;
 }
 
-function figureAuditHtml(position: SemanticAuditPosition): string {
-  const figures = SEMANTIC_AUDIT_LIMITS[position].elements / 2;
-  return auditTextChunks(position, figures)
-    .map((text) => `<figure><figcaption>${text}</figcaption></figure>`)
-    .join("");
+function figureCaptionAuditHtml(position: SemanticAuditPosition): string {
+  const textLength = position === "introduction" ? 1_100 : 500;
+  return `<figcaption>${"x".repeat(textLength)}</figcaption>`;
+}
+
+function figureImageAuditHtml(position: SemanticAuditPosition): string {
+  const textLength = position === "introduction" ? 700 : 150;
+  return `<figure><img src="${TALL_PNG}" alt="Tall image"><figcaption>${"x".repeat(textLength)}</figcaption></figure>`;
 }
 
 function imageAuditHtml(position: SemanticAuditPosition): string {
-  const spans = SEMANTIC_AUDIT_LIMITS[position].elements - 2;
-  return `<figure><img src="${TALL_PNG}" alt="Tall image">${auditTextChunks(position, spans)
-    .map((text) => `<span>${text}</span>`)
-    .join("")}</figure>`;
+  return `<img src="${TALL_PNG}" alt="Tall image">${"x".repeat(SEMANTIC_AUDIT_LIMITS[position].text)}`;
 }
 
 function tableAuditHtml(position: SemanticAuditPosition): string {
-  const { elements, rows } = SEMANTIC_AUDIT_LIMITS[position];
-  const structuralElements = 10 + rows;
-  const cells = elements - structuralElements;
-  const text = auditTextChunks(position, cells, SEMANTIC_AUDIT_LIMITS[position].text - "Audit".length);
+  const limits = SEMANTIC_AUDIT_LIMITS[position];
+  const rowColumns = position === "introduction" ? 3 : 2;
+  const cellTextLength = position === "introduction" ? 300 : 40;
+  const chunks = auditTextChunks(position, limits.cells, cellTextLength);
   let cellIndex = 0;
-  const rowHtml = Array.from({ length: rows }, (_, rowIndex) => {
-    const cellsInRow = Math.floor(cells / rows) + (rowIndex < cells % rows ? 1 : 0);
+  const rows = Array.from({ length: limits.rows }, (_, rowIndex) => {
     const tag = rowIndex === 0 ? "th" : "td";
-    const content = Array.from({ length: cellsInRow }, () => `<${tag}>${text[cellIndex++]}</${tag}>`).join("");
-    return `<tr>${content}</tr>`;
+    return `<tr>${Array.from({ length: rowColumns }, () => `<${tag}>${chunks[cellIndex++] ?? ""}</${tag}>`).join("")}</tr>`;
   });
-  return `<table><caption>Audit</caption><colgroup><col><col><col><col></colgroup><thead>${rowHtml[0]}</thead><tbody>${rowHtml.slice(1, -1).join("")}</tbody><tfoot>${rowHtml.at(-1)}</tfoot></table>`;
+  const head = rows.shift() ?? "";
+  const foot = rows.pop() ?? "";
+  const caption = position === "introduction" ? "<caption>Cap</caption>" : "";
+  return `<table>${caption}<colgroup>${"<col>".repeat(limits.columns)}</colgroup><thead>${head}</thead><tbody>${rows.join("")}</tbody><tfoot>${foot}</tfoot></table>`;
 }
 
-const SEMANTIC_AUDIT_CASES = [
-  ...["section", "article", "header", "footer", "main", "aside", "div", "p", "blockquote", "pre", "code"]
-    .map((tag) => ({ id: tag, tags: [tag], html: (position: SemanticAuditPosition) => repeatedAuditTag(tag, position) })),
-  ...["span", "strong", "em", "b", "i", "u", "s", "small", "sup", "sub", "a"]
-    .map((tag) => ({ id: tag, tags: [tag], html: (position: SemanticAuditPosition) => repeatedAuditTag(tag, position) })),
-  ...(["br", "hr"] as const)
-    .map((tag) => ({ id: tag, tags: [tag], html: (position: SemanticAuditPosition) => voidAuditTag(tag, position) })),
-  ...["h1", "h2", "h3", "h4", "h5", "h6"]
-    .map((tag) => ({ id: tag, tags: [tag], html: (position: SemanticAuditPosition) => repeatedAuditTag(tag, position) })),
-  { id: "ul-li", tags: ["ul", "li"], html: (position: SemanticAuditPosition) => listAuditHtml("ul", position) },
-  { id: "ol-li", tags: ["ol", "li"], html: (position: SemanticAuditPosition) => listAuditHtml("ol", position) },
-  { id: "dl-dt-dd", tags: ["dl", "dt", "dd"], html: descriptionListAuditHtml },
-  { id: "figure-figcaption", tags: ["figure", "figcaption"], html: figureAuditHtml },
-  { id: "image", tags: ["img"], html: imageAuditHtml },
-  {
-    id: "table-family",
-    tags: ["table", "caption", "colgroup", "col", "thead", "tbody", "tfoot", "tr", "th", "td"],
-    html: tableAuditHtml,
-  },
+function tableCaptionAuditHtml(): string {
+  const text = "C".repeat(60);
+  return `<table><caption>${text}</caption><tbody><tr><td>x</td></tr></tbody></table>`;
+}
+
+const SAFE_INLINE_TAGS = ["span", "code", "strong", "em", "b", "i", "u", "s", "small", "sup", "sub", "a"] as const;
+const POSITIVE_LAYOUT_TAGS = [
+  "section", "article", "header", "main", "aside", "div", "p", "br", "hr", "h1", "h2", "h3", "h4", "h5", "h6",
+  "ul", "ol", "li", "dl", "dt", "dd", "blockquote", "figure", "figcaption", "table", "caption", "thead", "tbody",
+  "tfoot", "tr", "th", "td", "colgroup", "col", "img",
 ] as const;
 
-const EXPECTED_AUDITED_TAGS = [
-  "a", "article", "aside", "b", "blockquote", "br", "caption", "code", "col", "colgroup", "dd", "div", "dl", "dt", "em", "figcaption", "figure", "footer", "h1", "h2", "h3", "h4", "h5", "h6", "header", "hr", "i", "img", "li", "main", "ol", "p", "pre", "s", "section", "small", "span", "strong", "sub", "sup", "table", "tbody", "td", "tfoot", "th", "thead", "tr", "u", "ul",
+const SEMANTIC_ACCEPTED_CAP_CASES = [
+  ...SAFE_INLINE_TAGS.map((tag) => ({ id: `inline-${tag}`, tags: [tag], html: (position: SemanticAuditPosition) => repeatedInlineAuditTag(tag, position) })),
+  ...[
+    ["section", 1], ["article", 1], ["header", 1], ["main", 1], ["aside", 1], ["div", 1], ["p", 2], ["blockquote", 3], ["figure", 3],
+  ].map(([tag, weight]) => ({ id: `weighted-${tag}`, tags: [tag as string], html: (position: SemanticAuditPosition) => weightedAuditTag(tag as string, weight as number, position) })),
+  { id: "break-cap", tags: ["br"], html: (position: SemanticAuditPosition) => `${"x".repeat(SEMANTIC_AUDIT_LIMITS[position].text)}${"<br>".repeat(SEMANTIC_AUDIT_LIMITS[position].breaks)}` },
+  { id: "rule-budget", tags: ["hr"], html: (position: SemanticAuditPosition) => "<hr>".repeat(SEMANTIC_AUDIT_LIMITS[position].lines / 2) },
+  ...[["h1", 5], ["h2", 4], ["h3", 3], ["h4", 3], ["h5", 3], ["h6", 3]]
+    .map(([tag, weight]) => ({ id: `heading-${tag}`, tags: [tag as string], html: (position: SemanticAuditPosition) => headingAuditHtml(tag as string, weight as number, position) })),
+  { id: "unordered-list", tags: ["ul", "li"], html: (position: SemanticAuditPosition) => listAuditHtml("ul", position) },
+  { id: "ordered-list", tags: ["ol", "li"], html: (position: SemanticAuditPosition) => listAuditHtml("ol", position) },
+  { id: "description-list", tags: ["dl", "dt", "dd"], html: descriptionListAuditHtml },
+  { id: "figure-caption-cap", tags: ["figcaption"], html: figureCaptionAuditHtml },
+  { id: "figure-image-nesting", tags: ["figure", "figcaption", "img"], html: figureImageAuditHtml },
+  { id: "image-text-cap", tags: ["img"], html: imageAuditHtml },
+  { id: "table-maxima", tags: ["table", "caption", "colgroup", "col", "thead", "tbody", "tfoot", "tr", "th", "td"], html: tableAuditHtml },
+  { id: "table-caption", tags: ["caption"], html: tableCaptionAuditHtml },
+] as const;
+
+const SEMANTIC_REJECTED_CASES = [
+  { id: "maximum-line-breaks", position: "introduction", html: "<br>".repeat(64), issue: /line break/i },
+  { id: "maximum-headings", position: "conclusion", html: "<h1>x</h1>".repeat(36), issue: /heading/i },
+  { id: "maximum-welcome-figcaptions", position: "introduction", html: "<figcaption>x</figcaption>".repeat(64), issue: /figure caption/i },
+  { id: "maximum-closing-figcaptions", position: "conclusion", html: "<figcaption>x</figcaption>".repeat(36), issue: /figure caption/i },
+  { id: "maximum-table-cells", position: "introduction", html: `<table><tbody>${Array.from({ length: 8 }, (_, rowIndex) => `<tr>${"<td>x</td>".repeat(rowIndex === 0 ? 47 : 1)}</tr>`).join("")}</tbody></table>`, issue: /table columns/i },
+  { id: "maximum-table-captions", position: "introduction", html: `<table>${"<caption>x</caption>".repeat(63)}</table>`, issue: /table caption/i },
+  { id: "closing-caption-with-max-rows", position: "conclusion", html: `<table><caption>Cap</caption><tbody>${"<tr><td>x</td><td>x</td></tr>".repeat(6)}</tbody></table>`, issue: /estimated lines/i },
+  ...(["introduction", "conclusion"] as const).flatMap((position) => [
+    { id: `over-figure-caption-cap-${position}`, position, html: "<figcaption>One</figcaption><figcaption>Two</figcaption>", issue: /figure caption/i },
+    { id: `over-table-caption-cap-${position}`, position, html: "<table><caption>One</caption><caption>Two</caption></table>", issue: /table caption/i },
+    { id: `over-table-columns-${position}`, position, html: `<table><tbody><tr>${"<td>x</td>".repeat(SEMANTIC_AUDIT_LIMITS[position].columns + 1)}</tr></tbody></table>`, issue: /table columns/i },
+  ]),
 ] as const;
 
 function stylesheet(): string {
@@ -875,6 +938,12 @@ describe("SU Full landscape browser and PDF contract", () => {
         expect(storedHtml).not.toMatch(/\s(?:class|id|data-[a-z0-9_-]+|role|aria-[a-z0-9_-]+|style)=/i);
       }
     }
+    if (fixture.authoringCase === "table-max") {
+      for (const storedHtml of [report.reportHtml?.introductionHtml, report.reportHtml?.conclusionHtml]) {
+        expect(storedHtml).toBeTruthy();
+        expect(storedHtml).not.toMatch(/(?:colspan|rowspan|<col[^>]+span)/i);
+      }
+    }
     const { html } = routeMarkup(report);
     const directory = mkdtempSync(join(tmpdir(), "report-html-peers-matrix-"));
     const pdfPath = join(directory, `${fixture.id}.pdf`);
@@ -986,8 +1055,10 @@ describe("SU Full landscape browser and PDF contract", () => {
     try {
       await load(page, html);
       const desktop = await horizontalOverflow(page);
+      const desktopClipping = await authoredClipping(page);
       await page.setViewportSize({ width: 390, height: 844 });
       const mobile = await horizontalOverflow(page);
+      const mobileClipping = await authoredClipping(page);
       await page.setViewportSize({ width: 1280, height: 720 });
       await page.emulateMedia({ media: "print" });
       const outside = await authoredContentOutsidePhysicalPage(page);
@@ -1005,9 +1076,11 @@ describe("SU Full landscape browser and PDF contract", () => {
         desktopDocumentWidth: desktop.document,
         desktopViewportWidth: desktop.viewport,
         desktopOffenders: desktop.offenders,
+        desktopClipping,
         mobileDocumentWidth: mobile.document,
         mobileViewportWidth: mobile.viewport,
         mobileOffenders: mobile.offenders,
+        mobileClipping,
         authoredOutsidePhysicalPage: {
           count: outside.length,
           first: outside.at(0) ?? null,
@@ -1018,9 +1091,11 @@ describe("SU Full landscape browser and PDF contract", () => {
         desktopDocumentWidth: 1280,
         desktopViewportWidth: 1280,
         desktopOffenders: [],
+        desktopClipping: [],
         mobileDocumentWidth: 390,
         mobileViewportWidth: 390,
         mobileOffenders: [],
+        mobileClipping: [],
         authoredOutsidePhysicalPage: {
           count: 0,
           first: null,
@@ -1034,15 +1109,15 @@ describe("SU Full landscape browser and PDF contract", () => {
     }
   });
 
-  it("audits every allowed semantic tag at maximum accepted composition", async () => {
-    expect([...new Set(SEMANTIC_AUDIT_CASES.flatMap((fixture) => fixture.tags))].sort())
-      .toEqual(EXPECTED_AUDITED_TAGS);
+  it("renders every allowed semantic tag at an accepted boundary without counting rejections as coverage", async () => {
+    expect([...new Set(SEMANTIC_ACCEPTED_CAP_CASES.flatMap((fixture) => fixture.tags))].sort())
+      .toEqual([...SAFE_INLINE_TAGS, ...POSITIVE_LAYOUT_TAGS].sort());
 
     const unsafe: unknown[] = [];
     const acceptedSafe: string[] = [];
-    const rejected: Array<{ id: string; issues: string[] }> = [];
+    const unexpectedlyRejected: Array<{ id: string; issues: string[] }> = [];
 
-    for (const fixture of SEMANTIC_AUDIT_CASES) {
+    for (const fixture of SEMANTIC_ACCEPTED_CAP_CASES) {
       for (const position of ["introduction", "conclusion"] as const) {
         const id = `${fixture.id}/${position}`;
         const prepared = prepareReportHtmlForStorage({
@@ -1053,7 +1128,7 @@ describe("SU Full landscape browser and PDF contract", () => {
           },
         });
         if (!prepared.ok) {
-          rejected.push({ id, issues: prepared.issues.map((issue) => issue.message) });
+          unexpectedlyRejected.push({ id, issues: prepared.issues.map((issue) => issue.message) });
           continue;
         }
 
@@ -1104,9 +1179,28 @@ describe("SU Full landscape browser and PDF contract", () => {
       }
     }
 
-    if (unsafe.length > 0) {
-      throw new Error(JSON.stringify({ unsafe, acceptedSafe, rejected }, null, 2));
+    if (unsafe.length > 0 || unexpectedlyRejected.length > 0) {
+      throw new Error(JSON.stringify({ unsafe, acceptedSafe, unexpectedlyRejected }, null, 2));
     }
-    expect(acceptedSafe.length + rejected.length).toBe(SEMANTIC_AUDIT_CASES.length * 2);
+    expect(acceptedSafe).toHaveLength(SEMANTIC_ACCEPTED_CAP_CASES.length * 2);
+  });
+
+  it("rejects every former escape and explicit over-cap semantic composition with a plain issue", () => {
+    const accepted: string[] = [];
+    for (const fixture of SEMANTIC_REJECTED_CASES) {
+      const prepared = prepareReportHtmlForStorage({
+        reportHtml: {
+          schemaVersion: 1,
+          introductionHtml: fixture.position === "introduction" ? fixture.html : null,
+          conclusionHtml: fixture.position === "conclusion" ? fixture.html : null,
+        },
+      });
+      if (prepared.ok) {
+        accepted.push(fixture.id);
+        continue;
+      }
+      expect(prepared.issues.map((issue) => issue.message).join(" ")).toMatch(fixture.issue);
+    }
+    expect(accepted).toEqual([]);
   });
 });

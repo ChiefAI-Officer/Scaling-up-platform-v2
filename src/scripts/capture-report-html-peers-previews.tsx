@@ -1,7 +1,7 @@
 import { mkdir, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 
-import { chromium } from "playwright";
+import { chromium, type Page } from "playwright";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
@@ -30,7 +30,7 @@ export const LONG_CLOSING_VISIBLE_CHARACTERS = 850;
 const longWelcome = "W".repeat(LONG_WELCOME_VISIBLE_CHARACTERS);
 const longClosing = "C".repeat(LONG_CLOSING_VISIBLE_CHARACTERS);
 
-type AuthoringCase = "default" | "welcome-only" | "closing-only" | "both" | "long" | "adversarial" | "semantic-budget" | "semantic-rich";
+type AuthoringCase = "default" | "welcome-only" | "closing-only" | "both" | "long" | "adversarial" | "semantic-budget" | "semantic-rich" | "figure-max" | "table-max";
 type PeerReference = "current" | "historical";
 
 type CaptureFixture = {
@@ -44,10 +44,36 @@ type CaptureFixture = {
 };
 
 const TALL_PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAA+gCAIAAAC0f+F8AAAALUlEQVR42u3DAQ0AAAgDoM8uFrKSxQ0ibGR6K4mqqqqqqqqqqqqqqqqqqqq/H9OeIDkSuu58AAAAAElFTkSuQmCC";
-const semanticBudgetWelcome = `${"<h6>H</h6>".repeat(4)}${"<br>".repeat(8)}<p>${"W".repeat(996)}</p>`;
-const semanticBudgetClosing = `${"<h6>H</h6>".repeat(2)}${"<br>".repeat(4)}<p>${"C".repeat(398)}</p>`;
-const semanticRichWelcome = `<figure><img src="${TALL_PNG}" alt="Tall report image"></figure><table><tbody>${"<tr><td></td></tr>".repeat(8)}</tbody></table><ul>${"<li></li>".repeat(3)}</ul><blockquote></blockquote><p><code></code><a href="https://scalingup.com">${"R".repeat(500)}</a></p>`;
-const semanticRichClosing = `<figure><img src="${TALL_PNG}" alt="Tall report image"></figure><table><tbody><tr><td><code></code><a href="https://scalingup.com">${"R".repeat(300)}</a></td></tr>${"<tr><td></td></tr>".repeat(2)}</tbody></table>`;
+const semanticBudgetWelcome = `${"<h6>H</h6>".repeat(4)}${"<br>".repeat(8)}<p>${"W".repeat(896)}</p>`;
+const semanticBudgetClosing = `${"<h6>H</h6>".repeat(2)}${"<br>".repeat(4)}<p>${"C".repeat(298)}</p>`;
+const semanticRichWelcome = `<figure><img src="${TALL_PNG}" alt="Tall report image"></figure><table><tbody>${"<tr><td></td></tr>".repeat(4)}</tbody></table><ul>${"<li></li>".repeat(2)}</ul><p><code></code><a href="https://scalingup.com">${"R".repeat(300)}</a></p>`;
+const semanticRichClosing = `<figure><img src="${TALL_PNG}" alt="Tall report image"></figure><table><tbody>${"<tr><td></td></tr>".repeat(3)}</tbody></table><code></code><a href="https://scalingup.com">${"R".repeat(100)}</a>`;
+const figureMaxWelcome = `<figure><img src="${TALL_PNG}" alt="Tall report image"><figcaption>${"F".repeat(700)}</figcaption></figure>`;
+const figureMaxClosing = `<figure><img src="${TALL_PNG}" alt="Tall report image"><figcaption>${"F".repeat(150)}</figcaption></figure>`;
+
+function maxTableHtml(position: "introduction" | "conclusion"): string {
+  const rows = position === "introduction" ? 8 : 6;
+  const columns = position === "introduction" ? 4 : 3;
+  const rowColumns = position === "introduction" ? 3 : 2;
+  const cellText = position === "introduction" ? "T".repeat(300) : "T".repeat(40);
+  const chunks = Array.from({ length: rows * rowColumns }, (_, index) => {
+    const start = Math.floor(index * cellText.length / (rows * rowColumns));
+    const end = Math.floor((index + 1) * cellText.length / (rows * rowColumns));
+    return cellText.slice(start, end);
+  });
+  let cellIndex = 0;
+  const rowHtml = Array.from({ length: rows }, (_, rowIndex) => {
+    const tag = rowIndex === 0 ? "th" : "td";
+    return `<tr>${Array.from({ length: rowColumns }, (_, columnIndex) => {
+      const spans = rowIndex === 0 && columnIndex === 0 ? ' colspan="2" rowspan="2"' : "";
+      return `<${tag}${spans}>${chunks[cellIndex++]}</${tag}>`;
+    }).join("")}</tr>`;
+  });
+  const head = rowHtml.shift() ?? "";
+  const foot = rowHtml.pop() ?? "";
+  const caption = position === "introduction" ? "<caption>Cap</caption>" : "";
+  return `<table>${caption}<colgroup>${`<col span="2">`.repeat(columns)}</colgroup><thead>${head}</thead><tbody>${rowHtml.join("")}</tbody><tfoot>${foot}</tfoot></table>`;
+}
 
 const authoringCases: ReadonlyArray<Omit<CaptureFixture, "id" | "peerReference">> = [
   {
@@ -96,15 +122,29 @@ const authoringCases: ReadonlyArray<Omit<CaptureFixture, "id" | "peerReference">
     authoringCase: "semantic-budget",
     introductionHtml: semanticBudgetWelcome,
     conclusionHtml: semanticBudgetClosing,
-    welcomeVisibleCharacters: 1_000,
-    closingVisibleCharacters: 400,
+    welcomeVisibleCharacters: 900,
+    closingVisibleCharacters: 300,
   },
   {
     authoringCase: "semantic-rich",
     introductionHtml: semanticRichWelcome,
     conclusionHtml: semanticRichClosing,
-    welcomeVisibleCharacters: 500,
-    closingVisibleCharacters: 300,
+    welcomeVisibleCharacters: 300,
+    closingVisibleCharacters: 100,
+  },
+  {
+    authoringCase: "figure-max",
+    introductionHtml: figureMaxWelcome,
+    conclusionHtml: figureMaxClosing,
+    welcomeVisibleCharacters: 700,
+    closingVisibleCharacters: 150,
+  },
+  {
+    authoringCase: "table-max",
+    introductionHtml: maxTableHtml("introduction"),
+    conclusionHtml: maxTableHtml("conclusion"),
+    welcomeVisibleCharacters: 303,
+    closingVisibleCharacters: 40,
   },
 ];
 
@@ -131,6 +171,19 @@ async function productionReportCss(): Promise<string> {
     readFile(join(stylesRoot, "su-report.css"), "utf8"),
   ]);
   return `${brand.replace(/@import[^;]+;\s*/g, "")}\n${report}`;
+}
+
+async function settlePaint(page: Page): Promise<void> {
+  await page.evaluate(() => new Promise<void>((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  }));
+}
+
+async function capturePageImage(page: Page, pageNumber: 2 | 25, path: string): Promise<void> {
+  const locator = page.locator(`[data-page-number='${pageNumber}']`);
+  await locator.scrollIntoViewIfNeeded();
+  await settlePaint(page);
+  await locator.screenshot({ path, animations: "disabled" });
 }
 
 function currentReport() {
@@ -227,15 +280,17 @@ async function captureFixture(
       { waitUntil: "load" },
     );
     await page.evaluate(() => document.fonts.ready);
-    await page.locator("[data-page-number='2']").screenshot({ path: artifacts.desktopPage2, animations: "disabled" });
-    await page.locator("[data-page-number='25']").screenshot({ path: artifacts.desktopPage25, animations: "disabled" });
+    await capturePageImage(page, 2, artifacts.desktopPage2);
+    await capturePageImage(page, 25, artifacts.desktopPage25);
 
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.locator("[data-page-number='2']").screenshot({ path: artifacts.mobilePage2, animations: "disabled" });
-    await page.locator("[data-page-number='25']").screenshot({ path: artifacts.mobilePage25, animations: "disabled" });
+    await capturePageImage(page, 2, artifacts.mobilePage2);
+    await capturePageImage(page, 25, artifacts.mobilePage25);
 
     await page.setViewportSize({ width: 1280, height: 720 });
     await page.emulateMedia({ media: "print" });
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await settlePaint(page);
     await page.pdf({
       path: artifacts.pdf,
       format: "A4",
