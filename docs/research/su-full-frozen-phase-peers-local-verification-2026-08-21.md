@@ -4,7 +4,8 @@
 - Branch: `codex/su-full-esperto-landscape-closeout-wording`
 - Task 7 base commit: `88e85050c542a6da730624491567872b4a8b06ad`
 - Original Task 7 verified source commit: `58e919efe52bcfa30cb431619fcdc3233210170f`
-- Final-review remediation verified source commit: `3e18f25094e66dcf09f161b4f423565e98550b6b`
+- Final-review remediation implementation commit: `3e18f25094e66dcf09f161b4f423565e98550b6b`
+- Final-review remediation verified source commit: `ae561d1f9e59e10f13e002615dc6564722cc8e8d`
 - Design: `docs/superpowers/specs/2026-08-21-su-full-frozen-phase-peers-design.md`
 - Plan: `docs/superpowers/plans/2026-08-21-su-full-frozen-phase-peers.md`
 
@@ -127,7 +128,10 @@ and absent local `DATABASE_URL` during static data collection.
 
 The original Task 7 evidence above remains a historical record with its original
 timings. Final whole-branch review subsequently found two Important and four Minor
-gaps. Local commit `3e18f25094e66dcf09f161b4f423565e98550b6b` resolves all of them:
+gaps. Local commit `3e18f25094e66dcf09f161b4f423565e98550b6b` resolves all of them;
+follow-up test-fixture commit `ae561d1f9e59e10f13e002615dc6564722cc8e8d`
+makes the existing on-screen component test exercise the stricter contract with a
+complete canonical report:
 
 - untrusted peer presentations are rebuilt from the same report and compared as an
   exact deterministic structure, binding `you`, Peers, frozen recommendation,
@@ -155,14 +159,14 @@ passed 14/14 suites and 508/508 tests.
 The first remediation Turbopack attempt exposed one compile-only cast diagnostic at
 the untrusted report boundary. The final code uses the explicit `unknown` boundary
 required by TypeScript. After that correction was committed, the complete final chain
-was rerun from `src/` on `3e18f25094e66dcf09f161b4f423565e98550b6b`:
+was rerun from `src/` on `ae561d1f9e59e10f13e002615dc6564722cc8e8d`:
 
 - exact Task 7 Jest set: exit `0`, **12/12 suites, 489/489 tests, 0 snapshots** in
-  9.449s;
+  8.785s;
 - deterministic generation and committed generated-module diff: both exit `0`;
-- ESLint across all 13 remediation TypeScript/TSX paths: exit `0`, zero diagnostics;
+- ESLint across all 14 remediation TypeScript/TSX paths: exit `0`, zero diagnostics;
 - migration safety: exit `0`, all **49 migrations** approved; and
-- `CI=true npx next build --turbopack`: exit `0`, compiled in 23.5s, passed
+- `CI=true npx next build --turbopack`: exit `0`, compiled in 83s, passed
   TypeScript, and generated **95/95** static pages.
 
 The successful remediation build retained only the same established non-fatal local

@@ -7,8 +7,9 @@ No release, lifecycle, database, remote, deployment, Production, or communicatio
 action was performed.
 
 - Remediation base: `7010c528bddb670eca837d57b918da87ec390376`
-- Verified code/test commit: `3e18f25094e66dcf09f161b4f423565e98550b6b`
-- Code/test subject: `fix: close frozen peer review findings`
+- Implementation commit: `3e18f25094e66dcf09f161b4f423565e98550b6b`
+- Verified source commit: `ae561d1f9e59e10f13e002615dc6564722cc8e8d`
+- Subjects: `fix: close frozen peer review findings`; `test: use canonical peer report fixture`
 - Branch: `codex/su-full-esperto-landscape-closeout-wording`
 
 ## Findings closed
@@ -127,12 +128,12 @@ to the exact Task 7 list.
 An intermediate Turbopack run exposed one compile-only diagnostic at the untrusted
 report cast in `su-full-peer-presentation.ts`. The explicit `unknown` boundary was
 added and committed. The complete required chain was then rerun from `src/` on the
-final code tree at `3e18f25094e66dcf09f161b4f423565e98550b6b`.
+final code tree at `ae561d1f9e59e10f13e002615dc6564722cc8e8d`.
 
 ### Exact Task 7 test set
 
 The exact 12 paths from Task 7 passed **12/12 suites, 489/489 tests, 0 snapshots** in
-9.449s. Expected submit-suite console output exercised existing negative paths; Jest
+8.785s. Expected submit-suite console output exercised existing negative paths; Jest
 reported zero failures.
 
 ### Generation and committed diff
@@ -147,8 +148,9 @@ exited `0`.
 
 ### Full changed-path ESLint
 
-ESLint covered all 13 changed TypeScript/TSX production and test paths in the
-remediation commit. It exited `0` with zero diagnostics.
+ESLint covered all 14 changed TypeScript/TSX production and test paths from the
+remediation base through the verified source commit. It exited `0` with zero
+diagnostics.
 
 ### Migration and production build
 
@@ -158,12 +160,23 @@ CI=true npx next build --turbopack
 ```
 
 - migration safety: exit `0`, all **49 migrations** approved;
-- Turbopack: exit `0`, compiled in 23.5s, passed TypeScript, and generated **95/95**
+- Turbopack: exit `0`, compiled in 83s, passed TypeScript, and generated **95/95**
   static pages.
 
 The build retained only the established non-fatal workspace-root/multiple-lockfile,
 middleware-deprecation, missing local Inngest-key, and missing local `DATABASE_URL`
 diagnostics.
+
+### Additional whole-repository completion check
+
+An additional `npm test -- --runInBand` check was run after the required chain. It
+passed **765/766 suites, 9,384/9,385 tests, and 16/16 snapshots** and exposed one
+older component test that attached a complete peer presentation to an unrelated,
+partial Rockefeller report fixture. The stricter same-report validator correctly
+rejected it. The test was changed to use the existing complete canonical Scaling Up
+Full report fixture and then passed **1/1 suite, 28/28 tests**. Because the finding
+was in test setup rather than production code, the complete required final chain was
+rerun on the resulting commit as recorded above.
 
 ## Rulings and costs
 
