@@ -51,6 +51,26 @@ describe("report HTML configuration", () => {
     expect(prepared.didStripContent).toBe(true);
   });
 
+  it("applies the smaller closing-message limit without rejecting the same welcome content", () => {
+    const text = "x".repeat(901);
+    const prepared = prepareReportHtmlForStorage({
+      reportHtml: {
+        schemaVersion: 1,
+        introductionHtml: `<p>${text}</p>`,
+        conclusionHtml: `<p>${text}</p>`,
+      },
+    });
+
+    expect(prepared.ok).toBe(false);
+    if (prepared.ok) throw new Error("expected the closing-message limit to fail");
+    expect(prepared.issues).toEqual([
+      {
+        path: "reportHtml.conclusionHtml",
+        message: expect.stringMatching(/text/i),
+      },
+    ]);
+  });
+
   it("leaves configuration without reportHtml unchanged", () => {
     const reportConfig = { publicMarketing: { scoreBands: [] } };
     const prepared = prepareReportHtmlForStorage(reportConfig);

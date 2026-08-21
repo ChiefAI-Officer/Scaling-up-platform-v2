@@ -116,21 +116,18 @@ function PrefacePage({ number, footerBrand }: { number: number; footerBrand: SuF
 
 function CustomHtmlPage({
   report,
-  position,
   html,
   number,
-  beforeConclusion,
 }: {
   report: RespondentReport;
-  position: "introduction" | "conclusion";
   html: SafeReportHtmlFragment;
   number: number;
-  beforeConclusion?: ReactNode;
 }) {
   return (
     <SuFullLandscapePage number={number} footerBrand={report}>
-      {beforeConclusion}
-      <ReportHtmlSection position={position} html={html} />
+      <div className="su-full-landscape-custom-content">
+        <ReportHtmlSection position="introduction" html={html} />
+      </div>
     </SuFullLandscapePage>
   );
 }
@@ -286,25 +283,43 @@ function DetailPage({
   );
 }
 
-function ConclusionPage({ report, model, contactEmail, number, beforeConclusion }: {
+function ConclusionPage({ report, model, contactEmail, number, beforeConclusion, conclusionHtml }: {
   report: RespondentReport;
   model: SuFullLandscapeReportModel;
   contactEmail?: string | null;
   number: number;
   beforeConclusion?: ReactNode;
+  conclusionHtml?: SafeReportHtmlFragment | null;
 }) {
   return (
     <SuFullLandscapePage number={number} footerBrand={report}>
       {beforeConclusion}
       <h2>Conclusion</h2>
       <p><strong>ScaleUp Score</strong> {scaleUpScore(model.scaleUpScore)}</p>
-      <p>Your strongest chapter is {model.strongestChapter.label}; your focus chapter is {model.weakestChapter.label}.</p>
+      <p>Your strongest chapter is {model.strongestChapter.label}; Your focus chapter is {model.weakestChapter.label}.</p>
+      {conclusionHtml ? (
+        <div className="su-full-landscape-custom-content">
+          <ReportHtmlSection position="conclusion" html={conclusionHtml} />
+        </div>
+      ) : (
+        <DefaultNextSteps report={report} contactEmail={contactEmail} />
+      )}
+    </SuFullLandscapePage>
+  );
+}
+
+function DefaultNextSteps({ report, contactEmail }: {
+  report: RespondentReport;
+  contactEmail?: string | null;
+}) {
+  return (
+    <>
       <h3>Next steps</h3>
       <p>Choose one priority from the feedback, agree a concrete owner and review date, and return to the remaining findings in your next planning cycle.</p>
       {(contactEmail ?? report.referringCoachEmail) ? (
         <p><a href={`mailto:${contactEmail ?? report.referringCoachEmail}`}>Contact your coach</a></p>
       ) : null}
-    </SuFullLandscapePage>
+    </>
   );
 }
 
@@ -346,7 +361,7 @@ export function SuFullLandscapeReport({
         switch (page.kind) {
           case "cover": return <CoverPage key={page.number} number={page.number} report={report} />;
           case "preface": return report.reportHtml?.introductionHtml
-            ? <CustomHtmlPage key={page.number} number={page.number} report={report} position="introduction" html={report.reportHtml.introductionHtml} />
+            ? <CustomHtmlPage key={page.number} number={page.number} report={report} html={report.reportHtml.introductionHtml} />
             : <PrefacePage key={page.number} number={page.number} footerBrand={report} />;
           case "contents": return <ContentsPage key={page.number} number={page.number} footerBrand={report} />;
           case "introduction": return <IntroductionPage key={page.number} number={page.number} report={report} model={model} />;
@@ -358,9 +373,7 @@ export function SuFullLandscapeReport({
             return <ChapterPage chapter={chapter} key={page.number} number={page.number} footerBrand={report} />;
           }
           case "detail": return <DetailPage key={page.number} page={page} questions={questions} peerProvenance={model.peerProvenance} footerBrand={report} />;
-          case "conclusion": return report.reportHtml?.conclusionHtml
-            ? <CustomHtmlPage key={page.number} number={page.number} report={report} position="conclusion" html={report.reportHtml.conclusionHtml} beforeConclusion={beforeConclusion} />
-            : <ConclusionPage key={page.number} number={page.number} report={report} model={model} contactEmail={contactEmail} beforeConclusion={beforeConclusion} />;
+          case "conclusion": return <ConclusionPage key={page.number} number={page.number} report={report} model={model} contactEmail={contactEmail} beforeConclusion={beforeConclusion} conclusionHtml={report.reportHtml?.conclusionHtml} />;
           case "appendix": return <AppendixPage key={page.number} number={page.number} model={model} footerBrand={report} />;
           default: {
             const impossible: never = page;

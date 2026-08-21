@@ -1,12 +1,15 @@
-import {
-  MAX_REPORT_HTML_FRAGMENT_LENGTH,
-  sanitizeReportHtmlFragment,
-} from "@/lib/assessments/report-html-sanitizer";
+import { sanitizeReportHtmlFragment } from "@/lib/assessments/report-html-sanitizer";
+
+const limits = {
+  introduction: { rawCharacters: 12_000, textCharacters: 2_200, elements: 64, depth: 8, images: 1, tables: 1, tableRows: 8 },
+  conclusion: { rawCharacters: 12_000, textCharacters: 900, elements: 36, depth: 6, images: 1, tables: 1, tableRows: 6 },
+} as const;
 
 describe("sanitizeReportHtmlFragment", () => {
   it("keeps report presentation markup and approved inline styles", () => {
     const result = sanitizeReportHtmlFragment(
       '<section class="report-callout" aria-label="Next step" data-region="cta" style="padding:20px;background-color:#ffffff"><h2>Next step</h2><a href="https://scalingup.com">Continue</a></section>',
+      "introduction",
     );
 
     expect(result.html).toContain('class="report-callout"');
@@ -19,6 +22,7 @@ describe("sanitizeReportHtmlFragment", () => {
   it("removes executable and interactive content", () => {
     const result = sanitizeReportHtmlFragment(
       '<style>body{display:none}</style><script>alert(1)</script><form><input></form><iframe src="https://evil.test"></iframe><a href="javascript:alert(1)" onclick="x()">x</a>',
+      "introduction",
     );
 
     expect(result.html).not.toMatch(
@@ -30,6 +34,7 @@ describe("sanitizeReportHtmlFragment", () => {
   it("blocks CSS URL vectors while keeping an approved declaration", () => {
     const result = sanitizeReportHtmlFragment(
       '<div style="background-image:url(https://evil.test/pixel);color:red">x</div>',
+      "introduction",
     );
 
     expect(result.html).toBe('<div style="color:red">x</div>');
@@ -44,7 +49,7 @@ describe("sanitizeReportHtmlFragment", () => {
     "color:red/*comment*/",
   ])("rejects adversarial CSS declaration %s", (style) => {
     expect(
-      sanitizeReportHtmlFragment(`<div style="${style};color:red">x</div>`)
+      sanitizeReportHtmlFragment(`<div style="${style};color:red">x</div>`, "introduction")
         .html,
     ).toBe('<div style="color:red">x</div>');
   });
@@ -52,20 +57,24 @@ describe("sanitizeReportHtmlFragment", () => {
   it("is idempotent for an accepted fragment", () => {
     const once = sanitizeReportHtmlFragment(
       '<section class="report-callout" style="color:#123456;padding:16px"><a href="https://scalingup.com">Continue</a></section>',
+      "introduction",
     ).html;
 
-    expect(sanitizeReportHtmlFragment(once).html).toBe(once);
+    expect(sanitizeReportHtmlFragment(once, "introduction").html).toBe(once);
   });
 
   it("keeps safe image sources and strips SVG data images", () => {
     const httpsImage = sanitizeReportHtmlFragment(
       '<img src="https://cdn.scalingup.com/report.png" alt="Report">',
+      "introduction",
     ).html;
     const relativeImage = sanitizeReportHtmlFragment(
       '<img src="/uploads/report.png" alt="Report">',
+      "introduction",
     ).html;
     const svgImage = sanitizeReportHtmlFragment(
       '<img src="data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=" alt="Unsafe">',
+      "introduction",
     ).html;
 
     expect(httpsImage).toContain('referrerpolicy="no-referrer"');
@@ -73,12 +82,90 @@ describe("sanitizeReportHtmlFragment", () => {
     expect(svgImage).not.toContain("data:image/svg+xml");
   });
 
-  it("rejects a fragment over the storage limit", () => {
+  it.each(["introduction", "conclusion"] as const)("rejects a fragment over the %s source limit", (position) => {
     const result = sanitizeReportHtmlFragment(
-      "x".repeat(MAX_REPORT_HTML_FRAGMENT_LENGTH + 1),
+      "x".repeat(limits[position].rawCharacters + 1),
+      position,
     );
 
     expect(result.ok).toBe(false);
     expect(result.html).toBe("");
+  });
+
+  it.each(["introduction", "conclusion"] as const)("rejects %s content over the visible-text limit", (position) => {
+    const result = sanitizeReportHtmlFragment(
+      `<p>${"x".repeat(limits[position].textCharacters + 1)}</p>`,
+      position,
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.issue).toMatch(/text/i);
+  });
+
+  it.each(["introduction", "conclusion"] as const)("rejects %s content over the element limit", (position) => {
+    const result = sanitizeReportHtmlFragment(
+      Array.from({ length: limits[position].elements + 1 }, () => "<span>x</span>").join(""),
+      position,
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.issue).toMatch(/element/i);
+  });
+
+  it.each(["introduction", "conclusion"] as const)("rejects %s content over the nesting limit", (position) => {
+    const levels = limits[position].depth + 1;
+    const result = sanitizeReportHtmlFragment(
+      `${"<div>".repeat(levels)}x${"</div>".repeat(levels)}`,
+      position,
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.issue).toMatch(/nested/i);
+  });
+
+  it.each(["introduction", "conclusion"] as const)("rejects %s content over the image limit", (position) => {
+    const result = sanitizeReportHtmlFragment(
+      '<img src="https://cdn.scalingup.com/one.png"><img src="https://cdn.scalingup.com/two.png">',
+      position,
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.issue).toMatch(/image/i);
+  });
+
+  it.each(["introduction", "conclusion"] as const)("rejects %s content over the table limit", (position) => {
+    const result = sanitizeReportHtmlFragment(
+      "<table><tbody><tr><td>One</td></tr></tbody></table><table><tbody><tr><td>Two</td></tr></tbody></table>",
+      position,
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.issue).toMatch(/table/i);
+  });
+
+  it.each(["introduction", "conclusion"] as const)("rejects %s content over the table-row limit", (position) => {
+    const rows = Array.from(
+      { length: limits[position].tableRows + 1 },
+      () => "<tr><td>row</td></tr>",
+    ).join("");
+    const result = sanitizeReportHtmlFragment(`<table><tbody>${rows}</tbody></table>`, position);
+
+    expect(result.ok).toBe(false);
+    expect(result.issue).toMatch(/row/i);
+  });
+
+  it("removes layout-affecting CSS and image dimensions while keeping bounded content", () => {
+    const result = sanitizeReportHtmlFragment(
+      '<section style="width:100px;max-width:90px;min-width:10px;height:100px;min-height:10px;max-height:90px;margin:-1px;padding:1vw;display:grid;gap:2vh;color:red"><h2>Heading</h2><a href="https://scalingup.com">Link</a><ul><li>Item</li></ul><img src="https://cdn.scalingup.com/report.png" width="400" height="300"><table><tbody><tr><td>Cell</td></tr></tbody></table></section>',
+      "introduction",
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.html).toContain("<h2>Heading</h2>");
+    expect(result.html).toContain('href="https://scalingup.com"');
+    expect(result.html).toContain("<ul><li>Item</li></ul>");
+    expect(result.html).toContain("<table><tbody><tr><td>Cell</td></tr></tbody></table>");
+    expect(result.html).toContain('src="https://cdn.scalingup.com/report.png"');
+    expect(result.html).not.toMatch(/(?:width|height|grid|flex|vw|vh|-1px)/i);
   });
 });

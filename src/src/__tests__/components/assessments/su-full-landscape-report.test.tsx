@@ -159,12 +159,12 @@ test("falls back to the frozen referring coach email when no explicit contact is
     .toHaveAttribute("href", "mailto:referrer@example.com");
 });
 
-test("replaces the landscape preface and conclusion pages with custom HTML", () => {
+test("replaces Welcome but protects the respondent summary before a custom closing message", () => {
   const report = {
     ...completeSuFullLandscapeReport(),
     reportHtml: {
       introductionHtml: "<h2>Landscape custom introduction</h2>",
-      conclusionHtml: "<h2>Landscape custom conclusion</h2>",
+    conclusionHtml: "<h2>Custom closing message</h2>",
     },
   };
   const presentation = completeSuFullLandscapePresentation(report);
@@ -179,12 +179,13 @@ test("replaces the landscape preface and conclusion pages with custom HTML", () 
   expect(screen.getByTestId("su-full-landscape-page-2")).not.toHaveTextContent(
     "This report turns your submitted assessment",
   );
-  expect(screen.getByTestId("su-full-landscape-page-25")).toHaveTextContent(
-    "Landscape custom conclusion",
-  );
-  expect(screen.getByTestId("su-full-landscape-page-25")).not.toHaveTextContent(
-    "Choose one priority from the feedback",
-  );
+  const page25 = screen.getByTestId("su-full-landscape-page-25");
+  expect(page25).toHaveTextContent("ScaleUp Score");
+  expect(page25).toHaveTextContent("55 / 100");
+  expect(page25).toHaveTextContent("Your strongest chapter is");
+  expect(page25).toHaveTextContent("Your focus chapter is");
+  expect(page25).toHaveTextContent("Custom closing message");
+  expect(page25).not.toHaveTextContent("Choose one priority from the feedback");
   expect(screen.getAllByTestId(/^su-full-landscape-page-/)).toHaveLength(26);
 });
 

@@ -2965,6 +2965,11 @@
   overflow-x: auto;
 }
 
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-custom-content .su-report-custom-html {
+  padding: 0;
+  overflow-wrap: anywhere;
+}
+
 .su-public-brand.su-report .su-report-custom-html :focus-visible {
   outline: 3px solid #522583;
   outline-offset: 3px;

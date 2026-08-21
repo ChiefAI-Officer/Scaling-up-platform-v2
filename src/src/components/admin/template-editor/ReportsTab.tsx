@@ -7,6 +7,7 @@ import type {
   SafeReportHtml,
   SafeReportHtmlFragment,
 } from "@/lib/assessments/report-html";
+import { REPORT_HTML_LIMITS } from "@/lib/assessments/report-html-sanitizer";
 
 function HtmlRegion({
   id,
@@ -52,7 +53,7 @@ function HtmlRegion({
             value={html}
             onChange={(event) => onChange(event.target.value)}
             disabled={isReadOnly}
-            maxLength={100_000}
+            maxLength={REPORT_HTML_LIMITS[position].rawCharacters}
             spellCheck={false}
             className="min-h-[168px] w-full resize-y rounded-lg border border-slate-700 bg-slate-950 p-4 font-mono text-xs leading-6 text-slate-100 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-70"
           />
@@ -60,7 +61,9 @@ function HtmlRegion({
             <span>
               Paste HTML. Unsafe scripts and attributes are removed when you save the draft.
             </span>
-            <span className="shrink-0">{html.length.toLocaleString()} / 100,000</span>
+            <span className="shrink-0">
+              {html.length.toLocaleString()} / {REPORT_HTML_LIMITS[position].rawCharacters.toLocaleString()}
+            </span>
           </div>
         </div>
         <div className="bg-muted/30 p-5">
@@ -102,15 +105,15 @@ export function ReportsTab({
       <div>
         <h2 className="text-xl font-semibold text-foreground">Report content</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Add HTML before and after the generated result. Leave either field blank to keep its current default.
+          Add optional content to the Welcome and Closing sections. The generated report between them stays unchanged.
         </p>
       </div>
 
       <HtmlRegion
         id="report-introduction-html"
-        title="Introduction / preface"
+        title="Welcome section"
         label="Introduction / preface HTML"
-        helper="Appears after the report cover and before generated results."
+        helper="Replaces the default Welcome content on page 2."
         value={value.introductionHtml}
         previewHtml={previewValue.introductionHtml}
         position="introduction"
@@ -127,16 +130,16 @@ export function ReportsTab({
         <div>
           <h3 className="text-sm font-semibold text-foreground">Generated report</h3>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Questions, scoring, findings, peer benchmarks, and answers generate this section automatically.
+            Scores, phase, You and Peers comparisons, explanations, feedback, and question order are generated automatically and cannot be replaced here.
           </p>
         </div>
       </section>
 
       <HtmlRegion
         id="report-conclusion-html"
-        title="Conclusion / call to action"
+        title="Closing message"
         label="Conclusion / call-to-action HTML"
-        helper="Appears after generated results and before the report footer."
+        helper="Appears after the respondent's score and strongest/focus summary on page 25. It replaces only the default next steps and coach link."
         value={value.conclusionHtml}
         previewHtml={previewValue.conclusionHtml}
         position="conclusion"

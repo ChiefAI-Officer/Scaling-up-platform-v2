@@ -86,9 +86,10 @@ export function mergeReportHtml(
 
 function sanitizeFragmentForStorage(
   value: string | null,
+  position: "introduction" | "conclusion",
 ): { value: string | null; result?: SanitizeReportHtmlResult } {
   if (value === null || value.trim() === "") return { value: null };
-  const result = sanitizeReportHtmlFragment(value);
+  const result = sanitizeReportHtmlFragment(value, position);
   return { value: result.ok ? result.html : null, result };
 }
 
@@ -136,9 +137,11 @@ export function prepareReportHtmlForStorage(
 
   const introduction = sanitizeFragmentForStorage(
     value.introductionHtml as string | null,
+    "introduction",
   );
   const conclusion = sanitizeFragmentForStorage(
     value.conclusionHtml as string | null,
+    "conclusion",
   );
   for (const [field, result] of [
     ["introductionHtml", introduction.result],
@@ -212,7 +215,10 @@ export function loadSafeReportHtml(
       return null;
     }
 
-    const result = sanitizeReportHtmlFragment(value);
+    const result = sanitizeReportHtmlFragment(
+      value,
+      field === "introductionHtml" ? "introduction" : "conclusion",
+    );
     if (!result.ok) {
       emitCanonicalDrift(field, options.onDrift);
       return null;

@@ -1,6 +1,25 @@
 import sanitizeHtml from "sanitize-html";
 
-export const MAX_REPORT_HTML_FRAGMENT_LENGTH = 100_000;
+export const REPORT_HTML_LIMITS = {
+  introduction: {
+    rawCharacters: 12_000,
+    textCharacters: 2_200,
+    elements: 64,
+    depth: 8,
+    images: 1,
+    tables: 1,
+    tableRows: 8,
+  },
+  conclusion: {
+    rawCharacters: 12_000,
+    textCharacters: 900,
+    elements: 36,
+    depth: 6,
+    images: 1,
+    tables: 1,
+    tableRows: 6,
+  },
+} as const;
 
 export type SanitizeReportHtmlResult = {
   ok: boolean;
@@ -79,8 +98,6 @@ const ALLOWED_ATTRIBUTES: Record<string, string[]> = {
     "src",
     "alt",
     "title",
-    "width",
-    "height",
     "loading",
     "referrerpolicy",
     ...COMMON_ATTRIBUTES,
@@ -91,7 +108,7 @@ const ALLOWED_ATTRIBUTES: Record<string, string[]> = {
   col: ["span", ...COMMON_ATTRIBUTES],
 };
 
-const LENGTH = "(?:0|-?\\d+(?:\\.\\d+)?(?:px|pt|em|rem|%|ex|ch|vw|vh))";
+const LENGTH = "(?:0|\\d+(?:\\.\\d+)?(?:px|pt|em|rem|%|ex|ch))";
 const HEX_COLOR = "#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})";
 const RGB_COLOR = "rgba?\\(\\s*\\d+(?:\\.\\d+)?%?\\s*,\\s*\\d+(?:\\.\\d+)?%?\\s*,\\s*\\d+(?:\\.\\d+)?%?(?:\\s*,\\s*(?:0|1|0?\\.\\d+))?\\s*\\)";
 const NAMED_COLOR = "[a-z]+";
@@ -120,7 +137,7 @@ const ALLOWED_STYLES = {
     "text-decoration": [/^(?:none|underline|line-through|overline)$/i],
     "text-transform": [/^(?:none|uppercase|lowercase|capitalize)$/i],
     "white-space": [/^(?:normal|nowrap|pre|pre-wrap|pre-line)$/i],
-    display: [/^(?:block|inline|inline-block|flex|grid|none)$/i],
+    display: [/^(?:block|inline|inline-block|none)$/i],
     "align-items": [/^(?:stretch|start|end|center|baseline)$/i],
     "justify-content": [
       /^(?:start|end|center|space-between|space-around|space-evenly)$/i,
@@ -143,12 +160,6 @@ const ALLOWED_STYLES = {
     "border-left": [borderValue],
     "border-color": [colorValue],
     "border-radius": [spacingValue],
-    width: [lengthValue],
-    height: [lengthValue],
-    "min-width": [lengthValue],
-    "max-width": [lengthValue],
-    "min-height": [lengthValue],
-    "max-height": [lengthValue],
     "object-fit": [/^(?:contain|cover|fill|none|scale-down)$/i],
   },
 };
@@ -175,15 +186,80 @@ function removeObscuredCss(attributes: Record<string, string>): void {
   else attributes.style = declarations.join(";");
 }
 
+type ReportHtmlPosition = keyof typeof REPORT_HTML_LIMITS;
+
+const VOID_TAGS = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"]);
+const TAG_TOKEN = /<\/?([a-z][a-z0-9:-]*)(?:\s[^<>]*?)?\s*\/?>/gi;
+
+function measureStructure(html: string) {
+  let elements = 0;
+  let depth = 0;
+  let maximumDepth = 0;
+  let images = 0;
+  let tables = 0;
+  let tableRows = 0;
+  const stack: string[] = [];
+
+  for (const token of html.matchAll(TAG_TOKEN)) {
+    const tag = token[1].toLowerCase();
+    const isClosing = token[0].startsWith("</");
+    if (isClosing) {
+      const index = stack.lastIndexOf(tag);
+      if (index !== -1) {
+        stack.length = index;
+        depth = stack.length;
+      }
+      continue;
+    }
+
+    elements += 1;
+    if (tag === "img") images += 1;
+    if (tag === "table") tables += 1;
+    if (tag === "tr") tableRows += 1;
+    if (!VOID_TAGS.has(tag) && !token[0].endsWith("/>")) {
+      stack.push(tag);
+      depth = stack.length;
+      maximumDepth = Math.max(maximumDepth, depth);
+    }
+  }
+
+  const text = sanitizeHtml(html, {
+    allowedTags: [],
+    allowedAttributes: {},
+  }).replace(/\s+/g, " ").trim();
+
+  return { elements, depth: maximumDepth, images, tables, tableRows, text };
+}
+
+function issueForLimit(
+  position: ReportHtmlPosition,
+  kind: "rawCharacters" | "textCharacters" | "elements" | "depth" | "images" | "tables" | "tableRows",
+): string {
+  const field = position === "introduction" ? "Welcome section" : "Closing message";
+  const limit = REPORT_HTML_LIMITS[position][kind];
+  const messages = {
+    rawCharacters: `must be ${limit.toLocaleString()} characters or fewer.`,
+    textCharacters: `must contain ${limit.toLocaleString()} visible text characters or fewer.`,
+    elements: `must contain ${limit} HTML elements or fewer.`,
+    depth: `cannot be nested more than ${limit} levels deep.`,
+    images: `can contain ${limit} image or fewer.`,
+    tables: `can contain ${limit} table or fewer.`,
+    tableRows: `can contain ${limit} table rows or fewer.`,
+  } as const;
+  return `${field} ${messages[kind]}`;
+}
+
 export function sanitizeReportHtmlFragment(
   raw: string,
+  position: ReportHtmlPosition,
 ): SanitizeReportHtmlResult {
-  if (raw.length > MAX_REPORT_HTML_FRAGMENT_LENGTH) {
+  const limits = REPORT_HTML_LIMITS[position];
+  if (raw.length > limits.rawCharacters) {
     return {
       ok: false,
       html: "",
       didStripContent: false,
-      issue: `Report HTML must be ${MAX_REPORT_HTML_FRAGMENT_LENGTH.toLocaleString()} characters or fewer.`,
+      issue: issueForLimit(position, "rawCharacters"),
     };
   }
 
@@ -239,6 +315,25 @@ export function sanitizeReportHtmlFragment(
       },
     },
   });
+
+  const structure = measureStructure(html);
+  for (const [kind, value] of [
+    ["textCharacters", structure.text.length],
+    ["elements", structure.elements],
+    ["depth", structure.depth],
+    ["images", structure.images],
+    ["tables", structure.tables],
+    ["tableRows", structure.tableRows],
+  ] as const) {
+    if (value > limits[kind]) {
+      return {
+        ok: false,
+        html: "",
+        didStripContent: html !== raw.trim(),
+        issue: issueForLimit(position, kind),
+      };
+    }
+  }
 
   return {
     ok: true,
