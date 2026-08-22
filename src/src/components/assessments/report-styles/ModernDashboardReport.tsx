@@ -91,7 +91,11 @@ export function ModernDashboardReport({
       </section>
       {reportHtml?.introductionHtml ? (
         <section className="report-page report-page--dashboard-introduction report-page-break">
-          <ReportHtmlSection position="introduction" html={reportHtml.introductionHtml} />
+          <ReportHtmlSection
+            position="introduction"
+            html={reportHtml.introductionHtml}
+            personalization={presentation.identity}
+          />
           <ReportProvenance presentation={presentation} />
         </section>
       ) : null}
@@ -131,7 +135,11 @@ export function ModernDashboardReport({
       ) : null}
       {reportHtml?.conclusionHtml ? (
         <section className="report-page report-page--dashboard-conclusion report-page-break">
-          <ReportHtmlSection position="conclusion" html={reportHtml.conclusionHtml} />
+          <ReportHtmlSection
+            position="conclusion"
+            html={reportHtml.conclusionHtml}
+            personalization={presentation.identity}
+          />
           <ReportProvenance presentation={presentation} />
         </section>
       ) : null}

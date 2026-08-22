@@ -31,14 +31,24 @@ function escapeReportHtmlText(value: string): string {
     .replaceAll("'", "&#39;");
 }
 
-/** Substitute the two source-report personalization fields as escaped text. */
+export type ReportHtmlPersonalization = Readonly<{
+  respondentName: string;
+  companyName?: string | null;
+}>;
+
+/** Substitute source-report fields, then re-sanitize before restoring the brand. */
 export function personalizeSafeReportHtml(
   html: SafeReportHtmlFragment,
-  values: { respondentName: string; companyName?: string | null },
-): SafeReportHtmlFragment {
-  return html
+  values: ReportHtmlPersonalization,
+  position: "introduction" | "conclusion" = "introduction",
+): SafeReportHtmlFragment | null {
+  const substituted = html
     .replaceAll("{{respondentName}}", escapeReportHtmlText(values.respondentName))
-    .replaceAll("{{companyName}}", escapeReportHtmlText(values.companyName ?? "")) as SafeReportHtmlFragment;
+    .replaceAll("{{companyName}}", escapeReportHtmlText(values.companyName ?? ""));
+  const result = sanitizeReportHtmlFragment(substituted, position);
+  return result.ok && result.html
+    ? (result.html as SafeReportHtmlFragment)
+    : null;
 }
 
 export type ReportHtmlIssue = {

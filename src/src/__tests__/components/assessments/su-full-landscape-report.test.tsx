@@ -218,6 +218,26 @@ test("personalizes escaped respondent and company tokens in authored report HTML
   expect(preface.querySelector("founder")).toBeNull();
 });
 
+test("keeps Classic cover fallbacks for duplicate campaign titles and email-only identities", () => {
+  const source = completeSuFullLandscapeReport();
+  const report = {
+    ...source,
+    campaignLabel: source.assessmentName,
+    respondentName: "ari@example.com",
+    respondentEmail: "ARI@example.com",
+  };
+  const presentation = completeSuFullLandscapePresentation(report);
+  const model = buildSuFullLandscapeReportModel({ report, presentation, resolvedStyle: "CLASSIC" });
+  if (!model) throw new Error("The canonical landscape fixture must build");
+
+  render(<SuFullLandscapeReport report={report} model={model} />);
+
+  const cover = screen.getByTestId("su-full-landscape-page-1");
+  expect(within(cover).getAllByText(report.assessmentName)).toHaveLength(1);
+  expect(cover).not.toHaveTextContent("Report for:");
+  expect(cover).toHaveTextContent("Email: ARI@example.com");
+});
+
 test("keeps generated add-ons before the landscape conclusion without adding a page", () => {
   const report = {
     ...completeSuFullLandscapeReport(),

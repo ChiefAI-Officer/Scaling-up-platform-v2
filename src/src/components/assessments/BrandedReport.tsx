@@ -644,6 +644,7 @@ export function LegacyClassicReport({
         <ReportHtmlSection
           position="introduction"
           html={report.reportHtml.introductionHtml}
+          personalization={report}
         />
       ) : null}
 
@@ -999,6 +1000,7 @@ export function LegacyClassicReport({
         <ReportHtmlSection
           position="conclusion"
           html={report.reportHtml.conclusionHtml}
+          personalization={report}
         />
       ) : (
         <section className="su-report-conclusion" data-testid="report-conclusion">

@@ -2,6 +2,7 @@ import {
   extractReportHtml,
   loadSafeReportHtml,
   mergeReportHtml,
+  personalizeSafeReportHtml,
   prepareReportHtmlForStorage,
 } from "@/lib/assessments/report-html";
 
@@ -124,6 +125,29 @@ describe("report HTML configuration", () => {
     });
     expect(onDrift).toHaveBeenCalledTimes(1);
     expect(onDrift).toHaveBeenCalledWith("introductionHtml");
+  });
+
+  it("re-sanitizes personalized fragments so tokens cannot create unsafe attributes", () => {
+    const stored = loadSafeReportHtml({
+      reportHtml: {
+        schemaVersion: 1,
+        introductionHtml: '<a href="{{respondentName}}">Open {{companyName}}</a><img src="{{respondentName}}" alt="Profile">',
+        conclusionHtml: null,
+      },
+    });
+    if (!stored.introductionHtml) throw new Error("expected a safe introduction");
+
+    const personalized = personalizeSafeReportHtml(
+      stored.introductionHtml,
+      {
+        respondentName: "javascript:alert(1)",
+        companyName: "Acme & Sons",
+      },
+    );
+
+    expect(personalized).not.toContain("javascript:");
+    expect(personalized).not.toMatch(/\b(?:href|src)=/);
+    expect(personalized).toContain("<a>Open Acme &amp; Sons</a>");
   });
 
   it("drops only a malformed stored fragment", () => {

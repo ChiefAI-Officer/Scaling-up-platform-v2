@@ -19,6 +19,7 @@ import {
   completeSuFullPeerReport,
 } from "@/__tests__/fixtures/su-full-peer";
 import { buildSuFullPeerPresentationResult } from "@/lib/assessments/su-full-peer-presentation";
+import { loadSafeReportHtml } from "@/lib/assessments/report-html";
 
 // ── Fixture builders ───────────────────────────────────────────────────────
 
@@ -54,6 +55,27 @@ function baseReport(overrides: Partial<RespondentReport> = {}): RespondentReport
 }
 
 describe("BrandedReport — respondent identity and next steps", () => {
+  it("personalizes report HTML on the Classic fallback path", () => {
+    render(
+      <BrandedReport
+        report={baseReport({
+          reportHtml: loadSafeReportHtml({
+            reportHtml: {
+              schemaVersion: 1,
+              introductionHtml: "<p>Dear {{respondentName}} from {{companyName}}</p>",
+              conclusionHtml: null,
+            },
+          }),
+        })}
+      />,
+    );
+
+    expect(screen.getByTestId("report-html-introduction")).toHaveTextContent(
+      "Dear Sarah Chen from Northwind Logistics",
+    );
+    expect(screen.queryByText(/\{\{respondentName\}\}/)).not.toBeInTheDocument();
+  });
+
   it("shows the taker's email and both next-step links", () => {
     render(
       <BrandedReport
