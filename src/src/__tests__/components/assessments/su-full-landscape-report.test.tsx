@@ -82,6 +82,13 @@ test("renders the fixed 26-page landscape composition with truthful peer context
   expect(document.querySelectorAll(".su-full-landscape-peer-contour")).toHaveLength(10);
   expect(document.querySelectorAll(".su-full-landscape-peer-contour[stroke-dasharray]")).toHaveLength(0);
   expect(screen.getByTestId("su-full-landscape-page-1")).toHaveTextContent("Coach Example");
+  const cover = screen.getByTestId("su-full-landscape-page-1");
+  expect(within(cover).getByRole("img", { name: "Scaling Up" })).toHaveAttribute(
+    "src",
+    "/brand/su-logo-white.svg",
+  );
+  expect(cover).toHaveTextContent("Report for: Ari Founder · CEO");
+  expect(cover).toHaveTextContent("Acme · 17 August 2026");
   expect(screen.getAllByTestId("coach-name")).toHaveLength(27);
   expect(screen.getAllByTestId("coach-logo")).toHaveLength(27);
   const chapterKeyItems = screen.getByTestId("su-full-landscape-page-3")
@@ -187,6 +194,48 @@ test("replaces Welcome but protects the respondent summary before a custom closi
   expect(page25).toHaveTextContent("Custom closing message");
   expect(page25).not.toHaveTextContent("Choose one priority from the feedback");
   expect(screen.getAllByTestId(/^su-full-landscape-page-/)).toHaveLength(26);
+});
+
+test("personalizes escaped respondent and company tokens in authored report HTML", () => {
+  const report = {
+    ...completeSuFullLandscapeReport(),
+    respondentName: "Ari <Founder> & Team",
+    companyName: "Acme & Sons",
+    reportHtml: {
+      introductionHtml: "<p>Dear {{respondentName}},</p><p>For {{companyName}}</p>",
+      conclusionHtml: null,
+    },
+  };
+  const presentation = completeSuFullLandscapePresentation(report);
+  const model = buildSuFullLandscapeReportModel({ report, presentation, resolvedStyle: "CLASSIC" });
+  if (!model) throw new Error("The canonical landscape fixture must build");
+
+  render(<SuFullLandscapeReport report={report} model={model} />);
+
+  const preface = screen.getByTestId("report-html-introduction");
+  expect(preface).toHaveTextContent("Dear Ari <Founder> & Team,");
+  expect(preface).toHaveTextContent("For Acme & Sons");
+  expect(preface.querySelector("founder")).toBeNull();
+});
+
+test("keeps Classic cover fallbacks for duplicate campaign titles and email-only identities", () => {
+  const source = completeSuFullLandscapeReport();
+  const report = {
+    ...source,
+    campaignLabel: source.assessmentName,
+    respondentName: "ari@example.com",
+    respondentEmail: "ARI@example.com",
+  };
+  const presentation = completeSuFullLandscapePresentation(report);
+  const model = buildSuFullLandscapeReportModel({ report, presentation, resolvedStyle: "CLASSIC" });
+  if (!model) throw new Error("The canonical landscape fixture must build");
+
+  render(<SuFullLandscapeReport report={report} model={model} />);
+
+  const cover = screen.getByTestId("su-full-landscape-page-1");
+  expect(within(cover).getAllByText(report.assessmentName)).toHaveLength(1);
+  expect(cover).not.toHaveTextContent("Report for:");
+  expect(cover).toHaveTextContent("Email: ARI@example.com");
 });
 
 test("keeps generated add-ons before the landscape conclusion without adding a page", () => {

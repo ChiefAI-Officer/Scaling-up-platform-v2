@@ -311,6 +311,7 @@ export function BrandedReport({
           presentation={presentation()}
           comparison={comparison}
           reportHtml={report.reportHtml}
+          reportHtmlPersonalization={report.templateAlias === "scaling-up-full" ? report : undefined}
           responsiveEnabled={responsiveEnabled}
           beforeConclusion={beforeConclusion}
         />
@@ -323,6 +324,7 @@ export function BrandedReport({
           presentation={presentation()}
           comparison={comparison}
           reportHtml={report.reportHtml}
+          reportHtmlPersonalization={report.templateAlias === "scaling-up-full" ? report : undefined}
           responsiveEnabled={responsiveEnabled}
           beforeConclusion={beforeConclusion}
         />
@@ -644,6 +646,7 @@ export function LegacyClassicReport({
         <ReportHtmlSection
           position="introduction"
           html={report.reportHtml.introductionHtml}
+          personalization={report.templateAlias === "scaling-up-full" ? report : undefined}
         />
       ) : null}
 
@@ -999,6 +1002,7 @@ export function LegacyClassicReport({
         <ReportHtmlSection
           position="conclusion"
           html={report.reportHtml.conclusionHtml}
+          personalization={report.templateAlias === "scaling-up-full" ? report : undefined}
         />
       ) : (
         <section className="su-report-conclusion" data-testid="report-conclusion">

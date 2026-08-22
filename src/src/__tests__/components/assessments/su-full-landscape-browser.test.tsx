@@ -40,6 +40,38 @@ const LEGACY_FALSE_FREEZE_CLAIM = /frozen governed snapshot|peer values[^.]{0,12
 const ENGINEERING_LANGUAGE = /governed|snapshot|sourceId|source id|catalogue|provenance|legacy baseline|phase-aware|frozen|esperto-five-phase-peers|esperto-controlled/i;
 const REPRESENTATIVE_482_CHARACTER_FEEDBACK = "In order to scale, smart application and linking of information technology is essential. Sales, marketing, project management, production,humanresources,reporting,etc.Thisgivesstructureand clarity, prevents mistakes and makes growing a lot easier. With the size of your company, a lot of systems likely still work independently of each other, or you primarily use Excel. This is customary, but in your next growth phase you will have to start thinking about smart solutions. Act now";
 
+function restoredScalingUpFullCtaReport() {
+  const prepared = prepareReportHtmlForStorage({
+    reportHtml: {
+      schemaVersion: 1,
+      introductionHtml: [
+        '<div aria-label="Verne Harnish preface">',
+        '<strong aria-label="Preface heading">PREFACE</strong>',
+        '<p>Dear {{respondentName}},\n\nCongratulations! You are now the owner of your own personalized ScaleUp Assessment report. With this report you will gain a better understanding of how well prepared you are for Scaling Up, how you and your company compare to your peers and what your priorities may be. To reach the \'next level\' you now have the choice of using the Scaling Up book, implementing a growth program or working with a coach. Ultimately, this report will work as a guide and input towards your personal growth path. {{companyName}}, you can use this report as a guide and as input for your personal growth path.\n\nThe assessment has been predominantly devised utilizing the Scaling Up / Rockefeller Habits 2.0 methodology, alongside academic growth models and organizational development theories. We have received input from many seasoned growth entrepreneurs, coaches, mentors and academics. We hope and believe you will be positively surprised by the number of Scaling Up insights throughout this report. We would highly recommend repeating this assessment annually, in order to keep track of your progress.\n\nI wish you many great insights. Enjoy the report and keep scaling!</p>',
+        '<img src="https://platformtest.scalingup.com/brand/verne-harnish-preface.jpg" alt="Verne Harnish">',
+        '<span aria-label="Verne Harnish signature"></span>',
+        '<aside>Verne Harnish, CEO\nScaling Up\nAuthor of Scaling Up (Rockefeller Habits 2.0)\nThe Greatest Business Decisions of All Time\nMastering the Rockefeller Habits</aside>',
+        "</div>",
+      ].join(""),
+      conclusionHtml: [
+        '<section aria-label="Scaling Up Full next steps">',
+        '<p><strong>Next step</strong> – Go back thru the book Scaling Up (Rockefeller Habits 2.0) or start with Mastering the Rockefeller Habits (quicker/simpler read to start).</p>',
+        '<img src="https://platformtest.scalingup.com/brand/scaling-up-books.png" alt="Mastering the Rockefeller Habits and Scaling Up books">',
+        '<p>Or you can schedule a complimentary one-hour debrief of your assessment with one of our 280+ coaching partners around the globe.</p>',
+        '<a href="https://coaches.scalingup.com/coach-match-after-assessment-form" target="_blank" rel="noopener noreferrer" aria-label="Request a complimentary follow-up">YES! I WOULD LIKE A COMPLIMENTARY FOLLOW-UP</a>',
+        '<a href="https://scalingup.com/book/" target="_blank" rel="noopener noreferrer" aria-label="Buy the books">YES! I LIKE TO BUY THE BOOKS</a>',
+        "</section>",
+      ].join(""),
+    },
+  });
+  if (!prepared.ok) throw new Error(prepared.issues.map((issue) => issue.message).join(" "));
+  const report = completeSuFullLandscapeReport();
+  return {
+    ...report,
+    reportHtml: (prepared.reportConfig as { reportHtml: typeof report.reportHtml }).reportHtml,
+  };
+}
+
 const SEMANTIC_ESCAPE_CASES = [
   {
     id: "exact-limit-pre",
@@ -628,6 +660,133 @@ describe("SU Full landscape browser and PDF contract", () => {
     else process.env[ENABLED] = savedEnabled;
     if (savedKill === undefined) delete process.env[KILL];
     else process.env[KILL] = savedKill;
+  });
+
+  it("restores the approved Scaling Up Full CTA hierarchy and button treatment", async () => {
+    const { html } = routeMarkup(restoredScalingUpFullCtaReport());
+    const page = await browser.newPage({ viewport: { width: 1123, height: 794 } });
+    try {
+      await load(page, html);
+      await page.emulateMedia({ media: "print" });
+      const cta = page.locator('[aria-label="Scaling Up Full next steps"]');
+      const layout = await cta.evaluate((element) => {
+        const paragraph = element.querySelector("p");
+        const image = element.querySelector("img");
+        const followup = element.querySelectorAll("p")[1];
+        const actions = element.querySelectorAll("a");
+        if (!paragraph || !image || !followup || actions.length !== 2) {
+          throw new Error("Incomplete Scaling Up Full CTA fixture");
+        }
+        const rect = (value: Element) => value.getBoundingClientRect();
+        const sectionRect = rect(element);
+        return {
+          order: [rect(paragraph).bottom, rect(image).top, rect(image).bottom, rect(followup).top, rect(followup).bottom, rect(actions[0]).top, rect(actions[0]).bottom, rect(actions[1]).top],
+          imageWidth: rect(image).width,
+          imageCenterError: Math.abs((rect(image).left + rect(image).right) / 2 - (sectionRect.left + sectionRect.right) / 2),
+          buttons: [...actions].map((action) => {
+            const style = getComputedStyle(action);
+            const actionRect = rect(action);
+            return {
+              background: style.backgroundColor,
+              color: style.color,
+              display: style.display,
+              href: action.getAttribute("href"),
+              minHeight: Number.parseFloat(style.minHeight),
+              centerError: Math.abs((actionRect.left + actionRect.right) / 2 - (sectionRect.left + sectionRect.right) / 2),
+            };
+          }),
+        };
+      });
+
+      expect(layout.order.every((value, index, values) => index === 0 || value >= values[index - 1])).toBe(true);
+      expect(layout.imageWidth).toBeGreaterThanOrEqual(300);
+      expect(layout.imageCenterError).toBeLessThanOrEqual(1);
+      expect(layout.buttons).toHaveLength(2);
+      expect(layout.buttons.map((button) => button.href)).toEqual([
+        "https://coaches.scalingup.com/coach-match-after-assessment-form",
+        "https://scalingup.com/book/",
+      ]);
+      expect(layout.buttons.every((button) =>
+        button.background === "rgb(247, 166, 0)"
+        && button.color === "rgb(255, 255, 255)"
+        && button.display === "flex"
+        && button.minHeight === 44
+        && button.centerError <= 1
+      )).toBe(true);
+      expect(await authoredContentOutsidePhysicalPage(page)).toEqual([]);
+    } finally {
+      await page.close();
+    }
+  });
+
+  it("renders the recovered Classic cover with legible reversed brand typography", async () => {
+    const { html } = routeMarkup(restoredScalingUpFullCtaReport());
+    const page = await browser.newPage({ viewport: { width: 1123, height: 794 } });
+    try {
+      await load(page, html);
+      await page.emulateMedia({ media: "print" });
+      const cover = page.locator('[data-page-number="1"]');
+      const result = await cover.evaluate((element) => {
+        const title = element.querySelector("h1");
+        const logo = element.querySelector<HTMLImageElement>('img[alt="Scaling Up"]');
+        if (!title || !logo) throw new Error("Incomplete recovered cover");
+        return {
+          background: getComputedStyle(element).backgroundColor,
+          titleColor: getComputedStyle(title).color,
+          titleSize: Number.parseFloat(getComputedStyle(title).fontSize),
+          logoWidth: logo.getBoundingClientRect().width,
+        };
+      });
+
+      expect(result).toEqual({
+        background: "rgb(82, 37, 131)",
+        titleColor: "rgb(255, 255, 255)",
+        titleSize: 52,
+        logoWidth: 180,
+      });
+    } finally {
+      await page.close();
+    }
+  });
+
+  it("restores the source Verne Harnish preface composition", async () => {
+    const { html } = routeMarkup(restoredScalingUpFullCtaReport());
+    const page = await browser.newPage({ viewport: { width: 1123, height: 794 } });
+    try {
+      await load(page, html);
+      await page.emulateMedia({ media: "print" });
+      const layout = await page.locator('[aria-label="Verne Harnish preface"]').evaluate((element) => {
+        const copy = element.querySelector("p");
+        const image = element.querySelector("img");
+        const signature = element.querySelector<HTMLElement>('[aria-label="Verne Harnish signature"]');
+        const attribution = element.querySelector("aside");
+        if (!copy || !image || !signature || !attribution) throw new Error("Incomplete preface fixture");
+        const copyRect = copy.getBoundingClientRect();
+        const imageRect = image.getBoundingClientRect();
+        const signatureRect = signature.getBoundingClientRect();
+        const attributionRect = attribution.getBoundingClientRect();
+        return {
+          copyBeforePortrait: copyRect.right < imageRect.left,
+          portraitWidth: imageRect.width,
+          attributionBelowPortrait: attributionRect.top >= imageRect.bottom,
+          signatureBelowCopy: signatureRect.top >= copyRect.bottom,
+          signatureWidth: signatureRect.width,
+          signatureBackground: getComputedStyle(signature).backgroundImage,
+        };
+      });
+
+      expect(layout).toMatchObject({
+        copyBeforePortrait: true,
+        attributionBelowPortrait: true,
+        signatureBelowCopy: true,
+      });
+      expect(layout.portraitWidth).toBeGreaterThanOrEqual(180);
+      expect(layout.signatureWidth).toBeGreaterThanOrEqual(180);
+      expect(layout.signatureBackground).toContain("verne-harnish-signature.png");
+      expect(await authoredContentOutsidePhysicalPage(page)).toEqual([]);
+    } finally {
+      await page.close();
+    }
   });
 
   it("under print media keeps every opener and Appendix contour on its 0-10 track and row center", async () => {

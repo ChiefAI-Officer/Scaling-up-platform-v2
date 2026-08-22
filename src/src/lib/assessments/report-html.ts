@@ -22,6 +22,35 @@ export interface SafeReportHtml {
   conclusionHtml: SafeReportHtmlFragment | null;
 }
 
+function escapeReportHtmlText(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+export type ReportHtmlPersonalization = Readonly<{
+  respondentName: string;
+  companyName?: string | null;
+}>;
+
+/** Substitute source-report fields, then re-sanitize before restoring the brand. */
+export function personalizeSafeReportHtml(
+  html: SafeReportHtmlFragment,
+  values: ReportHtmlPersonalization,
+  position: "introduction" | "conclusion" = "introduction",
+): SafeReportHtmlFragment | null {
+  const substituted = html
+    .replaceAll("{{respondentName}}", escapeReportHtmlText(values.respondentName))
+    .replaceAll("{{companyName}}", escapeReportHtmlText(values.companyName ?? ""));
+  const result = sanitizeReportHtmlFragment(substituted, position);
+  return result.ok && result.html
+    ? (result.html as SafeReportHtmlFragment)
+    : null;
+}
+
 export type ReportHtmlIssue = {
   path: string;
   message: string;

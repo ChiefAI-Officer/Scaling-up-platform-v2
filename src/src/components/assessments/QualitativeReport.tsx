@@ -509,6 +509,7 @@ export function QualitativeReport({
         <ReportHtmlSection
           position="introduction"
           html={report.reportHtml.introductionHtml}
+          personalization={report.templateAlias === "scaling-up-full" ? report : undefined}
         />
       ) : (
         <section className="su-section su-preface" data-testid="qual-preface">
@@ -565,6 +566,7 @@ export function QualitativeReport({
         <ReportHtmlSection
           position="conclusion"
           html={report.reportHtml.conclusionHtml}
+          personalization={report.templateAlias === "scaling-up-full" ? report : undefined}
         />
       ) : (
         <section

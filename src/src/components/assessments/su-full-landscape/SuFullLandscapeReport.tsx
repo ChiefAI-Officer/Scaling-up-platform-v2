@@ -18,6 +18,7 @@ import { ReportHtmlSection } from "@/components/assessments/ReportHtmlSection";
 import type { SafeReportHtmlFragment } from "@/lib/assessments/report-html";
 import type { ReactNode } from "react";
 import { buildSuFullPeerDisclosureModel } from "@/lib/assessments/su-full-peer-disclosure";
+import { respondentNameMatchesEmail } from "@/lib/assessments/respondent-display-name";
 
 const CHAPTER_COPY: Readonly<Record<SuFullLandscapeChapter["key"], string>> = {
   people: "The People chapter reviews the employee and culture foundations that support sustainable growth.",
@@ -81,18 +82,42 @@ export function PeerSnapshotDisclosure({
 }
 
 function CoverPage({ report, number }: { report: RespondentReport; number: number }) {
+  const respondentNameIsEmail = respondentNameMatchesEmail(
+    report.respondentName,
+    report.respondentEmail,
+  );
+
   return (
-    <SuFullLandscapePage number={number} footerBrand={report}>
+    <SuFullLandscapePage number={number} variant="cover" footerBrand={report}>
       <div className="su-full-landscape-cover-brand">
-        <span className="su-full-landscape-cover-mark">Scaling Up</span>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          className="su-full-landscape-cover-mark"
+          src="/brand/su-logo-white.svg"
+          alt="Scaling Up"
+          width={180}
+          height={24}
+        />
         <CoachLogo url={report.coachLogoUrl} name={report.coachName} variant="cover" />
       </div>
-      <p>Scaling Up Assessment</p>
-      <h1>{report.assessmentName}</h1>
-      <p>Prepared for {report.respondentName}</p>
-      {report.companyName ? <p>{report.companyName}</p> : null}
-      <p>Submitted {formatDate(report.submittedAt)}</p>
-      {report.coachName ? <p>Coach: {report.coachName}</p> : null}
+      <div className="su-full-landscape-cover-title">
+        <p>Scaling Up Assessment</p>
+        <h1>{report.assessmentName}</h1>
+        {report.campaignLabel && report.campaignLabel !== report.assessmentName
+          ? <p>{report.campaignLabel}</p>
+          : null}
+      </div>
+      <div className="su-full-landscape-cover-meta">
+        {!respondentNameIsEmail ? (
+          <p className="su-full-landscape-cover-for">
+            Report for: {report.respondentName}{report.jobTitle ? ` · ${report.jobTitle}` : ""}
+          </p>
+        ) : null}
+        {report.respondentEmail ? <p>Email: {report.respondentEmail}</p> : null}
+        <p className="su-full-landscape-cover-sub">
+          {report.companyName ? `${report.companyName} · ` : ""}{formatDate(report.submittedAt)}
+        </p>
+      </div>
     </SuFullLandscapePage>
   );
 }
@@ -126,7 +151,11 @@ function CustomHtmlPage({
   return (
     <SuFullLandscapePage number={number} footerBrand={report}>
       <div className="su-full-landscape-custom-content">
-        <ReportHtmlSection position="introduction" html={html} />
+        <ReportHtmlSection
+          position="introduction"
+          html={html}
+          personalization={report}
+        />
       </div>
     </SuFullLandscapePage>
   );
@@ -299,7 +328,11 @@ function ConclusionPage({ report, model, contactEmail, number, beforeConclusion,
       <p>Your strongest chapter is {model.strongestChapter.label}; Your focus chapter is {model.weakestChapter.label}.</p>
       {conclusionHtml ? (
         <div className="su-full-landscape-custom-content">
-          <ReportHtmlSection position="conclusion" html={conclusionHtml} />
+          <ReportHtmlSection
+            position="conclusion"
+            html={conclusionHtml}
+            personalization={report}
+          />
         </div>
       ) : (
         <DefaultNextSteps report={report} contactEmail={contactEmail} />
