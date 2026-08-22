@@ -17,7 +17,10 @@ import {
   ReportProvenance,
 } from "@/components/assessments/report-styles/ReportSharedContent";
 import { ReportHtmlSection } from "@/components/assessments/ReportHtmlSection";
-import type { SafeReportHtml } from "@/lib/assessments/report-html";
+import type {
+  ReportHtmlPersonalization,
+  SafeReportHtml,
+} from "@/lib/assessments/report-html";
 import type { ReactNode } from "react";
 
 function comparisonLabels(
@@ -49,12 +52,14 @@ export function ModernDashboardReport({
   presentation,
   comparison,
   reportHtml,
+  reportHtmlPersonalization,
   responsiveEnabled = false,
   beforeConclusion,
 }: {
   presentation: IndividualReportPresentation;
   comparison?: ReportComparisonModel | null;
   reportHtml?: SafeReportHtml;
+  reportHtmlPersonalization?: ReportHtmlPersonalization;
   responsiveEnabled?: boolean;
   beforeConclusion?: ReactNode;
 }) {
@@ -94,7 +99,7 @@ export function ModernDashboardReport({
           <ReportHtmlSection
             position="introduction"
             html={reportHtml.introductionHtml}
-            personalization={presentation.identity}
+            personalization={reportHtmlPersonalization}
           />
           <ReportProvenance presentation={presentation} />
         </section>
@@ -138,7 +143,7 @@ export function ModernDashboardReport({
           <ReportHtmlSection
             position="conclusion"
             html={reportHtml.conclusionHtml}
-            personalization={presentation.identity}
+            personalization={reportHtmlPersonalization}
           />
           <ReportProvenance presentation={presentation} />
         </section>

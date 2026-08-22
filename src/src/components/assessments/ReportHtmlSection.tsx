@@ -11,9 +11,11 @@ export function ReportHtmlSection({
 }: {
   position: "introduction" | "conclusion";
   html: SafeReportHtmlFragment;
-  personalization: ReportHtmlPersonalization;
+  personalization?: ReportHtmlPersonalization;
 }) {
-  const personalizedHtml = personalizeSafeReportHtml(html, personalization, position);
+  const personalizedHtml = personalization
+    ? personalizeSafeReportHtml(html, personalization, position)
+    : html;
   if (!personalizedHtml) return null;
 
   return (

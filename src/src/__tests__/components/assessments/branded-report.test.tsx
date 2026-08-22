@@ -59,6 +59,7 @@ describe("BrandedReport — respondent identity and next steps", () => {
     render(
       <BrandedReport
         report={baseReport({
+          templateAlias: "scaling-up-full",
           reportHtml: loadSafeReportHtml({
             reportHtml: {
               schemaVersion: 1,
@@ -74,6 +75,26 @@ describe("BrandedReport — respondent identity and next steps", () => {
       "Dear Sarah Chen from Northwind Logistics",
     );
     expect(screen.queryByText(/\{\{respondentName\}\}/)).not.toBeInTheDocument();
+  });
+
+  it("leaves token-like text unchanged for non-Scaling Up Full assessments", () => {
+    render(
+      <BrandedReport
+        report={baseReport({
+          reportHtml: loadSafeReportHtml({
+            reportHtml: {
+              schemaVersion: 1,
+              introductionHtml: "<p>Literal {{respondentName}} and {{companyName}}</p>",
+              conclusionHtml: null,
+            },
+          }),
+        })}
+      />,
+    );
+
+    expect(screen.getByTestId("report-html-introduction")).toHaveTextContent(
+      "Literal {{respondentName}} and {{companyName}}",
+    );
   });
 
   it("shows the taker's email and both next-step links", () => {
