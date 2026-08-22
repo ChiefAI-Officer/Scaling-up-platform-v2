@@ -2659,24 +2659,72 @@
 }
 
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-page-body > :first-child { margin-top: 0; }
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-page--cover {
+  color: #ffffff;
+  background: linear-gradient(to right, #f7a600 0 20%, #008bd2 20% 40%, #946b36 40% 60%, #95c11f 60% 80%, #522583 80% 100%) top / 100% 8px no-repeat, #522583;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-page--cover .su-full-landscape-page-body {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 12mm 16mm 15mm;
+}
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-cover-brand {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin: -10mm -12mm 16mm;
-  padding: 10px 12mm;
-  background: #522583;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  position: relative;
+  z-index: 1;
 }
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-cover-mark {
   display: block;
+  width: 180px;
+  height: auto;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-cover-brand .su-report-coach { color: #ffffff; }
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-cover-title {
+  position: relative;
+  z-index: 1;
+  margin-top: 18mm;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-page--cover .su-full-landscape-cover-title p {
+  max-width: 46rem;
+  margin: 8px 0 0;
+  color: rgba(255, 255, 255, .88);
+  font-size: 18px;
+  font-weight: 300;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-page--cover .su-full-landscape-cover-title h1 {
+  max-width: 18ch;
+  margin: 8px 0 0;
+  color: #ffffff;
+  font-size: 52px;
+  line-height: 1.02;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-cover-meta {
+  position: relative;
+  z-index: 1;
+  margin-top: auto;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-cover-meta p {
+  margin: 4px 0 0;
+  color: rgba(255, 255, 255, .82);
+  font-size: 15px;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-cover-meta .su-full-landscape-cover-for {
   color: #ffffff;
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
   font-size: 20px;
   font-weight: 700;
-  letter-spacing: .04em;
 }
-.su-public-brand.su-report.su-full-landscape .su-full-landscape-cover-brand .su-report-coach { color: #ffffff; }
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-cover-meta .su-full-landscape-cover-sub {
+  font-style: italic;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-page--cover .su-full-landscape-page-footer,
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-page--cover .su-full-landscape-page-footer .su-report-coach-name {
+  color: rgba(255, 255, 255, .78);
+}
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-chapter-kicker {
   margin: 0 0 6px;
   color: var(--chapter-line-color);
@@ -2976,6 +3024,135 @@
   overflow-wrap: anywhere;
 }
 
+/* Source-faithful Scaling Up Full closing treatment. The editor keeps the
+   content versioned; this selector supplies only the approved report layout. */
+.su-public-brand.su-report.su-full-landscape
+  .su-report-custom-html--conclusion
+  [aria-label="Scaling Up Full next steps"] {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin-top: 14px;
+  color: #6b00a8;
+  font-family: Roboto, Arial, sans-serif;
+}
+.su-public-brand.su-report.su-full-landscape
+  .su-report-custom-html--conclusion
+  [aria-label="Scaling Up Full next steps"] > p {
+  align-self: center;
+  width: min(84%, 780px);
+  margin: 0;
+  color: #6b00a8;
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: left;
+}
+.su-public-brand.su-report.su-full-landscape
+  .su-report-custom-html--conclusion
+  [aria-label="Scaling Up Full next steps"] > img {
+  display: block;
+  width: 340px;
+  max-width: 72%;
+  height: auto;
+  max-height: 190px;
+  margin: 0 auto;
+  object-fit: contain;
+}
+.su-public-brand.su-report.su-full-landscape
+  .su-report-custom-html--conclusion
+  [aria-label="Scaling Up Full next steps"] > a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 6px;
+  background: #f7a600;
+  color: #ffffff;
+  font-family: Roboto, Arial, sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+  text-decoration: none;
+  text-transform: uppercase;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* The Verne preface remains authored/versioned HTML. These source-specific
+   rules restore its Esperto composition without widening the HTML allowlist. */
+.su-public-brand.su-report.su-full-landscape
+  .su-report-custom-html--introduction
+  [aria-label="Verne Harnish preface"] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 230px;
+  grid-template-rows: auto auto auto;
+  column-gap: 34px;
+  align-items: start;
+  width: 100%;
+  color: #17131d;
+  font-family: Roboto, Arial, sans-serif;
+}
+.su-public-brand.su-report.su-full-landscape
+  .su-report-custom-html--introduction
+  [aria-label="Preface heading"] {
+  grid-column: 1 / -1;
+  margin: 0 0 22px;
+  color: #17131d;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 25px;
+  font-weight: 400;
+}
+.su-public-brand.su-report.su-full-landscape
+  .su-report-custom-html--introduction
+  [aria-label="Verne Harnish preface"] > p {
+  grid-column: 1;
+  grid-row: 2;
+  margin: 0;
+  color: #17131d;
+  font-size: 12px;
+  line-height: 1.36;
+  text-align: justify;
+  white-space: pre-line;
+}
+.su-public-brand.su-report.su-full-landscape
+  .su-report-custom-html--introduction
+  [aria-label="Verne Harnish preface"] > img {
+  grid-column: 2;
+  grid-row: 2;
+  display: block;
+  width: 230px;
+  max-width: 100%;
+  height: 285px;
+  max-height: 285px;
+  object-fit: cover;
+}
+.su-public-brand.su-report.su-full-landscape
+  .su-report-custom-html--introduction
+  [aria-label="Verne Harnish signature"] {
+  grid-column: 1;
+  grid-row: 3;
+  display: block;
+  width: 220px;
+  height: 92px;
+  margin-top: 12px;
+  background: url("/brand/verne-harnish-signature.png") center / contain no-repeat;
+}
+.su-public-brand.su-report.su-full-landscape
+  .su-report-custom-html--introduction
+  [aria-label="Verne Harnish preface"] > aside {
+  grid-column: 2;
+  grid-row: 3;
+  margin-top: 8px;
+  color: #17131d;
+  font-size: 10px;
+  line-height: 1.35;
+  white-space: pre-line;
+}
+
 .su-public-brand.su-report .su-report-custom-html :focus-visible {
   outline: 3px solid #522583;
   outline-offset: 3px;
@@ -2999,6 +3176,26 @@
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--chapter .su-full-landscape-vertical-chart,
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-chapter-copy,
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--detail .su-full-landscape-page-body > h2 {
+    grid-column: 1;
+    grid-row: auto;
+  }
+  .su-public-brand.su-report.su-full-landscape
+    .su-report-custom-html--introduction
+    [aria-label="Verne Harnish preface"] {
+    grid-template-columns: 1fr;
+  }
+  .su-public-brand.su-report.su-full-landscape
+    .su-report-custom-html--introduction
+    [aria-label="Verne Harnish preface"] > p,
+  .su-public-brand.su-report.su-full-landscape
+    .su-report-custom-html--introduction
+    [aria-label="Verne Harnish preface"] > img,
+  .su-public-brand.su-report.su-full-landscape
+    .su-report-custom-html--introduction
+    [aria-label="Verne Harnish signature"],
+  .su-public-brand.su-report.su-full-landscape
+    .su-report-custom-html--introduction
+    [aria-label="Verne Harnish preface"] > aside {
     grid-column: 1;
     grid-row: auto;
   }

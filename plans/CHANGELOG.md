@@ -6,6 +6,15 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="su-full-report-source-restoration-pre-pr"></a>
+### 2026-08-22 — Scaling Up Full report source restoration locally verified <!-- ENTRY_ISO:2026-08-22 ENTRY_SLUG:su-full-report-source-restoration-pre-pr -->
+
+**Status: IMPLEMENTED + VISUALLY ACCEPTED + LOCALLY VERIFIED; PR PENDING; NOT DEPLOYED OR PUBLISHED.** Scaling Up Full now restores the customer-facing Classic cover hierarchy in its dedicated 26-page landscape renderer: the full-purple branded cover carries the white Scaling Up logo, coach byline, assessment title, respondent identity, company, and submission date. The introduction and conclusion continue to be authored through the existing arbitrary-HTML fields; no visual editor, report-style picker, gauge, assessment-type control, schema, migration, or additional settings surface was added.
+
+**Source-faithful HTML fills.** The approved Verne Harnish preface uses the exact text, portrait, signature, and attribution recovered from the supplied Esperto report, with only two narrowly escaped personalization tokens (`{{respondentName}}` and `{{companyName}}`). The approved Scaling Up Full conclusion preserves the supplied vertical composition: next-step copy, centered Scaling Up books, follow-up copy, and two centered orange actions. The irrelevant 32-question-assessment action is intentionally omitted for Scaling Up Full. The two retained actions use the already-validated Coach Match and Scaling Up books destinations. Sanitized `aria-label` markers scope the source-specific print and responsive layout without restoring report-style controls or permitting arbitrary authored CSS.
+
+**Verification and boundary.** Test-first regressions covered cover semantics and computed styling, escaped token personalization, real sanitizer save/load behavior, exact CTA destinations and geometry, Verne preface composition, mobile containment, and all 26 physical report pages. Fresh focused evidence passed **7/7 suites and 120/120 tests**; the real Chromium/PDF matrix passed **48/48 tests**; the complete repository passed **774/774 suites, 9,582/9,582 tests, and 16/16 snapshots**. Changed-path ESLint emitted no diagnostics, migration safety approved all **49 migrations**, and the Production-equivalent Turbopack build compiled, passed TypeScript/static generation, and generated **95/95 pages**. Repository-wide raw `tsc --noEmit` retains its established unrelated test-fixture baseline and is not the release gate. The local source-to-PDF preview was visually accepted; generated preview artifacts remain untracked. No Production environment, deployment, assessment version, campaign, response, report, email, or customer record was changed, and neither report HTML field was populated or published.
+
 <a id="report-html-peers-integration-verified"></a>
 ### 2026-08-21 — Report HTML authoring plus phase-aware Peers locally verified <!-- ENTRY_ISO:2026-08-21 ENTRY_SLUG:report-html-peers-integration-verified -->
 

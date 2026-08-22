@@ -22,6 +22,25 @@ export interface SafeReportHtml {
   conclusionHtml: SafeReportHtmlFragment | null;
 }
 
+function escapeReportHtmlText(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+/** Substitute the two source-report personalization fields as escaped text. */
+export function personalizeSafeReportHtml(
+  html: SafeReportHtmlFragment,
+  values: { respondentName: string; companyName?: string | null },
+): SafeReportHtmlFragment {
+  return html
+    .replaceAll("{{respondentName}}", escapeReportHtmlText(values.respondentName))
+    .replaceAll("{{companyName}}", escapeReportHtmlText(values.companyName ?? "")) as SafeReportHtmlFragment;
+}
+
 export type ReportHtmlIssue = {
   path: string;
   message: string;
