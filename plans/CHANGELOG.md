@@ -6,6 +6,15 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="report-html-silent-truncation-fix-ready"></a>
+### 2026-08-25 — Report HTML silent-truncation fix ready for Production <!-- ENTRY_ISO:2026-08-25 ENTRY_SLUG:report-html-silent-truncation-fix-ready -->
+
+**Status: IMPLEMENTED + LOCALLY VERIFIED + USER-AUTHORIZED FOR PRODUCTION; PR, MERGE, AND DEPLOYMENT PENDING.** The Reports-tab Welcome and Closing textareas no longer apply a native `maxlength` that silently cut oversized pastes before application validation. The editor retains the complete source, marks an over-limit field invalid, and shows the exact character overage beside a destructive counter. Save Draft now validates dirty report HTML before starting any metadata, version, or invitation save lane, so invalid report content cannot accompany a partial multi-lane update. The API's existing sanitizer remains authoritative and its field-specific `INVALID_REPORT_HTML` issue is surfaced to the author instead of a generic save failure.
+
+**Incident and compatibility boundary.** The supplied QSP v2 preface was approximately 36,960 source characters and included two embedded base64 images plus authored CSS/layout. The browser truncated it at 12,000 characters in the middle of an image; the malformed prefix then sanitized to a tiny shell, explaining the observed Production draft. The fix prevents that silent data loss but deliberately does not relax the existing 12,000-character, one-image, semantic-layout, or unsafe-HTML guardrails. The source must still be reduced to supported report HTML before it can be saved. No Production assessment version, campaign, response, report, email, flag, schema, migration, or customer record was changed during diagnosis or local verification.
+
+**Verification and rollback.** Test-first regressions proved that 12,001 characters remain intact with no browser `maxlength`, the exact inline issue is accessible, every save lane is skipped while unrelated dirty state remains, and server sanitizer issues reach the toast. The affected matrix passed **6/6 suites and 128/128 tests**; the complete repository passed **774/774 suites, 9,589/9,589 tests, and 16/16 snapshots**. Changed-path ESLint emitted no diagnostics, migration safety approved all **49 migrations**, `git diff --check` passed, and the Production-equivalent Turbopack build compiled, passed TypeScript/static generation, and generated **95/95 pages**. The invalid state was visually reviewed in the local app. This is validation-only UI/save behavior with no migration or flag; rollback is the protected revert of the release commit.
+
 <a id="su-full-report-html-authoring-launched"></a>
 ### 2026-08-22 — Scaling Up Full report HTML authoring launched and source content published <!-- ENTRY_ISO:2026-08-22 ENTRY_SLUG:su-full-report-html-authoring-launched -->
 

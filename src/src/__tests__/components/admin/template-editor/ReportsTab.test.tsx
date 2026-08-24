@@ -31,13 +31,41 @@ describe("ReportsTab", () => {
     expect(screen.getByLabelText("Introduction / preface HTML")).toHaveValue(
       "<p>Intro</p>",
     );
-    expect(screen.getByLabelText("Introduction / preface HTML")).toHaveAttribute("maxlength", "12000");
     expect(screen.getByText("Generated report")).toBeInTheDocument();
     expect(
       screen.getByLabelText("Conclusion / call-to-action HTML"),
     ).toHaveValue("<p>CTA</p>");
-    expect(screen.getByLabelText("Conclusion / call-to-action HTML")).toHaveAttribute("maxlength", "12000");
     expect(screen.queryByText(/WYSIWYG|Add block|preset/i)).toBeNull();
+  });
+
+  it("retains an oversized edit and explains why it cannot be saved", () => {
+    function StatefulReportsTab() {
+      const [current, setCurrent] = React.useState(value);
+      return (
+        <ReportsTab
+          value={current}
+          previewHref="/admin/assessments/templates/tpl_1/versions/ver_2/preview-report"
+          historicalPreviewHref={null}
+          previewDisabled={false}
+          onChange={setCurrent}
+          isReadOnly={false}
+        />
+      );
+    }
+
+    render(<StatefulReportsTab />);
+    const input = screen.getByLabelText("Introduction / preface HTML");
+    const oversized = "x".repeat(12_001);
+
+    fireEvent.change(input, { target: { value: oversized } });
+
+    expect(input).toHaveValue(oversized);
+    expect(input).not.toHaveAttribute("maxlength");
+    expect(input).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Welcome section is 1 character over the 12,000-character limit (12,001 entered).",
+    );
+    expect(screen.getByText("12,001 / 12,000")).toHaveClass("text-destructive");
   });
 
   it("updates one fragment without changing the other", () => {
