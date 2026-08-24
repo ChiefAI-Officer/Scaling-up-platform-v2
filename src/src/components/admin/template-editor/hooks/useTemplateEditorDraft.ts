@@ -65,10 +65,12 @@ import {
   type MarketingCtaConfigV1,
 } from "@/lib/assessments/marketing-cta";
 import {
+  extractReportHtml,
   mergeReportHtml,
   type ReportHtmlConfigV1,
   type SafeReportHtml,
 } from "@/lib/assessments/report-html";
+import { reportHtmlSourceCharacterIssue } from "@/lib/assessments/report-html-sanitizer";
 
 export interface UseTemplateEditorDraftArgs {
   template: TemplateEditorTabbedTemplate;
@@ -128,6 +130,20 @@ export type TemplateRowPatch = Partial<{
   resultsEmailContentApproved: boolean;
   defaultReportStyle: ReportStyleKey;
 }>;
+
+function reportHtmlIssueMessage(body: unknown): string | null {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return null;
+  const response = body as Record<string, unknown>;
+  if (response.code !== "INVALID_REPORT_HTML" || !Array.isArray(response.issues)) {
+    return null;
+  }
+  const firstIssue = response.issues[0];
+  if (!firstIssue || typeof firstIssue !== "object" || Array.isArray(firstIssue)) {
+    return null;
+  }
+  const message = (firstIssue as Record<string, unknown>).message;
+  return typeof message === "string" && message.length > 0 ? message : null;
+}
 
 export function useTemplateEditorDraft({
   template,
@@ -935,6 +951,26 @@ export function useTemplateEditorDraft({
   const handleSaveDraft = useCallback(async () => {
     if (isPublished || savingDraft) return;
     if (!isAnyDirty) return;
+    if (dirtyFlags.reportConfig) {
+      const reportHtml = extractReportHtml(reportConfigRef.current);
+      const sourceCharacterIssue =
+        reportHtmlSourceCharacterIssue(
+          reportHtml.introductionHtml ?? "",
+          "introduction",
+        ) ??
+        reportHtmlSourceCharacterIssue(
+          reportHtml.conclusionHtml ?? "",
+          "conclusion",
+        );
+      if (sourceCharacterIssue) {
+        toast({
+          title: "Could not save report content",
+          description: sourceCharacterIssue,
+          variant: "destructive",
+        });
+        return;
+      }
+    }
     setSavingDraft(true);
     try {
       let invitedWelcomePayload: InvitedWelcomeAuthoringInputV1 | undefined;
@@ -1115,9 +1151,12 @@ export function useTemplateEditorDraft({
       const results = await Promise.all(ops);
       const failed = results.find((r) => !r.ok);
       if (failed) {
+        const reportHtmlIssue = reportHtmlIssueMessage(failed.body);
         toast({
           title: "Could not save draft",
-          description: `Save failed for ${failed.surface}. Please try again.`,
+          description:
+            reportHtmlIssue ??
+            `Save failed for ${failed.surface}. Please try again.`,
           variant: "destructive",
         });
         return;

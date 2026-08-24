@@ -4,7 +4,10 @@ import React from "react";
 import type {
   ReportHtmlConfigV1,
 } from "@/lib/assessments/report-html";
-import { REPORT_HTML_LIMITS } from "@/lib/assessments/report-html-sanitizer";
+import {
+  REPORT_HTML_LIMITS,
+  reportHtmlSourceCharacterIssue,
+} from "@/lib/assessments/report-html-sanitizer";
 
 function HtmlRegion({
   id,
@@ -26,6 +29,8 @@ function HtmlRegion({
   isReadOnly: boolean;
 }) {
   const html = value ?? "";
+  const sourceCharacterIssue = reportHtmlSourceCharacterIssue(html, position);
+  const errorId = `${id}-error`;
   return (
     <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
       <div className="p-5">
@@ -47,15 +52,22 @@ function HtmlRegion({
             value={html}
             onChange={(event) => onChange(event.target.value)}
             disabled={isReadOnly}
-            maxLength={REPORT_HTML_LIMITS[position].rawCharacters}
+            aria-invalid={sourceCharacterIssue ? true : undefined}
+            aria-describedby={sourceCharacterIssue ? errorId : undefined}
             spellCheck={false}
-            className="min-h-[168px] w-full resize-y rounded-lg border border-slate-700 bg-slate-950 p-4 font-mono text-xs leading-6 text-slate-100 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-70"
+            className={`min-h-[168px] w-full resize-y rounded-lg border bg-slate-950 p-4 font-mono text-xs leading-6 text-slate-100 outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-70 ${sourceCharacterIssue ? "border-destructive focus:border-destructive focus:ring-destructive/20" : "border-slate-700 focus:border-primary focus:ring-primary/20"}`}
           />
           <div className="mt-2 flex items-start justify-between gap-4 text-[11px] text-muted-foreground">
-            <span>
-              Paste HTML. Unsafe scripts and attributes are removed when you save the draft.
-            </span>
-            <span className="shrink-0">
+            {sourceCharacterIssue ? (
+              <span id={errorId} role="alert" className="text-destructive">
+                {sourceCharacterIssue}
+              </span>
+            ) : (
+              <span>
+                Paste HTML. Unsafe scripts and attributes are removed when you save the draft.
+              </span>
+            )}
+            <span className={`shrink-0 ${sourceCharacterIssue ? "font-semibold text-destructive" : ""}`}>
               {html.length.toLocaleString()} / {REPORT_HTML_LIMITS[position].rawCharacters.toLocaleString()}
             </span>
           </div>

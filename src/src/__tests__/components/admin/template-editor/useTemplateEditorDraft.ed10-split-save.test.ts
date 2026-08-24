@@ -44,11 +44,13 @@ interface FetchCall {
 let fetchCalls: FetchCall[];
 let patchStatus: number;
 let patchResponseBody: unknown;
+let patchErrorResponseBody: unknown;
 
 function installFetch() {
   fetchCalls = [];
   patchStatus = 200;
   patchResponseBody = { success: true };
+  patchErrorResponseBody = { success: false, error: "BOOM" };
   global.fetch = jest.fn(
     async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : String(input);
@@ -68,7 +70,7 @@ function installFetch() {
         json: async () =>
           patchStatus >= 200 && patchStatus < 300
             ? patchResponseBody
-            : { success: false, error: "BOOM" },
+            : patchErrorResponseBody,
       } as unknown as Response;
     },
   ) as unknown as typeof fetch;
@@ -141,6 +143,70 @@ afterEach(() => {
 // Lane 1 — Save-Draft metadata PATCH body (the flag-OFF trap)
 // ════════════════════════════════════════════════════════════════════════
 describe("useTemplateEditorDraft — Save-Draft metadata body (ED10 trim)", () => {
+  it("aborts every save lane before fetch when report HTML exceeds its source limit", async () => {
+    const { result } = renderDraft({ ed10Active: true });
+
+    act(() => {
+      result.current.handleTemplateFieldChange({ name: "Renamed" });
+      result.current.handleReportHtmlChange({
+        schemaVersion: 1,
+        introductionHtml: "x".repeat(12_001),
+        conclusionHtml: null,
+      });
+    });
+
+    await act(async () => {
+      await result.current.handleSaveDraft();
+    });
+
+    expect(fetchCalls).toHaveLength(0);
+    expect(result.current.dirtyFlags.metadata).toBe(true);
+    expect(result.current.dirtyFlags.reportConfig).toBe(true);
+    expect(toastMock).toHaveBeenCalledWith({
+      title: "Could not save report content",
+      description:
+        "Welcome section is 1 character over the 12,000-character limit (12,001 entered).",
+      variant: "destructive",
+    });
+  });
+
+  it("shows the server's field-specific report HTML issue when sanitization rejects the draft", async () => {
+    const { result } = renderDraft({ ed10Active: true });
+    patchStatus = 422;
+    patchErrorResponseBody = {
+      success: false,
+      error: "Invalid report HTML",
+      code: "INVALID_REPORT_HTML",
+      issues: [
+        {
+          path: "reportHtml.introductionHtml",
+          message: "Welcome section can contain 1 image or fewer.",
+        },
+      ],
+    };
+
+    act(() => {
+      result.current.handleReportHtmlChange({
+        schemaVersion: 1,
+        introductionHtml:
+          '<img src="https://example.test/one.png"><img src="https://example.test/two.png">',
+        conclusionHtml: null,
+      });
+    });
+
+    await act(async () => {
+      await result.current.handleSaveDraft();
+    });
+
+    expect(fetchCalls).toHaveLength(1);
+    expect(result.current.dirtyFlags.reportConfig).toBe(true);
+    expect(toastMock).toHaveBeenCalledWith({
+      title: "Could not save draft",
+      description: "Welcome section can contain 1 image or fewer.",
+      variant: "destructive",
+    });
+  });
+
   it("rehydrates canonical report HTML before clearing its dirty state", async () => {
     const { result } = renderDraft({ ed10Active: true });
     patchResponseBody = {

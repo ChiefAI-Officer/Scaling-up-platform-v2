@@ -189,7 +189,7 @@ function visibleTextLengthWithinTags(html: string, tags: readonly string[]): num
   }, 0);
 }
 
-type ReportHtmlPosition = keyof typeof REPORT_HTML_LIMITS;
+export type ReportHtmlPosition = keyof typeof REPORT_HTML_LIMITS;
 
 const VOID_TAGS = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"]);
 const TAG_TOKEN = /<\/?([a-z][a-z0-9:-]*)(?:\s[^<>]*?)?\s*\/?>/gi;
@@ -429,17 +429,30 @@ function issueForLimit(
   return `${field} ${messages[kind]}`;
 }
 
+export function reportHtmlSourceCharacterIssue(
+  raw: string,
+  position: ReportHtmlPosition,
+): string | null {
+  const limit = REPORT_HTML_LIMITS[position].rawCharacters;
+  if (raw.length <= limit) return null;
+
+  const field = position === "introduction" ? "Welcome section" : "Closing message";
+  const over = raw.length - limit;
+  return `${field} is ${over.toLocaleString()} character${over === 1 ? "" : "s"} over the ${limit.toLocaleString()}-character limit (${raw.length.toLocaleString()} entered).`;
+}
+
 export function sanitizeReportHtmlFragment(
   raw: string,
   position: ReportHtmlPosition,
 ): SanitizeReportHtmlResult {
+  const sourceCharacterIssue = reportHtmlSourceCharacterIssue(raw, position);
   const limits = REPORT_HTML_LIMITS[position];
-  if (raw.length > limits.rawCharacters) {
+  if (sourceCharacterIssue) {
     return {
       ok: false,
       html: "",
       didStripContent: false,
-      issue: issueForLimit(position, "rawCharacters"),
+      issue: sourceCharacterIssue,
     };
   }
 
