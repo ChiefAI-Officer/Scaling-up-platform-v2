@@ -95,16 +95,63 @@ test("renders the authored 25-page landscape composition without rejected pages"
   expect(cover).toHaveTextContent("Acme · 17 August 2026");
   expect(screen.getAllByTestId("coach-name")).toHaveLength(26);
   expect(screen.getAllByTestId("coach-logo")).toHaveLength(26);
-  const chapterKeyItems = screen.getByTestId("su-full-landscape-page-3")
-    .querySelectorAll(".su-full-landscape-chapter-key li");
-  const contents = screen.getByTestId("su-full-landscape-page-3");
-  expect(contents).toHaveTextContent("People 6");
-  expect(contents).toHaveTextContent("Your Employees (7–8)");
-  expect(contents).toHaveTextContent("Appendix A: chapter comparisons 25");
-  expect(chapterKeyItems).toHaveLength(5);
-  expect(Array.from(chapterKeyItems).map((item) => item.className)).toEqual([
-    "is-people", "is-strategy", "is-execution", "is-cash", "is-you",
-  ]);
+  const contents = screen.getByRole("region", { name: "Table of contents" });
+  const pageNumberFor = (
+    predicate: (page: (typeof model.pages)[number]) => boolean,
+  ) => {
+    const page = model.pages.find(predicate);
+    if (!page) throw new Error("Canonical fixture is missing a table-of-contents page");
+    return page.number;
+  };
+  const detailRange = (firstQuestionKey: string, lastQuestionKey: string) => {
+    const detailPageNumber = (questionKey: string) => pageNumberFor(
+      (page) => page.kind === "detail" && page.questionKeys.includes(questionKey),
+    );
+    const firstPage = detailPageNumber(firstQuestionKey);
+    const lastPage = detailPageNumber(lastQuestionKey);
+    return firstPage === lastPage ? String(firstPage) : `${firstPage}–${lastPage}`;
+  };
+
+  expect(within(contents).getByText("Introduction")).toBeInTheDocument();
+  expect(within(contents).getByTestId("toc-introduction")).toHaveTextContent(
+    `Introduction ${pageNumberFor((page) => page.kind === "introduction")}`,
+  );
+  expect(within(contents).getByText("Your Profile")).toBeInTheDocument();
+  expect(within(contents).getByTestId("toc-profile")).toHaveTextContent(
+    `Your Profile ${pageNumberFor((page) => page.kind === "profile")}`,
+  );
+  expect(within(contents).getByText("People")).toHaveClass("su-full-toc-domain--people");
+  expect(within(contents).getByTestId("toc-domain-people")).toHaveTextContent(
+    `People ${pageNumberFor((page) => page.kind === "chapter" && page.chapterKey === "people")}`,
+  );
+  expect(within(contents).getByText("Your Employees")).toHaveClass("su-full-toc-subsection");
+  expect(within(contents).getByTestId("toc-subsection-your-employees")).toHaveTextContent(
+    `Your Employees ${detailRange("Q01", "Q08")}`,
+  );
+  expect(
+    within(contents).getByTestId("toc-subsection-company-culture").textContent
+      ?.replace(/\s+/g, " ")
+      .trim(),
+  ).toBe(`Company Culture ${detailRange("Q09", "Q13")}`);
+  expect(within(contents).getByTestId("toc-domain-strategy")).toHaveTextContent(
+    `Strategy ${pageNumberFor((page) => page.kind === "chapter" && page.chapterKey === "strategy")}`,
+  );
+  expect(within(contents).getByTestId("toc-domain-execution")).toHaveTextContent(
+    `Execution ${pageNumberFor((page) => page.kind === "chapter" && page.chapterKey === "execution")}`,
+  );
+  expect(within(contents).getByTestId("toc-domain-cash")).toHaveTextContent(
+    `Cash ${pageNumberFor((page) => page.kind === "chapter" && page.chapterKey === "cash")}`,
+  );
+  expect(within(contents).getByTestId("toc-domain-you")).toHaveTextContent(
+    `You ${pageNumberFor((page) => page.kind === "chapter" && page.chapterKey === "you")}`,
+  );
+  expect(within(contents).getByTestId("toc-conclusion")).toHaveTextContent(
+    `In conclusion ${pageNumberFor((page) => page.kind === "conclusion")}`,
+  );
+  expect(within(contents).getByTestId("toc-appendix")).toHaveTextContent(
+    `Appendix A ${pageNumberFor((page) => page.kind === "appendix")}`,
+  );
+  expect(within(contents).getByLabelText("Five Scaling Up decisions")).toBeInTheDocument();
   const chartTitleIds = Array.from(
     document.querySelectorAll<HTMLElement>("[aria-labelledby^=\"su-landscape-vertical-chart-title-\"]"),
   ).map((chart) => chart.getAttribute("aria-labelledby"));
@@ -117,12 +164,30 @@ test("renders the authored 25-page landscape composition without rejected pages"
   expect(screen.getByTestId("su-full-landscape-page-4")).toHaveTextContent(
     "Phase 4 from FTE 12",
   );
-  expect(screen.getByTestId("su-full-landscape-page-5")).toHaveTextContent("You");
-  expect(screen.getByTestId("su-full-landscape-page-5")).toHaveTextContent("Peers");
-  expect(screen.getByTestId("su-full-landscape-page-5")).toHaveTextContent("Deviation");
-  expect(screen.getByTestId("su-full-landscape-page-5").querySelectorAll("tbody tr")).toHaveLength(15);
-  expect(screen.getByTestId("su-full-landscape-page-5").querySelectorAll(".su-full-landscape-profile-row--chapter")).toHaveLength(5);
-  expect(screen.getByTestId("su-full-landscape-page-5").querySelectorAll(".su-full-landscape-profile-row--subsection")).toHaveLength(10);
+  const profile = screen.getByRole("region", { name: "Your profile" });
+  const strongestRelative = [...model.profileRows]
+    .sort((a, b) => b.deviation - a.deviation || a.stableKey.localeCompare(b.stableKey))[0];
+  const weakestRelative = [...model.profileRows]
+    .sort((a, b) => a.deviation - b.deviation || a.stableKey.localeCompare(b.stableKey))[0];
+  expect(within(profile).getByRole("columnheader", { name: "You" })).toBeInTheDocument();
+  expect(within(profile).getByRole("columnheader", { name: "Peers" })).toBeInTheDocument();
+  expect(within(profile).getByRole("columnheader", { name: "Deviation" })).toBeInTheDocument();
+  expect(profile.querySelectorAll("tbody tr")).toHaveLength(15);
+  expect(profile.querySelectorAll(".su-full-landscape-profile-row--chapter")).toHaveLength(5);
+  expect(profile.querySelectorAll(".su-full-landscape-profile-row--subsection")).toHaveLength(10);
+  expect(within(profile).getByTestId("profile-domain-people")).toHaveClass("is-people");
+  expect(within(profile).getByTestId("profile-result-commentary")).toHaveTextContent(
+    model.strongestChapter.label,
+  );
+  expect(within(profile).getByTestId("profile-result-commentary")).toHaveTextContent(
+    model.weakestChapter.label,
+  );
+  expect(within(profile).getByTestId("profile-result-commentary")).toHaveTextContent(
+    strongestRelative.label,
+  );
+  expect(within(profile).getByTestId("profile-result-commentary")).toHaveTextContent(
+    weakestRelative.label,
+  );
   expect(screen.getAllByLabelText("Peer benchmark information").length).toBeGreaterThanOrEqual(2);
 
   for (const detail of screen.getAllByTestId(/^su-full-landscape-detail-Q/)) {

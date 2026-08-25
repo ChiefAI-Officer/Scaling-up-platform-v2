@@ -2752,6 +2752,167 @@
   height: 8px;
   background: var(--chapter-color);
 }
+.su-public-brand.su-report.su-full-landscape .su-full-toc > h2,
+.su-public-brand.su-report.su-full-landscape .su-full-profile > h2 {
+  margin: 0 0 12px;
+  text-transform: uppercase;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-toc-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(250px, .85fr);
+  gap: 10mm;
+  align-items: start;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-toc-list,
+.su-public-brand.su-report.su-full-landscape .su-full-toc-subsections {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-toc-entry,
+.su-public-brand.su-report.su-full-landscape .su-full-toc-subsections li {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: baseline;
+  min-height: 21px;
+  padding: 4px 0;
+  border-bottom: 1px solid #e5e2e8;
+  color: #1a1322;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-toc-entry--plain {
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-toc-group > .su-full-toc-entry {
+  color: var(--chapter-line-color);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-toc-subsections li {
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 17px;
+  margin-left: 32px;
+  padding: 3px 0;
+  border-bottom: 0;
+  color: var(--chapter-line-color);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-toc-index {
+  color: #6b6480;
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-toc-domain {
+  color: inherit;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-toc-page {
+  justify-self: end;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-toc-decisions {
+  align-self: center;
+  margin: 10mm 0 0;
+  text-align: center;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-toc-decision-graphic {
+  position: relative;
+  width: 280px;
+  height: 245px;
+  margin: 0 auto;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-toc-decision-ring {
+  position: absolute;
+  inset: 15px 20px 0;
+  width: 240px;
+  height: 240px;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-toc-decision-label {
+  position: absolute;
+  color: var(--chapter-line-color);
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 15px;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-toc-decision-label--people { top: 0; left: 50%; color: #9a6200; transform: translateX(-50%); }
+.su-public-brand.su-report.su-full-landscape .su-full-toc-decision-label--strategy { top: 47%; right: -4px; color: #00628f; }
+.su-public-brand.su-report.su-full-landscape .su-full-toc-decision-label--execution { right: 16px; bottom: -7px; color: #624018; }
+.su-public-brand.su-report.su-full-landscape .su-full-toc-decision-label--cash { bottom: -7px; left: 22px; color: #4d6600; }
+.su-public-brand.su-report.su-full-landscape .su-full-toc-decisions figcaption {
+  max-width: 42ch;
+  margin: 14px auto 0;
+  color: #4b4359;
+  font-size: 10px;
+  line-height: 1.4;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-profile-intro {
+  margin: 0 0 16px;
+  color: #4b4359;
+  font-size: 11px;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-profile-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(250px, .85fr);
+  gap: 8mm;
+  align-items: start;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-profile-table {
+  font-variant-numeric: tabular-nums;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-profile-table th,
+.su-public-brand.su-report.su-full-landscape .su-full-profile-table td {
+  padding: 4px 8px;
+  border: 1px solid #ffffff;
+  line-height: 1.15;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-profile-table thead th {
+  padding-top: 2px;
+  color: #6b6480;
+  font-size: 8px;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-profile-table thead th:not(:first-child),
+.su-public-brand.su-report.su-full-landscape .su-full-profile-table tbody td {
+  text-align: right;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-profile-table .su-full-landscape-profile-row--chapter {
+  background: var(--chapter-color);
+  color: #ffffff;
+  font-weight: 700;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-profile-table .su-full-landscape-profile-row--chapter.is-people,
+.su-public-brand.su-report.su-full-landscape .su-full-profile-table .su-full-landscape-profile-row--chapter.is-cash {
+  color: #1a1322;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-profile-table .su-full-landscape-profile-row--chapter:not(:first-child) > * {
+  border-top-width: 9px;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-profile-table .su-full-landscape-profile-row--chapter th {
+  color: inherit;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-profile-table .su-full-landscape-profile-row--subsection {
+  background: color-mix(in srgb, var(--chapter-peer-color) 45%, #ffffff);
+  color: #1a1322;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-profile-table .su-full-landscape-profile-row--subsection th {
+  padding-left: 24px;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-profile-commentary {
+  padding-left: 8mm;
+  border-left: 1px solid #cdc8d3;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-profile-commentary p {
+  margin: 0 0 15px;
+  color: #1a1322;
+  font-size: 10.5px;
+  line-height: 1.4;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-profile-commentary strong {
+  color: #522583;
+}
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-page-body h1,
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-page-body h2,
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-page-body h3,
@@ -3172,6 +3333,9 @@
 
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page-body,
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--detail .su-full-landscape-page-body { grid-template-columns: 1fr; padding: 24px 18px; }
+  .su-public-brand.su-report.su-full-landscape .su-full-toc-layout,
+  .su-public-brand.su-report.su-full-landscape .su-full-profile-layout { grid-template-columns: 1fr; gap: 24px; }
+  .su-public-brand.su-report.su-full-landscape .su-full-profile-commentary { padding: 20px 0 0; border-top: 1px solid #cdc8d3; border-left: 0; }
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-cover-brand { margin: -24px -18px 16px; padding: 10px 18px; }
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--chapter .su-full-landscape-vertical-chart,
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-chapter-copy,

@@ -150,6 +150,11 @@ function ContentsPage({ model, number, footerBrand }: {
   number: number;
   footerBrand: SuFullLandscapeFooterBrand;
 }) {
+  const pageNumber = (kind: "introduction" | "profile" | "conclusion") => {
+    const page = model.pages.find((candidate) => candidate.kind === kind);
+    if (!page) throw new Error(`Landscape contents is missing the ${kind} page`);
+    return page.number;
+  };
   const chapterPageNumber = (chapterKey: SuFullLandscapeChapterKey) => {
     const page = model.pages.find((candidate) =>
       candidate.kind === "chapter" && candidate.chapterKey === chapterKey,
@@ -164,37 +169,137 @@ function ContentsPage({ model, number, footerBrand }: {
     if (!page) throw new Error(`Landscape contents is missing the ${questionKey} detail page`);
     return page.number;
   };
-  const detailRange = (firstQuestionKey: string, lastQuestionKey: string) =>
-    `${detailPageNumber(firstQuestionKey)}–${detailPageNumber(lastQuestionKey)}`;
+  const detailRange = (firstQuestionKey: string, lastQuestionKey: string) => {
+    const firstPage = detailPageNumber(firstQuestionKey);
+    const lastPage = detailPageNumber(lastQuestionKey);
+    return firstPage === lastPage ? String(firstPage) : `${firstPage}–${lastPage}`;
+  };
   const appendixPage = model.pages.find((candidate) => candidate.kind === "appendix");
   if (!appendixPage) throw new Error("Landscape contents is missing the appendix page");
   const entries = [
-    ["People", chapterPageNumber("people"), [`Your Employees (${detailRange("Q01", "Q08")})`, `Company Culture (${detailRange("Q09", "Q13")})`]],
-    ["Strategy", chapterPageNumber("strategy"), [`Strategy (${detailRange("Q14", "Q20")})`]],
-    ["Execution", chapterPageNumber("execution"), [`Leadership Team (${detailRange("Q21", "Q24")})`, `Operational Processes (${detailRange("Q25", "Q29")})`, `Sales and Marketing (${detailRange("Q30", "Q34")})`, `Scalability, Innovation and Technology (${detailRange("Q35", "Q40")})`]],
-    ["Cash", chapterPageNumber("cash"), [`Cash (${detailRange("Q41", "Q45")})`]],
-    ["You", chapterPageNumber("you"), [`Your Leadership (${detailRange("Q46", "Q55")})`, `Internal Communication (${detailRange("Q56", "Q61")})`]],
+    {
+      key: "people",
+      label: "People",
+      page: chapterPageNumber("people"),
+      subsections: [
+        { key: "your-employees", label: "Your Employees", pages: detailRange("Q01", "Q08") },
+        { key: "company-culture", label: "Company Culture", pages: detailRange("Q09", "Q13") },
+      ],
+    },
+    {
+      key: "strategy",
+      label: "Strategy",
+      page: chapterPageNumber("strategy"),
+      subsections: [
+        { key: "goals-and-strategy", label: "Goals and Strategy", pages: detailRange("Q14", "Q20") },
+      ],
+    },
+    {
+      key: "execution",
+      label: "Execution",
+      page: chapterPageNumber("execution"),
+      subsections: [
+        { key: "leadership-team", label: "Leadership Team", pages: detailRange("Q21", "Q24") },
+        { key: "operational-processes", label: "Operational Processes", pages: detailRange("Q25", "Q29") },
+        { key: "sales-and-marketing", label: "Sales and Marketing", pages: detailRange("Q30", "Q34") },
+        { key: "scalability-innovation-and-technology", label: "Scalability, Innovation and Technology", pages: detailRange("Q35", "Q40") },
+      ],
+    },
+    {
+      key: "cash",
+      label: "Cash",
+      page: chapterPageNumber("cash"),
+      subsections: [
+        { key: "finance-and-cash", label: "Finance and Cash", pages: detailRange("Q41", "Q45") },
+      ],
+    },
+    {
+      key: "you",
+      label: "You",
+      page: chapterPageNumber("you"),
+      subsections: [
+        { key: "your-leadership", label: "Your Leadership", pages: detailRange("Q46", "Q55") },
+        { key: "internal-communication", label: "Internal Communication", pages: detailRange("Q56", "Q61") },
+      ],
+    },
   ] as const;
   return (
     <SuFullLandscapePage number={number} footerBrand={footerBrand}>
-      <h2>Contents</h2>
-      <ol>
-        {entries.map(([label, page, subsections]) => (
-          <li key={label}>
-            {label} <span>{page}</span>
-            <ul>{subsections.map((subsection) => <li key={subsection}>{subsection}</li>)}</ul>
-          </li>
-        ))}
-      </ol>
-      <ul className="su-full-landscape-chapter-key" aria-label="Chapter key">
-        {(["people", "strategy", "execution", "cash", "you"] as const).map((chapter) => (
-          <li className={`is-${chapter}`} key={chapter}>
-            <span aria-hidden="true" />
-            {chapter[0].toUpperCase() + chapter.slice(1)}
-          </li>
-        ))}
-      </ul>
-      <p>Appendix A: chapter comparisons <span>{appendixPage.number}</span></p>
+      <section className="su-full-toc" aria-label="Table of contents">
+        <h2>Table of Contents</h2>
+        <div className="su-full-toc-layout">
+          <ol className="su-full-toc-list">
+            <li className="su-full-toc-entry su-full-toc-entry--plain" data-testid="toc-introduction">
+              <span className="su-full-toc-index" aria-hidden="true" />
+              <span>Introduction</span> <span className="su-full-toc-page">{pageNumber("introduction")}</span>
+            </li>
+            <li className="su-full-toc-entry su-full-toc-entry--plain" data-testid="toc-profile">
+              <span className="su-full-toc-index">1.</span>
+              <span>Your Profile</span> <span className="su-full-toc-page">{pageNumber("profile")}</span>
+            </li>
+            {entries.map((entry, index) => (
+              <li className={`su-full-toc-group is-${entry.key}`} key={entry.key}>
+                <div className="su-full-toc-entry" data-testid={`toc-domain-${entry.key}`}>
+                  <span className="su-full-toc-index">{index + 2}.</span>
+                  <span className={`su-full-toc-domain su-full-toc-domain--${entry.key}`}>{entry.label}</span>{" "}
+                  <span className="su-full-toc-page">{entry.page}</span>
+                </div>
+                <ul className="su-full-toc-subsections">
+                  {entry.subsections.map((subsection) => (
+                    <li data-testid={`toc-subsection-${subsection.key}`} key={subsection.key}>
+                      <span className="su-full-toc-subsection">{subsection.label}</span>{" "}
+                      <span className="su-full-toc-page">{subsection.pages}</span>
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+            <li className="su-full-toc-entry su-full-toc-entry--plain" data-testid="toc-conclusion">
+              <span className="su-full-toc-index" aria-hidden="true" />
+              <span>In conclusion</span> <span className="su-full-toc-page">{pageNumber("conclusion")}</span>
+            </li>
+            <li className="su-full-toc-entry su-full-toc-entry--plain" data-testid="toc-appendix">
+              <span className="su-full-toc-index" aria-hidden="true" />
+              <span>Appendix A</span> <span className="su-full-toc-page">{appendixPage.number}</span>
+            </li>
+          </ol>
+          <figure className="su-full-toc-decisions">
+            <div className="su-full-toc-decision-graphic">
+              <svg
+                aria-label="Five Scaling Up decisions"
+                className="su-full-toc-decision-ring"
+                role="img"
+                viewBox="0 0 120 120"
+              >
+                {(["people", "strategy", "execution", "cash", "you"] as const).map((chapter, index) => (
+                  <circle
+                    className={`is-${chapter}`}
+                    cx="60"
+                    cy="60"
+                    fill="none"
+                    key={chapter}
+                    pathLength="100"
+                    r="39"
+                    stroke="var(--chapter-color)"
+                    strokeDasharray="19 81"
+                    strokeWidth="15"
+                    transform={`rotate(${-90 + (index * 72)} 60 60)`}
+                  />
+                ))}
+                <circle cx="60" cy="60" fill="#522583" r="20" />
+                <text fill="#ffffff" fontSize="12" fontWeight="700" textAnchor="middle" x="60" y="64">YOU</text>
+              </svg>
+              <span aria-hidden="true" className="su-full-toc-decision-label su-full-toc-decision-label--people">people</span>
+              <span aria-hidden="true" className="su-full-toc-decision-label su-full-toc-decision-label--strategy">strategy</span>
+              <span aria-hidden="true" className="su-full-toc-decision-label su-full-toc-decision-label--execution">execution</span>
+              <span aria-hidden="true" className="su-full-toc-decision-label su-full-toc-decision-label--cash">cash</span>
+            </div>
+            <figcaption>
+              The five Scaling Up decisions organize the core report. Subsections are indented beneath the decision they belong to.
+            </figcaption>
+          </figure>
+        </div>
+      </section>
     </SuFullLandscapePage>
   );
 }
@@ -222,33 +327,56 @@ function IntroductionPage({ report, model, number }: {
 }
 
 function ProfilePage({ model, number, footerBrand }: { model: SuFullLandscapeReportModel; number: number; footerBrand: SuFullLandscapeFooterBrand }) {
+  const strongestRelative = [...model.profileRows]
+    .sort((a, b) => b.deviation - a.deviation || a.stableKey.localeCompare(b.stableKey))[0];
+  const weakestRelative = [...model.profileRows]
+    .sort((a, b) => a.deviation - b.deviation || a.stableKey.localeCompare(b.stableKey))[0];
+  const formatDeviation = (value: number) => `${value >= 0 ? "+" : ""}${formatNumber(value)}`;
+
   return (
     <SuFullLandscapePage number={number} footerBrand={footerBrand}>
-      <h2>Your profile</h2>
-      <table>
-        <thead><tr><th>Chapter / subsection</th><th>You</th><th>Peers</th><th>Deviation</th></tr></thead>
-        <tbody>
-          {model.chapters.flatMap((chapter) => [
-            <tr className="su-full-landscape-profile-row--chapter" key={`chapter-${chapter.key}`}>
-              <th><strong>{chapter.label}</strong> <span>Chapter aggregate</span></th>
-              <td>{formatNumber(chapter.youAverage)}</td>
-              <td>{formatNumber(chapter.peersAverage)}</td>
-              <td>{formatNumber(chapter.youAverage - chapter.peersAverage)}</td>
-            </tr>,
-            ...model.profileRows
-              .filter((row) => row.chapterKey === chapter.key)
-              .map((row) => (
-                <tr className="su-full-landscape-profile-row--subsection" key={row.stableKey}>
-                  <th>{row.label} <span>Subsection</span></th>
-                  <td>{formatNumber(row.youAverage)}</td>
-                  <td>{formatNumber(row.peersAverage)}</td>
-                  <td>{formatNumber(row.deviation)}</td>
-                </tr>
-              )),
-          ])}
-        </tbody>
-      </table>
-      <p>Strongest chapter: {model.strongestChapter.label}. Focus chapter: {model.weakestChapter.label}.</p>
+      <section className="su-full-profile" aria-label="Your profile">
+        <h2>Your Profile</h2>
+        <p className="su-full-profile-intro">
+          We begin with an overview of the main sections. Your results are compared with the peer benchmark associated with this completed assessment.
+        </p>
+        <div className="su-full-profile-layout">
+          <table className="su-full-profile-table">
+            <thead><tr><th scope="col">Chapter / subsection</th><th scope="col">You</th><th scope="col">Peers</th><th scope="col">Deviation</th></tr></thead>
+            <tbody>
+              {model.chapters.flatMap((chapter) => [
+                <tr
+                  className={`su-full-landscape-profile-row--chapter is-${chapter.key}`}
+                  data-testid={`profile-domain-${chapter.key}`}
+                  key={`chapter-${chapter.key}`}
+                >
+                  <th scope="row">{chapter.label}</th>
+                  <td>{formatNumber(chapter.youAverage)}</td>
+                  <td>{formatNumber(chapter.peersAverage)}</td>
+                  <td>{formatDeviation(chapter.youAverage - chapter.peersAverage)}</td>
+                </tr>,
+                ...model.profileRows
+                  .filter((row) => row.chapterKey === chapter.key)
+                  .map((row) => (
+                    <tr className={`su-full-landscape-profile-row--subsection is-${chapter.key}`} key={row.stableKey}>
+                      <th scope="row">{row.label}</th>
+                      <td>{formatNumber(row.youAverage)}</td>
+                      <td>{formatNumber(row.peersAverage)}</td>
+                      <td>{formatDeviation(row.deviation)}</td>
+                    </tr>
+                  )),
+              ])}
+            </tbody>
+          </table>
+          <aside className="su-full-profile-commentary" data-testid="profile-result-commentary">
+            <p><strong>{model.strongestChapter.label} is your strongest chapter.</strong> It has your highest chapter score in this completed assessment.</p>
+            <p><strong>{model.weakestChapter.label} is the current focus chapter.</strong> It has your lowest chapter score in this completed assessment.</p>
+            <p><strong>{strongestRelative.label} has the highest relative deviation from Peers.</strong> The difference is {formatDeviation(strongestRelative.deviation)}.</p>
+            <p><strong>{weakestRelative.label} has the lowest relative deviation from Peers.</strong> The difference is {formatDeviation(weakestRelative.deviation)}.</p>
+            <p>Relative deviations compare the two displayed scores; they are not separate findings or readiness labels.</p>
+          </aside>
+        </div>
+      </section>
     </SuFullLandscapePage>
   );
 }
