@@ -77,14 +77,14 @@ describe("BrandedReport — respondent identity and next steps", () => {
     expect(screen.queryByText(/\{\{respondentName\}\}/)).not.toBeInTheDocument();
   });
 
-  it("leaves token-like text unchanged for non-Scaling Up Full assessments", () => {
+  it("personalizes report HTML for non-Scaling Up Full assessments", () => {
     render(
       <BrandedReport
         report={baseReport({
           reportHtml: loadSafeReportHtml({
             reportHtml: {
               schemaVersion: 1,
-              introductionHtml: "<p>Literal {{respondentName}} and {{companyName}}</p>",
+              introductionHtml: "<p>Dear {{respondentName}} from {{companyName}}</p>",
               conclusionHtml: null,
             },
           }),
@@ -93,8 +93,9 @@ describe("BrandedReport — respondent identity and next steps", () => {
     );
 
     expect(screen.getByTestId("report-html-introduction")).toHaveTextContent(
-      "Literal {{respondentName}} and {{companyName}}",
+      "Dear Sarah Chen from Northwind Logistics",
     );
+    expect(screen.queryByText(/\{\{respondentName\}\}/)).not.toBeInTheDocument();
   });
 
   it("shows the taker's email and both next-step links", () => {
