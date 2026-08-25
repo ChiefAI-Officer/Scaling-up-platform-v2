@@ -3164,7 +3164,11 @@
 }
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-bar-fill { display: block; height: 100%; border-radius: 0; }
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-bar-fill--you { background: var(--chapter-line-color); }
-.su-public-brand.su-report.su-full-landscape .su-full-landscape-bar-fill--peers { background: #6b6480; }
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-bar-fill--peers {
+  box-sizing: border-box;
+  background: var(--chapter-peer-color);
+  border: 1px solid var(--chapter-line-color);
+}
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-bar-value {
   color: #1a1322;
   font-size: 11px;
@@ -3205,6 +3209,33 @@
   text-overflow: clip;
 }
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-detail-bars { display: grid; gap: 5px; max-width: 500px; }
+
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-conclusion-layout {
+  display: grid;
+  grid-template-columns: minmax(0, .56fr) minmax(0, .44fr);
+  gap: 8mm;
+  min-width: 0;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-conclusion-summary {
+  min-width: 0;
+  padding-right: 8mm;
+  border-right: 1px solid #cdc8d3;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-conclusion-summary h2 {
+  margin: 0 0 16px;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-conclusion-summary p {
+  margin: 0;
+  padding: 13px 0;
+  border-bottom: 1px solid #ded9e4;
+  line-height: 1.45;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-conclusion-summary strong {
+  color: #3f1c66;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-default-next-steps {
+  min-width: 0;
+}
 
 .su-public-brand.su-report .su-report-custom-html {
   box-sizing: border-box;
@@ -3388,7 +3419,9 @@
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--detail .su-full-landscape-page-body { grid-template-columns: 1fr; padding: 24px 18px; }
   .su-public-brand.su-report.su-full-landscape .su-full-toc-layout,
   .su-public-brand.su-report.su-full-landscape .su-full-profile-layout,
-  .su-public-brand.su-report.su-full-landscape .su-full-introduction-layout { grid-template-columns: 1fr; gap: 24px; }
+  .su-public-brand.su-report.su-full-landscape .su-full-introduction-layout,
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-conclusion-layout { grid-template-columns: 1fr; gap: 24px; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-conclusion-summary { padding-right: 0; padding-bottom: 20px; border-right: 0; border-bottom: 1px solid #cdc8d3; }
   .su-public-brand.su-report.su-full-landscape .su-full-profile-commentary { padding: 20px 0 0; border-top: 1px solid #cdc8d3; border-left: 0; }
   .su-public-brand.su-report.su-full-landscape .su-full-introduction-results { padding: 20px 0 0; border-top: 1px solid #cdc8d3; border-left: 0; }
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-cover-brand { margin: -24px -18px 16px; padding: 10px 18px; }
@@ -3502,6 +3535,19 @@
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page:first-child { break-before: auto; page-break-before: auto; }
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page:last-child { break-after: auto; page-break-after: auto; }
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-detail { break-inside: avoid; page-break-inside: avoid; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-conclusion-layout {
+    position: relative;
+    display: block;
+    min-height: 165mm;
+  }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-conclusion-summary { width: 54%; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-conclusion-layout > .su-full-landscape-custom-content,
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-conclusion-layout > .su-full-landscape-default-next-steps {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 42%;
+  }
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page-header,
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-bar-fill,
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-peer-contour { -webkit-print-color-adjust: exact; print-color-adjust: exact; }

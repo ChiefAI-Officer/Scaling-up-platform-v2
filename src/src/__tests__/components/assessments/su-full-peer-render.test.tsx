@@ -96,7 +96,12 @@ test("keeps the shipped Classic SU Full peer sequence while the landscape gate i
 
 test("renders the complete Classic SU Full peer report as the landscape composition when the gate is ON", () => {
   process.env[LANDSCAPE_ENABLED] = "1";
-  render(<BrandedReport report={suFullLandscapeReportWithPeers()} contactEmail="coach@example.com" />);
+  const report = suFullLandscapeReportWithPeers();
+  const expectedFrozenRecommendationQ01 = report.result.perQuestion.find(
+    (question) => question.stableKey === "Q01",
+  )?.recommendation;
+  expect(expectedFrozenRecommendationQ01).toEqual(expect.any(String));
+  render(<BrandedReport report={report} contactEmail="coach@example.com" />);
 
   const landscape = screen.getByTestId("su-full-landscape-report");
   expect(landscape).toBeInTheDocument();
@@ -104,12 +109,12 @@ test("renders the complete Classic SU Full peer report as the landscape composit
   expect(screen.queryByTestId("su-full-peer-sequence")).not.toBeInTheDocument();
   expect(screen.queryByTestId("report-sections")).not.toBeInTheDocument();
 
-  const chapterPolylines = [7, 11, 14, 19, 21].flatMap((number) =>
-    Array.from(screen.getByTestId(`su-full-landscape-page-${number}`).querySelectorAll("polyline")),
+  const chapterPolylines = Array.from(
+    landscape.querySelectorAll(".su-full-landscape-page--chapter polyline"),
   );
-  const appendixPolylines = Array.from(
-    screen.getByTestId("su-full-landscape-page-26").querySelectorAll("polyline"),
-  );
+  const appendix = landscape.querySelector(".su-full-landscape-page--appendix");
+  expect(appendix).toBeInTheDocument();
+  const appendixPolylines = Array.from(appendix!.querySelectorAll("polyline"));
   expect(chapterPolylines).toHaveLength(5);
   expect(appendixPolylines).toHaveLength(5);
   for (const polyline of [...chapterPolylines, ...appendixPolylines]) {
@@ -118,6 +123,11 @@ test("renders the complete Classic SU Full peer report as the landscape composit
 
   const details = screen.getAllByTestId(/^su-full-landscape-detail-Q/);
   expect(details).toHaveLength(61);
+  const q01Detail = screen.getByTestId("su-full-landscape-detail-Q01");
+  expect(q01Detail.querySelector(".su-full-landscape-feedback")?.textContent)
+    .toBe(expectedFrozenRecommendationQ01);
+  expect(within(q01Detail).getByTestId("su-full-detail-you-Q01")).toHaveClass("is-people");
+  expect(within(q01Detail).getByTestId("su-full-detail-peers-Q01")).toHaveClass("is-people");
   for (const detail of details) {
     const bars = within(detail).getByTestId(`su-landscape-detail-bars-${detail.dataset.questionKey}`);
     const paragraph = detail.querySelector(".su-full-landscape-feedback");

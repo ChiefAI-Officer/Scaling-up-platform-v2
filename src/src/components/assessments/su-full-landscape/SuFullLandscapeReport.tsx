@@ -502,20 +502,32 @@ function ConclusionPage({ report, model, contactEmail, number, beforeConclusion,
   return (
     <SuFullLandscapePage number={number} footerBrand={report}>
       {beforeConclusion}
-      <h2>Conclusion</h2>
-      <p><strong>ScaleUp Score</strong> {scaleUpScore(model.scaleUpScore)}</p>
-      <p>Your strongest chapter is {model.strongestChapter.label}; Your focus chapter is {model.weakestChapter.label}.</p>
-      {conclusionHtml ? (
-        <div className="su-full-landscape-custom-content">
-          <ReportHtmlSection
-            position="conclusion"
-            html={conclusionHtml}
-            personalization={report}
-          />
-        </div>
-      ) : (
-        <DefaultNextSteps report={report} contactEmail={contactEmail} />
-      )}
+      <div className="su-full-landscape-conclusion-layout">
+        <section
+          aria-label="Scaling Up Full result summary"
+          className="su-full-landscape-conclusion-summary"
+        >
+          <h2>Conclusion</h2>
+          <p><strong>ScaleUp Score {scaleUpScore(model.scaleUpScore)}</strong></p>
+          <p><strong>Your strongest chapter is {model.strongestChapter.label}.</strong></p>
+          <p><strong>Your focus chapter is {model.weakestChapter.label}.</strong></p>
+          <p><strong>Closest comparison: {model.closestQuestions[0].label} is closest to the selected peer benchmark.</strong></p>
+          <p><strong>Largest-distance comparison: {model.largestGapQuestions[0].label} is furthest from the selected peer benchmark.</strong></p>
+        </section>
+        {conclusionHtml ? (
+          <div className="su-full-landscape-custom-content">
+            <ReportHtmlSection
+              position="conclusion"
+              html={conclusionHtml}
+              personalization={report}
+            />
+          </div>
+        ) : (
+          <div className="su-full-landscape-default-next-steps">
+            <DefaultNextSteps report={report} contactEmail={contactEmail} />
+          </div>
+        )}
+      </div>
     </SuFullLandscapePage>
   );
 }

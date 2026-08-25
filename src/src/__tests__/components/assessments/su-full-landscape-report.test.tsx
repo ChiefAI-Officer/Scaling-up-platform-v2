@@ -52,6 +52,15 @@ test("renders detail paired bars in You then Peers order with visible values", (
   expect(detail).toHaveTextContent("6.6");
 });
 
+test("renders detail You and Peers bars with their People domain context", () => {
+  const question = peopleQuestions()[0];
+
+  render(<SuFullDetailPairedBars chapterKey="people" question={question} />);
+
+  expect(screen.getByTestId("su-full-detail-you-Q01")).toHaveClass("is-people");
+  expect(screen.getByTestId("su-full-detail-peers-Q01")).toHaveClass("is-people");
+});
+
 test("populates the Introduction from available frozen report data", () => {
   const source = completeSuFullLandscapeReport();
   const report = {
@@ -146,6 +155,10 @@ test("renders the authored 25-page landscape composition without rejected pages"
   const presentation = completeSuFullLandscapePresentation(report);
   const model = buildSuFullLandscapeReportModel({ report, presentation, resolvedStyle: "CLASSIC" });
   if (!model) throw new Error("The canonical landscape fixture must build");
+  const expectedFrozenRecommendationQ01 = model.chapters
+    .flatMap((chapter) => chapter.questions)
+    .find((question) => question.stableKey === "Q01")?.recommendation;
+  expect(expectedFrozenRecommendationQ01).toEqual(expect.any(String));
 
   render(
     <SuFullLandscapeReport
@@ -262,6 +275,9 @@ test("renders the authored 25-page landscape composition without rejected pages"
   expect(screen.getByTestId("su-full-landscape-page-7")).toHaveClass("su-full-landscape-page--detail");
   expect(screen.getByTestId("su-full-landscape-page-25")).toHaveClass("su-full-landscape-page--appendix");
   expect(screen.getAllByTestId(/^su-full-landscape-detail-Q/)).toHaveLength(61);
+  expect(screen.getByTestId("su-full-landscape-detail-Q01").querySelector(
+    ".su-full-landscape-feedback",
+  )?.textContent).toBe(expectedFrozenRecommendationQ01);
 
   expect(screen.getByTestId("su-full-landscape-page-4")).toHaveTextContent(
     "Phase 4 - Delegation",
@@ -363,6 +379,38 @@ test("preserves the authored preface and respondent summary before a custom clos
   expect(screen.getAllByTestId(/^su-full-landscape-page-/)).toHaveLength(25);
 });
 
+test("populates the Conclusion from permitted results before the unchanged authored CTA", () => {
+  const report = restoredScalingUpFullCtaReport();
+  const presentation = completeSuFullLandscapePresentation(report);
+  const sourceModel = buildSuFullLandscapeReportModel({ report, presentation, resolvedStyle: "CLASSIC" });
+  if (!sourceModel) throw new Error("The available-results fixture must build");
+  const model = { ...sourceModel, scaleUpScore: 73 };
+
+  render(<SuFullLandscapeReport report={report} model={model} />);
+
+  const conclusion = screen.getByTestId("su-full-landscape-page-24");
+  expect(within(conclusion).getByText(/ScaleUp Score/i)).toHaveTextContent("73");
+  expect(within(conclusion).getByText(/strongest/i))
+    .toHaveTextContent(model.strongestChapter.label);
+  expect(within(conclusion).getByText(/focus/i))
+    .toHaveTextContent(model.weakestChapter.label);
+  expect(within(conclusion).getByText(/closest comparison/i))
+    .toHaveTextContent(model.closestQuestions[0].label);
+  expect(within(conclusion).getByText(/largest-distance comparison/i))
+    .toHaveTextContent(model.largestGapQuestions[0].label);
+  const authoredCta = within(conclusion).getByLabelText("Scaling Up Full next steps");
+  expect(authoredCta).toBeInTheDocument();
+  const expectedAuthoredCta = document.createElement("div");
+  expectedAuthoredCta.innerHTML = report.reportHtml?.conclusionHtml ?? "";
+  expect(screen.getByTestId("report-html-conclusion").innerHTML)
+    .toBe(expectedAuthoredCta.innerHTML);
+  const resultSummary = within(conclusion).getByLabelText("Scaling Up Full result summary");
+  expect(resultSummary.compareDocumentPosition(authoredCta) & Node.DOCUMENT_POSITION_FOLLOWING)
+    .toBeTruthy();
+  expect(within(conclusion).queryByText(/biggest challenge|percentile|industry comparison/i))
+    .not.toBeInTheDocument();
+});
+
 test("personalizes escaped respondent and company tokens in authored report HTML", () => {
   const report = {
     ...completeSuFullLandscapeReport(),
@@ -448,7 +496,11 @@ test("keeps the landscape renderer's A4 print and responsive screen contract sco
   expect(stylesheet).not.toMatch(/@page\s*\{\s*size:\s*A4\s+landscape\s*;/);
   expect(stylesheet).toContain(".su-full-landscape-detail { break-inside: avoid;");
   expect(stylesheet).toMatch(/\.su-full-landscape-bar-fill\s*\{[^}]*display: block;[^}]*border-radius: 0;/);
+  expect(stylesheet).toMatch(/\.su-full-landscape-bar-fill--you\s*\{[^}]*background: var\(--chapter-line-color\);/);
+  expect(stylesheet).toMatch(/\.su-full-landscape-bar-fill--peers\s*\{[^}]*background: var\(--chapter-peer-color\);[^}]*border: 1px solid var\(--chapter-line-color\);/);
   expect(stylesheet).toMatch(/\.su-full-landscape-peer-contour\s*\{[^}]*color: var\(--chapter-line-color\);/);
+  expect(stylesheet).toMatch(/@media print[\s\S]*?\.su-full-landscape-conclusion-layout\s*\{[^}]*position: relative;[^}]*display: block;[^}]*min-height: 165mm;/);
+  expect(stylesheet).toMatch(/@media print[\s\S]*?\.su-full-landscape-conclusion-layout > \.su-full-landscape-custom-content[^}]*\{[^}]*position: absolute;[^}]*top: 0;[^}]*right: 0;[^}]*width: 42%;/);
   expect(stylesheet).toContain(".su-full-landscape-report .is-people { --chapter-color:");
   expect(stylesheet).toContain(".su-full-landscape-report .is-strategy { --chapter-color:");
   expect(stylesheet).toContain(".su-full-landscape-report .is-execution { --chapter-color:");
