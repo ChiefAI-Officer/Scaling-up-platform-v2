@@ -70,7 +70,8 @@ test("populates the Introduction from available frozen report data", () => {
 
   const introduction = screen.getByRole("region", { name: "Introduction" });
   expect(within(introduction).getByText(report.respondentName, { exact: false })).toBeInTheDocument();
-  expect(within(introduction).getByText(report.companyName, { exact: false })).toBeInTheDocument();
+  expect(within(introduction).getAllByText(report.companyName, { exact: false }).length)
+    .toBeGreaterThan(0);
   expect(within(introduction).getByText(/56 full-time equivalent/i)).toBeInTheDocument();
   expect(within(introduction).getByText(/9 freelance/i)).toBeInTheDocument();
   expect(within(introduction).getByText(/Phase 3/i)).toBeInTheDocument();
@@ -93,6 +94,26 @@ test("omits unavailable optional and unsupported Introduction data cleanly", () 
   expect(within(introduction).queryByText(/freelance/i)).not.toBeInTheDocument();
   expect(screen.queryByText(/undefined|null|not provided/i)).not.toBeInTheDocument();
   expect(screen.queryByText(/years old|entrepreneur for|partners|international revenue/i))
+    .not.toBeInTheDocument();
+});
+
+test("keeps the known company and excludes non-whitelisted title data when headcount is absent", () => {
+  const report = {
+    ...completeSuFullLandscapeReport(),
+    assessmentName: "Unapproved Internal Assessment Title",
+    rawAnswers: [],
+  };
+  const presentation = completeSuFullLandscapePresentation(report);
+  const model = buildSuFullLandscapeReportModel({ report, presentation, resolvedStyle: "CLASSIC" });
+  if (!model) throw new Error("The no-headcount fixture must build");
+
+  render(<SuFullLandscapeReport report={report} model={model} />);
+
+  const introduction = screen.getByRole("region", { name: "Introduction" });
+  expect(within(introduction).getByText(report.companyName, { exact: false })).toBeInTheDocument();
+  expect(within(introduction).queryByText(report.assessmentName, { exact: false }))
+    .not.toBeInTheDocument();
+  expect(within(introduction).queryByText(/full-time equivalent|freelance/i))
     .not.toBeInTheDocument();
 });
 

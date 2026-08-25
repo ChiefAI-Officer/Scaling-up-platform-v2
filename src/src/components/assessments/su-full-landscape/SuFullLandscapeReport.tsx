@@ -338,9 +338,9 @@ function IntroductionPage({ report, model, number }: {
         <div className="su-full-introduction-layout">
           <div className="su-full-introduction-overview">
             <p>
-              Dear {report.respondentName}, this report presents your {report.assessmentName} results
-              across People, Strategy, Execution, Cash, and You. It also shows the peer benchmark
-              frozen with this completed assessment.
+              Dear {report.respondentName}, this report presents the Scaling Up Full results for
+              {" "}{report.companyName} across People, Strategy, Execution, Cash, and You. It also
+              shows the peer benchmark frozen with this completed assessment.
             </p>
             {fte !== null || freelance !== null ? (
               <p>
