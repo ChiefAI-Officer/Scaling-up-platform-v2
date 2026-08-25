@@ -6,6 +6,15 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="qsp-v2-canonical-report-ready"></a>
+### 2026-08-25 — Canonical QSP v2 preface and full report ready <!-- ENTRY_ISO:2026-08-25 ENTRY_SLUG:qsp-v2-canonical-report-ready -->
+
+**Status: IMPLEMENTED + VISUALLY VERIFIED + RELEASE PENDING; QSP VERSION REMAINS A DRAFT.** Jeff's supplied Quarterly Session Preparation v2 preface has been converted from an unsupported ~36,960-character full HTML document into an 853-character semantic report fragment that fits the existing 12,000-character, one-image, no-authored-style contract. It preserves the exact preface copy, a first-name greeting, Scaling Up branding, Verne Harnish portrait and attribution, and responsive/print-safe composition. The new `{{respondentFirstName}}` token is escaped and re-sanitized through the existing report seam. No sanitizer limit was relaxed.
+
+**Canonical report path.** The Admin full-report preview now builds QSP v2 from its saved five sections and 22 questions instead of the generic scored preview fixture. QSP custom introduction/conclusion fragments receive the same respondent-safe personalization as the individual qualitative renderer. Source-faithful logo and portrait assets are local to the application, and print pagination gives the preface its own page and starts the final Closing section cleanly. A six-page A4 report was rendered with representative identity and answers through `BrandedReport`; Poppler text extraction confirmed the personalized preface and all five parts, and every rasterized page was visually inspected with no missing asset, clipping, overlap, or unresolved placeholder. The artifact is a representative review sample, not a real respondent record.
+
+**Verification and boundary.** Test-first regressions covered first-name substitution, QSP qualitative rendering, real saved-version preview anatomy, bounded canonical HTML, local assets, responsive markers, and print breaks. Focused coverage passed **4/4 suites and 79/79 tests**. The complete repository passed **774/774 suites, 9,595/9,595 tests, and 16/16 snapshots**; changed-path ESLint emitted no diagnostics, migration safety approved all **49 migrations**, `git diff --check` passed, and the Production-equivalent Turbopack build compiled, completed TypeScript/static generation, and generated **95/95 pages**. No Production environment, version, campaign, submission, answer, report, email, or customer record was changed, and the QSP draft was not published.
+
 <a id="su-full-esperto-cosmetic-parity-release-authorized"></a>
 ### 2026-08-25 — Scaling Up Full ESPERTO cosmetic parity release authorized <!-- ENTRY_ISO:2026-08-25 ENTRY_SLUG:su-full-esperto-cosmetic-parity-release-authorized -->
 

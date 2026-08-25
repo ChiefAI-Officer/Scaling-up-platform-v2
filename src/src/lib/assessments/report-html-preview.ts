@@ -20,6 +20,7 @@ export interface ReportHtmlPreviewInput {
 }
 
 const REPRESENTATIVE_SUBMITTED_AT = new Date("2026-01-15T12:00:00.000Z");
+const QSP_V2_TEMPLATE_ALIAS = "qsp-v2";
 
 function deterministicAnswers(questions: readonly {
   stableKey: string;
@@ -69,9 +70,61 @@ function withRepresentativeIdentity(
   };
 }
 
+function buildSavedQualitativePreviewReport(
+  input: ReportHtmlPreviewInput,
+): RespondentReport {
+  const parsed = TemplateVersionForScoringSchema.safeParse({
+    questions: input.version.questions,
+    sections: input.version.sections,
+    scoringConfig: input.version.scoringConfig,
+  });
+  if (!parsed.success) {
+    throw new Error("Saved assessment version cannot build a representative preview");
+  }
+
+  const answers = deterministicAnswers(parsed.data.questions);
+  const questionsByKey = buildQuestionMetaByKey(parsed.data.questions);
+  return withRepresentativeIdentity(
+    {
+      respondentName: "",
+      respondentEmail: null,
+      jobTitle: null,
+      companyName: "",
+      assessmentName: "",
+      templateAlias: input.template.alias,
+      reportStyle: "CLASSIC",
+      campaignLabel: null,
+      submittedAt: REPRESENTATIVE_SUBMITTED_AT,
+      result: {
+        perQuestion: [],
+        perSection: [],
+        overallTotal: 0,
+        overallAverage: 0,
+        countAchieved: 0,
+        tier: null,
+        tierMetricValue: 0,
+        unansweredKeys: [],
+      },
+      sections: parsed.data.sections,
+      questionByKey: Object.fromEntries(
+        Object.entries(questionsByKey).map(([key, question]) => [key, question.label]),
+      ),
+      questionsByKey,
+      rawAnswers: answers,
+      scoringConfig: parsed.data.scoringConfig,
+      provenance: { submissionId: "", versionId: "", contentHash: "", templateName: "" },
+      degraded: false,
+    },
+    input,
+  );
+}
+
 export function buildReportHtmlPreviewReport(
   input: ReportHtmlPreviewInput,
 ): RespondentReport {
+  if (input.template.alias === QSP_V2_TEMPLATE_ALIAS) {
+    return buildSavedQualitativePreviewReport(input);
+  }
   if (input.template.alias !== SCALING_UP_FULL_TEMPLATE_ALIAS) {
     return withRepresentativeIdentity(
       buildReportStylePreviewReport("scored", "normal"),

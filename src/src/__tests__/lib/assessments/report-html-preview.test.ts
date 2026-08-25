@@ -1,4 +1,5 @@
 import { buildTemplateContent } from "../../../../prisma/seed-scaling-up-full-assessment";
+import { buildQspV2Content } from "../../../../prisma/seed-qsp-v2-assessment";
 import { loadSafeReportHtml } from "@/lib/assessments/report-html";
 import { buildReportHtmlPreviewReport } from "@/lib/assessments/report-html-preview";
 import {
@@ -61,5 +62,47 @@ describe("buildReportHtmlPreviewReport", () => {
     expect(report.result.perQuestion.every((row) => row.peerValue === undefined)).toBe(true);
     expect(report.suFullPeerPresentation?.provenance.legacy).toBe(true);
     expect(buildSuFullPeerDisclosureModel(report.suFullPeerPresentation!.provenance).provenanceLabel).toBe("Historical benchmark");
+  });
+
+  it("builds QSP v2 from the saved qualitative sections and questions", () => {
+    const qsp = buildQspV2Content();
+    const report = buildReportHtmlPreviewReport({
+      template: {
+        id: "tpl_qsp",
+        alias: "qsp-v2",
+        name: "Quarterly Session Prep v2",
+      },
+      version: {
+        id: "ver_qsp",
+        questions: qsp.questions,
+        sections: qsp.sections,
+        scoringConfig: qsp.scoringConfig,
+        reportConfig: {
+          reportHtml: {
+            schemaVersion: 1,
+            introductionHtml: "<h1>Dear {{respondentFirstName}},</h1>",
+            conclusionHtml: null,
+          },
+        },
+      },
+      peerReference: "current",
+    });
+
+    expect(report.templateAlias).toBe("qsp-v2");
+    expect(report.sections).toEqual(qsp.sections);
+    expect(Object.keys(report.questionsByKey)).toHaveLength(qsp.questions.length);
+    expect(report.rawAnswers).toHaveLength(qsp.questions.length);
+    expect(report.questionByKey.P4_critical_number).toBe(
+      "Critical Number Identification: What is the ONE area of the business where significant improvement would have the greatest impact next quarter?",
+    );
+    expect(report.reportHtml).toEqual(
+      loadSafeReportHtml({
+        reportHtml: {
+          schemaVersion: 1,
+          introductionHtml: "<h1>Dear {{respondentFirstName}},</h1>",
+          conclusionHtml: null,
+        },
+      }),
+    );
   });
 });
