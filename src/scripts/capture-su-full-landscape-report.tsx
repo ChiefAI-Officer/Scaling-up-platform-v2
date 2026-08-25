@@ -38,13 +38,15 @@ async function reportCss(): Promise<string> {
   return `${brand.replace(/@import[^;]+;\\s*/g, "")}\n${report}`;
 }
 
-async function localBrandAssets(): Promise<{ logo: string; signature: string }> {
+async function localBrandAssets(): Promise<{ decisionDiagram: string; logo: string; signature: string }> {
   const brandRoot = join(appRoot, "public", "brand");
-  const [logo, signature] = await Promise.all([
+  const [decisionDiagram, logo, signature] = await Promise.all([
+    readFile(join(brandRoot, "su-esperto-five-decisions.png")),
     readFile(join(brandRoot, "su-logo-white.svg")),
     readFile(join(brandRoot, "verne-harnish-signature.png")),
   ]);
   return {
+    decisionDiagram: `data:image/png;base64,${decisionDiagram.toString("base64")}`,
     logo: `data:image/svg+xml;base64,${logo.toString("base64")}`,
     signature: `data:image/png;base64,${signature.toString("base64")}`,
   };
@@ -74,7 +76,9 @@ async function main(): Promise<void> {
       model={model}
       contactEmail="coach@example.com"
     />,
-  ).replace('src="/brand/su-logo-white.svg"', `src="${assets.logo}"`);
+  )
+    .replace('src="/brand/su-logo-white.svg"', `src="${assets.logo}"`)
+    .replace('src="/brand/su-esperto-five-decisions.png"', `src="${assets.decisionDiagram}"`);
 
   const browser = await chromium.launch({ headless: true });
   try {

@@ -257,16 +257,12 @@ test("renders the authored 25-page landscape composition without rejected pages"
   expect(within(contents).getByTestId("toc-appendix")).toHaveTextContent(
     `Appendix A ${pageNumberFor((page) => page.kind === "appendix")}`,
   );
-  const decisionGraphic = within(contents).getByLabelText("Five Scaling Up decisions");
-  expect(decisionGraphic).toBeInTheDocument();
-  expect(decisionGraphic.querySelector(".su-full-toc-decision-center")).toHaveAttribute(
-    "fill",
-    "var(--chapter-color)",
+  const decisionGraphic = within(contents).getByRole("img", { name: "Five Scaling Up decisions" });
+  expect(decisionGraphic).toHaveAttribute(
+    "src",
+    "/brand/su-esperto-five-decisions.png",
   );
-  for (const domain of ["people", "strategy", "execution", "cash"] as const) {
-    expect(contents.querySelector(`.su-full-toc-decision-label--${domain}`))
-      .toHaveClass(`is-${domain}`);
-  }
+  expect(contents.querySelector(".su-full-toc-decision-ring")).not.toBeInTheDocument();
   const chartTitleIds = Array.from(
     document.querySelectorAll<HTMLElement>("[aria-labelledby^=\"su-landscape-vertical-chart-title-\"]"),
   ).map((chart) => chart.getAttribute("aria-labelledby"));
@@ -372,8 +368,8 @@ test("preserves the authored preface and respondent summary before a custom clos
   const page24 = screen.getByTestId("su-full-landscape-page-24");
   expect(page24).toHaveTextContent("ScaleUp Score");
   expect(page24).toHaveTextContent("55 / 100");
-  expect(page24).toHaveTextContent("Your strongest chapter is");
-  expect(page24).toHaveTextContent("Your focus chapter is");
+  expect(page24).toHaveTextContent("You scored highest on");
+  expect(page24).toHaveTextContent("and lowest on");
   expect(page24).toHaveTextContent("Custom closing message");
   expect(page24).not.toHaveTextContent("Choose one priority from the feedback");
   expect(screen.getAllByTestId(/^su-full-landscape-page-/)).toHaveLength(25);
@@ -384,20 +380,30 @@ test("populates the Conclusion from permitted results before the unchanged autho
   const presentation = completeSuFullLandscapePresentation(report);
   const sourceModel = buildSuFullLandscapeReportModel({ report, presentation, resolvedStyle: "CLASSIC" });
   if (!sourceModel) throw new Error("The available-results fixture must build");
-  const model = { ...sourceModel, scaleUpScore: 73 };
+  const profileRows = sourceModel.profileRows.map((row, index) => ({
+    ...row,
+    youAverage: index === 1 ? 9 : index === 8 ? 1 : 5,
+    deviation: index === 9 ? 3 : index === 4 ? -4 : 0,
+  }));
+  const model = { ...sourceModel, scaleUpScore: 73, profileRows };
 
   render(<SuFullLandscapeReport report={report} model={model} />);
 
   const conclusion = screen.getByTestId("su-full-landscape-page-24");
-  expect(within(conclusion).getByText(/ScaleUp Score/i)).toHaveTextContent("73");
-  expect(within(conclusion).getByText(/strongest/i))
-    .toHaveTextContent(model.strongestChapter.label);
-  expect(within(conclusion).getByText(/focus/i))
-    .toHaveTextContent(model.weakestChapter.label);
-  expect(within(conclusion).getByText(/closest comparison/i))
-    .toHaveTextContent(model.closestQuestions[0].label);
-  expect(within(conclusion).getByText(/largest-distance comparison/i))
-    .toHaveTextContent(model.largestGapQuestions[0].label);
+  expect(within(conclusion).getByRole("heading", { name: "In Conclusion" })).toBeInTheDocument();
+  const narrative = within(conclusion).getByTestId("su-full-conclusion-narrative");
+  expect(narrative).toHaveTextContent(
+    "With a ScaleUp Score of 73 / 100, you are doing extremely well and are perhaps an example for others! However, in order to reach the next phase, there is still room for improvement.",
+  );
+  expect(narrative).toHaveTextContent(
+    `You scored highest on ${profileRows[1].label} and lowest on ${profileRows[8].label}.`,
+  );
+  expect(narrative).toHaveTextContent(
+    `In comparison to other companies, in the same phase, you score higher on ${profileRows[9].label} and lower on ${profileRows[4].label}.`,
+  );
+  expect(narrative).toHaveTextContent(
+    "Hopefully this report will give you sufficient insight into how and where you and your organization can improve. Good luck and we hope to see you again for another Scaling Up Assessment in the future!",
+  );
   const authoredCta = within(conclusion).getByLabelText("Scaling Up Full next steps");
   expect(authoredCta).toBeInTheDocument();
   const expectedAuthoredCta = document.createElement("div");
@@ -409,6 +415,35 @@ test("populates the Conclusion from permitted results before the unchanged autho
     .toBeTruthy();
   expect(within(conclusion).queryByText(/biggest challenge|percentile|industry comparison/i))
     .not.toBeInTheDocument();
+});
+
+test.each([
+  {
+    score: 19,
+    opening: "This was your report of the Scaling Up Assessment. You have a ScaleUp Score of 19 / 100. You have still a lot of focus areas on which you can work within your company. If you want to grow quickly, then your organization is probably not ready yet.",
+    closing: "Hopefully this report has given you sufficient insight into where you and your organization can improve. Good luck and we'll see you back at this Scaling Up Assessment - perhaps for a higher score...",
+  },
+  {
+    score: 55,
+    opening: "You have a ScaleUp Score of 55 / 100, a great score. You are pretty well on the way to becoming a strong growth organization.",
+    closing: "Hopefully this report has given you sufficient insight into where you and your organization can improve. Good luck and we'll see you back at this Scaling Up Assessment - perhaps for a higher score...",
+  },
+  {
+    score: 73,
+    opening: "With a ScaleUp Score of 73 / 100, you are doing extremely well and are perhaps an example for others! However, in order to reach the next phase, there is still room for improvement.",
+    closing: "Hopefully this report will give you sufficient insight into how and where you and your organization can improve. Good luck and we hope to see you again for another Scaling Up Assessment in the future!",
+  },
+])("uses ESPERTO's score-banded Conclusion narrative at score $score", ({ score, opening, closing }) => {
+  const report = restoredScalingUpFullCtaReport();
+  const presentation = completeSuFullLandscapePresentation(report);
+  const sourceModel = buildSuFullLandscapeReportModel({ report, presentation, resolvedStyle: "CLASSIC" });
+  if (!sourceModel) throw new Error("The score-band fixture must build");
+
+  render(<SuFullLandscapeReport report={report} model={{ ...sourceModel, scaleUpScore: score }} />);
+
+  const narrative = screen.getByTestId("su-full-conclusion-narrative");
+  expect(narrative).toHaveTextContent(opening);
+  expect(narrative).toHaveTextContent(closing);
 });
 
 test("personalizes escaped respondent and company tokens in authored report HTML", () => {
@@ -506,7 +541,7 @@ test("keeps the landscape renderer's A4 print and responsive screen contract sco
   expect(stylesheet).toContain(".su-full-landscape-report .is-execution { --chapter-color:");
   expect(stylesheet).toContain(".su-full-landscape-report .is-cash { --chapter-color:");
   expect(stylesheet).toContain(".su-full-landscape-report .is-you { --chapter-color:");
-  expect(stylesheet).toMatch(/\.su-full-toc-decision-label\s*\{[^}]*color: var\(--chapter-line-color\);/);
+  expect(stylesheet).toMatch(/\.su-full-toc-decision-graphic\s*\{[^}]*max-width: 100%;[^}]*height: auto;/);
   expect(stylesheet).toMatch(/\.su-full-profile-commentary strong\s*\{[^}]*color: var\(--chapter-color\);/);
   expect(stylesheet).toContain("print-color-adjust: exact;");
   expect(stylesheet).toContain("@media screen and (max-width: 760px)");

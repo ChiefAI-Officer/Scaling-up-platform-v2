@@ -2831,29 +2831,12 @@
   text-align: center;
 }
 .su-public-brand.su-report.su-full-landscape .su-full-toc-decision-graphic {
-  position: relative;
-  width: 280px;
-  height: 245px;
+  display: block;
+  width: 300px;
+  max-width: 100%;
+  height: auto;
   margin: 0 auto;
 }
-.su-public-brand.su-report.su-full-landscape .su-full-toc-decision-ring {
-  position: absolute;
-  inset: 15px 20px 0;
-  width: 240px;
-  height: 240px;
-}
-.su-public-brand.su-report.su-full-landscape .su-full-toc-decision-label {
-  position: absolute;
-  color: var(--chapter-line-color);
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-size: 15px;
-  text-transform: capitalize;
-  white-space: nowrap;
-}
-.su-public-brand.su-report.su-full-landscape .su-full-toc-decision-label--people { top: 0; left: 50%; transform: translateX(-50%); }
-.su-public-brand.su-report.su-full-landscape .su-full-toc-decision-label--strategy { top: 47%; right: -4px; }
-.su-public-brand.su-report.su-full-landscape .su-full-toc-decision-label--execution { right: 16px; bottom: -7px; }
-.su-public-brand.su-report.su-full-landscape .su-full-toc-decision-label--cash { bottom: -7px; left: 22px; }
 .su-public-brand.su-report.su-full-landscape .su-full-toc-decisions figcaption {
   max-width: 42ch;
   margin: 14px auto 0;
@@ -3222,16 +3205,15 @@
   border-right: 1px solid #cdc8d3;
 }
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-conclusion-summary h2 {
-  margin: 0 0 16px;
+  margin: 0 0 22px;
+  text-transform: uppercase;
 }
-.su-public-brand.su-report.su-full-landscape .su-full-landscape-conclusion-summary p {
-  margin: 0;
-  padding: 13px 0;
-  border-bottom: 1px solid #ded9e4;
-  line-height: 1.45;
-}
-.su-public-brand.su-report.su-full-landscape .su-full-landscape-conclusion-summary strong {
-  color: #3f1c66;
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-conclusion-narrative p {
+  margin: 0 0 18px;
+  padding: 0;
+  color: #322b3d;
+  font-size: 12px;
+  line-height: 1.55;
 }
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-default-next-steps {
   min-width: 0;

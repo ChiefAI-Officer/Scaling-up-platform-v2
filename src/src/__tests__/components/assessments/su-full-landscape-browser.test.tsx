@@ -1070,7 +1070,7 @@ describe("SU Full landscape browser and PDF contract", () => {
       expect(info).toMatch(/^Pages:\s+24$/m);
       expect(info).toMatch(/^Page size:\s+841\.9\d* x 594\.9\d* pts \(A4\)$/m);
       const text = normalize(execFileSync("pdftotext", [pdfPath, "-"], { encoding: "utf8", maxBuffer: 20 * 1024 * 1024 }));
-      expect(text).toContain("ScaleUp Score 55 / 100");
+      expect(text).toContain("ScaleUp Score: 55 / 100");
       expect(text).not.toContain("Frozen feedback");
       const searchableWords = normalizeWords(text);
       expect(searchableWords).toContain(normalizeWords(REPRESENTATIVE_482_CHARACTER_FEEDBACK));
@@ -1183,8 +1183,8 @@ describe("SU Full landscape browser and PDF contract", () => {
       expect(await authoredContentOutsidePhysicalPage(page)).toEqual([]);
       const conclusionPage = page.locator(`[data-page-number='${expectedPageCount - 1}']`);
       await expect(conclusionPage.innerText()).resolves.toContain("55 / 100");
-      await expect(conclusionPage.innerText()).resolves.toContain("Your strongest chapter is");
-      await expect(conclusionPage.innerText()).resolves.toContain("Your focus chapter is");
+      await expect(conclusionPage.innerText()).resolves.toContain("You scored highest on");
+      await expect(conclusionPage.innerText()).resolves.toContain("and lowest on");
 
       await page.pdf({
         path: pdfPath,
@@ -1198,9 +1198,9 @@ describe("SU Full landscape browser and PDF contract", () => {
       const pdfText = normalize(execFileSync("pdftotext", [pdfPath, "-"], { encoding: "utf8", maxBuffer: 20 * 1024 * 1024 }));
       expect(pdfText).toContain(provenance);
       expect(pdfText).toContain(disclosure);
-      expect(pdfText).toContain("ScaleUp Score 55 / 100");
-      expect(pdfText).toContain("Your strongest chapter is");
-      expect(pdfText).toContain("Your focus chapter is");
+      expect(pdfText).toContain("ScaleUp Score of 55 / 100");
+      expect(pdfText).toContain("You scored highest on");
+      expect(pdfText).toContain("and lowest on");
       expect(pdfText).not.toMatch(ENGINEERING_LANGUAGE);
     } finally {
       await page.close();

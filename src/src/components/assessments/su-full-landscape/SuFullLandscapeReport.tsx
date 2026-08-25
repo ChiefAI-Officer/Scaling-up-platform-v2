@@ -80,6 +80,39 @@ function scaleUpScore(value: number): string {
   return `${Math.round(value)} / 100`;
 }
 
+type EspertoConclusionBand = "low" | "middle" | "high";
+
+function espertoConclusionBand(report: RespondentReport, score: number): EspertoConclusionBand {
+  const tierLabel = report.result.tier?.label.trim().toLowerCase();
+  if (tierLabel === "not ready") return "low";
+  if (tierLabel === "on the way") return "middle";
+  if (tierLabel === "exemplary") return "high";
+
+  // These are the current configured SU Full tier boundaries. The source
+  // reports confirm the prose and representative scores, but not the exact
+  // transition points; completed reports normally carry the frozen tier above.
+  if (score <= 40) return "low";
+  if (score <= 65) return "middle";
+  return "high";
+}
+
+function conclusionOpening(band: EspertoConclusionBand, score: number): string {
+  const formattedScore = scaleUpScore(score);
+  if (band === "low") {
+    return `This was your report of the Scaling Up Assessment. You have a ScaleUp Score of ${formattedScore}. You have still a lot of focus areas on which you can work within your company. If you want to grow quickly, then your organization is probably not ready yet.`;
+  }
+  if (band === "middle") {
+    return `You have a ScaleUp Score of ${formattedScore}, a great score. You are pretty well on the way to becoming a strong growth organization.`;
+  }
+  return `With a ScaleUp Score of ${formattedScore}, you are doing extremely well and are perhaps an example for others! However, in order to reach the next phase, there is still room for improvement.`;
+}
+
+function conclusionClosing(band: EspertoConclusionBand): string {
+  return band === "high"
+    ? "Hopefully this report will give you sufficient insight into how and where you and your organization can improve. Good luck and we hope to see you again for another Scaling Up Assessment in the future!"
+    : "Hopefully this report has given you sufficient insight into where you and your organization can improve. Good luck and we'll see you back at this Scaling Up Assessment - perhaps for a higher score...";
+}
+
 function questionByKey(model: SuFullLandscapeReportModel): ReadonlyMap<string, SuFullLandscapeQuestion> {
   return new Map(
     model.chapters.flatMap((chapter) =>
@@ -284,36 +317,16 @@ function ContentsPage({ model, number, footerBrand }: {
             </li>
           </ol>
           <figure className="su-full-toc-decisions">
-            <div className="su-full-toc-decision-graphic">
-              <svg
-                aria-label="Five Scaling Up decisions"
-                className="su-full-toc-decision-ring"
-                role="img"
-                viewBox="0 0 120 120"
-              >
-                {(["people", "strategy", "execution", "cash", "you"] as const).map((chapter, index) => (
-                  <circle
-                    className={`is-${chapter}`}
-                    cx="60"
-                    cy="60"
-                    fill="none"
-                    key={chapter}
-                    pathLength="100"
-                    r="39"
-                    stroke="var(--chapter-color)"
-                    strokeDasharray="19 81"
-                    strokeWidth="15"
-                    transform={`rotate(${-90 + (index * 72)} 60 60)`}
-                  />
-                ))}
-                <circle className="su-full-toc-decision-center is-you" cx="60" cy="60" fill="var(--chapter-color)" r="20" />
-                <text fill="#ffffff" fontSize="12" fontWeight="700" textAnchor="middle" x="60" y="64">YOU</text>
-              </svg>
-              <span aria-hidden="true" className="su-full-toc-decision-label su-full-toc-decision-label--people is-people">people</span>
-              <span aria-hidden="true" className="su-full-toc-decision-label su-full-toc-decision-label--strategy is-strategy">strategy</span>
-              <span aria-hidden="true" className="su-full-toc-decision-label su-full-toc-decision-label--execution is-execution">execution</span>
-              <span aria-hidden="true" className="su-full-toc-decision-label su-full-toc-decision-label--cash is-cash">cash</span>
-            </div>
+            {/* The user explicitly requested the original ESPERTO diagram rather
+                than a locally reinterpreted ring. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              alt="Five Scaling Up decisions"
+              className="su-full-toc-decision-graphic"
+              height="940"
+              src="/brand/su-esperto-five-decisions.png"
+              width="1270"
+            />
             <figcaption>
               The five Scaling Up decisions organize the core report. Subsections are indented beneath the decision they belong to.
             </figcaption>
@@ -509,6 +522,16 @@ function ConclusionPage({ report, model, contactEmail, number, beforeConclusion,
   beforeConclusion?: ReactNode;
   conclusionHtml?: SafeReportHtmlFragment | null;
 }) {
+  const band = espertoConclusionBand(report, model.scaleUpScore);
+  const highestResult = [...model.profileRows]
+    .sort((a, b) => b.youAverage - a.youAverage || a.stableKey.localeCompare(b.stableKey))[0];
+  const lowestResult = [...model.profileRows]
+    .sort((a, b) => a.youAverage - b.youAverage || a.stableKey.localeCompare(b.stableKey))[0];
+  const highestRelative = [...model.profileRows]
+    .sort((a, b) => b.deviation - a.deviation || a.stableKey.localeCompare(b.stableKey))[0];
+  const lowestRelative = [...model.profileRows]
+    .sort((a, b) => a.deviation - b.deviation || a.stableKey.localeCompare(b.stableKey))[0];
+
   return (
     <SuFullLandscapePage number={number} footerBrand={report}>
       {beforeConclusion}
@@ -517,12 +540,15 @@ function ConclusionPage({ report, model, contactEmail, number, beforeConclusion,
           aria-label="Scaling Up Full result summary"
           className="su-full-landscape-conclusion-summary"
         >
-          <h2>Conclusion</h2>
-          <p><strong>ScaleUp Score {scaleUpScore(model.scaleUpScore)}</strong></p>
-          <p><strong>Your strongest chapter is {model.strongestChapter.label}.</strong></p>
-          <p><strong>Your focus chapter is {model.weakestChapter.label}.</strong></p>
-          <p><strong>Closest comparison: {model.closestQuestions[0].label} is closest to the selected peer benchmark.</strong></p>
-          <p><strong>Largest-distance comparison: {model.largestGapQuestions[0].label} is furthest from the selected peer benchmark.</strong></p>
+          <h2>In Conclusion</h2>
+          <div className="su-full-landscape-conclusion-narrative" data-testid="su-full-conclusion-narrative">
+            <p>{conclusionOpening(band, model.scaleUpScore)}</p>
+            <p>You scored highest on {highestResult.label} and lowest on {lowestResult.label}.</p>
+            <p>
+              In comparison to other companies, in the same phase, you score higher on {highestRelative.label} and lower on {lowestRelative.label}.
+            </p>
+            <p>{conclusionClosing(band)}</p>
+          </div>
         </section>
         {conclusionHtml ? (
           <div className="su-full-landscape-custom-content">

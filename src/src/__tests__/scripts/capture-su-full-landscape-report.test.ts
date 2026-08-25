@@ -110,6 +110,20 @@ async function expectEditionSixBrandAssets(pdfPath: string, directory: string): 
     "verne-harnish-signature.png",
   );
   expect(extractedImageHashes).toContain(await rawRgbHash(signaturePath));
+
+  const tocPrefix = join(directory, "toc-decision-diagram");
+  execFileSync("pdfimages", ["-f", "3", "-l", "3", "-png", pdfPath, tocPrefix]);
+  const tocImagePaths = readdirSync(directory)
+    .filter((name) => name.startsWith("toc-decision-diagram-") && name.endsWith(".png"))
+    .map((name) => join(directory, name));
+  const tocImageHashes = await Promise.all(tocImagePaths.map(rawRgbHash));
+  const sourceDiagramPath = join(
+    process.cwd(),
+    "public",
+    "brand",
+    "su-esperto-five-decisions.png",
+  );
+  expect(tocImageHashes).toContain(await rawRgbHash(sourceDiagramPath));
 }
 
 test("captures the canonical landscape fixture as a CSS-sized print PDF", () => {
