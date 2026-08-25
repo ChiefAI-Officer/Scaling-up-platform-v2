@@ -5,6 +5,10 @@ import {
   personalizeSafeReportHtml,
   prepareReportHtmlForStorage,
 } from "@/lib/assessments/report-html";
+import { sanitizeReportHtmlFragment } from "@/lib/assessments/report-html-sanitizer";
+import { QSP_V2_PREFACE_HTML } from "@/lib/assessments/qsp-v2-report-content";
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
 
 describe("report HTML configuration", () => {
   it("preserves unrelated report configuration", () => {
@@ -148,6 +152,74 @@ describe("report HTML configuration", () => {
     expect(personalized).not.toContain("javascript:");
     expect(personalized).not.toMatch(/\b(?:href|src)=/);
     expect(personalized).toContain("<a>Open Acme &amp; Sons</a>");
+  });
+
+  it("personalizes the report-safe respondent first-name token", () => {
+    const stored = loadSafeReportHtml({
+      reportHtml: {
+        schemaVersion: 1,
+        introductionHtml: "<h1>Dear {{respondentFirstName}},</h1>",
+        conclusionHtml: null,
+      },
+    });
+    if (!stored.introductionHtml) throw new Error("expected a safe introduction");
+
+    expect(
+      personalizeSafeReportHtml(stored.introductionHtml, {
+        respondentName: "Alex Rivera",
+      }),
+    ).toBe("<h1>Dear Alex,</h1>");
+  });
+
+  it("keeps the canonical QSP v2 preface inside the authored-report contract", () => {
+    const sanitized = sanitizeReportHtmlFragment(
+      QSP_V2_PREFACE_HTML,
+      "introduction",
+    );
+
+    expect(sanitized).toMatchObject({ ok: true, didStripContent: false });
+    expect(sanitized.html).toContain('aria-label="QSP v2 preface"');
+    expect(sanitized.html).toContain("Dear {{respondentFirstName}},");
+    expect(sanitized.html).toContain(
+      "This is your report from the Quarterly Session Preparation Assessment.",
+    );
+    expect(sanitized.html).toContain("We wish you many great insights.");
+    expect(sanitized.html).toContain("Verne Harnish");
+    expect(sanitized.html.match(/<img\b/g)).toHaveLength(1);
+    expect(sanitized.html).not.toMatch(/<(?:html|head|body|style)\b/i);
+    expect(QSP_V2_PREFACE_HTML.length).toBeLessThanOrEqual(12_000);
+  });
+
+  it("ships the source-faithful QSP preface brand assets", () => {
+    const publicBrand = path.join(process.cwd(), "public", "brand");
+
+    expect(
+      existsSync(path.join(publicBrand, "su-logo-color.png")),
+    ).toBe(true);
+    expect(
+      existsSync(path.join(publicBrand, "verne-harnish-qsp-preface.jpg")),
+    ).toBe(true);
+  });
+
+  it("binds the QSP preface markers to the canonical responsive report layout", () => {
+    const css = readFileSync(
+      path.join(process.cwd(), "src", "styles", "su-report.css"),
+      "utf8",
+    );
+
+    expect(css).toContain('[aria-label="QSP v2 preface"]');
+    expect(css).toContain('[aria-label="QSP v2 preface brand"]');
+    expect(css).toContain('url("/brand/su-logo-color.png")');
+    expect(css).toContain("grid-template-columns: minmax(0, 1fr) 220px");
+    expect(css).toContain('[aria-label="QSP v2 preface signer"]');
+    expect(css).toContain("border-radius: 50%");
+    const qspStart = css.indexOf("Jeff's QSP v2 preface");
+    const qspEnd = css.indexOf("Source-faithful Scaling Up Full", qspStart);
+    expect(css.slice(qspStart, qspEnd)).toContain("break-after: page");
+    expect(css.slice(qspStart, qspEnd)).toContain(
+      '[data-testid="qual-section-P5_closing"]',
+    );
+    expect(css.slice(qspStart, qspEnd)).toContain("break-before: page");
   });
 
   it("drops only a malformed stored fragment", () => {
