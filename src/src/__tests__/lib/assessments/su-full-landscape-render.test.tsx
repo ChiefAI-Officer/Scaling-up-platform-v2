@@ -63,6 +63,64 @@ function renderLandscape(report = completeSuFullLandscapeReport()) {
   return model;
 }
 
+test.each([
+  {
+    label: "real respondent name",
+    report: completeSuFullLandscapeReport(),
+    introduction: "Dear Ari Founder, this report presents the Scaling Up Full results for Acme",
+    people: "So, in your case Ari Founder, let's ask that key question",
+    strategy: "Ari Founder, to have such a strong and effective strategy",
+  },
+  {
+    label: "respondent email fallback",
+    report: {
+      ...completeSuFullLandscapeReport(),
+      respondentName: "ari@example.com",
+    },
+    introduction: "This report presents the Scaling Up Full results for Acme",
+    people: "So, in your case, let's ask that key question",
+    strategy: "To have such a strong and effective strategy",
+  },
+] as const)("renders clean opener personalization for a $label", ({ report, introduction, people, strategy }) => {
+  renderLandscape(report);
+
+  const introductionOverview = document.querySelector(".su-full-introduction-overview");
+  const peopleNarrative = screen.getByTestId("chapter-narrative-people");
+  const strategyNarrative = screen.getByTestId("chapter-narrative-strategy");
+
+  expect(introductionOverview).toHaveTextContent(introduction);
+  expect(peopleNarrative).toHaveTextContent(people);
+  expect(strategyNarrative).toHaveTextContent(strategy);
+
+  if (report.respondentName === report.respondentEmail) {
+    expect(introductionOverview).not.toHaveTextContent(report.respondentEmail!);
+    expect(introductionOverview).not.toHaveTextContent(/^\s*Dear\b/);
+    for (const narrative of screen.getAllByTestId(/^chapter-narrative-/)) {
+      expect(narrative).not.toHaveTextContent(report.respondentEmail!);
+      expect(narrative.textContent).not.toMatch(/\bin your case\s+,|^\s*,|\s{2,}/);
+    }
+  }
+});
+
+test("chooses profile deviation signs after rounding to one decimal place", () => {
+  const report = completeSuFullLandscapeReport();
+  const presentation = completeSuFullLandscapePresentation(report);
+  const model = buildSuFullLandscapeReportModel({ report, presentation, resolvedStyle: "CLASSIC" });
+  if (!model) throw new Error("The landscape fixture must build");
+  const deviations = [0.16, -0.16, 0.04] as const;
+  const profileRows = model.profileRows.map((row, index) => ({
+    ...row,
+    deviation: deviations[index] ?? row.deviation,
+  }));
+
+  render(<SuFullLandscapeReport report={report} model={{ ...model, profileRows }} />);
+
+  const renderedRows = document.querySelectorAll(".su-full-landscape-profile-row--subsection");
+  expect(renderedRows[0].lastElementChild).toHaveTextContent(/^\+0\.2$/);
+  expect(renderedRows[1].lastElementChild).toHaveTextContent(/^-0\.2$/);
+  expect(renderedRows[2].lastElementChild).toHaveTextContent(/^0\.0$/);
+});
+
 test("renders every detail card as question then You/Peers bars then the Esperto paragraph without an added heading", () => {
   const model = renderLandscape(reportForPhase(4));
   const question = model.chapters[0].questions[0];

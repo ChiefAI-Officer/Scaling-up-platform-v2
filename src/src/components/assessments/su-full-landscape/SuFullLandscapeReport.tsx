@@ -324,10 +324,11 @@ function ContentsPage({ model, number, footerBrand }: {
   );
 }
 
-function IntroductionPage({ report, model, number }: {
+function IntroductionPage({ report, model, number, respondentDisplayName }: {
   report: RespondentReport;
   model: SuFullLandscapeReportModel;
   number: number;
+  respondentDisplayName: string | null;
 }) {
   const fte = rawNumberAnswer(report.rawAnswers, "Q_FTE_CONTRACT");
   const freelance = rawNumberAnswer(report.rawAnswers, "Q_FREELANCE");
@@ -338,7 +339,7 @@ function IntroductionPage({ report, model, number }: {
         <div className="su-full-introduction-layout">
           <div className="su-full-introduction-overview">
             <p>
-              Dear {report.respondentName}, this report presents the Scaling Up Full results for
+              {respondentDisplayName ? <>Dear {respondentDisplayName}, this</> : <>This</>} report presents the Scaling Up Full results for
               {" "}{report.companyName} across People, Strategy, Execution, Cash, and You. It also
               shows the peer benchmark frozen with this completed assessment.
             </p>
@@ -389,7 +390,10 @@ function ProfilePage({ model, number, footerBrand }: { model: SuFullLandscapeRep
     .sort((a, b) => b.deviation - a.deviation || a.stableKey.localeCompare(b.stableKey))[0];
   const weakestRelative = [...model.profileRows]
     .sort((a, b) => a.deviation - b.deviation || a.stableKey.localeCompare(b.stableKey))[0];
-  const formatDeviation = (value: number) => `${value >= 0 ? "+" : ""}${formatNumber(value)}`;
+  const formatDeviation = (value: number) => {
+    const rounded = Math.round(value * 10) / 10;
+    return `${rounded > 0 ? "+" : ""}${rounded.toFixed(1)}`;
+  };
 
   return (
     <SuFullLandscapePage number={number} footerBrand={footerBrand}>
@@ -439,7 +443,13 @@ function ProfilePage({ model, number, footerBrand }: { model: SuFullLandscapeRep
   );
 }
 
-function ChapterPage({ chapter, number, footerBrand, respondentName }: { chapter: SuFullLandscapeChapter; number: number; footerBrand: SuFullLandscapeFooterBrand; respondentName: string }) {
+function ChapterPage({ chapter, number, footerBrand, respondentDisplayName }: { chapter: SuFullLandscapeChapter; number: number; footerBrand: SuFullLandscapeFooterBrand; respondentDisplayName: string | null }) {
+  const personalize = (paragraph: string) => respondentDisplayName
+    ? paragraph.replaceAll("{{respondentName}}", respondentDisplayName)
+    : paragraph
+      .replace("So, in your case {{respondentName}},", "So, in your case,")
+      .replace("{{respondentName}}, to", "To");
+
   return (
     <SuFullLandscapePage number={number} chapterKey={chapter.key} variant="chapter" footerBrand={footerBrand}>
       <div className="su-full-landscape-chapter-copy">
@@ -447,7 +457,7 @@ function ChapterPage({ chapter, number, footerBrand, respondentName }: { chapter
         <h2>{chapter.label}</h2>
         <div data-testid={`chapter-narrative-${chapter.key}`} className="su-full-landscape-chapter-narrative">
           {CHAPTER_COPY[chapter.key].map((paragraph, index) => (
-            <p key={index}>{paragraph.replaceAll("{{respondentName}}", respondentName)}</p>
+            <p key={index}>{personalize(paragraph)}</p>
           ))}
         </div>
       </div>
@@ -577,6 +587,10 @@ export function SuFullLandscapeReport({
 }) {
   const chapters = new Map(model.chapters.map((chapter) => [chapter.key, chapter]));
   const questions = questionByKey(model);
+  const respondentDisplayName = respondentNameMatchesEmail(
+    report.respondentName,
+    report.respondentEmail,
+  ) ? null : report.respondentName;
 
   return (
     <div className="su-public-brand su-report su-full-landscape">
@@ -586,12 +600,12 @@ export function SuFullLandscapeReport({
           case "cover": return <CoverPage key={page.number} number={page.number} report={report} />;
           case "preface": return <CustomHtmlPage key={page.number} number={page.number} report={report} html={report.reportHtml!.introductionHtml!} />;
           case "contents": return <ContentsPage key={page.number} model={model} number={page.number} footerBrand={report} />;
-          case "introduction": return <IntroductionPage key={page.number} number={page.number} report={report} model={model} />;
+          case "introduction": return <IntroductionPage key={page.number} number={page.number} report={report} model={model} respondentDisplayName={respondentDisplayName} />;
           case "profile": return <ProfilePage key={page.number} number={page.number} model={model} footerBrand={report} />;
           case "chapter": {
             const chapter = chapters.get(page.chapterKey);
             if (!chapter) throw new Error(`Landscape chapter page ${page.number} is missing ${page.chapterKey}`);
-            return <ChapterPage chapter={chapter} key={page.number} number={page.number} footerBrand={report} respondentName={report.respondentName} />;
+            return <ChapterPage chapter={chapter} key={page.number} number={page.number} footerBrand={report} respondentDisplayName={respondentDisplayName} />;
           }
           case "detail": return <DetailPage key={page.number} page={page} questions={questions} peerProvenance={model.peerProvenance} footerBrand={report} />;
           case "conclusion": return <ConclusionPage key={page.number} number={page.number} report={report} model={model} contactEmail={contactEmail} beforeConclusion={beforeConclusion} conclusionHtml={report.reportHtml?.conclusionHtml} />;
