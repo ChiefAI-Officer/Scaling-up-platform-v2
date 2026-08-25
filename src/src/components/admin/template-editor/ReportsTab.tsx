@@ -8,6 +8,11 @@ import {
   REPORT_HTML_LIMITS,
   reportHtmlSourceCharacterIssue,
 } from "@/lib/assessments/report-html-sanitizer";
+import {
+  REPORT_PLACEHOLDERS,
+  reportPlaceholderIssue,
+  type ReportPlaceholderToken,
+} from "@/lib/assessments/report-placeholders";
 
 function HtmlRegion({
   id,
@@ -29,8 +34,28 @@ function HtmlRegion({
   isReadOnly: boolean;
 }) {
   const html = value ?? "";
-  const sourceCharacterIssue = reportHtmlSourceCharacterIssue(html, position);
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+  const authoringIssue =
+    reportHtmlSourceCharacterIssue(html, position) ??
+    reportPlaceholderIssue(html, title);
   const errorId = `${id}-error`;
+
+  function insertPlaceholder(token: ReportPlaceholderToken) {
+    const textarea = textareaRef.current;
+    if (!textarea || isReadOnly) return;
+
+    const selectionStart = textarea.selectionStart ?? html.length;
+    const selectionEnd = textarea.selectionEnd ?? selectionStart;
+    const nextHtml =
+      html.slice(0, selectionStart) + token + html.slice(selectionEnd);
+    const nextCaret = selectionStart + token.length;
+    onChange(nextHtml);
+    requestAnimationFrame(() => {
+      textarea.focus();
+      textarea.setSelectionRange(nextCaret, nextCaret);
+    });
+  }
+
   return (
     <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
       <div className="p-5">
@@ -47,27 +72,57 @@ function HtmlRegion({
             {label}
           </label>
           <textarea
+            ref={textareaRef}
             id={id}
             aria-label={label}
             value={html}
             onChange={(event) => onChange(event.target.value)}
             disabled={isReadOnly}
-            aria-invalid={sourceCharacterIssue ? true : undefined}
-            aria-describedby={sourceCharacterIssue ? errorId : undefined}
+            aria-invalid={authoringIssue ? true : undefined}
+            aria-describedby={authoringIssue ? errorId : undefined}
             spellCheck={false}
-            className={`min-h-[168px] w-full resize-y rounded-lg border bg-slate-950 p-4 font-mono text-xs leading-6 text-slate-100 outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-70 ${sourceCharacterIssue ? "border-destructive focus:border-destructive focus:ring-destructive/20" : "border-slate-700 focus:border-primary focus:ring-primary/20"}`}
+            className={`min-h-[168px] w-full resize-y rounded-lg border bg-slate-950 p-4 font-mono text-xs leading-6 text-slate-100 outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-70 ${authoringIssue ? "border-destructive focus:border-destructive focus:ring-destructive/20" : "border-slate-700 focus:border-primary focus:ring-primary/20"}`}
           />
+          <div className="mt-3 rounded-lg border border-border bg-muted/30 p-3">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <p className="text-xs font-semibold text-foreground">
+                Available fields
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                Select a field to insert it at the cursor.
+              </p>
+            </div>
+            <div className="mt-2 grid gap-2 lg:grid-cols-3">
+              {REPORT_PLACEHOLDERS.map((field) => (
+                <button
+                  key={field.token}
+                  type="button"
+                  aria-label={`Insert ${field.label} placeholder`}
+                  disabled={isReadOnly}
+                  onClick={() => insertPlaceholder(field.token)}
+                  className="rounded-md border border-border bg-background px-2.5 py-2 text-left transition-colors hover:border-primary hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <code className="block text-[11px] font-semibold text-foreground">
+                    {field.token}
+                  </code>
+                  <span className="mt-1 block text-[10px] leading-4 text-muted-foreground">
+                    {field.description}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="mt-2 flex items-start justify-between gap-4 text-[11px] text-muted-foreground">
-            {sourceCharacterIssue ? (
+            {authoringIssue ? (
               <span id={errorId} role="alert" className="text-destructive">
-                {sourceCharacterIssue}
+                {authoringIssue}
               </span>
             ) : (
               <span>
                 Paste HTML. Unsafe scripts and attributes are removed when you save the draft.
               </span>
             )}
-            <span className={`shrink-0 ${sourceCharacterIssue ? "font-semibold text-destructive" : ""}`}>
+            <span className={`shrink-0 ${authoringIssue ? "font-semibold text-destructive" : ""}`}>
               {html.length.toLocaleString()} / {REPORT_HTML_LIMITS[position].rawCharacters.toLocaleString()}
             </span>
           </div>
@@ -138,7 +193,7 @@ export function ReportsTab({
       <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
         <h3 className="text-base font-semibold text-foreground">Full report preview</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          Preview uses the last saved content and the exact report styling.
+          Preview uses the last saved content, exact report styling, and representative respondent and company details.
         </p>
         <div className="mt-4 flex flex-wrap gap-3">
           <PreviewLink href={previewHref} disabled={previewDisabled}>

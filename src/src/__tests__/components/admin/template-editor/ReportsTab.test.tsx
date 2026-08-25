@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { ReportsTab } from "@/components/admin/template-editor/ReportsTab";
 
 const value = {
@@ -92,6 +92,91 @@ describe("ReportsTab", () => {
     });
   });
 
+  it("shows the same three available fields beside both report regions", () => {
+    render(
+      <ReportsTab
+        value={value}
+        previewHref="/admin/assessments/templates/tpl_1/versions/ver_2/preview-report"
+        historicalPreviewHref={null}
+        previewDisabled={false}
+        onChange={jest.fn()}
+        isReadOnly={false}
+      />,
+    );
+
+    expect(screen.getAllByText("Available fields")).toHaveLength(2);
+    expect(screen.getAllByText("{{respondentFirstName}}")).toHaveLength(2);
+    expect(screen.getAllByText("{{respondentName}}")).toHaveLength(2);
+    expect(screen.getAllByText("{{companyName}}")).toHaveLength(2);
+    expect(
+      screen.getAllByText(
+        "First name from the respondent record. Uses “there” when unavailable.",
+      ),
+    ).toHaveLength(2);
+  });
+
+  it("inserts a field over the current selection and restores the caret", async () => {
+    function StatefulReportsTab() {
+      const [current, setCurrent] = React.useState(value);
+      return (
+        <ReportsTab
+          value={current}
+          previewHref="/admin/assessments/templates/tpl_1/versions/ver_2/preview-report"
+          historicalPreviewHref={null}
+          previewDisabled={false}
+          onChange={setCurrent}
+          isReadOnly={false}
+        />
+      );
+    }
+
+    render(<StatefulReportsTab />);
+    const welcome = screen.getByLabelText(
+      "Introduction / preface HTML",
+    ) as HTMLTextAreaElement;
+    welcome.focus();
+    welcome.setSelectionRange(3, 8);
+
+    fireEvent.click(
+      screen.getAllByRole("button", {
+        name: "Insert First name placeholder",
+      })[0],
+    );
+
+    expect(welcome).toHaveValue("<p>{{respondentFirstName}}</p>");
+    await waitFor(() => {
+      expect(welcome).toHaveFocus();
+      expect(welcome.selectionStart).toBe(26);
+      expect(welcome.selectionEnd).toBe(26);
+    });
+  });
+
+  it("marks unsupported placeholders invalid while preserving the edit", () => {
+    function StatefulReportsTab() {
+      const [current, setCurrent] = React.useState(value);
+      return (
+        <ReportsTab
+          value={current}
+          previewHref="/admin/assessments/templates/tpl_1/versions/ver_2/preview-report"
+          historicalPreviewHref={null}
+          previewDisabled={false}
+          onChange={setCurrent}
+          isReadOnly={false}
+        />
+      );
+    }
+
+    render(<StatefulReportsTab />);
+    const welcome = screen.getByLabelText("Introduction / preface HTML");
+    fireEvent.change(welcome, {
+      target: { value: "<p>{{unknownField}}</p>" },
+    });
+
+    expect(welcome).toHaveValue("<p>{{unknownField}}</p>");
+    expect(welcome).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByRole("alert")).toHaveTextContent("{{unknownField}}");
+  });
+
   it("offers only saved full-report previews and disables them while report content is dirty", () => {
     render(
       <ReportsTab
@@ -105,7 +190,7 @@ describe("ReportsTab", () => {
     );
 
     expect(screen.getByText("Full report preview")).toBeInTheDocument();
-    expect(screen.getByText("Preview uses the last saved content and the exact report styling.")).toBeInTheDocument();
+    expect(screen.getByText("Preview uses the last saved content, exact report styling, and representative respondent and company details.")).toBeInTheDocument();
     expect(screen.getByText("Save the draft to preview your latest changes.")).toBeInTheDocument();
     expect(screen.queryByTestId("report-html-preview-introduction")).toBeNull();
     expect(screen.queryByTestId("report-html-preview-conclusion")).toBeNull();
@@ -129,5 +214,10 @@ describe("ReportsTab", () => {
     expect(
       screen.getByLabelText("Conclusion / call-to-action HTML"),
     ).toBeDisabled();
+    for (const button of screen.getAllByRole("button", {
+      name: /Insert .* placeholder/,
+    })) {
+      expect(button).toBeDisabled();
+    }
   });
 });

@@ -71,6 +71,7 @@ import {
   type SafeReportHtml,
 } from "@/lib/assessments/report-html";
 import { reportHtmlSourceCharacterIssue } from "@/lib/assessments/report-html-sanitizer";
+import { reportPlaceholderIssue } from "@/lib/assessments/report-placeholders";
 
 export interface UseTemplateEditorDraftArgs {
   template: TemplateEditorTabbedTemplate;
@@ -953,7 +954,7 @@ export function useTemplateEditorDraft({
     if (!isAnyDirty) return;
     if (dirtyFlags.reportConfig) {
       const reportHtml = extractReportHtml(reportConfigRef.current);
-      const sourceCharacterIssue =
+      const authoringIssue =
         reportHtmlSourceCharacterIssue(
           reportHtml.introductionHtml ?? "",
           "introduction",
@@ -961,11 +962,19 @@ export function useTemplateEditorDraft({
         reportHtmlSourceCharacterIssue(
           reportHtml.conclusionHtml ?? "",
           "conclusion",
+        ) ??
+        reportPlaceholderIssue(
+          reportHtml.introductionHtml ?? "",
+          "Welcome section",
+        ) ??
+        reportPlaceholderIssue(
+          reportHtml.conclusionHtml ?? "",
+          "Closing message",
         );
-      if (sourceCharacterIssue) {
+      if (authoringIssue) {
         toast({
           title: "Could not save report content",
-          description: sourceCharacterIssue,
+          description: authoringIssue,
           variant: "destructive",
         });
         return;
