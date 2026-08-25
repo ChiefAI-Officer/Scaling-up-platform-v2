@@ -2838,10 +2838,10 @@
   text-transform: capitalize;
   white-space: nowrap;
 }
-.su-public-brand.su-report.su-full-landscape .su-full-toc-decision-label--people { top: 0; left: 50%; color: #9a6200; transform: translateX(-50%); }
-.su-public-brand.su-report.su-full-landscape .su-full-toc-decision-label--strategy { top: 47%; right: -4px; color: #00628f; }
-.su-public-brand.su-report.su-full-landscape .su-full-toc-decision-label--execution { right: 16px; bottom: -7px; color: #624018; }
-.su-public-brand.su-report.su-full-landscape .su-full-toc-decision-label--cash { bottom: -7px; left: 22px; color: #4d6600; }
+.su-public-brand.su-report.su-full-landscape .su-full-toc-decision-label--people { top: 0; left: 50%; transform: translateX(-50%); }
+.su-public-brand.su-report.su-full-landscape .su-full-toc-decision-label--strategy { top: 47%; right: -4px; }
+.su-public-brand.su-report.su-full-landscape .su-full-toc-decision-label--execution { right: 16px; bottom: -7px; }
+.su-public-brand.su-report.su-full-landscape .su-full-toc-decision-label--cash { bottom: -7px; left: 22px; }
 .su-public-brand.su-report.su-full-landscape .su-full-toc-decisions figcaption {
   max-width: 42ch;
   margin: 14px auto 0;
@@ -2911,7 +2911,7 @@
   line-height: 1.4;
 }
 .su-public-brand.su-report.su-full-landscape .su-full-profile-commentary strong {
-  color: #522583;
+  color: var(--chapter-color);
 }
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-page-body h1,
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-page-body h2,

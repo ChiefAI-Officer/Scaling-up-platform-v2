@@ -103,14 +103,6 @@ test("renders the authored 25-page landscape composition without rejected pages"
     if (!page) throw new Error("Canonical fixture is missing a table-of-contents page");
     return page.number;
   };
-  const detailRange = (firstQuestionKey: string, lastQuestionKey: string) => {
-    const detailPageNumber = (questionKey: string) => pageNumberFor(
-      (page) => page.kind === "detail" && page.questionKeys.includes(questionKey),
-    );
-    const firstPage = detailPageNumber(firstQuestionKey);
-    const lastPage = detailPageNumber(lastQuestionKey);
-    return firstPage === lastPage ? String(firstPage) : `${firstPage}–${lastPage}`;
-  };
 
   expect(within(contents).getByText("Introduction")).toBeInTheDocument();
   expect(within(contents).getByTestId("toc-introduction")).toHaveTextContent(
@@ -125,14 +117,25 @@ test("renders the authored 25-page landscape composition without rejected pages"
     `People ${pageNumberFor((page) => page.kind === "chapter" && page.chapterKey === "people")}`,
   );
   expect(within(contents).getByText("Your Employees")).toHaveClass("su-full-toc-subsection");
-  expect(within(contents).getByTestId("toc-subsection-your-employees")).toHaveTextContent(
-    `Your Employees ${detailRange("Q01", "Q08")}`,
-  );
-  expect(
-    within(contents).getByTestId("toc-subsection-company-culture").textContent
-      ?.replace(/\s+/g, " ")
-      .trim(),
-  ).toBe(`Company Culture ${detailRange("Q09", "Q13")}`);
+  const authoredSubsectionPages = [
+    ["your-employees", "Your Employees", "7–8"],
+    ["company-culture", "Company Culture", "9"],
+    ["goals-and-strategy", "Goals and Strategy", "11–12"],
+    ["leadership-team", "Leadership Team", "14"],
+    ["operational-processes", "Operational Processes", "15"],
+    ["sales-and-marketing", "Sales and Marketing", "16"],
+    ["scalability-innovation-and-technology", "Scalability, Innovation and Technology", "17"],
+    ["finance-and-cash", "Finance and Cash", "19"],
+    ["your-leadership", "Your Leadership", "21–22"],
+    ["internal-communication", "Internal Communication", "23"],
+  ] as const;
+  for (const [testId, label, pages] of authoredSubsectionPages) {
+    expect(
+      within(contents).getByTestId(`toc-subsection-${testId}`).textContent
+        ?.replace(/\s+/g, " ")
+        .trim(),
+    ).toBe(`${label} ${pages}`);
+  }
   expect(within(contents).getByTestId("toc-domain-strategy")).toHaveTextContent(
     `Strategy ${pageNumberFor((page) => page.kind === "chapter" && page.chapterKey === "strategy")}`,
   );
@@ -151,7 +154,16 @@ test("renders the authored 25-page landscape composition without rejected pages"
   expect(within(contents).getByTestId("toc-appendix")).toHaveTextContent(
     `Appendix A ${pageNumberFor((page) => page.kind === "appendix")}`,
   );
-  expect(within(contents).getByLabelText("Five Scaling Up decisions")).toBeInTheDocument();
+  const decisionGraphic = within(contents).getByLabelText("Five Scaling Up decisions");
+  expect(decisionGraphic).toBeInTheDocument();
+  expect(decisionGraphic.querySelector(".su-full-toc-decision-center")).toHaveAttribute(
+    "fill",
+    "var(--chapter-color)",
+  );
+  for (const domain of ["people", "strategy", "execution", "cash"] as const) {
+    expect(contents.querySelector(`.su-full-toc-decision-label--${domain}`))
+      .toHaveClass(`is-${domain}`);
+  }
   const chartTitleIds = Array.from(
     document.querySelectorAll<HTMLElement>("[aria-labelledby^=\"su-landscape-vertical-chart-title-\"]"),
   ).map((chart) => chart.getAttribute("aria-labelledby"));
@@ -352,6 +364,8 @@ test("keeps the landscape renderer's A4 print and responsive screen contract sco
   expect(stylesheet).toContain(".su-full-landscape-report .is-execution { --chapter-color:");
   expect(stylesheet).toContain(".su-full-landscape-report .is-cash { --chapter-color:");
   expect(stylesheet).toContain(".su-full-landscape-report .is-you { --chapter-color:");
+  expect(stylesheet).toMatch(/\.su-full-toc-decision-label\s*\{[^}]*color: var\(--chapter-line-color\);/);
+  expect(stylesheet).toMatch(/\.su-full-profile-commentary strong\s*\{[^}]*color: var\(--chapter-color\);/);
   expect(stylesheet).toContain("print-color-adjust: exact;");
   expect(stylesheet).toContain("@media screen and (max-width: 760px)");
   expect(stylesheet).toContain(".su-full-landscape-page-body { grid-template-columns: 1fr;");

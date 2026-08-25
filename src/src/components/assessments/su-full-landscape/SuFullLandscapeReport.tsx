@@ -286,13 +286,13 @@ function ContentsPage({ model, number, footerBrand }: {
                     transform={`rotate(${-90 + (index * 72)} 60 60)`}
                   />
                 ))}
-                <circle cx="60" cy="60" fill="#522583" r="20" />
+                <circle className="su-full-toc-decision-center is-you" cx="60" cy="60" fill="var(--chapter-color)" r="20" />
                 <text fill="#ffffff" fontSize="12" fontWeight="700" textAnchor="middle" x="60" y="64">YOU</text>
               </svg>
-              <span aria-hidden="true" className="su-full-toc-decision-label su-full-toc-decision-label--people">people</span>
-              <span aria-hidden="true" className="su-full-toc-decision-label su-full-toc-decision-label--strategy">strategy</span>
-              <span aria-hidden="true" className="su-full-toc-decision-label su-full-toc-decision-label--execution">execution</span>
-              <span aria-hidden="true" className="su-full-toc-decision-label su-full-toc-decision-label--cash">cash</span>
+              <span aria-hidden="true" className="su-full-toc-decision-label su-full-toc-decision-label--people is-people">people</span>
+              <span aria-hidden="true" className="su-full-toc-decision-label su-full-toc-decision-label--strategy is-strategy">strategy</span>
+              <span aria-hidden="true" className="su-full-toc-decision-label su-full-toc-decision-label--execution is-execution">execution</span>
+              <span aria-hidden="true" className="su-full-toc-decision-label su-full-toc-decision-label--cash is-cash">cash</span>
             </div>
             <figcaption>
               The five Scaling Up decisions organize the core report. Subsections are indented beneath the decision they belong to.
