@@ -15,13 +15,13 @@ import { ReportStyleScope } from "@/components/assessments/ReportStyleScope";
 import {
   completeSuFullLandscapePresentation,
   completeSuFullLandscapeReport,
+  restoredScalingUpFullCtaReport,
 } from "@/__tests__/fixtures/su-full-landscape";
 import {
   SU_FULL_PHASE_PEER_CONTENT_HASHES,
   SU_FULL_PHASE_PEER_SOURCE_ID,
   getGovernedPeerValue,
 } from "@/lib/assessments/su-full-phase-peer-catalogue";
-import { prepareReportHtmlForStorage } from "@/lib/assessments/report-html";
 import {
   SU_FULL_GOVERNED_PEER_DISCLOSURE,
   SU_FULL_LEGACY_PEER_DISCLOSURE,
@@ -39,38 +39,6 @@ const HISTORICAL_PEER_DISCLOSURE = "Peers shows the historical benchmark used fo
 const LEGACY_FALSE_FREEZE_CLAIM = /frozen governed snapshot|peer values[^.]{0,120}frozen (?:when|at) (?:this result was )?scored/i;
 const ENGINEERING_LANGUAGE = /governed|snapshot|sourceId|source id|catalogue|provenance|legacy baseline|phase-aware|frozen|esperto-five-phase-peers|esperto-controlled/i;
 const REPRESENTATIVE_482_CHARACTER_FEEDBACK = "In order to scale, smart application and linking of information technology is essential. Sales, marketing, project management, production,humanresources,reporting,etc.Thisgivesstructureand clarity, prevents mistakes and makes growing a lot easier. With the size of your company, a lot of systems likely still work independently of each other, or you primarily use Excel. This is customary, but in your next growth phase you will have to start thinking about smart solutions. Act now";
-
-function restoredScalingUpFullCtaReport() {
-  const prepared = prepareReportHtmlForStorage({
-    reportHtml: {
-      schemaVersion: 1,
-      introductionHtml: [
-        '<div aria-label="Verne Harnish preface">',
-        '<strong aria-label="Preface heading">PREFACE</strong>',
-        '<p>Dear {{respondentName}},\n\nCongratulations! You are now the owner of your own personalized ScaleUp Assessment report. With this report you will gain a better understanding of how well prepared you are for Scaling Up, how you and your company compare to your peers and what your priorities may be. To reach the \'next level\' you now have the choice of using the Scaling Up book, implementing a growth program or working with a coach. Ultimately, this report will work as a guide and input towards your personal growth path. {{companyName}}, you can use this report as a guide and as input for your personal growth path.\n\nThe assessment has been predominantly devised utilizing the Scaling Up / Rockefeller Habits 2.0 methodology, alongside academic growth models and organizational development theories. We have received input from many seasoned growth entrepreneurs, coaches, mentors and academics. We hope and believe you will be positively surprised by the number of Scaling Up insights throughout this report. We would highly recommend repeating this assessment annually, in order to keep track of your progress.\n\nI wish you many great insights. Enjoy the report and keep scaling!</p>',
-        '<img src="https://platformtest.scalingup.com/brand/verne-harnish-preface.jpg" alt="Verne Harnish">',
-        '<span aria-label="Verne Harnish signature"></span>',
-        '<aside>Verne Harnish, CEO\nScaling Up\nAuthor of Scaling Up (Rockefeller Habits 2.0)\nThe Greatest Business Decisions of All Time\nMastering the Rockefeller Habits</aside>',
-        "</div>",
-      ].join(""),
-      conclusionHtml: [
-        '<section aria-label="Scaling Up Full next steps">',
-        '<p><strong>Next step</strong> – Go back thru the book Scaling Up (Rockefeller Habits 2.0) or start with Mastering the Rockefeller Habits (quicker/simpler read to start).</p>',
-        '<img src="https://platformtest.scalingup.com/brand/scaling-up-books.png" alt="Mastering the Rockefeller Habits and Scaling Up books">',
-        '<p>Or you can schedule a complimentary one-hour debrief of your assessment with one of our 280+ coaching partners around the globe.</p>',
-        '<a href="https://coaches.scalingup.com/coach-match-after-assessment-form" target="_blank" rel="noopener noreferrer" aria-label="Request a complimentary follow-up">YES! I WOULD LIKE A COMPLIMENTARY FOLLOW-UP</a>',
-        '<a href="https://scalingup.com/book/" target="_blank" rel="noopener noreferrer" aria-label="Buy the books">YES! I LIKE TO BUY THE BOOKS</a>',
-        "</section>",
-      ].join(""),
-    },
-  });
-  if (!prepared.ok) throw new Error(prepared.issues.map((issue) => issue.message).join(" "));
-  const report = completeSuFullLandscapeReport();
-  return {
-    ...report,
-    reportHtml: (prepared.reportConfig as { reportHtml: typeof report.reportHtml }).reportHtml,
-  };
-}
 
 const SEMANTIC_ESCAPE_CASES = [
   {

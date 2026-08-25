@@ -2,6 +2,7 @@ import type { RespondentReport } from "@/lib/assessments/respondent-report";
 import { CoachLogo } from "@/components/assessments/CoachLogo";
 import type {
   SuFullLandscapeChapter,
+  SuFullLandscapeChapterKey,
   SuFullLandscapePage as SuFullLandscapePageDescriptor,
   SuFullLandscapeQuestion,
   SuFullLandscapeReportModel,

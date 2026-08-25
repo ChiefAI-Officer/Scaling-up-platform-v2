@@ -10,6 +10,7 @@ import { SuFullLandscapeReport } from "@/components/assessments/su-full-landscap
 import {
   completeSuFullLandscapePresentation,
   completeSuFullLandscapeReport,
+  restoredScalingUpFullCtaReport,
 } from "@/__tests__/fixtures/su-full-landscape";
 import { buildSuFullLandscapeReportModel } from "@/lib/assessments/su-full-landscape-report";
 
@@ -51,13 +52,7 @@ test("renders detail paired bars in You then Peers order with visible values", (
 });
 
 test("renders the authored 25-page landscape composition without rejected pages", () => {
-  const report = {
-    ...completeSuFullLandscapeReport(),
-    reportHtml: {
-      introductionHtml: '<section aria-label="Verne Harnish preface"><h2>Preface</h2></section>',
-      conclusionHtml: null,
-    },
-  };
+  const report = restoredScalingUpFullCtaReport();
   const presentation = completeSuFullLandscapePresentation(report);
   const model = buildSuFullLandscapeReportModel({ report, presentation, resolvedStyle: "CLASSIC" });
   if (!model) throw new Error("The canonical landscape fixture must build");
@@ -153,8 +148,9 @@ test("renders the authored 25-page landscape composition without rejected pages"
   expect(screen.getByTestId("su-full-landscape-page-24")).toHaveTextContent("ScaleUp Score");
   expect(screen.getByTestId("su-full-landscape-page-4")).toHaveTextContent("55 / 100");
   expect(screen.getByTestId("su-full-landscape-page-24")).toHaveTextContent("55 / 100");
-  expect(screen.getByRole("link", { name: "Contact your coach" })).toHaveAttribute("href", "mailto:coach@example.com");
-  expect(screen.getByTestId("su-full-landscape-page-24")).toHaveTextContent("Next steps");
+  expect(screen.getByRole("link", { name: "Request a complimentary follow-up" }))
+    .toHaveAttribute("href", "https://coaches.scalingup.com/coach-match-after-assessment-form");
+  expect(screen.getByTestId("su-full-landscape-page-24")).toHaveTextContent("Next step");
   expect(document.body.textContent).not.toMatch(/TCPDF/i);
 });
 
