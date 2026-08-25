@@ -170,6 +170,33 @@ describe("useTemplateEditorDraft — Save-Draft metadata body (ED10 trim)", () =
     });
   });
 
+  it("aborts every save lane before fetch when report HTML has an unsupported placeholder", async () => {
+    const { result } = renderDraft({ ed10Active: true });
+
+    act(() => {
+      result.current.handleTemplateFieldChange({ name: "Renamed" });
+      result.current.handleReportHtmlChange({
+        schemaVersion: 1,
+        introductionHtml: "<p>{{unknownField}}</p>",
+        conclusionHtml: null,
+      });
+    });
+
+    await act(async () => {
+      await result.current.handleSaveDraft();
+    });
+
+    expect(fetchCalls).toHaveLength(0);
+    expect(result.current.dirtyFlags.metadata).toBe(true);
+    expect(result.current.dirtyFlags.reportConfig).toBe(true);
+    expect(toastMock).toHaveBeenCalledWith({
+      title: "Could not save report content",
+      description:
+        "Welcome section contains unsupported placeholder {{unknownField}}. Use {{respondentFirstName}}, {{respondentName}}, or {{companyName}}.",
+      variant: "destructive",
+    });
+  });
+
   it("shows the server's field-specific report HTML issue when sanitization rejects the draft", async () => {
     const { result } = renderDraft({ ed10Active: true });
     patchStatus = 422;

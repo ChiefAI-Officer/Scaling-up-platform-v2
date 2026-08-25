@@ -147,4 +147,17 @@ describe("qualitative report HTML regions", () => {
     expect(screen.getByRole("heading", { name: "Dear Alex," })).toBeInTheDocument();
     expect(screen.queryByText(/respondentFirstName/)).not.toBeInTheDocument();
   });
+
+  it("personalizes all supported fields for LVA report HTML", () => {
+    render(<QualitativeReport report={qualitative({
+      introductionHtml:
+        "<p>{{respondentFirstName}} · {{respondentName}} · {{companyName}}</p>",
+      conclusionHtml: null,
+    })} />);
+
+    expect(screen.getByTestId("report-html-introduction")).toHaveTextContent(
+      "Alex · Alex Doe · Acme",
+    );
+    expect(screen.queryByText(/\{\{(?:respondent|company)/)).not.toBeInTheDocument();
+  });
 });
