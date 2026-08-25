@@ -2640,11 +2640,12 @@
   align-content: start;
 }
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--chapter .su-full-landscape-page-body {
-  grid-template-columns: minmax(0, .4fr) minmax(0, .6fr);
-  column-gap: 12mm;
+  grid-template-columns: minmax(0, .44fr) minmax(0, .56fr);
+  column-gap: 10mm;
 }
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-chapter-copy {
   grid-column: 1;
+  padding-right: 2mm;
 }
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--chapter .su-full-landscape-vertical-chart {
   grid-column: 2;
@@ -2733,6 +2734,17 @@
   letter-spacing: .14em;
   text-transform: uppercase;
 }
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-chapter-copy h2 {
+  color: var(--chapter-line-color);
+}
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-chapter-narrative p {
+  margin: 0 0 12px;
+  font-size: 10px;
+  line-height: 1.35;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-chapter-narrative p:last-child {
+  margin-bottom: 0;
+}
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-chapter-key {
   display: flex;
   flex-wrap: wrap;
@@ -2751,6 +2763,191 @@
   width: 20px;
   height: 8px;
   background: var(--chapter-color);
+}
+.su-public-brand.su-report.su-full-landscape .su-full-toc > h2,
+.su-public-brand.su-report.su-full-landscape .su-full-profile > h2 {
+  margin: 0 0 12px;
+  text-transform: uppercase;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-toc-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(250px, .85fr);
+  gap: 10mm;
+  align-items: start;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-toc-list,
+.su-public-brand.su-report.su-full-landscape .su-full-toc-subsections {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-toc-entry,
+.su-public-brand.su-report.su-full-landscape .su-full-toc-subsections li {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: baseline;
+  min-height: 21px;
+  padding: 4px 0;
+  border-bottom: 1px solid #e5e2e8;
+  color: #1a1322;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-toc-entry--plain {
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-toc-group > .su-full-toc-entry {
+  color: var(--chapter-line-color);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-toc-subsections li {
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 17px;
+  margin-left: 32px;
+  padding: 3px 0;
+  border-bottom: 0;
+  color: var(--chapter-line-color);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-toc-index {
+  color: #6b6480;
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-toc-domain {
+  color: inherit;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-toc-page {
+  justify-self: end;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-toc-decisions {
+  align-self: center;
+  margin: 10mm 0 0;
+  text-align: center;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-toc-decision-graphic {
+  display: block;
+  width: 300px;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-toc-decisions figcaption {
+  max-width: 42ch;
+  margin: 14px auto 0;
+  color: #4b4359;
+  font-size: 10px;
+  line-height: 1.4;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-profile-intro {
+  margin: 0 0 16px;
+  color: #4b4359;
+  font-size: 11px;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-introduction > h2 {
+  margin: 0 0 14px;
+  text-transform: uppercase;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-introduction-layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10mm;
+  align-items: start;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-introduction-layout p {
+  margin: 0 0 14px;
+  font-size: 10.5px;
+  line-height: 1.4;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-introduction-phase {
+  margin-top: 16px;
+  padding-left: 14px;
+  border-left: 4px solid var(--chapter-color);
+}
+.su-public-brand.su-report.su-full-landscape .su-full-introduction-phase h3 {
+  margin: 0 0 8px;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-introduction-phase p {
+  margin-bottom: 0;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-introduction-results {
+  padding-left: 8mm;
+  border-left: 1px solid color-mix(in srgb, var(--chapter-color) 24%, transparent);
+}
+.su-public-brand.su-report.su-full-landscape .su-full-introduction-score {
+  padding: 12px 0;
+  border-top: 3px solid var(--chapter-color);
+  border-bottom: 1px solid color-mix(in srgb, var(--chapter-color) 24%, transparent);
+  color: var(--chapter-color);
+}
+.su-public-brand.su-report.su-full-landscape .su-full-introduction-score strong {
+  color: var(--chapter-color);
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 18px;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-profile-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(250px, .85fr);
+  gap: 8mm;
+  align-items: start;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-profile-table {
+  font-variant-numeric: tabular-nums;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-profile-table th,
+.su-public-brand.su-report.su-full-landscape .su-full-profile-table td {
+  padding: 4px 8px;
+  border: 1px solid #ffffff;
+  line-height: 1.15;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-profile-table thead th {
+  padding-top: 2px;
+  color: #6b6480;
+  font-size: 8px;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-profile-table thead th:not(:first-child),
+.su-public-brand.su-report.su-full-landscape .su-full-profile-table tbody td {
+  text-align: right;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-profile-table .su-full-landscape-profile-row--chapter {
+  background: var(--chapter-color);
+  color: #ffffff;
+  font-weight: 700;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-profile-table .su-full-landscape-profile-row--chapter.is-people,
+.su-public-brand.su-report.su-full-landscape .su-full-profile-table .su-full-landscape-profile-row--chapter.is-cash {
+  color: #1a1322;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-profile-table .su-full-landscape-profile-row--chapter:not(:first-child) > * {
+  border-top-width: 9px;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-profile-table .su-full-landscape-profile-row--chapter th {
+  color: inherit;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-profile-table .su-full-landscape-profile-row--subsection {
+  background: color-mix(in srgb, var(--chapter-peer-color) 45%, #ffffff);
+  color: #1a1322;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-profile-table .su-full-landscape-profile-row--subsection th {
+  padding-left: 24px;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-profile-commentary {
+  padding-left: 8mm;
+  border-left: 1px solid #cdc8d3;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-profile-commentary p {
+  margin: 0 0 15px;
+  color: #1a1322;
+  font-size: 10.5px;
+  line-height: 1.4;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-profile-commentary strong {
+  color: var(--chapter-color);
 }
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-page-body h1,
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-page-body h2,
@@ -2950,7 +3147,11 @@
 }
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-bar-fill { display: block; height: 100%; border-radius: 0; }
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-bar-fill--you { background: var(--chapter-line-color); }
-.su-public-brand.su-report.su-full-landscape .su-full-landscape-bar-fill--peers { background: #6b6480; }
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-bar-fill--peers {
+  box-sizing: border-box;
+  background: var(--chapter-peer-color);
+  border: 1px solid var(--chapter-line-color);
+}
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-bar-value {
   color: #1a1322;
   font-size: 11px;
@@ -2991,6 +3192,32 @@
   text-overflow: clip;
 }
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-detail-bars { display: grid; gap: 5px; max-width: 500px; }
+
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-conclusion-layout {
+  display: grid;
+  grid-template-columns: minmax(0, .56fr) minmax(0, .44fr);
+  gap: 8mm;
+  min-width: 0;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-conclusion-summary {
+  min-width: 0;
+  padding-right: 8mm;
+  border-right: 1px solid #cdc8d3;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-conclusion-summary h2 {
+  margin: 0 0 22px;
+  text-transform: uppercase;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-conclusion-narrative p {
+  margin: 0 0 18px;
+  padding: 0;
+  color: #322b3d;
+  font-size: 12px;
+  line-height: 1.55;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-default-next-steps {
+  min-width: 0;
+}
 
 .su-public-brand.su-report .su-report-custom-html {
   box-sizing: border-box;
@@ -3340,6 +3567,13 @@
 
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page-body,
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--detail .su-full-landscape-page-body { grid-template-columns: 1fr; padding: 24px 18px; }
+  .su-public-brand.su-report.su-full-landscape .su-full-toc-layout,
+  .su-public-brand.su-report.su-full-landscape .su-full-profile-layout,
+  .su-public-brand.su-report.su-full-landscape .su-full-introduction-layout,
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-conclusion-layout { grid-template-columns: 1fr; gap: 24px; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-conclusion-summary { padding-right: 0; padding-bottom: 20px; border-right: 0; border-bottom: 1px solid #cdc8d3; }
+  .su-public-brand.su-report.su-full-landscape .su-full-profile-commentary { padding: 20px 0 0; border-top: 1px solid #cdc8d3; border-left: 0; }
+  .su-public-brand.su-report.su-full-landscape .su-full-introduction-results { padding: 20px 0 0; border-top: 1px solid #cdc8d3; border-left: 0; }
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-cover-brand { margin: -24px -18px 16px; padding: 10px 18px; }
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--chapter .su-full-landscape-vertical-chart,
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-chapter-copy,
@@ -3451,11 +3685,24 @@
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page:first-child { break-before: auto; page-break-before: auto; }
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page:last-child { break-after: auto; page-break-after: auto; }
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-detail { break-inside: avoid; page-break-inside: avoid; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-conclusion-layout {
+    position: relative;
+    display: block;
+    min-height: 165mm;
+  }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-conclusion-summary { width: 54%; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-conclusion-layout > .su-full-landscape-custom-content,
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-conclusion-layout > .su-full-landscape-default-next-steps {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 42%;
+  }
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page-header,
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-bar-fill,
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-peer-contour { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
-  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--chapter .su-full-landscape-page-body { grid-template-columns: minmax(0, .3fr) minmax(0, .7fr); }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--chapter .su-full-landscape-page-body { grid-template-columns: minmax(0, .44fr) minmax(0, .56fr); }
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--chapter.is-strategy .su-full-landscape-vertical-chart { --chart-row-height: 50px; }
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--chapter.is-execution .su-full-landscape-vertical-chart { --chart-row-height: 30px; }
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--chapter.is-you .su-full-landscape-vertical-chart { --chart-row-height: 34px; }

@@ -2,6 +2,7 @@ import type { RespondentReport } from "@/lib/assessments/respondent-report";
 import { CoachLogo } from "@/components/assessments/CoachLogo";
 import type {
   SuFullLandscapeChapter,
+  SuFullLandscapeChapterKey,
   SuFullLandscapePage as SuFullLandscapePageDescriptor,
   SuFullLandscapeQuestion,
   SuFullLandscapeReportModel,
@@ -20,12 +21,32 @@ import type { ReactNode } from "react";
 import { buildSuFullPeerDisclosureModel } from "@/lib/assessments/su-full-peer-disclosure";
 import { respondentNameMatchesEmail } from "@/lib/assessments/respondent-display-name";
 
-const CHAPTER_COPY: Readonly<Record<SuFullLandscapeChapter["key"], string>> = {
-  people: "The People chapter reviews the employee and culture foundations that support sustainable growth.",
-  strategy: "The Strategy chapter focuses on the choices that align the organization around a clear direction.",
-  execution: "The Execution chapter examines the operating disciplines that turn plans into consistent results.",
-  cash: "The Cash chapter considers the practices that strengthen financial visibility and resilience.",
-  you: "The You chapter reflects on leadership and internal communication as the company grows.",
+const CHAPTER_COPY: Readonly<Record<SuFullLandscapeChapter["key"], readonly string[]>> = {
+  people: [
+    "People - without a doubt the key to success within your organization. Every management book, academic study and personal story relays the same message.",
+    "So, in your case {{respondentName}}, let's ask that key question: Are all your employees happy and engaged in the business? And would you 'rehire' all of them?",
+    "The success and scalability of your organization is mainly determined by the success that you have recruiting, training, involving, motivating and growing the best people you can find. And this can never be based on luck. Real success is based upon a philosophy around people, core values, the company culture, introduction program, continuous training and reward.",
+  ],
+  strategy: [
+    "Articulating a clear and differential strategy, supported by a strong core culture that can deliver on the brand's promises, is the key for any company that wants to scale up. So how do you know if you have this industry dominating strategy? Sustainable top-line revenue growth and an increasing gross margin are the two key financial indicators. If you don't have a killer strategy your company will slowly face continuous pricing pressures as the market commoditizes your products and services.",
+    "{{respondentName}}, to have such a strong and effective strategy, it is key that the leadership team has a system and process to devote time and attention to this. A strong strategy needs a very clear and compelling vision and long term goal (BHAG). It needs to be specific and clear on which clients you want to service, how you will be unique and that your competences are clearly aligned with that goal. You then need clear measureable (non financial) yearly and quarterly goals. And a process needs to be in place to review and discuss trends and information from employees, clients and the market in general. Information on competition, technologies and potential disrupters needs to be part of the periodic strategic assessment.",
+    "And a strategy works best when all employees know it, understand it and are motivated by it.",
+  ],
+  execution: [
+    "Execution is, in many organizations, the biggest challenge. Where most entrepreneurs have a natural passion for clients, product development and innovation, many of them lack the skills and intrinsic motivation for a flawless and scalable execution. Execution and operations are broad areas and its success is dependent from many factors. But let us first distinguish leadership and management. As the entrepreneur of the organization, the focus lies on leadership, with the key objective being emotional involvement in the long and short term vision of the company across all employees. Management however is focused on process. The right people doing the right things right. And do all processes run without drama and drive industry-leading profitability? The entrepreneur does not have to be the person to manage this. An operations director, COO, or well functioning management team are, in many situations, the critical people to get this right.",
+    "Execution success is dependent on many factors. A well functioning leadership team, with a disciplined process and rhythm for prioritization and goalsetting. Clear KPIs, measurement systems, a process for employee and client feedback. Automation and digitalization of primary and secondary processes and so on.",
+    "We have put the sales and marketing function also in this chapter, as we see the systematic organization of these processes as part of the execution.",
+  ],
+  cash: [
+    "Growth sucks cash. This is the first law of entrepreneurial gravity. Yet many company leaders pay more attention to revenue and profit than they do to cash. And usually a company needs to be in severe cash crisis before predictive systems are implemented and the business model is optimized to be cash rich.",
+    "So the key question is: Do you have consistent cash sources, ideally internally generated, to fuel business growth?",
+  ],
+  you: [
+    "Peter Drucker nailed it: \"The Bottleneck is always on top of the bottle\". We mentioned that people are the most critical factor in defining a company's success. We lied. It is, in fact, you, the entrepreneur, founder and leader. Therefore, the responsibility lies with this person in recruitment, motivation, training and overall involvement ensuring the business reaches a higher level.",
+    "In other words, your ambition level, energy, speeches, involvement and example behavior are the real key to scaling up. Interestingly, your behavior needs to adapt to cater for each new organizational phase. This requires growth and development from you, as the leader too. Continuously identifying what the organization needs from you. This starts with moving from working 'in' your company to working 'at' your company and usually ends with making sure that you let your professional management run the operations so you can build the organization even further.",
+    "Within this process one of the key areas of success is the level in which you involve your employees in the company vision and goals. Hence why we stress the importance of internal communication.",
+    "To continuously grow as a leader is challenging. Having a mentor or coach can be extremely beneficial in setting you on the right leadership development trajectory. Successful leaders are happy, have a good work-life balance, read a lot and learn from other entrepreneurs. Note, it is about the decisions you take, not the time that you put in.",
+  ],
 };
 
 function formatNumber(value: number): string {
@@ -43,12 +64,12 @@ function formatDate(value: Date | string): string {
   }).format(date);
 }
 
-function rawFte(rawAnswers: unknown): number | null {
+function rawNumberAnswer(rawAnswers: unknown, stableKey: "Q_FTE_CONTRACT" | "Q_FREELANCE"): number | null {
   if (!Array.isArray(rawAnswers)) return null;
   const answer = rawAnswers.find(
-    (value) => value !== null
-      && typeof value === "object"
-      && (value as Record<string, unknown>).stableKey === "Q_FTE_CONTRACT",
+    (candidate) => candidate !== null
+      && typeof candidate === "object"
+      && (candidate as Record<string, unknown>).stableKey === stableKey,
   ) as Record<string, unknown> | undefined;
   return answer && typeof answer.value === "number" && Number.isFinite(answer.value)
     ? answer.value
@@ -57,6 +78,39 @@ function rawFte(rawAnswers: unknown): number | null {
 
 function scaleUpScore(value: number): string {
   return `${Math.round(value)} / 100`;
+}
+
+type EspertoConclusionBand = "low" | "middle" | "high";
+
+function espertoConclusionBand(report: RespondentReport, score: number): EspertoConclusionBand {
+  const tierLabel = report.result.tier?.label.trim().toLowerCase();
+  if (tierLabel === "not ready") return "low";
+  if (tierLabel === "on the way") return "middle";
+  if (tierLabel === "exemplary") return "high";
+
+  // These are the current configured SU Full tier boundaries. The source
+  // reports confirm the prose and representative scores, but not the exact
+  // transition points; completed reports normally carry the frozen tier above.
+  if (score <= 40) return "low";
+  if (score <= 65) return "middle";
+  return "high";
+}
+
+function conclusionOpening(band: EspertoConclusionBand, score: number): string {
+  const formattedScore = scaleUpScore(score);
+  if (band === "low") {
+    return `This was your report of the Scaling Up Assessment. You have a ScaleUp Score of ${formattedScore}. You have still a lot of focus areas on which you can work within your company. If you want to grow quickly, then your organization is probably not ready yet.`;
+  }
+  if (band === "middle") {
+    return `You have a ScaleUp Score of ${formattedScore}, a great score. You are pretty well on the way to becoming a strong growth organization.`;
+  }
+  return `With a ScaleUp Score of ${formattedScore}, you are doing extremely well and are perhaps an example for others! However, in order to reach the next phase, there is still room for improvement.`;
+}
+
+function conclusionClosing(band: EspertoConclusionBand): string {
+  return band === "high"
+    ? "Hopefully this report will give you sufficient insight into how and where you and your organization can improve. Good luck and we hope to see you again for another Scaling Up Assessment in the future!"
+    : "Hopefully this report has given you sufficient insight into where you and your organization can improve. Good luck and we'll see you back at this Scaling Up Assessment - perhaps for a higher score...";
 }
 
 function questionByKey(model: SuFullLandscapeReportModel): ReadonlyMap<string, SuFullLandscapeQuestion> {
@@ -122,23 +176,6 @@ function CoverPage({ report, number }: { report: RespondentReport; number: numbe
   );
 }
 
-function PrefacePage({ number, footerBrand }: { number: number; footerBrand: SuFullLandscapeFooterBrand }) {
-  return (
-    <SuFullLandscapePage number={number} footerBrand={footerBrand}>
-      <h2>Welcome</h2>
-      <p>
-        This report turns your submitted assessment into a practical view of the
-        systems that support your company&apos;s growth. Use it to identify the
-        conversations, choices, and actions that deserve attention next.
-      </p>
-      <p>
-        Your answers and feedback are preserved from the completed assessment;
-        peer values are explained wherever they appear.
-      </p>
-    </SuFullLandscapePage>
-  );
-}
-
 function CustomHtmlPage({
   report,
   html,
@@ -161,116 +198,281 @@ function CustomHtmlPage({
   );
 }
 
-function ContentsPage({ number, footerBrand }: { number: number; footerBrand: SuFullLandscapeFooterBrand }) {
+function ContentsPage({ model, number, footerBrand }: {
+  model: SuFullLandscapeReportModel;
+  number: number;
+  footerBrand: SuFullLandscapeFooterBrand;
+}) {
+  const pageNumber = (kind: "introduction" | "profile" | "conclusion") => {
+    const page = model.pages.find((candidate) => candidate.kind === kind);
+    if (!page) throw new Error(`Landscape contents is missing the ${kind} page`);
+    return page.number;
+  };
+  const chapterPageNumber = (chapterKey: SuFullLandscapeChapterKey) => {
+    const page = model.pages.find((candidate) =>
+      candidate.kind === "chapter" && candidate.chapterKey === chapterKey,
+    );
+    if (!page) throw new Error(`Landscape contents is missing the ${chapterKey} chapter page`);
+    return page.number;
+  };
+  const detailPageNumber = (questionKey: string) => {
+    const page = model.pages.find((candidate) =>
+      candidate.kind === "detail" && candidate.questionKeys.includes(questionKey),
+    );
+    if (!page) throw new Error(`Landscape contents is missing the ${questionKey} detail page`);
+    return page.number;
+  };
+  const detailRange = (firstQuestionKey: string, lastQuestionKey: string) => {
+    const firstPage = detailPageNumber(firstQuestionKey);
+    const lastPage = detailPageNumber(lastQuestionKey);
+    return firstPage === lastPage ? String(firstPage) : `${firstPage}–${lastPage}`;
+  };
+  const appendixPage = model.pages.find((candidate) => candidate.kind === "appendix");
+  if (!appendixPage) throw new Error("Landscape contents is missing the appendix page");
   const entries = [
-    ["People", 7, ["Your Employees (8–9)", "Company Culture (10)"]],
-    ["Strategy", 11, ["Strategy (12–13)"]],
-    ["Execution", 14, ["Leadership Team (15)", "Operational Processes (16)", "Sales and Marketing (17)", "Scalability, Innovation and Technology (18)"]],
-    ["Cash", 19, ["Cash (20)"]],
-    ["You", 21, ["Your Leadership (22–23)", "Internal Communication (24)"]],
+    {
+      key: "people",
+      label: "People",
+      page: chapterPageNumber("people"),
+      subsections: [
+        { key: "your-employees", label: "Your Employees", pages: detailRange("Q01", "Q08") },
+        { key: "company-culture", label: "Company Culture", pages: detailRange("Q09", "Q13") },
+      ],
+    },
+    {
+      key: "strategy",
+      label: "Strategy",
+      page: chapterPageNumber("strategy"),
+      subsections: [
+        { key: "goals-and-strategy", label: "Goals and Strategy", pages: detailRange("Q14", "Q20") },
+      ],
+    },
+    {
+      key: "execution",
+      label: "Execution",
+      page: chapterPageNumber("execution"),
+      subsections: [
+        { key: "leadership-team", label: "Leadership Team", pages: detailRange("Q21", "Q24") },
+        { key: "operational-processes", label: "Operational Processes", pages: detailRange("Q25", "Q29") },
+        { key: "sales-and-marketing", label: "Sales and Marketing", pages: detailRange("Q30", "Q34") },
+        { key: "scalability-innovation-and-technology", label: "Scalability, Innovation and Technology", pages: detailRange("Q35", "Q40") },
+      ],
+    },
+    {
+      key: "cash",
+      label: "Cash",
+      page: chapterPageNumber("cash"),
+      subsections: [
+        { key: "finance-and-cash", label: "Finance and Cash", pages: detailRange("Q41", "Q45") },
+      ],
+    },
+    {
+      key: "you",
+      label: "You",
+      page: chapterPageNumber("you"),
+      subsections: [
+        { key: "your-leadership", label: "Your Leadership", pages: detailRange("Q46", "Q55") },
+        { key: "internal-communication", label: "Internal Communication", pages: detailRange("Q56", "Q61") },
+      ],
+    },
   ] as const;
   return (
     <SuFullLandscapePage number={number} footerBrand={footerBrand}>
-      <h2>Contents</h2>
-      <ol>
-        {entries.map(([label, page, subsections]) => (
-          <li key={label}>
-            {label} <span>{page}</span>
-            <ul>{subsections.map((subsection) => <li key={subsection}>{subsection}</li>)}</ul>
-          </li>
-        ))}
-      </ol>
-      <ul className="su-full-landscape-chapter-key" aria-label="Chapter key">
-        {(["people", "strategy", "execution", "cash", "you"] as const).map((chapter) => (
-          <li className={`is-${chapter}`} key={chapter}>
-            <span aria-hidden="true" />
-            {chapter[0].toUpperCase() + chapter.slice(1)}
-          </li>
-        ))}
-      </ul>
-      <p>Appendix A: chapter comparisons <span>26</span></p>
+      <section className="su-full-toc" aria-label="Table of contents">
+        <h2>Table of Contents</h2>
+        <div className="su-full-toc-layout">
+          <ol className="su-full-toc-list">
+            <li className="su-full-toc-entry su-full-toc-entry--plain" data-testid="toc-introduction">
+              <span className="su-full-toc-index" aria-hidden="true" />
+              <span>Introduction</span> <span className="su-full-toc-page">{pageNumber("introduction")}</span>
+            </li>
+            <li className="su-full-toc-entry su-full-toc-entry--plain" data-testid="toc-profile">
+              <span className="su-full-toc-index">1.</span>
+              <span>Your Profile</span> <span className="su-full-toc-page">{pageNumber("profile")}</span>
+            </li>
+            {entries.map((entry, index) => (
+              <li className={`su-full-toc-group is-${entry.key}`} key={entry.key}>
+                <div className="su-full-toc-entry" data-testid={`toc-domain-${entry.key}`}>
+                  <span className="su-full-toc-index">{index + 2}.</span>
+                  <span className={`su-full-toc-domain su-full-toc-domain--${entry.key}`}>{entry.label}</span>{" "}
+                  <span className="su-full-toc-page">{entry.page}</span>
+                </div>
+                <ul className="su-full-toc-subsections">
+                  {entry.subsections.map((subsection) => (
+                    <li data-testid={`toc-subsection-${subsection.key}`} key={subsection.key}>
+                      <span className="su-full-toc-subsection">{subsection.label}</span>{" "}
+                      <span className="su-full-toc-page">{subsection.pages}</span>
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+            <li className="su-full-toc-entry su-full-toc-entry--plain" data-testid="toc-conclusion">
+              <span className="su-full-toc-index" aria-hidden="true" />
+              <span>In conclusion</span> <span className="su-full-toc-page">{pageNumber("conclusion")}</span>
+            </li>
+            <li className="su-full-toc-entry su-full-toc-entry--plain" data-testid="toc-appendix">
+              <span className="su-full-toc-index" aria-hidden="true" />
+              <span>Appendix A</span> <span className="su-full-toc-page">{appendixPage.number}</span>
+            </li>
+          </ol>
+          <figure className="su-full-toc-decisions">
+            {/* The user explicitly requested the original ESPERTO diagram rather
+                than a locally reinterpreted ring. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              alt="Five Scaling Up decisions"
+              className="su-full-toc-decision-graphic"
+              height="940"
+              src="/brand/su-esperto-five-decisions.png"
+              width="1270"
+            />
+            <figcaption>
+              The five Scaling Up decisions organize the core report. Subsections are indented beneath the decision they belong to.
+            </figcaption>
+          </figure>
+        </div>
+      </section>
     </SuFullLandscapePage>
   );
 }
 
-function IntroductionPage({ report, model, number }: {
+function IntroductionPage({ report, model, number, respondentDisplayName }: {
   report: RespondentReport;
   model: SuFullLandscapeReportModel;
   number: number;
+  respondentDisplayName: string | null;
 }) {
-  const fte = rawFte(report.rawAnswers);
+  const fte = rawNumberAnswer(report.rawAnswers, "Q_FTE_CONTRACT");
+  const freelance = rawNumberAnswer(report.rawAnswers, "Q_FREELANCE");
   return (
     <SuFullLandscapePage number={number} footerBrand={report}>
-      <h2>Introduction</h2>
-      <p><strong>ScaleUp Score</strong> {scaleUpScore(model.scaleUpScore)}</p>
-      <PeerSnapshotDisclosure provenance={model.peerProvenance} />
-      {model.growthPhase && fte !== null ? (
-        <section aria-label="Growth phase">
-          <h3>Phase {model.growthPhase.number} from FTE {fte}</h3>
-          <p>{model.growthPhase.name}</p>
-        </section>
-      ) : null}
-      <p>Read each chapter as a focused conversation: compare the values, review your feedback, then choose the next useful action.</p>
+      <section className="su-full-introduction" aria-labelledby={`su-full-introduction-${number}`}>
+        <h2 id={`su-full-introduction-${number}`}>Introduction</h2>
+        <div className="su-full-introduction-layout">
+          <div className="su-full-introduction-overview">
+            <p>
+              {respondentDisplayName ? <>Dear {respondentDisplayName}, this</> : <>This</>} report presents the Scaling Up Full results for
+              {" "}{report.companyName} across People, Strategy, Execution, Cash, and You. It also
+              shows the peer benchmark frozen with this completed assessment.
+            </p>
+            {fte !== null || freelance !== null ? (
+              <p>
+                {fte !== null ? (
+                  <>{report.companyName} reported {fte} full-time equivalent {fte === 1 ? "employee" : "employees"} on permanent or temporary contracts.</>
+                ) : null}
+                {fte !== null && freelance !== null ? " " : null}
+                {freelance !== null ? (
+                  <>{fte !== null ? "It also" : report.companyName} reported {freelance} freelance {freelance === 1 ? "employee" : "employees"}.</>
+                ) : null}
+              </p>
+            ) : null}
+            {model.growthPhase ? (
+              <section className="su-full-introduction-phase" aria-label="Growth phase">
+                <h3>Phase {model.growthPhase.number} - {model.growthPhase.name}</h3>
+                <p>{model.growthPhase.narrative}</p>
+              </section>
+            ) : null}
+          </div>
+          <div className="su-full-introduction-results">
+            <p>
+              The detailed pages preserve the feedback selected from your submitted answers. Read each
+              comparison together with its recommendation before deciding what to address next.
+            </p>
+            <p className="su-full-introduction-score">
+              <strong>Your ScaleUp Score: {scaleUpScore(model.scaleUpScore)}</strong>
+            </p>
+            <p>
+              This is the platform score frozen with this completed assessment. Read it as an overall
+              summary alongside the chapter scores, peer comparisons, and detailed feedback.
+            </p>
+            <PeerSnapshotDisclosure provenance={model.peerProvenance} />
+            <p>
+              Continue to the detailed results to compare the values, review your feedback, and choose
+              the next useful action.
+            </p>
+          </div>
+        </div>
+      </section>
     </SuFullLandscapePage>
   );
 }
 
 function ProfilePage({ model, number, footerBrand }: { model: SuFullLandscapeReportModel; number: number; footerBrand: SuFullLandscapeFooterBrand }) {
+  const strongestRelative = [...model.profileRows]
+    .sort((a, b) => b.deviation - a.deviation || a.stableKey.localeCompare(b.stableKey))[0];
+  const weakestRelative = [...model.profileRows]
+    .sort((a, b) => a.deviation - b.deviation || a.stableKey.localeCompare(b.stableKey))[0];
+  const formatDeviation = (value: number) => {
+    const rounded = Math.round(value * 10) / 10;
+    return `${rounded > 0 ? "+" : ""}${rounded.toFixed(1)}`;
+  };
+
   return (
     <SuFullLandscapePage number={number} footerBrand={footerBrand}>
-      <h2>Your profile</h2>
-      <table>
-        <thead><tr><th>Chapter / subsection</th><th>You</th><th>Peers</th><th>Deviation</th></tr></thead>
-        <tbody>
-          {model.chapters.flatMap((chapter) => [
-            <tr className="su-full-landscape-profile-row--chapter" key={`chapter-${chapter.key}`}>
-              <th><strong>{chapter.label}</strong> <span>Chapter aggregate</span></th>
-              <td>{formatNumber(chapter.youAverage)}</td>
-              <td>{formatNumber(chapter.peersAverage)}</td>
-              <td>{formatNumber(chapter.youAverage - chapter.peersAverage)}</td>
-            </tr>,
-            ...model.profileRows
-              .filter((row) => row.chapterKey === chapter.key)
-              .map((row) => (
-                <tr className="su-full-landscape-profile-row--subsection" key={row.stableKey}>
-                  <th>{row.label} <span>Subsection</span></th>
-                  <td>{formatNumber(row.youAverage)}</td>
-                  <td>{formatNumber(row.peersAverage)}</td>
-                  <td>{formatNumber(row.deviation)}</td>
-                </tr>
-              )),
-          ])}
-        </tbody>
-      </table>
-      <p>Strongest chapter: {model.strongestChapter.label}. Focus chapter: {model.weakestChapter.label}.</p>
+      <section className="su-full-profile" aria-label="Your profile">
+        <h2>Your Profile</h2>
+        <p className="su-full-profile-intro">
+          We begin with an overview of the main sections. Your results are compared with the peer benchmark associated with this completed assessment.
+        </p>
+        <div className="su-full-profile-layout">
+          <table className="su-full-profile-table">
+            <thead><tr><th scope="col">Chapter / subsection</th><th scope="col">You</th><th scope="col">Peers</th><th scope="col">Deviation</th></tr></thead>
+            <tbody>
+              {model.chapters.flatMap((chapter) => [
+                <tr
+                  className={`su-full-landscape-profile-row--chapter is-${chapter.key}`}
+                  data-testid={`profile-domain-${chapter.key}`}
+                  key={`chapter-${chapter.key}`}
+                >
+                  <th scope="row">{chapter.label}</th>
+                  <td>{formatNumber(chapter.youAverage)}</td>
+                  <td>{formatNumber(chapter.peersAverage)}</td>
+                  <td>{formatDeviation(chapter.youAverage - chapter.peersAverage)}</td>
+                </tr>,
+                ...model.profileRows
+                  .filter((row) => row.chapterKey === chapter.key)
+                  .map((row) => (
+                    <tr className={`su-full-landscape-profile-row--subsection is-${chapter.key}`} key={row.stableKey}>
+                      <th scope="row">{row.label}</th>
+                      <td>{formatNumber(row.youAverage)}</td>
+                      <td>{formatNumber(row.peersAverage)}</td>
+                      <td>{formatDeviation(row.deviation)}</td>
+                    </tr>
+                  )),
+              ])}
+            </tbody>
+          </table>
+          <aside className="su-full-profile-commentary" data-testid="profile-result-commentary">
+            <p><strong>{model.strongestChapter.label} is your strongest chapter.</strong> It has your highest chapter score in this completed assessment.</p>
+            <p><strong>{model.weakestChapter.label} is the current focus chapter.</strong> It has your lowest chapter score in this completed assessment.</p>
+            <p><strong>{strongestRelative.label} has the highest relative deviation from Peers.</strong> The difference is {formatDeviation(strongestRelative.deviation)}.</p>
+            <p><strong>{weakestRelative.label} has the lowest relative deviation from Peers.</strong> The difference is {formatDeviation(weakestRelative.deviation)}.</p>
+            <p>Relative deviations compare the two displayed scores; they are not separate findings or readiness labels.</p>
+          </aside>
+        </div>
+      </section>
     </SuFullLandscapePage>
   );
 }
 
-function PeerDashboardPage({ model, number, footerBrand }: { model: SuFullLandscapeReportModel; number: number; footerBrand: SuFullLandscapeFooterBrand }) {
-  return (
-    <SuFullLandscapePage number={number} footerBrand={footerBrand}>
-      <h2>Peers and comparisons</h2>
-      <PeerSnapshotDisclosure provenance={model.peerProvenance} />
-      <table>
-        <thead><tr><th>Chapter</th><th>You</th><th>Peers</th></tr></thead>
-        <tbody>{model.chapters.map((chapter) => (
-          <tr key={chapter.key}><th>{chapter.label}</th><td>{formatNumber(chapter.youAverage)}</td><td>{formatNumber(chapter.peersAverage)}</td></tr>
-        ))}</tbody>
-      </table>
-      <p>Closest comparisons: {model.closestQuestions.map((question) => question.label).join("; ")}.</p>
-      <p>Largest gaps: {model.largestGapQuestions.map((question) => question.label).join("; ")}.</p>
-    </SuFullLandscapePage>
-  );
-}
+function ChapterPage({ chapter, number, footerBrand, respondentDisplayName }: { chapter: SuFullLandscapeChapter; number: number; footerBrand: SuFullLandscapeFooterBrand; respondentDisplayName: string | null }) {
+  const personalize = (paragraph: string) => respondentDisplayName
+    ? paragraph.replaceAll("{{respondentName}}", respondentDisplayName)
+    : paragraph
+      .replace("So, in your case {{respondentName}},", "So, in your case,")
+      .replace("{{respondentName}}, to", "To");
 
-function ChapterPage({ chapter, number, footerBrand }: { chapter: SuFullLandscapeChapter; number: number; footerBrand: SuFullLandscapeFooterBrand }) {
   return (
     <SuFullLandscapePage number={number} chapterKey={chapter.key} variant="chapter" footerBrand={footerBrand}>
       <div className="su-full-landscape-chapter-copy">
         <p className="su-full-landscape-chapter-kicker">{chapter.key}</p>
         <h2>{chapter.label}</h2>
-        <p>{CHAPTER_COPY[chapter.key]}</p>
+        <div data-testid={`chapter-narrative-${chapter.key}`} className="su-full-landscape-chapter-narrative">
+          {CHAPTER_COPY[chapter.key].map((paragraph, index) => (
+            <p key={index}>{personalize(paragraph)}</p>
+          ))}
+        </div>
       </div>
       <SuFullVerticalPeerChart chapterKey={chapter.key} instanceId={`page-${number}-${chapter.key}`} questions={chapter.questions} title={`${chapter.label} comparison`} />
     </SuFullLandscapePage>
@@ -320,23 +522,48 @@ function ConclusionPage({ report, model, contactEmail, number, beforeConclusion,
   beforeConclusion?: ReactNode;
   conclusionHtml?: SafeReportHtmlFragment | null;
 }) {
+  const band = espertoConclusionBand(report, model.scaleUpScore);
+  const highestResult = [...model.profileRows]
+    .sort((a, b) => b.youAverage - a.youAverage || a.stableKey.localeCompare(b.stableKey))[0];
+  const lowestResult = [...model.profileRows]
+    .sort((a, b) => a.youAverage - b.youAverage || a.stableKey.localeCompare(b.stableKey))[0];
+  const highestRelative = [...model.profileRows]
+    .sort((a, b) => b.deviation - a.deviation || a.stableKey.localeCompare(b.stableKey))[0];
+  const lowestRelative = [...model.profileRows]
+    .sort((a, b) => a.deviation - b.deviation || a.stableKey.localeCompare(b.stableKey))[0];
+
   return (
     <SuFullLandscapePage number={number} footerBrand={report}>
       {beforeConclusion}
-      <h2>Conclusion</h2>
-      <p><strong>ScaleUp Score</strong> {scaleUpScore(model.scaleUpScore)}</p>
-      <p>Your strongest chapter is {model.strongestChapter.label}; Your focus chapter is {model.weakestChapter.label}.</p>
-      {conclusionHtml ? (
-        <div className="su-full-landscape-custom-content">
-          <ReportHtmlSection
-            position="conclusion"
-            html={conclusionHtml}
-            personalization={report}
-          />
-        </div>
-      ) : (
-        <DefaultNextSteps report={report} contactEmail={contactEmail} />
-      )}
+      <div className="su-full-landscape-conclusion-layout">
+        <section
+          aria-label="Scaling Up Full result summary"
+          className="su-full-landscape-conclusion-summary"
+        >
+          <h2>In Conclusion</h2>
+          <div className="su-full-landscape-conclusion-narrative" data-testid="su-full-conclusion-narrative">
+            <p>{conclusionOpening(band, model.scaleUpScore)}</p>
+            <p>You scored highest on {highestResult.label} and lowest on {lowestResult.label}.</p>
+            <p>
+              In comparison to other companies, in the same phase, you score higher on {highestRelative.label} and lower on {lowestRelative.label}.
+            </p>
+            <p>{conclusionClosing(band)}</p>
+          </div>
+        </section>
+        {conclusionHtml ? (
+          <div className="su-full-landscape-custom-content">
+            <ReportHtmlSection
+              position="conclusion"
+              html={conclusionHtml}
+              personalization={report}
+            />
+          </div>
+        ) : (
+          <div className="su-full-landscape-default-next-steps">
+            <DefaultNextSteps report={report} contactEmail={contactEmail} />
+          </div>
+        )}
+      </div>
     </SuFullLandscapePage>
   );
 }
@@ -386,6 +613,10 @@ export function SuFullLandscapeReport({
 }) {
   const chapters = new Map(model.chapters.map((chapter) => [chapter.key, chapter]));
   const questions = questionByKey(model);
+  const respondentDisplayName = respondentNameMatchesEmail(
+    report.respondentName,
+    report.respondentEmail,
+  ) ? null : report.respondentName;
 
   return (
     <div className="su-public-brand su-report su-full-landscape">
@@ -393,17 +624,14 @@ export function SuFullLandscapeReport({
         {model.pages.map((page) => {
         switch (page.kind) {
           case "cover": return <CoverPage key={page.number} number={page.number} report={report} />;
-          case "preface": return report.reportHtml?.introductionHtml
-            ? <CustomHtmlPage key={page.number} number={page.number} report={report} html={report.reportHtml.introductionHtml} />
-            : <PrefacePage key={page.number} number={page.number} footerBrand={report} />;
-          case "contents": return <ContentsPage key={page.number} number={page.number} footerBrand={report} />;
-          case "introduction": return <IntroductionPage key={page.number} number={page.number} report={report} model={model} />;
+          case "preface": return <CustomHtmlPage key={page.number} number={page.number} report={report} html={report.reportHtml!.introductionHtml!} />;
+          case "contents": return <ContentsPage key={page.number} model={model} number={page.number} footerBrand={report} />;
+          case "introduction": return <IntroductionPage key={page.number} number={page.number} report={report} model={model} respondentDisplayName={respondentDisplayName} />;
           case "profile": return <ProfilePage key={page.number} number={page.number} model={model} footerBrand={report} />;
-          case "peer-dashboard": return <PeerDashboardPage key={page.number} number={page.number} model={model} footerBrand={report} />;
           case "chapter": {
             const chapter = chapters.get(page.chapterKey);
             if (!chapter) throw new Error(`Landscape chapter page ${page.number} is missing ${page.chapterKey}`);
-            return <ChapterPage chapter={chapter} key={page.number} number={page.number} footerBrand={report} />;
+            return <ChapterPage chapter={chapter} key={page.number} number={page.number} footerBrand={report} respondentDisplayName={respondentDisplayName} />;
           }
           case "detail": return <DetailPage key={page.number} page={page} questions={questions} peerProvenance={model.peerProvenance} footerBrand={report} />;
           case "conclusion": return <ConclusionPage key={page.number} number={page.number} report={report} model={model} contactEmail={contactEmail} beforeConclusion={beforeConclusion} conclusionHtml={report.reportHtml?.conclusionHtml} />;

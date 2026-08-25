@@ -15,62 +15,31 @@ import { ReportStyleScope } from "@/components/assessments/ReportStyleScope";
 import {
   completeSuFullLandscapePresentation,
   completeSuFullLandscapeReport,
+  restoredScalingUpFullCtaReport,
 } from "@/__tests__/fixtures/su-full-landscape";
 import {
   SU_FULL_PHASE_PEER_CONTENT_HASHES,
   SU_FULL_PHASE_PEER_SOURCE_ID,
   getGovernedPeerValue,
 } from "@/lib/assessments/su-full-phase-peer-catalogue";
-import { prepareReportHtmlForStorage } from "@/lib/assessments/report-html";
 import {
   SU_FULL_GOVERNED_PEER_DISCLOSURE,
   SU_FULL_LEGACY_PEER_DISCLOSURE,
 } from "@/lib/assessments/su-full-peer-disclosure";
 import type { GrowthPhaseNumber } from "@/lib/assessments/su-full-phase";
+import { prepareReportHtmlForStorage } from "@/lib/assessments/report-html";
 
 jest.setTimeout(60_000);
 
 const ENABLED = "NEXT_PUBLIC_WAVE_SU_FULL_LANDSCAPE_REPORT_ENABLED";
 const KILL = "NEXT_PUBLIC_WAVE_SU_FULL_LANDSCAPE_REPORT_KILL";
-const OPENER_PAGES = [7, 11, 14, 19, 21] as const;
-const CHART_PAGES = [...OPENER_PAGES, 26] as const;
+const OPENER_PAGES = [5, 9, 12, 17, 19] as const;
+const CHART_PAGES = [...OPENER_PAGES, 24] as const;
 const PEER_DISCLOSURE = "Peers shows the benchmark associated with your organizational phase when you completed this assessment. It is not matched by industry, geography, or a custom peer group.";
 const HISTORICAL_PEER_DISCLOSURE = "Peers shows the historical benchmark used for this report. It is not matched by industry, geography, or a custom peer group.";
 const LEGACY_FALSE_FREEZE_CLAIM = /frozen governed snapshot|peer values[^.]{0,120}frozen (?:when|at) (?:this result was )?scored/i;
-const ENGINEERING_LANGUAGE = /governed|snapshot|sourceId|source id|catalogue|provenance|legacy baseline|phase-aware|frozen|esperto-five-phase-peers|esperto-controlled/i;
+const ENGINEERING_LANGUAGE = /governed|snapshot|sourceId|source id|catalogue|provenance|legacy baseline|phase-aware|esperto-five-phase-peers|esperto-controlled/i;
 const REPRESENTATIVE_482_CHARACTER_FEEDBACK = "In order to scale, smart application and linking of information technology is essential. Sales, marketing, project management, production,humanresources,reporting,etc.Thisgivesstructureand clarity, prevents mistakes and makes growing a lot easier. With the size of your company, a lot of systems likely still work independently of each other, or you primarily use Excel. This is customary, but in your next growth phase you will have to start thinking about smart solutions. Act now";
-
-function restoredScalingUpFullCtaReport() {
-  const prepared = prepareReportHtmlForStorage({
-    reportHtml: {
-      schemaVersion: 1,
-      introductionHtml: [
-        '<div aria-label="Verne Harnish preface">',
-        '<strong aria-label="Preface heading">PREFACE</strong>',
-        '<p>Dear {{respondentName}},\n\nCongratulations! You are now the owner of your own personalized ScaleUp Assessment report. With this report you will gain a better understanding of how well prepared you are for Scaling Up, how you and your company compare to your peers and what your priorities may be. To reach the \'next level\' you now have the choice of using the Scaling Up book, implementing a growth program or working with a coach. Ultimately, this report will work as a guide and input towards your personal growth path. {{companyName}}, you can use this report as a guide and as input for your personal growth path.\n\nThe assessment has been predominantly devised utilizing the Scaling Up / Rockefeller Habits 2.0 methodology, alongside academic growth models and organizational development theories. We have received input from many seasoned growth entrepreneurs, coaches, mentors and academics. We hope and believe you will be positively surprised by the number of Scaling Up insights throughout this report. We would highly recommend repeating this assessment annually, in order to keep track of your progress.\n\nI wish you many great insights. Enjoy the report and keep scaling!</p>',
-        '<img src="https://platformtest.scalingup.com/brand/verne-harnish-preface.jpg" alt="Verne Harnish">',
-        '<span aria-label="Verne Harnish signature"></span>',
-        '<aside>Verne Harnish, CEO\nScaling Up\nAuthor of Scaling Up (Rockefeller Habits 2.0)\nThe Greatest Business Decisions of All Time\nMastering the Rockefeller Habits</aside>',
-        "</div>",
-      ].join(""),
-      conclusionHtml: [
-        '<section aria-label="Scaling Up Full next steps">',
-        '<p><strong>Next step</strong> – Go back thru the book Scaling Up (Rockefeller Habits 2.0) or start with Mastering the Rockefeller Habits (quicker/simpler read to start).</p>',
-        '<img src="https://platformtest.scalingup.com/brand/scaling-up-books.png" alt="Mastering the Rockefeller Habits and Scaling Up books">',
-        '<p>Or you can schedule a complimentary one-hour debrief of your assessment with one of our 280+ coaching partners around the globe.</p>',
-        '<a href="https://coaches.scalingup.com/coach-match-after-assessment-form" target="_blank" rel="noopener noreferrer" aria-label="Request a complimentary follow-up">YES! I WOULD LIKE A COMPLIMENTARY FOLLOW-UP</a>',
-        '<a href="https://scalingup.com/book/" target="_blank" rel="noopener noreferrer" aria-label="Buy the books">YES! I LIKE TO BUY THE BOOKS</a>',
-        "</section>",
-      ].join(""),
-    },
-  });
-  if (!prepared.ok) throw new Error(prepared.issues.map((issue) => issue.message).join(" "));
-  const report = completeSuFullLandscapeReport();
-  return {
-    ...report,
-    reportHtml: (prepared.reportConfig as { reportHtml: typeof report.reportHtml }).reportHtml,
-  };
-}
 
 const SEMANTIC_ESCAPE_CASES = [
   {
@@ -548,12 +517,12 @@ function expectedChartMembership(report: ReturnType<typeof completeSuFullLandsca
     keys.slice(45, 61),
   ];
   return [
-    { page: "7", charts: [chapters[0]] },
-    { page: "11", charts: [chapters[1]] },
-    { page: "14", charts: [chapters[2]] },
-    { page: "19", charts: [chapters[3]] },
-    { page: "21", charts: [chapters[4]] },
-    { page: "26", charts: chapters },
+    { page: "5", charts: [chapters[0]] },
+    { page: "9", charts: [chapters[1]] },
+    { page: "12", charts: [chapters[2]] },
+    { page: "17", charts: [chapters[3]] },
+    { page: "19", charts: [chapters[4]] },
+    { page: "24", charts: chapters },
   ];
 }
 
@@ -809,7 +778,7 @@ describe("SU Full landscape browser and PDF contract", () => {
           }
         }
       }
-      const appendixCharts = await geometry(page, 26);
+      const appendixCharts = await geometry(page, 24);
       expect(appendixCharts).toHaveLength(5);
       for (const chart of appendixCharts) {
         expect(chart.display).not.toBe("none");
@@ -859,7 +828,7 @@ describe("SU Full landscape browser and PDF contract", () => {
       );
       expect(peerRows.every((row) => row.labelVisible && row.scaleVisible && row.valueVisible)).toBe(true);
       expect(peerRows.every((row) => row.value === row.expected && row.widthError <= 1)).toBe(true);
-      await expect(page.locator("[data-page-number='7'] .su-full-landscape-chart-legend").isVisible())
+      await expect(page.locator("[data-page-number='5'] .su-full-landscape-chart-legend").isVisible())
         .resolves.toBe(true);
       expectLabelsToFit(await labelFit(page, CHART_PAGES));
     } finally {
@@ -882,7 +851,7 @@ describe("SU Full landscape browser and PDF contract", () => {
         const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
         try {
           await load(page, html);
-          await expect(page.locator("[data-testid^='su-full-landscape-page-']").count()).resolves.toBe(26);
+          await expect(page.locator("[data-testid^='su-full-landscape-page-']").count()).resolves.toBe(24);
           await expect(page.getByText(fixture.disclosure).count()).resolves.toBeGreaterThanOrEqual(2);
           await expect(page.locator("body").innerText()).resolves.not.toMatch(ENGINEERING_LANGUAGE);
           if (fixture.name === "historical") {
@@ -891,28 +860,27 @@ describe("SU Full landscape browser and PDF contract", () => {
             await expect(page.locator("body").innerText()).resolves.not.toMatch(LEGACY_FALSE_FREEZE_CLAIM);
           }
           await expect(page.locator("[data-page-number='6']").innerText()).resolves.toContain(fixture.provenance);
-          await expect(page.locator("[data-page-number='8']").innerText()).resolves.toContain(fixture.provenance);
           await expect(q01PeerValue(page)).resolves.toBe(fixture.q01);
           const desktop = await horizontalOverflow(page);
           expect(desktop.offenders).toEqual([]);
           expect(desktop.document).toBeLessThanOrEqual(desktop.viewport + 1);
+          await saveVisualArtifact(page, `${fixture.name}-desktop-page-5`, "[data-page-number='5']");
           await saveVisualArtifact(page, `${fixture.name}-desktop-page-6`, "[data-page-number='6']");
-          await saveVisualArtifact(page, `${fixture.name}-desktop-page-8`, "[data-page-number='8']");
 
           await page.setViewportSize({ width: 390, height: 844 });
           const mobile = await horizontalOverflow(page);
           expect(mobile.offenders).toEqual([]);
           expect(mobile.document).toBeLessThanOrEqual(mobile.viewport + 1);
-          const mobileDetailColumns = await page.locator("[data-page-number='8'] .su-full-landscape-page-body")
+          const mobileDetailColumns = await page.locator("[data-page-number='6'] .su-full-landscape-page-body")
             .evaluate((body) => getComputedStyle(body).gridTemplateColumns.split(" ").filter(Boolean).length);
           expect(mobileDetailColumns).toBe(1);
           await expect(q01PeerValue(page)).resolves.toBe(fixture.q01);
-          await saveVisualArtifact(page, `${fixture.name}-mobile-page-8`, "[data-page-number='8']");
+          await saveVisualArtifact(page, `${fixture.name}-mobile-page-6`, "[data-page-number='6']");
 
           await page.setViewportSize({ width: 1280, height: 720 });
           await page.emulateMedia({ media: "print" });
           await expect(q01PeerValue(page)).resolves.toBe(fixture.q01);
-          const printDetail = await page.locator("[data-page-number='8']").evaluate((detail) => {
+          const printDetail = await page.locator("[data-page-number='6']").evaluate((detail) => {
             const pageRect = detail.getBoundingClientRect();
             const feedback = [...detail.querySelectorAll<HTMLElement>(".su-full-landscape-feedback")];
             return {
@@ -928,7 +896,7 @@ describe("SU Full landscape browser and PDF contract", () => {
           });
           expect(printDetail.scrollWidth).toBeLessThanOrEqual(printDetail.clientWidth + 1);
           expect(printDetail.feedbackOutside).toBe(0);
-          await saveVisualArtifact(page, `${fixture.name}-print-page-8`, "[data-page-number='8']");
+          await saveVisualArtifact(page, `${fixture.name}-print-page-6`, "[data-page-number='6']");
 
           const pdfPath = join(directory, `${fixture.name}.pdf`);
           await page.pdf({
@@ -938,7 +906,7 @@ describe("SU Full landscape browser and PDF contract", () => {
             preferCSSPageSize: true,
             printBackground: true,
           });
-          expect(execFileSync("pdfinfo", [pdfPath], { encoding: "utf8" })).toMatch(/^Pages:\s+26$/m);
+          expect(execFileSync("pdfinfo", [pdfPath], { encoding: "utf8" })).toMatch(/^Pages:\s+24$/m);
           const pdfText = normalize(execFileSync("pdftotext", [pdfPath, "-"], { encoding: "utf8", maxBuffer: 20 * 1024 * 1024 }));
           expect(pdfText).toContain(fixture.provenance);
           expect(pdfText).toContain(fixture.disclosure);
@@ -979,7 +947,7 @@ describe("SU Full landscape browser and PDF contract", () => {
     }
   });
 
-  it("meets all five chapter contrast contracts and produces a complete 26-page A4 landscape PDF", async () => {
+  it("meets all five chapter contrast contracts and produces a complete 24-page A4 landscape PDF", async () => {
     const { html, report } = routeMarkup(reportWithRepresentativeDensityFeedback());
     const page = await browser.newPage({ viewport: { width: 1123, height: 794 } });
     const directory = mkdtempSync(join(tmpdir(), "su-full-landscape-browser-"));
@@ -1019,7 +987,7 @@ describe("SU Full landscape browser and PDF contract", () => {
       expect(contrast.every((chapter) => chapter.contour >= 3)).toBe(true);
 
       const barContrast = await page.locator(
-        [8, 12, 15, 20, 22].map((number) => `[data-page-number="${number}"] .su-full-landscape-detail`).join(","),
+        [6, 10, 13, 18, 20].map((number) => `[data-page-number="${number}"] .su-full-landscape-detail`).join(","),
       ).evaluateAll((details) => {
         const rgb = (value: string) => (value.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
         const luminance = (value: string) => {
@@ -1043,7 +1011,7 @@ describe("SU Full landscape browser and PDF contract", () => {
           const trackColor = getComputedStyle(track).backgroundColor;
           return {
             you: ratio(getComputedStyle(you).backgroundColor, trackColor),
-            peers: ratio(getComputedStyle(peers).backgroundColor, trackColor),
+            peers: ratio(getComputedStyle(peers).borderColor, trackColor),
             value: ratio(getComputedStyle(value).color, "rgb(255, 255, 255)"),
           };
         });
@@ -1051,7 +1019,7 @@ describe("SU Full landscape browser and PDF contract", () => {
       expect(barContrast).toHaveLength(27);
       expect(barContrast.every((row) => row.you >= 3 && row.peers >= 3 && row.value >= 4.5)).toBe(true);
 
-      const profileFit = await page.locator("[data-page-number='5']").evaluate((profile) => {
+      const profileFit = await page.locator("[data-page-number='4']").evaluate((profile) => {
         const footer = profile.querySelector<HTMLElement>(".su-full-landscape-page-footer");
         const rows = [...profile.querySelectorAll<HTMLElement>("tbody tr")];
         if (!footer) throw new Error("Missing page 5 footer");
@@ -1099,10 +1067,10 @@ describe("SU Full landscape browser and PDF contract", () => {
         printBackground: true,
       });
       const info = execFileSync("pdfinfo", [pdfPath], { encoding: "utf8" });
-      expect(info).toMatch(/^Pages:\s+26$/m);
+      expect(info).toMatch(/^Pages:\s+24$/m);
       expect(info).toMatch(/^Page size:\s+841\.9\d* x 594\.9\d* pts \(A4\)$/m);
       const text = normalize(execFileSync("pdftotext", [pdfPath, "-"], { encoding: "utf8", maxBuffer: 20 * 1024 * 1024 }));
-      expect(text).toContain("ScaleUp Score 55 / 100");
+      expect(text).toContain("ScaleUp Score: 55 / 100");
       expect(text).not.toContain("Frozen feedback");
       const searchableWords = normalizeWords(text);
       expect(searchableWords).toContain(normalizeWords(REPRESENTATIVE_482_CHARACTER_FEEDBACK));
@@ -1116,12 +1084,13 @@ describe("SU Full landscape browser and PDF contract", () => {
     }
   });
 
-  it.each(REPORT_HTML_PEER_FIXTURES)("keeps the $authoringCase/$peerReference authored-report matrix inside 26 physical pages", async (fixture) => {
+  it.each(REPORT_HTML_PEER_FIXTURES)("keeps the $authoringCase/$peerReference authored-report matrix inside its sequential physical-page contract", async (fixture) => {
     const provenance = fixture.peerReference === "current" ? "Phase 4 · Delegation" : "Historical benchmark";
     const disclosure = fixture.peerReference === "current"
       ? SU_FULL_GOVERNED_PEER_DISCLOSURE
       : SU_FULL_LEGACY_PEER_DISCLOSURE;
     const report = reportWithAuthoringCase(fixture);
+    const expectedPageCount = report.reportHtml?.introductionHtml ? 25 : 24;
     if (fixture.authoringCase === "adversarial") {
       for (const storedHtml of [
         report.reportHtml?.introductionHtml,
@@ -1143,8 +1112,15 @@ describe("SU Full landscape browser and PDF contract", () => {
     const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
     try {
       await load(page, html);
-      expect(await page.locator("[data-testid^='su-full-landscape-page-']").count()).toBe(26);
-      expect(await page.locator(".su-full-landscape-page").count()).toBe(26);
+      const renderedPages = await page.locator("[data-testid^='su-full-landscape-page-']").all();
+      const renderedPageNumbers = await page.locator("[data-page-number]").evaluateAll((pages) =>
+        pages.map((renderedPage) => Number((renderedPage as HTMLElement).dataset.pageNumber)),
+      );
+      expect(renderedPages).toHaveLength(expectedPageCount);
+      expect(renderedPageNumbers).toEqual(
+        Array.from({ length: expectedPageCount }, (_, index) => index + 1),
+      );
+      expect(await page.locator(".su-full-landscape-page").count()).toBe(expectedPageCount);
       await expect(page.locator("body").innerText()).resolves.toContain(provenance);
       await expect(page.getByText(disclosure, { exact: true }).count()).resolves.toBeGreaterThanOrEqual(2);
       await expect(page.locator("body").innerText()).resolves.not.toMatch(ENGINEERING_LANGUAGE);
@@ -1205,9 +1181,10 @@ describe("SU Full landscape browser and PDF contract", () => {
       await page.setViewportSize({ width: 1280, height: 720 });
       await page.emulateMedia({ media: "print" });
       expect(await authoredContentOutsidePhysicalPage(page)).toEqual([]);
-      await expect(page.locator("[data-page-number='25']").innerText()).resolves.toContain("55 / 100");
-      await expect(page.locator("[data-page-number='25']").innerText()).resolves.toContain("Your strongest chapter is");
-      await expect(page.locator("[data-page-number='25']").innerText()).resolves.toContain("Your focus chapter is");
+      const conclusionPage = page.locator(`[data-page-number='${expectedPageCount - 1}']`);
+      await expect(conclusionPage.innerText()).resolves.toContain("55 / 100");
+      await expect(conclusionPage.innerText()).resolves.toContain("You scored highest on");
+      await expect(conclusionPage.innerText()).resolves.toContain("and lowest on");
 
       await page.pdf({
         path: pdfPath,
@@ -1217,13 +1194,13 @@ describe("SU Full landscape browser and PDF contract", () => {
         printBackground: true,
       });
       const pdfinfo = execFileSync("pdfinfo", [pdfPath], { encoding: "utf8" });
-      expect(pdfinfo).toMatch(/^Pages:\s+26$/m);
+      expect(pdfinfo).toMatch(new RegExp(`^Pages:\\s+${expectedPageCount}$`, "m"));
       const pdfText = normalize(execFileSync("pdftotext", [pdfPath, "-"], { encoding: "utf8", maxBuffer: 20 * 1024 * 1024 }));
       expect(pdfText).toContain(provenance);
       expect(pdfText).toContain(disclosure);
-      expect(pdfText).toContain("ScaleUp Score 55 / 100");
-      expect(pdfText).toContain("Your strongest chapter is");
-      expect(pdfText).toContain("Your focus chapter is");
+      expect(pdfText).toContain("ScaleUp Score of 55 / 100");
+      expect(pdfText).toContain("You scored highest on");
+      expect(pdfText).toContain("and lowest on");
       expect(pdfText).not.toMatch(ENGINEERING_LANGUAGE);
     } finally {
       await page.close();
@@ -1242,6 +1219,7 @@ describe("SU Full landscape browser and PDF contract", () => {
     }
 
     const { html } = routeMarkup(prepared);
+    const expectedPageCount = prepared.reportHtml?.introductionHtml ? 25 : 24;
     const directory = mkdtempSync(join(tmpdir(), "report-html-semantic-escape-"));
     const pdfPath = join(directory, `${fixture.id}-${fixture.peerReference}.pdf`);
     const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
@@ -1294,7 +1272,7 @@ describe("SU Full landscape browser and PDF contract", () => {
           first: null,
           last: null,
         },
-        physicalPdfPages: 26,
+        physicalPdfPages: expectedPageCount,
       });
     } finally {
       await page.close();

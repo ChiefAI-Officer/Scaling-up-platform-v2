@@ -32,15 +32,22 @@ function barFillClass(kind: "you" | "peers"): string {
 }
 
 function BarMeasure({
+  chapterKey,
   label,
+  questionKey,
   value,
 }: {
+  chapterKey: SuFullLandscapeChapterKey;
   label: "You" | "Peers";
+  questionKey: string;
   value: number;
 }) {
   const kind = label === "You" ? "you" : "peers";
   return (
-    <div className="su-full-landscape-bar-measure">
+    <div
+      className={`su-full-landscape-bar-measure ${chapterColorClass(chapterKey)}`}
+      data-testid={`su-full-detail-${kind}-${questionKey}`}
+    >
       <span className="su-full-landscape-bar-label">{label}</span>
       <span className="su-full-landscape-bar-track" aria-hidden="true">
         <span
@@ -151,8 +158,8 @@ export function SuFullDetailPairedBars({
       className={`su-full-landscape-detail-bars ${chapterColorClass(chapterKey)}`}
       data-testid={`su-landscape-detail-bars-${question.stableKey}`}
     >
-      <BarMeasure label="You" value={question.you} />
-      <BarMeasure label="Peers" value={question.peers} />
+      <BarMeasure chapterKey={chapterKey} label="You" questionKey={question.stableKey} value={question.you} />
+      <BarMeasure chapterKey={chapterKey} label="Peers" questionKey={question.stableKey} value={question.peers} />
     </div>
   );
 }

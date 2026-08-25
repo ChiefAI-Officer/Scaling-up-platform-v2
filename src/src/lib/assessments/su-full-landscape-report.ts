@@ -41,11 +41,13 @@ export type SuFullLandscapeChapter = Readonly<{
   peersAverage: number;
 }>;
 
-export type SuFullLandscapePage =
-  | Readonly<{ number: number; kind: "cover" | "preface" | "contents" | "introduction" | "profile" | "peer-dashboard" | "conclusion" }>
-  | Readonly<{ number: number; kind: "chapter"; chapterKey: SuFullLandscapeChapterKey }>
-  | Readonly<{ number: number; kind: "detail"; chapterKey: SuFullLandscapeChapterKey; questionKeys: readonly string[] }>
-  | Readonly<{ number: 26; kind: "appendix" }>;
+type SuFullLandscapePageContent =
+  | Readonly<{ kind: "cover" | "preface" | "contents" | "introduction" | "profile" | "conclusion" }>
+  | Readonly<{ kind: "chapter"; chapterKey: SuFullLandscapeChapterKey }>
+  | Readonly<{ kind: "detail"; chapterKey: SuFullLandscapeChapterKey; questionKeys: readonly string[] }>
+  | Readonly<{ kind: "appendix" }>;
+
+export type SuFullLandscapePage = SuFullLandscapePageContent & Readonly<{ number: number }>;
 
 export type SuFullLandscapeReportModel = Readonly<{
   scaleUpScore: number;
@@ -74,7 +76,6 @@ export type SuFullLandscapeChapterDefinition = Readonly<{
 }>;
 
 export type SuFullLandscapePageGroup = Readonly<{
-  number: number;
   chapterKey: SuFullLandscapeChapterKey;
   questionKeys: readonly string[];
 }>;
@@ -108,19 +109,19 @@ export const SU_FULL_LANDSCAPE_CHAPTERS: readonly SuFullLandscapeChapterDefiniti
 ] as const;
 
 export const SU_FULL_LANDSCAPE_PAGE_GROUPS: readonly SuFullLandscapePageGroup[] = [
-  { number: 8, chapterKey: "people", questionKeys: questionKeys(1, 6) },
-  { number: 9, chapterKey: "people", questionKeys: questionKeys(7, 8) },
-  { number: 10, chapterKey: "people", questionKeys: questionKeys(9, 13) },
-  { number: 12, chapterKey: "strategy", questionKeys: questionKeys(14, 19) },
-  { number: 13, chapterKey: "strategy", questionKeys: questionKeys(20, 20) },
-  { number: 15, chapterKey: "execution", questionKeys: questionKeys(21, 24) },
-  { number: 16, chapterKey: "execution", questionKeys: questionKeys(25, 29) },
-  { number: 17, chapterKey: "execution", questionKeys: questionKeys(30, 34) },
-  { number: 18, chapterKey: "execution", questionKeys: questionKeys(35, 40) },
-  { number: 20, chapterKey: "cash", questionKeys: questionKeys(41, 45) },
-  { number: 22, chapterKey: "you", questionKeys: questionKeys(46, 51) },
-  { number: 23, chapterKey: "you", questionKeys: questionKeys(52, 55) },
-  { number: 24, chapterKey: "you", questionKeys: questionKeys(56, 61) },
+  { chapterKey: "people", questionKeys: questionKeys(1, 6) },
+  { chapterKey: "people", questionKeys: questionKeys(7, 8) },
+  { chapterKey: "people", questionKeys: questionKeys(9, 13) },
+  { chapterKey: "strategy", questionKeys: questionKeys(14, 19) },
+  { chapterKey: "strategy", questionKeys: questionKeys(20, 20) },
+  { chapterKey: "execution", questionKeys: questionKeys(21, 24) },
+  { chapterKey: "execution", questionKeys: questionKeys(25, 29) },
+  { chapterKey: "execution", questionKeys: questionKeys(30, 34) },
+  { chapterKey: "execution", questionKeys: questionKeys(35, 40) },
+  { chapterKey: "cash", questionKeys: questionKeys(41, 45) },
+  { chapterKey: "you", questionKeys: questionKeys(46, 51) },
+  { chapterKey: "you", questionKeys: questionKeys(52, 55) },
+  { chapterKey: "you", questionKeys: questionKeys(56, 61) },
 ] as const;
 
 const CANONICAL_QUESTION_KEYS = CANONICAL_SECTIONS.flatMap((section) => section.questionKeys);
@@ -284,36 +285,28 @@ function growthPhaseFromFrozenResult(
   return GROWTH_PHASE_NARRATIVES[result.recommendationPhase] ?? null;
 }
 
-function pages(): readonly SuFullLandscapePage[] {
-  const chapterPageByKey: Readonly<Record<SuFullLandscapeChapterKey, number>> = {
-    people: 7,
-    strategy: 11,
-    execution: 14,
-    cash: 19,
-    you: 21,
-  };
-  const staticPages: readonly SuFullLandscapePage[] = [
-    { number: 1, kind: "cover" },
-    { number: 2, kind: "preface" },
-    { number: 3, kind: "contents" },
-    { number: 4, kind: "introduction" },
-    { number: 5, kind: "profile" },
-    { number: 6, kind: "peer-dashboard" },
-    { number: 25, kind: "conclusion" },
-    { number: 26, kind: "appendix" },
+function pages(hasAuthoredPreface: boolean): readonly SuFullLandscapePage[] {
+  const logicalPages: readonly SuFullLandscapePageContent[] = [
+    { kind: "cover" },
+    ...(hasAuthoredPreface ? [{ kind: "preface" } as const] : []),
+    { kind: "contents" },
+    { kind: "introduction" },
+    { kind: "profile" },
+    ...SU_FULL_LANDSCAPE_CHAPTERS.flatMap((chapter) => [
+      { kind: "chapter" as const, chapterKey: chapter.key },
+      ...SU_FULL_LANDSCAPE_PAGE_GROUPS
+        .filter((group) => group.chapterKey === chapter.key)
+        .map((group) => ({
+          kind: "detail" as const,
+          chapterKey: group.chapterKey,
+          questionKeys: [...group.questionKeys],
+        })),
+    ]),
+    { kind: "conclusion" },
+    { kind: "appendix" },
   ];
-  const chapterPages = SU_FULL_LANDSCAPE_CHAPTERS.map((chapter) => ({
-    number: chapterPageByKey[chapter.key],
-    kind: "chapter" as const,
-    chapterKey: chapter.key,
-  }));
-  const detailPages = SU_FULL_LANDSCAPE_PAGE_GROUPS.map((group) => ({
-    number: group.number,
-    kind: "detail" as const,
-    chapterKey: group.chapterKey,
-    questionKeys: [...group.questionKeys],
-  }));
-  return [...staticPages, ...chapterPages, ...detailPages].sort((left, right) => left.number - right.number);
+
+  return logicalPages.map((page, index) => ({ ...page, number: index + 1 }));
 }
 
 /**
@@ -404,8 +397,9 @@ export function buildSuFullLandscapeReportModel(input: {
   const allQuestions = chapters.flatMap((chapter) => chapter.questions);
   if (!sameKeys(allQuestions.map((question) => question.stableKey), CANONICAL_QUESTION_KEYS)) return null;
 
-  const orderedPages = pages();
-  if (orderedPages.length !== 26 || !orderedPages.every((page, index) => page.number === index + 1)) return null;
+  const orderedPages = pages(Boolean(report.reportHtml?.introductionHtml));
+  const expectedPageCount = report.reportHtml?.introductionHtml ? 25 : 24;
+  if (orderedPages.length !== expectedPageCount || !orderedPages.every((page, index) => page.number === index + 1)) return null;
   const strongestChapter = [...chapters].sort((left, right) => right.youAverage - left.youAverage)[0];
   const weakestChapter = [...chapters].sort((left, right) => left.youAverage - right.youAverage)[0];
   if (!strongestChapter || !weakestChapter) return null;
