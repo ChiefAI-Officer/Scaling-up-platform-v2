@@ -122,23 +122,6 @@ function CoverPage({ report, number }: { report: RespondentReport; number: numbe
   );
 }
 
-function PrefacePage({ number, footerBrand }: { number: number; footerBrand: SuFullLandscapeFooterBrand }) {
-  return (
-    <SuFullLandscapePage number={number} footerBrand={footerBrand}>
-      <h2>Welcome</h2>
-      <p>
-        This report turns your submitted assessment into a practical view of the
-        systems that support your company&apos;s growth. Use it to identify the
-        conversations, choices, and actions that deserve attention next.
-      </p>
-      <p>
-        Your answers and feedback are preserved from the completed assessment;
-        peer values are explained wherever they appear.
-      </p>
-    </SuFullLandscapePage>
-  );
-}
-
 function CustomHtmlPage({
   report,
   html,
@@ -161,13 +144,35 @@ function CustomHtmlPage({
   );
 }
 
-function ContentsPage({ number, footerBrand }: { number: number; footerBrand: SuFullLandscapeFooterBrand }) {
+function ContentsPage({ model, number, footerBrand }: {
+  model: SuFullLandscapeReportModel;
+  number: number;
+  footerBrand: SuFullLandscapeFooterBrand;
+}) {
+  const chapterPageNumber = (chapterKey: SuFullLandscapeChapterKey) => {
+    const page = model.pages.find((candidate) =>
+      candidate.kind === "chapter" && candidate.chapterKey === chapterKey,
+    );
+    if (!page) throw new Error(`Landscape contents is missing the ${chapterKey} chapter page`);
+    return page.number;
+  };
+  const detailPageNumber = (questionKey: string) => {
+    const page = model.pages.find((candidate) =>
+      candidate.kind === "detail" && candidate.questionKeys.includes(questionKey),
+    );
+    if (!page) throw new Error(`Landscape contents is missing the ${questionKey} detail page`);
+    return page.number;
+  };
+  const detailRange = (firstQuestionKey: string, lastQuestionKey: string) =>
+    `${detailPageNumber(firstQuestionKey)}–${detailPageNumber(lastQuestionKey)}`;
+  const appendixPage = model.pages.find((candidate) => candidate.kind === "appendix");
+  if (!appendixPage) throw new Error("Landscape contents is missing the appendix page");
   const entries = [
-    ["People", 7, ["Your Employees (8–9)", "Company Culture (10)"]],
-    ["Strategy", 11, ["Strategy (12–13)"]],
-    ["Execution", 14, ["Leadership Team (15)", "Operational Processes (16)", "Sales and Marketing (17)", "Scalability, Innovation and Technology (18)"]],
-    ["Cash", 19, ["Cash (20)"]],
-    ["You", 21, ["Your Leadership (22–23)", "Internal Communication (24)"]],
+    ["People", chapterPageNumber("people"), [`Your Employees (${detailRange("Q01", "Q08")})`, `Company Culture (${detailRange("Q09", "Q13")})`]],
+    ["Strategy", chapterPageNumber("strategy"), [`Strategy (${detailRange("Q14", "Q20")})`]],
+    ["Execution", chapterPageNumber("execution"), [`Leadership Team (${detailRange("Q21", "Q24")})`, `Operational Processes (${detailRange("Q25", "Q29")})`, `Sales and Marketing (${detailRange("Q30", "Q34")})`, `Scalability, Innovation and Technology (${detailRange("Q35", "Q40")})`]],
+    ["Cash", chapterPageNumber("cash"), [`Cash (${detailRange("Q41", "Q45")})`]],
+    ["You", chapterPageNumber("you"), [`Your Leadership (${detailRange("Q46", "Q55")})`, `Internal Communication (${detailRange("Q56", "Q61")})`]],
   ] as const;
   return (
     <SuFullLandscapePage number={number} footerBrand={footerBrand}>
@@ -188,7 +193,7 @@ function ContentsPage({ number, footerBrand }: { number: number; footerBrand: Su
           </li>
         ))}
       </ul>
-      <p>Appendix A: chapter comparisons <span>26</span></p>
+      <p>Appendix A: chapter comparisons <span>{appendixPage.number}</span></p>
     </SuFullLandscapePage>
   );
 }
@@ -243,23 +248,6 @@ function ProfilePage({ model, number, footerBrand }: { model: SuFullLandscapeRep
         </tbody>
       </table>
       <p>Strongest chapter: {model.strongestChapter.label}. Focus chapter: {model.weakestChapter.label}.</p>
-    </SuFullLandscapePage>
-  );
-}
-
-function PeerDashboardPage({ model, number, footerBrand }: { model: SuFullLandscapeReportModel; number: number; footerBrand: SuFullLandscapeFooterBrand }) {
-  return (
-    <SuFullLandscapePage number={number} footerBrand={footerBrand}>
-      <h2>Peers and comparisons</h2>
-      <PeerSnapshotDisclosure provenance={model.peerProvenance} />
-      <table>
-        <thead><tr><th>Chapter</th><th>You</th><th>Peers</th></tr></thead>
-        <tbody>{model.chapters.map((chapter) => (
-          <tr key={chapter.key}><th>{chapter.label}</th><td>{formatNumber(chapter.youAverage)}</td><td>{formatNumber(chapter.peersAverage)}</td></tr>
-        ))}</tbody>
-      </table>
-      <p>Closest comparisons: {model.closestQuestions.map((question) => question.label).join("; ")}.</p>
-      <p>Largest gaps: {model.largestGapQuestions.map((question) => question.label).join("; ")}.</p>
     </SuFullLandscapePage>
   );
 }
@@ -393,13 +381,10 @@ export function SuFullLandscapeReport({
         {model.pages.map((page) => {
         switch (page.kind) {
           case "cover": return <CoverPage key={page.number} number={page.number} report={report} />;
-          case "preface": return report.reportHtml?.introductionHtml
-            ? <CustomHtmlPage key={page.number} number={page.number} report={report} html={report.reportHtml.introductionHtml} />
-            : <PrefacePage key={page.number} number={page.number} footerBrand={report} />;
-          case "contents": return <ContentsPage key={page.number} number={page.number} footerBrand={report} />;
+          case "preface": return <CustomHtmlPage key={page.number} number={page.number} report={report} html={report.reportHtml!.introductionHtml!} />;
+          case "contents": return <ContentsPage key={page.number} model={model} number={page.number} footerBrand={report} />;
           case "introduction": return <IntroductionPage key={page.number} number={page.number} report={report} model={model} />;
           case "profile": return <ProfilePage key={page.number} number={page.number} model={model} footerBrand={report} />;
-          case "peer-dashboard": return <PeerDashboardPage key={page.number} number={page.number} model={model} footerBrand={report} />;
           case "chapter": {
             const chapter = chapters.get(page.chapterKey);
             if (!chapter) throw new Error(`Landscape chapter page ${page.number} is missing ${page.chapterKey}`);

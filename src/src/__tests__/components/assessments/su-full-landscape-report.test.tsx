@@ -50,8 +50,14 @@ test("renders detail paired bars in You then Peers order with visible values", (
   expect(detail).toHaveTextContent("6.6");
 });
 
-test("renders the fixed 26-page landscape composition with truthful peer context", () => {
-  const report = completeSuFullLandscapeReport();
+test("renders the authored 25-page landscape composition without rejected pages", () => {
+  const report = {
+    ...completeSuFullLandscapeReport(),
+    reportHtml: {
+      introductionHtml: '<section aria-label="Verne Harnish preface"><h2>Preface</h2></section>',
+      conclusionHtml: null,
+    },
+  };
   const presentation = completeSuFullLandscapePresentation(report);
   const model = buildSuFullLandscapeReportModel({ report, presentation, resolvedStyle: "CLASSIC" });
   if (!model) throw new Error("The canonical landscape fixture must build");
@@ -65,15 +71,18 @@ test("renders the fixed 26-page landscape composition with truthful peer context
   );
 
   const pages = screen.getAllByTestId(/^su-full-landscape-page-/);
-  expect(pages).toHaveLength(26);
+  expect(pages).toHaveLength(25);
   expect(pages.map((page) => page.dataset.pageNumber)).toEqual(
-    Array.from({ length: 26 }, (_, index) => String(index + 1)),
+    Array.from({ length: 25 }, (_, index) => String(index + 1)),
   );
-  for (const number of [7, 11, 14, 19, 21]) {
+  expect(screen.queryByRole("heading", { name: "Welcome" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "Peers and comparisons" })).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Verne Harnish preface")).toBeInTheDocument();
+  for (const number of [6, 10, 13, 18, 20]) {
     expect(screen.getByTestId(`su-full-landscape-page-${number}`))
       .toHaveTextContent("Score of Peers");
   }
-  const appendix = screen.getByTestId("su-full-landscape-page-26");
+  const appendix = screen.getByTestId("su-full-landscape-page-25");
   expect(appendix.querySelectorAll("polyline")).toHaveLength(5);
   expect(appendix.querySelectorAll(".su-full-landscape-chart-row")).toHaveLength(61);
   for (const question of model.chapters.flatMap((chapter) => chapter.questions)) {
@@ -89,10 +98,14 @@ test("renders the fixed 26-page landscape composition with truthful peer context
   );
   expect(cover).toHaveTextContent("Report for: Ari Founder · CEO");
   expect(cover).toHaveTextContent("Acme · 17 August 2026");
-  expect(screen.getAllByTestId("coach-name")).toHaveLength(27);
-  expect(screen.getAllByTestId("coach-logo")).toHaveLength(27);
+  expect(screen.getAllByTestId("coach-name")).toHaveLength(26);
+  expect(screen.getAllByTestId("coach-logo")).toHaveLength(26);
   const chapterKeyItems = screen.getByTestId("su-full-landscape-page-3")
     .querySelectorAll(".su-full-landscape-chapter-key li");
+  const contents = screen.getByTestId("su-full-landscape-page-3");
+  expect(contents).toHaveTextContent("People 6");
+  expect(contents).toHaveTextContent("Your Employees (7–8)");
+  expect(contents).toHaveTextContent("Appendix A: chapter comparisons 25");
   expect(chapterKeyItems).toHaveLength(5);
   expect(Array.from(chapterKeyItems).map((item) => item.className)).toEqual([
     "is-people", "is-strategy", "is-execution", "is-cash", "is-you",
@@ -101,9 +114,9 @@ test("renders the fixed 26-page landscape composition with truthful peer context
     document.querySelectorAll<HTMLElement>("[aria-labelledby^=\"su-landscape-vertical-chart-title-\"]"),
   ).map((chart) => chart.getAttribute("aria-labelledby"));
   expect(new Set(chartTitleIds).size).toBe(chartTitleIds.length);
-  expect(screen.getByTestId("su-full-landscape-page-7")).toHaveClass("su-full-landscape-page--chapter");
-  expect(screen.getByTestId("su-full-landscape-page-8")).toHaveClass("su-full-landscape-page--detail");
-  expect(screen.getByTestId("su-full-landscape-page-26")).toHaveClass("su-full-landscape-page--appendix");
+  expect(screen.getByTestId("su-full-landscape-page-6")).toHaveClass("su-full-landscape-page--chapter");
+  expect(screen.getByTestId("su-full-landscape-page-7")).toHaveClass("su-full-landscape-page--detail");
+  expect(screen.getByTestId("su-full-landscape-page-25")).toHaveClass("su-full-landscape-page--appendix");
   expect(screen.getAllByTestId(/^su-full-landscape-detail-Q/)).toHaveLength(61);
 
   expect(screen.getByTestId("su-full-landscape-page-4")).toHaveTextContent(
@@ -115,15 +128,6 @@ test("renders the fixed 26-page landscape composition with truthful peer context
   expect(screen.getByTestId("su-full-landscape-page-5").querySelectorAll("tbody tr")).toHaveLength(15);
   expect(screen.getByTestId("su-full-landscape-page-5").querySelectorAll(".su-full-landscape-profile-row--chapter")).toHaveLength(5);
   expect(screen.getByTestId("su-full-landscape-page-5").querySelectorAll(".su-full-landscape-profile-row--subsection")).toHaveLength(10);
-  expect(screen.getByTestId("su-full-landscape-page-6")).toHaveTextContent(
-    "Peers shows the benchmark associated with your organizational phase when you completed this assessment. It is not matched by industry, geography, or a custom peer group.",
-  );
-  expect(screen.getByTestId("su-full-landscape-page-6")).toHaveTextContent(
-    "Phase 4 · Delegation",
-  );
-  expect(screen.getByTestId("su-full-landscape-page-6")).not.toHaveTextContent(
-    /governed|snapshot|sourceId|source id|catalogue|provenance|legacy baseline|phase-aware|frozen|esperto-five-phase-peers/i,
-  );
   expect(screen.getAllByLabelText("Peer benchmark information").length).toBeGreaterThanOrEqual(2);
 
   for (const detail of screen.getAllByTestId(/^su-full-landscape-detail-Q/)) {
@@ -146,11 +150,11 @@ test("renders the fixed 26-page landscape composition with truthful peer context
     expect(detail).toHaveTextContent(question.recommendation!);
   }
 
-  expect(screen.getByTestId("su-full-landscape-page-25")).toHaveTextContent("ScaleUp Score");
+  expect(screen.getByTestId("su-full-landscape-page-24")).toHaveTextContent("ScaleUp Score");
   expect(screen.getByTestId("su-full-landscape-page-4")).toHaveTextContent("55 / 100");
-  expect(screen.getByTestId("su-full-landscape-page-25")).toHaveTextContent("55 / 100");
+  expect(screen.getByTestId("su-full-landscape-page-24")).toHaveTextContent("55 / 100");
   expect(screen.getByRole("link", { name: "Contact your coach" })).toHaveAttribute("href", "mailto:coach@example.com");
-  expect(screen.getByTestId("su-full-landscape-page-25")).toHaveTextContent("Next steps");
+  expect(screen.getByTestId("su-full-landscape-page-24")).toHaveTextContent("Next steps");
   expect(document.body.textContent).not.toMatch(/TCPDF/i);
 });
 
@@ -166,7 +170,7 @@ test("falls back to the frozen referring coach email when no explicit contact is
     .toHaveAttribute("href", "mailto:referrer@example.com");
 });
 
-test("replaces Welcome but protects the respondent summary before a custom closing message", () => {
+test("preserves the authored preface and respondent summary before a custom closing message", () => {
   const report = {
     ...completeSuFullLandscapeReport(),
     reportHtml: {
@@ -186,14 +190,14 @@ test("replaces Welcome but protects the respondent summary before a custom closi
   expect(screen.getByTestId("su-full-landscape-page-2")).not.toHaveTextContent(
     "This report turns your submitted assessment",
   );
-  const page25 = screen.getByTestId("su-full-landscape-page-25");
-  expect(page25).toHaveTextContent("ScaleUp Score");
-  expect(page25).toHaveTextContent("55 / 100");
-  expect(page25).toHaveTextContent("Your strongest chapter is");
-  expect(page25).toHaveTextContent("Your focus chapter is");
-  expect(page25).toHaveTextContent("Custom closing message");
-  expect(page25).not.toHaveTextContent("Choose one priority from the feedback");
-  expect(screen.getAllByTestId(/^su-full-landscape-page-/)).toHaveLength(26);
+  const page24 = screen.getByTestId("su-full-landscape-page-24");
+  expect(page24).toHaveTextContent("ScaleUp Score");
+  expect(page24).toHaveTextContent("55 / 100");
+  expect(page24).toHaveTextContent("Your strongest chapter is");
+  expect(page24).toHaveTextContent("Your focus chapter is");
+  expect(page24).toHaveTextContent("Custom closing message");
+  expect(page24).not.toHaveTextContent("Choose one priority from the feedback");
+  expect(screen.getAllByTestId(/^su-full-landscape-page-/)).toHaveLength(25);
 });
 
 test("personalizes escaped respondent and company tokens in authored report HTML", () => {
@@ -258,14 +262,15 @@ test("keeps generated add-ons before the landscape conclusion without adding a p
     />,
   );
 
-  const page = screen.getByTestId("su-full-landscape-page-25");
+  const page = screen.getByTestId("su-full-landscape-page-23");
   const addon = screen.getByTestId("generated-addon");
   const conclusion = screen.getByTestId("report-html-conclusion");
   expect(page).toContainElement(addon);
   expect(
     addon.compareDocumentPosition(conclusion) & Node.DOCUMENT_POSITION_FOLLOWING,
   ).toBeTruthy();
-  expect(screen.getAllByTestId(/^su-full-landscape-page-/)).toHaveLength(26);
+  expect(screen.queryByRole("heading", { name: "Welcome" })).not.toBeInTheDocument();
+  expect(screen.getAllByTestId(/^su-full-landscape-page-/)).toHaveLength(24);
 });
 
 test("keeps the landscape renderer's A4 print and responsive screen contract scoped", () => {
