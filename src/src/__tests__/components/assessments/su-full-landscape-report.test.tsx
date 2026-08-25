@@ -10,7 +10,9 @@ import { SuFullLandscapeReport } from "@/components/assessments/su-full-landscap
 import {
   completeSuFullLandscapePresentation,
   completeSuFullLandscapeReport,
+  restoredScalingUpFullCtaReport,
 } from "@/__tests__/fixtures/su-full-landscape";
+import { GROWTH_PHASE_NARRATIVES } from "@/lib/assessments/su-full-phase";
 import { buildSuFullLandscapeReportModel } from "@/lib/assessments/su-full-landscape-report";
 
 function peopleQuestions() {
@@ -50,11 +52,113 @@ test("renders detail paired bars in You then Peers order with visible values", (
   expect(detail).toHaveTextContent("6.6");
 });
 
-test("renders the fixed 26-page landscape composition with truthful peer context", () => {
+test("renders detail You and Peers bars with their People domain context", () => {
+  const question = peopleQuestions()[0];
+
+  render(<SuFullDetailPairedBars chapterKey="people" question={question} />);
+
+  expect(screen.getByTestId("su-full-detail-you-Q01")).toHaveClass("is-people");
+  expect(screen.getByTestId("su-full-detail-peers-Q01")).toHaveClass("is-people");
+});
+
+test("populates the Introduction from available frozen report data", () => {
+  const source = completeSuFullLandscapeReport();
+  const report = {
+    ...source,
+    rawAnswers: [
+      { stableKey: "Q_FTE_CONTRACT", value: 56 },
+      { stableKey: "Q_FREELANCE", value: 9 },
+    ],
+  };
+  const presentation = completeSuFullLandscapePresentation(report);
+  const sourceModel = buildSuFullLandscapeReportModel({ report, presentation, resolvedStyle: "CLASSIC" });
+  if (!sourceModel) throw new Error("The available-data fixture must build");
+  const model = { ...sourceModel, scaleUpScore: 73, growthPhase: GROWTH_PHASE_NARRATIVES[3] };
+
+  render(<SuFullLandscapeReport report={report} model={model} />);
+
+  const introduction = screen.getByRole("region", { name: "Introduction" });
+  expect(within(introduction).getByText(report.respondentName, { exact: false })).toBeInTheDocument();
+  expect(within(introduction).getAllByText(report.companyName, { exact: false }).length)
+    .toBeGreaterThan(0);
+  expect(within(introduction).getByText(/56 full-time equivalent/i)).toBeInTheDocument();
+  expect(within(introduction).getByText(/9 freelance/i)).toBeInTheDocument();
+  expect(within(introduction).getByText(/Phase 3/i)).toBeInTheDocument();
+  expect(within(introduction).getByText(/ScaleUp Score.*73/i)).toBeInTheDocument();
+});
+
+test("omits unavailable optional and unsupported Introduction data cleanly", () => {
+  const report = {
+    ...completeSuFullLandscapeReport(),
+    rawAnswers: [{ stableKey: "Q_FTE_CONTRACT", value: 56 }],
+  };
+  const presentation = completeSuFullLandscapePresentation(report);
+  const model = buildSuFullLandscapeReportModel({ report, presentation, resolvedStyle: "CLASSIC" });
+  if (!model) throw new Error("The missing-data fixture must build");
+
+  render(<SuFullLandscapeReport report={report} model={model} />);
+
+  const introduction = screen.getByRole("region", { name: "Introduction" });
+  expect(within(introduction).getByText(/56 full-time equivalent/i)).toBeInTheDocument();
+  expect(within(introduction).queryByText(/freelance/i)).not.toBeInTheDocument();
+  expect(screen.queryByText(/undefined|null|not provided/i)).not.toBeInTheDocument();
+  expect(screen.queryByText(/years old|entrepreneur for|partners|international revenue/i))
+    .not.toBeInTheDocument();
+});
+
+test("keeps the known company and excludes non-whitelisted title data when headcount is absent", () => {
+  const report = {
+    ...completeSuFullLandscapeReport(),
+    assessmentName: "Unapproved Internal Assessment Title",
+    rawAnswers: [],
+  };
+  const presentation = completeSuFullLandscapePresentation(report);
+  const model = buildSuFullLandscapeReportModel({ report, presentation, resolvedStyle: "CLASSIC" });
+  if (!model) throw new Error("The no-headcount fixture must build");
+
+  render(<SuFullLandscapeReport report={report} model={model} />);
+
+  const introduction = screen.getByRole("region", { name: "Introduction" });
+  expect(within(introduction).getByText(report.companyName, { exact: false })).toBeInTheDocument();
+  expect(within(introduction).queryByText(report.assessmentName, { exact: false }))
+    .not.toBeInTheDocument();
+  expect(within(introduction).queryByText(/full-time equivalent|freelance/i))
+    .not.toBeInTheDocument();
+});
+
+test("renders the five source-text chapter narratives without unavailable personalization", () => {
   const report = completeSuFullLandscapeReport();
   const presentation = completeSuFullLandscapePresentation(report);
   const model = buildSuFullLandscapeReportModel({ report, presentation, resolvedStyle: "CLASSIC" });
+  if (!model) throw new Error("The chapter narrative fixture must build");
+
+  render(<SuFullLandscapeReport report={report} model={model} />);
+
+  const sourcePhrases = [
+    ["People", /without a doubt the key to success/i],
+    ["Strategy", /articulating a clear and differential strategy/i],
+    ["Execution", /execution is, in many organizations, the biggest challenge/i],
+    ["Cash", /growth sucks cash/i],
+    ["You", /the bottleneck is always on top of the bottle/i],
+  ] as const;
+  for (const [label, sourcePhrase] of sourcePhrases) {
+    const narrative = screen.getByTestId(`chapter-narrative-${label.toLowerCase()}`);
+    expect(narrative).not.toBeEmptyDOMElement();
+    expect(narrative).toHaveTextContent(sourcePhrase);
+  }
+  expect(screen.queryByText(/years experience as an entrepreneur/i)).not.toBeInTheDocument();
+  expect(screen.queryByText(/partner\(s\)/i)).not.toBeInTheDocument();
+});
+
+test("renders the authored 25-page landscape composition without rejected pages", () => {
+  const report = restoredScalingUpFullCtaReport();
+  const presentation = completeSuFullLandscapePresentation(report);
+  const model = buildSuFullLandscapeReportModel({ report, presentation, resolvedStyle: "CLASSIC" });
   if (!model) throw new Error("The canonical landscape fixture must build");
+  const expectedFrozenRecommendationQ01 = model.chapters
+    .flatMap((chapter) => chapter.questions)
+    .find((question) => question.stableKey === "Q01")?.recommendation;
+  expect(expectedFrozenRecommendationQ01).toEqual(expect.any(String));
 
   render(
     <SuFullLandscapeReport
@@ -65,15 +169,18 @@ test("renders the fixed 26-page landscape composition with truthful peer context
   );
 
   const pages = screen.getAllByTestId(/^su-full-landscape-page-/);
-  expect(pages).toHaveLength(26);
+  expect(pages).toHaveLength(25);
   expect(pages.map((page) => page.dataset.pageNumber)).toEqual(
-    Array.from({ length: 26 }, (_, index) => String(index + 1)),
+    Array.from({ length: 25 }, (_, index) => String(index + 1)),
   );
-  for (const number of [7, 11, 14, 19, 21]) {
+  expect(screen.queryByRole("heading", { name: "Welcome" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "Peers and comparisons" })).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Verne Harnish preface")).toBeInTheDocument();
+  for (const number of [6, 10, 13, 18, 20]) {
     expect(screen.getByTestId(`su-full-landscape-page-${number}`))
       .toHaveTextContent("Score of Peers");
   }
-  const appendix = screen.getByTestId("su-full-landscape-page-26");
+  const appendix = screen.getByTestId("su-full-landscape-page-25");
   expect(appendix.querySelectorAll("polyline")).toHaveLength(5);
   expect(appendix.querySelectorAll(".su-full-landscape-chart-row")).toHaveLength(61);
   for (const question of model.chapters.flatMap((chapter) => chapter.questions)) {
@@ -89,40 +196,111 @@ test("renders the fixed 26-page landscape composition with truthful peer context
   );
   expect(cover).toHaveTextContent("Report for: Ari Founder · CEO");
   expect(cover).toHaveTextContent("Acme · 17 August 2026");
-  expect(screen.getAllByTestId("coach-name")).toHaveLength(27);
-  expect(screen.getAllByTestId("coach-logo")).toHaveLength(27);
-  const chapterKeyItems = screen.getByTestId("su-full-landscape-page-3")
-    .querySelectorAll(".su-full-landscape-chapter-key li");
-  expect(chapterKeyItems).toHaveLength(5);
-  expect(Array.from(chapterKeyItems).map((item) => item.className)).toEqual([
-    "is-people", "is-strategy", "is-execution", "is-cash", "is-you",
-  ]);
+  expect(screen.getAllByTestId("coach-name")).toHaveLength(26);
+  expect(screen.getAllByTestId("coach-logo")).toHaveLength(26);
+  const contents = screen.getByRole("region", { name: "Table of contents" });
+  const pageNumberFor = (
+    predicate: (page: (typeof model.pages)[number]) => boolean,
+  ) => {
+    const page = model.pages.find(predicate);
+    if (!page) throw new Error("Canonical fixture is missing a table-of-contents page");
+    return page.number;
+  };
+
+  expect(within(contents).getByText("Introduction")).toBeInTheDocument();
+  expect(within(contents).getByTestId("toc-introduction")).toHaveTextContent(
+    `Introduction ${pageNumberFor((page) => page.kind === "introduction")}`,
+  );
+  expect(within(contents).getByText("Your Profile")).toBeInTheDocument();
+  expect(within(contents).getByTestId("toc-profile")).toHaveTextContent(
+    `Your Profile ${pageNumberFor((page) => page.kind === "profile")}`,
+  );
+  expect(within(contents).getByText("People")).toHaveClass("su-full-toc-domain--people");
+  expect(within(contents).getByTestId("toc-domain-people")).toHaveTextContent(
+    `People ${pageNumberFor((page) => page.kind === "chapter" && page.chapterKey === "people")}`,
+  );
+  expect(within(contents).getByText("Your Employees")).toHaveClass("su-full-toc-subsection");
+  const authoredSubsectionPages = [
+    ["your-employees", "Your Employees", "7–8"],
+    ["company-culture", "Company Culture", "9"],
+    ["goals-and-strategy", "Goals and Strategy", "11–12"],
+    ["leadership-team", "Leadership Team", "14"],
+    ["operational-processes", "Operational Processes", "15"],
+    ["sales-and-marketing", "Sales and Marketing", "16"],
+    ["scalability-innovation-and-technology", "Scalability, Innovation and Technology", "17"],
+    ["finance-and-cash", "Finance and Cash", "19"],
+    ["your-leadership", "Your Leadership", "21–22"],
+    ["internal-communication", "Internal Communication", "23"],
+  ] as const;
+  for (const [testId, label, pages] of authoredSubsectionPages) {
+    expect(
+      within(contents).getByTestId(`toc-subsection-${testId}`).textContent
+        ?.replace(/\s+/g, " ")
+        .trim(),
+    ).toBe(`${label} ${pages}`);
+  }
+  expect(within(contents).getByTestId("toc-domain-strategy")).toHaveTextContent(
+    `Strategy ${pageNumberFor((page) => page.kind === "chapter" && page.chapterKey === "strategy")}`,
+  );
+  expect(within(contents).getByTestId("toc-domain-execution")).toHaveTextContent(
+    `Execution ${pageNumberFor((page) => page.kind === "chapter" && page.chapterKey === "execution")}`,
+  );
+  expect(within(contents).getByTestId("toc-domain-cash")).toHaveTextContent(
+    `Cash ${pageNumberFor((page) => page.kind === "chapter" && page.chapterKey === "cash")}`,
+  );
+  expect(within(contents).getByTestId("toc-domain-you")).toHaveTextContent(
+    `You ${pageNumberFor((page) => page.kind === "chapter" && page.chapterKey === "you")}`,
+  );
+  expect(within(contents).getByTestId("toc-conclusion")).toHaveTextContent(
+    `In conclusion ${pageNumberFor((page) => page.kind === "conclusion")}`,
+  );
+  expect(within(contents).getByTestId("toc-appendix")).toHaveTextContent(
+    `Appendix A ${pageNumberFor((page) => page.kind === "appendix")}`,
+  );
+  const decisionGraphic = within(contents).getByRole("img", { name: "Five Scaling Up decisions" });
+  expect(decisionGraphic).toHaveAttribute(
+    "src",
+    "/brand/su-esperto-five-decisions.png",
+  );
+  expect(contents.querySelector(".su-full-toc-decision-ring")).not.toBeInTheDocument();
   const chartTitleIds = Array.from(
     document.querySelectorAll<HTMLElement>("[aria-labelledby^=\"su-landscape-vertical-chart-title-\"]"),
   ).map((chart) => chart.getAttribute("aria-labelledby"));
   expect(new Set(chartTitleIds).size).toBe(chartTitleIds.length);
-  expect(screen.getByTestId("su-full-landscape-page-7")).toHaveClass("su-full-landscape-page--chapter");
-  expect(screen.getByTestId("su-full-landscape-page-8")).toHaveClass("su-full-landscape-page--detail");
-  expect(screen.getByTestId("su-full-landscape-page-26")).toHaveClass("su-full-landscape-page--appendix");
+  expect(screen.getByTestId("su-full-landscape-page-6")).toHaveClass("su-full-landscape-page--chapter");
+  expect(screen.getByTestId("su-full-landscape-page-7")).toHaveClass("su-full-landscape-page--detail");
+  expect(screen.getByTestId("su-full-landscape-page-25")).toHaveClass("su-full-landscape-page--appendix");
   expect(screen.getAllByTestId(/^su-full-landscape-detail-Q/)).toHaveLength(61);
+  expect(screen.getByTestId("su-full-landscape-detail-Q01").querySelector(
+    ".su-full-landscape-feedback",
+  )?.textContent).toBe(expectedFrozenRecommendationQ01);
 
   expect(screen.getByTestId("su-full-landscape-page-4")).toHaveTextContent(
-    "Phase 4 from FTE 12",
+    "Phase 4 - Delegation",
   );
-  expect(screen.getByTestId("su-full-landscape-page-5")).toHaveTextContent("You");
-  expect(screen.getByTestId("su-full-landscape-page-5")).toHaveTextContent("Peers");
-  expect(screen.getByTestId("su-full-landscape-page-5")).toHaveTextContent("Deviation");
-  expect(screen.getByTestId("su-full-landscape-page-5").querySelectorAll("tbody tr")).toHaveLength(15);
-  expect(screen.getByTestId("su-full-landscape-page-5").querySelectorAll(".su-full-landscape-profile-row--chapter")).toHaveLength(5);
-  expect(screen.getByTestId("su-full-landscape-page-5").querySelectorAll(".su-full-landscape-profile-row--subsection")).toHaveLength(10);
-  expect(screen.getByTestId("su-full-landscape-page-6")).toHaveTextContent(
-    "Peers shows the benchmark associated with your organizational phase when you completed this assessment. It is not matched by industry, geography, or a custom peer group.",
+  const profile = screen.getByRole("region", { name: "Your profile" });
+  const strongestRelative = [...model.profileRows]
+    .sort((a, b) => b.deviation - a.deviation || a.stableKey.localeCompare(b.stableKey))[0];
+  const weakestRelative = [...model.profileRows]
+    .sort((a, b) => a.deviation - b.deviation || a.stableKey.localeCompare(b.stableKey))[0];
+  expect(within(profile).getByRole("columnheader", { name: "You" })).toBeInTheDocument();
+  expect(within(profile).getByRole("columnheader", { name: "Peers" })).toBeInTheDocument();
+  expect(within(profile).getByRole("columnheader", { name: "Deviation" })).toBeInTheDocument();
+  expect(profile.querySelectorAll("tbody tr")).toHaveLength(15);
+  expect(profile.querySelectorAll(".su-full-landscape-profile-row--chapter")).toHaveLength(5);
+  expect(profile.querySelectorAll(".su-full-landscape-profile-row--subsection")).toHaveLength(10);
+  expect(within(profile).getByTestId("profile-domain-people")).toHaveClass("is-people");
+  expect(within(profile).getByTestId("profile-result-commentary")).toHaveTextContent(
+    model.strongestChapter.label,
   );
-  expect(screen.getByTestId("su-full-landscape-page-6")).toHaveTextContent(
-    "Phase 4 · Delegation",
+  expect(within(profile).getByTestId("profile-result-commentary")).toHaveTextContent(
+    model.weakestChapter.label,
   );
-  expect(screen.getByTestId("su-full-landscape-page-6")).not.toHaveTextContent(
-    /governed|snapshot|sourceId|source id|catalogue|provenance|legacy baseline|phase-aware|frozen|esperto-five-phase-peers/i,
+  expect(within(profile).getByTestId("profile-result-commentary")).toHaveTextContent(
+    strongestRelative.label,
+  );
+  expect(within(profile).getByTestId("profile-result-commentary")).toHaveTextContent(
+    weakestRelative.label,
   );
   expect(screen.getAllByLabelText("Peer benchmark information").length).toBeGreaterThanOrEqual(2);
 
@@ -146,11 +324,12 @@ test("renders the fixed 26-page landscape composition with truthful peer context
     expect(detail).toHaveTextContent(question.recommendation!);
   }
 
-  expect(screen.getByTestId("su-full-landscape-page-25")).toHaveTextContent("ScaleUp Score");
+  expect(screen.getByTestId("su-full-landscape-page-24")).toHaveTextContent("ScaleUp Score");
   expect(screen.getByTestId("su-full-landscape-page-4")).toHaveTextContent("55 / 100");
-  expect(screen.getByTestId("su-full-landscape-page-25")).toHaveTextContent("55 / 100");
-  expect(screen.getByRole("link", { name: "Contact your coach" })).toHaveAttribute("href", "mailto:coach@example.com");
-  expect(screen.getByTestId("su-full-landscape-page-25")).toHaveTextContent("Next steps");
+  expect(screen.getByTestId("su-full-landscape-page-24")).toHaveTextContent("55 / 100");
+  expect(screen.getByRole("link", { name: "Request a complimentary follow-up" }))
+    .toHaveAttribute("href", "https://coaches.scalingup.com/coach-match-after-assessment-form");
+  expect(screen.getByTestId("su-full-landscape-page-24")).toHaveTextContent("Next step");
   expect(document.body.textContent).not.toMatch(/TCPDF/i);
 });
 
@@ -166,7 +345,7 @@ test("falls back to the frozen referring coach email when no explicit contact is
     .toHaveAttribute("href", "mailto:referrer@example.com");
 });
 
-test("replaces Welcome but protects the respondent summary before a custom closing message", () => {
+test("preserves the authored preface and respondent summary before a custom closing message", () => {
   const report = {
     ...completeSuFullLandscapeReport(),
     reportHtml: {
@@ -186,14 +365,85 @@ test("replaces Welcome but protects the respondent summary before a custom closi
   expect(screen.getByTestId("su-full-landscape-page-2")).not.toHaveTextContent(
     "This report turns your submitted assessment",
   );
-  const page25 = screen.getByTestId("su-full-landscape-page-25");
-  expect(page25).toHaveTextContent("ScaleUp Score");
-  expect(page25).toHaveTextContent("55 / 100");
-  expect(page25).toHaveTextContent("Your strongest chapter is");
-  expect(page25).toHaveTextContent("Your focus chapter is");
-  expect(page25).toHaveTextContent("Custom closing message");
-  expect(page25).not.toHaveTextContent("Choose one priority from the feedback");
-  expect(screen.getAllByTestId(/^su-full-landscape-page-/)).toHaveLength(26);
+  const page24 = screen.getByTestId("su-full-landscape-page-24");
+  expect(page24).toHaveTextContent("ScaleUp Score");
+  expect(page24).toHaveTextContent("55 / 100");
+  expect(page24).toHaveTextContent("You scored highest on");
+  expect(page24).toHaveTextContent("and lowest on");
+  expect(page24).toHaveTextContent("Custom closing message");
+  expect(page24).not.toHaveTextContent("Choose one priority from the feedback");
+  expect(screen.getAllByTestId(/^su-full-landscape-page-/)).toHaveLength(25);
+});
+
+test("populates the Conclusion from permitted results before the unchanged authored CTA", () => {
+  const report = restoredScalingUpFullCtaReport();
+  const presentation = completeSuFullLandscapePresentation(report);
+  const sourceModel = buildSuFullLandscapeReportModel({ report, presentation, resolvedStyle: "CLASSIC" });
+  if (!sourceModel) throw new Error("The available-results fixture must build");
+  const profileRows = sourceModel.profileRows.map((row, index) => ({
+    ...row,
+    youAverage: index === 1 ? 9 : index === 8 ? 1 : 5,
+    deviation: index === 9 ? 3 : index === 4 ? -4 : 0,
+  }));
+  const model = { ...sourceModel, scaleUpScore: 73, profileRows };
+
+  render(<SuFullLandscapeReport report={report} model={model} />);
+
+  const conclusion = screen.getByTestId("su-full-landscape-page-24");
+  expect(within(conclusion).getByRole("heading", { name: "In Conclusion" })).toBeInTheDocument();
+  const narrative = within(conclusion).getByTestId("su-full-conclusion-narrative");
+  expect(narrative).toHaveTextContent(
+    "With a ScaleUp Score of 73 / 100, you are doing extremely well and are perhaps an example for others! However, in order to reach the next phase, there is still room for improvement.",
+  );
+  expect(narrative).toHaveTextContent(
+    `You scored highest on ${profileRows[1].label} and lowest on ${profileRows[8].label}.`,
+  );
+  expect(narrative).toHaveTextContent(
+    `In comparison to other companies, in the same phase, you score higher on ${profileRows[9].label} and lower on ${profileRows[4].label}.`,
+  );
+  expect(narrative).toHaveTextContent(
+    "Hopefully this report will give you sufficient insight into how and where you and your organization can improve. Good luck and we hope to see you again for another Scaling Up Assessment in the future!",
+  );
+  const authoredCta = within(conclusion).getByLabelText("Scaling Up Full next steps");
+  expect(authoredCta).toBeInTheDocument();
+  const expectedAuthoredCta = document.createElement("div");
+  expectedAuthoredCta.innerHTML = report.reportHtml?.conclusionHtml ?? "";
+  expect(screen.getByTestId("report-html-conclusion").innerHTML)
+    .toBe(expectedAuthoredCta.innerHTML);
+  const resultSummary = within(conclusion).getByLabelText("Scaling Up Full result summary");
+  expect(resultSummary.compareDocumentPosition(authoredCta) & Node.DOCUMENT_POSITION_FOLLOWING)
+    .toBeTruthy();
+  expect(within(conclusion).queryByText(/biggest challenge|percentile|industry comparison/i))
+    .not.toBeInTheDocument();
+});
+
+test.each([
+  {
+    score: 19,
+    opening: "This was your report of the Scaling Up Assessment. You have a ScaleUp Score of 19 / 100. You have still a lot of focus areas on which you can work within your company. If you want to grow quickly, then your organization is probably not ready yet.",
+    closing: "Hopefully this report has given you sufficient insight into where you and your organization can improve. Good luck and we'll see you back at this Scaling Up Assessment - perhaps for a higher score...",
+  },
+  {
+    score: 55,
+    opening: "You have a ScaleUp Score of 55 / 100, a great score. You are pretty well on the way to becoming a strong growth organization.",
+    closing: "Hopefully this report has given you sufficient insight into where you and your organization can improve. Good luck and we'll see you back at this Scaling Up Assessment - perhaps for a higher score...",
+  },
+  {
+    score: 73,
+    opening: "With a ScaleUp Score of 73 / 100, you are doing extremely well and are perhaps an example for others! However, in order to reach the next phase, there is still room for improvement.",
+    closing: "Hopefully this report will give you sufficient insight into how and where you and your organization can improve. Good luck and we hope to see you again for another Scaling Up Assessment in the future!",
+  },
+])("uses ESPERTO's score-banded Conclusion narrative at score $score", ({ score, opening, closing }) => {
+  const report = restoredScalingUpFullCtaReport();
+  const presentation = completeSuFullLandscapePresentation(report);
+  const sourceModel = buildSuFullLandscapeReportModel({ report, presentation, resolvedStyle: "CLASSIC" });
+  if (!sourceModel) throw new Error("The score-band fixture must build");
+
+  render(<SuFullLandscapeReport report={report} model={{ ...sourceModel, scaleUpScore: score }} />);
+
+  const narrative = screen.getByTestId("su-full-conclusion-narrative");
+  expect(narrative).toHaveTextContent(opening);
+  expect(narrative).toHaveTextContent(closing);
 });
 
 test("personalizes escaped respondent and company tokens in authored report HTML", () => {
@@ -258,14 +508,15 @@ test("keeps generated add-ons before the landscape conclusion without adding a p
     />,
   );
 
-  const page = screen.getByTestId("su-full-landscape-page-25");
+  const page = screen.getByTestId("su-full-landscape-page-23");
   const addon = screen.getByTestId("generated-addon");
   const conclusion = screen.getByTestId("report-html-conclusion");
   expect(page).toContainElement(addon);
   expect(
     addon.compareDocumentPosition(conclusion) & Node.DOCUMENT_POSITION_FOLLOWING,
   ).toBeTruthy();
-  expect(screen.getAllByTestId(/^su-full-landscape-page-/)).toHaveLength(26);
+  expect(screen.queryByRole("heading", { name: "Welcome" })).not.toBeInTheDocument();
+  expect(screen.getAllByTestId(/^su-full-landscape-page-/)).toHaveLength(24);
 });
 
 test("keeps the landscape renderer's A4 print and responsive screen contract scoped", () => {
@@ -280,12 +531,18 @@ test("keeps the landscape renderer's A4 print and responsive screen contract sco
   expect(stylesheet).not.toMatch(/@page\s*\{\s*size:\s*A4\s+landscape\s*;/);
   expect(stylesheet).toContain(".su-full-landscape-detail { break-inside: avoid;");
   expect(stylesheet).toMatch(/\.su-full-landscape-bar-fill\s*\{[^}]*display: block;[^}]*border-radius: 0;/);
+  expect(stylesheet).toMatch(/\.su-full-landscape-bar-fill--you\s*\{[^}]*background: var\(--chapter-line-color\);/);
+  expect(stylesheet).toMatch(/\.su-full-landscape-bar-fill--peers\s*\{[^}]*background: var\(--chapter-peer-color\);[^}]*border: 1px solid var\(--chapter-line-color\);/);
   expect(stylesheet).toMatch(/\.su-full-landscape-peer-contour\s*\{[^}]*color: var\(--chapter-line-color\);/);
+  expect(stylesheet).toMatch(/@media print[\s\S]*?\.su-full-landscape-conclusion-layout\s*\{[^}]*position: relative;[^}]*display: block;[^}]*min-height: 165mm;/);
+  expect(stylesheet).toMatch(/@media print[\s\S]*?\.su-full-landscape-conclusion-layout > \.su-full-landscape-custom-content[^}]*\{[^}]*position: absolute;[^}]*top: 0;[^}]*right: 0;[^}]*width: 42%;/);
   expect(stylesheet).toContain(".su-full-landscape-report .is-people { --chapter-color:");
   expect(stylesheet).toContain(".su-full-landscape-report .is-strategy { --chapter-color:");
   expect(stylesheet).toContain(".su-full-landscape-report .is-execution { --chapter-color:");
   expect(stylesheet).toContain(".su-full-landscape-report .is-cash { --chapter-color:");
   expect(stylesheet).toContain(".su-full-landscape-report .is-you { --chapter-color:");
+  expect(stylesheet).toMatch(/\.su-full-toc-decision-graphic\s*\{[^}]*max-width: 100%;[^}]*height: auto;/);
+  expect(stylesheet).toMatch(/\.su-full-profile-commentary strong\s*\{[^}]*color: var\(--chapter-color\);/);
   expect(stylesheet).toContain("print-color-adjust: exact;");
   expect(stylesheet).toContain("@media screen and (max-width: 760px)");
   expect(stylesheet).toContain(".su-full-landscape-page-body { grid-template-columns: 1fr;");

@@ -155,11 +155,12 @@ export const REPORT_HTML_PEER_FIXTURES: readonly CaptureFixture[] = authoringCas
 
 export function artifactPathsFor(fixture: CaptureFixture) {
   const directory = join(REPORT_HTML_PEER_OUTPUT_DIRECTORY, fixture.id);
+  const lastPageNumber = fixture.introductionHtml ? 25 : 24;
   return {
     desktopPage2: join(directory, "desktop-page-2.png"),
-    desktopPage25: join(directory, "desktop-page-25.png"),
+    desktopLastPage: join(directory, `desktop-page-${lastPageNumber}.png`),
     mobilePage2: join(directory, "mobile-page-2.png"),
-    mobilePage25: join(directory, "mobile-page-25.png"),
+    mobileLastPage: join(directory, `mobile-page-${lastPageNumber}.png`),
     pdf: join(directory, "full-report.pdf"),
   };
 }
@@ -179,7 +180,7 @@ async function settlePaint(page: Page): Promise<void> {
   }));
 }
 
-async function capturePageImage(page: Page, pageNumber: 2 | 25, path: string): Promise<void> {
+async function capturePageImage(page: Page, pageNumber: number, path: string): Promise<void> {
   const locator = page.locator(`[data-page-number='${pageNumber}']`);
   await locator.scrollIntoViewIfNeeded();
   await settlePaint(page);
@@ -272,6 +273,7 @@ async function captureFixture(
   browser: Awaited<ReturnType<typeof chromium.launch>>,
 ): Promise<void> {
   const artifacts = artifactPathsFor(fixture);
+  const lastPageNumber = fixture.introductionHtml ? 25 : 24;
   await mkdir(join(REPORT_HTML_PEER_OUTPUT_DIRECTORY, fixture.id), { recursive: true });
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
   try {
@@ -281,11 +283,11 @@ async function captureFixture(
     );
     await page.evaluate(() => document.fonts.ready);
     await capturePageImage(page, 2, artifacts.desktopPage2);
-    await capturePageImage(page, 25, artifacts.desktopPage25);
+    await capturePageImage(page, lastPageNumber, artifacts.desktopLastPage);
 
     await page.setViewportSize({ width: 390, height: 844 });
     await capturePageImage(page, 2, artifacts.mobilePage2);
-    await capturePageImage(page, 25, artifacts.mobilePage25);
+    await capturePageImage(page, lastPageNumber, artifacts.mobileLastPage);
 
     await page.setViewportSize({ width: 1280, height: 720 });
     await page.emulateMedia({ media: "print" });

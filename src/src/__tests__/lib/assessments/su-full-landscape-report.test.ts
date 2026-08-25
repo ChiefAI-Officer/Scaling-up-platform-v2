@@ -51,29 +51,52 @@ const Q13_SCORE_7_AUDITED_PHASE_OUTPUTS = [
 ] as const;
 
 describe("buildSuFullLandscapeReportModel", () => {
-  it("composes the canonical 26-page report with every detail question exactly once", () => {
+  it("composes authored and historical reports without rejected pages", () => {
     const report = completeSuFullLandscapeReport();
-    const presentation = completeSuFullLandscapePresentation(report);
+    const authoredReport = {
+      ...report,
+      reportHtml: {
+        introductionHtml: '<section aria-label="Verne Harnish preface"><h2>Preface</h2></section>',
+        conclusionHtml: null,
+      },
+    };
+    const authoredModel = buildSuFullLandscapeReportModel({
+      report: authoredReport,
+      presentation: completeSuFullLandscapePresentation(authoredReport),
+      resolvedStyle: "CLASSIC",
+    });
+    const noPrefaceModel = buildSuFullLandscapeReportModel({
+      report,
+      presentation: completeSuFullLandscapePresentation(report),
+      resolvedStyle: "CLASSIC",
+    });
 
-    const model = buildSuFullLandscapeReportModel({ report, presentation, resolvedStyle: "CLASSIC" });
-
-    expect(model).not.toBeNull();
-    expect(model!.pages).toHaveLength(26);
-    expect(model!.pages.map((page) => page.number)).toEqual(
-      Array.from({ length: 26 }, (_, index) => index + 1),
+    expect(authoredModel).not.toBeNull();
+    expect(authoredModel!.pages).toHaveLength(25);
+    expect(authoredModel!.pages.map((page) => page.number)).toEqual(
+      Array.from({ length: 25 }, (_, index) => index + 1),
     );
-    expect(detailKeys(model!)).toEqual(keys("Q01", "Q61"));
-    expect(new Set(detailKeys(model!)).size).toBe(61);
-    expect(chapterPageNumbers(model!)).toEqual([7, 11, 14, 19, 21]);
-    expect(model!.pages[25].kind).toBe("appendix");
-    expect(model!.peerProvenance).toEqual({
+    expect(authoredModel!.pages.some((page) => page.kind === "preface")).toBe(true);
+    expect(authoredModel!.pages.map((page) => page.kind)).not.toContain("peer-dashboard");
+
+    expect(noPrefaceModel).not.toBeNull();
+    expect(noPrefaceModel!.pages).toHaveLength(24);
+    expect(noPrefaceModel!.pages.map((page) => page.number)).toEqual(
+      Array.from({ length: 24 }, (_, index) => index + 1),
+    );
+    expect(noPrefaceModel!.pages.some((page) => page.kind === "preface")).toBe(false);
+    expect(detailKeys(authoredModel!)).toEqual(keys("Q01", "Q61"));
+    expect(new Set(detailKeys(authoredModel!)).size).toBe(61);
+    expect(chapterPageNumbers(authoredModel!)).toEqual([6, 10, 13, 18, 20]);
+    expect(authoredModel!.pages[24].kind).toBe("appendix");
+    expect(authoredModel!.peerProvenance).toEqual({
       sourceId: SU_FULL_PHASE_PEER_SOURCE_ID,
       contentHash: SU_FULL_PHASE_PEER_CONTENT_HASHES[4],
       phase: 4,
       legacy: false,
     });
-    expect(Object.isFrozen(model)).toBe(true);
-    expect(Object.isFrozen(model!.pages)).toBe(true);
+    expect(Object.isFrozen(authoredModel)).toBe(true);
+    expect(Object.isFrozen(authoredModel!.pages)).toBe(true);
   });
 
   it("uses the fixed detail groups and five canonical chapter groupings", () => {
@@ -84,12 +107,12 @@ describe("buildSuFullLandscapeReportModel", () => {
     });
 
     expect(model).not.toBeNull();
-    expect(SU_FULL_LANDSCAPE_PAGE_GROUPS.map(({ number, questionKeys }) => [number, questionKeys])).toEqual([
-      [8, keys("Q01", "Q06")], [9, keys("Q07", "Q08")], [10, keys("Q09", "Q13")],
-      [12, keys("Q14", "Q19")], [13, keys("Q20", "Q20")], [15, keys("Q21", "Q24")],
-      [16, keys("Q25", "Q29")], [17, keys("Q30", "Q34")], [18, keys("Q35", "Q40")],
-      [20, keys("Q41", "Q45")], [22, keys("Q46", "Q51")], [23, keys("Q52", "Q55")],
-      [24, keys("Q56", "Q61")],
+    expect(SU_FULL_LANDSCAPE_PAGE_GROUPS.map(({ chapterKey, questionKeys }) => [chapterKey, questionKeys])).toEqual([
+      ["people", keys("Q01", "Q06")], ["people", keys("Q07", "Q08")], ["people", keys("Q09", "Q13")],
+      ["strategy", keys("Q14", "Q19")], ["strategy", keys("Q20", "Q20")], ["execution", keys("Q21", "Q24")],
+      ["execution", keys("Q25", "Q29")], ["execution", keys("Q30", "Q34")], ["execution", keys("Q35", "Q40")],
+      ["cash", keys("Q41", "Q45")], ["you", keys("Q46", "Q51")], ["you", keys("Q52", "Q55")],
+      ["you", keys("Q56", "Q61")],
     ]);
     expect(SU_FULL_LANDSCAPE_CHAPTERS.map((chapter) => [chapter.key, chapter.sectionStableKeys])).toEqual([
       ["people", ["S_PEOPLE_YE", "S_PEOPLE_CC"]],

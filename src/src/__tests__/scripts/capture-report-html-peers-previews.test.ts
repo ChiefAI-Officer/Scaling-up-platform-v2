@@ -60,11 +60,12 @@ describe("report HTML peers visual capture fixture contract", () => {
     expect(adversarial.map((fixture) => fixture.closingVisibleCharacters)).toEqual([900, 900]);
 
     for (const fixture of REPORT_HTML_PEER_FIXTURES) {
+      const expectedPageCount = fixture.introductionHtml ? 25 : 24;
       expect(artifactPathsFor(fixture)).toEqual({
         desktopPage2: expect.stringMatching(new RegExp(`${fixture.id}/desktop-page-2\\.png$`)),
-        desktopPage25: expect.stringMatching(new RegExp(`${fixture.id}/desktop-page-25\\.png$`)),
+        desktopLastPage: expect.stringMatching(new RegExp(`${fixture.id}/desktop-page-${expectedPageCount}\\.png$`)),
         mobilePage2: expect.stringMatching(new RegExp(`${fixture.id}/mobile-page-2\\.png$`)),
-        mobilePage25: expect.stringMatching(new RegExp(`${fixture.id}/mobile-page-25\\.png$`)),
+        mobileLastPage: expect.stringMatching(new RegExp(`${fixture.id}/mobile-page-${expectedPageCount}\\.png$`)),
         pdf: expect.stringMatching(new RegExp(`${fixture.id}/full-report\\.pdf$`)),
       });
     }
