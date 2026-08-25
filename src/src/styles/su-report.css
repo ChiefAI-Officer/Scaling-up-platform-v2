@@ -3246,6 +3246,141 @@
   overflow-x: auto;
 }
 
+/* Jeff's QSP v2 preface is stored as bounded semantic HTML. These report-owned
+   rules restore the approved composition without accepting authored styles or
+   a second content image. The text in the brand marker remains an email-safe
+   fallback; the on-screen/PDF report replaces it with the canonical logo. */
+.su-public-brand.su-report
+  .su-report-custom-html--introduction
+  [aria-label="QSP v2 preface"] {
+  position: relative;
+  min-height: 520px;
+  overflow: hidden;
+  color: #12131a;
+  font-family: Inter, "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+.su-public-brand.su-report
+  .su-report-custom-html--introduction
+  [aria-label="QSP v2 preface"]::before {
+  position: absolute;
+  top: -210px;
+  right: -210px;
+  width: 360px;
+  height: 360px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #8b6df2 0%, #5b3fd9 45%, #3ec6d9 100%);
+  content: "";
+  opacity: .9;
+  pointer-events: none;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.su-public-brand.su-report
+  .su-report-custom-html--introduction
+  [aria-label="QSP v2 preface"] > * {
+  position: relative;
+  z-index: 1;
+}
+.su-public-brand.su-report
+  .su-report-custom-html--introduction
+  [aria-label="QSP v2 preface brand"] {
+  width: 253px;
+  height: 34px;
+  margin: 0 0 56px;
+  overflow: hidden;
+  background: url("/brand/su-logo-color.png") left center / contain no-repeat;
+  color: transparent;
+  white-space: nowrap;
+}
+.su-public-brand.su-report
+  .su-report-custom-html--introduction
+  [aria-label="QSP v2 preface eyebrow"] {
+  margin: 0 0 10px;
+  color: #5b3fd9;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+}
+.su-public-brand.su-report
+  .su-report-custom-html--introduction
+  [aria-label="QSP v2 preface"] > h1 {
+  margin: 0 0 24px;
+  color: #12131a;
+  font-size: 34px;
+  font-weight: 900;
+  letter-spacing: -.5px;
+  line-height: 1.15;
+}
+.su-public-brand.su-report
+  .su-report-custom-html--introduction
+  [aria-label="QSP v2 preface content"] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: 48px;
+  align-items: start;
+}
+.su-public-brand.su-report
+  .su-report-custom-html--introduction
+  [aria-label="QSP v2 preface content"] article p {
+  margin: 0 0 18px;
+  color: #4b5163;
+  font-size: 16px;
+  line-height: 1.65;
+}
+.su-public-brand.su-report
+  .su-report-custom-html--introduction
+  [aria-label="QSP v2 preface signer"] {
+  text-align: center;
+}
+.su-public-brand.su-report
+  .su-report-custom-html--introduction
+  [aria-label="QSP v2 preface signer"] > img {
+  display: block;
+  width: 132px;
+  height: 132px;
+  max-height: 132px;
+  margin: 0 auto 18px;
+  border: 1px solid #e4e7ee;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.su-public-brand.su-report
+  .su-report-custom-html--introduction
+  [aria-label="QSP v2 preface signer"] > p {
+  margin: 0;
+  color: #12131a;
+  font-size: 14px;
+  line-height: 1.35;
+}
+.su-public-brand.su-report
+  .su-report-custom-html--introduction
+  [aria-label="QSP v2 preface signer"] small {
+  display: block;
+  color: #8a90a3;
+  font-size: 12px;
+}
+.su-public-brand.su-report
+  .su-report-custom-html--introduction
+  [aria-label="QSP v2 preface"] > hr {
+  margin: 40px 0 0;
+  border: 0;
+  border-top: 1px solid #e4e7ee;
+}
+@media print {
+  .su-public-brand.su-report
+    .su-report-custom-html--introduction
+    [aria-label="QSP v2 preface"] {
+    break-after: page;
+    page-break-after: always;
+  }
+  .su-public-brand.su-report
+    [data-testid="qual-section-P5_closing"] {
+    break-before: page;
+    page-break-before: always;
+  }
+}
+
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-custom-content .su-report-custom-html {
   padding: 0;
   overflow-wrap: anywhere;
@@ -3388,6 +3523,39 @@
 @media screen and (max-width: 760px) {
   .su-public-brand.su-report .su-report-custom-html {
     padding: 28px 20px;
+  }
+  .su-public-brand.su-report
+    .su-report-custom-html--introduction
+    [aria-label="QSP v2 preface"] {
+    min-height: auto;
+  }
+  .su-public-brand.su-report
+    .su-report-custom-html--introduction
+    [aria-label="QSP v2 preface brand"] {
+    width: 220px;
+    margin-bottom: 42px;
+  }
+  .su-public-brand.su-report
+    .su-report-custom-html--introduction
+    [aria-label="QSP v2 preface content"] {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+  .su-public-brand.su-report
+    .su-report-custom-html--introduction
+    [aria-label="QSP v2 preface signer"] {
+    display: grid;
+    grid-template-columns: 88px minmax(0, 1fr);
+    gap: 16px;
+    align-items: center;
+    text-align: left;
+  }
+  .su-public-brand.su-report
+    .su-report-custom-html--introduction
+    [aria-label="QSP v2 preface signer"] > img {
+    width: 88px;
+    height: 88px;
+    margin: 0;
   }
 
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page {

@@ -130,4 +130,21 @@ describe("qualitative report HTML regions", () => {
     expect(screen.getByTestId("qual-preface")).toBeInTheDocument();
     expect(screen.getByTestId("report-conclusion")).toBeInTheDocument();
   });
+
+  it("personalizes the QSP v2 custom preface greeting", () => {
+    render(<QualitativeReport report={report({
+      assessmentName: "Quarterly Session Prep v2",
+      templateAlias: "qsp-v2",
+      sections: [],
+      questionsByKey: {},
+      rawAnswers: [],
+      reportHtml: {
+        introductionHtml: "<h1>Dear {{respondentFirstName}},</h1>",
+        conclusionHtml: null,
+      },
+    })} />);
+
+    expect(screen.getByRole("heading", { name: "Dear Alex," })).toBeInTheDocument();
+    expect(screen.queryByText(/respondentFirstName/)).not.toBeInTheDocument();
+  });
 });

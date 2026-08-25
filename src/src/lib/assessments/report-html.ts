@@ -3,6 +3,7 @@ import {
   type SanitizeReportHtmlResult,
 } from "@/lib/assessments/report-html-sanitizer";
 import { isReportHtmlExperienceEnabled } from "@/lib/assessments/wave-report-html-authoring-flags";
+import { greetingName } from "@/lib/assessments/respondent-display-name";
 
 export interface ReportHtmlConfigV1 {
   schemaVersion: 1;
@@ -43,6 +44,10 @@ export function personalizeSafeReportHtml(
   position: "introduction" | "conclusion" = "introduction",
 ): SafeReportHtmlFragment | null {
   const substituted = html
+    .replaceAll(
+      "{{respondentFirstName}}",
+      escapeReportHtmlText(greetingName(values.respondentName)),
+    )
     .replaceAll("{{respondentName}}", escapeReportHtmlText(values.respondentName))
     .replaceAll("{{companyName}}", escapeReportHtmlText(values.companyName ?? ""));
   const result = sanitizeReportHtmlFragment(substituted, position);
