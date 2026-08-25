@@ -110,7 +110,7 @@ describe("ReportsTab", () => {
     expect(screen.getAllByText("{{companyName}}")).toHaveLength(2);
     expect(
       screen.getAllByText(
-        "First name from the respondent record. Uses “there” when unavailable.",
+        "First name from the respondent record or public submission. Uses “there” when unavailable.",
       ),
     ).toHaveLength(2);
   });

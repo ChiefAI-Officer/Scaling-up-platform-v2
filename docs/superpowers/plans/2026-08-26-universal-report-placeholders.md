@@ -252,4 +252,3 @@ CI=true npx next build --turbopack
 - [ ] **Step 4: Review the final diff against the spec**
 
 Confirm the branch adds only the three agreed tokens, every production individual-report path personalizes them, editor and server validation share one registry, group/email behavior remains unchanged, and no schema or migration changed.
-

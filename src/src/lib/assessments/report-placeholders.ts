@@ -3,13 +3,13 @@ export const REPORT_PLACEHOLDERS = [
     token: "{{respondentFirstName}}",
     label: "First name",
     description:
-      "First name from the respondent record. Uses “there” when unavailable.",
+      "First name from the respondent record or public submission. Uses “there” when unavailable.",
   },
   {
     token: "{{respondentName}}",
     label: "Full name",
     description:
-      "Full name from the respondent record. May use their email when a name is unavailable.",
+      "Full name from the respondent record or public submission. May use their email when a name is unavailable.",
   },
   {
     token: "{{companyName}}",
