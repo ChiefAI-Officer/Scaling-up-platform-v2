@@ -9,11 +9,22 @@ import { SuFullLandscapeReport } from "@/components/assessments/su-full-landscap
 import {
   completeSuFullLandscapePresentation,
   completeSuFullLandscapeReport,
+  restoredScalingUpFullCtaReport,
 } from "@/__tests__/fixtures/su-full-landscape";
 import { buildSuFullLandscapeReportModel } from "@/lib/assessments/su-full-landscape-report";
 
 const appRoot = process.cwd();
-const outputPath = join(appRoot, "tmp/pdfs/su-full-landscape-fixture.pdf");
+const defaultOutputPath = join(appRoot, "tmp/pdfs/su-full-landscape-fixture.pdf");
+
+type CaptureVariant = "edition-6" | "null-preface";
+
+function captureVariant(): CaptureVariant {
+  const variant = process.env.SU_FULL_LANDSCAPE_CAPTURE_VARIANT ?? "null-preface";
+  if (variant !== "edition-6" && variant !== "null-preface") {
+    throw new Error(`Unsupported SU Full landscape capture variant: ${variant}`);
+  }
+  return variant;
+}
 
 async function reportCss(): Promise<string> {
   const stylesRoot = join(appRoot, "src/styles");
@@ -27,20 +38,43 @@ async function reportCss(): Promise<string> {
   return `${brand.replace(/@import[^;]+;\\s*/g, "")}\n${report}`;
 }
 
+async function localBrandAssets(): Promise<{ logo: string; signature: string }> {
+  const brandRoot = join(appRoot, "public", "brand");
+  const [logo, signature] = await Promise.all([
+    readFile(join(brandRoot, "su-logo-white.svg")),
+    readFile(join(brandRoot, "verne-harnish-signature.png")),
+  ]);
+  return {
+    logo: `data:image/svg+xml;base64,${logo.toString("base64")}`,
+    signature: `data:image/png;base64,${signature.toString("base64")}`,
+  };
+}
+
 async function main(): Promise<void> {
-  const report = completeSuFullLandscapeReport();
+  const outputPath = process.env.SU_FULL_LANDSCAPE_CAPTURE_OUTPUT ?? defaultOutputPath;
+  const report = captureVariant() === "edition-6"
+    ? restoredScalingUpFullCtaReport()
+    : completeSuFullLandscapeReport();
   const presentation = completeSuFullLandscapePresentation(report);
   const model = buildSuFullLandscapeReportModel({ report, presentation, resolvedStyle: "CLASSIC" });
   if (!model) throw new Error("Canonical SU Full landscape model is unavailable");
 
-  const [styles] = await Promise.all([reportCss(), mkdir(dirname(outputPath), { recursive: true })]);
+  const [rawStyles, assets] = await Promise.all([
+    reportCss(),
+    localBrandAssets(),
+    mkdir(dirname(outputPath), { recursive: true }),
+  ]);
+  const styles = rawStyles.replace(
+    'url("/brand/verne-harnish-signature.png")',
+    `url("${assets.signature}")`,
+  );
   const markup = renderToStaticMarkup(
     <SuFullLandscapeReport
       report={{ ...report, coachName: "Coach Example" }}
       model={model}
       contactEmail="coach@example.com"
     />,
-  );
+  ).replace('src="/brand/su-logo-white.svg"', `src="${assets.logo}"`);
 
   const browser = await chromium.launch({ headless: true });
   try {
@@ -61,7 +95,9 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((error: unknown) => {
-  console.error("SU Full landscape PDF capture failed:", error);
-  process.exitCode = 1;
-});
+if (require.main === module) {
+  main().catch((error: unknown) => {
+    console.error("SU Full landscape PDF capture failed:", error);
+    process.exitCode = 1;
+  });
+}
