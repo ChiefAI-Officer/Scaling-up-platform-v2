@@ -21,12 +21,32 @@ import type { ReactNode } from "react";
 import { buildSuFullPeerDisclosureModel } from "@/lib/assessments/su-full-peer-disclosure";
 import { respondentNameMatchesEmail } from "@/lib/assessments/respondent-display-name";
 
-const CHAPTER_COPY: Readonly<Record<SuFullLandscapeChapter["key"], string>> = {
-  people: "The People chapter reviews the employee and culture foundations that support sustainable growth.",
-  strategy: "The Strategy chapter focuses on the choices that align the organization around a clear direction.",
-  execution: "The Execution chapter examines the operating disciplines that turn plans into consistent results.",
-  cash: "The Cash chapter considers the practices that strengthen financial visibility and resilience.",
-  you: "The You chapter reflects on leadership and internal communication as the company grows.",
+const CHAPTER_COPY: Readonly<Record<SuFullLandscapeChapter["key"], readonly string[]>> = {
+  people: [
+    "People - without a doubt the key to success within your organization. Every management book, academic study and personal story relays the same message.",
+    "So, in your case {{respondentName}}, let's ask that key question: Are all your employees happy and engaged in the business? And would you 'rehire' all of them?",
+    "The success and scalability of your organization is mainly determined by the success that you have recruiting, training, involving, motivating and growing the best people you can find. And this can never be based on luck. Real success is based upon a philosophy around people, core values, the company culture, introduction program, continuous training and reward.",
+  ],
+  strategy: [
+    "Articulating a clear and differential strategy, supported by a strong core culture that can deliver on the brand's promises, is the key for any company that wants to scale up. So how do you know if you have this industry dominating strategy? Sustainable top-line revenue growth and an increasing gross margin are the two key financial indicators. If you don't have a killer strategy your company will slowly face continuous pricing pressures as the market commoditizes your products and services.",
+    "{{respondentName}}, to have such a strong and effective strategy, it is key that the leadership team has a system and process to devote time and attention to this. A strong strategy needs a very clear and compelling vision and long term goal (BHAG). It needs to be specific and clear on which clients you want to service, how you will be unique and that your competences are clearly aligned with that goal. You then need clear measureable (non financial) yearly and quarterly goals. And a process needs to be in place to review and discuss trends and information from employees, clients and the market in general. Information on competition, technologies and potential disrupters needs to be part of the periodic strategic assessment.",
+    "And a strategy works best when all employees know it, understand it and are motivated by it.",
+  ],
+  execution: [
+    "Execution is, in many organizations, the biggest challenge. Where most entrepreneurs have a natural passion for clients, product development and innovation, many of them lack the skills and intrinsic motivation for a flawless and scalable execution. Execution and operations are broad areas and its success is dependent from many factors. But let us first distinguish leadership and management. As the entrepreneur of the organization, the focus lies on leadership, with the key objective being emotional involvement in the long and short term vision of the company across all employees. Management however is focused on process. The right people doing the right things right. And do all processes run without drama and drive industry-leading profitability? The entrepreneur does not have to be the person to manage this. An operations director, COO, or well functioning management team are, in many situations, the critical people to get this right.",
+    "Execution success is dependent on many factors. A well functioning leadership team, with a disciplined process and rhythm for prioritization and goalsetting. Clear KPIs, measurement systems, a process for employee and client feedback. Automation and digitalization of primary and secondary processes and so on.",
+    "We have put the sales and marketing function also in this chapter, as we see the systematic organization of these processes as part of the execution.",
+  ],
+  cash: [
+    "Growth sucks cash. This is the first law of entrepreneurial gravity. Yet many company leaders pay more attention to revenue and profit than they do to cash. And usually a company needs to be in severe cash crisis before predictive systems are implemented and the business model is optimized to be cash rich.",
+    "So the key question is: Do you have consistent cash sources, ideally internally generated, to fuel business growth?",
+  ],
+  you: [
+    "Peter Drucker nailed it: \"The Bottleneck is always on top of the bottle\". We mentioned that people are the most critical factor in defining a company's success. We lied. It is, in fact, you, the entrepreneur, founder and leader. Therefore, the responsibility lies with this person in recruitment, motivation, training and overall involvement ensuring the business reaches a higher level.",
+    "In other words, your ambition level, energy, speeches, involvement and example behavior are the real key to scaling up. Interestingly, your behavior needs to adapt to cater for each new organizational phase. This requires growth and development from you, as the leader too. Continuously identifying what the organization needs from you. This starts with moving from working 'in' your company to working 'at' your company and usually ends with making sure that you let your professional management run the operations so you can build the organization even further.",
+    "Within this process one of the key areas of success is the level in which you involve your employees in the company vision and goals. Hence why we stress the importance of internal communication.",
+    "To continuously grow as a leader is challenging. Having a mentor or coach can be extremely beneficial in setting you on the right leadership development trajectory. Successful leaders are happy, have a good work-life balance, read a lot and learn from other entrepreneurs. Note, it is about the decisions you take, not the time that you put in.",
+  ],
 };
 
 function formatNumber(value: number): string {
@@ -44,12 +64,12 @@ function formatDate(value: Date | string): string {
   }).format(date);
 }
 
-function rawFte(rawAnswers: unknown): number | null {
+function rawNumberAnswer(rawAnswers: unknown, stableKey: "Q_FTE_CONTRACT" | "Q_FREELANCE"): number | null {
   if (!Array.isArray(rawAnswers)) return null;
   const answer = rawAnswers.find(
-    (value) => value !== null
-      && typeof value === "object"
-      && (value as Record<string, unknown>).stableKey === "Q_FTE_CONTRACT",
+    (candidate) => candidate !== null
+      && typeof candidate === "object"
+      && (candidate as Record<string, unknown>).stableKey === stableKey,
   ) as Record<string, unknown> | undefined;
   return answer && typeof answer.value === "number" && Number.isFinite(answer.value)
     ? answer.value
@@ -309,19 +329,57 @@ function IntroductionPage({ report, model, number }: {
   model: SuFullLandscapeReportModel;
   number: number;
 }) {
-  const fte = rawFte(report.rawAnswers);
+  const fte = rawNumberAnswer(report.rawAnswers, "Q_FTE_CONTRACT");
+  const freelance = rawNumberAnswer(report.rawAnswers, "Q_FREELANCE");
   return (
     <SuFullLandscapePage number={number} footerBrand={report}>
-      <h2>Introduction</h2>
-      <p><strong>ScaleUp Score</strong> {scaleUpScore(model.scaleUpScore)}</p>
-      <PeerSnapshotDisclosure provenance={model.peerProvenance} />
-      {model.growthPhase && fte !== null ? (
-        <section aria-label="Growth phase">
-          <h3>Phase {model.growthPhase.number} from FTE {fte}</h3>
-          <p>{model.growthPhase.name}</p>
-        </section>
-      ) : null}
-      <p>Read each chapter as a focused conversation: compare the values, review your feedback, then choose the next useful action.</p>
+      <section className="su-full-introduction" aria-labelledby={`su-full-introduction-${number}`}>
+        <h2 id={`su-full-introduction-${number}`}>Introduction</h2>
+        <div className="su-full-introduction-layout">
+          <div className="su-full-introduction-overview">
+            <p>
+              Dear {report.respondentName}, this report presents your {report.assessmentName} results
+              across People, Strategy, Execution, Cash, and You. It also shows the peer benchmark
+              frozen with this completed assessment.
+            </p>
+            {fte !== null || freelance !== null ? (
+              <p>
+                {fte !== null ? (
+                  <>{report.companyName} reported {fte} full-time equivalent {fte === 1 ? "employee" : "employees"} on permanent or temporary contracts.</>
+                ) : null}
+                {fte !== null && freelance !== null ? " " : null}
+                {freelance !== null ? (
+                  <>{fte !== null ? "It also" : report.companyName} reported {freelance} freelance {freelance === 1 ? "employee" : "employees"}.</>
+                ) : null}
+              </p>
+            ) : null}
+            {model.growthPhase ? (
+              <section className="su-full-introduction-phase" aria-label="Growth phase">
+                <h3>Phase {model.growthPhase.number} - {model.growthPhase.name}</h3>
+                <p>{model.growthPhase.narrative}</p>
+              </section>
+            ) : null}
+          </div>
+          <div className="su-full-introduction-results">
+            <p>
+              The detailed pages preserve the feedback selected from your submitted answers. Read each
+              comparison together with its recommendation before deciding what to address next.
+            </p>
+            <p className="su-full-introduction-score">
+              <strong>Your ScaleUp Score: {scaleUpScore(model.scaleUpScore)}</strong>
+            </p>
+            <p>
+              This is the platform score frozen with this completed assessment. Read it as an overall
+              summary alongside the chapter scores, peer comparisons, and detailed feedback.
+            </p>
+            <PeerSnapshotDisclosure provenance={model.peerProvenance} />
+            <p>
+              Continue to the detailed results to compare the values, review your feedback, and choose
+              the next useful action.
+            </p>
+          </div>
+        </div>
+      </section>
     </SuFullLandscapePage>
   );
 }
@@ -381,13 +439,17 @@ function ProfilePage({ model, number, footerBrand }: { model: SuFullLandscapeRep
   );
 }
 
-function ChapterPage({ chapter, number, footerBrand }: { chapter: SuFullLandscapeChapter; number: number; footerBrand: SuFullLandscapeFooterBrand }) {
+function ChapterPage({ chapter, number, footerBrand, respondentName }: { chapter: SuFullLandscapeChapter; number: number; footerBrand: SuFullLandscapeFooterBrand; respondentName: string }) {
   return (
     <SuFullLandscapePage number={number} chapterKey={chapter.key} variant="chapter" footerBrand={footerBrand}>
       <div className="su-full-landscape-chapter-copy">
         <p className="su-full-landscape-chapter-kicker">{chapter.key}</p>
         <h2>{chapter.label}</h2>
-        <p>{CHAPTER_COPY[chapter.key]}</p>
+        <div data-testid={`chapter-narrative-${chapter.key}`} className="su-full-landscape-chapter-narrative">
+          {CHAPTER_COPY[chapter.key].map((paragraph, index) => (
+            <p key={index}>{paragraph.replaceAll("{{respondentName}}", respondentName)}</p>
+          ))}
+        </div>
       </div>
       <SuFullVerticalPeerChart chapterKey={chapter.key} instanceId={`page-${number}-${chapter.key}`} questions={chapter.questions} title={`${chapter.label} comparison`} />
     </SuFullLandscapePage>
@@ -517,7 +579,7 @@ export function SuFullLandscapeReport({
           case "chapter": {
             const chapter = chapters.get(page.chapterKey);
             if (!chapter) throw new Error(`Landscape chapter page ${page.number} is missing ${page.chapterKey}`);
-            return <ChapterPage chapter={chapter} key={page.number} number={page.number} footerBrand={report} />;
+            return <ChapterPage chapter={chapter} key={page.number} number={page.number} footerBrand={report} respondentName={report.respondentName} />;
           }
           case "detail": return <DetailPage key={page.number} page={page} questions={questions} peerProvenance={model.peerProvenance} footerBrand={report} />;
           case "conclusion": return <ConclusionPage key={page.number} number={page.number} report={report} model={model} contactEmail={contactEmail} beforeConclusion={beforeConclusion} conclusionHtml={report.reportHtml?.conclusionHtml} />;

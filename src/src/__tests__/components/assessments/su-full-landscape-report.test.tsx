@@ -12,6 +12,7 @@ import {
   completeSuFullLandscapeReport,
   restoredScalingUpFullCtaReport,
 } from "@/__tests__/fixtures/su-full-landscape";
+import { GROWTH_PHASE_NARRATIVES } from "@/lib/assessments/su-full-phase";
 import { buildSuFullLandscapeReportModel } from "@/lib/assessments/su-full-landscape-report";
 
 function peopleQuestions() {
@@ -49,6 +50,74 @@ test("renders detail paired bars in You then Peers order with visible values", (
   expect(detail.textContent?.indexOf("You")).toBeLessThan(detail.textContent?.indexOf("Peers") ?? -1);
   expect(detail).toHaveTextContent("0.0");
   expect(detail).toHaveTextContent("6.6");
+});
+
+test("populates the Introduction from available frozen report data", () => {
+  const source = completeSuFullLandscapeReport();
+  const report = {
+    ...source,
+    rawAnswers: [
+      { stableKey: "Q_FTE_CONTRACT", value: 56 },
+      { stableKey: "Q_FREELANCE", value: 9 },
+    ],
+  };
+  const presentation = completeSuFullLandscapePresentation(report);
+  const sourceModel = buildSuFullLandscapeReportModel({ report, presentation, resolvedStyle: "CLASSIC" });
+  if (!sourceModel) throw new Error("The available-data fixture must build");
+  const model = { ...sourceModel, scaleUpScore: 73, growthPhase: GROWTH_PHASE_NARRATIVES[3] };
+
+  render(<SuFullLandscapeReport report={report} model={model} />);
+
+  const introduction = screen.getByRole("region", { name: "Introduction" });
+  expect(within(introduction).getByText(report.respondentName, { exact: false })).toBeInTheDocument();
+  expect(within(introduction).getByText(report.companyName, { exact: false })).toBeInTheDocument();
+  expect(within(introduction).getByText(/56 full-time equivalent/i)).toBeInTheDocument();
+  expect(within(introduction).getByText(/9 freelance/i)).toBeInTheDocument();
+  expect(within(introduction).getByText(/Phase 3/i)).toBeInTheDocument();
+  expect(within(introduction).getByText(/ScaleUp Score.*73/i)).toBeInTheDocument();
+});
+
+test("omits unavailable optional and unsupported Introduction data cleanly", () => {
+  const report = {
+    ...completeSuFullLandscapeReport(),
+    rawAnswers: [{ stableKey: "Q_FTE_CONTRACT", value: 56 }],
+  };
+  const presentation = completeSuFullLandscapePresentation(report);
+  const model = buildSuFullLandscapeReportModel({ report, presentation, resolvedStyle: "CLASSIC" });
+  if (!model) throw new Error("The missing-data fixture must build");
+
+  render(<SuFullLandscapeReport report={report} model={model} />);
+
+  const introduction = screen.getByRole("region", { name: "Introduction" });
+  expect(within(introduction).getByText(/56 full-time equivalent/i)).toBeInTheDocument();
+  expect(within(introduction).queryByText(/freelance/i)).not.toBeInTheDocument();
+  expect(screen.queryByText(/undefined|null|not provided/i)).not.toBeInTheDocument();
+  expect(screen.queryByText(/years old|entrepreneur for|partners|international revenue/i))
+    .not.toBeInTheDocument();
+});
+
+test("renders the five source-text chapter narratives without unavailable personalization", () => {
+  const report = completeSuFullLandscapeReport();
+  const presentation = completeSuFullLandscapePresentation(report);
+  const model = buildSuFullLandscapeReportModel({ report, presentation, resolvedStyle: "CLASSIC" });
+  if (!model) throw new Error("The chapter narrative fixture must build");
+
+  render(<SuFullLandscapeReport report={report} model={model} />);
+
+  const sourcePhrases = [
+    ["People", /without a doubt the key to success/i],
+    ["Strategy", /articulating a clear and differential strategy/i],
+    ["Execution", /execution is, in many organizations, the biggest challenge/i],
+    ["Cash", /growth sucks cash/i],
+    ["You", /the bottleneck is always on top of the bottle/i],
+  ] as const;
+  for (const [label, sourcePhrase] of sourcePhrases) {
+    const narrative = screen.getByTestId(`chapter-narrative-${label.toLowerCase()}`);
+    expect(narrative).not.toBeEmptyDOMElement();
+    expect(narrative).toHaveTextContent(sourcePhrase);
+  }
+  expect(screen.queryByText(/years experience as an entrepreneur/i)).not.toBeInTheDocument();
+  expect(screen.queryByText(/partner\(s\)/i)).not.toBeInTheDocument();
 });
 
 test("renders the authored 25-page landscape composition without rejected pages", () => {
@@ -174,7 +243,7 @@ test("renders the authored 25-page landscape composition without rejected pages"
   expect(screen.getAllByTestId(/^su-full-landscape-detail-Q/)).toHaveLength(61);
 
   expect(screen.getByTestId("su-full-landscape-page-4")).toHaveTextContent(
-    "Phase 4 from FTE 12",
+    "Phase 4 - Delegation",
   );
   const profile = screen.getByRole("region", { name: "Your profile" });
   const strongestRelative = [...model.profileRows]
