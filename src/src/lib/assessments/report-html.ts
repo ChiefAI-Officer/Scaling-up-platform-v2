@@ -4,6 +4,7 @@ import {
 } from "@/lib/assessments/report-html-sanitizer";
 import { isReportHtmlExperienceEnabled } from "@/lib/assessments/wave-report-html-authoring-flags";
 import { greetingName } from "@/lib/assessments/respondent-display-name";
+import { reportPlaceholderIssue } from "@/lib/assessments/report-placeholders";
 
 export interface ReportHtmlConfigV1 {
   schemaVersion: 1;
@@ -161,6 +162,25 @@ export function prepareReportHtmlForStorage(
       issues.push({
         path: `reportHtml.${field}`,
         message: "Expected a string or null.",
+      });
+    }
+  }
+
+  if (issues.length > 0) {
+    return { ok: false, reportConfig, issues };
+  }
+
+  for (const [field, label] of [
+    ["introductionHtml", "Welcome section"],
+    ["conclusionHtml", "Closing message"],
+  ] as const) {
+    const fragment = value[field] as string | null;
+    if (fragment === null) continue;
+    const issue = reportPlaceholderIssue(fragment, label);
+    if (issue) {
+      issues.push({
+        path: `reportHtml.${field}`,
+        message: issue,
       });
     }
   }

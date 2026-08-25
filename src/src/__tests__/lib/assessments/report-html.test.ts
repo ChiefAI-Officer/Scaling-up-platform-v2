@@ -56,6 +56,43 @@ describe("report HTML configuration", () => {
     expect(prepared.didStripContent).toBe(true);
   });
 
+  it("rejects unsupported report placeholders before storage", () => {
+    const prepared = prepareReportHtmlForStorage({
+      reportHtml: {
+        schemaVersion: 1,
+        introductionHtml: "<p>{{unknownField}}</p>",
+        conclusionHtml: "<p>{{coachName}}</p>",
+      },
+    });
+
+    expect(prepared).toMatchObject({
+      ok: false,
+      issues: [
+        {
+          path: "reportHtml.introductionHtml",
+          message: expect.stringContaining("{{unknownField}}"),
+        },
+        {
+          path: "reportHtml.conclusionHtml",
+          message: expect.stringContaining("{{coachName}}"),
+        },
+      ],
+    });
+  });
+
+  it("accepts every supported report placeholder", () => {
+    const prepared = prepareReportHtmlForStorage({
+      reportHtml: {
+        schemaVersion: 1,
+        introductionHtml:
+          "<p>{{respondentFirstName}} {{respondentName}} {{companyName}}</p>",
+        conclusionHtml: null,
+      },
+    });
+
+    expect(prepared).toMatchObject({ ok: true });
+  });
+
   it("applies the smaller closing-message limit without rejecting the same welcome content", () => {
     const text = "x".repeat(901);
     const prepared = prepareReportHtmlForStorage({
