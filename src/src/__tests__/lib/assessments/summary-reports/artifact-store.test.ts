@@ -18,6 +18,10 @@ const {
   del: jest.Mock;
 };
 
+const RANDOM_SUFFIX = "a".repeat(30);
+const VALID_ARTIFACT_PATH = `summary-reports/campaign-1/request-1-${RANDOM_SUFFIX}.pdf`;
+const MISSING_ARTIFACT_PATH = `summary-reports/campaign-1/missing-${RANDOM_SUFFIX}.pdf`;
+
 describe("summary report private artifact store", () => {
   const originalSummaryToken = process.env.SUMMARY_REPORT_BLOB_READ_WRITE_TOKEN;
   const originalLegacyToken = process.env.BLOB_READ_WRITE_TOKEN;
@@ -48,7 +52,7 @@ describe("summary report private artifact store", () => {
     const bytes = Buffer.from("frozen PDF bytes");
     const createdAt = new Date("2026-08-27T03:00:00.000Z");
     mockPut.mockResolvedValue({
-      pathname: "summary-reports/Campaign-Team-Co/request-01-abc123.pdf",
+      pathname: `summary-reports/Campaign-Team-Co/request-01-${RANDOM_SUFFIX}.pdf`,
       url: "https://public.example/never-expose-this",
       downloadUrl: "https://public.example/never-expose-this?download=1",
     });
@@ -71,7 +75,7 @@ describe("summary report private artifact store", () => {
       },
     );
     expect(result).toEqual({
-      path: "summary-reports/Campaign-Team-Co/request-01-abc123.pdf",
+      path: `summary-reports/Campaign-Team-Co/request-01-${RANDOM_SUFFIX}.pdf`,
       sha256:
         "97557d339b80cdf69a99ce1d6804540af7450170c2c4798749dd3c321bfa6dbd",
       sizeBytes: bytes.byteLength,
@@ -110,14 +114,13 @@ describe("summary report private artifact store", () => {
       blob: { etag: "etag-123" },
     });
 
-    const result = await createSummaryArtifactStore().getPdf(
-      "summary-reports/campaign-1/request-1.pdf",
-    );
+    const result =
+      await createSummaryArtifactStore().getPdf(VALID_ARTIFACT_PATH);
 
-    expect(mockGet).toHaveBeenCalledWith(
-      "summary-reports/campaign-1/request-1.pdf",
-      { access: "private", token: "summary-report-token" },
-    );
+    expect(mockGet).toHaveBeenCalledWith(VALID_ARTIFACT_PATH, {
+      access: "private",
+      token: "summary-report-token",
+    });
     expect(result).toEqual({ stream, etag: "etag-123" });
     expect(result?.stream).toBe(stream);
   });
@@ -126,9 +129,7 @@ describe("summary report private artifact store", () => {
     mockGet.mockResolvedValue(null);
 
     await expect(
-      createSummaryArtifactStore().getPdf(
-        "summary-reports/campaign-1/missing.pdf",
-      ),
+      createSummaryArtifactStore().getPdf(MISSING_ARTIFACT_PATH),
     ).resolves.toBeNull();
   });
 
@@ -146,6 +147,12 @@ describe("summary report private artifact store", () => {
       "summary-reports/campaign-1/request-1/extra.pdf",
       "summary-reports/campaign-1/request-1.txt",
       "summary-reports/campaign.1/request-1.pdf",
+      "summary-reports/campaign-1/request-1.pdf",
+      `summary-reports/campaign-1/request-1-${"a".repeat(29)}.pdf`,
+      `summary-reports/campaign-1/request-1-${"a".repeat(31)}.pdf`,
+      `summary-reports/campaign-1/request-1-${"a".repeat(29)}_.pdf`,
+      `summary-reports/campaign-1/-${RANDOM_SUFFIX}.pdf`,
+      `summary-reports/${"a".repeat(900)}/request-1-${RANDOM_SUFFIX}.pdf`,
     ];
     const store = createSummaryArtifactStore();
 
@@ -166,9 +173,7 @@ describe("summary report private artifact store", () => {
     delete process.env.SUMMARY_REPORT_BLOB_READ_WRITE_TOKEN;
 
     await expect(
-      createSummaryArtifactStore().getPdf(
-        "summary-reports/campaign-1/request-1.pdf",
-      ),
+      createSummaryArtifactStore().getPdf(VALID_ARTIFACT_PATH),
     ).rejects.toThrow("Summary report blob storage is not configured");
     expect(mockGet).not.toHaveBeenCalled();
   });
@@ -177,36 +182,22 @@ describe("summary report private artifact store", () => {
     mockDel.mockRejectedValueOnce(new Error("already missing"));
 
     const store = createSummaryArtifactStore();
-    await expect(
-      store.delete("summary-reports/campaign-1/request-1.pdf"),
-    ).resolves.toBeUndefined();
-    await expect(
-      store.delete("summary-reports/campaign-1/request-1.pdf"),
-    ).resolves.toBeUndefined();
+    await expect(store.delete(VALID_ARTIFACT_PATH)).resolves.toBeUndefined();
+    await expect(store.delete(VALID_ARTIFACT_PATH)).resolves.toBeUndefined();
 
-    expect(mockDel).toHaveBeenNthCalledWith(
-      1,
-      "summary-reports/campaign-1/request-1.pdf",
-      {
-        token: "summary-report-token",
-      },
-    );
-    expect(mockDel).toHaveBeenNthCalledWith(
-      2,
-      "summary-reports/campaign-1/request-1.pdf",
-      {
-        token: "summary-report-token",
-      },
-    );
+    expect(mockDel).toHaveBeenNthCalledWith(1, VALID_ARTIFACT_PATH, {
+      token: "summary-report-token",
+    });
+    expect(mockDel).toHaveBeenNthCalledWith(2, VALID_ARTIFACT_PATH, {
+      token: "summary-report-token",
+    });
   });
 
   it("does not attempt best-effort deletion without the dedicated token", async () => {
     delete process.env.SUMMARY_REPORT_BLOB_READ_WRITE_TOKEN;
 
     await expect(
-      createSummaryArtifactStore().delete(
-        "summary-reports/campaign-1/request-1.pdf",
-      ),
+      createSummaryArtifactStore().delete(VALID_ARTIFACT_PATH),
     ).resolves.toBeUndefined();
     expect(mockDel).not.toHaveBeenCalled();
   });

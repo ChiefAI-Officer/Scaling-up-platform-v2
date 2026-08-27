@@ -47,10 +47,17 @@ function pathnameFor(input: {
   return `summary-reports/${sanitizePathSegment(input.campaignId)}/${sanitizePathSegment(input.creationRequestId)}.pdf`;
 }
 
+const MAXIMUM_BLOB_PATHNAME_LENGTH = 950;
+const SAFE_PATH_SEGMENT = "[a-zA-Z0-9_](?:[a-zA-Z0-9_-]*[a-zA-Z0-9_])?";
+const SUMMARY_ARTIFACT_PATH_PATTERN = new RegExp(
+  `^summary-reports/${SAFE_PATH_SEGMENT}/${SAFE_PATH_SEGMENT}-[a-zA-Z0-9]{30}\\.pdf$`,
+);
+
 function assertSummaryArtifactPath(path: string): void {
-  // `addRandomSuffix` extends the final safe filename segment, so this accepts
-  // both the requested filename and the pathname returned by Vercel Blob.
-  if (!/^summary-reports\/[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+\.pdf$/.test(path)) {
+  if (
+    path.length > MAXIMUM_BLOB_PATHNAME_LENGTH ||
+    !SUMMARY_ARTIFACT_PATH_PATTERN.test(path)
+  ) {
     throw new Error("Invalid summary report artifact path");
   }
 }
