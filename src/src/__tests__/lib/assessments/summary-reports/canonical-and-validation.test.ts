@@ -42,6 +42,17 @@ describe("canonicalJson", () => {
 
     expect(() => canonicalJson(cyclic)).toThrow("Cannot canonicalize cyclic object");
   });
+
+  it("rejects sparse arrays instead of serializing holes", () => {
+    expect(() => canonicalJson(new Array(1))).toThrow(SnapshotCanonicalizationError);
+  });
+
+  it("rejects arrays with symbol keys", () => {
+    const array = ["source"] as string[] & { [key: symbol]: string };
+    array[Symbol("source")] = "hidden";
+
+    expect(() => canonicalJson(array)).toThrow(SnapshotCanonicalizationError);
+  });
 });
 
 describe("sha256Hex", () => {

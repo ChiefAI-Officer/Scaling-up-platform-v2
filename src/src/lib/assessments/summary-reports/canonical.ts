@@ -89,12 +89,20 @@ function canonicalize(value: unknown, path: string, ancestors: Set<object>): str
 
   ancestors.add(value);
   try {
+    if (Object.getOwnPropertySymbols(value).length > 0) return unsupported(path, "symbol key");
+
     if (Array.isArray(value)) {
-      return `[${value.map((entry, index) => canonicalize(entry, `${path}[${index}]`, ancestors)).join(",")}]`;
+      const entries: string[] = [];
+      for (let index = 0; index < value.length; index += 1) {
+        if (!Object.prototype.hasOwnProperty.call(value, index)) {
+          return unsupported(`${path}[${index}]`, "undefined");
+        }
+        entries.push(canonicalize(value[index], `${path}[${index}]`, ancestors));
+      }
+      return `[${entries.join(",")}]`;
     }
 
     if (!isPlainObject(value)) return unsupported(path, "non-plain object");
-    if (Object.getOwnPropertySymbols(value).length > 0) return unsupported(path, "symbol key");
 
     return `{${Object.keys(value)
       .sort()
