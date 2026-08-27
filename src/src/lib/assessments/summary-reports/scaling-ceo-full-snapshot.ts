@@ -21,6 +21,7 @@ import {
   type SelectedSummarySource,
 } from "./canonical";
 import { SUMMARY_REPORT_REGISTRY } from "./registry";
+import { SCALING_CEO_FULL_PEER_BENCHMARK } from "./scaling-ceo-full-peer-benchmarks";
 import { validateComposition } from "./validation";
 
 type AccessCampaignFindFirstArgs = Parameters<
@@ -515,6 +516,11 @@ export async function buildScalingCeoFullSnapshot(
   };
   const reportModel = buildGroupReportModel(modelInput);
   const frozenReportModel = freezeCampaignGroupReportModel(reportModel);
+  const peerBenchmark = jsonSafe(SCALING_CEO_FULL_PEER_BENCHMARK);
+  // The persisted summary artifact owns this accepted peer contract. Keep the
+  // live/direct report model untouched and replace only the frozen copy's
+  // provenance with the summary-report-specific version.
+  frozenReportModel.benchmarkVersion = peerBenchmark.version;
   const modelContentHash = sha256Hex(
     canonicalJson(
       jsonSafe({
@@ -556,6 +562,7 @@ export async function buildScalingCeoFullSnapshot(
     },
     createdAt: input.createdAt.toISOString(),
     sources: frozenSources,
+    peerBenchmark,
     reportModel: frozenReportModel,
     provenance: {
       generatedAt: input.createdAt.toISOString(),
@@ -573,9 +580,7 @@ export async function buildScalingCeoFullSnapshot(
       coachName,
       isImported: destination.importManifest != null,
       benchmarkKeyMismatch: reportModel.benchmarkKeyMismatch,
-      ...(reportModel.benchmarkVersion !== undefined
-        ? { benchmarkVersion: reportModel.benchmarkVersion }
-        : {}),
+      benchmarkVersion: peerBenchmark.version,
     },
   };
   const inputHash = sha256Hex(canonicalJson(snapshot));

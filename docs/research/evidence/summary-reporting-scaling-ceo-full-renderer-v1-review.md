@@ -2,64 +2,75 @@
 
 Date: 2026-08-27
 
-## Scope and artifacts
+## Scope and durable evidence
 
-- Accepted comparison source: `docs/research/evidence/platform-scaling-group-report-candidate-jeff-approved-2026-08-27.png` (the Jeff-approved live Scaling group-report candidate).
-- Frozen Team-0 input: `src/src/__tests__/fixtures/summary-reports/scaling-ceo-full-snapshot.json`.
-- Team-0 PDF: `src/tmp/pdfs/scaling-ceo-full-team-0.pdf`.
-- Team-populated PDF: `src/tmp/pdfs/scaling-ceo-full-team-2.pdf`. This artifact is created only for visual verification by adding two deterministic synthetic Team sources to the de-identified fixture.
-- Final Team-0 page rasters: `src/tmp/pdfs/team0-delivery-page-1.png` through `team0-delivery-page-8.png`.
-- Final Team-populated page rasters: `src/tmp/pdfs/team2-delivery-page-1.png` through `team2-delivery-page-8.png`.
-- Team-0 SHA-256: `85b0dfcbbc59ccba44f6489f508648f45e5d266a5f11367f307d433c4bcf5a58`.
-- Team-populated SHA-256: `441c5012f6d7dc0b0f4c76a0e6bd5ab5dca7d18bc3b776c4ea0c5befec3150c3`.
+- Accepted comparison source: `docs/research/evidence/platform-scaling-group-report-candidate-jeff-approved-2026-08-27-deidentified.png`.
+- Accepted-source SHA-256: `0842e2816e965a9419b111018c2e5b3c4d330f823c5d8c3b8e28df58e64a6cee`.
+- De-identification audit: `docs/research/evidence/platform-scaling-group-report-candidate-jeff-approved-2026-08-27-deidentified-audit.md`.
+- Frozen Team-0 input: `src/src/__tests__/fixtures/summary-reports/scaling-ceo-full-snapshot.json`. Its committed JSON is reproduced exactly by the production Task 6 snapshot builder.
+- Team-0 PDF: eight A4 portrait pages; SHA-256 `c17e145b2f33aef459fc3e5eb97dc318c6c98002849ac2f0a44a73e151b57994`.
+- Team-2 PDF: eight A4 portrait pages; SHA-256 `6afbbcc58d20c23b4aacc04c5b3464c5bd5d3b7a7609de5eb42c089da5d180f5`.
+- Team-50 PDF: ten A4 portrait pages; SHA-256 `64cd642576d86e10e7d2ddd1d4fd65c90e4bfede070cdbd55ec79f02f4e9eaf6`.
+
+The PDFs and their complete raster sets were created in `src/tmp/pdfs/` for inspection and removed after verification, as required by the PDF workflow. The following representative 144-DPI rasters are committed so the review remains inspectable from a clean checkout:
+
+| Tracked raster                                                                                                     | SHA-256                                                            |
+| ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------ |
+| `docs/research/evidence/summary-reporting-scaling-ceo-full-renderer-v1/team0-page-2-provenance-and-aggregates.png` | `11bae4b0373ebf336c901e206e064811d5b1b7ce4c0291b2a1d6462b96298fee` |
+| `docs/research/evidence/summary-reporting-scaling-ceo-full-renderer-v1/team0-page-3-scaleup-and-disclosure.png`    | `7dd13494e3ce05fd755fb105b3922637c2c106264d002f9915b8e5495eb1ada0` |
+| `docs/research/evidence/summary-reporting-scaling-ceo-full-renderer-v1/team2-page-4-question-comparison.png`       | `fc8143e25b341860ba0c7c954c0f9ac6087dae0bb538a127e565790f2ee977b3` |
+| `docs/research/evidence/summary-reporting-scaling-ceo-full-renderer-v1/team50-page-8-appendix-start.png`           | `06a3f2c6de02df3b6c4af68197ed4506a6dbc68806de8c91fc5ea4a087c4c498` |
+| `docs/research/evidence/summary-reporting-scaling-ceo-full-renderer-v1/team50-page-9-appendix-continued.png`       | `6bb2669fef7f000345b544e491857e9c6593c4ae5bda5618a480d691f15b92e3` |
+| `docs/research/evidence/summary-reporting-scaling-ceo-full-renderer-v1/team50-page-10-appendix-final.png`          | `793e2c99ed6c7e901ac6c5df9462628e2608c6e229ccfb007900c79dd2dddbba` |
 
 The comparison is structural and cosmetic, not a claim of pixel identity. The accepted source is one continuous browser report; renderer v1 is an immutable A4 artifact with deliberate page ownership and fixed artifact footers.
 
 ## Page-specific review
 
-| Page/state        | Evidence observed                                                                                                                                                                                                                                                                                                                                                                    |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Team 0, page 1    | The accepted hierarchy is preserved: local white Scaling Up logo, de-identified coach attribution, `Group Report`, `Your Scaling Up Full Assessment Report`, organization/team/date attribution, and a dominant purple cover. The locked orange top rule and blue accent are crisp. The title has no mid-word hyphen or clipping.                                                    |
-| Team 0, page 2    | Provenance, Alignment Profile, section comparison, and domain comparison remain readable at the locked dense table scale. CEO values are emphasized in purple. Every Team and gap cell is explicitly `Not available`; no CEO value is reused as a fabricated Team value. Both headings remain attached to their following table.                                                     |
-| Team 0, page 3    | Peer Comparison precedes ScaleUp Score as in the accepted information order. The purple/blue/orange hierarchy remains legible. `Not available` fits in the Team score card without wrapping or clipping. CEO score `66`, peers `53.1`, deviation `+12.9`, and tier `Exemplary` match the frozen model.                                                                               |
-| Team 0, pages 4-7 | All 61 frozen questions appear in stable order. Purple CEO bars, table labels, numeric scores, and Team-0 null treatments remain readable. Rows do not split; continuation headings and their table header stay together. Page 7 contains the final ten rows and therefore has intentional unused space rather than stretching row density. No heading, label, bar, or footer clips. |
-| Team 0, page 8    | Appendix B is on a dedicated page and shows the CEO domain row. The large remaining area is intentional capacity for Team rows in the same stable appendix layout, not missing or clipped content. The orange privacy note and purple table treatment retain the accepted appendix hierarchy.                                                                                        |
-| Team 2, page 2    | Synthetic Team averages and CEO-vs-Team gaps render independently from CEO values across section and domain tables. Composition reads `1 CEO / 2 Team`.                                                                                                                                                                                                                              |
-| Team 2, page 3    | Team value `54` is legible beside CEO `66`, peers `53.1`, deviation `+12.9`, and the CEO tier.                                                                                                                                                                                                                                                                                       |
-| Team 2, page 4    | CEO and Team question bars render side by side in purple and blue, including explicit zero values; rows remain aligned and unsplit.                                                                                                                                                                                                                                                  |
-| Team 2, page 8    | The appendix exposes only `CEO`, `Person 1`, and `Person 2`. The synthetic source names `Taylor Rowan` and `Morgan Lane` are absent from extracted PDF text. The table is legible and unclipped.                                                                                                                                                                                     |
+| Page/state         | Evidence observed                                                                                                                                                                                                                                                                                                                             |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Team 0, page 1     | The accepted hierarchy is preserved: local white Scaling Up logo, de-identified coach attribution, `Group Report`, `Your Scaling Up Full Assessment Report`, organization/team/date attribution, and a dominant purple cover. The locked orange top rule and blue accent are crisp. The title has no mid-word hyphen or clipping.             |
+| Team 0, page 2     | The exact UTC creation timestamp, CEO, campaign, assessment/pinned version, and selected/completed/invited counts are visible. Section and Domain tables are separately labeled; CEO, Team, peer, gap, and CEO-vs-peer columns are unambiguous. Team-0 values are consistently `Not available`, never inferred from CEO.                      |
+| Team 0, page 3     | The ScaleUp score cards show CEO `66`, Team `Not available`, peers `53.1`, CEO-vs-peers `+12.9`, and tier `Exemplary`. The exact peer benchmark version is visible with its provisional, single-Esperto-cohort, not-yet-size-matched disclosure. The unused space is intentional fixed-page composition, not missing content.                 |
+| Team 0, pages 4–7  | All 61 frozen questions appear in stable order with purple CEO and orange peer values/bars. Team is explicitly `Not available`. Rows remain unsplit, continuation headings and column headers repeat, and the final ten-row page intentionally retains white space rather than changing row density. No label, bar, footer, or heading clips. |
+| Team 0, page 8     | Appendix B shows the CEO domain row and no inferred Team member. The large remainder is intentional capacity in the explicit appendix page, not missing or clipped content.                                                                                                                                                                   |
+| Team 2, page 2     | Synthetic Team averages and CEO-vs-Team gaps render independently across Section and Domain tables. Provenance reports `3 selected / 3 completed / 3 invited`.                                                                                                                                                                                |
+| Team 2, page 3     | Team score `54` is legible beside CEO `66`, peers `53.1`, CEO-vs-peers `+12.9`, tier, and benchmark disclosure.                                                                                                                                                                                                                               |
+| Team 2, pages 4–7  | CEO, Team, and peer question values/bars render side by side in purple, blue, and orange, including explicit zero values. All rows remain aligned and unsplit.                                                                                                                                                                                |
+| Team 2, page 8     | Appendix B exposes only `CEO`, `Person 1`, and `Person 2`. Synthetic source names are absent from extracted PDF text. The table is legible and unclipped.                                                                                                                                                                                     |
+| Team 50, page 2    | Provenance reports `51 selected / 51 completed / 51 invited`; the dense Section and Domain tables remain readable without collision or clipping.                                                                                                                                                                                              |
+| Team 50, pages 4–7 | The complete question sequence retains CEO/Team/peer alignment and fixed footers. The smaller final chunk on page 7 intentionally preserves stable row height.                                                                                                                                                                                |
+| Team 50, page 8    | Appendix B starts with `CEO`, then `Person 1` through `Person 19`. Privacy notice, heading, and column header are attached and rows do not split.                                                                                                                                                                                             |
+| Team 50, page 9    | `Appendix B - Team Members (Anonymized) (continued)`, privacy notice, and column header repeat. The page contains exactly `Person 20` through `Person 39`.                                                                                                                                                                                    |
+| Team 50, page 10   | The continued identity and column header repeat above exactly `Person 40` through `Person 50`. The remainder is intentional last-chunk whitespace; all rows and the `Page 10 / 10` footer are intact.                                                                                                                                         |
 
-All eight final Team-0 rasters were inspected at 144 DPI. The Team-populated comparison, score, question-detail, and appendix pages were also inspected at 144 DPI. Every final page has the fixed footer text `Northstar Growth Review | scaling-ceo-full-pdf-v1 | Page N / 8`; this is also asserted across every parsed page in the renderer test.
+All Team-0 pages, Team-2 comparison/score/question/appendix pages, and Team-50 pages 2–10 were inspected at original 144-DPI raster detail. Every inspected page has the fixed campaign/version/`Page N / total` footer. Automated tests separately assert every footer across all physical pages, exact question sequence, absence of Team names, and 50-Team appendix boundaries.
 
 ## Comparison verdict and intentional differences
 
-PASS for the Task 8 visual gate. Renderer v1 faithfully carries forward the accepted report's hierarchy, locked purple/blue/orange palette, dense comparison tables, scale score emphasis, question bars, and anonymized appendix while adapting the continuous browser layout to A4 pages.
+**PASS for the Task 8 visual gate.** Renderer v1 faithfully carries forward the accepted report's hierarchy, locked purple/blue/orange palette, dense score comparisons, question-level CEO/Team/peer bars, and anonymized appendix while adapting the continuous browser layout to A4 pages.
 
 Observed differences are intentional and bounded:
 
-- The accepted source is a continuous HTML/print surface; renderer v1 owns an eight-page A4 sequence with fixed campaign/version/page footers.
+- The accepted source is a continuous HTML/print surface; renderer v1 owns a deterministic A4 sequence with fixed campaign/version/page footers.
 - Team 0 is written as `Not available` rather than inferred from CEO data.
-- The frozen canonical model contains section/domain/ScaleUp peer values but no question-level peer field. Renderer v1 therefore preserves peer comparison in the peer table and ScaleUp card, but does not invent the accepted source's orange per-question peer bars.
-- The appendix has a dedicated page so Team-populated artifacts retain stable anonymity and pagination. Team 0 consequently leaves intentional white space on page 8.
-- A decorative running header was omitted; the accepted hierarchy is carried by page headings and the mandatory artifact footer without nondeterministic duplicate chrome.
+- The provisional peer contract is frozen into each Task 6 snapshot so later benchmark changes cannot silently alter a generated artifact.
+- Section and Domain peers are integrated into two explicitly labeled tables, avoiding the accepted source's repeated unqualified row names.
+- Appendix B uses deterministic explicit 20-row chunks. This keeps identities anonymous, repeats context on every continuation, and trades some final-page density for stable boundaries and unsplit rows.
+- A decorative running header is omitted; page headings and the mandatory fixed footer preserve navigation without duplicate chrome.
 
 ## Mechanical verification
 
-Final verifier command:
+Team-0 verifier command:
 
 ```text
-node scripts/verify-summary-report-artifacts.mjs tmp/pdfs/scaling-ceo-full-team-0.pdf --expect-text "Appendix B" --min-pages 8 --max-pages 8 --sha256 85b0dfcbbc59ccba44f6489f508648f45e5d266a5f11367f307d433c4bcf5a58
+node scripts/verify-summary-report-artifacts.mjs tmp/pdfs/team0.pdf --expect-text "Appendix B" --min-pages 8 --max-pages 8 --sha256 c17e145b2f33aef459fc3e5eb97dc318c6c98002849ac2f0a44a73e151b57994
 ```
 
-Result:
+Team-50 verifier command:
 
-```json
-{
-  "ok": true,
-  "path": "tmp/pdfs/scaling-ceo-full-team-0.pdf",
-  "pages": 8,
-  "sha256": "85b0dfcbbc59ccba44f6489f508648f45e5d266a5f11367f307d433c4bcf5a58",
-  "title": "Scaling Up Group Report - Northstar Growth Review",
-  "expectedText": "Appendix B"
-}
+```text
+node scripts/verify-summary-report-artifacts.mjs tmp/pdfs/team50.pdf --expect-text "Person 50" --min-pages 10 --max-pages 10 --sha256 64cd642576d86e10e7d2ddd1d4fd65c90e4bfede070cdbd55ec79f02f4e9eaf6
 ```
+
+Both commands returned `ok: true`, their exact expected title/text/page count/SHA-256 values, and exit status 0.

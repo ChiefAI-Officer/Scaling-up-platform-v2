@@ -104,10 +104,11 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   provenanceColumn: { width: "48%" },
+  provenanceField: { marginBottom: 8 },
   eyebrow: {
     marginBottom: 3,
     fontSize: 6.8,
-    letterSpacing: 0.8,
+    letterSpacing: 0,
     textTransform: "uppercase",
     color: COLOR.muted,
   },
@@ -157,8 +158,8 @@ const styles = StyleSheet.create({
   },
   labelCell: { width: "40%" },
   numberCell: { width: "20%", textAlign: "right" },
-  peerLabelCell: { width: "36%" },
-  peerNumberCell: { width: "16%", textAlign: "right" },
+  comparisonLabelCell: { width: "30%" },
+  comparisonNumberCell: { width: "14%", textAlign: "right" },
   muted: { color: COLOR.muted },
   ceoValue: { fontFamily: "Helvetica-Bold", color: COLOR.purple },
   scoreCards: { flexDirection: "row", marginTop: 4 },
@@ -216,8 +217,8 @@ const styles = StyleSheet.create({
     borderLeftWidth: 1,
     borderColor: COLOR.border,
   },
-  questionLabel: { width: "52%", padding: 6 },
-  questionScore: { width: "24%", padding: 5 },
+  questionLabel: { width: "46%", padding: 6 },
+  questionScore: { width: "18%", padding: 5 },
   questionHeaderText: {
     fontFamily: "Helvetica-Bold",
     fontSize: 7.2,
@@ -231,7 +232,17 @@ const styles = StyleSheet.create({
   },
   ceoBar: { height: 8, borderRadius: 2, backgroundColor: COLOR.purple },
   teamBar: { height: 8, borderRadius: 2, backgroundColor: COLOR.blue },
+  peerBar: { height: 8, borderRadius: 2, backgroundColor: COLOR.orange },
   barValue: { fontFamily: "Helvetica-Bold", fontSize: 7.5 },
+  benchmarkDisclosure: {
+    marginTop: 12,
+    padding: 10,
+    borderLeftWidth: 4,
+    borderLeftColor: COLOR.orange,
+    backgroundColor: "#fff8e7",
+    fontSize: 8,
+    color: COLOR.muted,
+  },
   appendixIntro: {
     marginBottom: 10,
     padding: 10,
@@ -276,6 +287,17 @@ function formatDate(iso: string): string {
   }).format(new Date(iso));
 }
 
+function formatUtcTimestamp(iso: string): string {
+  const date = new Date(iso);
+  const year = String(date.getUTCFullYear()).padStart(4, "0");
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  const hours = String(date.getUTCHours()).padStart(2, "0");
+  const minutes = String(date.getUTCMinutes()).padStart(2, "0");
+  const seconds = String(date.getUTCSeconds()).padStart(2, "0");
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds} UTC`;
+}
+
 function footerText(snapshot: ScalingCeoFullSnapshot): string {
   return `${snapshot.destination.campaignName} | ${SCALING_CEO_FULL_RENDERER_VERSION}`;
 }
@@ -315,95 +337,82 @@ interface ComparisonRow {
   ceo: number | null;
   teamAvg: number | null;
   dev: number | null;
+  peers?: number | null;
+  devPeers?: number | null;
 }
 
 function ComparisonTable({ rows }: { rows: ComparisonRow[] }) {
   return (
     <View style={styles.table}>
       <View key="header" style={styles.tableHeader}>
-        <View key="area" style={[styles.tableCell, styles.labelCell]}>
+        <View key="area" style={[styles.tableCell, styles.comparisonLabelCell]}>
           <Text style={styles.tableHeaderText}>Area</Text>
         </View>
-        <View key="ceo" style={[styles.tableCell, styles.numberCell]}>
+        <View key="ceo" style={[styles.tableCell, styles.comparisonNumberCell]}>
           <Text style={styles.tableHeaderText}>CEO</Text>
         </View>
-        <View key="team" style={[styles.tableCell, styles.numberCell]}>
+        <View
+          key="team"
+          style={[styles.tableCell, styles.comparisonNumberCell]}
+        >
           <Text style={styles.tableHeaderText}>Team avg</Text>
         </View>
-        <View key="gap" style={[styles.tableCell, styles.numberCell]}>
+        <View key="gap" style={[styles.tableCell, styles.comparisonNumberCell]}>
           <Text style={styles.tableHeaderText}>Gap</Text>
         </View>
-      </View>
-      {rows.map((row) => (
-        <View key={row.key} style={styles.tableRow} wrap={false}>
-          <View key="area" style={[styles.tableCell, styles.labelCell]}>
-            <Text>{row.label}</Text>
-          </View>
-          <View key="ceo" style={[styles.tableCell, styles.numberCell]}>
-            <Text style={styles.ceoValue}>{formatNumber(row.ceo)}</Text>
-          </View>
-          <View key="team" style={[styles.tableCell, styles.numberCell]}>
-            <Text style={row.teamAvg == null ? styles.muted : {}}>
-              {formatNumber(row.teamAvg)}
-            </Text>
-          </View>
-          <View key="gap" style={[styles.tableCell, styles.numberCell]}>
-            <Text style={row.dev == null ? styles.muted : {}}>
-              {formatGap(row.dev)}
-            </Text>
-          </View>
-        </View>
-      ))}
-    </View>
-  );
-}
-
-interface PeerRow {
-  key: string;
-  label: string;
-  ceo: number | null;
-  teamAvg: number | null;
-  peers?: number | null;
-  devPeers?: number | null;
-}
-
-function PeerTable({ rows }: { rows: PeerRow[] }) {
-  return (
-    <View style={styles.table}>
-      <View key="header" style={styles.tableHeader}>
-        <View key="area" style={[styles.tableCell, styles.peerLabelCell]}>
-          <Text style={styles.tableHeaderText}>Area</Text>
-        </View>
-        <View key="ceo" style={[styles.tableCell, styles.peerNumberCell]}>
-          <Text style={styles.tableHeaderText}>CEO</Text>
-        </View>
-        <View key="team" style={[styles.tableCell, styles.peerNumberCell]}>
-          <Text style={styles.tableHeaderText}>Team</Text>
-        </View>
-        <View key="peers" style={[styles.tableCell, styles.peerNumberCell]}>
+        <View
+          key="peers"
+          style={[styles.tableCell, styles.comparisonNumberCell]}
+        >
           <Text style={styles.tableHeaderText}>Peers</Text>
         </View>
-        <View key="gap" style={[styles.tableCell, styles.peerNumberCell]}>
+        <View
+          key="peer-gap"
+          style={[styles.tableCell, styles.comparisonNumberCell]}
+        >
           <Text style={styles.tableHeaderText}>CEO vs peers</Text>
         </View>
       </View>
       {rows.map((row) => (
         <View key={row.key} style={styles.tableRow} wrap={false}>
-          <View key="area" style={[styles.tableCell, styles.peerLabelCell]}>
+          <View
+            key="area"
+            style={[styles.tableCell, styles.comparisonLabelCell]}
+          >
             <Text>{row.label}</Text>
           </View>
-          <View key="ceo" style={[styles.tableCell, styles.peerNumberCell]}>
+          <View
+            key="ceo"
+            style={[styles.tableCell, styles.comparisonNumberCell]}
+          >
             <Text style={styles.ceoValue}>{formatNumber(row.ceo)}</Text>
           </View>
-          <View key="team" style={[styles.tableCell, styles.peerNumberCell]}>
+          <View
+            key="team"
+            style={[styles.tableCell, styles.comparisonNumberCell]}
+          >
             <Text style={row.teamAvg == null ? styles.muted : {}}>
               {formatNumber(row.teamAvg)}
             </Text>
           </View>
-          <View key="peers" style={[styles.tableCell, styles.peerNumberCell]}>
+          <View
+            key="gap"
+            style={[styles.tableCell, styles.comparisonNumberCell]}
+          >
+            <Text style={row.dev == null ? styles.muted : {}}>
+              {formatGap(row.dev)}
+            </Text>
+          </View>
+          <View
+            key="peers"
+            style={[styles.tableCell, styles.comparisonNumberCell]}
+          >
             <Text>{formatNumber(row.peers)}</Text>
           </View>
-          <View key="gap" style={[styles.tableCell, styles.peerNumberCell]}>
+          <View
+            key="peer-gap"
+            style={[styles.tableCell, styles.comparisonNumberCell]}
+          >
             <Text>{formatGap(row.devPeers)}</Text>
           </View>
         </View>
@@ -425,7 +434,7 @@ function ScoreBar({
   variant,
 }: {
   value: number | null;
-  variant: "ceo" | "team";
+  variant: "ceo" | "team" | "peer";
 }) {
   if (value == null || !Number.isFinite(value)) {
     return <Text style={[styles.barValue, styles.muted]}>Not available</Text>;
@@ -436,7 +445,11 @@ function ScoreBar({
       <View style={styles.barTrack}>
         <View
           style={[
-            variant === "ceo" ? styles.ceoBar : styles.teamBar,
+            variant === "ceo"
+              ? styles.ceoBar
+              : variant === "team"
+                ? styles.teamBar
+                : styles.peerBar,
             { width: `${Math.max(2, Math.min(100, value * 10))}%` },
           ]}
         />
@@ -456,15 +469,14 @@ function ScalingCeoFullDocument({
 
   const ceoSource = snapshot.sources.find((source) => source.role === "CEO");
   const ceoName = ceoSource?.respondent.displayName ?? "CEO";
-  const teamCount = snapshot.sources.filter(
-    (source) => source.role === "TEAM",
-  ).length;
   const sectionRows: ComparisonRow[] = scored.sections.map((row) => ({
     key: row.stableKey,
     label: row.name,
     ceo: row.ceo,
     teamAvg: row.teamAvg,
     dev: row.dev,
+    peers: row.peers,
+    devPeers: row.devPeers,
   }));
   const domainRows: ComparisonRow[] = (scored.domains ?? []).map((row) => ({
     key: row.key,
@@ -472,26 +484,15 @@ function ScalingCeoFullDocument({
     ceo: row.ceo,
     teamAvg: row.teamAvg,
     dev: row.dev,
+    peers: row.peers,
+    devPeers: row.devPeers,
   }));
-  const peerRows: PeerRow[] = [
-    ...scored.sections.map((row) => ({
-      key: `section:${row.stableKey}`,
-      label: row.name,
-      ceo: row.ceo,
-      teamAvg: row.teamAvg,
-      peers: row.peers,
-      devPeers: row.devPeers,
-    })),
-    ...(scored.domains ?? []).map((row) => ({
-      key: `domain:${row.key}`,
-      label: row.label,
-      ceo: row.ceo,
-      teamAvg: row.teamAvg,
-      peers: row.peers,
-      devPeers: row.devPeers,
-    })),
-  ].filter((row) => row.peers != null && Number.isFinite(row.peers));
   const questionPages = chunkRows(scored.questions, 17);
+  const appendixPages = chunkRows(scored.appendixB ?? [], 20);
+  const questionPeers = snapshot.peerBenchmark.questions as Record<
+    string,
+    number
+  >;
   const createdAt = new Date(snapshot.createdAt);
 
   return (
@@ -532,28 +533,47 @@ function ScalingCeoFullDocument({
       <Page size="A4" orientation="portrait" style={styles.page}>
         <View style={styles.provenance}>
           <View style={styles.provenanceColumn}>
-            <Text style={styles.eyebrow}>CEO source</Text>
-            <Text style={styles.provenanceValue}>{ceoName}</Text>
-            <Text style={[styles.eyebrow, { marginTop: 9 }]}>Campaign</Text>
-            <Text style={styles.provenanceValue}>
-              {snapshot.destination.campaignName}
-            </Text>
+            <View style={styles.provenanceField}>
+              <Text style={styles.eyebrow}>CEO</Text>
+              <Text style={styles.provenanceValue}>{ceoName}</Text>
+            </View>
+            <View style={styles.provenanceField}>
+              <Text style={styles.eyebrow}>Campaign</Text>
+              <Text style={styles.provenanceValue}>
+                {snapshot.destination.campaignName}
+              </Text>
+            </View>
+            <View>
+              <Text style={styles.eyebrow}>Assessment / pinned version</Text>
+              <Text style={styles.provenanceValue}>
+                {snapshot.provenance.assessmentName} /{" "}
+                {snapshot.provenance.versionLabel}
+              </Text>
+            </View>
           </View>
           <View style={styles.provenanceColumn}>
-            <Text style={styles.eyebrow}>Frozen at</Text>
-            <Text style={styles.provenanceValue}>
-              {formatDate(snapshot.createdAt)}
-            </Text>
-            <Text style={[styles.eyebrow, { marginTop: 9 }]}>Composition</Text>
-            <Text style={styles.provenanceValue}>1 CEO | {teamCount} Team</Text>
+            <View style={styles.provenanceField}>
+              <Text style={styles.eyebrow}>Created at (UTC)</Text>
+              <Text style={styles.provenanceValue}>
+                {formatUtcTimestamp(snapshot.createdAt)}
+              </Text>
+            </View>
+            <View>
+              <Text style={styles.eyebrow}>Selected / completed / invited</Text>
+              <Text style={styles.provenanceValue}>
+                {snapshot.sources.length} selected /{" "}
+                {snapshot.provenance.completedCount} completed /{" "}
+                {snapshot.provenance.invitedCount} invited
+              </Text>
+            </View>
           </View>
         </View>
 
         <View style={styles.section}>
           <SectionHeading>Alignment Profile</SectionHeading>
           <Text style={styles.sectionIntro}>
-            CEO vs Team average (excludes CEO). A missing Team cohort is shown
-            as Not available; no Team value is inferred from the CEO.
+            Section scores - CEO vs Team vs Peers. Team average (excludes CEO).
+            A missing Team cohort is Not available; no value is inferred.
           </Text>
           <ComparisonTable rows={sectionRows} />
         </View>
@@ -562,8 +582,8 @@ function ScalingCeoFullDocument({
           <View style={styles.section}>
             <SectionHeading>CEO vs Team by Domain</SectionHeading>
             <Text style={styles.sectionIntro}>
-              Domain scores use the frozen creation-time model. Team average
-              excludes the selected CEO source.
+              Domain scores - CEO vs Team vs Peers. Values use the frozen
+              creation-time model; Team average (excludes CEO).
             </Text>
             <ComparisonTable rows={domainRows} />
           </View>
@@ -572,17 +592,6 @@ function ScalingCeoFullDocument({
       </Page>
 
       <Page size="A4" orientation="portrait" style={styles.page}>
-        {peerRows.length > 0 ? (
-          <View style={styles.section}>
-            <SectionHeading>Peer Comparison</SectionHeading>
-            <Text style={styles.sectionIntro}>
-              Peer values are the benchmark set frozen into this report. They
-              are not recalculated when the artifact is viewed.
-            </Text>
-            <PeerTable rows={peerRows} />
-          </View>
-        ) : null}
-
         {scored.scaleUpScore ? (
           <View style={styles.section}>
             <SectionHeading>ScaleUp Score</SectionHeading>
@@ -625,6 +634,9 @@ function ScalingCeoFullDocument({
             ) : null}
           </View>
         ) : null}
+        <Text style={styles.benchmarkDisclosure}>
+          {snapshot.peerBenchmark.disclosure}
+        </Text>
         <Footer snapshot={snapshot} pageKey="peer-score" />
       </Page>
 
@@ -657,6 +669,9 @@ function ScalingCeoFullDocument({
               <View style={styles.questionScore}>
                 <Text style={styles.questionHeaderText}>Team avg</Text>
               </View>
+              <View style={styles.questionScore}>
+                <Text style={styles.questionHeaderText}>Peers</Text>
+              </View>
             </View>
             {questions.map((question) => (
               <View
@@ -673,6 +688,12 @@ function ScalingCeoFullDocument({
                 <View style={styles.questionScore}>
                   <ScoreBar value={question.teamMean} variant="team" />
                 </View>
+                <View style={styles.questionScore}>
+                  <ScoreBar
+                    value={questionPeers[question.stableKey] ?? null}
+                    variant="peer"
+                  />
+                </View>
               </View>
             ))}
           </View>
@@ -683,52 +704,65 @@ function ScalingCeoFullDocument({
         </Page>
       ))}
 
-      <Page size="A4" orientation="portrait" style={styles.page}>
-        <Footer snapshot={snapshot} pageKey="appendix-b" />
-        <View style={styles.section}>
-          <SectionHeading>
-            Appendix B - Team Members (Anonymized)
-          </SectionHeading>
-          <Text style={styles.appendixIntro}>
-            Individual Team identities are intentionally omitted. Non-CEO rows
-            use deterministic Person labels in selected source order.
-          </Text>
-          <View style={styles.table}>
-            <View key="header" style={styles.tableHeader}>
-              <View style={[styles.tableCell, styles.labelCell]}>
-                <Text style={styles.tableHeaderText}>Member</Text>
-              </View>
-              {(["People", "Strategy", "Execution", "Cash"] as const).map(
-                (label) => (
-                  <View
-                    key={label}
-                    style={[styles.tableCell, styles.numberCell]}
-                  >
-                    <Text style={styles.tableHeaderText}>{label}</Text>
-                  </View>
-                ),
-              )}
-            </View>
-            {(scored.appendixB ?? []).map((row) => (
-              <View key={row.personLabel} style={styles.tableRow} wrap={false}>
+      {appendixPages.map((rows, pageIndex) => (
+        <Page
+          key={`appendix-b:${pageIndex}`}
+          size="A4"
+          orientation="portrait"
+          style={styles.page}
+        >
+          <Footer snapshot={snapshot} pageKey={`appendix-b:${pageIndex}`} />
+          <View style={styles.section}>
+            <SectionHeading>
+              {pageIndex === 0
+                ? "Appendix B - Team Members (Anonymized)"
+                : "Appendix B - Team Members (Anonymized) (continued)"}
+            </SectionHeading>
+            <Text style={styles.appendixIntro}>
+              Individual Team identities are intentionally omitted. Non-CEO rows
+              use deterministic Person labels in selected source order.
+            </Text>
+            <View style={styles.table}>
+              <View key="header" style={styles.tableHeader}>
                 <View style={[styles.tableCell, styles.labelCell]}>
-                  <Text>{row.personLabel}</Text>
+                  <Text style={styles.tableHeaderText}>Member</Text>
                 </View>
-                {(["people", "strategy", "execution", "cash"] as const).map(
-                  (key) => (
+                {(["People", "Strategy", "Execution", "Cash"] as const).map(
+                  (label) => (
                     <View
-                      key={key}
+                      key={label}
                       style={[styles.tableCell, styles.numberCell]}
                     >
-                      <Text>{formatNumber(row.domainScores[key])}</Text>
+                      <Text style={styles.tableHeaderText}>{label}</Text>
                     </View>
                   ),
                 )}
               </View>
-            ))}
+              {rows.map((row) => (
+                <View
+                  key={row.personLabel}
+                  style={styles.tableRow}
+                  wrap={false}
+                >
+                  <View style={[styles.tableCell, styles.labelCell]}>
+                    <Text>{row.personLabel}</Text>
+                  </View>
+                  {(["people", "strategy", "execution", "cash"] as const).map(
+                    (key) => (
+                      <View
+                        key={key}
+                        style={[styles.tableCell, styles.numberCell]}
+                      >
+                        <Text>{formatNumber(row.domainScores[key])}</Text>
+                      </View>
+                    ),
+                  )}
+                </View>
+              ))}
+            </View>
           </View>
-        </View>
-      </Page>
+        </Page>
+      ))}
     </Document>
   );
 }

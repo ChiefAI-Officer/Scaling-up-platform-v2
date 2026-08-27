@@ -1,3 +1,4 @@
+import goldenSnapshotJson from "@/__tests__/fixtures/summary-reports/scaling-ceo-full-snapshot.json";
 import { buildGroupReportModel } from "@/lib/assessments/group-report-model";
 import {
   buildScalingCeoFullSnapshot,
@@ -9,6 +10,7 @@ import {
   canonicalJson,
   sha256Hex,
   type FrozenCampaignGroupReport,
+  type ScalingCeoFullSnapshot,
   type SelectedSummarySource,
 } from "@/lib/assessments/summary-reports/canonical";
 import type { AccessControlDb } from "@/lib/assessments/access-control";
@@ -35,6 +37,8 @@ const coachActor: ApiActor = {
   role: "COACH",
   coachId: "coach-1",
 };
+
+const goldenSnapshot = goldenSnapshotJson as unknown as ScalingCeoFullSnapshot;
 
 function destinationCampaign(overrides: Record<string, unknown> = {}) {
   const fixture = fixtureScalingUpFull();
@@ -159,6 +163,112 @@ function selectedFixtureModel() {
       ...submission,
       respondentId: modelId(submission.respondentId),
     })),
+  });
+}
+
+const GOLDEN_SECTION_DOMAINS: Record<string, string> = {
+  S_PEOPLE_YE: "people",
+  S_PEOPLE_CC: "people",
+  S_STRATEGY: "strategy",
+  S_EXEC_LT: "execution",
+  S_EXEC_OP: "execution",
+  S_EXEC_SM: "execution",
+  S_EXEC_SIT: "execution",
+  S_CASH: "cash",
+  S_YOU_LEAD: "you",
+  S_YOU_IC: "you",
+};
+
+function goldenDestinationCampaign(): CampaignRow {
+  const questions = Object.entries(
+    goldenSnapshot.reportModel.questionsByKey,
+  ).map(([stableKey, meta]) => ({
+    stableKey,
+    type: meta.type,
+    label: meta.label,
+    sectionStableKey: meta.sectionStableKey,
+    scale: { min: meta.min, max: meta.max, step: 1 },
+  }));
+  const sections = goldenSnapshot.reportModel.scored!.sections.map(
+    (section, index) => ({
+      stableKey: section.stableKey,
+      sortOrder: index + 1,
+      name: section.name,
+      domain: GOLDEN_SECTION_DOMAINS[section.stableKey],
+    }),
+  );
+
+  return destinationCampaign({
+    id: goldenSnapshot.destination.campaignId,
+    name: goldenSnapshot.destination.campaignName,
+    organizationId: goldenSnapshot.destination.organizationId,
+    templateId: goldenSnapshot.destination.templateId,
+    versionId: goldenSnapshot.destination.versionId,
+    language: goldenSnapshot.destination.language,
+    status: "ACTIVE",
+    organization: {
+      id: goldenSnapshot.destination.organizationId,
+      name: goldenSnapshot.destination.organizationName,
+    },
+    template: {
+      id: goldenSnapshot.destination.templateId,
+      alias: goldenSnapshot.destination.templateAlias,
+      name: goldenSnapshot.provenance.assessmentName,
+    },
+    version: {
+      id: goldenSnapshot.destination.versionId,
+      templateId: goldenSnapshot.destination.templateId,
+      versionNumber: goldenSnapshot.destination.versionNumber,
+      language: goldenSnapshot.destination.language,
+      publishedAt: new Date("2026-08-01T00:00:00.000Z"),
+      questions,
+      sections,
+      scoringConfig: {},
+    },
+    creatorCoach: {
+      profileImage: goldenSnapshot.provenance.coachLogoUrl,
+      firstName: "Jordan",
+      lastName: "Coach",
+    },
+  });
+}
+
+function goldenSourceSubmission() {
+  const campaign = goldenDestinationCampaign();
+  const source = goldenSnapshot.sources[0];
+  return sourceSubmission(0, campaign, {
+    id: source.submissionId,
+    campaignId: source.sourceCampaignId,
+    respondentId: source.respondent.id,
+    submittedAt: new Date(source.submittedAt),
+    answers: source.answers,
+    result: source.result,
+    respondent: {
+      id: source.respondent.id,
+      organizationId: goldenSnapshot.destination.organizationId,
+      firstName: "Avery",
+      lastName: "Morgan",
+      jobTitle: source.respondent.jobTitle,
+      deletedAt: null,
+    },
+    invitation: {
+      campaignId: source.sourceCampaignId,
+      respondentId: source.respondent.id,
+      status: "SUBMITTED",
+      revokedAt: null,
+    },
+    campaign: {
+      id: source.sourceCampaignId,
+      organizationId: goldenSnapshot.destination.organizationId,
+      templateId: goldenSnapshot.destination.templateId,
+      versionId: goldenSnapshot.destination.versionId,
+      language: goldenSnapshot.destination.language,
+      status: "ACTIVE",
+      accessMode: "INVITED",
+      createdByCoachId: null,
+      deletedAt: null,
+      template: { alias: goldenSnapshot.destination.templateAlias },
+    },
   });
 }
 
@@ -304,9 +414,13 @@ describe("buildScalingCeoFullSnapshot", () => {
     ]);
     const approvedModel = selectedFixtureModel();
     const frozenModel: FrozenCampaignGroupReport = result.snapshot.reportModel;
-    expect(rehydrateCampaignGroupReportModel(frozenModel)).toEqual(
-      approvedModel,
+    expect(approvedModel.benchmarkVersion).toBe(
+      "2026-06-28.cohort1.provisional",
     );
+    expect(rehydrateCampaignGroupReportModel(frozenModel)).toEqual({
+      ...approvedModel,
+      benchmarkVersion: "2026-08-14.question-controlled-aggregate-provisional",
+    });
     expect(result.snapshot.createdAt).toBe(createdAt.toISOString());
     expect(result.snapshot.destination).toEqual({
       campaignId: "campaign-destination",
@@ -390,6 +504,69 @@ describe("buildScalingCeoFullSnapshot", () => {
     expect(result.snapshot.reportModel.scored!.scaleUpScore).toEqual(
       expect.objectContaining({ ceo: 70, teamAvg: 48 }),
     );
+  });
+
+  it("freezes the summary-specific question benchmark and version into the snapshot", async () => {
+    const { db } = buildDb();
+
+    const result = await buildScalingCeoFullSnapshot(db, actor, {
+      destinationCampaignId: "campaign-destination",
+      sources: selectedSources(),
+      createdAt: new Date("2026-08-27T12:34:56.789Z"),
+    });
+
+    expect(result.kind).toBe("ok");
+    if (result.kind !== "ok") return;
+
+    const frozen = result.snapshot.peerBenchmark;
+    expect(frozen).toEqual(
+      expect.objectContaining({
+        version: "2026-08-14.question-controlled-aggregate-provisional",
+        status: "provisional",
+        cohort: "single Esperto cohort",
+        disclosure:
+          "Peers = provisional industry benchmark (single Esperto cohort, v2026-08-14.question-controlled-aggregate-provisional); not yet size-matched.",
+      }),
+    );
+    expect(Object.keys(frozen.questions)).toHaveLength(61);
+    expect(frozen.questions).toEqual(
+      expect.objectContaining({ Q01: 6.3, Q30: 5.6, Q61: 5.6 }),
+    );
+    expect(result.snapshot.reportModel.benchmarkVersion).toBe(
+      "2026-08-14.question-controlled-aggregate-provisional",
+    );
+    expect(result.snapshot.provenance.benchmarkVersion).toBe(
+      "2026-08-14.question-controlled-aggregate-provisional",
+    );
+    expect(() => canonicalJson(result.snapshot)).not.toThrow();
+  });
+
+  it("reproduces the committed de-identified golden snapshot through the production builder", async () => {
+    const destination = goldenDestinationCampaign();
+    const source = goldenSourceSubmission();
+    const { db } = buildDb({
+      destination,
+      campaigns: [destination],
+      submissions: [source],
+    });
+
+    const result = await buildScalingCeoFullSnapshot(db, actor, {
+      destinationCampaignId: destination.id,
+      sources: [
+        {
+          submissionId: source.id,
+          sourceCampaignId: source.campaignId,
+          role: "CEO",
+          position: 0,
+        },
+      ],
+      createdAt: new Date(goldenSnapshot.createdAt),
+    });
+
+    expect(result.kind).toBe("ok");
+    if (result.kind !== "ok") return;
+    expect(result.snapshot).toEqual(goldenSnapshot);
+    expect(result.inputHash).toBe(sha256Hex(canonicalJson(goldenSnapshot)));
   });
 
   it("rejects invalid CEO composition before reading destination or sources", async () => {

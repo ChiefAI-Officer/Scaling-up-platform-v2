@@ -4,6 +4,7 @@ import type { GroupReportProvenance } from "@/lib/assessments/group-report";
 import type { CampaignGroupReport } from "@/lib/assessments/group-report-model";
 
 import type { SummaryReportSourceRole } from "./types";
+import type { ScalingCeoFullPeerBenchmark } from "./scaling-ceo-full-peer-benchmarks";
 
 export type SnapshotJsonValue =
   | null
@@ -70,6 +71,8 @@ export interface ScalingCeoFullSnapshot {
     answers: SnapshotJsonValue;
     result: SnapshotJsonValue;
   }>;
+  /** Summary-report-owned peer values frozen at immutable creation time. */
+  peerBenchmark: JsonSafe<ScalingCeoFullPeerBenchmark>;
   reportModel: FrozenCampaignGroupReport;
   provenance: ScalingCeoFullProvenance;
 }
