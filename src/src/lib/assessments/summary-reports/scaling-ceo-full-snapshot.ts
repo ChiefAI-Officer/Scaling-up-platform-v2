@@ -482,26 +482,33 @@ export async function buildScalingCeoFullSnapshot(
     };
   });
 
-  const participants: GroupReportParticipantInput[] = frozenSources.map(
-    (source) => ({
-      respondentId: selectedSourceModelId(source),
+  // The shared live model intentionally sorts by display name. Immutable
+  // summaries instead own the explicit role/position order selected in the
+  // wizard. Supply deterministic submission-scoped sort identities so the
+  // shared model builds its de-identified Appendix in that order, then restore
+  // the real display identities by the same model IDs before freezing.
+  const modelSources = frozenSources.map((source, index) => ({
+    source,
+    modelId: selectedSourceModelId(source),
+    sortProfile: {
+      firstName: `SummaryOrder${String(index).padStart(8, "0")}`,
+      lastName: "",
+      jobTitle: source.respondent.jobTitle,
+    },
+  }));
+  const participants: GroupReportParticipantInput[] = modelSources.map(
+    ({ source, modelId, sortProfile }) => ({
+      respondentId: modelId,
       isCEO: source.role === "CEO",
-      respondent: {
-        firstName: rowById.get(source.submissionId)?.respondent?.firstName,
-        lastName: rowById.get(source.submissionId)?.respondent?.lastName,
-        jobTitle: source.respondent.jobTitle,
-      },
+      respondent: sortProfile,
     }),
   );
-  const submissions: GroupReportSubmissionInput[] = frozenSources.map(
-    (source) => ({
-      respondentId: selectedSourceModelId(source),
+  const submissions: GroupReportSubmissionInput[] = modelSources.map(
+    ({ source, modelId, sortProfile }) => ({
+      respondentId: modelId,
       answers: source.answers,
       result: source.result,
-      respondent: participants.find(
-        (participant) =>
-          participant.respondentId === selectedSourceModelId(source),
-      )?.respondent,
+      respondent: sortProfile,
     }),
   );
   const modelInput: GroupReportInput = {
@@ -515,6 +522,36 @@ export async function buildScalingCeoFullSnapshot(
     submissions,
   };
   const reportModel = buildGroupReportModel(modelInput);
+  const respondentByModelId = new Map(
+    reportModel.respondents.map((respondent) => [
+      respondent.respondentId,
+      respondent,
+    ]),
+  );
+  reportModel.respondents = modelSources.map(({ source, modelId }) => {
+    const respondent = respondentByModelId.get(modelId);
+    if (!respondent) {
+      throw new Error(
+        `Summary report model is missing selected source ${modelId}`,
+      );
+    }
+    return {
+      ...respondent,
+      name: source.respondent.displayName,
+      jobTitle: source.respondent.jobTitle,
+    };
+  });
+  reportModel.answersByRespondent = new Map(
+    modelSources.map(({ modelId }) => {
+      const answers = reportModel.answersByRespondent.get(modelId);
+      if (!answers) {
+        throw new Error(
+          `Summary report answer index is missing selected source ${modelId}`,
+        );
+      }
+      return [modelId, answers];
+    }),
+  );
   const frozenReportModel = freezeCampaignGroupReportModel(reportModel);
   const peerBenchmark = jsonSafe(SCALING_CEO_FULL_PEER_BENCHMARK);
   // The persisted summary artifact owns this accepted peer contract. Keep the

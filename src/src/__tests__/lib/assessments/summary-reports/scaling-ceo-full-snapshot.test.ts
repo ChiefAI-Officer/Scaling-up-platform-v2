@@ -1,3 +1,8 @@
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
+
 import goldenSnapshotJson from "@/__tests__/fixtures/summary-reports/scaling-ceo-full-snapshot.json";
 import { buildGroupReportModel } from "@/lib/assessments/group-report-model";
 import {
@@ -39,6 +44,55 @@ const coachActor: ApiActor = {
 };
 
 const goldenSnapshot = goldenSnapshotJson as unknown as ScalingCeoFullSnapshot;
+
+jest.setTimeout(60_000);
+
+const rendererScratchRoot = join(process.cwd(), "tmp", "pdfs");
+mkdirSync(rendererScratchRoot, { recursive: true });
+const rendererBuildDir = mkdtempSync(
+  join(rendererScratchRoot, "summary-ordering-test-"),
+);
+const rendererBuildPath = join(rendererBuildDir, "renderer.mjs");
+
+beforeAll(() => {
+  execFileSync(join(process.cwd(), "node_modules", ".bin", "esbuild"), [
+    "src/lib/assessments/summary-reports/renderers/index.tsx",
+    "--bundle",
+    "--platform=node",
+    "--format=esm",
+    "--packages=external",
+    "--jsx=automatic",
+    `--outfile=${rendererBuildPath}`,
+  ]);
+});
+
+afterAll(() => {
+  rmSync(rendererBuildDir, { recursive: true, force: true });
+});
+
+function renderPdfVisibleText(snapshot: ScalingCeoFullSnapshot): string {
+  const rendererUrl = pathToFileURL(rendererBuildPath).href;
+  const script = `
+    import { readFileSync } from "node:fs";
+    import { PDFParse } from "pdf-parse";
+    import { renderSummaryReportPdf } from ${JSON.stringify(rendererUrl)};
+
+    const snapshot = JSON.parse(readFileSync(0, "utf8"));
+    const rendered = await renderSummaryReportPdf("SCALING_CEO_FULL", snapshot);
+    const parser = new PDFParse({ data: rendered.bytes });
+    try {
+      const text = await parser.getText();
+      process.stdout.write(text.text.replace(/\\r/g, "").replace(/\\s+/g, " ").trim());
+    } finally {
+      await parser.destroy();
+    }
+  `;
+  return execFileSync(
+    process.execPath,
+    ["--input-type=module", "--eval", script],
+    { input: JSON.stringify(snapshot), maxBuffer: 20 * 1024 * 1024 },
+  ).toString("utf8");
+}
 
 function destinationCampaign(overrides: Record<string, unknown> = {}) {
   const fixture = fixtureScalingUpFull();
@@ -567,6 +621,172 @@ describe("buildScalingCeoFullSnapshot", () => {
     if (result.kind !== "ok") return;
     expect(result.snapshot).toEqual(goldenSnapshot);
     expect(result.inputHash).toBe(sha256Hex(canonicalJson(goldenSnapshot)));
+  });
+
+  it("preserves explicit Team positions through the frozen model, Appendix, and PDF when names sort in reverse", async () => {
+    const campaign = destinationCampaign();
+    const ceo = sourceSubmission(0, campaign);
+    const zulu = sourceSubmission(1, campaign, {
+      respondent: {
+        ...sourceSubmission(1, campaign).respondent!,
+        firstName: "Zulu",
+        lastName: "Team",
+      },
+    });
+    const alpha = sourceSubmission(2, campaign, {
+      respondent: {
+        ...sourceSubmission(2, campaign).respondent!,
+        firstName: "Alpha",
+        lastName: "Team",
+      },
+    });
+    const { db } = buildDb({
+      destination: campaign,
+      campaigns: [campaign],
+      submissions: [ceo, zulu, alpha],
+    });
+
+    const result = await buildScalingCeoFullSnapshot(db, actor, {
+      destinationCampaignId: campaign.id,
+      sources: selectedSources(),
+      createdAt: new Date("2026-08-27T13:00:00.000Z"),
+    });
+
+    expect(result.kind).toBe("ok");
+    if (result.kind !== "ok") return;
+
+    const expectedModelIds = [
+      "summary-source:submission-s-ceo",
+      "summary-source:submission-s-dee",
+      "summary-source:submission-s-ed",
+    ];
+    expect(
+      result.snapshot.sources.map((source) => ({
+        modelId: `summary-source:${source.submissionId}`,
+        role: source.role,
+        position: source.position,
+        name: source.respondent.displayName,
+      })),
+    ).toEqual([
+      {
+        modelId: expectedModelIds[0],
+        role: "CEO",
+        position: 0,
+        name: "Sue Summit",
+      },
+      {
+        modelId: expectedModelIds[1],
+        role: "TEAM",
+        position: 0,
+        name: "Zulu Team",
+      },
+      {
+        modelId: expectedModelIds[2],
+        role: "TEAM",
+        position: 1,
+        name: "Alpha Team",
+      },
+    ]);
+    expect(
+      result.snapshot.reportModel.respondents.map((respondent) => ({
+        id: respondent.respondentId,
+        name: respondent.name,
+        jobTitle: respondent.jobTitle,
+      })),
+    ).toEqual([
+      { id: expectedModelIds[0], name: "Sue Summit", jobTitle: "CEO" },
+      {
+        id: expectedModelIds[1],
+        name: "Zulu Team",
+        jobTitle: "VP People",
+      },
+      { id: expectedModelIds[2], name: "Alpha Team", jobTitle: "VP Ops" },
+    ]);
+    expect(
+      Object.keys(result.snapshot.reportModel.answersByRespondent),
+    ).toEqual(expectedModelIds);
+    expect(result.snapshot.reportModel.scored?.appendixB).toEqual([
+      {
+        personLabel: "CEO",
+        domainScores: { people: 8, strategy: 6, execution: 7, cash: 9 },
+      },
+      {
+        personLabel: "Person 1",
+        domainScores: { people: 4, strategy: 6, execution: 5, cash: 3 },
+      },
+      {
+        personLabel: "Person 2",
+        domainScores: { people: 2, strategy: 6, execution: 3, cash: 3 },
+      },
+    ]);
+    expect(
+      result.snapshot.reportModel.scored?.domains?.map((domain) => ({
+        key: domain.key,
+        ceo: domain.ceo,
+        teamAvg: domain.teamAvg,
+        dev: domain.dev,
+      })),
+    ).toEqual([
+      { key: "people", ceo: 8, teamAvg: 3, dev: 5 },
+      { key: "strategy", ceo: 6, teamAvg: 6, dev: 0 },
+      { key: "execution", ceo: 7, teamAvg: 4, dev: 3 },
+      { key: "cash", ceo: 9, teamAvg: 3, dev: 6 },
+      { key: "you", ceo: 5, teamAvg: 8, dev: -3 },
+    ]);
+    expect(result.snapshot.reportModel.scored?.scaleUpScore).toEqual(
+      expect.objectContaining({ ceo: 70, teamAvg: 48 }),
+    );
+
+    const visibleText = renderPdfVisibleText(result.snapshot);
+    const appendixText = visibleText.slice(visibleText.indexOf("Appendix B"));
+    expect(appendixText).toContain(
+      "CEO 8 6 7 9 Person 1 4 6 5 3 Person 2 2 6 3 3",
+    );
+    expect(visibleText).not.toContain("Zulu Team");
+    expect(visibleText).not.toContain("Alpha Team");
+
+    const legacyFixture = fixtureScalingUpFull();
+    const reverseProfiles = {
+      "s-ceo": { firstName: "Sue", lastName: "Summit", jobTitle: "CEO" },
+      "s-dee": {
+        firstName: "Zulu",
+        lastName: "Team",
+        jobTitle: "VP People",
+      },
+      "s-ed": { firstName: "Alpha", lastName: "Team", jobTitle: "VP Ops" },
+    };
+    const legacy = buildGroupReportModel({
+      ...legacyFixture,
+      participants: legacyFixture.participants.map((participant) => ({
+        ...participant,
+        respondent:
+          reverseProfiles[
+            participant.respondentId as keyof typeof reverseProfiles
+          ],
+      })),
+      submissions: legacyFixture.submissions.map((submission) => ({
+        ...submission,
+        respondent:
+          reverseProfiles[
+            submission.respondentId as keyof typeof reverseProfiles
+          ],
+      })),
+    });
+    expect(legacy.respondents.map((respondent) => respondent.name)).toEqual([
+      "Sue Summit",
+      "Alpha Team",
+      "Zulu Team",
+    ]);
+    expect(
+      legacy.scored?.appendixB?.map((row) => [
+        row.personLabel,
+        row.domainScores.people,
+      ]),
+    ).toEqual([
+      ["CEO", 8],
+      ["Person 1", 2],
+      ["Person 2", 4],
+    ]);
   });
 
   it("rejects invalid CEO composition before reading destination or sources", async () => {
