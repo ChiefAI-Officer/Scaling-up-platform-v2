@@ -1,0 +1,1888 @@
+{
+  "schemaVersion": 1,
+  "reportType": "SCALING_CEO_FULL",
+  "destination": {
+    "campaignId": "fixture-campaign",
+    "campaignName": "Northstar Growth Review",
+    "organizationId": "fixture-organization",
+    "organizationName": "Northstar Sample Co",
+    "templateId": "fixture-template",
+    "templateAlias": "scaling-up-full",
+    "versionId": "fixture-version",
+    "versionNumber": 6,
+    "language": "en"
+  },
+  "createdAt": "2026-08-27T01:11:00.000Z",
+  "sources": [
+    {
+      "submissionId": "fixture-submission-ceo",
+      "sourceCampaignId": "fixture-campaign",
+      "role": "CEO",
+      "position": 0,
+      "submittedAt": "2026-08-26T21:56:00.000Z",
+      "respondent": {
+        "id": "fixture-respondent-ceo",
+        "displayName": "Avery Morgan",
+        "jobTitle": "Chief Executive Officer"
+      },
+      "answers": [
+        {
+          "stableKey": "Q01",
+          "value": 5
+        },
+        {
+          "stableKey": "Q02",
+          "value": 10
+        },
+        {
+          "stableKey": "Q03",
+          "value": 8
+        },
+        {
+          "stableKey": "Q04",
+          "value": 9
+        },
+        {
+          "stableKey": "Q05",
+          "value": 10
+        },
+        {
+          "stableKey": "Q06",
+          "value": 5
+        },
+        {
+          "stableKey": "Q07",
+          "value": 3
+        },
+        {
+          "stableKey": "Q08",
+          "value": 0
+        },
+        {
+          "stableKey": "Q09",
+          "value": 10
+        },
+        {
+          "stableKey": "Q10",
+          "value": 10
+        },
+        {
+          "stableKey": "Q11",
+          "value": 8
+        },
+        {
+          "stableKey": "Q12",
+          "value": 10
+        },
+        {
+          "stableKey": "Q13",
+          "value": 10
+        },
+        {
+          "stableKey": "Q14",
+          "value": 2
+        },
+        {
+          "stableKey": "Q15",
+          "value": 2
+        },
+        {
+          "stableKey": "Q16",
+          "value": 6
+        },
+        {
+          "stableKey": "Q17",
+          "value": 8
+        },
+        {
+          "stableKey": "Q18",
+          "value": 2
+        },
+        {
+          "stableKey": "Q19",
+          "value": 8
+        },
+        {
+          "stableKey": "Q20",
+          "value": 7
+        },
+        {
+          "stableKey": "Q21",
+          "value": 10
+        },
+        {
+          "stableKey": "Q22",
+          "value": 10
+        },
+        {
+          "stableKey": "Q23",
+          "value": 10
+        },
+        {
+          "stableKey": "Q24",
+          "value": 2
+        },
+        {
+          "stableKey": "Q25",
+          "value": 10
+        },
+        {
+          "stableKey": "Q26",
+          "value": 8
+        },
+        {
+          "stableKey": "Q27",
+          "value": 0
+        },
+        {
+          "stableKey": "Q28",
+          "value": 9
+        },
+        {
+          "stableKey": "Q29",
+          "value": 2
+        },
+        {
+          "stableKey": "Q30",
+          "value": 8
+        },
+        {
+          "stableKey": "Q31",
+          "value": 9
+        },
+        {
+          "stableKey": "Q32",
+          "value": 10
+        },
+        {
+          "stableKey": "Q33",
+          "value": 5
+        },
+        {
+          "stableKey": "Q34",
+          "value": 10
+        },
+        {
+          "stableKey": "Q35",
+          "value": 7
+        },
+        {
+          "stableKey": "Q36",
+          "value": 4
+        },
+        {
+          "stableKey": "Q37",
+          "value": 5
+        },
+        {
+          "stableKey": "Q38",
+          "value": 5
+        },
+        {
+          "stableKey": "Q39",
+          "value": 5
+        },
+        {
+          "stableKey": "Q40",
+          "value": 0
+        },
+        {
+          "stableKey": "Q41",
+          "value": 9
+        },
+        {
+          "stableKey": "Q42",
+          "value": 6
+        },
+        {
+          "stableKey": "Q43",
+          "value": 6
+        },
+        {
+          "stableKey": "Q44",
+          "value": 2
+        },
+        {
+          "stableKey": "Q45",
+          "value": 0
+        },
+        {
+          "stableKey": "Q46",
+          "value": 10
+        },
+        {
+          "stableKey": "Q47",
+          "value": 0
+        },
+        {
+          "stableKey": "Q48",
+          "value": 8
+        },
+        {
+          "stableKey": "Q49",
+          "value": 10
+        },
+        {
+          "stableKey": "Q50",
+          "value": 10
+        },
+        {
+          "stableKey": "Q51",
+          "value": 10
+        },
+        {
+          "stableKey": "Q52",
+          "value": 3
+        },
+        {
+          "stableKey": "Q53",
+          "value": 2
+        },
+        {
+          "stableKey": "Q54",
+          "value": 10
+        },
+        {
+          "stableKey": "Q55",
+          "value": 10
+        },
+        {
+          "stableKey": "Q56",
+          "value": 10
+        },
+        {
+          "stableKey": "Q57",
+          "value": 10
+        },
+        {
+          "stableKey": "Q58",
+          "value": 10
+        },
+        {
+          "stableKey": "Q59",
+          "value": 10
+        },
+        {
+          "stableKey": "Q60",
+          "value": 10
+        },
+        {
+          "stableKey": "Q61",
+          "value": 10
+        }
+      ],
+      "result": {
+        "perQuestion": [
+          {
+            "stableKey": "Q01",
+            "value": 5,
+            "achieved": true
+          },
+          {
+            "stableKey": "Q02",
+            "value": 10,
+            "achieved": true
+          },
+          {
+            "stableKey": "Q03",
+            "value": 8,
+            "achieved": true
+          },
+          {
+            "stableKey": "Q04",
+            "value": 9,
+            "achieved": true
+          },
+          {
+            "stableKey": "Q05",
+            "value": 10,
+            "achieved": true
+          },
+          {
+            "stableKey": "Q06",
+            "value": 5,
+            "achieved": true
+          },
+          {
+            "stableKey": "Q07",
+            "value": 3,
+            "achieved": false
+          },
+          {
+            "stableKey": "Q08",
+            "value": 0,
+            "achieved": false
+          },
+          {
+            "stableKey": "Q09",
+            "value": 10,
+            "achieved": true
+          },
+          {
+            "stableKey": "Q10",
+            "value": 10,
+            "achieved": true
+          },
+          {
+            "stableKey": "Q11",
+            "value": 8,
+            "achieved": true
+          },
+          {
+            "stableKey": "Q12",
+            "value": 10,
+            "achieved": true
+          },
+          {
+            "stableKey": "Q13",
+            "value": 10,
+            "achieved": true
+          },
+          {
+            "stableKey": "Q14",
+            "value": 2,
+            "achieved": false
+          },
+          {
+            "stableKey": "Q15",
+            "value": 2,
+            "achieved": false
+          },
+          {
+            "stableKey": "Q16",
+            "value": 6,
+            "achieved": true
+          },
+          {
+            "stableKey": "Q17",
+            "value": 8,
+            "achieved": true
+          },
+          {
+            "stableKey": "Q18",
+            "value": 2,
+            "achieved": false
+          },
+          {
+            "stableKey": "Q19",
+            "value": 8,
+            "achieved": true
+          },
+          {
+            "stableKey": "Q20",
+            "value": 7,
+            "achieved": true
+          },
+          {
+            "stableKey": "Q21",
+            "value": 10,
+            "achieved": true
+          },
+          {
+            "stableKey": "Q22",
+            "value": 10,
+            "achieved": true
+          },
+          {
+            "stableKey": "Q23",
+            "value": 10,
+            "achieved": true
+          },
+          {
+            "stableKey": "Q24",
+            "value": 2,
+            "achieved": false
+          },
+          {
+            "stableKey": "Q25",
+            "value": 10,
+            "achieved": true
+          },
+          {
+            "stableKey": "Q26",
+            "value": 8,
+            "achieved": true
+          },
+          {
+            "stableKey": "Q27",
+            "value": 0,
+            "achieved": false
+          },
+          {
+            "stableKey": "Q28",
+            "value": 9,
+            "achieved": true
+          },
+          {
+            "stableKey": "Q29",
+            "value": 2,
+            "achieved": false
+          },
+          {
+            "stableKey": "Q30",
+            "value": 8,
+            "achieved": true
+          },
+          {
+            "stableKey": "Q31",
+            "value": 9,
+            "achieved": true
+          },
+          {
+            "stableKey": "Q32",
+            "value": 10,
+            "achieved": true
+          },
+          {
+            "stableKey": "Q33",
+            "value": 5,
+            "achieved": true
+          },
+          {
+            "stableKey": "Q34",
+            "value": 10,
+            "achieved": true
+          },
+          {
+            "stableKey": "Q35",
+            "value": 7,
+            "achieved": true
+          },
+          {
+            "stableKey": "Q36",
+            "value": 4,
+            "achieved": false
+          },
+          {
+            "stableKey": "Q37",
+            "value": 5,
+            "achieved": true
+          },
+          {
+            "stableKey": "Q38",
+            "value": 5,
+            "achieved": true
+          },
+          {
+            "stableKey": "Q39",
+            "value": 5,
+            "achieved": true
+          },
+          {
+            "stableKey": "Q40",
+            "value": 0,
+            "achieved": false
+          },
+          {
+            "stableKey": "Q41",
+            "value": 9,
+            "achieved": true
+          },
+          {
+            "stableKey": "Q42",
+            "value": 6,
+            "achieved": true
+          },
+          {
+            "stableKey": "Q43",
+            "value": 6,
+            "achieved": true
+          },
+          {
+            "stableKey": "Q44",
+            "value": 2,
+            "achieved": false
+          },
+          {
+            "stableKey": "Q45",
+            "value": 0,
+            "achieved": false
+          },
+          {
+            "stableKey": "Q46",
+            "value": 10,
+            "achieved": true
+          },
+          {
+            "stableKey": "Q47",
+            "value": 0,
+            "achieved": false
+          },
+          {
+            "stableKey": "Q48",
+            "value": 8,
+            "achieved": true
+          },
+          {
+            "stableKey": "Q49",
+            "value": 10,
+            "achieved": true
+          },
+          {
+            "stableKey": "Q50",
+            "value": 10,
+            "achieved": true
+          },
+          {
+            "stableKey": "Q51",
+            "value": 10,
+            "achieved": true
+          },
+          {
+            "stableKey": "Q52",
+            "value": 3,
+            "achieved": false
+          },
+          {
+            "stableKey": "Q53",
+            "value": 2,
+            "achieved": false
+          },
+          {
+            "stableKey": "Q54",
+            "value": 10,
+            "achieved": true
+          },
+          {
+            "stableKey": "Q55",
+            "value": 10,
+            "achieved": true
+          },
+          {
+            "stableKey": "Q56",
+            "value": 10,
+            "achieved": true
+          },
+          {
+            "stableKey": "Q57",
+            "value": 10,
+            "achieved": true
+          },
+          {
+            "stableKey": "Q58",
+            "value": 10,
+            "achieved": true
+          },
+          {
+            "stableKey": "Q59",
+            "value": 10,
+            "achieved": true
+          },
+          {
+            "stableKey": "Q60",
+            "value": 10,
+            "achieved": true
+          },
+          {
+            "stableKey": "Q61",
+            "value": 10,
+            "achieved": true
+          }
+        ],
+        "perSection": [
+          {
+            "stableKey": "S_PEOPLE_YE",
+            "name": "Your Employees",
+            "totalPoints": 6.25,
+            "averagePoints": 6.25,
+            "achievedCount": 0,
+            "totalCount": 1
+          },
+          {
+            "stableKey": "S_PEOPLE_CC",
+            "name": "Company Culture",
+            "totalPoints": 9.6,
+            "averagePoints": 9.6,
+            "achievedCount": 0,
+            "totalCount": 1
+          },
+          {
+            "stableKey": "S_STRATEGY",
+            "name": "Strategy",
+            "totalPoints": 5,
+            "averagePoints": 5,
+            "achievedCount": 0,
+            "totalCount": 1
+          },
+          {
+            "stableKey": "S_EXEC_LT",
+            "name": "Leadership Team",
+            "totalPoints": 8,
+            "averagePoints": 8,
+            "achievedCount": 0,
+            "totalCount": 1
+          },
+          {
+            "stableKey": "S_EXEC_OP",
+            "name": "Operational Processes",
+            "totalPoints": 5.8,
+            "averagePoints": 5.8,
+            "achievedCount": 0,
+            "totalCount": 1
+          },
+          {
+            "stableKey": "S_EXEC_SM",
+            "name": "Sales and Marketing",
+            "totalPoints": 8.4,
+            "averagePoints": 8.4,
+            "achievedCount": 0,
+            "totalCount": 1
+          },
+          {
+            "stableKey": "S_EXEC_SIT",
+            "name": "Scalability, Innovation and Technology",
+            "totalPoints": 4.333333333333333,
+            "averagePoints": 4.333333333333333,
+            "achievedCount": 0,
+            "totalCount": 1
+          },
+          {
+            "stableKey": "S_CASH",
+            "name": "Cash",
+            "totalPoints": 4.6,
+            "averagePoints": 4.6,
+            "achievedCount": 0,
+            "totalCount": 1
+          },
+          {
+            "stableKey": "S_YOU_LEAD",
+            "name": "Your Leadership",
+            "totalPoints": 7.3,
+            "averagePoints": 7.3,
+            "achievedCount": 0,
+            "totalCount": 1
+          },
+          {
+            "stableKey": "S_YOU_IC",
+            "name": "Internal Communication",
+            "totalPoints": 10,
+            "averagePoints": 10,
+            "achievedCount": 0,
+            "totalCount": 1
+          }
+        ],
+        "perDomain": [
+          {
+            "key": "people",
+            "label": "People",
+            "averagePoints": 7.925,
+            "answeredSectionCount": 1,
+            "totalSectionCount": 1,
+            "tier": {
+              "label": "Exemplary",
+              "message": ""
+            }
+          },
+          {
+            "key": "strategy",
+            "label": "Strategy",
+            "averagePoints": 5,
+            "answeredSectionCount": 1,
+            "totalSectionCount": 1,
+            "tier": {
+              "label": "Exemplary",
+              "message": ""
+            }
+          },
+          {
+            "key": "execution",
+            "label": "Execution",
+            "averagePoints": 6.633333333333334,
+            "answeredSectionCount": 1,
+            "totalSectionCount": 1,
+            "tier": {
+              "label": "Exemplary",
+              "message": ""
+            }
+          },
+          {
+            "key": "cash",
+            "label": "Cash",
+            "averagePoints": 4.6,
+            "answeredSectionCount": 1,
+            "totalSectionCount": 1,
+            "tier": {
+              "label": "Exemplary",
+              "message": ""
+            }
+          },
+          {
+            "key": "you",
+            "label": "You",
+            "averagePoints": 8.65,
+            "answeredSectionCount": 1,
+            "totalSectionCount": 1,
+            "tier": {
+              "label": "Exemplary",
+              "message": ""
+            }
+          }
+        ],
+        "overallTotal": 418,
+        "overallAverage": 6.561666666666666,
+        "countAchieved": 46,
+        "tier": {
+          "label": "Exemplary",
+          "message": "Overall: Exemplary"
+        },
+        "tierMetricValue": 6.561666666666666,
+        "scaleUpScore": 66,
+        "unansweredKeys": []
+      }
+    }
+  ],
+  "reportModel": {
+    "reportType": "scored",
+    "provenance": {
+      "groupRenderVersion": "lva-fidelity-v2",
+      "scaleDegraded": false
+    },
+    "respondents": [
+      {
+        "respondentId": "summary-source:fixture-submission-ceo",
+        "name": "Avery Morgan",
+        "jobTitle": "Chief Executive Officer",
+        "isCEO": true,
+        "isOrphan": false
+      }
+    ],
+    "respondentCount": 1,
+    "degraded": false,
+    "questionsByKey": {
+      "Q01": {
+        "type": "SLIDER_LIKERT",
+        "label": "Effective recruitment process",
+        "sectionStableKey": "S_PEOPLE_YE",
+        "min": 0,
+        "max": 10
+      },
+      "Q02": {
+        "type": "SLIDER_LIKERT",
+        "label": "High staff retention",
+        "sectionStableKey": "S_PEOPLE_YE",
+        "min": 0,
+        "max": 10
+      },
+      "Q03": {
+        "type": "SLIDER_LIKERT",
+        "label": "Onboarding program",
+        "sectionStableKey": "S_PEOPLE_YE",
+        "min": 0,
+        "max": 10
+      },
+      "Q04": {
+        "type": "SLIDER_LIKERT",
+        "label": "Measuring employee satisfaction",
+        "sectionStableKey": "S_PEOPLE_YE",
+        "min": 0,
+        "max": 10
+      },
+      "Q05": {
+        "type": "SLIDER_LIKERT",
+        "label": "Positive about re-hiring employees",
+        "sectionStableKey": "S_PEOPLE_YE",
+        "min": 0,
+        "max": 10
+      },
+      "Q06": {
+        "type": "SLIDER_LIKERT",
+        "label": "Every employee has a training plan",
+        "sectionStableKey": "S_PEOPLE_YE",
+        "min": 0,
+        "max": 10
+      },
+      "Q07": {
+        "type": "SLIDER_LIKERT",
+        "label": "Outsourcing / Offshoring operations",
+        "sectionStableKey": "S_PEOPLE_YE",
+        "min": 0,
+        "max": 10
+      },
+      "Q08": {
+        "type": "SLIDER_LIKERT",
+        "label": "We apply flat-management or self-steering/organizing teams",
+        "sectionStableKey": "S_PEOPLE_YE",
+        "min": 0,
+        "max": 10
+      },
+      "Q09": {
+        "type": "SLIDER_LIKERT",
+        "label": "We have Core values",
+        "sectionStableKey": "S_PEOPLE_CC",
+        "min": 0,
+        "max": 10
+      },
+      "Q10": {
+        "type": "SLIDER_LIKERT",
+        "label": "We have focus on customers' needs",
+        "sectionStableKey": "S_PEOPLE_CC",
+        "min": 0,
+        "max": 10
+      },
+      "Q11": {
+        "type": "SLIDER_LIKERT",
+        "label": "Employees know core values",
+        "sectionStableKey": "S_PEOPLE_CC",
+        "min": 0,
+        "max": 10
+      },
+      "Q12": {
+        "type": "SLIDER_LIKERT",
+        "label": "We are transparent",
+        "sectionStableKey": "S_PEOPLE_CC",
+        "min": 0,
+        "max": 10
+      },
+      "Q13": {
+        "type": "SLIDER_LIKERT",
+        "label": "We have a positive and healthy culture",
+        "sectionStableKey": "S_PEOPLE_CC",
+        "min": 0,
+        "max": 10
+      },
+      "Q14": {
+        "type": "SLIDER_LIKERT",
+        "label": "We have formulated a long term (non-financial) goal",
+        "sectionStableKey": "S_STRATEGY",
+        "min": 0,
+        "max": 10
+      },
+      "Q15": {
+        "type": "SLIDER_LIKERT",
+        "label": "We have formulated yearly goals",
+        "sectionStableKey": "S_STRATEGY",
+        "min": 0,
+        "max": 10
+      },
+      "Q16": {
+        "type": "SLIDER_LIKERT",
+        "label": "We have formulated quarterly/ monthly goals (other than financial goals)",
+        "sectionStableKey": "S_STRATEGY",
+        "min": 0,
+        "max": 10
+      },
+      "Q17": {
+        "type": "SLIDER_LIKERT",
+        "label": "We work with a strategic plan",
+        "sectionStableKey": "S_STRATEGY",
+        "min": 0,
+        "max": 10
+      },
+      "Q18": {
+        "type": "SLIDER_LIKERT",
+        "label": "Each employee has personalized goals",
+        "sectionStableKey": "S_STRATEGY",
+        "min": 0,
+        "max": 10
+      },
+      "Q19": {
+        "type": "SLIDER_LIKERT",
+        "label": "We have implemented a growth methodology",
+        "sectionStableKey": "S_STRATEGY",
+        "min": 0,
+        "max": 10
+      },
+      "Q20": {
+        "type": "SLIDER_LIKERT",
+        "label": "We have an active acquisitions strategy",
+        "sectionStableKey": "S_STRATEGY",
+        "min": 0,
+        "max": 10
+      },
+      "Q21": {
+        "type": "SLIDER_LIKERT",
+        "label": "Tasks are properly allocated",
+        "sectionStableKey": "S_EXEC_LT",
+        "min": 0,
+        "max": 10
+      },
+      "Q22": {
+        "type": "SLIDER_LIKERT",
+        "label": "We have weekly management meetings.",
+        "sectionStableKey": "S_EXEC_LT",
+        "min": 0,
+        "max": 10
+      },
+      "Q23": {
+        "type": "SLIDER_LIKERT",
+        "label": "We have periodic strategic sessions.",
+        "sectionStableKey": "S_EXEC_LT",
+        "min": 0,
+        "max": 10
+      },
+      "Q24": {
+        "type": "SLIDER_LIKERT",
+        "label": "Leadership team receives regular training",
+        "sectionStableKey": "S_EXEC_LT",
+        "min": 0,
+        "max": 10
+      },
+      "Q25": {
+        "type": "SLIDER_LIKERT",
+        "label": "Our goals are translated into clear KPIs",
+        "sectionStableKey": "S_EXEC_OP",
+        "min": 0,
+        "max": 10
+      },
+      "Q26": {
+        "type": "SLIDER_LIKERT",
+        "label": "We use real-time data to measure our performance",
+        "sectionStableKey": "S_EXEC_OP",
+        "min": 0,
+        "max": 10
+      },
+      "Q27": {
+        "type": "SLIDER_LIKERT",
+        "label": "We grow with limited mistakes, errors and problems",
+        "sectionStableKey": "S_EXEC_OP",
+        "min": 0,
+        "max": 10
+      },
+      "Q28": {
+        "type": "SLIDER_LIKERT",
+        "label": "We measure customer satisfaction",
+        "sectionStableKey": "S_EXEC_OP",
+        "min": 0,
+        "max": 10
+      },
+      "Q29": {
+        "type": "SLIDER_LIKERT",
+        "label": "We have systematic processes for continuous improvement",
+        "sectionStableKey": "S_EXEC_OP",
+        "min": 0,
+        "max": 10
+      },
+      "Q30": {
+        "type": "SLIDER_LIKERT",
+        "label": "We have an effective lead generation process",
+        "sectionStableKey": "S_EXEC_SM",
+        "min": 0,
+        "max": 10
+      },
+      "Q31": {
+        "type": "SLIDER_LIKERT",
+        "label": "Sales achievement",
+        "sectionStableKey": "S_EXEC_SM",
+        "min": 0,
+        "max": 10
+      },
+      "Q32": {
+        "type": "SLIDER_LIKERT",
+        "label": "Weekly sales meeting",
+        "sectionStableKey": "S_EXEC_SM",
+        "min": 0,
+        "max": 10
+      },
+      "Q33": {
+        "type": "SLIDER_LIKERT",
+        "label": "Head of sales is not the entrepreneur",
+        "sectionStableKey": "S_EXEC_SM",
+        "min": 0,
+        "max": 10
+      },
+      "Q34": {
+        "type": "SLIDER_LIKERT",
+        "label": "We have an effective PR/communication strategy",
+        "sectionStableKey": "S_EXEC_SM",
+        "min": 0,
+        "max": 10
+      },
+      "Q35": {
+        "type": "SLIDER_LIKERT",
+        "label": "Most processes are automated",
+        "sectionStableKey": "S_EXEC_SIT",
+        "min": 0,
+        "max": 10
+      },
+      "Q36": {
+        "type": "SLIDER_LIKERT",
+        "label": "Systems prepped for growth",
+        "sectionStableKey": "S_EXEC_SIT",
+        "min": 0,
+        "max": 10
+      },
+      "Q37": {
+        "type": "SLIDER_LIKERT",
+        "label": "Better systems than competitors",
+        "sectionStableKey": "S_EXEC_SIT",
+        "min": 0,
+        "max": 10
+      },
+      "Q38": {
+        "type": "SLIDER_LIKERT",
+        "label": "Knowledge on latest technology",
+        "sectionStableKey": "S_EXEC_SIT",
+        "min": 0,
+        "max": 10
+      },
+      "Q39": {
+        "type": "SLIDER_LIKERT",
+        "label": "We are more innovative than competitors",
+        "sectionStableKey": "S_EXEC_SIT",
+        "min": 0,
+        "max": 10
+      },
+      "Q40": {
+        "type": "SLIDER_LIKERT",
+        "label": "Our business model is disruptive",
+        "sectionStableKey": "S_EXEC_SIT",
+        "min": 0,
+        "max": 10
+      },
+      "Q41": {
+        "type": "SLIDER_LIKERT",
+        "label": "Real time financial insights",
+        "sectionStableKey": "S_CASH",
+        "min": 0,
+        "max": 10
+      },
+      "Q42": {
+        "type": "SLIDER_LIKERT",
+        "label": "Up-to-date cashflow planning",
+        "sectionStableKey": "S_CASH",
+        "min": 0,
+        "max": 10
+      },
+      "Q43": {
+        "type": "SLIDER_LIKERT",
+        "label": "Access to growth capital",
+        "sectionStableKey": "S_CASH",
+        "min": 0,
+        "max": 10
+      },
+      "Q44": {
+        "type": "SLIDER_LIKERT",
+        "label": "Financial alert function",
+        "sectionStableKey": "S_CASH",
+        "min": 0,
+        "max": 10
+      },
+      "Q45": {
+        "type": "SLIDER_LIKERT",
+        "label": "Leadership understands balance sheet",
+        "sectionStableKey": "S_CASH",
+        "min": 0,
+        "max": 10
+      },
+      "Q46": {
+        "type": "SLIDER_LIKERT",
+        "label": "CEO works on the company and is able to remove from daily operations",
+        "sectionStableKey": "S_YOU_LEAD",
+        "min": 0,
+        "max": 10
+      },
+      "Q47": {
+        "type": "SLIDER_LIKERT",
+        "label": "Have a mentor",
+        "sectionStableKey": "S_YOU_LEAD",
+        "min": 0,
+        "max": 10
+      },
+      "Q48": {
+        "type": "SLIDER_LIKERT",
+        "label": "Have an entrepreneurial network",
+        "sectionStableKey": "S_YOU_LEAD",
+        "min": 0,
+        "max": 10
+      },
+      "Q49": {
+        "type": "SLIDER_LIKERT",
+        "label": "Enjoy management of company",
+        "sectionStableKey": "S_YOU_LEAD",
+        "min": 0,
+        "max": 10
+      },
+      "Q50": {
+        "type": "SLIDER_LIKERT",
+        "label": "Energized by team and company",
+        "sectionStableKey": "S_YOU_LEAD",
+        "min": 0,
+        "max": 10
+      },
+      "Q51": {
+        "type": "SLIDER_LIKERT",
+        "label": "Absence of CEO is possible",
+        "sectionStableKey": "S_YOU_LEAD",
+        "min": 0,
+        "max": 10
+      },
+      "Q52": {
+        "type": "SLIDER_LIKERT",
+        "label": "Read business books",
+        "sectionStableKey": "S_YOU_LEAD",
+        "min": 0,
+        "max": 10
+      },
+      "Q53": {
+        "type": "SLIDER_LIKERT",
+        "label": "Receives regular education",
+        "sectionStableKey": "S_YOU_LEAD",
+        "min": 0,
+        "max": 10
+      },
+      "Q54": {
+        "type": "SLIDER_LIKERT",
+        "label": "Healthy work - life balance",
+        "sectionStableKey": "S_YOU_LEAD",
+        "min": 0,
+        "max": 10
+      },
+      "Q55": {
+        "type": "SLIDER_LIKERT",
+        "label": "I am happy",
+        "sectionStableKey": "S_YOU_LEAD",
+        "min": 0,
+        "max": 10
+      },
+      "Q56": {
+        "type": "SLIDER_LIKERT",
+        "label": "Employees know long term goal",
+        "sectionStableKey": "S_YOU_IC",
+        "min": 0,
+        "max": 10
+      },
+      "Q57": {
+        "type": "SLIDER_LIKERT",
+        "label": "Employees know yearly goal",
+        "sectionStableKey": "S_YOU_IC",
+        "min": 0,
+        "max": 10
+      },
+      "Q58": {
+        "type": "SLIDER_LIKERT",
+        "label": "Employees know quarterly/monthly goals",
+        "sectionStableKey": "S_YOU_IC",
+        "min": 0,
+        "max": 10
+      },
+      "Q59": {
+        "type": "SLIDER_LIKERT",
+        "label": "Employees know vision and mission",
+        "sectionStableKey": "S_YOU_IC",
+        "min": 0,
+        "max": 10
+      },
+      "Q60": {
+        "type": "SLIDER_LIKERT",
+        "label": "Employees know elevator pitch",
+        "sectionStableKey": "S_YOU_IC",
+        "min": 0,
+        "max": 10
+      },
+      "Q61": {
+        "type": "SLIDER_LIKERT",
+        "label": "We frequently have company-wide meetings",
+        "sectionStableKey": "S_YOU_IC",
+        "min": 0,
+        "max": 10
+      }
+    },
+    "answersByRespondent": {
+      "summary-source:fixture-submission-ceo": {
+        "Q01": 5,
+        "Q02": 10,
+        "Q03": 8,
+        "Q04": 9,
+        "Q05": 10,
+        "Q06": 5,
+        "Q07": 3,
+        "Q08": 0,
+        "Q09": 10,
+        "Q10": 10,
+        "Q11": 8,
+        "Q12": 10,
+        "Q13": 10,
+        "Q14": 2,
+        "Q15": 2,
+        "Q16": 6,
+        "Q17": 8,
+        "Q18": 2,
+        "Q19": 8,
+        "Q20": 7,
+        "Q21": 10,
+        "Q22": 10,
+        "Q23": 10,
+        "Q24": 2,
+        "Q25": 10,
+        "Q26": 8,
+        "Q27": 0,
+        "Q28": 9,
+        "Q29": 2,
+        "Q30": 8,
+        "Q31": 9,
+        "Q32": 10,
+        "Q33": 5,
+        "Q34": 10,
+        "Q35": 7,
+        "Q36": 4,
+        "Q37": 5,
+        "Q38": 5,
+        "Q39": 5,
+        "Q40": 0,
+        "Q41": 9,
+        "Q42": 6,
+        "Q43": 6,
+        "Q44": 2,
+        "Q45": 0,
+        "Q46": 10,
+        "Q47": 0,
+        "Q48": 8,
+        "Q49": 10,
+        "Q50": 10,
+        "Q51": 10,
+        "Q52": 3,
+        "Q53": 2,
+        "Q54": 10,
+        "Q55": 10,
+        "Q56": 10,
+        "Q57": 10,
+        "Q58": 10,
+        "Q59": 10,
+        "Q60": 10,
+        "Q61": 10
+      }
+    },
+    "showTier": false,
+    "benchmarkVersion": "2026-08-14.question-controlled-aggregate-provisional",
+    "benchmarkKeyMismatch": false,
+    "scored": {
+      "sections": [
+        {
+          "stableKey": "S_PEOPLE_YE",
+          "name": "Your Employees",
+          "ceo": 6.25,
+          "teamAvg": null,
+          "dev": null,
+          "n": 0,
+          "peers": 5.9,
+          "devPeers": 0.34999999999999964,
+          "devPeersTeam": null
+        },
+        {
+          "stableKey": "S_PEOPLE_CC",
+          "name": "Company Culture",
+          "ceo": 9.6,
+          "teamAvg": null,
+          "dev": null,
+          "n": 0,
+          "peers": 6.3,
+          "devPeers": 3.3,
+          "devPeersTeam": null
+        },
+        {
+          "stableKey": "S_STRATEGY",
+          "name": "Strategy",
+          "ceo": 5,
+          "teamAvg": null,
+          "dev": null,
+          "n": 0,
+          "peers": 5,
+          "devPeers": 0,
+          "devPeersTeam": null
+        },
+        {
+          "stableKey": "S_EXEC_LT",
+          "name": "Leadership Team",
+          "ceo": 8,
+          "teamAvg": null,
+          "dev": null,
+          "n": 0,
+          "peers": 4.5,
+          "devPeers": 3.5,
+          "devPeersTeam": null
+        },
+        {
+          "stableKey": "S_EXEC_OP",
+          "name": "Operational Processes",
+          "ceo": 5.8,
+          "teamAvg": null,
+          "dev": null,
+          "n": 0,
+          "peers": 5.6,
+          "devPeers": 0.20000000000000018,
+          "devPeersTeam": null
+        },
+        {
+          "stableKey": "S_EXEC_SM",
+          "name": "Sales and Marketing",
+          "ceo": 8.4,
+          "teamAvg": null,
+          "dev": null,
+          "n": 0,
+          "peers": 6.4,
+          "devPeers": 2,
+          "devPeersTeam": null
+        },
+        {
+          "stableKey": "S_EXEC_SIT",
+          "name": "Scalability, Innovation and Technology",
+          "ceo": 4.333333333333333,
+          "teamAvg": null,
+          "dev": null,
+          "n": 0,
+          "peers": 6.6,
+          "devPeers": -2.2666666666666666,
+          "devPeersTeam": null
+        },
+        {
+          "stableKey": "S_CASH",
+          "name": "Cash",
+          "ceo": 4.6,
+          "teamAvg": null,
+          "dev": null,
+          "n": 0,
+          "peers": 7.8,
+          "devPeers": -3.2,
+          "devPeersTeam": null
+        },
+        {
+          "stableKey": "S_YOU_LEAD",
+          "name": "Your Leadership",
+          "ceo": 7.3,
+          "teamAvg": null,
+          "dev": null,
+          "n": 0,
+          "peers": 6.1,
+          "devPeers": 1.2000000000000002,
+          "devPeersTeam": null
+        },
+        {
+          "stableKey": "S_YOU_IC",
+          "name": "Internal Communication",
+          "ceo": 10,
+          "teamAvg": null,
+          "dev": null,
+          "n": 0,
+          "peers": 4.6,
+          "devPeers": 5.4,
+          "devPeersTeam": null
+        }
+      ],
+      "questions": [
+        {
+          "stableKey": "Q01",
+          "label": "Effective recruitment process",
+          "ceo": 5,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q02",
+          "label": "High staff retention",
+          "ceo": 10,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q03",
+          "label": "Onboarding program",
+          "ceo": 8,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q04",
+          "label": "Measuring employee satisfaction",
+          "ceo": 9,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q05",
+          "label": "Positive about re-hiring employees",
+          "ceo": 10,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q06",
+          "label": "Every employee has a training plan",
+          "ceo": 5,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q07",
+          "label": "Outsourcing / Offshoring operations",
+          "ceo": 3,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q08",
+          "label": "We apply flat-management or self-steering/organizing teams",
+          "ceo": 0,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q09",
+          "label": "We have Core values",
+          "ceo": 10,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q10",
+          "label": "We have focus on customers' needs",
+          "ceo": 10,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q11",
+          "label": "Employees know core values",
+          "ceo": 8,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q12",
+          "label": "We are transparent",
+          "ceo": 10,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q13",
+          "label": "We have a positive and healthy culture",
+          "ceo": 10,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q14",
+          "label": "We have formulated a long term (non-financial) goal",
+          "ceo": 2,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q15",
+          "label": "We have formulated yearly goals",
+          "ceo": 2,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q16",
+          "label": "We have formulated quarterly/ monthly goals (other than financial goals)",
+          "ceo": 6,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q17",
+          "label": "We work with a strategic plan",
+          "ceo": 8,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q18",
+          "label": "Each employee has personalized goals",
+          "ceo": 2,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q19",
+          "label": "We have implemented a growth methodology",
+          "ceo": 8,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q20",
+          "label": "We have an active acquisitions strategy",
+          "ceo": 7,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q21",
+          "label": "Tasks are properly allocated",
+          "ceo": 10,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q22",
+          "label": "We have weekly management meetings.",
+          "ceo": 10,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q23",
+          "label": "We have periodic strategic sessions.",
+          "ceo": 10,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q24",
+          "label": "Leadership team receives regular training",
+          "ceo": 2,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q25",
+          "label": "Our goals are translated into clear KPIs",
+          "ceo": 10,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q26",
+          "label": "We use real-time data to measure our performance",
+          "ceo": 8,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q27",
+          "label": "We grow with limited mistakes, errors and problems",
+          "ceo": 0,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q28",
+          "label": "We measure customer satisfaction",
+          "ceo": 9,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q29",
+          "label": "We have systematic processes for continuous improvement",
+          "ceo": 2,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q30",
+          "label": "We have an effective lead generation process",
+          "ceo": 8,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q31",
+          "label": "Sales achievement",
+          "ceo": 9,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q32",
+          "label": "Weekly sales meeting",
+          "ceo": 10,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q33",
+          "label": "Head of sales is not the entrepreneur",
+          "ceo": 5,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q34",
+          "label": "We have an effective PR/communication strategy",
+          "ceo": 10,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q35",
+          "label": "Most processes are automated",
+          "ceo": 7,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q36",
+          "label": "Systems prepped for growth",
+          "ceo": 4,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q37",
+          "label": "Better systems than competitors",
+          "ceo": 5,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q38",
+          "label": "Knowledge on latest technology",
+          "ceo": 5,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q39",
+          "label": "We are more innovative than competitors",
+          "ceo": 5,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q40",
+          "label": "Our business model is disruptive",
+          "ceo": 0,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q41",
+          "label": "Real time financial insights",
+          "ceo": 9,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q42",
+          "label": "Up-to-date cashflow planning",
+          "ceo": 6,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q43",
+          "label": "Access to growth capital",
+          "ceo": 6,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q44",
+          "label": "Financial alert function",
+          "ceo": 2,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q45",
+          "label": "Leadership understands balance sheet",
+          "ceo": 0,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q46",
+          "label": "CEO works on the company and is able to remove from daily operations",
+          "ceo": 10,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q47",
+          "label": "Have a mentor",
+          "ceo": 0,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q48",
+          "label": "Have an entrepreneurial network",
+          "ceo": 8,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q49",
+          "label": "Enjoy management of company",
+          "ceo": 10,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q50",
+          "label": "Energized by team and company",
+          "ceo": 10,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q51",
+          "label": "Absence of CEO is possible",
+          "ceo": 10,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q52",
+          "label": "Read business books",
+          "ceo": 3,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q53",
+          "label": "Receives regular education",
+          "ceo": 2,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q54",
+          "label": "Healthy work - life balance",
+          "ceo": 10,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q55",
+          "label": "I am happy",
+          "ceo": 10,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q56",
+          "label": "Employees know long term goal",
+          "ceo": 10,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q57",
+          "label": "Employees know yearly goal",
+          "ceo": 10,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q58",
+          "label": "Employees know quarterly/monthly goals",
+          "ceo": 10,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q59",
+          "label": "Employees know vision and mission",
+          "ceo": 10,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q60",
+          "label": "Employees know elevator pitch",
+          "ceo": 10,
+          "teamMean": null,
+          "n": 0
+        },
+        {
+          "stableKey": "Q61",
+          "label": "We frequently have company-wide meetings",
+          "ceo": 10,
+          "teamMean": null,
+          "n": 0
+        }
+      ],
+      "tier": {
+        "ceo": "Exemplary",
+        "teamDistribution": []
+      },
+      "domains": [
+        {
+          "key": "people",
+          "label": "People",
+          "ceo": 7.925,
+          "teamAvg": null,
+          "dev": null,
+          "n": 0,
+          "peers": 6.1,
+          "devPeers": 1.8250000000000002,
+          "devPeersTeam": null
+        },
+        {
+          "key": "strategy",
+          "label": "Strategy",
+          "ceo": 5,
+          "teamAvg": null,
+          "dev": null,
+          "n": 0,
+          "peers": 5,
+          "devPeers": 0,
+          "devPeersTeam": null
+        },
+        {
+          "key": "execution",
+          "label": "Execution",
+          "ceo": 6.633333333333334,
+          "teamAvg": null,
+          "dev": null,
+          "n": 0,
+          "peers": 5.8,
+          "devPeers": 0.8333333333333339,
+          "devPeersTeam": null
+        },
+        {
+          "key": "cash",
+          "label": "Cash",
+          "ceo": 4.6,
+          "teamAvg": null,
+          "dev": null,
+          "n": 0,
+          "peers": 7.8,
+          "devPeers": -3.2,
+          "devPeersTeam": null
+        },
+        {
+          "key": "you",
+          "label": "You",
+          "ceo": 8.65,
+          "teamAvg": null,
+          "dev": null,
+          "n": 0,
+          "peers": 5.4,
+          "devPeers": 3.25,
+          "devPeersTeam": null
+        }
+      ],
+      "scaleUpScore": {
+        "ceo": 66,
+        "teamAvg": null,
+        "peers": 53.1,
+        "devPeers": 12.9
+      },
+      "appendixB": [
+        {
+          "personLabel": "CEO",
+          "domainScores": {
+            "people": 7.925,
+            "strategy": 5,
+            "execution": 6.633333333333334,
+            "cash": 4.6
+          }
+        }
+      ]
+    }
+  },
+  "provenance": {
+    "generatedAt": "2026-08-27T01:11:00.000Z",
+    "completedCount": 1,
+    "invitedCount": 1,
+    "versionId": "fixture-version",
+    "templateAlias": "scaling-up-full",
+    "ceoRespondentId": "fixture-respondent-ceo",
+    "contentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "submissionIds": ["fixture-submission-ceo"],
+    "companyName": "Northstar Sample Co",
+    "assessmentName": "Scaling Up Full Assessment",
+    "versionLabel": "scaling-up-full-v6",
+    "coachLogoUrl": null,
+    "coachName": "Jordan Coach",
+    "isImported": false,
+    "benchmarkVersion": "2026-08-14.question-controlled-aggregate-provisional",
+    "benchmarkKeyMismatch": false
+  }
+}
