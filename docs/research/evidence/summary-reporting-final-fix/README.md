@@ -6,6 +6,23 @@ attribution, and the older mobile captures that did not show Summary Reports.
 Historical images and hashes remain in their original folders, explicitly as
 pre-fix evidence. Existing immutable artifacts are not modified or regenerated.
 
+## Independent review closeout
+
+At product commit `bc12913a493a6a141a04bade2584f15d3e45d4c1`, the single
+[independent scoped re-review](independent-review.md) found **8/8 findings
+addressed and no new Critical, Important or Minor defects**. Ready for the next
+separately authorized PR/infrastructure/Preview gate, not launch. Closing the
+visual-evidence findings means the limits are accurately recorded, not accepted.
+
+The controller independently ran **69/69 focused tests** on final product code
+and a fresh **exact-commit Turbopack build** (12.9s compile, TypeScript pass,
+92/92 static pages, exit0), with the documented credential-free warnings.
+[Verification provenance](controller-verification.md) distinguishes tool-output
+records from raw logs. The five-case headed run below included the successful
+image path before the final rejected-response-body cleanup change; its later
+restarted-server race and the final focused suites covered final code. It is not
+claimed as one uninterrupted five-case run against the final loader bytes.
+
 ## Corrected behavior
 
 - Unknown commit acknowledgement retains private bytes. Only attempts whose
