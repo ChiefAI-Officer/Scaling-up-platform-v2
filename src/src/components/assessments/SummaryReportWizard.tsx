@@ -48,6 +48,10 @@ export interface SummaryReportWizardProps {
 
 type CreateState = "idle" | "submitting" | "ambiguous";
 
+interface SubmittedCreateCommand {
+  body: string;
+}
+
 function newDraft(): ScalingCeoFullDraft {
   return {
     step: "TYPE",
@@ -148,6 +152,7 @@ export function SummaryReportWizard({
   const scopeCache = useRef(new Map<string, SummaryReportCandidate[]>());
   const candidateRequestId = useRef(0);
   const createRequestInFlight = useRef(false);
+  const submittedCommand = useRef<SubmittedCreateCommand | null>(null);
   const wasOpen = useRef(open);
   const [candidateState, setCandidateState] = useState<
     "idle" | "loading" | "error"
@@ -164,6 +169,7 @@ export function SummaryReportWizard({
       setCandidateState("idle");
       setCreateState("idle");
       createRequestInFlight.current = false;
+      submittedCommand.current = null;
       setError(null);
     }
     wasOpen.current = open;
@@ -235,12 +241,24 @@ export function SummaryReportWizard({
   function updateDraft(
     update: (value: ScalingCeoFullDraft) => ScalingCeoFullDraft,
   ) {
-    if (!frozen) setDraft(update);
+    if (!createRequestInFlight.current && !submittedCommand.current) {
+      setDraft(update);
+    }
   }
 
   function close() {
-    if (createState === "submitting") return;
+    if (createRequestInFlight.current) return;
     onClose();
+  }
+
+  function back() {
+    if (createRequestInFlight.current || submittedCommand.current) return;
+    setError(null);
+    setCreateState("idle");
+    updateDraft((value) => ({
+      ...value,
+      step: value.step === "REVIEW" ? "COMPOSITION" : "TYPE",
+    }));
   }
 
   function toggleSelection(id: string) {
@@ -294,35 +312,37 @@ export function SummaryReportWizard({
   }
 
   async function create() {
-    if (
-      !draft.reportType ||
-      !ceo ||
-      createState === "submitting" ||
-      createRequestInFlight.current
-    )
-      return;
+    if (createRequestInFlight.current) return;
+    let body: string;
+    if (createState === "ambiguous") {
+      if (!submittedCommand.current) return;
+      body = submittedCommand.current.body;
+    } else {
+      if (!draft.reportType || !ceo || submittedCommand.current) return;
+      const sources = [
+        {
+          submissionId: ceo.submissionId,
+          sourceCampaignId: ceo.campaignId,
+          role: "CEO",
+          position: 0,
+        },
+        ...team.map((candidate, position) => ({
+          submissionId: candidate.submissionId,
+          sourceCampaignId: candidate.campaignId,
+          role: "TEAM",
+          position,
+        })),
+      ];
+      body = JSON.stringify({
+        reportType: draft.reportType,
+        creationRequestId: draft.creationRequestId,
+        sources,
+      });
+      submittedCommand.current = { body };
+    }
     createRequestInFlight.current = true;
     setCreateState("submitting");
     setError(null);
-    const sources = [
-      {
-        submissionId: ceo.submissionId,
-        sourceCampaignId: ceo.campaignId,
-        role: "CEO",
-        position: 0,
-      },
-      ...team.map((candidate, position) => ({
-        submissionId: candidate.submissionId,
-        sourceCampaignId: candidate.campaignId,
-        role: "TEAM",
-        position,
-      })),
-    ];
-    const body = JSON.stringify({
-      reportType: draft.reportType,
-      creationRequestId: draft.creationRequestId,
-      sources,
-    });
     try {
       const response = await fetch(
         `/api/assessment-campaigns/${encodeURIComponent(campaignId)}/summary-reports`,
@@ -335,12 +355,14 @@ export function SummaryReportWizard({
       const responseBody = await response.json().catch(() => null);
       if (response.ok) {
         createRequestInFlight.current = false;
+        submittedCommand.current = null;
         onSuccess();
         onClose();
         return;
       }
       if (response.status === 422) {
         createRequestInFlight.current = false;
+        submittedCommand.current = null;
         setCreateState("idle");
         setError(
           responseBody &&
@@ -568,6 +590,7 @@ export function SummaryReportWizard({
                 <p className="font-semibold">
                   {campaignName} — Scaling CEO Full
                 </p>
+                <p>Name: {campaignName}</p>
                 <p>Destination: {campaignName}</p>
                 <p>
                   Assessment/version: {ceo.templateAlias} · v{ceo.versionNumber}{" "}
@@ -616,19 +639,10 @@ export function SummaryReportWizard({
         <DialogFooter className="sticky bottom-0 border-t bg-card pt-4 sm:justify-between">
           <Button
             variant="ghost"
-            disabled={createState === "submitting"}
-            onClick={
-              draft.step === "TYPE"
-                ? close
-                : () => {
-                    setError(null);
-                    setCreateState("idle");
-                    updateDraft((value) => ({
-                      ...value,
-                      step: value.step === "REVIEW" ? "COMPOSITION" : "TYPE",
-                    }));
-                  }
+            disabled={
+              createState === "submitting" || createState === "ambiguous"
             }
+            onClick={draft.step === "TYPE" ? close : back}
           >
             {draft.step === "TYPE" ? "Cancel" : "Back"}
           </Button>

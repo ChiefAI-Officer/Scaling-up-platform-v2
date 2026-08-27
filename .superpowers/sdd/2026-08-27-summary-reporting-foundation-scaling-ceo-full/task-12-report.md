@@ -84,3 +84,30 @@ After formatting, reran the focused Jest command (`2 passed`, `15 passed`), chan
 - The in-flight ref prevents two same-tick click handlers from submitting duplicate POSTs; 422 makes the draft editable, while ambiguous failures retain the frozen review payload and a Retry action.
 - Candidate requests use an abort controller plus monotonic request IDs after JSON parsing; source metadata is retained in scope and submission caches across Back and scope changes.
 - No build/browser gate was run: Task 12 explicitly delegates the broad browser/build gate to Task 14. No push or deploy was performed.
+
+## Fix R1 — lifecycle and acceptance coverage
+
+### RED
+
+Added acceptance/regression tests for CEO replacement with retained selection and Team 0, duplicate Team assignment plus explicit reorder payload, immutable ambiguous retry with Back disabled and close/reopen UUID rotation, synchronous in-flight Back/close/Escape guards, explicit Review `Name`, and real panel create/refresh.
+
+Before the state-machine fix, the wizard test run failed on the missing explicit Review name and on Back remaining enabled after a 503 ambiguous response.
+
+### GREEN
+
+Implemented a captured `submittedCommand` ref. The first create serializes the payload once; ambiguous Retry submits that stored body verbatim. The ref locks edits/Back throughout ambiguous state, while a 422 clears it for editable recovery. The in-flight ref guards close, dialog close/Escape, Back, and edit handlers synchronously. Review now shows `Name: {campaignName}`.
+
+```sh
+npx jest src/__tests__/components/assessments/summary-report-wizard.test.tsx src/__tests__/components/assessments/summary-reports-panel.test.tsx --runInBand
+```
+
+Result:
+
+```text
+PASS ...summary-report-wizard.test.tsx
+PASS ...summary-reports-panel.test.tsx
+Test Suites: 2 passed, 2 total
+Tests:       20 passed, 20 total
+```
+
+Post-fix formatting, lint, and diff commands were run on all four changed TS/TSX files. Targeted TypeScript diagnostic filtering reported no Task 12 file errors; the full repository check remains non-zero for the pre-existing errors recorded above.

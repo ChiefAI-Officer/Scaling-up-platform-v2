@@ -38,6 +38,25 @@ const REPORTS = [
   },
 ];
 
+const CANDIDATE = {
+  submissionId: "submission-ceo-123456",
+  campaignId: CAMPAIGN_ID,
+  campaignName: "Northstar Growth Campaign",
+  respondentId: "respondent-ceo",
+  respondentName: "Avery CEO",
+  jobTitle: "Chief Executive Officer",
+  organizationId: "org-1",
+  organizationName: "Northstar Growth",
+  templateId: "template-1",
+  templateAlias: "scaling-up-full",
+  versionId: "version-7",
+  versionNumber: 7,
+  language: "en",
+  submittedAt: "2026-08-20T12:00:00.000Z",
+  eligible: true,
+  disabledReason: null,
+};
+
 function response(body: unknown, status = 200) {
   return {
     ok: status >= 200 && status < 300,
@@ -152,6 +171,45 @@ describe("SummaryReportsPanel", () => {
       await screen.findByText("Summary reports are temporarily unavailable."),
     ).toBeInTheDocument();
     expect(screen.queryByRole("listitem")).toBeNull();
+  });
+
+  it("creates through its real wizard, closes it, and refreshes the report list", async () => {
+    let listCalls = 0;
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes("/candidates"))
+        return Promise.resolve(response({ candidates: [CANDIDATE] }));
+      if (url === BASE_URL) {
+        listCalls += 1;
+        if (listCalls === 1) return Promise.resolve(response({ reports: [] }));
+        if (listCalls === 2)
+          return Promise.resolve(response({ id: "report-new" }, 201));
+        return Promise.resolve(
+          response({ reports: [{ ...REPORTS[0], id: "report-new" }] }),
+        );
+      }
+      return Promise.reject(new Error("Unexpected request"));
+    });
+
+    renderPanel();
+    fireEvent.click(await screen.findByRole("button", { name: "Open Wizard" }));
+    fireEvent.click(screen.getByRole("button", { name: "Scaling CEO Full" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    await screen.findByText("Avery CEO");
+    fireEvent.click(screen.getByRole("button", { name: /Select Avery CEO/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /Assign Avery CEO as CEO/i }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Review" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create report" }));
+
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "Create summary report" }),
+      ).toBeNull(),
+    );
+    expect(await screen.findByRole("listitem")).toHaveTextContent(
+      "Northstar Growth Campaign",
+    );
   });
 
   it("does not create an artifact iframe until the user chooses View", async () => {

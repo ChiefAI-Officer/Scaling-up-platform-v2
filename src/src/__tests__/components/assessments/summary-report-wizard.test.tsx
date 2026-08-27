@@ -46,6 +46,20 @@ const TEAM = {
   jobTitle: "Chief Operating Officer",
 };
 
+const TEAM_TWO = {
+  ...TEAM,
+  submissionId: "submission-team-two-9999",
+  respondentId: "respondent-team-two",
+  respondentName: "Riley Team",
+};
+
+const CEO_TWO = {
+  ...CEO,
+  submissionId: "submission-ceo-two-9999",
+  respondentId: "respondent-ceo-two",
+  respondentName: "Casey CEO",
+};
+
 const INCOMPATIBLE = {
   ...CEO,
   submissionId: "submission-stale-0000",
@@ -251,5 +265,177 @@ describe("SummaryReportWizard", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
     expect(screen.getByText("CEO: Avery CEO")).toBeInTheDocument();
+  });
+
+  it("retains a replaced CEO card as selected, supports an empty Team, and shows the persisted automatic name", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue(
+      response({ candidates: [CEO, CEO_TWO] }),
+    );
+    renderWizard();
+
+    fireEvent.click(screen.getByRole("button", { name: "Scaling CEO Full" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    await screen.findByText("Avery CEO");
+    fireEvent.click(screen.getByRole("button", { name: /Select Avery CEO/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /Assign Avery CEO as CEO/i }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Select Casey CEO/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /Assign Casey CEO as CEO/i }),
+    );
+
+    expect(screen.getByText("CEO: Casey CEO")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Remove Avery CEO" }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Review" }));
+    expect(screen.getByText("Team count: 0")).toBeInTheDocument();
+    expect(
+      screen.getByText("Name: Northstar Growth Campaign"),
+    ).toBeInTheDocument();
+  });
+
+  it("prevents duplicate Team assignment and posts explicit reordered Team positions", async () => {
+    (global.fetch as jest.Mock).mockImplementation((url: string) =>
+      Promise.resolve(
+        url.includes("/candidates")
+          ? response({ candidates: [CEO, TEAM, TEAM_TWO] })
+          : response({ id: "report-1" }, 201),
+      ),
+    );
+    renderWizard();
+
+    fireEvent.click(screen.getByRole("button", { name: "Scaling CEO Full" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    await screen.findByText("Avery CEO");
+    for (const candidate of [CEO, TEAM, TEAM_TWO]) {
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: new RegExp(`Select ${candidate.respondentName}`),
+        }),
+      );
+    }
+    fireEvent.click(
+      screen.getByRole("button", { name: /Assign Avery CEO as CEO/i }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: /Assign Toni Team as Team/i }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Toni Team is Team/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /Assign Riley Team as Team/i }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Review" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Move down" })[0]);
+    fireEvent.click(screen.getByRole("button", { name: "Create report" }));
+
+    await waitFor(() =>
+      expect(global.fetch).toHaveBeenCalledWith(BASE_URL, expect.anything()),
+    );
+    const createCall = (global.fetch as jest.Mock).mock.calls.find(
+      ([url]) => url === BASE_URL,
+    );
+    expect(JSON.parse(createCall?.[1].body)).toMatchObject({
+      sources: [
+        { submissionId: CEO.submissionId, role: "CEO", position: 0 },
+        { submissionId: TEAM_TWO.submissionId, role: "TEAM", position: 0 },
+        { submissionId: TEAM.submissionId, role: "TEAM", position: 1 },
+      ],
+    });
+  });
+
+  it("retries the exact frozen ambiguous command, blocks Back, and starts a new UUID after close and reopen", async () => {
+    const uuid = jest
+      .fn()
+      .mockReturnValueOnce("request-uuid-1")
+      .mockReturnValueOnce("request-uuid-2");
+    Object.defineProperty(globalThis, "crypto", {
+      configurable: true,
+      value: { randomUUID: uuid },
+    });
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce(response({ candidates: [CEO] }))
+      .mockResolvedValueOnce(response({ error: "unavailable" }, 503))
+      .mockResolvedValueOnce(response({ id: "report-1" }, 200));
+    const { rerender, onClose } = renderWizard();
+
+    fireEvent.click(screen.getByRole("button", { name: "Scaling CEO Full" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    await screen.findByText("Avery CEO");
+    fireEvent.click(screen.getByRole("button", { name: /Select Avery CEO/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /Assign Avery CEO as CEO/i }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Review" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create report" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Retry this exact request",
+    );
+    expect(screen.getByRole("button", { name: "Back" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    const posts = (global.fetch as jest.Mock).mock.calls.filter(
+      ([url]) => url === BASE_URL,
+    );
+    expect(posts).toHaveLength(2);
+    expect(posts[1][1].body).toBe(posts[0][1].body);
+
+    rerender(
+      <SummaryReportWizard
+        open={false}
+        onClose={onClose}
+        onSuccess={jest.fn()}
+        campaignId={CAMPAIGN_ID}
+        campaignName="Northstar Growth Campaign"
+        assessmentName="Scaling Up Assessment"
+        implementedTypes={IMPLEMENTED_TYPES}
+      />,
+    );
+    rerender(
+      <SummaryReportWizard
+        open
+        onClose={onClose}
+        onSuccess={jest.fn()}
+        campaignId={CAMPAIGN_ID}
+        campaignName="Northstar Growth Campaign"
+        assessmentName="Scaling Up Assessment"
+        implementedTypes={IMPLEMENTED_TYPES}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Scaling CEO Full" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    await waitFor(() => expect(uuid).toHaveBeenCalledTimes(2));
+  });
+
+  it("guards Back, close, escape, and draft edits synchronously while create is in flight", async () => {
+    let resolveCreate: ((value: Response) => void) | undefined;
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce(response({ candidates: [CEO, TEAM] }))
+      .mockReturnValueOnce(
+        new Promise<Response>((resolve) => {
+          resolveCreate = resolve;
+        }),
+      );
+    const { onClose } = renderWizard();
+
+    fireEvent.click(screen.getByRole("button", { name: "Scaling CEO Full" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    await screen.findByText("Avery CEO");
+    fireEvent.click(screen.getByRole("button", { name: /Select Avery CEO/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /Assign Avery CEO as CEO/i }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Review" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create report" }));
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByText("Team count: 0")).toBeInTheDocument();
+
+    await act(async () => {
+      resolveCreate?.(response({ id: "report-1" }, 201));
+    });
   });
 });
