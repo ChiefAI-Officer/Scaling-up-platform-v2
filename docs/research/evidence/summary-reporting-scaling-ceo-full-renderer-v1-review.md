@@ -90,14 +90,14 @@ pending operations are in [the local-proof runbook](summary-reporting-local-proo
 | Coach/admin empty and populated lists | PASS: both actual hosts show the same single implemented catalog. The campaign panel remains primary; there is no new hub. `coach-empty-*`, `admin-empty-*`, `coach-populated-*`, `admin-populated-*` show the real components, not a static mockup. |
 | Composition | PASS after narrow scroll repair: selection is separate from role assignment; CEO is explicit, Team order is retained. At 390×844 the candidate region scrolls independently of the footer. The final action is fully visible/clickable above Review at the actual bottom; see `composition-bottom-mobile-viewport.png`. The earlier sticky-footer overlap was a real failure and was fixed, not accepted as baseline. |
 | Review | PASS after acceptance-gap repair: destination organization, CEO and ordered Team roles now include source campaign, assessment/version/language, completion timestamp and full submission identity. A same-name historical-source DOM regression proves disambiguation/order. `review-mobile-viewport.png` is legible; `admin-review-long-ids-mobile-viewport.png` proves long identities wrap within the dialog. The Review state changes no captured ambiguous-retry payload and adds no query. |
-| Modal / native PDF | PASS locally in headed Chromium: the settled `coach-pdf-preview-desktop.png` visibly paints the purple cover and native toolbar/page count, after actual inline HTTP 200 with `private, no-store` and `SAMEORIGIN`. Admin opens the same artifact; both actors open a new tab and download checksum-identical bytes. The exact artifact route required a narrow exception to the global DENY header; Next config and Vercel config carry matching overrides. No live CDN/CSP/header-precedence claim is made. |
+| Modal / native PDF | PASS for visible desktop content paint in the corrected R1 captures below: both coach/admin images show the upper purple cover, logo/title, populated thumbnails and native toolbar/page count. They do **not** show the complete cover page. The original committed captures were blank and did not support the earlier PASS claim. Real inline HTTP 200, `private, no-store`, `SAMEORIGIN`, new-tab and checksum-identical downloads are separately proven. The exact artifact route required a narrow exception to global DENY; matching Next/Vercel overrides do not prove deployed CDN/CSP/header precedence. |
 | Actual PDF pages | PASS for legibility/attribution: `local-pdf-1.png` has purple cover, local logo, campaign/organization/date hierarchy; `local-pdf-2.png` shows named CEO Alex CEO, frozen timestamp/version, 3 selected/completed/invited and labeled Section/Domain comparisons. `local-appendix-8.png` shows CEO, Person 1 (reordered Ed source), Person 2 (Dee source), with no Team names. All three are rasters of the bytes downloaded through the authorized route. |
 | Legacy mobile host layout | EXISTING LIMITATION: document width is 901px in a 390px viewport with Summary Reporting enabled **and with it off**, using the same campaign data. `coach-flag-off-mobile-viewport.png` records the comparison. The inherited respondent table/page overflow is not a wizard regression and is not claimed fixed. Full-page mobile screenshots can therefore exceed viewport width; use the `*-mobile-viewport.png` files for actual mobile composition. |
 
 All named screenshots are in [summary-reporting-local-proof](summary-reporting-local-proof/).
 Desktop viewports are 1440×1000 and mobile viewports 390×844. Full-page captures
 include content beyond the viewport and are explicitly not pixel-sized viewport
-evidence. The final lifecycle PDF has eight pages; its run-specific SHA-256 is
+evidence. The original full lifecycle PDF has eight pages; its run-specific SHA-256 is
 `be5ac1759faf087f9375f139e6d34df5ba6f99079b00df4e8d6f06a1a6316a4e`.
 The hash remains unchanged after retries, each host's download, and a later
 submission. New run timestamps naturally produce a different artifact hash.
@@ -124,16 +124,45 @@ inspection of the live source.
 - The local fixture has no coach avatar, so the cover uses the renderer's
   no-image attribution fallback; it does not prove a live coach-photo path.
   Optional/background identity answers are omitted from this synthetic input.
-- Headless-shell could not open the native PDF popup. Full Chromium new-headless
-  delivered the bytes and toolbar/thumbnails but initially captured a gray main
-  canvas; headed Chromium with a three-second paint settle visibly rendered the
-  page. Native paint is manually reviewed, not asserted by a pixel test. A
-  bounded Computer Use fallback failed with app-server error -10005; no desktop
-  capture is claimed from it, and the headed Playwright image is sufficient
-  positive local paint evidence. Mobile native viewer controls remain
-  browser-dependent; downloads/new-tab remain available.
+- Headless-shell could not open the native PDF popup. The original full
+  Chromium runs delivered bytes, but the committed desktop captures had blank
+  canvases: the pre-capture delay was invalidated by subsequent resize/full-page
+  capture. The earlier claim that those files proved paint was incorrect. R1
+  below replaces only the two desktop files with inspected viewport captures.
+  Native paint is manually reviewed, not asserted by a pixel test. A bounded
+  Computer Use fallback failed with app-server error -10005; no desktop capture
+  is claimed from it. Mobile native viewer controls remain browser-dependent;
+  downloads/new-tab remain available.
 
 **Verdict:** local lifecycle, mobile wizard containment, Review provenance and
 representative PDF legibility pass. The accepted bar-layout/A4/appendix
 differences keep the **actual-canary visual gate open before launch**; this
 addendum does not authorize global enablement or claim pixel identity to ESPERTO.
+
+### R1 evidence correction — exact final desktop files
+
+The blank coach image at commit `3dd74fc2` had SHA-256
+`ebb09fb4720dc45ff3376e528ef5d43cd46e72f7693dc07e615522f56b56cf85`.
+It and the blank admin image are superseded by the following **1440×1000
+viewport-only** captures, inspected after copying into their final tracked paths:
+
+| File | Final SHA-256 |
+| --- | --- |
+| `summary-reporting-local-proof/coach-pdf-preview-desktop.png` | `97985319235b627f6ba6093fbbb137141a4c23e5c0bf3689a620373a76a2fd90` |
+| `summary-reporting-local-proof/admin-pdf-preview-desktop.png` | `dac6275d3694ca42b4d23cd8cb82e859618141bf6fe1a30ff28c2a9ebebcf8b6` |
+
+Both show the upper purple cover, Scaling Up logo, `Your Scaling Up Full
+Assessment Report`, orange top rule, populated page thumbnails and `1 / 8`
+toolbar. The captured native surface cuts off the lower cover portion; this is
+positive content-paint evidence, **not** proof of complete-page visibility or
+mobile PDF readability. Complete cover/content legibility remains evidenced
+separately by the actual PDF rasters above and requires live canary acceptance.
+
+The focused headed lifecycle rerun passed **1/1**, 40.2s, including both actors'
+inline/new-tab/download and immutable checksum checks. Its PDF SHA-256 was
+`e838eac5839ef019b32bd7075674d82e3497254d7ffd67d98f8ef0af1b00baad`;
+this is a new timestamped run, distinct from the original full-suite PDF/rasters.
+The helper now activates the page and settles **after** setting the final
+viewport, then captures without full-page enlargement. Test runs write only
+ignored `src/test-results/summary-reporting-evidence/`; promoting inspected
+files is explicit, so a later run cannot overwrite accepted tracked evidence.

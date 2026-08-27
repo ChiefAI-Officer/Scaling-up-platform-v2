@@ -10,7 +10,9 @@ import { campaignId, adminCampaignId, adminSourceSuffix, sourceCampaignId, unsup
 // SDK wrapper and audits. Blob transport is simulated; limiter is development.
 test.describe.configure({ mode: "serial" });
 let proof: Awaited<ReturnType<typeof startSummaryProof>>;
-const evidence = join(process.cwd(), "..", "docs/research/evidence/summary-reporting-local-proof");
+// Test runs never overwrite reviewed, committed visual evidence. Promote only
+// the exact output files inspected after the run into docs/research/evidence.
+const evidence = join(process.cwd(), "test-results", "summary-reporting-evidence");
 const api = `/api/assessment-campaigns/${campaignId}/summary-reports`;
 const sourceOrder = [
   { submissionId: "proof-s-ceo", sourceCampaignId: campaignId, role: "CEO", position: 0 },
@@ -38,10 +40,16 @@ async function login(page: Page, role: "coach" | "admin") {
 function host(role: "coach" | "admin", id = campaignId) {
   return `${proof.baseURL}/${role === "coach" ? "portal/assessments" : "admin/assessments/campaigns"}/${id}`;
 }
-async function screenshots(page: Page, state: string) {
+async function screenshots(page: Page, state: string, nativePdf = false) {
   for (const [size, width, height] of [["desktop", 1440, 1000], ["mobile", 390, 844]] as const) {
     await page.setViewportSize({ width, height });
-    await page.screenshot({ path: join(evidence, `${state}-${size}.png`), fullPage: true, animations: "disabled" });
+    if (nativePdf) {
+      // Resize/foreground changes invalidate native PDF compositing. Settle
+      // AFTER the final viewport, and avoid fullPage's implicit enlargement.
+      await page.bringToFront();
+      await page.waitForTimeout(3000);
+    }
+    await page.screenshot({ path: join(evidence, `${state}-${size}.png`), fullPage: !nativePdf, animations: "disabled" });
     if (size === "mobile") await page.screenshot({ path: join(evidence, `${state}-mobile-viewport.png`), animations: "disabled" });
   }
   await page.setViewportSize({ width: 1440, height: 1000 });
@@ -151,10 +159,9 @@ test("coach/admin share one real catalog; compose, reorder, double-create and fr
     const path = join(proof.dir, `${role}.pdf`);
     await download.saveAs(path);
     expect(createHash("sha256").update(readFileSync(path)).digest("hex")).toBe(checksum);
-    // Native PDF painting is outside the DOM; retain a settled screenshot for
-    // manual inspection in addition to the byte/HTTP assertions above.
-    await active.waitForTimeout(3000);
-    await screenshots(active, `${role}-pdf-preview`);
+    // Native paint still requires inspection of the exact final image; bytes,
+    // HTTP success and a settling delay alone are not a visual PASS.
+    await screenshots(active, `${role}-pdf-preview`, true);
     await active.getByRole("button", { name: "Close", exact: true }).click();
   }
   execFileSync("pdftoppm", ["-f", "1", "-l", "2", "-scale-to", "1400", "-png", join(proof.dir, "coach.pdf"), join(evidence, "local-pdf")]);

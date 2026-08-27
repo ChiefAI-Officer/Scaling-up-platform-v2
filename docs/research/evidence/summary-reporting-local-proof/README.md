@@ -15,6 +15,9 @@ PATH=/opt/homebrew/opt/node@20/bin:$PATH npx playwright test e2e/summary-reporti
 
 Add `--headed` for the captured native-PDF visual proof. Full Chromium (not the
 headless shell) is selected explicitly; see the visual review for engine limits.
+New runs write images to ignored `src/test-results/summary-reporting-evidence/`
+(repository-relative), never directly over this reviewed evidence directory.
+Inspect the exact output at its final viewport before explicitly promoting it.
 
 The separate config deliberately does not reuse a developer server. The fixture
 starts PostgreSQL on an unused loopback port and a real Next development server
@@ -52,7 +55,9 @@ the same after retry, view/download and a later submission.
 
 Screenshots named `*-desktop.png` use 1440×1000; `*-mobile.png` are full-page
 captures from a 390×844 viewport. `*-mobile-viewport.png` preserve the actual
-390×844 visible viewport. Full-page images can be wider because the existing
+390×844 visible viewport. The corrected native-PDF desktop images are
+1440×1000 viewport-only captures, avoiding full-page compositor resizing.
+Full-page images can be wider because the existing
 campaign respondent table overflows on small screens. Do not treat the wider
 full-page image as a mobile viewport size. PDF page rasters are the actual bytes
 downloaded through the authorized route, not a mock HTML report.
@@ -112,8 +117,22 @@ runbook are the durable evidence; raw temporary PDFs are reproducible, not retai
 Representative evidence: [Review on mobile](review-mobile-viewport.png),
 [fully scrolled Composition](composition-bottom-mobile-viewport.png),
 [long source IDs](admin-review-long-ids-mobile-viewport.png),
-[painted PDF modal](coach-pdf-preview-desktop.png),
+[PDF modal with painted upper cover](coach-pdf-preview-desktop.png),
 [PDF provenance](local-pdf-2.png), [anonymous appendix](local-appendix-8.png).
+
+**R1 correction:** the original committed desktop native-PDF images were blank,
+so their claimed painted-cover PASS was not supported. A focused headed
+lifecycle rerun (`--grep 'coach/admin share one real catalog'`, **1/1 passed,
+40.2s**) regenerated only the promoted coach/admin desktop evidence after the
+final viewport resize/foreground activation and settling delay, without
+full-page enlargement. Both exact final files visibly paint the upper purple
+cover/logo/title, populated thumbnails and toolbar; the lower cover is cut off
+in the native capture. This closes visible content-paint proof, not full-page
+visibility or mobile readability. Exact image hashes and the distinct rerun
+artifact hash are in the [R1 visual correction](../summary-reporting-scaling-ceo-full-renderer-v1-review.md#r1-evidence-correction--exact-final-desktop-files).
+The original four-test results and PDF rasters above are preserved; no broad
+suite/build was repeated for this test/evidence-only repair. Edited E2E ESLint
+passed. Its loopback app/database and temporary outputs were cleaned separately.
 
 The original Task 8 renderer evidence remains intact. The accidental tracked
 Task 12 SDD scratch report was untracked without removing its local contents;
