@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PrismaClient, type Prisma } from "@prisma/client";
 import { hash } from "bcryptjs";
+import sharp from "sharp";
 import { buildTemplateContent } from "../../prisma/seed-scaling-up-full-assessment";
 import golden from "../../src/__tests__/fixtures/summary-reports/scaling-ceo-full-snapshot.json";
 import { scoreSubmission, TemplateVersionForScoringSchema } from "../../src/lib/assessments/scoring";
@@ -42,6 +43,8 @@ export async function startSummaryProof() {
     if (existsSync(join(process.cwd(), file))) throw new Error(`Refusing local proof with ${file}; use an isolated checkout without environment files`);
   }
   const dir = mkdtempSync(join(tmpdir(), "summary-proof-"));
+  // Synthetic raster only; served by the transport double, never live Blob.
+  writeFileSync(join(dir, "coach.png"), await sharp({ create: { width: 64, height: 64, channels: 3, background: "#2299cc" } }).png().toBuffer());
   const dataDir = join(dir, "pg");
   mkdirSync(join(dir, "objects"));
   const pgPort = await unusedPort();
@@ -111,19 +114,20 @@ export async function startSummaryProof() {
   }
   try {
     execFileSync("/opt/homebrew/bin/initdb", ["-D", dataDir, "-A", "trust", "-U", "proof", "--no-locale", "--encoding=UTF8"], { env: { PATH: env.PATH, HOME: env.HOME, NODE_ENV: "development" } });
-    execFileSync("/opt/homebrew/bin/pg_ctl", ["-D", dataDir, "-l", join(dir, "pg.log"), "-o", `-h 127.0.0.1 -p ${pgPort} -k ${dir}`, "-w", "start"]);
+    execFileSync("/opt/homebrew/bin/pg_ctl", ["-D", dataDir, "-l", join(dir, "pg.log"), "-o", `-h 127.0.0.1 -p ${pgPort} -k ${dir} -c timezone=Asia/Manila`, "-w", "start"]);
     pgStarted = true;
     execFileSync("/opt/homebrew/bin/createdb", ["-h", "127.0.0.1", "-p", String(pgPort), "-U", "proof", "summary_proof"]);
     // Historic migrations lack the initial categories baseline and cannot
     // bootstrap an empty DB. Use the exact pre-tracer schema, then execute the
     // complete new migration unchanged (including its immutable triggers).
     const baseline = join(dir, "baseline.prisma");
-    writeFileSync(baseline, execFileSync("git", ["show", "a57b9c04^:src/prisma/schema.prisma"]));
+    // Stable main ancestor survives squash merges of this feature branch.
+    writeFileSync(baseline, execFileSync("git", ["show", "16d5a29c31c2db64e7f4d11c4053f4bb9f5d43db:src/prisma/schema.prisma"]));
     execFileSync(process.execPath, ["node_modules/prisma/build/index.js", "db", "push", "--skip-generate", "--schema", baseline], { env: { PATH: env.PATH, HOME: env.HOME, NODE_ENV: "development", DATABASE_URL: databaseURL, DIRECT_URL: databaseURL }, stdio: "pipe" });
     execFileSync("/opt/homebrew/bin/psql", [databaseURL, "-v", "ON_ERROR_STOP=1", "-f", "prisma/migrations/20260827090000_add_summary_reports/migration.sql"], { stdio: "pipe" });
     const passwordHash = await hash(proofPassword, 10);
     for (const role of ["ADMIN", "COACH"]) await db.user.create({ data: { id: `proof-${role.toLowerCase()}`, email: `${role.toLowerCase()}@summary-proof.example`, name: `Proof ${role}`, role, passwordHash } });
-    await db.coach.create({ data: { id: "proof-coach-profile", userId: "proof-coach", email: "coach@summary-proof.example", firstName: "Casey", lastName: "Coach", certificationStatus: "ACTIVE" } });
+    await db.coach.create({ data: { id: "proof-coach-profile", userId: "proof-coach", email: "coach@summary-proof.example", firstName: "Casey", lastName: "Coach", profileImage: "https://summaryproof.public.blob.vercel-storage.com/coach-profiles/synthetic.png", certificationStatus: "ACTIVE" } });
     await db.organization.create({ data: { id: "proof-org", name: "Example Manufacturing", ownerCoachId: "proof-coach-profile" } });
     await db.accessGroup.create({ data: { id: "proof-access", name: "Local proof", createdBy: "proof-admin" } });
     await db.accessGroupCoach.create({ data: { accessGroupId: "proof-access", coachId: "proof-coach-profile", addedBy: "proof-admin" } });

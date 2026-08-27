@@ -98,6 +98,31 @@ function parseCandidates(value: unknown): SummaryReportCandidate[] | null {
     : null;
 }
 
+function validationMessage(value: unknown, selected: Map<string, SummaryReportCandidate>, selectedIds: string[]): string {
+  const fallback = "Please correct the composition and try again.";
+  if (!value || typeof value !== "object") return fallback;
+  const errors = (value as Record<string, unknown>).errors;
+  if (!Array.isArray(errors) || !errors.length) return fallback;
+  const entries = errors.filter((error): error is Record<string, unknown> => Boolean(error) && typeof error === "object");
+  // Never interpolate metadata or server messages for newly unauthorized sources.
+  if (entries.some((error) => error.code === "source_unavailable")) {
+    return "One or more selected sources are unavailable. Review your selection and try again.";
+  }
+  const messages: Record<string, string> = {
+    source_not_found: "The selected source is no longer available.",
+    source_not_completed: "The selected source is no longer completed.",
+    source_incompatible: "The selected source is no longer compatible.",
+    source_campaign_mismatch: "The selected source no longer matches its campaign.",
+    source_changed: "One or more selected sources changed before creation completed.",
+  };
+  return entries.map((error) => {
+    const message = typeof error.code === "string" && Object.hasOwn(messages, error.code) ? messages[error.code] : fallback;
+    const id = typeof error.submissionId === "string" ? error.submissionId : null;
+    const candidate = id && selectedIds.includes(id) ? selected.get(id) : null;
+    return message !== fallback && candidate ? `${candidate.respondentName} (${candidate.submissionId}): ${message}` : message;
+  }).join(" ") || fallback;
+}
+
 function disabledReasonLabel(reason: SummaryReportCandidate["disabledReason"]) {
   switch (reason) {
     case "WRONG_FAMILY":
@@ -377,13 +402,10 @@ export function SummaryReportWizard({
         createRequestInFlight.current = false;
         submittedCommand.current = null;
         setCreateState("idle");
-        setError(
-          responseBody &&
-            typeof responseBody === "object" &&
-            typeof (responseBody as Record<string, unknown>).error === "string"
-            ? (responseBody as Record<string, string>).error
-            : "Please correct the composition and try again.",
-        );
+        // Preserve selected metadata/roles, but refetch eligibility when the user
+        // returns to Composition (including a previously cached other scope).
+        scopeCache.current.clear();
+        setError(validationMessage(responseBody, candidateCache.current, draft.selectedIds));
         return;
       }
       setCreateState("ambiguous");

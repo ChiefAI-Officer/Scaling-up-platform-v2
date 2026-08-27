@@ -2,6 +2,14 @@
 
 Date: 2026-08-27
 
+**Historical record superseded by the final aggregate fix below.** The original
+Task 8 fidelity PASS was not product-owner acceptance. Its tier-bearing score
+rasters and image-less/footer-less attribution are not the current output.
+The preserved old hashes below identify historical evidence, not launch approval.
+
+Current corrected behavior, exact observations/hashes and remaining gates:
+[Final aggregate fix evidence](summary-reporting-final-fix/README.md).
+
 ## Scope and durable evidence
 
 - Accepted comparison source: `docs/research/evidence/platform-scaling-group-report-candidate-jeff-approved-2026-08-27-deidentified.png`.
@@ -48,7 +56,10 @@ All Team-0 pages, Team-2 comparison/score/question/appendix pages, and Team-50 p
 
 ## Comparison verdict and intentional differences
 
-**PASS for the Task 8 visual gate.** Renderer v1 faithfully carries forward the accepted report's hierarchy, locked purple/blue/orange palette, dense score comparisons, question-level CEO/Team/peer bars, and anonymized appendix while adapting the continuous browser layout to A4 pages.
+**Superseded Task 8 assessment, not actual-output acceptance.** The original
+fidelity PASS overstated preservation of the accepted hierarchy/palette and
+missed suppressed-tier and attribution defects. The final-fix record below
+supersedes that claim; product-owner visual acceptance remains required.
 
 Observed differences are intentional and bounded:
 
@@ -117,12 +128,16 @@ inspection of the live source.
 - The continuous browser report becomes fixed A4 page ownership and repeated
   campaign/version/page footers. Section/Domain results are separate tables;
   exact provenance and provisional peer disclosure are explicit. These alter
-  density and whitespace while retaining the purple/blue/orange hierarchy.
+  density and whitespace. The accepted dark-gradient cover becomes a lighter,
+  flat `#6d58a8` purple. The title is larger and differently wrapped/spaced,
+  with an orange top strip and separated blue accent; this is not preservation
+  of the exact accepted palette, cover hierarchy or layout.
 - Appendix B is anonymized and chunked at 20 rows per page with continuation
   context; the short two-Team local appendix intentionally has substantial
   whitespace. Team-50 continuation coverage remains in the preserved evidence.
-- The local fixture has no coach avatar, so the cover uses the renderer's
-  no-image attribution fallback; it does not prove a live coach-photo path.
+- The original local fixture had no coach avatar. At that HEAD there was no
+  image-rendering path at all, so describing it as a fallback was misleading.
+  The final fix restores bounded creation-time image support; see below.
   Optional/background identity answers are omitted from this synthetic input.
 - Headless-shell could not open the native PDF popup. The original full
   Chromium runs delivered bytes, but the committed desktop captures had blank
@@ -131,8 +146,9 @@ inspection of the live source.
   below replaces only the two desktop files with inspected viewport captures.
   Native paint is manually reviewed, not asserted by a pixel test. A bounded
   Computer Use fallback failed with app-server error -10005; no desktop capture
-  is claimed from it. Mobile native viewer controls remain browser-dependent;
-  downloads/new-tab remain available.
+  is claimed from it. The actual 390px native-PDF capture horizontally clips
+  the cover and shows a horizontal scrollbar. Native mobile readability is
+  not established; new-tab and download are the supported alternative actions.
 
 **Verdict:** local lifecycle, mobile wizard containment, Review provenance and
 representative PDF legibility pass. The accepted bar-layout/A4/appendix

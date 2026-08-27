@@ -65,6 +65,11 @@ const styles = StyleSheet.create({
   },
   logo: { width: 180, height: 24, objectFit: "contain" },
   coverCoach: { marginTop: 8, fontSize: 9, color: "#e9e4f4" },
+  coachRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  coachCoverImage: { width: 48, height: 40, objectFit: "contain" },
+  coachFooterImage: { width: 20, height: 18, objectFit: "contain" },
+  footerIdentity: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 4 },
+  footerLogo: { width: 80, height: 14, objectFit: "contain", backgroundColor: COLOR.purple },
   coverRule: {
     width: 70,
     height: 5,
@@ -312,14 +317,34 @@ function Footer({
   pageKey: string;
 }) {
   return (
-    <Text
+    <View
       key={pageKey}
       style={[styles.footer, cover ? styles.coverFooter : {}]}
       fixed
-      render={({ pageNumber, totalPages }) =>
-        `${footerText(snapshot)} | Page ${pageNumber} / ${totalPages}`
-      }
-    />
+    >
+      <View style={styles.footerIdentity}>
+        {/* eslint-disable-next-line jsx-a11y/alt-text */}
+        <Image src={LOCAL_LOGO} style={styles.footerLogo} />
+        <CoachAttribution snapshot={snapshot} />
+      </View>
+      <Text render={({ pageNumber, totalPages }) => `${footerText(snapshot)} | Page ${pageNumber} / ${totalPages}`} />
+    </View>
+  );
+}
+
+function CoachAttribution({ snapshot, cover = false }: { snapshot: ScalingCeoFullSnapshot; cover?: boolean }) {
+  const name = snapshot.provenance.coachName?.trim();
+  const image = snapshot.coachImage;
+  if (!name && !image) return null;
+  return (
+    <View style={[styles.coachRow, cover ? styles.coverCoach : {}]}>
+      {image ? (
+        // Bytes only: never pass the stored profile URL to the PDF renderer.
+        // eslint-disable-next-line jsx-a11y/alt-text
+        <Image src={{ data: Buffer.from(image.base64, "base64"), format: "png" }} style={cover ? styles.coachCoverImage : styles.coachFooterImage} />
+      ) : null}
+      {name ? <Text>Coached by {name}</Text> : null}
+    </View>
   );
 }
 
@@ -511,11 +536,7 @@ function ScalingCeoFullDocument({
         {/* React-PDF ImageProps does not expose the HTML alt attribute. */}
         {/* eslint-disable-next-line jsx-a11y/alt-text */}
         <Image src={LOCAL_LOGO} style={styles.logo} />
-        {snapshot.provenance.coachName ? (
-          <Text style={styles.coverCoach}>
-            Coached by {snapshot.provenance.coachName}
-          </Text>
-        ) : null}
+        <CoachAttribution snapshot={snapshot} cover />
         <View style={styles.coverRule} />
         <Text style={styles.coverKind}>Group Report</Text>
         <Text style={styles.coverTitle}>
@@ -629,7 +650,7 @@ function ScalingCeoFullDocument({
                 </Text>
               </View>
             </View>
-            {scored.tier.ceo ? (
+            {snapshot.reportModel.showTier && scored.tier.ceo ? (
               <Text style={styles.tier}>CEO tier: {scored.tier.ceo}</Text>
             ) : null}
           </View>

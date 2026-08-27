@@ -61,7 +61,9 @@ async function renderSummaryReportPdf(
     import { renderSummaryReportPdf } from ${JSON.stringify(rendererUrl)};
 
     const snapshot = JSON.parse(readFileSync(0, "utf8"));
+    const before = JSON.stringify(snapshot);
     const rendered = await renderSummaryReportPdf("SCALING_CEO_FULL", snapshot);
+    if (JSON.stringify(snapshot) !== before) throw new Error("Renderer mutated the frozen input");
     process.stdout.write(rendered.bytes);
   `;
   return {
@@ -275,6 +277,23 @@ function teamFiftySnapshot(): ScalingCeoFullSnapshot {
 }
 
 describe("Scaling CEO Full PDF renderer", () => {
+  it("hides provisional tier text when frozen showTier is false, without removing computed tiers", async () => {
+    expect(acceptedTeamZeroSnapshot.reportModel.showTier).toBe(false);
+    expect(acceptedTeamZeroSnapshot.reportModel.scored?.tier.ceo).toBeTruthy();
+    const rendered = await renderSummaryReportPdf("SCALING_CEO_FULL", acceptedTeamZeroSnapshot);
+    const inspected = inspectPdf(rendered.bytes);
+    expect(inspected.text).not.toContain("CEO tier");
+    expect(inspected.text).not.toContain("Exemplary");
+    expect(inspected.text).toContain("CEO vs peers");
+    expect(inspected.text).toContain("provisional industry benchmark");
+  });
+
+  it("shows the computed tier only when the frozen display policy enables it", async () => {
+    const snapshot = JSON.parse(JSON.stringify(acceptedTeamZeroSnapshot)) as ScalingCeoFullSnapshot;
+    snapshot.reportModel.showTier = true;
+    const inspected = inspectPdf((await renderSummaryReportPdf("SCALING_CEO_FULL", snapshot)).bytes);
+    expect(inspected.text).toContain("CEO tier: Exemplary");
+  });
   it("renders a titled PDF with the accepted section sequence and named CEO", async () => {
     const rendered = await renderSummaryReportPdf(
       "SCALING_CEO_FULL",
@@ -294,11 +313,31 @@ describe("Scaling CEO Full PDF renderer", () => {
     expect(inspected.pages).toBeGreaterThanOrEqual(2);
     expect(inspected.pageTexts).toHaveLength(inspected.pages);
     inspected.pageTexts.forEach((pageText, index) => {
+      expect(pageText).toContain("Coached by Jordan Coach");
       expect(pageText).toContain(
         "Northstar Growth Review | scaling-ceo-full-pdf-v1",
       );
       expect(pageText).toContain(`Page ${index + 1} / ${inspected.pages}`);
     });
+  });
+
+  it("embeds the frozen coach image and footer attribution without fetching a stored profile URL", async () => {
+    const snapshot = JSON.parse(JSON.stringify(acceptedTeamZeroSnapshot)) as ScalingCeoFullSnapshot;
+    snapshot.provenance.coachLogoUrl = "https://must-never-fetch.invalid/profile.png";
+    const sharp = (await import("sharp")).default;
+    const png = await sharp({ create: { width: 64, height: 32, channels: 3, background: "#2299cc" } }).png().toBuffer();
+    snapshot.coachImage = { mediaType: "image/png", base64: png.toString("base64"), sha256: "fixture", width: 64, height: 32 };
+    const rendered = await renderSummaryReportPdf("SCALING_CEO_FULL", snapshot);
+    const inspected = inspectPdf(rendered.bytes);
+    inspected.pageTexts.forEach((page) => expect(page).toContain("Coached by Jordan Coach"));
+    expect(rendered.bytes.toString("latin1")).toMatch(/\/Width 64\s*\/Height 32/);
+  });
+
+  it("omits coach attribution when neither frozen image nor name exists", async () => {
+    const snapshot = JSON.parse(JSON.stringify(acceptedTeamZeroSnapshot)) as ScalingCeoFullSnapshot;
+    snapshot.provenance.coachName = null;
+    const inspected = inspectPdf((await renderSummaryReportPdf("SCALING_CEO_FULL", snapshot)).bytes);
+    expect(inspected.text).not.toContain("Coached by");
   });
 
   it("renders exact creation provenance and separately identifies Section and Domain peers", async () => {

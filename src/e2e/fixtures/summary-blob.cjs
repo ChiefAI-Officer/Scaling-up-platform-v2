@@ -30,6 +30,10 @@ function authenticated(headers) {
 const agent = new MockAgent();
 agent.disableNetConnect();
 agent.enableNetConnect((host) => /^(127\.0\.0\.1|localhost)(:\d+)?$/.test(host));
+agent.get("https://summaryproof.public.blob.vercel-storage.com").intercept({ path: "/coach-profiles/synthetic.png", method: "GET" }).reply(() => ({
+  statusCode: 200, data: readFileSync(join(process.env.SUMMARY_PROOF_DIR, "coach.png")),
+  responseOptions: { headers: { "content-type": "image/png" } },
+})).persist();
 agent.get(origin).intercept({ path: /^\/\?pathname=/, method: "PUT" }).reply((options) => {
   const headers = authenticated(options.headers);
   if (headers["x-vercel-blob-access"] !== "private") throw new Error("Proof rejected public Blob upload");

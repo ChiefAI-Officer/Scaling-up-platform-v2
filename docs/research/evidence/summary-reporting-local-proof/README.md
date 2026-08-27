@@ -4,6 +4,11 @@ This is **local evidence, not a production launch record**. Global enablement,
 private-store provisioning, deployment, the exact campaign canary and product
 owner acceptance of live screens/PDF are still pending.
 
+**Current final-fix record:** [corrected behavior, final test results and inspected
+artifacts](../summary-reporting-final-fix/README.md). It supersedes the old
+tier-bearing/attribution evidence and mobile-list viewport claims below; these
+older run results remain historical, not final-output acceptance.
+
 ## Reproduce the local proof
 
 Run from the app directory `src/`, with Node 20, local PostgreSQL 16 binaries in
@@ -30,17 +35,22 @@ is used.
 The complete historic migration chain cannot bootstrap an empty database:
 `20260226000000_feb25_call_revisions_schema` fails with PostgreSQL `42P01`,
 `relation "categories" does not exist`. The fixture materializes the pre-tracer
-schema from `a57b9c04^`, initializes only that empty local database, then executes
+schema from stable main ancestor `16d5a29c31c2db64e7f4d11c4053f4bb9f5d43db`, initializes only that empty local database, then executes
 the **unchanged** `20260827090000_add_summary_reports/migration.sql` with
 `psql -v ON_ERROR_STOP=1`. This proves the tracer migration and its constraints,
 not successful replay of the historical chain. A shallow checkout must include
-that baseline commit to run this test.
+that main ancestor to run this test (fetch/deepen main history as needed).
+Its schema blob is `f3d1b8a0d35e5277f37b8ee912f23e546e496d20`, identical to the
+earlier implementation-only reference; no feature-branch object is needed after
+a squash merge. The fixture explicitly uses database timezone `Asia/Manila`
+to guard UTC creation/artifact timestamps at the raw insertion boundary.
 
 The production snapshot, renderer, Prisma adapters, authorization, audits and
 Blob SDK wrapper run unchanged. Only the external Blob **transport** is a test
 double: a fake token and exact private-store host are intercepted, bytes are
 stored in the fixture's temporary directory, and non-loopback network access is
-denied. Its private-access option and object paths are checked. This is not proof
+denied. Final-fix runs also serve one synthetic public-Blob coach PNG through
+that same transport double; no live avatar is fetched. Its private-access option and object paths are checked. This is not proof
 of actual Vercel Blob privacy, retention, CDN behavior or network availability.
 The development limiter is explicit; a separate unit regression proves missing
 distributed configuration fails closed in production. Actual Redis operation

@@ -1,4 +1,5 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
+import { randomUUID } from "node:crypto";
 import type { ApiActor } from "@/lib/auth/access-control";
 import {
   canViewGroupReport,
@@ -11,6 +12,8 @@ import {
 } from "./artifact-store";
 import {
   canonicalJson,
+  sha256Hex,
+  type FrozenCoachImage,
   type ScalingCeoFullSnapshot,
   type SelectedSummarySource,
 } from "./canonical";
@@ -20,6 +23,7 @@ import {
   type SummaryReportSnapshotDb,
 } from "./scaling-ceo-full-snapshot";
 import { summaryReportErrorClass } from "./http";
+import { loadSummaryCoachImage } from "./coach-image";
 
 export interface CreateSummaryReportCommand {
   destinationCampaignId: string;
@@ -52,6 +56,7 @@ export interface SummaryReportOperationalError {
 }
 
 export interface CreateSummaryReportDependencies {
+  loadCoachImage?: (url: string | null | undefined) => Promise<FrozenCoachImage | null>;
   artifactStore?: SummaryArtifactStore;
   buildSnapshot?: (
     tx: SummaryReportSnapshotDb,
@@ -271,10 +276,35 @@ export function createPrismaSummaryReportCreateTransaction(
   return {
     snapshotDb: createPrismaSnapshotDb(client),
     async createReport(data) {
-      return client.summaryReport.create({
-        data,
-        select: REPORT_LIST_SELECT,
-      });
+      // Prisma 5.22's JSON write conversion changes some floating-point values.
+      // Keep canonical JSON as a text parameter until PostgreSQL's jsonb cast.
+      // All identifiers are static; values remain bound, never interpolated SQL.
+      const manifest = data.moderationManifest == null || data.moderationManifest === Prisma.DbNull
+        ? null : data.moderationManifest === Prisma.JsonNull ? "null" : canonicalJson(data.moderationManifest);
+      const rows = await client.$queryRaw<SummaryReportListItem[]>`
+        INSERT INTO "summary_reports" (
+          "id", "campaignId", "reportType", "name", "templateId", "versionId", "language",
+          "createdByUserId", "createdByEmailSnapshot", "createdAt", "rendererVersion",
+          "inputSnapshot", "inputHash", "moderationManifest", "creationRequestId",
+          "artifactPath", "artifactSha256", "artifactSizeBytes", "artifactCreatedAt"
+        ) VALUES (
+          ${data.id ?? randomUUID()}, ${data.campaignId}, ${data.reportType}::"SummaryReportType",
+          ${data.name}, ${data.templateId}, ${data.versionId}, ${data.language},
+          ${data.createdByUserId}, ${data.createdByEmailSnapshot}, (${data.createdAt ?? new Date()}::timestamptz AT TIME ZONE 'UTC'),
+          ${data.rendererVersion}, ${canonicalJson(data.inputSnapshot)}::jsonb, ${data.inputHash},
+          ${manifest}::jsonb, ${data.creationRequestId}, ${data.artifactPath}, ${data.artifactSha256},
+          ${data.artifactSizeBytes}, (${data.artifactCreatedAt}::timestamptz AT TIME ZONE 'UTC')
+        )
+        ON CONFLICT ("creationRequestId") DO NOTHING
+        RETURNING "id", "campaignId", "reportType", "name", "createdByUserId", "createdByEmailSnapshot", "createdAt"
+      `;
+      if (!rows[0]) {
+        // Only the explicit request-ID conflict target can take this path.
+        throw Object.assign(new Error("Summary creation request already exists"), {
+          code: "P2002", meta: { target: ["creationRequestId"] },
+        });
+      }
+      return rows[0];
     },
     async createSources(data) {
       await client.summaryReportSource.createMany({ data });
@@ -519,8 +549,9 @@ function prismaSnapshot(
 
 /**
  * Creates a Summary Report through the immutable two-transaction lifecycle.
- * The only artifact written before persistence is private and every failure
- * after that write attempts orphan cleanup.
+ * The only artifact written before persistence is private. Cleanup is safe only
+ * before the write callback succeeds; a lost COMMIT acknowledgement can mean
+ * the immutable row already references these bytes.
  */
 export async function createSummaryReport(
   db: SummaryReportCreateDb,
@@ -585,9 +616,16 @@ export async function createSummaryReport(
   }
   if (frozen.kind !== "ok") return frozen;
 
+  // Network/decoding happens once, outside either DB transaction. The original
+  // source hash (including coach URL/name) still gates the second transaction;
+  // persisted identity covers the augmented snapshot actually rendered.
+  const coachImage = await (dependencyOverrides.loadCoachImage ?? loadSummaryCoachImage)(frozen.snapshot.provenance.coachLogoUrl);
+  const renderedSnapshot = coachImage ? { ...frozen.snapshot, coachImage } : frozen.snapshot;
+  const renderedInputHash = coachImage ? sha256Hex(canonicalJson(renderedSnapshot)) : frozen.inputHash;
+
   let rendered: { bytes: Buffer; rendererVersion: string };
   try {
-    rendered = await renderPdf(command.reportType, frozen.snapshot);
+    rendered = await renderPdf(command.reportType, renderedSnapshot);
   } catch (error) {
     safelyLogOperationalError(
       logOperationalError,
@@ -612,6 +650,7 @@ export async function createSummaryReport(
     return { kind: "render-failed" };
   }
 
+  let writeCallbackCompleted = false;
   try {
     const persisted = await db.repeatableRead(async (tx) => {
       const rechecked = await buildSnapshot(tx.snapshotDb, actor, {
@@ -644,8 +683,8 @@ export async function createSummaryReport(
         createdByEmailSnapshot: actor.email,
         createdAt,
         rendererVersion: rendered.rendererVersion,
-        inputSnapshot: prismaSnapshot(frozen.snapshot),
-        inputHash: frozen.inputHash,
+        inputSnapshot: prismaSnapshot(renderedSnapshot),
+        inputHash: renderedInputHash,
         creationRequestId: command.creationRequestId,
         artifactPath: artifact.path,
         artifactSha256: artifact.sha256,
@@ -678,12 +717,13 @@ export async function createSummaryReport(
           reportId: report.id,
           campaignId: command.destinationCampaignId,
           reportType: command.reportType,
-          inputHash: frozen.inputHash,
+          inputHash: renderedInputHash,
           artifactSha256: artifact.sha256,
         }),
       } satisfies Prisma.AuditLogUncheckedCreateInput;
       await tx.createAudit(auditData);
 
+      writeCallbackCompleted = true;
       return { kind: "created" as const, report };
     });
 
@@ -693,9 +733,13 @@ export async function createSummaryReport(
     }
     return persisted;
   } catch (error) {
-    await bestEffortDelete(artifactStore, artifact.path);
+    // A rejected callback never reaches COMMIT. Once it returns successfully,
+    // neither a connection error nor an empty/failed read proves rollback.
+    if (!writeCallbackCompleted) {
+      await bestEffortDelete(artifactStore, artifact.path);
+    }
 
-    if (isCreationRequestCollision(error)) {
+    if (writeCallbackCompleted || isCreationRequestCollision(error)) {
       let winner: SummaryReportListItem | null | "not-found";
       try {
         winner = await findAuthorizedExisting(

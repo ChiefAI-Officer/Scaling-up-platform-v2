@@ -46,6 +46,14 @@ export interface SelectedSummarySource {
   position: number;
 }
 
+export interface FrozenCoachImage {
+  mediaType: "image/png";
+  base64: string;
+  sha256: string;
+  width: number;
+  height: number;
+}
+
 export interface ScalingCeoFullSnapshot {
   schemaVersion: 1;
   reportType: "SCALING_CEO_FULL";
@@ -61,6 +69,8 @@ export interface ScalingCeoFullSnapshot {
     language: string;
   };
   createdAt: string;
+  /** Validated creation-time bytes, never a renderer-fetchable URL. */
+  coachImage?: FrozenCoachImage;
   sources: Array<{
     submissionId: string;
     sourceCampaignId: string;

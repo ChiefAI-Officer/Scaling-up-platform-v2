@@ -276,10 +276,15 @@ describe("SummaryReportWizard", () => {
     );
   });
 
-  it("keeps the editable draft after a conclusive validation response", async () => {
+  it.each([
+    ["source_not_found", "The selected source is no longer available."],
+    ["source_not_completed", "The selected source is no longer completed."],
+    ["source_incompatible", "The selected source is no longer compatible."],
+  ])("identifies an authorized %s failure, refreshes candidates and retains assignments", async (code, message) => {
     (global.fetch as jest.Mock)
       .mockResolvedValueOnce(response({ candidates: [CEO] }))
-      .mockResolvedValueOnce(response({ error: "invalid composition" }, 422));
+      .mockResolvedValueOnce(response({ errors: [{ code, message, submissionId: CEO.submissionId }] }, 422))
+      .mockResolvedValueOnce(response({ candidates: [CEO, INCOMPATIBLE] }));
     renderWizard();
 
     fireEvent.click(screen.getByRole("button", { name: "Scaling CEO Full" }));
@@ -293,10 +298,36 @@ describe("SummaryReportWizard", () => {
     fireEvent.click(screen.getByRole("button", { name: "Create report" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "invalid composition",
+      `Avery CEO (${CEO.submissionId}): ${message}`,
     );
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
     expect(screen.getByText("CEO: Avery CEO")).toBeInTheDocument();
+    await screen.findByRole("button", { name: /Sam Stale.*Incompatible version/i });
+    expect((global.fetch as jest.Mock).mock.calls.filter(([url]) => url.includes("/candidates"))).toHaveLength(2);
+    expect((global.fetch as jest.Mock).mock.calls.filter(([url]) => url === BASE_URL)).toHaveLength(1);
+  });
+
+  it.each([
+    [{ errors: [{ code: "source_unavailable", message: "Private source Avery CEO", submissionId: CEO.submissionId }] }, "One or more selected sources are unavailable. Review your selection and try again."],
+    [{ errors: "bad" }, "Please correct the composition and try again."],
+    [{ errors: [null] }, "Please correct the composition and try again."],
+    [{ errors: [{ code: "unknown", message: "untrusted detail" }] }, "Please correct the composition and try again."],
+  ])("handles concealed or malformed validation without leaking source details", async (envelope, expected) => {
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce(response({ candidates: [CEO] }))
+      .mockResolvedValueOnce(response(envelope, 422));
+    renderWizard();
+    fireEvent.click(screen.getByRole("button", { name: "Scaling CEO Full" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    await screen.findByText("Avery CEO");
+    fireEvent.click(screen.getByRole("button", { name: "Select Avery CEO" }));
+    fireEvent.click(screen.getByRole("button", { name: "Assign Avery CEO as CEO" }));
+    fireEvent.click(screen.getByRole("button", { name: "Review" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create report" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(expected);
+    expect(screen.getByRole("alert")).not.toHaveTextContent("Avery CEO");
+    expect(screen.getByRole("alert")).not.toHaveTextContent(CEO.submissionId);
+    expect(screen.getByRole("button", { name: "Back" })).toBeEnabled();
   });
 
   it("retains a replaced CEO card as selected, supports an empty Team, and shows the persisted automatic name", async () => {

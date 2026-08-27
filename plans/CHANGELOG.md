@@ -6,6 +6,25 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="summary-reporting-final-aggregate-fix"></a>
+### 2026-08-27 — Summary Reporting final aggregate fix <!-- ENTRY_ISO:2026-08-27 ENTRY_SLUG:summary-reporting-final-aggregate-fix -->
+
+**Status: LOCALLY VERIFIED; NOT MERGED, DEPLOYED OR LAUNCHED.** One bounded final-review fix wave for the existing Scaling CEO Full tracer; no other family, live data, flag or infrastructure change.
+
+**Important findings.** Unknown COMMIT outcomes now retain private artifacts; authorized reconciliation/same-UUID retry can recover, while confirmed pre-commit failures and known request losers still clean up. Empty/failed lookup does not prove rollback; rare private orphans are an explicit operational cost. PDF tier display honors frozen `showTier:false`, preserving computed tiers, scores and peer disclosure. Wizard consumes actual `errors[]` envelopes, provides authorized source-specific messages, conceals `source_unavailable`, keeps drafts/roles and refetches stale scopes without changing frozen ambiguous-retry semantics. Cover/footer coach image/name attribution is restored from validated creation-time bytes, not URL fetching in renderer/delivery.
+
+**Asset boundary.** Only known public Vercel Blob upload hosts are supported; Circle/arbitrary external hosts fall back to name-only. HTTPS/no credentials/nonstandard ports; no redirects; bounded time/bytes/pixels; sharp raster normalization to PNG bytes/dimensions/checksum in the immutable input. No live-avatar availability claim. Original source hash still gates the second transaction; the persisted hash covers the augmented rendered snapshot.
+
+**Integration discovery.** Real PostgreSQL proof found Prisma 5.22 JSON write conversion changing last-bit computed gap values. The report adapter now inserts canonical JSON through a bound text parameter cast to jsonb, with static SQL identifiers, explicit selected RETURNING fields and opaque UUID ID. No rounding/scoring change. Explicit request-ID conflict target preserves safe retry classification; unrelated uniqueness failures remain failures. UTC timestamps are explicit under a non-UTC DB session. Raw stored and Prisma-read hashes match; atomic report/source/audit rollback and a concurrent same-UUID race pass. Explicit raw field mapping requires upkeep.
+
+**Minor triage/evidence.** Persisted fields/enums/inverse relations/FK delete actions have expanded coverage. Local fixture now uses stable main ancestor `16d5a29c31c2db64e7f4d11c4053f4bb9f5d43db` (unchanged schema blob), then exact tracer SQL. Historical missing-categories chain failure remains out of scope. Actual 390px lists are scrolled into view and actionability checked on both hosts. Coach host clipping persists; admin panel fits. Current native previews show partial content and mobile horizontal clipping, not full readability. Lighter flat-purple cover, changed title/strip/spacing and column-bar/A4 differences are explicit; earlier fidelity PASS is superseded, not treated as user acceptance.
+
+**Final verification.** Named Jest 20 suites/246 tests; legacy attribution/policy 4 suites/48 tests; headed Chromium 5/5 (race 503/201 then retry200, one artifact). Changed-file ESLint exit0; migration safety 43 migrations exit0; credential-free Node20 Turbopack exit0, 13.4s compile and 92/92 static pages. Expected test/environment warnings remain disclosed. [Final evidence, hashes and limits](../docs/research/evidence/summary-reporting-final-fix/README.md) supersede old tier/branding/mobile-list evidence. No current tests overwrite reviewed images.
+
+**Still NOT RUN:** private Blob provisioning/privacy proof, real distributed Redis, push/PR/merge/deploy, deployed migration/framing/CSP/CDN behavior, exact approved canary and product-owner actual-output acceptance. Keep global off/canary empty initially; winning kill-switch rollback does not delete/recompute immutable rows.
+
+---
+
 <a id="summary-reporting-scaling-ceo-full-local-proof"></a>
 ### 2026-08-27 — Summary Reporting foundation + Scaling CEO Full local proof <!-- ENTRY_ISO:2026-08-27 ENTRY_SLUG:summary-reporting-scaling-ceo-full-local-proof -->
 

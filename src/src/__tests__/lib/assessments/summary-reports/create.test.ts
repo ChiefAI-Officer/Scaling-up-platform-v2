@@ -106,6 +106,7 @@ interface HarnessOptions {
   renderError?: Error;
   uploadError?: Error;
   persistError?: unknown;
+  commitAcknowledgementError?: Error;
   deleteError?: Error;
   authorized?: boolean | boolean[];
   beforeFindReturn?: () => Promise<void>;
@@ -189,7 +190,11 @@ function harness(options: HarnessOptions = {}) {
           ordinal: calls.transactions.length,
         };
         calls.transactionClients.push(transactionClient);
-        return callback(transactionClient);
+        const result = await callback(transactionClient);
+        if (calls.transactions.length === 2 && options.commitAcknowledgementError) {
+          throw options.commitAcknowledgementError;
+        }
+        return result;
       },
     ),
   } satisfies SummaryReportCreateDb;
@@ -304,6 +309,71 @@ function expectStandardJsonObjectPrototypes(value: unknown): void {
 }
 
 describe("createSummaryReport", () => {
+  it("persists the rendered coach bytes and augmented hash while rechecking the original source snapshot", async () => {
+    const test = harness();
+    const coachImage = { mediaType: "image/png" as const, base64: "cG5n", sha256: "image-identity", width: 32, height: 32 };
+    const loadCoachImage = jest.fn(async () => coachImage);
+    await expect(createSummaryReport(test.db, actor, command, { ...test.dependencies, loadCoachImage }))
+      .resolves.toMatchObject({ kind: "created" });
+    const expected = { ...snapshot, coachImage };
+    expect(test.calls.render).toEqual([expected]);
+    expect(test.calls.reportCreate[0]).toMatchObject({ inputSnapshot: expected, inputHash: sha256Hex(canonicalJson(expected)) });
+    expect(test.calls.build).toHaveLength(2);
+    expect(loadCoachImage).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(String(test.calls.auditCreate[0].changes)).inputHash).toBe(sha256Hex(canonicalJson(expected)));
+    expect(snapshot).not.toHaveProperty("coachImage");
+  });
+
+  it("does not let frozen coach assets bypass a changed-source recheck", async () => {
+    const test = harness({ snapshotResults: [
+      { kind: "ok", snapshot, inputHash: "original" },
+      { kind: "ok", snapshot, inputHash: "changed" },
+    ] });
+    const result = await createSummaryReport(test.db, actor, command, { ...test.dependencies, loadCoachImage: async () => ({ mediaType: "image/png", base64: "cG5n", sha256: "image-identity", width: 32, height: 32 }) });
+    expect(result).toMatchObject({ kind: "invalid", errors: [{ code: "source_changed" }] });
+    expect(test.calls.reportCreate).toHaveLength(0);
+    expect(test.calls.deleted).toEqual([artifact.path]);
+  });
+  it("retains committed bytes and reconciles an authorized report after a lost commit acknowledgement", async () => {
+    const test = harness({
+      commitAcknowledgementError: new Error("connection lost after commit"),
+      existingRows: [null, report()],
+    });
+    await expect(createSummaryReport(test.db, actor, command, test.dependencies))
+      .resolves.toEqual({ kind: "existing", report: report() });
+    expect(test.calls.sourceCreateMany.length).toBeGreaterThan(0);
+    expect(test.calls.auditCreate).toHaveLength(1);
+    expect(test.calls.deleted).toEqual([]);
+    await expect(createSummaryReport(test.db, actor, command, test.dependencies))
+      .resolves.toEqual({ kind: "existing", report: report() });
+    expect(test.calls.put).toHaveLength(1);
+  });
+
+  it.each(["empty", "failed"])("retains uncertain bytes after %s reconciliation and recovers on a later same-UUID retry", async (lookup) => {
+    const failure = new Error("commit status unknown");
+    const test = harness({
+      commitAcknowledgementError: failure,
+      existingRows: [null, null, report()],
+      findErrors: lookup === "failed" ? [null, new Error("read unavailable"), null] : [],
+    });
+    await expect(createSummaryReport(test.db, actor, command, test.dependencies)).rejects.toThrow();
+    expect(test.calls.deleted).toEqual([]);
+    await expect(createSummaryReport(test.db, actor, command, test.dependencies))
+      .resolves.toEqual({ kind: "existing", report: report() });
+    expect(test.calls.put).toHaveLength(1);
+    expect(test.calls.transactions).toHaveLength(2);
+  });
+
+  it("conceals a now-unauthorized recovered report without deleting uncertain bytes", async () => {
+    const test = harness({
+      commitAcknowledgementError: new Error("unknown commit"),
+      existingRows: [null, report()],
+      authorized: false,
+    });
+    await expect(createSummaryReport(test.db, actor, command, test.dependencies))
+      .resolves.toEqual({ kind: "not-found" });
+    expect(test.calls.deleted).toEqual([]);
+  });
   it("accepts the generated Prisma client through an explicit typed adapter", () => {
     expect(productionAdapterContract).toBe(createPrismaSummaryReportCreateDb);
     expect(transactionAdapterContract).toBe(
@@ -947,8 +1017,10 @@ describe("createSummaryReport", () => {
     );
   });
 
-  it("rethrows other P2002 targets after cleanup and sanitized logging", async () => {
-    const failure = p2002(["artifactPath"]);
+  it.each([
+    p2002(["artifactPath"]),
+    { code: "P2010", meta: { code: "23505", message: "private constraint detail" } },
+  ])("rethrows unrelated integrity failures after cleanup and sanitized logging", async (failure) => {
     const test = harness({ persistError: failure });
 
     await expect(
