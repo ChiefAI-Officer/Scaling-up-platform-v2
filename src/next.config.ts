@@ -25,6 +25,16 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  outputFileTracingIncludes: {
+    // Summary creation imports the app's Sharp; its OS-loaded libvips library
+    // is not discoverable through JavaScript imports alone. Include only the
+    // installed root-package native assets, not Next's separate Sharp copy.
+    // Next matches route globs with contains:true, covering this report family.
+    "/api/assessment-campaigns/*/summary-reports": [
+      "./node_modules/@img/sharp-*/lib/*.node",
+      "./node_modules/@img/sharp-libvips-*/lib/**/*",
+    ],
+  },
   async headers() {
     return [
       {

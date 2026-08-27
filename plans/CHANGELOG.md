@@ -6,6 +6,17 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="summary-reporting-native-packaging"></a>
+### 2026-08-27 — Summary Reporting native packaging correction <!-- ENTRY_ISO:2026-08-27 ENTRY_SLUG:summary-reporting-native-packaging -->
+
+**Status: TEST-CAMPAIGN CANARY DEPLOYED; LIVE PDF VERIFICATION BLOCKED.** Protected PR #384 merged as `af558860`; hosted checks and merged-main CI passed. The dark production deployment preserved the legacy entry for both Admin and Coach. Only `SUMMARY_REPORTING_CANARY=cmt3sxj95000g1bznjubxw4ms` was then activated in Production; global enablement remains off. Both canonical aliases point to exact-main Ready deployment `dpl_ZYY4S7MdYjnyco2hLaY1Hxxat7Yj` and health checks pass. The additive migration is applied, with report/source immutability triggers enabled.
+
+**Canary finding.** Candidates return 200, but report-list GET returns 500 before the route handler: its creation-service import loads Sharp, whose Linux native binary cannot find `libvips-cpp.so.8.18.3`. The local route trace also omits the native libvips library. This is a deployed native dependency packaging defect, not an observed Redis or Prisma failure. No live summary report has been created. A narrow route-specific tracing correction is being verified; no approved screen, calculation, source record, or flag scope changes. Local full-node_modules/browser tests did not establish serverless native-library completeness, so deployed route/PDF checks remain mandatory. [Release receipt](../docs/research/evidence/summary-reporting-production-release-2026-08-27.md) records evidence and the remaining acceptance gate.
+
+**Correction validated locally.** Explicit installed-root Sharp/native-libvips includes are scoped to the Summary Reports API family, with Next's child-route matching documented. Native regression: four red failures before the fix, final 9/9 green; affected API/image/PDF/SoT matrix 5 suites/84 tests green before the two final child assertions. Stable-source Node 24 Turbopack build exits 0 (TypeScript and 95/95 pages); its actual list/create trace now includes the missing libvips8.18.3 library. Lint, 50-migration gate, diff check, and independent review pass. No version, approved UI, calculation, authorization, or global flag changes. Deployed Linux import/live PDF checks remain pending.
+
+---
+
 <a id="summary-reporting-production-integration"></a>
 ### 2026-08-27 — Summary Reporting production integration <!-- ENTRY_ISO:2026-08-27 ENTRY_SLUG:summary-reporting-production-integration -->
 
