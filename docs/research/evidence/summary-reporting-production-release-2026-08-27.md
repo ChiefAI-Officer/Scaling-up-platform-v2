@@ -33,7 +33,7 @@ The user accepted the revised local CEO/Team composition, understood that only S
 - Independent integration review: no remaining issue. Separate re-review approved the nullable-organization compatibility guards without scope widening or changes to valid calculations.
 - Focused final matrix: 20/20 relevant suites, 271/271 tests pass (snapshot/renderer, API/storage/idempotency, wizard/panel, both hosts, flags/limiter, schema and SoT). Snapshot adds explicit missing-organization rejection and PDF-text equivalence despite newer main-model question-peer fields.
 - Full repository run: 791 suites, 788 passed / 3 failed; 9,850 passed / 4 failed tests, 16 snapshots passed. This run overlapped integration fixes. The snapshot benchmark/golden expectation and SoT-size failures were fixed and pass in the final focused run. The unrelated existing landscape capture exceeded its 5-second test deadline; a bounded standalone recheck is recorded separately, not hidden as an all-green full-suite result.
-- The nested-worktree browser harness authenticated successfully but timed out while compiling the Admin host. Both bundlers reproduced that environment boundary; isolated-copy verification is pending. This is not claimed as an end-to-end pass.
+- The nested-worktree browser harness authenticated successfully but timed out while compiling the Admin host. Both bundlers reproduced that environment boundary; the subsequent isolated-copy proof below passed.
 - Standalone landscape-capture recheck: 3/3 tests pass, exit 0, with an explicit 30-second local test deadline (6.671 seconds for the suite). No assertion or unrelated test source was changed. All failures from the full run have now passed their focused rechecks; the complete suite was not rerun after those fixes.
 - Live pre-release read-only baseline: authorized test Admin login, `SU Full report TEST` campaign, existing direct group report, healthy database/auth posture, and login `X-Frame-Options: DENY` verified. No invitation/reminder or assessment change performed.
 
@@ -43,7 +43,36 @@ All **5/5 tests passed**, exit 0, in 1.6 minutes using Node 24.20.0 and default 
 
 Covered both Admin/Coach list and composition, real sign-in, initial create 201 and replay 200, selected source ordering, exact stored canonical JSON hash, immutable PDF bytes after later source changes, authorization/current-access revocation, tamper denial, immutable database constraints, unsupported/flag-off/kill paths, DRAFT destinations, and concurrent identical requests (201/503, one retained report/source/audit/artifact). Fixture app/database stopped and its synthetic database removed; the original user preview remains running.
 
-[Protected PR #384](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/384) contains the release. [Notion release task](https://app.notion.com/p/3c98c45dd8298116a226c0d3056ac812) tracks dark deployment, exact-campaign canary and acceptance gates. Hosted checks, exact-SHA Ready deployment and live canary proof remain pending; build success does not imply deployment or global activation.
+[Protected PR #384](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/384) merged as `af55886022b2eebaae36fafa9d656c6a2ad9f48b` at `2026-08-27T13:42:26Z`. All hosted checks passed: Build (Node 20), Migration Safety Gate, Assessment Email Lease (PostgreSQL), Vercel and Preview Comments. The merged-main CI run also passed. [Notion release task](https://app.notion.com/p/3c98c45dd8298116a226c0d3056ac812) tracks the release and acceptance gate.
+
+### Dark production verification
+
+- Ready deployment `dpl_EFRQsDBR1uPemZK31F1V7Lsr1ZCE`, URL `https://scaling-up-platform-v2-kjlq854fg-scaling-up.vercel.app`, matches the exact merge SHA.
+- Both canonical aliases independently resolve to this deployment/project/SHA; both health endpoints returned HTTP 200 with healthy database and safe auth posture.
+- The additive migration finished at `2026-08-27T13:36:00.418Z`, with no rollback. Both tables exist and each expected immutability trigger is enabled. Initial report/source counts were 0/0.
+- Authorized Admin and Coach accounts both opened the existing `SU Full report TEST` campaign with the legacy group-report link present and no Summary Reports wizard. The legacy direct report remained available; login retained `X-Frame-Options: DENY`.
+
+### Canary activation
+
+Only Production `SUMMARY_REPORTING_CANARY` was set to `cmt3sxj95000g1bznjubxw4ms` (the user's existing `SU Full report TEST` campaign). Global enablement and kill remain absent; unrelated environment metadata is unchanged. The exact merged-main redeploy `dpl_ZYY4S7MdYjnyco2hLaY1Hxxat7Yj` reached Ready at `2026-08-27T13:48:02Z`; both aliases independently match its project/SHA and return healthy HTTP 200. Live report creation/preview/download and product-owner PDF acceptance remain pending.
+
+### Canary-native dependency finding
+
+- The live Coach host displays Summary Reports and opens the approved wizard. Candidates GET returns 200, exposing the existing single completed test source (Edition 6, `enUS`). No synthetic Team responses were added.
+- Report-list GET repeatedly returns HTTP 500 with a Next error document, independently reproduced after authorized Admin sign-in.
+- Runtime logs identify `ERR_DLOPEN_FAILED: libvips-cpp.so.8.18.3: cannot open shared object file` while loading root Sharp 0.35.1 on Linux x64. Static import path: route → creation service → coach-image → Sharp. Failure occurs before the handler/limiter. No matching rate-limit or list-handler failure events were observed.
+- The Mac production-build trace contains the Sharp native addon and libvips package metadata but omits its native library too. Full local node_modules masks this tracing gap. Next's nested Sharp 0.34.5 is a different dependency and is not substituted for the report service's version.
+- Follow-up branch `codex/summary-reporting-production-receipt` makes a narrow route-specific native-asset tracing correction. Verification must include generated trace completeness and deployed Linux route loading, then actual report/PDF proof; local build success alone is insufficient.
+- No live summary report or source record was created before the fault was identified. Existing assessments, submissions, invitations, and reminders remain unchanged.
+
+Primary references: [Next output-file tracing](https://nextjs.org/docs/app/api-reference/config/next-config-js/output), [Sharp native installation/deployment](https://sharp.pixelplumbing.com/install/).
+
+### Packaging correction verification
+
+- `next.config.ts` explicitly includes installed root `@img/sharp-*/lib/*.node` and `@img/sharp-libvips-*/lib/**/*` assets for the Summary Reports API family. Next's `contains:true` route matching also covers report children; this is documented and tested, not claimed as list-only isolation. No dependency version, UI, calculation, or authorization changed.
+- Test-first proof: four missing native-asset cases failed before the includes. Final config regression passes 9/9, including report children and exclusion of unrelated app routes. The affected API/image/PDF/SoT matrix passed 5 suites/84 tests before the two final child assertions; those final config assertions independently pass. Agent runtime/image/config proof also passed 3 suites/30 tests.
+- Final stable-source Node 24.20.0 Turbopack build exits 0; TypeScript and 95/95 pages pass. Actual generated list/create trace now contains both root Sharp `sharp-darwin-arm64-0.35.1.node` and `libvips-cpp.8.18.3.dylib`, with both files verified present. An earlier build overlapped the red-test temporary config removal and did not load the includes; it is not used as corrected-trace evidence.
+- Changed-file ESLint, 50-migration safety gate, and diff check pass. Independent review found no Critical/Important issue. Deployed Linux import and live PDF proof are still required.
 
 ## Next steps after the canary
 
