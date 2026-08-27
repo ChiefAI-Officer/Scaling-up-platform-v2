@@ -2,6 +2,7 @@ import type { ApiActor } from "@/lib/auth/access-control";
 import {
   asAccessDb,
   canViewGroupReport,
+  type AccessControlDb,
 } from "@/lib/assessments/access-control";
 import type { SummaryReportType } from "./types";
 
@@ -30,12 +31,36 @@ export interface SummaryReportCandidate {
     | null;
 }
 
-export interface SummaryReportCandidateDb {
+type AccessCampaignFindFirstArgs = Parameters<
+  AccessControlDb["assessmentCampaign"]["findFirst"]
+>[0];
+
+type AccessCampaignFindFirstResult = ReturnType<
+  AccessControlDb["assessmentCampaign"]["findFirst"]
+>;
+
+interface DestinationCampaignFindFirstArgs {
+  where: { id: string; deletedAt: null };
+  select: {
+    id: true;
+    organizationId: true;
+    templateId: true;
+    versionId: true;
+    language: true;
+    accessMode: true;
+    template: { select: { alias: true } };
+  };
+}
+
+export interface SummaryReportCandidateDb
+  extends Omit<AccessControlDb, "assessmentCampaign"> {
   assessmentCampaign: {
-    findFirst: (args: {
-      where: { id: string; deletedAt: null };
-      select: Record<string, unknown>;
-    }) => Promise<DestinationCampaignRow | null>;
+    findFirst(
+      args: AccessCampaignFindFirstArgs,
+    ): AccessCampaignFindFirstResult;
+    findFirst(
+      args: DestinationCampaignFindFirstArgs,
+    ): Promise<DestinationCampaignRow | null>;
   };
   assessmentSubmission: {
     findMany: (args: {

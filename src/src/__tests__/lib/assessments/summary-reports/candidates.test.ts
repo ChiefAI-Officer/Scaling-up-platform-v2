@@ -2,7 +2,14 @@ import {
   listSummaryReportCandidates,
   type SummaryReportCandidateDb,
 } from "@/lib/assessments/summary-reports/candidates";
+import type { AccessControlDb } from "@/lib/assessments/access-control";
 import type { ApiActor } from "@/lib/auth/access-control";
+
+function requireStrictAccessContract(
+  db: SummaryReportCandidateDb,
+): AccessControlDb {
+  return db;
+}
 
 const actor: ApiActor = {
   userId: "user-1",
@@ -62,7 +69,9 @@ function submission(overrides: Record<string, unknown> = {}) {
 
 function buildDb(options: {
   campaigns?: ReturnType<typeof campaign>[];
-  submissions?: unknown[];
+  submissions?: Awaited<
+    ReturnType<SummaryReportCandidateDb["assessmentSubmission"]["findMany"]>
+  >;
   grantedTemplateIds?: string[];
 } = {}) {
   const campaigns = options.campaigns ?? [campaign()];
@@ -71,7 +80,7 @@ function buildDb(options: {
     options.grantedTemplateIds ?? ["template-scaling"],
   );
 
-  return {
+  const db = {
     accessGroupCoach: {
       findMany: jest.fn(async () => [
         {
@@ -112,7 +121,10 @@ function buildDb(options: {
     assessmentSubmission: {
       findMany: jest.fn(async () => options.submissions ?? []),
     },
-  } as unknown as SummaryReportCandidateDb;
+  } satisfies SummaryReportCandidateDb;
+
+  requireStrictAccessContract(db);
+  return db;
 }
 
 describe("listSummaryReportCandidates", () => {
@@ -211,6 +223,8 @@ describe("listSummaryReportCandidates", () => {
     expect(query.where.respondentId).toEqual({ not: null });
     expect(query.select).not.toHaveProperty("answers");
     expect(query.select).not.toHaveProperty("result");
+    expect(query.select).not.toHaveProperty("publicTaker");
+    expect(query.select).not.toHaveProperty("summaryReportSources");
   });
 
   it("lists authorized same-organization ended reports, retains incompatible cards, and memoizes source authorization", async () => {
@@ -367,5 +381,11 @@ describe("listSummaryReportCandidates", () => {
       ([args]) => args.where.id === "campaign-closed" && args.select === undefined,
     );
     expect(sourceAuthCalls).toHaveLength(1);
+    expect(db.coach.findUnique).toHaveBeenCalledWith({ where: { id: "coach-1" } });
+    expect(db.organization.findUnique).toHaveBeenCalledWith({
+      where: { id: "organization-1" },
+    });
+    expect(db.accessGroupCoach.findMany).toHaveBeenCalled();
+    expect(db.accessGroupTemplate.findMany).toHaveBeenCalled();
   });
 });
