@@ -1312,6 +1312,7 @@ model AssessmentCampaign {
   participants   AssessmentCampaignParticipant[]
   invitations    AssessmentInvitation[]
   submissions    AssessmentSubmission[]
+  summaryReports SummaryReport[]
   ownershipEvents OrganizationOwnershipEvent[]
 
   @@index([organizationId])
@@ -1384,6 +1385,7 @@ model AssessmentSubmission {
   invitation AssessmentInvitation? @relation(fields: [invitationId], references: [id])
   referringCoach Coach?            @relation("AssessmentSubmissionReferringCoach", fields: [referringCoachId], references: [id], onDelete: Restrict)
   outboxEmails AssessmentEmailOutbox[]
+  summaryReportSources SummaryReportSource[]
 
   @@index([campaignId])
   @@index([respondentId, submittedAt])
@@ -1394,6 +1396,52 @@ model AssessmentSubmission {
   //   - (resultsTokenHash) WHERE resultsTokenHash IS NOT NULL
   //   - (idempotencyKey) WHERE idempotencyKey IS NOT NULL
   @@map("assessment_submissions")
+}
+
+model SummaryReport {
+  id                     String            @id @default(cuid())
+  campaignId             String
+  reportType             SummaryReportType
+  name                   String
+  templateId             String
+  versionId              String
+  language               String
+  createdByUserId        String
+  createdByEmailSnapshot String
+  createdAt              DateTime          @default(now())
+  rendererVersion        String
+  inputSnapshot          Json
+  inputHash              String
+  moderationManifest     Json?
+  creationRequestId      String            @unique
+  artifactPath           String            @unique
+  artifactSha256         String
+  artifactSizeBytes      Int
+  artifactCreatedAt      DateTime
+
+  campaign AssessmentCampaign   @relation(fields: [campaignId], references: [id], onDelete: Restrict)
+  sources  SummaryReportSource[]
+
+  @@index([campaignId, createdAt])
+  @@index([createdByUserId, createdAt])
+  @@map("summary_reports")
+}
+
+model SummaryReportSource {
+  id                 String                  @id @default(cuid())
+  summaryReportId    String
+  submissionId       String
+  role               SummaryReportSourceRole
+  position           Int
+  respondentSnapshot Json
+
+  summaryReport SummaryReport       @relation(fields: [summaryReportId], references: [id], onDelete: Cascade)
+  submission    AssessmentSubmission @relation(fields: [submissionId], references: [id], onDelete: Restrict)
+
+  @@unique([summaryReportId, submissionId])
+  @@unique([summaryReportId, role, position])
+  @@index([submissionId])
+  @@map("summary_report_sources")
 }
 
 /// Durable outbox for Quick Assessment lead/result emails (claudex R2 hardening).
@@ -1565,4 +1613,21 @@ enum AssessmentCampaignAccessMode {
 enum AssessmentTemplateAggregationMode {
   FULL_VISIBILITY
   CEO_ONLY
+}
+
+enum SummaryReportType {
+  SCALING_CEO_FULL
+  SCALING_CONDENSED_CEO
+  SCALING_SELF_COMPARISON
+  LVA_CEO_FULL
+  QSP_V1_CEO_FULL
+  QSP_V2_CEO_FULL
+  ROCKEFELLER_FULL
+}
+
+enum SummaryReportSourceRole {
+  CEO
+  TEAM
+  FOCUS
+  EARLIER
 }
