@@ -1,10 +1,12 @@
 import snapshotFixture from "@/__tests__/fixtures/summary-reports/scaling-ceo-full-snapshot.json";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import type { ApiActor } from "@/lib/auth/access-control";
 import type { StoredSummaryArtifact } from "@/lib/assessments/summary-reports/artifact-store";
 import type {
   ScalingCeoFullSnapshot,
   SelectedSummarySource,
 } from "@/lib/assessments/summary-reports/canonical";
+import type { SummaryReportSnapshotDb } from "@/lib/assessments/summary-reports/scaling-ceo-full-snapshot";
 
 jest.mock("@vercel/blob", () => ({
   put: jest.fn(),
@@ -16,12 +18,23 @@ jest.mock("@/lib/assessments/summary-reports/renderers", () => ({
 }));
 
 import {
+  createPrismaSummaryReportCreateDb,
+  createPrismaSummaryReportCreateTransaction,
   createSummaryReport,
   type CreateSummaryReportCommand,
   type SummaryReportCreateDb,
+  type SummaryReportCreateTransaction,
   type SummaryReportListItem,
   type SummaryReportOperationalError,
 } from "@/lib/assessments/summary-reports/create";
+
+const productionAdapterContract: (
+  client: PrismaClient,
+) => SummaryReportCreateDb = createPrismaSummaryReportCreateDb;
+const transactionAdapterContract: (
+  client: Prisma.TransactionClient,
+) => SummaryReportCreateTransaction =
+  createPrismaSummaryReportCreateTransaction;
 
 const actor: ApiActor = {
   userId: "user-admin-1",
@@ -92,13 +105,15 @@ interface HarnessOptions {
   persistError?: unknown;
   deleteError?: Error;
   authorized?: boolean | boolean[];
+  beforeFindReturn?: () => Promise<void>;
+  loggerThrows?: boolean;
 }
 
 function harness(options: HarnessOptions = {}) {
   const calls = {
     find: 0,
     transactions: [] as Array<{ isolationLevel: "RepeatableRead" }>,
-    transactionClients: [] as unknown[],
+    transactionClients: [] as SummaryReportCreateTransaction[],
     build: [] as unknown[],
     buildInputs: [] as Array<{
       actor: ApiActor;
@@ -126,48 +141,55 @@ function harness(options: HarnessOptions = {}) {
     ? [...options.authorized]
     : [options.authorized ?? true];
 
+  const snapshotDb = {
+    accessGroupCoach: { findMany: jest.fn(async () => []) },
+    accessGroupTemplate: { findMany: jest.fn(async () => []) },
+    organization: { findUnique: jest.fn(async () => null) },
+    coach: { findUnique: jest.fn(async () => null) },
+    assessmentCampaign: {
+      findFirst: jest.fn(async () => null),
+    },
+    assessmentSubmission: { findMany: jest.fn(async () => []) },
+  } satisfies SummaryReportSnapshotDb;
   const tx = {
-    summaryReport: {
-      create: jest.fn(async (args: { data: Record<string, unknown> }) => {
-        calls.reportCreate.push(args.data);
+    snapshotDb,
+    createReport: jest.fn(
+      async (data: Prisma.SummaryReportUncheckedCreateInput) => {
+        calls.reportCreate.push(data);
         if (options.persistError) throw options.persistError;
         return report();
-      }),
-    },
-    summaryReportSource: {
-      createMany: jest.fn(async (args: { data: Record<string, unknown>[] }) => {
-        calls.sourceCreateMany.push(...args.data);
-        return { count: args.data.length };
-      }),
-    },
-    auditLog: {
-      create: jest.fn(async (args: { data: Record<string, unknown> }) => {
-        calls.auditCreate.push(args.data);
-        return { id: "audit-1" };
-      }),
-    },
-  };
+      },
+    ),
+    createSources: jest.fn(
+      async (data: Prisma.SummaryReportSourceCreateManyInput[]) => {
+        calls.sourceCreateMany.push(...data);
+      },
+    ),
+    createAudit: jest.fn(async (data: Prisma.AuditLogUncheckedCreateInput) => {
+      calls.auditCreate.push(data);
+    }),
+  } satisfies SummaryReportCreateTransaction;
   const db = {
-    summaryReport: {
-      findUnique: jest.fn(async () => {
-        const index = calls.find++;
-        const findError = options.findErrors?.[index];
-        if (findError) throw findError;
-        return existingRows[Math.min(index, existingRows.length - 1)] ?? null;
-      }),
-    },
-    $transaction: jest.fn(
-      async <T>(
-        callback: (client: typeof tx) => Promise<T>,
-        transactionOptions: { isolationLevel: "RepeatableRead" },
-      ) => {
-        calls.transactions.push(transactionOptions);
-        const transactionClient = { ...tx, ordinal: calls.transactions.length };
+    accessDb: snapshotDb,
+    findByCreationRequestId: jest.fn(async () => {
+      const index = calls.find++;
+      await options.beforeFindReturn?.();
+      const findError = options.findErrors?.[index];
+      if (findError) throw findError;
+      return existingRows[Math.min(index, existingRows.length - 1)] ?? null;
+    }),
+    repeatableRead: jest.fn(
+      async <T>(callback: (client: typeof tx) => Promise<T>) => {
+        calls.transactions.push({ isolationLevel: "RepeatableRead" });
+        const transactionClient = {
+          ...tx,
+          ordinal: calls.transactions.length,
+        };
         calls.transactionClients.push(transactionClient);
         return callback(transactionClient);
       },
     ),
-  } as unknown as SummaryReportCreateDb;
+  } satisfies SummaryReportCreateDb;
   const store = {
     putPdf: jest.fn(async (input: unknown) => {
       calls.put.push(input);
@@ -208,6 +230,7 @@ function harness(options: HarnessOptions = {}) {
   const logOperationalError = jest.fn(
     (event: SummaryReportOperationalError) => {
       calls.operationalErrors.push(event);
+      if (options.loggerThrows) throw new Error("logging sink unavailable");
     },
   );
 
@@ -234,6 +257,13 @@ function p2002(target: string | string[]): {
 }
 
 describe("createSummaryReport", () => {
+  it("accepts the generated Prisma client through an explicit typed adapter", () => {
+    expect(productionAdapterContract).toBe(createPrismaSummaryReportCreateDb);
+    expect(transactionAdapterContract).toBe(
+      createPrismaSummaryReportCreateTransaction,
+    );
+  });
+
   it("rejects a malformed UUID before any database or rendering work", async () => {
     const test = harness();
 
@@ -289,6 +319,75 @@ describe("createSummaryReport", () => {
     expect(test.calls.transactions).toHaveLength(0);
   });
 
+  it("captures actor, command, and every source before a deferred fast-path await", async () => {
+    let releaseFind!: () => void;
+    const findGate = new Promise<void>((resolve) => {
+      releaseFind = resolve;
+    });
+    const test = harness({ beforeFindReturn: () => findGate });
+    const mutableActor = { ...actor };
+    const originalSources = sources.map((source) => ({ ...source }));
+    const mutableCommand: CreateSummaryReportCommand = {
+      ...command,
+      sources: originalSources.map((source) => ({ ...source })),
+    };
+
+    const pending = createSummaryReport(
+      test.db,
+      mutableActor,
+      mutableCommand,
+      test.dependencies,
+    );
+    mutableActor.userId = "mutated-user";
+    mutableActor.email = "mutated@example.com";
+    mutableCommand.destinationCampaignId = "mutated-campaign";
+    mutableCommand.creationRequestId = "not-a-uuid-anymore";
+    mutableCommand.sources[0]!.submissionId = "mutated-submission";
+    mutableCommand.sources.push({
+      submissionId: "late-source",
+      sourceCampaignId: "mutated-campaign",
+      role: "TEAM",
+      position: 99,
+    });
+    releaseFind();
+
+    await expect(pending).resolves.toEqual({
+      kind: "created",
+      report: report(),
+    });
+
+    const capturedInput = {
+      destinationCampaignId: command.destinationCampaignId,
+      sources: originalSources,
+      createdAt,
+    };
+    expect(test.calls.buildInputs).toEqual([
+      { actor, input: capturedInput },
+      { actor, input: capturedInput },
+    ]);
+    expect(test.calls.put).toEqual([
+      {
+        campaignId: command.destinationCampaignId,
+        creationRequestId: requestId,
+        bytes,
+        createdAt,
+      },
+    ]);
+    expect(test.calls.reportCreate[0]).toMatchObject({
+      campaignId: command.destinationCampaignId,
+      createdByUserId: actor.userId,
+      createdByEmailSnapshot: actor.email,
+      creationRequestId: requestId,
+    });
+    expect(test.calls.auditCreate[0]).toMatchObject({
+      entityId: "summary-report-1",
+      performedBy: actor.userId,
+    });
+    expect(
+      JSON.parse(String(test.calls.auditCreate[0]?.changes)),
+    ).toMatchObject({ campaignId: command.destinationCampaignId });
+  });
+
   it("creates one immutable report, ordered sources, and safe audit in two repeatable-read transactions", async () => {
     const test = harness();
 
@@ -304,7 +403,9 @@ describe("createSummaryReport", () => {
       { isolationLevel: "RepeatableRead" },
       { isolationLevel: "RepeatableRead" },
     ]);
-    expect(test.calls.build).toEqual(test.calls.transactionClients);
+    expect(test.calls.build).toEqual(
+      test.calls.transactionClients.map((client) => client.snapshotDb),
+    );
     expect(test.calls.buildInputs).toEqual([
       {
         actor,
@@ -346,7 +447,6 @@ describe("createSummaryReport", () => {
         rendererVersion: "scaling-ceo-full-pdf-v1",
         inputSnapshot: snapshot,
         inputHash: "input-sha-256",
-        moderationManifest: null,
         creationRequestId: requestId,
         artifactPath: artifact.path,
         artifactSha256: artifact.sha256,
@@ -381,22 +481,35 @@ describe("createSummaryReport", () => {
       reportId: "summary-report-1",
       campaignId: command.destinationCampaignId,
       reportType: command.reportType,
-      templateId: snapshot.destination.templateId,
-      versionId: snapshot.destination.versionId,
-      creationRequestId: requestId,
-      sourceSubmissionIds: snapshot.sources.map(
-        (source) => source.submissionId,
-      ),
-      sourceCount: snapshot.sources.length,
       inputHash: "input-sha-256",
       artifactSha256: artifact.sha256,
-      rendererVersion: "scaling-ceo-full-pdf-v1",
     });
     const auditText = JSON.stringify(audit);
+    for (const forbidden of [
+      "templateId",
+      "versionId",
+      "creationRequestId",
+      "sourceSubmissionIds",
+      "sourceCount",
+      "rendererVersion",
+      requestId,
+      snapshot.sources[0]?.submissionId,
+      snapshot.destination.templateId,
+      snapshot.destination.versionId,
+      snapshot.destination.campaignName,
+      snapshot.sources[0]?.respondent.displayName,
+      artifact.path,
+      "name",
+      "answer",
+      "answers",
+      "snapshot",
+      "artifactPath",
+      "path",
+      "token",
+    ]) {
+      if (forbidden) expect(auditText).not.toContain(forbidden);
+    }
     expect(auditText).not.toContain(actor.email);
-    expect(auditText).not.toContain(snapshot.destination.campaignName);
-    expect(auditText).not.toContain(artifact.path);
-    expect(auditText).not.toContain("answers");
     expect(test.calls.deleted).toEqual([]);
   });
 
@@ -478,6 +591,20 @@ describe("createSummaryReport", () => {
     );
   });
 
+  it("preserves render-failed when the sanitized render logger throws", async () => {
+    const test = harness({
+      renderError: new TypeError("render primary"),
+      loggerThrows: true,
+    });
+
+    await expect(
+      createSummaryReport(test.db, actor, command, test.dependencies),
+    ).resolves.toEqual({ kind: "render-failed" });
+    expect(test.calls.put).toHaveLength(0);
+    expect(test.calls.reportCreate).toHaveLength(0);
+    expect(test.calls.operationalErrors).toHaveLength(1);
+  });
+
   it("returns render-failed and creates no row when private upload fails", async () => {
     const test = harness({
       uploadError: new RangeError("token and answer secret"),
@@ -501,6 +628,19 @@ describe("createSummaryReport", () => {
     expect(JSON.stringify(test.calls.operationalErrors)).not.toContain(
       "token and answer secret",
     );
+  });
+
+  it("preserves render-failed when the sanitized upload logger throws", async () => {
+    const test = harness({
+      uploadError: new RangeError("upload primary"),
+      loggerThrows: true,
+    });
+
+    await expect(
+      createSummaryReport(test.db, actor, command, test.dependencies),
+    ).resolves.toEqual({ kind: "render-failed" });
+    expect(test.calls.reportCreate).toHaveLength(0);
+    expect(test.calls.operationalErrors).toHaveLength(1);
   });
 
   it.each([
@@ -599,6 +739,17 @@ describe("createSummaryReport", () => {
     expect(JSON.stringify(test.calls.operationalErrors)).not.toContain(
       artifact.path,
     );
+  });
+
+  it("preserves the primary persistence error and cleanup when its logger throws", async () => {
+    const failure = new SyntaxError("persist primary");
+    const test = harness({ persistError: failure, loggerThrows: true });
+
+    await expect(
+      createSummaryReport(test.db, actor, command, test.dependencies),
+    ).rejects.toBe(failure);
+    expect(test.calls.deleted).toEqual([artifact.path]);
+    expect(test.calls.operationalErrors).toHaveLength(1);
   });
 
   it("returns the authorized winner and deletes the loser artifact on a concurrent creationRequestId P2002", async () => {
