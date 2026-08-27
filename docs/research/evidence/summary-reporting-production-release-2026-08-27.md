@@ -37,7 +37,13 @@ The user accepted the revised local CEO/Team composition, understood that only S
 - Standalone landscape-capture recheck: 3/3 tests pass, exit 0, with an explicit 30-second local test deadline (6.671 seconds for the suite). No assertion or unrelated test source was changed. All failures from the full run have now passed their focused rechecks; the complete suite was not rerun after those fixes.
 - Live pre-release read-only baseline: authorized test Admin login, `SU Full report TEST` campaign, existing direct group report, healthy database/auth posture, and login `X-Frame-Options: DENY` verified. No invitation/reminder or assessment change performed.
 
-Protected PR checks, exact-SHA Ready deployment and live canary proof remain pending. Provisioning/build success does not imply deployment or global activation.
+### Final isolated browser proof
+
+All **5/5 tests passed**, exit 0, in 1.6 minutes using Node 24.20.0 and default Turbopack from a clean `/tmp` copy. The complete runtime source matches the release source; only the temporary fixture's explicit baseline `git -C` lookup and generated Next route types differ. No assertion was removed or relaxed. The earlier Admin compilation boundary cleared (1.619-second compile); root location, contention and runtime changed together, so no single cause is asserted.
+
+Covered both Admin/Coach list and composition, real sign-in, initial create 201 and replay 200, selected source ordering, exact stored canonical JSON hash, immutable PDF bytes after later source changes, authorization/current-access revocation, tamper denial, immutable database constraints, unsupported/flag-off/kill paths, DRAFT destinations, and concurrent identical requests (201/503, one retained report/source/audit/artifact). Fixture app/database stopped and its synthetic database removed; the original user preview remains running.
+
+[Protected PR #384](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/384) contains the release. [Notion release task](https://app.notion.com/p/3c98c45dd8298116a226c0d3056ac812) tracks dark deployment, exact-campaign canary and acceptance gates. Hosted checks, exact-SHA Ready deployment and live canary proof remain pending; build success does not imply deployment or global activation.
 
 ## Next steps after the canary
 
