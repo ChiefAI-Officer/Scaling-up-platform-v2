@@ -126,8 +126,40 @@ describe("summary report private artifact store", () => {
     mockGet.mockResolvedValue(null);
 
     await expect(
-      createSummaryArtifactStore().getPdf("summary-reports/missing.pdf"),
+      createSummaryArtifactStore().getPdf(
+        "summary-reports/campaign-1/missing.pdf",
+      ),
     ).resolves.toBeNull();
+  });
+
+  it("rejects malformed artifact paths before read or cleanup can reach Blob storage", async () => {
+    const malformedPaths = [
+      "https://store.example/summary-reports/campaign-1/request-1.pdf",
+      "/summary-reports/campaign-1/request-1.pdf",
+      "summary-reports/../request-1.pdf",
+      "summary-reports/campaign-1/../request-1.pdf",
+      "summary-reports\\campaign-1\\request-1.pdf",
+      "summary-reports//request-1.pdf",
+      "summary-reports/campaign-1/request-1.pdf?download=1",
+      "summary-reports/campaign-1/request-1.pdf#fragment",
+      "other-reports/campaign-1/request-1.pdf",
+      "summary-reports/campaign-1/request-1/extra.pdf",
+      "summary-reports/campaign-1/request-1.txt",
+      "summary-reports/campaign.1/request-1.pdf",
+    ];
+    const store = createSummaryArtifactStore();
+
+    for (const path of malformedPaths) {
+      await expect(store.getPdf(path)).rejects.toThrow(
+        "Invalid summary report artifact path",
+      );
+      await expect(store.delete(path)).rejects.toThrow(
+        "Invalid summary report artifact path",
+      );
+    }
+
+    expect(mockGet).not.toHaveBeenCalled();
+    expect(mockDel).not.toHaveBeenCalled();
   });
 
   it("fails closed for reads when the dedicated summary-report token is absent", async () => {

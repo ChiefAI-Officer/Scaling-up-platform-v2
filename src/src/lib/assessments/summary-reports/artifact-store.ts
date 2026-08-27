@@ -47,6 +47,14 @@ function pathnameFor(input: {
   return `summary-reports/${sanitizePathSegment(input.campaignId)}/${sanitizePathSegment(input.creationRequestId)}.pdf`;
 }
 
+function assertSummaryArtifactPath(path: string): void {
+  // `addRandomSuffix` extends the final safe filename segment, so this accepts
+  // both the requested filename and the pathname returned by Vercel Blob.
+  if (!/^summary-reports\/[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+\.pdf$/.test(path)) {
+    throw new Error("Invalid summary report artifact path");
+  }
+}
+
 export function createSummaryArtifactStore(): SummaryArtifactStore {
   return {
     async putPdf(input) {
@@ -67,6 +75,7 @@ export function createSummaryArtifactStore(): SummaryArtifactStore {
     },
 
     async getPdf(path) {
+      assertSummaryArtifactPath(path);
       const token = getSummaryReportBlobToken();
       const result = await get(path, { access: "private", token });
       if (!result || result.statusCode !== 200 || !result.stream) {
@@ -80,6 +89,7 @@ export function createSummaryArtifactStore(): SummaryArtifactStore {
     },
 
     async delete(path) {
+      assertSummaryArtifactPath(path);
       const token = process.env.SUMMARY_REPORT_BLOB_READ_WRITE_TOKEN?.trim();
       if (!token) return;
 
