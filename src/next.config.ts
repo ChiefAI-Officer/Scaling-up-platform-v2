@@ -31,6 +31,11 @@ const nextConfig: NextConfig = {
         source: "/:path*",
         headers: securityHeaders,
       },
+      {
+        // Only the authorized PDF delivery route may be embedded by this app.
+        source: "/api/assessment-campaigns/:id/summary-reports/:reportId/artifact",
+        headers: [{ key: "X-Frame-Options", value: "SAMEORIGIN" }],
+      },
     ];
   },
   async redirects() {

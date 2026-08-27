@@ -145,6 +145,8 @@ beforeEach(() => {
   // Overview carries the campaign fields the Wave N loop reads.
   mockGetCampaignOverview.mockResolvedValue({
     campaign: {
+      name: "Acme Q3",
+      templateName: "Scaling Up Full",
       organizationId: "org-1",
       templateId: TEMPLATE_ID,
       templateAlias: "scaling-up-full",
@@ -168,15 +170,25 @@ beforeEach(() => {
   delete process.env.WAVE_INVITATION_BANNER_ENABLED;
   delete process.env.WAVE_INVITATION_BANNER_CANARY;
   delete process.env.WAVE_INVITATION_BANNER_KILL;
+  delete process.env.SUMMARY_REPORTING_ENABLED;
+  delete process.env.SUMMARY_REPORTING_CANARY;
+  delete process.env.SUMMARY_REPORTING_KILL;
 });
 
 afterEach(() => {
   delete process.env.WAVE_J_SUFULL_GROUP_ENABLED;
   delete process.env.WAVE_F_GROUP_REPORT_ENABLED;
   delete process.env.WAVE_REPORT_STYLES_ENABLED;
+  delete process.env.WAVE_REPORT_STYLES_KILL;
+  delete process.env.WAVE_REPORT_STYLES_CANARY;
+  delete process.env.WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_ENABLED;
+  delete process.env.WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_KILL;
   delete process.env.WAVE_INVITATION_BANNER_ENABLED;
   delete process.env.WAVE_INVITATION_BANNER_CANARY;
   delete process.env.WAVE_INVITATION_BANNER_KILL;
+  delete process.env.SUMMARY_REPORTING_ENABLED;
+  delete process.env.SUMMARY_REPORTING_CANARY;
+  delete process.env.SUMMARY_REPORTING_KILL;
 });
 
 describe("CampaignDetail report appearance capability", () => {
@@ -335,6 +347,91 @@ describe("CampaignDetail entry-point publish gate (Wave J J-3)", () => {
     );
     await runPage();
     expect(mockCanViewGroupReport).not.toHaveBeenCalled();
+  });
+});
+
+describe("CampaignDetail Summary Reports capability", () => {
+  it("passes the implemented Scaling catalog only for a published, authorized invited campaign", async () => {
+    process.env.SUMMARY_REPORTING_ENABLED = "1";
+    mockFindFirst.mockResolvedValue(makeCampaign());
+
+    await runPage();
+
+    expect(captured.summaryReporting).toEqual({
+      campaignId: CAMPAIGN_ID,
+      campaignName: "Acme Q3",
+      assessmentName: "Scaling Up Full",
+      implementedTypes: [
+        {
+          type: "SCALING_CEO_FULL",
+          label: "Scaling Up · CEO Full",
+          description: "Compare one CEO with an explicitly selected leadership team.",
+        },
+      ],
+    });
+  });
+
+  it("shares report authorization without changing enabled presentation, email, or comparison capabilities", async () => {
+    process.env.SUMMARY_REPORTING_ENABLED = "1";
+    process.env.WAVE_J_SUFULL_GROUP_ENABLED = "1";
+    process.env.WAVE_REPORT_STYLES_ENABLED = "1";
+    process.env.WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_ENABLED = "1";
+    process.env.WAVE_INVITATION_BANNER_ENABLED = "1";
+    mockFindFirst.mockResolvedValue(makeCampaign());
+    mockGetCampaignRespondents.mockResolvedValue([
+      { hasSubmission: true, respondent: { id: "resp-1" } },
+    ]);
+    mockReportComparisonEnabled.mockReturnValue(true);
+
+    await runPage();
+
+    expect(mockCanViewGroupReport).toHaveBeenCalledTimes(1);
+    expect(captured).toMatchObject({
+      canViewGroupReport: true,
+      groupReportHref: `/assessments/${CAMPAIGN_ID}/report`,
+      summaryReporting: { campaignId: CAMPAIGN_ID },
+      brandedCustomHtmlEnabled: true,
+      invitationBannerEnabled: true,
+      resultsEmailEnabled: true,
+      resultsEmailApproved: true,
+      coachNotifyEnabled: true,
+      reportStylesAvailable: false,
+      canEditReportAppearance: false,
+      legacyOverTimeRespondentIds: [],
+    });
+    expect(captured.reportStylePreviewCapabilities).toBeUndefined();
+    expect(captured).not.toHaveProperty("resultsEmailContentApprovedHash");
+    expect(mockHasComparableLongitudinal).not.toHaveBeenCalled();
+  });
+
+  it("does not add a group-report authorization lookup when summary reporting is flag-off", async () => {
+    mockFindFirst.mockResolvedValue(makeCampaign());
+
+    await runPage();
+
+    expect(captured.summaryReporting).toBeNull();
+    expect(mockCanViewGroupReport).not.toHaveBeenCalled();
+  });
+
+  it("withholds the capability from an unauthorized coach", async () => {
+    process.env.SUMMARY_REPORTING_ENABLED = "1";
+    mockCanViewGroupReport.mockResolvedValue(false);
+    mockFindFirst.mockResolvedValue(makeCampaign());
+
+    await runPage();
+
+    expect(captured.summaryReporting).toBeNull();
+  });
+
+  it("keeps an unsupported family on its existing direct-link path", async () => {
+    process.env.SUMMARY_REPORTING_ENABLED = "1";
+    process.env.WAVE_F_GROUP_REPORT_ENABLED = "1";
+    mockFindFirst.mockResolvedValue(
+      makeCampaign({ template: { alias: "leadership-vision-alignment" } }),
+    );
+
+    expect(await runPage()).toBe(true);
+    expect(captured.summaryReporting).toBeNull();
   });
 });
 

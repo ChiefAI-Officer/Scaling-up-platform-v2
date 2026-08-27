@@ -87,7 +87,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   detailProps = null;
   mockOverview.mockResolvedValue({
-    campaign: { id: "camp-1", name: "Acme Q3", organizationId: "org-1", templateId: "tpl-1", alias: "acme-q3" },
+    campaign: { id: "camp-1", name: "Acme Q3", templateName: "Scaling Up Full", organizationId: "org-1", templateId: "tpl-1", alias: "acme-q3" },
   });
   mockRespondents.mockResolvedValue([]);
   mockFindFirst.mockResolvedValue({
@@ -109,6 +109,18 @@ beforeEach(() => {
   delete process.env.WAVE_INVITATION_BANNER_ENABLED;
   delete process.env.WAVE_INVITATION_BANNER_CANARY;
   delete process.env.WAVE_INVITATION_BANNER_KILL;
+  delete process.env.SUMMARY_REPORTING_ENABLED;
+  delete process.env.SUMMARY_REPORTING_CANARY;
+  delete process.env.SUMMARY_REPORTING_KILL;
+});
+
+afterEach(() => {
+  delete process.env.WAVE_INVITATION_BANNER_ENABLED;
+  delete process.env.WAVE_INVITATION_BANNER_CANARY;
+  delete process.env.WAVE_INVITATION_BANNER_KILL;
+  delete process.env.SUMMARY_REPORTING_ENABLED;
+  delete process.env.SUMMARY_REPORTING_CANARY;
+  delete process.env.SUMMARY_REPORTING_KILL;
 });
 
 describe("Admin campaign detail — auth gate", () => {
@@ -211,5 +223,79 @@ describe("Admin campaign detail — invitation banner authoring state", () => {
     await renderPage();
 
     expect(detailProps).toHaveProperty("invitationBannerEnabled", false);
+  });
+});
+
+describe("Admin campaign detail — Summary Reports capability", () => {
+  it("passes the same implemented Scaling catalog as the coach host", async () => {
+    process.env.SUMMARY_REPORTING_ENABLED = "1";
+    mockGetApiActor.mockResolvedValue({ role: "ADMIN", coachId: null, userId: "u1", email: "a@x.com" });
+    mockCanManage.mockResolvedValue(true);
+    mockFindFirst.mockResolvedValue({
+      id: "camp-1",
+      status: "ACTIVE",
+      accessMode: "INVITED",
+      createdByCoachId: "coach-1",
+      organizationId: "org-1",
+      template: { alias: "scaling-up-full" },
+      version: { id: "v1", publishedAt: new Date("2026-01-01") },
+    });
+
+    await renderPage();
+
+    expect(detailProps).toMatchObject({
+      summaryReporting: {
+        campaignId: "camp-1",
+        campaignName: "Acme Q3",
+        assessmentName: "Scaling Up Full",
+        implementedTypes: [
+          {
+            type: "SCALING_CEO_FULL",
+            label: "Scaling Up · CEO Full",
+            description: "Compare one CEO with an explicitly selected leadership team.",
+          },
+        ],
+      },
+      basePath: "/admin/assessments/campaigns",
+      hidePortalOnlyLinks: true,
+      brandedCustomHtmlEnabled: true,
+      reportStylesAvailable: true,
+      canEditReportAppearance: false,
+      resultsEmailEnabled: true,
+      resultsEmailApproved: true,
+      coachNotifyEnabled: true,
+    });
+    expect(mockCanViewGroup).toHaveBeenCalledTimes(1);
+    expect(detailProps).not.toHaveProperty("resultsEmailContentApprovedHash");
+  });
+
+  it("does not add a group-report authorization lookup when summary reporting is flag-off", async () => {
+    mockGetApiActor.mockResolvedValue({ role: "ADMIN", coachId: null, userId: "u1", email: "a@x.com" });
+    mockCanManage.mockResolvedValue(true);
+
+    await renderPage();
+
+    expect(detailProps).toMatchObject({ summaryReporting: null });
+    expect(mockCanViewGroup).not.toHaveBeenCalled();
+  });
+
+  it("withholds the capability from an unauthorized admin actor", async () => {
+    process.env.SUMMARY_REPORTING_ENABLED = "1";
+    mockGetApiActor.mockResolvedValue({ role: "ADMIN", coachId: null, userId: "u1", email: "a@x.com" });
+    mockCanManage.mockResolvedValue(true);
+    mockFindFirst.mockResolvedValue({
+      id: "camp-1",
+      status: "ACTIVE",
+      accessMode: "INVITED",
+      createdByCoachId: "coach-1",
+      organizationId: "org-1",
+      template: { alias: "scaling-up-full" },
+      version: { id: "v1", publishedAt: new Date("2026-01-01") },
+    });
+    mockCanViewGroup.mockResolvedValue(false);
+
+    await renderPage();
+
+    expect(detailProps).toMatchObject({ summaryReporting: null });
   });
 });

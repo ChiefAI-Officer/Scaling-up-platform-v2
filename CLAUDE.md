@@ -12,13 +12,13 @@ the full workshop lifecycle from request through post-event follow-up.
 
 | Key | Value |
 |-----|-------|
-| **Source Path** | `D:\The CTO Project\Scaling Up Platform v2\src` |
+| **Source Path** | `/Users/diushianstand/Scaling-up-platform-v2/src` |
 | **Repository** | `github.com/ChiefAI-Officer/Scaling-up-platform-v2` (deploys from `main`) |
 | **Live URL** | `scaling-up-platform-v2.vercel.app` |
 | **Client** | Jeff Verdun, CIO - Scaling Up |
 | **Operations** | Suzanne (handles manual approvals) |
-| **Integrated main history** | **Scaling Up Full ESPERTO cosmetic parity is LAUNCHED** from PR #378 (`4a40d7a2`) on Ready deployment `dpl_GkgZCSMVK7RJjAT7jZ8A6D9uznPy`; Edition 6 retains the published Verne preface and CTA from PR #374. The Coach mobile drawer fix remains live from PR #370 (`e40b826a`). Older launch history is retained in `plans/CHANGELOG.md`. |
-| **Last Updated** | <!-- LAST_UPDATED_ISO:2026-08-26 LAST_UPDATED_SLUG:universal-report-placeholders-release --> August 26 — **Universal report placeholders launched and Production health-verified.** |
+| **Integrated main history** | ESPERTO cosmetic parity (#378), Edition 6 content (#374), and Coach drawer fix (#370) remain launched. Receipts: `plans/CHANGELOG.md`. |
+| **Last Updated** | <!-- LAST_UPDATED_ISO:2026-08-27 LAST_UPDATED_SLUG:summary-reporting-production-integration --> August 27 — **Summary Reporting release authorized; integration verification underway.** |
 | **Jeff #48 validation** | Pre-launch validation passed 15/15 focused suites and 224/224 tests plus the production-context real-component harness/editor Preview coverage. Live production verification was read-only: the invited QSP route returned `200` with `qspStoryGroupEnabled=true`; no valid token was opened, no assessment was submitted, no authenticated editor session was used, and no PUBLIC QSP campaign exists. |
 | **Latest progress** | The [July 10 ledger](docs/agents/jul10-feedback-closeout.md) records 50 DONE, 0 PARTIAL, and 3 NEEDS DECISION. Only #33, #41, and #45 remain; each requires content or report-specific intent before implementation. The [August 1–7 delta](docs/agents/jul10-progress-delta-2026-08-01-to-2026-08-07.md) remains 12 outcomes because later acceptances began after August 7. |
 | **Work Logs** | Session work logs at `~/.claude/worklogs/` — invoke `/log-session` to log or generate reports |
@@ -27,6 +27,7 @@ the full workshop lifecycle from request through post-event follow-up.
 
 **Active items:** see `plans/JEFF_MAY6_SPRINT.md` for the open sprint ledger.
 
+- **Summary Reporting / Scaling CEO Full:** release authorized; private Blob and Redis verified. [Release receipt, checks, scope, flags and rollout](docs/research/evidence/summary-reporting-production-release-2026-08-27.md). Global enablement awaits live-canary acceptance; six variants remain unimplemented. Not yet deployed.
 - **SU Full landscape:** **LAUNCHED + GLOBALLY ENABLED + PRODUCTION-VERIFIED.** PR #367 merged as `c1c76082`; activated deployment `dpl_GKWACwsP9AocxTJr87E2BeNRPhPv` established the enabled release, which subsequent Ready `main` deployments retain. The controlled 60/100 Coach report renders 26 pages, all 61 questions in chapter pages and Appendix A, desktop contours, mobile peer bars, and no horizontal overflow or console error. The independent kill remains available. Evidence: `plans/CHANGELOG.md#su-full-esperto-landscape-production-accepted`.
 - **Scaling Up Full report authoring and source content:** **LAUNCHED + GLOBALLY ENABLED + CONTENT PUBLISHED.** PR #374 squash-merged as `133a57f9`; Ready deployment `dpl_t8xbV6VXPA5ngekuYhg9NchdDMjG` owns both canonical aliases with `WAVE_REPORT_HTML_AUTHORING_ENABLED=1` and no kill. Forward-only Edition 6 `cmt3pedwy0002y1c6uyf0onqo` publishes the source Verne Harnish preface and exact Scaling Up Full closing CTA without repinning any campaign. Evidence: `plans/CHANGELOG.md#su-full-report-html-authoring-launched`.
 - **Coach mobile drawer containment:** **LAUNCHED + PRODUCTION-VERIFIED.** PR #370 merged as `e40b826a`; Ready deployment `dpl_5dYYrWqAAMqsAbDfvRMji1RDseDE` owns both healthy canonical aliases. The responsive Coach drawer is portalled to `document.body`, escaping the sticky header's backdrop-filter containing block while preserving flag-off markup and outside-click dismissal. The authenticated Production receipt at 390×844 measures an 844px overlay/panel instead of the broken 64px containing block, with zero horizontal overflow. Evidence: `plans/CHANGELOG.md#coach-mobile-drawer-containment-fixed`.

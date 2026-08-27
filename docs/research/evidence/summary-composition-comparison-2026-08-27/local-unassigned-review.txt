@@ -1,0 +1,235 @@
+- link:
+  - /url: "#main-content"
+  - text: Skip to main content
+- navigation:
+  - link:
+    - /url: /admin/dashboard
+    - text: Scaling Up
+  - link:
+    - /url: /admin/dashboard
+    - text: Dashboard
+  - button:
+    - text: Workshops
+  - link:
+    - /url: /admin/approvals
+    - text: Approvals
+  - link:
+    - /url: /admin/assessments
+    - text: Assessments
+  - button:
+    - text: Automation
+  - button:
+    - text: People
+  - button:
+    - text: Financials
+  - button:
+  - link:
+    - /url: /admin/settings
+    - text: Settings
+  - button: Sign Out
+  - generic: P
+- main:
+  - complementary:
+    - navigation:
+      - paragraph: Assessments
+      - link:
+        - /url: /admin/assessments
+        - text: Dashboard
+      - link:
+        - /url: /admin/assessments/organizations
+        - text: Organizations
+      - link:
+        - /url: /admin/assessments/access-groups
+        - text: Access Groups
+      - link:
+        - /url: /admin/assessments/templates
+        - text: Templates
+      - link:
+        - /url: /admin/assessments/campaigns
+        - text: Campaigns
+      - link:
+        - /url: /admin/assessments/public-campaigns
+        - text: Public Campaigns
+      - link:
+        - /url: /admin/assessments/import
+        - text: Import
+      - link:
+        - /url: /admin/assessments/observability
+        - text: Observability
+      - link:
+        - /url: /admin/assessments/aggregate
+        - text: Aggregate Report
+  - link:
+    - /url: /admin/dashboard
+    - text: Admin
+  - generic: /
+  - link:
+    - /url: /admin/assessments
+    - text: Assessments
+  - generic: /
+  - link:
+    - /url: /admin/assessments/campaigns
+    - text: Campaigns
+  - generic: /
+  - generic: Scaling Q3 local proof
+  - link:
+    - /url: /admin/assessments/campaigns
+    - text: Back to Assessments
+  - heading [level=1]: Scaling Q3 local proof
+  - paragraph: proof-scaling
+  - generic: ACTIVE
+  - button:
+    - text: Close Campaign
+  - button:
+    - text: Delete campaign
+  - generic: Template
+  - generic: Scaling Up Full
+  - generic: Edition 1 · published Aug 1, 2026
+  - generic: Organization
+  - generic: Example Manufacturing
+  - generic: Opened
+  - generic: Aug 1, 2026, 8:00 AM
+  - button: Edit
+  - generic: Closes
+  - generic: Open-ended
+  - generic: Participants
+  - generic: "3"
+  - generic: Invited
+  - generic: "3"
+  - generic: Viewed
+  - generic: "3"
+  - generic: Submitted
+  - generic: "3"
+  - generic: Completion
+  - generic: 100%
+  - button:
+    - heading [level=2]: Invitation email
+    - paragraph: Using template default — click to customize
+    - generic: Edit
+  - generic: "Total:"
+  - generic: "3"
+  - generic: "New:"
+  - generic: "0"
+  - generic: "Invited:"
+  - generic: "0"
+  - generic: "Started:"
+  - generic: "0"
+  - generic: "Completed:"
+  - generic: "3"
+  - heading [level=3]: Reports
+  - generic: Summary Reports
+  - paragraph: Scaling Q3 local proof · Scaling Up Full
+  - button: Open Wizard
+  - paragraph: No summary reports yet.
+  - heading [level=2]: Respondents
+  - paragraph: Track invitation delivery and view individual results.
+  - button:
+    - text: Add Respondent
+  - button:
+    - text: Send Invitations
+  - button:
+    - text: Send Reminders
+  - link:
+    - /url: /api/assessment-campaigns/proof-scaling/respondents/export.csv
+    - text: Export respondents (CSV)
+  - table:
+    - rowgroup:
+      - row:
+        - columnheader: Name
+        - columnheader: Email
+        - columnheader: Team
+        - columnheader: Status
+        - columnheader: Sent
+        - columnheader: Submitted
+        - columnheader: Actions
+    - rowgroup:
+      - row:
+        - cell:
+          - generic: Alex CEO
+          - text: CEO
+          - button: (clear)
+          - generic: CEO
+        - cell: proof-s-ceo@summary-proof.example
+        - cell: —
+        - cell:
+          - generic: Completed
+        - cell: —
+        - cell: Aug 20, 2026, 5:00 PM
+        - cell:
+          - link:
+            - /url: /assessments/proof-scaling/respondents/proof-s-ceo-respondent/report
+            - text: View report
+          - button:
+            - text: Raw data
+          - link:
+            - /url: /api/assessment-campaigns/proof-scaling/respondents/proof-s-ceo-respondent/result/export.csv
+            - text: Download result (CSV)
+      - row:
+        - cell:
+          - generic: Dee Team
+          - button: Mark as CEO
+          - generic: Team member
+        - cell: proof-s-dee@summary-proof.example
+        - cell: —
+        - cell:
+          - generic: Completed
+        - cell: —
+        - cell: Aug 21, 2026, 5:00 PM
+        - cell:
+          - link:
+            - /url: /assessments/proof-scaling/respondents/proof-s-dee-respondent/report
+            - text: View report
+          - button:
+            - text: Raw data
+          - link:
+            - /url: /api/assessment-campaigns/proof-scaling/respondents/proof-s-dee-respondent/result/export.csv
+            - text: Download result (CSV)
+      - row:
+        - cell:
+          - generic: Ed Team
+          - button: Mark as CEO
+          - generic: Team member
+        - cell: proof-s-ed@summary-proof.example
+        - cell: —
+        - cell:
+          - generic: Completed
+        - cell: —
+        - cell: Aug 22, 2026, 5:00 PM
+        - cell:
+          - link:
+            - /url: /assessments/proof-scaling/respondents/proof-s-ed-respondent/report
+            - text: View report
+          - button:
+            - text: Raw data
+          - link:
+            - /url: /api/assessment-campaigns/proof-scaling/respondents/proof-s-ed-respondent/result/export.csv
+            - text: Download result (CSV)
+- contentinfo:
+  - paragraph: Scaling Up Workshop Platform v2.0
+- list
+- button "Open Next.js Dev Tools":
+- alert
+- dialog "Create summary report" [active]:
+  - heading "Create summary report" [level=2]
+  - paragraph: Scaling Q3 local proof · Scaling Up Full
+  - paragraph: Scaling Q3 local proof — Scaling CEO Full
+  - paragraph: "Name: Scaling Q3 local proof"
+  - paragraph: "Destination: Scaling Q3 local proof"
+  - paragraph: "Organization: Example Manufacturing"
+  - paragraph: "Assessment/version: scaling-up-full · v1 · en"
+  - paragraph: "CEO: Alex CEO"
+  - paragraph: Scaling Q3 local proof · scaling-up-full · v1 · en
+  - paragraph: "Completed: 2026-08-20T09:00:00.000Z"
+  - paragraph: "Submission: proof-s-ceo"
+  - paragraph: "Team count: 1"
+  - list:
+    - paragraph: "Team 1: Ed Team"
+    - button "Move up" [disabled]
+    - button "Move down" [disabled]
+    - paragraph: Scaling Q3 local proof · scaling-up-full · v1 · en
+    - paragraph: "Completed: 2026-08-22T09:00:00.000Z"
+    - paragraph: "Submission: proof-s-ed"
+  - button "Back"
+  - button "Create report"
+  - button "Close":
+    - generic: Close
