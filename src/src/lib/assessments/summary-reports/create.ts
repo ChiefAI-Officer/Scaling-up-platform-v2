@@ -19,6 +19,7 @@ import {
   buildScalingCeoFullSnapshot,
   type SummaryReportSnapshotDb,
 } from "./scaling-ceo-full-snapshot";
+import { summaryReportErrorClass } from "./http";
 
 export interface CreateSummaryReportCommand {
   destinationCampaignId: string;
@@ -364,15 +365,7 @@ function safelyLogOperationalError(
 }
 
 function errorClass(error: unknown): string {
-  if (error instanceof Error) return error.name || "Error";
-  if (
-    error !== null &&
-    (typeof error === "object" || typeof error === "function") &&
-    typeof error.constructor?.name === "string"
-  ) {
-    return error.constructor.name;
-  }
-  return typeof error;
+  return summaryReportErrorClass(error);
 }
 
 function operationalError(

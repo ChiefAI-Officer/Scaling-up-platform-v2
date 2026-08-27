@@ -10,6 +10,15 @@ import {
   createPrismaSummaryReportCreateDb,
   createSummaryReport,
 } from "@/lib/assessments/summary-reports/create";
+import {
+  checkSummaryReportRateLimit,
+  summaryReportErrorClass,
+  summaryReportJson,
+  summaryReportNotFound,
+} from "@/lib/assessments/summary-reports/http";
+import { RateLimits } from "@/lib/rate-limit";
+
+const CREATE_RATE_LIMIT = { interval: 60_000, maxRequests: 5 };
 
 const sourceSchema = z
   .object({
@@ -28,17 +37,6 @@ const createSchema = z
   })
   .strict();
 
-function json(body: unknown, status: number): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
-}
-
-function notFound(): Response {
-  return json({ error: "Not found" }, 404);
-}
-
 function safelyLogFailure(event: Record<string, unknown>): void {
   try {
     console.error(JSON.stringify(event));
@@ -47,23 +45,22 @@ function safelyLogFailure(event: Record<string, unknown>): void {
   }
 }
 
-function errorClass(error: unknown): string {
-  if (!(error instanceof Error)) return typeof error;
-  const candidate = error.constructor?.name;
-  return typeof candidate === "string" &&
-    /^[A-Za-z][A-Za-z0-9]{0,63}$/.test(candidate)
-    ? candidate
-    : "Error";
-}
-
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
   const { id: campaignId } = await params;
   const state = resolveSummaryReportingState(process.env, campaignId);
+  if (!state.enabled || state.killed) return summaryReportNotFound();
   const actor = await getApiActor();
-  if (!actor || !state.enabled || state.killed) return notFound();
+  if (!actor) return summaryReportNotFound();
+  const limiter = await checkSummaryReportRateLimit({
+    actorUserId: actor.userId,
+    campaignId,
+    operation: "list",
+    config: RateLimits.search,
+  });
+  if ("response" in limiter) return limiter.response;
 
   try {
     const result = await listAuthorizedSummaryReports(
@@ -71,15 +68,20 @@ export async function GET(
       actor,
       campaignId,
     );
-    if (result.kind === "not-found") return notFound();
-    return json({ reports: result.reports }, 200);
+    if (result.kind === "not-found")
+      return summaryReportNotFound(limiter.headers);
+    return summaryReportJson({ reports: result.reports }, 200, limiter.headers);
   } catch (error) {
     safelyLogFailure({
       event: "summary-report-list-failed",
       campaignId,
-      errorClass: errorClass(error),
+      errorClass: summaryReportErrorClass(error),
     });
-    return json({ error: "Summary reports are temporarily unavailable." }, 503);
+    return summaryReportJson(
+      { error: "Summary reports are temporarily unavailable." },
+      503,
+      limiter.headers,
+    );
   }
 }
 
@@ -89,18 +91,34 @@ export async function POST(
 ): Promise<Response> {
   const { id: campaignId } = await params;
   const state = resolveSummaryReportingState(process.env, campaignId);
+  if (!state.enabled || state.killed) return summaryReportNotFound();
   const actor = await getApiActor();
-  if (!actor || !state.enabled || state.killed) return notFound();
+  if (!actor) return summaryReportNotFound();
+  const limiter = await checkSummaryReportRateLimit({
+    actorUserId: actor.userId,
+    campaignId,
+    operation: "create",
+    config: CREATE_RATE_LIMIT,
+  });
+  if ("response" in limiter) return limiter.response;
 
   let body: unknown;
   try {
     body = await request.json();
   } catch {
-    return json({ error: "Invalid request body." }, 400);
+    return summaryReportJson(
+      { error: "Invalid request body." },
+      400,
+      limiter.headers,
+    );
   }
   const parsed = createSchema.safeParse(body);
   if (!parsed.success) {
-    return json({ error: "Invalid request body." }, 400);
+    return summaryReportJson(
+      { error: "Invalid request body." },
+      400,
+      limiter.headers,
+    );
   }
 
   try {
@@ -113,19 +131,22 @@ export async function POST(
       },
     );
 
-    if (result.kind === "not-found") return notFound();
+    if (result.kind === "not-found")
+      return summaryReportNotFound(limiter.headers);
     if (result.kind === "invalid") {
-      return json({ errors: result.errors }, 422);
+      return summaryReportJson({ errors: result.errors }, 422, limiter.headers);
     }
     if (result.kind === "render-failed") {
-      return json(
+      return summaryReportJson(
         { error: "Summary report could not be created. Try again." },
         503,
+        limiter.headers,
       );
     }
-    return json(
+    return summaryReportJson(
       { report: result.report },
       result.kind === "created" ? 201 : 200,
+      limiter.headers,
     );
   } catch (error) {
     safelyLogFailure({
@@ -133,11 +154,12 @@ export async function POST(
       campaignId,
       creationRequestId: parsed.data.creationRequestId,
       reportType: parsed.data.reportType,
-      errorClass: errorClass(error),
+      errorClass: summaryReportErrorClass(error),
     });
-    return json(
+    return summaryReportJson(
       { error: "Summary report could not be created. Try again." },
       503,
+      limiter.headers,
     );
   }
 }

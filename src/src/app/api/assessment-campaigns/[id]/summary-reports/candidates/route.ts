@@ -6,6 +6,13 @@ import {
   createPrismaSummaryReportCandidateDb,
   listSummaryReportCandidates,
 } from "@/lib/assessments/summary-reports/candidates";
+import {
+  checkSummaryReportRateLimit,
+  summaryReportErrorClass,
+  summaryReportJson,
+  summaryReportNotFound,
+} from "@/lib/assessments/summary-reports/http";
+import { RateLimits } from "@/lib/rate-limit";
 
 const querySchema = z
   .object({
@@ -14,39 +21,29 @@ const querySchema = z
   })
   .strict();
 
-function json(body: unknown, status: number): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
-}
-
-function notFound(): Response {
-  return json({ error: "Not found" }, 404);
-}
-
-function errorClass(error: unknown): string {
-  if (!(error instanceof Error)) return typeof error;
-  const candidate = error.constructor?.name;
-  return typeof candidate === "string" &&
-    /^[A-Za-z][A-Za-z0-9]{0,63}$/.test(candidate)
-    ? candidate
-    : "Error";
-}
-
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
   const { id: campaignId } = await params;
   const state = resolveSummaryReportingState(process.env, campaignId);
+  if (!state.enabled || state.killed) return summaryReportNotFound();
   const actor = await getApiActor();
-  if (!actor || !state.enabled || state.killed) return notFound();
+  if (!actor) return summaryReportNotFound();
+  const limiter = await checkSummaryReportRateLimit({
+    actorUserId: actor.userId,
+    campaignId,
+    operation: "candidates",
+    config: RateLimits.search,
+  });
+  if ("response" in limiter) return limiter.response;
 
   const parsed = querySchema.safeParse(
     Object.fromEntries(new URL(request.url).searchParams.entries()),
   );
-  if (!parsed.success) return json({ error: "Invalid query." }, 400);
+  if (!parsed.success) {
+    return summaryReportJson({ error: "Invalid query." }, 400, limiter.headers);
+  }
 
   try {
     const result = await listSummaryReportCandidates(
@@ -58,8 +55,13 @@ export async function GET(
         scope: parsed.data.scope,
       },
     );
-    if (result.kind === "not-found") return notFound();
-    return json({ candidates: result.candidates }, 200);
+    if (result.kind === "not-found")
+      return summaryReportNotFound(limiter.headers);
+    return summaryReportJson(
+      { candidates: result.candidates },
+      200,
+      limiter.headers,
+    );
   } catch (error) {
     try {
       console.error(
@@ -67,15 +69,16 @@ export async function GET(
           event: "summary-report-candidates-failed",
           campaignId,
           reportType: parsed.data.type,
-          errorClass: errorClass(error),
+          errorClass: summaryReportErrorClass(error),
         }),
       );
     } catch {
       // Observability must not change the safe route result.
     }
-    return json(
+    return summaryReportJson(
       { error: "Summary report candidates are temporarily unavailable." },
       503,
+      limiter.headers,
     );
   }
 }

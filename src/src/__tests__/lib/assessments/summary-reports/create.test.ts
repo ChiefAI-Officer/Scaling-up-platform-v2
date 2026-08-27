@@ -696,7 +696,9 @@ describe("createSummaryReport", () => {
   });
 
   it("returns render-failed and creates no artifact or row when rendering fails", async () => {
-    const test = harness({ renderError: new TypeError("answer secret") });
+    const renderError = new Error("answer secret");
+    renderError.name = "/private/render/answer-secret";
+    const test = harness({ renderError });
 
     await expect(
       createSummaryReport(test.db, actor, command, test.dependencies),
@@ -711,11 +713,14 @@ describe("createSummaryReport", () => {
         reportType: command.reportType,
         campaignId: command.destinationCampaignId,
         creationRequestId: requestId,
-        errorClass: "TypeError",
+        errorClass: "Error",
       },
     ]);
     expect(JSON.stringify(test.calls.operationalErrors)).not.toContain(
       "answer secret",
+    );
+    expect(JSON.stringify(test.calls.operationalErrors)).not.toContain(
+      "/private/render",
     );
   });
 
@@ -734,9 +739,9 @@ describe("createSummaryReport", () => {
   });
 
   it("returns render-failed and creates no row when private upload fails", async () => {
-    const test = harness({
-      uploadError: new RangeError("token and answer secret"),
-    });
+    const uploadError = new Error("token and answer secret");
+    uploadError.name = "respondent:avery@example.com";
+    const test = harness({ uploadError });
 
     await expect(
       createSummaryReport(test.db, actor, command, test.dependencies),
@@ -750,11 +755,14 @@ describe("createSummaryReport", () => {
         reportType: command.reportType,
         campaignId: command.destinationCampaignId,
         creationRequestId: requestId,
-        errorClass: "RangeError",
+        errorClass: "Error",
       },
     ]);
     expect(JSON.stringify(test.calls.operationalErrors)).not.toContain(
       "token and answer secret",
+    );
+    expect(JSON.stringify(test.calls.operationalErrors)).not.toContain(
+      "avery@example.com",
     );
   });
 

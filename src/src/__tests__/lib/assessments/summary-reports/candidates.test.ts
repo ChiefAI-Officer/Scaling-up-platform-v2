@@ -50,7 +50,7 @@ function campaign(overrides: Record<string, unknown> = {}) {
 }
 
 function submission(overrides: Record<string, unknown> = {}) {
-  return {
+  const candidate = {
     id: "submission-1",
     campaignId: "campaign-destination",
     respondentId: "respondent-1",
@@ -61,19 +61,37 @@ function submission(overrides: Record<string, unknown> = {}) {
       lastName: "Stone",
       jobTitle: "CEO",
       organizationId: "organization-1",
+      deletedAt: null,
+    },
+    invitation: {
+      campaignId: "campaign-destination",
+      respondentId: "respondent-1",
+      status: "SUBMITTED" as const,
+      revokedAt: null,
     },
     campaign: campaign(),
     ...overrides,
   };
+  if (!Object.hasOwn(overrides, "invitation")) {
+    candidate.invitation = {
+      campaignId: candidate.campaignId,
+      respondentId: candidate.respondentId,
+      status: "SUBMITTED" as const,
+      revokedAt: null,
+    };
+  }
+  return candidate;
 }
 
-function buildDb(options: {
-  campaigns?: ReturnType<typeof campaign>[];
-  submissions?: Awaited<
-    ReturnType<SummaryReportCandidateDb["assessmentSubmission"]["findMany"]>
-  >;
-  grantedTemplateIds?: string[];
-} = {}) {
+function buildDb(
+  options: {
+    campaigns?: ReturnType<typeof campaign>[];
+    submissions?: Awaited<
+      ReturnType<SummaryReportCandidateDb["assessmentSubmission"]["findMany"]>
+    >;
+    grantedTemplateIds?: string[];
+  } = {},
+) {
   const campaigns = options.campaigns ?? [campaign()];
   const campaignById = new Map(campaigns.map((row) => [row.id, row]));
   const grantedTemplateIds = new Set(
@@ -114,8 +132,9 @@ function buildDb(options: {
       })),
     },
     assessmentCampaign: {
-      findFirst: jest.fn(async (args: { where: { id: string } }) =>
-        campaignById.get(args.where.id) ?? null,
+      findFirst: jest.fn(
+        async (args: { where: { id: string } }) =>
+          campaignById.get(args.where.id) ?? null,
       ),
     },
     assessmentSubmission: {
@@ -174,8 +193,15 @@ describe("listSummaryReportCandidates", () => {
       campaigns: [campaign(), campaign({ id: "campaign-other" })],
       submissions: [
         submission(),
-        submission({ id: "submission-public", respondentId: null, respondent: null }),
-        submission({ id: "submission-wrong-family", campaign: wrongFamilyCampaign }),
+        submission({
+          id: "submission-public",
+          respondentId: null,
+          respondent: null,
+        }),
+        submission({
+          id: "submission-wrong-family",
+          campaign: wrongFamilyCampaign,
+        }),
         submission({
           id: "submission-other-campaign",
           campaignId: "campaign-other",
@@ -218,7 +244,8 @@ describe("listSummaryReportCandidates", () => {
       ],
     });
 
-    const query = (db.assessmentSubmission.findMany as jest.Mock).mock.calls[0][0];
+    const query = (db.assessmentSubmission.findMany as jest.Mock).mock
+      .calls[0][0];
     expect(query.where.campaignId).toBe("campaign-destination");
     expect(query.where.respondentId).toEqual({ not: null });
     expect(query.select).not.toHaveProperty("answers");
@@ -228,7 +255,11 @@ describe("listSummaryReportCandidates", () => {
   });
 
   it("lists authorized same-organization ended reports, retains incompatible cards, and memoizes source authorization", async () => {
-    const closed = campaign({ id: "campaign-closed", name: "Scaling Q2", status: "CLOSED" });
+    const closed = campaign({
+      id: "campaign-closed",
+      name: "Scaling Q2",
+      status: "CLOSED",
+    });
     const incompatible = campaign({
       id: "campaign-incompatible",
       name: "Scaling Q1",
@@ -284,6 +315,7 @@ describe("listSummaryReportCandidates", () => {
             lastName: "Quinn",
             jobTitle: null,
             organizationId: "organization-1",
+            deletedAt: null,
           },
           submittedAt: new Date("2026-08-27T10:00:00.000Z"),
         }),
@@ -298,6 +330,7 @@ describe("listSummaryReportCandidates", () => {
             lastName: "Quinn",
             jobTitle: "COO",
             organizationId: "organization-1",
+            deletedAt: null,
           },
           submittedAt: new Date("2026-08-27T10:00:00.000Z"),
         }),
@@ -344,7 +377,9 @@ describe("listSummaryReportCandidates", () => {
 
     expect(result.kind).toBe("ok");
     if (result.kind !== "ok") return;
-    expect(result.candidates.map((candidate) => candidate.submissionId)).toEqual([
+    expect(
+      result.candidates.map((candidate) => candidate.submissionId),
+    ).toEqual([
       "submission-incompatible",
       "submission-a",
       "submission-b",
@@ -364,7 +399,8 @@ describe("listSummaryReportCandidates", () => {
       ]),
     );
 
-    const query = (db.assessmentSubmission.findMany as jest.Mock).mock.calls[0][0];
+    const query = (db.assessmentSubmission.findMany as jest.Mock).mock
+      .calls[0][0];
     expect(query.where).not.toHaveProperty("campaignId");
     expect(query.where.campaign).toEqual(
       expect.objectContaining({
@@ -378,14 +414,107 @@ describe("listSummaryReportCandidates", () => {
     const sourceAuthCalls = (
       db.assessmentCampaign.findFirst as jest.Mock
     ).mock.calls.filter(
-      ([args]) => args.where.id === "campaign-closed" && args.select === undefined,
+      ([args]) =>
+        args.where.id === "campaign-closed" && args.select === undefined,
     );
     expect(sourceAuthCalls).toHaveLength(1);
-    expect(db.coach.findUnique).toHaveBeenCalledWith({ where: { id: "coach-1" } });
+    expect(db.coach.findUnique).toHaveBeenCalledWith({
+      where: { id: "coach-1" },
+    });
     expect(db.organization.findUnique).toHaveBeenCalledWith({
       where: { id: "organization-1" },
     });
     expect(db.accessGroupCoach.findMany).toHaveBeenCalled();
     expect(db.accessGroupTemplate.findMany).toHaveBeenCalled();
   });
+
+  it.each(["current", "all"] as const)(
+    "excludes deleted, revoked, incomplete, and mismatched personal sources in %s scope",
+    async (scope) => {
+      const staleCampaign = campaign({ id: "campaign-stale" });
+      const sourceCampaignId =
+        scope === "current" ? "campaign-destination" : "campaign-stale";
+      const sourceCampaign = scope === "current" ? campaign() : staleCampaign;
+      const valid = submission({
+        id: `submission-${scope}-valid`,
+        campaignId: sourceCampaignId,
+        campaign: sourceCampaign,
+        invitation: {
+          campaignId: sourceCampaignId,
+          respondentId: "respondent-1",
+          status: "SUBMITTED",
+          revokedAt: null,
+        },
+      });
+      const db = buildDb({
+        campaigns: [campaign(), staleCampaign],
+        submissions: [
+          valid,
+          submission({
+            id: `submission-${scope}-deleted`,
+            campaignId: sourceCampaignId,
+            campaign: sourceCampaign,
+            respondent: {
+              ...valid.respondent!,
+              deletedAt: new Date("2026-08-27T10:00:00.000Z"),
+            },
+            invitation: valid.invitation,
+          }),
+          submission({
+            id: `submission-${scope}-revoked`,
+            campaignId: sourceCampaignId,
+            campaign: sourceCampaign,
+            invitation: {
+              ...valid.invitation!,
+              revokedAt: new Date("2026-08-27T10:00:00.000Z"),
+            },
+          }),
+          submission({
+            id: `submission-${scope}-incomplete`,
+            campaignId: sourceCampaignId,
+            campaign: sourceCampaign,
+            invitation: { ...valid.invitation!, status: "VIEWED" },
+          }),
+          submission({
+            id: `submission-${scope}-campaign-mismatch`,
+            campaignId: sourceCampaignId,
+            campaign: sourceCampaign,
+            invitation: { ...valid.invitation!, campaignId: "campaign-other" },
+          }),
+          submission({
+            id: `submission-${scope}-respondent-mismatch`,
+            campaignId: sourceCampaignId,
+            campaign: sourceCampaign,
+            invitation: {
+              ...valid.invitation!,
+              respondentId: "respondent-other",
+            },
+          }),
+        ],
+      });
+
+      const result = await listSummaryReportCandidates(db, adminActor, {
+        destinationCampaignId: "campaign-destination",
+        reportType: "SCALING_CEO_FULL",
+        scope,
+      });
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          kind: "ok",
+          candidates: [expect.objectContaining({ submissionId: valid.id })],
+        }),
+      );
+      if (result.kind !== "ok") return;
+      expect(result.candidates).toHaveLength(1);
+      expect(result.candidates[0]?.submissionId).toBe(valid.id);
+
+      const query = (db.assessmentSubmission.findMany as jest.Mock).mock
+        .calls[0][0];
+      expect(query.where.respondent).toEqual({ is: { deletedAt: null } });
+      expect(query.where.invitation).toEqual({
+        is: { status: "SUBMITTED", revokedAt: null },
+      });
+    },
+  );
 });

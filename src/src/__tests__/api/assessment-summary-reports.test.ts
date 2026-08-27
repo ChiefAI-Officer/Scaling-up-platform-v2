@@ -29,6 +29,12 @@ jest.mock("@/lib/assessments/summary-reports/create", () => ({
 jest.mock("@/lib/assessments/summary-reports/artifact-store", () => ({
   createSummaryArtifactStore: jest.fn(),
 }));
+jest.mock("@/lib/rate-limit", () => ({
+  checkRateLimitStrict: jest.fn(),
+  RateLimits: {
+    search: { interval: 60_000, maxRequests: 60 },
+  },
+}));
 
 import { getApiActor } from "@/lib/auth/authorization";
 import { resolveSummaryReportingState } from "@/lib/assessments/summary-reports/flags";
@@ -45,6 +51,7 @@ import {
 } from "@/lib/assessments/summary-reports/candidates";
 import { createSummaryReport } from "@/lib/assessments/summary-reports/create";
 import { createSummaryArtifactStore } from "@/lib/assessments/summary-reports/artifact-store";
+import { checkRateLimitStrict } from "@/lib/rate-limit";
 import {
   GET as listReports,
   POST as createReport,
@@ -109,6 +116,11 @@ function responseBytes(response: Response): Uint8Array {
   return new Uint8Array((response as unknown as { _body: Uint8Array })._body);
 }
 
+function expectPrivateNoStore(response: Response): void {
+  expect(header(response, "Cache-Control")).toBe("private, no-store");
+  expect(header(response, "X-Content-Type-Options")).toBe("nosniff");
+}
+
 function streamOf(...chunks: Uint8Array[]): ReadableStream<Uint8Array> {
   return new NodeReadableStream<Uint8Array>({
     start(controller) {
@@ -145,6 +157,11 @@ describe("campaign Summary Report APIs", () => {
       enabled: true,
       killed: false,
     });
+    (checkRateLimitStrict as jest.Mock).mockResolvedValue({
+      success: true,
+      remaining: 59,
+      resetAt: 1_777_777_777,
+    });
   });
 
   afterEach(() => {
@@ -163,6 +180,8 @@ describe("campaign Summary Report APIs", () => {
             campaignParams(),
           ),
         protectedCall: listAuthorizedSummaryReports,
+        operation: "list",
+        config: { interval: 60_000, maxRequests: 60 },
       },
       {
         name: "candidates",
@@ -174,6 +193,8 @@ describe("campaign Summary Report APIs", () => {
             campaignParams(),
           ),
         protectedCall: listSummaryReportCandidates,
+        operation: "candidates",
+        config: { interval: 60_000, maxRequests: 60 },
       },
       {
         name: "create",
@@ -194,6 +215,8 @@ describe("campaign Summary Report APIs", () => {
             campaignParams(),
           ),
         protectedCall: createSummaryReport,
+        operation: "create",
+        config: { interval: 60_000, maxRequests: 5 },
       },
       {
         name: "artifact",
@@ -205,6 +228,8 @@ describe("campaign Summary Report APIs", () => {
             artifactParams(),
           ),
         protectedCall: getAuthorizedSummaryReportArtifact,
+        operation: "artifact",
+        config: { interval: 60_000, maxRequests: 30 },
       },
     ];
 
@@ -217,7 +242,9 @@ describe("campaign Summary Report APIs", () => {
 
         expect(response.status).toBe(404);
         expect(await json(response)).toEqual({ error: "Not found" });
+        expectPrivateNoStore(response);
         expect(protectedCall).not.toHaveBeenCalled();
+        expect(checkRateLimitStrict).not.toHaveBeenCalled();
         expect(resolveSummaryReportingState).toHaveBeenCalledWith(
           process.env,
           campaignId,
@@ -237,6 +264,9 @@ describe("campaign Summary Report APIs", () => {
 
         expect(response.status).toBe(404);
         expect(await json(response)).toEqual({ error: "Not found" });
+        expectPrivateNoStore(response);
+        expect(getApiActor).not.toHaveBeenCalled();
+        expect(checkRateLimitStrict).not.toHaveBeenCalled();
         expect(protectedCall).not.toHaveBeenCalled();
       },
     );
@@ -253,7 +283,66 @@ describe("campaign Summary Report APIs", () => {
 
         expect(response.status).toBe(404);
         expect(await json(response)).toEqual({ error: "Not found" });
+        expectPrivateNoStore(response);
+        expect(getApiActor).not.toHaveBeenCalled();
+        expect(checkRateLimitStrict).not.toHaveBeenCalled();
         expect(protectedCall).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each(calls)(
+      "uses an actor/campaign scoped distributed limiter before protected $name work",
+      async ({ invoke, protectedCall, operation, config }) => {
+        (checkRateLimitStrict as jest.Mock).mockResolvedValue({
+          success: false,
+          remaining: 0,
+          resetAt: 1_777_777_888,
+          retryAfter: 47,
+        });
+
+        const response = await invoke();
+
+        expect(response.status).toBe(429);
+        expectPrivateNoStore(response);
+        expect(header(response, "X-RateLimit-Limit")).toBe(
+          String(config.maxRequests),
+        );
+        expect(header(response, "X-RateLimit-Remaining")).toBe("0");
+        expect(header(response, "Retry-After")).toBe("47");
+        expect(checkRateLimitStrict).toHaveBeenCalledWith(
+          `summary-report:${operation}:${actor.userId}:${campaignId}`,
+          config,
+        );
+        expect(protectedCall).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each(calls)(
+      "fails closed without protected $name work when the limiter backend is unavailable",
+      async ({ invoke, protectedCall }) => {
+        const unsafe = new Error("redis path /private/blob respondent-name");
+        unsafe.name = "/private/blob/respondent-name";
+        (checkRateLimitStrict as jest.Mock).mockRejectedValue(unsafe);
+
+        const response = await invoke();
+
+        expect(response.status).toBe(503);
+        expectPrivateNoStore(response);
+        expect(await json(response)).toEqual({
+          error: "Summary reporting is temporarily unavailable.",
+        });
+        expect(protectedCall).not.toHaveBeenCalled();
+        const operationalLog = JSON.parse(
+          String(consoleError.mock.calls[0][0]),
+        );
+        expect(operationalLog).toEqual(
+          expect.objectContaining({
+            event: "summary-report-rate-limit-failed",
+            errorClass: "Error",
+          }),
+        );
+        expect(JSON.stringify(operationalLog)).not.toContain("private/blob");
+        expect(JSON.stringify(operationalLog)).not.toContain("respondent-name");
       },
     );
   });

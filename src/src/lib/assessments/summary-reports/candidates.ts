@@ -71,6 +71,8 @@ interface CandidateSubmissionFindManyArgs {
   where: {
     respondentId: { not: null };
     campaignId?: string;
+    respondent: { is: { deletedAt: null } };
+    invitation: { is: { status: "SUBMITTED"; revokedAt: null } };
     campaign: {
       organizationId: string;
       accessMode: "INVITED";
@@ -104,6 +106,13 @@ interface CandidateSubmissionRow {
     lastName: string;
     jobTitle: string | null;
     organizationId: string;
+    deletedAt: Date | null;
+  } | null;
+  invitation: {
+    campaignId: string;
+    respondentId: string;
+    status: "PENDING" | "SENT" | "VIEWED" | "SUBMITTED";
+    revokedAt: Date | null;
   } | null;
   campaign: {
     id: string;
@@ -230,6 +239,15 @@ export function createPrismaSummaryReportCandidateDb(
                 lastName: true,
                 jobTitle: true,
                 organizationId: true,
+                deletedAt: true,
+              },
+            },
+            invitation: {
+              select: {
+                campaignId: true,
+                respondentId: true,
+                status: true,
+                revokedAt: true,
               },
             },
             campaign: {
@@ -298,6 +316,8 @@ export async function listSummaryReportCandidates(
   const rows = await db.assessmentSubmission.findMany({
     where: {
       respondentId: { not: null },
+      respondent: { is: { deletedAt: null } },
+      invitation: { is: { status: "SUBMITTED", revokedAt: null } },
       ...(input.scope === "current"
         ? { campaignId: input.destinationCampaignId }
         : {}),
@@ -321,6 +341,15 @@ export async function listSummaryReportCandidates(
           lastName: true,
           jobTitle: true,
           organizationId: true,
+          deletedAt: true,
+        },
+      },
+      invitation: {
+        select: {
+          campaignId: true,
+          respondentId: true,
+          status: true,
+          revokedAt: true,
         },
       },
       campaign: {
@@ -349,6 +378,12 @@ export async function listSummaryReportCandidates(
       row.respondentId !== null &&
       row.respondent !== null &&
       row.respondent.id === row.respondentId &&
+      row.respondent.deletedAt === null &&
+      row.invitation !== null &&
+      row.invitation.status === "SUBMITTED" &&
+      row.invitation.revokedAt === null &&
+      row.invitation.campaignId === row.campaignId &&
+      row.invitation.respondentId === row.respondentId &&
       row.campaignId === source.id &&
       (input.scope === "all" || source.id === destination.id) &&
       source.organizationId === destination.organizationId &&
