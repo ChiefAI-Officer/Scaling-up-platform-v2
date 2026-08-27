@@ -118,7 +118,12 @@ export function SummaryReportsPanel({
         }
         if (!response.ok) throw new Error("Unable to list summary reports");
 
-        const parsed = parseReports(await response.json());
+        const body = await response.json();
+        if (controller.signal.aborted || requestId !== requestIdRef.current) {
+          return;
+        }
+
+        const parsed = parseReports(body);
         if (!parsed) throw new Error("Malformed summary report list");
 
         setReports(

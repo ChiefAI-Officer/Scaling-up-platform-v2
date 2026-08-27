@@ -262,4 +262,52 @@ describe("SummaryReportsPanel", () => {
       await Promise.resolve();
     });
   });
+
+  it("ignores an old campaign response whose JSON body resolves after the new campaign is ready", async () => {
+    let resolveOldJson: ((value: unknown) => void) | undefined;
+    const oldResponse = {
+      ok: true,
+      status: 200,
+      json: () =>
+        new Promise<unknown>((resolve) => {
+          resolveOldJson = resolve;
+        }),
+    } as Response;
+    const newCampaignReport = {
+      ...REPORTS[1],
+      id: "report-new-campaign",
+      campaignId: "campaign-456",
+      name: "New Campaign Report",
+    };
+
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce(oldResponse)
+      .mockResolvedValueOnce(response({ reports: [newCampaignReport] }));
+
+    const { rerender } = renderPanel();
+    await waitFor(() => expect(resolveOldJson).toBeDefined());
+
+    rerender(
+      <SummaryReportsPanel
+        campaignId="campaign-456"
+        campaignName="New Campaign"
+        assessmentName="Scaling Up Assessment"
+        implementedTypes={IMPLEMENTED_TYPES}
+      />,
+    );
+
+    expect(await screen.findByRole("listitem")).toHaveTextContent(
+      "New Campaign Report",
+    );
+
+    await act(async () => {
+      resolveOldJson?.({ reports: [REPORTS[0]] });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screen.getByRole("listitem")).toHaveTextContent(
+      "New Campaign Report",
+    );
+  });
 });
