@@ -1,4 +1,5 @@
 import type { ApiActor } from "@/lib/auth/access-control";
+import type { PrismaClient } from "@prisma/client";
 import {
   asAccessDb,
   canViewGroupReport,
@@ -25,10 +26,7 @@ export interface SummaryReportCandidate {
   submittedAt: string;
   eligible: boolean;
   disabledReason:
-    | "WRONG_FAMILY"
-    | "WRONG_ORGANIZATION"
-    | "INCOMPATIBLE_VERSION"
-    | null;
+    "WRONG_FAMILY" | "WRONG_ORGANIZATION" | "INCOMPATIBLE_VERSION" | null;
 }
 
 type AccessCampaignFindFirstArgs = Parameters<
@@ -52,23 +50,37 @@ interface DestinationCampaignFindFirstArgs {
   };
 }
 
-export interface SummaryReportCandidateDb
-  extends Omit<AccessControlDb, "assessmentCampaign"> {
+export interface SummaryReportCandidateDb extends Omit<
+  AccessControlDb,
+  "assessmentCampaign"
+> {
   assessmentCampaign: {
-    findFirst(
-      args: AccessCampaignFindFirstArgs,
-    ): AccessCampaignFindFirstResult;
+    findFirst(args: AccessCampaignFindFirstArgs): AccessCampaignFindFirstResult;
     findFirst(
       args: DestinationCampaignFindFirstArgs,
     ): Promise<DestinationCampaignRow | null>;
   };
   assessmentSubmission: {
-    findMany: (args: {
-      where: Record<string, unknown>;
-      select: Record<string, unknown>;
-      orderBy: Array<Record<string, "asc" | "desc">>;
-    }) => Promise<CandidateSubmissionRow[]>;
+    findMany: (
+      args: CandidateSubmissionFindManyArgs,
+    ) => Promise<CandidateSubmissionRow[]>;
   };
+}
+
+interface CandidateSubmissionFindManyArgs {
+  where: {
+    respondentId: { not: null };
+    campaignId?: string;
+    campaign: {
+      organizationId: string;
+      accessMode: "INVITED";
+      status: { in: Array<"ACTIVE" | "CLOSED"> };
+      deletedAt: null;
+      template: { alias: string };
+    };
+  };
+  select: Record<string, unknown>;
+  orderBy: [{ submittedAt: "desc" }, { id: "asc" }];
 }
 
 interface DestinationCampaignRow {
@@ -111,6 +123,139 @@ interface CandidateSubmissionRow {
 
 const SCALING_TEMPLATE_ALIAS = "scaling-up-full";
 
+function createCampaignDelegate(
+  client: PrismaClient,
+): SummaryReportCandidateDb["assessmentCampaign"] {
+  async function findFirst(
+    args: AccessCampaignFindFirstArgs,
+  ): AccessCampaignFindFirstResult;
+  async function findFirst(
+    args: DestinationCampaignFindFirstArgs,
+  ): Promise<DestinationCampaignRow | null>;
+  async function findFirst(
+    args: AccessCampaignFindFirstArgs | DestinationCampaignFindFirstArgs,
+  ): Promise<
+    Awaited<AccessCampaignFindFirstResult> | DestinationCampaignRow | null
+  > {
+    if ("select" in args && args.select) {
+      return client.assessmentCampaign.findFirst({
+        where: { id: args.where.id, deletedAt: null },
+        select: {
+          id: true,
+          organizationId: true,
+          templateId: true,
+          versionId: true,
+          language: true,
+          accessMode: true,
+          template: { select: { alias: true } },
+        },
+      });
+    }
+    return client.assessmentCampaign.findFirst({
+      where: { id: args.where.id, deletedAt: args.where.deletedAt },
+      select: {
+        id: true,
+        organizationId: true,
+        templateId: true,
+        createdByCoachId: true,
+        status: true,
+        deletedAt: true,
+      },
+    });
+  }
+  return { findFirst };
+}
+
+export function createPrismaSummaryReportCandidateDb(
+  client: PrismaClient,
+): SummaryReportCandidateDb {
+  return {
+    accessGroupCoach: {
+      findMany(args) {
+        return client.accessGroupCoach.findMany({
+          where: args.where?.coachId
+            ? { coachId: args.where.coachId }
+            : undefined,
+          select: {
+            accessGroupId: true,
+            coachId: true,
+            accessGroup: { select: { id: true, deletedAt: true } },
+          },
+        });
+      },
+    },
+    accessGroupTemplate: {
+      findMany(args) {
+        return client.accessGroupTemplate.findMany({
+          where: {
+            accessGroupId: args.where?.accessGroupId?.in
+              ? { in: args.where.accessGroupId.in }
+              : undefined,
+            templateId: args.where?.templateId,
+          },
+          select: { accessGroupId: true, templateId: true },
+        });
+      },
+    },
+    organization: {
+      findUnique(args) {
+        return client.organization.findUnique({
+          where: { id: args.where.id },
+          select: { id: true, ownerCoachId: true, deletedAt: true },
+        });
+      },
+    },
+    coach: {
+      findUnique(args) {
+        return client.coach.findUnique({
+          where: { id: args.where.id },
+          select: { id: true, certificationStatus: true },
+        });
+      },
+    },
+    assessmentCampaign: createCampaignDelegate(client),
+    assessmentSubmission: {
+      findMany(args) {
+        return client.assessmentSubmission.findMany({
+          where: args.where,
+          select: {
+            id: true,
+            campaignId: true,
+            respondentId: true,
+            submittedAt: true,
+            respondent: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                jobTitle: true,
+                organizationId: true,
+              },
+            },
+            campaign: {
+              select: {
+                id: true,
+                name: true,
+                organizationId: true,
+                templateId: true,
+                versionId: true,
+                language: true,
+                status: true,
+                accessMode: true,
+                deletedAt: true,
+                organization: { select: { id: true, name: true } },
+                template: { select: { alias: true } },
+                version: { select: { versionNumber: true } },
+              },
+            },
+          },
+          orderBy: args.orderBy,
+        });
+      },
+    },
+  } satisfies SummaryReportCandidateDb;
+}
+
 export async function listSummaryReportCandidates(
   db: SummaryReportCandidateDb,
   actor: ApiActor,
@@ -120,8 +265,7 @@ export async function listSummaryReportCandidates(
     scope: CandidateScope;
   },
 ): Promise<
-  | { kind: "ok"; candidates: SummaryReportCandidate[] }
-  | { kind: "not-found" }
+  { kind: "ok"; candidates: SummaryReportCandidate[] } | { kind: "not-found" }
 > {
   const authorized = await canViewGroupReport(
     asAccessDb(db),
