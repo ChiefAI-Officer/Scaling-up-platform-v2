@@ -1,16 +1,26 @@
 import { buildGroupReportModel } from "@/lib/assessments/group-report-model";
 import {
   buildScalingCeoFullSnapshot,
+  freezeCampaignGroupReportModel,
+  rehydrateCampaignGroupReportModel,
   type SummaryReportSnapshotDb,
 } from "@/lib/assessments/summary-reports/scaling-ceo-full-snapshot";
 import {
   canonicalJson,
   sha256Hex,
+  type FrozenCampaignGroupReport,
   type SelectedSummarySource,
 } from "@/lib/assessments/summary-reports/canonical";
+import type { AccessControlDb } from "@/lib/assessments/access-control";
 import type { ApiActor } from "@/lib/auth/access-control";
 
 import { fixtureScalingUpFull } from "../fixtures/group-report-fixtures";
+
+function requireStrictAccessContract(
+  db: SummaryReportSnapshotDb,
+): AccessControlDb {
+  return db;
+}
 
 const actor: ApiActor = {
   userId: "admin-1",
@@ -88,6 +98,7 @@ function sourceSubmission(
       firstName: source.respondent?.firstName ?? "",
       lastName: source.respondent?.lastName ?? "",
       jobTitle: source.respondent?.jobTitle ?? null,
+      deletedAt: null as Date | null,
     },
     invitation: {
       campaignId: campaign.id,
@@ -134,6 +145,23 @@ function selectedSources(): SelectedSummarySource[] {
   ];
 }
 
+function selectedFixtureModel() {
+  const fixture = fixtureScalingUpFull();
+  const modelId = (respondentId: string | null): string | null =>
+    respondentId ? `summary-source:submission-${respondentId}` : null;
+  return buildGroupReportModel({
+    ...fixture,
+    participants: fixture.participants.map((participant) => ({
+      ...participant,
+      respondentId: modelId(participant.respondentId)!,
+    })),
+    submissions: fixture.submissions.map((submission) => ({
+      ...submission,
+      respondentId: modelId(submission.respondentId),
+    })),
+  });
+}
+
 function buildDb(
   options: {
     destination?: CampaignRow | null;
@@ -172,6 +200,7 @@ function buildDb(
     findMany: jest.fn(
       async (args: {
         where: { id: { in: string[] }; campaignId: { in: string[] } };
+        select: Record<string, unknown>;
       }) => {
         const selected = new Set(args.where.id.in);
         const authorizedCampaigns = new Set(args.where.campaignId.in);
@@ -219,18 +248,34 @@ function buildDb(
     },
     assessmentCampaign,
     assessmentSubmission,
-  } as unknown as SummaryReportSnapshotDb;
+  } satisfies SummaryReportSnapshotDb;
+
+  requireStrictAccessContract(db);
 
   return { db, assessmentCampaign, assessmentSubmission };
 }
 
 describe("buildScalingCeoFullSnapshot", () => {
+  it("freezes and JSON-round-trips the approved model through an explicit typed boundary", () => {
+    const approvedModel = selectedFixtureModel();
+    const frozen: FrozenCampaignGroupReport =
+      freezeCampaignGroupReportModel(approvedModel);
+
+    expect(frozen.answersByRespondent).not.toBeInstanceOf(Map);
+    expect(() => canonicalJson(frozen)).not.toThrow();
+
+    const persisted: FrozenCampaignGroupReport = JSON.parse(
+      JSON.stringify(frozen),
+    );
+    expect(rehydrateCampaignGroupReportModel(persisted)).toEqual(approvedModel);
+  });
+
   it("freezes the exact selected cohort into the approved existing model", async () => {
     const later = sourceSubmission(2, destinationCampaign(), {
       id: "submission-later-not-selected",
       respondentId: "respondent-later",
     });
-    const { db, assessmentSubmission } = buildDb({
+    const { db, assessmentCampaign, assessmentSubmission } = buildDb({
       submissions: [
         sourceSubmission(0),
         sourceSubmission(1),
@@ -257,17 +302,11 @@ describe("buildScalingCeoFullSnapshot", () => {
       "TEAM",
       "TEAM",
     ]);
-    const approvedModel = buildGroupReportModel(fixtureScalingUpFull());
-    const { answersByRespondent: approvedAnswers, ...approvedVisibleModel } =
-      approvedModel;
-    const { answersByRespondent: frozenAnswers, ...frozenVisibleModel } =
-      result.snapshot.reportModel;
-    expect(frozenVisibleModel).toEqual(approvedVisibleModel);
-    expect(frozenAnswers).toEqual({
-      "s-ceo": Object.fromEntries(approvedAnswers.get("s-ceo")!),
-      "s-dee": Object.fromEntries(approvedAnswers.get("s-dee")!),
-      "s-ed": Object.fromEntries(approvedAnswers.get("s-ed")!),
-    });
+    const approvedModel = selectedFixtureModel();
+    const frozenModel: FrozenCampaignGroupReport = result.snapshot.reportModel;
+    expect(rehydrateCampaignGroupReportModel(frozenModel)).toEqual(
+      approvedModel,
+    );
     expect(result.snapshot.createdAt).toBe(createdAt.toISOString());
     expect(result.snapshot.destination).toEqual({
       campaignId: "campaign-destination",
@@ -295,8 +334,10 @@ describe("buildScalingCeoFullSnapshot", () => {
         versionLabel: "scaling-up-full-v1",
         coachLogoUrl: "https://assets.example/coach.png",
         coachName: "Casey Coach",
+        ceoRespondentId: "s-ceo",
       }),
     );
+    expect(result.snapshot.provenance).not.toHaveProperty("ceoParticipantId");
     expect(result.inputHash).toBe(sha256Hex(canonicalJson(result.snapshot)));
     expect(assessmentSubmission.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -306,6 +347,34 @@ describe("buildScalingCeoFullSnapshot", () => {
         },
       }),
     );
+    const sourceQuery = assessmentSubmission.findMany.mock.calls[0][0];
+    expect(sourceQuery.select).not.toHaveProperty("publicTaker");
+    expect(sourceQuery.select).not.toHaveProperty("referringCoachEmail");
+    expect(sourceQuery.select).not.toHaveProperty("resultsTokenHash");
+    expect(sourceQuery.select.respondent).toEqual({
+      select: {
+        id: true,
+        organizationId: true,
+        firstName: true,
+        lastName: true,
+        jobTitle: true,
+        deletedAt: true,
+      },
+    });
+    expect(sourceQuery.select.invitation).toEqual({
+      select: {
+        campaignId: true,
+        respondentId: true,
+        status: true,
+        revokedAt: true,
+      },
+    });
+    const destinationQuery = assessmentCampaign.findFirst.mock.calls.find(
+      ([args]) => args.select !== undefined,
+    )?.[0];
+    expect(destinationQuery?.select).not.toHaveProperty("participants");
+    expect(destinationQuery?.select).not.toHaveProperty("submissions");
+    expect(destinationQuery?.select).not.toHaveProperty("invitations");
     expect(
       result.snapshot.sources.some(
         (source) => source.submissionId === "submission-later-not-selected",
@@ -629,6 +698,39 @@ describe("buildScalingCeoFullSnapshot", () => {
     }
   });
 
+  it("rejects a selected source whose respondent was soft-deleted", async () => {
+    const ceo = sourceSubmission(0);
+    const { db } = buildDb({
+      submissions: [
+        {
+          ...ceo,
+          respondent: {
+            ...ceo.respondent,
+            deletedAt: new Date("2026-08-27T10:00:00.000Z"),
+          },
+        },
+        sourceSubmission(1),
+        sourceSubmission(2),
+      ],
+    });
+
+    const result = await buildScalingCeoFullSnapshot(db, actor, {
+      destinationCampaignId: "campaign-destination",
+      sources: selectedSources(),
+      createdAt: new Date("2026-08-27T12:00:00.000Z"),
+    });
+
+    expect(result.kind).toBe("invalid");
+    if (result.kind === "invalid") {
+      expect(result.errors).toContainEqual(
+        expect.objectContaining({
+          code: "source_not_completed",
+          submissionId: "submission-s-ceo",
+        }),
+      );
+    }
+  });
+
   it("uses explicit wizard roles instead of any candidate-roster CEO flag", async () => {
     const ceoRow = sourceSubmission(0, destinationCampaign(), {
       candidateRoster: { isCEO: false },
@@ -650,8 +752,14 @@ describe("buildScalingCeoFullSnapshot", () => {
     if (result.kind === "ok") {
       expect(result.snapshot.reportModel.respondents).toEqual(
         expect.arrayContaining([
-          expect.objectContaining({ respondentId: "s-ceo", isCEO: true }),
-          expect.objectContaining({ respondentId: "s-dee", isCEO: false }),
+          expect.objectContaining({
+            respondentId: "summary-source:submission-s-ceo",
+            isCEO: true,
+          }),
+          expect.objectContaining({
+            respondentId: "summary-source:submission-s-dee",
+            isCEO: false,
+          }),
         ]),
       );
     }
@@ -715,6 +823,103 @@ describe("buildScalingCeoFullSnapshot", () => {
       ).toBe(nestedDate.toISOString());
       expect(() => canonicalJson(first.snapshot)).not.toThrow();
       expect(first.inputHash).not.toBe(second.inputHash);
+    }
+  });
+
+  it("keeps cross-campaign selections for the same canonical respondent collision-free", async () => {
+    const destination = destinationCampaign();
+    const historical = destinationCampaign({
+      id: "campaign-historical",
+      name: "Scaling Q2",
+      status: "CLOSED",
+    });
+    const canonicalRespondentId = "respondent-shared";
+    const ceoBase = sourceSubmission(0, destination);
+    const teamBase = sourceSubmission(1, historical);
+    const ceo = {
+      ...ceoBase,
+      id: "submission-current-ceo",
+      respondentId: canonicalRespondentId,
+      respondent: {
+        ...ceoBase.respondent,
+        id: canonicalRespondentId,
+      },
+      invitation: {
+        ...ceoBase.invitation,
+        respondentId: canonicalRespondentId,
+      },
+    };
+    const team = {
+      ...teamBase,
+      id: "submission-historical-team",
+      respondentId: canonicalRespondentId,
+      respondent: {
+        ...teamBase.respondent,
+        id: canonicalRespondentId,
+      },
+      invitation: {
+        ...teamBase.invitation,
+        respondentId: canonicalRespondentId,
+      },
+    };
+    const sources: SelectedSummarySource[] = [
+      {
+        submissionId: ceo.id,
+        sourceCampaignId: destination.id,
+        role: "CEO",
+        position: 0,
+      },
+      {
+        submissionId: team.id,
+        sourceCampaignId: historical.id,
+        role: "TEAM",
+        position: 0,
+      },
+    ];
+    const { db } = buildDb({
+      destination,
+      campaigns: [destination, historical],
+      submissions: [ceo, team],
+    });
+
+    const result = await buildScalingCeoFullSnapshot(db, actor, {
+      destinationCampaignId: destination.id,
+      sources,
+      createdAt: new Date("2026-08-27T12:00:00.000Z"),
+    });
+
+    expect(result.kind).toBe("ok");
+    if (result.kind === "ok") {
+      expect(
+        result.snapshot.sources.map((source) => source.respondent.id),
+      ).toEqual([canonicalRespondentId, canonicalRespondentId]);
+      expect(result.snapshot.reportModel.respondents).toEqual([
+        expect.objectContaining({ isCEO: true }),
+        expect.objectContaining({ isCEO: false }),
+      ]);
+      expect(
+        new Set(
+          result.snapshot.reportModel.respondents.map(
+            (respondent) => respondent.respondentId,
+          ),
+        ).size,
+      ).toBe(2);
+      const people = result.snapshot.reportModel.scored!.domains!.find(
+        (domain) => domain.key === "people",
+      );
+      expect(people).toEqual(
+        expect.objectContaining({ ceo: 8, teamAvg: 4, dev: 4 }),
+      );
+      expect(result.snapshot.reportModel.scored!.appendixB).toEqual([
+        expect.objectContaining({
+          personLabel: "CEO",
+          domainScores: expect.objectContaining({ people: 8 }),
+        }),
+        expect.objectContaining({
+          personLabel: "Person 1",
+          domainScores: expect.objectContaining({ people: 4 }),
+        }),
+      ]);
     }
   });
 });

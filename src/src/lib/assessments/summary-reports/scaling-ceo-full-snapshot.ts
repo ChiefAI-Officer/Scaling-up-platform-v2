@@ -6,6 +6,7 @@ import {
 } from "@/lib/assessments/access-control";
 import {
   buildGroupReportModel,
+  type CampaignGroupReport,
   type GroupReportInput,
   type GroupReportParticipantInput,
   type GroupReportSubmissionInput,
@@ -14,6 +15,8 @@ import {
 import {
   canonicalJson,
   sha256Hex,
+  type FrozenCampaignGroupReport,
+  type JsonSafe,
   type ScalingCeoFullSnapshot,
   type SelectedSummarySource,
 } from "./canonical";
@@ -81,6 +84,7 @@ interface SnapshotSubmissionRow {
     firstName: string;
     lastName: string;
     jobTitle: string | null;
+    deletedAt: Date | null;
   } | null;
   invitation: {
     campaignId: string;
@@ -137,8 +141,8 @@ function displayName(row: SnapshotSubmissionRow): string {
   return name || respondent.jobTitle?.trim() || "Respondent";
 }
 
-function jsonSafe(value: unknown, path = "$"): unknown {
-  if (value instanceof Date) return value.toISOString();
+function jsonSafe<T>(value: T, path = "$"): JsonSafe<T> {
+  if (value instanceof Date) return value.toISOString() as JsonSafe<T>;
   if (value instanceof Map) {
     const object: Record<string, unknown> = {};
     for (const [key, entry] of value.entries()) {
@@ -147,19 +151,44 @@ function jsonSafe(value: unknown, path = "$"): unknown {
       }
       object[key] = jsonSafe(entry, `${path}.${key}`);
     }
-    return object;
+    return object as JsonSafe<T>;
   }
   if (Array.isArray(value)) {
-    return value.map((entry, index) => jsonSafe(entry, `${path}[${index}]`));
+    return value.map((entry, index) =>
+      jsonSafe(entry, `${path}[${index}]`),
+    ) as JsonSafe<T>;
   }
   if (value !== null && typeof value === "object") {
     const object: Record<string, unknown> = {};
     for (const [key, entry] of Object.entries(value)) {
       if (entry !== undefined) object[key] = jsonSafe(entry, `${path}.${key}`);
     }
-    return object;
+    return object as JsonSafe<T>;
   }
-  return value;
+  return value as JsonSafe<T>;
+}
+
+/** Converts the live model's Map indexes into its immutable JSON representation. */
+export function freezeCampaignGroupReportModel(
+  report: CampaignGroupReport,
+): FrozenCampaignGroupReport {
+  return jsonSafe(report);
+}
+
+/** Restores the live pure-model contract after reading a frozen JSON artifact. */
+export function rehydrateCampaignGroupReportModel(
+  frozen: FrozenCampaignGroupReport,
+): CampaignGroupReport {
+  const { answersByRespondent, ...report } = frozen;
+  return {
+    ...report,
+    answersByRespondent: new Map(
+      Object.entries(answersByRespondent).map(([respondentId, answers]) => [
+        respondentId,
+        new Map(Object.entries(answers)),
+      ]),
+    ),
+  };
 }
 
 function invalidSource(
@@ -196,6 +225,7 @@ function sourceStateErrors(
   if (
     !row.respondentId ||
     !respondent ||
+    respondent.deletedAt !== null ||
     respondent.id !== row.respondentId ||
     !invitation ||
     invitation.status !== "SUBMITTED" ||
@@ -256,6 +286,10 @@ function roleOrder(role: SelectedSummarySource["role"]): number {
   return (
     definition?.roles.findIndex((contract) => contract.role === role) ?? -1
   );
+}
+
+function selectedSourceModelId(source: { submissionId: string }): string {
+  return `summary-source:${source.submissionId}`;
 }
 
 export async function buildScalingCeoFullSnapshot(
@@ -373,6 +407,7 @@ export async function buildScalingCeoFullSnapshot(
           firstName: true,
           lastName: true,
           jobTitle: true,
+          deletedAt: true,
         },
       },
       invitation: {
@@ -441,14 +476,14 @@ export async function buildScalingCeoFullSnapshot(
         displayName: displayName(row),
         jobTitle: row.respondent.jobTitle,
       },
-      answers: row.answers,
-      result: row.result,
+      answers: jsonSafe(row.answers),
+      result: jsonSafe(row.result),
     };
   });
 
   const participants: GroupReportParticipantInput[] = frozenSources.map(
     (source) => ({
-      respondentId: source.respondent.id,
+      respondentId: selectedSourceModelId(source),
       isCEO: source.role === "CEO",
       respondent: {
         firstName: rowById.get(source.submissionId)?.respondent?.firstName,
@@ -459,11 +494,12 @@ export async function buildScalingCeoFullSnapshot(
   );
   const submissions: GroupReportSubmissionInput[] = frozenSources.map(
     (source) => ({
-      respondentId: source.respondent.id,
+      respondentId: selectedSourceModelId(source),
       answers: source.answers,
       result: source.result,
       respondent: participants.find(
-        (participant) => participant.respondentId === source.respondent.id,
+        (participant) =>
+          participant.respondentId === selectedSourceModelId(source),
       )?.respondent,
     }),
   );
@@ -478,6 +514,7 @@ export async function buildScalingCeoFullSnapshot(
     submissions,
   };
   const reportModel = buildGroupReportModel(modelInput);
+  const frozenReportModel = freezeCampaignGroupReportModel(reportModel);
   const modelContentHash = sha256Hex(
     canonicalJson(
       jsonSafe({
@@ -497,8 +534,13 @@ export async function buildScalingCeoFullSnapshot(
     ? `${creatorCoach.firstName} ${creatorCoach.lastName}`.trim()
     : null;
   const ceoSource = frozenSources.find((source) => source.role === "CEO");
+  if (!ceoSource) {
+    throw new Error(
+      "Validated Scaling CEO Full composition is missing its CEO",
+    );
+  }
 
-  const snapshot = jsonSafe({
+  const snapshot: ScalingCeoFullSnapshot = {
     schemaVersion: 1,
     reportType: "SCALING_CEO_FULL",
     destination: {
@@ -512,16 +554,16 @@ export async function buildScalingCeoFullSnapshot(
       versionNumber: destination.version.versionNumber,
       language: destination.language,
     },
-    createdAt: input.createdAt,
+    createdAt: input.createdAt.toISOString(),
     sources: frozenSources,
-    reportModel,
+    reportModel: frozenReportModel,
     provenance: {
-      generatedAt: input.createdAt,
+      generatedAt: input.createdAt.toISOString(),
       completedCount: frozenSources.length,
       invitedCount: frozenSources.length,
       versionId: destination.versionId,
       templateAlias: SCALING_TEMPLATE_ALIAS,
-      ceoParticipantId: ceoSource?.respondent.id ?? null,
+      ceoRespondentId: ceoSource.respondent.id,
       contentHash: modelContentHash,
       submissionIds: frozenSources.map((source) => source.submissionId),
       companyName: destination.organization.name,
@@ -530,10 +572,12 @@ export async function buildScalingCeoFullSnapshot(
       coachLogoUrl: creatorCoach?.profileImage ?? null,
       coachName,
       isImported: destination.importManifest != null,
-      benchmarkVersion: reportModel.benchmarkVersion,
       benchmarkKeyMismatch: reportModel.benchmarkKeyMismatch,
+      ...(reportModel.benchmarkVersion !== undefined
+        ? { benchmarkVersion: reportModel.benchmarkVersion }
+        : {}),
     },
-  }) as ScalingCeoFullSnapshot;
+  };
   const inputHash = sha256Hex(canonicalJson(snapshot));
 
   return { kind: "ok", snapshot, inputHash };

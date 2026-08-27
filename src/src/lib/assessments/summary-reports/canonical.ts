@@ -5,6 +5,39 @@ import type { CampaignGroupReport } from "@/lib/assessments/group-report-model";
 
 import type { SummaryReportSourceRole } from "./types";
 
+export type SnapshotJsonValue =
+  | null
+  | boolean
+  | number
+  | string
+  | SnapshotJsonValue[]
+  | { [key: string]: SnapshotJsonValue };
+
+/** Compile-time shape produced by the immutable snapshot serialization boundary. */
+export type JsonSafe<T> = unknown extends T
+  ? SnapshotJsonValue
+  : T extends Date
+    ? string
+    : T extends ReadonlyMap<string, infer TValue>
+      ? Record<string, JsonSafe<TValue>>
+      : T extends readonly (infer TEntry)[]
+        ? JsonSafe<TEntry>[]
+        : T extends null | boolean | number | string
+          ? T
+          : T extends object
+            ? { [TKey in keyof T]: JsonSafe<T[TKey]> }
+            : never;
+
+export type FrozenCampaignGroupReport = JsonSafe<CampaignGroupReport>;
+
+export type ScalingCeoFullProvenance = Omit<
+  JsonSafe<GroupReportProvenance>,
+  "ceoParticipantId"
+> & {
+  /** Canonical respondent selected for the explicit CEO source role. */
+  ceoRespondentId: string;
+};
+
 export interface SelectedSummarySource {
   submissionId: string;
   sourceCampaignId: string;
@@ -34,11 +67,11 @@ export interface ScalingCeoFullSnapshot {
     position: number;
     submittedAt: string;
     respondent: { id: string; displayName: string; jobTitle: string | null };
-    answers: unknown;
-    result: unknown;
+    answers: SnapshotJsonValue;
+    result: SnapshotJsonValue;
   }>;
-  reportModel: CampaignGroupReport;
-  provenance: Omit<GroupReportProvenance, "generatedAt"> & { generatedAt: string };
+  reportModel: FrozenCampaignGroupReport;
+  provenance: ScalingCeoFullProvenance;
 }
 
 export class SnapshotCanonicalizationError extends Error {
@@ -49,7 +82,9 @@ export class SnapshotCanonicalizationError extends Error {
 }
 
 function unsupported(path: string, type: string): never {
-  throw new SnapshotCanonicalizationError(`Cannot canonicalize ${type} at ${path}`);
+  throw new SnapshotCanonicalizationError(
+    `Cannot canonicalize ${type} at ${path}`,
+  );
 }
 
 function isPlainObject(value: object): value is Record<string, unknown> {
@@ -57,7 +92,11 @@ function isPlainObject(value: object): value is Record<string, unknown> {
   return prototype === Object.prototype || prototype === null;
 }
 
-function canonicalize(value: unknown, path: string, ancestors: Set<object>): string {
+function canonicalize(
+  value: unknown,
+  path: string,
+  ancestors: Set<object>,
+): string {
   if (value === null) return "null";
 
   switch (typeof value) {
@@ -84,12 +123,15 @@ function canonicalize(value: unknown, path: string, ancestors: Set<object>): str
 
   if (value instanceof Date) return unsupported(path, "Date");
   if (ancestors.has(value)) {
-    throw new SnapshotCanonicalizationError("Cannot canonicalize cyclic object");
+    throw new SnapshotCanonicalizationError(
+      "Cannot canonicalize cyclic object",
+    );
   }
 
   ancestors.add(value);
   try {
-    if (Object.getOwnPropertySymbols(value).length > 0) return unsupported(path, "symbol key");
+    if (Object.getOwnPropertySymbols(value).length > 0)
+      return unsupported(path, "symbol key");
 
     if (Array.isArray(value)) {
       const entries: string[] = [];
@@ -97,7 +139,9 @@ function canonicalize(value: unknown, path: string, ancestors: Set<object>): str
         if (!Object.prototype.hasOwnProperty.call(value, index)) {
           return unsupported(`${path}[${index}]`, "undefined");
         }
-        entries.push(canonicalize(value[index], `${path}[${index}]`, ancestors));
+        entries.push(
+          canonicalize(value[index], `${path}[${index}]`, ancestors),
+        );
       }
       return `[${entries.join(",")}]`;
     }
@@ -106,7 +150,10 @@ function canonicalize(value: unknown, path: string, ancestors: Set<object>): str
 
     return `{${Object.keys(value)
       .sort()
-      .map((key) => `${JSON.stringify(key)}:${canonicalize(value[key], `${path}.${key}`, ancestors)}`)
+      .map(
+        (key) =>
+          `${JSON.stringify(key)}:${canonicalize(value[key], `${path}.${key}`, ancestors)}`,
+      )
       .join(",")}}`;
   } finally {
     ancestors.delete(value);
