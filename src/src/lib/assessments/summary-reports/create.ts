@@ -499,11 +499,12 @@ function toNullablePrismaInputJson(
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (Array.isArray(value)) return value.map(toNullablePrismaInputJson);
   if (value !== null && typeof value === "object") {
-    const result: Record<string, Prisma.InputJsonValue | null> = {};
-    for (const [key, entry] of Object.entries(value)) {
-      result[key] = toNullablePrismaInputJson(entry);
-    }
-    return result;
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [
+        key,
+        toNullablePrismaInputJson(entry),
+      ]),
+    );
   }
   throw new TypeError("Canonical snapshot is not valid Prisma JSON input");
 }

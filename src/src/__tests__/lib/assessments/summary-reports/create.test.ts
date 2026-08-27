@@ -2,9 +2,12 @@ import snapshotFixture from "@/__tests__/fixtures/summary-reports/scaling-ceo-fu
 import type { Prisma, PrismaClient } from "@prisma/client";
 import type { ApiActor } from "@/lib/auth/access-control";
 import type { StoredSummaryArtifact } from "@/lib/assessments/summary-reports/artifact-store";
-import type {
-  ScalingCeoFullSnapshot,
-  SelectedSummarySource,
+import {
+  canonicalJson,
+  sha256Hex,
+  type ScalingCeoFullSnapshot,
+  type SelectedSummarySource,
+  type SnapshotJsonValue,
 } from "@/lib/assessments/summary-reports/canonical";
 import type { SummaryReportSnapshotDb } from "@/lib/assessments/summary-reports/scaling-ceo-full-snapshot";
 
@@ -126,7 +129,7 @@ function harness(options: HarnessOptions = {}) {
     render: [] as ScalingCeoFullSnapshot[],
     put: [] as unknown[],
     deleted: [] as string[],
-    reportCreate: [] as Array<Record<string, unknown>>,
+    reportCreate: [] as Prisma.SummaryReportUncheckedCreateInput[],
     sourceCreateMany: [] as Array<Record<string, unknown>>,
     auditCreate: [] as Array<Record<string, unknown>>,
     authorized: [] as string[],
@@ -254,6 +257,50 @@ function p2002(target: string | string[]): {
   meta: { target: string | string[] };
 } {
   return { code: "P2002", meta: { target } };
+}
+
+function deepFreezeJson<T>(value: T): T {
+  if (value !== null && typeof value === "object") {
+    for (const entry of Object.values(value)) deepFreezeJson(entry);
+    Object.freeze(value);
+  }
+  return value;
+}
+
+function requireJsonObject(value: unknown): Record<string, unknown> {
+  if (value === null || Array.isArray(value) || typeof value !== "object") {
+    throw new TypeError("Expected a JSON object");
+  }
+  return value as Record<string, unknown>;
+}
+
+function requireJsonArray(value: unknown): unknown[] {
+  if (!Array.isArray(value)) throw new TypeError("Expected a JSON array");
+  return value;
+}
+
+function expectOwnEnumerableDataProperty(
+  value: Record<string, unknown>,
+  key: string,
+): void {
+  const descriptor = Object.getOwnPropertyDescriptor(value, key);
+  expect(descriptor).toBeDefined();
+  expect(descriptor?.enumerable).toBe(true);
+  expect(descriptor && "value" in descriptor).toBe(true);
+  expect(descriptor && "get" in descriptor).toBe(false);
+  expect(descriptor && "set" in descriptor).toBe(false);
+}
+
+function expectStandardJsonObjectPrototypes(value: unknown): void {
+  if (value === null || typeof value !== "object") return;
+  if (Array.isArray(value)) {
+    expect(Object.getPrototypeOf(value)).toBe(Array.prototype);
+  } else {
+    expect(Object.getPrototypeOf(value)).toBe(Object.prototype);
+  }
+  for (const entry of Object.values(value)) {
+    expectStandardJsonObjectPrototypes(entry);
+  }
 }
 
 describe("createSummaryReport", () => {
@@ -511,6 +558,87 @@ describe("createSummaryReport", () => {
     }
     expect(auditText).not.toContain(actor.email);
     expect(test.calls.deleted).toEqual([]);
+  });
+
+  it("preserves prototype-named JSON keys as own data through the full persistence lifecycle", async () => {
+    const nestedAnswers: SnapshotJsonValue = JSON.parse(`{
+      "__proto__": {"rootMarker": "root-value"},
+      "constructor": {"prototype": {"constructorMarker": 17}},
+      "prototype": [
+        {
+          "__proto__": {"arrayMarker": true},
+          "constructor": "array-constructor",
+          "prototype": 3
+        },
+        {
+          "nested": {
+            "__proto__": "leaf-proto",
+            "constructor": false,
+            "prototype": null
+          }
+        }
+      ],
+      "safe": "unchanged"
+    }`);
+    const lifecycleSnapshot: ScalingCeoFullSnapshot = JSON.parse(
+      JSON.stringify(snapshot),
+    );
+    lifecycleSnapshot.sources[0]!.answers = nestedAnswers;
+    const frozenSnapshot = deepFreezeJson(lifecycleSnapshot);
+    const frozenCanonical = canonicalJson(frozenSnapshot);
+    const inputHash = sha256Hex(frozenCanonical);
+    const callerAnswersCanonical = canonicalJson(nestedAnswers);
+    const callerAnswersPrototype = Object.getPrototypeOf(nestedAnswers);
+    const objectPrototypeKeys = Object.getOwnPropertyNames(Object.prototype);
+    const test = harness({
+      snapshotResults: [
+        { kind: "ok", snapshot: frozenSnapshot, inputHash },
+        { kind: "ok", snapshot: frozenSnapshot, inputHash },
+      ],
+    });
+
+    await expect(
+      createSummaryReport(test.db, actor, command, test.dependencies),
+    ).resolves.toEqual({ kind: "created", report: report() });
+
+    const persistedCreate = test.calls.reportCreate[0]!;
+    const persistedSnapshot = requireJsonObject(persistedCreate.inputSnapshot);
+    const persistedSources = requireJsonArray(persistedSnapshot.sources);
+    const persistedSource = requireJsonObject(persistedSources[0]);
+    const persistedAnswers = requireJsonObject(persistedSource.answers);
+    const persistedPrototypeArray = requireJsonArray(
+      persistedAnswers.prototype,
+    );
+    const persistedArrayObject = requireJsonObject(persistedPrototypeArray[0]);
+    const persistedNestedContainer = requireJsonObject(
+      persistedPrototypeArray[1],
+    );
+    const persistedNestedObject = requireJsonObject(
+      persistedNestedContainer.nested,
+    );
+
+    for (const [object, keys] of [
+      [persistedAnswers, ["__proto__", "constructor", "prototype"]],
+      [persistedArrayObject, ["__proto__", "constructor", "prototype"]],
+      [persistedNestedObject, ["__proto__", "constructor", "prototype"]],
+    ] as const) {
+      for (const key of keys) expectOwnEnumerableDataProperty(object, key);
+    }
+    expect(canonicalJson(persistedAnswers)).toBe(callerAnswersCanonical);
+    expect(canonicalJson(persistedSnapshot)).toBe(frozenCanonical);
+    expect(persistedCreate.inputHash).toBe(inputHash);
+    expectStandardJsonObjectPrototypes(persistedSnapshot);
+    expect(Object.getOwnPropertyNames(Object.prototype)).toEqual(
+      objectPrototypeKeys,
+    );
+
+    expect(Object.getPrototypeOf(nestedAnswers)).toBe(callerAnswersPrototype);
+    expect(canonicalJson(nestedAnswers)).toBe(callerAnswersCanonical);
+    expect(canonicalJson(frozenSnapshot)).toBe(frozenCanonical);
+    expectStandardJsonObjectPrototypes(frozenSnapshot);
+    expect(frozenSnapshot.sources[0]!.answers).toBe(nestedAnswers);
+    expect(Object.isFrozen(frozenSnapshot)).toBe(true);
+    expect(Object.isFrozen(nestedAnswers)).toBe(true);
   });
 
   it("returns an authorized same-request report from the actor-safe fast path", async () => {
