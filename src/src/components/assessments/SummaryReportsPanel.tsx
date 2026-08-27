@@ -63,7 +63,10 @@ const summaryReportTypes = new Set<SummaryReportType>(
 );
 
 function isSummaryReportType(value: unknown): value is SummaryReportType {
-  return typeof value === "string" && summaryReportTypes.has(value as SummaryReportType);
+  return (
+    typeof value === "string" &&
+    summaryReportTypes.has(value as SummaryReportType)
+  );
 }
 
 function parseReports(value: unknown): SummaryReportListItem[] | null {
@@ -195,9 +198,7 @@ export function SummaryReportsPanel({
             {campaignName} · {assessmentName}
           </CardDescription>
         </div>
-        <Button onClick={() => setWizardOpen(true)}>
-          Open Wizard
-        </Button>
+        <Button onClick={() => setWizardOpen(true)}>Open Wizard</Button>
       </CardHeader>
       <CardContent>
         {displayLoadState === "loading" && (

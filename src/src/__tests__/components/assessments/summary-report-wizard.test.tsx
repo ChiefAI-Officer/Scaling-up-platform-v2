@@ -1,5 +1,11 @@
 import React from "react";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { SummaryReportWizard } from "@/components/assessments/SummaryReportWizard";
 
 const CAMPAIGN_ID = "campaign-123";
@@ -59,7 +65,9 @@ function response(body: unknown, status = 200) {
   } as Response;
 }
 
-function renderWizard(overrides: Partial<React.ComponentProps<typeof SummaryReportWizard>> = {}) {
+function renderWizard(
+  overrides: Partial<React.ComponentProps<typeof SummaryReportWizard>> = {},
+) {
   const onClose = jest.fn();
   const onSuccess = jest.fn();
   return {
@@ -93,7 +101,9 @@ describe("SummaryReportWizard", () => {
   it("shows only available type cards and creates nothing when cancelled", () => {
     const { onClose } = renderWizard();
 
-    expect(screen.getByRole("button", { name: "Scaling CEO Full" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Scaling CEO Full" }),
+    ).toBeInTheDocument();
     expect(screen.queryByText("Scaling Up · Condensed CEO")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onClose).toHaveBeenCalledTimes(1);
@@ -101,38 +111,59 @@ describe("SummaryReportWizard", () => {
   });
 
   it("keeps selection separate from CEO assignment and shows candidate metadata", async () => {
-    (global.fetch as jest.Mock).mockResolvedValue(response({ candidates: [CEO, TEAM, INCOMPATIBLE] }));
+    (global.fetch as jest.Mock).mockResolvedValue(
+      response({ candidates: [CEO, TEAM, INCOMPATIBLE] }),
+    );
     renderWizard();
 
     fireEvent.click(screen.getByRole("button", { name: "Scaling CEO Full" }));
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
     expect(await screen.findByText("Avery CEO")).toBeInTheDocument();
-    expect(screen.getAllByText((_, element) =>
-      element?.tagName === "P" && element.textContent === "Northstar Growth Campaign · Scaling Up · v7 · Aug 20, 2026",
-    )).toHaveLength(2);
-    expect(screen.getByText((_, element) =>
-      element?.tagName === "P" && element.textContent === "Submission …o-123456",
-    )).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Sam Stale.*Incompatible version/i })).toBeDisabled();
+    expect(
+      screen.getAllByText(
+        (_, element) =>
+          element?.tagName === "P" &&
+          element.textContent ===
+            "Northstar Growth Campaign · Scaling Up · v7 · Aug 20, 2026",
+      ),
+    ).toHaveLength(2);
+    expect(
+      screen.getByText(
+        (_, element) =>
+          element?.tagName === "P" &&
+          element.textContent === "Submission …o-123456",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Sam Stale.*Incompatible version/i }),
+    ).toBeDisabled();
 
     fireEvent.click(screen.getByRole("button", { name: /Select Avery CEO/i }));
-    fireEvent.click(screen.getByRole("button", { name: /Assign Avery CEO as CEO/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /Assign Avery CEO as CEO/i }),
+    );
     fireEvent.click(screen.getByRole("button", { name: /Select Toni Team/i }));
-    fireEvent.click(screen.getByRole("button", { name: /Assign Toni Team as Team/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /Assign Toni Team as Team/i }),
+    );
 
     expect(screen.getByText("CEO: Avery CEO")).toBeInTheDocument();
     expect(screen.getByText("Team: Toni Team")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Review" }));
     expect(await screen.findByText("Team count: 1")).toBeInTheDocument();
-    expect(screen.getByText("Northstar Growth Campaign — Scaling CEO Full")).toBeInTheDocument();
+    expect(
+      screen.getByText("Northstar Growth Campaign — Scaling CEO Full"),
+    ).toBeInTheDocument();
   });
 
   it("preserves assignments through scope changes and Back, then posts the exact ordered role payload once", async () => {
     (global.fetch as jest.Mock).mockImplementation((url: string) =>
-      Promise.resolve(url.includes("/candidates")
-        ? response({ candidates: [CEO, TEAM] })
-        : response({ id: "report-1" }, 201)),
+      Promise.resolve(
+        url.includes("/candidates")
+          ? response({ candidates: [CEO, TEAM] })
+          : response({ id: "report-1" }, 201),
+      ),
     );
     const { onClose, onSuccess } = renderWizard();
 
@@ -140,12 +171,24 @@ describe("SummaryReportWizard", () => {
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
     await screen.findByText("Avery CEO");
     fireEvent.click(screen.getByRole("button", { name: /Select Avery CEO/i }));
-    fireEvent.click(screen.getByRole("button", { name: /Assign Avery CEO as CEO/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /Assign Avery CEO as CEO/i }),
+    );
     fireEvent.click(screen.getByRole("button", { name: /Select Toni Team/i }));
-    fireEvent.click(screen.getByRole("button", { name: /Assign Toni Team as Team/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /Assign Toni Team as Team/i }),
+    );
     fireEvent.click(screen.getByRole("button", { name: "All campaigns" }));
-    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(`${BASE_URL}/candidates?type=SCALING_CEO_FULL&scope=all`, expect.anything()));
-    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    await waitFor(() =>
+      expect(global.fetch).toHaveBeenCalledWith(
+        `${BASE_URL}/candidates?type=SCALING_CEO_FULL&scope=all`,
+        expect.anything(),
+      ),
+    );
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
     fireEvent.click(screen.getByRole("button", { name: "Review" }));
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
     expect(screen.getByText("CEO: Avery CEO")).toBeInTheDocument();
@@ -157,20 +200,34 @@ describe("SummaryReportWizard", () => {
 
     await waitFor(() => expect(onSuccess).toHaveBeenCalledTimes(1));
     expect(onClose).toHaveBeenCalledTimes(1);
-    const createCalls = (global.fetch as jest.Mock).mock.calls.filter(([url]) => url === BASE_URL);
+    const createCalls = (global.fetch as jest.Mock).mock.calls.filter(
+      ([url]) => url === BASE_URL,
+    );
     expect(createCalls).toHaveLength(1);
-    expect(createCalls[0][1]).toEqual(expect.objectContaining({
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        reportType: "SCALING_CEO_FULL",
-        creationRequestId: "request-uuid-1",
-        sources: [
-          { submissionId: CEO.submissionId, sourceCampaignId: CAMPAIGN_ID, role: "CEO", position: 0 },
-          { submissionId: TEAM.submissionId, sourceCampaignId: CAMPAIGN_ID, role: "TEAM", position: 0 },
-        ],
+    expect(createCalls[0][1]).toEqual(
+      expect.objectContaining({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reportType: "SCALING_CEO_FULL",
+          creationRequestId: "request-uuid-1",
+          sources: [
+            {
+              submissionId: CEO.submissionId,
+              sourceCampaignId: CAMPAIGN_ID,
+              role: "CEO",
+              position: 0,
+            },
+            {
+              submissionId: TEAM.submissionId,
+              sourceCampaignId: CAMPAIGN_ID,
+              role: "TEAM",
+              position: 0,
+            },
+          ],
+        }),
       }),
-    }));
+    );
   });
 
   it("keeps the editable draft after a conclusive validation response", async () => {
@@ -183,11 +240,15 @@ describe("SummaryReportWizard", () => {
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
     await screen.findByText("Avery CEO");
     fireEvent.click(screen.getByRole("button", { name: /Select Avery CEO/i }));
-    fireEvent.click(screen.getByRole("button", { name: /Assign Avery CEO as CEO/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /Assign Avery CEO as CEO/i }),
+    );
     fireEvent.click(screen.getByRole("button", { name: "Review" }));
     fireEvent.click(screen.getByRole("button", { name: "Create report" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("invalid composition");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "invalid composition",
+    );
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
     expect(screen.getByText("CEO: Avery CEO")).toBeInTheDocument();
   });

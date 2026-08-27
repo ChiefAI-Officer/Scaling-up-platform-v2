@@ -94,7 +94,9 @@ describe("SummaryReportsPanel", () => {
       ),
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Open Wizard" }));
-    expect(screen.getByRole("dialog", { name: "Create summary report" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("dialog", { name: "Create summary report" }),
+    ).toBeInTheDocument();
   });
 
   it("offers a retry after an unavailable list response", async () => {
@@ -140,11 +142,15 @@ describe("SummaryReportsPanel", () => {
   });
 
   it("rejects a malformed report type instead of rendering an arbitrary registry label", async () => {
-    (global.fetch as jest.Mock).mockResolvedValue(response({ reports: [{ ...REPORTS[0], reportType: "NOT_A_REPORT" }] }));
+    (global.fetch as jest.Mock).mockResolvedValue(
+      response({ reports: [{ ...REPORTS[0], reportType: "NOT_A_REPORT" }] }),
+    );
 
     renderPanel();
 
-    expect(await screen.findByText("Summary reports are temporarily unavailable.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Summary reports are temporarily unavailable."),
+    ).toBeInTheDocument();
     expect(screen.queryByRole("listitem")).toBeNull();
   });
 

@@ -51,6 +51,23 @@ git diff --check
 
 Both completed with exit status 0 and no output.
 
+## Formatting verification (post-commit)
+
+Initial check:
+
+```sh
+npx prettier --check src/components/assessments/SummaryReportWizard.tsx src/components/assessments/SummaryReportsPanel.tsx src/__tests__/components/assessments/summary-report-wizard.test.tsx src/__tests__/components/assessments/summary-reports-panel.test.tsx
+```
+
+Reported formatting issues in all four Task 12 files. Ran `npx prettier --write` on exactly those files, then reran the same check. Result:
+
+```text
+Checking formatting...
+All matched files use Prettier code style!
+```
+
+After formatting, reran the focused Jest command (`2 passed`, `15 passed`), changed-file ESLint, and `git diff --check`; all completed successfully.
+
 `npx tsc --noEmit --pretty false` was also run. It remains non-zero because of broad, pre-existing repository test/type errors (including BigInt target and many older NextRequest fixture mismatches); its output contained no errors for Task 12 files after the local `reportType` narrowing fix.
 
 ## Files
