@@ -17,6 +17,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { formatTimestamp } from "@/lib/utils";
+import { SummaryReportWizard } from "@/components/assessments/SummaryReportWizard";
+import { SUMMARY_REPORT_REGISTRY } from "@/lib/assessments/summary-reports/registry";
 import type { SummaryReportType } from "@/lib/assessments/summary-reports/types";
 
 interface SummaryReportListItem {
@@ -37,8 +39,6 @@ export interface SummaryReportsPanelProps {
     label: string;
     description: string;
   }>;
-  /** Temporary Task 12 seam; absent means the wizard is unavailable. */
-  onOpenWizard?: () => void;
 }
 
 type LoadState = "loading" | "ready" | "error" | "hidden";
@@ -51,11 +51,19 @@ function isSummaryReportListItem(
   return (
     typeof report.id === "string" &&
     typeof report.campaignId === "string" &&
-    typeof report.reportType === "string" &&
+    isSummaryReportType(report.reportType) &&
     typeof report.name === "string" &&
     typeof report.createdByEmailSnapshot === "string" &&
     typeof report.createdAt === "string"
   );
+}
+
+const summaryReportTypes = new Set<SummaryReportType>(
+  SUMMARY_REPORT_REGISTRY.map((definition) => definition.type),
+);
+
+function isSummaryReportType(value: unknown): value is SummaryReportType {
+  return typeof value === "string" && summaryReportTypes.has(value as SummaryReportType);
 }
 
 function parseReports(value: unknown): SummaryReportListItem[] | null {
@@ -79,7 +87,6 @@ export function SummaryReportsPanel({
   campaignName,
   assessmentName,
   implementedTypes,
-  onOpenWizard,
 }: SummaryReportsPanelProps) {
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [stateCampaignId, setStateCampaignId] = useState<string | null>(null);
@@ -88,6 +95,7 @@ export function SummaryReportsPanel({
     useState<SummaryReportListItem | null>(null);
   const [previewLoaded, setPreviewLoaded] = useState(false);
   const [requestRevision, setRequestRevision] = useState(0);
+  const [wizardOpen, setWizardOpen] = useState(false);
   const returnFocusRef = useRef<HTMLButtonElement | null>(null);
   const requestIdRef = useRef(0);
 
@@ -187,7 +195,7 @@ export function SummaryReportsPanel({
             {campaignName} · {assessmentName}
           </CardDescription>
         </div>
-        <Button onClick={onOpenWizard} disabled={!onOpenWizard}>
+        <Button onClick={() => setWizardOpen(true)}>
           Open Wizard
         </Button>
       </CardHeader>
@@ -301,6 +309,15 @@ export function SummaryReportsPanel({
           )}
         </DialogContent>
       </Dialog>
+      <SummaryReportWizard
+        open={wizardOpen}
+        onClose={() => setWizardOpen(false)}
+        onSuccess={() => setRequestRevision((revision) => revision + 1)}
+        campaignId={campaignId}
+        campaignName={campaignName}
+        assessmentName={assessmentName}
+        implementedTypes={implementedTypes}
+      />
     </Card>
   );
 }

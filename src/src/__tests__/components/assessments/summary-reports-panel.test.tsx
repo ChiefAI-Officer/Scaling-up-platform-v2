@@ -46,14 +46,13 @@ function response(body: unknown, status = 200) {
   } as Response;
 }
 
-function renderPanel(onOpenWizard?: jest.Mock) {
+function renderPanel() {
   return render(
     <SummaryReportsPanel
       campaignId={CAMPAIGN_ID}
       campaignName="Northstar Growth Campaign"
       assessmentName="Scaling Up Assessment"
       implementedTypes={IMPLEMENTED_TYPES}
-      onOpenWizard={onOpenWizard}
     />,
   );
 }
@@ -78,7 +77,7 @@ describe("SummaryReportsPanel", () => {
     );
   });
 
-  it("shows an empty campaign library and disables the temporary wizard seam when absent", async () => {
+  it("shows an empty campaign library and opens its own wizard", async () => {
     (global.fetch as jest.Mock).mockResolvedValue(response({ reports: [] }));
 
     renderPanel();
@@ -94,7 +93,8 @@ describe("SummaryReportsPanel", () => {
             "Northstar Growth Campaign · Scaling Up Assessment",
       ),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Open Wizard" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Open Wizard" }));
+    expect(screen.getByRole("dialog", { name: "Create summary report" })).toBeInTheDocument();
   });
 
   it("offers a retry after an unavailable list response", async () => {
@@ -139,14 +139,13 @@ describe("SummaryReportsPanel", () => {
     expect(rows[1]).toHaveTextContent("coach@example.com");
   });
 
-  it("uses the supplied wizard callback", async () => {
-    const onOpenWizard = jest.fn();
-    (global.fetch as jest.Mock).mockResolvedValue(response({ reports: [] }));
+  it("rejects a malformed report type instead of rendering an arbitrary registry label", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue(response({ reports: [{ ...REPORTS[0], reportType: "NOT_A_REPORT" }] }));
 
-    renderPanel(onOpenWizard);
+    renderPanel();
 
-    fireEvent.click(await screen.findByRole("button", { name: "Open Wizard" }));
-    expect(onOpenWizard).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText("Summary reports are temporarily unavailable.")).toBeInTheDocument();
+    expect(screen.queryByRole("listitem")).toBeNull();
   });
 
   it("does not create an artifact iframe until the user chooses View", async () => {
