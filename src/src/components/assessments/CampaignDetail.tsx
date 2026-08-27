@@ -44,6 +44,7 @@ import {
 import { AssessmentResultView } from "./AssessmentResultView";
 import { formatTimestamp } from "@/lib/utils";
 import { CampaignStatusMetrics } from "./CampaignStatusMetrics";
+import { SummaryReportsPanel } from "./SummaryReportsPanel";
 import {
   CustomSlidesPanel,
   type CustomSlidesPanelSection,
@@ -54,6 +55,7 @@ import type {
   CampaignRespondentRow,
 } from "@/lib/assessments/campaign-detail";
 import type { ScoreResult } from "@/lib/assessments/scoring";
+import type { SummaryReportType } from "@/lib/assessments/summary-reports/types";
 import {
   computeCampaignStatusMetrics,
   getInvitationBand,
@@ -125,6 +127,21 @@ export interface CampaignDetailProps {
   canViewGroupReport?: boolean;
   /** Wave F #22 (T10) — `/assessments/<id>/report`; only used when the capability is true. */
   groupReportHref?: string;
+  /**
+   * Summary reporting is an independently server-authorized, campaign-local
+   * capability. A non-null value permits the panel (and its API fetch); absent
+   * or null retains the legacy group-report path byte-for-byte.
+   */
+  summaryReporting?: {
+    campaignId: string;
+    campaignName: string;
+    assessmentName: string;
+    implementedTypes: Array<{
+      type: SummaryReportType;
+      label: string;
+      description: string;
+    }>;
+  } | null;
   /**
    * Wave M (#19) — gate the custom-slides editor. Computed SERVER-side
    * (per-campaign flag AND status ∈ {DRAFT, ACTIVE}); the client receives ONLY
@@ -274,6 +291,7 @@ export function CampaignDetail({
   coachNotifyEnabled = false,
   canViewGroupReport = false,
   groupReportHref,
+  summaryReporting = null,
   customSlidesEnabled = false,
   onScreenResultsEnabled = false,
   reportStylesAvailable = false,
@@ -1399,7 +1417,7 @@ export function CampaignDetail({
           <ArrowLeft className="w-4 h-4" /> Back to Assessments
         </Link>
         <div className={responsiveEnabled ? "flex items-center justify-end gap-2" : "flex items-center gap-2"}>
-          {canViewGroupReport && groupReportHref && (
+          {!summaryReporting && canViewGroupReport && groupReportHref && (
             // Wave F #22 (T10) — gated campaign-level group report entry.
             // R3-M2: a PLAIN <a> (NOT a Next <Link>): a Link would prefetch
             // the bulk-PII group report on render — triggering the loader +
@@ -2171,6 +2189,8 @@ export function CampaignDetail({
         testIdPrefix="campaign-detail-metrics"
         className="mb-3"
       />
+
+      {summaryReporting && <SummaryReportsPanel {...summaryReporting} />}
 
       {/* Respondents table */}
       <div

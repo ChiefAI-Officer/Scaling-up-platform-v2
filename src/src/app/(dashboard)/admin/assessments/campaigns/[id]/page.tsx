@@ -50,6 +50,7 @@ import { isReportStyleSelectionEnabled } from "@/lib/assessments/wave-report-sty
 import { deriveReportStylePreviewCapabilities } from "@/lib/assessments/report-style-registry";
 import { isInvitationBannerEnabled } from "@/lib/assessments/wave-invitation-banner-flags";
 import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
+import { resolveSummaryReportingCapability } from "@/lib/assessments/summary-reports/capability";
 
 const ADMIN_CAMPAIGNS = "/admin/assessments/campaigns";
 
@@ -112,7 +113,7 @@ export default async function AdminCampaignDetailPage({ params }: PageProps) {
     campaignForFlag?.template != null &&
     isResultsEmailApproved(campaignForFlag.template);
   const coachNotifyEnabled = waveDCoachNotifyEnabled();
-  const canShowGroupReport =
+  const groupReportGate =
     campaignForFlag !== null &&
     campaignForFlag.accessMode === "INVITED" &&
     isGroupReportAlias(campaignForFlag.template?.alias) &&
@@ -120,7 +121,18 @@ export default async function AdminCampaignDetailPage({ params }: PageProps) {
     // a published version; qualitative (LVA/QSP) is never gated on publishedAt.
     (!groupReportRequiresPublishedVersion(campaignForFlag.template?.alias) ||
       campaignForFlag.version?.publishedAt != null) &&
-    isGroupReportEnabled(actor, campaignForFlag) &&
+    isGroupReportEnabled(actor, campaignForFlag);
+
+  const summaryReportingCandidate = resolveSummaryReportingCapability(
+    process.env,
+    campaignForFlag,
+    overview.campaign.name,
+    overview.campaign.templateName,
+  );
+  const needsGroupReportAccess =
+    groupReportGate || summaryReportingCandidate !== null;
+  const hasGroupReportAccess =
+    needsGroupReportAccess &&
     (await canViewGroupReport(asAccessDb(db), actor, id));
   const reportStylesAvailable =
     campaignForFlag !== null &&
@@ -128,6 +140,11 @@ export default async function AdminCampaignDetailPage({ params }: PageProps) {
       templateId: overview.campaign.templateId,
       campaignId: id,
     });
+  const canShowGroupReport = groupReportGate && hasGroupReportAccess;
+  const summaryReporting =
+    summaryReportingCandidate && hasGroupReportAccess
+      ? summaryReportingCandidate
+      : null;
 
   return (
     <div className={mobileResponsiveEnabled ? "min-w-0 max-w-full" : undefined}>
@@ -160,6 +177,7 @@ export default async function AdminCampaignDetailPage({ params }: PageProps) {
         coachNotifyEnabled={coachNotifyEnabled}
         canViewGroupReport={canShowGroupReport}
         groupReportHref={`/assessments/${id}/report`}
+        summaryReporting={summaryReporting}
         // Wave OSR (#71) — gate computed here, server-side, from the same flag the
         // PATCH route enforces. CLOSED is excluded inside the component (the route
         // 409s it), so this is the flag check only.

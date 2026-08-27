@@ -1,0 +1,162 @@
+- navigation:
+  - list:
+    - link:
+      - /url: /admin2/home
+      - text: Home
+    - link:
+      - /url: /admin2/members
+      - text: Members
+    - link:
+      - /url: /admin2/campaigns
+      - text: Campaigns
+    - link:
+      - /url: /admin2/reports
+      - text: Reports
+  - list:
+    - button:
+      - subscript: "2"
+    - button:
+    - button:
+      - generic: CD
+- main:
+  - button: < all Campaigns
+  - text: oGH8JyOp74
+  - text: peer_cohort_very_small
+  - heading [level=3]: Peer Cohort Pilot - Very Small Company
+  - generic: ScaleUp2
+  - generic: enUS
+  - text: "created: Aug 14, 2026 11:14 AM"
+  - generic: Aug 13, 2026 11:52 PM
+  - generic: "-"
+  - generic: Aug 27, 2026 11:52 PM
+  - generic: active
+  - button:
+    - text: edit
+  - heading [level=3]: "Current Status:"
+  - subscript: "4"
+  - text: "0"
+  - text: "0"
+  - text: "1"
+  - text: "3"
+  - text: 1 / 1
+  - generic: Response-rate
+  - generic: "avg. Duration:"
+  - generic: 2:33
+  - text: "(min: 0:40 | max: 4:30)"
+  - tablist:
+    - tab:
+      - text: Participants
+      - superscript: "4"
+    - tab [selected]:
+      - text: Reports
+      - superscript: "3"
+    - tab:
+      - text: Relations
+      - superscript: "0"
+  - tabpanel:
+    - searchbox
+    - generic: 3 Reports found
+    - button: Summary Reports
+    - table:
+      - rowgroup:
+        - row:
+          - columnheader
+          - columnheader: Type
+          - columnheader: Name
+          - columnheader: Language
+          - columnheader: Tags
+          - columnheader: created
+          - columnheader: Last opened
+          - columnheader
+      - rowgroup:
+        - row:
+          - cell
+          - cell:
+          - cell:
+            - text: AeqIuZZH3y
+            - generic: Four
+            - text: ","
+            - generic: Peer Experiment
+          - cell: enUS
+          - cell
+          - cell: Aug 14, 2026 8:58 PM
+          - cell
+          - cell:
+            - button:
+            - button:
+            - button:
+        - row:
+          - cell
+          - cell:
+          - cell:
+            - text: rVNFe40ti7
+            - generic: Three
+            - text: ","
+            - generic: Peer Experiment
+          - cell: enUS
+          - cell
+          - cell: Aug 14, 2026 8:53 PM
+          - cell
+          - cell:
+            - button:
+            - button:
+            - button:
+        - row:
+          - cell
+          - cell:
+          - cell:
+            - text: uim0WOdbfw
+            - generic: One
+            - text: ","
+            - generic: Peer Experiment
+          - cell: enUS
+          - cell
+          - cell: Aug 14, 2026 11:16 AM
+          - cell: Aug 14, 2026 8:41 PM
+          - cell:
+            - button:
+            - button:
+            - button:
+- dialog:
+  - document:
+    - heading "Add Summary Report ScaleUp2 enUS group" [level=4]:
+      - text: Add Summary Report
+      - generic: ScaleUp2
+      - generic: enUS
+      - generic "CEO Full Report":
+      - text: group
+    - button
+    - generic "Please choose a campaign variant.":
+      - generic: "1"
+      - generic: Variant
+    - separator
+    - generic "Please select the summary report type":
+      - generic: "2"
+      - generic: Type
+    - separator
+    - generic: "3"
+    - generic: Composition
+    - separator
+    - generic: "4"
+    - generic: Check-out
+    - heading "Check-out" [level=2]
+    - paragraph: "You are about to create:"
+    - list:
+      - generic: ScaleUp2
+      - generic: enUS
+      - generic "CEO Full Report":
+      - text: CEO Full Report
+      - text: CEO
+      - superscript: "1"
+      - text: ":"
+      - list:
+        - generic "uim0WOdbfw":
+          - 'generic "Report: uim0WOdbfw"':
+          - text: uim0WOdbfw
+        - text: One, Peer Experiment
+      - text: Team
+      - superscript: "0"
+      - text: ":"
+    - button "Back"
+    - button "Create Report"
+    - button "Cancel"

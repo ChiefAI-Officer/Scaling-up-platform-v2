@@ -19,6 +19,24 @@ jest.mock("ioredis", () => {
 
 import { checkRateLimitStrict, withRateLimitStrict } from "@/lib/rate-limit";
 
+it("fails closed in production when neither distributed backend URL is configured", async () => {
+  const previousEnv = process.env;
+  process.env = { ...previousEnv, NODE_ENV: "production" };
+  delete process.env.REDIS_URL;
+  delete process.env.KV_URL;
+  const warning = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+  try {
+    await jest.isolateModulesAsync(async () => {
+      const { checkRateLimitStrict: isolated } = await import("@/lib/rate-limit");
+      await expect(isolated("summary-report:create:proof", { interval: 60_000, maxRequests: 10 }))
+        .rejects.toThrow("Distributed rate limiter unavailable");
+    });
+  } finally {
+    process.env = previousEnv;
+    warning.mockRestore();
+  }
+});
+
 const config = { interval: 60_000, maxRequests: 10 };
 const successfulPipeline = (count: number) => [
   [null, 1],
