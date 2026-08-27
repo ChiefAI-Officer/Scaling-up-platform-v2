@@ -70,14 +70,17 @@ jest.mock("@/lib/db", () => ({
 const captured: {
   canViewGroupReport?: boolean;
   longitudinalRespondentIds?: string[];
+  summaryReporting?: unknown;
 } = {};
 jest.mock("@/components/assessments/CampaignDetail", () => ({
   CampaignDetail: (props: {
     canViewGroupReport?: boolean;
     longitudinalRespondentIds?: string[];
+    summaryReporting?: unknown;
   }) => {
     captured.canViewGroupReport = props.canViewGroupReport;
     captured.longitudinalRespondentIds = props.longitudinalRespondentIds;
+    captured.summaryReporting = props.summaryReporting;
     return null;
   },
 }));
@@ -113,6 +116,7 @@ function makeCampaign(overrides: Record<string, unknown> = {}) {
 async function runPage() {
   captured.canViewGroupReport = undefined;
   captured.longitudinalRespondentIds = undefined;
+  captured.summaryReporting = undefined;
   const node = await Page({ params: Promise.resolve({ id: CAMPAIGN_ID }) });
   // Render the returned tree so the (mocked) CampaignDetail is invoked and
   // captures the canViewGroupReport boolean the page computed.
@@ -128,6 +132,8 @@ beforeEach(() => {
   // Overview carries the campaign fields the Wave N loop reads.
   mockGetCampaignOverview.mockResolvedValue({
     campaign: {
+      name: "Acme Q3",
+      templateName: "Scaling Up Full",
       organizationId: "org-1",
       templateId: TEMPLATE_ID,
       alias: "su-full-campaign-slug", // CAMPAIGN slug, deliberately NOT the template alias
@@ -139,11 +145,17 @@ beforeEach(() => {
   delete process.env.WAVE_J_SUFULL_GROUP_ENABLED;
   delete process.env.WAVE_J_SUFULL_GROUP_CANARY;
   delete process.env.WAVE_J_SUFULL_GROUP_KILL;
+  delete process.env.SUMMARY_REPORTING_ENABLED;
+  delete process.env.SUMMARY_REPORTING_CANARY;
+  delete process.env.SUMMARY_REPORTING_KILL;
 });
 
 afterEach(() => {
   delete process.env.WAVE_J_SUFULL_GROUP_ENABLED;
   delete process.env.WAVE_F_GROUP_REPORT_ENABLED;
+  delete process.env.SUMMARY_REPORTING_ENABLED;
+  delete process.env.SUMMARY_REPORTING_CANARY;
+  delete process.env.SUMMARY_REPORTING_KILL;
 });
 
 describe("CampaignDetail entry-point publish gate (Wave J J-3)", () => {
@@ -193,6 +205,58 @@ describe("CampaignDetail entry-point publish gate (Wave J J-3)", () => {
     );
     await runPage();
     expect(mockCanViewGroupReport).not.toHaveBeenCalled();
+  });
+});
+
+describe("CampaignDetail Summary Reports capability", () => {
+  it("passes the implemented Scaling catalog only for a published, authorized invited campaign", async () => {
+    process.env.SUMMARY_REPORTING_ENABLED = "1";
+    mockFindFirst.mockResolvedValue(makeCampaign());
+
+    await runPage();
+
+    expect(captured.summaryReporting).toEqual({
+      campaignId: CAMPAIGN_ID,
+      campaignName: "Acme Q3",
+      assessmentName: "Scaling Up Full",
+      implementedTypes: [
+        {
+          type: "SCALING_CEO_FULL",
+          label: "Scaling Up · CEO Full",
+          description: "Compare one CEO with an explicitly selected leadership team.",
+        },
+      ],
+    });
+  });
+
+  it("does not add a group-report authorization lookup when summary reporting is flag-off", async () => {
+    mockFindFirst.mockResolvedValue(makeCampaign());
+
+    await runPage();
+
+    expect(captured.summaryReporting).toBeNull();
+    expect(mockCanViewGroupReport).not.toHaveBeenCalled();
+  });
+
+  it("withholds the capability from an unauthorized coach", async () => {
+    process.env.SUMMARY_REPORTING_ENABLED = "1";
+    mockCanViewGroupReport.mockResolvedValue(false);
+    mockFindFirst.mockResolvedValue(makeCampaign());
+
+    await runPage();
+
+    expect(captured.summaryReporting).toBeNull();
+  });
+
+  it("keeps an unsupported family on its existing direct-link path", async () => {
+    process.env.SUMMARY_REPORTING_ENABLED = "1";
+    process.env.WAVE_F_GROUP_REPORT_ENABLED = "1";
+    mockFindFirst.mockResolvedValue(
+      makeCampaign({ template: { alias: "leadership-vision-alignment" } }),
+    );
+
+    expect(await runPage()).toBe(true);
+    expect(captured.summaryReporting).toBeNull();
   });
 });
 

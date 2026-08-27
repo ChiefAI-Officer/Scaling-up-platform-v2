@@ -40,6 +40,7 @@ import {
   isGroupReportAlias,
   groupReportRequiresPublishedVersion,
 } from "@/lib/assessments/wave-f-flags";
+import { resolveSummaryReportingCapability } from "@/lib/assessments/summary-reports/capability";
 
 const ADMIN_CAMPAIGNS = "/admin/assessments/campaigns";
 
@@ -87,7 +88,7 @@ export default async function AdminCampaignDetailPage({ params }: PageProps) {
       version: { select: { id: true, publishedAt: true } },
     },
   });
-  const canShowGroupReport =
+  const groupReportGate =
     campaignForFlag !== null &&
     campaignForFlag.accessMode === "INVITED" &&
     isGroupReportAlias(campaignForFlag.template?.alias) &&
@@ -95,8 +96,24 @@ export default async function AdminCampaignDetailPage({ params }: PageProps) {
     // a published version; qualitative (LVA/QSP) is never gated on publishedAt.
     (!groupReportRequiresPublishedVersion(campaignForFlag.template?.alias) ||
       campaignForFlag.version?.publishedAt != null) &&
-    isGroupReportEnabled(actor, campaignForFlag) &&
+    isGroupReportEnabled(actor, campaignForFlag);
+
+  const summaryReportingCandidate = resolveSummaryReportingCapability(
+    process.env,
+    campaignForFlag,
+    overview.campaign.name,
+    overview.campaign.templateName,
+  );
+  const needsGroupReportAccess =
+    groupReportGate || summaryReportingCandidate !== null;
+  const hasGroupReportAccess =
+    needsGroupReportAccess &&
     (await canViewGroupReport(asAccessDb(db), actor, id));
+  const canShowGroupReport = groupReportGate && hasGroupReportAccess;
+  const summaryReporting =
+    summaryReportingCandidate && hasGroupReportAccess
+      ? summaryReportingCandidate
+      : null;
 
   return (
     <div>
@@ -117,6 +134,7 @@ export default async function AdminCampaignDetailPage({ params }: PageProps) {
         customHtmlEmailEnabled={waveDCustomHtmlEmailEnabled()}
         canViewGroupReport={canShowGroupReport}
         groupReportHref={`/assessments/${id}/report`}
+        summaryReporting={summaryReporting}
         // Wave OSR (#71) — gate computed here, server-side, from the same flag the
         // PATCH route enforces. CLOSED is excluded inside the component (the route
         // 409s it), so this is the flag check only.

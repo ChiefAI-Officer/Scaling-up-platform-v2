@@ -30,6 +30,7 @@ import {
 } from "@/lib/assessments/wave-f-flags";
 import { isCustomSlidesEnabled } from "@/lib/assessments/wave-m-flags";
 import { isOnScreenResultsEnabled } from "@/lib/assessments/wave-osr-flags";
+import { resolveSummaryReportingCapability } from "@/lib/assessments/summary-reports/capability";
 import {
   hasComparableLongitudinal,
   asLongitudinalEligibilityDb,
@@ -96,7 +97,7 @@ export default async function CampaignDetailPage({ params }: PageProps) {
       version: { select: { id: true, publishedAt: true, sections: true } },
     },
   });
-  const canShowGroupReport =
+  const groupReportGate =
     campaignForFlag !== null &&
     campaignForFlag.accessMode === "INVITED" &&
     // Allowlisted surface — LVA + SU-Full + QSP + Rockefeller (#72 / DT-5).
@@ -106,8 +107,27 @@ export default async function CampaignDetailPage({ params }: PageProps) {
     // gated on publishedAt.
     (!groupReportRequiresPublishedVersion(campaignForFlag.template?.alias) ||
       campaignForFlag.version?.publishedAt != null) &&
-    isGroupReportEnabled(actor, campaignForFlag) &&
+    isGroupReportEnabled(actor, campaignForFlag);
+
+  // Summary Reports is a narrower, independently flagged campaign-local
+  // surface. Resolve its pure umbrella/family/publish gate before requesting
+  // group-report access so flag-off and unsupported campaigns add no lookup.
+  const summaryReportingCandidate = resolveSummaryReportingCapability(
+    process.env,
+    campaignForFlag,
+    overview.campaign.name,
+    overview.campaign.templateName,
+  );
+  const needsGroupReportAccess =
+    groupReportGate || summaryReportingCandidate !== null;
+  const hasGroupReportAccess =
+    needsGroupReportAccess &&
     (await canViewGroupReport(asAccessDb(db), actor, id));
+  const canShowGroupReport = groupReportGate && hasGroupReportAccess;
+  const summaryReporting =
+    summaryReportingCandidate && hasGroupReportAccess
+      ? summaryReportingCandidate
+      : null;
 
   // Wave M (#19) — custom-slides editor. Gated by the per-campaign flag
   // (canary/global/kill) AND status ∈ {DRAFT, ACTIVE} (CLOSED is read-only,
@@ -180,6 +200,7 @@ export default async function CampaignDetailPage({ params }: PageProps) {
       customHtmlEmailEnabled={waveDCustomHtmlEmailEnabled()}
       canViewGroupReport={canShowGroupReport}
       groupReportHref={`/assessments/${id}/report`}
+      summaryReporting={summaryReporting}
       customSlidesEnabled={customSlidesEnabled}
       // Wave OSR (#71) — gate computed here, server-side, from the same flag the
       // PATCH route enforces. CLOSED is excluded inside the component (the route
