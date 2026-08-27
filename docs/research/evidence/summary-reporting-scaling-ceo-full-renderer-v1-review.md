@@ -74,3 +74,66 @@ node scripts/verify-summary-report-artifacts.mjs tmp/pdfs/team50.pdf --expect-te
 ```
 
 Both commands returned `ok: true`, their exact expected title/text/page count/SHA-256 values, and exit status 0.
+
+## Task 14 — real local lifecycle and UI review (2026-08-27)
+
+The Task 8 evidence above is preserved unchanged. This addendum concerns the
+real campaign hosts, authenticated API/Prisma lifecycle, and PDF bytes produced
+from a deidentified local 61-question CEO + two-Team campaign. It is **not a
+live-canary or global-launch approval**. Reproduction, boundary limitations and
+pending operations are in [the local-proof runbook](summary-reporting-local-proof/README.md).
+
+### Observed UI and artifact results
+
+| State | Local result and evidence |
+| --- | --- |
+| Coach/admin empty and populated lists | PASS: both actual hosts show the same single implemented catalog. The campaign panel remains primary; there is no new hub. `coach-empty-*`, `admin-empty-*`, `coach-populated-*`, `admin-populated-*` show the real components, not a static mockup. |
+| Composition | PASS after narrow scroll repair: selection is separate from role assignment; CEO is explicit, Team order is retained. At 390×844 the candidate region scrolls independently of the footer. The final action is fully visible/clickable above Review at the actual bottom; see `composition-bottom-mobile-viewport.png`. The earlier sticky-footer overlap was a real failure and was fixed, not accepted as baseline. |
+| Review | PASS after acceptance-gap repair: destination organization, CEO and ordered Team roles now include source campaign, assessment/version/language, completion timestamp and full submission identity. A same-name historical-source DOM regression proves disambiguation/order. `review-mobile-viewport.png` is legible; `admin-review-long-ids-mobile-viewport.png` proves long identities wrap within the dialog. The Review state changes no captured ambiguous-retry payload and adds no query. |
+| Modal / native PDF | PASS locally in headed Chromium: the settled `coach-pdf-preview-desktop.png` visibly paints the purple cover and native toolbar/page count, after actual inline HTTP 200 with `private, no-store` and `SAMEORIGIN`. Admin opens the same artifact; both actors open a new tab and download checksum-identical bytes. The exact artifact route required a narrow exception to the global DENY header; Next config and Vercel config carry matching overrides. No live CDN/CSP/header-precedence claim is made. |
+| Actual PDF pages | PASS for legibility/attribution: `local-pdf-1.png` has purple cover, local logo, campaign/organization/date hierarchy; `local-pdf-2.png` shows named CEO Alex CEO, frozen timestamp/version, 3 selected/completed/invited and labeled Section/Domain comparisons. `local-appendix-8.png` shows CEO, Person 1 (reordered Ed source), Person 2 (Dee source), with no Team names. All three are rasters of the bytes downloaded through the authorized route. |
+| Legacy mobile host layout | EXISTING LIMITATION: document width is 901px in a 390px viewport with Summary Reporting enabled **and with it off**, using the same campaign data. `coach-flag-off-mobile-viewport.png` records the comparison. The inherited respondent table/page overflow is not a wizard regression and is not claimed fixed. Full-page mobile screenshots can therefore exceed viewport width; use the `*-mobile-viewport.png` files for actual mobile composition. |
+
+All named screenshots are in [summary-reporting-local-proof](summary-reporting-local-proof/).
+Desktop viewports are 1440×1000 and mobile viewports 390×844. Full-page captures
+include content beyond the viewport and are explicitly not pixel-sized viewport
+evidence. The final lifecycle PDF has eight pages; its run-specific SHA-256 is
+`be5ac1759faf087f9375f139e6d34df5ba6f99079b00df4e8d6f06a1a6316a4e`.
+The hash remains unchanged after retries, each host's download, and a later
+submission. New run timestamps naturally produce a different artifact hash.
+
+### Exact visible differences and remaining visual gate
+
+The comparison source remains the tracked deidentified accepted artifact above.
+The approved spec's discovery-record and original-PDF links are absent in this
+worktree; no unrelated dirty originals were imported. This is a comparison to
+the durable deidentified baseline and preserved Task 8 evidence, not a fresh
+inspection of the live source.
+
+- **Question-bar layout differs:** the accepted source stacks CEO/peer bars
+  beneath each question; renderer v1 uses side-by-side CEO / Team / peer column
+  mini-bars and numeric values. This is a visible density/layout deviation,
+  not merely a paper-size change, and must be explicitly accepted on the canary.
+- The continuous browser report becomes fixed A4 page ownership and repeated
+  campaign/version/page footers. Section/Domain results are separate tables;
+  exact provenance and provisional peer disclosure are explicit. These alter
+  density and whitespace while retaining the purple/blue/orange hierarchy.
+- Appendix B is anonymized and chunked at 20 rows per page with continuation
+  context; the short two-Team local appendix intentionally has substantial
+  whitespace. Team-50 continuation coverage remains in the preserved evidence.
+- The local fixture has no coach avatar, so the cover uses the renderer's
+  no-image attribution fallback; it does not prove a live coach-photo path.
+  Optional/background identity answers are omitted from this synthetic input.
+- Headless-shell could not open the native PDF popup. Full Chromium new-headless
+  delivered the bytes and toolbar/thumbnails but initially captured a gray main
+  canvas; headed Chromium with a three-second paint settle visibly rendered the
+  page. Native paint is manually reviewed, not asserted by a pixel test. A
+  bounded Computer Use fallback failed with app-server error -10005; no desktop
+  capture is claimed from it, and the headed Playwright image is sufficient
+  positive local paint evidence. Mobile native viewer controls remain
+  browser-dependent; downloads/new-tab remain available.
+
+**Verdict:** local lifecycle, mobile wizard containment, Review provenance and
+representative PDF legibility pass. The accepted bar-layout/A4/appendix
+differences keep the **actual-canary visual gate open before launch**; this
+addendum does not authorize global enablement or claim pixel identity to ESPERTO.

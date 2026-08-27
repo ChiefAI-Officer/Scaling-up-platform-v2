@@ -666,6 +666,7 @@ describe("campaign Summary Report APIs", () => {
       );
 
       expect(response.status).toBe(200);
+      expect(header(response, "X-Frame-Options")).toBe("SAMEORIGIN");
       expect(header(response, "Content-Type")).toBe("application/pdf");
       expect(header(response, "Cache-Control")).toBe("private, no-store");
       expect(header(response, "X-Content-Type-Options")).toBe("nosniff");
@@ -843,6 +844,11 @@ describe("campaign Summary Report APIs", () => {
     (auditSummaryReportArtifactAccess as jest.Mock).mockRejectedValue(
       new Error("database unavailable"),
     );
+    (checkRateLimitStrict as jest.Mock).mockResolvedValue({
+      success: true,
+      remaining: 29,
+      resetAt: 1_777_777_777,
+    });
 
     const response = await getArtifact(
       request(
@@ -852,6 +858,10 @@ describe("campaign Summary Report APIs", () => {
     );
 
     expect(response.status).toBe(503);
+    expect(header(response, "X-RateLimit-Limit")).toBe("30");
+    expect(header(response, "X-RateLimit-Remaining")).toBe("29");
+    expect(header(response, "X-RateLimit-Reset")).toBe("1777777777");
+    expectPrivateNoStore(response);
     expect(await json(response)).toEqual({
       error: "Summary report artifact is temporarily unavailable.",
     });

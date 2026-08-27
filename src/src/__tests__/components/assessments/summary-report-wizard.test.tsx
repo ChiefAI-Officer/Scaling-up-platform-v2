@@ -5,6 +5,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { SummaryReportWizard } from "@/components/assessments/SummaryReportWizard";
 
@@ -122,6 +123,37 @@ describe("SummaryReportWizard", () => {
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("disambiguates same-name historical sources in Review and preserves their explicit order", async () => {
+    const historical = {
+      ...TEAM_TWO,
+      respondentName: TEAM.respondentName,
+      campaignId: "historical-campaign",
+      campaignName: "Northstar Previous Quarter",
+      submittedAt: "2026-07-10T09:30:00.000Z",
+    };
+    (global.fetch as jest.Mock).mockResolvedValue(
+      response({ candidates: [CEO, TEAM, historical] }),
+    );
+    renderWizard();
+    fireEvent.click(screen.getByRole("button", { name: "Scaling CEO Full" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    await screen.findByText("Avery CEO");
+    fireEvent.click(screen.getByRole("button", { name: "Select Avery CEO" }));
+    fireEvent.click(screen.getByRole("button", { name: "Assign Avery CEO as CEO" }));
+    for (const button of screen.getAllByRole("button", { name: "Select Toni Team" })) fireEvent.click(button);
+    for (const button of screen.getAllByRole("button", { name: "Assign Toni Team as Team" })) fireEvent.click(button);
+    fireEvent.click(screen.getByRole("button", { name: "Review" }));
+    expect(screen.getByText("Organization: Northstar Growth")).toBeInTheDocument();
+    expect(screen.getByText(`Submission: ${CEO.submissionId}`)).toBeInTheDocument();
+    const rows = screen.getAllByRole("listitem");
+    expect(within(rows[0]).getByText(`Submission: ${TEAM.submissionId}`)).toBeInTheDocument();
+    expect(within(rows[1]).getByText(`Submission: ${historical.submissionId}`)).toBeInTheDocument();
+    expect(within(rows[1]).getByText("Northstar Previous Quarter · scaling-up-full · v7 · en")).toBeInTheDocument();
+    expect(within(rows[1]).getByText(`Completed: ${historical.submittedAt}`)).toBeInTheDocument();
+    fireEvent.click(within(rows[1]).getByRole("button", { name: "Move up" }));
+    expect(within(screen.getAllByRole("listitem")[0]).getByText(`Submission: ${historical.submissionId}`)).toBeInTheDocument();
   });
 
   it("keeps selection separate from CEO assignment and shows candidate metadata", async () => {

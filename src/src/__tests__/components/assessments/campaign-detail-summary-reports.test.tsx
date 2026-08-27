@@ -20,6 +20,7 @@ jest.mock("@/components/ui/use-toast", () => ({
 }));
 
 import { CampaignDetail } from "@/components/assessments/CampaignDetail";
+import { resolveSummaryReportingCapability } from "@/lib/assessments/summary-reports/capability";
 import type { CampaignOverview } from "@/lib/assessments/campaign-detail";
 
 const CAMPAIGN_ID = "camp-summary-1";
@@ -67,6 +68,30 @@ const summaryReporting = {
 };
 
 describe("CampaignDetail — Summary Reports integration", () => {
+  it.each([
+    { state: "unsupported family", alias: "RockHabits", killed: "0", status: "ACTIVE" as const, visible: false },
+    { state: "kill override", alias: "scaling-up-full", killed: "1", status: "ACTIVE" as const, visible: false },
+    { state: "DRAFT destination with published version", alias: "scaling-up-full", killed: "0", status: "DRAFT" as const, visible: true },
+  ])("preserves the real DOM contract for $state", async ({ alias, killed, status, visible }) => {
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ reports: [] }) });
+    const overview = makeOverview();
+    overview.campaign.status = status;
+    const capability = resolveSummaryReportingCapability(
+      { SUMMARY_REPORTING_ENABLED: "1", SUMMARY_REPORTING_KILL: killed },
+      { id: CAMPAIGN_ID, accessMode: "INVITED", template: { alias }, version: { publishedAt: new Date("2026-08-01") } },
+      "Acme Q3", "Scaling Up Full",
+    );
+    render(<CampaignDetail initialOverview={overview} initialRespondents={[]} canViewGroupReport groupReportHref={GROUP_REPORT_HREF} summaryReporting={capability} />);
+    if (visible) {
+      expect(await screen.findByText("No summary reports yet.")).toBeInTheDocument();
+      expect(screen.queryByTestId("campaign-detail-view-group-report")).toBeNull();
+    } else {
+      expect(screen.queryByText("Summary Reports")).toBeNull();
+      expect(screen.getByTestId("campaign-detail-view-group-report")).toHaveAttribute("href", GROUP_REPORT_HREF);
+      expect(global.fetch).not.toHaveBeenCalled();
+    }
+  });
+
   it("keeps the existing group-report link DOM when summary reporting capability is absent or null", () => {
     const baseProps = {
       initialOverview: makeOverview(),

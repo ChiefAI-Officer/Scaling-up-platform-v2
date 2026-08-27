@@ -46,6 +46,15 @@
           "value": "no-store, max-age=0"
         }
       ]
+    },
+    {
+      "source": "/api/assessment-campaigns/:id/summary-reports/:reportId/artifact",
+      "headers": [
+        {
+          "key": "X-Frame-Options",
+          "value": "SAMEORIGIN"
+        }
+      ]
     }
   ],
   "rewrites": [

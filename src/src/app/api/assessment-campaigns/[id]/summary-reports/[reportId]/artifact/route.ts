@@ -202,7 +202,7 @@ export async function GET(
     await auditSummaryReportArtifactAccess(readDb, actor, metadata, action);
   } catch (error) {
     logArtifactFailure({ stage: "audit", reportId, error });
-    return unavailable();
+    return unavailable(limiter.headers);
   }
 
   return new Response(new Uint8Array(bytes), {
@@ -212,6 +212,9 @@ export async function GET(
       "Content-Disposition": `${disposition}; filename="${filenameFor(metadata)}"`,
       "Cache-Control": "private, no-store",
       "X-Content-Type-Options": "nosniff",
+      // The authorized campaign modal embeds this PDF. Keep every other
+      // response on the site's DENY default; never allow cross-origin framing.
+      "X-Frame-Options": "SAMEORIGIN",
       "Content-Length": String(bytes.byteLength),
       ...limiter.headers,
     },

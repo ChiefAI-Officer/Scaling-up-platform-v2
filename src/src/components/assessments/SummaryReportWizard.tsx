@@ -129,6 +129,19 @@ function sourceCandidate(
   return id ? (candidates.get(id) ?? null) : null;
 }
 
+function SourceProvenance({ candidate }: { candidate: SummaryReportCandidate }) {
+  return (
+    <div className="min-w-0 space-y-1 break-words text-xs text-muted-foreground">
+      <p>
+        {candidate.campaignName} · {candidate.templateAlias} · v
+        {candidate.versionNumber} · {candidate.language}
+      </p>
+      <p>Completed: {candidate.submittedAt}</p>
+      <p className="break-all">Submission: {candidate.submissionId}</p>
+    </div>
+  );
+}
+
 export function SummaryReportWizard({
   open,
   onClose,
@@ -396,7 +409,7 @@ export function SummaryReportWizard({
     >
       <DialogContent
         aria-describedby={undefined}
-        className="max-h-[90vh] overflow-y-auto sm:max-w-4xl"
+        className="max-h-[90vh] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden sm:max-w-4xl"
       >
         <DialogHeader>
           <DialogTitle>Create summary report</DialogTitle>
@@ -405,238 +418,245 @@ export function SummaryReportWizard({
           </DialogDescription>
         </DialogHeader>
 
-        {draft.step === "TYPE" && (
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Choose a report type.
-            </p>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {implementedTypes.map((type) => (
-                <button
-                  key={type.type}
-                  type="button"
-                  aria-label={type.label}
-                  className={`rounded-lg border p-4 text-left transition-colors ${draft.reportType === type.type ? "border-primary bg-primary/5" : "hover:bg-accent"}`}
+        <div className="min-h-0 overflow-y-auto">
+          {draft.step === "TYPE" && (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Choose a report type.
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {implementedTypes.map((type) => (
+                  <button
+                    key={type.type}
+                    type="button"
+                    aria-label={type.label}
+                    className={`rounded-lg border p-4 text-left transition-colors ${draft.reportType === type.type ? "border-primary bg-primary/5" : "hover:bg-accent"}`}
+                    onClick={() =>
+                      updateDraft((value) => ({
+                        ...value,
+                        reportType:
+                          type.type === "SCALING_CEO_FULL" ? type.type : null,
+                      }))
+                    }
+                  >
+                    <span className="block font-semibold text-foreground">
+                      {type.label}
+                    </span>
+                    <span className="mt-1 block text-sm text-muted-foreground">
+                      {type.description}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {draft.step === "COMPOSITION" && (
+            <div className="space-y-4">
+              <div
+                className="flex flex-wrap gap-2"
+                role="group"
+                aria-label="Source campaign scope"
+              >
+                <Button
+                  variant={draft.scope === "current" ? "default" : "outline"}
+                  size="sm"
+                  disabled={frozen}
                   onClick={() =>
-                    updateDraft((value) => ({
-                      ...value,
-                      reportType:
-                        type.type === "SCALING_CEO_FULL" ? type.type : null,
-                    }))
+                    updateDraft((value) => ({ ...value, scope: "current" }))
                   }
                 >
-                  <span className="block font-semibold text-foreground">
-                    {type.label}
-                  </span>
-                  <span className="mt-1 block text-sm text-muted-foreground">
-                    {type.description}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {draft.step === "COMPOSITION" && (
-          <div className="space-y-4">
-            <div
-              className="flex flex-wrap gap-2"
-              role="group"
-              aria-label="Source campaign scope"
-            >
-              <Button
-                variant={draft.scope === "current" ? "default" : "outline"}
-                size="sm"
-                disabled={frozen}
-                onClick={() =>
-                  updateDraft((value) => ({ ...value, scope: "current" }))
-                }
-              >
-                Current campaign
-              </Button>
-              <Button
-                variant={draft.scope === "all" ? "default" : "outline"}
-                size="sm"
-                disabled={frozen}
-                onClick={() =>
-                  updateDraft((value) => ({ ...value, scope: "all" }))
-                }
-              >
-                All campaigns
-              </Button>
-            </div>
-            <div className="rounded-md border bg-muted/30 p-3 text-sm">
-              <p>
-                {ceo
-                  ? `CEO: ${ceo.respondentName}`
-                  : "CEO: Choose exactly one CEO"}
-              </p>
-              <p>
-                Team:{" "}
-                {team.length
-                  ? team.map((candidate) => candidate.respondentName).join(", ")
-                  : "None selected"}
-              </p>
-            </div>
-            {candidateState === "loading" && (
-              <p className="text-sm text-muted-foreground">
-                Loading report sources…
-              </p>
-            )}
-            {candidateState === "error" && (
-              <p role="alert" className="text-sm text-destructive">
-                {error}
-              </p>
-            )}
-            <div className="space-y-3">
-              {candidates.map((candidate) => {
-                const selected = draft.selectedIds.includes(
-                  candidate.submissionId,
-                );
-                const isCeo = draft.ceoSubmissionId === candidate.submissionId;
-                const isTeam = draft.teamSubmissionIds.includes(
-                  candidate.submissionId,
-                );
-                const unavailable = !candidate.eligible;
-                const suffix = candidate.submissionId.slice(-8);
-                return (
-                  <Card
-                    key={candidate.submissionId}
-                    className={unavailable ? "opacity-60" : ""}
-                  >
-                    <CardHeader className="space-y-1 p-4">
-                      <CardTitle className="text-base">
-                        {candidate.respondentName}
-                      </CardTitle>
-                      <CardDescription>
-                        {candidate.jobTitle ?? "No job title"} ·{" "}
-                        {candidate.organizationName}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-3 p-4 pt-0">
-                      <p className="text-sm text-muted-foreground">
-                        {candidate.campaignName} · Scaling Up · v
-                        {candidate.versionNumber} ·{" "}
-                        {shortDate(candidate.submittedAt)}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Submission …{suffix}
-                      </p>
-                      {unavailable ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled
-                          aria-label={`${candidate.respondentName} ${disabledReasonLabel(candidate.disabledReason)}`}
-                        >
-                          {disabledReasonLabel(candidate.disabledReason)}
-                        </Button>
-                      ) : (
-                        <div className="flex flex-wrap gap-2">
+                  Current campaign
+                </Button>
+                <Button
+                  variant={draft.scope === "all" ? "default" : "outline"}
+                  size="sm"
+                  disabled={frozen}
+                  onClick={() =>
+                    updateDraft((value) => ({ ...value, scope: "all" }))
+                  }
+                >
+                  All campaigns
+                </Button>
+              </div>
+              <div className="rounded-md border bg-muted/30 p-3 text-sm">
+                <p>
+                  {ceo
+                    ? `CEO: ${ceo.respondentName}`
+                    : "CEO: Choose exactly one CEO"}
+                </p>
+                <p>
+                  Team:{" "}
+                  {team.length
+                    ? team.map((candidate) => candidate.respondentName).join(", ")
+                    : "None selected"}
+                </p>
+              </div>
+              {candidateState === "loading" && (
+                <p className="text-sm text-muted-foreground">
+                  Loading report sources…
+                </p>
+              )}
+              {candidateState === "error" && (
+                <p role="alert" className="text-sm text-destructive">
+                  {error}
+                </p>
+              )}
+              <div className="space-y-3">
+                {candidates.map((candidate) => {
+                  const selected = draft.selectedIds.includes(
+                    candidate.submissionId,
+                  );
+                  const isCeo = draft.ceoSubmissionId === candidate.submissionId;
+                  const isTeam = draft.teamSubmissionIds.includes(
+                    candidate.submissionId,
+                  );
+                  const unavailable = !candidate.eligible;
+                  const suffix = candidate.submissionId.slice(-8);
+                  return (
+                    <Card
+                      key={candidate.submissionId}
+                      className={unavailable ? "opacity-60" : ""}
+                    >
+                      <CardHeader className="space-y-1 p-4">
+                        <CardTitle className="text-base">
+                          {candidate.respondentName}
+                        </CardTitle>
+                        <CardDescription>
+                          {candidate.jobTitle ?? "No job title"} ·{" "}
+                          {candidate.organizationName}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-3 p-4 pt-0">
+                        <p className="text-sm text-muted-foreground">
+                          {candidate.campaignName} · Scaling Up · v
+                          {candidate.versionNumber} ·{" "}
+                          {shortDate(candidate.submittedAt)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Submission …{suffix}
+                        </p>
+                        {unavailable ? (
                           <Button
                             variant="outline"
                             size="sm"
-                            disabled={frozen}
-                            onClick={() =>
-                              toggleSelection(candidate.submissionId)
-                            }
+                            disabled
+                            aria-label={`${candidate.respondentName} ${disabledReasonLabel(candidate.disabledReason)}`}
                           >
-                            {selected
-                              ? `Remove ${candidate.respondentName}`
-                              : `Select ${candidate.respondentName}`}
+                            {disabledReasonLabel(candidate.disabledReason)}
                           </Button>
-                          {selected && (
-                            <>
-                              <Button
-                                variant={isCeo ? "default" : "outline"}
-                                size="sm"
-                                disabled={frozen}
-                                onClick={() =>
-                                  assignCeo(candidate.submissionId)
-                                }
-                              >
-                                {isCeo
-                                  ? `${candidate.respondentName} is CEO`
-                                  : `Assign ${candidate.respondentName} as CEO`}
-                              </Button>
-                              <Button
-                                variant={isTeam ? "default" : "outline"}
-                                size="sm"
-                                disabled={frozen}
-                                onClick={() =>
-                                  assignTeam(candidate.submissionId)
-                                }
-                              >
-                                {isTeam
-                                  ? `${candidate.respondentName} is Team`
-                                  : `Assign ${candidate.respondentName} as Team`}
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                );
-              })}
+                        ) : (
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={frozen}
+                              onClick={() =>
+                                toggleSelection(candidate.submissionId)
+                              }
+                            >
+                              {selected
+                                ? `Remove ${candidate.respondentName}`
+                                : `Select ${candidate.respondentName}`}
+                            </Button>
+                            {selected && (
+                              <>
+                                <Button
+                                  variant={isCeo ? "default" : "outline"}
+                                  size="sm"
+                                  disabled={frozen}
+                                  onClick={() =>
+                                    assignCeo(candidate.submissionId)
+                                  }
+                                >
+                                  {isCeo
+                                    ? `${candidate.respondentName} is CEO`
+                                    : `Assign ${candidate.respondentName} as CEO`}
+                                </Button>
+                                <Button
+                                  variant={isTeam ? "default" : "outline"}
+                                  size="sm"
+                                  disabled={frozen}
+                                  onClick={() =>
+                                    assignTeam(candidate.submissionId)
+                                  }
+                                >
+                                  {isTeam
+                                    ? `${candidate.respondentName} is Team`
+                                    : `Assign ${candidate.respondentName} as Team`}
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {draft.step === "REVIEW" && ceo && (
-          <div className="space-y-4">
-            <Card>
-              <CardContent className="space-y-2 p-4 text-sm">
-                <p className="font-semibold">
-                  {campaignName} — Scaling CEO Full
-                </p>
-                <p>Name: {campaignName}</p>
-                <p>Destination: {campaignName}</p>
-                <p>
-                  Assessment/version: {ceo.templateAlias} · v{ceo.versionNumber}{" "}
-                  · {ceo.language}
-                </p>
-                <p>CEO: {ceo.respondentName}</p>
-                <p>Team count: {team.length}</p>
-                {team.length > 0 && (
-                  <ol className="list-decimal pl-5">
-                    {team.map((candidate, index) => (
-                      <li
-                        key={candidate.submissionId}
-                        className="flex items-center gap-2"
-                      >
-                        {candidate.respondentName}{" "}
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          disabled={frozen || index === 0}
-                          onClick={() => moveTeam(candidate.submissionId, -1)}
+          {draft.step === "REVIEW" && ceo && (
+            <div className="space-y-4">
+              <Card>
+                <CardContent className="space-y-2 p-4 text-sm">
+                  <p className="font-semibold">
+                    {campaignName} — Scaling CEO Full
+                  </p>
+                  <p>Name: {campaignName}</p>
+                  <p>Destination: {campaignName}</p>
+                  {/* Eligible Scaling sources share the destination organization. */}
+                  <p>Organization: {ceo.organizationName}</p>
+                  <p>
+                    Assessment/version: {ceo.templateAlias} · v{ceo.versionNumber}{" "}
+                    · {ceo.language}
+                  </p>
+                  <p>CEO: {ceo.respondentName}</p>
+                  <SourceProvenance candidate={ceo} />
+                  <p>Team count: {team.length}</p>
+                  {team.length > 0 && (
+                    <ol className="space-y-3">
+                      {team.map((candidate, index) => (
+                        <li
+                          key={candidate.submissionId}
+                          className="min-w-0 space-y-1 border-t pt-2"
                         >
-                          Move up
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          disabled={frozen || index === team.length - 1}
-                          onClick={() => moveTeam(candidate.submissionId, 1)}
-                        >
-                          Move down
-                        </Button>
-                      </li>
-                    ))}
-                  </ol>
-                )}
-              </CardContent>
-            </Card>
-            {error && (
-              <p role="alert" className="text-sm text-destructive">
-                {error}
-              </p>
-            )}
-          </div>
-        )}
-
-        <DialogFooter className="sticky bottom-0 border-t bg-card pt-4 sm:justify-between">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p>Team {index + 1}: {candidate.respondentName}</p>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={frozen || index === 0}
+                              onClick={() => moveTeam(candidate.submissionId, -1)}
+                            >
+                              Move up
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={frozen || index === team.length - 1}
+                              onClick={() => moveTeam(candidate.submissionId, 1)}
+                            >
+                              Move down
+                            </Button>
+                          </div>
+                          <SourceProvenance candidate={candidate} />
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                </CardContent>
+              </Card>
+              {error && (
+                <p role="alert" className="text-sm text-destructive">
+                  {error}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+        <DialogFooter className="border-t bg-card pt-4 sm:justify-between">
           <Button
             variant="ghost"
             disabled={
