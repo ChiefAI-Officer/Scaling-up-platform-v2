@@ -6,6 +6,19 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="summary-reporting-production-canary-verified"></a>
+### 2026-08-27 — Summary Reporting production canary verified <!-- ENTRY_ISO:2026-08-27 ENTRY_SLUG:summary-reporting-production-canary-verified -->
+
+**Status: DEPLOYED AND CANARY-VERIFIED; GLOBAL OFF.** Approved implementation PR #384 and native-packaging correction PR #385 passed all hosted checks and protected squash merges. Feature-bearing main `0673e34fa5c695bdea96544dde332445ab818dd6` is Ready in deployment `dpl_7dEWXzUB4p3M54AVyQkUUz2KoVou`; both canonical aliases independently match its project/deployment/SHA and return healthy database/safe auth posture. Merged-main CI passed. Only the existing `SU Full report TEST` campaign (`cmt3sxj95000g1bznjubxw4ms`) is enabled through the Production canary; global enable and kill remain absent. Dedicated private Blob credentials remain server-only and encrypted; no unrelated environment changes.
+
+**Actual live proof.** The Coach used the approved wizard to select the existing Edition 6 CEO response with zero Team sources and create one saved report (POST201). Both Coach and Admin list/open the same artifact. Inline/attachment GETs return HTTP200 PDF, `private, no-store`, correct disposition, `SAMEORIGIN`, and identical 200,776-byte content. All eight A4 pages were rendered and visually inspected: cover/coach attribution, profile/domain tables, ScaleUp score and provisional-peer disclosure, all 61 question rows, and the anonymized appendix. Missing Team values remain Not available; no Team average was fabricated. The native browser PDF viewer displays the actual eight-page artifact. Private anonymous storage access returns403; unauthenticated application delivery redirects to sign-in without PDF bytes.
+
+**Persistence/security receipt.** Exactly one report, one expected CEO source, and one creation audit exist; persisted canonical snapshot and PDF hashes match the audit and authenticated stored/downloaded bytes. Scoped creation logs show201 with no Sharp/rate-limit/5xx errors. No invitations, reminders, source answers, assessment settings, or respondent records were changed. Production only proves the existing CEO-only cohort; selected multi-member Team order/calculations and later-source immutability/revocation were exercised in the isolated five-test browser proof, not by mutating production data.
+
+**Next gate.** User acceptance of these actual live screens/PDF is still required before global activation for compatible Scaling Up Full campaigns. Then plan Condensed CEO and Self Comparison using the shared lifecycle, followed by LVA, QSP v1/v2, and Rockefeller. Six variants remain unimplemented. Placeholders, import/deletion, sharing, report hubs, and changes to the Jeff-approved Full report body remain outside this release. [Complete receipt and authenticated report link](../docs/research/evidence/summary-reporting-production-release-2026-08-27.md).
+
+---
+
 <a id="summary-reporting-native-packaging"></a>
 ### 2026-08-27 — Summary Reporting native packaging correction <!-- ENTRY_ISO:2026-08-27 ENTRY_SLUG:summary-reporting-native-packaging -->
 

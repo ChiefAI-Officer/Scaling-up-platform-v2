@@ -1,5 +1,7 @@
 # Summary Reporting — production release receipt, August 27, 2026
 
+**Current status: deployed and live-canary verified; global enablement still off pending user acceptance.** The packaging incident below is resolved. [Open the production Admin campaign](https://platformtest.scalingup.com/admin/assessments/campaigns/cmt3sxj95000g1bznjubxw4ms), then Reports → View. [Open the saved PDF](https://platformtest.scalingup.com/api/assessment-campaigns/cmt3sxj95000g1bznjubxw4ms/summary-reports/512c509c-171e-4013-a642-b683ca232f7f/artifact?disposition=inline) requires an authorized session.
+
 ## Authority and scope
 
 The user accepted the revised local CEO/Team composition, understood that only Scaling Up CEO Full is implemented, and requested: “push to prod now. then assess and recommend next steps”. The approved plan still requires actual live-canary PDF acceptance before global enablement. No unrelated feature or customer messaging is authorized by this release.
@@ -76,8 +78,43 @@ Primary references: [Next output-file tracing](https://nextjs.org/docs/app/api-r
 
 ## Next steps after the canary
 
-1. Obtain acceptance of the actual live CEO Full screens/PDF; then enable globally for compatible Scaling Up Full campaigns.
+1. Obtain acceptance of the actual live CEO Full screens/PDF; then enable globally for compatible Scaling Up Full campaigns. This production fixture has one CEO only; a genuine multi-member test cohort should be checked before broad rollout, without fabricating production responses.
 2. Plan Scaling Condensed CEO + Self Comparison on the existing lifecycle.
 3. Follow with LVA CEO Full, distinct QSP v1/v2 CEO Full, then Team-only Rockefeller Full, per the approved family order.
 
 Do not fork the shared wizard/list/storage/authorization lifecycle. Do not add placeholders, imports, deletion, sharing, or a report hub to this scope.
+
+## Final production verification
+
+### Corrected deployment
+
+- [PR #385](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/385) passed Build, Migration Safety Gate, PostgreSQL email-lease integration, Vercel, and Preview Comments; protected squash merge `0673e34fa5c695bdea96544dde332445ab818dd6` at `2026-08-27T14:06:23Z`. Merged-main CI also passed.
+- Exact Preview `dpl_4tnwheJsV1GUgwX2v6LhJstr8i6p` was authenticated with the existing Admin test account. Session200 and Summary Reports GET404 JSON `Not found`, `private, no-store`, proved the native import reached the flag-off handler rather than failing500. No protection bypass was created.
+- Production `dpl_7dEWXzUB4p3M54AVyQkUUz2KoVou` / `https://scaling-up-platform-v2-871vn1dht-scaling-up.vercel.app` reached Ready on exact feature-bearing merge SHA. Both canonical aliases independently matched project/deployment/SHA; both health endpoints returned200 with healthy database/safe auth posture.
+- Exact single-campaign encrypted Production canary retained; global enable/kill absent; private Blob token encrypted for Preview+Production. Pre-UI database counts0/0, additive migration applied and not rolled back.
+
+### Created artifact and delivery
+
+| Item | Verified value |
+| --- | --- |
+| Report | `512c509c-171e-4013-a642-b683ca232f7f` |
+| Campaign | `cmt3sxj95000g1bznjubxw4ms` — existing `SU Full report TEST` |
+| Source | `cmt3tp3l8001hbecr6ac5uwux`, CEO position0, Team0 |
+| Renderer / language | `scaling-ceo-full-pdf-v1` / `enUS` |
+| Creation | Coach UI POST201 at `2026-08-27T14:10:03.672Z`; one report/source/create-audit |
+| Input SHA-256 | `4455afb54ef8d553cfef586397838945d1ac7a5b9db593c10982925669ec1ffc` |
+| PDF SHA-256 | `13068349e0b5c5ed9dc207b5359120562ee1821bc463b1523c9376f03de2a83e` |
+| PDF bytes / pages | 200,776 bytes / 8 A4 portrait pages |
+
+- Coach and Admin both see and open the same saved report in the production campaign. Native PDF iframe visibly renders the real artifact; the UI Download control was exercised.
+- Authenticated Admin inline and attachment requests each return200 `application/pdf`; identical bytes/hash, correct filename/disposition, `Cache-Control: private, no-store`, and `X-Frame-Options: SAMEORIGIN`. Existing login framing remains DENY.
+- An unauthenticated application artifact request returns307 to `/api/auth/signin`, not PDF content. The exact anonymous private Blob object request returns403; authenticated private SDK get200 matches database bytecount/hash and the API downloads.
+- Read-only persisted canonical input hash matches the recorded hash and creation audit; source identity/position and audit count are exact. No duplicate report or retry was introduced. Scoped production requests show no5xx, Sharp, or rate-limit failures after the correction.
+- Downloaded PDF was rendered with Poppler and all8 pages visually inspected: no clipped/overlapping report text or missing coach image; all61 question rows and zero-Team Not available treatment are present. Existing whitespace/pagination and the explicit provisional/non-size-matched peer disclosure remain. This is the preserved platform Full body, not a claim of pixel-identical ESPERTO31-page output.
+- Local inspection files are under `/tmp/summary-live-pdf.ApWR9S`; the durable authoritative artifact remains private in the application. No private PDF/answers/credentials are committed into the repository.
+
+### Boundaries and remaining gate
+
+Only the existing CEO-only test cohort was created in Production. Multi-member Team composition/order and post-creation source-change/revocation invariants were verified in the isolated5/5 browser tests, not by altering real records. No invitation, reminder, respondent, answer, assessment setting, or existing report was changed. The original local preview remains available. Actual-output user acceptance and global activation are not claimed complete.
+
+The campaign host still emits the pre-existing React418 text-hydration warning seen on pre-feature deployment `dpl_GarxuXDsnTnmtD8tBuP5i1ooFDpk` as well as the corrected canary. The campaign's initially server-rendered UTC date text changes to the browser-local date after hydration. This release does not claim a warning-free app console or silently expand into unrelated date formatting; report controls and actual stored PDF delivery were exercised successfully despite that existing warning.
