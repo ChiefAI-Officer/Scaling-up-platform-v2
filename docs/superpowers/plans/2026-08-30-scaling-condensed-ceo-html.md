@@ -32,7 +32,7 @@
 - Consumes: `RespondentReport`, `SU_FULL_LANDSCAPE_CHAPTERS`, `SU_FULL_LANDSCAPE_SECTIONS`, and `buildSuFullPeerPresentationResult`.
 - Produces: `buildScalingCondensedCeoModel(report): {kind:"ok"; model: ScalingCondensedCeoModel} | {kind:"invalid"; code:"condensed_source_incomplete"}`.
 
-- [ ] **Step 1: Write the golden fixture and failing model tests**
+- [x] **Step 1: Write the golden fixture and failing model tests**
 
 Use the literal artifact score sequence and assert the desired API:
 
@@ -48,13 +48,13 @@ export const CONDENSED_GOLDEN_CURRENT_SCORES = [
 
 Tests cover ordered Q01-Q61 output, `13/7/20/5/16` groups, exact current/peer values, zero preservation, missing/invalid values, section drift, invalid peer provenance, and absence of remarks/recommendations.
 
-- [ ] **Step 2: Run the model test and observe RED**
+- [x] **Step 2: Run the model test and observe RED**
 
 Run: `PATH="/opt/homebrew/opt/node@20/bin:$PATH" npx jest src/__tests__/lib/assessments/summary-reports/scaling-condensed-ceo-model.test.ts --runInBand`
 
 Expected: FAIL because `scaling-condensed-ceo-model` does not exist.
 
-- [ ] **Step 3: Implement the minimal pure projection**
+- [x] **Step 3: Implement the minimal pure projection**
 
 Add the prior branch's validated projection without renderer or wizard imports. The output row is exactly:
 
@@ -67,11 +67,11 @@ type CondensedQuestion = {
 };
 ```
 
-- [ ] **Step 4: Run the model test and observe GREEN**
+- [x] **Step 4: Run the model test and observe GREEN**
 
 Run the Step 2 command. Expected: PASS.
 
-- [ ] **Step 5: Commit the self-contained model cycle**
+- [x] **Step 5: Commit the self-contained model cycle**
 
 ```bash
 git add src/src/lib/assessments/summary-reports/scaling-condensed-ceo-model.ts src/src/__tests__/lib/assessments/summary-reports/scaling-condensed-ceo-model.test.ts src/src/__tests__/fixtures/summary-reports/scaling-condensed-ceo-golden.ts
@@ -88,7 +88,7 @@ git commit -m "feat: model condensed CEO scores"
 - Consumes: `ApiActor`, `canViewGroupReport`, `resolveSummaryReportingState`, `buildStoredRespondentReport`, and Task 1's model builder.
 - Produces: `getScalingCondensedCeoSnapshot(db, actor, campaignId, generatedAt, env): Promise<ScalingCondensedCeoResult>`.
 
-- [ ] **Step 1: Write failing snapshot tests with a narrow fake transaction DB**
+- [x] **Step 1: Write failing snapshot tests with a narrow fake transaction DB**
 
 Exercise these observable branches:
 
@@ -105,13 +105,13 @@ expect(submissionFindFirst).toHaveBeenCalledWith(expect.objectContaining({
 
 Also assert disabled/killed, forbidden, unsupported/public/unpublished, no CEO, CEO not submitted, incomplete result, and that no `findMany` Team-submission query exists.
 
-- [ ] **Step 2: Run the snapshot test and observe RED**
+- [x] **Step 2: Run the snapshot test and observe RED**
 
 Run: `PATH="/opt/homebrew/opt/node@20/bin:$PATH" npx jest src/__tests__/lib/assessments/summary-reports/scaling-condensed-ceo-snapshot.test.ts --runInBand`
 
 Expected: FAIL because the snapshot loader does not exist.
 
-- [ ] **Step 3: Implement one repeatable-read CEO-only snapshot loader**
+- [x] **Step 3: Implement one repeatable-read CEO-only snapshot loader**
 
 The successful frozen shape is:
 
@@ -129,13 +129,13 @@ export interface ScalingCondensedCeoSnapshot {
 
 Do not copy the prior multi-campaign `sources` picker or raw Team source payload.
 
-- [ ] **Step 4: Run snapshot and existing group-access suites and observe GREEN**
+- [x] **Step 4: Run snapshot and existing group-access suites and observe GREEN**
 
 Run: `PATH="/opt/homebrew/opt/node@20/bin:$PATH" npx jest src/__tests__/lib/assessments/summary-reports/scaling-condensed-ceo-snapshot.test.ts src/__tests__/lib/auth/can-view-group-report.test.ts --runInBand`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit the snapshot cycle**
+- [x] **Step 5: Commit the snapshot cycle**
 
 ```bash
 git add src/src/lib/assessments/summary-reports/scaling-condensed-ceo-snapshot.ts src/src/__tests__/lib/assessments/summary-reports/scaling-condensed-ceo-snapshot.test.ts
@@ -153,17 +153,17 @@ git commit -m "feat: resolve condensed CEO snapshot"
 - Consumes: `ScalingCondensedCeoSnapshot`, `SuFullLandscapePage`, `SuFullVerticalPeerChart`, and `CoachLogo`.
 - Produces: `<ScalingCondensedCeoReport snapshot={snapshot} responsiveEnabled={boolean} />`.
 
-- [ ] **Step 1: Write the failing golden DOM test**
+- [x] **Step 1: Write the failing golden DOM test**
 
 Assert exactly two `[data-page-number]` sections, `Condensed version`, five charts, 61 unique Q rows with literal scores and peers, Coach byline chrome, and absence of `Team`, `Narrative`, `Profile`, `Conclusion`, `Appendix B`, `Appendix C`, `Remarks`, and `Verbatims`.
 
-- [ ] **Step 2: Run the component test and observe RED**
+- [x] **Step 2: Run the component test and observe RED**
 
 Run: `PATH="/opt/homebrew/opt/node@20/bin:$PATH" npx jest src/__tests__/components/assessments/scaling-condensed-ceo-report.test.tsx --runInBand`
 
 Expected: FAIL because the component does not exist.
 
-- [ ] **Step 3: Implement the two-page composition using existing HTML primitives**
+- [x] **Step 3: Implement the two-page composition using existing HTML primitives**
 
 The root must remain in the approved renderer family:
 
@@ -176,13 +176,13 @@ The root must remain in the approved renderer family:
 
 Add only Condensed-specific cover/print selectors that the existing landscape classes cannot express.
 
-- [ ] **Step 4: Run component plus existing landscape suites and observe GREEN**
+- [x] **Step 4: Run component plus existing landscape suites and observe GREEN**
 
 Run: `PATH="/opt/homebrew/opt/node@20/bin:$PATH" npx jest src/__tests__/components/assessments/scaling-condensed-ceo-report.test.tsx src/__tests__/components/assessments/su-full-landscape-report.test.tsx src/__tests__/components/assessments/su-full-peer-render.test.tsx --runInBand`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit the HTML composition cycle**
+- [x] **Step 5: Commit the HTML composition cycle**
 
 ```bash
 git add src/src/components/assessments/ScalingCondensedCeoReport.tsx src/src/styles/su-report.css src/src/__tests__/components/assessments/scaling-condensed-ceo-report.test.tsx
@@ -192,7 +192,7 @@ git commit -m "feat: render condensed CEO HTML report"
 ### Task 4: Add the gated report route and shared access protocol
 
 **Files:**
-- Modify: `src/src/lib/assessments/group-report-access-gate.ts`
+- Create: `src/src/lib/assessments/condensed-ceo-report-access-gate.ts`
 - Create: `src/src/app/(report)/assessments/[id]/report/condensed/page.tsx`
 - Create: `src/src/__tests__/app/condensed-ceo-report-route.test.tsx`
 - Modify: `src/src/__tests__/middleware.test.ts`
@@ -201,30 +201,30 @@ git commit -m "feat: render condensed CEO HTML report"
 - Consumes: Task 2 loader, Task 3 component, `viewReport`, `defaultReportGateDeps`, `PrintReportButton`, group metrics.
 - Produces: `/assessments/[id]/report/condensed` and `viewCondensedCeoReport(...)`.
 
-- [ ] **Step 1: Write failing route/gate tests**
+- [x] **Step 1: Write failing route/gate tests**
 
 Prove disabled/forbidden 404 behavior, fail-closed audit, clean no-CEO/no-submission/incomplete panels, successful `GROUP_REPORT_VIEW` audit with `kind:"condensed-ceo"`, both print actions, and no-store middleware coverage.
 
-- [ ] **Step 2: Run the route tests and observe RED**
+- [x] **Step 2: Run the route tests and observe RED**
 
 Run: `PATH="/opt/homebrew/opt/node@20/bin:$PATH" npx jest src/__tests__/app/condensed-ceo-report-route.test.tsx src/__tests__/middleware.test.ts --runInBand`
 
 Expected: FAIL because the route/adapter do not exist.
 
-- [ ] **Step 3: Implement the adapter and server page**
+- [x] **Step 3: Implement the adapter and server page**
 
 Use the existing gate ordering and audit action. The page renders actions only for `ok`; clean unavailable outcomes return before the action bar.
 
-- [ ] **Step 4: Run Condensed and existing group route suites and observe GREEN**
+- [x] **Step 4: Run Condensed and existing group route suites and observe GREEN**
 
 Run: `PATH="/opt/homebrew/opt/node@20/bin:$PATH" npx jest src/__tests__/app/condensed-ceo-report-route.test.tsx src/__tests__/app/group-report-route.test.tsx src/__tests__/middleware.test.ts --runInBand`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit the route cycle**
+- [x] **Step 5: Commit the route cycle**
 
 ```bash
-git add src/src/lib/assessments/group-report-access-gate.ts 'src/src/app/(report)/assessments/[id]/report/condensed/page.tsx' src/src/__tests__/app/condensed-ceo-report-route.test.tsx src/src/__tests__/middleware.test.ts
+git add src/src/lib/assessments/condensed-ceo-report-access-gate.ts 'src/src/app/(report)/assessments/[id]/report/condensed/page.tsx' src/src/__tests__/app/condensed-ceo-report-route.test.tsx src/src/__tests__/middleware.test.ts
 git commit -m "feat: serve condensed CEO report"
 ```
 
@@ -240,27 +240,27 @@ git commit -m "feat: serve condensed CEO report"
 - Consumes: B1 `summaryReporting.implementedTypes` and `groupReportHref`.
 - Produces: the second `Condensed CEO` plain anchor to `${groupReportHref}/condensed`.
 
-- [ ] **Step 1: Write failing registry/dropdown tests**
+- [x] **Step 1: Write failing registry/dropdown tests**
 
 Assert `implemented:true`, `rendererVersion:"scaling-condensed-ceo-html-v1"`, Group first, Condensed second, both `target="_blank"`, Condensed is a native anchor, and capability-null markup matches the existing single-button snapshot/expectations.
 
-- [ ] **Step 2: Run the registry/dropdown tests and observe RED**
+- [x] **Step 2: Run the registry/dropdown tests and observe RED**
 
 Run: `PATH="/opt/homebrew/opt/node@20/bin:$PATH" npx jest src/__tests__/lib/assessments/summary-reports/registry-and-flags.test.ts src/__tests__/components/assessments/campaign-detail-summary-reports.test.tsx --runInBand`
 
 Expected: FAIL because Condensed is unavailable and absent from the dropdown.
 
-- [ ] **Step 3: Implement the minimal catalog and plain-anchor entry**
+- [x] **Step 3: Implement the minimal catalog and plain-anchor entry**
 
 Do not modify `SummaryReportWizard`, candidates APIs, POST schemas, create lifecycle, artifact routes, or PDF renderer dispatch.
 
-- [ ] **Step 4: Run capability, dropdown, portal, and Admin suites and observe GREEN**
+- [x] **Step 4: Run capability, dropdown, portal, and Admin suites and observe GREEN**
 
 Run: `PATH="/opt/homebrew/opt/node@20/bin:$PATH" npx jest src/__tests__/lib/assessments/summary-reports/registry-and-flags.test.ts src/__tests__/components/assessments/campaign-detail-summary-reports.test.tsx src/__tests__/app/portal-campaign-detail-publish-gate.test.tsx src/__tests__/app/admin-campaign-detail-page.test.tsx --runInBand`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit the dropdown cycle**
+- [x] **Step 5: Commit the dropdown cycle**
 
 ```bash
 git add src/src/lib/assessments/summary-reports/registry.ts src/src/components/assessments/CampaignDetail.tsx src/src/__tests__/lib/assessments/summary-reports/registry-and-flags.test.ts src/src/__tests__/components/assessments/campaign-detail-summary-reports.test.tsx
@@ -279,11 +279,11 @@ git commit -m "feat: add condensed report dropdown entry"
 - Consumes: all completed tasks.
 - Produces: verified fixed-point diff and PR-ready evidence.
 
-- [ ] **Step 1: Update SoT in the same branch**
+- [x] **Step 1: Update SoT in the same branch**
 
 Prepend a non-launch implementation entry to `plans/CHANGELOG.md`; update the `CLAUDE.md` anchor/prose without claiming merge, deployment, activation, or Production verification.
 
-- [ ] **Step 2: Run focused and complete Jest verification**
+- [x] **Step 2: Run focused and complete Jest verification**
 
 ```bash
 PATH="/opt/homebrew/opt/node@20/bin:$PATH" npx jest \
@@ -298,7 +298,7 @@ PATH="/opt/homebrew/opt/node@20/bin:$PATH" npm run test -- --runInBand
 
 Expected: all suites pass with zero failures.
 
-- [ ] **Step 3: Run migration, lint, and exact build gates**
+- [x] **Step 3: Run migration, lint, and build gates (exact wrapper safely blocked before compilation by absent `DIRECT_URL`; direct Turbopack gate passed)**
 
 ```bash
 PATH="/opt/homebrew/opt/node@20/bin:$PATH" node scripts/check-migration-safety.mjs
@@ -308,7 +308,7 @@ PATH="/opt/homebrew/opt/node@20/bin:$PATH" CI=true npm run build
 
 Expected: exit 0 for every command.
 
-- [ ] **Step 4: Produce and inspect the local two-page browser PDF**
+- [x] **Step 4: Produce and inspect the local two-page browser PDF**
 
 Use an isolated fixture/dev server and Chromium `page.pdf({landscape:true, printBackground:true})`, then run `pdfinfo`, `pdftotext`, and `pdftoppm`. Require exactly two pages, 61 Q rows with peer labels, no excluded content, and visually inspect both PNGs against Jeff's supplied two-page source.
 
@@ -333,4 +333,3 @@ Push `codex/b2-condensed-ceo-html`, create a PR to `main` with the test/build/vi
 - Placeholder scan: no `TBD`, `TODO`, deferred implementation instruction, or unspecified test body remains.
 - Type consistency: the model feeds the snapshot, the snapshot feeds the HTML component/page, and the dropdown targets the page's exact route.
 - Scope: Comparison, other report families, saved history UI, wizard changes, server PDF rendering, environment changes, and Production mutations remain excluded.
-
