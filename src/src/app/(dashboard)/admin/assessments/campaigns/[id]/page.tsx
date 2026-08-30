@@ -50,7 +50,6 @@ import { isReportStyleSelectionEnabled } from "@/lib/assessments/wave-report-sty
 import { deriveReportStylePreviewCapabilities } from "@/lib/assessments/report-style-registry";
 import { isInvitationBannerEnabled } from "@/lib/assessments/wave-invitation-banner-flags";
 import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
-import { resolveSummaryReportingCapability } from "@/lib/assessments/summary-reports/capability";
 
 const ADMIN_CAMPAIGNS = "/admin/assessments/campaigns";
 
@@ -123,16 +122,8 @@ export default async function AdminCampaignDetailPage({ params }: PageProps) {
       campaignForFlag.version?.publishedAt != null) &&
     isGroupReportEnabled(actor, campaignForFlag);
 
-  const summaryReportingCandidate = resolveSummaryReportingCapability(
-    process.env,
-    campaignForFlag,
-    overview.campaign.name,
-    overview.campaign.templateName,
-  );
-  const needsGroupReportAccess =
-    groupReportGate || summaryReportingCandidate !== null;
-  const hasGroupReportAccess =
-    needsGroupReportAccess &&
+  const canShowGroupReport =
+    groupReportGate &&
     (await canViewGroupReport(asAccessDb(db), actor, id));
   const reportStylesAvailable =
     campaignForFlag !== null &&
@@ -140,12 +131,6 @@ export default async function AdminCampaignDetailPage({ params }: PageProps) {
       templateId: overview.campaign.templateId,
       campaignId: id,
     });
-  const canShowGroupReport = groupReportGate && hasGroupReportAccess;
-  const summaryReporting =
-    summaryReportingCandidate && hasGroupReportAccess
-      ? summaryReportingCandidate
-      : null;
-
   return (
     <div className={mobileResponsiveEnabled ? "min-w-0 max-w-full" : undefined}>
       {/* Breadcrumb */}
@@ -177,7 +162,6 @@ export default async function AdminCampaignDetailPage({ params }: PageProps) {
         coachNotifyEnabled={coachNotifyEnabled}
         canViewGroupReport={canShowGroupReport}
         groupReportHref={`/assessments/${id}/report`}
-        summaryReporting={summaryReporting}
         // Wave OSR (#71) — gate computed here, server-side, from the same flag the
         // PATCH route enforces. CLOSED is excluded inside the component (the route
         // 409s it), so this is the flag check only.

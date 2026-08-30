@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 
 jest.mock("next/navigation", () => ({
   useRouter: () => ({
@@ -87,8 +87,11 @@ describe("CampaignDetail — Summary Reports integration", () => {
     );
     render(<CampaignDetail initialOverview={overview} initialRespondents={[]} canViewGroupReport groupReportHref={GROUP_REPORT_HREF} summaryReporting={capability} />);
     if (visible) {
-      expect(await screen.findByText("No summary reports yet.")).toBeInTheDocument();
-      expect(screen.queryByTestId("campaign-detail-view-group-report")).toBeNull();
+      const trigger = screen.getByTestId("campaign-detail-view-group-report");
+      expect(trigger.tagName).toBe("BUTTON");
+      expect(trigger).toHaveTextContent("View reports");
+      expect(screen.queryByText("Summary Reports")).toBeNull();
+      expect(global.fetch).not.toHaveBeenCalled();
     } else {
       expect(screen.queryByText("Summary Reports")).toBeNull();
       expect(screen.getByTestId("campaign-detail-view-group-report")).toHaveAttribute("href", GROUP_REPORT_HREF);
@@ -122,7 +125,7 @@ describe("CampaignDetail — Summary Reports integration", () => {
     expect(screen.queryByText("Summary Reports")).toBeNull();
   });
 
-  it("replaces the primary group-report link with the campaign-local Summary Reports panel when authorized", async () => {
+  it("turns the primary group-report entry into a non-prefetching report dropdown when authorized", async () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -139,9 +142,23 @@ describe("CampaignDetail — Summary Reports integration", () => {
       />,
     );
 
-    expect(screen.queryByTestId("campaign-detail-view-group-report")).toBeNull();
-    expect(screen.getByText("Summary Reports")).toBeInTheDocument();
-    expect(screen.getByText("Acme Q3 · Scaling Up Full")).toBeInTheDocument();
-    expect(await screen.findByText("No summary reports yet.")).toBeInTheDocument();
+    const trigger = screen.getByTestId("campaign-detail-view-group-report");
+    expect(trigger.tagName).toBe("BUTTON");
+    expect(trigger).toHaveTextContent("View reports");
+    expect(screen.queryByText("Summary Reports")).toBeNull();
+    expect(global.fetch).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+
+    const groupReport = await screen.findByTestId(
+      "campaign-detail-group-report-option",
+    );
+    expect(groupReport.tagName).toBe("A");
+    expect(groupReport).toHaveTextContent("Group report");
+    expect(groupReport).toHaveAttribute("href", GROUP_REPORT_HREF);
+    expect(groupReport).toHaveAttribute("target", "_blank");
+    expect(groupReport).toHaveAttribute("rel", "noopener noreferrer");
+    expect(groupReport).not.toHaveAttribute("data-prefetch");
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 });

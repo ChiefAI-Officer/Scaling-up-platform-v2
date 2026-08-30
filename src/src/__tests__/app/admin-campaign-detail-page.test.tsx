@@ -55,9 +55,12 @@ const mockIsResultsEmailApproved = jest.fn(() => true);
 jest.mock("@/lib/assessments/results-email-approval", () => ({
   isResultsEmailApproved: (...a: unknown[]) => mockIsResultsEmailApproved(...a),
 }));
+const mockGroupReportEnabled = jest.fn(() => false);
+const mockGroupReportAlias = jest.fn(() => false);
 jest.mock("@/lib/assessments/wave-f-flags", () => ({
-  isGroupReportEnabled: () => false,
-  isGroupReportAlias: () => false,
+  isGroupReportEnabled: (...a: unknown[]) => mockGroupReportEnabled(...a),
+  isGroupReportAlias: (...a: unknown[]) => mockGroupReportAlias(...a),
+  groupReportRequiresPublishedVersion: () => true,
 }));
 jest.mock("@/lib/assessments/wave-report-styles-flags", () => ({
   isReportStylesEnabled: () => true,
@@ -86,6 +89,8 @@ async function renderPage(id = "camp-1") {
 beforeEach(() => {
   jest.clearAllMocks();
   detailProps = null;
+  mockGroupReportEnabled.mockReturnValue(false);
+  mockGroupReportAlias.mockReturnValue(false);
   mockOverview.mockResolvedValue({
     campaign: { id: "camp-1", name: "Acme Q3", templateName: "Scaling Up Full", organizationId: "org-1", templateId: "tpl-1", alias: "acme-q3" },
   });
@@ -227,10 +232,12 @@ describe("Admin campaign detail — invitation banner authoring state", () => {
 });
 
 describe("Admin campaign detail — Summary Reports capability", () => {
-  it("passes the same implemented Scaling catalog as the coach host", async () => {
+  it("never passes the Summary Reports panel capability and keeps the canonical group report", async () => {
     process.env.SUMMARY_REPORTING_ENABLED = "1";
     mockGetApiActor.mockResolvedValue({ role: "ADMIN", coachId: null, userId: "u1", email: "a@x.com" });
     mockCanManage.mockResolvedValue(true);
+    mockGroupReportEnabled.mockReturnValue(true);
+    mockGroupReportAlias.mockReturnValue(true);
     mockFindFirst.mockResolvedValue({
       id: "camp-1",
       status: "ACTIVE",
@@ -243,19 +250,10 @@ describe("Admin campaign detail — Summary Reports capability", () => {
 
     await renderPage();
 
+    expect(detailProps).not.toHaveProperty("summaryReporting");
     expect(detailProps).toMatchObject({
-      summaryReporting: {
-        campaignId: "camp-1",
-        campaignName: "Acme Q3",
-        assessmentName: "Scaling Up Full",
-        implementedTypes: [
-          {
-            type: "SCALING_CEO_FULL",
-            label: "Scaling Up · CEO Full",
-            description: "Compare one CEO with an explicitly selected leadership team.",
-          },
-        ],
-      },
+      canViewGroupReport: true,
+      groupReportHref: "/assessments/camp-1/report",
       basePath: "/admin/assessments/campaigns",
       hidePortalOnlyLinks: true,
       brandedCustomHtmlEnabled: true,
@@ -269,17 +267,7 @@ describe("Admin campaign detail — Summary Reports capability", () => {
     expect(detailProps).not.toHaveProperty("resultsEmailContentApprovedHash");
   });
 
-  it("does not add a group-report authorization lookup when summary reporting is flag-off", async () => {
-    mockGetApiActor.mockResolvedValue({ role: "ADMIN", coachId: null, userId: "u1", email: "a@x.com" });
-    mockCanManage.mockResolvedValue(true);
-
-    await renderPage();
-
-    expect(detailProps).toMatchObject({ summaryReporting: null });
-    expect(mockCanViewGroup).not.toHaveBeenCalled();
-  });
-
-  it("withholds the capability from an unauthorized admin actor", async () => {
+  it("does not add a group-report authorization lookup when only Summary Reporting is enabled", async () => {
     process.env.SUMMARY_REPORTING_ENABLED = "1";
     mockGetApiActor.mockResolvedValue({ role: "ADMIN", coachId: null, userId: "u1", email: "a@x.com" });
     mockCanManage.mockResolvedValue(true);
@@ -292,10 +280,11 @@ describe("Admin campaign detail — Summary Reports capability", () => {
       template: { alias: "scaling-up-full" },
       version: { id: "v1", publishedAt: new Date("2026-01-01") },
     });
-    mockCanViewGroup.mockResolvedValue(false);
 
     await renderPage();
 
-    expect(detailProps).toMatchObject({ summaryReporting: null });
+    expect(detailProps).not.toHaveProperty("summaryReporting");
+    expect(detailProps).toHaveProperty("canViewGroupReport", false);
+    expect(mockCanViewGroup).not.toHaveBeenCalled();
   });
 });
