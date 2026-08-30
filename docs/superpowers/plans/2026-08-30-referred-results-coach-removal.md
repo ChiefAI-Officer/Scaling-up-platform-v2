@@ -263,7 +263,7 @@ git commit -m "feat: hide removed referrals from coach reads"
 - Preserves: `ReferredResultsList` props and GET response shape.
 - Produces: per-entry Delete controls, confirmation, in-flight state, inline error, and server refresh.
 
-- [ ] **Step 1: Write failing interaction tests**
+- [x] **Step 1: Write failing interaction tests**
 
 Add tests that render both responsive actions and assert:
 
@@ -278,23 +278,23 @@ expect(fetch).toHaveBeenCalledWith(
 
 Cover cancel (no DELETE), in-flight disabled controls, successful reload, later-page fallback to the previous cursor trail when the refreshed page is empty, and failed DELETE preserving the row with `role="alert"`.
 
-- [ ] **Step 2: Run the component suite and verify RED**
+- [x] **Step 2: Run the component suite and verify RED**
 
 Run: `npx jest src/__tests__/components/assessments/referred-results-list.test.tsx --runInBand`
 
 Expected: FAIL because no Delete controls exist.
 
-- [ ] **Step 3: Implement minimal client behavior**
+- [x] **Step 3: Implement minimal client behavior**
 
 Extend `ResultActions` with `onDelete`, `deleting`, and a unique accessible label. Track one `deletingId` and one `deleteError`. Confirm with copy that removal affects the Coach list while administrators retain oversight. Send `DELETE` with JSON accept headers. On success call `loadPage` for current query/filter/trail; if that returns an empty page while `pageIndex > 0`, repeat with the final cursor removed. Keep the item visible on all failures.
 
-- [ ] **Step 4: Run the component suite and verify GREEN**
+- [x] **Step 4: Run the component suite and verify GREEN**
 
 Run: `npx jest src/__tests__/components/assessments/referred-results-list.test.tsx --runInBand`
 
 Expected: PASS.
 
-- [ ] **Step 5: Run the complete feature regression matrix**
+- [x] **Step 5: Run the complete feature regression matrix**
 
 Run:
 
@@ -314,7 +314,7 @@ npx jest \
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit the UI unit**
+- [x] **Step 6: Commit the UI unit**
 
 ```bash
 git add src/src/components/assessments/ReferredResultsList.tsx src/src/__tests__/components/assessments/referred-results-list.test.tsx
