@@ -312,14 +312,14 @@ Expected: exit 0 for every command.
 
 Use an isolated fixture/dev server and Chromium `page.pdf({landscape:true, printBackground:true})`, then run `pdfinfo`, `pdftotext`, and `pdftoppm`. Require exactly two pages, 61 Q rows with peer labels, no excluded content, and visually inspect both PNGs against Jeff's supplied two-page source.
 
-- [ ] **Step 5: Commit verification/SoT receipts**
+- [x] **Step 5: Commit verification/SoT receipts**
 
 ```bash
 git add CLAUDE.md plans/CHANGELOG.md docs/superpowers/specs/2026-08-30-scaling-condensed-ceo-html-design.md docs/superpowers/plans/2026-08-30-scaling-condensed-ceo-html.md
 git commit -m "docs: record condensed CEO implementation"
 ```
 
-- [ ] **Step 6: Run two-axis fixed-point review and fix findings**
+- [x] **Step 6: Run two-axis fixed-point review and fix findings**
 
 Review `git diff cdafe246...HEAD` against repository standards and the B2 spec in separate passes. For each actionable finding, add a failing regression test when behavior changes, implement the smallest fix, rerun affected checks, commit, and repeat both review axes until clear.
 
