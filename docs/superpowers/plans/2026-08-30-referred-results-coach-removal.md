@@ -368,7 +368,7 @@ git add CLAUDE.md plans/CHANGELOG.md docs/superpowers/plans/2026-08-30-referred-
 git commit -m "docs: record referred result removal verification"
 ```
 
-- [ ] **Step 6: Run the required review loop**
+- [x] **Step 6: Run the required review loop**
 
 Use the repository code-review skill against merge-base `origin/main`, review both Standards and Spec Compliance, repair every actionable finding through RED/GREEN tests, rerun affected gates, and repeat until the review returns no actionable findings. Do not open or merge the PR while a review pass is still running.
 
