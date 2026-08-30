@@ -29,4 +29,3 @@ export function condensedGoldenReport(): RespondentReport {
 export const CONDENSED_GOLDEN_PEERS = SU_FULL_QUESTION_BENCHMARKS.map(
   ({ value }) => value,
 );
-

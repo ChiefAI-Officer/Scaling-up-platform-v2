@@ -83,4 +83,3 @@ Peer values use the existing source-backed Q01-Q61 benchmark snapshot. Tests mus
 - Run changed-file ESLint, `node scripts/check-migration-safety.mjs`, and `CI=true npm run build` under Node 20.
 - Render the final HTML route to browser PDF in an isolated local fixture, confirm exactly two landscape pages, render both pages to PNG, and visually compare them with the supplied source PDF.
 - Review the fixed-point diff along separate Standards and Spec axes; fix actionable findings and repeat until clear before opening the PR.
-
