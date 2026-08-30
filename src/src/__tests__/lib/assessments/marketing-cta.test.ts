@@ -5,6 +5,9 @@ import {
   mergeMarketingCta,
 } from "@/lib/assessments/marketing-cta";
 
+const SCALING_UP_QUICK_PUBLIC_URL =
+  "https://scaling-up-platform-v2.vercel.app/quiz/scaling_up_quick_pub_260610041810";
+
 describe("versioned marketing CTA content", () => {
   it("builds the approved Full Marketing snapshot", () => {
     const cta = createMarketingCtaPreset("FULL_MARKETING");
@@ -28,7 +31,7 @@ describe("versioned marketing CTA content", () => {
           id: "full-assessment-button",
           target: {
             kind: "url",
-            href: "https://scalinguptoolkit.com/s/ScaleUpQA",
+            href: SCALING_UP_QUICK_PUBLIC_URL,
           },
         }),
         expect.objectContaining({

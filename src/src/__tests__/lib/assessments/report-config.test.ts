@@ -1,4 +1,8 @@
 import { reportConfigFor, DEFAULT_REPORT_CONFIG } from "@/lib/assessments/report-config";
+import { createMarketingCtaPreset } from "@/lib/assessments/marketing-cta";
+
+const SCALING_UP_QUICK_PUBLIC_URL =
+  "https://scaling-up-platform-v2.vercel.app/quiz/scaling_up_quick_pub_260610041810";
 
 describe("reportConfigFor", () => {
   it("Rockefeller stays scored but hides the score table (#24)", () => {
@@ -71,7 +75,7 @@ describe("reportConfigFor", () => {
       publicResultActions: [
         {
           label: "Take the 32-question assessment",
-          href: "https://scalinguptoolkit.com/s/ScaleUpQA",
+          href: SCALING_UP_QUICK_PUBLIC_URL,
         },
         {
           label: "Request a complimentary follow-up",
@@ -83,5 +87,23 @@ describe("reportConfigFor", () => {
         },
       ],
     });
+  });
+
+  it("keeps shipped assessment CTAs off the external ESPERTO host", () => {
+    const sourceActions =
+      reportConfigFor("sunhub-quick-quiz").publicResultActions ?? [];
+    const fullMarketing = createMarketingCtaPreset("FULL_MARKETING");
+    const destinations = [
+      ...sourceActions.map((action) => action.href),
+      ...fullMarketing.blocks.flatMap((block) =>
+        block.type === "button" && block.target.kind === "url"
+          ? [block.target.href]
+          : [],
+      ),
+    ];
+
+    expect(destinations.map((href) => new URL(href).hostname)).not.toContain(
+      "scalinguptoolkit.com",
+    );
   });
 });
