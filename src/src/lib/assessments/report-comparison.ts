@@ -398,8 +398,10 @@ const SUMMARY_SELF_COMPARISON_QUESTION_KEYS = Array.from(
 );
 
 function isStrictSummarySnapshot(value: ComparisonSnapshot): boolean {
-  const keys = Object.keys(value.questionMetaByKey);
-  return keys.length === SUMMARY_SELF_COMPARISON_QUESTION_KEYS.length
+  const sliderKeys = Object.entries(value.questionMetaByKey)
+    .filter(([, meta]) => meta.type === "SLIDER_LIKERT")
+    .map(([key]) => key);
+  return sliderKeys.length === SUMMARY_SELF_COMPARISON_QUESTION_KEYS.length
     && SUMMARY_SELF_COMPARISON_QUESTION_KEYS.every((key) => {
       const meta = value.questionMetaByKey[key];
       return meta?.type === "SLIDER_LIKERT" && meta.min === 0 && meta.max === 10;

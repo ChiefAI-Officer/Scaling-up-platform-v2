@@ -658,7 +658,11 @@ describe("Summary Self Comparison adapter", () => {
 
   it("lists and loads the same person's earlier report without Wave RC rollout ownership", async () => {
     const db = makeReportComparisonDbFixture();
-    const questions = strictQuestions();
+    const questions = [
+      ...strictQuestions(),
+      { stableKey: "Q_FTE_CONTRACT", label: "Full-time employees", type: "TEXT" },
+      { stableKey: "Q_FREELANCE", label: "Freelancers", type: "TEXT" },
+    ];
     const focusRow = await db.assessmentSubmission.findFirst({ where: { id: focus.submissionId } });
     if (!focusRow) throw new Error("fixture focus missing");
     focusRow.campaign.version.questions = questions;
