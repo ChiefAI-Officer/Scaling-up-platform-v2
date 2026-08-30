@@ -1472,6 +1472,24 @@ export function CampaignDetail({
                         <FileText aria-hidden className="h-4 w-4" /> Group report
                       </a>
                     </DropdownMenu.Item>
+                    {summaryReporting.implementedTypes.some(
+                      ({ type }) => type === "SCALING_CONDENSED_CEO",
+                    ) ? (
+                      <DropdownMenu.Item asChild>
+                        {/* Keep this a plain anchor: Next Link prefetch would
+                            load bulk PII and emit a view audit before click. */}
+                        <a
+                          href={`${groupReportHref}/condensed`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex min-h-11 cursor-pointer items-center gap-2 rounded-md px-3 text-sm text-foreground outline-none focus:bg-muted"
+                          data-testid="campaign-detail-condensed-ceo-option"
+                          {...(responsiveEnabled ? { "data-touch-target": true } : {})}
+                        >
+                          <FileText aria-hidden className="h-4 w-4" /> Condensed CEO
+                        </a>
+                      </DropdownMenu.Item>
+                    ) : null}
                     {selfComparisonEnabled ? <DropdownMenu.Item asChild>
                       <button
                         type="button"
