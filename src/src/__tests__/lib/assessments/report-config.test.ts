@@ -1,4 +1,5 @@
 import { reportConfigFor, DEFAULT_REPORT_CONFIG } from "@/lib/assessments/report-config";
+import { SCALING_UP_QUICK_PUBLIC_CAMPAIGN } from "@/lib/assessments/public-assessment-destinations";
 
 describe("reportConfigFor", () => {
   it("Rockefeller stays scored but hides the score table (#24)", () => {
@@ -71,7 +72,7 @@ describe("reportConfigFor", () => {
       publicResultActions: [
         {
           label: "Take the 32-question assessment",
-          href: "https://scalinguptoolkit.com/s/ScaleUpQA",
+          href: SCALING_UP_QUICK_PUBLIC_CAMPAIGN.href,
         },
         {
           label: "Request a complimentary follow-up",
@@ -84,4 +85,5 @@ describe("reportConfigFor", () => {
       ],
     });
   });
+
 });

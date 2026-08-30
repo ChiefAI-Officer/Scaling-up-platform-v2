@@ -24,6 +24,7 @@ import {
   type RespondentReport,
 } from "@/lib/assessments/respondent-report";
 import type { ScoreResult } from "@/lib/assessments/scoring";
+import { SCALING_UP_QUICK_PUBLIC_CAMPAIGN } from "@/lib/assessments/public-assessment-destinations";
 
 // ── Fixture builders ─────────────────────────────────────────────────────────
 
@@ -216,7 +217,7 @@ describe("buildReportEmailHtml — overall score", () => {
     });
 
     expect(bodyHtml).toContain("Take the 32-question assessment");
-    expect(bodyHtml).toContain("https://scalinguptoolkit.com/s/ScaleUpQA");
+    expect(bodyHtml).toContain(SCALING_UP_QUICK_PUBLIC_CAMPAIGN.href);
     expect(bodyHtml).toContain("Request a complimentary follow-up");
     expect(bodyHtml).toContain(
       "https://coaches.scalingup.com/coach-match-after-assessment-form",

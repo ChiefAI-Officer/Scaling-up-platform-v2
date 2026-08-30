@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { SCALING_UP_QUICK_PUBLIC_CAMPAIGN } from "@/lib/assessments/public-assessment-destinations";
+
 export type MarketingCtaPresetOrigin =
   | "FULL_MARKETING"
   | "SCALING_UP_QUICK"
@@ -113,7 +115,7 @@ export const publicMarketingReportConfigSchema = z
   .passthrough();
 
 const FULL_DESTINATIONS = {
-  assessment: "https://scalinguptoolkit.com/s/ScaleUpQA",
+  assessment: SCALING_UP_QUICK_PUBLIC_CAMPAIGN.href,
   followup:
     "https://coaches.scalingup.com/coach-match-after-assessment-form",
   books: "https://scalingup.com/book/",

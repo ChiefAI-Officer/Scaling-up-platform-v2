@@ -46,6 +46,8 @@ export const DEFAULT_REPORT_CONFIG: ReportConfig = {
   showTier: true,
 };
 
+import { SCALING_UP_QUICK_PUBLIC_CAMPAIGN } from "@/lib/assessments/public-assessment-destinations";
+
 /**
  * Per-template report behaviour, keyed by AssessmentTemplate.alias (stable across versions).
  * See ADR-0010. Report TYPE is a global presentation policy (intentionally retroactive);
@@ -75,7 +77,7 @@ const REPORT_CONFIG: Readonly<Record<string, ReportConfig>> = {
     publicResultActions: [
       {
         label: "Take the 32-question assessment",
-        href: "https://scalinguptoolkit.com/s/ScaleUpQA",
+        href: SCALING_UP_QUICK_PUBLIC_CAMPAIGN.href,
       },
       {
         label: "Request a complimentary follow-up",

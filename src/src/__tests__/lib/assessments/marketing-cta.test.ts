@@ -4,6 +4,7 @@ import {
   getMarketingCtaPublishIssues,
   mergeMarketingCta,
 } from "@/lib/assessments/marketing-cta";
+import { SCALING_UP_QUICK_PUBLIC_CAMPAIGN } from "@/lib/assessments/public-assessment-destinations";
 
 describe("versioned marketing CTA content", () => {
   it("builds the approved Full Marketing snapshot", () => {
@@ -28,7 +29,7 @@ describe("versioned marketing CTA content", () => {
           id: "full-assessment-button",
           target: {
             kind: "url",
-            href: "https://scalinguptoolkit.com/s/ScaleUpQA",
+            href: SCALING_UP_QUICK_PUBLIC_CAMPAIGN.href,
           },
         }),
         expect.objectContaining({
