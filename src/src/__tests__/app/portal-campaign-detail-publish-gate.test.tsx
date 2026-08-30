@@ -367,6 +367,11 @@ describe("CampaignDetail Summary Reports capability", () => {
           label: "Scaling Up · CEO Full",
           description: "Compare one CEO with an explicitly selected leadership team.",
         },
+        {
+          type: "SCALING_SELF_COMPARISON",
+          label: "Scaling Up · Self Comparison",
+          description: "Compare one current report with one earlier report for the same person.",
+        },
       ],
     });
   });

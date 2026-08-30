@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
+import { formatEventDateUTC } from "@/lib/utils";
 
 export interface SelfComparisonFocusCandidate {
   submissionId: string;
@@ -69,13 +70,13 @@ export function SelfComparisonPicker({ open, onClose, campaignId, focusCandidate
         <label className="grid gap-2 text-sm font-medium">Focus report
           <select className="h-10 rounded-md border bg-background px-3" value={focusId} onChange={(event) => setFocusId(event.target.value)}>
             <option value="">Select Focus</option>
-            {focusCandidates.map((candidate) => <option value={candidate.submissionId} key={candidate.submissionId}>{candidate.label} · {new Date(candidate.submittedAt).toLocaleDateString("en-US", { timeZone: "UTC" })}</option>)}
+            {focusCandidates.map((candidate) => <option value={candidate.submissionId} key={candidate.submissionId}>{candidate.label} · {formatEventDateUTC(candidate.submittedAt)}</option>)}
           </select>
         </label>
         <label className="grid gap-2 text-sm font-medium">Earlier report
           <select className="h-10 rounded-md border bg-background px-3" value={earlierId} onChange={(event) => setEarlierId(event.target.value)} disabled={state !== "ready"}>
             <option value="">{state === "loading" ? "Loading earlier reports…" : "Select Earlier"}</option>
-            {candidates.map((candidate) => <option value={candidate.submissionId} key={candidate.submissionId}>{candidate.campaignLabel ?? "Earlier assessment"} · {new Date(candidate.submittedAt).toLocaleDateString("en-US", { timeZone: "UTC" })} · Version {candidate.versionNumber}{candidate.isImported ? " · Imported" : ""}</option>)}
+            {candidates.map((candidate) => <option value={candidate.submissionId} key={candidate.submissionId}>{candidate.campaignLabel ?? "Earlier assessment"} · {formatEventDateUTC(candidate.submittedAt)} · Version {candidate.versionNumber}{candidate.isImported ? " · Imported" : ""}</option>)}
           </select>
         </label>
         {state === "ready" && candidates.length === 0 ? <p className="text-sm text-muted-foreground">No compatible earlier personal report is available.</p> : null}
