@@ -20,6 +20,7 @@ import {
 } from "@/__tests__/fixtures/su-full-peer";
 import { buildSuFullPeerPresentationResult } from "@/lib/assessments/su-full-peer-presentation";
 import { loadSafeReportHtml } from "@/lib/assessments/report-html";
+import { SCALING_UP_QUICK_PUBLIC_CAMPAIGN } from "@/lib/assessments/public-assessment-destinations";
 
 // ── Fixture builders ───────────────────────────────────────────────────────
 
@@ -139,7 +140,10 @@ describe("BrandedReport — respondent identity and next steps", () => {
 
     expect(
       screen.getByRole("link", { name: "Take the 32-question assessment" }),
-    ).toHaveAttribute("href", "https://scalinguptoolkit.com/s/ScaleUpQA");
+    ).toHaveAttribute(
+      "href",
+      SCALING_UP_QUICK_PUBLIC_CAMPAIGN.href,
+    );
     expect(
       screen.getByRole("link", { name: "Request a complimentary follow-up" }),
     ).toHaveAttribute(
