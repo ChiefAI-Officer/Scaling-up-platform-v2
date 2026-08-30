@@ -29,13 +29,13 @@ export const SUMMARY_REPORT_REGISTRY: readonly SummaryReportDefinition[] = [
     templateAliases: ["scaling-up-full"],
     label: "Scaling Up · Self Comparison",
     description: "Compare one current report with one earlier report for the same person.",
-    implemented: false,
+    implemented: true,
     roles: [
       { role: "FOCUS", min: 1, max: 1 },
       { role: "EARLIER", min: 1, max: 1 },
     ],
     hasRemarksStep: false,
-    rendererVersion: "scaling-self-comparison-pdf-v1",
+    rendererVersion: "scaling-self-comparison-html-v1",
   },
   {
     type: "LVA_CEO_FULL",

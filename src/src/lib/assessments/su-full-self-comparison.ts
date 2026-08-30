@@ -82,6 +82,18 @@ function deepFreeze<T>(value: T, seen = new WeakSet<object>()): T {
   return Object.freeze(value);
 }
 
+/** Compatibility that can be checked before the Focus landscape is loaded. */
+export function isSuFullSelfComparisonShapeCompatible(comparison: ReportComparisonModel): boolean {
+  return exactKeys(Object.keys(comparison.questions), QUESTION_KEYS)
+    && exactKeys(Object.keys(comparison.sections), SECTION_KEYS)
+    && QUESTION_KEYS.every((key) => {
+      const row = comparison.questions[key];
+      return row?.status === "comparable"
+        && Number.isFinite(row.current)
+        && Number.isFinite(row.previous);
+    });
+}
+
 export function buildSuFullSelfComparisonModel(input: {
   focus: SuFullLandscapeReportModel;
   comparison: ReportComparisonModel;
@@ -96,8 +108,7 @@ export function buildSuFullSelfComparisonModel(input: {
     || !input.respondentName.trim()
     || !(input.focusSubmittedAt instanceof Date)
     || !Number.isFinite(input.focusSubmittedAt.getTime())
-    || !exactKeys(Object.keys(comparison.questions), QUESTION_KEYS)
-    || !exactKeys(Object.keys(comparison.sections), SECTION_KEYS)
+    || !isSuFullSelfComparisonShapeCompatible(comparison)
   ) return null;
 
   const focusQuestions = focus.chapters.flatMap((chapter) =>
