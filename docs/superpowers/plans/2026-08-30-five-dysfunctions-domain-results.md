@@ -6,7 +6,7 @@
 
 **Architecture:** Add an optional per-template domain-results presentation policy to `report-config.ts`, consume the frozen `perDomain[].tier.message` in the existing Classic `BrandedReport` section, and add message-aware CSS that activates only for Five Dysfunctions. Correct ambiguous fractional touching-tier resolution at the scorer so exact seed boundaries select the higher band.
 
-**Tech Stack:** Next.js 15, React 19, TypeScript, Jest, Testing Library, scoped CSS.
+**Tech Stack:** Next.js 16.1.6, React 19, TypeScript, Jest, Testing Library, scoped CSS.
 
 **Spec:** `docs/superpowers/specs/2026-08-30-five-dysfunctions-domain-results-design.md`
 

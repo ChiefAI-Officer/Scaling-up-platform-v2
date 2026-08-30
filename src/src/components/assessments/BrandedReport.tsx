@@ -730,66 +730,56 @@ export function LegacyClassicReport({
           <div className="su-report-eyebrow">{domainResults?.eyebrow ?? "How you scored, by decision"}</div>
           <h2 className="su-h2 su-report-sec-title">{domainResults?.title ?? "Your Four Decisions"}</h2>
           <div className={hasDomainMessages ? "su-report-card-grid su-report-card-grid-with-messages" : "su-report-card-grid"}>
-            {domainCards.map((d) => (
-              <div
-                className={hasDomainMessages ? "su-report-decision-card su-report-decision-card-with-message" : "su-report-decision-card"}
-                key={d.key}
-                data-testid={`decision-card-${d.key}`}
-                style={{ borderLeftColor: d.color }}
-              >
-                {hasDomainMessages ? (
-                  <>
-                    <div className="su-report-decision-score">
-                      <div className="su-report-decision-head">
-                        <span className="su-report-decision-name">{d.label}</span>
-                        <span
-                          className="su-report-decision-avg"
-                          style={{
-                            color: DOMAIN_TEXT_COLOR[d.key.toLowerCase()] ?? d.color,
-                          }}
+            {domainCards.map((d) => {
+              const scoreContent = (
+                <>
+                  <div className="su-report-decision-head">
+                    <span className="su-report-decision-name">{d.label}</span>
+                    <span
+                      className="su-report-decision-avg"
+                      style={{
+                        color: DOMAIN_TEXT_COLOR[d.key.toLowerCase()] ?? d.color,
+                      }}
+                    >
+                      {d.avg === null ? "—" : formatNumber(d.avg)}
+                    </span>
+                  </div>
+                  <div className="su-report-decision-bar">
+                    <i style={{ width: `${d.pct}%`, backgroundColor: d.color }} />
+                  </div>
+                  <div className="su-report-decision-sub">
+                    {formatNumber(d.points)} points
+                  </div>
+                </>
+              );
+
+              return (
+                <div
+                  className={hasDomainMessages ? "su-report-decision-card su-report-decision-card-with-message" : "su-report-decision-card"}
+                  key={d.key}
+                  data-testid={`decision-card-${d.key}`}
+                  style={{ borderLeftColor: d.color }}
+                >
+                  {hasDomainMessages ? (
+                    <>
+                      <div className="su-report-decision-score">
+                        {scoreContent}
+                      </div>
+                      {d.message && (
+                        <p
+                          className="su-report-domain-tier-message"
+                          data-testid={`domain-tier-message-${d.key}`}
                         >
-                          {d.avg === null ? "—" : formatNumber(d.avg)}
-                        </span>
-                      </div>
-                      <div className="su-report-decision-bar">
-                        <i style={{ width: `${d.pct}%`, backgroundColor: d.color }} />
-                      </div>
-                      <div className="su-report-decision-sub">
-                        {formatNumber(d.points)} points
-                      </div>
-                    </div>
-                    {d.message && (
-                      <p
-                        className="su-report-domain-tier-message"
-                        data-testid={`domain-tier-message-${d.key}`}
-                      >
-                        {d.message}
-                      </p>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <div className="su-report-decision-head">
-                      <span className="su-report-decision-name">{d.label}</span>
-                      <span
-                        className="su-report-decision-avg"
-                        style={{
-                          color: DOMAIN_TEXT_COLOR[d.key.toLowerCase()] ?? d.color,
-                        }}
-                      >
-                        {d.avg === null ? "—" : formatNumber(d.avg)}
-                      </span>
-                    </div>
-                    <div className="su-report-decision-bar">
-                      <i style={{ width: `${d.pct}%`, backgroundColor: d.color }} />
-                    </div>
-                    <div className="su-report-decision-sub">
-                      {formatNumber(d.points)} points
-                    </div>
-                  </>
-                )}
-              </div>
-            ))}
+                          {d.message}
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    scoreContent
+                  )}
+                </div>
+              );
+            })}
           </div>
         </section>
       )}
