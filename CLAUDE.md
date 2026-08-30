@@ -17,8 +17,8 @@ the full workshop lifecycle from request through post-event follow-up.
 | **Live URL** | `scaling-up-platform-v2.vercel.app` |
 | **Client** | Jeff Verdun, CIO - Scaling Up |
 | **Operations** | Suzanne (handles manual approvals) |
-| **Integrated main history** | ESPERTO cosmetic parity (#378), Edition 6 content (#374), and Coach drawer fix (#370) remain launched. Receipts: `plans/CHANGELOG.md`. |
-| **Last Updated** | <!-- LAST_UPDATED_ISO:2026-08-30 LAST_UPDATED_SLUG:scaling-self-comparison-implemented --> August 30 — **Scaling Up Self Comparison is implemented on its PR branch as a Coach-only, one-person Focus-versus-Earlier HTML report.** |
+| **Integrated main history** | Recent launch receipts: `plans/CHANGELOG.md`. |
+| **Last Updated** | <!-- LAST_UPDATED_ISO:2026-08-30 LAST_UPDATED_SLUG:scaling-self-comparison-implemented --> August 30 — **PR #401 implements Coach-only one-person Focus-versus-Earlier Self Comparison; Public Assessments removal remains launched.** |
 | **Jeff #48 validation** | Pre-launch validation passed 15/15 focused suites and 224/224 tests plus the production-context real-component harness/editor Preview coverage. Live production verification was read-only: the invited QSP route returned `200` with `qspStoryGroupEnabled=true`; no valid token was opened, no assessment was submitted, no authenticated editor session was used, and no PUBLIC QSP campaign exists. |
 | **Latest progress** | The [July 10 ledger](docs/agents/jul10-feedback-closeout.md) records 50 DONE, 0 PARTIAL, and 3 NEEDS DECISION. Only #33, #41, and #45 remain; each requires content or report-specific intent before implementation. The [August 1–7 delta](docs/agents/jul10-progress-delta-2026-08-01-to-2026-08-07.md) remains 12 outcomes because later acceptances began after August 7. |
 | **Work Logs** | Session work logs at `~/.claude/worklogs/` — invoke `/log-session` to log or generate reports |
@@ -27,7 +27,8 @@ the full workshop lifecycle from request through post-event follow-up.
 
 **Active items:** see `plans/JEFF_MAY6_SPRINT.md` for the open sprint ledger.
 
-- **Summary Reporting / Scaling CEO Full:** PR #397 is merge-authorized: Admin drops the panel; eligible Coaches get a non-prefetching Group-report dropdown. The GH #393 Production canary was removed and Ready deployment `dpl_4k2us6vJ6VuoSS2MXDR7Z4Bws9Ee` applied the precondition; B2/B3 deliver Condensed/Comparison. [Release receipt](docs/research/evidence/summary-reporting-production-release-2026-08-27.md).
+- **Summary Reporting:** PR #397 merge-authorized; Coach-only non-prefetching Group-report dropdown. B2/B3 deliver Condensed/Comparison. [Receipt](docs/research/evidence/summary-reporting-production-release-2026-08-27.md).
+- **Public Assessments Coach removal:** **LAUNCHED + PRODUCTION-VERIFIED.** PR #399 merged as `00633092`; eligible referring Coaches can soft-remove their submissions from Coach views while ADMIN/STAFF oversight and underlying data remain. [Receipt](plans/CHANGELOG.md#referred-results-coach-removal-implemented).
 - **SU Full landscape:** **LAUNCHED + GLOBALLY ENABLED + PRODUCTION-VERIFIED.** PR #367 merged as `c1c76082`; activated deployment `dpl_GKWACwsP9AocxTJr87E2BeNRPhPv` established the enabled release, which subsequent Ready `main` deployments retain. The controlled 60/100 Coach report renders 26 pages, all 61 questions in chapter pages and Appendix A, desktop contours, mobile peer bars, and no horizontal overflow or console error. The independent kill remains available. Evidence: `plans/CHANGELOG.md#su-full-esperto-landscape-production-accepted`.
 - **Scaling Up Full report authoring and source content:** **LAUNCHED + GLOBALLY ENABLED + CONTENT PUBLISHED.** PR #374 squash-merged as `133a57f9`; Ready deployment `dpl_t8xbV6VXPA5ngekuYhg9NchdDMjG` owns both canonical aliases with `WAVE_REPORT_HTML_AUTHORING_ENABLED=1` and no kill. Forward-only Edition 6 `cmt3pedwy0002y1c6uyf0onqo` publishes the source Verne Harnish preface and exact Scaling Up Full closing CTA without repinning any campaign. Evidence: `plans/CHANGELOG.md#su-full-report-html-authoring-launched`.
 - **Coach mobile drawer containment:** **LAUNCHED + PRODUCTION-VERIFIED.** PR #370 merged as `e40b826a`; Ready deployment `dpl_5dYYrWqAAMqsAbDfvRMji1RDseDE` owns both healthy canonical aliases. The responsive Coach drawer is portalled to `document.body`, escaping the sticky header's backdrop-filter containing block while preserving flag-off markup and outside-click dismissal. The authenticated Production receipt at 390×844 measures an 844px overlay/panel instead of the broken 64px containing block, with zero horizontal overflow. Evidence: `plans/CHANGELOG.md#coach-mobile-drawer-containment-fixed`.
@@ -240,6 +241,7 @@ src/
 | `/api/coaches/[id]` | GET, PATCH, DELETE | Coach detail/update/delete | Admin |
 | `/api/coaches/[id]/certifications` | POST, DELETE | Grant/revoke workshop type certification | Admin |
 | `/api/assessments/referred-results` | GET | Coach-owned public submissions with scoped pagination/search | Coach |
+| `/api/assessments/referred-results/[submissionId]` | DELETE | Coach-owned collection soft removal | Coach |
 | `/api/admin/public-campaigns/[id]/submissions` | GET | Public campaign submissions with result/report oversight | Admin/Staff |
 | `/api/admin/assessment-email-delivery-intents` | GET | Paginated HELD assessment-email recovery intents with masked identity | Admin/Staff |
 | `/api/admin/assessment-email-delivery-intents/[id]` | GET | Audited frozen-payload and authorization-drift review detail | Admin/Staff |

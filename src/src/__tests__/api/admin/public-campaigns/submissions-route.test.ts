@@ -131,6 +131,7 @@ describe("GET /api/admin/public-campaigns/[id]/submissions", () => {
     // Newest first (query orders by submittedAt desc).
     const args = (db.assessmentSubmission.findMany as jest.Mock).mock.calls[0][0];
     expect(args.where).toMatchObject({ campaignId: "c1" });
+    expect(args.where).not.toHaveProperty("referredResultsDeletedAt");
     expect(args.orderBy).toMatchObject({ submittedAt: "desc" });
   });
 

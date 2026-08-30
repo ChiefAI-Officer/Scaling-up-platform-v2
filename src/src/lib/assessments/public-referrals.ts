@@ -19,6 +19,7 @@ interface PublicSubmissionFindFirst {
   findFirst: (args: {
     where: {
       id: string;
+      referredResultsDeletedAt?: null;
       campaign: {
         accessMode: "PUBLIC";
         deletedAt: null;
@@ -337,6 +338,7 @@ export async function exportPublicReferrals(
       ON t."id" = c."templateId"
     WHERE c."accessMode" = 'PUBLIC'
       AND c."deletedAt" IS NULL
+      AND s."referredResultsDeletedAt" IS NULL
       ${templateConstraint}
       ${searchConstraint}
     ORDER BY s."submittedAt" DESC, s."id" DESC
@@ -552,6 +554,7 @@ function publicReferralSearchScope(input: {
       ON c."id" = s."campaignId"
     ${input.extraJoin ?? Prisma.empty}
     WHERE s."referringCoachId" = ${input.coachId}
+      AND s."referredResultsDeletedAt" IS NULL
       AND c."accessMode" = 'PUBLIC'
       AND c."deletedAt" IS NULL
       ${templateConstraint}
@@ -621,10 +624,12 @@ export async function listPublicReferrals(
 
       const where: Record<string, unknown> = {
         referringCoachId: coachId,
+        referredResultsDeletedAt: null,
         campaign: campaignWhere,
       };
       const ownedWhere: Record<string, unknown> = {
         referringCoachId: coachId,
+        referredResultsDeletedAt: null,
         campaign: publicCampaignWhere,
       };
       let unsearchedCursorBoundary:
@@ -651,6 +656,7 @@ export async function listPublicReferrals(
                   ON cursor_campaign."id" = cursor_submission."campaignId"
                 WHERE cursor_submission."id" = ${cursor}
                   AND cursor_submission."referringCoachId" = ${coachId}
+                  AND cursor_submission."referredResultsDeletedAt" IS NULL
                   AND cursor_campaign."accessMode" = 'PUBLIC'
                   AND cursor_campaign."deletedAt" IS NULL
                   ${cursorTemplateConstraint}
@@ -810,6 +816,9 @@ export async function getPublicReferralReport(
       const submission = await tx.assessmentSubmission.findFirst({
         where: {
           id: submissionId,
+          ...(!isPrivilegedRole(actor.role)
+            ? { referredResultsDeletedAt: null }
+            : {}),
           campaign: {
             accessMode: "PUBLIC",
             deletedAt: null,

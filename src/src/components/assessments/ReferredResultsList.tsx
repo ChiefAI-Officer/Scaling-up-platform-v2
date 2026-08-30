@@ -206,11 +206,15 @@ function ResultActions({
   item,
   expanded,
   onToggle,
+  onDelete,
+  deleting,
   suffix,
 }: {
   item: DisplayReferral;
   expanded: boolean;
   onToggle: () => void;
+  onDelete: () => void;
+  deleting: boolean;
   suffix: string;
 }) {
   const detailsId = `referral-domains-${item.submissionId}-${suffix}`;
@@ -235,6 +239,15 @@ function ResultActions({
       >
         View report
       </a>
+      <button
+        type="button"
+        onClick={onDelete}
+        disabled={deleting}
+        aria-label={`${deleting ? "Deleting" : "Delete"} ${item.takerName}`}
+        className="rounded-md px-1.5 py-2 text-xs font-semibold text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {deleting ? "Deleting…" : "Delete"}
+      </button>
     </div>
   );
 }
@@ -285,6 +298,8 @@ export function ReferredResultsList({
   >(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState(false);
   const latestRequestId = useRef(0);
 
   const loadPage = useCallback(
@@ -320,7 +335,7 @@ export function ReferredResultsList({
           },
         );
         const payload = (await response.json()) as ReferredResultsResponse;
-        if (requestId !== latestRequestId.current) return;
+        if (requestId !== latestRequestId.current) return null;
         if (!response.ok || !payload.success || !Array.isArray(payload.items)) {
           throw new Error("Request failed");
         }
@@ -359,11 +374,13 @@ export function ReferredResultsList({
           templateId: filter,
           cursorTrail: safeTrail,
         });
+        return payload.items.length;
       } catch {
-        if (requestId !== latestRequestId.current) return;
+        if (requestId !== latestRequestId.current) return null;
         setItems([]);
         setNextCursor(null);
         setError(true);
+        return null;
       } finally {
         if (requestId === latestRequestId.current) {
           setLoading(false);
@@ -416,6 +433,43 @@ export function ReferredResultsList({
       else updated.add(submissionId);
       return updated;
     });
+  }
+
+  async function removeItem(item: DisplayReferral) {
+    const confirmed = window.confirm(
+      `Delete ${item.takerName}'s referred result? It will be removed from your Public Assessments list. Scaling Up administrators retain it for oversight.`,
+    );
+    if (!confirmed) return;
+
+    setDeletingId(item.submissionId);
+    setDeleteError(false);
+    try {
+      const response = await fetch(
+        `/api/assessments/referred-results/${encodeURIComponent(item.submissionId)}`,
+        {
+          method: "DELETE",
+          headers: { Accept: "application/json" },
+        },
+      );
+      if (!response.ok) throw new Error("Removal failed");
+
+      const remaining = await loadPage({
+        query: appliedQuery,
+        filter: templateId,
+        trail: cursorTrail,
+      });
+      if (remaining === 0 && cursorTrail.length > 0) {
+        await loadPage({
+          query: appliedQuery,
+          filter: templateId,
+          trail: cursorTrail.slice(0, -1),
+        });
+      }
+    } catch {
+      setDeleteError(true);
+    } finally {
+      setDeletingId(null);
+    }
   }
 
   function nextPage() {
@@ -573,6 +627,16 @@ export function ReferredResultsList({
         </p>
       </div>
 
+      {deleteError && (
+        <div
+          role="alert"
+          aria-label="Referred result removal failed"
+          className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+        >
+          We couldn’t remove this result. Please try again.
+        </div>
+      )}
+
       {loading ? (
         <div
           role="status"
@@ -673,6 +737,8 @@ export function ReferredResultsList({
                           item={item}
                           expanded={expanded}
                           onToggle={() => toggleDetails(item.submissionId)}
+                          onDelete={() => void removeItem(item)}
+                          deleting={deletingId === item.submissionId}
                           suffix="desktop"
                         />
                       </td>
@@ -741,6 +807,8 @@ export function ReferredResultsList({
                     item={item}
                     expanded={expanded}
                     onToggle={() => toggleDetails(item.submissionId)}
+                    onDelete={() => void removeItem(item)}
+                    deleting={deletingId === item.submissionId}
                     suffix="mobile"
                   />
                   {expanded && (
