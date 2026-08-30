@@ -98,7 +98,11 @@ interface CondensedSnapshotTx extends AccessControlDb {
 export interface ScalingCondensedCeoSnapshotDb {
   $transaction<T>(
     callback: (tx: CondensedSnapshotTx) => Promise<T>,
-    options: { isolationLevel: "RepeatableRead" },
+    options: {
+      isolationLevel: "RepeatableRead";
+      maxWait: number;
+      timeout: number;
+    },
   ): Promise<T>;
 }
 
@@ -316,6 +320,12 @@ export async function getScalingCondensedCeoSnapshot(
         },
       };
     },
-    { isolationLevel: "RepeatableRead" },
+    {
+      isolationLevel: "RepeatableRead",
+      // Match the established report read-path budget. Prisma's 5-second
+      // interactive-transaction default is too short for Neon cold starts.
+      maxWait: 10_000,
+      timeout: 15_000,
+    },
   );
 }

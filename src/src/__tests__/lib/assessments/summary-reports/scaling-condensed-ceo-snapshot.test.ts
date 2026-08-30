@@ -151,7 +151,11 @@ test("resolves and freezes only the current campaign CEO", async () => {
   expect(test.tx.assessmentSubmission).not.toHaveProperty("findMany");
   expect(test.db.$transaction).toHaveBeenCalledWith(
     expect.any(Function),
-    expect.objectContaining({ isolationLevel: "RepeatableRead" }),
+    {
+      isolationLevel: "RepeatableRead",
+      maxWait: 10_000,
+      timeout: 15_000,
+    },
   );
 });
 
