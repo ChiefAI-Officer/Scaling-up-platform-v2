@@ -464,12 +464,30 @@
   margin-top: 10px;
 }
 
+.su-public-brand .su-report-card-grid-with-messages {
+  grid-template-columns: 1fr;
+}
+
 .su-public-brand .su-report-decision-card {
   border: 1px solid #ece8f2;
   border-left: 5px solid #522583;
   border-radius: 13px;
   padding: 14px 16px;
   background: #ffffff;
+}
+
+.su-public-brand .su-report-decision-card-with-message {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  align-items: center;
+  column-gap: 24px;
+}
+
+.su-public-brand .su-report-domain-tier-message {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #3d354a;
 }
 
 .su-public-brand .su-report-decision-head {
@@ -1040,6 +1058,7 @@
   .su-public-brand .su-report-headline { font-size: 24px; }
   .su-public-brand .su-report-decisions { padding: 8px 24px; }
   .su-public-brand .su-report-card-grid { grid-template-columns: 1fr; }
+  .su-public-brand .su-report-decision-card-with-message { grid-template-columns: 1fr; row-gap: 14px; }
   .su-public-brand .su-report-sections { padding: 6px 24px 32px; }
   .su-public-brand .su-report-grid { grid-template-columns: 1fr; }
   .su-public-brand .su-report-scores { padding: 32px 24px; }
