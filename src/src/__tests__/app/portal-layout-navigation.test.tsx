@@ -47,26 +47,31 @@ beforeEach(() => {
 });
 
 describe("(portal)/layout coach navigation", () => {
-  it("keeps the flag-off desktop sidebar and mobile props unchanged", async () => {
+  it("groups the flag-off desktop sidebar and keeps mobile props unchanged", async () => {
     const { container } = render(
       await PortalLayout({ children: <div>Page</div> }),
     );
     const sidebar = container.querySelector("aside");
     expect(sidebar).not.toBeNull();
+    const sidebarQueries = within(sidebar as HTMLElement);
     expect(
-      within(sidebar as HTMLElement)
+      sidebarQueries
         .getAllByRole("link")
         .map((link) => link.textContent?.trim()),
     ).toEqual([
       "Dashboard",
       "My Workshops",
-      "Members",
-      "Assessments",
       "Registrations",
       "Request Workshop",
+      "Assessments",
+      "Members",
       "Settings",
       "AAlexCoach",
     ]);
+    for (const label of ["WORKSHOPS", "ASSESSMENTS"]) {
+      const heading = sidebarQueries.getByText(label);
+      expect(heading.closest("a, button")).toBeNull();
+    }
     expect(mockMobileNav).toHaveBeenCalledWith({
       coachName: "Alex",
     });
@@ -86,14 +91,17 @@ describe("(portal)/layout coach navigation", () => {
         label: link.textContent?.trim(),
         href: link.getAttribute("href"),
       }));
-    expect(links.slice(2, 5)).toEqual([
+    expect(links.slice(4, 7)).toEqual([
       { label: "My Campaigns", href: "/portal/assessments" },
       {
-        label: "Referred Results",
+        label: "Public Assessments",
         href: "/portal/assessments/referred-results",
       },
       { label: "Members", href: "/portal/members" },
     ]);
+    const sidebarQueries = within(sidebar as HTMLElement);
+    expect(sidebarQueries.getByText("WORKSHOPS").closest("a, button")).toBeNull();
+    expect(sidebarQueries.getByText("ASSESSMENTS").closest("a, button")).toBeNull();
     expect(mockMobileNav).toHaveBeenCalledWith({
       coachName: "Alex",
       referredResultsEnabled: true,

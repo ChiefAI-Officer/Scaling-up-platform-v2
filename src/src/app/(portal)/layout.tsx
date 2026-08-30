@@ -22,7 +22,7 @@ export default async function PortalLayout({ children }: PortalLayoutProps) {
 
     const coachName = coach.firstName || session.user.name || "Coach";
     const referredResultsEnabled = isReferredResultsEnabled();
-    const primaryNavItems = getCoachPrimaryNavItems({ referredResultsEnabled });
+    const primaryNavGroups = getCoachPrimaryNavItems({ referredResultsEnabled });
     const AccountIcon = coachAccountNavItem.icon;
     const mobileResponsiveEnabled = isMobileResponsiveEnabled();
 
@@ -38,20 +38,29 @@ export default async function PortalLayout({ children }: PortalLayoutProps) {
                 </div>
 
                 <nav className="flex-1 py-6 px-3 space-y-1">
-                    {primaryNavItems.map((item) => {
-                        const Icon = item.icon;
+                    {primaryNavGroups.map((group) => (
+                        <div key={group.label ?? "primary"} className="space-y-1">
+                            {group.label ? (
+                                <div className="px-4 pt-5 pb-2 text-xs font-semibold uppercase tracking-wider text-sidebar-muted">
+                                    {group.label}
+                                </div>
+                            ) : null}
+                            {group.items.map((item) => {
+                                const Icon = item.icon;
 
-                        return (
-                            <CoachNavLink
-                                key={item.href}
-                                href={item.href}
-                                icon={<Icon className="w-5 h-5" />}
-                                {...(item.exact ? { exact: true } : {})}
-                            >
-                                {item.label}
-                            </CoachNavLink>
-                        );
-                    })}
+                                return (
+                                    <CoachNavLink
+                                        key={item.href}
+                                        href={item.href}
+                                        icon={<Icon className="w-5 h-5" />}
+                                        {...(item.exact ? { exact: true } : {})}
+                                    >
+                                        {item.label}
+                                    </CoachNavLink>
+                                );
+                            })}
+                        </div>
+                    ))}
                     <NavSeparator />
 
                     <div className="pt-4 mt-4 border-t border-sidebar-border">

@@ -17,6 +17,11 @@ export interface CoachNavItem {
   exact?: boolean;
 }
 
+export interface CoachNavGroup {
+  label: string | null;
+  items: CoachNavItem[];
+}
+
 const DASHBOARD_NAV_ITEM: CoachNavItem = {
   href: "/portal/home",
   label: "Dashboard",
@@ -48,13 +53,23 @@ const REQUEST_WORKSHOP_NAV_ITEM: CoachNavItem = {
   icon: PlusCircle,
 };
 
-export const coachPrimaryNavItems: CoachNavItem[] = [
-  DASHBOARD_NAV_ITEM,
-  WORKSHOPS_NAV_ITEM,
-  MEMBERS_NAV_ITEM,
-  ASSESSMENTS_NAV_ITEM,
-  REGISTRATIONS_NAV_ITEM,
-  REQUEST_WORKSHOP_NAV_ITEM,
+export const coachPrimaryNavItems: CoachNavGroup[] = [
+  {
+    label: null,
+    items: [DASHBOARD_NAV_ITEM],
+  },
+  {
+    label: "WORKSHOPS",
+    items: [
+      WORKSHOPS_NAV_ITEM,
+      REGISTRATIONS_NAV_ITEM,
+      REQUEST_WORKSHOP_NAV_ITEM,
+    ],
+  },
+  {
+    label: "ASSESSMENTS",
+    items: [ASSESSMENTS_NAV_ITEM, MEMBERS_NAV_ITEM],
+  },
 ];
 
 interface CoachPrimaryNavOptions {
@@ -63,28 +78,41 @@ interface CoachPrimaryNavOptions {
 
 export function getCoachPrimaryNavItems({
   referredResultsEnabled,
-}: CoachPrimaryNavOptions): CoachNavItem[] {
+}: CoachPrimaryNavOptions): CoachNavGroup[] {
   if (!referredResultsEnabled) {
     return coachPrimaryNavItems;
   }
 
   return [
-    DASHBOARD_NAV_ITEM,
-    WORKSHOPS_NAV_ITEM,
     {
-      href: "/portal/assessments",
-      label: "My Campaigns",
-      icon: ClipboardList,
-      exact: true,
+      label: null,
+      items: [DASHBOARD_NAV_ITEM],
     },
     {
-      href: "/portal/assessments/referred-results",
-      label: "Referred Results",
-      icon: ClipboardCheck,
+      label: "WORKSHOPS",
+      items: [
+        WORKSHOPS_NAV_ITEM,
+        REGISTRATIONS_NAV_ITEM,
+        REQUEST_WORKSHOP_NAV_ITEM,
+      ],
     },
-    MEMBERS_NAV_ITEM,
-    REGISTRATIONS_NAV_ITEM,
-    REQUEST_WORKSHOP_NAV_ITEM,
+    {
+      label: "ASSESSMENTS",
+      items: [
+        {
+          href: "/portal/assessments",
+          label: "My Campaigns",
+          icon: ClipboardList,
+          exact: true,
+        },
+        {
+          href: "/portal/assessments/referred-results",
+          label: "Public Assessments",
+          icon: ClipboardCheck,
+        },
+        MEMBERS_NAV_ITEM,
+      ],
+    },
   ];
 }
 
