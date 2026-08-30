@@ -19,8 +19,10 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import {
   ArrowLeft,
+  ChevronDown,
   Download,
   FileText,
   Loader2,
@@ -44,7 +46,6 @@ import {
 import { AssessmentResultView } from "./AssessmentResultView";
 import { formatTimestamp } from "@/lib/utils";
 import { CampaignStatusMetrics } from "./CampaignStatusMetrics";
-import { SummaryReportsPanel } from "./SummaryReportsPanel";
 import {
   CustomSlidesPanel,
   type CustomSlidesPanelSection,
@@ -129,8 +130,8 @@ export interface CampaignDetailProps {
   groupReportHref?: string;
   /**
    * Summary reporting is an independently server-authorized, campaign-local
-   * capability. A non-null value permits the panel (and its API fetch); absent
-   * or null retains the legacy group-report path byte-for-byte.
+   * capability. A non-null value permits the Coach report dropdown; absent or
+   * null retains the legacy group-report path byte-for-byte.
    */
   summaryReporting?: {
     campaignId: string;
@@ -1417,22 +1418,62 @@ export function CampaignDetail({
           <ArrowLeft className="w-4 h-4" /> Back to Assessments
         </Link>
         <div className={responsiveEnabled ? "flex items-center justify-end gap-2" : "flex items-center gap-2"}>
-          {!summaryReporting && canViewGroupReport && groupReportHref && (
-            // Wave F #22 (T10) — gated campaign-level group report entry.
-            // R3-M2: a PLAIN <a> (NOT a Next <Link>): a Link would prefetch
-            // the bulk-PII group report on render — triggering the loader +
-            // a GROUP_REPORT_VIEW audit before any explicit click. target=
-            // "_blank" opens the report in its own tab; rel guards the opener.
-            <a
-              href={groupReportHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={responsiveEnabled ? "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90" : "inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-sm font-medium text-primary-foreground px-3 py-1.5 rounded-lg transition-colors"}
-              data-testid="campaign-detail-view-group-report"
-              {...(responsiveEnabled ? { "data-touch-target": true } : {})}
-            >
-              <FileText className="w-4 h-4" /> View group report
-            </a>
+          {canViewGroupReport && groupReportHref && (
+            summaryReporting ? (
+              <DropdownMenu.Root>
+                <DropdownMenu.Trigger asChild>
+                  <button
+                    type="button"
+                    className={responsiveEnabled ? "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90" : "inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-sm font-medium text-primary-foreground px-3 py-1.5 rounded-lg transition-colors"}
+                    data-testid="campaign-detail-view-group-report"
+                    {...(responsiveEnabled ? { "data-touch-target": true } : {})}
+                  >
+                    <FileText className="h-4 w-4" />
+                    View reports
+                    <ChevronDown className="h-4 w-4" />
+                  </button>
+                </DropdownMenu.Trigger>
+                <DropdownMenu.Portal>
+                  <DropdownMenu.Content
+                    align="end"
+                    sideOffset={6}
+                    className="z-50 min-w-48 rounded-lg border border-border bg-card p-1 shadow-lg"
+                  >
+                    <DropdownMenu.Item asChild>
+                      {/* R3-M2: keep this a PLAIN <a>, not a Next <Link>. A
+                          Link may prefetch the bulk-PII report and emit a
+                          GROUP_REPORT_VIEW audit before an explicit click. */}
+                      <a
+                        href={groupReportHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex min-h-11 cursor-pointer items-center gap-2 rounded-md px-3 text-sm text-foreground outline-none focus:bg-muted"
+                        data-testid="campaign-detail-group-report-option"
+                        {...(responsiveEnabled ? { "data-touch-target": true } : {})}
+                      >
+                        <FileText className="h-4 w-4" /> Group report
+                      </a>
+                    </DropdownMenu.Item>
+                  </DropdownMenu.Content>
+                </DropdownMenu.Portal>
+              </DropdownMenu.Root>
+            ) : (
+              // Wave F #22 (T10) — gated campaign-level group report entry.
+              // R3-M2: a PLAIN <a> (NOT a Next <Link>): a Link would prefetch
+              // the bulk-PII group report on render — triggering the loader +
+              // a GROUP_REPORT_VIEW audit before any explicit click. target=
+              // "_blank" opens the report in its own tab; rel guards the opener.
+              <a
+                href={groupReportHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={responsiveEnabled ? "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90" : "inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-sm font-medium text-primary-foreground px-3 py-1.5 rounded-lg transition-colors"}
+                data-testid="campaign-detail-view-group-report"
+                {...(responsiveEnabled ? { "data-touch-target": true } : {})}
+              >
+                <FileText className="w-4 h-4" /> View group report
+              </a>
+            )
           )}
           {!responsiveEnabled && !hidePortalOnlyLinks && (
             <Link
@@ -2189,8 +2230,6 @@ export function CampaignDetail({
         testIdPrefix="campaign-detail-metrics"
         className="mb-3"
       />
-
-      {summaryReporting && <SummaryReportsPanel {...summaryReporting} />}
 
       {/* Respondents table */}
       <div
