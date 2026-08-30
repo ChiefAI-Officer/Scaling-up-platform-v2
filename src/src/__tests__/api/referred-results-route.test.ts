@@ -258,7 +258,10 @@ describe("GET /api/assessments/referred-results", () => {
             accessMode: "PUBLIC",
             deletedAt: null,
             submissions: {
-              some: { referringCoachId: "coach-1" },
+              some: {
+                referringCoachId: "coach-1",
+                referredResultsDeletedAt: null,
+              },
             },
           },
         },

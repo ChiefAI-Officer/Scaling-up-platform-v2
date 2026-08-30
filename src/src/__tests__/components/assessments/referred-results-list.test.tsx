@@ -167,6 +167,16 @@ function apiResponse(
   } as Response;
 }
 
+function mutationResponse(ok: boolean) {
+  return {
+    ok,
+    json: async () => ({
+      success: ok,
+      ...(ok ? {} : { error: "Removal temporarily unavailable" }),
+    }),
+  } as Response;
+}
+
 const mockFetch = jest.fn<Promise<Response>, [RequestInfo | URL, RequestInit?]>();
 
 beforeEach(() => {
@@ -531,6 +541,144 @@ describe("ReferredResultsList", () => {
     expect(screen.getByRole("option", {
       name: "Leadership Qualitative Assessment",
     })).toHaveValue("tpl-2");
+  });
+
+  it("requires confirmation before sending either desktop or mobile removal", async () => {
+    const confirm = jest.spyOn(window, "confirm").mockReturnValue(false);
+
+    render(<ReferredResultsList coachLinks={[]} />);
+    await screen.findAllByText("Jordan Lee");
+
+    const deleteButtons = screen.getAllByRole("button", {
+      name: "Delete Jordan Lee",
+    });
+    expect(deleteButtons).toHaveLength(2);
+    fireEvent.click(deleteButtons[0]);
+
+    expect(confirm).toHaveBeenCalledWith(
+      expect.stringMatching(/administrators retain it for oversight/i),
+    );
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    confirm.mockRestore();
+  });
+
+  it("disables both controls while removing and reloads server-owned state after success", async () => {
+    const confirm = jest.spyOn(window, "confirm").mockReturnValue(true);
+    let finishDelete!: (response: Response) => void;
+    mockFetch
+      .mockResolvedValueOnce(apiResponse())
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>((resolve) => {
+            finishDelete = resolve;
+          }),
+      )
+      .mockResolvedValueOnce(
+        apiResponse([qualitativeItem], null, undefined, 17, 17),
+      );
+
+    render(<ReferredResultsList coachLinks={[]} />);
+    await screen.findAllByText("Jordan Lee");
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "Delete Jordan Lee" })[0],
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.getAllByRole("button", { name: "Deleting Jordan Lee" }),
+      ).toHaveLength(2),
+    );
+    for (const button of screen.getAllByRole("button", {
+      name: "Deleting Jordan Lee",
+    })) {
+      expect(button).toBeDisabled();
+    }
+    expect(mockFetch).toHaveBeenNthCalledWith(
+      2,
+      "/api/assessments/referred-results/sub-1",
+      expect.objectContaining({
+        method: "DELETE",
+        headers: { Accept: "application/json" },
+      }),
+    );
+
+    await act(async () => {
+      finishDelete(mutationResponse(true));
+    });
+    expect(await screen.findAllByText("Sam Rivera")).not.toHaveLength(0);
+    expect(screen.queryByText("Jordan Lee")).not.toBeInTheDocument();
+    expect(mockFetch).toHaveBeenNthCalledWith(
+      3,
+      "/api/assessments/referred-results?take=25",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+    confirm.mockRestore();
+  });
+
+  it("keeps the entry visible and presents a retry-safe error when removal fails", async () => {
+    const confirm = jest.spyOn(window, "confirm").mockReturnValue(true);
+    mockFetch
+      .mockResolvedValueOnce(apiResponse())
+      .mockResolvedValueOnce(mutationResponse(false));
+
+    render(<ReferredResultsList coachLinks={[]} />);
+    await screen.findAllByText("Jordan Lee");
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "Delete Jordan Lee" })[0],
+    );
+
+    expect(
+      await screen.findByRole("alert", {
+        name: "Referred result removal failed",
+      }),
+    ).toHaveTextContent("couldn’t remove this result");
+    expect(screen.getAllByText("Jordan Lee")).not.toHaveLength(0);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    confirm.mockRestore();
+  });
+
+  it("falls back one cursor page when removal empties a later page", async () => {
+    const confirm = jest.spyOn(window, "confirm").mockReturnValue(true);
+    mockFetch
+      .mockResolvedValueOnce(
+        apiResponse([scoredItemAt(26)], null, undefined, 1, 26),
+      )
+      .mockResolvedValueOnce(mutationResponse(true))
+      .mockResolvedValueOnce(apiResponse([], null, undefined, 0, 25))
+      .mockResolvedValueOnce(
+        apiResponse(
+          Array.from({ length: 25 }, (_, index) => scoredItemAt(index + 1)),
+          null,
+          undefined,
+          25,
+          25,
+        ),
+      );
+
+    render(
+      <ReferredResultsList
+        coachLinks={[]}
+        initialCursorTrail={["sub-25"]}
+      />,
+    );
+    await screen.findAllByText("Leader 26");
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "Delete Leader 26" })[0],
+    );
+
+    expect(await screen.findByText("Showing 1–25 of 25")).toBeInTheDocument();
+    expect(mockFetch).toHaveBeenNthCalledWith(
+      3,
+      "/api/assessments/referred-results?cursor=sub-25&take=25",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+    expect(mockFetch).toHaveBeenNthCalledWith(
+      4,
+      "/api/assessments/referred-results?take=25",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+    expect(window.location.search).toBe("");
+    confirm.mockRestore();
   });
 
   it("keeps the lifetime referral count stable while filters change the matching total", async () => {

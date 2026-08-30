@@ -1434,6 +1434,7 @@ model AssessmentSubmission {
   resultsTokenExpiresAt DateTime?
   resultsTokenRevokedAt DateTime?
   resultsTokenViewedAt  DateTime?
+  referredResultsDeletedAt DateTime? // Coach-collection tombstone; ADMIN/STAFF oversight remains intact
 
   campaign   AssessmentCampaign    @relation(fields: [campaignId], references: [id])
   respondent OrgRespondent?        @relation(fields: [respondentId], references: [id])
