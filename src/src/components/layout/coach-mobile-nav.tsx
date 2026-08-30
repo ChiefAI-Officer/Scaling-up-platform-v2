@@ -81,10 +81,23 @@ export function CoachMobileNav({
         </div>
 
         <nav className="flex-1 py-4 px-3 space-y-1">
-          {primaryNavGroups.map((group) => (
-            <div key={group.label ?? "primary"} className="space-y-1">
+          {primaryNavGroups.map((group) => {
+            const labelId = group.label
+              ? `coach-mobile-nav-${group.label.toLowerCase()}`
+              : undefined;
+
+            return (
+              <div
+                key={group.label ?? "primary"}
+                className="space-y-1"
+                role={group.label ? "group" : undefined}
+                aria-labelledby={labelId}
+              >
               {group.label ? (
-                <div className="px-4 pt-5 pb-2 text-xs font-semibold uppercase tracking-wider text-sidebar-muted">
+                <div
+                  id={labelId}
+                  className="px-4 pt-5 pb-2 text-xs font-semibold uppercase tracking-wider text-sidebar-muted"
+                >
                   {group.label}
                 </div>
               ) : null}
@@ -113,8 +126,9 @@ export function CoachMobileNav({
                   </Link>
                 );
               })}
-            </div>
-          ))}
+              </div>
+            );
+          })}
         </nav>
 
         <div className="p-4 border-t border-sidebar-border">

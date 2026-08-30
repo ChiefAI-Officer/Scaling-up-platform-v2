@@ -38,10 +38,23 @@ export default async function PortalLayout({ children }: PortalLayoutProps) {
                 </div>
 
                 <nav className="flex-1 py-6 px-3 space-y-1">
-                    {primaryNavGroups.map((group) => (
-                        <div key={group.label ?? "primary"} className="space-y-1">
+                    {primaryNavGroups.map((group) => {
+                        const labelId = group.label
+                            ? `coach-desktop-nav-${group.label.toLowerCase()}`
+                            : undefined;
+
+                        return (
+                            <div
+                                key={group.label ?? "primary"}
+                                className="space-y-1"
+                                role={group.label ? "group" : undefined}
+                                aria-labelledby={labelId}
+                            >
                             {group.label ? (
-                                <div className="px-4 pt-5 pb-2 text-xs font-semibold uppercase tracking-wider text-sidebar-muted">
+                                <div
+                                    id={labelId}
+                                    className="px-4 pt-5 pb-2 text-xs font-semibold uppercase tracking-wider text-sidebar-muted"
+                                >
                                     {group.label}
                                 </div>
                             ) : null}
@@ -59,8 +72,9 @@ export default async function PortalLayout({ children }: PortalLayoutProps) {
                                     </CoachNavLink>
                                 );
                             })}
-                        </div>
-                    ))}
+                            </div>
+                        );
+                    })}
                     <NavSeparator />
 
                     <div className="pt-4 mt-4 border-t border-sidebar-border">

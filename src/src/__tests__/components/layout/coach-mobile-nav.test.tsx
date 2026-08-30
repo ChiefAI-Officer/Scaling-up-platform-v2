@@ -94,7 +94,11 @@ describe("CoachMobileNav", () => {
       "AAlex",
     ]);
     for (const label of ["WORKSHOPS", "ASSESSMENTS"]) {
-      expect(screen.getByText(label).closest("a, button")).toBeNull();
+      const heading = screen.getByText(label);
+      expect(heading.closest("a, button")).toBeNull();
+      expect(screen.getByRole("group", { name: label })).toContainElement(
+        heading,
+      );
     }
   });
 
@@ -117,6 +121,12 @@ describe("CoachMobileNav", () => {
     ]);
     expect(screen.getByText("WORKSHOPS").closest("a, button")).toBeNull();
     expect(screen.getByText("ASSESSMENTS").closest("a, button")).toBeNull();
+    expect(screen.getByRole("group", { name: "WORKSHOPS" })).toContainElement(
+      screen.getByText("WORKSHOPS"),
+    );
+    expect(screen.getByRole("group", { name: "ASSESSMENTS" })).toContainElement(
+      screen.getByText("ASSESSMENTS"),
+    );
   });
 
   it("marks only Public Assessments current on its route", () => {

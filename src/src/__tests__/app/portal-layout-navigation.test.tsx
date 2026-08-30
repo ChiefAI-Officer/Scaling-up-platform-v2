@@ -71,6 +71,9 @@ describe("(portal)/layout coach navigation", () => {
     for (const label of ["WORKSHOPS", "ASSESSMENTS"]) {
       const heading = sidebarQueries.getByText(label);
       expect(heading.closest("a, button")).toBeNull();
+      expect(
+        sidebarQueries.getByRole("group", { name: label }),
+      ).toContainElement(heading);
     }
     expect(mockMobileNav).toHaveBeenCalledWith({
       coachName: "Alex",
@@ -102,6 +105,12 @@ describe("(portal)/layout coach navigation", () => {
     const sidebarQueries = within(sidebar as HTMLElement);
     expect(sidebarQueries.getByText("WORKSHOPS").closest("a, button")).toBeNull();
     expect(sidebarQueries.getByText("ASSESSMENTS").closest("a, button")).toBeNull();
+    expect(
+      sidebarQueries.getByRole("group", { name: "WORKSHOPS" }),
+    ).toContainElement(sidebarQueries.getByText("WORKSHOPS"));
+    expect(
+      sidebarQueries.getByRole("group", { name: "ASSESSMENTS" }),
+    ).toContainElement(sidebarQueries.getByText("ASSESSMENTS"));
     expect(mockMobileNav).toHaveBeenCalledWith({
       coachName: "Alex",
       referredResultsEnabled: true,

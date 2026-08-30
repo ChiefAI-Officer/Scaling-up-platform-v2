@@ -53,19 +53,23 @@ const REQUEST_WORKSHOP_NAV_ITEM: CoachNavItem = {
   icon: PlusCircle,
 };
 
+const DASHBOARD_NAV_GROUP: CoachNavGroup = {
+  label: null,
+  items: [DASHBOARD_NAV_ITEM],
+};
+
+const WORKSHOPS_NAV_GROUP: CoachNavGroup = {
+  label: "WORKSHOPS",
+  items: [
+    WORKSHOPS_NAV_ITEM,
+    REGISTRATIONS_NAV_ITEM,
+    REQUEST_WORKSHOP_NAV_ITEM,
+  ],
+};
+
 export const coachPrimaryNavItems: CoachNavGroup[] = [
-  {
-    label: null,
-    items: [DASHBOARD_NAV_ITEM],
-  },
-  {
-    label: "WORKSHOPS",
-    items: [
-      WORKSHOPS_NAV_ITEM,
-      REGISTRATIONS_NAV_ITEM,
-      REQUEST_WORKSHOP_NAV_ITEM,
-    ],
-  },
+  DASHBOARD_NAV_GROUP,
+  WORKSHOPS_NAV_GROUP,
   {
     label: "ASSESSMENTS",
     items: [ASSESSMENTS_NAV_ITEM, MEMBERS_NAV_ITEM],
@@ -84,18 +88,8 @@ export function getCoachPrimaryNavItems({
   }
 
   return [
-    {
-      label: null,
-      items: [DASHBOARD_NAV_ITEM],
-    },
-    {
-      label: "WORKSHOPS",
-      items: [
-        WORKSHOPS_NAV_ITEM,
-        REGISTRATIONS_NAV_ITEM,
-        REQUEST_WORKSHOP_NAV_ITEM,
-      ],
-    },
+    DASHBOARD_NAV_GROUP,
+    WORKSHOPS_NAV_GROUP,
     {
       label: "ASSESSMENTS",
       items: [
