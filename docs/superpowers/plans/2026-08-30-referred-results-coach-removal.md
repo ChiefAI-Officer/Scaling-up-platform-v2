@@ -48,7 +48,7 @@
 - Produces: `AssessmentSubmission.referredResultsDeletedAt: Date | null` in Prisma and PostgreSQL.
 - Consumes: no new runtime interface.
 
-- [ ] **Step 1: Write the failing schema/migration test**
+- [x] **Step 1: Write the failing schema/migration test**
 
 ```ts
 expect(schema).toMatch(
@@ -60,13 +60,13 @@ expect(sql).toContain(
 expect(sql).not.toMatch(/DELETE|DROP\s+(?:TABLE|COLUMN)|UPDATE\s+/i);
 ```
 
-- [ ] **Step 2: Run the test and verify RED**
+- [x] **Step 2: Run the test and verify RED**
 
 Run: `npx jest src/__tests__/prisma/referred-results-coach-removal-migration.test.ts --runInBand`
 
 Expected: FAIL because the schema field and migration file do not exist.
 
-- [ ] **Step 3: Add the minimal additive schema and SQL**
+- [x] **Step 3: Add the minimal additive schema and SQL**
 
 ```prisma
 referredResultsDeletedAt DateTime? // Coach-collection tombstone; ADMIN/STAFF oversight remains intact
@@ -77,13 +77,13 @@ ALTER TABLE "assessment_submissions"
   ADD COLUMN "referredResultsDeletedAt" TIMESTAMP(3);
 ```
 
-- [ ] **Step 4: Generate Prisma and verify GREEN**
+- [x] **Step 4: Generate Prisma and verify GREEN**
 
 Run: `npx prisma generate && npx jest src/__tests__/prisma/referred-results-coach-removal-migration.test.ts --runInBand`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit the schema unit**
+- [x] **Step 5: Commit the schema unit**
 
 ```bash
 git add src/prisma/schema.prisma src/prisma/migrations/20260830100000_add_referred_results_coach_removal src/src/__tests__/prisma/referred-results-coach-removal-migration.test.ts
