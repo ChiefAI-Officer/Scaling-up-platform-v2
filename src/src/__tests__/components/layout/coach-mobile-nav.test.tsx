@@ -72,7 +72,7 @@ describe("CoachMobileNav", () => {
     expect(trigger).toHaveAttribute("aria-expanded", "true");
   });
 
-  it("keeps the existing mobile destinations while the surface is disabled", () => {
+  it("groups the flag-off mobile destinations", () => {
     openNavigation(false);
 
     expect(screen.getByRole("link", { name: "Assessments" })).toHaveAttribute(
@@ -80,11 +80,29 @@ describe("CoachMobileNav", () => {
       "/portal/assessments",
     );
     expect(
-      screen.queryByRole("link", { name: "Referred Results" }),
+      screen.queryByRole("link", { name: "Public Assessments" }),
     ).not.toBeInTheDocument();
+    expect(
+      screen.getAllByRole("link").map((link) => link.textContent?.trim()),
+    ).toEqual([
+      "Dashboard",
+      "My Workshops",
+      "Registrations",
+      "Request Workshop",
+      "Assessments",
+      "Members",
+      "AAlex",
+    ]);
+    for (const label of ["WORKSHOPS", "ASSESSMENTS"]) {
+      const heading = screen.getByText(label);
+      expect(heading.closest("a, button")).toBeNull();
+      expect(screen.getByRole("group", { name: label })).toContainElement(
+        heading,
+      );
+    }
   });
 
-  it("renders My Campaigns, Referred Results, then Members when enabled", () => {
+  it("renders the grouped enabled destinations", () => {
     openNavigation(true);
 
     const links = screen
@@ -93,17 +111,25 @@ describe("CoachMobileNav", () => {
         label: link.textContent?.trim(),
         href: link.getAttribute("href"),
       }));
-    expect(links.slice(2, 5)).toEqual([
+    expect(links.slice(4, 7)).toEqual([
       { label: "My Campaigns", href: "/portal/assessments" },
       {
-        label: "Referred Results",
+        label: "Public Assessments",
         href: "/portal/assessments/referred-results",
       },
       { label: "Members", href: "/portal/members" },
     ]);
+    expect(screen.getByText("WORKSHOPS").closest("a, button")).toBeNull();
+    expect(screen.getByText("ASSESSMENTS").closest("a, button")).toBeNull();
+    expect(screen.getByRole("group", { name: "WORKSHOPS" })).toContainElement(
+      screen.getByText("WORKSHOPS"),
+    );
+    expect(screen.getByRole("group", { name: "ASSESSMENTS" })).toContainElement(
+      screen.getByText("ASSESSMENTS"),
+    );
   });
 
-  it("marks only Referred Results current on its route", () => {
+  it("marks only Public Assessments current on its route", () => {
     mockPathname = "/portal/assessments/referred-results";
     openNavigation(true);
 
@@ -111,7 +137,7 @@ describe("CoachMobileNav", () => {
       screen.getByRole("link", { name: "My Campaigns" }),
     ).not.toHaveAttribute("aria-current");
     expect(
-      screen.getByRole("link", { name: "Referred Results" }),
+      screen.getByRole("link", { name: "Public Assessments" }),
     ).toHaveAttribute("aria-current", "page");
   });
 });

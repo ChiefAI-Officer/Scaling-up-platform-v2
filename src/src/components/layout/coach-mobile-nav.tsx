@@ -8,7 +8,7 @@ import { signOut } from "next-auth/react";
 import { Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isNavLinkActive } from "@/lib/nav-utils";
-import { getCoachPrimaryNavItems } from "@/lib/coach-nav";
+import { getCoachPrimaryNavGroups } from "@/lib/coach-nav";
 
 interface CoachMobileNavProps {
   coachName: string;
@@ -27,7 +27,7 @@ export function CoachMobileNav({
   const drawerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const pathname = usePathname();
-  const primaryNavItems = getCoachPrimaryNavItems({
+  const primaryNavGroups = getCoachPrimaryNavGroups({
     referredResultsEnabled: referredResultsEnabled === true,
   });
 
@@ -81,29 +81,52 @@ export function CoachMobileNav({
         </div>
 
         <nav className="flex-1 py-4 px-3 space-y-1">
-          {primaryNavItems.map((link) => {
-            const Icon = link.icon;
-            const isActive = isNavLinkActive(
-              pathname,
-              link.href,
-              link.exact,
-            );
+          {primaryNavGroups.map((group) => {
+            const labelId = group.label
+              ? `coach-mobile-nav-${group.label.toLowerCase()}`
+              : undefined;
+
             return (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={() => setOpen(false)}
-                className={cn(
-                  "flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm transition-colors duration-200 cursor-pointer",
-                  isActive
-                    ? "bg-sidebar-border text-sidebar-foreground font-semibold"
-                    : "text-sidebar-muted hover:text-sidebar-foreground hover:bg-sidebar-border font-medium"
-                )}
-                aria-current={isActive ? "page" : undefined}
+              <div
+                key={group.label ?? "primary"}
+                className="space-y-1"
+                role={group.label ? "group" : undefined}
+                aria-labelledby={labelId}
               >
-                <Icon className={cn("w-5 h-5", isActive && "text-white")} />
-                {link.label}
-              </Link>
+              {group.label ? (
+                <div
+                  id={labelId}
+                  className="px-4 pt-5 pb-2 text-xs font-semibold uppercase tracking-wider text-sidebar-muted"
+                >
+                  {group.label}
+                </div>
+              ) : null}
+              {group.items.map((link) => {
+                const Icon = link.icon;
+                const isActive = isNavLinkActive(
+                  pathname,
+                  link.href,
+                  link.exact,
+                );
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setOpen(false)}
+                    className={cn(
+                      "flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm transition-colors duration-200 cursor-pointer",
+                      isActive
+                        ? "bg-sidebar-border text-sidebar-foreground font-semibold"
+                        : "text-sidebar-muted hover:text-sidebar-foreground hover:bg-sidebar-border font-medium"
+                    )}
+                    aria-current={isActive ? "page" : undefined}
+                  >
+                    <Icon className={cn("w-5 h-5", isActive && "text-white")} />
+                    {link.label}
+                  </Link>
+                );
+              })}
+              </div>
             );
           })}
         </nav>
