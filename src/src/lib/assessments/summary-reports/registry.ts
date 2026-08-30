@@ -19,10 +19,10 @@ export const SUMMARY_REPORT_REGISTRY: readonly SummaryReportDefinition[] = [
     templateAliases: ["scaling-up-full"],
     label: "Scaling Up · Condensed CEO",
     description: "Create a two-page CEO score and peer appendix.",
-    implemented: false,
+    implemented: true,
     roles: [{ role: "CEO", min: 1, max: 1 }],
     hasRemarksStep: false,
-    rendererVersion: "scaling-condensed-ceo-pdf-v1",
+    rendererVersion: "scaling-condensed-ceo-html-v1",
   },
   {
     type: "SCALING_SELF_COMPARISON",
