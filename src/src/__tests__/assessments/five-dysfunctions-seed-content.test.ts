@@ -18,6 +18,7 @@
 
 import { buildFiveDysfunctionsContent } from "../../../prisma/seed-five-dysfunctions";
 import {
+  scoreSubmission,
   TemplateVersionForScoringSchema,
   TemplateVersionForPublishSchema,
 } from "../../lib/assessments/scoring";
@@ -25,6 +26,24 @@ import {
 // ─── Shared fixture ───────────────────────────────────────────────────────
 
 const content = buildFiveDysfunctionsContent();
+
+function scoreWithTrustAverage(trustValues: number[]) {
+  const version = TemplateVersionForScoringSchema.parse({
+    questions: content.questions,
+    sections: content.sections,
+    scoringConfig: content.scoringConfig,
+  });
+  let trustIndex = 0;
+  const answers = version.questions.map((question) => ({
+    stableKey: question.stableKey,
+    value:
+      question.sectionStableKey === "S_TRUST"
+        ? trustValues[trustIndex++]
+        : 1,
+  }));
+
+  return scoreSubmission(version, answers);
+}
 
 // ─── 1. Sections ─────────────────────────────────────────────────────────
 
@@ -272,6 +291,34 @@ describe("buildFiveDysfunctionsContent() — scoringConfig.domains", () => {
       expect(high!.minMetric).toBe(3.75);
       expect(high!.maxMetric).toBe(5);
     }
+  });
+});
+
+// ─── 4b. Scoring — fractional domain tier boundaries ──────────────────────
+
+describe("buildFiveDysfunctionsContent() — Trust tier boundaries", () => {
+  it("maps a Trust average of exactly 3.25 to the seeded Medium tier", () => {
+    const result = scoreWithTrustAverage([3, 3, 3, 3, 3, 3, 4, 4]);
+    const trust = result.perDomain?.find((domain) => domain.key === "trust");
+
+    expect(trust?.averagePoints).toBe(3.25);
+    expect(trust?.tier).toEqual({
+      label: "Medium",
+      message:
+        "Your team may need to get more comfortable being vulnerable and open with one another about individual strengths, weaknesses, mistakes and needs for help.",
+    });
+  });
+
+  it("maps a Trust average of exactly 3.75 to the seeded High tier", () => {
+    const result = scoreWithTrustAverage([3, 3, 4, 4, 4, 4, 4, 4]);
+    const trust = result.perDomain?.find((domain) => domain.key === "trust");
+
+    expect(trust?.averagePoints).toBe(3.75);
+    expect(trust?.tier).toEqual({
+      label: "High",
+      message:
+        "Your team has created an environment where vulnerability and openness are the norm.",
+    });
   });
 });
 

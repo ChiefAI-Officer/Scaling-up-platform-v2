@@ -1618,12 +1618,15 @@ export function computePerDomainTierContexts(
  * `maxMetric === undefined` means open-ended above (only valid on the top tier).
  */
 function resolveTier(tiers: Tier[], value: number): Tier | null {
+  let matchedTier: Tier | null = null;
   for (const t of tiers) {
     const aboveMin = value >= t.minMetric;
     const belowMax = t.maxMetric === undefined || value <= t.maxMetric;
-    if (aboveMin && belowMax) return t;
+    if (aboveMin && belowMax && (!matchedTier || t.minMetric > matchedTier.minMetric)) {
+      matchedTier = t;
+    }
   }
-  return null;
+  return matchedTier;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
