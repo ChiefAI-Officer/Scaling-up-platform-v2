@@ -372,6 +372,6 @@ git commit -m "docs: record referred result removal verification"
 
 Use the repository code-review skill against merge-base `origin/main`, review both Standards and Spec Compliance, repair every actionable finding through RED/GREEN tests, rerun affected gates, and repeat until the review returns no actionable findings. Do not open or merge the PR while a review pass is still running.
 
-- [ ] **Step 7: Push and open the PR**
+- [x] **Step 7: Push and open the PR**
 
 Push `codex/387-item-8-delete-referred`, open one PR referencing #387 item 8 and the #261 claim, include exact local verification, and explicitly state the no-environment/no-Production-data boundary. Wait for hosted checks and review the final PR diff; do not merge.
