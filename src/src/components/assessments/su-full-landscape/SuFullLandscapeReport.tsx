@@ -159,7 +159,7 @@ function CoverPage({ report, number, selfComparison }: { report: RespondentRepor
         <p>Scaling Up Assessment</p>
         <h1>{selfComparison ? "Self Comparison" : report.assessmentName}</h1>
         {selfComparison ? <p>{selfComparison.focus.campaignLabel ?? "Focus"} · {formatDate(selfComparison.focus.submittedAt)}<br />{selfComparison.earlier.campaignLabel ?? "Earlier"} · {formatDate(selfComparison.earlier.submittedAt)}</p> : null}
-        {report.campaignLabel && report.campaignLabel !== report.assessmentName
+        {!selfComparison && report.campaignLabel && report.campaignLabel !== report.assessmentName
           ? <p>{report.campaignLabel}</p>
           : null}
       </div>
@@ -612,18 +612,22 @@ function SelfComparisonAppendices({ selfComparison, firstPage, footerBrand }: {
   ] as const;
   return <>
     <SuFullLandscapePage number={firstPage} variant="appendix" footerBrand={footerBrand}>
-      <h2>Appendix B: decision comparison</h2>
-      <table className="su-full-self-comparison-appendix-table">
-        <thead><tr><th scope="col">Report</th>{selfComparison.appendixB.rows[0]?.decisions.map((decision) => <th scope="col" key={decision.key}>{decision.key[0].toUpperCase() + decision.key.slice(1)}</th>)}</tr></thead>
-        <tbody>{selfComparison.appendixB.rows.map((row) => <tr key={row.label}><th scope="row">{row.label}</th>{row.decisions.map((decision) => <td key={decision.key}>{formatNumber(decision.value)}</td>)}</tr>)}</tbody>
-      </table>
+      <section className="su-full-self-comparison-appendix">
+        <h2>Appendix B: decision comparison</h2>
+        <table className="su-full-self-comparison-appendix-table">
+          <thead><tr><th scope="col">Report</th>{selfComparison.appendixB.rows[0]?.decisions.map((decision) => <th scope="col" key={decision.key}>{decision.key[0].toUpperCase() + decision.key.slice(1)}</th>)}</tr></thead>
+          <tbody>{selfComparison.appendixB.rows.map((row) => <tr key={row.label}><th scope="row">{row.label}</th>{row.decisions.map((decision) => <td key={decision.key}>{formatNumber(decision.value)}</td>)}</tr>)}</tbody>
+        </table>
+      </section>
     </SuFullLandscapePage>
     {groups.map(([label, rows], index) => <SuFullLandscapePage number={firstPage + index + 1} variant="appendix" footerBrand={footerBrand} key={label}>
-      <h2>{index === 0 ? "Appendix C: question comparison" : `Appendix C: ${label}`}</h2>
-      <table className="su-full-self-comparison-appendix-table">
-        <thead><tr><th scope="col">Question</th><th scope="col">Focus</th><th scope="col">Earlier</th><th scope="col">Average</th></tr></thead>
-        <tbody>{rows.map((row) => <tr key={row.stableKey}><th scope="row">{row.stableKey} · {row.label}</th><td>{formatNumber(row.focus)}</td><td>{formatNumber(row.earlier)}</td><td>{formatNumber(row.average)}</td></tr>)}</tbody>
-      </table>
+      <section className="su-full-self-comparison-appendix">
+        <h2>{index === 0 ? "Appendix C: question comparison" : `Appendix C: ${label}`}</h2>
+        <table className="su-full-self-comparison-appendix-table">
+          <thead><tr><th scope="col">Question</th><th scope="col">Focus</th><th scope="col">Earlier</th><th scope="col">Average</th></tr></thead>
+          <tbody>{rows.map((row) => <tr key={row.stableKey}><th scope="row">{row.stableKey} · {row.label}</th><td>{formatNumber(row.focus)}</td><td>{formatNumber(row.earlier)}</td><td>{formatNumber(row.average)}</td></tr>)}</tbody>
+        </table>
+      </section>
     </SuFullLandscapePage>)}
   </>;
 }

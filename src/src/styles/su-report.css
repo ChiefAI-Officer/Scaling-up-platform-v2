@@ -3188,6 +3188,12 @@
   border-collapse: collapse;
   font-size: 10px;
 }
+.su-public-brand.su-report.su-full-landscape .su-full-self-comparison-appendix {
+  grid-column: 1 / -1;
+  grid-row: 1 / -1;
+  align-self: start;
+  min-width: 0;
+}
 .su-public-brand.su-report.su-full-landscape .su-full-self-comparison-appendix-table th,
 .su-public-brand.su-report.su-full-landscape .su-full-self-comparison-appendix-table td {
   padding: 4px 6px;

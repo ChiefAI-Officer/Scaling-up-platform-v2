@@ -6,6 +6,19 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="scaling-self-comparison-implemented"></a>
+### 2026-08-30 — Scaling Up Self Comparison implemented <!-- ENTRY_ISO:2026-08-30 ENTRY_SLUG:scaling-self-comparison-implemented -->
+
+**Status: IMPLEMENTED AND LOCALLY VERIFIED; PR/INDEPENDENT REVIEW PENDING.** GH #261 B3 adds the Coach-only Scaling Up Self Comparison as one designated CEO Participant's personal Focus report versus that same person's strictly earlier personal report. It does not compare a Team, cohort, or campaign average. The source semantics were verified against the live ESPERTO wizard evidence and supplied 31-page artifact before design. The Wave RC engine audit found reusable same-person identity, organization/template scope, chronology, frozen-score, and dual-campaign authorization checks; the Summary adapter bypasses only Wave RC's separate dark rollout predicates.
+
+**Authorization and compatibility boundary.** The existing Summary Reporting umbrella/canary/kill capability remains the sole feature gate. The new surface is Coach-only, reuses current bulk-report access, binds Focus server-side to the destination Campaign's designated CEO Participant, reauthorizes both Campaigns, and enters the existing `viewRespondentReport` rate-limit/audit/no-store protocol before rendering. Invalid, inaccessible, cross-person, later, malformed, and incompatible selections fail closed. Cross-version eligibility requires exactly Q01-Q61 as Slider Likert 0-10 plus the ten canonical section identities; Focus supplies wording, recommendations, current scores, open-response report content, and Peers, while Earlier supplies only previous scores.
+
+**Canonical output and persistence boundary.** The approved server-rendered Scaling Up landscape report remains canonical. Self Comparison adds Focus/Earlier series to the profile and question body, preserves Appendix A as Focus + Peers, and adds Appendix B decision rows plus Appendix C's exact Q01-Q45/Q56-Q61 Focus/Earlier/average rows. It uses the existing browser print/PDF control and creates no Blob artifact, `SummaryReport` row, schema migration, email/share path, Admin mount, environment value, feature flag, or Production-data write. Visual capture produced a 29-page A4 landscape artifact; inspection of cover, profile, and Appendices B/C caught and corrected a duplicate cover label and inherited Appendix A grid squeeze.
+
+**TDD and verification receipt.** Focused RED/GREEN cycles cover the Summary adapter, strict projection, HTML semantics and ordinary-report preservation, Coach/CEO authorization envelope, registry, picker, and exact 0-10 scale rejection. The affected matrix passes **8 suites / 71 tests**, with the adapter suite subsequently passing **28/28** after the strict-scale addition. Changed-file ESLint passes. The exact `CI=true npm run build` reached Prisma generation and the 50-migration safety check, then stopped before compilation because this isolated worktree intentionally has no `DIRECT_URL`; no environment value was supplied or changed. The credential-free equivalent `CI=true npx next build --turbopack` compiled, passed TypeScript, generated **95/95 pages**, and included both new dynamic routes. Missing local database/Inngest values emitted existing non-fatal page-generation warnings.
+
+---
+
 <a id="summary-reports-coach-dropdown-implemented"></a>
 ### 2026-08-30 — Summary Reports coach-only dropdown implemented <!-- ENTRY_ISO:2026-08-30 ENTRY_SLUG:summary-reports-coach-dropdown-implemented -->
 
