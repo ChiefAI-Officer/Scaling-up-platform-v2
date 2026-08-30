@@ -129,7 +129,11 @@ function isLiveSameScope(submission: ComparisonSubmission, focus: ComparisonSubm
     isScoreResult(submission.result);
 }
 
-function isApplicableFocus(submission: ComparisonSubmission | null, focus: ReportComparisonFocus): submission is ComparisonSubmission {
+function isApplicableFocus(
+  submission: ComparisonSubmission | null,
+  focus: ReportComparisonFocus,
+  requireWaveRcEligibility: boolean,
+): submission is ComparisonSubmission {
   return submission !== null &&
     submission.id === focus.submissionId &&
     submission.campaignId === focus.campaignId &&
@@ -142,10 +146,10 @@ function isApplicableFocus(submission: ComparisonSubmission | null, focus: Repor
     submission.campaign.accessMode === "INVITED" &&
     submission.campaign.template.alias === REPORT_COMPARISON_ALIAS &&
     isScoreResult(submission.result) &&
-    isReportComparisonEnabled({
+    (!requireWaveRcEligibility || isReportComparisonEnabled({
       organizationId: submission.campaign.organizationId,
       templateId: submission.campaign.templateId,
-    });
+    }));
 }
 
 function compareNewest(left: ComparisonSubmission, right: ComparisonSubmission): number {
@@ -257,12 +261,13 @@ async function discoverReportComparisonCandidates(
   db: ReportComparisonDb,
   viewer: ReportComparisonViewer,
   focus: ReportComparisonFocus,
+  requireWaveRcEligibility = true,
 ): Promise<CandidateOutcome> {
   if (!await liveCeoGrantMatchesFocus(db, viewer, focus)) {
     return { kind: "unavailable" };
   }
   const focusSubmission = await loadFocus(db, focus);
-  if (!isApplicableFocus(focusSubmission, focus) || !ceoFocusMatches(viewer, focus)) {
+  if (!isApplicableFocus(focusSubmission, focus, requireWaveRcEligibility) || !ceoFocusMatches(viewer, focus)) {
     return { kind: "not-applicable" };
   }
   if (!await operatorCanRead(db, viewer, focus.campaignId)) {
@@ -342,6 +347,23 @@ export async function listReportComparisonCandidates(
   }
 }
 
+/**
+ * Summary Reporting owns rollout for this adapter. It skips only Wave RC's
+ * rollout predicates; all identity, chronology, liveness, and access checks
+ * remain in the shared discovery path.
+ */
+export async function listSummarySelfComparisonCandidates(
+  db: ReportComparisonDb,
+  viewer: Extract<ReportComparisonViewer, { kind: "operator" }>,
+  focus: ReportComparisonFocus,
+): Promise<CandidateOutcome> {
+  try {
+    return await discoverReportComparisonCandidates(db, viewer, focus, false);
+  } catch {
+    return { kind: "unavailable" };
+  }
+}
+
 function snapshot(submission: ComparisonSubmission): ComparisonSnapshot {
   const rawMeta = buildQuestionMetaByKey(submission.campaign.version.questions);
   const questionMetaByKey: Record<string, ComparisonQuestionMeta> = Object.create(null);
@@ -363,6 +385,16 @@ export async function loadReportComparison(
   baselineSubmissionId: string,
 ): Promise<ComparisonOutcome> {
   if (!isReportComparisonRolloutActive()) return { kind: "invalid" };
+  return loadReportComparisonWithPolicy(db, viewer, focus, baselineSubmissionId, true);
+}
+
+async function loadReportComparisonWithPolicy(
+  db: ReportComparisonDb,
+  viewer: ReportComparisonViewer,
+  focus: ReportComparisonFocus,
+  baselineSubmissionId: string,
+  requireWaveRcEligibility: boolean,
+): Promise<ComparisonOutcome> {
   const startedAt = Date.now();
   try {
     const outcome = await db.$transaction(async (tx) => {
@@ -373,7 +405,7 @@ export async function loadReportComparison(
         loadFocus(tx, focus),
         tx.assessmentSubmission.findFirst({ where: { id: baselineSubmissionId }, include: submissionInclude }),
       ]);
-      if (!isApplicableFocus(focusSubmission, focus) || !baseline || !ceoFocusMatches(viewer, focus)) return { kind: "invalid" } as const;
+      if (!isApplicableFocus(focusSubmission, focus, requireWaveRcEligibility) || !baseline || !ceoFocusMatches(viewer, focus)) return { kind: "invalid" } as const;
       if (viewer.kind === "operator") {
         const [focusAllowed, baselineAllowed] = await Promise.all([
           operatorCanRead(tx, viewer, focus.campaignId),
@@ -400,6 +432,16 @@ export async function loadReportComparison(
     emitReportComparisonMetric("comparison_invalid", { viewer: viewerMetric(viewer), reason: "error", latencyMs: Date.now() - startedAt });
     return { kind: "invalid" };
   }
+}
+
+/** Summary-owned counterpart to loadReportComparison; operator-only by design. */
+export async function loadSummarySelfComparison(
+  db: ReportComparisonDb,
+  viewer: Extract<ReportComparisonViewer, { kind: "operator" }>,
+  focus: ReportComparisonFocus,
+  earlierSubmissionId: string,
+): Promise<ComparisonOutcome> {
+  return loadReportComparisonWithPolicy(db, viewer, focus, earlierSubmissionId, false);
 }
 
 /** Bridge a Prisma client or transaction to the intentionally narrow service DB. */
