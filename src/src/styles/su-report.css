@@ -2703,6 +2703,14 @@
   font-size: 52px;
   line-height: 1.02;
 }
+.su-public-brand.su-report.su-full-landscape.su-condensed-ceo .su-condensed-ceo-cover-title h1 {
+  max-width: 15ch;
+}
+.su-public-brand.su-report.su-full-landscape.su-condensed-ceo .su-condensed-ceo-cover-title .su-condensed-ceo-cover-edition {
+  margin-top: 16px;
+  font-size: 24px;
+  font-weight: 700;
+}
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-cover-meta {
   position: relative;
   z-index: 1;

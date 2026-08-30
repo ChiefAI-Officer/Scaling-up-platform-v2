@@ -68,6 +68,11 @@ const summaryReporting = {
       label: "Scaling Up · CEO Full",
       description: "Compare one CEO with an explicitly selected leadership team.",
     },
+    {
+      type: "SCALING_CONDENSED_CEO" as const,
+      label: "Scaling Up · Condensed CEO",
+      description: "Create a two-page CEO score and peer appendix.",
+    },
   ],
 };
 
@@ -159,6 +164,18 @@ describe("CampaignDetail — Summary Reports integration", () => {
     expect(groupReport).toHaveAttribute("target", "_blank");
     expect(groupReport).toHaveAttribute("rel", "noopener noreferrer");
     expect(groupReport).not.toHaveAttribute("data-prefetch");
+    const condensed = screen.getByTestId("campaign-detail-condensed-ceo-option");
+    expect(condensed.tagName).toBe("A");
+    expect(condensed).toHaveTextContent("Condensed CEO");
+    expect(condensed).toHaveAttribute("href", `${GROUP_REPORT_HREF}/condensed`);
+    expect(condensed).toHaveAttribute("target", "_blank");
+    expect(condensed).toHaveAttribute("rel", "noopener noreferrer");
+    expect(condensed).not.toHaveAttribute("data-prefetch");
+    const options = screen.getAllByRole("menuitem");
+    expect(options.map((option) => option.textContent)).toEqual([
+      expect.stringContaining("Group report"),
+      expect.stringContaining("Condensed CEO"),
+    ]);
     expect(global.fetch).not.toHaveBeenCalled();
   });
 });

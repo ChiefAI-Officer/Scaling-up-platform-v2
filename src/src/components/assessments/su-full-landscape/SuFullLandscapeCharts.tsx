@@ -67,7 +67,10 @@ export function SuFullVerticalPeerChart({
   instanceId = chapterKey,
 }: {
   chapterKey: SuFullLandscapeChapterKey;
-  questions: readonly SuFullLandscapeQuestion[];
+  questions: readonly Pick<
+    SuFullLandscapeQuestion,
+    "stableKey" | "label" | "you" | "peers"
+  >[];
   title?: string;
   instanceId?: string;
 }) {

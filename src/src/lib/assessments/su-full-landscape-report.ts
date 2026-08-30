@@ -100,6 +100,12 @@ const CANONICAL_SECTIONS: readonly CanonicalSection[] = [
   { stableKey: "S_YOU_IC", label: "Internal Communication", domain: "you", questionKeys: questionKeys(56, 61) },
 ] as const;
 
+/**
+ * Canonical Scaling Up Full section membership shared by bounded report
+ * projections. Consumers validate against it; they do not derive or repair it.
+ */
+export const SU_FULL_LANDSCAPE_SECTIONS = CANONICAL_SECTIONS;
+
 export const SU_FULL_LANDSCAPE_CHAPTERS: readonly SuFullLandscapeChapterDefinition[] = [
   { key: "people", label: "People", sectionStableKeys: ["S_PEOPLE_YE", "S_PEOPLE_CC"] },
   { key: "strategy", label: "Strategy", sectionStableKeys: ["S_STRATEGY"] },

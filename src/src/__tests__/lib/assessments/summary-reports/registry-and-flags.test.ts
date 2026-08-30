@@ -22,10 +22,10 @@ describe("SUMMARY_REPORT_REGISTRY", () => {
         templateAliases: ["scaling-up-full"],
         label: "Scaling Up · Condensed CEO",
         description: "Create a two-page CEO score and peer appendix.",
-        implemented: false,
+        implemented: true,
         roles: [{ role: "CEO", min: 1, max: 1 }],
         hasRemarksStep: false,
-        rendererVersion: "scaling-condensed-ceo-pdf-v1",
+        rendererVersion: "scaling-condensed-ceo-html-v1",
       },
       {
         type: "SCALING_SELF_COMPARISON",
@@ -92,12 +92,13 @@ describe("SUMMARY_REPORT_REGISTRY", () => {
     ]);
   });
 
-  it("uses unique identifiers and exposes only Scaling CEO Full as implemented", () => {
+  it("uses unique identifiers and exposes only the two implemented Scaling report types", () => {
     const types = SUMMARY_REPORT_REGISTRY.map((definition) => definition.type);
 
     expect(new Set(types).size).toBe(7);
     expect(SUMMARY_REPORT_REGISTRY.filter((definition) => definition.implemented)).toEqual([
       expect.objectContaining({ type: "SCALING_CEO_FULL" }),
+      expect.objectContaining({ type: "SCALING_CONDENSED_CEO" }),
     ]);
   });
 });

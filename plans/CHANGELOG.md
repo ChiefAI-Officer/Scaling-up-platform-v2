@@ -6,6 +6,19 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="scaling-condensed-ceo-html-implemented"></a>
+### 2026-08-30 — Scaling Condensed CEO canonical HTML report implemented <!-- ENTRY_ISO:2026-08-30 ENTRY_SLUG:scaling-condensed-ceo-html-implemented -->
+
+**Status: PR #402 OPEN; IMPLEMENTED, VISUALLY VERIFIED, AND INDEPENDENTLY REVIEWED LOCALLY; NOT MERGED, DEPLOYED, OR LAUNCHED.** Handoff B2 of GH #261 adds `Condensed CEO` as the second option in B1's Coach-only Scaling Up Full report dropdown. The option is a plain, non-prefetching anchor and opens the report in one click. Its canonical output is server-rendered HTML with exactly two A4-landscape print pages: a branded cover and a five-chart appendix containing all 61 ordered questions, the CEO's current score, and the approved peer benchmark. It does not enter the saved-report wizard or artifact lifecycle and introduces no `@react-pdf` renderer.
+
+**Privacy, authorization, and snapshot boundary.** A dedicated repeatable-read loader applies the existing Summary Reporting flag state and group-report authorization before resolving exactly one `isCEO` campaign participant and that participant's submitted result. It never fetches Team submissions. Missing CEO, unsubmitted CEO, and incomplete source data render clean unavailable states; unsupported, unpublished, disabled, killed, or unauthorized requests remain hidden. Successful access preserves the existing rate limit and emits the fail-closed `GROUP_REPORT_VIEW` audit with the Condensed kind, source submission, frozen Template Version/hash, and peer provenance. The loader uses the established report read-path transaction budget for high-latency clients. The route is covered by no-store middleware and exposes print controls only after a valid snapshot.
+
+**Harvest, TDD, and review receipt.** The earlier local branch supplied the renderer-independent score projection and snapshot ideas only; its `@react-pdf` renderer and wizard integration were discarded in accordance with decisions #392 and #391. Five production slices were developed red-green and committed separately: model, CEO snapshot, HTML composition, access route, and dropdown registry. The focused B2 matrix passes **5 suites / 37 tests**; broader route and dropdown regressions pass **7 suites / 88 tests**. The complete serial run passed **795/797 suites, 9,897/9,899 tests, and 16/16 snapshots**: an existing 5-second Edition 6 PDF-capture timeout persisted in isolation, while one 60-second browser semantic-tag timeout passed **48/48 tests** when isolated. Changed-file ESLint, migration safety across all **51 migrations**, changelog freshness, diff hygiene, and the direct `CI=true npx next build --turbopack` gate pass, including TypeScript and **95/95 pages**. The repository's exact `CI=true npm run build` wrapper cannot pass safely in this isolated worktree because it runs `prisma migrate deploy` and no `DIRECT_URL` is present; Production credentials were deliberately not imported and no database was touched. Independent Spec review was clean; Standards review identified the default transaction budget, which was corrected test-first and passed both re-review axes.
+
+**Visual proof and scope.** Chromium print output is exactly two A4-landscape pages. `pdfinfo`, extracted-text checks, and PNG inspection confirm the cover, five charts, 61 unique Q rows, peer labels, and no Team aggregate, narrative, profile, conclusion, remarks, verbatims, or extra page. The implementation changes no schema, migration, environment variable, feature flag, campaign, assessment, submission, saved artifact, or Production record. Comparison and every non-Scaling report family remain outside B2.
+
+---
+
 <a id="referred-results-coach-removal-implemented"></a>
 ### 2026-08-30 — Referred Results Coach removal implemented <!-- ENTRY_ISO:2026-08-30 ENTRY_SLUG:referred-results-coach-removal-implemented -->
 

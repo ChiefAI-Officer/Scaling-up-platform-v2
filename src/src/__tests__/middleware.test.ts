@@ -91,6 +91,8 @@ describe("CEO self-report middleware policy", () => {
 
   it("keeps the established no-store group-report behavior", () => {
     const group = runMiddleware("/assessments/campaign-1/report", { sub: "user-1" });
+    const condensed = runMiddleware("/assessments/campaign-1/report/condensed", { sub: "user-1" });
     expect(group.headers.get("Cache-Control")).toBe("no-store, private");
+    expect(condensed.headers.get("Cache-Control")).toBe("no-store, private");
   });
 });
