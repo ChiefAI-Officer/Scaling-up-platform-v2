@@ -1428,9 +1428,9 @@ export function CampaignDetail({
                     data-testid="campaign-detail-view-group-report"
                     {...(responsiveEnabled ? { "data-touch-target": true } : {})}
                   >
-                    <FileText className="h-4 w-4" />
+                    <FileText aria-hidden className="h-4 w-4" />
                     View reports
-                    <ChevronDown className="h-4 w-4" />
+                    <ChevronDown aria-hidden className="h-4 w-4" />
                   </button>
                 </DropdownMenu.Trigger>
                 <DropdownMenu.Portal>
@@ -1451,7 +1451,7 @@ export function CampaignDetail({
                         data-testid="campaign-detail-group-report-option"
                         {...(responsiveEnabled ? { "data-touch-target": true } : {})}
                       >
-                        <FileText className="h-4 w-4" /> Group report
+                        <FileText aria-hidden className="h-4 w-4" /> Group report
                       </a>
                     </DropdownMenu.Item>
                   </DropdownMenu.Content>
