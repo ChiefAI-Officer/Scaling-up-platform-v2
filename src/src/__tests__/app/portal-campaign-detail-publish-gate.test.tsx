@@ -372,6 +372,11 @@ describe("CampaignDetail Summary Reports capability", () => {
           label: "Scaling Up · Condensed CEO",
           description: "Create a two-page CEO score and peer appendix.",
         },
+        {
+          type: "SCALING_SELF_COMPARISON",
+          label: "Scaling Up · Self Comparison",
+          description: "Compare one current report with one earlier report for the same person.",
+        },
       ],
     });
   });

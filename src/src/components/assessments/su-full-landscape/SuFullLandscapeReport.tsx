@@ -20,6 +20,7 @@ import type { SafeReportHtmlFragment } from "@/lib/assessments/report-html";
 import type { ReactNode } from "react";
 import { buildSuFullPeerDisclosureModel } from "@/lib/assessments/su-full-peer-disclosure";
 import { respondentNameMatchesEmail } from "@/lib/assessments/respondent-display-name";
+import type { SuFullSelfComparisonModel } from "@/lib/assessments/su-full-self-comparison";
 
 const CHAPTER_COPY: Readonly<Record<SuFullLandscapeChapter["key"], readonly string[]>> = {
   people: [
@@ -135,7 +136,7 @@ export function PeerSnapshotDisclosure({
   );
 }
 
-function CoverPage({ report, number }: { report: RespondentReport; number: number }) {
+function CoverPage({ report, number, selfComparison }: { report: RespondentReport; number: number; selfComparison?: SuFullSelfComparisonModel }) {
   const respondentNameIsEmail = respondentNameMatchesEmail(
     report.respondentName,
     report.respondentEmail,
@@ -156,8 +157,9 @@ function CoverPage({ report, number }: { report: RespondentReport; number: numbe
       </div>
       <div className="su-full-landscape-cover-title">
         <p>Scaling Up Assessment</p>
-        <h1>{report.assessmentName}</h1>
-        {report.campaignLabel && report.campaignLabel !== report.assessmentName
+        <h1>{selfComparison ? "Self Comparison" : report.assessmentName}</h1>
+        {selfComparison ? <p>{selfComparison.focus.campaignLabel ?? "Focus"} · {formatDate(selfComparison.focus.submittedAt)}<br />{selfComparison.earlier.campaignLabel ?? "Earlier"} · {formatDate(selfComparison.earlier.submittedAt)}</p> : null}
+        {!selfComparison && report.campaignLabel && report.campaignLabel !== report.assessmentName
           ? <p>{report.campaignLabel}</p>
           : null}
       </div>
@@ -398,7 +400,7 @@ function IntroductionPage({ report, model, number, respondentDisplayName }: {
   );
 }
 
-function ProfilePage({ model, number, footerBrand }: { model: SuFullLandscapeReportModel; number: number; footerBrand: SuFullLandscapeFooterBrand }) {
+function ProfilePage({ model, number, footerBrand, selfComparison }: { model: SuFullLandscapeReportModel; number: number; footerBrand: SuFullLandscapeFooterBrand; selfComparison?: SuFullSelfComparisonModel }) {
   const strongestRelative = [...model.profileRows]
     .sort((a, b) => b.deviation - a.deviation || a.stableKey.localeCompare(b.stableKey))[0];
   const weakestRelative = [...model.profileRows]
@@ -416,30 +418,24 @@ function ProfilePage({ model, number, footerBrand }: { model: SuFullLandscapeRep
           We begin with an overview of the main sections. Your results are compared with the peer benchmark associated with this completed assessment.
         </p>
         <div className="su-full-profile-layout">
-          <table className="su-full-profile-table">
-            <thead><tr><th scope="col">Chapter / subsection</th><th scope="col">You</th><th scope="col">Peers</th><th scope="col">Deviation</th></tr></thead>
+          <table className="su-full-profile-table" aria-label={selfComparison ? "Focus and Earlier profile" : undefined}>
+            {selfComparison ? <thead><tr><th scope="col">Chapter / subsection</th><th scope="col">Focus</th><th scope="col">Earlier</th><th scope="col">Peers</th><th scope="col">Dev from Earlier</th><th scope="col">Dev from Peers</th></tr></thead>
+              : <thead><tr><th scope="col">Chapter / subsection</th><th scope="col">You</th><th scope="col">Peers</th><th scope="col">Deviation</th></tr></thead>}
             <tbody>
-              {model.chapters.flatMap((chapter) => [
-                <tr
-                  className={`su-full-landscape-profile-row--chapter is-${chapter.key}`}
-                  data-testid={`profile-domain-${chapter.key}`}
-                  key={`chapter-${chapter.key}`}
-                >
-                  <th scope="row">{chapter.label}</th>
-                  <td>{formatNumber(chapter.youAverage)}</td>
-                  <td>{formatNumber(chapter.peersAverage)}</td>
-                  <td>{formatDeviation(chapter.youAverage - chapter.peersAverage)}</td>
+              {selfComparison ? selfComparison.chapters.flatMap((chapter) => [
+                <tr className={`su-full-landscape-profile-row--chapter is-${chapter.chapterKey}`} data-testid={`profile-domain-${chapter.chapterKey}`} key={`chapter-${chapter.chapterKey}`}>
+                  <th scope="row">{chapter.label}</th><td>{formatNumber(chapter.focus)}</td><td>{formatNumber(chapter.earlier)}</td><td>{formatNumber(chapter.peers)}</td><td>{formatDeviation(chapter.deltaFromEarlier)}</td><td>{formatDeviation(chapter.deltaFromPeers)}</td>
                 </tr>,
-                ...model.profileRows
-                  .filter((row) => row.chapterKey === chapter.key)
-                  .map((row) => (
-                    <tr className={`su-full-landscape-profile-row--subsection is-${chapter.key}`} key={row.stableKey}>
-                      <th scope="row">{row.label}</th>
-                      <td>{formatNumber(row.youAverage)}</td>
-                      <td>{formatNumber(row.peersAverage)}</td>
-                      <td>{formatDeviation(row.deviation)}</td>
-                    </tr>
-                  )),
+                ...selfComparison.profileRows.filter((row) => row.chapterKey === chapter.chapterKey).map((row) => <tr className={`su-full-landscape-profile-row--subsection is-${chapter.chapterKey}`} key={row.stableKey}>
+                  <th scope="row">{row.label}</th><td>{formatNumber(row.focus)}</td><td>{formatNumber(row.earlier)}</td><td>{formatNumber(row.peers)}</td><td>{formatDeviation(row.deltaFromEarlier)}</td><td>{formatDeviation(row.deltaFromPeers)}</td>
+                </tr>),
+              ]) : model.chapters.flatMap((chapter) => [
+                <tr className={`su-full-landscape-profile-row--chapter is-${chapter.key}`} data-testid={`profile-domain-${chapter.key}`} key={`chapter-${chapter.key}`}>
+                  <th scope="row">{chapter.label}</th><td>{formatNumber(chapter.youAverage)}</td><td>{formatNumber(chapter.peersAverage)}</td><td>{formatDeviation(chapter.youAverage - chapter.peersAverage)}</td>
+                </tr>,
+                ...model.profileRows.filter((row) => row.chapterKey === chapter.key).map((row) => <tr className={`su-full-landscape-profile-row--subsection is-${chapter.key}`} key={row.stableKey}>
+                  <th scope="row">{row.label}</th><td>{formatNumber(row.youAverage)}</td><td>{formatNumber(row.peersAverage)}</td><td>{formatDeviation(row.deviation)}</td>
+                </tr>),
               ])}
             </tbody>
           </table>
@@ -456,7 +452,7 @@ function ProfilePage({ model, number, footerBrand }: { model: SuFullLandscapeRep
   );
 }
 
-function ChapterPage({ chapter, number, footerBrand, respondentDisplayName }: { chapter: SuFullLandscapeChapter; number: number; footerBrand: SuFullLandscapeFooterBrand; respondentDisplayName: string | null }) {
+function ChapterPage({ chapter, number, footerBrand, respondentDisplayName, previousByKey }: { chapter: SuFullLandscapeChapter; number: number; footerBrand: SuFullLandscapeFooterBrand; respondentDisplayName: string | null; previousByKey?: ReadonlyMap<string, number> }) {
   const personalize = (paragraph: string) => respondentDisplayName
     ? paragraph.replaceAll("{{respondentName}}", respondentDisplayName)
     : paragraph
@@ -474,7 +470,7 @@ function ChapterPage({ chapter, number, footerBrand, respondentDisplayName }: { 
           ))}
         </div>
       </div>
-      <SuFullVerticalPeerChart chapterKey={chapter.key} instanceId={`page-${number}-${chapter.key}`} questions={chapter.questions} title={`${chapter.label} comparison`} />
+      <SuFullVerticalPeerChart chapterKey={chapter.key} instanceId={`page-${number}-${chapter.key}`} questions={chapter.questions} title={`${chapter.label} comparison`} previousByKey={previousByKey} />
     </SuFullLandscapePage>
   );
 }
@@ -484,11 +480,13 @@ function DetailPage({
   questions,
   peerProvenance,
   footerBrand,
+  previousByKey,
 }: {
   page: Extract<SuFullLandscapePageDescriptor, { kind: "detail" }>;
   questions: ReadonlyMap<string, SuFullLandscapeQuestion>;
   peerProvenance: SuFullLandscapeReportModel["peerProvenance"];
   footerBrand: SuFullLandscapeFooterBrand;
+  previousByKey?: ReadonlyMap<string, number>;
 }) {
   return (
     <SuFullLandscapePage number={page.number} chapterKey={page.chapterKey} variant="detail" footerBrand={footerBrand}>
@@ -502,10 +500,11 @@ function DetailPage({
             className="su-full-landscape-detail"
             data-testid={`su-full-landscape-detail-${question.stableKey}`}
             data-question-key={question.stableKey}
+            data-self-comparison-question={previousByKey ? question.stableKey : undefined}
             key={question.stableKey}
           >
             <h3>{question.label}</h3>
-            <SuFullDetailPairedBars chapterKey={page.chapterKey} question={question} />
+            <SuFullDetailPairedBars chapterKey={page.chapterKey} question={question} previous={previousByKey?.get(question.stableKey)} />
             <p className="su-full-landscape-feedback">{question.recommendation}</p>
           </article>
         );
@@ -600,16 +599,51 @@ function AppendixPage({ model, number, footerBrand }: { model: SuFullLandscapeRe
   );
 }
 
+function SelfComparisonAppendices({ selfComparison, firstPage, footerBrand }: {
+  selfComparison: SuFullSelfComparisonModel;
+  firstPage: number;
+  footerBrand: SuFullLandscapeFooterBrand;
+}) {
+  const groups = [
+    ["People", selfComparison.appendixC.filter((row) => Number(row.stableKey.slice(1)) <= 13)],
+    ["Strategy", selfComparison.appendixC.filter((row) => { const number = Number(row.stableKey.slice(1)); return number >= 14 && number <= 20; })],
+    ["Execution", selfComparison.appendixC.filter((row) => { const number = Number(row.stableKey.slice(1)); return number >= 21 && number <= 40; })],
+    ["Cash + Internal Communication", selfComparison.appendixC.filter((row) => { const number = Number(row.stableKey.slice(1)); return number >= 41; })],
+  ] as const;
+  return <>
+    <SuFullLandscapePage number={firstPage} variant="appendix" footerBrand={footerBrand}>
+      <section className="su-full-self-comparison-appendix">
+        <h2>Appendix B: decision comparison</h2>
+        <table className="su-full-self-comparison-appendix-table">
+          <thead><tr><th scope="col">Report</th>{selfComparison.appendixB.rows[0]?.decisions.map((decision) => <th scope="col" key={decision.key}>{decision.key[0].toUpperCase() + decision.key.slice(1)}</th>)}</tr></thead>
+          <tbody>{selfComparison.appendixB.rows.map((row) => <tr key={row.label}><th scope="row">{row.label}</th>{row.decisions.map((decision) => <td key={decision.key}>{formatNumber(decision.value)}</td>)}</tr>)}</tbody>
+        </table>
+      </section>
+    </SuFullLandscapePage>
+    {groups.map(([label, rows], index) => <SuFullLandscapePage number={firstPage + index + 1} variant="appendix" footerBrand={footerBrand} key={label}>
+      <section className="su-full-self-comparison-appendix">
+        <h2>{index === 0 ? "Appendix C: question comparison" : `Appendix C: ${label}`}</h2>
+        <table className="su-full-self-comparison-appendix-table">
+          <thead><tr><th scope="col">Question</th><th scope="col">Focus</th><th scope="col">Earlier</th><th scope="col">Average</th></tr></thead>
+          <tbody>{rows.map((row) => <tr key={row.stableKey}><th scope="row">{row.stableKey} · {row.label}</th><td>{formatNumber(row.focus)}</td><td>{formatNumber(row.earlier)}</td><td>{formatNumber(row.average)}</td></tr>)}</tbody>
+        </table>
+      </section>
+    </SuFullLandscapePage>)}
+  </>;
+}
+
 export function SuFullLandscapeReport({
   report,
   model,
   contactEmail,
   beforeConclusion,
+  selfComparison,
 }: {
   report: RespondentReport;
   model: SuFullLandscapeReportModel;
   contactEmail?: string | null;
   beforeConclusion?: ReactNode;
+  selfComparison?: SuFullSelfComparisonModel;
 }) {
   const chapters = new Map(model.chapters.map((chapter) => [chapter.key, chapter]));
   const questions = questionByKey(model);
@@ -617,23 +651,27 @@ export function SuFullLandscapeReport({
     report.respondentName,
     report.respondentEmail,
   ) ? null : report.respondentName;
+  const previousByKey = selfComparison
+    ? new Map(selfComparison.questions.map((question) => [question.stableKey, question.earlier]))
+    : undefined;
+  const appendixPage = model.pages.find((page) => page.kind === "appendix");
 
   return (
     <div className="su-public-brand su-report su-full-landscape">
       <div className="su-full-landscape-report" data-testid="su-full-landscape-report">
         {model.pages.map((page) => {
         switch (page.kind) {
-          case "cover": return <CoverPage key={page.number} number={page.number} report={report} />;
+          case "cover": return <CoverPage key={page.number} number={page.number} report={report} selfComparison={selfComparison} />;
           case "preface": return <CustomHtmlPage key={page.number} number={page.number} report={report} html={report.reportHtml!.introductionHtml!} />;
           case "contents": return <ContentsPage key={page.number} model={model} number={page.number} footerBrand={report} />;
           case "introduction": return <IntroductionPage key={page.number} number={page.number} report={report} model={model} respondentDisplayName={respondentDisplayName} />;
-          case "profile": return <ProfilePage key={page.number} number={page.number} model={model} footerBrand={report} />;
+          case "profile": return <ProfilePage key={page.number} number={page.number} model={model} footerBrand={report} selfComparison={selfComparison} />;
           case "chapter": {
             const chapter = chapters.get(page.chapterKey);
             if (!chapter) throw new Error(`Landscape chapter page ${page.number} is missing ${page.chapterKey}`);
-            return <ChapterPage chapter={chapter} key={page.number} number={page.number} footerBrand={report} respondentDisplayName={respondentDisplayName} />;
+            return <ChapterPage chapter={chapter} key={page.number} number={page.number} footerBrand={report} respondentDisplayName={respondentDisplayName} previousByKey={previousByKey} />;
           }
-          case "detail": return <DetailPage key={page.number} page={page} questions={questions} peerProvenance={model.peerProvenance} footerBrand={report} />;
+          case "detail": return <DetailPage key={page.number} page={page} questions={questions} peerProvenance={model.peerProvenance} footerBrand={report} previousByKey={previousByKey} />;
           case "conclusion": return <ConclusionPage key={page.number} number={page.number} report={report} model={model} contactEmail={contactEmail} beforeConclusion={beforeConclusion} conclusionHtml={report.reportHtml?.conclusionHtml} />;
           case "appendix": return <AppendixPage key={page.number} number={page.number} model={model} footerBrand={report} />;
           default: {
@@ -642,6 +680,7 @@ export function SuFullLandscapeReport({
           }
         }
         })}
+        {selfComparison && appendixPage ? <SelfComparisonAppendices selfComparison={selfComparison} firstPage={appendixPage.number + 1} footerBrand={report} /> : null}
       </div>
     </div>
   );

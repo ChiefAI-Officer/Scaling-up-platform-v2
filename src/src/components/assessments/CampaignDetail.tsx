@@ -57,6 +57,7 @@ import type {
 } from "@/lib/assessments/campaign-detail";
 import type { ScoreResult } from "@/lib/assessments/scoring";
 import type { SummaryReportType } from "@/lib/assessments/summary-reports/types";
+import { SelfComparisonPicker } from "@/components/assessments/SelfComparisonPicker";
 import {
   computeCampaignStatusMetrics,
   getInvitationBand,
@@ -326,8 +327,19 @@ export function CampaignDetail({
     string | null
   >(null);
   const [closeDialogOpen, setCloseDialogOpen] = useState(false);
+  const [selfComparisonOpen, setSelfComparisonOpen] = useState(false);
   const [closeReason, setCloseReason] = useState("");
   const [closing, setClosing] = useState(false);
+  const selfComparisonEnabled = summaryReporting?.implementedTypes.some((entry) => entry.type === "SCALING_SELF_COMPARISON") ?? false;
+  const selfComparisonFocusCandidates = respondents.flatMap((row) =>
+    row.isCEO && row.submissionId && row.submittedAt
+      ? [{
+          submissionId: row.submissionId,
+          label: `${row.respondent.firstName} ${row.respondent.lastName}`.trim() || row.respondent.email,
+          submittedAt: new Date(row.submittedAt).toISOString(),
+        }]
+      : [],
+  );
 
   // Delete campaign dialog state (Wave D, #1 — soft-delete with blast-radius confirm).
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -1409,6 +1421,12 @@ export function CampaignDetail({
 
   return (
     <div className={responsiveEnabled ? "min-w-0 max-w-6xl mx-auto space-y-6 [&_a]:min-h-11 [&_button]:min-h-11" : "space-y-6 max-w-6xl mx-auto"}>
+      {selfComparisonEnabled ? <SelfComparisonPicker
+        open={selfComparisonOpen}
+        onClose={() => setSelfComparisonOpen(false)}
+        campaignId={campaign.id}
+        focusCandidates={selfComparisonFocusCandidates}
+      /> : null}
       <div className={responsiveEnabled ? "flex flex-col items-stretch gap-4 sm:flex-row sm:items-center sm:justify-between" : "flex items-center justify-between gap-4"}>
         <Link
           href={basePath}
@@ -1472,6 +1490,16 @@ export function CampaignDetail({
                         </a>
                       </DropdownMenu.Item>
                     ) : null}
+                    {selfComparisonEnabled ? <DropdownMenu.Item asChild>
+                      <button
+                        type="button"
+                        onClick={() => setSelfComparisonOpen(true)}
+                        className="flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-md px-3 text-left text-sm text-foreground outline-none focus:bg-muted"
+                        data-testid="campaign-detail-self-comparison-option"
+                      >
+                        <FileText aria-hidden className="h-4 w-4" /> Self Comparison
+                      </button>
+                    </DropdownMenu.Item> : null}
                   </DropdownMenu.Content>
                 </DropdownMenu.Portal>
               </DropdownMenu.Root>

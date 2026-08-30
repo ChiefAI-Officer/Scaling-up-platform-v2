@@ -3,6 +3,7 @@ import { asAccessDb, canManageCampaign } from "@/lib/assessments/access-control"
 import { buildQuestionMetaByKey } from "@/lib/assessments/question-meta";
 import {
   buildReportComparisonModel,
+  isStrictSuFullSelfComparisonModel,
   type ComparisonQuestionMeta,
   type ComparisonSnapshot,
   type ReportComparisonCandidate,
@@ -129,7 +130,11 @@ function isLiveSameScope(submission: ComparisonSubmission, focus: ComparisonSubm
     isScoreResult(submission.result);
 }
 
-function isApplicableFocus(submission: ComparisonSubmission | null, focus: ReportComparisonFocus): submission is ComparisonSubmission {
+function isApplicableFocus(
+  submission: ComparisonSubmission | null,
+  focus: ReportComparisonFocus,
+  requireWaveRcEligibility: boolean,
+): submission is ComparisonSubmission {
   return submission !== null &&
     submission.id === focus.submissionId &&
     submission.campaignId === focus.campaignId &&
@@ -142,10 +147,10 @@ function isApplicableFocus(submission: ComparisonSubmission | null, focus: Repor
     submission.campaign.accessMode === "INVITED" &&
     submission.campaign.template.alias === REPORT_COMPARISON_ALIAS &&
     isScoreResult(submission.result) &&
-    isReportComparisonEnabled({
+    (!requireWaveRcEligibility || isReportComparisonEnabled({
       organizationId: submission.campaign.organizationId,
       templateId: submission.campaign.templateId,
-    });
+    }));
 }
 
 function compareNewest(left: ComparisonSubmission, right: ComparisonSubmission): number {
@@ -257,16 +262,22 @@ async function discoverReportComparisonCandidates(
   db: ReportComparisonDb,
   viewer: ReportComparisonViewer,
   focus: ReportComparisonFocus,
+  requireWaveRcEligibility = true,
+  requireStrictSummaryCompatibility = false,
 ): Promise<CandidateOutcome> {
   if (!await liveCeoGrantMatchesFocus(db, viewer, focus)) {
     return { kind: "unavailable" };
   }
   const focusSubmission = await loadFocus(db, focus);
-  if (!isApplicableFocus(focusSubmission, focus) || !ceoFocusMatches(viewer, focus)) {
+  if (!isApplicableFocus(focusSubmission, focus, requireWaveRcEligibility) || !ceoFocusMatches(viewer, focus)) {
     return { kind: "not-applicable" };
   }
   if (!await operatorCanRead(db, viewer, focus.campaignId)) {
     return { kind: "unavailable" };
+  }
+  const strictFocusSnapshot = requireStrictSummaryCompatibility ? snapshot(focusSubmission) : null;
+  if (strictFocusSnapshot && !isStrictSummarySnapshot(strictFocusSnapshot)) {
+    return { kind: "not-applicable" };
   }
   const identity = await identityIds(db, focusSubmission);
   const ids = identity.ids;
@@ -293,9 +304,18 @@ async function discoverReportComparisonCandidates(
   });
   const winners = new Map<string, ComparisonSubmission>();
   for (const row of [...rows].sort(compareNewest)) {
-    if (isEarlierSamePerson(row, focusSubmission, new Set(ids)) && !winners.has(row.campaignId)) {
-      winners.set(row.campaignId, row);
+    if (!isEarlierSamePerson(row, focusSubmission, new Set(ids)) || winners.has(row.campaignId)) continue;
+    if (strictFocusSnapshot) {
+      const earlierSnapshot = snapshot(row);
+      if (
+        !isStrictSummarySnapshot(earlierSnapshot)
+        || !isStrictSuFullSelfComparisonModel(buildReportComparisonModel({
+          focus: strictFocusSnapshot,
+          baseline: earlierSnapshot,
+        }))
+      ) continue;
     }
+    winners.set(row.campaignId, row);
   }
   const authorized: ComparisonSubmission[] = [];
   for (const row of winners.values()) {
@@ -342,6 +362,23 @@ export async function listReportComparisonCandidates(
   }
 }
 
+/**
+ * Summary Reporting owns rollout for this adapter. It skips only Wave RC's
+ * rollout predicates; all identity, chronology, liveness, and access checks
+ * remain in the shared discovery path.
+ */
+export async function listSummarySelfComparisonCandidates(
+  db: ReportComparisonDb,
+  viewer: Extract<ReportComparisonViewer, { kind: "operator" }>,
+  focus: ReportComparisonFocus,
+): Promise<CandidateOutcome> {
+  try {
+    return await discoverReportComparisonCandidates(db, viewer, focus, false, true);
+  } catch {
+    return { kind: "unavailable" };
+  }
+}
+
 function snapshot(submission: ComparisonSubmission): ComparisonSnapshot {
   const rawMeta = buildQuestionMetaByKey(submission.campaign.version.questions);
   const questionMetaByKey: Record<string, ComparisonQuestionMeta> = Object.create(null);
@@ -355,6 +392,22 @@ function snapshot(submission: ComparisonSubmission): ComparisonSnapshot {
   return { ...candidateFor(submission), result: submission.result, questionMetaByKey };
 }
 
+const SUMMARY_SELF_COMPARISON_QUESTION_KEYS = Array.from(
+  { length: 61 },
+  (_, index) => `Q${String(index + 1).padStart(2, "0")}`,
+);
+
+function isStrictSummarySnapshot(value: ComparisonSnapshot): boolean {
+  const sliderKeys = Object.entries(value.questionMetaByKey)
+    .filter(([, meta]) => meta.type === "SLIDER_LIKERT")
+    .map(([key]) => key);
+  return sliderKeys.length === SUMMARY_SELF_COMPARISON_QUESTION_KEYS.length
+    && SUMMARY_SELF_COMPARISON_QUESTION_KEYS.every((key) => {
+      const meta = value.questionMetaByKey[key];
+      return meta?.type === "SLIDER_LIKERT" && meta.min === 0 && meta.max === 10;
+    });
+}
+
 /** Rechecks authorization and every live eligibility fact atomically with the baseline read. */
 export async function loadReportComparison(
   db: ReportComparisonDb,
@@ -363,6 +416,16 @@ export async function loadReportComparison(
   baselineSubmissionId: string,
 ): Promise<ComparisonOutcome> {
   if (!isReportComparisonRolloutActive()) return { kind: "invalid" };
+  return loadReportComparisonWithPolicy(db, viewer, focus, baselineSubmissionId, true);
+}
+
+async function loadReportComparisonWithPolicy(
+  db: ReportComparisonDb,
+  viewer: ReportComparisonViewer,
+  focus: ReportComparisonFocus,
+  baselineSubmissionId: string,
+  requireWaveRcEligibility: boolean,
+): Promise<ComparisonOutcome> {
   const startedAt = Date.now();
   try {
     const outcome = await db.$transaction(async (tx) => {
@@ -373,7 +436,7 @@ export async function loadReportComparison(
         loadFocus(tx, focus),
         tx.assessmentSubmission.findFirst({ where: { id: baselineSubmissionId }, include: submissionInclude }),
       ]);
-      if (!isApplicableFocus(focusSubmission, focus) || !baseline || !ceoFocusMatches(viewer, focus)) return { kind: "invalid" } as const;
+      if (!isApplicableFocus(focusSubmission, focus, requireWaveRcEligibility) || !baseline || !ceoFocusMatches(viewer, focus)) return { kind: "invalid" } as const;
       if (viewer.kind === "operator") {
         const [focusAllowed, baselineAllowed] = await Promise.all([
           operatorCanRead(tx, viewer, focus.campaignId),
@@ -383,7 +446,12 @@ export async function loadReportComparison(
       }
       const ids = new Set((await identityIds(tx, focusSubmission)).ids);
       if (!isEarlierSamePerson(baseline, focusSubmission, ids)) return { kind: "invalid" } as const;
-      return { kind: "ok", model: buildReportComparisonModel({ focus: snapshot(focusSubmission), baseline: snapshot(baseline) }) } as const;
+      const focusSnapshot = snapshot(focusSubmission);
+      const baselineSnapshot = snapshot(baseline);
+      if (!requireWaveRcEligibility && (!isStrictSummarySnapshot(focusSnapshot) || !isStrictSummarySnapshot(baselineSnapshot))) {
+        return { kind: "invalid" } as const;
+      }
+      return { kind: "ok", model: buildReportComparisonModel({ focus: focusSnapshot, baseline: baselineSnapshot }) } as const;
     }, { isolationLevel: "Serializable" });
     if (outcome.kind === "ok") {
       emitReportComparisonMetric("comparison_ok", {
@@ -400,6 +468,16 @@ export async function loadReportComparison(
     emitReportComparisonMetric("comparison_invalid", { viewer: viewerMetric(viewer), reason: "error", latencyMs: Date.now() - startedAt });
     return { kind: "invalid" };
   }
+}
+
+/** Summary-owned counterpart to loadReportComparison; operator-only by design. */
+export async function loadSummarySelfComparison(
+  db: ReportComparisonDb,
+  viewer: Extract<ReportComparisonViewer, { kind: "operator" }>,
+  focus: ReportComparisonFocus,
+  earlierSubmissionId: string,
+): Promise<ComparisonOutcome> {
+  return loadReportComparisonWithPolicy(db, viewer, focus, earlierSubmissionId, false);
 }
 
 /** Bridge a Prisma client or transaction to the intentionally narrow service DB. */
