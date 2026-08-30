@@ -7,7 +7,7 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { SignOutButton } from "@/components/layout/sign-out-button";
 import {
     coachAccountNavItem,
-    getCoachPrimaryNavItems,
+    getCoachPrimaryNavGroups,
 } from "@/lib/coach-nav";
 import { isReferredResultsEnabled } from "@/lib/assessments/wave-83-flags";
 import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
@@ -22,7 +22,7 @@ export default async function PortalLayout({ children }: PortalLayoutProps) {
 
     const coachName = coach.firstName || session.user.name || "Coach";
     const referredResultsEnabled = isReferredResultsEnabled();
-    const primaryNavGroups = getCoachPrimaryNavItems({ referredResultsEnabled });
+    const primaryNavGroups = getCoachPrimaryNavGroups({ referredResultsEnabled });
     const AccountIcon = coachAccountNavItem.icon;
     const mobileResponsiveEnabled = isMobileResponsiveEnabled();
 

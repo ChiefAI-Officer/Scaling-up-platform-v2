@@ -67,7 +67,7 @@ const WORKSHOPS_NAV_GROUP: CoachNavGroup = {
   ],
 };
 
-export const coachPrimaryNavItems: CoachNavGroup[] = [
+const coachPrimaryNavGroups: CoachNavGroup[] = [
   DASHBOARD_NAV_GROUP,
   WORKSHOPS_NAV_GROUP,
   {
@@ -80,11 +80,11 @@ interface CoachPrimaryNavOptions {
   referredResultsEnabled: boolean;
 }
 
-export function getCoachPrimaryNavItems({
+export function getCoachPrimaryNavGroups({
   referredResultsEnabled,
 }: CoachPrimaryNavOptions): CoachNavGroup[] {
   if (!referredResultsEnabled) {
-    return coachPrimaryNavItems;
+    return coachPrimaryNavGroups;
   }
 
   return [

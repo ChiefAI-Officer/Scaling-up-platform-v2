@@ -1,10 +1,10 @@
 import {
   coachAccountNavItem,
-  getCoachPrimaryNavItems,
+  getCoachPrimaryNavGroups,
 } from "@/lib/coach-nav";
 
 function navShape(referredResultsEnabled: boolean) {
-  return getCoachPrimaryNavItems({ referredResultsEnabled }).map((group) => ({
+  return getCoachPrimaryNavGroups({ referredResultsEnabled }).map((group) => ({
     label: group.label,
     items: group.items.map(({ label, href }) => ({ label, href })),
   }));
@@ -65,7 +65,7 @@ describe("coach navigation config", () => {
 
   it("does not expose admin-only or unsupported coach links", () => {
     const hrefs = [
-      ...getCoachPrimaryNavItems({ referredResultsEnabled: true }).flatMap(
+      ...getCoachPrimaryNavGroups({ referredResultsEnabled: true }).flatMap(
         (group) => group.items.map((item) => item.href),
       ),
       coachAccountNavItem.href,

@@ -8,7 +8,7 @@ import { signOut } from "next-auth/react";
 import { Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isNavLinkActive } from "@/lib/nav-utils";
-import { getCoachPrimaryNavItems } from "@/lib/coach-nav";
+import { getCoachPrimaryNavGroups } from "@/lib/coach-nav";
 
 interface CoachMobileNavProps {
   coachName: string;
@@ -27,7 +27,7 @@ export function CoachMobileNav({
   const drawerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const pathname = usePathname();
-  const primaryNavGroups = getCoachPrimaryNavItems({
+  const primaryNavGroups = getCoachPrimaryNavGroups({
     referredResultsEnabled: referredResultsEnabled === true,
   });
 
