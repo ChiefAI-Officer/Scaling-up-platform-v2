@@ -387,6 +387,8 @@ export function LegacyClassicReport({
     ? result.perSection
     : [];
   const perDomain = Array.isArray(result.perDomain) ? result.perDomain : null;
+  const reportConfig = reportConfigFor(report.templateAlias);
+  const domainResults = reportConfig.domainResults;
 
   const title = assessmentName ?? report.assessmentName;
   // Show the coach's campaign label as a subtitle ONLY when it differs from the title.
@@ -427,7 +429,7 @@ export function LegacyClassicReport({
   // report — not a LOW/GOOD/TOP band here. report-config keys this off the alias.
   // The ScaleUp score ring/number still renders; only the band + tier message
   // are suppressed when showTier is false.
-  const showTier = reportConfigFor(report.templateAlias).showTier;
+  const showTier = reportConfig.showTier;
 
   // Per-question lookups.
   const pqByKey = new Map<string, PerQuestionResult>();
@@ -499,9 +501,14 @@ export function LegacyClassicReport({
         points += Number.isFinite(sc.ps.totalPoints) ? sc.ps.totalPoints : 0;
       }
     }
-    return { key: d.key, label: d.label || d.key, color, avg, pct, points };
+    const message =
+      domainResults?.showTierMessage === true && d.tier?.message
+        ? d.tier.message
+        : null;
+    return { key: d.key, label: d.label || d.key, color, avg, pct, points, message };
   });
   const hasDomainCards = domainCards.length > 0;
+  const hasDomainMessages = domainCards.some((domain) => domain.message !== null);
 
   // ── Recommendations grouped by section (only non-empty) ──────────────────
   // Wave U (spec 19u U-5/D6) — NON-SLIDER findings from the frozen
@@ -695,7 +702,7 @@ export function LegacyClassicReport({
           </div>
         </div>
         {/* small stats row */}
-        {reportConfigFor(report.templateAlias).showOverallMeta !== false && (
+        {reportConfig.showOverallMeta !== false && (
         <div className="su-report-stats">
           <div className="su-report-stat">
             <span className="su-report-stat-v">
@@ -720,35 +727,59 @@ export function LegacyClassicReport({
       {/* ── 2b. Per-decision cards (domain templates only) ──────────────── */}
       {hasDomainCards && (
         <section className="su-report-decisions" data-testid="report-decisions">
-          <div className="su-report-eyebrow">How you scored, by decision</div>
-          <h2 className="su-h2 su-report-sec-title">Your Four Decisions</h2>
-          <div className="su-report-card-grid">
-            {domainCards.map((d) => (
-              <div
-                className="su-report-decision-card"
-                key={d.key}
-                data-testid={`decision-card-${d.key}`}
-                style={{ borderLeftColor: d.color }}
-              >
-                <div className="su-report-decision-head">
-                  <span className="su-report-decision-name">{d.label}</span>
-                  <span
-                    className="su-report-decision-avg"
-                    style={{
-                      color: DOMAIN_TEXT_COLOR[d.key.toLowerCase()] ?? d.color,
-                    }}
-                  >
-                    {d.avg === null ? "—" : formatNumber(d.avg)}
-                  </span>
+          <div className="su-report-eyebrow">{domainResults?.eyebrow ?? "How you scored, by decision"}</div>
+          <h2 className="su-h2 su-report-sec-title">{domainResults?.title ?? "Your Four Decisions"}</h2>
+          <div className={hasDomainMessages ? "su-report-card-grid su-report-card-grid-with-messages" : "su-report-card-grid"}>
+            {domainCards.map((d) => {
+              const scoreContent = (
+                <>
+                  <div className="su-report-decision-head">
+                    <span className="su-report-decision-name">{d.label}</span>
+                    <span
+                      className="su-report-decision-avg"
+                      style={{
+                        color: DOMAIN_TEXT_COLOR[d.key.toLowerCase()] ?? d.color,
+                      }}
+                    >
+                      {d.avg === null ? "—" : formatNumber(d.avg)}
+                    </span>
+                  </div>
+                  <div className="su-report-decision-bar">
+                    <i style={{ width: `${d.pct}%`, backgroundColor: d.color }} />
+                  </div>
+                  <div className="su-report-decision-sub">
+                    {formatNumber(d.points)} points
+                  </div>
+                </>
+              );
+
+              return (
+                <div
+                  className={hasDomainMessages ? "su-report-decision-card su-report-decision-card-with-message" : "su-report-decision-card"}
+                  key={d.key}
+                  data-testid={`decision-card-${d.key}`}
+                  style={{ borderLeftColor: d.color }}
+                >
+                  {hasDomainMessages ? (
+                    <>
+                      <div className="su-report-decision-score">
+                        {scoreContent}
+                      </div>
+                      {d.message && (
+                        <p
+                          className="su-report-domain-tier-message"
+                          data-testid={`domain-tier-message-${d.key}`}
+                        >
+                          {d.message}
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    scoreContent
+                  )}
                 </div>
-                <div className="su-report-decision-bar">
-                  <i style={{ width: `${d.pct}%`, backgroundColor: d.color }} />
-                </div>
-                <div className="su-report-decision-sub">
-                  {formatNumber(d.points)} points
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
       )}

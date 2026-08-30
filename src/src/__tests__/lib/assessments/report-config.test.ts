@@ -31,7 +31,17 @@ describe("reportConfigFor", () => {
       showScoreTable: true,
       showTier: true,
       showCoachCta: false,
+      domainResults: {
+        eyebrow: "How you scored, by area",
+        title: "The Five Categories",
+        showTierMessage: true,
+      },
     });
+  });
+
+  it("locks domain-results presentation to five-dysfunctions only", () => {
+    expect(reportConfigFor("scaling-up-full").domainResults).toBeUndefined();
+    expect(reportConfigFor(undefined).domainResults).toBeUndefined();
   });
 
   it("every other scored report shows the coach CTA by default (#81) — only five-dysfunctions opts out", () => {

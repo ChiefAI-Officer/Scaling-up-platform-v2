@@ -386,6 +386,82 @@ function suFullReport(): RespondentReport {
   });
 }
 
+function fiveDysfunctionsReport(): RespondentReport {
+  const result: ScoreResult = {
+    perQuestion: [],
+    perSection: [
+      { stableKey: "S_TRUST", name: "Trust", totalPoints: 34, averagePoints: 4.25, achievedCount: 8, totalCount: 8 },
+      { stableKey: "S_CONFLICT", name: "Conflict", totalPoints: 28, averagePoints: 3.5, achievedCount: 8, totalCount: 8 },
+      { stableKey: "S_COMMITMENT", name: "Commitment", totalPoints: 21, averagePoints: 3, achievedCount: 7, totalCount: 7 },
+      { stableKey: "S_ACCOUNTABILITY", name: "Accountability", totalPoints: 28, averagePoints: 4, achievedCount: 7, totalCount: 7 },
+      { stableKey: "S_RESULTS", name: "Results", totalPoints: 28, averagePoints: 3.5, achievedCount: 8, totalCount: 8 },
+    ],
+    perDomain: [
+      {
+        key: "trust",
+        label: "Trust",
+        averagePoints: 4.25,
+        answeredSectionCount: 1,
+        totalSectionCount: 1,
+        tier: { label: "High", message: "Your team has created an environment where vulnerability and openness are the norm." },
+      },
+      {
+        key: "conflict",
+        label: "Conflict",
+        averagePoints: 3.5,
+        answeredSectionCount: 1,
+        totalSectionCount: 1,
+        tier: { label: "Medium", message: "Your team may need to learn to engage in more unfiltered discussion around important topics." },
+      },
+      {
+        key: "commitment",
+        label: "Commitment",
+        averagePoints: 3,
+        answeredSectionCount: 1,
+        totalSectionCount: 1,
+        tier: { label: "Low", message: "Your team is not able to buy-in to clear decisions, leaving room for ambiguity and second-guessing." },
+      },
+      {
+        key: "accountability",
+        label: "Accountability",
+        averagePoints: 4,
+        answeredSectionCount: 1,
+        totalSectionCount: 1,
+        tier: { label: "High", message: "Your team does not hesitate to confront one another about performance and behavioral concerns." },
+      },
+      {
+        key: "results",
+        label: "Results",
+        averagePoints: 3.5,
+        answeredSectionCount: 1,
+        totalSectionCount: 1,
+        tier: { label: "Medium", message: "Members of your team may be placing too much importance on individual or departmental recognition and ego, rather than focusing on the collective goals of the team." },
+      },
+    ],
+    overallTotal: 139,
+    overallAverage: 3.66,
+    countAchieved: 38,
+    tier: { label: "Submitted", message: "Thank you for completing the Five Dysfunctions of a Team Assessment." },
+    tierMetricValue: 3.66,
+    unansweredKeys: [],
+  };
+  return baseReport({
+    templateAlias: "five-dysfunctions",
+    assessmentName: "The Five Dysfunctions of a Team — Team Assessment",
+    result,
+    sections: result.perSection.map((section) => ({
+      stableKey: section.stableKey,
+      name: section.name,
+      domain: section.name.toLowerCase(),
+    })),
+    scoringConfig: {
+      tierMetric: "overallAvg",
+      passThreshold: 0,
+      tiers: [{ minMetric: 1, label: "Submitted", message: "" }],
+    },
+  });
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // Cover
 // ════════════════════════════════════════════════════════════════════════════
@@ -523,6 +599,63 @@ describe("BrandedReport — overall (SU Full ScaleUp)", () => {
     const overall = screen.getByTestId("report-overall");
     expect(overall.textContent).toContain("72 / 100");
     expect(overall.textContent).toContain("Scaling");
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Domain-result cards (Five Dysfunctions)
+// ════════════════════════════════════════════════════════════════════════════
+
+describe("BrandedReport — Five Dysfunctions domain-result cards", () => {
+  it("renders template labels and the five frozen per-domain messages", () => {
+    render(<BrandedReport report={fiveDysfunctionsReport()} />);
+
+    expect(screen.getAllByTestId("report-decisions")).toHaveLength(1);
+    const decisions = screen.getByTestId("report-decisions");
+    expect(within(decisions).getByText("How you scored, by area")).toBeInTheDocument();
+    expect(within(decisions).getByRole("heading", { name: "The Five Categories" })).toBeInTheDocument();
+    expect(within(decisions).queryByRole("heading", { name: "Your Four Decisions" })).not.toBeInTheDocument();
+    expect(within(decisions).getAllByTestId(/^decision-card-/)).toHaveLength(5);
+    expect(within(decisions).getAllByTestId(/^domain-tier-message-/)).toHaveLength(5);
+    expect(screen.getByTestId("domain-tier-message-trust")).toHaveTextContent(
+      "Your team has created an environment where vulnerability and openness are the norm.",
+    );
+    expect(screen.getByTestId("domain-tier-message-conflict")).toHaveTextContent(
+      "Your team may need to learn to engage in more unfiltered discussion around important topics.",
+    );
+    expect(screen.getByTestId("domain-tier-message-commitment")).toHaveTextContent(
+      "Your team is not able to buy-in to clear decisions, leaving room for ambiguity and second-guessing.",
+    );
+    expect(screen.getByTestId("domain-tier-message-accountability")).toHaveTextContent(
+      "Your team does not hesitate to confront one another about performance and behavioral concerns.",
+    );
+    expect(screen.getByTestId("domain-tier-message-results")).toHaveTextContent(
+      "Members of your team may be placing too much importance on individual or departmental recognition and ego, rather than focusing on the collective goals of the team.",
+    );
+  });
+
+  it("omits a card message when the frozen domain tier is absent", () => {
+    const report = fiveDysfunctionsReport();
+    report.result = {
+      ...report.result,
+      perDomain: report.result.perDomain?.map((domain) =>
+        domain.key === "trust" ? { ...domain, tier: null } : domain,
+      ),
+    };
+    render(<BrandedReport report={report} />);
+
+    expect(screen.getByTestId("decision-card-trust")).toBeInTheDocument();
+    expect(screen.queryByTestId("domain-tier-message-trust")).not.toBeInTheDocument();
+    expect(screen.getAllByTestId(/^domain-tier-message-/)).toHaveLength(4);
+  });
+
+  it("keeps Scaling Up Full's old section labels and no-message markup", () => {
+    render(<BrandedReport report={suFullReport()} />);
+
+    const decisions = screen.getByTestId("report-decisions");
+    expect(within(decisions).getByText("How you scored, by decision")).toBeInTheDocument();
+    expect(within(decisions).getByRole("heading", { name: "Your Four Decisions" })).toBeInTheDocument();
+    expect(within(decisions).queryByTestId(/^domain-tier-message-/)).not.toBeInTheDocument();
   });
 });
 
