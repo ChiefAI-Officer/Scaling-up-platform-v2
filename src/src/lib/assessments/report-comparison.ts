@@ -262,6 +262,7 @@ async function discoverReportComparisonCandidates(
   viewer: ReportComparisonViewer,
   focus: ReportComparisonFocus,
   requireWaveRcEligibility = true,
+  requireStrictSummaryCompatibility = false,
 ): Promise<CandidateOutcome> {
   if (!await liveCeoGrantMatchesFocus(db, viewer, focus)) {
     return { kind: "unavailable" };
@@ -272,6 +273,9 @@ async function discoverReportComparisonCandidates(
   }
   if (!await operatorCanRead(db, viewer, focus.campaignId)) {
     return { kind: "unavailable" };
+  }
+  if (requireStrictSummaryCompatibility && !isStrictSummarySnapshot(snapshot(focusSubmission))) {
+    return { kind: "not-applicable" };
   }
   const identity = await identityIds(db, focusSubmission);
   const ids = identity.ids;
@@ -298,7 +302,11 @@ async function discoverReportComparisonCandidates(
   });
   const winners = new Map<string, ComparisonSubmission>();
   for (const row of [...rows].sort(compareNewest)) {
-    if (isEarlierSamePerson(row, focusSubmission, new Set(ids)) && !winners.has(row.campaignId)) {
+    if (
+      isEarlierSamePerson(row, focusSubmission, new Set(ids))
+      && (!requireStrictSummaryCompatibility || isStrictSummarySnapshot(snapshot(row)))
+      && !winners.has(row.campaignId)
+    ) {
       winners.set(row.campaignId, row);
     }
   }
@@ -358,7 +366,7 @@ export async function listSummarySelfComparisonCandidates(
   focus: ReportComparisonFocus,
 ): Promise<CandidateOutcome> {
   try {
-    return await discoverReportComparisonCandidates(db, viewer, focus, false);
+    return await discoverReportComparisonCandidates(db, viewer, focus, false, true);
   } catch {
     return { kind: "unavailable" };
   }

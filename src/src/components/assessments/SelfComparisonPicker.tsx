@@ -41,7 +41,7 @@ export function SelfComparisonPicker({ open, onClose, campaignId, focusCandidate
       setState("loading");
       setEarlierId("");
       try {
-        const response = await fetch(`/api/assessment-campaigns/${encodeURIComponent(campaignId)}/summary-reports/self-comparison-candidates?focus=${encodeURIComponent(focusId)}`, { signal: controller.signal });
+        const response = await fetch(`/api/assessment-campaigns/${encodeURIComponent(campaignId)}/summary-reports/self-comparison-candidates?focusSubmissionId=${encodeURIComponent(focusId)}`, { signal: controller.signal });
         if (!response.ok) throw new Error("candidate request failed");
         const body = await response.json() as { candidates?: EarlierCandidate[] };
         if (!Array.isArray(body.candidates)) throw new Error("invalid candidate response");
@@ -59,6 +59,8 @@ export function SelfComparisonPicker({ open, onClose, campaignId, focusCandidate
     const href = `/assessments/${encodeURIComponent(campaignId)}/self-comparison?focus=${encodeURIComponent(focusId)}&earlier=${encodeURIComponent(earlierId)}`;
     window.open(href, "_blank", "noopener,noreferrer");
   };
+  const selectedFocus = focusCandidates.find((candidate) => candidate.submissionId === focusId);
+  const selectedEarlier = candidates.find((candidate) => candidate.submissionId === earlierId);
 
   return <Dialog open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
     <DialogContent>
@@ -81,6 +83,10 @@ export function SelfComparisonPicker({ open, onClose, campaignId, focusCandidate
         </label>
         {state === "ready" && candidates.length === 0 ? <p className="text-sm text-muted-foreground">No compatible earlier personal report is available.</p> : null}
         {state === "error" ? <p role="alert" className="text-sm text-destructive">Earlier reports are temporarily unavailable.</p> : null}
+        {selectedFocus && selectedEarlier ? <div className="rounded-md border bg-muted/40 p-3 text-sm">
+          <p className="font-medium">{selectedFocus.label}: Focus {formatEventDateUTC(selectedFocus.submittedAt)} vs Earlier {selectedEarlier.campaignLabel ?? "assessment"} {formatEventDateUTC(selectedEarlier.submittedAt)}</p>
+          <p className="mt-1 text-muted-foreground">This shows the CEO&apos;s own trajectory, not the company average.</p>
+        </div> : null}
       </div>
       <DialogFooter><Button variant="outline" onClick={onClose}>Cancel</Button><Button onClick={openReport} disabled={!focusId || !earlierId}>Open Self Comparison</Button></DialogFooter>
     </DialogContent>

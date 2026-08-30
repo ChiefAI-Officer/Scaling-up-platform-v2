@@ -34,12 +34,12 @@ interface SelfComparisonAccessDb {
 export type SelfComparisonFocus = ReportComparisonFocus & Readonly<{ submittedAt: Date }>;
 export type SelfComparisonCandidateAccessOutcome =
   | Readonly<{ kind: "ok"; focus: SelfComparisonFocus; candidates: readonly ReportComparisonCandidate[]; bounded: boolean }>
-  | Readonly<{ kind: "not-found" }>;
+  | Readonly<{ kind: "not-found" | "unavailable" }>;
 export type SelfComparisonLoadAccessOutcome =
   | Readonly<{ kind: "ok"; focus: SelfComparisonFocus; comparison: ReportComparisonModel }>
   | Readonly<{ kind: "not-found" }>;
 
-async function authorizeFocus(
+export async function authorizeSelfComparisonFocus(
   rawDb: unknown,
   actor: ApiActor,
   input: { destinationCampaignId: string; focusSubmissionId: string },
@@ -95,18 +95,14 @@ export async function listAuthorizedSelfComparisonCandidates(
   actor: ApiActor,
   input: { destinationCampaignId: string; focusSubmissionId: string },
 ): Promise<SelfComparisonCandidateAccessOutcome> {
-  const focus = await authorizeFocus(rawDb, actor, input);
+  const focus = await authorizeSelfComparisonFocus(rawDb, actor, input);
   if (!focus) return { kind: "not-found" };
   const viewer = { kind: "operator" as const, actor };
   const comparisonDb = asReportComparisonDb(rawDb);
   const discovered = await listSummarySelfComparisonCandidates(comparisonDb, viewer, focus);
+  if (discovered.kind === "unavailable") return { kind: "unavailable" };
   if (discovered.kind !== "ok") return { kind: "not-found" };
-  const candidates: ReportComparisonCandidate[] = [];
-  for (const candidate of discovered.candidates) {
-    const loaded = await loadSummarySelfComparison(comparisonDb, viewer, focus, candidate.submissionId);
-    if (loaded.kind === "ok" && isSuFullSelfComparisonShapeCompatible(loaded.model)) candidates.push(candidate);
-  }
-  return { kind: "ok", focus, candidates, bounded: discovered.bounded };
+  return { kind: "ok", focus, candidates: discovered.candidates, bounded: discovered.bounded };
 }
 
 export async function loadAuthorizedSelfComparison(
@@ -114,7 +110,7 @@ export async function loadAuthorizedSelfComparison(
   actor: ApiActor,
   input: { destinationCampaignId: string; focusSubmissionId: string; earlierSubmissionId: string },
 ): Promise<SelfComparisonLoadAccessOutcome> {
-  const focus = await authorizeFocus(rawDb, actor, input);
+  const focus = await authorizeSelfComparisonFocus(rawDb, actor, input);
   if (!focus) return { kind: "not-found" };
   const loaded = await loadSummarySelfComparison(
     asReportComparisonDb(rawDb),

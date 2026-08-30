@@ -73,6 +73,14 @@ describe("buildSuFullSelfComparisonModel", () => {
     ["an unmatched question", (comparison: ReportComparisonModel) => { comparison.questions.Q01 = { ...comparison.questions.Q01, status: "unmatched" }; }],
     ["a mismatched Focus value", (comparison: ReportComparisonModel) => { comparison.questions.Q01 = { ...comparison.questions.Q01, current: 9 }; }],
     ["a missing canonical section", (comparison: ReportComparisonModel) => { delete comparison.sections.S_CASH; }],
+    ["an Earlier report missing a canonical section value", (comparison: ReportComparisonModel) => {
+      comparison.sections.S_CASH = {
+        current: 5,
+        previous: null,
+        delta: null,
+        status: "unmatched",
+      };
+    }],
     ["a non-finite Earlier value", (comparison: ReportComparisonModel) => { comparison.questions.Q02 = { ...comparison.questions.Q02, previous: Number.NaN }; }],
   ])("fails closed for %s", (_case, mutate) => {
     const { focus, comparison } = fixture();

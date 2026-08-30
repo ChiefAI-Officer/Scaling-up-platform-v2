@@ -76,10 +76,11 @@ describe("CEO self-report middleware policy", () => {
     expect(mockAuthOptions?.callbacks.authorized({ token: null, req: request("/assessments/campaign-1/respondents/respondent-1/report") })).toBe(false);
   });
 
-  it("sets no-store and no-referrer headers on the shell, exchange, and individual report responses", () => {
+  it("sets no-store and no-referrer headers on every PII report response", () => {
     const shell = runMiddleware("/assessments/self-report");
     const exchange = runMiddleware("/assessments/self-report/exchange");
     const individual = runMiddleware("/assessments/campaign-1/respondents/respondent-1/report");
+    const selfComparison = runMiddleware("/assessments/campaign-1/self-comparison", { sub: "user-1" });
 
     expect(shell.headers.get("Cache-Control")).toBe("no-store, private");
     expect(shell.headers.get("Referrer-Policy")).toBe("no-referrer");
@@ -87,6 +88,8 @@ describe("CEO self-report middleware policy", () => {
     expect(exchange.headers.get("Referrer-Policy")).toBe("no-referrer");
     expect(individual.headers.get("Cache-Control")).toBe("no-store, private");
     expect(individual.headers.get("Referrer-Policy")).toBe("no-referrer");
+    expect(selfComparison.headers.get("Cache-Control")).toBe("no-store, private");
+    expect(selfComparison.headers.get("Referrer-Policy")).toBe("no-referrer");
   });
 
   it("keeps the established no-store group-report behavior", () => {

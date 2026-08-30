@@ -19,7 +19,13 @@ test("selects Focus then Earlier and opens the one-person report route", async (
   />);
 
   await screen.findByRole("option", { name: /Annual 2025.*Version 5.*Imported/ });
+  expect(global.fetch).toHaveBeenCalledWith(
+    "/api/assessment-campaigns/campaign-2026/summary-reports/self-comparison-candidates?focusSubmissionId=focus-1",
+    expect.objectContaining({ signal: expect.any(AbortSignal) }),
+  );
   fireEvent.change(screen.getByLabelText("Earlier report"), { target: { value: "earlier-1" } });
+  expect(screen.getByText(/Ari Founder.*May 1, 2026.*Annual 2025.*May 1, 2025/i)).toBeVisible();
+  expect(screen.getByText(/CEO.s own trajectory, not the company average/i)).toBeVisible();
   fireEvent.click(screen.getByRole("button", { name: "Open Self Comparison" }));
 
   await waitFor(() => expect(open).toHaveBeenCalledWith(

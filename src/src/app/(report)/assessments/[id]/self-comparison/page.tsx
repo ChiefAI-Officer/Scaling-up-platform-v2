@@ -5,7 +5,10 @@ import { viewRespondentReport, defaultReportGateDeps } from "@/lib/assessments/r
 import { resolvePeerReportEnhancementsForCampaign } from "@/lib/assessments/peer-report-resolver";
 import { buildSuFullLandscapeReportModel } from "@/lib/assessments/su-full-landscape-report";
 import { buildSuFullSelfComparisonModel } from "@/lib/assessments/su-full-self-comparison";
-import { loadAuthorizedSelfComparison } from "@/lib/assessments/summary-reports/self-comparison-access";
+import {
+  authorizeSelfComparisonFocus,
+  loadAuthorizedSelfComparison,
+} from "@/lib/assessments/summary-reports/self-comparison-access";
 import { SuFullLandscapeReport } from "@/components/assessments/su-full-landscape/SuFullLandscapeReport";
 import { PrintReportButton } from "@/components/assessments/PrintReportButton";
 import { logAuditStrict } from "@/lib/audit";
@@ -22,18 +25,23 @@ export default async function SelfComparisonPage({ params, searchParams }: {
   const actor = await getApiActor();
   if (!actor || actor.role !== "COACH" || !focus || !earlier) notFound();
 
+  const authorizedFocus = await authorizeSelfComparisonFocus(db, actor, {
+    destinationCampaignId: campaignId,
+    focusSubmissionId: focus,
+  });
+  if (!authorizedFocus) notFound();
+
+  const gated = await viewRespondentReport(defaultReportGateDeps(), {
+    campaignId,
+    respondentId: authorizedFocus.respondentId,
+  });
+  if (gated.outcome.status !== "ok" || gated.outcome.report.provenance.submissionId !== authorizedFocus.submissionId) notFound();
   const access = await loadAuthorizedSelfComparison(db, actor, {
     destinationCampaignId: campaignId,
     focusSubmissionId: focus,
     earlierSubmissionId: earlier,
   });
   if (access.kind !== "ok") notFound();
-
-  const gated = await viewRespondentReport(defaultReportGateDeps(), {
-    campaignId,
-    respondentId: access.focus.respondentId,
-  });
-  if (gated.outcome.status !== "ok" || gated.outcome.report.provenance.submissionId !== access.focus.submissionId) notFound();
   const { report, reportStylesAvailable } = gated.outcome;
   const enhanced = await resolvePeerReportEnhancementsForCampaign({ db, report, campaignId, reportStylesAvailable });
   const presentation = enhanced.report.suFullPeerPresentation;

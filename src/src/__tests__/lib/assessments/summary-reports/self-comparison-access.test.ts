@@ -38,17 +38,22 @@ beforeEach(() => {
 
 afterEach(() => delete process.env.SUMMARY_REPORTING_ENABLED);
 
-test("authorizes the Coach's designated CEO Focus and filters incompatible Earlier reports", async () => {
+test("authorizes the Coach's designated CEO Focus without reloading discovery candidates", async () => {
   jest.mocked(listSummarySelfComparisonCandidates).mockResolvedValue({ kind: "ok", candidates: [
     { submissionId: "earlier-good", campaignId: "c1", campaignLabel: "Earlier", submittedAt: new Date(), versionId: "v1", versionNumber: 1, isImported: false },
-    { submissionId: "earlier-bad", campaignId: "c2", campaignLabel: "Bad", submittedAt: new Date(), versionId: "v2", versionNumber: 2, isImported: false },
   ], bounded: false });
-  jest.mocked(loadSummarySelfComparison)
-    .mockResolvedValueOnce({ kind: "ok", model: compatibleModel() })
-    .mockResolvedValueOnce({ kind: "invalid" });
 
   await expect(listAuthorizedSelfComparisonCandidates(db(), actor, input)).resolves.toMatchObject({
     kind: "ok", focus: { respondentId: "person-1" }, candidates: [{ submissionId: "earlier-good" }],
+  });
+  expect(loadSummarySelfComparison).not.toHaveBeenCalled();
+});
+
+test("preserves candidate-service unavailability for an enumeration-safe 503", async () => {
+  jest.mocked(listSummarySelfComparisonCandidates).mockResolvedValue({ kind: "unavailable" });
+
+  await expect(listAuthorizedSelfComparisonCandidates(db(), actor, input)).resolves.toEqual({
+    kind: "unavailable",
   });
 });
 

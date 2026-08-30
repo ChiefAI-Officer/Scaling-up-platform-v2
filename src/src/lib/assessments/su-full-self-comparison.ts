@@ -86,6 +86,10 @@ function deepFreeze<T>(value: T, seen = new WeakSet<object>()): T {
 export function isSuFullSelfComparisonShapeCompatible(comparison: ReportComparisonModel): boolean {
   return exactKeys(Object.keys(comparison.questions), QUESTION_KEYS)
     && exactKeys(Object.keys(comparison.sections), SECTION_KEYS)
+    && SECTION_KEYS.every((key) => {
+      const row = comparison.sections[key];
+      return Number.isFinite(row?.current) && Number.isFinite(row?.previous);
+    })
     && QUESTION_KEYS.every((key) => {
       const row = comparison.questions[key];
       return row?.status === "comparable"
