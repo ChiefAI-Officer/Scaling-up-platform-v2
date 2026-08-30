@@ -34,7 +34,8 @@ interface SelfComparisonAccessDb {
 export type SelfComparisonFocus = ReportComparisonFocus & Readonly<{ submittedAt: Date }>;
 export type SelfComparisonCandidateAccessOutcome =
   | Readonly<{ kind: "ok"; focus: SelfComparisonFocus; candidates: readonly ReportComparisonCandidate[]; bounded: boolean }>
-  | Readonly<{ kind: "not-found" | "unavailable" }>;
+  | Readonly<{ kind: "not-found" }>
+  | Readonly<{ kind: "unavailable" }>;
 export type SelfComparisonLoadAccessOutcome =
   | Readonly<{ kind: "ok"; focus: SelfComparisonFocus; comparison: ReportComparisonModel }>
   | Readonly<{ kind: "not-found" }>;
