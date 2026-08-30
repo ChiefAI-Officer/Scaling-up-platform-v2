@@ -333,11 +333,11 @@ git commit -m "feat: confirm referred result removal in coach UI"
 - Consumes: final verified behavior and exact test/build counts from Tasks 1–4.
 - Produces: same-PR source-of-truth receipt and review-ready branch.
 
-- [ ] **Step 1: Update source of truth without launch overclaims**
+- [x] **Step 1: Update source of truth without launch overclaims**
 
 Prepend a `2026-08-30` changelog entry with slug `referred-results-coach-removal-implemented`. Update the `CLAUDE.md` `LAST_UPDATED_ISO`/`LAST_UPDATED_SLUG` anchor and short current-status prose. Add the DELETE route to the API table. State explicitly: locally implemented and verified; not merged, deployed, activated, or Production-tested; no environment/flag/Production-data mutation.
 
-- [ ] **Step 2: Run source-of-truth and migration gates**
+- [x] **Step 2: Run source-of-truth and migration gates**
 
 Run:
 
@@ -349,19 +349,19 @@ git diff --check
 
 Expected: all exit 0.
 
-- [ ] **Step 3: Run changed-file ESLint**
+- [x] **Step 3: Run changed-file ESLint**
 
 Run `npx eslint` with every changed `.ts` and `.tsx` path reported by `git diff --name-only origin/main`.
 
 Expected: exit 0 with no diagnostics.
 
-- [ ] **Step 4: Run the Production-equivalent build**
+- [x] **Step 4: Run the Production-equivalent build**
 
 Run: `CI=true npm run build`
 
 Expected: exit 0 after Prisma generation, migration safety, TypeScript, and Turbopack static generation.
 
-- [ ] **Step 5: Commit documentation and verification receipt**
+- [x] **Step 5: Commit documentation and verification receipt**
 
 ```bash
 git add CLAUDE.md plans/CHANGELOG.md docs/superpowers/plans/2026-08-30-referred-results-coach-removal.md

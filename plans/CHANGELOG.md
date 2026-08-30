@@ -34,6 +34,17 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="referred-results-coach-removal-implemented"></a>
+### 2026-08-30 — Referred Results Coach removal implemented <!-- ENTRY_ISO:2026-08-30 ENTRY_SLUG:referred-results-coach-removal-implemented -->
+
+**Status: IMPLEMENTED + LOCALLY VERIFIED; NOT MERGED, DEPLOYED, ACTIVATED, OR PRODUCTION-TESTED.** An eligible referring Coach can now confirm removal of a garbage public submission from their own Public Assessments collection. Desktop and mobile controls share one accessible per-row mutation state, preserve the row with an inline error on failure, and reload authoritative pagination after success, including returning from an emptied later page.
+
+**Contract and security boundary.** Removal is a purpose-specific `AssessmentSubmission.referredResultsDeletedAt` soft-delete, never a hard delete and never a generic submission deletion. Authorization derives only from the frozen `referringCoachId`, requires a currently active/unexpired Coach, and returns enumeration-safe `404` responses for missing, foreign, non-Public, deleted-campaign, or already-removed rows. The strict fail-closed mutation limiter runs before the write; the conditional tombstone and PII-free audit row commit in one transaction. Every Coach list, count, search, filter option, CSV export, and report path excludes removed rows, while ADMIN/STAFF public-campaign list and report oversight deliberately retain them. Coaches still cannot edit, reassign, restore, manage the source campaign, or delete the underlying submission.
+
+**Verification and operating boundary.** TDD covered the additive migration, atomic mutation/audit rollback, route authorization/rate limiting, all Coach read paths, privileged oversight, and desktop/mobile confirmation behavior. The focused feature matrix passed **9/9 suites and 107/107 tests**; the final feature-plus-source-of-truth rerun passed **10/10 suites and 111/111 tests**. Changed-file ESLint and diff hygiene emitted no diagnostics, migration safety approved all **51 migrations**, and the exact `CI=true npm run build` passed TypeScript and generated **95/95 pages** after applying the additive migration only to the documented local development sandbox. Actual-component visual review at 1440×900 and 390×844 confirmed a secondary destructive action beside **View report**, readable responsive cards, and no horizontal overflow; the temporary harness was removed. No saved environment setting or feature flag was added or changed, and no Production assessment, campaign, submission, audit, or customer record was read or mutated. Review, hosted-check, and PR receipts follow before merge.
+
+---
+
 <a id="coach-portal-navigation-production-release"></a>
 ### 2026-08-30 — Coach portal navigation production release <!-- ENTRY_ISO:2026-08-30 ENTRY_SLUG:coach-portal-navigation-production-release -->
 
