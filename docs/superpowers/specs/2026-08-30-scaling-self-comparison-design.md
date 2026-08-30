@@ -140,7 +140,7 @@ The Self Comparison projection composes the existing approved Focus landscape mo
 - Appendix B: named Focus/Earlier four-decision table for People, Strategy, Execution, and Cash; no You column.
 - Appendix C: Focus, Earlier, and their arithmetic average for `Q01–Q45` and `Q56–Q61`, grouped over four pages; `Q46–Q55` are deliberately omitted from Appendix C while remaining present in the main body.
 
-No visible label, table header, legend, accessible name, or test identifier uses `Team` or `Team avg` in Self Comparison output.
+No comparison-series label, source-role label, table header, legend, accessible name, or test identifier uses `Team` or `Team avg` in Self Comparison output. Legitimate instrument content such as the `Leadership Team` section and Focus recommendation prose remains unchanged.
 
 The ordinary approved Scaling Up Full report remains byte-for-byte on its existing branch when no Self Comparison model is supplied.
 
