@@ -6,6 +6,17 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="coach-portal-navigation-production-release"></a>
+### 2026-08-30 — Coach portal navigation production release <!-- ENTRY_ISO:2026-08-30 ENTRY_SLUG:coach-portal-navigation-production-release -->
+
+**Status: PRODUCTION RELEASE AUTHORIZED; PR #396 READY TO MERGE.** Jeff's first prioritized Phase 1 item now gives the Coach portal one consistent navigation hierarchy on desktop and mobile: Dashboard remains ungrouped, Workshops contains My Workshops / Registrations / Request Workshop, and Assessments contains My Campaigns / Public Assessments / Members. The former Referred Results label is now Public Assessments while retaining its existing `/portal/assessments/referred-results` route. Settings and the profile footer remain in their existing pinned regions.
+
+**Flag and accessibility boundary.** The grouped model intentionally applies in both existing Referred Results flag states. With the flag off, the legacy Assessments destination sits under the Assessments heading and My Campaigns / Public Assessments remain absent. No route, capability flag, environment setting, schema, migration, assessment, campaign, response, or customer record changes. Desktop and mobile expose the visible section labels as non-interactive, programmatically named groups.
+
+**Verification.** The three focused navigation suites passed **13/13 tests**; changed-file ESLint and diff hygiene passed. The fresh release run passed **792/792 suites, 9,866/9,866 tests, and 16/16 snapshots** after one load-sensitive focus timeout passed **27/27** in isolation and the complete rerun passed cleanly. The final Production-equivalent `CI=true npm run build` checked all **50 migrations**, passed TypeScript, and generated **95/95 pages**. Authenticated local review at 1440×900 covered both existing flag states; the responsive shell was checked at 390×844 and the mobile grouped contract is covered by the real component suite. Two independent standards/spec review loops finished with no actionable findings. PR #396 passed Build, Migration Safety Gate, Assessment Email Lease (PostgreSQL), Vercel, and Vercel Preview Comments before production authorization.
+
+---
+
 <a id="summary-reporting-production-canary-verified"></a>
 ### 2026-08-27 — Summary Reporting production canary verified <!-- ENTRY_ISO:2026-08-27 ENTRY_SLUG:summary-reporting-production-canary-verified -->
 
