@@ -29,6 +29,7 @@
 - Modify: `src/src/lib/assessments/marketing-cta.ts`
 - Modify: `src/src/__tests__/lib/assessments/report-config.test.ts`
 - Modify: `src/src/__tests__/lib/assessments/marketing-cta.test.ts`
+- Create: `src/src/__tests__/lib/assessments/public-assessment-destinations.test.ts`
 - Modify: `src/src/__tests__/assessments/report-email.test.ts`
 - Modify: `src/src/__tests__/components/assessments/branded-report.test.tsx`
 - Modify: `src/src/__tests__/components/public-quiz-results.test.tsx`

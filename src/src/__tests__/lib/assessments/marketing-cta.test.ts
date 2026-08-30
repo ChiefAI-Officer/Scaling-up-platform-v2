@@ -4,9 +4,7 @@ import {
   getMarketingCtaPublishIssues,
   mergeMarketingCta,
 } from "@/lib/assessments/marketing-cta";
-
-const SCALING_UP_QUICK_PUBLIC_URL =
-  "https://scaling-up-platform-v2.vercel.app/quiz/scaling_up_quick_pub_260610041810";
+import { SCALING_UP_QUICK_PUBLIC_CAMPAIGN } from "@/lib/assessments/public-assessment-destinations";
 
 describe("versioned marketing CTA content", () => {
   it("builds the approved Full Marketing snapshot", () => {
@@ -31,7 +29,7 @@ describe("versioned marketing CTA content", () => {
           id: "full-assessment-button",
           target: {
             kind: "url",
-            href: SCALING_UP_QUICK_PUBLIC_URL,
+            href: SCALING_UP_QUICK_PUBLIC_CAMPAIGN.href,
           },
         }),
         expect.objectContaining({

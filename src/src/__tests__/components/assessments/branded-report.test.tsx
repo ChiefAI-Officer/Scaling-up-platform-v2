@@ -20,6 +20,7 @@ import {
 } from "@/__tests__/fixtures/su-full-peer";
 import { buildSuFullPeerPresentationResult } from "@/lib/assessments/su-full-peer-presentation";
 import { loadSafeReportHtml } from "@/lib/assessments/report-html";
+import { SCALING_UP_QUICK_PUBLIC_CAMPAIGN } from "@/lib/assessments/public-assessment-destinations";
 
 // ── Fixture builders ───────────────────────────────────────────────────────
 
@@ -141,7 +142,7 @@ describe("BrandedReport — respondent identity and next steps", () => {
       screen.getByRole("link", { name: "Take the 32-question assessment" }),
     ).toHaveAttribute(
       "href",
-      "https://scaling-up-platform-v2.vercel.app/quiz/scaling_up_quick_pub_260610041810",
+      SCALING_UP_QUICK_PUBLIC_CAMPAIGN.href,
     );
     expect(
       screen.getByRole("link", { name: "Request a complimentary follow-up" }),

@@ -13,6 +13,7 @@ import React from "react";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import type { ScoreResult } from "@/lib/assessments/scoring";
 import { createMarketingCtaPreset } from "@/lib/assessments/marketing-cta";
+import { SCALING_UP_QUICK_PUBLIC_CAMPAIGN } from "@/lib/assessments/public-assessment-destinations";
 
 // ── crypto.randomUUID stub (jsdom ships without it) ──────────────────────
 Object.defineProperty(globalThis, "crypto", {
@@ -398,7 +399,7 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
       screen.getByRole("link", { name: "Take the 32-question assessment" }),
     ).toHaveAttribute(
       "href",
-      "https://scaling-up-platform-v2.vercel.app/quiz/scaling_up_quick_pub_260610041810",
+      SCALING_UP_QUICK_PUBLIC_CAMPAIGN.href,
     );
     expect(
       screen.getByRole("link", { name: "Request a complimentary follow-up" }),
