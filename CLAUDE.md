@@ -20,7 +20,7 @@ the full workshop lifecycle from request through post-event follow-up.
 | **Integrated main history** | ESPERTO cosmetic parity (#378), Edition 6 content (#374), and Coach drawer fix (#370) remain launched. Receipts: `plans/CHANGELOG.md`. |
 | **Last Updated** | <!-- LAST_UPDATED_ISO:2026-08-30 LAST_UPDATED_SLUG:referred-results-coach-removal-implemented --> August 30 — **Coach-side Public Assessments removal implemented and locally verified; PR and deployment pending.** |
 | **Jeff #48 validation** | Pre-launch validation passed 15/15 focused suites and 224/224 tests plus the production-context real-component harness/editor Preview coverage. Live production verification was read-only: the invited QSP route returned `200` with `qspStoryGroupEnabled=true`; no valid token was opened, no assessment was submitted, no authenticated editor session was used, and no PUBLIC QSP campaign exists. |
-| **Latest progress** | [July 10 ledger](docs/agents/jul10-feedback-closeout.md): 50 DONE, 3 NEEDS DECISION (#33/#41/#45). [August 1–7 delta](docs/agents/jul10-progress-delta-2026-08-01-to-2026-08-07.md): 12 outcomes. |
+| **Latest progress** | The [July 10 ledger](docs/agents/jul10-feedback-closeout.md) records 50 DONE, 0 PARTIAL, and 3 NEEDS DECISION. Only #33, #41, and #45 remain; each requires content or report-specific intent before implementation. The [August 1–7 delta](docs/agents/jul10-progress-delta-2026-08-01-to-2026-08-07.md) remains 12 outcomes because later acceptances began after August 7. |
 | **Work Logs** | Session work logs at `~/.claude/worklogs/` — invoke `/log-session` to log or generate reports |
 
 ## Current Status
@@ -241,7 +241,7 @@ src/
 | `/api/coaches/[id]` | GET, PATCH, DELETE | Coach detail/update/delete | Admin |
 | `/api/coaches/[id]/certifications` | POST, DELETE | Grant/revoke workshop type certification | Admin |
 | `/api/assessments/referred-results` | GET | Coach-owned public submissions with scoped pagination/search | Coach |
-| `/api/assessments/referred-results/[submissionId]` | DELETE | Remove a Coach-owned public submission from that Coach's collection | Coach |
+| `/api/assessments/referred-results/[submissionId]` | DELETE | Coach-owned collection soft removal | Coach |
 | `/api/admin/public-campaigns/[id]/submissions` | GET | Public campaign submissions with result/report oversight | Admin/Staff |
 | `/api/admin/assessment-email-delivery-intents` | GET | Paginated HELD assessment-email recovery intents with masked identity | Admin/Staff |
 | `/api/admin/assessment-email-delivery-intents/[id]` | GET | Audited frozen-payload and authorization-drift review detail | Admin/Staff |
