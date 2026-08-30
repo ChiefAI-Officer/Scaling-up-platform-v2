@@ -199,6 +199,18 @@ _Avoid_: conflating it with the **Cohort trend** (aggregate, everyone at once) o
 The comparison embedded inside one canonical **Results report**. It keeps the selected current Scaling Up Full submission as the report and adds Current / Previous / Change facts from one eligible earlier frozen submission for the same person, Organization, and Template. Native and historical imported submissions share this path; imported provenance stays visible on screen and in print. A changed question type or slider bounds makes that question non-comparable, so Previous and Change are both shown as dashes. Coach/admin access continues through the normal report gate; an eligible CEO may reach only their own exact report through **CEO self-access**. The older **Per-respondent longitudinal comparison** route remains a rollback entry while this capability is dark and is suppressed on campaign detail only when report-native comparison is enabled.
 _Avoid_: “group comparison” (that is the one-campaign Aggregate report), “trend report” (the older multi-point longitudinal view), or treating an imported baseline as less authoritative than a native frozen submission.
 
+**Self Comparison report**:
+A Coach-generated, printable Scaling Up Full report for **one person across exactly two completed personal reports**. The **Focus Report** supplies the current wording, recommendations, open responses, score, and Peers; the **Earlier Report** supplies the prior score series. Both sources must resolve to the same person in the same Organization and Template, and the Earlier Report must have been completed before the Focus Report. This is the ESPERTO `selfcompare` meaning and is not a company or Team-over-time report.
+_Avoid_: “team comparison,” “campaign comparison,” or “group-over-time report”; calling either source a generated Summary Report (both are personal Results reports).
+
+**Focus Report** (Self Comparison):
+The newer completed personal Results report that owns the Self Comparison report's respondent identity and presentation: cover name, current wording, recommendations, open responses, ScaleUp Score, and Peers. In the campaign entry flow it is the completed CEO report from the selected Campaign.
+_Avoid_: “source campaign” (the selected object is a personal report/submission), “current team,” or implying that the Focus Report may be completed before the Earlier Report.
+
+**Earlier Report** (Self Comparison):
+The one older completed personal Results report used as the previous score series. It must resolve to the same person as the Focus Report and have a strictly earlier completion time. It contributes previous numeric answers and aggregates only; it does not replace Focus wording, recommendations, open responses, Peers, or identity.
+_Avoid_: “baseline campaign,” “Team,” or treating a same-name different person as eligible.
+
 **CEO self-access**:
 A narrow capability path that lets the invited CEO who just submitted an eligible Scaling Up Full assessment open only their own canonical **Results report** and choose their own eligible earlier submissions. The raw signed bearer is carried in a fragment, exchanged immediately for an HTTP-only sealed session scoped to the exact report path, and never kept in rendered state or browser storage. Every report/comparison read revalidates the live invitation, submission binding, Organization, Campaign, Respondent, disclosure setting, CEO designation, expiry, and rollout gate. Capability audits use the stable actor `CEO_SELF`.
 _Avoid_: calling it an account login, emailing/storing the raw bearer as report state, widening it to group/portal/admin routes, or assuming a sealed session survives a live revocation.
@@ -226,7 +238,7 @@ _Avoid_: "delete admin" implying a hard row delete (FKs forbid it); assuming a k
 - A **Respondent**'s progress in a campaign is an **Invitation status band**; their answers, once submitted, may produce a **Scoring tier** result.
 - A **Results report email** carries the complete **Results report** inline to an invited respondent, public taker, or verified referring coach.
 - A **Results report** (per-respondent) and an **Aggregate report** (cohort) are both viewed through the **Report access gate**, which wraps each one's **loader**.
-- A **Cohort trend** aggregates one scored **Template**'s results across an **Organization**'s **Campaigns** over time; a **Per-respondent longitudinal comparison** does the same for a single **Respondent** (scored templates only — ADR-0016), while a **Report-native comparison** places one selected earlier submission directly inside the canonical Results report.
+- A **Cohort trend** aggregates one scored **Template**'s results across an **Organization**'s **Campaigns** over time; a **Per-respondent longitudinal comparison** does the same for a single **Respondent** (scored templates only — ADR-0016), while a **Report-native comparison** places one selected earlier submission directly inside the canonical Results report and a **Self Comparison report** turns exactly one Focus Report plus one Earlier Report into the Coach-facing printable artifact.
 - **CEO self-access** exchanges one raw fragment bearer for one exact-path sealed session and never grants portal, admin, aggregate, or another respondent's report access.
 - A **Campaign** may carry coach-authored **Custom slides** that its **Section pager** weaves in as non-question pages.
 
