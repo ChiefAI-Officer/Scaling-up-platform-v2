@@ -29,6 +29,9 @@
 - Modify: `src/src/lib/assessments/marketing-cta.ts`
 - Modify: `src/src/__tests__/lib/assessments/report-config.test.ts`
 - Modify: `src/src/__tests__/lib/assessments/marketing-cta.test.ts`
+- Modify: `src/src/__tests__/assessments/report-email.test.ts`
+- Modify: `src/src/__tests__/components/assessments/branded-report.test.tsx`
+- Modify: `src/src/__tests__/components/public-quiz-results.test.tsx`
 
 **Interfaces:**
 - Produces: `SCALING_UP_QUICK_PUBLIC_CAMPAIGN` with `templateAlias`, `campaignAlias`, and derived `href`.
@@ -41,6 +44,8 @@ Update the SunHub report-config expectation and Full Marketing preset expectatio
 ```ts
 "https://scaling-up-platform-v2.vercel.app/quiz/scaling_up_quick_pub_260610041810"
 ```
+
+Update the existing report-email, BrandedReport, and public-quiz-result consumer assertions to the same hand-verified literal. Those assertions prove the action reaches every shipped SunHub result surface rather than only the configuration objects.
 
 Add one regression test that collects URL destinations from `reportConfigFor("sunhub-quick-quiz").publicResultActions` and all URL targets from `createMarketingCtaPreset("FULL_MARKETING").blocks`, then asserts:
 
@@ -56,7 +61,7 @@ Run:
 
 ```bash
 cd src
-npx jest src/__tests__/lib/assessments/report-config.test.ts src/__tests__/lib/assessments/marketing-cta.test.ts --runInBand
+npx jest src/__tests__/lib/assessments/report-config.test.ts src/__tests__/lib/assessments/marketing-cta.test.ts src/__tests__/assessments/report-email.test.ts src/__tests__/components/assessments/branded-report.test.tsx src/__tests__/components/public-quiz-results.test.tsx --runInBand
 ```
 
 Expected: FAIL because both existing outputs still equal `https://scalinguptoolkit.com/s/ScaleUpQA`.
@@ -93,7 +98,7 @@ Run the same Jest command from Step 2. Expected: both suites pass with zero fail
 - [ ] **Step 6: Commit the behavior and tests**
 
 ```bash
-git add src/src/lib/assessments/public-assessment-destinations.ts src/src/lib/assessments/report-config.ts src/src/lib/assessments/marketing-cta.ts src/src/__tests__/lib/assessments/report-config.test.ts src/src/__tests__/lib/assessments/marketing-cta.test.ts
+git add src/src/lib/assessments/public-assessment-destinations.ts src/src/lib/assessments/report-config.ts src/src/lib/assessments/marketing-cta.ts src/src/__tests__/lib/assessments/report-config.test.ts src/src/__tests__/lib/assessments/marketing-cta.test.ts src/src/__tests__/assessments/report-email.test.ts src/src/__tests__/components/assessments/branded-report.test.tsx src/src/__tests__/components/public-quiz-results.test.tsx
 git commit -m "fix(assessments): link mini quiz to public assessment"
 ```
 
@@ -116,8 +121,8 @@ Prepend a CHANGELOG entry describing the verified target, the five published unp
 From `src/` run:
 
 ```bash
-npx jest src/__tests__/lib/assessments/report-config.test.ts src/__tests__/lib/assessments/marketing-cta.test.ts --runInBand
-npx eslint src/lib/assessments/public-assessment-destinations.ts src/lib/assessments/report-config.ts src/lib/assessments/marketing-cta.ts src/__tests__/lib/assessments/report-config.test.ts src/__tests__/lib/assessments/marketing-cta.test.ts
+npx jest src/__tests__/lib/assessments/report-config.test.ts src/__tests__/lib/assessments/marketing-cta.test.ts src/__tests__/assessments/report-email.test.ts src/__tests__/components/assessments/branded-report.test.tsx src/__tests__/components/public-quiz-results.test.tsx --runInBand
+npx eslint src/lib/assessments/public-assessment-destinations.ts src/lib/assessments/report-config.ts src/lib/assessments/marketing-cta.ts src/__tests__/lib/assessments/report-config.test.ts src/__tests__/lib/assessments/marketing-cta.test.ts src/__tests__/assessments/report-email.test.ts src/__tests__/components/assessments/branded-report.test.tsx src/__tests__/components/public-quiz-results.test.tsx
 CI=true npm run build
 ```
 
