@@ -323,7 +323,7 @@ git commit -m "docs: record condensed CEO implementation"
 
 Review `git diff cdafe246...HEAD` against repository standards and the B2 spec in separate passes. For each actionable finding, add a failing regression test when behavior changes, implement the smallest fix, rerun affected checks, commit, and repeat both review axes until clear.
 
-- [ ] **Step 7: Push and open the protected PR**
+- [x] **Step 7: Push and open the protected PR**
 
 Push `codex/b2-condensed-ceo-html`, create a PR to `main` with the test/build/visual receipts and explicit no-env/no-Production-data statement, wait for hosted checks, inspect review threads, and continue the review loop. Do not merge.
 
