@@ -39,13 +39,17 @@ beforeEach(() => {
 afterEach(() => delete process.env.SUMMARY_REPORTING_ENABLED);
 
 test("authorizes the Coach's designated CEO Focus without reloading discovery candidates", async () => {
+  const database = db();
   jest.mocked(listSummarySelfComparisonCandidates).mockResolvedValue({ kind: "ok", candidates: [
     { submissionId: "earlier-good", campaignId: "c1", campaignLabel: "Earlier", submittedAt: new Date(), versionId: "v1", versionNumber: 1, isImported: false },
   ], bounded: false });
 
-  await expect(listAuthorizedSelfComparisonCandidates(db(), actor, input)).resolves.toMatchObject({
+  await expect(listAuthorizedSelfComparisonCandidates(database, actor, input)).resolves.toMatchObject({
     kind: "ok", focus: { respondentId: "person-1" }, candidates: [{ submissionId: "earlier-good" }],
   });
+  expect(database.assessmentSubmission.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+    where: expect.not.objectContaining({ submittedAt: expect.anything() }),
+  }));
   expect(loadSummarySelfComparison).not.toHaveBeenCalled();
 });
 

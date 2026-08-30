@@ -68,7 +68,6 @@ export async function authorizeSelfComparisonFocus(
     where: {
       id: input.focusSubmissionId,
       campaignId: input.destinationCampaignId,
-      submittedAt: { not: null },
       respondentId: { not: null },
       invitation: { revokedAt: null, status: "SUBMITTED" },
     },
