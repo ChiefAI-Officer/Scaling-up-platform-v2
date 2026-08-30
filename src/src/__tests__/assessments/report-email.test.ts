@@ -216,7 +216,9 @@ describe("buildReportEmailHtml — overall score", () => {
     });
 
     expect(bodyHtml).toContain("Take the 32-question assessment");
-    expect(bodyHtml).toContain("https://scalinguptoolkit.com/s/ScaleUpQA");
+    expect(bodyHtml).toContain(
+      "https://scaling-up-platform-v2.vercel.app/quiz/scaling_up_quick_pub_260610041810",
+    );
     expect(bodyHtml).toContain("Request a complimentary follow-up");
     expect(bodyHtml).toContain(
       "https://coaches.scalingup.com/coach-match-after-assessment-form",

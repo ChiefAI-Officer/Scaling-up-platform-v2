@@ -139,7 +139,10 @@ describe("BrandedReport — respondent identity and next steps", () => {
 
     expect(
       screen.getByRole("link", { name: "Take the 32-question assessment" }),
-    ).toHaveAttribute("href", "https://scalinguptoolkit.com/s/ScaleUpQA");
+    ).toHaveAttribute(
+      "href",
+      "https://scaling-up-platform-v2.vercel.app/quiz/scaling_up_quick_pub_260610041810",
+    );
     expect(
       screen.getByRole("link", { name: "Request a complimentary follow-up" }),
     ).toHaveAttribute(
