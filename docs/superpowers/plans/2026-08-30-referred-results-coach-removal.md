@@ -200,7 +200,7 @@ git commit -m "feat: add coach-owned referred result removal"
 - Preserves: `listPublicReferrals`, `exportPublicReferrals`, and `getPublicReferralReport` public return types.
 - Produces: Coach reads exclude tombstoned rows; privileged report/admin list reads retain them.
 
-- [ ] **Step 1: Write failing Coach-read tests**
+- [x] **Step 1: Write failing Coach-read tests**
 
 Pin `referredResultsDeletedAt: null` in ordinary `where` and `ownedWhere`, both raw search scopes, search-cursor SQL, and export SQL. For example:
 
@@ -215,17 +215,17 @@ expect(searchSql.sql).toContain('s."referredResultsDeletedAt" IS NULL');
 
 Add a route assertion that assessment options require `submissions.some` to contain both `referringCoachId` and `referredResultsDeletedAt: null`.
 
-- [ ] **Step 2: Write failing report/admin boundary tests**
+- [x] **Step 2: Write failing report/admin boundary tests**
 
 Add `referredResultsDeletedAt` to the report fixture. Assert Coach report lookup includes null in its `where`, while ADMIN/STAFF lookup omits that predicate and succeeds for a tombstoned fixture. In the admin submissions route test, assert `findMany.where` remains exactly campaign-scoped and has no `referredResultsDeletedAt` filter.
 
-- [ ] **Step 3: Run focused readers and verify RED**
+- [x] **Step 3: Run focused readers and verify RED**
 
 Run: `npx jest src/__tests__/lib/assessments/public-referrals.test.ts src/__tests__/api/referred-results-route.test.ts src/__tests__/api/referred-results-export-route.test.ts src/__tests__/api/admin/public-campaigns/submissions-route.test.ts --runInBand`
 
 Expected: FAIL on missing Coach tombstone constraints.
 
-- [ ] **Step 4: Add minimal Coach-only predicates**
+- [x] **Step 4: Add minimal Coach-only predicates**
 
 Add `s."referredResultsDeletedAt" IS NULL` to export and shared search SQL; add `referredResultsDeletedAt: null` to Prisma list/count/cursor filters; add it to the assessment-option nested submission filter. In `getPublicReferralReport`, spread the predicate only when `!isPrivilegedRole(actor.role)`:
 
@@ -239,13 +239,13 @@ where: {
 }
 ```
 
-- [ ] **Step 5: Run focused readers and verify GREEN**
+- [x] **Step 5: Run focused readers and verify GREEN**
 
 Run the command from Step 3 plus `src/__tests__/app/public-submission-report-page.test.tsx`.
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit the read-boundary unit**
+- [x] **Step 6: Commit the read-boundary unit**
 
 ```bash
 git add src/src/lib/assessments/public-referrals.ts src/src/app/api/assessments/referred-results/route.ts src/src/__tests__/lib/assessments/public-referrals.test.ts src/src/__tests__/api/referred-results-route.test.ts src/src/__tests__/api/admin/public-campaigns/submissions-route.test.ts

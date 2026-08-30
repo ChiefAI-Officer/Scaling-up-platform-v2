@@ -67,6 +67,7 @@ describe("exportPublicReferrals", () => {
     expect(sql.values).toContain("coach-owner");
     expect(sql.values).toContain("template-four-decisions");
     expect(sql.values).toContain("%avery%");
+    expect(sql.sql).toContain('s."referredResultsDeletedAt" IS NULL');
   });
 
   it("returns a structured overflow instead of materializing an export", async () => {
@@ -239,6 +240,7 @@ const FROZEN_RESULT = {
 
 const PUBLIC_SUBMISSION = {
   id: "sub-1",
+  referredResultsDeletedAt: null as Date | null,
   submittedAt: new Date("2026-07-29T08:30:00.000Z"),
   answers: [{ stableKey: "q1", value: 7.4 }],
   result: FROZEN_RESULT,
@@ -362,6 +364,10 @@ describe("getPublicReferralReport", () => {
     expect(
       db.findFirst.mock.calls[0][0].select.referringCoach.select,
     ).toHaveProperty("email", true);
+    expect(db.findFirst.mock.calls[0][0].where).toMatchObject({
+      id: "sub-1",
+      referredResultsDeletedAt: null,
+    });
     expect(db.$transaction).toHaveBeenCalledTimes(1);
   });
 
@@ -441,6 +447,7 @@ describe("getPublicReferralReport", () => {
     async (role) => {
       const db = makeReportDb({
         ...PUBLIC_SUBMISSION,
+        referredResultsDeletedAt: new Date("2026-08-30T10:00:00.000Z"),
         referringCoachId: null as never,
         referringCoach: null as never,
       });
@@ -452,6 +459,9 @@ describe("getPublicReferralReport", () => {
       );
 
       expect(outcome.status).toBe("ok");
+      expect(db.findFirst.mock.calls[0][0].where).not.toHaveProperty(
+        "referredResultsDeletedAt",
+      );
     },
   );
 
@@ -483,6 +493,7 @@ describe("getPublicReferralReport", () => {
       expect.objectContaining({
         where: {
           id: "sub-deleted",
+          referredResultsDeletedAt: null,
           campaign: {
             accessMode: "PUBLIC",
             deletedAt: null,
@@ -727,6 +738,7 @@ describe("listPublicReferrals", () => {
       expect.objectContaining({
         where: expect.objectContaining({
           referringCoachId: "coach-owner",
+          referredResultsDeletedAt: null,
           campaign: expect.objectContaining({
             accessMode: "PUBLIC",
             deletedAt: null,
@@ -751,6 +763,7 @@ describe("listPublicReferrals", () => {
     expect(db.findFirst).toHaveBeenCalledWith({
       where: {
         referringCoachId: "coach-owner",
+        referredResultsDeletedAt: null,
         campaign: {
           accessMode: "PUBLIC",
           deletedAt: null,
@@ -763,6 +776,7 @@ describe("listPublicReferrals", () => {
     expect(db.count).toHaveBeenCalledWith({
       where: {
         referringCoachId: "coach-owner",
+        referredResultsDeletedAt: null,
         campaign: {
           accessMode: "PUBLIC",
           deletedAt: null,
@@ -805,6 +819,7 @@ describe("listPublicReferrals", () => {
       expect(db.findFirst).toHaveBeenCalledWith({
         where: {
           referringCoachId: "coach-owner",
+          referredResultsDeletedAt: null,
           campaign: {
             accessMode: "PUBLIC",
             deletedAt: null,
@@ -862,6 +877,9 @@ describe("listPublicReferrals", () => {
       expect(constrainedSql.sql).toMatch(/referringCoachId/);
       expect(constrainedSql.sql).toMatch(/accessMode/);
       expect(constrainedSql.sql).toMatch(/deletedAt/);
+      expect(constrainedSql.sql).toContain(
+        's."referredResultsDeletedAt" IS NULL',
+      );
       expect(constrainedSql.values).toEqual(
         expect.arrayContaining([
           "coach-owner",
@@ -875,6 +893,7 @@ describe("listPublicReferrals", () => {
       expect.objectContaining({
         where: {
           referringCoachId: "coach-owner",
+          referredResultsDeletedAt: null,
           campaign: {
             accessMode: "PUBLIC",
             deletedAt: null,
@@ -937,6 +956,9 @@ describe("listPublicReferrals", () => {
     expect(searchSql.sql.match(/referringCoachId/g)).toHaveLength(2);
     expect(searchSql.sql.match(/accessMode/g)).toHaveLength(2);
     expect(searchSql.sql.match(/deletedAt/g)).toHaveLength(2);
+    expect(
+      searchSql.sql.match(/referredResultsDeletedAt/g),
+    ).toHaveLength(2);
     expect(searchSql.sql.match(/templateId/g)).toHaveLength(2);
     expect(searchSql.sql).not.toContain("sub-cursor");
     expect(searchSql.values).toEqual(

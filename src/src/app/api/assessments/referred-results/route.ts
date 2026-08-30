@@ -77,7 +77,10 @@ export async function GET(request: NextRequest) {
             accessMode: "PUBLIC",
             deletedAt: null,
             submissions: {
-              some: { referringCoachId: actor.coachId },
+              some: {
+                referringCoachId: actor.coachId,
+                referredResultsDeletedAt: null,
+              },
             },
           },
         },
