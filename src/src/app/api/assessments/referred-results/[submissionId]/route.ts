@@ -15,6 +15,13 @@ const submissionIdSchema = z
   .max(191)
   .regex(/^[A-Za-z0-9_-]+$/);
 
+const requestIdSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(128)
+  .regex(/^[A-Za-z0-9._:-]+$/);
+
 const privateHeaders = {
   "Cache-Control": "no-store, private",
 };
@@ -87,7 +94,12 @@ export async function DELETE(
     );
   }
 
-  const requestId = request.headers.get("x-request-id")?.trim() || randomUUID();
+  const suppliedRequestId = requestIdSchema.safeParse(
+    request.headers.get("x-request-id"),
+  );
+  const requestId = suppliedRequestId.success
+    ? suppliedRequestId.data
+    : randomUUID();
   try {
     const outcome = await removeReferredResult(
       db as never,

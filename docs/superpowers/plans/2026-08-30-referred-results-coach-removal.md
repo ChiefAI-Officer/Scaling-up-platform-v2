@@ -171,7 +171,7 @@ Expected: FAIL because the route does not exist.
 
 - [x] **Step 7: Implement the minimal route**
 
-Use a strict Zod identifier schema (`trim`, `min(1)`, `max(191)`, `/^[A-Za-z0-9_-]+$/`), `randomUUID` fallback for `x-request-id`, `checkRateLimitStrict` with `{ interval: 60_000, maxRequests: 10 }`, and map the three domain outcomes exactly as specified.
+Use a strict Zod submission identifier schema (`trim`, `min(1)`, `max(191)`, `/^[A-Za-z0-9_-]+$/`), accept `x-request-id` only when it is 1–128 characters from `[A-Za-z0-9._:-]` and otherwise fall back to `randomUUID`, call `checkRateLimitStrict` with `{ interval: 60_000, maxRequests: 10 }`, and map the three domain outcomes exactly as specified.
 
 - [x] **Step 8: Run mutation tests and verify GREEN**
 

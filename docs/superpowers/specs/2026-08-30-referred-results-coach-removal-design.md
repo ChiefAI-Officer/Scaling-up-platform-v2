@@ -136,7 +136,9 @@ transaction, so an audit failure rolls back the tombstone.
 The audit changes contain only bounded metadata: `kind:
 "referred-results-removal"`, `softDelete: true`, and the request identifier. Taker
 identity, answers, results, and raw referral emails are not copied into the audit
-payload.
+payload. A supplied request identifier is accepted only when it is 1–128
+characters from `[A-Za-z0-9._:-]`; any other value is discarded and replaced
+with a generated UUID before it reaches the transaction or response.
 
 ## Coach read boundaries
 

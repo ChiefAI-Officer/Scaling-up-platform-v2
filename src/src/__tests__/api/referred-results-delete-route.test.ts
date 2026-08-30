@@ -14,6 +14,10 @@ jest.mock("next/server", () => ({
   },
 }));
 
+jest.mock("node:crypto", () => ({
+  randomUUID: () => "generated-request-id",
+}));
+
 const mockGetApiActor = jest.fn<Promise<ApiActor | null>, []>();
 const mockEnabled = jest.fn<boolean, []>();
 const mockRateLimit = jest.fn();
@@ -48,13 +52,13 @@ const actor: ApiActor = {
   coachId: "coach-1",
 };
 
-function request() {
+function request(requestId = "request-1") {
   return new Request(
     "https://platform.example/api/assessments/referred-results/sub-1",
     {
       method: "DELETE",
       headers: {
-        "x-request-id": "request-1",
+        "x-request-id": requestId,
         "x-forwarded-for": "203.0.113.8, 10.0.0.1",
         "user-agent": "test-agent",
       },
@@ -191,6 +195,24 @@ describe("DELETE /api/assessments/referred-results/[submissionId]", () => {
       }),
     );
   });
+
+  it.each(["taker@example.com", "x".repeat(129), "bad request id"])(
+    "replaces the unsafe request id %p before audit persistence",
+    async (requestId) => {
+      const response = await DELETE(request(requestId), context());
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("x-request-id")).toBe(
+        "generated-request-id",
+      );
+      expect(mockRemove).toHaveBeenCalledWith(
+        { marker: "database" },
+        actor,
+        "sub-1",
+        expect.objectContaining({ requestId: "generated-request-id" }),
+      );
+    },
+  );
 
   it("returns a retryable 503 when the atomic mutation fails", async () => {
     const error = new Error("audit unavailable");
