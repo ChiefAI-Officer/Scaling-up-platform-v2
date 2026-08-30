@@ -638,6 +638,18 @@ describe("Summary Self Comparison adapter", () => {
     type: "SLIDER_LIKERT",
     scale: { min: 0, max: 10 },
   }));
+  const strictResult = (value: number) => ({
+    scaleUpScore: value * 10,
+    perDomain: [],
+    perSection: [
+      "S_PEOPLE_YE", "S_PEOPLE_CC", "S_STRATEGY", "S_EXEC_LT", "S_EXEC_OP",
+      "S_EXEC_SM", "S_EXEC_SIT", "S_CASH", "S_YOU_LEAD", "S_YOU_IC",
+    ].map((stableKey) => ({ stableKey, averagePoints: value })),
+    perQuestion: Array.from({ length: 61 }, (_, index) => ({
+      stableKey: `Q${String(index + 1).padStart(2, "0")}`,
+      value,
+    })),
+  });
 
   beforeEach(() => {
     delete process.env.WAVE_RC_REPORT_COMPARISON_ENABLED;
@@ -650,7 +662,11 @@ describe("Summary Self Comparison adapter", () => {
     const focusRow = await db.assessmentSubmission.findFirst({ where: { id: focus.submissionId } });
     if (!focusRow) throw new Error("fixture focus missing");
     focusRow.campaign.version.questions = questions;
-    for (const earlier of db.rows) earlier.campaign.version.questions = questions;
+    focusRow.result = strictResult(6);
+    for (const earlier of db.rows) {
+      earlier.campaign.version.questions = questions;
+      earlier.result = strictResult(5);
+    }
 
     await expect(
       listSummarySelfComparisonCandidates(db, operatorViewer, focus),
@@ -672,18 +688,19 @@ describe("Summary Self Comparison adapter", () => {
   });
 
   it("filters strict compatibility before applying the 12-candidate presentation bound", async () => {
-    const invalidQuestions = strictQuestions().slice(0, 60);
     const priorRows = Array.from({ length: 13 }, (_, index) => row({
       id: `prior-${index + 1}`,
       campaignId: `prior-campaign-${index + 1}`,
       respondentId: `prior-respondent-${index + 1}`,
       submittedAt: new Date(Date.UTC(2025, 11, 13 - index)),
-      questions: index === 12 ? strictQuestions() : invalidQuestions,
+      questions: strictQuestions(),
+      result: index === 12 ? strictResult(5) : validResult,
     }));
     const db = makeReportComparisonDbFixture({ priorRows });
     const focusRow = await db.assessmentSubmission.findFirst({ where: { id: focus.submissionId } });
     if (!focusRow) throw new Error("fixture focus missing");
     focusRow.campaign.version.questions = strictQuestions();
+    focusRow.result = strictResult(6);
 
     await expect(listSummarySelfComparisonCandidates(db, operatorViewer, focus)).resolves.toMatchObject({
       kind: "ok",
@@ -702,6 +719,8 @@ describe("Summary Self Comparison adapter", () => {
     const focusRow = await db.assessmentSubmission.findFirst({ where: { id: focus.submissionId } });
     if (!focusRow) throw new Error("fixture focus missing");
     focusRow.campaign.version.questions = questions;
+    focusRow.result = strictResult(6);
+    db.rows[0].result = strictResult(5);
 
     await expect(loadSummarySelfComparison(db, operatorViewer, focus, "prior-native")).resolves.toEqual({ kind: "invalid" });
   });

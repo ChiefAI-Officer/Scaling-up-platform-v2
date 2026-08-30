@@ -3,6 +3,7 @@ import { asAccessDb, canManageCampaign } from "@/lib/assessments/access-control"
 import { buildQuestionMetaByKey } from "@/lib/assessments/question-meta";
 import {
   buildReportComparisonModel,
+  isStrictSuFullSelfComparisonModel,
   type ComparisonQuestionMeta,
   type ComparisonSnapshot,
   type ReportComparisonCandidate,
@@ -274,7 +275,8 @@ async function discoverReportComparisonCandidates(
   if (!await operatorCanRead(db, viewer, focus.campaignId)) {
     return { kind: "unavailable" };
   }
-  if (requireStrictSummaryCompatibility && !isStrictSummarySnapshot(snapshot(focusSubmission))) {
+  const strictFocusSnapshot = requireStrictSummaryCompatibility ? snapshot(focusSubmission) : null;
+  if (strictFocusSnapshot && !isStrictSummarySnapshot(strictFocusSnapshot)) {
     return { kind: "not-applicable" };
   }
   const identity = await identityIds(db, focusSubmission);
@@ -302,13 +304,18 @@ async function discoverReportComparisonCandidates(
   });
   const winners = new Map<string, ComparisonSubmission>();
   for (const row of [...rows].sort(compareNewest)) {
-    if (
-      isEarlierSamePerson(row, focusSubmission, new Set(ids))
-      && (!requireStrictSummaryCompatibility || isStrictSummarySnapshot(snapshot(row)))
-      && !winners.has(row.campaignId)
-    ) {
-      winners.set(row.campaignId, row);
+    if (!isEarlierSamePerson(row, focusSubmission, new Set(ids)) || winners.has(row.campaignId)) continue;
+    if (strictFocusSnapshot) {
+      const earlierSnapshot = snapshot(row);
+      if (
+        !isStrictSummarySnapshot(earlierSnapshot)
+        || !isStrictSuFullSelfComparisonModel(buildReportComparisonModel({
+          focus: strictFocusSnapshot,
+          baseline: earlierSnapshot,
+        }))
+      ) continue;
     }
+    winners.set(row.campaignId, row);
   }
   const authorized: ComparisonSubmission[] = [];
   for (const row of winners.values()) {

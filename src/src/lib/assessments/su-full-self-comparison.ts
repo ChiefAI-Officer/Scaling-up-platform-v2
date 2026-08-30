@@ -1,4 +1,7 @@
-import type { ReportComparisonModel } from "@/lib/assessments/report-comparison-model";
+import {
+  isStrictSuFullSelfComparisonModel,
+  type ReportComparisonModel,
+} from "@/lib/assessments/report-comparison-model";
 import type {
   SuFullLandscapeChapterKey,
   SuFullLandscapeReportModel,
@@ -7,10 +10,6 @@ import type {
 const QUESTION_KEYS = Array.from({ length: 61 }, (_, index) =>
   `Q${String(index + 1).padStart(2, "0")}`,
 );
-const SECTION_KEYS = [
-  "S_PEOPLE_YE", "S_PEOPLE_CC", "S_STRATEGY", "S_EXEC_LT", "S_EXEC_OP",
-  "S_EXEC_SM", "S_EXEC_SIT", "S_CASH", "S_YOU_LEAD", "S_YOU_IC",
-] as const;
 const DECISIONS = ["people", "strategy", "execution", "cash"] as const;
 const APPENDIX_C_KEYS = [...QUESTION_KEYS.slice(0, 45), ...QUESTION_KEYS.slice(55)];
 
@@ -84,18 +83,7 @@ function deepFreeze<T>(value: T, seen = new WeakSet<object>()): T {
 
 /** Compatibility that can be checked before the Focus landscape is loaded. */
 export function isSuFullSelfComparisonShapeCompatible(comparison: ReportComparisonModel): boolean {
-  return exactKeys(Object.keys(comparison.questions), QUESTION_KEYS)
-    && exactKeys(Object.keys(comparison.sections), SECTION_KEYS)
-    && SECTION_KEYS.every((key) => {
-      const row = comparison.sections[key];
-      return Number.isFinite(row?.current) && Number.isFinite(row?.previous);
-    })
-    && QUESTION_KEYS.every((key) => {
-      const row = comparison.questions[key];
-      return row?.status === "comparable"
-        && Number.isFinite(row.current)
-        && Number.isFinite(row.previous);
-    });
+  return isStrictSuFullSelfComparisonModel(comparison);
 }
 
 export function buildSuFullSelfComparisonModel(input: {
