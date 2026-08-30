@@ -124,6 +124,7 @@ export interface ScalingCondensedCeoSnapshot {
   provenance: {
     coachLogoUrl: string | null;
     coachName: string | null;
+    versionContentHash: string;
     peer: ScalingCondensedCeoModel["peerProvenance"];
   };
 }
@@ -309,6 +310,7 @@ export async function getScalingCondensedCeoSnapshot(
           provenance: {
             coachLogoUrl: report.coachLogoUrl ?? null,
             coachName: report.coachName?.trim() || null,
+            versionContentHash: campaign.version.contentHash,
             peer: modeled.model.peerProvenance,
           },
         },

@@ -34,6 +34,7 @@ function goldenSnapshot(): ScalingCondensedCeoSnapshot {
     provenance: {
       coachLogoUrl: "https://example.com/coach.png",
       coachName: "Casey Coach",
+      versionContentHash: "version-hash",
       peer: modeled.model.peerProvenance,
     },
   };

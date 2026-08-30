@@ -133,6 +133,7 @@ test("resolves and freezes only the current campaign CEO", async () => {
     provenance: {
       coachLogoUrl: "https://example.com/coach.png",
       coachName: "Casey Coach",
+      versionContentHash: "version-hash",
       peer: result.snapshot.model.peerProvenance,
     },
   });
