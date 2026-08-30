@@ -6,6 +6,19 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="summary-reports-coach-dropdown-implemented"></a>
+### 2026-08-30 — Summary Reports coach-only dropdown implemented <!-- ENTRY_ISO:2026-08-30 ENTRY_SLUG:summary-reports-coach-dropdown-implemented -->
+
+**Status: LOCALLY VERIFIED; PR/REVIEW PENDING; NOT MERGED OR DEPLOYED.** Handoff B1 of GH #387 item 3 moves the Summary Reports launch surface out of Admin. The Admin campaign host no longer resolves or passes the narrower Summary Reporting capability and retains its existing server-gated `/assessments/<campaignId>/report` entry. The Coach host keeps the existing server authorization; eligible Scaling Up Full campaigns now show a `View reports` dropdown whose first B1 item is the canonical Group report.
+
+**Privacy and compatibility boundary.** The menu item remains a plain `<a target="_blank" rel="noopener noreferrer">`, not a Next Link, so rendering the menu cannot prefetch the bulk-PII report or emit `GROUP_REPORT_VIEW` before an explicit click. When Summary Reporting is absent or null, the original `View group report` anchor branch is unchanged byte-for-byte. The obsolete saved-history panel render is removed, while `SummaryReportsPanel`, its API routes, resolver, registry, immutable report/source tables, artifacts, and existing saved records remain intact for B2/B3. No environment variable, feature flag, schema, migration, report renderer, assessment, campaign, response, or Production record changed.
+
+**Test-first and verification receipt.** The Coach contract failed first because the active capability still hid the primary entry and mounted the panel; the Admin contract failed first because the host still passed `summaryReporting`. Green focused cycles passed 2 suites / 9 tests and 2 suites / 31 tests. The broader assessment matrix passed 58 suites / 759 tests / 1 snapshot. The fresh complete run passed **792/792 suites, 9,865/9,865 tests, and 16/16 snapshots**. Changed-file ESLint passed with no warnings or errors; migration safety checked all **50 migrations**; diff hygiene passed. The first isolated-worktree build attempt stopped before compilation because ignored `DIRECT_URL` was unavailable. Reusing the unchanged existing local `.env` through an ignored symlink, the exact `CI=true npm run build` found no pending migrations, passed TypeScript/Turbopack, and generated **95/95 pages**.
+
+**Merge gate.** Per GH #393 and the handoff, `SUMMARY_REPORTING_CANARY` must be cleared outside this PR before merge. This implementation did not read or change that environment value. Condensed and Comparison report bodies/options remain B2/B3, not placeholders in this slice.
+
+---
+
 <a id="coach-portal-navigation-production-release"></a>
 ### 2026-08-30 — Coach portal navigation production release <!-- ENTRY_ISO:2026-08-30 ENTRY_SLUG:coach-portal-navigation-production-release -->
 

@@ -1,7 +1,9 @@
 # Summary Reports Coach Dropdown Design
 
-**Date:** 2026-08-30  
-**Tracker:** [GH #387](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/issues/387), item 3 / Handoff B1  
+**Date:** 2026-08-30
+
+**Tracker:** [GH #387](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/issues/387), item 3 / Handoff B1
+
 **Fixed point:** `f84ad2ed7ce070a314d8bd75ad19254dc36a1544` (`origin/main` after PR #396)
 
 ## Goal
