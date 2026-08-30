@@ -103,7 +103,7 @@ git commit -m "feat: add referred result removal tombstone"
 - Produces: `DELETE /api/assessments/referred-results/[submissionId]` returning private JSON plus strict rate headers.
 - Consumes: `ApiActor`, `isCoachCurrentlyCertified`, `checkRateLimitStrict`, the existing Referred Results flag, Prisma transaction methods.
 
-- [ ] **Step 1: Write failing domain tests**
+- [x] **Step 1: Write failing domain tests**
 
 Cover an active owner success, inactive Coach `forbidden`, foreign/non-Public/deleted-campaign/already-removed/missing rows as `not-found`, conditional `updateMany`, and audit atomicity. Pin the write shape:
 
@@ -129,23 +129,23 @@ expect(auditLog.create).toHaveBeenCalledWith({
 
 Assert the serialized audit changes contain `referred-results-removal`, `softDelete`, and `requestId`, and do not contain taker identity, answers, results, or referral email.
 
-- [ ] **Step 2: Run domain tests and verify RED**
+- [x] **Step 2: Run domain tests and verify RED**
 
 Run: `npx jest src/__tests__/lib/assessments/referred-results-removal.test.ts --runInBand`
 
 Expected: FAIL because the module does not exist.
 
-- [ ] **Step 3: Implement the minimal transaction**
+- [x] **Step 3: Implement the minimal transaction**
 
 Define a narrow database interface. In one `$transaction`, load only the Coach certification fields, return `forbidden` when ineligible, run the conditional `assessmentSubmission.updateMany`, return `not-found` on count zero, then create the bounded audit row through `tx.auditLog.create`. Accept `now` and `requestId` through an audit/options argument so tests are deterministic.
 
-- [ ] **Step 4: Run domain tests and verify GREEN**
+- [x] **Step 4: Run domain tests and verify GREEN**
 
 Run: `npx jest src/__tests__/lib/assessments/referred-results-removal.test.ts --runInBand`
 
 Expected: PASS.
 
-- [ ] **Step 5: Write failing route tests**
+- [x] **Step 5: Write failing route tests**
 
 Cover:
 
@@ -163,23 +163,23 @@ await expect(deleteRequest({ outcome: "removed" })).toHaveStatus(200);
 
 Also assert auth runs before the feature gate/limiter, limiter runs before the domain write, the key is `referred-results-delete:coach-1`, private/no-store headers are present, and the request ID is returned.
 
-- [ ] **Step 6: Run route tests and verify RED**
+- [x] **Step 6: Run route tests and verify RED**
 
 Run: `npx jest src/__tests__/api/referred-results-delete-route.test.ts --runInBand`
 
 Expected: FAIL because the route does not exist.
 
-- [ ] **Step 7: Implement the minimal route**
+- [x] **Step 7: Implement the minimal route**
 
 Use a strict Zod identifier schema (`trim`, `min(1)`, `max(191)`, `/^[A-Za-z0-9_-]+$/`), `randomUUID` fallback for `x-request-id`, `checkRateLimitStrict` with `{ interval: 60_000, maxRequests: 10 }`, and map the three domain outcomes exactly as specified.
 
-- [ ] **Step 8: Run mutation tests and verify GREEN**
+- [x] **Step 8: Run mutation tests and verify GREEN**
 
 Run: `npx jest src/__tests__/lib/assessments/referred-results-removal.test.ts src/__tests__/api/referred-results-delete-route.test.ts --runInBand`
 
 Expected: PASS.
 
-- [ ] **Step 9: Commit the mutation unit**
+- [x] **Step 9: Commit the mutation unit**
 
 ```bash
 git add src/src/lib/assessments/referred-results-removal.ts src/src/app/api/assessments/referred-results/'[submissionId]'/route.ts src/src/__tests__/lib/assessments/referred-results-removal.test.ts src/src/__tests__/api/referred-results-delete-route.test.ts
