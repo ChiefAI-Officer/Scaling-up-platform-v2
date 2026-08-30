@@ -27,7 +27,7 @@ function fillWidth(value: number): string {
   return `${clamp(value, 0, 10) * 10}%`;
 }
 
-function barFillClass(kind: "you" | "peers"): string {
+function barFillClass(kind: "you" | "previous" | "peers"): string {
   return `su-full-landscape-bar-fill su-full-landscape-bar-fill--${kind}`;
 }
 
@@ -38,11 +38,11 @@ function BarMeasure({
   value,
 }: {
   chapterKey: SuFullLandscapeChapterKey;
-  label: "You" | "Peers";
+  label: "You" | "Focus" | "Earlier" | "Peers";
   questionKey: string;
   value: number;
 }) {
-  const kind = label === "You" ? "you" : "peers";
+  const kind = label === "Peers" ? "peers" : label === "Earlier" ? "previous" : "you";
   return (
     <div
       className={`su-full-landscape-bar-measure ${chapterColorClass(chapterKey)}`}
@@ -65,15 +65,23 @@ export function SuFullVerticalPeerChart({
   questions,
   title = "Section comparison",
   instanceId = chapterKey,
+  previousByKey,
 }: {
   chapterKey: SuFullLandscapeChapterKey;
-  questions: readonly SuFullLandscapeQuestion[];
+  questions: readonly Pick<
+    SuFullLandscapeQuestion,
+    "stableKey" | "label" | "you" | "peers"
+  >[];
   title?: string;
   instanceId?: string;
+  previousByKey?: ReadonlyMap<string, number>;
 }) {
   const points = questions
     .map((question, index) => `${clamp(question.peers, 0, 10) * 10},${index + 0.5}`)
     .join(" ");
+  const previousPoints = previousByKey
+    ? questions.map((question, index) => `${clamp(previousByKey.get(question.stableKey) ?? 0, 0, 10) * 10},${index + 0.5}`).join(" ")
+    : null;
 
   return (
     <section
@@ -101,6 +109,15 @@ export function SuFullVerticalPeerChart({
             strokeWidth="2"
             vectorEffect="non-scaling-stroke"
           />
+          {previousPoints ? <polyline
+            className="su-full-landscape-previous-contour"
+            fill="none"
+            points={previousPoints}
+            stroke="currentColor"
+            strokeDasharray="5 4"
+            strokeWidth="2"
+            vectorEffect="non-scaling-stroke"
+          /> : null}
         </svg>
         <ol className="su-full-landscape-chart-rows">
           {questions.map((question) => (
@@ -113,7 +130,7 @@ export function SuFullVerticalPeerChart({
               <h4 className="su-full-landscape-chart-question">
                 {question.label}
               </h4>
-              <span className="su-full-landscape-vertical-you-label">You</span>
+              <span className="su-full-landscape-vertical-you-label">{previousByKey ? "Focus" : "You"}</span>
               <span className="su-full-landscape-vertical-scale" aria-hidden="true">
                 <span
                   className={barFillClass("you")}
@@ -121,6 +138,11 @@ export function SuFullVerticalPeerChart({
                 />
               </span>
               <strong className="su-full-landscape-bar-value">{formatValue(question.you)}</strong>
+              {previousByKey ? <>
+                <span className="su-full-landscape-mobile-peer-label">Earlier</span>
+                <span className="su-full-landscape-mobile-peer-scale" aria-hidden="true"><span className={barFillClass("previous")} style={{ width: fillWidth(previousByKey.get(question.stableKey) ?? 0) }} /></span>
+                <strong className="su-full-landscape-mobile-peer-value">{formatValue(previousByKey.get(question.stableKey) ?? 0)}</strong>
+              </> : null}
               <span className="su-full-landscape-mobile-peer-label">Peers</span>
               <span className="su-full-landscape-mobile-peer-scale" aria-hidden="true">
                 <span
@@ -132,13 +154,14 @@ export function SuFullVerticalPeerChart({
                 {formatValue(question.peers)}
               </strong>
               <span className="sr-only">
-                You {formatValue(question.you)}. Peers {formatValue(question.peers)}.
+                {previousByKey ? `Focus ${formatValue(question.you)}. Earlier ${formatValue(previousByKey.get(question.stableKey) ?? 0)}. ` : `You ${formatValue(question.you)}. `}Peers {formatValue(question.peers)}.
               </span>
             </li>
           ))}
         </ol>
       </div>
       <p className="su-full-landscape-chart-legend">
+        {previousByKey ? <><span aria-hidden="true" className="su-full-landscape-chart-legend-mark is-previous" /><span>Score of Previous</span></> : null}
         <span aria-hidden="true" className="su-full-landscape-chart-legend-mark" />
         <span>Score of Peers</span>
       </p>
@@ -149,16 +172,19 @@ export function SuFullVerticalPeerChart({
 export function SuFullDetailPairedBars({
   chapterKey,
   question,
+  previous,
 }: {
   chapterKey: SuFullLandscapeChapterKey;
   question: SuFullLandscapeQuestion;
+  previous?: number;
 }) {
   return (
     <div
       className={`su-full-landscape-detail-bars ${chapterColorClass(chapterKey)}`}
       data-testid={`su-landscape-detail-bars-${question.stableKey}`}
     >
-      <BarMeasure chapterKey={chapterKey} label="You" questionKey={question.stableKey} value={question.you} />
+      <BarMeasure chapterKey={chapterKey} label={previous === undefined ? "You" : "Focus"} questionKey={question.stableKey} value={question.you} />
+      {previous === undefined ? null : <BarMeasure chapterKey={chapterKey} label="Earlier" questionKey={question.stableKey} value={previous} />}
       <BarMeasure chapterKey={chapterKey} label="Peers" questionKey={question.stableKey} value={question.peers} />
     </div>
   );

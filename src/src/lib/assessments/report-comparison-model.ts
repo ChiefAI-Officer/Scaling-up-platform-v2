@@ -53,6 +53,37 @@ export interface ReportComparisonInput {
   baseline: ComparisonSnapshot;
 }
 
+const SU_FULL_SELF_COMPARISON_QUESTION_KEYS = Array.from(
+  { length: 61 },
+  (_, index) => `Q${String(index + 1).padStart(2, "0")}`,
+);
+const SU_FULL_SELF_COMPARISON_SECTION_KEYS = [
+  "S_PEOPLE_YE", "S_PEOPLE_CC", "S_STRATEGY", "S_EXEC_LT", "S_EXEC_OP",
+  "S_EXEC_SM", "S_EXEC_SIT", "S_CASH", "S_YOU_LEAD", "S_YOU_IC",
+] as const;
+
+function hasExactKeys(actual: readonly string[], expected: readonly string[]): boolean {
+  return actual.length === expected.length
+    && new Set(actual).size === expected.length
+    && actual.every((key) => expected.includes(key));
+}
+
+/** Complete frozen-result compatibility for the 61-question Scaling Up Self Comparison. */
+export function isStrictSuFullSelfComparisonModel(model: ReportComparisonModel): boolean {
+  return hasExactKeys(Object.keys(model.questions), SU_FULL_SELF_COMPARISON_QUESTION_KEYS)
+    && hasExactKeys(Object.keys(model.sections), SU_FULL_SELF_COMPARISON_SECTION_KEYS)
+    && SU_FULL_SELF_COMPARISON_SECTION_KEYS.every((key) => {
+      const row = model.sections[key];
+      return Number.isFinite(row?.current) && Number.isFinite(row?.previous);
+    })
+    && SU_FULL_SELF_COMPARISON_QUESTION_KEYS.every((key) => {
+      const row = model.questions[key];
+      return row?.status === "comparable"
+        && Number.isFinite(row.current)
+        && Number.isFinite(row.previous);
+    });
+}
+
 type FrozenRow = Record<string, unknown>;
 
 function finite(value: unknown): number | null {

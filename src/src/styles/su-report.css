@@ -2722,6 +2722,14 @@
   font-size: 52px;
   line-height: 1.02;
 }
+.su-public-brand.su-report.su-full-landscape.su-condensed-ceo .su-condensed-ceo-cover-title h1 {
+  max-width: 15ch;
+}
+.su-public-brand.su-report.su-full-landscape.su-condensed-ceo .su-condensed-ceo-cover-title .su-condensed-ceo-cover-edition {
+  margin-top: 16px;
+  font-size: 24px;
+  font-weight: 700;
+}
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-cover-meta {
   position: relative;
   z-index: 1;
@@ -3166,6 +3174,10 @@
 }
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-bar-fill { display: block; height: 100%; border-radius: 0; }
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-bar-fill--you { background: var(--chapter-line-color); }
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-bar-fill--previous {
+  background: #5f50a1;
+  opacity: 0.78;
+}
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-bar-fill--peers {
   box-sizing: border-box;
   background: var(--chapter-peer-color);
@@ -3190,6 +3202,33 @@
   display: inline-block;
   width: 18px;
   border-top: 2px solid var(--chapter-line-color);
+}
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-chart-legend-mark.is-previous {
+  border-top-color: #5f50a1;
+  border-top-style: dashed;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-landscape-previous-contour {
+  color: #5f50a1;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-self-comparison-appendix-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10px;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-self-comparison-appendix {
+  grid-column: 1 / -1;
+  grid-row: 1 / -1;
+  align-self: start;
+  min-width: 0;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-self-comparison-appendix-table th,
+.su-public-brand.su-report.su-full-landscape .su-full-self-comparison-appendix-table td {
+  padding: 4px 6px;
+  border-bottom: 1px solid #e9e7eb;
+  text-align: right;
+}
+.su-public-brand.su-report.su-full-landscape .su-full-self-comparison-appendix-table th:first-child {
+  text-align: left;
 }
 
 .su-public-brand.su-report.su-full-landscape .su-full-landscape-detail {

@@ -11,8 +11,12 @@ import { isReportComparisonRolloutActive } from "@/lib/assessments/wave-report-c
 // individual patterns separate: CEO self-access intentionally opens only the
 // individual path, never the campaign-level group report.
 export const GROUP_REPORT_NO_STORE_REGEX = /^\/assessments\/[^/]+\/report\/?$/;
+export const CONDENSED_REPORT_NO_STORE_REGEX =
+  /^\/assessments\/[^/]+\/report\/condensed\/?$/;
 export const RESPONDENT_REPORT_REGEX =
   /^\/assessments\/[^/]+\/respondents\/[^/]+\/report\/?$/;
+export const SELF_COMPARISON_REPORT_REGEX =
+  /^\/assessments\/[^/]+\/self-comparison\/?$/;
 export const PUBLIC_REFERRAL_REPORT_NO_STORE_REGEX =
   /^\/assessments\/public-submissions\/[^/]+\/report\/?$/;
 const CEO_SELF_REPORT_PATH = "/assessments/self-report";
@@ -122,12 +126,14 @@ export default withAuth(
     if (
       pathname === CEO_SELF_REPORT_PATH ||
       pathname === CEO_SELF_REPORT_EXCHANGE_PATH ||
-      RESPONDENT_REPORT_REGEX.test(pathname)
+      RESPONDENT_REPORT_REGEX.test(pathname) ||
+      SELF_COMPARISON_REPORT_REGEX.test(pathname)
     ) {
       passthrough.headers.set("Cache-Control", "no-store, private");
       passthrough.headers.set("Referrer-Policy", "no-referrer");
     } else if (
       GROUP_REPORT_NO_STORE_REGEX.test(pathname) ||
+      CONDENSED_REPORT_NO_STORE_REGEX.test(pathname) ||
       PUBLIC_REFERRAL_REPORT_NO_STORE_REGEX.test(pathname)
     ) {
       passthrough.headers.set("Cache-Control", "no-store, private");

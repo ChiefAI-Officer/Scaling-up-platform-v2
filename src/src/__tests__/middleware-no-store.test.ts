@@ -25,6 +25,8 @@ import { join } from "path";
 const GROUP_REPORT_NO_STORE_REGEX = /^\/assessments\/[^/]+\/report\/?$/;
 const RESPONDENT_REPORT_REGEX =
   /^\/assessments\/[^/]+\/respondents\/[^/]+\/report\/?$/;
+const SELF_COMPARISON_REPORT_REGEX =
+  /^\/assessments\/[^/]+\/self-comparison\/?$/;
 const PUBLIC_REFERRAL_REPORT_NO_STORE_REGEX =
   /^\/assessments\/public-submissions\/[^/]+\/report\/?$/;
 
@@ -36,12 +38,18 @@ const NO_STORE_HEADER_VALUE = "no-store, private";
 function noStoreHeaderFor(pathname: string): string | undefined {
   return GROUP_REPORT_NO_STORE_REGEX.test(pathname) ||
     RESPONDENT_REPORT_REGEX.test(pathname) ||
+    SELF_COMPARISON_REPORT_REGEX.test(pathname) ||
     PUBLIC_REFERRAL_REPORT_NO_STORE_REGEX.test(pathname)
     ? NO_STORE_HEADER_VALUE
     : undefined;
 }
 
 describe("R2-LOW-1: assessment report no-store middleware", () => {
+  it("sets the header on the personal Self Comparison report", () => {
+    expect(noStoreHeaderFor("/assessments/campaign-1/self-comparison")).toBe(
+      "no-store, private",
+    );
+  });
   describe("public referral report gets no-store, private", () => {
     it("keeps the behavioral mirror synchronized with middleware source", () => {
       const source = readFileSync(

@@ -1,6 +1,8 @@
 import { canManageCampaign } from "@/lib/assessments/access-control";
 import {
+  listSummarySelfComparisonCandidates,
   listReportComparisonCandidates,
+  loadSummarySelfComparison,
   loadReportComparison,
   type ReportComparisonDb,
   type ReportComparisonFocus,
@@ -626,5 +628,144 @@ describe("loadReportComparison", () => {
       loadReportComparison(killedDb, ceoViewer, focus, "prior-native"),
     ).resolves.toEqual({ kind: "invalid" });
     delete process.env.WAVE_RC_REPORT_COMPARISON_KILL;
+  });
+});
+
+describe("Summary Self Comparison adapter", () => {
+  const strictQuestions = () => Array.from({ length: 61 }, (_, index) => ({
+    stableKey: `Q${String(index + 1).padStart(2, "0")}`,
+    label: `Question ${index + 1}`,
+    type: "SLIDER_LIKERT",
+    scale: { min: 0, max: 10 },
+  }));
+  const strictResult = (value: number) => ({
+    scaleUpScore: value * 10,
+    perDomain: [],
+    perSection: [
+      "S_PEOPLE_YE", "S_PEOPLE_CC", "S_STRATEGY", "S_EXEC_LT", "S_EXEC_OP",
+      "S_EXEC_SM", "S_EXEC_SIT", "S_CASH", "S_YOU_LEAD", "S_YOU_IC",
+    ].map((stableKey) => ({ stableKey, averagePoints: value })),
+    perQuestion: Array.from({ length: 61 }, (_, index) => ({
+      stableKey: `Q${String(index + 1).padStart(2, "0")}`,
+      value,
+    })),
+  });
+
+  beforeEach(() => {
+    delete process.env.WAVE_RC_REPORT_COMPARISON_ENABLED;
+    delete process.env.WAVE_RC_REPORT_COMPARISON_KILL;
+  });
+
+  it("lists and loads the same person's earlier report without Wave RC rollout ownership", async () => {
+    const db = makeReportComparisonDbFixture();
+    const questions = [
+      ...strictQuestions(),
+      { stableKey: "Q_FTE_CONTRACT", label: "Full-time employees", type: "TEXT" },
+      { stableKey: "Q_FREELANCE", label: "Freelancers", type: "TEXT" },
+    ];
+    const focusRow = await db.assessmentSubmission.findFirst({ where: { id: focus.submissionId } });
+    if (!focusRow) throw new Error("fixture focus missing");
+    focusRow.campaign.version.questions = questions;
+    focusRow.result = strictResult(6);
+    for (const earlier of db.rows) {
+      earlier.campaign.version.questions = questions;
+      earlier.result = strictResult(5);
+    }
+
+    await expect(
+      listSummarySelfComparisonCandidates(db, operatorViewer, focus),
+    ).resolves.toMatchObject({
+      kind: "ok",
+      candidates: [
+        {
+          submissionId: "prior-native",
+          campaignLabel: "Prior assessment",
+          versionNumber: 1,
+          isImported: false,
+        },
+        { submissionId: "prior-imported", isImported: true },
+      ],
+    });
+    await expect(
+      loadSummarySelfComparison(db, operatorViewer, focus, "prior-native"),
+    ).resolves.toMatchObject({ kind: "ok" });
+  });
+
+  it("filters strict compatibility before applying the 12-candidate presentation bound", async () => {
+    const priorRows = Array.from({ length: 13 }, (_, index) => row({
+      id: `prior-${index + 1}`,
+      campaignId: `prior-campaign-${index + 1}`,
+      respondentId: `prior-respondent-${index + 1}`,
+      submittedAt: new Date(Date.UTC(2025, 11, 13 - index)),
+      questions: strictQuestions(),
+      result: index === 12 ? strictResult(5) : validResult,
+    }));
+    const db = makeReportComparisonDbFixture({ priorRows });
+    const focusRow = await db.assessmentSubmission.findFirst({ where: { id: focus.submissionId } });
+    if (!focusRow) throw new Error("fixture focus missing");
+    focusRow.campaign.version.questions = strictQuestions();
+    focusRow.result = strictResult(6);
+
+    await expect(listSummarySelfComparisonCandidates(db, operatorViewer, focus)).resolves.toMatchObject({
+      kind: "ok",
+      candidates: [{ submissionId: "prior-13" }],
+    });
+  });
+
+  it("rejects a 61-question pair whose Slider scale is not exactly 0-10", async () => {
+    const questions = Array.from({ length: 61 }, (_, index) => ({
+      stableKey: `Q${String(index + 1).padStart(2, "0")}`,
+      label: `Question ${index + 1}`,
+      type: "SLIDER_LIKERT",
+      scale: { min: 1, max: 5 },
+    }));
+    const db = makeReportComparisonDbFixture({ priorRows: [row({ id: "prior-native", questions })] });
+    const focusRow = await db.assessmentSubmission.findFirst({ where: { id: focus.submissionId } });
+    if (!focusRow) throw new Error("fixture focus missing");
+    focusRow.campaign.version.questions = questions;
+    focusRow.result = strictResult(6);
+    db.rows[0].result = strictResult(5);
+
+    await expect(loadSummarySelfComparison(db, operatorViewer, focus, "prior-native")).resolves.toEqual({ kind: "invalid" });
+  });
+
+  it("keeps Wave RC unavailable while its rollout is off", async () => {
+    const db = makeReportComparisonDbFixture();
+
+    await expect(listReportComparisonCandidates(db, operatorViewer, focus)).resolves.toEqual({
+      kind: "not-applicable",
+    });
+    await expect(loadReportComparison(db, operatorViewer, focus, "prior-native")).resolves.toEqual({
+      kind: "invalid",
+    });
+  });
+
+  it.each([
+    ["a different person", row({ id: "prior-native", respondentId: "stranger" })],
+    ["a later submission", row({ id: "prior-native", submittedAt: new Date("2026-02-01T00:00:00.000Z") })],
+  ])("rejects %s", async (_case, earlier) => {
+    const db = makeReportComparisonDbFixture({
+      priorRows: [earlier],
+      identityRows: [{
+        id: focus.respondentId,
+        organizationId: "org-1",
+        normalizedEmail: "ceo@example.com",
+        deletedAt: null,
+      }],
+    });
+
+    await expect(
+      loadSummarySelfComparison(db, operatorViewer, focus, "prior-native"),
+    ).resolves.toEqual({ kind: "invalid" });
+  });
+
+  it("rejects an earlier campaign the operator cannot read", async () => {
+    const db = makeReportComparisonDbFixture({
+      canRead: (campaignId) => campaignId !== "prior-native-campaign",
+    });
+
+    await expect(
+      loadSummarySelfComparison(db, operatorViewer, focus, "prior-native"),
+    ).resolves.toEqual({ kind: "invalid" });
   });
 });
