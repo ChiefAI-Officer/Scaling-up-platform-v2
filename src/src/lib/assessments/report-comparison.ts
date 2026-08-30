@@ -377,6 +377,20 @@ function snapshot(submission: ComparisonSubmission): ComparisonSnapshot {
   return { ...candidateFor(submission), result: submission.result, questionMetaByKey };
 }
 
+const SUMMARY_SELF_COMPARISON_QUESTION_KEYS = Array.from(
+  { length: 61 },
+  (_, index) => `Q${String(index + 1).padStart(2, "0")}`,
+);
+
+function isStrictSummarySnapshot(value: ComparisonSnapshot): boolean {
+  const keys = Object.keys(value.questionMetaByKey);
+  return keys.length === SUMMARY_SELF_COMPARISON_QUESTION_KEYS.length
+    && SUMMARY_SELF_COMPARISON_QUESTION_KEYS.every((key) => {
+      const meta = value.questionMetaByKey[key];
+      return meta?.type === "SLIDER_LIKERT" && meta.min === 0 && meta.max === 10;
+    });
+}
+
 /** Rechecks authorization and every live eligibility fact atomically with the baseline read. */
 export async function loadReportComparison(
   db: ReportComparisonDb,
@@ -415,7 +429,12 @@ async function loadReportComparisonWithPolicy(
       }
       const ids = new Set((await identityIds(tx, focusSubmission)).ids);
       if (!isEarlierSamePerson(baseline, focusSubmission, ids)) return { kind: "invalid" } as const;
-      return { kind: "ok", model: buildReportComparisonModel({ focus: snapshot(focusSubmission), baseline: snapshot(baseline) }) } as const;
+      const focusSnapshot = snapshot(focusSubmission);
+      const baselineSnapshot = snapshot(baseline);
+      if (!requireWaveRcEligibility && (!isStrictSummarySnapshot(focusSnapshot) || !isStrictSummarySnapshot(baselineSnapshot))) {
+        return { kind: "invalid" } as const;
+      }
+      return { kind: "ok", model: buildReportComparisonModel({ focus: focusSnapshot, baseline: baselineSnapshot }) } as const;
     }, { isolationLevel: "Serializable" });
     if (outcome.kind === "ok") {
       emitReportComparisonMetric("comparison_ok", {

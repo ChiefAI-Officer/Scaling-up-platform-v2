@@ -639,6 +639,16 @@ describe("Summary Self Comparison adapter", () => {
 
   it("lists and loads the same person's earlier report without Wave RC rollout ownership", async () => {
     const db = makeReportComparisonDbFixture();
+    const strictQuestions = Array.from({ length: 61 }, (_, index) => ({
+      stableKey: `Q${String(index + 1).padStart(2, "0")}`,
+      label: `Question ${index + 1}`,
+      type: "SLIDER_LIKERT",
+      scale: { min: 0, max: 10 },
+    }));
+    const focusRow = await db.assessmentSubmission.findFirst({ where: { id: focus.submissionId } });
+    if (!focusRow) throw new Error("fixture focus missing");
+    focusRow.campaign.version.questions = strictQuestions;
+    for (const earlier of db.rows) earlier.campaign.version.questions = strictQuestions;
 
     await expect(
       listSummarySelfComparisonCandidates(db, operatorViewer, focus),
@@ -657,6 +667,21 @@ describe("Summary Self Comparison adapter", () => {
     await expect(
       loadSummarySelfComparison(db, operatorViewer, focus, "prior-native"),
     ).resolves.toMatchObject({ kind: "ok" });
+  });
+
+  it("rejects a 61-question pair whose Slider scale is not exactly 0-10", async () => {
+    const questions = Array.from({ length: 61 }, (_, index) => ({
+      stableKey: `Q${String(index + 1).padStart(2, "0")}`,
+      label: `Question ${index + 1}`,
+      type: "SLIDER_LIKERT",
+      scale: { min: 1, max: 5 },
+    }));
+    const db = makeReportComparisonDbFixture({ priorRows: [row({ id: "prior-native", questions })] });
+    const focusRow = await db.assessmentSubmission.findFirst({ where: { id: focus.submissionId } });
+    if (!focusRow) throw new Error("fixture focus missing");
+    focusRow.campaign.version.questions = questions;
+
+    await expect(loadSummarySelfComparison(db, operatorViewer, focus, "prior-native")).resolves.toEqual({ kind: "invalid" });
   });
 
   it("keeps Wave RC unavailable while its rollout is off", async () => {
