@@ -5,6 +5,12 @@ export interface PublicResultAction {
   href: string;
 }
 
+export interface DomainResultsPresentation {
+  readonly eyebrow: string;
+  readonly title: string;
+  readonly showTierMessage: boolean;
+}
+
 export interface ReportConfig {
   /** Which renderer drives the per-respondent report. */
   reportType: ReportType;
@@ -37,6 +43,8 @@ export interface ReportConfig {
    * true; invited and operator renders retain their existing conclusion.
    */
   publicResultActions?: readonly PublicResultAction[];
+  /** Optional template-owned labels and frozen tier-message policy for domain results. */
+  readonly domainResults?: DomainResultsPresentation;
 }
 
 /** Default = current behaviour (back-compatible): scored report with the table and tier shown, coach CTA shown. */
@@ -99,6 +107,11 @@ const REPORT_CONFIG: Readonly<Record<string, ReportConfig>> = {
     showScoreTable: true,
     showTier: true,
     showCoachCta: false,
+    domainResults: {
+      eyebrow: "How you scored, by area",
+      title: "The Five Categories",
+      showTierMessage: true,
+    },
   },
 };
 
