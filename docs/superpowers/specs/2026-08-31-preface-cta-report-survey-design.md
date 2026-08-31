@@ -43,7 +43,7 @@ Raise only the conclusion `estimatedLines` limit from 16 to 24:
 - The existing 900-visible-character cap already accommodates ESPERTO-scale CTA prose and remains unchanged.
 - Element, depth, image, table, heading, break, CSS, and sanitization safeguards remain unchanged.
 
-The change is accepted only if browser tests prove the 24-line boundary remains inside the physical page with the existing page count, and 25 lines are rejected. The complete supported-surface suite must remain green.
+The change is accepted only if browser tests prove the 24-line boundary remains inside Scaling Up Full's fixed physical page with its existing page count, while Classic scored/qualitative and the alternate styles preserve their own safe print behavior without clipping or content loss. Dynamic Classic layouts may add a physical page rather than clip authored content. Twenty-five estimated lines remain rejected. The complete supported-surface suite must remain green.
 
 ## Non-goals
 
@@ -51,4 +51,3 @@ The change is accepted only if browser tests prove the 24-line boundary remains 
 - No group-report or email authoring surface.
 - No automatic campaign migration to a newer template version.
 - No new report page or change to report pagination.
-

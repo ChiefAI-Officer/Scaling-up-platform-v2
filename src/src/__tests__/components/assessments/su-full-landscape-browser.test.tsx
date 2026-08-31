@@ -279,7 +279,7 @@ function stylesheet(): string {
 const EXPANDED_CLOSING_BOUNDARY_HTML = `${"<h6>H</h6>".repeat(2)}${"<br>".repeat(4)}<p>${"C".repeat(796)}</p><ul><li></li><li></li></ul>`;
 
 function alternateStyleMarkup(
-  style: "EXECUTIVE_BOARDROOM" | "MODERN_DASHBOARD",
+  style: "CLASSIC_SCORED" | "CLASSIC_QUALITATIVE" | "EXECUTIVE_BOARDROOM" | "MODERN_DASHBOARD",
   conclusionHtml: string,
 ): string {
   const prepared = prepareReportHtmlForStorage({
@@ -290,15 +290,25 @@ function alternateStyleMarkup(
     },
   });
   if (!prepared.ok) throw new Error("Alternate-style closing fixture must remain inside storage limits");
+  const anatomy = style === "CLASSIC_QUALITATIVE" ? "qualitative" : "scored";
   const report = {
-    ...buildReportStylePreviewReport("scored", "normal"),
+    ...buildReportStylePreviewReport(anatomy, "normal"),
+    reportStyle: "CLASSIC" as const,
     reportHtml: (prepared.reportConfig as { reportHtml: NonNullable<ReturnType<typeof buildReportStylePreviewReport>["reportHtml"]> }).reportHtml,
   };
   const presentation = buildIndividualReportPresentation(report);
   const reportHtmlPersonalization = report;
   const rendered = style === "EXECUTIVE_BOARDROOM"
     ? <ExecutiveBoardroomReport presentation={presentation} reportHtml={report.reportHtml} reportHtmlPersonalization={reportHtmlPersonalization} />
-    : <ModernDashboardReport presentation={presentation} reportHtml={report.reportHtml} reportHtmlPersonalization={reportHtmlPersonalization} />;
+    : style === "MODERN_DASHBOARD"
+      ? <ModernDashboardReport presentation={presentation} reportHtml={report.reportHtml} reportHtmlPersonalization={reportHtmlPersonalization} />
+      : (
+        <ReportStyleScope report={report} reportStylesAvailable>
+          <div className="su-report-page">
+            <BrandedReport report={report} reportStylesAvailable />
+          </div>
+        </ReportStyleScope>
+      );
   return renderToStaticMarkup(
     <main className="su-public-brand su-report">{rendered}</main>,
   );
@@ -668,8 +678,13 @@ describe("SU Full landscape browser and PDF contract", () => {
     else process.env[KILL] = savedKill;
   });
 
-  it.each(["EXECUTIVE_BOARDROOM", "MODERN_DASHBOARD"] as const)(
-    "keeps the expanded Closing boundary on one existing %s print page without screen clipping",
+  it.each([
+    "CLASSIC_SCORED",
+    "CLASSIC_QUALITATIVE",
+    "EXECUTIVE_BOARDROOM",
+    "MODERN_DASHBOARD",
+  ] as const)(
+    "paginates the expanded Closing boundary safely in %s without screen clipping",
     async (style) => {
       const directory = mkdtempSync(join(tmpdir(), `report-html-${style.toLowerCase()}-`));
       const renderPdf = async (id: "short" | "boundary", conclusionHtml: string) => {
@@ -694,6 +709,7 @@ describe("SU Full landscape browser and PDF contract", () => {
           const info = execFileSync("pdfinfo", [pdfPath], { encoding: "utf8" });
           return {
             pages: Number(info.match(/^Pages:\s+(\d+)$/m)?.[1]),
+            pdfText: execFileSync("pdftotext", [pdfPath, "-"], { encoding: "utf8" }).replace(/\s+/g, ""),
             desktop,
             desktopClipping,
             mobile,
@@ -711,7 +727,9 @@ describe("SU Full landscape browser and PDF contract", () => {
         expect(Number.isInteger(short.pages)).toBe(true);
         expect(short.pages).toBeGreaterThan(1);
         expect(Number.isInteger(boundary.pages)).toBe(true);
-        expect(boundary.pages).toBe(short.pages);
+        const expectedAdditionalPages = style.startsWith("CLASSIC_") ? 1 : 0;
+        expect(boundary.pages).toBe(short.pages + expectedAdditionalPages);
+        expect(boundary.pdfText).toContain("C".repeat(100));
         expect(boundary.desktop.offenders).toEqual([]);
         expect(boundary.desktop.document).toBeLessThanOrEqual(boundary.desktop.viewport + 1);
         expect(boundary.desktopClipping).toEqual([]);
