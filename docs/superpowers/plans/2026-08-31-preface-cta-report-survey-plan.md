@@ -35,4 +35,3 @@
 - State that the mini quiz is pinned to an older version without the authored content.
 - Do not repin it. Record that choosing a newer version is a separate authorized production-data operation.
 - Include the complete surface survey and the two unrecoverable clipped clauses in the PR/report.
-
