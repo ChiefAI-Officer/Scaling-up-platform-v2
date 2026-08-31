@@ -10,6 +10,12 @@ import {
   validateWriteAuthorization,
   type PromotionInput,
 } from "@/lib/scripts/promote-sunhub-quick-quiz-core";
+import {
+  applyPromotion,
+  loadPromotionInput,
+  quiescePromotion,
+  type DbClient,
+} from "@/lib/scripts/promote-sunhub-quick-quiz-runner";
 
 const SOURCE_UPDATED_AT = new Date("2026-08-31T01:00:00.000Z");
 const QUIESCED_AT = new Date("2026-08-31T01:05:00.000Z");
@@ -368,5 +374,306 @@ describe("promote SunHub quick quiz core", () => {
         },
       },
     });
+  });
+});
+
+type RunnerState = {
+  source: Record<string, unknown>;
+  successor: Record<string, unknown> | null;
+  quiesceReceipts: Array<Record<string, unknown>>;
+  promotionReceipts: Array<Record<string, unknown>>;
+  retiredAliasOwnerId: string | null;
+};
+
+function applyInput(): PromotionInput {
+  const args = writeArgs("apply", QUIESCED_AT);
+  return input({
+    args,
+    sourceCampaign: { ...input().sourceCampaign, status: "CLOSED", updatedAt: QUIESCED_AT },
+    expected: { sourceUpdatedAt: QUIESCED_AT.toISOString(), submissionCount: 12 },
+    now: DRAINED_AT,
+  });
+}
+
+function runnerState(value: PromotionInput = input()): RunnerState {
+  const { submissionCount, ...source } = value.sourceCampaign;
+  return {
+    source: { ...source, _count: { submissions: submissionCount } },
+    successor: null,
+    quiesceReceipts: [],
+    promotionReceipts: [],
+    retiredAliasOwnerId: null,
+  };
+}
+
+function auditReceipt(plan: ReturnType<typeof buildPromotionPlan>, operator = "operator@example.com") {
+  return {
+    entityType: "AssessmentCampaign",
+    entityId: SOURCE_CAMPAIGN_ID,
+    action: plan.manifest.audit.action,
+    performedBy: operator,
+    changes: JSON.stringify(plan.manifest.audit.payload),
+  };
+}
+
+function persistedSuccessor(plan: ReturnType<typeof buildPromotionPlan>) {
+  return {
+    ...plan.successor,
+    organizationId: null,
+    externalId: null,
+    invitedWelcomeSnapshot: null,
+    invitationSubject: null,
+    invitationBodyMarkdown: null,
+    invitationBodyHtml: null,
+    inviteSendStartedAt: null,
+    inviteSendHeartbeatAt: null,
+    invitesSentAt: null,
+    importManifest: null,
+    deletedAt: null,
+    _count: {
+      participants: 0,
+      invitations: 0,
+      submissions: 0,
+      summaryReports: 0,
+    },
+  };
+}
+
+function runnerDb(state: RunnerState, value: PromotionInput = input()) {
+  const assessmentCampaignFindUnique = jest.fn(async (args: { where: { id?: string; alias?: string } }) => {
+    if (args.where.id === SOURCE_CAMPAIGN_ID) return state.source;
+    if (args.where.id === "item7-sunhub-quick-quiz-v7-successor") return state.successor;
+    if (args.where.alias === RETIRED_ALIAS) {
+      return state.retiredAliasOwnerId ? { id: state.retiredAliasOwnerId } : null;
+    }
+    return null;
+  });
+  const assessmentCampaignUpdateMany = jest.fn().mockResolvedValue({ count: 1 });
+  const assessmentCampaignCreate = jest.fn().mockResolvedValue({ id: "item7-sunhub-quick-quiz-v7-successor" });
+  const auditLogFindMany = jest.fn(async (args: { where: { action: string } }) =>
+    args.where.action === "PUBLIC_CAMPAIGN_SUCCESSOR_QUIESCE"
+      ? state.quiesceReceipts
+      : state.promotionReceipts,
+  );
+  const auditLogCreate = jest.fn().mockResolvedValue({});
+  const executeRaw = jest.fn().mockResolvedValue(1);
+  const tx = {
+    assessmentCampaign: {
+      findUnique: assessmentCampaignFindUnique,
+      updateMany: assessmentCampaignUpdateMany,
+      create: assessmentCampaignCreate,
+    },
+    assessmentTemplate: {
+      findUnique: jest.fn().mockResolvedValue(value.template),
+    },
+    assessmentTemplateVersion: {
+      findUnique: jest.fn(async (args: { where: { id: string } }) =>
+        args.where.id === SOURCE_VERSION_ID ? value.sourceVersion : value.targetVersion,
+      ),
+      findFirst: jest.fn().mockResolvedValue({ id: value.latestPublishedVersionId }),
+    },
+    auditLog: {
+      findMany: auditLogFindMany,
+      create: auditLogCreate,
+    },
+    $executeRaw: executeRaw,
+  };
+  const transaction = jest.fn(async (
+    callback: (client: typeof tx) => unknown,
+    options?: { isolationLevel: "Serializable" },
+  ) => {
+    void options;
+    return callback(tx);
+  });
+  return {
+    db: { ...tx, $transaction: transaction } as unknown as DbClient,
+    tx,
+    transaction,
+  };
+}
+
+describe("promote SunHub quick quiz runner", () => {
+  it("loads the dry-run snapshot through read-only queries", async () => {
+    const args = parsePromotionArgs([]);
+    const value = input({ args });
+    const state = runnerState(value);
+    const { db, tx, transaction } = runnerDb(state, value);
+
+    await expect(loadPromotionInput(db, {
+      args,
+      now: value.now,
+    })).resolves.toEqual(value);
+
+    expect(transaction).not.toHaveBeenCalled();
+    expect(tx.assessmentCampaign.updateMany).not.toHaveBeenCalled();
+    expect(tx.assessmentCampaign.create).not.toHaveBeenCalled();
+    expect(tx.auditLog.create).not.toHaveBeenCalled();
+    expect(tx.$executeRaw).not.toHaveBeenCalled();
+  });
+
+  it("quiesces ACTIVE to CLOSED with one exact CAS and an atomic receipt while retaining the live alias", async () => {
+    const value = input();
+    const plan = buildPromotionPlan(value);
+    const { db, tx, transaction } = runnerDb(runnerState(value), value);
+
+    await expect(quiescePromotion(db, plan, "operator@example.com")).resolves.toEqual({
+      status: "quiesced",
+    });
+
+    expect(transaction).toHaveBeenCalledTimes(1);
+    expect(tx.assessmentCampaign.updateMany).toHaveBeenCalledTimes(1);
+    expect(tx.assessmentCampaign.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: SOURCE_CAMPAIGN_ID,
+        versionId: SOURCE_VERSION_ID,
+        alias: LIVE_ALIAS,
+        status: "ACTIVE",
+        deletedAt: null,
+        updatedAt: SOURCE_UPDATED_AT,
+      },
+      data: { status: "CLOSED" },
+    });
+    expect(tx.auditLog.create).toHaveBeenCalledWith({ data: auditReceipt(plan) });
+    expect(tx.assessmentCampaign.create).not.toHaveBeenCalled();
+    expect(tx.$executeRaw).not.toHaveBeenCalled();
+  });
+
+  it("aborts quiescence when its exact CAS matches zero rows", async () => {
+    const value = input();
+    const plan = buildPromotionPlan(value);
+    const { db, tx } = runnerDb(runnerState(value), value);
+    tx.assessmentCampaign.updateMany.mockResolvedValueOnce({ count: 0 });
+
+    await expect(quiescePromotion(db, plan, "operator@example.com")).rejects.toThrow("CAS");
+    expect(tx.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it("applies in one Serializable transaction with a count-protected source CAS, allow-listed successor, and receipt", async () => {
+    const value = applyInput();
+    const plan = buildPromotionPlan(value);
+    const { db, tx, transaction } = runnerDb(runnerState(value), value);
+
+    await expect(applyPromotion(db, plan, "operator@example.com")).resolves.toEqual({
+      status: "applied",
+      successorCampaignId: "item7-sunhub-quick-quiz-v7-successor",
+    });
+
+    expect(transaction).toHaveBeenCalledTimes(1);
+    expect(transaction.mock.calls[0][1]).toEqual({ isolationLevel: "Serializable" });
+    expect(tx.assessmentCampaign.findUnique).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: SOURCE_CAMPAIGN_ID },
+    }));
+    expect(tx.assessmentTemplate.findUnique).toHaveBeenCalled();
+    expect(tx.assessmentTemplateVersion.findUnique).toHaveBeenCalledTimes(2);
+    expect(tx.assessmentTemplateVersion.findFirst).toHaveBeenCalled();
+
+    expect(tx.$executeRaw).toHaveBeenCalledTimes(1);
+    const [sqlParts, ...casValues] = tx.$executeRaw.mock.calls[0];
+    expect(Array.from(sqlParts).join("?")).toContain("COUNT(*)");
+    expect(casValues).toEqual([
+      RETIRED_ALIAS,
+      SOURCE_CAMPAIGN_ID,
+      SOURCE_VERSION_ID,
+      LIVE_ALIAS,
+      "CLOSED",
+      QUIESCED_AT,
+      12,
+    ]);
+    expect(tx.assessmentCampaign.create).toHaveBeenCalledWith({ data: plan.successor });
+    expect(tx.auditLog.create).toHaveBeenCalledWith({ data: auditReceipt(plan) });
+  });
+
+  it("revalidates planner invariants inside apply and writes nothing on drift", async () => {
+    const value = applyInput();
+    const plan = buildPromotionPlan(value);
+    const drifted = { ...value, targetVersion: { ...value.targetVersion, scoringConfig: {} } };
+    const { db, tx } = runnerDb(runnerState(value), drifted);
+
+    await expect(applyPromotion(db, plan, "operator@example.com")).rejects.toMatchObject({
+      field: "targetVersion.scoringConfig",
+    });
+    expect(tx.$executeRaw).not.toHaveBeenCalled();
+    expect(tx.assessmentCampaign.create).not.toHaveBeenCalled();
+    expect(tx.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it("aborts apply when the source alias/count CAS matches zero rows", async () => {
+    const value = applyInput();
+    const plan = buildPromotionPlan(value);
+    const { db, tx } = runnerDb(runnerState(value), value);
+    tx.$executeRaw.mockResolvedValueOnce(0);
+
+    await expect(applyPromotion(db, plan, "operator@example.com")).rejects.toThrow("CAS");
+    expect(tx.assessmentCampaign.create).not.toHaveBeenCalled();
+    expect(tx.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it("returns idempotent for a complete deterministic apply manifest without writes", async () => {
+    const value = applyInput();
+    const plan = buildPromotionPlan(value);
+    const state = runnerState(value);
+    state.source = {
+      ...state.source,
+      alias: RETIRED_ALIAS,
+      status: "CLOSED",
+      updatedAt: DRAINED_AT,
+    };
+    state.successor = persistedSuccessor(plan);
+    state.retiredAliasOwnerId = SOURCE_CAMPAIGN_ID;
+    state.promotionReceipts = [auditReceipt(plan)];
+    const { db, tx } = runnerDb(state, value);
+
+    await expect(applyPromotion(db, plan, "retry@example.com")).resolves.toEqual({
+      status: "idempotent",
+      successorCampaignId: "item7-sunhub-quick-quiz-v7-successor",
+    });
+    expect(tx.$executeRaw).not.toHaveBeenCalled();
+    expect(tx.assessmentCampaign.create).not.toHaveBeenCalled();
+    expect(tx.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["missing receipt", (state: RunnerState) => {
+      state.promotionReceipts = [];
+    }],
+    ["conflicting receipt", (state: RunnerState, plan: ReturnType<typeof buildPromotionPlan>) => {
+      state.promotionReceipts = [{ ...auditReceipt(plan), changes: "{}" }];
+    }],
+    ["conflicting successor", (state: RunnerState) => {
+      state.successor = { ...state.successor, versionId: SOURCE_VERSION_ID };
+    }],
+    ["non-empty successor relations", (state: RunnerState) => {
+      state.successor = { ...state.successor, _count: { participants: 0, invitations: 0, submissions: 1, summaryReports: 0 } };
+    }],
+  ])("rejects partial or conflicting idempotency state: %s", async (_name, mutate) => {
+    const value = applyInput();
+    const plan = buildPromotionPlan(value);
+    const state = runnerState(value);
+    state.source = { ...state.source, alias: RETIRED_ALIAS, status: "CLOSED", updatedAt: DRAINED_AT };
+    state.successor = persistedSuccessor(plan);
+    state.retiredAliasOwnerId = SOURCE_CAMPAIGN_ID;
+    state.promotionReceipts = [auditReceipt(plan)];
+    mutate(state, plan);
+    const { db, tx } = runnerDb(state, value);
+
+    await expect(applyPromotion(db, plan, "operator@example.com")).rejects.toThrow("idempotency");
+    expect(tx.$executeRaw).not.toHaveBeenCalled();
+    expect(tx.assessmentCampaign.create).not.toHaveBeenCalled();
+    expect(tx.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it("returns idempotent for a complete quiescence receipt without changing the live alias", async () => {
+    const value = input();
+    const plan = buildPromotionPlan(value);
+    const state = runnerState(value);
+    state.source = { ...state.source, status: "CLOSED", updatedAt: QUIESCED_AT };
+    state.quiesceReceipts = [auditReceipt(plan)];
+    const { db, tx } = runnerDb(state, value);
+
+    await expect(quiescePromotion(db, plan, "retry@example.com")).resolves.toEqual({
+      status: "idempotent",
+    });
+    expect(tx.assessmentCampaign.updateMany).not.toHaveBeenCalled();
+    expect(tx.auditLog.create).not.toHaveBeenCalled();
   });
 });
