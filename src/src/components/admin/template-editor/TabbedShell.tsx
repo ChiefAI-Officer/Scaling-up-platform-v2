@@ -81,7 +81,7 @@ import {
   deriveReportStylePreviewCapabilities,
   type ReportStyleKey,
 } from "@/lib/assessments/report-style-registry";
-import type { InvitedWelcomeConfigV1 } from "@/lib/assessments/invited-welcome-config";
+import type { InvitedWelcomeConfig } from "@/lib/assessments/invited-welcome-config";
 import { extractMarketingCta } from "@/lib/assessments/marketing-cta";
 import {
   extractReportHtml,
@@ -179,7 +179,7 @@ export interface TemplateEditorTabbedTemplate {
   aggregationMode: "FULL_VISIBILITY" | "CEO_ONLY";
   accessMode?: "INVITED" | "PUBLIC";
   deliveryType?: AssessmentTemplateDeliveryType;
-  invitedWelcomeDefault?: InvitedWelcomeConfigV1;
+  invitedWelcomeDefault?: InvitedWelcomeConfig;
 }
 
 export interface TemplateEditorTabbedVersion {

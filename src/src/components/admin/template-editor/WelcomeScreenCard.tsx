@@ -5,12 +5,12 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import { InvitedWelcomeCard } from "@/components/assessments/InvitedWelcomeCard";
 import {
   splitWelcomeMessage,
-  type InvitedWelcomeAuthoringInputV1,
+  type InvitedWelcomeAuthoringInput,
 } from "@/lib/assessments/invited-welcome-config";
 import type { WelcomeQuestion } from "@/components/assessments/assessment-welcome";
 
 export type WelcomeFieldErrors = Partial<
-  Record<keyof InvitedWelcomeAuthoringInputV1, string>
+  Record<keyof InvitedWelcomeAuthoringInput, string>
 >;
 
 interface EditorQuestion {
@@ -32,7 +32,7 @@ export function WelcomeScreenCard({
   focusRequestToken,
   onChange,
 }: {
-  values: InvitedWelcomeAuthoringInputV1;
+  values: InvitedWelcomeAuthoringInput;
   finePrint: string | null;
   questions: readonly EditorQuestion[];
   sections: readonly unknown[];
@@ -40,9 +40,9 @@ export function WelcomeScreenCard({
   errors?: WelcomeFieldErrors;
   expanded?: boolean;
   onExpandedChange?: (expanded: boolean) => void;
-  focusField?: keyof InvitedWelcomeAuthoringInputV1 | null;
+  focusField?: keyof InvitedWelcomeAuthoringInput | null;
   focusRequestToken?: number;
-  onChange: (patch: Partial<InvitedWelcomeAuthoringInputV1>) => void;
+  onChange: (patch: Partial<InvitedWelcomeAuthoringInput>) => void;
 }) {
   const [localExpanded, setLocalExpanded] = useState(false);
   const expanded = controlledExpanded ?? localExpanded;
@@ -58,7 +58,7 @@ export function WelcomeScreenCard({
   }));
   const summary = values.ledeParagraphs[0] || "Set the first message respondents see.";
   const shortenedSummary = summary.length > 88 ? `${summary.slice(0, 85).trimEnd()}…` : summary;
-  const config = { schemaVersion: 1 as const, ...values, finePrint };
+  const config = { schemaVersion: 2 as const, ...values, finePrint };
 
   function setExpanded(next: boolean) {
     if (controlledExpanded === undefined) setLocalExpanded(next);
@@ -74,7 +74,7 @@ export function WelcomeScreenCard({
   }, [expanded, focusField, focusRequestToken]);
 
   const field = (
-    key: Exclude<keyof InvitedWelcomeAuthoringInputV1, "ledeParagraphs">,
+    key: Exclude<keyof InvitedWelcomeAuthoringInput, "ledeParagraphs">,
     label: string,
     options: { help?: string; multiline?: boolean } = {},
   ) => {
@@ -200,6 +200,7 @@ export function WelcomeScreenCard({
                 ) : null}
               </div>
               {field("sharingHeading", "Sharing heading")}
+              {field("sharingDescription", "Sharing explanation", { multiline: true })}
               {field("scoresHeading", "Scores heading")}
               {field("scoresDescription", "Scores explanation")}
               {field("ctaLabel", "Button label")}

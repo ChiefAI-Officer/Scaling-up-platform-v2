@@ -84,6 +84,7 @@ describe("Welcome screen Save Draft", () => {
             headingTemplate: "{{campaignName}}",
             ledeParagraphs: GENERIC_INVITED_WELCOME_CONFIG.ledeParagraphs,
             sharingHeading: GENERIC_INVITED_WELCOME_CONFIG.sharingHeading,
+            sharingDescription: GENERIC_INVITED_WELCOME_CONFIG.sharingDescription,
             scoresHeading: GENERIC_INVITED_WELCOME_CONFIG.scoresHeading,
             scoresDescription: GENERIC_INVITED_WELCOME_CONFIG.scoresDescription,
             ctaLabel: GENERIC_INVITED_WELCOME_CONFIG.ctaLabel,

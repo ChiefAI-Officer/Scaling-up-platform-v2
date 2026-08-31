@@ -10,11 +10,8 @@ import {
 } from "./assessment-welcome";
 import {
   interpolateWelcomeHeading,
-  type InvitedWelcomeConfigV1,
+  type InvitedWelcomeConfig,
 } from "@/lib/assessments/invited-welcome-config";
-
-const NAMED_ANSWER_DISCLOSURE =
-  "Your coach or facilitator and authorized Scaling Up staff can review your named individual answers.";
 
 export function InvitedWelcomeCard({
   config,
@@ -25,7 +22,7 @@ export function InvitedWelcomeCard({
   headingId = "invite-title",
   preview = false,
 }: {
-  config: InvitedWelcomeConfigV1;
+  config: InvitedWelcomeConfig;
   campaignName: string;
   questions: WelcomeQuestion[];
   sections: unknown[];
@@ -50,7 +47,7 @@ export function InvitedWelcomeCard({
         timeLabel={deriveTimeEstimate(questions.length)}
         expectationText={presentation.expectationText}
         sharingLabel={config.sharingHeading}
-        sharingSub={NAMED_ANSWER_DISCLOSURE}
+        sharingSub={config.sharingDescription}
         scoresLabel={config.scoresHeading}
         scoresSub={config.scoresDescription}
       />

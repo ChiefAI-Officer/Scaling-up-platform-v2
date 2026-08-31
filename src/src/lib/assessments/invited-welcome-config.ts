@@ -12,13 +12,31 @@ export interface InvitedWelcomeConfigV1 {
   finePrint: string | null;
 }
 
-export type InvitedWelcomeAuthoringInputV1 = Omit<
-  InvitedWelcomeConfigV1,
+export interface InvitedWelcomeConfigV2 {
+  schemaVersion: 2;
+  eyebrow: string;
+  headingTemplate: string;
+  ledeParagraphs: string[];
+  sharingHeading: string;
+  sharingDescription: string;
+  scoresHeading: string;
+  scoresDescription: string;
+  ctaLabel: string;
+  finePrint: string | null;
+}
+
+export type InvitedWelcomeConfig = InvitedWelcomeConfigV2;
+
+export type InvitedWelcomeAuthoringInput = Omit<
+  InvitedWelcomeConfig,
   "schemaVersion" | "finePrint"
 >;
 
 export const RESUME_NOTE =
   "Answer in one sitting or come back later — your link stays active.";
+
+export const DEFAULT_INVITED_WELCOME_SHARING_DESCRIPTION =
+  "Your coach or facilitator and authorized Scaling Up staff can review your named individual answers.";
 
 const CONTROL_CHARACTERS = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/;
 const TEMPLATE_TOKEN = /{{[^{}]+}}/g;
@@ -58,7 +76,7 @@ const ledeParagraphsSchema = z
     }
   });
 
-const authoringFieldsSchema = z.object({
+const v1AuthoringFieldsSchema = z.object({
   eyebrow: normalizedText(60),
   headingTemplate: headingTemplateSchema,
   ledeParagraphs: ledeParagraphsSchema,
@@ -66,6 +84,10 @@ const authoringFieldsSchema = z.object({
   scoresHeading: normalizedText(120),
   scoresDescription: normalizedText(400),
   ctaLabel: normalizedText(80),
+});
+
+const authoringFieldsSchema = v1AuthoringFieldsSchema.extend({
+  sharingDescription: normalizedText(400),
 });
 
 export const invitedWelcomeAuthoringInputSchema = authoringFieldsSchema
@@ -81,20 +103,41 @@ export const invitedWelcomeAuthoringInputSchema = authoringFieldsSchema
       }
     }
   })
-  .transform((value): InvitedWelcomeAuthoringInputV1 => ({
+  .transform((value): InvitedWelcomeAuthoringInput => ({
     eyebrow: value.eyebrow,
     headingTemplate: value.headingTemplate,
     ledeParagraphs: value.ledeParagraphs,
     sharingHeading: value.sharingHeading,
+    sharingDescription: value.sharingDescription,
     scoresHeading: value.scoresHeading,
     scoresDescription: value.scoresDescription,
     ctaLabel: value.ctaLabel,
   }));
 
-export const invitedWelcomeConfigSchema = authoringFieldsSchema.extend({
+const invitedWelcomeConfigV1Schema = v1AuthoringFieldsSchema.extend({
   schemaVersion: z.literal(1),
   finePrint: normalizedText(1_000).nullable(),
 });
+
+const invitedWelcomeConfigV2Schema = authoringFieldsSchema.extend({
+  schemaVersion: z.literal(2),
+  finePrint: normalizedText(1_000).nullable(),
+});
+
+export const invitedWelcomeConfigSchema = z
+  .discriminatedUnion("schemaVersion", [
+    invitedWelcomeConfigV1Schema,
+    invitedWelcomeConfigV2Schema,
+  ])
+  .transform((value): InvitedWelcomeConfig =>
+    value.schemaVersion === 2
+      ? value
+      : {
+          ...value,
+          schemaVersion: 2,
+          sharingDescription: DEFAULT_INVITED_WELCOME_SHARING_DESCRIPTION,
+        },
+  );
 
 const DEFAULT_WELCOME_LEDE: string[] = [
   "A quick check on how your team works together. You can answer in one sitting or come back later — your link stays active.",
@@ -123,26 +166,27 @@ export const LEGACY_WELCOME_LEDE_BY_ALIAS: Readonly<
   ]),
 });
 
-export const GENERIC_INVITED_WELCOME_CONFIG: Readonly<InvitedWelcomeConfigV1> =
+export const GENERIC_INVITED_WELCOME_CONFIG: Readonly<InvitedWelcomeConfig> =
   Object.freeze({
-    schemaVersion: 1,
+    schemaVersion: 2,
     eyebrow: "You're invited",
     headingTemplate: "{{campaignName}}",
     ledeParagraphs: DEFAULT_WELCOME_LEDE,
     sharingHeading: "How your answers are shared",
+    sharingDescription: DEFAULT_INVITED_WELCOME_SHARING_DESCRIPTION,
     scoresHeading: "Your category scores",
     scoresDescription: "See where the team stands across each category.",
     ctaLabel: "Start the assessment",
     finePrint: null,
   });
 
-function cloneConfig(config: Readonly<InvitedWelcomeConfigV1>): InvitedWelcomeConfigV1 {
+function cloneConfig(config: Readonly<InvitedWelcomeConfig>): InvitedWelcomeConfig {
   return { ...config, ledeParagraphs: [...config.ledeParagraphs] };
 }
 
 export function resolveLegacyInvitedWelcomeConfig(
   templateAlias: string | null | undefined,
-): InvitedWelcomeConfigV1 {
+): InvitedWelcomeConfig {
   if (
     !templateAlias ||
     !Object.prototype.hasOwnProperty.call(LEGACY_WELCOME_LEDE_BY_ALIAS, templateAlias)
@@ -159,10 +203,10 @@ export function resolveLegacyInvitedWelcomeConfig(
 export function buildInvitedWelcomeConfig(
   input: unknown,
   finePrint: string | null,
-): InvitedWelcomeConfigV1 {
+): InvitedWelcomeConfig {
   const authoring = invitedWelcomeAuthoringInputSchema.parse(input);
   return invitedWelcomeConfigSchema.parse({
-    schemaVersion: 1,
+    schemaVersion: 2,
     ...authoring,
     finePrint,
   });

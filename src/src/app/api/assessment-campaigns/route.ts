@@ -64,7 +64,7 @@ import {
 } from "@/lib/assessments/report-style-policy";
 import { isAdminOwnedAssessmentPresentationEnabled } from "@/lib/assessments/wave-admin-owned-assessment-presentation-flags";
 import { loadInvitedWelcomeSnapshot } from "@/lib/assessments/invited-welcome-snapshot";
-import type { InvitedWelcomeConfigV1 } from "@/lib/assessments/invited-welcome-config";
+import type { InvitedWelcomeConfig } from "@/lib/assessments/invited-welcome-config";
 import { isInvitationBannerEnabled } from "@/lib/assessments/wave-invitation-banner-flags";
 
 function withoutInvitedWelcomeSnapshot<
@@ -525,7 +525,7 @@ export async function POST(request: NextRequest) {
     // Shared create payload. `alias` is overridden on the P2002 fallback path.
     function campaignCreateData(
       alias: string,
-      invitedWelcomeSnapshot: InvitedWelcomeConfigV1,
+      invitedWelcomeSnapshot: InvitedWelcomeConfig,
       resolvedReportStyle: CampaignReportStyleResolution,
     ) {
       return {
@@ -574,7 +574,7 @@ export async function POST(request: NextRequest) {
     async function loadCreationPresentation(
       tx: Prisma.TransactionClient,
     ): Promise<{
-      invitedWelcomeSnapshot: InvitedWelcomeConfigV1;
+      invitedWelcomeSnapshot: InvitedWelcomeConfig;
       resolvedReportStyle: CampaignReportStyleResolution;
     }> {
       const invitedWelcomeSnapshot = await loadInvitedWelcomeSnapshot(

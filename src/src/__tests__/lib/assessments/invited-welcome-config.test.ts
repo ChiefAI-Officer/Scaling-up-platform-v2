@@ -14,6 +14,7 @@ const validAuthoring = {
   headingTemplate: "Welcome to {{campaignName}}",
   ledeParagraphs: ["First paragraph.", "Second paragraph."],
   sharingHeading: "How your answers are shared",
+  sharingDescription: "Only the facilitation team can review these answers.",
   scoresHeading: "Your category scores",
   scoresDescription: "See where the team stands across each category.",
   ctaLabel: "Start the assessment",
@@ -22,13 +23,15 @@ const validAuthoring = {
 describe("invited Welcome config", () => {
   it("matches the current generic invited card", () => {
     expect(GENERIC_INVITED_WELCOME_CONFIG).toEqual({
-      schemaVersion: 1,
+      schemaVersion: 2,
       eyebrow: "You're invited",
       headingTemplate: "{{campaignName}}",
       ledeParagraphs: [
         "A quick check on how your team works together. You can answer in one sitting or come back later — your link stays active.",
       ],
       sharingHeading: "How your answers are shared",
+      sharingDescription:
+        "Your coach or facilitator and authorized Scaling Up staff can review your named individual answers.",
       scoresHeading: "Your category scores",
       scoresDescription: "See where the team stands across each category.",
       ctaLabel: "Start the assessment",
@@ -73,6 +76,7 @@ describe("invited Welcome config", () => {
     ["eyebrow", "x".repeat(61)],
     ["headingTemplate", `{{campaignName}}${"x".repeat(145)}`],
     ["sharingHeading", "x".repeat(121)],
+    ["sharingDescription", "x".repeat(401)],
     ["scoresHeading", "x".repeat(121)],
     ["scoresDescription", "x".repeat(401)],
     ["ctaLabel", "x".repeat(81)],
@@ -144,20 +148,60 @@ describe("invited Welcome config", () => {
     ).toBe(false);
   });
 
+  it("upgrades an exact V1 config in memory and preserves authored V2", () => {
+    const legacyV1 = {
+      schemaVersion: 1,
+      eyebrow: "You're invited",
+      headingTemplate: "{{campaignName}}",
+      ledeParagraphs: ["Legacy paragraph."],
+      sharingHeading: "Who can read this",
+      scoresHeading: "Your scores",
+      scoresDescription: "Review the categories.",
+      ctaLabel: "Begin",
+      finePrint: null,
+    };
+
+    expect(invitedWelcomeConfigSchema.parse(legacyV1)).toEqual({
+      ...legacyV1,
+      schemaVersion: 2,
+      sharingDescription:
+        "Your coach or facilitator and authorized Scaling Up staff can review your named individual answers.",
+    });
+    expect(
+      invitedWelcomeConfigSchema.parse({
+        schemaVersion: 2,
+        ...validAuthoring,
+        finePrint: RESUME_NOTE,
+      }),
+    ).toEqual({
+      schemaVersion: 2,
+      ...validAuthoring,
+      finePrint: RESUME_NOTE,
+    });
+  });
+
   it("fails closed for malformed or future persisted configs", () => {
     expect(invitedWelcomeConfigSchema.safeParse({ ...validAuthoring }).success).toBe(false);
     expect(
       invitedWelcomeConfigSchema.safeParse({
         ...validAuthoring,
+        schemaVersion: 3,
+        finePrint: null,
+      }).success,
+    ).toBe(false);
+    expect(
+      invitedWelcomeConfigSchema.safeParse({
+        ...validAuthoring,
         schemaVersion: 2,
+        sharingDescription: undefined,
         finePrint: null,
       }).success,
     ).toBe(false);
   });
 
-  it("builds a V1 config and preserves only server fine print", () => {
+  it("builds a V2 config and preserves only server fine print", () => {
     expect(buildInvitedWelcomeConfig(validAuthoring, RESUME_NOTE)).toEqual({
-      schemaVersion: 1,
+      schemaVersion: 2,
       ...validAuthoring,
       finePrint: RESUME_NOTE,
     });

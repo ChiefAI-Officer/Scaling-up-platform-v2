@@ -1,7 +1,7 @@
 import {
   invitedWelcomeConfigSchema,
   resolveLegacyInvitedWelcomeConfig,
-  type InvitedWelcomeConfigV1,
+  type InvitedWelcomeConfig,
 } from "./invited-welcome-config";
 
 interface InvitedWelcomeSnapshotTx {
@@ -16,7 +16,7 @@ interface InvitedWelcomeSnapshotTx {
   };
 }
 
-function fresh(config: InvitedWelcomeConfigV1): InvitedWelcomeConfigV1 {
+function fresh(config: InvitedWelcomeConfig): InvitedWelcomeConfig {
   return { ...config, ledeParagraphs: [...config.ledeParagraphs] };
 }
 
@@ -28,7 +28,7 @@ function fresh(config: InvitedWelcomeConfigV1): InvitedWelcomeConfigV1 {
 export async function loadInvitedWelcomeSnapshot(
   tx: InvitedWelcomeSnapshotTx,
   templateId: string,
-): Promise<InvitedWelcomeConfigV1> {
+): Promise<InvitedWelcomeConfig> {
   const template = await tx.assessmentTemplate.findUnique({
     where: { id: templateId },
     select: { alias: true, invitedWelcomeDefault: true },
