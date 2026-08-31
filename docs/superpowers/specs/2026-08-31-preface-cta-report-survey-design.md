@@ -17,12 +17,19 @@ Production read-only evidence on 31 August 2026 established:
 
 - the live campaign id is `cmsm0jlxo0002lvi3lvb8u2gy`;
 - its pinned version id is v1 `cmsm0efu30005dlwfucrosxdm`;
-- it has 12 completed submissions at the time of investigation;
+- it had 12 completed submissions at the time of the initial investigation;
 - target v7 is `cmtd124fz000413xies2p6bh8`;
 - v1 and v7 have byte-equivalent questions, sections, and scoring configuration;
 - v7 additionally owns the intended report HTML and public marketing configuration.
 
-Changing the existing campaign's `versionId` would make its 12 historical submissions appear to belong to v7, because submissions intentionally derive version provenance through their immutable Campaign. Loading report HTML from the latest version at render time would likewise retroactively restyle issued reports and violate the pinned-version contract. Neither is acceptable.
+Two later operator-invoked read-only dry-runs, after the guarded successor CLI was
+implemented, both observed the same source and target identities, source status
+`ACTIVE`, source `updatedAt=2026-08-09T16:27:07.375Z`, and **14** completed
+submissions. The matching reads performed no mutation. The count change from 12 to
+14 is expected live-campaign drift and is why quiesce/apply must use an immediately
+preceding dry-run rather than this design's historical receipt.
+
+Changing the existing campaign's `versionId` would make its historical submissions appear to belong to v7, because submissions intentionally derive version provenance through their immutable Campaign. Loading report HTML from the latest version at render time would likewise retroactively restyle issued reports and violate the pinned-version contract. Neither is acceptable.
 
 ## Completion approach
 
@@ -56,6 +63,34 @@ The successor copies the source's Template id, language, name, description, publ
 
 The successor starts with no submissions and receives fresh timestamps. The source becomes CLOSED but is not deleted.
 
+## Implemented operation and co-validation rulings
+
+The guarded operation is implemented as a pure planner, injected transaction runner,
+and import-safe CLI. Co-validation tightened the design in four material ways:
+
+- the successor allow-list excludes invitation subject/body and invited Welcome
+  fields, and happy-path plans assert the complete manifest with canonical ISO CAS
+  timestamps;
+- idempotent completion requires the persisted default `inviteTiming`, a matching
+  schema-versioned receipt, zero successor relations, and the complete source and
+  successor manifest;
+- every write rejects a blank operator before transaction creation, uses only the
+  callback-scoped transaction client, and revalidates the same planner invariants;
+- generated commands quote every dynamic argument, accept only conservative
+  PostgreSQL DNS hostnames, defer Prisma construction until all write guards pass,
+  and never invent an audit identity.
+
+Consequently, a dry-run without `--operator` intentionally prints only this
+copy-pastable read-only rerun instruction:
+
+```bash
+npx tsx scripts/promote-sunhub-quick-quiz.ts --dry-run --operator '<REQUIRED_NONBLANK_OPERATOR_IDENTITY>'
+```
+
+It does not print `--quiesce`, `--apply`, or the Production acknowledgement. Only a
+fresh dry-run supplied with a real operator identity may render the complete
+shell-quoted next write command.
+
 ## Report-surface survey
 
 | Surface | Authored Preface/Closing contract | Result |
@@ -80,10 +115,62 @@ Acceptance requires exact-boundary browser/PDF proof across Scaling Up Full, Cla
 - Do not add a new authoring surface or expose report HTML to group reports or email.
 - Do not merge or deploy as part of implementing the guarded operation.
 
+## Explicitly unexecuted Production checklist
+
+Every step below remains unexecuted and requires separate Production authorization:
+
+1. Re-run the read-only command above with the real operator identity; verify the
+   exact source/target ids, source `ACTIVE` state, database host, `updatedAt`, and
+   current submission count.
+2. Execute only the exact shell-quoted `--quiesce` command emitted by that dry-run.
+3. Wait at least 15 minutes, then re-run the same read-only command and capture the
+   quiesced `updatedAt` and post-drain submission count.
+4. Execute only the emitted apply command. Its exact argument shape is:
+
+   ```bash
+   npx tsx scripts/promote-sunhub-quick-quiz.ts --apply --i-know-this-is-prod --expect-database-host '<HOST_FROM_POST_DRAIN_DRY_RUN>' --expect-source-updated-at '<POST_QUIESCE_UPDATED_AT>' --expect-submissions '<POST_DRAIN_COUNT>' --operator '<NONBLANK_OPERATOR_IDENTITY>'
+   ```
+
+   The final values do not exist yet because quiesce was not executed; substituting
+   today's ACTIVE receipt would be unsafe and is deliberately not presented as an
+   executable apply command.
+5. Verify the retired v1 source, active v7 successor, complete promotion receipt,
+   unchanged 14-or-later historical v1 submissions, and zero inherited successor
+   relations.
+6. Submit one separately authorized new smoke response through
+   `/quiz/sunhub-quick-quiz` and verify the authored v7 Preface and Closing/CTA in
+   browser and print output.
+
+No quiesce, apply, feature-flag or environment edit, Production write, merge,
+deployment, or smoke submission occurred during implementation or final local
+verification. Therefore Production is **not repaired** by this work.
+
+## Final verification receipt
+
+- Successor planner/runner/CLI: **61/61** tests passed.
+- Report HTML sanitizer: **74/74** tests passed; 24 estimated lines are accepted and
+  25 remain rejected.
+- Public submit coverage: **2 suites / 69 tests** passed.
+- The recovered all-surface command passed **9 suites / 258 tests / 2 snapshots**;
+  its two browser-backed report-style tests could not launch because Playwright
+  Chromium headless-shell revision 1200 is absent from this machine.
+- The capture contract passed **2/2**. The real browser/PDF matrix was attempted and
+  all 52 tests stopped at the same missing browser executable before assertions.
+  Chromium was not installed. The prior branch receipt already recorded **52/52**
+  passing across Scaling Up Full, Classic scored, Classic qualitative, Executive
+  Boardroom, and Modern Dashboard; that evidence is historical, not a fresh pass.
+- Changed-file ESLint emitted no diagnostics, migration safety approved all **51**
+  migrations, and fixed-point `git diff --check` passed.
+- Exact `CI=true npm run build` completed Prisma generation and migration safety,
+  then exited 1 solely because this isolated worktree has no `DIRECT_URL`. No
+  credentials were imported. `CI=true ./node_modules/.bin/next build --turbopack`
+  exited 0 after compilation, TypeScript, and **95/95** static pages; the established
+  missing local database/Inngest warnings remained non-fatal.
+
 ## Acceptance
 
 1. The 24-line Closing boundary is implemented and physically verified across all supported report styles; 25 is rejected.
 2. The all-report survey clearly separates working supported surfaces from never-supported surfaces.
 3. A dry-run-default, explicitly credentialed, CAS-protected, audited two-phase successor operation is implemented test-first.
-4. Read-only dry-run against current state is an explicit operator step outside CI; it proves source/target invariants and prints the exact quiesce or apply command without writing.
-5. After separately authorized execution, `/quiz/sunhub-quick-quiz` serves v7 and a new test submission visibly contains Jeff's authored Preface and Closing/CTA, while the 12 historical submissions remain on the retired v1 campaign.
+4. Read-only dry-run against current state is an explicit operator step outside CI; it proves source/target invariants without writing. Without an operator identity it prints only the safe read-only rerun; with a real operator it prints the exact quiesce or apply command.
+5. After separately authorized execution, `/quiz/sunhub-quick-quiz` serves v7 and a new test submission visibly contains Jeff's authored Preface and Closing/CTA, while the 14-or-later historical submissions remain on the retired v1 campaign. This acceptance item remains pending.
