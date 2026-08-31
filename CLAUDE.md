@@ -18,7 +18,7 @@ the full workshop lifecycle from request through post-event follow-up.
 | **Client** | Jeff Verdun, CIO - Scaling Up |
 | **Operations** | Suzanne (handles manual approvals) |
 | **Integrated main history** | Recent launch receipts: `plans/CHANGELOG.md`. |
-| **Last Updated** | <!-- LAST_UPDATED_ISO:2026-08-31 LAST_UPDATED_SLUG:five-dysfunctions-word-report-parity-implemented --> August 31 — **Five Dysfunctions Word-report visual parity implemented and visually verified in PR #407; hosted checks green.** |
+| **Last Updated** | <!-- LAST_UPDATED_ISO:2026-08-31 LAST_UPDATED_SLUG:five-dysfunctions-word-report-parity-launched --> August 31 — **Five Dysfunctions Word-report parity launched through PR #407; Production deployment and health verified.** |
 | **Jeff #48 validation** | Pre-launch validation passed 15/15 focused suites and 224/224 tests plus the production-context real-component harness/editor Preview coverage. Live production verification was read-only: the invited QSP route returned `200` with `qspStoryGroupEnabled=true`; no valid token was opened, no assessment was submitted, no authenticated editor session was used, and no PUBLIC QSP campaign exists. |
 | **Latest progress** | The [July 10 ledger](docs/agents/jul10-feedback-closeout.md) records 50 DONE, 0 PARTIAL, and 3 NEEDS DECISION. Only #33, #41, and #45 remain; each requires content or report-specific intent before implementation. The [August 1–7 delta](docs/agents/jul10-progress-delta-2026-08-01-to-2026-08-07.md) remains 12 outcomes because later acceptances began after August 7. |
 | **Work Logs** | Session work logs at `~/.claude/worklogs/` — invoke `/log-session` to log or generate reports |

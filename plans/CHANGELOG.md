@@ -6,10 +6,10 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
-<a id="five-dysfunctions-word-report-parity-implemented"></a>
-### 2026-08-31 — Five Dysfunctions Word-report visual parity implemented <!-- ENTRY_ISO:2026-08-31 ENTRY_SLUG:five-dysfunctions-word-report-parity-implemented -->
+<a id="five-dysfunctions-word-report-parity-launched"></a>
+### 2026-08-31 — Five Dysfunctions Word-report visual parity launched <!-- ENTRY_ISO:2026-08-31 ENTRY_SLUG:five-dysfunctions-word-report-parity-launched -->
 
-**Status: PR #407 OPEN + HOSTED CHECKS GREEN + VISUALLY VERIFIED; not merged or deployed.** The Five Dysfunctions individual report now reproduces Jeff's supplied three-page Word composition through the existing `BrandedReport`: Cover → The Five Categories → detailed section-by-section breakdown → closing CTA/footer. The report-specific configuration suppresses the generic Overall Result and All sections score-summary blocks. It does not create another results-by-area section; the existing category section remains the sole category summary.
+**Status: LAUNCHED TO PRODUCTION.** PR #407 merged to `main` as squash `ee304a5f527554b9c1dfa47306ff374c87fc6b41`. The Five Dysfunctions individual report now reproduces Jeff's supplied three-page Word composition through the existing `BrandedReport`: Cover → The Five Categories → detailed section-by-section breakdown → closing CTA/footer. The report-specific configuration suppresses the generic Overall Result and All sections score-summary blocks. It does not create another results-by-area section; the existing category section remains the sole category summary.
 
 **Visual and compatibility boundary.** Each category now presents its compact bordered score/bar/points card on the left and its frozen tier interpretation as a separate unboxed message on the right; below 720px each message stacks directly beneath its score card. Desktop QA at 1440×1000 and mobile QA at 390×844 confirmed all five ordered category rows, the intended section order, zero horizontal overflow, and no duplicate Overall or score-summary block. Five Dysfunctions owns this canonical Classic composition even when an alternate style was previously stored, preventing those renderers from bypassing the Word contract. Scaling Up Full and every non-Five-Dysfunctions report retain their stored-style behavior, shared Overall/table policy, and original unified card structure. Screen, browser print, and PDF continue to use the same report component and stylesheet.
 
@@ -17,7 +17,7 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 **No-write boundary.** No environment variable, feature flag, schema, migration, template/version, campaign, submission, report record, email, or Production data was created, changed, or deleted.
 
-**PR receipt.** PR #407 is mergeable. Build, Migration Safety Gate, Assessment Email Lease (PostgreSQL), Vercel, and Vercel Preview Comments all passed; the preview deployment is Ready. Standards and spec re-review found no remaining issues.
+**Launch receipt.** PR #407 merged after Build, Migration Safety Gate, Assessment Email Lease (PostgreSQL), Vercel, and Vercel Preview Comments passed. Post-merge run `33401875717` passed Build, Migration Safety Gate, and Assessment Email Lease (PostgreSQL). Production deployment `6182926828` reached Ready at `https://scaling-up-platform-v2-35dd8zov5-scaling-up.vercel.app`. Read-only health checks returned HTTP 200 with database `healthy` and auth posture `safe` from both canonical aliases; the exact Production deployment health endpoint returned the same result. The known respondent report route returned the expected unauthenticated HTTP 307 to the sign-in callback. No authenticated Production report was opened and no Production write was performed during smoke testing.
 
 ---
 
