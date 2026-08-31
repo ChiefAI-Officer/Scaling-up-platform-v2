@@ -4,7 +4,17 @@ import { resolveLegacyInvitedWelcomeConfig } from "@/lib/assessments/invited-wel
 describe("invited Welcome backfill verifier", () => {
   it("accepts canonical V1 and V2 legacy rows with untouched public campaigns", () => {
     const qsp = resolveLegacyInvitedWelcomeConfig("qsp-v2");
-    const qspV1 = { ...qsp, schemaVersion: 1 };
+    const qspV1 = {
+      schemaVersion: 1,
+      eyebrow: qsp.eyebrow,
+      headingTemplate: qsp.headingTemplate,
+      ledeParagraphs: qsp.ledeParagraphs,
+      sharingHeading: qsp.sharingHeading,
+      scoresHeading: qsp.scoresHeading,
+      scoresDescription: qsp.scoresDescription,
+      ctaLabel: qsp.ctaLabel,
+      finePrint: qsp.finePrint,
+    };
     const qspV2 = {
       ...qspV1,
       schemaVersion: 2,

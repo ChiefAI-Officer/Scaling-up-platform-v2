@@ -197,6 +197,14 @@ describe("invited Welcome config", () => {
         finePrint: null,
       }).success,
     ).toBe(false);
+    expect(
+      invitedWelcomeConfigSchema.safeParse({
+        schemaVersion: 2,
+        ...validAuthoring,
+        finePrint: null,
+        unversionedFutureField: "must not be discarded",
+      }).success,
+    ).toBe(false);
   });
 
   it("builds a V2 config and preserves only server fine print", () => {

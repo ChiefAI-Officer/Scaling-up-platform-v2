@@ -17,6 +17,8 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 **TDD and local verification receipt.** Compatibility/snapshot/import, renderer/editor/save, and API suites pass **15 suites / 246 tests**. Exact changed-file ESLint is clean and migration safety approves all **51 migrations**. The complete repository run exposed no feature failure, but was not fully green: the established load-sensitive SU Full browser test exceeded its 60-second limit, and two Summary PDF assertions could not import `pdf-parse` from the stale shared dependency install. The exact `CI=true npm run build` reached Prisma generation and migration safety, then stopped because this isolated worktree intentionally has no `DIRECT_URL`. A credential-free Turbopack compile then reached unrelated dependency drift: `@react-pdf/renderer` was absent and the installed `@vercel/blob` was older than the lockfile. A narrow dependency repair was attempted but stopped at `ENOSPC`; the incomplete generated worktree install was removed and its ignored dependency symlink restored. No environment value was supplied or changed.
 
+**Independent review.** Parallel standards and spec reviewers found one shared P2: persisted v1/v2 Zod schemas stripped unknown keys and could conceal an unversioned writer. A witnessed RED test proved the gap; both storage schemas now reject unknown fields while the intentionally permissive authoring transform remains unchanged. The corrected compatibility/verifier matrix passes **5 suites / 48 tests**, reviewer-focused coverage passes **2 suites / 30 tests**, and both reviewers clear the corrected tree with no remaining findings.
+
 ---
 
 <a id="five-dysfunctions-domain-results-merge-authorized"></a>

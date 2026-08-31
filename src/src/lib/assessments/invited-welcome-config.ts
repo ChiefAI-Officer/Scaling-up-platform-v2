@@ -117,12 +117,12 @@ export const invitedWelcomeAuthoringInputSchema = authoringFieldsSchema
 const invitedWelcomeConfigV1Schema = v1AuthoringFieldsSchema.extend({
   schemaVersion: z.literal(1),
   finePrint: normalizedText(1_000).nullable(),
-});
+}).strict();
 
 const invitedWelcomeConfigV2Schema = authoringFieldsSchema.extend({
   schemaVersion: z.literal(2),
   finePrint: normalizedText(1_000).nullable(),
-});
+}).strict();
 
 export const invitedWelcomeConfigSchema = z
   .discriminatedUnion("schemaVersion", [
