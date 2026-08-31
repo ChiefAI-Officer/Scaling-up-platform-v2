@@ -7,6 +7,7 @@
 
 import { stableCanonicalJson } from "@/lib/assessments/assessment-email-delivery-intents";
 import {
+  DRAIN_WINDOW_MS,
   LIVE_ALIAS,
   RETIRED_ALIAS,
   SOURCE_CAMPAIGN_ID,
@@ -428,6 +429,107 @@ function assertCompleteApply(
   ) {
     invariant("idempotency.apply", "partial or conflicting promotion state was found");
   }
+}
+
+function record(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function canonicalIso(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  const parsed = new Date(value);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString() === value;
+}
+
+/**
+ * Reconstruct the pre-apply plan from its durable audit payload. This is only
+ * for inspecting a completed promotion: apply itself keeps using the original
+ * in-memory plan and both paths share assertCompleteApply below.
+ */
+function planFromApplyReceipt(input: PromotionInput, receipts: AuditReceiptRow[]): PromotionPlan {
+  if (receipts.length !== 1) invariant("idempotency.apply", "expected exactly one promotion receipt");
+  const receipt = receipts[0];
+  if (receipt.action !== "PUBLIC_CAMPAIGN_SUCCESSOR_PROMOTION") {
+    invariant("idempotency.apply", "promotion receipt action did not match");
+  }
+
+  let payload: Record<string, unknown> | null = null;
+  try {
+    payload = record(JSON.parse(receipt.changes));
+  } catch {
+    invariant("idempotency.apply", "promotion receipt payload was not JSON");
+  }
+  if (!payload) invariant("idempotency.apply", "promotion receipt payload was not an object");
+
+  const source = record(payload.source);
+  if (
+    !source ||
+    source.id !== SOURCE_CAMPAIGN_ID ||
+    source.versionId !== SOURCE_VERSION_ID ||
+    source.alias !== LIVE_ALIAS ||
+    source.status !== "CLOSED" ||
+    source.deletedAt !== null ||
+    !canonicalIso(source.updatedAt) ||
+    !Number.isSafeInteger(source.submissionCount) ||
+    (source.submissionCount as number) < 0
+  ) {
+    invariant("idempotency.apply", "promotion receipt payload did not contain a valid source CAS");
+  }
+
+  const expected: PromotionExpectedCas = {
+    sourceUpdatedAt: source.updatedAt as string,
+    submissionCount: source.submissionCount as number,
+  };
+  const preApplyInput: PromotionInput = {
+    ...input,
+    args: {
+      mode: "apply",
+      hasProductionAcknowledgement: true,
+      expectedSourceUpdatedAt: expected.sourceUpdatedAt,
+      expectedSubmissionCount: expected.submissionCount,
+    },
+    sourceCampaign: {
+      ...input.sourceCampaign,
+      alias: LIVE_ALIAS,
+      status: "CLOSED",
+      updatedAt: expected.sourceUpdatedAt,
+      submissionCount: expected.submissionCount,
+    },
+    retiredAliasOccupied: false,
+    expected,
+    now: new Date(new Date(expected.sourceUpdatedAt).getTime() + DRAIN_WINDOW_MS),
+  };
+  const plan = buildPromotionPlan(preApplyInput);
+  if (!receiptMatches(receipt, plan)) {
+    invariant("idempotency.apply", "promotion receipt did not match the complete manifest");
+  }
+  return plan;
+}
+
+/**
+ * Inspect a retired source read-only using the exact completed-apply predicate
+ * already used by apply retries. Any partial or conflicting state aborts.
+ */
+export async function inspectCompletedPromotion(
+  db: TransactionClient,
+  input: PromotionInput,
+): Promise<{ status: "complete" } | null> {
+  if (
+    input.sourceCampaign.alias !== RETIRED_ALIAS ||
+    input.sourceCampaign.status !== "CLOSED"
+  ) {
+    return null;
+  }
+
+  const [successor, receipts] = await Promise.all([
+    loadSuccessor(db),
+    loadReceipts(db, "PUBLIC_CAMPAIGN_SUCCESSOR_PROMOTION"),
+  ]);
+  const plan = planFromApplyReceipt(input, receipts);
+  assertCompleteApply(input, successor, receipts, plan);
+  return { status: "complete" };
 }
 
 /** Close the exact source while retaining its live alias and write one receipt. */

@@ -22,11 +22,11 @@ import {
   parsePromotionArgs,
   validateWriteAuthorization,
   type PromotionArgs,
-  type PromotionInput,
   type PromotionPlan,
 } from "@/lib/scripts/promote-sunhub-quick-quiz-core";
 import {
   applyPromotion,
+  inspectCompletedPromotion,
   loadPromotionInput,
   quiescePromotion,
   type DbClient,
@@ -54,16 +54,6 @@ type CliInvocation = {
   operator?: string;
 };
 
-type CompletionCampaign = {
-  id: string;
-  templateId: string;
-  versionId: string;
-  language: string;
-  alias: string;
-  status: string;
-  deletedAt: Date | string | null;
-};
-
 /** Parse the URL with the platform parser; never parse credentials by slicing. */
 export function databaseHostFromUrl(databaseUrl: string | undefined): string {
   if (!databaseUrl) throw new Error("DATABASE_URL is required and must be supplied by the runtime environment.");
@@ -72,12 +62,18 @@ export function databaseHostFromUrl(databaseUrl: string | undefined): string {
   try {
     url = new URL(databaseUrl);
   } catch {
-    throw new Error("DATABASE_URL must be a valid PostgreSQL connection URL.");
+    throw new Error("DATABASE_URL hostname must be a valid conservative DNS hostname.");
   }
   if ((url.protocol !== "postgres:" && url.protocol !== "postgresql:") || url.hostname === "") {
-    throw new Error("DATABASE_URL must be a PostgreSQL connection URL with a hostname.");
+    throw new Error("DATABASE_URL hostname must be a valid conservative DNS hostname.");
   }
-  return url.hostname;
+  const hostname = url.hostname;
+  const label = "[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?";
+  const conservativeDnsHostname = new RegExp(`^(?=.{1,253}$)(?:${label})(?:\\.${label})*$`, "i");
+  if (!conservativeDnsHostname.test(hostname)) {
+    throw new Error("DATABASE_URL hostname must be a valid conservative DNS hostname.");
+  }
+  return hostname;
 }
 
 /** Separate the CLI-only operator identity before the pure core parses its flags. */
@@ -102,25 +98,31 @@ export function parsePromotionCliArgs(argv: string[]): CliInvocation {
 }
 
 function requireOperator(operator: string | undefined): string {
-  if (!operator || operator.trim() === "") throw new Error("--operator must be a nonblank operator identity for every write.");
+  if (!operator || operator.trim() === "" || operator === OPERATOR_PLACEHOLDER) {
+    throw new Error("--operator must be a nonblank operator identity for every write.");
+  }
   return operator;
 }
 
 function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, "'\\\"'\\\"'")}'`;
+  return `'${value.replace(/'/g, "'\"'\"'")}'`;
 }
 
 function writeCommand(mode: "quiesce" | "apply", plan: PromotionPlan, host: string, operator?: string): string {
-  const identity = operator === undefined ? OPERATOR_PLACEHOLDER : shellQuote(operator);
+  const identity = requireOperator(operator);
   return [
     COMMAND,
     `--${mode}`,
     "--i-know-this-is-prod",
-    "--expect-database-host", host,
-    "--expect-source-updated-at", plan.sourceCas.updatedAt,
-    "--expect-submissions", String(plan.sourceCas.submissionCount),
-    "--operator", identity,
+    "--expect-database-host", shellQuote(host),
+    "--expect-source-updated-at", shellQuote(plan.sourceCas.updatedAt),
+    "--expect-submissions", shellQuote(String(plan.sourceCas.submissionCount)),
+    "--operator", shellQuote(identity),
   ].join(" ");
+}
+
+function readOnlyRerunCommand(): string {
+  return `${COMMAND} --dry-run --operator ${shellQuote(OPERATOR_PLACEHOLDER)}`;
 }
 
 /** Format the fully verified dry-run state without doing any I/O. */
@@ -134,6 +136,11 @@ export function formatPromotionOutcome(plan: PromotionPlan, host: string, now: D
   ];
 
   if (plan.sourceCas.status === "ACTIVE") {
+    if (!operator || operator.trim() === "" || operator === OPERATOR_PLACEHOLDER) {
+      lines.push("Source is ACTIVE. A truthful complete write command requires a real operator identity. Re-run this read-only command after replacing the quoted placeholder:");
+      lines.push(readOnlyRerunCommand());
+      return lines;
+    }
     lines.push("Source is ACTIVE. Run this exact quiesce command only after separate Production authorization:");
     lines.push(writeCommand("quiesce", plan, host, operator));
     return lines;
@@ -146,42 +153,14 @@ export function formatPromotionOutcome(plan: PromotionPlan, host: string, now: D
     return lines;
   }
 
+  if (!operator || operator.trim() === "" || operator === OPERATOR_PLACEHOLDER) {
+    lines.push("Source is CLOSED and drained. A truthful complete write command requires a real operator identity. Re-run this read-only command after replacing the quoted placeholder:");
+    lines.push(readOnlyRerunCommand());
+    return lines;
+  }
   lines.push("Source is CLOSED and has drained for at least 15 minutes. Run this exact apply command only after separate Production authorization:");
   lines.push(writeCommand("apply", plan, host, operator));
   return lines;
-}
-
-function completionMatches(input: PromotionInput, successor: CompletionCampaign | null): boolean {
-  const source = input.sourceCampaign;
-  return (
-    source.id === SOURCE_CAMPAIGN_ID &&
-    source.versionId === SOURCE_VERSION_ID &&
-    source.alias === RETIRED_ALIAS &&
-    source.status === "CLOSED" &&
-    source.deletedAt === null &&
-    successor?.id === SUCCESSOR_CAMPAIGN_ID &&
-    successor.templateId === source.templateId &&
-    successor.versionId === TARGET_VERSION_ID &&
-    successor.language === source.language &&
-    successor.alias === LIVE_ALIAS &&
-    successor.status === "ACTIVE" &&
-    successor.deletedAt === null
-  );
-}
-
-async function loadCompletionSuccessor(db: DbClient): Promise<CompletionCampaign | null> {
-  return db.assessmentCampaign.findUnique({
-    where: { id: SUCCESSOR_CAMPAIGN_ID },
-    select: {
-      id: true,
-      templateId: true,
-      versionId: true,
-      language: true,
-      alias: true,
-      status: true,
-      deletedAt: true,
-    },
-  }) as Promise<CompletionCampaign | null>;
 }
 
 function output(write: (line: string) => void, lines: string[]): void {
@@ -209,8 +188,8 @@ export async function runPromotionCli(
   const now = dependencies.now?.() ?? new Date();
   try {
     const input = await loadPromotionInput(db, { args: invocation.args, now });
-    const successor = await loadCompletionSuccessor(db);
-    if (completionMatches(input, successor)) {
+    const completion = await inspectCompletedPromotion(db, input);
+    if (completion) {
       output(write, [
         "SunHub quick-quiz successor promotion is complete.",
         `Retired source: ${SOURCE_CAMPAIGN_ID} (${SOURCE_VERSION_ID}, CLOSED, ${RETIRED_ALIAS}).`,
@@ -245,12 +224,15 @@ export async function runPromotionCli(
 }
 
 async function main(): Promise<void> {
-  const { PrismaClient } = await import("@prisma/client");
-  const prisma = new PrismaClient();
+  let prisma: { $disconnect(): Promise<void> } | undefined;
   await runPromotionCli(process.argv.slice(2), {
-    createDb: () => prisma as unknown as DbClient,
+    createDb: async () => {
+      const { PrismaClient } = await import("@prisma/client");
+      prisma = new PrismaClient();
+      return prisma as unknown as DbClient;
+    },
     databaseUrl: process.env.DATABASE_URL,
-    disconnect: async () => prisma.$disconnect(),
+    disconnect: async () => prisma?.$disconnect(),
   });
 }
 

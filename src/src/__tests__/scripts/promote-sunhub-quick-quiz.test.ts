@@ -13,14 +13,17 @@ import {
 } from "@/lib/scripts/promote-sunhub-quick-quiz-core";
 import {
   applyPromotion,
+  inspectCompletedPromotion,
   loadPromotionInput,
   quiescePromotion,
   type DbClient,
 } from "@/lib/scripts/promote-sunhub-quick-quiz-runner";
 import {
+  databaseHostFromUrl,
   formatPromotionOutcome,
   runPromotionCli,
 } from "../../../scripts/promote-sunhub-quick-quiz";
+import { execFileSync } from "node:child_process";
 
 const SOURCE_UPDATED_AT = new Date("2026-08-31T01:00:00.000Z");
 const QUIESCED_AT = new Date("2026-08-31T01:05:00.000Z");
@@ -747,6 +750,13 @@ describe("promote SunHub quick quiz runner", () => {
 });
 
 describe("promote SunHub quick quiz CLI policy", () => {
+  function shellArguments(command: string): string[] {
+    const output = execFileSync("/bin/sh", ["-c", `set -- ${command}; for value do printf '%s\\n' "$value"; done`], {
+      encoding: "utf8",
+    });
+    return output.trimEnd().split("\n");
+  }
+
   function cliDependencies(db: DbClient, now = DRAINED_AT) {
     const lines: string[] = [];
     return {
@@ -767,7 +777,7 @@ describe("promote SunHub quick quiz CLI policy", () => {
 
     await expect(runPromotionCli([], dependencies)).resolves.toEqual({ state: "ready-to-quiesce" });
 
-    expect(lines.join("\n")).toContain("--quiesce --i-know-this-is-prod");
+    expect(lines.join("\n")).toContain("--dry-run --operator '<REQUIRED_NONBLANK_OPERATOR_IDENTITY>'");
     expect(transaction).not.toHaveBeenCalled();
     expect(root.assessmentCampaign.updateMany).not.toHaveBeenCalled();
     expect(root.assessmentCampaign.create).not.toHaveBeenCalled();
@@ -839,12 +849,16 @@ describe("promote SunHub quick quiz CLI policy", () => {
     expect(transaction).not.toHaveBeenCalled();
   });
 
-  it("prints a complete quiesce command while the source is ACTIVE", () => {
+  it("prints a shell-safe read-only rerun, not a write command, without an operator", () => {
     const plan = buildPromotionPlan(input({ args: parsePromotionArgs([]) }));
+    const output = formatPromotionOutcome(plan, "db.production.internal", DRAINED_AT).join("\n");
 
-    expect(formatPromotionOutcome(plan, "db.production.internal", DRAINED_AT).join("\n")).toContain(
-      `npx tsx scripts/promote-sunhub-quick-quiz.ts --quiesce --i-know-this-is-prod --expect-database-host db.production.internal --expect-source-updated-at ${SOURCE_UPDATED_AT.toISOString()} --expect-submissions 12 --operator`,
-    );
+    expect(output).not.toContain("--quiesce");
+    expect(output).not.toContain("--i-know-this-is-prod");
+    expect(output).toContain("--dry-run --operator '<REQUIRED_NONBLANK_OPERATOR_IDENTITY>'");
+    expect(shellArguments(output.split("\n").at(-1) ?? "")).toEqual([
+      "npx", "tsx", "scripts/promote-sunhub-quick-quiz.ts", "--dry-run", "--operator", "<REQUIRED_NONBLANK_OPERATOR_IDENTITY>",
+    ]);
   });
 
   it("prints a wait without an apply command until CLOSED has drained for 15 minutes", () => {
@@ -860,25 +874,65 @@ describe("promote SunHub quick quiz CLI policy", () => {
     expect(output).not.toContain("--apply");
   });
 
-  it("prints a complete apply command after CLOSED has drained", () => {
+  it("quotes every dynamic write argument through /bin/sh without executing payload", () => {
     const value = input({
       args: parsePromotionArgs([]),
       sourceCampaign: { ...input().sourceCampaign, status: "CLOSED", updatedAt: QUIESCED_AT },
       expected: { sourceUpdatedAt: QUIESCED_AT.toISOString(), submissionCount: 12 },
     });
     const plan = buildPromotionPlan(value);
+    const adversarialPlan = {
+      ...plan,
+      sourceCas: {
+        ...plan.sourceCas,
+        updatedAt: "2026-08-31T01:05:00.000Z;$(not-executed)",
+        submissionCount: 12 as number,
+      },
+    };
+    const command = formatPromotionOutcome(
+      adversarialPlan,
+      "db.example.test;$(not-executed)",
+      DRAINED_AT,
+      "O'Malley; $(not-executed) spaced",
+    ).at(-1) ?? "";
 
-    expect(formatPromotionOutcome(plan, "db.production.internal", DRAINED_AT).join("\n")).toContain(
-      `npx tsx scripts/promote-sunhub-quick-quiz.ts --apply --i-know-this-is-prod --expect-database-host db.production.internal --expect-source-updated-at ${QUIESCED_AT.toISOString()} --expect-submissions 12 --operator`,
-    );
+    expect(shellArguments(command)).toEqual([
+      "npx", "tsx", "scripts/promote-sunhub-quick-quiz.ts", "--apply", "--i-know-this-is-prod",
+      "--expect-database-host", "db.example.test;$(not-executed)",
+      "--expect-source-updated-at", "2026-08-31T01:05:00.000Z;$(not-executed)",
+      "--expect-submissions", "12",
+      "--operator", "O'Malley; $(not-executed) spaced",
+    ]);
+  });
+
+  it.each([
+    "postgresql://operator:password@db.production.internal:5432/platform",
+    "postgres://operator:password@db-2.production.internal/platform",
+  ])("accepts a conservative PostgreSQL hostname: %s", (url) => {
+    expect(databaseHostFromUrl(url)).toMatch(/^[a-z0-9.-]+$/);
+  });
+
+  it.each([
+    "postgresql://operator:password@db$(bad).example/platform",
+    "postgresql://operator:password@db;bad.example/platform",
+    "postgresql://operator:password@db bad.example/platform",
+    "postgresql://operator:password@db..bad.example/platform",
+    "postgresql://operator:password@-db.example/platform",
+    "postgresql://operator:password@db-.example/platform",
+  ])("rejects a non-DNS DATABASE_URL hostname before client construction: %s", async (url) => {
+    const createDb = jest.fn();
+    await expect(runPromotionCli([], { createDb, databaseUrl: url })).rejects.toThrow("hostname");
+    expect(createDb).not.toHaveBeenCalled();
   });
 
   it("reports only the exact retired source and active successor state as complete", async () => {
-    const value = input({ args: parsePromotionArgs([]) });
+    const value = applyInput();
     const plan = buildPromotionPlan(value);
     const state = runnerState(value);
     state.source = { ...state.source, alias: RETIRED_ALIAS, status: "CLOSED" };
     state.successor = persistedSuccessor(plan);
+    state.retiredAliasOwnerId = SOURCE_CAMPAIGN_ID;
+    state.promotionReceipts = [auditReceipt(plan)];
     const { db, transaction } = runnerDb(state, value);
     const { dependencies, lines } = cliDependencies(db);
 
@@ -886,5 +940,26 @@ describe("promote SunHub quick quiz CLI policy", () => {
     expect(lines.join("\n")).toContain("promotion is complete");
     expect(lines.join("\n")).toContain(SUCCESSOR_CAMPAIGN_ID);
     expect(transaction).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["missing receipt", (state: RunnerState) => { state.promotionReceipts = []; }],
+    ["non-default invite timing", (state: RunnerState) => { state.successor = { ...state.successor, inviteTiming: "ON_OPEN" }; }],
+    ["non-zero successor relation", (state: RunnerState) => { state.successor = { ...state.successor, _count: { participants: 0, invitations: 0, submissions: 1, summaryReports: 0 } }; }],
+    ["source field drift", (state: RunnerState) => { state.source = { ...state.source, name: "drift" }; }],
+    ["successor field drift", (state: RunnerState) => { state.successor = { ...state.successor, versionId: SOURCE_VERSION_ID }; }],
+  ])("does not report a partial completed promotion: %s", async (_name, mutate) => {
+    const value = applyInput();
+    const plan = buildPromotionPlan(value);
+    const state = runnerState(value);
+    state.source = { ...state.source, alias: RETIRED_ALIAS, status: "CLOSED" };
+    state.successor = persistedSuccessor(plan);
+    state.retiredAliasOwnerId = SOURCE_CAMPAIGN_ID;
+    state.promotionReceipts = [auditReceipt(plan)];
+    mutate(state);
+    const { db } = runnerDb(state, value);
+    const loaded = await loadPromotionInput(db, { args: parsePromotionArgs([]) });
+
+    await expect(inspectCompletedPromotion(db, loaded)).rejects.toThrow("idempotency.apply");
   });
 });
