@@ -106,7 +106,35 @@ describe("GET /org-survey/[campaignAlias]/me invited Welcome", () => {
     expect(body.data.campaign).not.toHaveProperty("invitedWelcomeDefault");
   });
 
-  it.each([null, { schemaVersion: 99 }, { schemaVersion: 1 }])(
+  it("upgrades a valid frozen V1 snapshot in memory without falling back", async () => {
+    process.env.WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_ENABLED = "1";
+    const legacyV1 = {
+      schemaVersion: 1,
+      eyebrow: "Frozen legacy eyebrow",
+      headingTemplate: "{{campaignName}}",
+      ledeParagraphs: ["Frozen legacy lede."],
+      sharingHeading: "Who reviews this",
+      scoresHeading: "Your scores",
+      scoresDescription: "Review every category.",
+      ctaLabel: "Begin",
+      finePrint: null,
+    };
+    (db.assessmentInvitation.findUnique as jest.Mock).mockResolvedValue(
+      fixture(legacyV1, "qsp-v2"),
+    );
+
+    const response = await GET(new Request("http://localhost/org-survey/demo/me") as never, params);
+    const body = await response.json();
+
+    expect(body.data.invitedWelcome).toEqual({
+      ...legacyV1,
+      schemaVersion: 2,
+      sharingDescription:
+        "Your coach or facilitator and authorized Scaling Up staff can review your named individual answers.",
+    });
+  });
+
+  it.each([null, { schemaVersion: 99 }, { schemaVersion: 1, eyebrow: "partial" }])(
     "uses the exact frozen legacy alias fallback for invalid snapshot %#",
     async (snapshot) => {
       process.env.WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_ENABLED = "1";

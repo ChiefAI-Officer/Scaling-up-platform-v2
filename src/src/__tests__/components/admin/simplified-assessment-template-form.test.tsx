@@ -132,6 +132,7 @@ describe("SimplifiedAssessmentTemplateForm", () => {
       "Heading",
       "Welcome message",
       "Sharing heading",
+      "Sharing explanation",
       "Scores heading",
       "Scores explanation",
       "Button label",
@@ -162,6 +163,9 @@ describe("SimplifiedAssessmentTemplateForm", () => {
     fireEvent.change(screen.getByLabelText("Welcome message"), {
       target: { value: "First paragraph.\n\nSecond paragraph." },
     });
+    fireEvent.change(screen.getByLabelText("Sharing explanation"), {
+      target: { value: "Your facilitator can review your named answers." },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Create and start building" }));
 
     await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
@@ -175,6 +179,7 @@ describe("SimplifiedAssessmentTemplateForm", () => {
         headingTemplate: "{{campaignName}}",
         ledeParagraphs: ["First paragraph.", "Second paragraph."],
         sharingHeading: "How your answers are shared",
+        sharingDescription: "Your facilitator can review your named answers.",
         scoresHeading: "Your category scores",
         scoresDescription: "See where the team stands across each category.",
         ctaLabel: "Start the assessment",

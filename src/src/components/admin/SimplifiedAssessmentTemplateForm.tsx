@@ -8,7 +8,7 @@ import { WelcomeScreenCard, type WelcomeFieldErrors } from "@/components/admin/t
 import {
   GENERIC_INVITED_WELCOME_CONFIG,
   invitedWelcomeAuthoringInputSchema,
-  type InvitedWelcomeAuthoringInputV1,
+  type InvitedWelcomeAuthoringInput,
 } from "@/lib/assessments/invited-welcome-config";
 import { generateTemplateInternalId } from "@/lib/assessments/template-internal-id";
 import { AssessmentDeliveryTypePicker } from "@/components/admin/AssessmentDeliveryTypePicker";
@@ -17,12 +17,13 @@ import type { AssessmentTemplateDeliveryType } from "@prisma/client";
 const NAME_ERROR_ID = "template-assessment-name-error";
 const INTERNAL_ID_ERROR_ID = "template-internal-id-error";
 
-function initialWelcomeValues(): InvitedWelcomeAuthoringInputV1 {
+function initialWelcomeValues(): InvitedWelcomeAuthoringInput {
   return {
     eyebrow: GENERIC_INVITED_WELCOME_CONFIG.eyebrow,
     headingTemplate: GENERIC_INVITED_WELCOME_CONFIG.headingTemplate,
     ledeParagraphs: [...GENERIC_INVITED_WELCOME_CONFIG.ledeParagraphs],
     sharingHeading: GENERIC_INVITED_WELCOME_CONFIG.sharingHeading,
+    sharingDescription: GENERIC_INVITED_WELCOME_CONFIG.sharingDescription,
     scoresHeading: GENERIC_INVITED_WELCOME_CONFIG.scoresHeading,
     scoresDescription: GENERIC_INVITED_WELCOME_CONFIG.scoresDescription,
     ctaLabel: GENERIC_INVITED_WELCOME_CONFIG.ctaLabel,
@@ -52,7 +53,7 @@ export function SimplifiedAssessmentTemplateForm({
   const [welcomeExpanded, setWelcomeExpanded] = useState(false);
   const [welcomeErrors, setWelcomeErrors] = useState<WelcomeFieldErrors>({});
   const [welcomeFocusField, setWelcomeFocusField] = useState<
-    keyof InvitedWelcomeAuthoringInputV1 | null
+    keyof InvitedWelcomeAuthoringInput | null
   >(null);
   const [welcomeFocusRequestToken, setWelcomeFocusRequestToken] = useState(0);
 
@@ -99,17 +100,17 @@ export function SimplifiedAssessmentTemplateForm({
       return;
     }
 
-    let invitedWelcomeDefault: InvitedWelcomeAuthoringInputV1 | undefined;
+    let invitedWelcomeDefault: InvitedWelcomeAuthoringInput | undefined;
     if (welcomeAuthoringEnabled) {
       const parsedWelcome = invitedWelcomeAuthoringInputSchema.safeParse(
         welcomeValues,
       );
       if (!parsedWelcome.success) {
         const errors: WelcomeFieldErrors = {};
-        let firstInvalidField: keyof InvitedWelcomeAuthoringInputV1 | null = null;
+        let firstInvalidField: keyof InvitedWelcomeAuthoringInput | null = null;
         for (const issue of parsedWelcome.error.issues) {
           const key = issue.path[0] as
-            | keyof InvitedWelcomeAuthoringInputV1
+            | keyof InvitedWelcomeAuthoringInput
             | undefined;
           if (!key) continue;
           if (errors[key] === undefined) errors[key] = issue.message;
@@ -128,7 +129,7 @@ export function SimplifiedAssessmentTemplateForm({
       creationMode: "simplified";
       name: string;
       internalId?: string;
-      invitedWelcomeDefault?: InvitedWelcomeAuthoringInputV1;
+      invitedWelcomeDefault?: InvitedWelcomeAuthoringInput;
       deliveryType?: AssessmentTemplateDeliveryType;
     } = {
       creationMode: "simplified",
@@ -236,7 +237,7 @@ export function SimplifiedAssessmentTemplateForm({
           onChange={(patch) => {
             setWelcomeValues((values) => ({ ...values, ...patch }));
             const [field] = Object.keys(patch) as Array<
-              keyof InvitedWelcomeAuthoringInputV1
+              keyof InvitedWelcomeAuthoringInput
             >;
             if (field) {
               setWelcomeErrors((errors) => ({ ...errors, [field]: undefined }));

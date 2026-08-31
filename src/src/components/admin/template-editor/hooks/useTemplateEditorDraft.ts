@@ -58,7 +58,7 @@ import {
   invitedWelcomeAuthoringInputSchema,
   invitedWelcomeConfigSchema,
   resolveLegacyInvitedWelcomeConfig,
-  type InvitedWelcomeAuthoringInputV1,
+  type InvitedWelcomeAuthoringInput,
 } from "@/lib/assessments/invited-welcome-config";
 import {
   mergeMarketingCta,
@@ -198,17 +198,18 @@ export function useTemplateEditorDraft({
   })();
   const welcomeFinePrint = initialWelcome.finePrint;
   const [welcomeValues, setWelcomeValues] =
-    useState<InvitedWelcomeAuthoringInputV1>({
+    useState<InvitedWelcomeAuthoringInput>({
       eyebrow: initialWelcome.eyebrow,
       headingTemplate: initialWelcome.headingTemplate,
       ledeParagraphs: [...initialWelcome.ledeParagraphs],
       sharingHeading: initialWelcome.sharingHeading,
+      sharingDescription: initialWelcome.sharingDescription,
       scoresHeading: initialWelcome.scoresHeading,
       scoresDescription: initialWelcome.scoresDescription,
       ctaLabel: initialWelcome.ctaLabel,
     });
   const [welcomeErrors, setWelcomeErrors] = useState<
-    Partial<Record<keyof InvitedWelcomeAuthoringInputV1, string>>
+    Partial<Record<keyof InvitedWelcomeAuthoringInput, string>>
   >({});
 
   // Version-level editable fields (language only, in this checkpoint).
@@ -354,12 +355,12 @@ export function useTemplateEditorDraft({
     [setMetadataDirty],
   );
   const handleWelcomeFieldChange = useCallback(
-    (patch: Partial<InvitedWelcomeAuthoringInputV1>) => {
+    (patch: Partial<InvitedWelcomeAuthoringInput>) => {
       setWelcomeValues((prev) => ({ ...prev, ...patch }));
       setWelcomeErrors((prev) => {
         const next = { ...prev };
         for (const key of Object.keys(patch) as Array<
-          keyof InvitedWelcomeAuthoringInputV1
+          keyof InvitedWelcomeAuthoringInput
         >) {
           delete next[key];
         }
@@ -982,18 +983,18 @@ export function useTemplateEditorDraft({
     }
     setSavingDraft(true);
     try {
-      let invitedWelcomePayload: InvitedWelcomeAuthoringInputV1 | undefined;
+      let invitedWelcomePayload: InvitedWelcomeAuthoringInput | undefined;
       if (dirtyFlags.welcome) {
         const parsedWelcome = invitedWelcomeAuthoringInputSchema.safeParse(
           welcomeValues,
         );
         if (!parsedWelcome.success) {
           const errors: Partial<
-            Record<keyof InvitedWelcomeAuthoringInputV1, string>
+            Record<keyof InvitedWelcomeAuthoringInput, string>
           > = {};
           for (const issue of parsedWelcome.error.issues) {
             const key = issue.path[0] as
-              | keyof InvitedWelcomeAuthoringInputV1
+              | keyof InvitedWelcomeAuthoringInput
               | undefined;
             if (key && errors[key] === undefined) errors[key] = issue.message;
           }

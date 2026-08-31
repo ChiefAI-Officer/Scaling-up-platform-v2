@@ -69,7 +69,8 @@ import { InvitedWelcomeCard } from "@/components/assessments/InvitedWelcomeCard"
 import {
   invitedWelcomeConfigSchema,
   resolveLegacyInvitedWelcomeConfig,
-  type InvitedWelcomeConfigV1,
+  DEFAULT_INVITED_WELCOME_SHARING_DESCRIPTION,
+  type InvitedWelcomeConfig,
 } from "@/lib/assessments/invited-welcome-config";
 
 // Wave OSR (#71) — the in-place report needs the report stylesheets. This route
@@ -140,7 +141,7 @@ interface SurveyData {
    * no-op leaves the section pages unchanged. The client never sanitizes.
    */
   customSlides?: SafeSlide[];
-  invitedWelcome?: InvitedWelcomeConfigV1;
+  invitedWelcome?: InvitedWelcomeConfig;
 }
 
 type Phase =
@@ -695,7 +696,7 @@ export function OrgSurveyClient({
               timeLabel={timeEstimate}
               expectationText={welcomePresentation.expectationText}
               sharingLabel="How your answers are shared"
-              sharingSub="Your coach or facilitator and authorized Scaling Up staff can review your named individual answers."
+              sharingSub={DEFAULT_INVITED_WELCOME_SHARING_DESCRIPTION}
               scoresSub="See where the team stands across each category."
             />
             <WelcomeStats

@@ -2,15 +2,32 @@ import { verifyInvitedWelcomeBackfill } from "@/lib/assessments/invited-welcome-
 import { resolveLegacyInvitedWelcomeConfig } from "@/lib/assessments/invited-welcome-config";
 
 describe("invited Welcome backfill verifier", () => {
-  it("reports valid invited coverage and untouched public campaigns", () => {
+  it("accepts canonical V1 and V2 legacy rows with untouched public campaigns", () => {
     const qsp = resolveLegacyInvitedWelcomeConfig("qsp-v2");
+    const qspV1 = {
+      schemaVersion: 1,
+      eyebrow: qsp.eyebrow,
+      headingTemplate: qsp.headingTemplate,
+      ledeParagraphs: qsp.ledeParagraphs,
+      sharingHeading: qsp.sharingHeading,
+      scoresHeading: qsp.scoresHeading,
+      scoresDescription: qsp.scoresDescription,
+      ctaLabel: qsp.ctaLabel,
+      finePrint: qsp.finePrint,
+    };
+    const qspV2 = {
+      ...qspV1,
+      schemaVersion: 2,
+      sharingDescription:
+        "Your coach or facilitator and authorized Scaling Up staff can review your named individual answers.",
+    };
     const result = verifyInvitedWelcomeBackfill({
       templates: [
-        { id: "t1", alias: "qsp-v2", deletedAt: null, invitedWelcomeDefault: qsp },
+        { id: "t1", alias: "qsp-v2", deletedAt: null, invitedWelcomeDefault: qspV1 },
         { id: "t2", alias: "old", deletedAt: new Date(), invitedWelcomeDefault: null },
       ],
       campaigns: [
-        { id: "c1", accessMode: "INVITED", templateAlias: "qsp-v2", invitedWelcomeSnapshot: qsp },
+        { id: "c1", accessMode: "INVITED", templateAlias: "qsp-v2", invitedWelcomeSnapshot: qspV2 },
         { id: "c2", accessMode: "PUBLIC", templateAlias: "qsp-v2", invitedWelcomeSnapshot: null },
       ],
       immutabilityTriggerPresent: true,

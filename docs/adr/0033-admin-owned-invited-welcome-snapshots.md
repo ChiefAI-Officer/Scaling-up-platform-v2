@@ -24,6 +24,14 @@ It is template-row presentation metadata, outside Template Version content and
 its hash. The Build tab edits a versioned structured plain-text contract; the
 server owns the schema version and protected fine print.
 
+The storage contract is forward-versioned. Schema v2 adds the required
+`sharingDescription` authoring field. Readers continue to accept valid v1
+objects and normalize them in memory with the exact former disclosure sentence;
+explicit template saves and newly created invited campaigns write v2. Existing
+template or campaign JSON is not rewritten, and the immutable campaign trigger
+continues to prohibit snapshot updates. Malformed and unknown future versions
+remain invalid and use the existing safe fallback behavior.
+
 Every new `INVITED` campaign copies the resolved template default into
 `AssessmentCampaign.invitedWelcomeSnapshot` in the same transaction that
 creates the campaign. That snapshot is the participant read source and is
