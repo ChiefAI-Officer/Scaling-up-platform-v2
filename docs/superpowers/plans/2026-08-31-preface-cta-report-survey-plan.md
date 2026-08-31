@@ -203,7 +203,7 @@ git add CLAUDE.md plans/CHANGELOG.md docs/superpowers/specs/2026-08-31-preface-c
 git commit -m "docs: record mini quiz successor operation"
 ```
 
-- [ ] **Step 5: Complete review and PR update**
+- [x] **Step 5: Complete review and PR update**
 
 Review from the fixed point, remediate actionable findings, rerun affected checks, push the branch, update PR #405, and wait for every hosted check. Keep merge, deployment, feature-flag changes, and Production apply out of scope.
 
