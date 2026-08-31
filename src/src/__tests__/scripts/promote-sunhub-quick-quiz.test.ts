@@ -133,6 +133,7 @@ describe("promote SunHub quick quiz core", () => {
     expect(() => parsePromotionArgs(["--quiesce", "--quiesce"])).toThrow("mode");
     expect(() => parsePromotionArgs(["--quiesce"])).toThrow("expect-database-host");
     expect(() => parsePromotionArgs(["--apply", "--expect-database-host", "db", "--expect-source-updated-at", "not-a-date", "--expect-submissions", "12"])).toThrow("expect-source-updated-at");
+    expect(() => parsePromotionArgs(["--apply", "--expect-database-host", "db", "--expect-source-updated-at", "2026-08-31T01:00:00Z", "--expect-submissions", "12"])).toThrow("expect-source-updated-at");
     expect(() => parsePromotionArgs(["--quiesce", "--expect-database-host", "db", "--expect-source-updated-at", SOURCE_UPDATED_AT.toISOString(), "--expect-submissions", "1.5"])).toThrow("expect-submissions");
   });
 
@@ -140,32 +141,93 @@ describe("promote SunHub quick quiz core", () => {
     const plan = buildPromotionPlan(input());
 
     expect(RETIRED_ALIAS).toBe("sunhub-quick-quiz-retired-v1");
-    expect(plan.manifest).toMatchObject({
-      schemaVersion: 1,
-      source: { campaignId: SOURCE_CAMPAIGN_ID, versionId: SOURCE_VERSION_ID, alias: LIVE_ALIAS },
-      target: { versionId: TARGET_VERSION_ID },
+    expect(plan).toEqual({
+      mode: "quiesce",
+      sourceCas: {
+        id: SOURCE_CAMPAIGN_ID,
+        versionId: SOURCE_VERSION_ID,
+        alias: LIVE_ALIAS,
+        status: "ACTIVE",
+        deletedAt: null,
+        updatedAt: SOURCE_UPDATED_AT.toISOString(),
+        submissionCount: 12,
+      },
       successor: {
         id: "item7-sunhub-quick-quiz-v7-successor",
+        templateId: "template-sunhub",
+        language: "en",
         alias: LIVE_ALIAS,
         versionId: TARGET_VERSION_ID,
+        name: "SunHub quick quiz",
+        description: "Eight questions",
+        status: "ACTIVE",
+        accessMode: "PUBLIC",
+        publicConfig: { landing: "sunhub" },
+        openAt: new Date("2026-01-01T00:00:00.000Z"),
+        endMode: "OPEN_END",
+        closeAt: null,
+        notifyAdminOnSubmit: true,
+        sendResultsToRespondent: false,
+        notifyCoachOnCompletion: false,
+        showResultsOnScreen: true,
+        reportStyle: "CLASSIC",
+        reportStyleSource: "TEMPLATE_DEFAULT",
+        reportStyleLockedAt: null,
+        customSlides: [{ title: "Welcome" }],
+        createdBy: "admin-1",
+        createdByCoachId: null,
       },
-      expected: { sourceUpdatedAt: SOURCE_UPDATED_AT.toISOString(), submissionCount: 12 },
-      audit: { action: "PUBLIC_CAMPAIGN_SUCCESSOR_QUIESCE" },
-    });
-    expect(plan.successor).toMatchObject({
-      templateId: "template-sunhub",
-      language: "en",
-      name: "SunHub quick quiz",
-      customSlides: [{ title: "Welcome" }],
-    });
-    expect(plan.sourceCas).toEqual({
-      id: SOURCE_CAMPAIGN_ID,
-      versionId: SOURCE_VERSION_ID,
-      alias: LIVE_ALIAS,
-      status: "ACTIVE",
-      deletedAt: null,
-      updatedAt: SOURCE_UPDATED_AT.toISOString(),
-      submissionCount: 12,
+      manifest: {
+        schemaVersion: 1,
+        operation: "sunhub-quick-quiz-successor-promotion",
+        mode: "quiesce",
+        source: { campaignId: SOURCE_CAMPAIGN_ID, templateId: "template-sunhub", versionId: SOURCE_VERSION_ID, alias: LIVE_ALIAS },
+        target: { versionId: TARGET_VERSION_ID, templateId: "template-sunhub", language: "en" },
+        successor: { id: "item7-sunhub-quick-quiz-v7-successor", alias: LIVE_ALIAS, versionId: TARGET_VERSION_ID, templateId: "template-sunhub" },
+        expected: { sourceUpdatedAt: SOURCE_UPDATED_AT.toISOString(), submissionCount: 12 },
+        audit: {
+          action: "PUBLIC_CAMPAIGN_SUCCESSOR_QUIESCE",
+          payload: {
+            schemaVersion: 1,
+            source: {
+              id: SOURCE_CAMPAIGN_ID,
+              versionId: SOURCE_VERSION_ID,
+              alias: LIVE_ALIAS,
+              status: "ACTIVE",
+              deletedAt: null,
+              updatedAt: SOURCE_UPDATED_AT.toISOString(),
+              submissionCount: 12,
+            },
+            targetVersionId: TARGET_VERSION_ID,
+            successor: {
+              id: "item7-sunhub-quick-quiz-v7-successor",
+              templateId: "template-sunhub",
+              versionId: TARGET_VERSION_ID,
+              language: "en",
+              alias: LIVE_ALIAS,
+              name: "SunHub quick quiz",
+              description: "Eight questions",
+              status: "ACTIVE",
+              accessMode: "PUBLIC",
+              publicConfig: { landing: "sunhub" },
+              openAt: new Date("2026-01-01T00:00:00.000Z"),
+              endMode: "OPEN_END",
+              closeAt: null,
+              notifyAdminOnSubmit: true,
+              sendResultsToRespondent: false,
+              notifyCoachOnCompletion: false,
+              showResultsOnScreen: true,
+              reportStyle: "CLASSIC",
+              reportStyleSource: "TEMPLATE_DEFAULT",
+              reportStyleLockedAt: null,
+              customSlides: [{ title: "Welcome" }],
+              createdBy: "admin-1",
+              createdByCoachId: null,
+            },
+            retiredAlias: RETIRED_ALIAS,
+          },
+        },
+      },
     });
   });
 
@@ -176,12 +238,12 @@ describe("promote SunHub quick quiz core", () => {
     expect(() => validateWriteAuthorization(args, "db.production.internal")).not.toThrow();
   });
 
-  it.each([
+  const invariantCases: Array<[string, (value: PromotionInput) => PromotionInput, string]> = [
     ["source campaign id", (value: PromotionInput) => ({ ...value, sourceCampaign: { ...value.sourceCampaign, id: "wrong" } }), "sourceCampaign.id"],
     ["source version id", (value: PromotionInput) => ({ ...value, sourceCampaign: { ...value.sourceCampaign, versionId: "wrong" } }), "sourceCampaign.versionId"],
     ["template relationship", (value: PromotionInput) => ({ ...value, sourceVersion: { ...value.sourceVersion, templateId: "wrong" } }), "sourceVersion.templateId"],
     ["language", (value: PromotionInput) => ({ ...value, targetVersion: { ...value.targetVersion, language: "fr" } }), "targetVersion.language"],
-    ["source status", (value: PromotionInput) => ({ ...value, sourceCampaign: { ...value.sourceCampaign, status: "CLOSED" } }), "sourceCampaign.status"],
+    ["source status", (value: PromotionInput) => ({ ...value, sourceCampaign: { ...value.sourceCampaign, status: "CLOSED" as const } }), "sourceCampaign.status"],
     ["public access", (value: PromotionInput) => ({ ...value, sourceCampaign: { ...value.sourceCampaign, accessMode: "INVITED" } }), "sourceCampaign.accessMode"],
     ["deleted template", (value: PromotionInput) => ({ ...value, template: { ...value.template, deletedAt: SOURCE_UPDATED_AT } }), "template.deletedAt"],
     ["disabled template", (value: PromotionInput) => ({ ...value, template: { ...value.template, disabledAt: SOURCE_UPDATED_AT } }), "template.disabledAt"],
@@ -196,7 +258,9 @@ describe("promote SunHub quick quiz core", () => {
     ["scoring", (value: PromotionInput) => ({ ...value, targetVersion: { ...value.targetVersion, scoringConfig: {} } }), "targetVersion.scoringConfig"],
     ["source updated at", (value: PromotionInput) => ({ ...value, expected: { ...value.expected, sourceUpdatedAt: "2026-08-31T00:00:00.000Z" } }), "sourceCampaign.updatedAt"],
     ["submission count", (value: PromotionInput) => ({ ...value, expected: { ...value.expected, submissionCount: 11 } }), "sourceCampaign.submissionCount"],
-  ])("rejects invariant drift in %s", (_name, mutate, field) => {
+  ];
+
+  it.each(invariantCases)("rejects invariant drift in %s", (_name, mutate, field) => {
     expectInvariant(mutate, field);
   });
 
@@ -216,8 +280,93 @@ describe("promote SunHub quick quiz core", () => {
       args,
       sourceCampaign: { ...input().sourceCampaign, status: "CLOSED", updatedAt: QUIESCED_AT },
       expected: { sourceUpdatedAt: QUIESCED_AT.toISOString(), submissionCount: 12 },
-    }))).toMatchObject({
-      manifest: { audit: { action: "PUBLIC_CAMPAIGN_SUCCESSOR_PROMOTION" } },
+    }))).toEqual({
+      mode: "apply",
+      sourceCas: {
+        id: SOURCE_CAMPAIGN_ID,
+        versionId: SOURCE_VERSION_ID,
+        alias: LIVE_ALIAS,
+        status: "CLOSED",
+        deletedAt: null,
+        updatedAt: QUIESCED_AT.toISOString(),
+        submissionCount: 12,
+      },
+      successor: {
+        id: "item7-sunhub-quick-quiz-v7-successor",
+        templateId: "template-sunhub",
+        versionId: TARGET_VERSION_ID,
+        language: "en",
+        alias: LIVE_ALIAS,
+        name: "SunHub quick quiz",
+        description: "Eight questions",
+        status: "ACTIVE",
+        accessMode: "PUBLIC",
+        publicConfig: { landing: "sunhub" },
+        openAt: new Date("2026-01-01T00:00:00.000Z"),
+        endMode: "OPEN_END",
+        closeAt: null,
+        notifyAdminOnSubmit: true,
+        sendResultsToRespondent: false,
+        notifyCoachOnCompletion: false,
+        showResultsOnScreen: true,
+        reportStyle: "CLASSIC",
+        reportStyleSource: "TEMPLATE_DEFAULT",
+        reportStyleLockedAt: null,
+        customSlides: [{ title: "Welcome" }],
+        createdBy: "admin-1",
+        createdByCoachId: null,
+      },
+      manifest: {
+        schemaVersion: 1,
+        operation: "sunhub-quick-quiz-successor-promotion",
+        mode: "apply",
+        source: { campaignId: SOURCE_CAMPAIGN_ID, templateId: "template-sunhub", versionId: SOURCE_VERSION_ID, alias: LIVE_ALIAS },
+        target: { versionId: TARGET_VERSION_ID, templateId: "template-sunhub", language: "en" },
+        successor: { id: "item7-sunhub-quick-quiz-v7-successor", alias: LIVE_ALIAS, versionId: TARGET_VERSION_ID, templateId: "template-sunhub" },
+        expected: { sourceUpdatedAt: QUIESCED_AT.toISOString(), submissionCount: 12 },
+        audit: {
+          action: "PUBLIC_CAMPAIGN_SUCCESSOR_PROMOTION",
+          payload: {
+            schemaVersion: 1,
+            source: {
+              id: SOURCE_CAMPAIGN_ID,
+              versionId: SOURCE_VERSION_ID,
+              alias: LIVE_ALIAS,
+              status: "CLOSED",
+              deletedAt: null,
+              updatedAt: QUIESCED_AT.toISOString(),
+              submissionCount: 12,
+            },
+            targetVersionId: TARGET_VERSION_ID,
+            successor: {
+              id: "item7-sunhub-quick-quiz-v7-successor",
+              templateId: "template-sunhub",
+              versionId: TARGET_VERSION_ID,
+              language: "en",
+              alias: LIVE_ALIAS,
+              name: "SunHub quick quiz",
+              description: "Eight questions",
+              status: "ACTIVE",
+              accessMode: "PUBLIC",
+              publicConfig: { landing: "sunhub" },
+              openAt: new Date("2026-01-01T00:00:00.000Z"),
+              endMode: "OPEN_END",
+              closeAt: null,
+              notifyAdminOnSubmit: true,
+              sendResultsToRespondent: false,
+              notifyCoachOnCompletion: false,
+              showResultsOnScreen: true,
+              reportStyle: "CLASSIC",
+              reportStyleSource: "TEMPLATE_DEFAULT",
+              reportStyleLockedAt: null,
+              customSlides: [{ title: "Welcome" }],
+              createdBy: "admin-1",
+              createdByCoachId: null,
+            },
+            retiredAlias: RETIRED_ALIAS,
+          },
+        },
+      },
     });
   });
 });

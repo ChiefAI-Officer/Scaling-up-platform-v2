@@ -110,6 +110,10 @@ export type SuccessorCampaignFields = Omit<
   | "deletedAt"
   | "updatedAt"
   | "submissionCount"
+  | "invitedWelcomeSnapshot"
+  | "invitationSubject"
+  | "invitationBodyMarkdown"
+  | "invitationBodyHtml"
 > & {
   id: string;
   versionId: string;
@@ -170,6 +174,13 @@ function parseIso(value: Date | string, field: string): string {
   return date.toISOString();
 }
 
+/** Accept only the canonical ISO representation used by compare-and-swap. */
+function parseCanonicalIso(value: string, field: string): string {
+  const parsed = parseIso(value, field);
+  if (parsed !== value) fail(field, "must be a canonical ISO timestamp");
+  return parsed;
+}
+
 function readFlagValue(argv: string[], flag: string): string | undefined {
   const positions = argv.reduce<number[]>((result, value, index) => {
     if (value === flag) result.push(index);
@@ -225,7 +236,7 @@ export function parsePromotionArgs(argv: string[]): PromotionArgs {
       mode,
       hasProductionAcknowledgement: argv.includes("--i-know-this-is-prod"),
       ...(expectedDatabaseHost ? { expectedDatabaseHost } : {}),
-      ...(expectedSourceUpdatedAt ? { expectedSourceUpdatedAt: parseIso(expectedSourceUpdatedAt, "expect-source-updated-at") } : {}),
+      ...(expectedSourceUpdatedAt ? { expectedSourceUpdatedAt: parseCanonicalIso(expectedSourceUpdatedAt, "expect-source-updated-at") } : {}),
       ...(expectedSubmissions ? { expectedSubmissionCount: parseSubmissionCount(expectedSubmissions) } : {}),
     };
   }
@@ -234,7 +245,7 @@ export function parsePromotionArgs(argv: string[]): PromotionArgs {
     mode,
     hasProductionAcknowledgement: argv.includes("--i-know-this-is-prod"),
     expectedDatabaseHost: requireWriteValue(expectedDatabaseHost, "expect-database-host"),
-    expectedSourceUpdatedAt: parseIso(
+    expectedSourceUpdatedAt: parseCanonicalIso(
       requireWriteValue(expectedSourceUpdatedAt, "expect-source-updated-at"),
       "expect-source-updated-at",
     ),
@@ -311,7 +322,7 @@ function auditAction(mode: PromotionMode): PromotionManifest["audit"]["action"] 
 export function buildPromotionPlan(input: PromotionInput): PromotionPlan {
   const { args, sourceCampaign, sourceVersion, targetVersion, template, expected } = input;
   const sourceUpdatedAt = parseIso(sourceCampaign.updatedAt, "sourceCampaign.updatedAt");
-  const expectedUpdatedAt = parseIso(expected.sourceUpdatedAt, "expected.sourceUpdatedAt");
+  const expectedUpdatedAt = parseCanonicalIso(expected.sourceUpdatedAt, "expected.sourceUpdatedAt");
   const sourceStatus = expectedStatus(args.mode, sourceCampaign.status);
 
   if (sourceCampaign.id !== SOURCE_CAMPAIGN_ID) fail("sourceCampaign.id", "does not match the compiled source campaign");
@@ -363,20 +374,16 @@ export function buildPromotionPlan(input: PromotionInput): PromotionPlan {
     status: "ACTIVE",
     accessMode: sourceCampaign.accessMode,
     publicConfig: sourceCampaign.publicConfig,
-    invitedWelcomeSnapshot: sourceCampaign.invitedWelcomeSnapshot,
     openAt: sourceCampaign.openAt,
     endMode: sourceCampaign.endMode,
     closeAt: sourceCampaign.closeAt,
     notifyAdminOnSubmit: sourceCampaign.notifyAdminOnSubmit,
-    invitationSubject: sourceCampaign.invitationSubject,
-    invitationBodyMarkdown: sourceCampaign.invitationBodyMarkdown,
     sendResultsToRespondent: sourceCampaign.sendResultsToRespondent,
     notifyCoachOnCompletion: sourceCampaign.notifyCoachOnCompletion,
     showResultsOnScreen: sourceCampaign.showResultsOnScreen,
     reportStyle: sourceCampaign.reportStyle,
     reportStyleSource: sourceCampaign.reportStyleSource,
     reportStyleLockedAt: sourceCampaign.reportStyleLockedAt,
-    invitationBodyHtml: sourceCampaign.invitationBodyHtml,
     customSlides: sourceCampaign.customSlides,
     createdBy: sourceCampaign.createdBy,
     createdByCoachId: sourceCampaign.createdByCoachId,
