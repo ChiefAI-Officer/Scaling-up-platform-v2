@@ -10,6 +10,8 @@
 
 **Spec:** `docs/superpowers/specs/2026-08-31-preface-cta-report-survey-design.md`
 
+**Command working directory:** Run Node, Jest, ESLint, migration-safety, and build commands from the app root, `src/`. File paths in each task are repository-root-relative.
+
 ## Global Constraints
 
 - Exact source campaign: `cmsm0jlxo0002lvi3lvb8u2gy`, alias `sunhub-quick-quiz`, version `cmsm0efu30005dlwfucrosxdm` (v1).
@@ -27,12 +29,13 @@
 ### Task 1: Pure successor plan and invariant failures
 
 **Files:**
-- Create: `src/lib/scripts/promote-sunhub-quick-quiz-core.ts`
-- Test: `src/__tests__/scripts/promote-sunhub-quick-quiz.test.ts`
+- Create: `src/src/lib/scripts/promote-sunhub-quick-quiz-core.ts`
+- Test: `src/src/__tests__/scripts/promote-sunhub-quick-quiz.test.ts`
 
 **Interfaces:**
 - Produces: `parsePromotionArgs(argv: string[]): PromotionArgs`.
 - Produces: `buildPromotionPlan(input: PromotionInput): PromotionPlan`.
+- Produces: `validateWriteAuthorization(args, actualDatabaseHost): void`.
 - Produces constants `SOURCE_CAMPAIGN_ID`, `SOURCE_VERSION_ID`, `TARGET_VERSION_ID`, `LIVE_ALIAS`, and `RETIRED_ALIAS`.
 - `PromotionInput` contains source campaign, source/target versions, latest published version id, retired-alias occupancy, and expected CAS values.
 
@@ -48,7 +51,7 @@ Expected: FAIL because the core module does not exist.
 
 - [ ] **Step 3: Implement the pure planner**
 
-Compare the stored JSON payloads exactly as Prisma returns them; do not add a second content-hash scheme. Return a schema-versioned manifest containing exact source/target identity, deterministic successor id, copied successor fields, expected CAS values, and audit payload; throw field-specific `PromotionInvariantError` messages for every failed guard.
+Compare stored JSON payloads with the existing `stableCanonicalJson` helper; do not add a second canonicalization or content-hash scheme. Return a schema-versioned manifest containing exact source/target identity, deterministic successor id, copied successor fields, expected CAS values, and audit payload; throw field-specific `PromotionInvariantError` messages for every failed guard.
 
 - [ ] **Step 4: Run the pure tests and verify GREEN**
 
@@ -66,8 +69,8 @@ git commit -m "feat(assessments): plan mini quiz successor safely"
 ### Task 2: Transactional apply and idempotency
 
 **Files:**
-- Create: `src/lib/scripts/promote-sunhub-quick-quiz-runner.ts`
-- Modify: `src/__tests__/scripts/promote-sunhub-quick-quiz.test.ts`
+- Create: `src/src/lib/scripts/promote-sunhub-quick-quiz-runner.ts`
+- Modify: `src/src/__tests__/scripts/promote-sunhub-quick-quiz.test.ts`
 
 **Interfaces:**
 - Consumes: `PromotionPlan` from Task 1.
@@ -106,11 +109,11 @@ git commit -m "feat(assessments): apply mini quiz successor atomically"
 ### Task 3: Guarded CLI and read-only dry run
 
 **Files:**
-- Create: `scripts/promote-sunhub-quick-quiz.ts`
-- Modify: `src/__tests__/scripts/promote-sunhub-quick-quiz.test.ts`
+- Create: `src/scripts/promote-sunhub-quick-quiz.ts`
+- Modify: `src/src/__tests__/scripts/promote-sunhub-quick-quiz.test.ts`
 
 **Interfaces:**
-- Consumes: `parsePromotionArgs`, `buildPromotionPlan`, `loadPromotionInput`, `applyPromotion`, and `checkGuard`.
+- Consumes: `parsePromotionArgs`, `buildPromotionPlan`, `validateWriteAuthorization`, `loadPromotionInput`, `quiescePromotion`, and `applyPromotion`.
 - Produces: operator command `npx tsx scripts/promote-sunhub-quick-quiz.ts [apply arguments]`.
 
 - [ ] **Step 1: Write failing CLI-policy tests**
