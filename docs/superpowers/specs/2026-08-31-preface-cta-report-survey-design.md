@@ -50,4 +50,4 @@ The change is accepted only if browser tests prove the 24-line boundary remains 
 - No production data, campaign pin, environment variable, or feature-flag changes.
 - No group-report or email authoring surface.
 - No automatic campaign migration to a newer template version.
-- No new report page or change to report pagination.
+- No new fixed report page or forced pagination rule. Classic's existing dynamic print flow may naturally add a page for longer accepted content instead of clipping it.

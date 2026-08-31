@@ -276,7 +276,7 @@ function stylesheet(): string {
     .replace(/@import[^;]+;\s*/g, "");
 }
 
-const EXPANDED_CLOSING_BOUNDARY_HTML = `${"<h6>H</h6>".repeat(2)}${"<br>".repeat(4)}<p>${"C".repeat(796)}</p><ul><li></li><li></li></ul>`;
+const EXPANDED_CLOSING_BOUNDARY_HTML = `${"<h6>H</h6>".repeat(2)}${"<br>".repeat(4)}<p>${"C".repeat(782)}END-OF-CLOSING</p><ul><li></li><li></li></ul>`;
 
 function alternateStyleMarkup(
   style: "CLASSIC_SCORED" | "CLASSIC_QUALITATIVE" | "EXECUTIVE_BOARDROOM" | "MODERN_DASHBOARD",
@@ -729,7 +729,7 @@ describe("SU Full landscape browser and PDF contract", () => {
         expect(Number.isInteger(boundary.pages)).toBe(true);
         const expectedAdditionalPages = style.startsWith("CLASSIC_") ? 1 : 0;
         expect(boundary.pages).toBe(short.pages + expectedAdditionalPages);
-        expect(boundary.pdfText).toContain("C".repeat(100));
+        expect(boundary.pdfText).toContain("END-OF-CLOSING");
         expect(boundary.desktop.offenders).toEqual([]);
         expect(boundary.desktop.document).toBeLessThanOrEqual(boundary.desktop.viewport + 1);
         expect(boundary.desktopClipping).toEqual([]);
