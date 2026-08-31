@@ -698,8 +698,10 @@ describe("commitRestrictedImport — CREATE path", () => {
     expect(data.createdByCoachId).toBe("coach-1");
     expect(data.invitedWelcomeSnapshot).toEqual(
       expect.objectContaining({
-        schemaVersion: 1,
+        schemaVersion: 2,
         eyebrow: "WELCOME TEST",
+        sharingDescription:
+          "Your coach or facilitator and authorized Scaling Up staff can review your named individual answers.",
         headingTemplate: "{{campaignName}} · Scaling Up Full",
       }),
     );

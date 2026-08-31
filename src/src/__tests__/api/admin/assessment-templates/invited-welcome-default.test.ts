@@ -42,6 +42,7 @@ const authored = {
   headingTemplate: "Begin {{campaignName}}",
   ledeParagraphs: ["First paragraph.", "Second paragraph."],
   sharingHeading: "Who sees this",
+  sharingDescription: "Only the facilitation team sees named answers.",
   scoresHeading: "What you receive",
   scoresDescription: "Review the result by category.",
   ctaLabel: "Begin now",
@@ -115,7 +116,7 @@ describe("PATCH invited Welcome template default", () => {
       where: { id: "tpl-1" },
       data: {
         invitedWelcomeDefault: {
-          schemaVersion: 1,
+          schemaVersion: 2,
           ...authored,
           finePrint: RESUME_NOTE,
         },

@@ -8,6 +8,9 @@ import {
   type MarketingCtaConfigV1,
   type MarketingCtaIssue,
 } from "@/lib/assessments/marketing-cta";
+import { TALK_TO_A_COACH_URL } from "@/lib/assessments/talk-to-a-coach";
+
+const LEGACY_TALK_TO_A_COACH_URL = "https://scalingup.com/coaches";
 
 function escapeText(value: string): string {
   return value
@@ -23,13 +26,13 @@ function escapeAttribute(value: string): string {
     .replaceAll("'", "&#39;");
 }
 
-function compileTarget(target: LinkTarget): {
+function compileTarget(target: LinkTarget, talkToCoachUrl: string): {
   href: string;
   dynamicAttribute?: string;
 } {
   if (target.kind === "referringCoachOrDirectory") {
     return {
-      href: "https://scalingup.com/coaches",
+      href: talkToCoachUrl,
       dynamicAttribute:
         ' data-dynamic-target="referring-coach-or-directory"',
     };
@@ -39,7 +42,10 @@ function compileTarget(target: LinkTarget): {
   return { href: `tel:${target.number.replace(/[^+0-9]/g, "")}` };
 }
 
-export function compileMarketingCtaHtml(cta: MarketingCtaConfigV1): string {
+function compileMarketingCtaHtmlWithCoachFallback(
+  cta: MarketingCtaConfigV1,
+  talkToCoachUrl: string,
+): string {
   const parsed = marketingCtaConfigSchema.safeParse(cta);
   if (!parsed.success) throw new Error("Invalid Marketing CTA structure");
   const issues = getMarketingCtaStructuralIssues(parsed.data);
@@ -58,10 +64,10 @@ export function compileMarketingCtaHtml(cta: MarketingCtaConfigV1): string {
     if (block.type === "image") {
       const image = `<img src="${escapeAttribute(block.src)}" alt="${escapeAttribute(block.alt)}" class="marketing-cta__image marketing-cta__image--${block.width}" />`;
       if (!block.link) return `<figure>${image}</figure>`;
-      const target = compileTarget(block.link);
+      const target = compileTarget(block.link, talkToCoachUrl);
       return `<figure><a href="${escapeAttribute(target.href)}"${target.dynamicAttribute ?? ""}>${image}</a></figure>`;
     }
-    const target = compileTarget(block.target);
+    const target = compileTarget(block.target, talkToCoachUrl);
     const tab = block.newTab
       ? ' target="_blank" rel="noopener noreferrer"'
       : "";
@@ -85,6 +91,10 @@ export function compileMarketingCtaHtml(cta: MarketingCtaConfigV1): string {
     throw new Error("Marketing CTA compiler emitted content outside the allow-list");
   }
   return compiled;
+}
+
+export function compileMarketingCtaHtml(cta: MarketingCtaConfigV1): string {
+  return compileMarketingCtaHtmlWithCoachFallback(cta, TALK_TO_A_COACH_URL);
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -144,8 +154,14 @@ export function loadSafeMarketingCta(
   const parsed = marketingCtaConfigSchema.safeParse(raw);
   if (!parsed.success) return null;
   try {
-    const compiled = compileMarketingCtaHtml(parsed.data);
-    return parsed.data.sanitizedHtml === compiled ? parsed.data : null;
+    const currentCompiled = compileMarketingCtaHtml(parsed.data);
+    if (parsed.data.sanitizedHtml === currentCompiled) return parsed.data;
+
+    const legacyCompiled = compileMarketingCtaHtmlWithCoachFallback(
+      parsed.data,
+      LEGACY_TALK_TO_A_COACH_URL,
+    );
+    return parsed.data.sanitizedHtml === legacyCompiled ? parsed.data : null;
   } catch {
     return null;
   }

@@ -9,7 +9,7 @@ The simplified **Create assessment** page uses the same fixed
 save action.
 
 The collapsed state preserves the name-first journey. Expanding the card shows
-the same seven fields and respondent preview as Build. On Create, that preview
+the same eight fields and respondent preview as Build. On Create, that preview
 uses `Example campaign` with zero questions and zero sections because the v1
 draft does not exist until the page action succeeds. The 1024 px state retains
 the shared fields-before-preview stack.
@@ -19,7 +19,7 @@ the shared fields-before-preview stack.
 The Welcome screen is a fixed, nearly full-width card in the existing **Build**
 canvas, directly after the assessment header and before Section 1. It is collapsed
 by default so the rest of the builder remains visible. Expanding it reveals the
-seven authored fields followed by the respondent preview; at 1024 px those columns
+eight authored fields followed by the respondent preview; at 1024 px those columns
 stack in that source order.
 
 The card summary is:
@@ -43,12 +43,13 @@ ADMIN and STAFF author:
 - heading template, retaining `{{campaignName}}`;
 - one to four Welcome-message paragraphs;
 - sharing heading;
+- sharing explanation;
 - scores heading;
 - scores explanation; and
 - button label.
 
 The platform derives time, question count, section count, scale, rating description,
-the CTA arrow, layout, icons, and the named-answer disclosure. The server preserves
+the CTA arrow, layout, and icons. The server preserves
 legacy fine print when present. These are not presented as editable inputs and there
 are no `Automatic` or `Protected` boxes in the interface.
 
@@ -75,14 +76,14 @@ report rendering, links, stored styles, and first-response locks remain intact.
   field, validation, accessibility, and responsive contract.
 - Create order is Assessment name → Welcome screen → Advanced / Internal ID →
   Cancel and Create and start building.
-- Create starts collapsed; its expanded state shows all seven fields,
+- Create starts collapsed; its expanded state shows all eight fields,
   `Example campaign`, zero questions, and zero sections.
 - The default state is collapsed.
 - The card occupies the normal Build canvas width but does not hide the header or
   Section 1 context.
 - The expanded desktop state uses fields beside preview; 1024 px stacks fields then
   preview without horizontal scrolling.
-- No field permits authoring the protected disclosure, facts, icons, fine print, or
+- No field permits authoring derived facts, icons, fine print, or
   system styling.
 - No card-level save button is present.
 - Public assessment Welcome screens are outside this artifact and remain unchanged.

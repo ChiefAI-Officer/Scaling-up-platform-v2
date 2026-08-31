@@ -117,12 +117,12 @@ describe("BrandedReport — respondent identity and next steps", () => {
     ).toHaveAttribute("href", "mailto:coach%40example.com");
   });
 
-  it("falls back to the certified-coach directory when no verified email exists", () => {
+  it("falls back to Jeff's Talk-to-a-Coach form when no verified email exists", () => {
     render(<BrandedReport report={rockefellerReport()} />);
 
     expect(
       screen.getByRole("link", { name: /talk to a coach/i }),
-    ).toHaveAttribute("href", "https://scalingup.com/coaches");
+    ).toHaveAttribute("href", "https://coaches.scalingup.com/find-a-coach-contact-form");
   });
 
   it("renders the three source actions for a SunHub public result", () => {
@@ -607,6 +607,28 @@ describe("BrandedReport — overall (SU Full ScaleUp)", () => {
 // ════════════════════════════════════════════════════════════════════════════
 
 describe("BrandedReport — Five Dysfunctions domain-result cards", () => {
+  it("follows the Word-document section structure", () => {
+    render(<BrandedReport report={fiveDysfunctionsReport()} />);
+
+    expect(screen.queryByTestId("report-overall")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("report-scores-table")).not.toBeInTheDocument();
+    expect(screen.getByTestId("report-decisions")).toBeInTheDocument();
+    expect(screen.getByTestId("report-sections")).toBeInTheDocument();
+    expect(screen.getByTestId("report-conclusion")).toBeInTheDocument();
+  });
+
+  it("uses the Word-document structure even when a modern report style is stored", () => {
+    const report = fiveDysfunctionsReport();
+    report.reportStyle = "MODERN_DASHBOARD";
+
+    render(<BrandedReport report={report} reportStylesAvailable />);
+
+    expect(screen.getByTestId("report-cover")).toBeInTheDocument();
+    expect(screen.getByTestId("report-decisions")).toBeInTheDocument();
+    expect(screen.queryByTestId("report-overall")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("report-scores-table")).not.toBeInTheDocument();
+  });
+
   it("renders template labels and the five frozen per-domain messages", () => {
     render(<BrandedReport report={fiveDysfunctionsReport()} />);
 
@@ -617,6 +639,12 @@ describe("BrandedReport — Five Dysfunctions domain-result cards", () => {
     expect(within(decisions).queryByRole("heading", { name: "Your Four Decisions" })).not.toBeInTheDocument();
     expect(within(decisions).getAllByTestId(/^decision-card-/)).toHaveLength(5);
     expect(within(decisions).getAllByTestId(/^domain-tier-message-/)).toHaveLength(5);
+    expect(decisions.querySelector(".su-report-card-grid")).toHaveClass("su-report-card-grid-split");
+    for (const row of within(decisions).getAllByTestId(/^decision-card-/)) {
+      expect(row).toHaveClass("su-report-domain-result-row");
+      expect(row).not.toHaveClass("su-report-decision-card");
+      expect(row.querySelector(".su-report-domain-score-card")).toHaveClass("su-report-decision-card");
+    }
     expect(screen.getByTestId("domain-tier-message-trust")).toHaveTextContent(
       "Your team has created an environment where vulnerability and openness are the norm.",
     );
@@ -649,13 +677,36 @@ describe("BrandedReport — Five Dysfunctions domain-result cards", () => {
     expect(screen.getAllByTestId(/^domain-tier-message-/)).toHaveLength(4);
   });
 
+  it("keeps split score rows when every frozen domain tier is absent", () => {
+    const report = fiveDysfunctionsReport();
+    report.result = {
+      ...report.result,
+      perDomain: report.result.perDomain?.map((domain) => ({
+        ...domain,
+        tier: null,
+      })),
+    };
+
+    render(<BrandedReport report={report} />);
+
+    const decisions = screen.getByTestId("report-decisions");
+    expect(decisions.querySelector(".su-report-card-grid")).toHaveClass(
+      "su-report-card-grid-split",
+    );
+    expect(within(decisions).getAllByTestId(/^decision-card-/)).toHaveLength(5);
+    expect(within(decisions).queryByTestId(/^domain-tier-message-/)).not.toBeInTheDocument();
+  });
+
   it("keeps Scaling Up Full's old section labels and no-message markup", () => {
     render(<BrandedReport report={suFullReport()} />);
 
     const decisions = screen.getByTestId("report-decisions");
+    expect(screen.getByTestId("report-overall")).toBeInTheDocument();
+    expect(screen.getByTestId("report-scores-table")).toBeInTheDocument();
     expect(within(decisions).getByText("How you scored, by decision")).toBeInTheDocument();
     expect(within(decisions).getByRole("heading", { name: "Your Four Decisions" })).toBeInTheDocument();
     expect(within(decisions).queryByTestId(/^domain-tier-message-/)).not.toBeInTheDocument();
+    expect(decisions.querySelector(".su-report-card-grid")).not.toHaveClass("su-report-card-grid-split");
   });
 });
 

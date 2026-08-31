@@ -638,7 +638,7 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
     );
     expect(
       screen.getByRole("link", { name: /talk to a coach/i }),
-    ).toHaveAttribute("href", "https://scalingup.com/coaches");
+    ).toHaveAttribute("href", "https://coaches.scalingup.com/find-a-coach-contact-form");
   });
 
   it("omits referringCoachEmail entirely when no ?coach= param is present", async () => {

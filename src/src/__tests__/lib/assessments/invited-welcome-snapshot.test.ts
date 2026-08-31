@@ -13,8 +13,18 @@ function tx(row: unknown) {
 }
 
 describe("loadInvitedWelcomeSnapshot", () => {
-  it("reloads and returns a fresh valid stored default through the supplied tx", async () => {
-    const stored = { ...GENERIC_INVITED_WELCOME_CONFIG, eyebrow: "Custom" };
+  it("upgrades a V1 default to a fresh V2 snapshot through the supplied tx", async () => {
+    const stored = {
+      schemaVersion: 1,
+      eyebrow: "Custom",
+      headingTemplate: "{{campaignName}}",
+      ledeParagraphs: ["Legacy copy."],
+      sharingHeading: "Who reviews this",
+      scoresHeading: "Your scores",
+      scoresDescription: "Review each category.",
+      ctaLabel: "Begin",
+      finePrint: null,
+    };
     const client = tx({ alias: "custom", invitedWelcomeDefault: stored });
 
     const first = await loadInvitedWelcomeSnapshot(client as never, "tpl-1");
@@ -24,10 +34,29 @@ describe("loadInvitedWelcomeSnapshot", () => {
       where: { id: "tpl-1" },
       select: { alias: true, invitedWelcomeDefault: true },
     });
-    expect(first).toEqual(stored);
+    expect(first).toEqual({
+      ...stored,
+      schemaVersion: 2,
+      sharingDescription:
+        "Your coach or facilitator and authorized Scaling Up staff can review your named individual answers.",
+    });
     expect(first).not.toBe(stored);
     expect(first).not.toBe(second);
     expect(first.ledeParagraphs).not.toBe(stored.ledeParagraphs);
+  });
+
+  it("preserves an authored V2 Sharing explanation", async () => {
+    const stored = {
+      ...GENERIC_INVITED_WELCOME_CONFIG,
+      sharingDescription: "Only named facilitators can review these answers.",
+    };
+
+    await expect(
+      loadInvitedWelcomeSnapshot(
+        tx({ alias: "custom", invitedWelcomeDefault: stored }) as never,
+        "tpl-1",
+      ),
+    ).resolves.toEqual(stored);
   });
 
   it.each([null, { schemaVersion: 99 }])(

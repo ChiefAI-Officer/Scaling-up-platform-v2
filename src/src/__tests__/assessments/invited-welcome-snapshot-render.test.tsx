@@ -1,14 +1,15 @@
 import React from "react";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { InvitedWelcomeCard } from "@/components/assessments/InvitedWelcomeCard";
-import type { InvitedWelcomeConfigV1 } from "@/lib/assessments/invited-welcome-config";
+import type { InvitedWelcomeConfig } from "@/lib/assessments/invited-welcome-config";
 
-const config: InvitedWelcomeConfigV1 = {
-  schemaVersion: 1,
+const config: InvitedWelcomeConfig = {
+  schemaVersion: 2,
   eyebrow: "Join us",
   headingTemplate: "Take {{campaignName}} today",
   ledeParagraphs: ["First authored paragraph.", "<strong>text</strong> stays text."],
   sharingHeading: "Who can read this",
+  sharingDescription: "Only the invited facilitation team can read this answer set.",
   scoresHeading: "Your useful scores",
   scoresDescription: "Compare every category.",
   ctaLabel: "Begin now",
@@ -46,7 +47,7 @@ describe("InvitedWelcomeCard", () => {
     expect(within(expectations).getByText("Who can read this")).toBeInTheDocument();
     expect(
       within(expectations).getByText(
-        "Your coach or facilitator and authorized Scaling Up staff can review your named individual answers.",
+        "Only the invited facilitation team can read this answer set.",
       ),
     ).toBeInTheDocument();
     expect(within(expectations).getByText("Your useful scores")).toBeInTheDocument();

@@ -163,6 +163,47 @@ describe("invited Welcome snapshot on coach campaign create", () => {
     expect(second.invitedWelcomeSnapshot.eyebrow).toBe("Changed");
   });
 
+  it("normalizes a V1 template default into V2 for only the new campaign", async () => {
+    currentWelcome = {
+      schemaVersion: 1,
+      eyebrow: "Frozen V1",
+      headingTemplate: "{{campaignName}}",
+      ledeParagraphs: ["Legacy copy."],
+      sharingHeading: "Who reviews this",
+      scoresHeading: "Your scores",
+      scoresDescription: "Review the categories.",
+      ctaLabel: "Begin",
+      finePrint: null,
+    } as never;
+
+    await POST(request(baseBody) as never);
+    currentWelcome = {
+      ...GENERIC_INVITED_WELCOME_CONFIG,
+      sharingDescription: "A newly authored explanation.",
+    };
+    await POST(request({ ...baseBody, name: "Q4" }) as never);
+
+    const first = (db.assessmentCampaign.create as jest.Mock).mock.calls[0][0].data;
+    const second = (db.assessmentCampaign.create as jest.Mock).mock.calls[1][0].data;
+    expect(first.invitedWelcomeSnapshot).toEqual(
+      expect.objectContaining({
+        schemaVersion: 2,
+        eyebrow: "Frozen V1",
+        sharingDescription:
+          "Your coach or facilitator and authorized Scaling Up staff can review your named individual answers.",
+      }),
+    );
+    expect(second.invitedWelcomeSnapshot).toEqual(
+      expect.objectContaining({
+        schemaVersion: 2,
+        sharingDescription: "A newly authored explanation.",
+      }),
+    );
+    expect(first.invitedWelcomeSnapshot.sharingDescription).not.toBe(
+      second.invitedWelcomeSnapshot.sharingDescription,
+    );
+  });
+
   it("writes the snapshot while off without exposing it in the create response", async () => {
     delete process.env.WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_ENABLED;
 
