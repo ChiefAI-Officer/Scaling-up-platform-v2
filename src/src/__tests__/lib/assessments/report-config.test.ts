@@ -28,6 +28,7 @@ describe("reportConfigFor", () => {
   it("five-dysfunctions uses Jeff's Word-document report presentation", () => {
     expect(reportConfigFor("five-dysfunctions")).toEqual({
       reportType: "scored",
+      forceClassicStyle: true,
       showOverall: false,
       showScoreTable: false,
       showTier: true,

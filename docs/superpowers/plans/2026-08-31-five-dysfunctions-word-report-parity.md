@@ -28,11 +28,11 @@
 
 **Interfaces:**
 - Consumes: template alias passed to `reportConfigFor(alias)`
-- Produces: optional `showOverall` and `domainResults.layout` presentation values
+- Produces: optional `showOverall`, `forceClassicStyle`, and `domainResults.layout` presentation values
 
 - [ ] **Step 1: Write a failing configuration test**
 
-Assert that `reportConfigFor("five-dysfunctions")` returns `showOverall: false`, `showScoreTable: false`, and `domainResults.layout: "split"`, while `DEFAULT_REPORT_CONFIG.showOverall` remains omitted/backward-compatible.
+Assert that `reportConfigFor("five-dysfunctions")` returns `forceClassicStyle: true`, `showOverall: false`, `showScoreTable: false`, and `domainResults.layout: "split"`, while the defaults remain omitted/backward-compatible.
 
 - [ ] **Step 2: Run the focused configuration test and verify RED**
 
@@ -42,7 +42,7 @@ Expected: FAIL because the new presentation policy does not exist.
 
 - [ ] **Step 3: Add the minimal configuration fields**
 
-Add optional `showOverall` to `ReportConfig`, optional `layout: "unified" | "split"` to `DomainResultsPresentation`, and configure Five Dysfunctions with `showOverall: false`, `showScoreTable: false`, and `layout: "split"`.
+Add optional `showOverall` and `forceClassicStyle` to `ReportConfig`, optional `layout: "split"` to `DomainResultsPresentation`, and configure Five Dysfunctions with `forceClassicStyle: true`, `showOverall: false`, `showScoreTable: false`, and `layout: "split"`.
 
 - [ ] **Step 4: Run the focused configuration test and verify GREEN**
 
@@ -162,4 +162,3 @@ Review `origin/main...HEAD` against this spec and repository standards. Fix ever
 - [ ] **Step 6: Push and open a pull request**
 
 Push `codex/five-dysfunctions-word-parity`, open a PR to `main`, and monitor required checks/review feedback.
-

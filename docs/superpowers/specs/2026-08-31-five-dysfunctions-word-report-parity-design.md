@@ -38,6 +38,7 @@ Extend the existing per-template report configuration instead of branching on an
 
 - Add an optional `showOverall` presentation flag whose omitted value preserves current behavior.
 - Set `showOverall: false` and the existing `showScoreTable: false` for Five Dysfunctions.
+- Force the canonical Classic composition for Five Dysfunctions so stored alternate-style selections cannot bypass the Word structure.
 - Add a domain-result layout option for the Word-style split presentation; omitted layout preserves the existing unified card.
 - Have `BrandedReport` render sections and CSS classes from those configuration values.
 
@@ -62,4 +63,3 @@ Required assertions:
 - No schema or migration changes.
 - No template, campaign, response, report-record, or production-data writes.
 - No new report renderer or duplicate results-by-area section.
-

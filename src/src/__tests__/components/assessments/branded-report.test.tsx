@@ -617,6 +617,18 @@ describe("BrandedReport — Five Dysfunctions domain-result cards", () => {
     expect(screen.getByTestId("report-conclusion")).toBeInTheDocument();
   });
 
+  it("uses the Word-document structure even when a modern report style is stored", () => {
+    const report = fiveDysfunctionsReport();
+    report.reportStyle = "MODERN_DASHBOARD";
+
+    render(<BrandedReport report={report} reportStylesAvailable />);
+
+    expect(screen.getByTestId("report-cover")).toBeInTheDocument();
+    expect(screen.getByTestId("report-decisions")).toBeInTheDocument();
+    expect(screen.queryByTestId("report-overall")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("report-scores-table")).not.toBeInTheDocument();
+  });
+
   it("renders template labels and the five frozen per-domain messages", () => {
     render(<BrandedReport report={fiveDysfunctionsReport()} />);
 
@@ -663,6 +675,26 @@ describe("BrandedReport — Five Dysfunctions domain-result cards", () => {
     expect(screen.getByTestId("decision-card-trust")).toBeInTheDocument();
     expect(screen.queryByTestId("domain-tier-message-trust")).not.toBeInTheDocument();
     expect(screen.getAllByTestId(/^domain-tier-message-/)).toHaveLength(4);
+  });
+
+  it("keeps split score rows when every frozen domain tier is absent", () => {
+    const report = fiveDysfunctionsReport();
+    report.result = {
+      ...report.result,
+      perDomain: report.result.perDomain?.map((domain) => ({
+        ...domain,
+        tier: null,
+      })),
+    };
+
+    render(<BrandedReport report={report} />);
+
+    const decisions = screen.getByTestId("report-decisions");
+    expect(decisions.querySelector(".su-report-card-grid")).toHaveClass(
+      "su-report-card-grid-split",
+    );
+    expect(within(decisions).getAllByTestId(/^decision-card-/)).toHaveLength(5);
+    expect(within(decisions).queryByTestId(/^domain-tier-message-/)).not.toBeInTheDocument();
   });
 
   it("keeps Scaling Up Full's old section labels and no-message markup", () => {

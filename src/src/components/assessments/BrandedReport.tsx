@@ -236,12 +236,13 @@ export function BrandedReport({
     report.templateAlias,
     report.publicLeadActions,
   );
-  const resolvedStyle = sourcePublicResult
-    ? "CLASSIC"
-    : effectiveReportStyle({
-        storedStyle: runtimeStyle,
-        available: reportStylesAvailable === true,
-      });
+  const resolvedStyle =
+    config.forceClassicStyle || sourcePublicResult
+      ? "CLASSIC"
+      : effectiveReportStyle({
+          storedStyle: runtimeStyle,
+          available: reportStylesAvailable === true,
+        });
   const classic = () =>
     config.reportType === "qualitative" ? (
       <QualitativeReport
@@ -282,7 +283,7 @@ export function BrandedReport({
 
   switch (resolvedStyle) {
     case "CLASSIC": {
-      const fallbackReason = sourcePublicResult
+      const fallbackReason = sourcePublicResult || config.forceClassicStyle
         ? null
         : rawStyle !== null &&
             rawStyle !== undefined &&
@@ -509,8 +510,7 @@ export function LegacyClassicReport({
   });
   const hasDomainCards = domainCards.length > 0;
   const hasDomainMessages = domainCards.some((domain) => domain.message !== null);
-  const splitDomainResults =
-    hasDomainMessages && domainResults?.layout === "split";
+  const splitDomainResults = domainResults?.layout === "split";
 
   // ── Recommendations grouped by section (only non-empty) ──────────────────
   // Wave U (spec 19u U-5/D6) — NON-SLIDER findings from the frozen
@@ -764,6 +764,14 @@ export function LegacyClassicReport({
                   </div>
                 </>
               );
+              const messageContent = d.message ? (
+                <p
+                  className="su-report-domain-tier-message"
+                  data-testid={`domain-tier-message-${d.key}`}
+                >
+                  {d.message}
+                </p>
+              ) : null;
 
               if (splitDomainResults) {
                 return (
@@ -778,14 +786,7 @@ export function LegacyClassicReport({
                     >
                       {scoreContent}
                     </div>
-                    {d.message && (
-                      <p
-                        className="su-report-domain-tier-message"
-                        data-testid={`domain-tier-message-${d.key}`}
-                      >
-                        {d.message}
-                      </p>
-                    )}
+                    {messageContent}
                   </div>
                 );
               }
@@ -802,14 +803,7 @@ export function LegacyClassicReport({
                       <div className="su-report-decision-score">
                         {scoreContent}
                       </div>
-                      {d.message && (
-                        <p
-                          className="su-report-domain-tier-message"
-                          data-testid={`domain-tier-message-${d.key}`}
-                        >
-                          {d.message}
-                        </p>
-                      )}
+                      {messageContent}
                     </>
                   ) : (
                     scoreContent
