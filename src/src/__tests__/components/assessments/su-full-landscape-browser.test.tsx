@@ -103,7 +103,7 @@ type SemanticAuditPosition = "introduction" | "conclusion";
 const TALL_PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAA+gCAIAAAC0f+F8AAAALUlEQVR42u3DAQ0AAAgDoM8uFrKSxQ0ibGR6K4mqqqqqqqqqqqqqqqqqqqq/H9OeIDkSuu58AAAAAElFTkSuQmCC";
 const SEMANTIC_AUDIT_LIMITS = {
   introduction: { elements: 64, text: 2_200, rows: 8, columns: 4, cells: 24, headings: 4, breaks: 8, lines: 32 },
-  conclusion: { elements: 36, text: 900, rows: 6, columns: 3, cells: 12, headings: 2, breaks: 4, lines: 16 },
+  conclusion: { elements: 36, text: 900, rows: 6, columns: 3, cells: 12, headings: 2, breaks: 4, lines: 24 },
 } as const;
 
 function auditTextChunks(
@@ -126,10 +126,10 @@ function repeatedInlineAuditTag(tag: string, position: SemanticAuditPosition): s
 }
 
 function weightedAuditTag(tag: string, weight: number, position: SemanticAuditPosition): string {
-  const { elements, lines } = SEMANTIC_AUDIT_LIMITS[position];
+  const { elements, lines, text } = SEMANTIC_AUDIT_LIMITS[position];
   const count = Math.min(elements, Math.floor(lines / (weight + 1)));
   const textLines = lines - count * weight;
-  return auditTextChunks(position, count, textLines * 100)
+  return auditTextChunks(position, count, Math.min(textLines * 100, text))
     .map((text) => `<${tag}>${text}</${tag}>`)
     .join("");
 }
@@ -145,19 +145,19 @@ function headingAuditHtml(tag: string, weight: number, position: SemanticAuditPo
 }
 
 function listAuditHtml(tag: "ul" | "ol", position: SemanticAuditPosition): string {
-  const { lines } = SEMANTIC_AUDIT_LIMITS[position];
+  const { lines, text } = SEMANTIC_AUDIT_LIMITS[position];
   const items = Math.floor((lines - 1) / 2);
   const textLines = lines - 1 - items;
-  return `<${tag}>${auditTextChunks(position, items, textLines * 100)
+  return `<${tag}>${auditTextChunks(position, items, Math.min(textLines * 100, text))
     .map((text) => `<li>${text}</li>`)
     .join("")}</${tag}>`;
 }
 
 function descriptionListAuditHtml(position: SemanticAuditPosition): string {
-  const { lines } = SEMANTIC_AUDIT_LIMITS[position];
+  const { lines, text } = SEMANTIC_AUDIT_LIMITS[position];
   const items = Math.floor((lines - 1) / 2);
   const textLines = lines - 1 - items;
-  return `<dl>${auditTextChunks(position, items, textLines * 100)
+  return `<dl>${auditTextChunks(position, items, Math.min(textLines * 100, text))
     .map((text, index) => index % 2 === 0 ? `<dt>${text}</dt>` : `<dd>${text}</dd>`)
     .join("")}</dl>`;
 }
@@ -230,7 +230,7 @@ const SEMANTIC_REJECTED_CASES = [
   { id: "maximum-closing-figcaptions", position: "conclusion", html: "<figcaption>x</figcaption>".repeat(36), issue: /figure caption/i },
   { id: "maximum-table-cells", position: "introduction", html: `<table><tbody>${Array.from({ length: 8 }, (_, rowIndex) => `<tr>${"<td>x</td>".repeat(rowIndex === 0 ? 47 : 1)}</tr>`).join("")}</tbody></table>`, issue: /table columns/i },
   { id: "maximum-table-captions", position: "introduction", html: `<table>${"<caption>x</caption>".repeat(63)}</table>`, issue: /table caption/i },
-  { id: "closing-caption-with-max-rows", position: "conclusion", html: `<table><caption>Cap</caption><tbody>${"<tr><td>x</td><td>x</td></tr>".repeat(6)}</tbody></table>`, issue: /estimated lines/i },
+  { id: "closing-over-expanded-line-budget", position: "conclusion", html: "<div></div>".repeat(25), issue: /estimated lines/i },
   { id: "table-direct-td", position: "introduction", html: `<table>${"<td>x</td>".repeat(24)}</table>`, issue: /valid table structure/i },
   { id: "table-direct-th", position: "introduction", html: `<table>${"<th>x</th>".repeat(24)}</table>`, issue: /valid table structure/i },
   { id: "thead-without-tr", position: "introduction", html: "<table><thead><th>x</th></thead></table>", issue: /valid table structure/i },

@@ -258,15 +258,17 @@ describe("sanitizeReportHtmlFragment", () => {
     });
   });
 
-  it("rejects a Closing table that combines a caption with all six rows", () => {
+  it("keeps a Closing table with a caption inside the expanded budget and rejects added overflow blocks", () => {
     const rows = `<tr><td>x</td><td>x</td></tr>`.repeat(6);
-    const withoutCaption = sanitizeReportHtmlFragment(`<table><tbody>${rows}</tbody></table>`, "conclusion");
     const withCaption = sanitizeReportHtmlFragment(`<table><caption>Cap</caption><tbody>${rows}</tbody></table>`, "conclusion");
+    const atBoundary = sanitizeReportHtmlFragment(`<table><caption>Cap</caption><tbody>${rows}</tbody></table>${"<div></div>".repeat(7)}`, "conclusion");
+    const overBoundary = sanitizeReportHtmlFragment(`<table><caption>Cap</caption><tbody>${rows}</tbody></table>${"<div></div>".repeat(8)}`, "conclusion");
 
-    expect(withoutCaption.ok).toBe(true);
-    expect(withCaption).toMatchObject({
+    expect(withCaption.ok).toBe(true);
+    expect(atBoundary.ok).toBe(true);
+    expect(overBoundary).toMatchObject({
       ok: false,
-      issue: expect.stringContaining("16 estimated lines"),
+      issue: expect.stringContaining("24 estimated lines"),
     });
   });
 
@@ -280,7 +282,7 @@ describe("sanitizeReportHtmlFragment", () => {
 
   it.each([
     ["introduction", 8, 4, 32],
-    ["conclusion", 4, 2, 16],
+    ["conclusion", 4, 2, 24],
   ] as const)(
     "enforces exact %s semantic layout sublimits",
     (position, lineBreaks, headings, estimatedLines) => {

@@ -33,7 +33,7 @@ export const REPORT_HTML_LIMITS = {
     figureCaptions: 1,
     headings: 2,
     lineBreaks: 4,
-    estimatedLines: 16,
+    estimatedLines: 24,
   },
 } as const;
 

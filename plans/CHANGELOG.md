@@ -6,6 +6,17 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="preface-cta-report-survey-implemented"></a>
+### 2026-08-31 — Preface and CTA report survey implemented <!-- ENTRY_ISO:2026-08-31 ENTRY_SLUG:preface-cta-report-survey-implemented -->
+
+**Status: IMPLEMENTED AND LOCALLY VERIFIED; PR PENDING; NOT MERGED OR DEPLOYED.** GH #387 item 7 delivers Jeff's requested all-report survey and expands Closing-message authoring from 16 to 24 estimated lines. The 50% structural-budget increase retains the existing 900-character, element, depth, image, table, heading, break, CSS, and sanitization limits. The 24-line boundary was chosen against the fixed 165mm Scaling Up Full conclusion region and is covered by physical browser/print tests; the report remains on its existing page count with no authored node outside the page and no desktop/mobile clipping.
+
+**Surface and lifecycle finding.** Invited individual and PUBLIC quiz browser/print reports already honor the campaign-pinned Template Version's safe Welcome/Closing HTML across Classic, Executive Boardroom, Modern Dashboard, qualitative, and Scaling Up Full renderers. Group/aggregate reports never carried `reportHtml`, and results-report emails deliberately exclude it under the documented browser/print-only contract. The sole ACTIVE `sunhub-quick-quiz` campaign is pinned to v1, which lacks the content authored in later unpinned versions; its default preface/CTA behavior is therefore a version-lifecycle outcome, not a public-renderer defect. No campaign was repinned, no automatic latest-version behavior was introduced, and group/email authoring remains separate scope.
+
+**ESPERTO and verification receipt.** Read-only ESPERTO validation found personal and CEO Full reports use a standalone preface page plus one combined generated-conclusion/CTA page, while Condensed CEO has neither; the platform retains that governed one-page conclusion rather than adding a new CTA page. TDD first failed two sanitizer assertions against the old 16-line limit, then passed **74/74** after the one-line implementation change. The all-surface matrix passed **10 suites / 260 tests / 2 snapshots**; capture fixtures passed **2/2**; the full physical browser/PDF matrix passed **48/48**. Changed-file ESLint and diff hygiene passed, and migration safety approved all **51 migrations**. The exact `CI=true npm run build` reached Prisma and stopped because the isolated worktree has no `DIRECT_URL`; credentials were not imported and no database was touched. After a clean `npm ci`, the non-mutating `CI=true next build --turbopack` compiled, passed TypeScript, and generated **95/95 pages**; missing local database/Inngest values produced only existing page-generation warnings. No environment variable, feature flag, schema, migration, assessment, campaign, response, report record, email, or Production datum changed.
+
+---
+
 <a id="five-dysfunctions-domain-results-merge-authorized"></a>
 ### 2026-08-31 — Five Dysfunctions domain results merge authorized <!-- ENTRY_ISO:2026-08-31 ENTRY_SLUG:five-dysfunctions-domain-results-merge-authorized -->
 

@@ -45,7 +45,7 @@ type CaptureFixture = {
 
 const TALL_PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAA+gCAIAAAC0f+F8AAAALUlEQVR42u3DAQ0AAAgDoM8uFrKSxQ0ibGR6K4mqqqqqqqqqqqqqqqqqqqq/H9OeIDkSuu58AAAAAElFTkSuQmCC";
 const semanticBudgetWelcome = `${"<h6>H</h6>".repeat(4)}${"<br>".repeat(8)}<p>${"W".repeat(896)}</p>`;
-const semanticBudgetClosing = `${"<h6>H</h6>".repeat(2)}${"<br>".repeat(4)}<p>${"C".repeat(298)}</p>`;
+const semanticBudgetClosing = `${"<h6>H</h6>".repeat(2)}${"<br>".repeat(4)}<p>${"C".repeat(796)}</p><ul><li></li><li></li></ul>`;
 const semanticRichWelcome = `<figure><img src="${TALL_PNG}" alt="Tall report image"></figure><table><tbody>${"<tr><td></td></tr>".repeat(4)}</tbody></table><ul>${"<li></li>".repeat(2)}</ul><p><code></code><a href="https://scalingup.com">${"R".repeat(300)}</a></p>`;
 const semanticRichClosing = `<figure><img src="${TALL_PNG}" alt="Tall report image"></figure><table><tbody>${"<tr><td></td></tr>".repeat(3)}</tbody></table><code></code><a href="https://scalingup.com">${"R".repeat(100)}</a>`;
 const figureMaxWelcome = `<figure><img src="${TALL_PNG}" alt="Tall report image"><figcaption>${"F".repeat(700)}</figcaption></figure>`;
@@ -123,7 +123,7 @@ const authoringCases: ReadonlyArray<Omit<CaptureFixture, "id" | "peerReference">
     introductionHtml: semanticBudgetWelcome,
     conclusionHtml: semanticBudgetClosing,
     welcomeVisibleCharacters: 900,
-    closingVisibleCharacters: 300,
+    closingVisibleCharacters: 798,
   },
   {
     authoringCase: "semantic-rich",
