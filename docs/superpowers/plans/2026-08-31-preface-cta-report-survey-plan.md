@@ -1,37 +1,180 @@
-# Preface and CTA report survey implementation plan
+# Preface and CTA Report Completion Implementation Plan
 
-**Goal:** Deliver Jeff's all-report survey and safely expand closing-message customization without changing report scope or production data.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Complete Jeff Phase 1 item 7 by retaining the tested 24-line Closing expansion and adding a guarded successor-campaign operation that preserves v1 history while serving authored v7 Preface/Closing content at the existing mini-quiz URL.
+
+**Architecture:** Keep Campaign→Template Version immutability unchanged. A one-off dry-run-default CLI delegates to a pure planner and an injected database runner. A guarded quiesce closes v1 and starts a mandatory 15-minute drain; a later serializable apply revalidates all invariants, transfers the alias, creates a deterministic v7 successor, and writes an audit receipt. No write operation is executed during implementation.
+
+**Tech Stack:** TypeScript, Prisma/PostgreSQL transactions, Jest, existing safe-seed Production guard, Next.js report renderer, Playwright/Chromium, Poppler.
 
 **Spec:** `docs/superpowers/specs/2026-08-31-preface-cta-report-survey-design.md`
 
-## 1. RED: encode the new closing boundary
+## Global Constraints
 
-- Update sanitizer unit expectations so a 24-estimated-line conclusion is accepted and 25 is rejected.
-- Update the physical browser matrix to exercise 24 estimated lines in the fixed Scaling Up Full conclusion region.
-- Keep explicit coverage for the conclusion table composition whose previous failure message named 16.
-- Run the focused tests and record the expected failures against the 16-line implementation.
+- Exact source campaign: `cmsm0jlxo0002lvi3lvb8u2gy`, alias `sunhub-quick-quiz`, version `cmsm0efu30005dlwfucrosxdm` (v1).
+- Exact target Template Version: `cmtd124fz000413xies2p6bh8` (v7).
+- Retired source alias: `sunhub-quick-quiz-retired-v1`; successor keeps `sunhub-quick-quiz`.
+- Deterministic successor id: `item7-sunhub-quick-quiz-v7-successor`.
+- Writes require exactly one of `--quiesce`/`--apply`, `--i-know-this-is-prod`, exact database host, source `updatedAt`, and submission count.
+- Apply additionally requires v1 to have remained CLOSED for at least 15 minutes.
+- Questions, sections, scoring, Template, and language must match; the Template must be enabled, undeleted, and `PUBLIC_MARKETING_QUIZ`; v7 must be latest published and pass the real safe loader for Introduction and Closing.
+- Existing Campaign version ids and existing submissions are never mutated.
+- No environment variable, feature flag, schema, migration, report-loader fallback, email/group authoring, merge, deployment, or Production operation.
 
-## 2. GREEN: raise only the governed limit
+---
 
-- Change `REPORT_HTML_LIMITS.conclusion.estimatedLines` from 16 to 24.
-- Update test fixture metadata and expectations; do not change any other sanitizer limit or report layout.
-- Run sanitizer and physical browser tests until green.
+### Task 1: Pure successor plan and invariant failures
 
-## 3. Verify every report surface
+**Files:**
+- Create: `src/lib/scripts/promote-sunhub-quick-quiz-core.ts`
+- Test: `src/__tests__/scripts/promote-sunhub-quick-quiz.test.ts`
 
-- Run individual report-section and report-style suites.
-- Run invited loader, public quiz loader/client, group report, and email-report suites.
-- Confirm supported browser/print paths carry authored content and intentionally unsupported group/email paths remain unchanged.
+**Interfaces:**
+- Produces: `parsePromotionArgs(argv: string[]): PromotionArgs`.
+- Produces: `buildPromotionPlan(input: PromotionInput): PromotionPlan`.
+- Produces constants `SOURCE_CAMPAIGN_ID`, `SOURCE_VERSION_ID`, `TARGET_VERSION_ID`, `LIVE_ALIAS`, and `RETIRED_ALIAS`.
+- `PromotionInput` contains source campaign, source/target versions, latest published version id, retired-alias occupancy, and expected CAS values.
 
-## 4. Full gates and review
+- [ ] **Step 1: Write failing pure tests**
 
-- Run ESLint on changed TypeScript/TSX files.
-- Run `CI=true npm run build` from `src/`.
-- Run migration safety if required by the repository gate.
-- Review the branch against `origin/main`, fix actionable findings, commit, push, open a PR, and complete the review loop.
+Cover default dry-run argument parsing; mutually exclusive complete quiesce/apply arguments; missing/malformed expected values; exact happy-path plans; wrong campaign/version/template/language/status/access mode; deleted/disabled/wrong-delivery Template; occupied retired alias; target not latest/published; unsafe or missing Introduction/Closing; mismatched questions/sections/scoring; stale `updatedAt`; submission-count drift; and apply before the 15-minute drain expires.
 
-## 5. Report product follow-up separately
+- [ ] **Step 2: Run the pure tests and verify RED**
 
-- State that the mini quiz is pinned to an older version without the authored content.
-- Do not repin it. Record that choosing a newer version is a separate authorized production-data operation.
-- Include the complete surface survey and the two unrecoverable clipped clauses in the PR/report.
+Run: `npx jest src/__tests__/scripts/promote-sunhub-quick-quiz.test.ts --runInBand`
+
+Expected: FAIL because the core module does not exist.
+
+- [ ] **Step 3: Implement the pure planner**
+
+Compare the stored JSON payloads exactly as Prisma returns them; do not add a second content-hash scheme. Return a schema-versioned manifest containing exact source/target identity, deterministic successor id, copied successor fields, expected CAS values, and audit payload; throw field-specific `PromotionInvariantError` messages for every failed guard.
+
+- [ ] **Step 4: Run the pure tests and verify GREEN**
+
+Run: `npx jest src/__tests__/scripts/promote-sunhub-quick-quiz.test.ts --runInBand`
+
+Expected: all pure planner tests pass.
+
+- [ ] **Step 5: Commit the pure plan seam**
+
+```bash
+git add src/src/lib/scripts/promote-sunhub-quick-quiz-core.ts src/src/__tests__/scripts/promote-sunhub-quick-quiz.test.ts
+git commit -m "feat(assessments): plan mini quiz successor safely"
+```
+
+### Task 2: Transactional apply and idempotency
+
+**Files:**
+- Create: `src/lib/scripts/promote-sunhub-quick-quiz-runner.ts`
+- Modify: `src/__tests__/scripts/promote-sunhub-quick-quiz.test.ts`
+
+**Interfaces:**
+- Consumes: `PromotionPlan` from Task 1.
+- Produces: `loadPromotionInput(db, expected): Promise<PromotionInput>`.
+- Produces: `quiescePromotion(db, plan, operator): Promise<{ status: "quiesced" | "idempotent" }>`.
+- Produces: `applyPromotion(db, plan, operator): Promise<{ status: "applied" | "idempotent"; successorCampaignId: string }>`.
+- `DbClient` is a narrow injected Prisma-compatible interface for unit tests.
+
+- [ ] **Step 1: Write failing runner tests**
+
+Require dry-run loading to perform no writes; quiesce to CAS ACTIVE→CLOSED without changing the alias and write a quiescence receipt; apply to use one serializable transaction and re-read every invariant inside it; source alias CAS to match exact id/version/status/deletedAt/updatedAt/count; successor to use the deterministic id, copy only approved fields, and pin v7; promotion AuditLog to be created in the transaction; CAS count zero to abort; and the complete deterministic source/successor/receipt manifest to return idempotent success without writes.
+
+- [ ] **Step 2: Run the runner tests and verify RED**
+
+Run: `npx jest src/__tests__/scripts/promote-sunhub-quick-quiz.test.ts --runInBand`
+
+Expected: FAIL because runner exports do not exist.
+
+- [ ] **Step 3: Implement transactional apply**
+
+Use the injected `$transaction` seam. Quiesce uses one exact `updateMany` plus `PUBLIC_CAMPAIGN_SUCCESSOR_QUIESCE` receipt. Apply runs at `Serializable`, reloads the locked logical state, repeats the pure invariant checks, performs exact source alias CAS, creates the deterministic successor from the allow-list, and creates `PUBLIC_CAMPAIGN_SUCCESSOR_PROMOTION`. Do not mutate or copy submissions, participants, invitations, summary reports, lease timestamps, or import provenance.
+
+- [ ] **Step 4: Run runner and pure tests and verify GREEN**
+
+Run: `npx jest src/__tests__/scripts/promote-sunhub-quick-quiz.test.ts --runInBand`
+
+Expected: all tests pass.
+
+- [ ] **Step 5: Commit the transactional seam**
+
+```bash
+git add src/src/lib/scripts/promote-sunhub-quick-quiz-runner.ts src/src/__tests__/scripts/promote-sunhub-quick-quiz.test.ts
+git commit -m "feat(assessments): apply mini quiz successor atomically"
+```
+
+### Task 3: Guarded CLI and read-only dry run
+
+**Files:**
+- Create: `scripts/promote-sunhub-quick-quiz.ts`
+- Modify: `src/__tests__/scripts/promote-sunhub-quick-quiz.test.ts`
+
+**Interfaces:**
+- Consumes: `parsePromotionArgs`, `buildPromotionPlan`, `loadPromotionInput`, `applyPromotion`, and `checkGuard`.
+- Produces: operator command `npx tsx scripts/promote-sunhub-quick-quiz.ts [apply arguments]`.
+
+- [ ] **Step 1: Write failing CLI-policy tests**
+
+Assert dry-run is the default; quiesce/apply without expected host/timestamp/count fails parsing; every write without `--i-know-this-is-prod` is blocked; host mismatch is blocked independent of provider; dry-run never invokes a write; pre-quiesce output prints a complete quiesce command; quiesced output with less than 15 minutes prints no apply command; and drained output includes a complete copy-pastable apply command.
+
+- [ ] **Step 2: Run the CLI-policy tests and verify RED**
+
+Run: `npx jest src/__tests__/scripts/promote-sunhub-quick-quiz.test.ts --runInBand`
+
+Expected: FAIL because the CLI seam/output formatter is absent.
+
+- [ ] **Step 3: Implement the CLI**
+
+Do not load any env file in application code. The operator must supply credentials explicitly through the runtime command. Connect read-only for dry-run, print the verified plan, and exit. On quiesce/apply, require the unconditional confirmation and exact-host guard before invoking the runner. Keep `main()` behind `require.main === module` and export formatting helpers for tests so CI never connects to a database.
+
+- [ ] **Step 4: Run tests and a Production read-only dry-run**
+
+Run tests as above, then:
+
+```bash
+npx tsx --env-file=/Users/diushianstand/Scaling-up-platform-v2/src/.env scripts/promote-sunhub-quick-quiz.ts
+```
+
+Expected: verified source v1/target v7 plan and exact quiesce command; no writes. Confirm source campaign `updatedAt`, submission count, and row identities are unchanged with a second dry-run. This read-only inspection is operator-invoked outside CI; do not run quiesce or apply.
+
+- [ ] **Step 5: Commit the guarded CLI**
+
+```bash
+git add src/scripts/promote-sunhub-quick-quiz.ts src/src/__tests__/scripts/promote-sunhub-quick-quiz.test.ts
+git commit -m "feat(assessments): guard mini quiz successor operation"
+```
+
+### Task 4: Re-verify report completion and repository gates
+
+**Files:**
+- Modify: `CLAUDE.md`
+- Modify: `plans/CHANGELOG.md`
+- Modify: `docs/superpowers/specs/2026-08-31-preface-cta-report-survey-design.md`
+- Modify: `docs/superpowers/plans/2026-08-31-preface-cta-report-survey-plan.md`
+
+**Interfaces:**
+- Consumes: all prior tasks and the existing 24-line sanitizer/report tests.
+- Produces: final review receipts and the explicitly unexecuted Production checklist.
+
+- [ ] **Step 1: Run focused and all-surface tests**
+
+Run the successor-operation suite, sanitizer suite, public quiz result/submit suites, invited report loader, report styles/sections, group report, email report, and the real Chromium/PDF boundary matrix.
+
+- [ ] **Step 2: Run repository gates**
+
+Run changed-file ESLint, `node scripts/check-migration-safety.mjs`, `git diff --check`, and `CI=true npm run build`. If the wrapper stops only because the isolated worktree lacks `DIRECT_URL`, do not import credentials; run `CI=true ./node_modules/.bin/next build --turbopack` and rely on hosted Build for the migration-bearing wrapper.
+
+- [ ] **Step 3: Update source-of-truth documentation**
+
+Record the corrected v5-v7 content chronology, the successor design, dry-run receipt, exact unexecuted apply command, safety boundary, and verification results. Do not claim the live campaign is repaired until a separately authorized apply and smoke test occur.
+
+- [ ] **Step 4: Commit documentation and verification receipts**
+
+```bash
+git add CLAUDE.md plans/CHANGELOG.md docs/superpowers/specs/2026-08-31-preface-cta-report-survey-design.md docs/superpowers/plans/2026-08-31-preface-cta-report-survey-plan.md
+git commit -m "docs: record mini quiz successor operation"
+```
+
+- [ ] **Step 5: Complete review and PR update**
+
+Review from the fixed point, remediate actionable findings, rerun affected checks, push the branch, update PR #405, and wait for every hosted check. Keep merge, deployment, feature-flag changes, and Production apply out of scope.
