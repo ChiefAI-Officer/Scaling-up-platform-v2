@@ -2,6 +2,7 @@ import type { QuestionMeta, RespondentReport } from "@/lib/assessments/responden
 import type { PerQuestionResult, PerSectionResult, ScoreResult } from "@/lib/assessments/scoring";
 import { parseResolvedFindings } from "@/lib/assessments/findings-section-model";
 import { reportConfigFor } from "@/lib/assessments/report-config";
+import { TALK_TO_A_COACH_URL } from "@/lib/assessments/talk-to-a-coach";
 import {
   domainColor,
   formatReportDate,
@@ -244,7 +245,7 @@ function ctaFor(contactEmail: string | null, eligible: boolean): ScoredReportVie
     contactEmail,
     label: "Talk to a Coach →",
     href: contactEmail === null
-      ? "https://scalingup.com/coaches"
+      ? TALK_TO_A_COACH_URL
       : `mailto:${encodeURIComponent(contactEmail)}`,
     learnMoreHref: "https://scalingup.com",
   };

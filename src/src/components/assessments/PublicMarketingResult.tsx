@@ -3,6 +3,7 @@ import type {
   MarketingCtaConfigV1,
 } from "@/lib/assessments/marketing-cta";
 import type { PublicMarketingScoreBand } from "@/lib/assessments/public-marketing-result";
+import { TALK_TO_A_COACH_URL } from "@/lib/assessments/talk-to-a-coach";
 import "@/styles/public-marketing-result.css";
 
 function destination(
@@ -14,7 +15,7 @@ function destination(
   if (target.kind === "tel") return `tel:${target.number.replace(/[^+0-9]/g, "")}`;
   return referringCoachEmail
     ? `mailto:${referringCoachEmail}`
-    : "https://scalingup.com/coaches";
+    : TALK_TO_A_COACH_URL;
 }
 
 export function PublicMarketingResult({

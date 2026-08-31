@@ -162,6 +162,19 @@ describe("buildScoredReportViewModel", () => {
     expect(overridden).not.toBe(base);
   });
 
+  it("uses Jeff's Talk-to-a-Coach form when no referring coach exists", () => {
+    const withoutReferringCoach = buildScoredReportViewModel(
+      makeReport({ referringCoachEmail: null }),
+    );
+
+    expect(withoutReferringCoach.cta.href).toBe(
+      "https://coaches.scalingup.com/find-a-coach-contact-form",
+    );
+    expect(buildScoredReportViewModel(makeReport({ referringCoachEmail: "coach@example.com" })).cta.href).toBe(
+      "mailto:coach%40example.com",
+    );
+  });
+
   it("provides the exact legacy display labels for subtitles, metrics, and achievement markers", () => {
     const standard = buildScoredReportViewModel(makeReport());
     const duplicateSubtitle = buildScoredReportViewModel(makeReport({ campaignLabel: "Scaling Up Full" }));
