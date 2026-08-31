@@ -20,7 +20,7 @@
 - Deterministic successor id: `item7-sunhub-quick-quiz-v7-successor`.
 - Writes require exactly one of `--quiesce`/`--apply`, `--i-know-this-is-prod`, exact database host, source `updatedAt`, and submission count.
 - Apply additionally requires v1 to have remained CLOSED for at least 15 minutes.
-- Questions, sections, scoring, Template, and language must match; the Template must be enabled, undeleted, and `PUBLIC_MARKETING_QUIZ`; v7 must be latest published and pass the real safe loader for Introduction and Closing.
+- Questions, sections, scoring, Template, and language must match; the Template must be enabled, undeleted, and `PUBLIC_MARKETING_QUIZ`; the source must be published; v7 must be published, non-archived, the latest Active version, and pass the real safe loader for Introduction and Closing.
 - Existing Campaign version ids and existing submissions are never mutated.
 - No environment variable, feature flag, schema, migration, report-loader fallback, email/group authoring, merge, deployment, or Production operation.
 
@@ -37,7 +37,7 @@
 - Produces: `buildPromotionPlan(input: PromotionInput): PromotionPlan`.
 - Produces: `validateWriteAuthorization(args, actualDatabaseHost): void`.
 - Produces constants `SOURCE_CAMPAIGN_ID`, `SOURCE_VERSION_ID`, `TARGET_VERSION_ID`, `LIVE_ALIAS`, and `RETIRED_ALIAS`.
-- `PromotionInput` contains source campaign, source/target versions, latest published version id, retired-alias occupancy, and expected CAS values.
+- `PromotionInput` contains source campaign, source/target versions including lifecycle state, latest published non-archived version id, retired-alias occupancy, and expected CAS values.
 
 - [x] **Step 1: Write failing pure tests**
 
@@ -76,7 +76,7 @@ git commit -m "feat(assessments): plan mini quiz successor safely"
 - Consumes: `PromotionPlan` from Task 1.
 - Produces: `loadPromotionInput(db, expected): Promise<PromotionInput>`.
 - Produces: `quiescePromotion(db, plan, operator): Promise<{ status: "quiesced" | "idempotent" }>`.
-- Produces: `applyPromotion(db, plan, operator): Promise<{ status: "applied" | "idempotent"; successorCampaignId: string }>`.
+- Produces: `applyPromotion(db, plan, operator, databaseJsonNull): Promise<{ status: "applied" | "idempotent"; successorCampaignId: string }>`; the Prisma database-NULL sentinel is dependency-injected only at the runner create seam.
 - `DbClient` is a narrow injected Prisma-compatible interface for unit tests.
 
 - [x] **Step 1: Write failing runner tests**
@@ -153,7 +153,11 @@ complete canonical manifests and ISO timestamps, added persisted `inviteTiming` 
 zero-relation completion checks, proved all writes use the callback transaction,
 rejected blank operators before connection/transaction creation, shell-quoted every
 dynamic command argument, restricted URL hosts, and made completion inspection reuse
-the full runner manifest/receipt predicate.
+the full runner manifest/receipt predicate. Final review additionally translated
+nullable copied JSON to injected database-NULL sentinels, aligned target resolution
+with the shared published/non-archived Active-version contract, and made durable
+completion reconstruct its historical plan from a strict schema-versioned receipt
+without rerunning mutable current preflight invariants.
 
 ### Task 4: Re-verify report completion and repository gates
 
@@ -171,7 +175,7 @@ the full runner manifest/receipt predicate.
 
 Run the successor-operation suite, sanitizer suite, public quiz result/submit suites, invited report loader, report styles/sections, group report, email report, and the real Chromium/PDF boundary matrix.
 
-Fresh results: successor **61/61**, sanitizer **74/74**, public submit **69/69**,
+Fresh results: successor **74/74**, sanitizer **74/74**, public submit **69/69**,
 capture contract **2/2**, and the non-browser surface coverage **9 suites / 258
 tests / 2 snapshots** passed. Two report-style tests and all 52 physical matrix
 tests stopped before assertions because this host lacks Playwright Chromium

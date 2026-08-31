@@ -23,11 +23,13 @@ import {
   formatPromotionOutcome,
   runPromotionCli,
 } from "../../../scripts/promote-sunhub-quick-quiz";
+import { Prisma } from "@prisma/client";
 import { execFileSync } from "node:child_process";
 
 const SOURCE_UPDATED_AT = new Date("2026-08-31T01:00:00.000Z");
 const QUIESCED_AT = new Date("2026-08-31T01:05:00.000Z");
 const DRAINED_AT = new Date("2026-08-31T01:20:00.000Z");
+const JSON_DATABASE_NULL = Prisma.DbNull;
 
 function writeArgs(
   mode: "quiesce" | "apply" = "quiesce",
@@ -93,6 +95,7 @@ function input(overrides: Partial<PromotionInput> = {}): PromotionInput {
       templateId: "template-sunhub",
       language: "en",
       publishedAt: new Date("2026-08-01T00:00:00.000Z"),
+      archivedAt: null,
       questions: [{ key: "q1", text: "Question" }],
       sections: [{ key: "s1", questionKeys: ["q1"] }],
       scoringConfig: { ranges: [{ min: 0, max: 100 }] },
@@ -103,6 +106,7 @@ function input(overrides: Partial<PromotionInput> = {}): PromotionInput {
       templateId: "template-sunhub",
       language: "en",
       publishedAt: new Date("2026-08-30T00:00:00.000Z"),
+      archivedAt: null,
       questions: [{ text: "Question", key: "q1" }],
       sections: [{ questionKeys: ["q1"], key: "s1" }],
       scoringConfig: { ranges: [{ max: 100, min: 0 }] },
@@ -264,7 +268,9 @@ describe("promote SunHub quick quiz core", () => {
     ["delivery type", (value: PromotionInput) => ({ ...value, template: { ...value.template, deliveryType: "INVITED_ASSESSMENT" } }), "template.deliveryType"],
     ["retired alias", (value: PromotionInput) => ({ ...value, retiredAliasOccupied: true }), "retiredAlias"],
     ["latest target", (value: PromotionInput) => ({ ...value, latestPublishedVersionId: "other" }), "latestPublishedVersionId"],
+    ["published source", (value: PromotionInput) => ({ ...value, sourceVersion: { ...value.sourceVersion, publishedAt: null } }), "sourceVersion.publishedAt"],
     ["published target", (value: PromotionInput) => ({ ...value, targetVersion: { ...value.targetVersion, publishedAt: null } }), "targetVersion.publishedAt"],
+    ["non-archived target", (value: PromotionInput) => ({ ...value, targetVersion: { ...value.targetVersion, archivedAt: SOURCE_UPDATED_AT } }), "targetVersion.archivedAt"],
     ["safe introduction", (value: PromotionInput) => ({ ...value, targetVersion: { ...value.targetVersion, reportConfig: { reportHtml: { schemaVersion: 1, introductionHtml: "<script>bad</script>", conclusionHtml: "<p>Book a call</p>" } } } }), "targetVersion.reportConfig.reportHtml.introductionHtml"],
     ["missing conclusion", (value: PromotionInput) => ({ ...value, targetVersion: { ...value.targetVersion, reportConfig: { reportHtml: { schemaVersion: 1, introductionHtml: "<p>Welcome</p>", conclusionHtml: null } } } }), "targetVersion.reportConfig.reportHtml.conclusionHtml"],
     ["questions", (value: PromotionInput) => ({ ...value, targetVersion: { ...value.targetVersion, questions: [] } }), "targetVersion.questions"],
@@ -550,6 +556,34 @@ describe("promote SunHub quick quiz runner", () => {
     expect(tx.$executeRaw).not.toHaveBeenCalled();
   });
 
+  it("identifies v7 as latest when a later published version is archived", async () => {
+    const args = parsePromotionArgs([]);
+    const value = input({ args });
+    const state = runnerState(value);
+    const { db, root } = runnerDb(state, value);
+    root.assessmentTemplateVersion.findFirst.mockImplementation(
+      async (query: { where: { archivedAt?: null } }) =>
+        query.where.archivedAt === null
+          ? { id: TARGET_VERSION_ID }
+          : { id: "archived-v8" },
+    );
+
+    const loaded = await loadPromotionInput(db, { args, now: value.now });
+
+    expect(loaded.latestPublishedVersionId).toBe(TARGET_VERSION_ID);
+    expect(root.assessmentTemplateVersion.findFirst).toHaveBeenCalledWith({
+      where: {
+        templateId: "template-sunhub",
+        language: "en",
+        publishedAt: { not: null },
+        archivedAt: null,
+      },
+      orderBy: { versionNumber: "desc" },
+      select: { id: true },
+    });
+    expect(() => buildPromotionPlan(loaded)).not.toThrow();
+  });
+
   it("quiesces ACTIVE to CLOSED with one exact CAS and an atomic receipt while retaining the live alias", async () => {
     const value = input();
     const plan = buildPromotionPlan(value);
@@ -596,7 +630,7 @@ describe("promote SunHub quick quiz runner", () => {
     const plan = buildPromotionPlan(value);
     const { db, root, tx, transaction } = runnerDb(runnerState(value), value);
 
-    await expect(applyPromotion(db, plan, "operator@example.com")).resolves.toEqual({
+    await expect(applyPromotion(db, plan, "operator@example.com", JSON_DATABASE_NULL)).resolves.toEqual({
       status: "applied",
       successorCampaignId: "item7-sunhub-quick-quiz-v7-successor",
     });
@@ -630,13 +664,64 @@ describe("promote SunHub quick quiz runner", () => {
     expect(root.$executeRaw).not.toHaveBeenCalled();
   });
 
+  it("translates copied null JSON fields to database-null sentinels at create", async () => {
+    const base = applyInput();
+    const value = {
+      ...base,
+      sourceCampaign: {
+        ...base.sourceCampaign,
+        publicConfig: null,
+        customSlides: null,
+      },
+    };
+    const plan = buildPromotionPlan(value);
+    const { db, tx } = runnerDb(runnerState(value), value);
+
+    await applyPromotion(db, plan, "operator@example.com", JSON_DATABASE_NULL);
+
+    expect(tx.assessmentCampaign.create).toHaveBeenCalledWith({
+      data: {
+        ...plan.successor,
+        publicConfig: JSON_DATABASE_NULL,
+        customSlides: JSON_DATABASE_NULL,
+      },
+    });
+  });
+
+  it("recognizes persisted database-null JSON fields as exact completed state", async () => {
+    const base = applyInput();
+    const value = {
+      ...base,
+      sourceCampaign: {
+        ...base.sourceCampaign,
+        publicConfig: null,
+        customSlides: null,
+      },
+    };
+    const plan = buildPromotionPlan(value);
+    const state = runnerState(value);
+    state.source = { ...state.source, alias: RETIRED_ALIAS, status: "CLOSED", updatedAt: DRAINED_AT };
+    state.successor = persistedSuccessor(plan);
+    state.retiredAliasOwnerId = SOURCE_CAMPAIGN_ID;
+    state.promotionReceipts = [auditReceipt(plan)];
+    const { db, tx } = runnerDb(state, value);
+
+    await expect(
+      applyPromotion(db, plan, "retry@example.com", JSON_DATABASE_NULL),
+    ).resolves.toEqual({
+      status: "idempotent",
+      successorCampaignId: SUCCESSOR_CAMPAIGN_ID,
+    });
+    expect(tx.assessmentCampaign.create).not.toHaveBeenCalled();
+  });
+
   it("revalidates planner invariants inside apply and writes nothing on drift", async () => {
     const value = applyInput();
     const plan = buildPromotionPlan(value);
     const drifted = { ...value, targetVersion: { ...value.targetVersion, scoringConfig: {} } };
     const { db, tx } = runnerDb(runnerState(value), drifted);
 
-    await expect(applyPromotion(db, plan, "operator@example.com")).rejects.toMatchObject({
+    await expect(applyPromotion(db, plan, "operator@example.com", JSON_DATABASE_NULL)).rejects.toMatchObject({
       field: "targetVersion.scoringConfig",
     });
     expect(tx.$executeRaw).not.toHaveBeenCalled();
@@ -650,7 +735,7 @@ describe("promote SunHub quick quiz runner", () => {
     const { db, tx } = runnerDb(runnerState(value), value);
     tx.$executeRaw.mockResolvedValueOnce(0);
 
-    await expect(applyPromotion(db, plan, "operator@example.com")).rejects.toThrow("CAS");
+    await expect(applyPromotion(db, plan, "operator@example.com", JSON_DATABASE_NULL)).rejects.toThrow("CAS");
     expect(tx.assessmentCampaign.create).not.toHaveBeenCalled();
     expect(tx.auditLog.create).not.toHaveBeenCalled();
   });
@@ -670,7 +755,7 @@ describe("promote SunHub quick quiz runner", () => {
     state.promotionReceipts = [auditReceipt(plan)];
     const { db, tx } = runnerDb(state, value);
 
-    await expect(applyPromotion(db, plan, "retry@example.com")).resolves.toEqual({
+    await expect(applyPromotion(db, plan, "retry@example.com", JSON_DATABASE_NULL)).resolves.toEqual({
       status: "idempotent",
       successorCampaignId: "item7-sunhub-quick-quiz-v7-successor",
     });
@@ -706,7 +791,7 @@ describe("promote SunHub quick quiz runner", () => {
     mutate(state, plan);
     const { db, tx } = runnerDb(state, value);
 
-    await expect(applyPromotion(db, plan, "operator@example.com")).rejects.toThrow("idempotency");
+    await expect(applyPromotion(db, plan, "operator@example.com", JSON_DATABASE_NULL)).rejects.toThrow("idempotency");
     expect(tx.$executeRaw).not.toHaveBeenCalled();
     expect(tx.assessmentCampaign.create).not.toHaveBeenCalled();
     expect(tx.auditLog.create).not.toHaveBeenCalled();
@@ -731,7 +816,7 @@ describe("promote SunHub quick quiz runner", () => {
     ["quiesce", (db: DbClient, plan: ReturnType<typeof buildPromotionPlan>, operator: string) =>
       quiescePromotion(db, plan, operator), input()],
     ["apply", (db: DbClient, plan: ReturnType<typeof buildPromotionPlan>, operator: string) =>
-      applyPromotion(db, plan, operator), applyInput()],
+      applyPromotion(db, plan, operator, JSON_DATABASE_NULL), applyInput()],
   ])("rejects an empty %s operator before opening a transaction", async (_name, run, value) => {
     const plan = buildPromotionPlan(value);
     const { db, root, tx, transaction } = runnerDb(runnerState(value), value);
@@ -943,7 +1028,58 @@ describe("promote SunHub quick quiz CLI policy", () => {
   });
 
   it.each([
+    ["a later version publishes", (value: PromotionInput) => ({
+      ...value,
+      latestPublishedVersionId: "published-v8",
+    })],
+    ["the historical target is archived", (value: PromotionInput) => ({
+      ...value,
+      targetVersion: { ...value.targetVersion, archivedAt: DRAINED_AT },
+      latestPublishedVersionId: "previous-active-version",
+    })],
+    ["the template is disabled", (value: PromotionInput) => ({
+      ...value,
+      template: { ...value.template, disabledAt: DRAINED_AT },
+    })],
+  ])("keeps exact completed state durable after %s", async (_name, mutateCurrentState) => {
+    const historicalValue = applyInput();
+    const historicalPlan = buildPromotionPlan(historicalValue);
+    const state = runnerState(historicalValue);
+    state.source = { ...state.source, alias: RETIRED_ALIAS, status: "CLOSED" };
+    state.successor = persistedSuccessor(historicalPlan);
+    state.retiredAliasOwnerId = SOURCE_CAMPAIGN_ID;
+    state.promotionReceipts = [auditReceipt(historicalPlan)];
+    const currentValue = mutateCurrentState(historicalValue);
+    const { db } = runnerDb(state, currentValue);
+    const loaded = await loadPromotionInput(db, { args: parsePromotionArgs([]) });
+
+    await expect(inspectCompletedPromotion(db, loaded)).resolves.toEqual({ status: "complete" });
+  });
+
+  it.each([
     ["missing receipt", (state: RunnerState) => { state.promotionReceipts = []; }],
+    ["malformed receipt JSON", (state: RunnerState, plan: ReturnType<typeof buildPromotionPlan>) => {
+      state.promotionReceipts = [{ ...auditReceipt(plan), changes: "{" }];
+    }],
+    ["extra receipt payload key", (state: RunnerState, plan: ReturnType<typeof buildPromotionPlan>) => {
+      const payload = JSON.parse(auditReceipt(plan).changes) as Record<string, unknown>;
+      state.promotionReceipts = [{ ...auditReceipt(plan), changes: JSON.stringify({ ...payload, extra: true }) }];
+    }],
+    ["extra successor field", (state: RunnerState, plan: ReturnType<typeof buildPromotionPlan>) => {
+      const payload = JSON.parse(auditReceipt(plan).changes) as { successor: Record<string, unknown> };
+      payload.successor.invitationSubject = "must not be copied";
+      state.promotionReceipts = [{ ...auditReceipt(plan), changes: JSON.stringify(payload) }];
+    }],
+    ["mismatched receipt constant", (state: RunnerState, plan: ReturnType<typeof buildPromotionPlan>) => {
+      const payload = JSON.parse(auditReceipt(plan).changes) as Record<string, unknown>;
+      payload.targetVersionId = SOURCE_VERSION_ID;
+      state.promotionReceipts = [{ ...auditReceipt(plan), changes: JSON.stringify(payload) }];
+    }],
+    ["unsupported receipt schema", (state: RunnerState, plan: ReturnType<typeof buildPromotionPlan>) => {
+      const payload = JSON.parse(auditReceipt(plan).changes) as Record<string, unknown>;
+      payload.schemaVersion = 2;
+      state.promotionReceipts = [{ ...auditReceipt(plan), changes: JSON.stringify(payload) }];
+    }],
     ["non-default invite timing", (state: RunnerState) => { state.successor = { ...state.successor, inviteTiming: "ON_OPEN" }; }],
     ["non-zero successor relation", (state: RunnerState) => { state.successor = { ...state.successor, _count: { participants: 0, invitations: 0, submissions: 1, summaryReports: 0 } }; }],
     ["source field drift", (state: RunnerState) => { state.source = { ...state.source, name: "drift" }; }],
@@ -956,7 +1092,7 @@ describe("promote SunHub quick quiz CLI policy", () => {
     state.successor = persistedSuccessor(plan);
     state.retiredAliasOwnerId = SOURCE_CAMPAIGN_ID;
     state.promotionReceipts = [auditReceipt(plan)];
-    mutate(state);
+    mutate(state, plan);
     const { db } = runnerDb(state, value);
     const loaded = await loadPromotionInput(db, { args: parsePromotionArgs([]) });
 

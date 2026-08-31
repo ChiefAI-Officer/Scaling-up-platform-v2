@@ -30,6 +30,7 @@ import {
   loadPromotionInput,
   quiescePromotion,
   type DbClient,
+  type PromotionJsonDatabaseNull,
 } from "@/lib/scripts/promote-sunhub-quick-quiz-runner";
 
 const COMMAND = "npx tsx scripts/promote-sunhub-quick-quiz.ts";
@@ -43,6 +44,8 @@ export type PromotionCliDependencies = {
   now?: () => Date;
   write?: (line: string) => void;
   disconnect?: (db: DbClient) => Promise<void>;
+  /** Resolved lazily only on apply; the runner has no runtime Prisma import. */
+  getJsonDatabaseNull?: () => PromotionJsonDatabaseNull | Promise<PromotionJsonDatabaseNull>;
 };
 
 export type PromotionCliResult = {
@@ -215,7 +218,15 @@ export async function runPromotionCli(
       return { state: "quiesced" };
     }
 
-    const result = await applyPromotion(db, plan, operator);
+    if (!dependencies.getJsonDatabaseNull) {
+      throw new Error("A database JSON-null sentinel is required for apply.");
+    }
+    const result = await applyPromotion(
+      db,
+      plan,
+      operator,
+      await dependencies.getJsonDatabaseNull(),
+    );
     output(write, [`Apply ${result.status}; successor campaign: ${result.successorCampaignId}.`]);
     return { state: "applied" };
   } finally {
@@ -225,14 +236,22 @@ export async function runPromotionCli(
 
 async function main(): Promise<void> {
   let prisma: { $disconnect(): Promise<void> } | undefined;
+  let databaseJsonNull: PromotionJsonDatabaseNull | undefined;
   await runPromotionCli(process.argv.slice(2), {
     createDb: async () => {
-      const { PrismaClient } = await import("@prisma/client");
+      const { Prisma, PrismaClient } = await import("@prisma/client");
       prisma = new PrismaClient();
+      databaseJsonNull = Prisma.DbNull;
       return prisma as unknown as DbClient;
     },
     databaseUrl: process.env.DATABASE_URL,
     disconnect: async () => prisma?.$disconnect(),
+    getJsonDatabaseNull: () => {
+      if (!databaseJsonNull) {
+        throw new Error("Database JSON-null sentinel was requested before client construction.");
+      }
+      return databaseJsonNull;
+    },
   });
 }
 

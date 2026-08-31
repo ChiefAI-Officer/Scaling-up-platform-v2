@@ -77,6 +77,7 @@ export type TemplateVersionSnapshot = {
   templateId: string;
   language: string;
   publishedAt: Date | string | null;
+  archivedAt: Date | string | null;
   questions: Json;
   sections: Json;
   scoringConfig: Json;
@@ -337,11 +338,13 @@ export function buildPromotionPlan(input: PromotionInput): PromotionPlan {
   if (targetVersion.templateId !== template.id) fail("targetVersion.templateId", "must match template.id");
   if (sourceVersion.language !== sourceCampaign.language) fail("sourceVersion.language", "must match source campaign language");
   if (targetVersion.language !== sourceCampaign.language) fail("targetVersion.language", "must match source campaign language");
+  if (sourceVersion.publishedAt === null) fail("sourceVersion.publishedAt", "must be published");
   if (template.deletedAt !== null) fail("template.deletedAt", "must be null");
   if (template.disabledAt !== null) fail("template.disabledAt", "must be null");
   if (template.deliveryType !== "PUBLIC_MARKETING_QUIZ") fail("template.deliveryType", "must be PUBLIC_MARKETING_QUIZ");
   if (input.retiredAliasOccupied) fail("retiredAlias", `${RETIRED_ALIAS} is already occupied`);
   if (targetVersion.publishedAt === null) fail("targetVersion.publishedAt", "must be published");
+  if (targetVersion.archivedAt !== null) fail("targetVersion.archivedAt", "must be null");
   if (input.latestPublishedVersionId !== TARGET_VERSION_ID) fail("latestPublishedVersionId", "must identify the compiled target version");
   if (!canonicalEqual(sourceVersion.questions, targetVersion.questions, "targetVersion.questions")) fail("targetVersion.questions", "must canonically match sourceVersion.questions");
   if (!canonicalEqual(sourceVersion.sections, targetVersion.sections, "targetVersion.sections")) fail("targetVersion.sections", "must canonically match sourceVersion.sections");

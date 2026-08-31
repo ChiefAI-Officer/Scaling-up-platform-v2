@@ -36,7 +36,7 @@ Changing the existing campaign's `versionId` would make its historical submissio
 Preserve the old campaign and create a successor behind the same public alias with a drained, two-phase cutover:
 
 1. Verify the exact source campaign, source v1, target v7, current source timestamp, and operator-confirmed submission count.
-2. Verify source and target belong to the same enabled Public-marketing Template and language, target v7 is the latest published version, their questions/sections/scoring are canonically identical, and the real report-HTML safe loader accepts both v7 regions.
+2. Verify source and target belong to the same enabled Public-marketing Template and language, the source is published, target v7 is published and non-archived, v7 is the latest Active version, their questions/sections/scoring are canonically identical, and the real report-HTML safe loader accepts both v7 regions.
 3. Quiesce: compare-and-swap the v1 campaign from ACTIVE to CLOSED while it still owns `sunhub-quick-quiz`, and write a durable quiescence receipt.
 4. Wait at least 15 minutes. This exceeds the request execution window and drains submissions that resolved v1 before quiescence. During this maintenance window, the public link truthfully reports that the campaign is closed.
 5. Re-run dry-run after the drain window. Capture the post-drain submission count and quiesced `updatedAt` used by apply.
@@ -66,7 +66,7 @@ The successor starts with no submissions and receives fresh timestamps. The sour
 ## Implemented operation and co-validation rulings
 
 The guarded operation is implemented as a pure planner, injected transaction runner,
-and import-safe CLI. Co-validation tightened the design in four material ways:
+and import-safe CLI. Co-validation and final review tightened the design in six material ways:
 
 - the successor allow-list excludes invitation subject/body and invited Welcome
   fields, and happy-path plans assert the complete manifest with canonical ISO CAS
@@ -78,7 +78,14 @@ and import-safe CLI. Co-validation tightened the design in four material ways:
   callback-scoped transaction client, and revalidates the same planner invariants;
 - generated commands quote every dynamic argument, accept only conservative
   PostgreSQL DNS hostnames, defer Prisma construction until all write guards pass,
-  and never invent an audit identity.
+  and never invent an audit identity;
+- nullable `publicConfig` and `customSlides` are translated only at the create
+  seam to an injected Prisma database-NULL sentinel, while the pure planner and
+  import-safe runner remain free of a hard runtime Prisma dependency;
+- latest-version resolution uses the shared published/non-archived Active-version
+  contract, and completed-operation inspection reconstructs the historical plan
+  from a strictly validated receipt rather than rerunning mutable current preflight
+  rules after later publication, target archival, or template disablement.
 
 Consequently, a dry-run without `--operator` intentionally prints only this
 copy-pastable read-only rerun instruction:
@@ -147,7 +154,7 @@ verification. Therefore Production is **not repaired** by this work.
 
 ## Final verification receipt
 
-- Successor planner/runner/CLI: **61/61** tests passed.
+- Successor planner/runner/CLI: **74/74** tests passed.
 - Report HTML sanitizer: **74/74** tests passed; 24 estimated lines are accepted and
   25 remain rejected.
 - Public submit coverage: **2 suites / 69 tests** passed.

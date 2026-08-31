@@ -5,10 +5,13 @@
  * supplies the client; tests supply the same narrow Prisma-compatible seam.
  */
 
+import type { Prisma } from "@prisma/client";
+
+import { activePublishedWhere } from "@/lib/assessments/active-version";
 import { stableCanonicalJson } from "@/lib/assessments/assessment-email-delivery-intents";
 import {
-  DRAIN_WINDOW_MS,
   LIVE_ALIAS,
+  PROMOTION_MANIFEST_SCHEMA_VERSION,
   RETIRED_ALIAS,
   SOURCE_CAMPAIGN_ID,
   SOURCE_VERSION_ID,
@@ -67,11 +70,22 @@ export type AuditCreateData = {
   changes: string;
 };
 
+/** Prisma's database-NULL sentinel, injected so this module stays import-safe. */
+export type PromotionJsonDatabaseNull = Prisma.NullTypes.DbNull;
+
+type SuccessorCampaignCreateData = Omit<
+  SuccessorCampaignFields,
+  "publicConfig" | "customSlides"
+> & {
+  publicConfig: Prisma.InputJsonValue | PromotionJsonDatabaseNull;
+  customSlides: Prisma.InputJsonValue | PromotionJsonDatabaseNull;
+};
+
 export interface TransactionClient {
   assessmentCampaign: {
     findUnique(args: unknown): Promise<SourceCampaignRow | SuccessorCampaignRow | { id: string } | null>;
     updateMany(args: unknown): Promise<{ count: number }>;
-    create(args: { data: SuccessorCampaignFields }): Promise<{ id: string }>;
+    create(args: { data: SuccessorCampaignCreateData }): Promise<{ id: string }>;
   };
   assessmentTemplate: {
     findUnique(args: unknown): Promise<TemplateSnapshot | null>;
@@ -138,6 +152,7 @@ const versionSelect = {
   templateId: true,
   language: true,
   publishedAt: true,
+  archivedAt: true,
   questions: true,
   sections: true,
   scoringConfig: true,
@@ -187,7 +202,7 @@ export async function loadPromotionInput(
   }) as SourceCampaignRow | null;
   if (!sourceRow) invariant("sourceCampaign.id", "the compiled source campaign was not found");
 
-  const [template, sourceVersion, targetVersion, latestPublishedVersion, retiredAliasOwner] =
+  const [template, sourceVersion, targetVersion, latestActiveVersion, retiredAliasOwner] =
     await Promise.all([
       db.assessmentTemplate.findUnique({
         where: { id: sourceRow.templateId },
@@ -211,9 +226,9 @@ export async function loadPromotionInput(
         where: {
           templateId: sourceRow.templateId,
           language: sourceRow.language,
-          publishedAt: { not: null },
+          ...activePublishedWhere,
         },
-        orderBy: [{ versionNumber: "desc" }, { createdAt: "desc" }],
+        orderBy: { versionNumber: "desc" },
         select: { id: true },
       }),
       db.assessmentCampaign.findUnique({
@@ -241,7 +256,7 @@ export async function loadPromotionInput(
     template,
     sourceVersion,
     targetVersion,
-    latestPublishedVersionId: latestPublishedVersion?.id ?? null,
+    latestPublishedVersionId: latestActiveVersion?.id ?? null,
     retiredAliasOccupied: retiredAliasOwner !== null,
     expected,
     ...(loadExpected.now === undefined ? {} : { now: loadExpected.now }),
@@ -389,6 +404,23 @@ function expectedSuccessor(plan: PromotionPlan): SuccessorCampaignRow {
   };
 }
 
+function successorCreateData(
+  plan: PromotionPlan,
+  databaseJsonNull: PromotionJsonDatabaseNull,
+): SuccessorCampaignCreateData {
+  return {
+    ...plan.successor,
+    publicConfig:
+      plan.successor.publicConfig === null
+        ? databaseJsonNull
+        : plan.successor.publicConfig as Prisma.InputJsonValue,
+    customSlides:
+      plan.successor.customSlides === null
+        ? databaseJsonNull
+        : plan.successor.customSlides as Prisma.InputJsonValue,
+  };
+}
+
 async function loadSuccessor(db: TransactionClient): Promise<SuccessorCampaignRow | null> {
   return db.assessmentCampaign.findUnique({
     where: { id: SUCCESSOR_CAMPAIGN_ID },
@@ -443,16 +475,86 @@ function canonicalIso(value: unknown): value is string {
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString() === value;
 }
 
+function hasExactKeys(
+  value: Record<string, unknown>,
+  expectedKeys: readonly string[],
+): boolean {
+  const actualKeys = Object.keys(value).sort();
+  const sortedExpectedKeys = [...expectedKeys].sort();
+  return (
+    actualKeys.length === sortedExpectedKeys.length &&
+    actualKeys.every((key, index) => key === sortedExpectedKeys[index])
+  );
+}
+
+function nullableString(value: unknown): value is string | null {
+  return value === null || typeof value === "string";
+}
+
+function nullableCanonicalIso(value: unknown): value is string | null {
+  return value === null || canonicalIso(value);
+}
+
+const APPLY_RECEIPT_KEYS = [
+  "schemaVersion",
+  "source",
+  "targetVersionId",
+  "successor",
+  "retiredAlias",
+] as const;
+
+const SOURCE_CAS_KEYS = [
+  "id",
+  "versionId",
+  "alias",
+  "status",
+  "deletedAt",
+  "updatedAt",
+  "submissionCount",
+] as const;
+
+const SUCCESSOR_ALLOW_LIST = [
+  "id",
+  "templateId",
+  "versionId",
+  "language",
+  "alias",
+  "name",
+  "description",
+  "status",
+  "accessMode",
+  "publicConfig",
+  "openAt",
+  "endMode",
+  "closeAt",
+  "notifyAdminOnSubmit",
+  "sendResultsToRespondent",
+  "notifyCoachOnCompletion",
+  "showResultsOnScreen",
+  "reportStyle",
+  "reportStyleSource",
+  "reportStyleLockedAt",
+  "customSlides",
+  "createdBy",
+  "createdByCoachId",
+] as const;
+
 /**
- * Reconstruct the pre-apply plan from its durable audit payload. This is only
- * for inspecting a completed promotion: apply itself keeps using the original
- * in-memory plan and both paths share assertCompleteApply below.
+ * Reconstruct the historical apply plan solely from its durable audit payload.
+ * Completion inspection must not rerun today's mutable preflight facts (for
+ * example Active-version, archive, or template-enabled state).
  */
-function planFromApplyReceipt(input: PromotionInput, receipts: AuditReceiptRow[]): PromotionPlan {
+function planFromApplyReceipt(receipts: AuditReceiptRow[]): PromotionPlan {
   if (receipts.length !== 1) invariant("idempotency.apply", "expected exactly one promotion receipt");
   const receipt = receipts[0];
-  if (receipt.action !== "PUBLIC_CAMPAIGN_SUCCESSOR_PROMOTION") {
-    invariant("idempotency.apply", "promotion receipt action did not match");
+  if (
+    receipt.entityType !== "AssessmentCampaign" ||
+    receipt.entityId !== SOURCE_CAMPAIGN_ID ||
+    receipt.action !== "PUBLIC_CAMPAIGN_SUCCESSOR_PROMOTION" ||
+    typeof receipt.performedBy !== "string" ||
+    receipt.performedBy.trim() === ""
+  ) {
+    invariant("idempotency.apply", "promotion receipt identity did not match");
   }
 
   let payload: Record<string, unknown> | null = null;
@@ -462,10 +564,21 @@ function planFromApplyReceipt(input: PromotionInput, receipts: AuditReceiptRow[]
     invariant("idempotency.apply", "promotion receipt payload was not JSON");
   }
   if (!payload) invariant("idempotency.apply", "promotion receipt payload was not an object");
+  if (!hasExactKeys(payload, APPLY_RECEIPT_KEYS)) {
+    invariant("idempotency.apply", "promotion receipt payload keys did not match the schema");
+  }
+  if (
+    payload.schemaVersion !== PROMOTION_MANIFEST_SCHEMA_VERSION ||
+    payload.targetVersionId !== TARGET_VERSION_ID ||
+    payload.retiredAlias !== RETIRED_ALIAS
+  ) {
+    invariant("idempotency.apply", "promotion receipt constants did not match");
+  }
 
   const source = record(payload.source);
   if (
     !source ||
+    !hasExactKeys(source, SOURCE_CAS_KEYS) ||
     source.id !== SOURCE_CAMPAIGN_ID ||
     source.versionId !== SOURCE_VERSION_ID ||
     source.alias !== LIVE_ALIAS ||
@@ -478,30 +591,118 @@ function planFromApplyReceipt(input: PromotionInput, receipts: AuditReceiptRow[]
     invariant("idempotency.apply", "promotion receipt payload did not contain a valid source CAS");
   }
 
+  const sourceCas: PromotionPlan["sourceCas"] = {
+    id: SOURCE_CAMPAIGN_ID,
+    versionId: SOURCE_VERSION_ID,
+    alias: LIVE_ALIAS,
+    status: "CLOSED",
+    deletedAt: null,
+    updatedAt: source.updatedAt as string,
+    submissionCount: source.submissionCount as number,
+  };
+  const successorRecord = record(payload.successor);
+  if (
+    !successorRecord ||
+    !hasExactKeys(successorRecord, SUCCESSOR_ALLOW_LIST) ||
+    successorRecord.id !== SUCCESSOR_CAMPAIGN_ID ||
+    typeof successorRecord.templateId !== "string" ||
+    successorRecord.templateId === "" ||
+    successorRecord.versionId !== TARGET_VERSION_ID ||
+    typeof successorRecord.language !== "string" ||
+    successorRecord.language === "" ||
+    successorRecord.alias !== LIVE_ALIAS ||
+    typeof successorRecord.name !== "string" ||
+    !nullableString(successorRecord.description) ||
+    successorRecord.status !== "ACTIVE" ||
+    successorRecord.accessMode !== "PUBLIC" ||
+    !canonicalIso(successorRecord.openAt) ||
+    typeof successorRecord.endMode !== "string" ||
+    successorRecord.endMode === "" ||
+    !nullableCanonicalIso(successorRecord.closeAt) ||
+    typeof successorRecord.notifyAdminOnSubmit !== "boolean" ||
+    typeof successorRecord.sendResultsToRespondent !== "boolean" ||
+    typeof successorRecord.notifyCoachOnCompletion !== "boolean" ||
+    typeof successorRecord.showResultsOnScreen !== "boolean" ||
+    typeof successorRecord.reportStyle !== "string" ||
+    successorRecord.reportStyle === "" ||
+    typeof successorRecord.reportStyleSource !== "string" ||
+    successorRecord.reportStyleSource === "" ||
+    !nullableCanonicalIso(successorRecord.reportStyleLockedAt) ||
+    typeof successorRecord.createdBy !== "string" ||
+    successorRecord.createdBy === "" ||
+    !nullableString(successorRecord.createdByCoachId)
+  ) {
+    invariant("idempotency.apply", "promotion receipt successor did not match the allow-list schema");
+  }
+
+  const successor: SuccessorCampaignFields = {
+    id: SUCCESSOR_CAMPAIGN_ID,
+    templateId: successorRecord.templateId,
+    versionId: TARGET_VERSION_ID,
+    language: successorRecord.language,
+    alias: LIVE_ALIAS,
+    name: successorRecord.name,
+    description: successorRecord.description,
+    status: "ACTIVE",
+    accessMode: "PUBLIC",
+    publicConfig: successorRecord.publicConfig,
+    openAt: successorRecord.openAt,
+    endMode: successorRecord.endMode,
+    closeAt: successorRecord.closeAt,
+    notifyAdminOnSubmit: successorRecord.notifyAdminOnSubmit,
+    sendResultsToRespondent: successorRecord.sendResultsToRespondent,
+    notifyCoachOnCompletion: successorRecord.notifyCoachOnCompletion,
+    showResultsOnScreen: successorRecord.showResultsOnScreen,
+    reportStyle: successorRecord.reportStyle,
+    reportStyleSource: successorRecord.reportStyleSource,
+    reportStyleLockedAt: successorRecord.reportStyleLockedAt,
+    customSlides: successorRecord.customSlides,
+    createdBy: successorRecord.createdBy,
+    createdByCoachId: successorRecord.createdByCoachId,
+  };
   const expected: PromotionExpectedCas = {
     sourceUpdatedAt: source.updatedAt as string,
     submissionCount: source.submissionCount as number,
   };
-  const preApplyInput: PromotionInput = {
-    ...input,
-    args: {
-      mode: "apply",
-      hasProductionAcknowledgement: true,
-      expectedSourceUpdatedAt: expected.sourceUpdatedAt,
-      expectedSubmissionCount: expected.submissionCount,
-    },
-    sourceCampaign: {
-      ...input.sourceCampaign,
-      alias: LIVE_ALIAS,
-      status: "CLOSED",
-      updatedAt: expected.sourceUpdatedAt,
-      submissionCount: expected.submissionCount,
-    },
-    retiredAliasOccupied: false,
-    expected,
-    now: new Date(new Date(expected.sourceUpdatedAt).getTime() + DRAIN_WINDOW_MS),
+  const historicalPayload: PromotionPlan["manifest"]["audit"]["payload"] = {
+    schemaVersion: PROMOTION_MANIFEST_SCHEMA_VERSION,
+    source: sourceCas,
+    targetVersionId: TARGET_VERSION_ID,
+    successor,
+    retiredAlias: RETIRED_ALIAS,
   };
-  const plan = buildPromotionPlan(preApplyInput);
+  const plan: PromotionPlan = {
+    mode: "apply",
+    sourceCas,
+    successor,
+    manifest: {
+      schemaVersion: PROMOTION_MANIFEST_SCHEMA_VERSION,
+      operation: "sunhub-quick-quiz-successor-promotion",
+      mode: "apply",
+      source: {
+        campaignId: SOURCE_CAMPAIGN_ID,
+        templateId: successor.templateId,
+        versionId: SOURCE_VERSION_ID,
+        alias: LIVE_ALIAS,
+      },
+      target: {
+        versionId: TARGET_VERSION_ID,
+        templateId: successor.templateId,
+        language: successor.language,
+      },
+      successor: {
+        id: SUCCESSOR_CAMPAIGN_ID,
+        alias: LIVE_ALIAS,
+        versionId: TARGET_VERSION_ID,
+        templateId: successor.templateId,
+      },
+      expected,
+      audit: {
+        action: "PUBLIC_CAMPAIGN_SUCCESSOR_PROMOTION",
+        payload: historicalPayload,
+      },
+    },
+  };
   if (!receiptMatches(receipt, plan)) {
     invariant("idempotency.apply", "promotion receipt did not match the complete manifest");
   }
@@ -527,7 +728,7 @@ export async function inspectCompletedPromotion(
     loadSuccessor(db),
     loadReceipts(db, "PUBLIC_CAMPAIGN_SUCCESSOR_PROMOTION"),
   ]);
-  const plan = planFromApplyReceipt(input, receipts);
+  const plan = planFromApplyReceipt(receipts);
   assertCompleteApply(input, successor, receipts, plan);
   return { status: "complete" };
 }
@@ -581,6 +782,7 @@ export async function applyPromotion(
   db: DbClient,
   plan: PromotionPlan,
   operator: string,
+  databaseJsonNull: PromotionJsonDatabaseNull,
 ): Promise<{
   status: "applied" | "idempotent";
   successorCampaignId: typeof SUCCESSOR_CAMPAIGN_ID;
@@ -625,7 +827,9 @@ export async function applyPromotion(
     `;
     if (updated !== 1) invariant("sourceCampaign.CAS", "promotion alias/count CAS matched zero rows");
 
-    await tx.assessmentCampaign.create({ data: plan.successor });
+    await tx.assessmentCampaign.create({
+      data: successorCreateData(plan, databaseJsonNull),
+    });
     await tx.auditLog.create({ data: receiptData(plan, operator) });
     return {
       status: "applied" as const,
