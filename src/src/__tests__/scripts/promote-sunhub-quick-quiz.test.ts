@@ -419,6 +419,7 @@ function auditReceipt(plan: ReturnType<typeof buildPromotionPlan>, operator = "o
 function persistedSuccessor(plan: ReturnType<typeof buildPromotionPlan>) {
   return {
     ...plan.successor,
+    inviteTiming: "IMMEDIATELY",
     organizationId: null,
     externalId: null,
     invitedWelcomeSnapshot: null,
@@ -440,21 +441,25 @@ function persistedSuccessor(plan: ReturnType<typeof buildPromotionPlan>) {
 }
 
 function runnerDb(state: RunnerState, value: PromotionInput = input()) {
-  const assessmentCampaignFindUnique = jest.fn(async (args: { where: { id?: string; alias?: string } }) => {
+  const findCampaign = async (args: { where: { id?: string; alias?: string } }) => {
     if (args.where.id === SOURCE_CAMPAIGN_ID) return state.source;
     if (args.where.id === "item7-sunhub-quick-quiz-v7-successor") return state.successor;
     if (args.where.alias === RETIRED_ALIAS) {
       return state.retiredAliasOwnerId ? { id: state.retiredAliasOwnerId } : null;
     }
     return null;
-  });
-  const assessmentCampaignUpdateMany = jest.fn().mockResolvedValue({ count: 1 });
-  const assessmentCampaignCreate = jest.fn().mockResolvedValue({ id: "item7-sunhub-quick-quiz-v7-successor" });
-  const auditLogFindMany = jest.fn(async (args: { where: { action: string } }) =>
+  };
+  const findVersion = async (args: { where: { id: string } }) =>
+    args.where.id === SOURCE_VERSION_ID ? value.sourceVersion : value.targetVersion;
+  const findReceipts = async (args: { where: { action: string } }) =>
     args.where.action === "PUBLIC_CAMPAIGN_SUCCESSOR_QUIESCE"
       ? state.quiesceReceipts
-      : state.promotionReceipts,
-  );
+      : state.promotionReceipts;
+
+  const assessmentCampaignFindUnique = jest.fn(findCampaign);
+  const assessmentCampaignUpdateMany = jest.fn().mockResolvedValue({ count: 1 });
+  const assessmentCampaignCreate = jest.fn().mockResolvedValue({ id: "item7-sunhub-quick-quiz-v7-successor" });
+  const auditLogFindMany = jest.fn(findReceipts);
   const auditLogCreate = jest.fn().mockResolvedValue({});
   const executeRaw = jest.fn().mockResolvedValue(1);
   const tx = {
@@ -467,9 +472,7 @@ function runnerDb(state: RunnerState, value: PromotionInput = input()) {
       findUnique: jest.fn().mockResolvedValue(value.template),
     },
     assessmentTemplateVersion: {
-      findUnique: jest.fn(async (args: { where: { id: string } }) =>
-        args.where.id === SOURCE_VERSION_ID ? value.sourceVersion : value.targetVersion,
-      ),
+      findUnique: jest.fn(findVersion),
       findFirst: jest.fn().mockResolvedValue({ id: value.latestPublishedVersionId }),
     },
     auditLog: {
@@ -485,8 +488,32 @@ function runnerDb(state: RunnerState, value: PromotionInput = input()) {
     void options;
     return callback(tx);
   });
+  const rootWriteForbidden = jest.fn(async () => {
+    throw new Error("root write forbidden: transaction-bound write required");
+  });
+  const root = {
+    assessmentCampaign: {
+      findUnique: jest.fn(findCampaign),
+      updateMany: rootWriteForbidden,
+      create: rootWriteForbidden,
+    },
+    assessmentTemplate: {
+      findUnique: jest.fn().mockResolvedValue(value.template),
+    },
+    assessmentTemplateVersion: {
+      findUnique: jest.fn(findVersion),
+      findFirst: jest.fn().mockResolvedValue({ id: value.latestPublishedVersionId }),
+    },
+    auditLog: {
+      findMany: jest.fn(findReceipts),
+      create: rootWriteForbidden,
+    },
+    $executeRaw: rootWriteForbidden,
+    $transaction: transaction,
+  };
   return {
-    db: { ...tx, $transaction: transaction } as unknown as DbClient,
+    db: root as unknown as DbClient,
+    root,
     tx,
     transaction,
   };
@@ -497,7 +524,7 @@ describe("promote SunHub quick quiz runner", () => {
     const args = parsePromotionArgs([]);
     const value = input({ args });
     const state = runnerState(value);
-    const { db, tx, transaction } = runnerDb(state, value);
+    const { db, root, tx, transaction } = runnerDb(state, value);
 
     await expect(loadPromotionInput(db, {
       args,
@@ -505,6 +532,10 @@ describe("promote SunHub quick quiz runner", () => {
     })).resolves.toEqual(value);
 
     expect(transaction).not.toHaveBeenCalled();
+    expect(root.assessmentCampaign.updateMany).not.toHaveBeenCalled();
+    expect(root.assessmentCampaign.create).not.toHaveBeenCalled();
+    expect(root.auditLog.create).not.toHaveBeenCalled();
+    expect(root.$executeRaw).not.toHaveBeenCalled();
     expect(tx.assessmentCampaign.updateMany).not.toHaveBeenCalled();
     expect(tx.assessmentCampaign.create).not.toHaveBeenCalled();
     expect(tx.auditLog.create).not.toHaveBeenCalled();
@@ -514,7 +545,7 @@ describe("promote SunHub quick quiz runner", () => {
   it("quiesces ACTIVE to CLOSED with one exact CAS and an atomic receipt while retaining the live alias", async () => {
     const value = input();
     const plan = buildPromotionPlan(value);
-    const { db, tx, transaction } = runnerDb(runnerState(value), value);
+    const { db, root, tx, transaction } = runnerDb(runnerState(value), value);
 
     await expect(quiescePromotion(db, plan, "operator@example.com")).resolves.toEqual({
       status: "quiesced",
@@ -536,6 +567,10 @@ describe("promote SunHub quick quiz runner", () => {
     expect(tx.auditLog.create).toHaveBeenCalledWith({ data: auditReceipt(plan) });
     expect(tx.assessmentCampaign.create).not.toHaveBeenCalled();
     expect(tx.$executeRaw).not.toHaveBeenCalled();
+    expect(root.assessmentCampaign.updateMany).not.toHaveBeenCalled();
+    expect(root.assessmentCampaign.create).not.toHaveBeenCalled();
+    expect(root.auditLog.create).not.toHaveBeenCalled();
+    expect(root.$executeRaw).not.toHaveBeenCalled();
   });
 
   it("aborts quiescence when its exact CAS matches zero rows", async () => {
@@ -551,7 +586,7 @@ describe("promote SunHub quick quiz runner", () => {
   it("applies in one Serializable transaction with a count-protected source CAS, allow-listed successor, and receipt", async () => {
     const value = applyInput();
     const plan = buildPromotionPlan(value);
-    const { db, tx, transaction } = runnerDb(runnerState(value), value);
+    const { db, root, tx, transaction } = runnerDb(runnerState(value), value);
 
     await expect(applyPromotion(db, plan, "operator@example.com")).resolves.toEqual({
       status: "applied",
@@ -581,6 +616,10 @@ describe("promote SunHub quick quiz runner", () => {
     ]);
     expect(tx.assessmentCampaign.create).toHaveBeenCalledWith({ data: plan.successor });
     expect(tx.auditLog.create).toHaveBeenCalledWith({ data: auditReceipt(plan) });
+    expect(root.assessmentCampaign.updateMany).not.toHaveBeenCalled();
+    expect(root.assessmentCampaign.create).not.toHaveBeenCalled();
+    expect(root.auditLog.create).not.toHaveBeenCalled();
+    expect(root.$executeRaw).not.toHaveBeenCalled();
   });
 
   it("revalidates planner invariants inside apply and writes nothing on drift", async () => {
@@ -645,6 +684,9 @@ describe("promote SunHub quick quiz runner", () => {
     ["non-empty successor relations", (state: RunnerState) => {
       state.successor = { ...state.successor, _count: { participants: 0, invitations: 0, submissions: 1, summaryReports: 0 } };
     }],
+    ["non-default successor invite timing", (state: RunnerState) => {
+      state.successor = { ...state.successor, inviteTiming: "ON_OPEN" };
+    }],
   ])("rejects partial or conflicting idempotency state: %s", async (_name, mutate) => {
     const value = applyInput();
     const plan = buildPromotionPlan(value);
@@ -675,5 +717,26 @@ describe("promote SunHub quick quiz runner", () => {
     });
     expect(tx.assessmentCampaign.updateMany).not.toHaveBeenCalled();
     expect(tx.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["quiesce", (db: DbClient, plan: ReturnType<typeof buildPromotionPlan>, operator: string) =>
+      quiescePromotion(db, plan, operator), input()],
+    ["apply", (db: DbClient, plan: ReturnType<typeof buildPromotionPlan>, operator: string) =>
+      applyPromotion(db, plan, operator), applyInput()],
+  ])("rejects an empty %s operator before opening a transaction", async (_name, run, value) => {
+    const plan = buildPromotionPlan(value);
+    const { db, root, tx, transaction } = runnerDb(runnerState(value), value);
+
+    await expect(run(db, plan, "  \t ")).rejects.toThrow("operator");
+    expect(transaction).not.toHaveBeenCalled();
+    expect(root.assessmentCampaign.updateMany).not.toHaveBeenCalled();
+    expect(root.assessmentCampaign.create).not.toHaveBeenCalled();
+    expect(root.auditLog.create).not.toHaveBeenCalled();
+    expect(root.$executeRaw).not.toHaveBeenCalled();
+    expect(tx.assessmentCampaign.updateMany).not.toHaveBeenCalled();
+    expect(tx.assessmentCampaign.create).not.toHaveBeenCalled();
+    expect(tx.auditLog.create).not.toHaveBeenCalled();
+    expect(tx.$executeRaw).not.toHaveBeenCalled();
   });
 });

@@ -30,6 +30,7 @@ type SourceCampaignRow = Omit<SourceCampaign, "submissionCount"> & {
 };
 
 type SuccessorCampaignRow = SuccessorCampaignFields & {
+  inviteTiming: "IMMEDIATELY";
   organizationId: string | null;
   externalId: string | null;
   invitedWelcomeSnapshot: unknown;
@@ -147,6 +148,7 @@ const successorSelect = {
   organizationId: true,
   externalId: true,
   inviteSendStartedAt: true,
+  inviteTiming: true,
   inviteSendHeartbeatAt: true,
   invitesSentAt: true,
   importManifest: true,
@@ -162,6 +164,10 @@ const successorSelect = {
 
 function invariant(field: string, message: string): never {
   throw new PromotionInvariantError(field, message);
+}
+
+function requireOperator(operator: string): void {
+  if (operator.trim() === "") invariant("operator", "must be non-empty");
 }
 
 function sourceFromRow(row: SourceCampaignRow): SourceCampaign {
@@ -361,6 +367,7 @@ function sourceMatchesPlan(
 function expectedSuccessor(plan: PromotionPlan): SuccessorCampaignRow {
   return {
     ...plan.successor,
+    inviteTiming: "IMMEDIATELY",
     organizationId: null,
     externalId: null,
     invitedWelcomeSnapshot: null,
@@ -429,6 +436,7 @@ export async function quiescePromotion(
   plan: PromotionPlan,
   operator: string,
 ): Promise<{ status: "quiesced" | "idempotent" }> {
+  requireOperator(operator);
   if (plan.mode !== "quiesce") invariant("plan.mode", "must be quiesce");
 
   return db.$transaction(async (tx) => {
@@ -475,6 +483,7 @@ export async function applyPromotion(
   status: "applied" | "idempotent";
   successorCampaignId: typeof SUCCESSOR_CAMPAIGN_ID;
 }> {
+  requireOperator(operator);
   if (plan.mode !== "apply") invariant("plan.mode", "must be apply");
 
   return db.$transaction(async (tx) => {
