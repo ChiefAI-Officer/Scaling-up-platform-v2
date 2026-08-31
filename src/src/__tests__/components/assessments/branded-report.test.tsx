@@ -607,6 +607,16 @@ describe("BrandedReport — overall (SU Full ScaleUp)", () => {
 // ════════════════════════════════════════════════════════════════════════════
 
 describe("BrandedReport — Five Dysfunctions domain-result cards", () => {
+  it("follows the Word-document section structure", () => {
+    render(<BrandedReport report={fiveDysfunctionsReport()} />);
+
+    expect(screen.queryByTestId("report-overall")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("report-scores-table")).not.toBeInTheDocument();
+    expect(screen.getByTestId("report-decisions")).toBeInTheDocument();
+    expect(screen.getByTestId("report-sections")).toBeInTheDocument();
+    expect(screen.getByTestId("report-conclusion")).toBeInTheDocument();
+  });
+
   it("renders template labels and the five frozen per-domain messages", () => {
     render(<BrandedReport report={fiveDysfunctionsReport()} />);
 
@@ -617,6 +627,12 @@ describe("BrandedReport — Five Dysfunctions domain-result cards", () => {
     expect(within(decisions).queryByRole("heading", { name: "Your Four Decisions" })).not.toBeInTheDocument();
     expect(within(decisions).getAllByTestId(/^decision-card-/)).toHaveLength(5);
     expect(within(decisions).getAllByTestId(/^domain-tier-message-/)).toHaveLength(5);
+    expect(decisions.querySelector(".su-report-card-grid")).toHaveClass("su-report-card-grid-split");
+    for (const row of within(decisions).getAllByTestId(/^decision-card-/)) {
+      expect(row).toHaveClass("su-report-domain-result-row");
+      expect(row).not.toHaveClass("su-report-decision-card");
+      expect(row.querySelector(".su-report-domain-score-card")).toHaveClass("su-report-decision-card");
+    }
     expect(screen.getByTestId("domain-tier-message-trust")).toHaveTextContent(
       "Your team has created an environment where vulnerability and openness are the norm.",
     );
@@ -653,9 +669,12 @@ describe("BrandedReport — Five Dysfunctions domain-result cards", () => {
     render(<BrandedReport report={suFullReport()} />);
 
     const decisions = screen.getByTestId("report-decisions");
+    expect(screen.getByTestId("report-overall")).toBeInTheDocument();
+    expect(screen.getByTestId("report-scores-table")).toBeInTheDocument();
     expect(within(decisions).getByText("How you scored, by decision")).toBeInTheDocument();
     expect(within(decisions).getByRole("heading", { name: "Your Four Decisions" })).toBeInTheDocument();
     expect(within(decisions).queryByTestId(/^domain-tier-message-/)).not.toBeInTheDocument();
+    expect(decisions.querySelector(".su-report-card-grid")).not.toHaveClass("su-report-card-grid-split");
   });
 });
 

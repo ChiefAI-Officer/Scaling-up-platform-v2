@@ -9,6 +9,7 @@ export interface DomainResultsPresentation {
   readonly eyebrow: string;
   readonly title: string;
   readonly showTierMessage: boolean;
+  readonly layout?: "unified" | "split";
 }
 
 export interface ReportConfig {
@@ -16,6 +17,8 @@ export interface ReportConfig {
   reportType: ReportType;
   /** Whether the scored renderer shows the "All sections" score/average table. */
   showScoreTable: boolean;
+  /** Whether the scored renderer shows the overall-result block. */
+  showOverall?: boolean;
   /** Whether the scored renderer lists every answered statement by section. */
   showDetailedBreakdown?: boolean;
   /** Whether the overall block shows total, average, and section-count facts. */
@@ -104,13 +107,15 @@ const REPORT_CONFIG: Readonly<Record<string, ReportConfig>> = {
    */
   "five-dysfunctions": {
     reportType: "scored",
-    showScoreTable: true,
+    showOverall: false,
+    showScoreTable: false,
     showTier: true,
     showCoachCta: false,
     domainResults: {
       eyebrow: "How you scored, by area",
       title: "The Five Categories",
       showTierMessage: true,
+      layout: "split",
     },
   },
 };

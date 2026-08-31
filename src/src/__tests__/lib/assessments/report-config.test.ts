@@ -25,18 +25,24 @@ describe("reportConfigFor", () => {
   });
 
   // ── #81: five-dysfunctions hides the "Talk to your coach" CTA ───────────────
-  it("five-dysfunctions is scored but hides the coach CTA (#81)", () => {
+  it("five-dysfunctions uses Jeff's Word-document report presentation", () => {
     expect(reportConfigFor("five-dysfunctions")).toEqual({
       reportType: "scored",
-      showScoreTable: true,
+      showOverall: false,
+      showScoreTable: false,
       showTier: true,
       showCoachCta: false,
       domainResults: {
         eyebrow: "How you scored, by area",
         title: "The Five Categories",
         showTierMessage: true,
+        layout: "split",
       },
     });
+  });
+
+  it("keeps overall visibility backward-compatible by default", () => {
+    expect(DEFAULT_REPORT_CONFIG.showOverall).toBeUndefined();
   });
 
   it("locks domain-results presentation to five-dysfunctions only", () => {
