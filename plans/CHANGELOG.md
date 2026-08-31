@@ -6,6 +6,19 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="invited-welcome-sharing-explanation-implemented"></a>
+### 2026-08-31 — Invited Welcome sharing explanation implemented <!-- ENTRY_ISO:2026-08-31 ENTRY_SLUG:invited-welcome-sharing-explanation-implemented -->
+
+**Status: IMPLEMENTED + FOCUSED TESTS GREEN; PR pending; not merged or deployed.** GH #387 item 4 adds the missing ADMIN/STAFF-authored **Sharing explanation** directly beneath Sharing heading on the shared Create/Build Welcome card. The live preview and invited participant component render that authored value. The feature-off participant path retains the exact former sentence, and PUBLIC Welcome screens and invitation-email content remain separate and unchanged.
+
+**Schema and lifecycle decision.** The stored contract advances to schema v2 with required `sharingDescription`. Compatibility reads accept valid v1 and normalize it in memory with the exact legacy disclosure; explicit template saves, new invited campaigns, and historical-import campaign creation persist v2. No migration or data rewrite is required. Existing DRAFT, ACTIVE, CLOSED, and imported campaign snapshot JSON remains untouched and immutable under ADR-0033, so editing a template intentionally affects future campaigns only.
+
+**Diagnosis and ESPERTO cross-check.** Read-only inspection of ESPERTO showed invitation copy in a campaign **Mail** surface whose preview and CTA lead to a separate assessment route. That supports two distinct causes for “customization not working”: email customization is not Welcome customization, and an existing campaign correctly retains its frozen Welcome snapshot. Recommendation: keep ADR-0033 semantics and make the future-campaign lifecycle copy explicit (already present); treat any stronger campaign-age or email-vs-Welcome affordance as a separate UX item. No ESPERTO save, campaign creation, email send, environment/flag change, or Production-data mutation occurred.
+
+**TDD and local verification receipt.** Compatibility/snapshot/import, renderer/editor/save, and API suites pass **15 suites / 246 tests**. Exact changed-file ESLint is clean and migration safety approves all **51 migrations**. The complete repository run exposed no feature failure, but was not fully green: the established load-sensitive SU Full browser test exceeded its 60-second limit, and two Summary PDF assertions could not import `pdf-parse` from the stale shared dependency install. The exact `CI=true npm run build` reached Prisma generation and migration safety, then stopped because this isolated worktree intentionally has no `DIRECT_URL`. A credential-free Turbopack compile then reached unrelated dependency drift: `@react-pdf/renderer` was absent and the installed `@vercel/blob` was older than the lockfile. A narrow dependency repair was attempted but stopped at `ENOSPC`; the incomplete generated worktree install was removed and its ignored dependency symlink restored. No environment value was supplied or changed.
+
+---
+
 <a id="five-dysfunctions-domain-results-merge-authorized"></a>
 ### 2026-08-31 — Five Dysfunctions domain results merge authorized <!-- ENTRY_ISO:2026-08-31 ENTRY_SLUG:five-dysfunctions-domain-results-merge-authorized -->
 
