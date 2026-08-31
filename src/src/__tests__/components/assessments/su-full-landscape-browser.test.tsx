@@ -12,6 +12,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { REPORT_HTML_PEER_FIXTURES } from "../../../../scripts/capture-report-html-peers-previews";
 import { BrandedReport } from "@/components/assessments/BrandedReport";
 import { ReportStyleScope } from "@/components/assessments/ReportStyleScope";
+import { ExecutiveBoardroomReport } from "@/components/assessments/report-styles/ExecutiveBoardroomReport";
+import { ModernDashboardReport } from "@/components/assessments/report-styles/ModernDashboardReport";
 import {
   completeSuFullLandscapePresentation,
   completeSuFullLandscapeReport,
@@ -28,6 +30,8 @@ import {
 } from "@/lib/assessments/su-full-peer-disclosure";
 import type { GrowthPhaseNumber } from "@/lib/assessments/su-full-phase";
 import { prepareReportHtmlForStorage } from "@/lib/assessments/report-html";
+import { buildIndividualReportPresentation } from "@/lib/assessments/individual-report-presentation";
+import { buildReportStylePreviewReport } from "@/lib/assessments/report-style-preview-fixture";
 
 jest.setTimeout(60_000);
 
@@ -261,10 +265,43 @@ const SEMANTIC_REJECTED_CASES = [
 ] as const;
 
 function stylesheet(): string {
-  return ["su-public-brand.css", "su-report.css"]
+  return [
+    "su-public-brand.css",
+    "su-report.css",
+    "su-report-executive.css",
+    "su-report-dashboard.css",
+  ]
     .map((name) => readFileSync(join(process.cwd(), "src", "styles", name), "utf8"))
     .join("\n")
     .replace(/@import[^;]+;\s*/g, "");
+}
+
+const EXPANDED_CLOSING_BOUNDARY_HTML = `${"<h6>H</h6>".repeat(2)}${"<br>".repeat(4)}<p>${"C".repeat(796)}</p><ul><li></li><li></li></ul>`;
+
+function alternateStyleMarkup(
+  style: "EXECUTIVE_BOARDROOM" | "MODERN_DASHBOARD",
+  conclusionHtml: string,
+): string {
+  const prepared = prepareReportHtmlForStorage({
+    reportHtml: {
+      schemaVersion: 1,
+      introductionHtml: null,
+      conclusionHtml,
+    },
+  });
+  if (!prepared.ok) throw new Error("Alternate-style closing fixture must remain inside storage limits");
+  const report = {
+    ...buildReportStylePreviewReport("scored", "normal"),
+    reportHtml: (prepared.reportConfig as { reportHtml: NonNullable<ReturnType<typeof buildReportStylePreviewReport>["reportHtml"]> }).reportHtml,
+  };
+  const presentation = buildIndividualReportPresentation(report);
+  const reportHtmlPersonalization = report;
+  const rendered = style === "EXECUTIVE_BOARDROOM"
+    ? <ExecutiveBoardroomReport presentation={presentation} reportHtml={report.reportHtml} reportHtmlPersonalization={reportHtmlPersonalization} />
+    : <ModernDashboardReport presentation={presentation} reportHtml={report.reportHtml} reportHtmlPersonalization={reportHtmlPersonalization} />;
+  return renderToStaticMarkup(
+    <main className="su-public-brand su-report">{rendered}</main>,
+  );
 }
 
 function routeMarkup(
@@ -630,6 +667,63 @@ describe("SU Full landscape browser and PDF contract", () => {
     if (savedKill === undefined) delete process.env[KILL];
     else process.env[KILL] = savedKill;
   });
+
+  it.each(["EXECUTIVE_BOARDROOM", "MODERN_DASHBOARD"] as const)(
+    "keeps the expanded Closing boundary on one existing %s print page without screen clipping",
+    async (style) => {
+      const directory = mkdtempSync(join(tmpdir(), `report-html-${style.toLowerCase()}-`));
+      const renderPdf = async (id: "short" | "boundary", conclusionHtml: string) => {
+        const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+        const pdfPath = join(directory, `${id}.pdf`);
+        try {
+          await load(page, alternateStyleMarkup(style, conclusionHtml));
+          const desktop = await horizontalOverflow(page);
+          const desktopClipping = await authoredClipping(page);
+          await page.setViewportSize({ width: 390, height: 844 });
+          const mobile = await horizontalOverflow(page);
+          const mobileClipping = await authoredClipping(page);
+          await page.setViewportSize({ width: 1280, height: 900 });
+          await page.emulateMedia({ media: "print" });
+          const printClipping = await authoredClipping(page);
+          await page.pdf({
+            path: pdfPath,
+            format: "Letter",
+            preferCSSPageSize: true,
+            printBackground: true,
+          });
+          const info = execFileSync("pdfinfo", [pdfPath], { encoding: "utf8" });
+          return {
+            pages: Number(info.match(/^Pages:\s+(\d+)$/m)?.[1]),
+            desktop,
+            desktopClipping,
+            mobile,
+            mobileClipping,
+            printClipping,
+          };
+        } finally {
+          await page.close();
+        }
+      };
+
+      try {
+        const short = await renderPdf("short", "<p>Choose one next step.</p>");
+        const boundary = await renderPdf("boundary", EXPANDED_CLOSING_BOUNDARY_HTML);
+        expect(Number.isInteger(short.pages)).toBe(true);
+        expect(short.pages).toBeGreaterThan(1);
+        expect(Number.isInteger(boundary.pages)).toBe(true);
+        expect(boundary.pages).toBe(short.pages);
+        expect(boundary.desktop.offenders).toEqual([]);
+        expect(boundary.desktop.document).toBeLessThanOrEqual(boundary.desktop.viewport + 1);
+        expect(boundary.desktopClipping).toEqual([]);
+        expect(boundary.mobile.offenders).toEqual([]);
+        expect(boundary.mobile.document).toBeLessThanOrEqual(boundary.mobile.viewport + 1);
+        expect(boundary.mobileClipping).toEqual([]);
+        expect(boundary.printClipping).toEqual([]);
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
+    },
+  );
 
   it("restores the approved Scaling Up Full CTA hierarchy and button treatment", async () => {
     const { html } = routeMarkup(restoredScalingUpFullCtaReport());
