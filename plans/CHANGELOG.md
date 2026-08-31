@@ -6,6 +6,21 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="talk-to-a-coach-fallback-corrected"></a>
+### 2026-08-31 — Talk-to-a-Coach fallback corrected <!-- ENTRY_ISO:2026-08-31 ENTRY_SLUG:talk-to-a-coach-fallback-corrected -->
+
+**Status: PR #406 MERGE-AUTHORIZED; CURRENT `main` (`6aa02116`) INTEGRATED AND LOCALLY VERIFIED; REFRESHED HOSTED CHECKS PENDING; NOT YET MERGED OR DEPLOYED.** GH #387 item 5 corrects only the existing on-screen no-referral **Talk to a coach** fallback to Jeff's exact embedded destination: `https://coaches.scalingup.com/find-a-coach-contact-form`. The original no-referral reproduction reached the stale `https://scalingup.com/coaches` route, which redirected to the 2020 Scaling Up Summit registration; the verified-referral control remains the server-verified referring Coach `mailto:` route. The exact form link was taken from Jeff's embedded source, not inferred from the stale redirect.
+
+**Coverage and frozen-snapshot boundary.** Scaling Up Quick's public result surface and Rockefeller Classic's report next-step surface now use the canonical fallback only when verified Coach contact is absent. Current Marketing CTA compilation emits that same form URL. Frozen published Quick CTA HTML produced by the prior compiler remains accepted only if it is byte-for-byte exact legacy compiler output; there is no stored-data rewrite, generic replacement, partial match, or sanitizer bypass. The unrecoverably clipped additional clause after “Same … and Rockefeller” remains an explicit open question; no other surface was guessed. Result-email behavior and the separate complimentary-follow-up action remain out of scope.
+
+**TDD and verification receipt.** The focused RED was five expected stale-destination failures while the 81 existing controls stayed green; focused GREEN passed **5 suites / 86 tests / 1 snapshot**. After replacing a temporary shared-dependency symlink with a clean lockfile install, the required fresh complete rerun passed **805/805 suites, 9,962/9,962 tests, and 16/16 snapshots**. Exact changed-file ESLint emitted no diagnostics, migration safety approved all **51 migrations**, and diff hygiene passed. The required unchanged `CI=true npm run build` command was run and stopped safely before compilation because this credential-free isolated worktree has no `DIRECT_URL`; no environment value was supplied or changed and no database was touched. The credential-free equivalent `CI=true npx next build --turbopack` then compiled successfully, passed TypeScript, and generated **95/95 pages**. Independent task review found no spec, security, compatibility, or test-quality issues.
+
+**Current-main integration verification.** After merging current `main` (`6aa02116` / PR #404), the combined feature/SoT matrix passed **6 suites / 90 tests / 1 snapshot**. The first complete run reached **804/805 suites and 9,966/9,967 tests** when the established 5-second SU Full PDF capture timed out at 6.86s; that unchanged suite then passed **3/3 tests** in isolation, and the required fresh complete rerun passed **805/805 suites, 9,967/9,967 tests, and 16/16 snapshots**. Exact changed-file ESLint and all **51** migration-safety checks remained clean. The credential-free current-main `CI=true npx next build --turbopack` compiled, passed TypeScript, and generated **95/95 pages**; missing local database/Inngest values emitted only the existing non-fatal page-generation warnings.
+
+**No-write boundary.** No environment variable, feature flag, schema, migration, template/version, campaign, submission, report record, email, or Production data was created, changed, or deleted.
+
+---
+
 <a id="invited-welcome-sharing-explanation-implemented"></a>
 ### 2026-08-31 — Invited Welcome sharing explanation implemented <!-- ENTRY_ISO:2026-08-31 ENTRY_SLUG:invited-welcome-sharing-explanation-implemented -->
 

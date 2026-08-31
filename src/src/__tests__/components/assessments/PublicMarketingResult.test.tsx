@@ -23,13 +23,13 @@ describe("PublicMarketingResult", () => {
     expect(screen.getAllByRole("link")).toHaveLength(3);
   });
 
-  it("resolves the Quick coach action to coach email or directory", () => {
+  it("resolves the Quick coach action to the verified coach or Jeff's Talk-to-a-Coach form", () => {
     const { rerender } = render(
       <PublicMarketingResult score={50} scoreBands={[]} marketingCta={createMarketingCtaPreset("SCALING_UP_QUICK")} referringCoachEmail="coach@example.com" />,
     );
     expect(screen.getByRole("link", { name: /talk to a coach/i })).toHaveAttribute("href", "mailto:coach@example.com");
     rerender(<PublicMarketingResult score={50} scoreBands={[]} marketingCta={createMarketingCtaPreset("SCALING_UP_QUICK")} referringCoachEmail={null} />);
-    expect(screen.getByRole("link", { name: /talk to a coach/i })).toHaveAttribute("href", "https://scalingup.com/coaches");
+    expect(screen.getByRole("link", { name: /talk to a coach/i })).toHaveAttribute("href", "https://coaches.scalingup.com/find-a-coach-contact-form");
   });
 
   it("renders score bands without legacy structured CTA blocks", () => {

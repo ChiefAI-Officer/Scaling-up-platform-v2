@@ -117,12 +117,12 @@ describe("BrandedReport — respondent identity and next steps", () => {
     ).toHaveAttribute("href", "mailto:coach%40example.com");
   });
 
-  it("falls back to the certified-coach directory when no verified email exists", () => {
+  it("falls back to Jeff's Talk-to-a-Coach form when no verified email exists", () => {
     render(<BrandedReport report={rockefellerReport()} />);
 
     expect(
       screen.getByRole("link", { name: /talk to a coach/i }),
-    ).toHaveAttribute("href", "https://scalingup.com/coaches");
+    ).toHaveAttribute("href", "https://coaches.scalingup.com/find-a-coach-contact-form");
   });
 
   it("renders the three source actions for a SunHub public result", () => {

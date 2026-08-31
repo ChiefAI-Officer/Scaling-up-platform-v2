@@ -8,6 +8,12 @@ import {
   prepareMarketingCtaForStorage,
 } from "@/lib/assessments/marketing-cta-compiler";
 
+const LEGACY_QUICK_CTA_HTML =
+  '<section class="marketing-cta" data-schema-version="1">' +
+  '<a class="marketing-cta__button marketing-cta__button--primary" href="https://scalingup.com" target="_blank" rel="noopener noreferrer">Explore Scaling Up resources</a>' +
+  '<a class="marketing-cta__button marketing-cta__button--secondary" href="https://scalingup.com/coaches" data-dynamic-target="referring-coach-or-directory" target="_blank" rel="noopener noreferrer">Talk to a coach</a>' +
+  "</section>";
+
 describe("marketing CTA compiler", () => {
   it("escapes text and never emits executable markup", () => {
     const escapedText: MarketingCtaConfigV1 = {
@@ -101,6 +107,32 @@ describe("marketing CTA compiler", () => {
     expect(html).toContain('data-dynamic-target="referring-coach-or-directory"');
     expect(html).not.toContain("iframe");
     expect(html).not.toContain("<form");
+  });
+
+  it("compiles the dynamic no-coach target to Jeff's Talk-to-a-Coach form", () => {
+    const html = compileMarketingCtaHtml(
+      createMarketingCtaPreset("SCALING_UP_QUICK"),
+    );
+
+    expect(html).toContain(
+      'href="https://coaches.scalingup.com/find-a-coach-contact-form"',
+    );
+    expect(html).not.toContain('href="https://scalingup.com/coaches"');
+  });
+
+  it("loads a published Quick snapshot compiled with the legacy fallback", () => {
+    const preset = createMarketingCtaPreset("SCALING_UP_QUICK");
+
+    expect(
+      loadSafeMarketingCta({
+        publicMarketing: {
+          marketingCta: {
+            ...preset,
+            sanitizedHtml: LEGACY_QUICK_CTA_HTML,
+          },
+        },
+      }),
+    ).toEqual({ ...preset, sanitizedHtml: LEGACY_QUICK_CTA_HTML });
   });
 
   it("discards forged HTML and only loads compiler-matching storage", () => {

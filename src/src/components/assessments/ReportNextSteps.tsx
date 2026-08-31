@@ -1,12 +1,11 @@
 import type { PublicResultAction } from "@/lib/assessments/report-config";
+import { TALK_TO_A_COACH_URL } from "@/lib/assessments/talk-to-a-coach";
 
 interface ReportNextStepsProps {
   contactEmail?: string | null;
   showCoachLink?: boolean;
   publicResultActions?: readonly PublicResultAction[];
 }
-
-const COACH_DIRECTORY_URL = "https://scalingup.com/coaches";
 
 export function ReportNextSteps({
   contactEmail,
@@ -16,7 +15,7 @@ export function ReportNextSteps({
   const email = contactEmail?.trim() ?? "";
   const coachHref =
     email === ""
-      ? COACH_DIRECTORY_URL
+      ? TALK_TO_A_COACH_URL
       : `mailto:${encodeURIComponent(email)}`;
 
   return (
