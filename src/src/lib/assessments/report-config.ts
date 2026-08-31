@@ -9,6 +9,7 @@ export interface DomainResultsPresentation {
   readonly eyebrow: string;
   readonly title: string;
   readonly showTierMessage: boolean;
+  readonly layout?: "split";
 }
 
 export interface ReportConfig {
@@ -16,6 +17,10 @@ export interface ReportConfig {
   reportType: ReportType;
   /** Whether the scored renderer shows the "All sections" score/average table. */
   showScoreTable: boolean;
+  /** Whether this template owns one canonical report composition across stored styles. */
+  forceClassicStyle?: boolean;
+  /** Whether the scored renderer shows the overall-result block. */
+  showOverall?: boolean;
   /** Whether the scored renderer lists every answered statement by section. */
   showDetailedBreakdown?: boolean;
   /** Whether the overall block shows total, average, and section-count facts. */
@@ -98,19 +103,21 @@ const REPORT_CONFIG: Readonly<Record<string, ReportConfig>> = {
     ],
   },
   /**
-   * Five Dysfunctions: scored (DEFAULT presentation) but WITHOUT the
-   * "Talk to your Scaling Up Certified Coach" CTA (#81). All other scored
-   * behaviour matches the default (table + tier shown).
+   * Five Dysfunctions owns the Word-document report composition and therefore
+   * always uses the Classic renderer, independent of a stored report style.
    */
   "five-dysfunctions": {
     reportType: "scored",
-    showScoreTable: true,
+    forceClassicStyle: true,
+    showOverall: false,
+    showScoreTable: false,
     showTier: true,
     showCoachCta: false,
     domainResults: {
       eyebrow: "How you scored, by area",
       title: "The Five Categories",
       showTierMessage: true,
+      layout: "split",
     },
   },
 };

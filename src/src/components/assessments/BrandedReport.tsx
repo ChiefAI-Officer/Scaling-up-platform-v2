@@ -236,12 +236,13 @@ export function BrandedReport({
     report.templateAlias,
     report.publicLeadActions,
   );
-  const resolvedStyle = sourcePublicResult
-    ? "CLASSIC"
-    : effectiveReportStyle({
-        storedStyle: runtimeStyle,
-        available: reportStylesAvailable === true,
-      });
+  const resolvedStyle =
+    config.forceClassicStyle || sourcePublicResult
+      ? "CLASSIC"
+      : effectiveReportStyle({
+          storedStyle: runtimeStyle,
+          available: reportStylesAvailable === true,
+        });
   const classic = () =>
     config.reportType === "qualitative" ? (
       <QualitativeReport
@@ -282,7 +283,7 @@ export function BrandedReport({
 
   switch (resolvedStyle) {
     case "CLASSIC": {
-      const fallbackReason = sourcePublicResult
+      const fallbackReason = sourcePublicResult || config.forceClassicStyle
         ? null
         : rawStyle !== null &&
             rawStyle !== undefined &&
@@ -509,6 +510,7 @@ export function LegacyClassicReport({
   });
   const hasDomainCards = domainCards.length > 0;
   const hasDomainMessages = domainCards.some((domain) => domain.message !== null);
+  const splitDomainResults = domainResults?.layout === "split";
 
   // ── Recommendations grouped by section (only non-empty) ──────────────────
   // Wave U (spec 19u U-5/D6) — NON-SLIDER findings from the frozen
@@ -658,6 +660,7 @@ export function LegacyClassicReport({
       ) : null}
 
       {/* ── 2. Overall ──────────────────────────────────────────────────── */}
+      {reportConfig.showOverall !== false && (
       <section className="su-report-overall" data-testid="report-overall">
         <div className="su-report-eyebrow">Overall result</div>
         {/* sr-only: announce score + band to screen readers before the decorative ring */}
@@ -723,13 +726,22 @@ export function LegacyClassicReport({
         </div>
         )}
       </section>
+      )}
 
       {/* ── 2b. Per-decision cards (domain templates only) ──────────────── */}
       {hasDomainCards && (
         <section className="su-report-decisions" data-testid="report-decisions">
           <div className="su-report-eyebrow">{domainResults?.eyebrow ?? "How you scored, by decision"}</div>
           <h2 className="su-h2 su-report-sec-title">{domainResults?.title ?? "Your Four Decisions"}</h2>
-          <div className={hasDomainMessages ? "su-report-card-grid su-report-card-grid-with-messages" : "su-report-card-grid"}>
+          <div
+            className={[
+              "su-report-card-grid",
+              hasDomainMessages ? "su-report-card-grid-with-messages" : null,
+              splitDomainResults ? "su-report-card-grid-split" : null,
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          >
             {domainCards.map((d) => {
               const scoreContent = (
                 <>
@@ -752,6 +764,32 @@ export function LegacyClassicReport({
                   </div>
                 </>
               );
+              const messageContent = d.message ? (
+                <p
+                  className="su-report-domain-tier-message"
+                  data-testid={`domain-tier-message-${d.key}`}
+                >
+                  {d.message}
+                </p>
+              ) : null;
+
+              if (splitDomainResults) {
+                return (
+                  <div
+                    className="su-report-domain-result-row"
+                    key={d.key}
+                    data-testid={`decision-card-${d.key}`}
+                  >
+                    <div
+                      className="su-report-decision-card su-report-domain-score-card"
+                      style={{ borderLeftColor: d.color }}
+                    >
+                      {scoreContent}
+                    </div>
+                    {messageContent}
+                  </div>
+                );
+              }
 
               return (
                 <div
@@ -765,14 +803,7 @@ export function LegacyClassicReport({
                       <div className="su-report-decision-score">
                         {scoreContent}
                       </div>
-                      {d.message && (
-                        <p
-                          className="su-report-domain-tier-message"
-                          data-testid={`domain-tier-message-${d.key}`}
-                        >
-                          {d.message}
-                        </p>
-                      )}
+                      {messageContent}
                     </>
                   ) : (
                     scoreContent
