@@ -78,15 +78,20 @@ export function verifyInvitedWelcomeBackfill(input: {
     alias(template.alias).templates += 1;
     if (template.invitedWelcomeDefault === null) {
       result.templatesNull += 1;
-    } else if (!invitedWelcomeConfigSchema.safeParse(template.invitedWelcomeDefault).success) {
-      result.templatesInvalid += 1;
-    } else if (
-      !isDeepStrictEqual(
+    } else {
+      const parsed = invitedWelcomeConfigSchema.safeParse(
         template.invitedWelcomeDefault,
-        resolveLegacyInvitedWelcomeConfig(template.alias),
-      )
-    ) {
-      result.templatesMismatched += 1;
+      );
+      if (!parsed.success) {
+        result.templatesInvalid += 1;
+      } else if (
+        !isDeepStrictEqual(
+          parsed.data,
+          resolveLegacyInvitedWelcomeConfig(template.alias),
+        )
+      ) {
+        result.templatesMismatched += 1;
+      }
     }
   }
 
@@ -97,15 +102,20 @@ export function verifyInvitedWelcomeBackfill(input: {
       counts.invitedCampaigns += 1;
       if (campaign.invitedWelcomeSnapshot === null) {
         result.invitedCampaignsNull += 1;
-      } else if (!invitedWelcomeConfigSchema.safeParse(campaign.invitedWelcomeSnapshot).success) {
-        result.invitedCampaignsInvalid += 1;
-      } else if (
-        !isDeepStrictEqual(
+      } else {
+        const parsed = invitedWelcomeConfigSchema.safeParse(
           campaign.invitedWelcomeSnapshot,
-          resolveLegacyInvitedWelcomeConfig(campaign.templateAlias),
-        )
-      ) {
-        result.invitedCampaignsMismatched += 1;
+        );
+        if (!parsed.success) {
+          result.invitedCampaignsInvalid += 1;
+        } else if (
+          !isDeepStrictEqual(
+            parsed.data,
+            resolveLegacyInvitedWelcomeConfig(campaign.templateAlias),
+          )
+        ) {
+          result.invitedCampaignsMismatched += 1;
+        }
       }
     } else {
       result.publicCampaignsTotal += 1;

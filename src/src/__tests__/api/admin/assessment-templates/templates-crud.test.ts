@@ -139,6 +139,7 @@ describe("POST /api/admin/assessment-templates (create)", () => {
     headingTemplate: "Complete {{campaignName}}",
     ledeParagraphs: ["Paragraph one.", "Paragraph two."],
     sharingHeading: "Who reviews this",
+    sharingDescription: "Your named facilitator reviews these answers.",
     scoresHeading: "Your scores",
     scoresDescription: "Review your categories.",
     ctaLabel: "Begin",
@@ -374,7 +375,7 @@ describe("POST /api/admin/assessment-templates (create)", () => {
       expect.objectContaining({
         data: expect.objectContaining({
           invitedWelcomeDefault: {
-            schemaVersion: 1,
+            schemaVersion: 2,
             ...authoredWelcome,
             finePrint: null,
           },

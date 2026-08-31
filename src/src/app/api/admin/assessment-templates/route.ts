@@ -22,7 +22,7 @@ import {
   buildInvitedWelcomeConfig,
   GENERIC_INVITED_WELCOME_CONFIG,
   invitedWelcomeAuthoringInputSchema,
-  type InvitedWelcomeConfigV1,
+  type InvitedWelcomeConfig,
 } from "@/lib/assessments/invited-welcome-config";
 import { isAdminOwnedAssessmentPresentationEnabled } from "@/lib/assessments/wave-admin-owned-assessment-presentation-flags";
 import { isPublicMarketingCtaEnabled } from "@/lib/assessments/wave-public-marketing-cta-flags";
@@ -135,6 +135,7 @@ const ExactInvitedWelcomeAuthoringInputSchema = z
     headingTemplate: z.unknown(),
     ledeParagraphs: z.unknown(),
     sharingHeading: z.unknown(),
+    sharingDescription: z.unknown(),
     scoresHeading: z.unknown(),
     scoresDescription: z.unknown(),
     ctaLabel: z.unknown(),
@@ -215,7 +216,7 @@ export async function POST(request: NextRequest) {
       body.creationMode === "simplified";
     let data: NormalizedCreateData;
     let manualInternalId = false;
-    let effectiveWelcomeDefault: Readonly<InvitedWelcomeConfigV1> =
+    let effectiveWelcomeDefault: Readonly<InvitedWelcomeConfig> =
       GENERIC_INVITED_WELCOME_CONFIG;
 
     if (simplified) {

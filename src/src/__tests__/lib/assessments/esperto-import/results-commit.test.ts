@@ -182,8 +182,10 @@ describe("commitResultsImport — campaign create", () => {
     expect(data.name).toContain("BDvhuDORxZ");
     expect(data.invitedWelcomeSnapshot).toEqual(
       expect.objectContaining({
-        schemaVersion: 1,
+        schemaVersion: 2,
         eyebrow: "WELCOME TEST",
+        sharingDescription:
+          "Your coach or facilitator and authorized Scaling Up staff can review your named individual answers.",
         headingTemplate: "{{campaignName}} quarterly check-in",
       }),
     );

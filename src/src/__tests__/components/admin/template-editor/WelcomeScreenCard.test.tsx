@@ -3,14 +3,15 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { WelcomeScreenCard } from "@/components/admin/template-editor/WelcomeScreenCard";
 import {
   GENERIC_INVITED_WELCOME_CONFIG,
-  type InvitedWelcomeAuthoringInputV1,
+  type InvitedWelcomeAuthoringInput,
 } from "@/lib/assessments/invited-welcome-config";
 
-const values: InvitedWelcomeAuthoringInputV1 = {
+const values: InvitedWelcomeAuthoringInput = {
   eyebrow: GENERIC_INVITED_WELCOME_CONFIG.eyebrow,
   headingTemplate: GENERIC_INVITED_WELCOME_CONFIG.headingTemplate,
   ledeParagraphs: [...GENERIC_INVITED_WELCOME_CONFIG.ledeParagraphs],
   sharingHeading: GENERIC_INVITED_WELCOME_CONFIG.sharingHeading,
+  sharingDescription: GENERIC_INVITED_WELCOME_CONFIG.sharingDescription,
   scoresHeading: GENERIC_INVITED_WELCOME_CONFIG.scoresHeading,
   scoresDescription: GENERIC_INVITED_WELCOME_CONFIG.scoresDescription,
   ctaLabel: GENERIC_INVITED_WELCOME_CONFIG.ctaLabel,
@@ -78,8 +79,8 @@ describe("WelcomeScreenCard", () => {
     await waitFor(() => expect(screen.getByLabelText("Heading")).toHaveFocus());
   });
 
-  it("expands all seven authored fields and the live Example campaign preview", () => {
-    const { container } = renderCard();
+  it("expands all eight authored fields and previews an edited sharing explanation", () => {
+    const { container, onChange } = renderCard();
     fireEvent.click(screen.getByRole("button", { name: "Expand Welcome screen" }));
 
     expect(screen.getByText(
@@ -90,6 +91,7 @@ describe("WelcomeScreenCard", () => {
       "Heading",
       "Welcome message",
       "Sharing heading",
+      "Sharing explanation",
       "Scores heading",
       "Scores explanation",
       "Button label",
@@ -97,6 +99,12 @@ describe("WelcomeScreenCard", () => {
       expect(screen.getByLabelText(label)).toBeInTheDocument();
     }
     expect(screen.getByRole("heading", { name: "Example campaign" })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Sharing explanation"), {
+      target: { value: "Only your named coach can review these answers." },
+    });
+    expect(onChange).toHaveBeenCalledWith({
+      sharingDescription: "Only your named coach can review these answers.",
+    });
     expect(screen.getByRole("button", { name: "Start the assessment →" })).toBeDisabled();
     expect(container.textContent).not.toMatch(/Automatic:|Protected:/);
     expect(screen.queryByRole("button", { name: /save welcome/i })).not.toBeInTheDocument();
