@@ -105,7 +105,14 @@ describe("GET /api/admin/public-campaigns/[id]/submissions", () => {
       {
         id: "s1",
         submittedAt: new Date("2026-07-20T10:00:00Z"),
-        publicTaker: { firstName: "Jane", lastName: "Smith", email: "jane@x.com" },
+        publicTaker: {
+          firstName: "Jane",
+          lastName: "Smith",
+          email: "jane@x.com",
+          phone: "+1 415 555 0100",
+          company: "Example Co",
+          country: "US",
+        },
         referringCoachEmail: "coach@x.com",
       },
       {
@@ -141,7 +148,14 @@ describe("GET /api/admin/public-campaigns/[id]/submissions", () => {
       {
         id: "s1",
         submittedAt: new Date("2026-07-20T10:00:00Z"),
-        publicTaker: { firstName: "Jane", lastName: "Smith", email: "jane@x.com" },
+        publicTaker: {
+          firstName: "Jane",
+          lastName: "Smith",
+          email: "jane@x.com",
+          phone: "+1 415 555 0100",
+          company: "Example Co",
+          country: "US",
+        },
         referringCoachEmail: "coach@x.com",
       },
     ]);

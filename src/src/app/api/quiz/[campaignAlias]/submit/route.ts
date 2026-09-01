@@ -4,7 +4,7 @@
  * Anonymous public-mode submit. The campaign's accessMode MUST be PUBLIC.
  * No invitation token; the visitor provides their own name + email. We
  * create an AssessmentSubmission with respondentId=null + invitationId=null
- * and store {firstName, lastName, email} in the publicTaker JSON column.
+ * and store the template-configured contact values in the publicTaker JSON column.
  *
  * Task 6 additions (Quick Assessment lead pipeline):
  *  (a) Response includes full ScoreResult + Cache-Control: no-store.
@@ -18,7 +18,7 @@
  *
  * Body:
  *   {
- *     publicTaker: { firstName, lastName, email },
+ *     publicTaker: { firstName, lastName, email, ...configuredContactValues },
  *     answers: Array<{ stableKey, value }>,
  *     referringCoachEmail?: string,
  *     idempotencyKey?: string   (NEW — client-supplied; max 200 chars)
@@ -68,6 +68,10 @@ import {
 import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
 import { isFindingsLogicEnabled } from "@/lib/assessments/wave-u-flags";
 import { resolveActiveReportHtml } from "@/lib/assessments/report-html";
+import {
+  parsePublicContactValues,
+  type ValidatedPublicContactValues,
+} from "@/lib/assessments/public-contact-config";
 
 // ---------------------------------------------------------------------------
 // Request body schema
@@ -85,12 +89,22 @@ const OptionalReferralEmailSchema = z.preprocess((value) => {
   return normalized.success ? normalized.data : null;
 }, ReferralEmailSchema.nullable());
 
-const PublicSubmitBodySchema = z.object({
-  publicTaker: z.object({
-    firstName: z.string().min(1).max(100).trim(),
-    lastName: z.string().min(1).max(100).trim(),
-    email: z.string().email().max(320).trim().toLowerCase(),
-  }),
+const PublicTakerEnvelopeSchema = z
+  .record(z.string(), z.unknown())
+  .superRefine((value, ctx) => {
+    for (const key of ["firstName", "lastName", "email"] as const) {
+      if (!Object.prototype.hasOwnProperty.call(value, key)) {
+        ctx.addIssue({
+          code: "custom",
+          path: [key],
+          message: `${key} is required`,
+        });
+      }
+    }
+  });
+
+const PublicSubmitEnvelopeSchema = z.object({
+  publicTaker: PublicTakerEnvelopeSchema,
   answers: z
     .array(
       z.object({
@@ -121,15 +135,11 @@ function stableJson(value: unknown): string {
 }
 
 function normalizedSubmissionIdentity(input: {
-  publicTaker: { firstName: string; lastName: string; email: string };
+  publicTaker: Partial<Record<string, string>>;
   answers: Array<{ stableKey: string; value: unknown }>;
 }): string {
   return stableJson({
-    publicTaker: {
-      firstName: input.publicTaker.firstName.trim(),
-      lastName: input.publicTaker.lastName.trim(),
-      email: input.publicTaker.email.trim().toLowerCase(),
-    },
+    publicTaker: input.publicTaker,
     answers: [...input.answers].sort((left, right) =>
       left.stableKey.localeCompare(right.stableKey),
     ),
@@ -156,14 +166,14 @@ export async function POST(
 
     const { campaignAlias } = await params;
     const raw = await request.json().catch(() => ({}));
-    const parsed = PublicSubmitBodySchema.safeParse(raw);
+    const parsed = PublicSubmitEnvelopeSchema.safeParse(raw);
     if (!parsed.success) {
       return NextResponse.json(
         { success: false, error: "Invalid body", details: parsed.error.flatten() },
         { status: 400 },
       );
     }
-    const data = parsed.data;
+    const envelope = parsed.data;
 
     // -----------------------------------------------------------------------
     // Campaign gate checks
@@ -196,6 +206,26 @@ export async function POST(
         { status: 403 },
       );
     }
+    let publicTaker: ValidatedPublicContactValues;
+    try {
+      publicTaker = parsePublicContactValues(
+        campaign.template.alias,
+        envelope.publicTaker,
+      );
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Invalid body",
+            details: error.flatten(),
+          },
+          { status: 400 },
+        );
+      }
+      throw error;
+    }
+    const data = { ...envelope, publicTaker };
     const reportStylesAvailable = isReportStylesEnabled({
       templateId: campaign.templateId,
       campaignId: campaign.id,
@@ -245,11 +275,7 @@ export async function POST(
       resolvedReportStyle: ReportStyleKey = campaign.reportStyle,
     ) => {
       const existingIdentity = normalizedSubmissionIdentity({
-        publicTaker: existing.publicTaker as {
-          firstName: string;
-          lastName: string;
-          email: string;
-        },
+        publicTaker: existing.publicTaker as Partial<Record<string, string>>,
         answers: existing.answers as Array<{
           stableKey: string;
           value: unknown;
@@ -670,11 +696,7 @@ export async function POST(
             invitationId: null,
             answers: submittedAnswers as Prisma.InputJsonValue,
             result: result as unknown as Prisma.InputJsonValue,
-            publicTaker: {
-              firstName: data.publicTaker.firstName,
-              lastName: data.publicTaker.lastName,
-              email: data.publicTaker.email,
-            } as Prisma.InputJsonValue,
+            publicTaker: data.publicTaker as Prisma.InputJsonValue,
             referringCoachId: verifiedReferral?.id ?? null,
             referringCoachEmail: verifiedReferral?.email ?? null,
             idempotencyKey: data.idempotencyKey ?? null,

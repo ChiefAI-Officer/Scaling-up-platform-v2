@@ -44,6 +44,11 @@ import {
 import { PublicMarketingResult } from "@/components/assessments/PublicMarketingResult";
 import type { PublicMarketingResultConfig } from "@/lib/assessments/public-marketing-result";
 import type { SafeReportHtml } from "@/lib/assessments/report-html";
+import {
+  resolvePublicContactConfig,
+  type PublicContactFieldKey,
+  type PublicContactValues,
+} from "@/lib/assessments/public-contact-config";
 
 interface SectionDef {
   stableKey: string;
@@ -145,6 +150,10 @@ export function PublicQuizClient({
 }: PublicQuizClientProps) {
   const sections = useMemo(() => toSections(rawSections), [rawSections]);
   const questions = useMemo(() => toQuestions(rawQuestions), [rawQuestions]);
+  const contactConfig = useMemo(
+    () => resolvePublicContactConfig(templateAlias),
+    [templateAlias],
+  );
 
   // §4 — Per-coach attribution. A `?coach=<ref>` query param (the coach's email
   // for v1) is forwarded to the submit route as `referringCoachEmail`. The
@@ -178,9 +187,7 @@ export function PublicQuizClient({
   );
 
   const [step, setStep] = useState<Step>(isOpen ? "intro" : "error");
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [email, setEmail] = useState("");
+  const [contactValues, setContactValues] = useState<PublicContactValues>({});
   const [answers, setAnswers] = useState<Record<string, number | string | string[]>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -318,6 +325,10 @@ export function PublicQuizClient({
   }
 
   if (step === "info") {
+    const setContactValue = (key: PublicContactFieldKey, value: string) => {
+      setContactValues((current) => ({ ...current, [key]: value }));
+    };
+
     return (
       <div className="ty-page">
         <header className="ty-header">
@@ -328,12 +339,11 @@ export function PublicQuizClient({
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              if (
-                firstName.trim() === "" ||
-                lastName.trim() === "" ||
-                email.trim() === ""
-              )
-                return;
+              if (contactConfig.fields.some(
+                (field) =>
+                  field.required &&
+                  (contactValues[field.key] ?? "").trim() === "",
+              )) return;
               setStep("form");
             }}
             className="ty-card"
@@ -344,56 +354,58 @@ export function PublicQuizClient({
               About you
             </h1>
             <p className="ty-sub">
-              We use your name and email to show you your results and email you
-              a copy, and, where applicable, to share them with the Scaling Up
-              team and the coach who referred you (who receives the full
-              report).
+              We use the contact information you provide to deliver your
+              results and email you a copy. It may also be shared with
+              authorized Scaling Up staff and, if you used a coach referral
+              link, that verified coach, who receives the full report. Scaling
+              Up retains personal data as described in its{" "}
+              <a href="https://scalingup.com/privacy-policy/">Privacy Policy</a>.
             </p>
-            <div className="survey-question">
-              <label className="wf-label" htmlFor="quiz-first-name-input">
-                First name
-              </label>
-              <input
-                id="quiz-first-name-input"
-                type="text"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                required
-                maxLength={100}
-                className="wf-input"
-                data-testid="quiz-first-name"
-              />
-            </div>
-            <div className="survey-question">
-              <label className="wf-label" htmlFor="quiz-last-name-input">
-                Last name
-              </label>
-              <input
-                id="quiz-last-name-input"
-                type="text"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                required
-                maxLength={100}
-                className="wf-input"
-                data-testid="quiz-last-name"
-              />
-            </div>
-            <div className="survey-question">
-              <label className="wf-label" htmlFor="quiz-email-input">
-                Email
-              </label>
-              <input
-                id="quiz-email-input"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                maxLength={320}
-                className="wf-input"
-                data-testid="quiz-email"
-              />
-            </div>
+            {contactConfig.fields.map((field) => {
+              const slug = field.key.replace(
+                /[A-Z]/g,
+                (letter) => `-${letter.toLowerCase()}`,
+              );
+              const id = `quiz-${slug}-input`;
+              const value = contactValues[field.key] ?? "";
+              return (
+                <div className="survey-question" key={field.key}>
+                  <label className="wf-label" htmlFor={id}>
+                    {field.label}
+                  </label>
+                  {field.inputType === "select" ? (
+                    <select
+                      id={id}
+                      value={value}
+                      onChange={(event) => setContactValue(field.key, event.target.value)}
+                      required={field.required}
+                      autoComplete={field.autoComplete}
+                      className="wf-input"
+                      data-testid={`quiz-${slug}`}
+                    >
+                      <option value="">Select...</option>
+                      {field.options?.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      id={id}
+                      type={field.inputType}
+                      value={value}
+                      onChange={(event) => setContactValue(field.key, event.target.value)}
+                      required={field.required}
+                      maxLength={field.maxLength}
+                      autoComplete={field.autoComplete}
+                      className="wf-input"
+                      data-testid={`quiz-${slug}`}
+                    />
+                  )}
+                </div>
+              );
+            })}
             <div className="hero-cta-row" style={{ justifyContent: "space-between" }}>
               <button
                 type="button"
@@ -419,6 +431,9 @@ export function PublicQuizClient({
 
   // step === "results" — render the branded in-place report.
   if (step === "results" && results && reportStyle) {
+    const firstName = contactValues.firstName ?? "";
+    const lastName = contactValues.lastName ?? "";
+    const email = contactValues.email ?? "";
     const report: RespondentReport = {
       respondentName: `${firstName.trim()} ${lastName.trim()}`.trim(),
       respondentEmail: email.trim() || null,
@@ -547,15 +562,19 @@ export function PublicQuizClient({
     // draft stay in sync.
     const pruned = pruneAnswersToQuestions(answers, knownKeys);
     if (pruned !== answers) setAnswers(pruned);
+    const publicTaker = Object.fromEntries(
+      contactConfig.fields.flatMap((field) => {
+        const value = (contactValues[field.key] ?? "").trim();
+        return value === "" && !field.required ? [] : [[field.key, value]];
+      }),
+    );
     try {
       const res = await fetch(`/api/quiz/${campaignAlias}/submit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           publicTaker: {
-            firstName: firstName.trim(),
-            lastName: lastName.trim(),
-            email: email.trim(),
+            ...publicTaker,
           },
           answers: Object.entries(pruned).map(([stableKey, value]) => ({
             stableKey,
