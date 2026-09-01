@@ -6,6 +6,15 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="public-result-summary-deduplication"></a>
+### 2026-09-02 — Public result summary deduplication <!-- ENTRY_ISO:2026-09-02 ENTRY_SLUG:public-result-summary-deduplication -->
+
+**Status: RELEASE SCOPE FOR PR #418.** Public browser results with a non-empty, versioned marketing score guide now mark that guide as active and suppress the canonical overall-score block under screen media only. This removes the duplicated score visualization reported by Jeff while leaving the canonical result mounted and visible for print/PDF. Public results with no configured score bands keep the canonical on-screen result, and invited, Coach/Admin, group, aggregate, email, scoring, persistence, and report-content behavior remain unchanged. The screen selector covers both Classic `.su-report-overall` markup and alternate `[data-report-block="score-summary"]` report styles.
+
+**Evidence.** The change followed a red/green regression cycle for both score-band and no-band public results. The complete Jest suite passes **808/808 suites, 10,099/10,099 tests, and 16/16 snapshots**. Changed-file ESLint, all **51** migration checks, the Turbopack production build, diff hygiene, and Chromium desktop/mobile/print-media inspection pass. Screen media hides the canonical block without leaving a gap; print media hides the marketing add-on and preserves the canonical score result.
+
+---
+
 <a id="sunhub-successor-durable-verifier"></a>
 ### 2026-09-02 — SunHub successor durable completion verifier <!-- ENTRY_ISO:2026-09-02 ENTRY_SLUG:sunhub-successor-durable-verifier -->
 

@@ -451,6 +451,8 @@ export function PublicQuizClient({
 
   // step === "results" — render the branded in-place report.
   if (step === "results" && results && reportStyle) {
+    const hasPublicScoreGuide =
+      (marketingResultConfig?.scoreBands.length ?? 0) > 0;
     const firstName = contactValues.firstName ?? "";
     const lastName = contactValues.lastName ?? "";
     const email = contactValues.email ?? "";
@@ -505,7 +507,11 @@ export function PublicQuizClient({
         report={report}
         reportStylesAvailable={reportStylesAvailable}
       >
-        <main className="survey-body" data-testid="quiz-results">
+        <main
+          className="survey-body"
+          data-testid="quiz-results"
+          data-public-score-guide={hasPublicScoreGuide ? "active" : undefined}
+        >
           {/* Scope wrapper so su-report.css applies (ADR-0005) — same wrapper the
               invited (report) route layout provides. */}
           <div className="su-public-brand su-report">
