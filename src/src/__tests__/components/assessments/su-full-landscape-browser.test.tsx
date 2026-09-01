@@ -12,6 +12,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { REPORT_HTML_PEER_FIXTURES } from "../../../../scripts/capture-report-html-peers-previews";
 import { BrandedReport } from "@/components/assessments/BrandedReport";
 import { ReportStyleScope } from "@/components/assessments/ReportStyleScope";
+import { ExecutiveBoardroomReport } from "@/components/assessments/report-styles/ExecutiveBoardroomReport";
+import { ModernDashboardReport } from "@/components/assessments/report-styles/ModernDashboardReport";
 import {
   completeSuFullLandscapePresentation,
   completeSuFullLandscapeReport,
@@ -28,6 +30,8 @@ import {
 } from "@/lib/assessments/su-full-peer-disclosure";
 import type { GrowthPhaseNumber } from "@/lib/assessments/su-full-phase";
 import { prepareReportHtmlForStorage } from "@/lib/assessments/report-html";
+import { buildIndividualReportPresentation } from "@/lib/assessments/individual-report-presentation";
+import { buildReportStylePreviewReport } from "@/lib/assessments/report-style-preview-fixture";
 
 jest.setTimeout(60_000);
 
@@ -103,7 +107,7 @@ type SemanticAuditPosition = "introduction" | "conclusion";
 const TALL_PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAA+gCAIAAAC0f+F8AAAALUlEQVR42u3DAQ0AAAgDoM8uFrKSxQ0ibGR6K4mqqqqqqqqqqqqqqqqqqqq/H9OeIDkSuu58AAAAAElFTkSuQmCC";
 const SEMANTIC_AUDIT_LIMITS = {
   introduction: { elements: 64, text: 2_200, rows: 8, columns: 4, cells: 24, headings: 4, breaks: 8, lines: 32 },
-  conclusion: { elements: 36, text: 900, rows: 6, columns: 3, cells: 12, headings: 2, breaks: 4, lines: 16 },
+  conclusion: { elements: 36, text: 900, rows: 6, columns: 3, cells: 12, headings: 2, breaks: 4, lines: 24 },
 } as const;
 
 function auditTextChunks(
@@ -126,10 +130,10 @@ function repeatedInlineAuditTag(tag: string, position: SemanticAuditPosition): s
 }
 
 function weightedAuditTag(tag: string, weight: number, position: SemanticAuditPosition): string {
-  const { elements, lines } = SEMANTIC_AUDIT_LIMITS[position];
+  const { elements, lines, text } = SEMANTIC_AUDIT_LIMITS[position];
   const count = Math.min(elements, Math.floor(lines / (weight + 1)));
   const textLines = lines - count * weight;
-  return auditTextChunks(position, count, textLines * 100)
+  return auditTextChunks(position, count, Math.min(textLines * 100, text))
     .map((text) => `<${tag}>${text}</${tag}>`)
     .join("");
 }
@@ -145,19 +149,19 @@ function headingAuditHtml(tag: string, weight: number, position: SemanticAuditPo
 }
 
 function listAuditHtml(tag: "ul" | "ol", position: SemanticAuditPosition): string {
-  const { lines } = SEMANTIC_AUDIT_LIMITS[position];
+  const { lines, text } = SEMANTIC_AUDIT_LIMITS[position];
   const items = Math.floor((lines - 1) / 2);
   const textLines = lines - 1 - items;
-  return `<${tag}>${auditTextChunks(position, items, textLines * 100)
+  return `<${tag}>${auditTextChunks(position, items, Math.min(textLines * 100, text))
     .map((text) => `<li>${text}</li>`)
     .join("")}</${tag}>`;
 }
 
 function descriptionListAuditHtml(position: SemanticAuditPosition): string {
-  const { lines } = SEMANTIC_AUDIT_LIMITS[position];
+  const { lines, text } = SEMANTIC_AUDIT_LIMITS[position];
   const items = Math.floor((lines - 1) / 2);
   const textLines = lines - 1 - items;
-  return `<dl>${auditTextChunks(position, items, textLines * 100)
+  return `<dl>${auditTextChunks(position, items, Math.min(textLines * 100, text))
     .map((text, index) => index % 2 === 0 ? `<dt>${text}</dt>` : `<dd>${text}</dd>`)
     .join("")}</dl>`;
 }
@@ -230,7 +234,7 @@ const SEMANTIC_REJECTED_CASES = [
   { id: "maximum-closing-figcaptions", position: "conclusion", html: "<figcaption>x</figcaption>".repeat(36), issue: /figure caption/i },
   { id: "maximum-table-cells", position: "introduction", html: `<table><tbody>${Array.from({ length: 8 }, (_, rowIndex) => `<tr>${"<td>x</td>".repeat(rowIndex === 0 ? 47 : 1)}</tr>`).join("")}</tbody></table>`, issue: /table columns/i },
   { id: "maximum-table-captions", position: "introduction", html: `<table>${"<caption>x</caption>".repeat(63)}</table>`, issue: /table caption/i },
-  { id: "closing-caption-with-max-rows", position: "conclusion", html: `<table><caption>Cap</caption><tbody>${"<tr><td>x</td><td>x</td></tr>".repeat(6)}</tbody></table>`, issue: /estimated lines/i },
+  { id: "closing-over-expanded-line-budget", position: "conclusion", html: "<div></div>".repeat(25), issue: /estimated lines/i },
   { id: "table-direct-td", position: "introduction", html: `<table>${"<td>x</td>".repeat(24)}</table>`, issue: /valid table structure/i },
   { id: "table-direct-th", position: "introduction", html: `<table>${"<th>x</th>".repeat(24)}</table>`, issue: /valid table structure/i },
   { id: "thead-without-tr", position: "introduction", html: "<table><thead><th>x</th></thead></table>", issue: /valid table structure/i },
@@ -261,10 +265,53 @@ const SEMANTIC_REJECTED_CASES = [
 ] as const;
 
 function stylesheet(): string {
-  return ["su-public-brand.css", "su-report.css"]
+  return [
+    "su-public-brand.css",
+    "su-report.css",
+    "su-report-executive.css",
+    "su-report-dashboard.css",
+  ]
     .map((name) => readFileSync(join(process.cwd(), "src", "styles", name), "utf8"))
     .join("\n")
     .replace(/@import[^;]+;\s*/g, "");
+}
+
+const EXPANDED_CLOSING_BOUNDARY_HTML = `${"<h6>H</h6>".repeat(2)}${"<br>".repeat(4)}<p>${"C".repeat(782)}END-OF-CLOSING</p><ul><li></li><li></li></ul>`;
+
+function alternateStyleMarkup(
+  style: "CLASSIC_SCORED" | "CLASSIC_QUALITATIVE" | "EXECUTIVE_BOARDROOM" | "MODERN_DASHBOARD",
+  conclusionHtml: string,
+): string {
+  const prepared = prepareReportHtmlForStorage({
+    reportHtml: {
+      schemaVersion: 1,
+      introductionHtml: null,
+      conclusionHtml,
+    },
+  });
+  if (!prepared.ok) throw new Error("Alternate-style closing fixture must remain inside storage limits");
+  const anatomy = style === "CLASSIC_QUALITATIVE" ? "qualitative" : "scored";
+  const report = {
+    ...buildReportStylePreviewReport(anatomy, "normal"),
+    reportStyle: "CLASSIC" as const,
+    reportHtml: (prepared.reportConfig as { reportHtml: NonNullable<ReturnType<typeof buildReportStylePreviewReport>["reportHtml"]> }).reportHtml,
+  };
+  const presentation = buildIndividualReportPresentation(report);
+  const reportHtmlPersonalization = report;
+  const rendered = style === "EXECUTIVE_BOARDROOM"
+    ? <ExecutiveBoardroomReport presentation={presentation} reportHtml={report.reportHtml} reportHtmlPersonalization={reportHtmlPersonalization} />
+    : style === "MODERN_DASHBOARD"
+      ? <ModernDashboardReport presentation={presentation} reportHtml={report.reportHtml} reportHtmlPersonalization={reportHtmlPersonalization} />
+      : (
+        <ReportStyleScope report={report} reportStylesAvailable>
+          <div className="su-report-page">
+            <BrandedReport report={report} reportStylesAvailable />
+          </div>
+        </ReportStyleScope>
+      );
+  return renderToStaticMarkup(
+    <main className="su-public-brand su-report">{rendered}</main>,
+  );
 }
 
 function routeMarkup(
@@ -630,6 +677,71 @@ describe("SU Full landscape browser and PDF contract", () => {
     if (savedKill === undefined) delete process.env[KILL];
     else process.env[KILL] = savedKill;
   });
+
+  it.each([
+    "CLASSIC_SCORED",
+    "CLASSIC_QUALITATIVE",
+    "EXECUTIVE_BOARDROOM",
+    "MODERN_DASHBOARD",
+  ] as const)(
+    "paginates the expanded Closing boundary safely in %s without screen clipping",
+    async (style) => {
+      const directory = mkdtempSync(join(tmpdir(), `report-html-${style.toLowerCase()}-`));
+      const renderPdf = async (id: "short" | "boundary", conclusionHtml: string) => {
+        const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+        const pdfPath = join(directory, `${id}.pdf`);
+        try {
+          await load(page, alternateStyleMarkup(style, conclusionHtml));
+          const desktop = await horizontalOverflow(page);
+          const desktopClipping = await authoredClipping(page);
+          await page.setViewportSize({ width: 390, height: 844 });
+          const mobile = await horizontalOverflow(page);
+          const mobileClipping = await authoredClipping(page);
+          await page.setViewportSize({ width: 1280, height: 900 });
+          await page.emulateMedia({ media: "print" });
+          const printClipping = await authoredClipping(page);
+          await page.pdf({
+            path: pdfPath,
+            format: "Letter",
+            preferCSSPageSize: true,
+            printBackground: true,
+          });
+          const info = execFileSync("pdfinfo", [pdfPath], { encoding: "utf8" });
+          return {
+            pages: Number(info.match(/^Pages:\s+(\d+)$/m)?.[1]),
+            pdfText: execFileSync("pdftotext", [pdfPath, "-"], { encoding: "utf8" }).replace(/\s+/g, ""),
+            desktop,
+            desktopClipping,
+            mobile,
+            mobileClipping,
+            printClipping,
+          };
+        } finally {
+          await page.close();
+        }
+      };
+
+      try {
+        const short = await renderPdf("short", "<p>Choose one next step.</p>");
+        const boundary = await renderPdf("boundary", EXPANDED_CLOSING_BOUNDARY_HTML);
+        expect(Number.isInteger(short.pages)).toBe(true);
+        expect(short.pages).toBeGreaterThan(1);
+        expect(Number.isInteger(boundary.pages)).toBe(true);
+        const expectedAdditionalPages = style.startsWith("CLASSIC_") ? 1 : 0;
+        expect(boundary.pages).toBe(short.pages + expectedAdditionalPages);
+        expect(boundary.pdfText).toContain("END-OF-CLOSING");
+        expect(boundary.desktop.offenders).toEqual([]);
+        expect(boundary.desktop.document).toBeLessThanOrEqual(boundary.desktop.viewport + 1);
+        expect(boundary.desktopClipping).toEqual([]);
+        expect(boundary.mobile.offenders).toEqual([]);
+        expect(boundary.mobile.document).toBeLessThanOrEqual(boundary.mobile.viewport + 1);
+        expect(boundary.mobileClipping).toEqual([]);
+        expect(boundary.printClipping).toEqual([]);
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
+    },
+  );
 
   it("restores the approved Scaling Up Full CTA hierarchy and button treatment", async () => {
     const { html } = routeMarkup(restoredScalingUpFullCtaReport());
