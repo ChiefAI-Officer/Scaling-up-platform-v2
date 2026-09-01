@@ -429,6 +429,13 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
     });
 
     expect(screen.getByText("Canonical report conclusion")).toBeInTheDocument();
+    expect(screen.getByTestId("quiz-results")).toHaveAttribute(
+      "data-public-score-guide",
+      "active",
+    );
+    // The canonical summary stays in the DOM for the unchanged print/PDF path;
+    // screen CSS suppresses it only while this marker is active.
+    expect(screen.getByTestId("report-overall")).toBeInTheDocument();
     const scoreGuide = screen.getByRole("region", { name: "Score guide" });
     const conclusion = screen.getByTestId("report-html-conclusion");
     const footer = screen.getByTestId("report-footer");
@@ -443,6 +450,25 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(document.querySelector(".public-marketing-cta-blocks")).toBeNull();
+  });
+
+  it("keeps the canonical overall result visible when marketing score bands are empty", async () => {
+    await submitAndRender({
+      reportHtmlExperienceActive: true,
+      reportHtml: {
+        introductionHtml: null,
+        conclusionHtml: "<p>Canonical report conclusion</p>",
+      },
+      marketingResultConfig: {
+        scoreBands: [],
+        marketingCta: createMarketingCtaPreset("FULL_MARKETING"),
+      },
+    });
+
+    expect(screen.getByTestId("quiz-results")).not.toHaveAttribute(
+      "data-public-score-guide",
+    );
+    expect(screen.getByTestId("report-overall")).toBeInTheDocument();
   });
 
   it("keeps successor score bands inside an alternate report style", async () => {

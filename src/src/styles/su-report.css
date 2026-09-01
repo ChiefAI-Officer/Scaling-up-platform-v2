@@ -2347,6 +2347,14 @@
    print layout and the default-OFF report tree remain unchanged. Keep these
    rules at the stylesheet tail so they override legacy desktop constraints. */
 @media screen {
+  /* Public marketing results render their own score guide. Suppress the
+     canonical score summary on screen only so print/PDF keeps its unchanged,
+     non-marketing result block. The data-block selector covers alternate styles. */
+  [data-public-score-guide="active"] .su-report-overall,
+  [data-public-score-guide="active"] [data-report-block="score-summary"] {
+    display: none !important;
+  }
+
   [data-responsive-report],
   [data-responsive-report] section,
   [data-responsive-report] .su-report-cover-inner,
