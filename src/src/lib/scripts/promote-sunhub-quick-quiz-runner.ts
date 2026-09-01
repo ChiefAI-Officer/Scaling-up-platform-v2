@@ -104,9 +104,19 @@ export interface TransactionClient {
 export interface DbClient extends TransactionClient {
   $transaction<T>(
     callback: (tx: TransactionClient) => Promise<T>,
-    options?: { isolationLevel: "Serializable" },
+    options?: {
+      isolationLevel: "Serializable";
+      maxWait: number;
+      timeout: number;
+    },
   ): Promise<T>;
 }
+
+const PROMOTION_TRANSACTION_OPTIONS = {
+  isolationLevel: "Serializable" as const,
+  maxWait: 10_000,
+  timeout: 30_000,
+};
 
 export type PromotionLoadExpected = {
   args: PromotionArgs;
@@ -774,7 +784,7 @@ export async function quiescePromotion(
 
     await tx.auditLog.create({ data: receiptData(plan, operator) });
     return { status: "quiesced" as const };
-  }, { isolationLevel: "Serializable" });
+  }, PROMOTION_TRANSACTION_OPTIONS);
 }
 
 /** Atomically retire v1's alias, create the deterministic v7 successor, and receipt it. */
@@ -835,5 +845,5 @@ export async function applyPromotion(
       status: "applied" as const,
       successorCampaignId: SUCCESSOR_CAMPAIGN_ID,
     };
-  }, { isolationLevel: "Serializable" });
+  }, PROMOTION_TRANSACTION_OPTIONS);
 }

@@ -32,7 +32,7 @@
 - `src/src/lib/scripts/promote-sunhub-quick-quiz-runner.ts`
 - `src/src/__tests__/scripts/promote-sunhub-quick-quiz.test.ts`
 
-- [ ] **Step 1: Run the successor-operation suite**
+- [x] **Step 1: Run the successor-operation suite**
 
 Run: `npx jest src/__tests__/scripts/promote-sunhub-quick-quiz.test.ts --runInBand`
 
@@ -42,15 +42,19 @@ Expected: all dry-run, authorization, quiesce, drain, apply, idempotency, proven
 
 Resolve the merge SHA, wait for the Vercel deployment to be Ready, and verify `/api/health` on the exact deployment, `scaling-up-platform-v2.vercel.app`, and `platformtest.scalingup.com`. Do not quiesce while an older build is serving.
 
+Execution note: PR #414 merged as `83a18dc91d544661efa740186dcbb9bd1ef0397e`; Vercel's exact-commit status succeeded and both canonical health aliases passed. Exact deployment-host verification remains open because the local Vercel CLI credential cannot inspect the project.
+
 ### Task 2: Quiesce v1 using only fresh emitted values
 
-- [ ] **Step 1: Run an operator-bearing dry-run**
+- [x] **Step 1: Run an operator-bearing dry-run**
 
 Run the existing CLI with the Production env file and the real operator identity. Save its complete source/target manifest and emitted quiesce command. Confirm source is ACTIVE, owns `sunhub-quick-quiz`, remains pinned to v1, target is published Active v7, and retired alias/successor are unoccupied.
 
 - [ ] **Step 2: Execute exactly the emitted quiesce command**
 
 Do not hand-edit host, timestamp, count, operator, or identifiers. The command must include `--quiesce`, `--i-know-this-is-prod`, exact host, exact source `updatedAt`, and exact submission count. Any drift aborts without mutation.
+
+Execution note: the first exact command failed before commit because the complete manifest reload exceeded Prisma's default 5-second interactive-transaction timeout. A fresh dry-run confirmed complete rollback: source remains ACTIVE with 15 submissions and unchanged `updatedAt`; no receipt or successor exists. The bounded-timeout TDD hotfix must deploy before retrying from another fresh operator-bearing dry-run.
 
 - [ ] **Step 3: Verify the quiescence receipt**
 
