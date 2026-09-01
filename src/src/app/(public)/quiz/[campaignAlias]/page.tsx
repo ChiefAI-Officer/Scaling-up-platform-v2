@@ -19,6 +19,7 @@ import { isPublicMarketingCtaEnabled } from "@/lib/assessments/wave-public-marke
 import { loadPublicMarketingResultConfig } from "@/lib/assessments/public-marketing-result";
 import { resolveActiveReportHtml } from "@/lib/assessments/report-html";
 import { isReportHtmlExperienceEnabled } from "@/lib/assessments/wave-report-html-authoring-flags";
+import { invitedWelcomeConfigSchema } from "@/lib/assessments/invited-welcome-config";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -51,7 +52,15 @@ export default async function PublicQuizPage({
       deletedAt: true,
       // Wave M (#19): coach-authored custom slides (raw CustomSlide[] JSON).
       customSlides: true,
-      template: { select: { id: true, name: true, alias: true, deliveryType: true } },
+      template: {
+        select: {
+          id: true,
+          name: true,
+          alias: true,
+          deliveryType: true,
+          invitedWelcomeDefault: true,
+        },
+      },
     },
   });
   // SEC-M6: a soft-deleted campaign is invisible — 404 like a missing one.
@@ -71,6 +80,10 @@ export default async function PublicQuizPage({
   if (!version || version.publishedAt === null) {
     notFound();
   }
+
+  const parsedWelcomeConfig = invitedWelcomeConfigSchema.safeParse(
+    campaign.template.invitedWelcomeDefault,
+  );
 
   const now = new Date();
   const isOpen =
@@ -115,6 +128,9 @@ export default async function PublicQuizPage({
       questions={version.questions as unknown}
       customSlides={customSlides}
       marketingResultConfig={marketingResultConfig}
+      {...(parsedWelcomeConfig.success
+        ? { welcomeConfig: parsedWelcomeConfig.data }
+        : {})}
       {...(reportHtmlExperienceActive && reportHtml
         ? { reportHtmlExperienceActive: true, reportHtml }
         : {})}

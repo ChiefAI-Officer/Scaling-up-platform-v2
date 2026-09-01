@@ -65,7 +65,7 @@ import {
   reviveOnScreenReport,
 } from "@/lib/assessments/onscreen-result-store";
 import { exchangeCeoReportAccessUrl } from "@/lib/assessments/ceo-report-access-client";
-import { InvitedWelcomeCard } from "@/components/assessments/InvitedWelcomeCard";
+import { AssessmentWelcomeCard } from "@/components/assessments/AssessmentWelcomeCard";
 import {
   invitedWelcomeConfigSchema,
   resolveLegacyInvitedWelcomeConfig,
@@ -666,7 +666,7 @@ export function OrgSurveyClient({
         <div className="su-welcome-page">
           <WelcomeShellHeader caption={orgName ?? "Team Assessment"} />
           <main className="su-welcome-body">
-            <InvitedWelcomeCard
+            <AssessmentWelcomeCard
               config={invitedWelcome}
               campaignName={phase.data.campaign.name}
               questions={sortedQuestions}

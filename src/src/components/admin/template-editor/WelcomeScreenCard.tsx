@@ -2,7 +2,7 @@
 
 import React, { useId, useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { InvitedWelcomeCard } from "@/components/assessments/InvitedWelcomeCard";
+import { AssessmentWelcomeCard } from "@/components/assessments/AssessmentWelcomeCard";
 import {
   splitWelcomeMessage,
   type InvitedWelcomeAuthoringInput,
@@ -162,8 +162,9 @@ export function WelcomeScreenCard({
           className="border-t border-border p-5"
         >
           <p className="mb-5 rounded-lg bg-muted px-4 py-3 text-sm text-muted-foreground">
-            Changes become the default for future invited campaigns. Campaigns already
-            created keep the Welcome screen they started with.
+            Public campaigns use these changes immediately. Future invited campaigns
+            use them as their default; invited campaigns already created keep the
+            Welcome screen they started with.
           </p>
           <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(360px,1.1fr)]">
             <div data-testid="welcome-screen-fields" className="space-y-4">
@@ -211,7 +212,7 @@ export function WelcomeScreenCard({
                 Respondent preview
               </p>
               <div className="su-public-brand su-assessment-brand overflow-hidden rounded-xl border border-border bg-background shadow-sm">
-                <InvitedWelcomeCard
+                <AssessmentWelcomeCard
                   config={config}
                   campaignName="Example campaign"
                   questions={previewQuestions}

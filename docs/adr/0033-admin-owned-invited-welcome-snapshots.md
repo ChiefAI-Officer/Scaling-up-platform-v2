@@ -1,6 +1,6 @@
 # ADR-0033 — Admin-owned invited Welcome defaults are frozen per campaign
 
-**Status:** Accepted (2026-08-10)
+**Status:** Accepted (2026-08-10); PUBLIC read lifecycle amended (2026-09-01)
 
 **Supersedes:** [ADR-0026](0026-welcome-screen-copy-is-code-owned.md)
 
@@ -39,10 +39,12 @@ immutable after insertion. Template changes therefore affect only invited
 campaigns created after the save. The non-retroactivity boundary includes
 existing `DRAFT`, `ACTIVE`, `CLOSED`, and imported campaigns.
 
-Snapshot persistence is unconditional and remains active while the presentation
-feature flag is off or killed. The coordinated flag controls only the new admin
-authoring/rendering presentation and coach UI/API ownership. This avoids a data
-gap during dark deployment and makes rollback presentation-only.
+Invited snapshot persistence is unconditional and remains active while the invited
+presentation feature flag is off or killed. That coordinated flag controls only
+the invited/admin authoring and rendering presentation plus coach UI/API ownership.
+This avoids a data gap during dark deployment and makes invited rollback
+presentation-only. The PUBLIC live-template read has no feature flag; operational
+rollback of that behavior is a code revert.
 
 Migration `20260810160000_add_invited_welcome_snapshots` adds nullable JSONB
 columns, backfills template defaults and all existing invited campaigns with the
@@ -50,9 +52,12 @@ exact legacy alias-resolved content, and installs a trigger that rejects updates
 to a non-null campaign snapshot. Invalid or absent template defaults resolve to
 the exact legacy alias copy when a campaign is created.
 
-`PUBLIC` campaigns are a separate product surface. They do not write or read
-`invitedWelcomeSnapshot`; their existing campaign-authored public Welcome and
-fallback behavior are unchanged.
+`PUBLIC` campaigns remain a separate lifecycle. They do not write or read
+`invitedWelcomeSnapshot`; instead, the public route strictly parses and reads the
+current template-row Welcome default at request time. A template edit therefore
+updates existing public campaign links immediately. Missing or malformed JSON
+retains the standing public fallback. Question-bank facts (count, time, format,
+scale, and sections) remain derived from the campaign's pinned Template Version.
 
 Report appearance is also assessment-owned in the coach workflow. With the
 coordinated flag active, coach creation and detail surfaces expose no report
@@ -68,18 +73,22 @@ snapshots and renderers are not rewritten.
 - Admins can update one assessment's future invited Welcome without a deploy or
   Template Version publication.
 - Two campaigns created around an admin save may intentionally display different
-  Welcome copy; each remains stable for its lifetime.
+  invited Welcome copy; each invited snapshot remains stable for its lifetime.
+- Existing public campaigns intentionally reflect the current template Welcome
+  copy without repinning or recreating the campaign.
 - Campaign create and historical-import paths must all resolve and persist the
   snapshot transactionally. Reuse paths must never mutate it.
-- Rollback or kill restores the legacy presentation and coach controls but does
-  not stop snapshot writes or erase either JSON column.
+- Invited presentation rollback or kill restores its legacy presentation and coach
+  controls but does not stop snapshot writes or erase either JSON column. PUBLIC
+  live-template rendering is flagless and rolls back by reverting its code path.
 - Removing the immutable trigger or adding a per-campaign override requires a
   new ADR because it changes the participant-history guarantee.
 
 ## Rejected alternatives
 
-- **Live template reads:** retroactive and capable of changing an already-issued
-  participant link.
+- **Live template reads for invited campaigns:** retroactive and capable of changing
+  an already-issued invited participant link. PUBLIC links intentionally use live
+  reads under the separately approved 2026-09-01 lifecycle.
 - **Template Version storage:** couples presentation copy to scored content and
   publication lifecycle.
 - **Coach or per-campaign Welcome overrides:** create drift in assessment content

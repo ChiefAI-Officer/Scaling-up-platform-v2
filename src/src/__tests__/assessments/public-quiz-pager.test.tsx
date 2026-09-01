@@ -668,4 +668,74 @@ describe("PublicQuizClient — SectionPager wiring", () => {
     // The expectation row also states the real count + scale.
     expect(within(expectations).getByText(/2 short statements, rated 0–3\./i)).toBeInTheDocument();
   });
+
+  it("preserves the existing public presentation when no saved Welcome config is supplied", () => {
+    render(
+      <PublicQuizClient
+        {...baseProps}
+        campaignDescription="Campaign-specific public description."
+      />,
+    );
+
+    expect(screen.getByText("Free assessment")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Team Alpha Assessment" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Campaign-specific public description."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Start the assessment →" }),
+    ).toBeInTheDocument();
+  });
+
+  it("renders saved template Welcome copy while keeping question-bank facts derived", () => {
+    const { container } = render(
+      <PublicQuizClient
+        {...baseProps}
+        welcomeConfig={{
+          schemaVersion: 2,
+          eyebrow: "You're invited to take this survey",
+          headingTemplate: "Take {{campaignName}} today",
+          ledeParagraphs: [
+            "This survey is better than chocolate",
+            "A second saved paragraph.",
+          ],
+          sharingHeading: "Your information",
+          sharingDescription: "Your coach has access to your data.",
+          scoresHeading: "Your category scores",
+          scoresDescription: "You will get customized scoring based on your answers.",
+          ctaLabel: "Start the assessment Now",
+          finePrint: null,
+        }}
+      />,
+    );
+
+    expect(screen.getByText("You're invited to take this survey")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Take Team Alpha Assessment today" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("This survey is better than chocolate")).toBeInTheDocument();
+    expect(screen.getByText("A second saved paragraph.")).toBeInTheDocument();
+    const expectations = screen.getByTestId("welcome-expectations");
+    expect(within(expectations).getByText("Your information")).toBeInTheDocument();
+    expect(
+      within(expectations).getByText("Your coach has access to your data."),
+    ).toBeInTheDocument();
+    expect(within(expectations).getByText("Your category scores")).toBeInTheDocument();
+    expect(
+      within(expectations).getByText(
+        "You will get customized scoring based on your answers.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Start the assessment Now →" }),
+    ).toBeInTheDocument();
+    expect(container.querySelector(".su-welcome-fine")).not.toBeInTheDocument();
+
+    expect(within(expectations).getByText(/2 short statements, rated 0–3\./i)).toBeInTheDocument();
+    const stats = screen.getByTestId("welcome-stats");
+    expect(within(stats).getAllByText("2")).toHaveLength(2);
+    expect(within(stats).getByText("0–3")).toBeInTheDocument();
+  });
 });

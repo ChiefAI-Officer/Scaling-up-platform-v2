@@ -46,6 +46,26 @@ jest.mock("@/components/assessments/public-quiz-client", () => ({
 
 import PublicQuizPage from "@/app/(public)/quiz/[campaignAlias]/page";
 
+const baseCampaign = {
+  id: "campaign-83",
+  name: "Quick Assessment",
+  description: null,
+  accessMode: "PUBLIC",
+  status: "ACTIVE",
+  openAt: new Date("2026-07-01T00:00:00Z"),
+  closeAt: null,
+  versionId: "version-83",
+  deletedAt: null,
+  customSlides: null,
+  template: {
+    id: "template-83",
+    name: "Scaling Up Quick",
+    alias: "scaling-up-quick",
+    deliveryType: "PUBLIC_MARKETING_QUIZ",
+    invitedWelcomeDefault: null,
+  },
+};
+
 beforeEach(() => {
   jest.clearAllMocks();
   delete process.env.WAVE_ED10_PREVIEW_SETTINGS_ENABLED;
@@ -53,23 +73,7 @@ beforeEach(() => {
   delete process.env.WAVE_REPORT_HTML_AUTHORING_ENABLED;
   delete process.env.WAVE_REPORT_HTML_AUTHORING_KILL;
   mockIsReferredResultsEnabled.mockReturnValue(false);
-  mockCampaignFindUnique.mockResolvedValue({
-    id: "campaign-83",
-    name: "Quick Assessment",
-    description: null,
-    accessMode: "PUBLIC",
-    status: "ACTIVE",
-    openAt: new Date("2026-07-01T00:00:00Z"),
-    closeAt: null,
-    versionId: "version-83",
-    deletedAt: null,
-    customSlides: null,
-    template: {
-      id: "template-83",
-      name: "Scaling Up Quick",
-      alias: "scaling-up-quick",
-    },
-  });
+  mockCampaignFindUnique.mockResolvedValue(baseCampaign);
   mockVersionFindUnique.mockResolvedValue({
     questions: [],
     sections: [],
@@ -98,6 +102,61 @@ describe("PublicQuizPage referred-results disclosure boundary", () => {
     const props = await renderPage();
 
     expect(props).toHaveProperty("referredResultsEnabled", true);
+  });
+
+  it("passes the related template's strictly parsed Welcome config to the public client", async () => {
+    const welcomeConfig = {
+      schemaVersion: 2,
+      eyebrow: "You're invited to take this survey",
+      headingTemplate: "Take {{campaignName}} today",
+      ledeParagraphs: ["This survey is better than chocolate"],
+      sharingHeading: "Your information",
+      sharingDescription: "Your coach has access to your data.",
+      scoresHeading: "Your category scores",
+      scoresDescription: "You will get customized scoring.",
+      ctaLabel: "Start the assessment Now",
+      finePrint: null,
+    };
+    mockCampaignFindUnique.mockResolvedValue({
+      ...baseCampaign,
+      template: {
+        id: "template-jv",
+        name: "JV New Assessment Testing",
+        alias: "jv-new-assessment-testing",
+        deliveryType: "PUBLIC_MARKETING_QUIZ",
+        invitedWelcomeDefault: welcomeConfig,
+      },
+    });
+
+    const props = await renderPage();
+
+    expect(props).toHaveProperty("welcomeConfig", welcomeConfig);
+    expect(mockCampaignFindUnique).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({
+          template: {
+            select: expect.objectContaining({ invitedWelcomeDefault: true }),
+          },
+        }),
+      }),
+    );
+  });
+
+  it("does not pass malformed persisted Welcome JSON to the public client", async () => {
+    mockCampaignFindUnique.mockResolvedValue({
+      ...baseCampaign,
+      template: {
+        id: "template-jv",
+        name: "JV New Assessment Testing",
+        alias: "jv-new-assessment-testing",
+        deliveryType: "PUBLIC_MARKETING_QUIZ",
+        invitedWelcomeDefault: { schemaVersion: 99, eyebrow: "unsafe partial" },
+      },
+    });
+
+    const props = await renderPage();
+
+    expect(props).not.toHaveProperty("welcomeConfig");
   });
 
   it("omits report HTML props while the successor experience is off", async () => {

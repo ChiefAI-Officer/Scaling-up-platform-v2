@@ -13,7 +13,7 @@ import {
   type InvitedWelcomeConfig,
 } from "@/lib/assessments/invited-welcome-config";
 
-export function InvitedWelcomeCard({
+export function AssessmentWelcomeCard({
   config,
   campaignName,
   questions,
@@ -21,6 +21,7 @@ export function InvitedWelcomeCard({
   onStart,
   headingId = "invite-title",
   preview = false,
+  startButtonTestId,
 }: {
   config: InvitedWelcomeConfig;
   campaignName: string;
@@ -29,6 +30,7 @@ export function InvitedWelcomeCard({
   onStart: () => void;
   headingId?: string;
   preview?: boolean;
+  startButtonTestId?: string;
 }) {
   const presentation = deriveWelcomePresentation(questions);
 
@@ -63,6 +65,7 @@ export function InvitedWelcomeCard({
           className="su-welcome-cta"
           disabled={preview}
           aria-disabled={preview || undefined}
+          data-testid={startButtonTestId}
         >
           {config.ctaLabel} →
         </button>

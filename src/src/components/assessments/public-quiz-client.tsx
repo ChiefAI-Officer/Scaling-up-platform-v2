@@ -49,6 +49,10 @@ import {
   type PublicContactFieldKey,
   type PublicContactValues,
 } from "@/lib/assessments/public-contact-config";
+import {
+  type InvitedWelcomeConfig,
+} from "@/lib/assessments/invited-welcome-config";
+import { AssessmentWelcomeCard } from "@/components/assessments/AssessmentWelcomeCard";
 
 interface SectionDef {
   stableKey: string;
@@ -121,6 +125,8 @@ interface PublicQuizClientProps {
    */
   customSlides?: SafeSlide[];
   marketingResultConfig?: PublicMarketingResultConfig | null;
+  /** Strictly parsed current template Welcome copy for PUBLIC campaigns. */
+  welcomeConfig?: InvitedWelcomeConfig;
   /** Server-resolved fragments from this campaign's pinned version. */
   reportHtml?: SafeReportHtml;
   /** Composite successor decision resolved by the server page. */
@@ -145,6 +151,7 @@ export function PublicQuizClient({
   referredResultsEnabled = false,
   qspStoryGroupEnabled = false,
   marketingResultConfig = null,
+  welcomeConfig,
   reportHtml = { introductionHtml: null, conclusionHtml: null },
   reportHtmlExperienceActive = false,
 }: PublicQuizClientProps) {
@@ -275,49 +282,62 @@ export function PublicQuizClient({
       <div className="su-welcome-page">
         <WelcomeShellHeader caption={templateName} />
         <main className="su-welcome-body">
-          <section className="su-welcome-card" aria-labelledby="hero-title">
-            <span className="su-welcome-eyebrow">Free assessment</span>
-            <h1 className="su-welcome-title" id="hero-title">
-              {campaignName}
-            </h1>
-            {campaignDescription ? (
-              <p className="su-welcome-lede" style={{ whiteSpace: "pre-line" }}>
-                {campaignDescription}
-              </p>
-            ) : (
-              <p className="su-welcome-lede">
-                See how your business scores across the Four Decisions —
-                People, Strategy, Execution, and Cash — and get your results
-                instantly.
-              </p>
-            )}
-            <WelcomeExpectations
-              timeLabel={timeEstimate}
-              expectationText={welcomePresentation.expectationText}
-              sharingLabel="How your results are shared"
-              sharingSub="You receive your results immediately. Authorized Scaling Up staff can review your full report; your referring coach can too, if you used their link."
-              scoresSub="See where you stand across each category."
+          {welcomeConfig ? (
+            <AssessmentWelcomeCard
+              config={welcomeConfig}
+              campaignName={campaignName}
+              questions={sortedQuestions}
+              sections={sortedSections}
+              onStart={() => setStep("info")}
+              headingId="hero-title"
+              startButtonTestId="quiz-start"
             />
-            <WelcomeStats
-              questionCount={sortedQuestions.length}
-              sectionCount={sortedSections.length}
-              scaleLabel={welcomePresentation.scaleLabel}
-            />
-            <div className="su-welcome-cta-row">
-              <button
-                type="button"
-                onClick={() => setStep("info")}
-                className="su-welcome-cta"
-                data-testid="quiz-start"
-              >
-                Start the assessment →
-              </button>
-            </div>
-            <p className="su-welcome-fine">
-              Free to take — you&apos;ll get your results on screen and a copy
-              by email.
-            </p>
-          </section>
+          ) : (
+            <section className="su-welcome-card" aria-labelledby="hero-title">
+              <span className="su-welcome-eyebrow">Free assessment</span>
+              <h1 className="su-welcome-title" id="hero-title">
+                {campaignName}
+              </h1>
+              {campaignDescription ? (
+                <p className="su-welcome-lede" style={{ whiteSpace: "pre-line" }}>
+                  {campaignDescription}
+                </p>
+              ) : (
+                <p className="su-welcome-lede">
+                  See how your business scores across the Four Decisions —
+                  People, Strategy, Execution, and Cash — and get your results
+                  instantly.
+                </p>
+              )}
+              <WelcomeExpectations
+                timeLabel={timeEstimate}
+                expectationText={welcomePresentation.expectationText}
+                sharingLabel="How your results are shared"
+                sharingSub="You receive your results immediately. Authorized Scaling Up staff can review your full report; your referring coach can too, if you used their link."
+                scoresLabel="Your category scores"
+                scoresSub="See where you stand across each category."
+              />
+              <WelcomeStats
+                questionCount={sortedQuestions.length}
+                sectionCount={sortedSections.length}
+                scaleLabel={welcomePresentation.scaleLabel}
+              />
+              <div className="su-welcome-cta-row">
+                <button
+                  type="button"
+                  onClick={() => setStep("info")}
+                  className="su-welcome-cta"
+                  data-testid="quiz-start"
+                >
+                  Start the assessment →
+                </button>
+              </div>
+              <p className="su-welcome-fine">
+                Free to take — you&apos;ll get your results on screen and a copy
+                by email.
+              </p>
+            </section>
+          )}
         </main>
         <footer className="su-welcome-foot">Powered by Scaling Up</footer>
       </div>
