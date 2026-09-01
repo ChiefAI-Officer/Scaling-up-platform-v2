@@ -719,7 +719,7 @@ describe("PublicQuizClient — SectionPager wiring", () => {
           scoresHeading: "Your category scores",
           scoresDescription: "You will get customized scoring based on your answers.",
           ctaLabel: "Start the assessment Now",
-          finePrint: null,
+          finePrint: "Return later if you need to.",
         }}
       />,
     );
@@ -744,7 +744,10 @@ describe("PublicQuizClient — SectionPager wiring", () => {
     expect(
       screen.getByRole("button", { name: "Start the assessment Now →" }),
     ).toBeInTheDocument();
-    expect(container.querySelector(".su-welcome-fine")).not.toBeInTheDocument();
+    expect(screen.getByText("Return later if you need to.")).toBeInTheDocument();
+    expect(container.querySelector(".su-welcome-fine")).toHaveTextContent(
+      "Return later if you need to.",
+    );
 
     expect(within(expectations).getByText(/2 short statements, rated 0–3\./i)).toBeInTheDocument();
     const stats = screen.getByTestId("welcome-stats");

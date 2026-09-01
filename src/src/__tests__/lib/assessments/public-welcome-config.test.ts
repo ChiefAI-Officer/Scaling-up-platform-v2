@@ -1,8 +1,11 @@
 import { resolvePublicWelcomeConfig } from "@/lib/assessments/public-welcome-config";
-import { resolveLegacyInvitedWelcomeConfig } from "@/lib/assessments/invited-welcome-config";
+import {
+  DEFAULT_INVITED_WELCOME_SHARING_DESCRIPTION,
+  resolveLegacyInvitedWelcomeConfig,
+} from "@/lib/assessments/invited-welcome-config";
 
 describe("resolvePublicWelcomeConfig", () => {
-  it("treats a schema-v1 migration backfill as an unedited template default", () => {
+  it("normalizes and returns a schema-v1 migration backfill", () => {
     const storedV1Backfill = {
       schemaVersion: 1,
       eyebrow: "You're invited",
@@ -17,19 +20,28 @@ describe("resolvePublicWelcomeConfig", () => {
       finePrint: null,
     };
 
-    expect(
-      resolvePublicWelcomeConfig(storedV1Backfill, "sunhub-quick-quiz"),
-    ).toBeNull();
+    expect(resolvePublicWelcomeConfig(storedV1Backfill)).toEqual({
+      ...storedV1Backfill,
+      schemaVersion: 2,
+      sharingDescription: DEFAULT_INVITED_WELCOME_SHARING_DESCRIPTION,
+    });
   });
 
-  it.each(["sunhub-quick-quiz", "scaling-up-quick", "scaling-up-full"])(
-    "treats the schema-v2 code baseline for %s as unedited",
+  it.each([
+    "sunhub-quick-quiz",
+    "scaling-up-quick",
+    "scaling-up-full",
+    "unmapped-template",
+    "__proto__",
+    "constructor",
+  ])(
+    "returns the stored schema-v2 configuration for %s without alias selection",
     (templateAlias) => {
       const storedV2Baseline = resolveLegacyInvitedWelcomeConfig(templateAlias);
 
-      expect(
-        resolvePublicWelcomeConfig(storedV2Baseline, templateAlias),
-      ).toBeNull();
+      expect(resolvePublicWelcomeConfig(storedV2Baseline)).toEqual(
+        storedV2Baseline,
+      );
     },
   );
 
@@ -41,7 +53,7 @@ describe("resolvePublicWelcomeConfig", () => {
     const baseline = resolveLegacyInvitedWelcomeConfig("scaling-up-quick");
     const edited = { ...baseline, [key]: value };
 
-    expect(resolvePublicWelcomeConfig(edited, "scaling-up-quick")).toEqual(edited);
+    expect(resolvePublicWelcomeConfig(edited)).toEqual(edited);
   });
 
   it.each([
@@ -50,6 +62,6 @@ describe("resolvePublicWelcomeConfig", () => {
     { schemaVersion: 99 },
     { schemaVersion: 1, eyebrow: "partial" },
   ])("uses the public presentation for absent or malformed config %#", (stored) => {
-    expect(resolvePublicWelcomeConfig(stored, "scaling-up-quick")).toBeNull();
+    expect(resolvePublicWelcomeConfig(stored)).toBeNull();
   });
 });
