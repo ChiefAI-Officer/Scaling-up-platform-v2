@@ -171,6 +171,8 @@ const versionSelect = {
 
 const successorSelect = {
   ...sourceSelect,
+  // Database-managed and intentionally absent from the durable successor manifest.
+  updatedAt: false,
   organizationId: true,
   externalId: true,
   inviteSendStartedAt: true,
