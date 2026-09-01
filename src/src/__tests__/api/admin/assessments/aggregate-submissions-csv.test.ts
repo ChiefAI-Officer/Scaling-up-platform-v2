@@ -170,6 +170,33 @@ describe("GET /api/admin/assessments/aggregate/submissions.csv", () => {
           },
         },
       },
+      {
+        id: "sub-public",
+        campaignId: "c2",
+        respondentId: null,
+        submittedAt: new Date("2026-05-04T10:00:00Z"),
+        result: {
+          countAchieved: 20,
+          overallTotal: 80,
+          overallAverage: 3,
+          tier: { label: "Building", message: "Keep going" },
+          perSection: [],
+        },
+        publicTaker: {
+          firstName: "Public",
+          lastName: "Person",
+          email: "public@example.com",
+          phone: "+1 415 555 0100",
+          company: "Example Co",
+          country: "US",
+        },
+        respondent: null,
+        campaign: {
+          name: "Website Assessment",
+          organization: null,
+          creatorCoach: null,
+        },
+      },
     ]);
     (db.assessmentCampaignParticipant.findMany as jest.Mock).mockResolvedValue([
       { campaignId: "c1", respondentId: "r1", isCEO: true },
@@ -198,6 +225,10 @@ describe("GET /api/admin/assessments/aggregate/submissions.csv", () => {
     expect(body).toContain('"Q2 Rockefeller"');
     expect(body).toContain('"Alice Anderson"');
     expect(body).toContain('"alice@example.com"');
+    expect(body).toContain('"Public Person"');
+    expect(body).toContain('"public@example.com"');
+    expect(body).not.toContain('"+1 415 555 0100"');
+    expect(body).not.toContain('"Example Co"');
     expect(body).toContain('"Yes"'); // isCEO
     expect(body).toContain('"30"'); // countAchieved
     expect(body).toContain('"Great"'); // tier

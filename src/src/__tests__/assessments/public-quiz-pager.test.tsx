@@ -159,6 +159,45 @@ describe("PublicQuizClient — SectionPager wiring", () => {
     expect(screen.queryByText("Question Two")).not.toBeInTheDocument();
   });
 
+  it("renders the configured full contact form from templateAlias without Coach Email", () => {
+    render(<PublicQuizClient {...baseProps} templateAlias="scaling-up-quick" />);
+    fireEvent.click(screen.getByTestId("quiz-start"));
+
+    const expectedFields = [
+      ["First name", "100"],
+      ["Last name", "100"],
+      ["Email", "320"],
+      ["Phone", "50"],
+      ["Title", "100"],
+      ["Company", "200"],
+      ["Number of employees", "100"],
+      ["City", "100"],
+      ["State", "100"],
+    ] as const;
+
+    for (const [label, maxLength] of expectedFields) {
+      expect(screen.getByLabelText(label)).toHaveAttribute("maxlength", maxLength);
+    }
+    expect(screen.getByLabelText("State")).not.toBeRequired();
+    expect(screen.getByLabelText("Country")).toBeRequired();
+    expect(screen.getByLabelText("Country").tagName).toBe("SELECT");
+    expect(screen.getByRole("option", { name: "Select..." })).toHaveValue("");
+    expect(screen.getByLabelText("Number of employees")).toHaveAttribute("type", "text");
+    expect(screen.queryByLabelText(/coach email/i)).not.toBeInTheDocument();
+  });
+
+  it("describes all collected contact information and links the retention policy", () => {
+    render(<PublicQuizClient {...baseProps} templateAlias="scaling-up-quick" />);
+    fireEvent.click(screen.getByTestId("quiz-start"));
+
+    expect(screen.getByText(/contact information you provide/i)).toBeInTheDocument();
+    expect(screen.queryByText(/use your name and email/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /privacy policy/i })).toHaveAttribute(
+      "href",
+      "https://scalingup.com/privacy-policy/",
+    );
+  });
+
   it("G1: a section WITH a description renders the 'What this section covers' callout AND its question on the SAME screen (no separate Begin step)", () => {
     // Wave G merged the per-section intro into the same page as its questions —
     // applied UNIFORMLY, including the LIVE public quiz (G1). A described section
@@ -283,6 +322,71 @@ describe("PublicQuizClient — SectionPager wiring", () => {
 
     // Draft cleared on success.
     expect(localStorage.getItem(key)).toBeNull();
+  });
+
+  it("submits every configured full-assessment contact value and omits blank optional State", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        success: true,
+        data: {
+          submissionId: "sub_full_contact",
+          reportStyle: "CLASSIC",
+          scoreResult: {
+            perQuestion: [],
+            perSection: [],
+            overallTotal: 0,
+            overallAverage: 0,
+            countAchieved: 0,
+            tier: null,
+            tierMetricValue: 0,
+            unansweredKeys: [],
+          },
+        },
+      }),
+    });
+    render(
+      <PublicQuizClient
+        {...baseProps}
+        templateAlias="scaling-up-quick"
+        sections={[sections[0]]}
+        questions={[questions[0]]}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("quiz-start"));
+
+    const values: Record<string, string> = {
+      "First name": "Ada",
+      "Last name": "Lovelace",
+      Email: "ada@example.com",
+      Phone: "+44 20 7946 0958",
+      Title: "Founder",
+      Company: "Analytical Engines Ltd",
+      "Number of employees": "42",
+      City: "London",
+    };
+    for (const [label, value] of Object.entries(values)) {
+      fireEvent.change(screen.getByLabelText(label), { target: { value } });
+    }
+    fireEvent.change(screen.getByLabelText("Country"), { target: { value: "GB" } });
+    fireEvent.click(screen.getByTestId("quiz-info-next"));
+    fireEvent.change(screen.getByRole("slider"), { target: { value: "2" } });
+    fireEvent.click(screen.getByRole("button", { name: /submit/i }));
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
+    const [, init] = (global.fetch as jest.Mock).mock.calls[0];
+    expect(JSON.parse((init as RequestInit).body as string).publicTaker).toEqual({
+      firstName: "Ada",
+      lastName: "Lovelace",
+      email: "ada@example.com",
+      phone: "+44 20 7946 0958",
+      jobTitle: "Founder",
+      company: "Analytical Engines Ltd",
+      numberOfEmployees: "42",
+      city: "London",
+      country: "GB",
+    });
   });
 
   it("prunes a stale draft answer key (no longer a rendered question) from the submit POST body (R3-M2)", async () => {
@@ -518,7 +622,7 @@ describe("PublicQuizClient — SectionPager wiring", () => {
     ]);
   });
 
-  it("info step does NOT promise emailed results (D3 policy)", () => {
+  it("info step uses the current delivery disclosure without legacy promises", () => {
     render(<PublicQuizClient {...baseProps} />);
     fireEvent.click(screen.getByTestId("quiz-start"));
     // Old false promises must be absent
@@ -528,7 +632,7 @@ describe("PublicQuizClient — SectionPager wiring", () => {
     // Invited-flow wording must be absent on the public lead-magnet (PR #47).
     expect(screen.queryByText(/facilitator will follow up/i)).not.toBeInTheDocument();
     // Accurate public copy must be present.
-    expect(screen.getByText(/show you your results/i)).toBeInTheDocument();
+    expect(screen.getByText(/contact information you provide/i)).toBeInTheDocument();
   });
 
   it("Screen 1 (welcome) renders the value-prop 'what to expect' list and stat chips from ACTUAL data", () => {

@@ -176,7 +176,7 @@ const CAMPAIGN = {
   versionId: "ver-1",
   reportStyle: "MODERN_DASHBOARD",
   reportStyleLockedAt: new Date("2026-01-02T00:00:00.000Z"),
-  template: { name: "Scaling Up Quick Assessment" },
+  template: { name: "Scaling Up Quick Assessment", alias: "unmapped-template" },
 };
 
 const VERSION = {
@@ -195,6 +195,18 @@ const VALID_BODY = {
   },
   answers: [{ stableKey: "q1", value: 5 }],
   referringCoachEmail: null,
+};
+
+const FULL_PUBLIC_TAKER = {
+  firstName: "Jane",
+  lastName: "Doe",
+  email: "jane@example.com",
+  phone: "+1 415 555 0100",
+  jobTitle: "Founder",
+  company: "Example Co",
+  numberOfEmployees: "42",
+  city: "San Francisco",
+  country: "US",
 };
 
 function makeRequest(body: unknown, alias = "quick-assessment"): Request {
@@ -406,6 +418,78 @@ describe("preserved behavior", () => {
     });
     const res = await POST(makeRequest(VALID_BODY) as never, makeParams() as never);
     expect(res.status).toBe(404);
+  });
+});
+
+describe("template-configured public contact values", () => {
+  beforeEach(() => {
+    (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValue({
+      ...CAMPAIGN,
+      template: {
+        ...CAMPAIGN.template,
+        alias: "scaling-up-quick",
+      },
+    });
+  });
+
+  it("rejects a missing field that the trusted template config requires", async () => {
+    const withoutPhone: Partial<typeof FULL_PUBLIC_TAKER> = {
+      ...FULL_PUBLIC_TAKER,
+    };
+    delete withoutPhone.phone;
+
+    const res = await POST(
+      makeRequest({ ...VALID_BODY, publicTaker: withoutPhone }) as never,
+      makeParams("website-assessment") as never,
+    );
+
+    expect(res.status).toBe(400);
+    expect(txMock.assessmentSubmission.create).not.toHaveBeenCalled();
+  });
+
+  it("accepts absent optional State and persists every configured value", async () => {
+    const res = await POST(
+      makeRequest({ ...VALID_BODY, publicTaker: FULL_PUBLIC_TAKER }) as never,
+      makeParams("website-assessment") as never,
+    );
+
+    expect(res.status).toBe(200);
+    expect(txMock.assessmentSubmission.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ publicTaker: FULL_PUBLIC_TAKER }),
+      }),
+    );
+    const reportEmail = jest.requireMock(
+      "@/lib/assessments/report-email",
+    ) as { buildRespondentReportFromSubmission: jest.Mock };
+    expect(reportEmail.buildRespondentReportFromSubmission).toHaveBeenCalled();
+    for (const call of reportEmail.buildRespondentReportFromSubmission.mock.calls) {
+      expect(call[0].publicTaker).toEqual(FULL_PUBLIC_TAKER);
+    }
+    for (const result of reportEmail.buildRespondentReportFromSubmission.mock.results) {
+      expect(result.value).toMatchObject({
+        respondentName: "Jane Doe",
+        respondentEmail: "jane@example.com",
+      });
+    }
+  });
+
+  it("uses templateAlias rather than the campaign URL alias", async () => {
+    (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValue({
+      ...CAMPAIGN,
+      template: {
+        ...CAMPAIGN.template,
+        alias: "sunhub-quick-quiz",
+      },
+    });
+
+    const res = await POST(
+      makeRequest({ ...VALID_BODY, publicTaker: FULL_PUBLIC_TAKER }) as never,
+      makeParams("website-assessment") as never,
+    );
+
+    expect(res.status).toBe(400);
+    expect(txMock.assessmentSubmission.create).not.toHaveBeenCalled();
   });
 });
 
@@ -1455,6 +1539,31 @@ describe("idempotency — duplicate idempotencyKey (P2002)", () => {
           ...IDEMPOTENT_BODY.publicTaker,
           email: "different@example.com",
         },
+      }) as never,
+      makeParams() as never,
+    );
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({
+      success: false,
+      error: "IDEMPOTENCY_KEY_REUSED",
+    });
+  });
+
+  it("returns 409 when a configured additive contact value changes", async () => {
+    (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValue({
+      ...CAMPAIGN,
+      template: { ...CAMPAIGN.template, alias: "scaling-up-quick" },
+    });
+    (db.assessmentSubmission.findFirst as jest.Mock).mockResolvedValue({
+      ...EXISTING_SUB,
+      publicTaker: FULL_PUBLIC_TAKER,
+    });
+
+    const res = await POST(
+      makeRequest({
+        ...IDEMPOTENT_BODY,
+        publicTaker: { ...FULL_PUBLIC_TAKER, phone: "+1 415 555 0199" },
       }) as never,
       makeParams() as never,
     );
