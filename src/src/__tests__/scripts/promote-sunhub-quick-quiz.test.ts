@@ -594,6 +594,11 @@ describe("promote SunHub quick quiz runner", () => {
     });
 
     expect(transaction).toHaveBeenCalledTimes(1);
+    expect(transaction.mock.calls[0][1]).toEqual({
+      isolationLevel: "Serializable",
+      maxWait: 10_000,
+      timeout: 30_000,
+    });
     expect(tx.assessmentCampaign.updateMany).toHaveBeenCalledTimes(1);
     expect(tx.assessmentCampaign.updateMany).toHaveBeenCalledWith({
       where: {
@@ -636,7 +641,11 @@ describe("promote SunHub quick quiz runner", () => {
     });
 
     expect(transaction).toHaveBeenCalledTimes(1);
-    expect(transaction.mock.calls[0][1]).toEqual({ isolationLevel: "Serializable" });
+    expect(transaction.mock.calls[0][1]).toEqual({
+      isolationLevel: "Serializable",
+      maxWait: 10_000,
+      timeout: 30_000,
+    });
     expect(tx.assessmentCampaign.findUnique).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: SOURCE_CAMPAIGN_ID },
     }));
