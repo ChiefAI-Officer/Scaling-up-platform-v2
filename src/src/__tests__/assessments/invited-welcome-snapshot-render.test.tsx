@@ -1,6 +1,6 @@
 import React from "react";
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { InvitedWelcomeCard } from "@/components/assessments/InvitedWelcomeCard";
+import { AssessmentWelcomeCard } from "@/components/assessments/AssessmentWelcomeCard";
 import type { InvitedWelcomeConfig } from "@/lib/assessments/invited-welcome-config";
 
 const config: InvitedWelcomeConfig = {
@@ -22,11 +22,11 @@ const questions = Array.from({ length: 8 }, () => ({
 }));
 const sections = [{ stableKey: "s1" }, { stableKey: "s2" }, { stableKey: "s3" }, { stableKey: "s4" }];
 
-describe("InvitedWelcomeCard", () => {
+describe("AssessmentWelcomeCard", () => {
   it("renders authored copy with system-derived facts, disclosure, arrow, and fine print", () => {
     const onStart = jest.fn();
     const { container } = render(
-      <InvitedWelcomeCard
+      <AssessmentWelcomeCard
         config={config}
         campaignName="Q3 Planning"
         questions={questions}

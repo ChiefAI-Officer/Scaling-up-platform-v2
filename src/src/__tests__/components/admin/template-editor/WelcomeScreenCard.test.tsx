@@ -84,7 +84,7 @@ describe("WelcomeScreenCard", () => {
     fireEvent.click(screen.getByRole("button", { name: "Expand Welcome screen" }));
 
     expect(screen.getByText(
-      "Changes become the default for future invited campaigns. Campaigns already created keep the Welcome screen they started with.",
+      "Public campaigns use these changes immediately. Future invited campaigns use them as their default; invited campaigns already created keep the Welcome screen they started with.",
     )).toBeInTheDocument();
     for (const label of [
       "Invitation label",
