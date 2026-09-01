@@ -50,43 +50,45 @@ Execution note: PR #414 merged as `83a18dc91d544661efa740186dcbb9bd1ef0397e`; Ve
 
 Run the existing CLI with the Production env file and the real operator identity. Save its complete source/target manifest and emitted quiesce command. Confirm source is ACTIVE, owns `sunhub-quick-quiz`, remains pinned to v1, target is published Active v7, and retired alias/successor are unoccupied.
 
-- [ ] **Step 2: Execute exactly the emitted quiesce command**
+- [x] **Step 2: Execute exactly the emitted quiesce command**
 
 Do not hand-edit host, timestamp, count, operator, or identifiers. The command must include `--quiesce`, `--i-know-this-is-prod`, exact host, exact source `updatedAt`, and exact submission count. Any drift aborts without mutation.
 
 Execution note: the first exact command failed before commit because the complete manifest reload exceeded Prisma's default 5-second interactive-transaction timeout. A fresh dry-run confirmed complete rollback: source remains ACTIVE with 15 submissions and unchanged `updatedAt`; no receipt or successor exists. The bounded-timeout TDD hotfix must deploy before retrying from another fresh operator-bearing dry-run.
 
-- [ ] **Step 3: Verify the quiescence receipt**
+- [x] **Step 3: Verify the quiescence receipt**
 
 Run a fresh dry-run. Confirm the source is CLOSED, still owns the public alias, historical counts are unchanged, and the `PUBLIC_CAMPAIGN_SUCCESSOR_QUIESCE` receipt exists. Record the exact quiesced timestamp.
 
 ### Task 3: Drain and atomically apply the successor
 
-- [ ] **Step 1: Wait at least 15 minutes from the durable quiesce time**
+- [x] **Step 1: Wait at least 15 minutes from the durable quiesce time**
 
 Do not use the local command start time. During the drain, the public quiz is intentionally closed; monitor only read-only health and state.
 
-- [ ] **Step 2: Run a fresh operator-bearing dry-run after the drain**
+- [x] **Step 2: Run a fresh operator-bearing dry-run after the drain**
 
 Use newly reported `updatedAt` and submission count. Confirm the drain is eligible and the CLI emits an apply command. If any invariant or count changed, stop and diagnose rather than reusing old values.
 
-- [ ] **Step 3: Execute exactly the emitted apply command**
+- [x] **Step 3: Execute exactly the emitted apply command**
 
 The transaction must rename/retire v1 and create the deterministic v7 successor under `sunhub-quick-quiz`. Do not mutate source `versionId`, submissions, participants, invitations, reports, delivery state, or import provenance.
 
 ### Task 4: Verify Production provenance and presentation
 
-- [ ] **Step 1: Verify complete manifests and idempotency**
+- [x] **Step 1: Verify complete manifests and idempotency**
 
 Run a post-apply dry-run. Confirm source v1 is retired under `sunhub-quick-quiz-retired-v1`, retains all historical relations, successor is ACTIVE at `sunhub-quick-quiz`, is pinned to v7, begins with zero inherited relations, and the promotion receipt matches the deterministic manifest. Re-running apply in inspection mode must report idempotent completion without writes.
 
-- [ ] **Step 2: Verify route and report inputs**
+- [x] **Step 2: Verify route and report inputs**
 
 Confirm `/quiz/sunhub-quick-quiz` returns HTTP 200 and resolves the successor. Verify v7's safe loaded `introductionHtml` and `conclusionHtml` are present at the supported individual browser/print report seam. Do not claim group/aggregate/email custom HTML support.
 
 - [ ] **Step 3: Verify health on exact and canonical deployments**
 
 Check HTTP 200, database `healthy`, and auth posture `safe` on the exact deployment and both canonical aliases.
+
+Execution note: Vercel's exact-commit deployment status succeeded for both release SHAs, and both canonical aliases are healthy/safe after apply. Exact deployment-host health remains unverified because the local Vercel credential cannot inspect the project or resolve the deployment hostname from its dashboard id.
 
 - [ ] **Step 4: Record the Production receipt**
 

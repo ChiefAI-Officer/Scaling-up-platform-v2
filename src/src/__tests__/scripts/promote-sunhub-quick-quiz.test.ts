@@ -1027,12 +1027,18 @@ describe("promote SunHub quick quiz CLI policy", () => {
     state.successor = persistedSuccessor(plan);
     state.retiredAliasOwnerId = SOURCE_CAMPAIGN_ID;
     state.promotionReceipts = [auditReceipt(plan)];
-    const { db, transaction } = runnerDb(state, value);
+    const { db, root, transaction } = runnerDb(state, value);
     const { dependencies, lines } = cliDependencies(db);
 
     await expect(runPromotionCli([], dependencies)).resolves.toEqual({ state: "complete" });
     expect(lines.join("\n")).toContain("promotion is complete");
     expect(lines.join("\n")).toContain(SUCCESSOR_CAMPAIGN_ID);
+    expect(root.assessmentCampaign.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: SUCCESSOR_CAMPAIGN_ID },
+        select: expect.objectContaining({ updatedAt: false }),
+      }),
+    );
     expect(transaction).not.toHaveBeenCalled();
   });
 
