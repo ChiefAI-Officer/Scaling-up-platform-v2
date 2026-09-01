@@ -83,7 +83,6 @@ export default async function PublicQuizPage({
 
   const welcomeConfig = resolvePublicWelcomeConfig(
     campaign.template.invitedWelcomeDefault,
-    campaign.template.alias,
   );
 
   const now = new Date();

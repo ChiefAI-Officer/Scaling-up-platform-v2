@@ -1,5 +1,14 @@
 # Public Welcome edited-template design
 
+> **Superseded on 2026-09-01.** New Jeff acceptance evidence showed that this
+> Option C baseline discriminator silently ignored a valid saved Welcome on the
+> eight-question assessment. The approved replacement is
+> [All Public Assessment Presentation Design](2026-09-01-all-public-presentation-design.md):
+> every schema-valid current Template Welcome value is authoritative for Public
+> Campaigns, including seed- and backfill-equivalent values. This file remains as
+> the historical decision record; its baseline-comparison behavior is no longer
+> current.
+
 **Origin:** GH #387 item 4 follow-up; Jeff's `JV New Assessment Testing` report
 **Fixed point:** `6f24ee6872f6b693700e279e602feaf1d2e8d5a6`
 
