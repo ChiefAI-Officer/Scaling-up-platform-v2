@@ -684,6 +684,19 @@ describe("PublicQuizClient — SectionPager wiring", () => {
     expect(
       screen.getByText("Campaign-specific public description."),
     ).toBeInTheDocument();
+    expect(screen.queryByText("You're invited")).not.toBeInTheDocument();
+    expect(screen.queryByText(/coach or facilitator/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/the team stands/i)).not.toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "You receive your results immediately. Authorized Scaling Up staff can review your full report; your referring coach can too, if you used their link.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Free to take — you'll get your results on screen and a copy by email.",
+      ),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Start the assessment →" }),
     ).toBeInTheDocument();

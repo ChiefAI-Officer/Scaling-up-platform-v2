@@ -19,7 +19,7 @@ import { isPublicMarketingCtaEnabled } from "@/lib/assessments/wave-public-marke
 import { loadPublicMarketingResultConfig } from "@/lib/assessments/public-marketing-result";
 import { resolveActiveReportHtml } from "@/lib/assessments/report-html";
 import { isReportHtmlExperienceEnabled } from "@/lib/assessments/wave-report-html-authoring-flags";
-import { invitedWelcomeConfigSchema } from "@/lib/assessments/invited-welcome-config";
+import { resolvePublicWelcomeConfig } from "@/lib/assessments/public-welcome-config";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -81,8 +81,9 @@ export default async function PublicQuizPage({
     notFound();
   }
 
-  const parsedWelcomeConfig = invitedWelcomeConfigSchema.safeParse(
+  const welcomeConfig = resolvePublicWelcomeConfig(
     campaign.template.invitedWelcomeDefault,
+    campaign.template.alias,
   );
 
   const now = new Date();
@@ -128,9 +129,7 @@ export default async function PublicQuizPage({
       questions={version.questions as unknown}
       customSlides={customSlides}
       marketingResultConfig={marketingResultConfig}
-      {...(parsedWelcomeConfig.success
-        ? { welcomeConfig: parsedWelcomeConfig.data }
-        : {})}
+      {...(welcomeConfig ? { welcomeConfig } : {})}
       {...(reportHtmlExperienceActive && reportHtml
         ? { reportHtmlExperienceActive: true, reportHtml }
         : {})}
