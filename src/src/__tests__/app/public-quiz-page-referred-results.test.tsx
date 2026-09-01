@@ -142,6 +142,37 @@ describe("PublicQuizPage referred-results disclosure boundary", () => {
     );
   });
 
+  it("keeps the public presentation for an unedited schema-v1 template backfill", async () => {
+    mockCampaignFindUnique.mockResolvedValue({
+      ...baseCampaign,
+      description: "Campaign-specific public description.",
+      template: {
+        ...baseCampaign.template,
+        invitedWelcomeDefault: {
+          schemaVersion: 1,
+          eyebrow: "You're invited",
+          headingTemplate: "{{campaignName}}",
+          ledeParagraphs: [
+            "A quick check on how your team works together. You can answer in one sitting or come back later — your link stays active.",
+          ],
+          sharingHeading: "How your answers are shared",
+          scoresHeading: "Your category scores",
+          scoresDescription: "See where the team stands across each category.",
+          ctaLabel: "Start the assessment",
+          finePrint: null,
+        },
+      },
+    });
+
+    const props = await renderPage();
+
+    expect(props).not.toHaveProperty("welcomeConfig");
+    expect(props).toHaveProperty(
+      "campaignDescription",
+      "Campaign-specific public description.",
+    );
+  });
+
   it("does not pass malformed persisted Welcome JSON to the public client", async () => {
     mockCampaignFindUnique.mockResolvedValue({
       ...baseCampaign,

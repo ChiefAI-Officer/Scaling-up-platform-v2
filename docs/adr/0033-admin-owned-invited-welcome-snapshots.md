@@ -53,11 +53,15 @@ to a non-null campaign snapshot. Invalid or absent template defaults resolve to
 the exact legacy alias copy when a campaign is created.
 
 `PUBLIC` campaigns remain a separate lifecycle. They do not write or read
-`invitedWelcomeSnapshot`; instead, the public route strictly parses and reads the
-current template-row Welcome default at request time. A template edit therefore
-updates existing public campaign links immediately. Missing or malformed JSON
-retains the standing public fallback. Question-bank facts (count, time, format,
-scale, and sections) remain derived from the campaign's pinned Template Version.
+`invitedWelcomeSnapshot`; instead, the public route strictly parses the current
+template-row Welcome default at request time and renders it only when it differs
+from the code-owned baseline for the related template alias. Schema-v1 backfills
+must normalize to schema v2 before canonical comparison because v1 lacks
+`sharingDescription`. A template edit therefore updates existing public campaign
+links immediately, while missing, malformed, or baseline-equivalent JSON retains
+the standing public fallback and Campaign description. Question-bank facts (count,
+time, format, scale, and sections) remain derived from the campaign's pinned
+Template Version.
 
 Report appearance is also assessment-owned in the coach workflow. With the
 coordinated flag active, coach creation and detail surfaces expose no report
@@ -74,8 +78,9 @@ snapshots and renderers are not rewritten.
   Template Version publication.
 - Two campaigns created around an admin save may intentionally display different
   invited Welcome copy; each invited snapshot remains stable for its lifetime.
-- Existing public campaigns intentionally reflect the current template Welcome
-  copy without repinning or recreating the campaign.
+- Existing public campaigns intentionally reflect edited current template Welcome
+  copy without repinning or recreating the campaign; untouched templates retain the
+  anonymous public presentation.
 - Campaign create and historical-import paths must all resolve and persist the
   snapshot transactionally. Reuse paths must never mutate it.
 - Invited presentation rollback or kill restores its legacy presentation and coach

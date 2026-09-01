@@ -6,6 +6,17 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="public-welcome-unedited-baseline-corrected"></a>
+### 2026-09-01 — Unedited Public Welcome baseline restored <!-- ENTRY_ISO:2026-09-01 ENTRY_SLUG:public-welcome-unedited-baseline-corrected -->
+
+**Status: IMPLEMENTED LOCALLY; NOT MERGED OR DEPLOYED.** GH #387 S2 follow-up applies approved Option C to PR #411: edited template Welcome copy still renders immediately on existing PUBLIC links, while untouched template defaults return to the standing anonymous public presentation. The historical backfill populated every template with schema-v1 invited defaults, so valid/missing alone could not distinguish authored content; a new resolver strictly normalizes v1 to v2 and canonically compares it with the code baseline for the Campaign's related template alias.
+
+**Boundary.** Baseline-equivalent, absent, or malformed defaults pass no authored override, restoring Campaign descriptions, the public disclosure, public score language, CTA, and fine print without invited wording. A single authored field difference returns the full normalized configuration; authored lede paragraphs intentionally shadow Campaign description. INVITED campaigns continue reading immutable `invitedWelcomeSnapshot` under ADR-0033. No contact form, `org-survey` route, snapshot, schema, migration, flag, environment value, Production datum, campaign, submission, invitation, report, email, or admin field changed. The residual invited-flavoured wording on an explicitly edited Public template and the need for a separate Public Welcome configuration remain reported, not built.
+
+**TDD and verification receipt.** The required resolver RED failed before the module existed. The page-level RED then proved a schema-v1 untouched backfill was normalized and passed as authored invited copy. Focused GREEN passes **5 suites / 44 tests**, covering v1/v2 generic and alias-specific baselines, single-field edits, malformed inputs, public copy/Campaign-description restoration, edited-copy retention, the unchanged invited snapshot boundary, and SoT freshness. The clean fixed-point baseline reached **806/807 suites and 10,076/10,077 tests** with only the established five-second landscape-PDF timeout; that unchanged suite passed **3/3** immediately in isolation. The complete post-change repository run passed **808/808 suites, 10,089/10,089 tests, and 16/16 snapshots**. Exact changed-file ESLint emitted no diagnostics, migration safety approved all **51 migrations**, and diff hygiene passed. The required unchanged `CI=true npm run build` generated Prisma Client, found no pending migrations, compiled successfully with Turbopack, passed production TypeScript, and generated **95/95 pages**. Fixed-point review remains pending.
+
+---
+
 <a id="public-welcome-live-template-wiring-implemented"></a>
 ### 2026-09-01 — Public Welcome live-template wiring implemented <!-- ENTRY_ISO:2026-09-01 ENTRY_SLUG:public-welcome-live-template-wiring-implemented -->
 
