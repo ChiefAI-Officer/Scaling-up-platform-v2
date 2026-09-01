@@ -6,6 +6,15 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="sunhub-successor-durable-verifier"></a>
+### 2026-09-02 — SunHub successor durable completion verifier <!-- ENTRY_ISO:2026-09-02 ENTRY_SLUG:sunhub-successor-durable-verifier -->
+
+**Status: IMPLEMENTED AND LIVE-STATE-VERIFIED LOCALLY; NO PRODUCTION WRITE.** PR #416 (`615602a05d4464a7ce9086fafb0c3c5449e91d22`) correctly removed database-generated `updatedAt` from completion comparison and launched successfully. Minutes after the initially clean zero-history inspection, the normal ACTIVE-campaign workflow populated successor `inviteSendStartedAt` and `invitesSentAt` despite zero participants and zero invitations. The durable Campaign identity, v7 pin, retired v1, unique promotion receipt, all 15 historical v1 submissions, and zero successor participants/invitations/submissions/reports remained exact, but the verifier still rejected the workflow-owned timestamp drift.
+
+**Correction and evidence.** Apply creation continues to omit all delivery telemetry, so no v1 state can be copied. Completion inspection now also omits `inviteSendStartedAt`, `inviteSendHeartbeatAt`, and `invitesSentAt`, which may legitimately advance after activation; all receipt-bound allow-listed fields, source history, successor identity/version/alias/status, default invitation content, and zero inherited relation counts remain strict. TDD first failed the exact select contract and a durable post-workflow completion case, then the complete operation suite passed **75/75 tests** and the operation plus changelog gates passed **79/79**. Changed-file ESLint, all **51** migration checks, diff hygiene, and the 4 GB-heap `CI=true npm run build` with **95/95 pages** pass. A live read-only manifest against the post-workflow Production state reports the exact promotion complete. No Campaign, submission, invitation, receipt, report, schema, migration, flag, environment value, or other Production datum changed.
+
+---
+
 <a id="sunhub-v7-successor-cutover-live"></a>
 ### 2026-09-02 — SunHub v7 successor cutover live <!-- ENTRY_ISO:2026-09-02 ENTRY_SLUG:sunhub-v7-successor-cutover-live -->
 

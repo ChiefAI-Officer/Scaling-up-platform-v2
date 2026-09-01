@@ -455,9 +455,19 @@ function persistedSuccessor(plan: ReturnType<typeof buildPromotionPlan>) {
 }
 
 function runnerDb(state: RunnerState, value: PromotionInput = input()) {
-  const findCampaign = async (args: { where: { id?: string; alias?: string } }) => {
+  const findCampaign = async (args: {
+    where: { id?: string; alias?: string };
+    select?: Record<string, unknown>;
+  }) => {
     if (args.where.id === SOURCE_CAMPAIGN_ID) return state.source;
-    if (args.where.id === "item7-sunhub-quick-quiz-v7-successor") return state.successor;
+    if (args.where.id === "item7-sunhub-quick-quiz-v7-successor") {
+      if (!state.successor) return null;
+      const selected = { ...state.successor };
+      for (const [field, include] of Object.entries(args.select ?? {})) {
+        if (include === false) delete selected[field];
+      }
+      return selected;
+    }
     if (args.where.alias === RETIRED_ALIAS) {
       return state.retiredAliasOwnerId ? { id: state.retiredAliasOwnerId } : null;
     }
@@ -1036,10 +1046,36 @@ describe("promote SunHub quick quiz CLI policy", () => {
     expect(root.assessmentCampaign.findUnique).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: SUCCESSOR_CAMPAIGN_ID },
-        select: expect.objectContaining({ updatedAt: false }),
+        select: expect.objectContaining({
+          updatedAt: false,
+          inviteSendStartedAt: false,
+          inviteSendHeartbeatAt: false,
+          invitesSentAt: false,
+        }),
       }),
     );
     expect(transaction).not.toHaveBeenCalled();
+  });
+
+  it("keeps completion durable after workflow-owned delivery timestamps advance", async () => {
+    const value = applyInput();
+    const plan = buildPromotionPlan(value);
+    const state = runnerState(value);
+    state.source = { ...state.source, alias: RETIRED_ALIAS, status: "CLOSED" };
+    state.successor = {
+      ...persistedSuccessor(plan),
+      inviteSendStartedAt: DRAINED_AT,
+      inviteSendHeartbeatAt: DRAINED_AT,
+      invitesSentAt: DRAINED_AT,
+    };
+    state.retiredAliasOwnerId = SOURCE_CAMPAIGN_ID;
+    state.promotionReceipts = [auditReceipt(plan)];
+    const { db } = runnerDb(state, value);
+    const loaded = await loadPromotionInput(db, { args: parsePromotionArgs([]) });
+
+    await expect(inspectCompletedPromotion(db, loaded)).resolves.toEqual({
+      status: "complete",
+    });
   });
 
   it.each([

@@ -41,9 +41,6 @@ type SuccessorCampaignRow = SuccessorCampaignFields & {
   invitationSubject: string | null;
   invitationBodyMarkdown: string | null;
   invitationBodyHtml: string | null;
-  inviteSendStartedAt: Date | string | null;
-  inviteSendHeartbeatAt: Date | string | null;
-  invitesSentAt: Date | string | null;
   importManifest: unknown;
   deletedAt: Date | string | null;
   _count: {
@@ -175,10 +172,11 @@ const successorSelect = {
   updatedAt: false,
   organizationId: true,
   externalId: true,
-  inviteSendStartedAt: true,
   inviteTiming: true,
-  inviteSendHeartbeatAt: true,
-  invitesSentAt: true,
+  // Workflow-owned telemetry may advance after the zero-history successor is created.
+  inviteSendStartedAt: false,
+  inviteSendHeartbeatAt: false,
+  invitesSentAt: false,
   importManifest: true,
   _count: {
     select: {
@@ -402,9 +400,6 @@ function expectedSuccessor(plan: PromotionPlan): SuccessorCampaignRow {
     invitationSubject: null,
     invitationBodyMarkdown: null,
     invitationBodyHtml: null,
-    inviteSendStartedAt: null,
-    inviteSendHeartbeatAt: null,
-    invitesSentAt: null,
     importManifest: null,
     deletedAt: null,
     _count: {

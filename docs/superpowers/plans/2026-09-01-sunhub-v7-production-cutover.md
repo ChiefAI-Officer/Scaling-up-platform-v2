@@ -80,6 +80,8 @@ The transaction must rename/retire v1 and create the deterministic v7 successor 
 
 Run a post-apply dry-run. Confirm source v1 is retired under `sunhub-quick-quiz-retired-v1`, retains all historical relations, successor is ACTIVE at `sunhub-quick-quiz`, is pinned to v7, begins with zero inherited relations, and the promotion receipt matches the deterministic manifest. Re-running apply in inspection mode must report idempotent completion without writes.
 
+Execution note: immediate inspection and apply-mode replay passed. After activation, normal workflow telemetry populated `inviteSendStartedAt` and `invitesSentAt` with zero participants/invitations; the durable verifier now excludes only those workflow-owned timestamps and `updatedAt`, while retaining the receipt, field, identity, history, and zero-relation invariants. The post-workflow live read-only manifest again reports complete.
+
 - [x] **Step 2: Verify route and report inputs**
 
 Confirm `/quiz/sunhub-quick-quiz` returns HTTP 200 and resolves the successor. Verify v7's safe loaded `introductionHtml` and `conclusionHtml` are present at the supported individual browser/print report seam. Do not claim group/aggregate/email custom HTML support.
