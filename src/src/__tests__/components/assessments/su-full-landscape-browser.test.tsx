@@ -19,6 +19,7 @@ import {
   completeSuFullLandscapeReport,
   restoredScalingUpFullCtaReport,
 } from "@/__tests__/fixtures/su-full-landscape";
+import { ROCKEFELLER_BOOK_OFFER_REPORT_HTML } from "@/__tests__/fixtures/report-html";
 import {
   SU_FULL_PHASE_PEER_CONTENT_HASHES,
   SU_FULL_PHASE_PEER_SOURCE_ID,
@@ -106,8 +107,8 @@ type SemanticAuditPosition = "introduction" | "conclusion";
 
 const TALL_PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAA+gCAIAAAC0f+F8AAAALUlEQVR42u3DAQ0AAAgDoM8uFrKSxQ0ibGR6K4mqqqqqqqqqqqqqqqqqqqq/H9OeIDkSuu58AAAAAElFTkSuQmCC";
 const SEMANTIC_AUDIT_LIMITS = {
-  introduction: { elements: 64, text: 2_200, rows: 8, columns: 4, cells: 24, headings: 4, breaks: 8, lines: 32 },
-  conclusion: { elements: 36, text: 900, rows: 6, columns: 3, cells: 12, headings: 2, breaks: 4, lines: 24 },
+  introduction: { elements: 64, text: 2_200, rows: 8, columns: 4, cells: 24, headings: 4, breaks: 8, lines: 200 },
+  conclusion: { elements: 36, text: 900, rows: 6, columns: 3, cells: 12, headings: 2, breaks: 4, lines: 200 },
 } as const;
 
 function auditTextChunks(
@@ -149,18 +150,18 @@ function headingAuditHtml(tag: string, weight: number, position: SemanticAuditPo
 }
 
 function listAuditHtml(tag: "ul" | "ol", position: SemanticAuditPosition): string {
-  const { lines, text } = SEMANTIC_AUDIT_LIMITS[position];
-  const items = Math.floor((lines - 1) / 2);
-  const textLines = lines - 1 - items;
+  const { elements, lines, text } = SEMANTIC_AUDIT_LIMITS[position];
+  const items = Math.min(elements - 1, Math.floor((lines - 1) / 2));
+  const textLines = Math.max(0, lines - 1 - items);
   return `<${tag}>${auditTextChunks(position, items, Math.min(textLines * 100, text))
     .map((text) => `<li>${text}</li>`)
     .join("")}</${tag}>`;
 }
 
 function descriptionListAuditHtml(position: SemanticAuditPosition): string {
-  const { lines, text } = SEMANTIC_AUDIT_LIMITS[position];
-  const items = Math.floor((lines - 1) / 2);
-  const textLines = lines - 1 - items;
+  const { elements, lines, text } = SEMANTIC_AUDIT_LIMITS[position];
+  const items = Math.min(elements - 1, Math.floor((lines - 1) / 2));
+  const textLines = Math.max(0, lines - 1 - items);
   return `<dl>${auditTextChunks(position, items, Math.min(textLines * 100, text))
     .map((text, index) => index % 2 === 0 ? `<dt>${text}</dt>` : `<dd>${text}</dd>`)
     .join("")}</dl>`;
@@ -214,7 +215,7 @@ const SEMANTIC_ACCEPTED_CAP_CASES = [
     ["section", 1], ["article", 1], ["header", 1], ["main", 1], ["aside", 1], ["div", 1], ["p", 2], ["blockquote", 3], ["figure", 3],
   ].map(([tag, weight]) => ({ id: `weighted-${tag}`, tags: [tag as string], html: (position: SemanticAuditPosition) => weightedAuditTag(tag as string, weight as number, position) })),
   { id: "break-cap", tags: ["br"], html: (position: SemanticAuditPosition) => `${"x".repeat(SEMANTIC_AUDIT_LIMITS[position].text)}${"<br>".repeat(SEMANTIC_AUDIT_LIMITS[position].breaks)}` },
-  { id: "rule-budget", tags: ["hr"], html: (position: SemanticAuditPosition) => "<hr>".repeat(SEMANTIC_AUDIT_LIMITS[position].lines / 2) },
+  { id: "rule-budget", tags: ["hr"], html: (position: SemanticAuditPosition) => "<hr>".repeat(Math.min(SEMANTIC_AUDIT_LIMITS[position].elements, SEMANTIC_AUDIT_LIMITS[position].lines / 2)) },
   ...[["h1", 5], ["h2", 4], ["h3", 3], ["h4", 3], ["h5", 3], ["h6", 3]]
     .map(([tag, weight]) => ({ id: `heading-${tag}`, tags: [tag as string], html: (position: SemanticAuditPosition) => headingAuditHtml(tag as string, weight as number, position) })),
   { id: "unordered-list", tags: ["ul", "li"], html: (position: SemanticAuditPosition) => listAuditHtml("ul", position) },
@@ -234,7 +235,12 @@ const SEMANTIC_REJECTED_CASES = [
   { id: "maximum-closing-figcaptions", position: "conclusion", html: "<figcaption>x</figcaption>".repeat(36), issue: /figure caption/i },
   { id: "maximum-table-cells", position: "introduction", html: `<table><tbody>${Array.from({ length: 8 }, (_, rowIndex) => `<tr>${"<td>x</td>".repeat(rowIndex === 0 ? 47 : 1)}</tr>`).join("")}</tbody></table>`, issue: /table columns/i },
   { id: "maximum-table-captions", position: "introduction", html: `<table>${"<caption>x</caption>".repeat(63)}</table>`, issue: /table caption/i },
-  { id: "closing-over-expanded-line-budget", position: "conclusion", html: "<div></div>".repeat(25), issue: /estimated lines/i },
+  {
+    id: "welcome-over-expanded-line-budget",
+    position: "introduction",
+    html: `${"<blockquote></blockquote>".repeat(58)}${"<h1></h1>".repeat(4)}<img src="https://cdn.scalingup.com/report.png" alt="Report"><div></div>`,
+    issue: /estimated lines/i,
+  },
   { id: "table-direct-td", position: "introduction", html: `<table>${"<td>x</td>".repeat(24)}</table>`, issue: /valid table structure/i },
   { id: "table-direct-th", position: "introduction", html: `<table>${"<th>x</th>".repeat(24)}</table>`, issue: /valid table structure/i },
   { id: "thead-without-tr", position: "introduction", html: "<table><thead><th>x</th></thead></table>", issue: /valid table structure/i },
@@ -743,6 +749,48 @@ describe("SU Full landscape browser and PDF contract", () => {
     },
   );
 
+  it("renders the Rockefeller book offer in both authored landscape positions without overlapping later pages", async () => {
+    const prepared = prepareReportHtmlForStorage({
+      reportHtml: {
+        schemaVersion: 1,
+        introductionHtml: ROCKEFELLER_BOOK_OFFER_REPORT_HTML,
+        conclusionHtml: ROCKEFELLER_BOOK_OFFER_REPORT_HTML,
+      },
+    });
+    if (!prepared.ok) throw new Error(prepared.issues.map((issue) => issue.message).join(" "));
+    const source = reportForPhase(4);
+    const report = {
+      ...source,
+      reportHtml: (prepared.reportConfig as { reportHtml: typeof source.reportHtml }).reportHtml,
+    };
+    const { html } = routeMarkup(report);
+    const directory = mkdtempSync(join(tmpdir(), "rockefeller-report-html-"));
+    const pdfPath = join(directory, "rockefeller-report-html.pdf");
+    const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+    try {
+      await load(page, html);
+      await expect(page.locator("[data-page-number='2'] [data-testid='report-html-introduction']").innerText()).resolves.toContain("Conclusion");
+      expect((await page.locator("[data-page-number='24']").innerText()).toLowerCase()).toContain("in conclusion");
+      await expect(page.locator("[data-page-number='25'] [data-testid='report-html-conclusion']").innerText()).resolves.toContain("Order your own personal copy");
+      expect((await page.locator("[data-page-number='26']").innerText()).toLowerCase()).toContain("appendix a");
+      await page.emulateMedia({ media: "print" });
+      expect(await authoredContentOutsidePhysicalPage(page)).toEqual([]);
+      await page.pdf({
+        path: pdfPath,
+        format: "A4",
+        landscape: true,
+        preferCSSPageSize: true,
+        printBackground: true,
+      });
+      const pdfText = normalize(execFileSync("pdftotext", [pdfPath, "-"], { encoding: "utf8" }));
+      expect(pdfText).toContain("Order your own personal copy");
+      expect(pdfText).toContain("Appendix A: chapter comparisons");
+    } finally {
+      await page.close();
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it("restores the approved Scaling Up Full CTA hierarchy and button treatment", async () => {
     const { html } = routeMarkup(restoredScalingUpFullCtaReport());
     const page = await browser.newPage({ viewport: { width: 1123, height: 794 } });
@@ -1202,7 +1250,9 @@ describe("SU Full landscape browser and PDF contract", () => {
       ? SU_FULL_GOVERNED_PEER_DISCLOSURE
       : SU_FULL_LEGACY_PEER_DISCLOSURE;
     const report = reportWithAuthoringCase(fixture);
-    const expectedPageCount = report.reportHtml?.introductionHtml ? 25 : 24;
+    const expectedPageCount = 24
+      + Number(Boolean(report.reportHtml?.introductionHtml))
+      + Number(Boolean(report.reportHtml?.conclusionHtml));
     if (fixture.authoringCase === "adversarial") {
       for (const storedHtml of [
         report.reportHtml?.introductionHtml,
@@ -1293,7 +1343,10 @@ describe("SU Full landscape browser and PDF contract", () => {
       await page.setViewportSize({ width: 1280, height: 720 });
       await page.emulateMedia({ media: "print" });
       expect(await authoredContentOutsidePhysicalPage(page)).toEqual([]);
-      const conclusionPage = page.locator(`[data-page-number='${expectedPageCount - 1}']`);
+      const conclusionPageNumber = expectedPageCount
+        - 1
+        - Number(Boolean(report.reportHtml?.conclusionHtml));
+      const conclusionPage = page.locator(`[data-page-number='${conclusionPageNumber}']`);
       await expect(conclusionPage.innerText()).resolves.toContain("55 / 100");
       await expect(conclusionPage.innerText()).resolves.toContain("You scored highest on");
       await expect(conclusionPage.innerText()).resolves.toContain("and lowest on");
@@ -1306,7 +1359,12 @@ describe("SU Full landscape browser and PDF contract", () => {
         printBackground: true,
       });
       const pdfinfo = execFileSync("pdfinfo", [pdfPath], { encoding: "utf8" });
-      expect(pdfinfo).toMatch(new RegExp(`^Pages:\\s+${expectedPageCount}$`, "m"));
+      const physicalPageCount = Number(pdfinfo.match(/^Pages:\s+(\d+)$/m)?.[1]);
+      if (fixture.authoringCase === "table-max") {
+        expect(physicalPageCount).toBeGreaterThan(expectedPageCount);
+      } else {
+        expect(physicalPageCount).toBe(expectedPageCount);
+      }
       const pdfText = normalize(execFileSync("pdftotext", [pdfPath, "-"], { encoding: "utf8", maxBuffer: 20 * 1024 * 1024 }));
       expect(pdfText).toContain(provenance);
       expect(pdfText).toContain(disclosure);
@@ -1331,7 +1389,9 @@ describe("SU Full landscape browser and PDF contract", () => {
     }
 
     const { html } = routeMarkup(prepared);
-    const expectedPageCount = prepared.reportHtml?.introductionHtml ? 25 : 24;
+    const expectedPageCount = 24
+      + Number(Boolean(prepared.reportHtml?.introductionHtml))
+      + Number(Boolean(prepared.reportHtml?.conclusionHtml));
     const directory = mkdtempSync(join(tmpdir(), "report-html-semantic-escape-"));
     const pdfPath = join(directory, `${fixture.id}-${fixture.peerReference}.pdf`);
     const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });

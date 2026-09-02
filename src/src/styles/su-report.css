@@ -3766,6 +3766,12 @@
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page { break-before: page; page-break-before: always; break-after: page; page-break-after: always; break-inside: avoid; page-break-inside: avoid; width: 297mm; min-height: 210mm; height: 210mm; margin: 0; box-shadow: none; }
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page:first-child { break-before: auto; page-break-before: auto; }
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-page:last-child { break-after: auto; page-break-after: auto; }
+  .su-public-brand.su-report.su-full-landscape .su-full-landscape-page--authored {
+    height: auto;
+    min-height: 210mm;
+    break-inside: auto;
+    page-break-inside: auto;
+  }
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-detail { break-inside: avoid; page-break-inside: avoid; }
   .su-public-brand.su-report.su-full-landscape .su-full-landscape-conclusion-layout {
     position: relative;
