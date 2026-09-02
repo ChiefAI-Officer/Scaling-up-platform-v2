@@ -6,6 +6,17 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="five-dysfunctions-group-report-entry-implemented"></a>
+### 2026-09-02 — Five Dysfunctions group report entry implemented <!-- ENTRY_ISO:2026-09-02 ENTRY_SLUG:five-dysfunctions-group-report-entry-implemented -->
+
+**Status: IMPLEMENTED AND END-TO-END VERIFIED LOCALLY; NOT MERGED, DEPLOYED, OR ENABLED IN PRODUCTION.** GH #427 adds `five-dysfunctions` to the existing group-report allowlist and gives it an independent default-OFF `WAVE_5D_GROUP_REPORT_{ENABLED,CANARY,KILL}` rollout set. The canary matches exact Campaign ids only, the kill switch wins over both enabled and canary state, and the existing production-enabled Wave F flag cannot activate Five Dysfunctions. Coaches receive the existing plain **View group report** button; Five Dysfunctions remains outside the Summary Reports registry and therefore does not receive the Scaling Up Full dropdown, persistence, or composition wizard. The Admin Campaign Detail entry remains absent, and individual Five Dysfunctions reports, scored rendering, schemas, migrations, and existing campaign data remain unchanged.
+
+**Acceptance and data receipt.** With the dedicated enabled flag set in a local build connected to the existing Production data, Coach Campaign `cmtagcg310015t7d5anhl77us` showed the plain button and opened `/assessments/cmtagcg310015t7d5anhl77us/report` in a new tab. The rendered report showed real CEO, Team, and Dev values for Trust, Conflict, Commitment, Accountability, and Results, plus the per-question CEO-vs-team block. Removing the flag hid the button; setting `WAVE_5D_GROUP_REPORT_KILL=1` hid the button and made the report route unavailable even with enabled set. The corresponding Admin page remained unchanged. Required test data was created as the idempotent synthetic Production-linked Campaign `cmtk5xnel0008gy3h5xdiej0w`, with three submitted respondents (one CEO and two team members); its id and purpose are recorded on GH #427. No rollout environment variable was written or changed.
+
+**Verification and rollout.** The focused regression matrix passes **3 suites / 93 tests**; changed-file ESLint, diff hygiene, all **51** migration-safety checks, Prisma deployment state, the Turbopack production build, TypeScript, and **95/95 pages** pass. The full repository run reached **806/808 suites, 10,102/10,104 tests, and 16/16 snapshots**; both failures were unchanged SU Full landscape/PDF timeout tests outside this diff, and the 60-second browser contract passed immediately in isolation while the pre-existing 5-second PDF capture took 7.1 seconds. After merge, enable with encrypted `WAVE_5D_GROUP_REPORT_ENABLED=1` on Vercel project `prj_xcAWuAmGZAU3DCHgAauRv2WPKneo` and redeploy. Roll back with encrypted `WAVE_5D_GROUP_REPORT_KILL=1` plus redeploy; removing the enabled flag also restores the dark state.
+
+---
+
 <a id="public-result-summary-deduplication"></a>
 ### 2026-09-02 — Public result summary deduplication <!-- ENTRY_ISO:2026-09-02 ENTRY_SLUG:public-result-summary-deduplication -->
 
