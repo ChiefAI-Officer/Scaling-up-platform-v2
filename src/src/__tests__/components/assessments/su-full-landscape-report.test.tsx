@@ -150,7 +150,7 @@ test("renders the five source-text chapter narratives without unavailable person
   expect(screen.queryByText(/partner\(s\)/i)).not.toBeInTheDocument();
 });
 
-test("renders the authored 25-page landscape composition without rejected pages", () => {
+test("renders the authored 26-page landscape composition without rejected pages", () => {
   const report = restoredScalingUpFullCtaReport();
   const presentation = completeSuFullLandscapePresentation(report);
   const model = buildSuFullLandscapeReportModel({ report, presentation, resolvedStyle: "CLASSIC" });
@@ -169,9 +169,9 @@ test("renders the authored 25-page landscape composition without rejected pages"
   );
 
   const pages = screen.getAllByTestId(/^su-full-landscape-page-/);
-  expect(pages).toHaveLength(25);
+  expect(pages).toHaveLength(26);
   expect(pages.map((page) => page.dataset.pageNumber)).toEqual(
-    Array.from({ length: 25 }, (_, index) => String(index + 1)),
+    Array.from({ length: 26 }, (_, index) => String(index + 1)),
   );
   expect(screen.queryByRole("heading", { name: "Welcome" })).not.toBeInTheDocument();
   expect(screen.queryByRole("heading", { name: "Peers and comparisons" })).not.toBeInTheDocument();
@@ -180,7 +180,7 @@ test("renders the authored 25-page landscape composition without rejected pages"
     expect(screen.getByTestId(`su-full-landscape-page-${number}`))
       .toHaveTextContent("Score of Peers");
   }
-  const appendix = screen.getByTestId("su-full-landscape-page-25");
+  const appendix = screen.getByTestId("su-full-landscape-page-26");
   expect(appendix.querySelectorAll("polyline")).toHaveLength(5);
   expect(appendix.querySelectorAll(".su-full-landscape-chart-row")).toHaveLength(61);
   for (const question of model.chapters.flatMap((chapter) => chapter.questions)) {
@@ -196,8 +196,8 @@ test("renders the authored 25-page landscape composition without rejected pages"
   );
   expect(cover).toHaveTextContent("Report for: Ari Founder · CEO");
   expect(cover).toHaveTextContent("Acme · 17 August 2026");
-  expect(screen.getAllByTestId("coach-name")).toHaveLength(26);
-  expect(screen.getAllByTestId("coach-logo")).toHaveLength(26);
+  expect(screen.getAllByTestId("coach-name")).toHaveLength(27);
+  expect(screen.getAllByTestId("coach-logo")).toHaveLength(27);
   const contents = screen.getByRole("region", { name: "Table of contents" });
   const pageNumberFor = (
     predicate: (page: (typeof model.pages)[number]) => boolean,
@@ -269,7 +269,8 @@ test("renders the authored 25-page landscape composition without rejected pages"
   expect(new Set(chartTitleIds).size).toBe(chartTitleIds.length);
   expect(screen.getByTestId("su-full-landscape-page-6")).toHaveClass("su-full-landscape-page--chapter");
   expect(screen.getByTestId("su-full-landscape-page-7")).toHaveClass("su-full-landscape-page--detail");
-  expect(screen.getByTestId("su-full-landscape-page-25")).toHaveClass("su-full-landscape-page--appendix");
+  expect(screen.getByTestId("su-full-landscape-page-25")).toHaveClass("su-full-landscape-page--authored");
+  expect(screen.getByTestId("su-full-landscape-page-26")).toHaveClass("su-full-landscape-page--appendix");
   expect(screen.getAllByTestId(/^su-full-landscape-detail-Q/)).toHaveLength(61);
   expect(screen.getByTestId("su-full-landscape-detail-Q01").querySelector(
     ".su-full-landscape-feedback",
@@ -329,7 +330,7 @@ test("renders the authored 25-page landscape composition without rejected pages"
   expect(screen.getByTestId("su-full-landscape-page-24")).toHaveTextContent("55 / 100");
   expect(screen.getByRole("link", { name: "Request a complimentary follow-up" }))
     .toHaveAttribute("href", "https://coaches.scalingup.com/coach-match-after-assessment-form");
-  expect(screen.getByTestId("su-full-landscape-page-24")).toHaveTextContent("Next step");
+  expect(screen.getByTestId("su-full-landscape-page-25")).toHaveTextContent("Next step");
   expect(document.body.textContent).not.toMatch(/TCPDF/i);
 });
 
@@ -345,7 +346,7 @@ test("falls back to the frozen referring coach email when no explicit contact is
     .toHaveAttribute("href", "mailto:referrer@example.com");
 });
 
-test("preserves the authored preface and respondent summary before a custom closing message", () => {
+test("preserves the authored preface and gives the custom closing its own page after the respondent summary", () => {
   const report = {
     ...completeSuFullLandscapeReport(),
     reportHtml: {
@@ -370,9 +371,13 @@ test("preserves the authored preface and respondent summary before a custom clos
   expect(page24).toHaveTextContent("55 / 100");
   expect(page24).toHaveTextContent("You scored highest on");
   expect(page24).toHaveTextContent("and lowest on");
-  expect(page24).toHaveTextContent("Custom closing message");
+  expect(page24).not.toHaveTextContent("Custom closing message");
   expect(page24).not.toHaveTextContent("Choose one priority from the feedback");
-  expect(screen.getAllByTestId(/^su-full-landscape-page-/)).toHaveLength(25);
+  const closingPage = screen.getByTestId("su-full-landscape-page-25");
+  expect(closingPage).toHaveTextContent("Custom closing message");
+  expect(closingPage).toHaveClass("su-full-landscape-page--authored");
+  expect(screen.getByTestId("su-full-landscape-page-26")).toHaveTextContent("Appendix A");
+  expect(screen.getAllByTestId(/^su-full-landscape-page-/)).toHaveLength(26);
 });
 
 test("populates the Conclusion from permitted results before the unchanged authored CTA", () => {
@@ -404,14 +409,15 @@ test("populates the Conclusion from permitted results before the unchanged autho
   expect(narrative).toHaveTextContent(
     "Hopefully this report will give you sufficient insight into how and where you and your organization can improve. Good luck and we hope to see you again for another Scaling Up Assessment in the future!",
   );
-  const authoredCta = within(conclusion).getByLabelText("Scaling Up Full next steps");
+  const authoredClosingPage = screen.getByTestId("su-full-landscape-page-25");
+  const authoredCta = within(authoredClosingPage).getByLabelText("Scaling Up Full next steps");
   expect(authoredCta).toBeInTheDocument();
   const expectedAuthoredCta = document.createElement("div");
   expectedAuthoredCta.innerHTML = report.reportHtml?.conclusionHtml ?? "";
   expect(screen.getByTestId("report-html-conclusion").innerHTML)
     .toBe(expectedAuthoredCta.innerHTML);
   const resultSummary = within(conclusion).getByLabelText("Scaling Up Full result summary");
-  expect(resultSummary.compareDocumentPosition(authoredCta) & Node.DOCUMENT_POSITION_FOLLOWING)
+  expect(resultSummary.compareDocumentPosition(authoredClosingPage) & Node.DOCUMENT_POSITION_FOLLOWING)
     .toBeTruthy();
   expect(within(conclusion).queryByText(/biggest challenge|percentile|industry comparison/i))
     .not.toBeInTheDocument();
@@ -488,7 +494,7 @@ test("keeps Classic cover fallbacks for duplicate campaign titles and email-only
   expect(cover).toHaveTextContent("Email: ARI@example.com");
 });
 
-test("keeps generated add-ons before the landscape conclusion without adding a page", () => {
+test("keeps generated add-ons on the conclusion before the dedicated authored closing page", () => {
   const report = {
     ...completeSuFullLandscapeReport(),
     reportHtml: {
@@ -516,7 +522,7 @@ test("keeps generated add-ons before the landscape conclusion without adding a p
     addon.compareDocumentPosition(conclusion) & Node.DOCUMENT_POSITION_FOLLOWING,
   ).toBeTruthy();
   expect(screen.queryByRole("heading", { name: "Welcome" })).not.toBeInTheDocument();
-  expect(screen.getAllByTestId(/^su-full-landscape-page-/)).toHaveLength(24);
+  expect(screen.getAllByTestId(/^su-full-landscape-page-/)).toHaveLength(25);
 });
 
 test("keeps the landscape renderer's A4 print and responsive screen contract scoped", () => {

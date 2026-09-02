@@ -57,7 +57,7 @@ describe("buildSuFullLandscapeReportModel", () => {
       ...report,
       reportHtml: {
         introductionHtml: '<section aria-label="Verne Harnish preface"><h2>Preface</h2></section>',
-        conclusionHtml: null,
+        conclusionHtml: '<section aria-label="Rockefeller closing"><h2>Closing</h2></section>',
       },
     };
     const authoredModel = buildSuFullLandscapeReportModel({
@@ -72,11 +72,16 @@ describe("buildSuFullLandscapeReportModel", () => {
     });
 
     expect(authoredModel).not.toBeNull();
-    expect(authoredModel!.pages).toHaveLength(25);
+    expect(authoredModel!.pages).toHaveLength(26);
     expect(authoredModel!.pages.map((page) => page.number)).toEqual(
-      Array.from({ length: 25 }, (_, index) => index + 1),
+      Array.from({ length: 26 }, (_, index) => index + 1),
     );
     expect(authoredModel!.pages.some((page) => page.kind === "preface")).toBe(true);
+    expect(authoredModel!.pages.slice(-3).map((page) => page.kind)).toEqual([
+      "conclusion",
+      "closing",
+      "appendix",
+    ]);
     expect(authoredModel!.pages.map((page) => page.kind)).not.toContain("peer-dashboard");
 
     expect(noPrefaceModel).not.toBeNull();
@@ -88,7 +93,7 @@ describe("buildSuFullLandscapeReportModel", () => {
     expect(detailKeys(authoredModel!)).toEqual(keys("Q01", "Q61"));
     expect(new Set(detailKeys(authoredModel!)).size).toBe(61);
     expect(chapterPageNumbers(authoredModel!)).toEqual([6, 10, 13, 18, 20]);
-    expect(authoredModel!.pages[24].kind).toBe("appendix");
+    expect(authoredModel!.pages[25].kind).toBe("appendix");
     expect(authoredModel!.peerProvenance).toEqual({
       sourceId: SU_FULL_PHASE_PEER_SOURCE_ID,
       contentHash: SU_FULL_PHASE_PEER_CONTENT_HASHES[4],

@@ -17,7 +17,7 @@ export function SuFullLandscapePage({
 }: {
   number: number;
   chapterKey?: SuFullLandscapeChapterKey;
-  variant?: "cover" | "chapter" | "detail" | "appendix";
+  variant?: "cover" | "chapter" | "detail" | "appendix" | "authored";
   footerBrand: SuFullLandscapeFooterBrand;
   children: ReactNode;
 }) {
