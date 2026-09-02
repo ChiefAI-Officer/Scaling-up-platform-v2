@@ -189,16 +189,14 @@ describe("null / undefined safety", () => {
   });
 });
 
-describe("isGroupReportAlias (allowlisted surfaces — LVA + SU-Full + QSP + Rockefeller)", () => {
-  it("allowlist is exactly the 4 types Jeff asked for (#72 / DT-5)", () => {
-    // LVA (Jeff 2026-06-18) + SU-Full (Wave J J-3) + QSP + Rockefeller (#72).
-    // Five Dysfunctions stays OUT — Jeff rejected the scored group report for
-    // it in 2026-06-18 ("over-showed, confused him").
+describe("isGroupReportAlias (allowlisted group-report surfaces)", () => {
+  it("allowlist includes the four existing types plus Five Dysfunctions", () => {
     expect(GROUP_REPORT_ALIASES).toEqual([
       "leadership-vision-alignment",
       "scaling-up-full",
       "qsp-v2",
       "RockHabits",
+      "five-dysfunctions",
     ]);
   });
 
@@ -215,6 +213,8 @@ describe("isGroupReportAlias (allowlisted surfaces — LVA + SU-Full + QSP + Roc
     delete process.env.WAVE_J_SUFULL_GROUP_CANARY;
     delete process.env.WAVE_QSP_ROCK_GROUP_REPORT_ENABLED;
     delete process.env.WAVE_QSP_ROCK_GROUP_REPORT_CANARY;
+    delete process.env.WAVE_5D_GROUP_REPORT_ENABLED;
+    delete process.env.WAVE_5D_GROUP_REPORT_CANARY;
     for (const alias of GROUP_REPORT_ALIASES) {
       const enabled = isGroupReportEnabled(null, {
         id: "camp-drift",
@@ -244,8 +244,8 @@ describe("isGroupReportAlias (allowlisted surfaces — LVA + SU-Full + QSP + Roc
     expect(isGroupReportAlias("RockHabits")).toBe(true);
   });
 
-  it("returns false for Five Dysfunctions (deliberately NOT surfaced — Jeff 2026-06-18)", () => {
-    expect(isGroupReportAlias("five-dysfunctions")).toBe(false);
+  it("returns true for Five Dysfunctions (Jeff 2026-09-01)", () => {
+    expect(isGroupReportAlias("five-dysfunctions")).toBe(true);
   });
 
   it("returns false for the retired QSP-v1 alias (only v2 is surfaced)", () => {
@@ -420,6 +420,52 @@ describe("QSP + Rockefeller group-report expansion flag (#72 / DT-5)", () => {
     process.env[DT5_GLOBAL] = "1";
     expect(isGroupReportEnabled(null, lva)).toBe(false); // WAVE_F still off
     expect(isGroupReportEnabled(null, suf)).toBe(false); // WAVE_J still off
+  });
+});
+
+// ─── #427: Five Dysfunctions independent flag (ships dark under WAVE_F-on) ───
+
+const FIVE_D_GLOBAL = "WAVE_5D_GROUP_REPORT_ENABLED";
+const FIVE_D_CANARY = "WAVE_5D_GROUP_REPORT_CANARY";
+const FIVE_D_KILL = "WAVE_5D_GROUP_REPORT_KILL";
+
+describe("Five Dysfunctions group-report flag (#427)", () => {
+  afterEach(() => {
+    delete process.env[FIVE_D_GLOBAL];
+    delete process.env[FIVE_D_CANARY];
+    delete process.env[FIVE_D_KILL];
+  });
+
+  const fiveD = {
+    id: "camp-5d",
+    createdByCoachId: "coach-5d",
+    organizationId: "org-5d",
+    template: { alias: "five-dysfunctions" },
+  };
+
+  it("is enabled by its own enabled flag", () => {
+    process.env[FIVE_D_GLOBAL] = "1";
+    expect(isGroupReportEnabled(null, fiveD)).toBe(true);
+  });
+
+  it("kill overrides both the enabled flag and a matching canary", () => {
+    process.env[FIVE_D_GLOBAL] = "1";
+    process.env[FIVE_D_CANARY] = "camp-5d";
+    process.env[FIVE_D_KILL] = "1";
+    expect(isGroupReportEnabled(null, fiveD)).toBe(false);
+  });
+
+  it("canary matches campaign id only, not coach or organization ids", () => {
+    process.env[FIVE_D_CANARY] = "camp-5d";
+    expect(isGroupReportEnabled({ coachId: "coach-5d" }, fiveD)).toBe(true);
+
+    process.env[FIVE_D_CANARY] = "coach-5d,org-5d";
+    expect(isGroupReportEnabled({ coachId: "coach-5d" }, fiveD)).toBe(false);
+  });
+
+  it("stays off with WAVE_F enabled when its own flags are unset", () => {
+    process.env[GLOBAL] = "1";
+    expect(isGroupReportEnabled(null, fiveD)).toBe(false);
   });
 });
 

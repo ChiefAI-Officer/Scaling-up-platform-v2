@@ -115,6 +115,8 @@ export default async function AdminCampaignDetailPage({ params }: PageProps) {
   const groupReportGate =
     campaignForFlag !== null &&
     campaignForFlag.accessMode === "INVITED" &&
+    // #427 is explicitly a coach-side entry point; keep the admin surface unchanged.
+    campaignForFlag.template?.alias !== "five-dysfunctions" &&
     isGroupReportAlias(campaignForFlag.template?.alias) &&
     // Publish guard, lock-step with the loader (R3-H1): a scored surface needs
     // a published version; qualitative (LVA/QSP) is never gated on publishedAt.
