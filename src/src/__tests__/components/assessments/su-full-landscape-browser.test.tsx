@@ -452,6 +452,33 @@ async function authoredClipping(page: Page) {
   ));
 }
 
+async function rockefellerOfferGeometry(page: Page) {
+  return page.locator('table[aria-label="Rockefeller Habits checklist conclusion"]')
+    .evaluateAll((tables) => tables.map((table) => {
+      const offerCell = table.querySelectorAll<HTMLTableCellElement>("td")[1];
+      const image = offerCell?.querySelector<HTMLImageElement>("img");
+      const copy = offerCell?.querySelector<HTMLParagraphElement>("p");
+      if (!offerCell || !image || !copy) throw new Error("Incomplete Rockefeller book offer");
+      return {
+        offerCellWidth: offerCell.getBoundingClientRect().width,
+        imageWidth: image.getBoundingClientRect().width,
+        copyWidth: copy.getBoundingClientRect().width,
+      };
+    }));
+}
+
+function expectReadableRockefellerOffer(
+  offers: Awaited<ReturnType<typeof rockefellerOfferGeometry>>,
+  minimumCellWidth: number,
+) {
+  expect(offers).toHaveLength(2);
+  expect(offers.every((offer) =>
+    offer.offerCellWidth >= minimumCellWidth
+    && offer.imageWidth >= 100
+    && offer.copyWidth >= minimumCellWidth - 20
+  )).toBe(true);
+}
+
 function reportWithAuthoringCase(
   fixture: (typeof REPORT_HTML_PEER_FIXTURES)[number],
 ) {
@@ -773,12 +800,15 @@ describe("SU Full landscape browser and PDF contract", () => {
         await expect(page.locator("[data-testid='report-html-conclusion']").innerText()).resolves.toContain("Order your own personal copy");
         expect(await horizontalOverflow(page)).toMatchObject({ offenders: [] });
         expect(await authoredClipping(page)).toEqual([]);
+        expectReadableRockefellerOffer(await rockefellerOfferGeometry(page), 160);
         await page.setViewportSize({ width: 390, height: 844 });
         expect(await horizontalOverflow(page)).toMatchObject({ offenders: [] });
         expect(await authoredClipping(page)).toEqual([]);
+        expectReadableRockefellerOffer(await rockefellerOfferGeometry(page), 300);
         await page.setViewportSize({ width: 1280, height: 900 });
         await page.emulateMedia({ media: "print" });
         expect(await authoredClipping(page)).toEqual([]);
+        expectReadableRockefellerOffer(await rockefellerOfferGeometry(page), 160);
         await page.pdf({
           path: pdfPath,
           format: "Letter",
@@ -819,8 +849,10 @@ describe("SU Full landscape browser and PDF contract", () => {
       expect((await page.locator("[data-page-number='24']").innerText()).toLowerCase()).toContain("in conclusion");
       await expect(page.locator("[data-page-number='25'] [data-testid='report-html-conclusion']").innerText()).resolves.toContain("Order your own personal copy");
       expect((await page.locator("[data-page-number='26']").innerText()).toLowerCase()).toContain("appendix a");
+      expectReadableRockefellerOffer(await rockefellerOfferGeometry(page), 160);
       await page.emulateMedia({ media: "print" });
       expect(await authoredContentOutsidePhysicalPage(page)).toEqual([]);
+      expectReadableRockefellerOffer(await rockefellerOfferGeometry(page), 160);
       await page.pdf({
         path: pdfPath,
         format: "A4",

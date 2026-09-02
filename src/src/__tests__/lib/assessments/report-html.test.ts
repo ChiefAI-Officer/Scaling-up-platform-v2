@@ -24,9 +24,14 @@ describe("report HTML configuration", () => {
         conclusionHtml: null,
         [field]: ROCKEFELLER_BOOK_OFFER_REPORT_HTML,
       };
+      const sanitized = sanitizeReportHtmlFragment(
+        ROCKEFELLER_BOOK_OFFER_REPORT_HTML,
+        field === "introductionHtml" ? "introduction" : "conclusion",
+      );
+      expect(sanitized.ok).toBe(true);
 
       expect(loadSafeReportHtml({ reportHtml })[field]).toBe(
-        ROCKEFELLER_BOOK_OFFER_REPORT_HTML,
+        sanitized.html,
       );
     },
   );

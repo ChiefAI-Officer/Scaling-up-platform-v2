@@ -46,7 +46,7 @@ describe("sanitizeReportHtmlFragment", () => {
 
       expect(result).toMatchObject({
         ok: true,
-        didStripContent: false,
+        didStripContent: true,
       });
       expect(result.html).toContain(
         '<table aria-label="Rockefeller Habits checklist conclusion">',
@@ -55,6 +55,8 @@ describe("sanitizeReportHtmlFragment", () => {
         'alt="Mastering the Rockefeller Habits book cover"',
       );
       expect(result.html).toContain("Order your own personal copy");
+      expect(result.html).toContain('href="https://amzn.to/4xtRFrS"');
+      expect(result.html).not.toMatch(/\s(?:width|height)="/);
     },
   );
 

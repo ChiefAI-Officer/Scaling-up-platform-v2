@@ -3328,6 +3328,54 @@
   overflow-x: auto;
 }
 
+/* Jeff's Rockefeller conclusion is authored as a two-cell table. Image width
+   attributes are deliberately stripped at the trust boundary, so the report
+   owns the safe column sizing needed to keep the cover and purchase copy
+   readable in every renderer. */
+.su-public-brand.su-report
+  .su-report-custom-html
+  table[aria-label="Rockefeller Habits checklist conclusion"] {
+  display: table;
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  overflow: visible;
+}
+.su-public-brand.su-report
+  .su-report-custom-html
+  table[aria-label="Rockefeller Habits checklist conclusion"] td {
+  vertical-align: top;
+}
+.su-public-brand.su-report
+  .su-report-custom-html
+  table[aria-label="Rockefeller Habits checklist conclusion"] td:first-child {
+  padding-right: 28px;
+}
+.su-public-brand.su-report
+  .su-report-custom-html
+  table[aria-label="Rockefeller Habits checklist conclusion"] td[aria-label="Book offer"] {
+  width: 180px;
+  padding-left: 20px;
+}
+.su-public-brand.su-report
+  .su-report-custom-html
+  table[aria-label="Rockefeller Habits checklist conclusion"] td[aria-label="Book offer"] img {
+  display: block;
+  width: 134px;
+  max-width: 100%;
+  height: auto;
+  max-height: 201px;
+  margin: 0 auto 14px;
+  object-fit: contain;
+}
+.su-public-brand.su-report
+  .su-report-custom-html
+  table[aria-label="Rockefeller Habits checklist conclusion"] td[aria-label="Book offer"] p {
+  margin: 0;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
 /* Jeff's QSP v2 preface is stored as bounded semantic HTML. These report-owned
    rules restore the approved composition without accepting authored styles or
    a second content image. The text in the brand marker remains an email-safe
@@ -3605,6 +3653,37 @@
 @media screen and (max-width: 760px) {
   .su-public-brand.su-report .su-report-custom-html {
     padding: 28px 20px;
+  }
+  .su-public-brand.su-report
+    .su-report-custom-html
+    table[aria-label="Rockefeller Habits checklist conclusion"],
+  .su-public-brand.su-report
+    .su-report-custom-html
+    table[aria-label="Rockefeller Habits checklist conclusion"] tbody,
+  .su-public-brand.su-report
+    .su-report-custom-html
+    table[aria-label="Rockefeller Habits checklist conclusion"] tr,
+  .su-public-brand.su-report
+    .su-report-custom-html
+    table[aria-label="Rockefeller Habits checklist conclusion"] td {
+    display: block;
+    width: 100%;
+  }
+  .su-public-brand.su-report
+    .su-report-custom-html
+    table[aria-label="Rockefeller Habits checklist conclusion"] td:first-child {
+    padding-right: 0;
+  }
+  .su-public-brand.su-report
+    .su-report-custom-html
+    table[aria-label="Rockefeller Habits checklist conclusion"] td[aria-label="Book offer"] {
+    width: 100%;
+    padding: 24px 0 0;
+  }
+  .su-public-brand.su-report
+    .su-report-custom-html
+    table[aria-label="Rockefeller Habits checklist conclusion"] td[aria-label="Book offer"] img {
+    margin: 0 0 14px;
   }
   .su-public-brand.su-report
     .su-report-custom-html--introduction
