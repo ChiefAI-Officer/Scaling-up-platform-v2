@@ -246,13 +246,11 @@ test("organization-free INVITED campaign → forbidden", async () => {
 });
 
 test("non-allowlisted INVITED campaign → notApplicable (unsupported-template; scored engine not surfaced)", async () => {
-  // #72 (DT-5) surfaced LVA + SU-Full + QSP + Rockefeller. Five Dysfunctions is
-  // deliberately NOT surfaced (Jeff 2026-06-18: its scored group report
-  // "over-showed"), so it stands in here for a scored template that must NOT
-  // build/audit a group report even when INVITED + flag-on.
+  // An unmapped alias resolves to DEFAULT_REPORT_CONFIG (scored), so this keeps
+  // proving an unsupported scored template does not build/audit a group report.
   const mock = makeMockDb({
     campaign: makeCampaign({
-      template: { alias: "five-dysfunctions", name: "Five Dysfunctions" },
+      template: { alias: "enneagram", name: "Enneagram" },
     }),
   });
 
@@ -262,7 +260,7 @@ test("non-allowlisted INVITED campaign → notApplicable (unsupported-template; 
   if (res.kind !== "notApplicable") return;
   expect(res.reason).toBe("unsupported-template");
   // Wave J (J-3): the alias is carried even for unsupported templates.
-  expect(res.templateAlias).toBe("five-dysfunctions");
+  expect(res.templateAlias).toBe("enneagram");
   expect(mock._findManySubmissions).not.toHaveBeenCalled();
 });
 

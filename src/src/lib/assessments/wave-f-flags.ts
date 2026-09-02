@@ -81,6 +81,9 @@ function sufCanaryMatches(
  * - `WAVE_J_SUFULL_GROUP_ENABLED` enables globally.
  * - `WAVE_J_SUFULL_GROUP_CANARY` enables by exact campaign id only.
  *
+ * Five Dysfunctions uses its own default-OFF `WAVE_5D_GROUP_REPORT_*` flag set
+ * with campaign-id-only canary matching and kill precedence.
+ *
  * For all other aliases (including LVA), uses the original Wave F flags:
  * - `WAVE_F_GROUP_REPORT_ENABLED` enables globally.
  * - `WAVE_F_GROUP_REPORT_CANARY` matches coach/org/campaign id.
@@ -110,16 +113,22 @@ export function isGroupReportEnabled(
   // their OWN independent flag set — NOT WAVE_F. WAVE_F is ON in prod (the Wave
   // L LVA launch flipped it), so folding these onto WAVE_F would light them up
   // the instant this merges; a separate default-OFF flag lets them ship dark
-  // and be flipped deliberately (matches Jeff's caution — the scored group
-  // report "over-showed" for him in 2026-06-18). Campaign-id-only canary +
-  // kill precedence, mirroring SU-Full (the set includes scored Rockefeller,
-  // a bulk-PII surface).
+  // and be flipped deliberately. Campaign-id-only canary + kill precedence,
+  // mirroring SU-Full (the set includes scored Rockefeller, a bulk-PII surface).
   const alias = campaign?.template?.alias;
   if (typeof alias === "string" && QSP_ROCK_GROUP_REPORT_ALIASES.has(alias)) {
     if (isOn(process.env.WAVE_QSP_ROCK_GROUP_REPORT_KILL)) return false;
     return (
       isOn(process.env.WAVE_QSP_ROCK_GROUP_REPORT_ENABLED) ||
       sufCanaryMatches(process.env.WAVE_QSP_ROCK_GROUP_REPORT_CANARY, campaign)
+    );
+  }
+
+  if (alias === "five-dysfunctions") {
+    if (isOn(process.env.WAVE_5D_GROUP_REPORT_KILL)) return false;
+    return (
+      isOn(process.env.WAVE_5D_GROUP_REPORT_ENABLED) ||
+      sufCanaryMatches(process.env.WAVE_5D_GROUP_REPORT_CANARY, campaign)
     );
   }
 
@@ -144,13 +153,9 @@ const QSP_ROCK_GROUP_REPORT_ALIASES: ReadonlySet<string> = new Set([
 /**
  * Template aliases the group report is surfaced for.
  *
- * Per Jeff (2026-06-18): the aggregate/CEO group report was first wanted on the
- * Leadership Vision Alignment assessment ONLY — NOT on the scored reports
- * (Rockefeller / Five Dysfunctions), which over-showed in the mockup and
- * confused him. Wave J (J-3, 2026-06-28) adds Scaling Up Full — the (already
- * built) SCORED group engine — behind its own independent WAVE_J_SUFULL_GROUP_*
- * flag set + an enforced publish gate. The remaining scored templates stay
- * built but unreachable — add an alias here to surface one.
+ * The aggregate/CEO group report began with Leadership Vision Alignment, then
+ * expanded to Scaling Up Full, QSP, and Rockefeller. On 2026-09-01 Jeff asked
+ * for the existing scored group report to be surfaced for Five Dysfunctions.
  *
  * Single source of truth: gates BOTH the loader (group-report.ts) and the
  * CampaignDetail entry point.
@@ -167,10 +172,11 @@ export const GROUP_REPORT_ALIASES: readonly string[] = [
   // QSP (qualitative — reuses the LVA path) + Rockefeller (scored — reuses the
   // SU-Full path). The generic engine dispatches scored|qualitative via
   // reportConfigFor(alias), so no new engine work. Independently flag-gated by
-  // WAVE_QSP_ROCK_GROUP_REPORT_* (default-OFF → ships dark). Five Dysfunctions stays
-  // OUT: Jeff rejected its scored group report in 2026-06-18 ("over-showed").
+  // WAVE_QSP_ROCK_GROUP_REPORT_* (default-OFF → ships dark).
   "qsp-v2",
   "RockHabits",
+  // #427 (2026-09-01): independently gated by WAVE_5D_GROUP_REPORT_*.
+  "five-dysfunctions",
 ];
 
 /** Whether a campaign's template alias is surfaced for the group report. */

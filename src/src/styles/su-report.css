@@ -1932,6 +1932,28 @@
 .su-public-brand .su-group-apxb td {
   font-variant-numeric: tabular-nums;
 }
+/* Five Dysfunctions — named perspectives matrix. The question remains the
+   reading anchor; named answers lead to the collective average at the right. */
+.su-public-brand .su-group-individual-matrix {
+  min-width: max(100%, 44rem);
+}
+.su-public-brand .su-group-individual-matrix th:first-child {
+  min-width: 260px;
+}
+.su-public-brand .su-group-individual-matrix thead th:not(:first-child) {
+  min-width: 110px;
+  vertical-align: bottom;
+}
+.su-public-brand .su-group-individual-matrix td {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.su-public-brand .su-group-individual-matrix .su-group-team-average,
+.su-public-brand .su-group-team-summary tbody td:nth-child(2) {
+  background: #f8f4fc;
+  color: #522583;
+  font-weight: 800;
+}
 .su-public-brand .su-group-dev .su-group-dev-arrow {
   font-size: 10px;
   margin-right: 3px;
@@ -2221,6 +2243,23 @@
   .su-public-brand .su-group-mtx thead,
   .su-public-brand .su-group-prof thead {
     display: table-header-group;
+  }
+  .su-public-brand .su-group-individual-matrix {
+    min-width: 0;
+    table-layout: fixed;
+    font-size: 9px;
+  }
+  .su-public-brand .su-group-individual-matrix th:first-child {
+    width: 38%;
+    min-width: 0;
+  }
+  .su-public-brand .su-group-individual-matrix thead th:not(:first-child) {
+    min-width: 0;
+  }
+  .su-public-brand .su-group-individual-matrix th,
+  .su-public-brand .su-group-individual-matrix td {
+    padding: 5px 4px;
+    overflow-wrap: anywhere;
   }
 }
 

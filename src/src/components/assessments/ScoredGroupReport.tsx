@@ -2,15 +2,18 @@
  * Assessment v7.6 Wave F #22 — ScoredGroupReport (T7).
  *
  * The team-level scored report (Rockefeller Habits / Five Dysfunctions / SU
- * Full): reads each submission's FROZEN result and presents the CEO vs. the
- * NON-CEO team average. Pure presentational — every figure comes from the data
- * layer; the renderer NEVER recomputes a score.
+ * Full) reads each submission's FROZEN result. Rockefeller and SU Full present
+ * the CEO vs. the NON-CEO team average; Five Dysfunctions presents named
+ * respondent answers plus an all-respondent team average. Pure presentational —
+ * every figure comes from the data layer; the renderer NEVER recomputes a score.
  *
  * Anatomy (from wave-f-group-report-mockup.html):
  *   cover → "as of" line → alignment profile (Section | CEO | Team avg (excl.
  *   CEO) | Dev, with a ▲/▼ DIRECTIONAL indicator — alignment, not good/bad) →
  *   tier band → optional domains block + ScaleUp score (presence-driven) →
- *   per-question CEO-vs-team bars → footer.
+ *   per-question CEO-vs-team bars → footer. Five Dysfunctions replaces those
+ *   comparison blocks with the five team-fundamental averages and a named
+ *   answer matrix ending in the collective average.
  *
  * N<2 fallback: when a section/domain has zero non-CEO contributors, teamAvg
  * and dev are null; the cell shows "—" rather than comparing the CEO to himself.
@@ -26,6 +29,7 @@ import type {
   GroupScoredSection,
   GroupScoredDomain,
   GroupScoredQuestion,
+  GroupScoredIndividualResponse,
   GroupAppendixBRow,
 } from "@/lib/assessments/group-report-model";
 import { APPENDIX_B_DOMAIN_KEYS } from "@/lib/assessments/group-report-model";
@@ -209,6 +213,40 @@ function toProfileRows(sections: GroupScoredSection[]): ProfileRow[] {
   }));
 }
 
+function TeamSummaryTable({ sections }: { sections: GroupScoredSection[] }) {
+  return (
+    <div className="su-group-prof-scroll">
+      <table
+        className="su-group-prof su-group-team-summary"
+        data-testid="group-scored-team-summary"
+      >
+        <thead>
+          <tr>
+            <th scope="col">Team fundamental</th>
+            <th scope="col">Team average</th>
+            <th scope="col">Responses</th>
+          </tr>
+        </thead>
+        <tbody>
+          {sections.map((section) => (
+            <tr key={section.stableKey}>
+              <th scope="row">{section.name}</th>
+              <td>
+                {section.groupMean == null ? (
+                  <span className="su-group-na">—</span>
+                ) : (
+                  formatGroupNumber(section.groupMean)
+                )}
+              </td>
+              <td>{section.groupN ?? 0}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 // ── Domains block ────────────────────────────────────────────────────────────
 
 function DomainsBlock({
@@ -320,6 +358,102 @@ function QuestionBars({
   );
 }
 
+function NamedIndividualResponses({
+  questions,
+  responsiveEnabled,
+}: {
+  questions: GroupScoredQuestion[];
+  responsiveEnabled: boolean;
+}) {
+  const respondents = questions.find(
+    (question) => question.individualResponses?.length,
+  )?.individualResponses as GroupScoredIndividualResponse[] | undefined;
+  if (!respondents?.length) return null;
+
+  return (
+    <section
+      className="su-group-sec"
+      data-testid="group-scored-individual-responses"
+    >
+      <h2 className="su-group-sec-title">Individual answers and team average</h2>
+      <p className="su-group-intro">
+        Each column shows a team member&rsquo;s response. The team average includes
+        every respondent, including the CEO.
+      </p>
+      <div
+        className={
+          responsiveEnabled
+            ? "su-group-prof-scroll su-report-data-region"
+            : "su-group-prof-scroll"
+        }
+        {...(responsiveEnabled
+          ? {
+              role: "region",
+              tabIndex: 0,
+              "aria-label": "Named individual answers and team averages",
+            }
+          : {})}
+      >
+        <table className="su-group-prof su-group-individual-matrix">
+          <thead>
+            <tr>
+              <th scope="col">Question</th>
+              {respondents.map((respondent) => (
+                <th scope="col" key={respondent.respondentId}>
+                  {respondent.name}
+                  {respondent.isCEO && (
+                    <span className="su-group-prof-sub">CEO</span>
+                  )}
+                </th>
+              ))}
+              <th scope="col" className="su-group-team-average">
+                Team average
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {questions.map((question) => {
+              const values = new Map(
+                question.individualResponses?.map((response) => [
+                  response.respondentId,
+                  response.value,
+                ]),
+              );
+              return (
+                <tr
+                  key={question.stableKey}
+                  data-testid={`group-scored-individual-question-${question.stableKey}`}
+                >
+                  <th scope="row">{question.label}</th>
+                  {respondents.map((respondent) => {
+                    const value = values.get(respondent.respondentId);
+                    return (
+                      <td key={respondent.respondentId}>
+                        {value == null ? (
+                          <span className="su-group-na">—</span>
+                        ) : (
+                          formatGroupNumber(value)
+                        )}
+                      </td>
+                    );
+                  })}
+                  <td className="su-group-team-average">
+                    {question.groupMean == null ? (
+                      <span className="su-group-na">—</span>
+                    ) : (
+                      formatGroupNumber(question.groupMean)
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 // ── Appendix B — pseudonymized per-member domain grid ────────────────────────
 
 /** Display labels for the 4 Appendix-B domains (People/Strategy/Execution/Cash). */
@@ -404,6 +538,7 @@ export function ScoredGroupReport(props: GroupReportProps) {
   const responsiveEnabled = props.responsiveEnabled === true;
   const scored = report.scored;
   const hasCeo = cohortHasCeo(report);
+  const showsNamedTeamResponses = props.templateAlias === "five-dysfunctions";
   // Tier presentation policy (Wave J / J-2): SU-Full sets showTier=false to
   // suppress the band; undefined → show (back-compat for every other scored
   // template that predates the flag).
@@ -425,7 +560,11 @@ export function ScoredGroupReport(props: GroupReportProps) {
       data-responsive-report={responsiveEnabled ? "" : undefined}
     >
       <GroupReportCover
-        assessmentName={props.assessmentName}
+        assessmentName={
+          props.templateAlias === "five-dysfunctions"
+            ? props.assessmentName.replace(/^the\s+/i, "")
+            : props.assessmentName
+        }
         companyName={props.companyName}
         generatedAt={props.generatedAt}
         coachLogoUrl={props.coachLogoUrl}
@@ -446,30 +585,44 @@ export function ScoredGroupReport(props: GroupReportProps) {
           <GroupReportEmpty />
         ) : (
           <>
-            {!hasCeo && <GroupReportNoCeoNote ceoName={props.ceoName} />}
+            {!hasCeo && !showsNamedTeamResponses && (
+              <GroupReportNoCeoNote ceoName={props.ceoName} />
+            )}
 
             {/* ── Alignment profile (sections) ────────────────────────────── */}
             <section className="su-group-sec" data-testid="group-scored-profile-section">
               <h2 className="su-group-sec-title">
-                Alignment profile
-                {showTier && hasCeo && scored.tier.ceo ? (
+                {showsNamedTeamResponses ? "Team results" : "Alignment profile"}
+                {!showsNamedTeamResponses && showTier && hasCeo && scored.tier.ceo ? (
                   <span className="su-group-tier" data-testid="group-scored-ceo-tier">
                     CEO tier: {scored.tier.ceo}
                   </span>
                 ) : null}
               </h2>
-              <p className="su-group-intro">
-                Section scores — the CEO vs. the team average of the other
-                leaders (CEO excluded), with the gap. ▲/▼ show direction, not
-                good/bad.
-              </p>
-              <ProfileTable
-                rows={toProfileRows(scored.sections)}
-                hasCeo={hasCeo}
-                responsiveEnabled={responsiveEnabled}
-              />
+              {showsNamedTeamResponses ? (
+                <>
+                  <p className="su-group-intro">
+                    The team score for each fundamental averages every completed
+                    respondent, including the CEO.
+                  </p>
+                  <TeamSummaryTable sections={scored.sections} />
+                </>
+              ) : (
+                <>
+                  <p className="su-group-intro">
+                    Section scores — the CEO vs. the team average of the other
+                    leaders (CEO excluded), with the gap. ▲/▼ show direction, not
+                    good/bad.
+                  </p>
+                  <ProfileTable
+                    rows={toProfileRows(scored.sections)}
+                    hasCeo={hasCeo}
+                    responsiveEnabled={responsiveEnabled}
+                  />
+                </>
+              )}
 
-              {showTier && scored.tier.teamDistribution.length > 0 && (
+              {!showsNamedTeamResponses && showTier && scored.tier.teamDistribution.length > 0 && (
                 <div
                   className="su-group-tierband"
                   data-testid="group-scored-tier-band"
@@ -496,7 +649,7 @@ export function ScoredGroupReport(props: GroupReportProps) {
             </section>
 
             {/* ── Domains (presence-driven) ───────────────────────────────── */}
-            {scored.domains && scored.domains.length > 0 && (
+            {!showsNamedTeamResponses && scored.domains && scored.domains.length > 0 && (
               <DomainsBlock
                 domains={scored.domains}
                 hasCeo={hasCeo}
@@ -505,7 +658,7 @@ export function ScoredGroupReport(props: GroupReportProps) {
             )}
 
             {/* ── ScaleUp Score (presence-driven) ─────────────────────────── */}
-            {scored.scaleUpScore && (
+            {!showsNamedTeamResponses && scored.scaleUpScore && (
               <section className="su-group-sec" data-testid="group-scored-scaleup">
                 <h2 className="su-group-sec-title">ScaleUp Score</h2>
                 <div className="su-group-scaleup">
@@ -563,17 +716,26 @@ export function ScoredGroupReport(props: GroupReportProps) {
             )}
 
             {/* ── Per-question bars ───────────────────────────────────────── */}
-            {scored.questions.length > 0 && (
+            {scored.questions.length > 0 && !showsNamedTeamResponses && (
               <QuestionBars questions={scored.questions} hasCeo={hasCeo} />
             )}
 
+            {scored.questions.length > 0 && showsNamedTeamResponses && (
+              <NamedIndividualResponses
+                questions={scored.questions}
+                responsiveEnabled={responsiveEnabled}
+              />
+            )}
+
             {/* ── Appendix B — pseudonymized per-member grid (SU-Full) ──────── */}
-            {scored.appendixB && scored.appendixB.length > 0 && (
+            {!showsNamedTeamResponses &&
+              scored.appendixB &&
+              scored.appendixB.length > 0 && (
               <AppendixB
                 rows={scored.appendixB}
                 responsiveEnabled={responsiveEnabled}
               />
-            )}
+              )}
           </>
         )}
       </div>

@@ -191,6 +191,56 @@ describe("scored per-question", () => {
     expect(q.teamMean).toBe(1); // (1+2+0)/3
     expect(q.n).toBe(3);
   });
+
+  it("Five Dysfunctions carries named individual answers and an all-respondent average", () => {
+    const input = { ...fixtureRockefeller(), alias: "five-dysfunctions" };
+    const scored = scoredOf(input);
+    const q = findQuestion(scored.questions, "Q1_1")!;
+
+    // The source group-scoring rule includes every participant: (3+1+2+0)/4.
+    expect(findSection(scored.sections, "S1")).toMatchObject({
+      groupMean: 1.5,
+      groupN: 4,
+    });
+    expect(q).toMatchObject({
+      groupMean: 1.5,
+      groupN: 4,
+      individualResponses: [
+        { respondentId: "r-ceo", name: "John CEOExec", isCEO: true, value: 3 },
+        { respondentId: "r-amy", name: "Amy Alpha", isCEO: false, value: 1 },
+        { respondentId: "r-bob", name: "Bob Beta", isCEO: false, value: 2 },
+        { respondentId: "r-cara", name: "Cara Gamma", isCEO: false, value: 0 },
+      ],
+    });
+  });
+
+  it("keeps named individual-answer data scoped to Five Dysfunctions", () => {
+    const scored = scoredOf();
+    const q = findQuestion(scored.questions, "Q1_1")!;
+    expect(findSection(scored.sections, "S1")).not.toHaveProperty("groupMean");
+    expect(findSection(scored.sections, "S1")).not.toHaveProperty("groupN");
+    expect(q).not.toHaveProperty("groupMean");
+    expect(q).not.toHaveProperty("groupN");
+    expect(q).not.toHaveProperty("individualResponses");
+  });
+
+  it("Five Dysfunctions keeps a named row with a null value when a respondent skipped a question", () => {
+    const input = {
+      ...fixtureRockefellerSparseCash(),
+      alias: "five-dysfunctions",
+    };
+    const q = findQuestion(scoredOf(input).questions, "Q3_1")!;
+
+    expect(q).toMatchObject({
+      groupMean: 2,
+      groupN: 1,
+      individualResponses: [
+        { respondentId: "r-ceo", name: "John CEOExec", isCEO: true, value: 2 },
+        { respondentId: "r-amy", name: "Amy Alpha", isCEO: false, value: null },
+        { respondentId: "r-bob", name: "Bob Beta", isCEO: false, value: null },
+      ],
+    });
+  });
 });
 
 // ── headline blocks: domains / scaleUpScore / tier ──────────────────────────

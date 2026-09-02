@@ -232,6 +232,27 @@ describe("Admin campaign detail — invitation banner authoring state", () => {
 });
 
 describe("Admin campaign detail — Summary Reports capability", () => {
+  it("keeps the Five Dysfunctions group-report entry coach-side only", async () => {
+    mockGetApiActor.mockResolvedValue({ role: "ADMIN", coachId: null, userId: "u1", email: "a@x.com" });
+    mockCanManage.mockResolvedValue(true);
+    mockGroupReportEnabled.mockReturnValue(true);
+    mockGroupReportAlias.mockReturnValue(true);
+    mockFindFirst.mockResolvedValue({
+      id: "camp-1",
+      status: "ACTIVE",
+      accessMode: "INVITED",
+      createdByCoachId: "coach-1",
+      organizationId: "org-1",
+      template: { alias: "five-dysfunctions" },
+      version: { id: "v1", publishedAt: new Date("2026-01-01") },
+    });
+
+    await renderPage();
+
+    expect(detailProps).toHaveProperty("canViewGroupReport", false);
+    expect(mockCanViewGroup).not.toHaveBeenCalled();
+  });
+
   it("never passes the Summary Reports panel capability and keeps the canonical group report", async () => {
     process.env.SUMMARY_REPORTING_ENABLED = "1";
     mockGetApiActor.mockResolvedValue({ role: "ADMIN", coachId: null, userId: "u1", email: "a@x.com" });
