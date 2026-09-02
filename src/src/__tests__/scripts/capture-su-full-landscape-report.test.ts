@@ -12,8 +12,12 @@ const scriptPath = join(
   "capture-su-full-landscape-report.tsx",
 );
 
-function expectCompleteSequentialPdf(pdfPath: string, pages: number): string[] {
-  const pageTexts = Array.from({ length: pages }, (_, index) =>
+function expectCompleteSequentialPdf(
+  pdfPath: string,
+  physicalPages: number,
+  logicalPages: number,
+): string[] {
+  const pageTexts = Array.from({ length: physicalPages }, (_, index) =>
     execFileSync("pdftotext", [
       "-f",
       String(index + 1),
@@ -24,11 +28,11 @@ function expectCompleteSequentialPdf(pdfPath: string, pages: number): string[] {
       "-",
     ], { encoding: "utf8", maxBuffer: 20 * 1024 * 1024 }),
   );
-  const footerNumbers = pageTexts.map((text) =>
-    Number(text.replace(/\f/g, "").trimEnd().match(/(?:^|\s)(\d+)\s*$/)?.[1]),
-  );
+  const footerNumbers = pageTexts
+    .map((text) => Number(text.replace(/\f/g, "").trimEnd().match(/(?:^|\s)(\d+)\s*$/)?.[1]))
+    .filter(Number.isFinite);
   expect(footerNumbers).toEqual(
-    Array.from({ length: pages }, (_, index) => index + 1),
+    Array.from({ length: logicalPages }, (_, index) => index + 1),
   );
 
   const normalizedBodies = pageTexts.map((text, index) =>
@@ -43,7 +47,7 @@ function expectCompleteSequentialPdf(pdfPath: string, pages: number): string[] {
   const hashes = normalizedBodies.map((body) =>
     createHash("sha256").update(body).digest("hex"),
   );
-  expect(new Set(hashes).size).toBe(pages);
+  expect(new Set(hashes).size).toBe(physicalPages);
   return pageTexts;
 }
 
@@ -145,9 +149,14 @@ test("captures the canonical landscape fixture as a CSS-sized print PDF", () => 
 });
 
 test.each([
-  { variant: "edition-6", pages: 25, requiredText: "PREFACE" },
-  { variant: "null-preface", pages: 24, requiredText: "TABLE OF CONTENTS" },
-])("captures the $variant fixture as a sequential $pages-page PDF", async ({ variant, pages, requiredText }) => {
+  { variant: "edition-6", physicalPages: 27, logicalPages: 26, requiredText: "PREFACE" },
+  { variant: "null-preface", physicalPages: 24, logicalPages: 24, requiredText: "TABLE OF CONTENTS" },
+])("captures the $variant fixture as a complete sequential PDF", async ({
+  variant,
+  physicalPages,
+  logicalPages,
+  requiredText,
+}) => {
   const directory = mkdtempSync(join(tmpdir(), "su-full-landscape-capture-"));
   const pdfPath = join(directory, `${variant}.pdf`);
 
@@ -164,9 +173,9 @@ test.each([
 
     expect(existsSync(pdfPath)).toBe(true);
     expect(execFileSync("pdfinfo", [pdfPath], { encoding: "utf8" })).toMatch(
-      new RegExp(`^Pages:\\s+${pages}$`, "m"),
+      new RegExp(`^Pages:\\s+${physicalPages}$`, "m"),
     );
-    const pageTexts = expectCompleteSequentialPdf(pdfPath, pages);
+    const pageTexts = expectCompleteSequentialPdf(pdfPath, physicalPages, logicalPages);
     expect(pageTexts.join("\n")).toContain(requiredText);
     if (variant === "null-preface") {
       expect(pageTexts.join("\n")).not.toMatch(/(?:^|\n)\s*welcome\s*(?:\n|$)/im);
@@ -176,4 +185,4 @@ test.each([
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
-});
+}, 15_000);

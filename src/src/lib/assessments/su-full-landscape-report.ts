@@ -42,7 +42,7 @@ export type SuFullLandscapeChapter = Readonly<{
 }>;
 
 type SuFullLandscapePageContent =
-  | Readonly<{ kind: "cover" | "preface" | "contents" | "introduction" | "profile" | "conclusion" }>
+  | Readonly<{ kind: "cover" | "preface" | "contents" | "introduction" | "profile" | "conclusion" | "closing" }>
   | Readonly<{ kind: "chapter"; chapterKey: SuFullLandscapeChapterKey }>
   | Readonly<{ kind: "detail"; chapterKey: SuFullLandscapeChapterKey; questionKeys: readonly string[] }>
   | Readonly<{ kind: "appendix" }>;
@@ -291,7 +291,10 @@ function growthPhaseFromFrozenResult(
   return GROWTH_PHASE_NARRATIVES[result.recommendationPhase] ?? null;
 }
 
-function pages(hasAuthoredPreface: boolean): readonly SuFullLandscapePage[] {
+function pages(
+  hasAuthoredPreface: boolean,
+  hasAuthoredClosing: boolean,
+): readonly SuFullLandscapePage[] {
   const logicalPages: readonly SuFullLandscapePageContent[] = [
     { kind: "cover" },
     ...(hasAuthoredPreface ? [{ kind: "preface" } as const] : []),
@@ -309,6 +312,7 @@ function pages(hasAuthoredPreface: boolean): readonly SuFullLandscapePage[] {
         })),
     ]),
     { kind: "conclusion" },
+    ...(hasAuthoredClosing ? [{ kind: "closing" } as const] : []),
     { kind: "appendix" },
   ];
 
@@ -403,8 +407,10 @@ export function buildSuFullLandscapeReportModel(input: {
   const allQuestions = chapters.flatMap((chapter) => chapter.questions);
   if (!sameKeys(allQuestions.map((question) => question.stableKey), CANONICAL_QUESTION_KEYS)) return null;
 
-  const orderedPages = pages(Boolean(report.reportHtml?.introductionHtml));
-  const expectedPageCount = report.reportHtml?.introductionHtml ? 25 : 24;
+  const hasAuthoredPreface = Boolean(report.reportHtml?.introductionHtml);
+  const hasAuthoredClosing = Boolean(report.reportHtml?.conclusionHtml);
+  const orderedPages = pages(hasAuthoredPreface, hasAuthoredClosing);
+  const expectedPageCount = 24 + Number(hasAuthoredPreface) + Number(hasAuthoredClosing);
   if (orderedPages.length !== expectedPageCount || !orderedPages.every((page, index) => page.number === index + 1)) return null;
   const strongestChapter = [...chapters].sort((left, right) => right.youAverage - left.youAverage)[0];
   const weakestChapter = [...chapters].sort((left, right) => left.youAverage - right.youAverage)[0];

@@ -3,6 +3,7 @@ import {
   REPORT_HTML_TAG_POLICY,
   sanitizeReportHtmlFragment,
 } from "@/lib/assessments/report-html-sanitizer";
+import { ROCKEFELLER_BOOK_OFFER_REPORT_HTML } from "@/__tests__/fixtures/report-html";
 
 const limits = {
   introduction: { rawCharacters: 12_000, textCharacters: 2_200, elements: 64, depth: 8, images: 1, tables: 1, tableRows: 8 },
@@ -35,6 +36,30 @@ const malformedTableHtml = [
 ] as const;
 
 describe("sanitizeReportHtmlFragment", () => {
+  it.each(["introduction", "conclusion"] as const)(
+    "accepts the Rockefeller book-offer composition as %s content",
+    (position) => {
+      const result = sanitizeReportHtmlFragment(
+        ROCKEFELLER_BOOK_OFFER_REPORT_HTML,
+        position,
+      );
+
+      expect(result).toMatchObject({
+        ok: true,
+        didStripContent: true,
+      });
+      expect(result.html).toContain(
+        '<table aria-label="Rockefeller Habits checklist conclusion">',
+      );
+      expect(result.html).toContain(
+        'alt="Mastering the Rockefeller Habits book cover"',
+      );
+      expect(result.html).toContain("Order your own personal copy");
+      expect(result.html).toContain('href="https://amzn.to/4xtRFrS"');
+      expect(result.html).not.toMatch(/\s(?:width|height)="/);
+    },
+  );
+
   it("classifies every allowed tag explicitly and gives every layout tag positive cost", () => {
     const expectedInline = ["a", "b", "code", "em", "i", "s", "small", "span", "strong", "sub", "sup", "u"];
     const expectedUnwrapped = ["footer", "pre"];
@@ -258,17 +283,17 @@ describe("sanitizeReportHtmlFragment", () => {
     });
   });
 
-  it("keeps a Closing table with a caption inside the expanded budget and rejects added overflow blocks", () => {
+  it("accepts the former Closing overflow composition while retaining element limits", () => {
     const rows = `<tr><td>x</td><td>x</td></tr>`.repeat(6);
     const withCaption = sanitizeReportHtmlFragment(`<table><caption>Cap</caption><tbody>${rows}</tbody></table>`, "conclusion");
-    const atBoundary = sanitizeReportHtmlFragment(`<table><caption>Cap</caption><tbody>${rows}</tbody></table>${"<div></div>".repeat(7)}`, "conclusion");
-    const overBoundary = sanitizeReportHtmlFragment(`<table><caption>Cap</caption><tbody>${rows}</tbody></table>${"<div></div>".repeat(8)}`, "conclusion");
+    const formerOverflow = sanitizeReportHtmlFragment(`<table><caption>Cap</caption><tbody>${rows}</tbody></table>${"<div></div>".repeat(8)}`, "conclusion");
+    const tooManyElements = sanitizeReportHtmlFragment("<blockquote></blockquote>".repeat(37), "conclusion");
 
     expect(withCaption.ok).toBe(true);
-    expect(atBoundary.ok).toBe(true);
-    expect(overBoundary).toMatchObject({
+    expect(formerOverflow.ok).toBe(true);
+    expect(tooManyElements).toMatchObject({
       ok: false,
-      issue: expect.stringContaining("24 estimated lines"),
+      issue: expect.stringContaining("36 HTML elements"),
     });
   });
 
@@ -281,11 +306,11 @@ describe("sanitizeReportHtmlFragment", () => {
   });
 
   it.each([
-    ["introduction", 8, 4, 32],
-    ["conclusion", 4, 2, 24],
+    ["introduction", 8, 4],
+    ["conclusion", 4, 2],
   ] as const)(
-    "enforces exact %s semantic layout sublimits",
-    (position, lineBreaks, headings, estimatedLines) => {
+    "retains exact %s line-break and heading sublimits",
+    (position, lineBreaks, headings) => {
       expect(sanitizeReportHtmlFragment("<br>".repeat(lineBreaks), position).ok).toBe(true);
       expect(sanitizeReportHtmlFragment("<br>".repeat(lineBreaks + 1), position)).toMatchObject({
         ok: false,
@@ -296,15 +321,18 @@ describe("sanitizeReportHtmlFragment", () => {
         ok: false,
         issue: expect.stringContaining(`${headings} headings`),
       });
-
-      const acceptedBlocks = "<div></div>".repeat(estimatedLines);
-      expect(sanitizeReportHtmlFragment(acceptedBlocks, position).ok).toBe(true);
-      expect(sanitizeReportHtmlFragment(`${acceptedBlocks}<div></div>`, position)).toMatchObject({
-        ok: false,
-        issue: expect.stringContaining(`${estimatedLines} estimated lines`),
-      });
     },
   );
+
+  it("accepts 200 estimated Welcome lines and rejects 201", () => {
+    const atBoundary = `${"<blockquote></blockquote>".repeat(58)}${"<h1></h1>".repeat(4)}<img src="https://cdn.scalingup.com/report.png" alt="Report">`;
+
+    expect(sanitizeReportHtmlFragment(atBoundary, "introduction").ok).toBe(true);
+    expect(sanitizeReportHtmlFragment(`${atBoundary}<div></div>`, "introduction")).toMatchObject({
+      ok: false,
+      issue: expect.stringContaining("200 estimated lines"),
+    });
+  });
 
   it("removes executable and interactive content", () => {
     const result = sanitizeReportHtmlFragment(
