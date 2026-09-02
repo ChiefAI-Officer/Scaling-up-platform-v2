@@ -287,11 +287,12 @@ const EXPANDED_CLOSING_BOUNDARY_HTML = `${"<h6>H</h6>".repeat(2)}${"<br>".repeat
 function alternateStyleMarkup(
   style: "CLASSIC_SCORED" | "CLASSIC_QUALITATIVE" | "EXECUTIVE_BOARDROOM" | "MODERN_DASHBOARD",
   conclusionHtml: string,
+  introductionHtml: string | null = null,
 ): string {
   const prepared = prepareReportHtmlForStorage({
     reportHtml: {
       schemaVersion: 1,
-      introductionHtml: null,
+      introductionHtml,
       conclusionHtml,
     },
   });
@@ -436,7 +437,9 @@ async function authoredClipping(page: Page) {
         && style.overflowX !== "visible";
       const clipsHeight = element.scrollHeight > element.clientHeight + 1
         && style.overflowY !== "visible";
-      return clipsWidth || clipsHeight ? [{
+      const intentionallyContainedImage = element.tagName === "IMG"
+        && style.objectFit === "contain";
+      return (clipsWidth || clipsHeight) && !intentionallyContainedImage ? [{
         tag: element.tagName,
         clientWidth: element.clientWidth,
         scrollWidth: element.scrollWidth,
@@ -744,6 +747,49 @@ describe("SU Full landscape browser and PDF contract", () => {
         expect(boundary.mobileClipping).toEqual([]);
         expect(boundary.printClipping).toEqual([]);
       } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it.each([
+    "CLASSIC_SCORED",
+    "CLASSIC_QUALITATIVE",
+    "EXECUTIVE_BOARDROOM",
+    "MODERN_DASHBOARD",
+  ] as const)(
+    "renders the Rockefeller offer as both Preface and Closing in %s",
+    async (style) => {
+      const directory = mkdtempSync(join(tmpdir(), `rockefeller-${style.toLowerCase()}-`));
+      const pdfPath = join(directory, "report.pdf");
+      const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+      try {
+        await load(page, alternateStyleMarkup(
+          style,
+          ROCKEFELLER_BOOK_OFFER_REPORT_HTML,
+          ROCKEFELLER_BOOK_OFFER_REPORT_HTML,
+        ));
+        await expect(page.locator("[data-testid='report-html-introduction']").innerText()).resolves.toContain("Order your own personal copy");
+        await expect(page.locator("[data-testid='report-html-conclusion']").innerText()).resolves.toContain("Order your own personal copy");
+        expect(await horizontalOverflow(page)).toMatchObject({ offenders: [] });
+        expect(await authoredClipping(page)).toEqual([]);
+        await page.setViewportSize({ width: 390, height: 844 });
+        expect(await horizontalOverflow(page)).toMatchObject({ offenders: [] });
+        expect(await authoredClipping(page)).toEqual([]);
+        await page.setViewportSize({ width: 1280, height: 900 });
+        await page.emulateMedia({ media: "print" });
+        expect(await authoredClipping(page)).toEqual([]);
+        await page.pdf({
+          path: pdfPath,
+          format: "Letter",
+          preferCSSPageSize: true,
+          printBackground: true,
+        });
+        const pdfText = normalize(execFileSync("pdftotext", [pdfPath, "-"], { encoding: "utf8" }));
+        expect(pdfText.match(/Order/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
+        expect(pdfText.match(/Verne Harnish/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
+      } finally {
+        await page.close();
         rmSync(directory, { recursive: true, force: true });
       }
     },
