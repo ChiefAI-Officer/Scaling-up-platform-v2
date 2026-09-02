@@ -7,10 +7,30 @@ import {
 } from "@/lib/assessments/report-html";
 import { sanitizeReportHtmlFragment } from "@/lib/assessments/report-html-sanitizer";
 import { QSP_V2_PREFACE_HTML } from "@/lib/assessments/qsp-v2-report-content";
+import { ROCKEFELLER_BOOK_OFFER_REPORT_HTML } from "@/__tests__/fixtures/report-html";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 describe("report HTML configuration", () => {
+  it.each([
+    ["a newly issued report", "introductionHtml"],
+    ["a historical pinned report", "conclusionHtml"],
+  ] as const)(
+    "defensively loads the Rockefeller composition for %s",
+    (_reportAge, field) => {
+      const reportHtml = {
+        schemaVersion: 1,
+        introductionHtml: null,
+        conclusionHtml: null,
+        [field]: ROCKEFELLER_BOOK_OFFER_REPORT_HTML,
+      };
+
+      expect(loadSafeReportHtml({ reportHtml })[field]).toBe(
+        ROCKEFELLER_BOOK_OFFER_REPORT_HTML,
+      );
+    },
+  );
+
   it("preserves unrelated report configuration", () => {
     const next = mergeReportHtml(
       {
