@@ -16,7 +16,7 @@ export const REPORT_HTML_LIMITS = {
     figureCaptions: 1,
     headings: 4,
     lineBreaks: 8,
-    estimatedLines: 32,
+    estimatedLines: 200,
   },
   conclusion: {
     rawCharacters: 12_000,
@@ -33,7 +33,7 @@ export const REPORT_HTML_LIMITS = {
     figureCaptions: 1,
     headings: 2,
     lineBreaks: 4,
-    estimatedLines: 24,
+    estimatedLines: 200,
   },
 } as const;
 

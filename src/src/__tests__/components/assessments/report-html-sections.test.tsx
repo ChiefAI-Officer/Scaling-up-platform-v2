@@ -3,6 +3,7 @@ import { BrandedReport } from "@/components/assessments/BrandedReport";
 import { QualitativeReport } from "@/components/assessments/QualitativeReport";
 import type { RespondentReport } from "@/lib/assessments/respondent-report";
 import type { ScoreResult } from "@/lib/assessments/scoring";
+import { ROCKEFELLER_BOOK_OFFER_REPORT_HTML } from "@/__tests__/fixtures/report-html";
 
 function report(
   overrides: Partial<RespondentReport> = {},
@@ -60,6 +61,22 @@ function report(
 }
 
 describe("classic scored report HTML regions", () => {
+  it.each(["newly-issued", "historical-pinned"])(
+    "renders the complete Rockefeller offer in both authored regions for %s content",
+    () => {
+      render(<BrandedReport report={report({
+        reportHtml: {
+          introductionHtml: ROCKEFELLER_BOOK_OFFER_REPORT_HTML,
+          conclusionHtml: ROCKEFELLER_BOOK_OFFER_REPORT_HTML,
+        },
+      })} />);
+
+      expect(screen.getAllByText("Order your own personal copy", { exact: false })).toHaveLength(2);
+      expect(screen.getAllByRole("img", { name: "Mastering the Rockefeller Habits book cover" })).toHaveLength(2);
+      expect(screen.getAllByRole("link", { name: "here" })).toHaveLength(2);
+    },
+  );
+
   it("inserts the introduction after the cover and replaces the conclusion", () => {
     render(<BrandedReport report={report({
       reportHtml: {

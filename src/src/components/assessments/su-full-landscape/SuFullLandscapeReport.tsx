@@ -182,16 +182,18 @@ function CustomHtmlPage({
   report,
   html,
   number,
+  position,
 }: {
   report: RespondentReport;
   html: SafeReportHtmlFragment;
   number: number;
+  position: "introduction" | "conclusion";
 }) {
   return (
-    <SuFullLandscapePage number={number} footerBrand={report}>
+    <SuFullLandscapePage number={number} variant="authored" footerBrand={report}>
       <div className="su-full-landscape-custom-content">
         <ReportHtmlSection
-          position="introduction"
+          position={position}
           html={html}
           personalization={report}
         />
@@ -513,13 +515,13 @@ function DetailPage({
   );
 }
 
-function ConclusionPage({ report, model, contactEmail, number, beforeConclusion, conclusionHtml }: {
+function ConclusionPage({ report, model, contactEmail, number, beforeConclusion, hasAuthoredClosing }: {
   report: RespondentReport;
   model: SuFullLandscapeReportModel;
   contactEmail?: string | null;
   number: number;
   beforeConclusion?: ReactNode;
-  conclusionHtml?: SafeReportHtmlFragment | null;
+  hasAuthoredClosing: boolean;
 }) {
   const band = espertoConclusionBand(report, model.scaleUpScore);
   const highestResult = [...model.profileRows]
@@ -549,19 +551,11 @@ function ConclusionPage({ report, model, contactEmail, number, beforeConclusion,
             <p>{conclusionClosing(band)}</p>
           </div>
         </section>
-        {conclusionHtml ? (
-          <div className="su-full-landscape-custom-content">
-            <ReportHtmlSection
-              position="conclusion"
-              html={conclusionHtml}
-              personalization={report}
-            />
-          </div>
-        ) : (
+        {!hasAuthoredClosing ? (
           <div className="su-full-landscape-default-next-steps">
             <DefaultNextSteps report={report} contactEmail={contactEmail} />
           </div>
-        )}
+        ) : null}
       </div>
     </SuFullLandscapePage>
   );
@@ -662,7 +656,7 @@ export function SuFullLandscapeReport({
         {model.pages.map((page) => {
         switch (page.kind) {
           case "cover": return <CoverPage key={page.number} number={page.number} report={report} selfComparison={selfComparison} />;
-          case "preface": return <CustomHtmlPage key={page.number} number={page.number} report={report} html={report.reportHtml!.introductionHtml!} />;
+          case "preface": return <CustomHtmlPage key={page.number} number={page.number} report={report} html={report.reportHtml!.introductionHtml!} position="introduction" />;
           case "contents": return <ContentsPage key={page.number} model={model} number={page.number} footerBrand={report} />;
           case "introduction": return <IntroductionPage key={page.number} number={page.number} report={report} model={model} respondentDisplayName={respondentDisplayName} />;
           case "profile": return <ProfilePage key={page.number} number={page.number} model={model} footerBrand={report} selfComparison={selfComparison} />;
@@ -672,7 +666,8 @@ export function SuFullLandscapeReport({
             return <ChapterPage chapter={chapter} key={page.number} number={page.number} footerBrand={report} respondentDisplayName={respondentDisplayName} previousByKey={previousByKey} />;
           }
           case "detail": return <DetailPage key={page.number} page={page} questions={questions} peerProvenance={model.peerProvenance} footerBrand={report} previousByKey={previousByKey} />;
-          case "conclusion": return <ConclusionPage key={page.number} number={page.number} report={report} model={model} contactEmail={contactEmail} beforeConclusion={beforeConclusion} conclusionHtml={report.reportHtml?.conclusionHtml} />;
+          case "conclusion": return <ConclusionPage key={page.number} number={page.number} report={report} model={model} contactEmail={contactEmail} beforeConclusion={beforeConclusion} hasAuthoredClosing={Boolean(report.reportHtml?.conclusionHtml)} />;
+          case "closing": return <CustomHtmlPage key={page.number} number={page.number} report={report} html={report.reportHtml!.conclusionHtml!} position="conclusion" />;
           case "appendix": return <AppendixPage key={page.number} number={page.number} model={model} footerBrand={report} />;
           default: {
             const impossible: never = page;

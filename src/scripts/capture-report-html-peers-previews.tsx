@@ -153,9 +153,15 @@ export const REPORT_HTML_PEER_FIXTURES: readonly CaptureFixture[] = authoringCas
   { ...authoring, id: `${authoring.authoringCase}-historical` as const, peerReference: "historical" as const },
 ]);
 
+function logicalPageCount(fixture: CaptureFixture): number {
+  return 24
+    + Number(Boolean(fixture.introductionHtml))
+    + Number(Boolean(fixture.conclusionHtml));
+}
+
 export function artifactPathsFor(fixture: CaptureFixture) {
   const directory = join(REPORT_HTML_PEER_OUTPUT_DIRECTORY, fixture.id);
-  const lastPageNumber = fixture.introductionHtml ? 25 : 24;
+  const lastPageNumber = logicalPageCount(fixture);
   return {
     desktopPage2: join(directory, "desktop-page-2.png"),
     desktopLastPage: join(directory, `desktop-page-${lastPageNumber}.png`),
@@ -273,7 +279,7 @@ async function captureFixture(
   browser: Awaited<ReturnType<typeof chromium.launch>>,
 ): Promise<void> {
   const artifacts = artifactPathsFor(fixture);
-  const lastPageNumber = fixture.introductionHtml ? 25 : 24;
+  const lastPageNumber = logicalPageCount(fixture);
   await mkdir(join(REPORT_HTML_PEER_OUTPUT_DIRECTORY, fixture.id), { recursive: true });
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
   try {
