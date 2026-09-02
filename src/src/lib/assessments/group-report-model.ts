@@ -373,6 +373,15 @@ export interface GroupScoredSection {
   dev: number | null;
   n: number;
   /**
+   * Five Dysfunctions team score: mean across every contributing respondent,
+   * including the CEO, per the instrument's group-scoring instructions.
+   * Omitted for other scored report types so their CEO-vs-team contract stays
+   * unchanged.
+   */
+  groupMean?: number | null;
+  /** Number of respondents contributing to `groupMean` (Five Dysfunctions only). */
+  groupN?: number;
+  /**
    * Peers benchmark (Wave J / J-2). Attached ONLY for the SU-Full alias by
    * `applyBenchmarks`; `undefined` for every other template (omit-empty so the
    * renderer never shows a Peers column). `peers` = the static peer mean for
@@ -434,10 +443,27 @@ export interface GroupScoredQuestion {
   ceo: number | null;
   teamMean: number | null;
   n: number;
+  /** Five Dysfunctions mean across all named respondents, including the CEO. */
+  groupMean?: number | null;
+  /** Number of respondents contributing to `groupMean` (Five Dysfunctions only). */
+  groupN?: number;
+  /**
+   * Five Dysfunctions named answer columns, in the cohort's deterministic
+   * display order. A completed respondent with no usable score keeps a null
+   * cell so the report never silently drops a team member.
+   */
+  individualResponses?: GroupScoredIndividualResponse[];
   /** SU-Full answer-level Peers benchmark and signed CEO/team deviations. */
   peers?: number | null;
   devPeers?: number | null;
   devPeersTeam?: number | null;
+}
+
+export interface GroupScoredIndividualResponse {
+  respondentId: string;
+  name: string;
+  isCEO: boolean;
+  value: number | null;
 }
 
 /**
@@ -1165,6 +1191,7 @@ function parseScoreResult(result: unknown): ParsedScoreResult | null {
 
 /** A cohort member's parsed result, tagged CEO/non-CEO, for scored aggregation. */
 interface ScoredMember {
+  respondentId: string;
   isCEO: boolean;
   parsed: ParsedScoreResult;
 }
@@ -1181,6 +1208,21 @@ function teamMeanBy(
     if (v !== null) values.push(v);
   }
   return values.length > 0 ? { teamAvg: meanOf(values), n: values.length } : { teamAvg: null, n: 0 };
+}
+
+/** Mean across every respondent, including the CEO (Five Dysfunctions policy). */
+function groupMeanBy(
+  members: ScoredMember[],
+  get: (p: ParsedScoreResult) => number | null,
+): { groupMean: number | null; groupN: number } {
+  const values: number[] = [];
+  for (const member of members) {
+    const value = get(member.parsed);
+    if (value !== null) values.push(value);
+  }
+  return values.length > 0
+    ? { groupMean: meanOf(values), groupN: values.length }
+    : { groupMean: null, groupN: 0 };
 }
 
 /** The CEO submission's value via a getter (first CEO member; null when none). */
@@ -1200,20 +1242,29 @@ const devOf = (ceo: number | null, teamAvg: number | null): number | null =>
   ceo === null || teamAvg === null ? null : ceo - teamAvg;
 
 /**
- * Builds the scored aggregation: per-section + per-question CEO-vs-team rows,
- * plus the presence-driven headline blocks (domains / scaleUpScore / tier).
- * PURE — reads each member's parsed FROZEN result; never recomputes.
+ * Builds the scored aggregation from each member's parsed FROZEN result. Most
+ * scored aliases receive per-section and per-question CEO-vs-team rows plus the
+ * presence-driven headline blocks (domains / scaleUpScore / tier). Five
+ * Dysfunctions additionally receives named respondent values and means across
+ * every contributor, including the CEO. PURE — never recomputes an individual
+ * score.
  *
  * Section ORDER + display NAMES come from `version.sections` (mirrors the
  * per-respondent report); a section the version doesn't list falls back to the
  * result's own name. Only sections at least one submission scored are emitted.
  */
 function buildScoredReport(
+  alias: string,
   sectionsRaw: unknown,
   questionsByKey: Record<string, QuestionMeta>,
   scoredMembers: ScoredMember[],
+  respondents: GroupRespondent[],
 ): GroupScoredReport {
   const sectionList = parseGroupSections(sectionsRaw);
+  const showsNamedTeamResponses = alias === "five-dysfunctions";
+  const scoredMemberById = new Map(
+    scoredMembers.map((member) => [member.respondentId, member]),
+  );
 
   // Resolve a display name for a section key: version first, else result-carried.
   const versionName = new Map(sectionList.map((s) => [s.stableKey, s.name]));
@@ -1251,14 +1302,21 @@ function buildScoredReport(
       scoredMembers,
       (p) => p.sectionAvg.get(key) ?? null,
     );
-    sections.push({
+    const section: GroupScoredSection = {
       stableKey: key,
       name: versionName.get(key) ?? resultName(key),
       ceo,
       teamAvg,
       dev: devOf(ceo, teamAvg),
       n,
-    });
+    };
+    if (showsNamedTeamResponses) {
+      Object.assign(
+        section,
+        groupMeanBy(scoredMembers, (p) => p.sectionAvg.get(key) ?? null),
+      );
+    }
+    sections.push(section);
   }
 
   // Per-question rows — one per scored question any submission carries, in
@@ -1285,13 +1343,31 @@ function buildScoredReport(
       scoredMembers,
       (p) => p.questionValue.get(key) ?? null,
     );
-    questions.push({
+    const question: GroupScoredQuestion = {
       stableKey: key,
       label: stripLegacyDecimalSuffix(questionsByKey[key]?.label ?? key),
       ceo,
       teamMean: teamAvg,
       n,
-    });
+    };
+    if (showsNamedTeamResponses) {
+      Object.assign(
+        question,
+        groupMeanBy(scoredMembers, (p) => p.questionValue.get(key) ?? null),
+        {
+          individualResponses: respondents.map((respondent) => ({
+            respondentId: respondent.respondentId,
+            name: respondent.name,
+            isCEO: respondent.isCEO,
+            value:
+              scoredMemberById
+                .get(respondent.respondentId)
+                ?.parsed.questionValue.get(key) ?? null,
+          })),
+        },
+      );
+    }
+    questions.push(question);
   }
 
   const report: GroupScoredReport = {
@@ -1687,15 +1763,25 @@ export function buildGroupReportModel(input: GroupReportInput): CampaignGroupRep
         degraded = true;
         continue;
       }
-      scoredMembers.push({ isCEO: m.isCEO, parsed });
+      scoredMembers.push({ respondentId: m.respondentId, isCEO: m.isCEO, parsed });
       parsedById.set(m.respondentId, parsed);
     }
-    scored = buildScoredReport(input?.version?.sections, questionsByKey, scoredMembers);
+    scored = buildScoredReport(
+      input?.alias,
+      input?.version?.sections,
+      questionsByKey,
+      scoredMembers,
+      respondents,
+    );
     // Appendix B (Task 3) — the pseudonymized per-member domain grid. Built ONLY
     // when the scored report carries per-domain scores (i.e. SU-Full), in the
     // cohort's display order (`respondents`). Non-domain scored reports
     // (Rockefeller / Five-D) leave appendixB undefined → renderer omits it.
-    if (scored.domains && scored.domains.length > 0) {
+    if (
+      input?.alias === "scaling-up-full" &&
+      scored.domains &&
+      scored.domains.length > 0
+    ) {
       scored.appendixB = buildAppendixB(respondents, parsedById);
     }
     // Attach the static Peers benchmark (SU-Full only); the result drives the

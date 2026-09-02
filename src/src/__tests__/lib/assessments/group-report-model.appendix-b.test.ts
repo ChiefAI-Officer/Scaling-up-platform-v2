@@ -134,6 +134,13 @@ describe("scored Appendix B — SU-Full pseudonymized per-member domain grid", (
     expect(m.scored!.appendixB).toBeUndefined();
   });
 
+  it("is ABSENT for Five Dysfunctions even when its result carries domains", () => {
+    const input = { ...fixtureScalingUpFull(), alias: "five-dysfunctions" };
+    const m = buildGroupReportModel(input);
+    expect(m.scored!.domains).toBeDefined();
+    expect(m.scored!.appendixB).toBeUndefined();
+  });
+
   it("is ABSENT on an empty cohort", () => {
     const input = { ...fixtureScalingUpFull(), submissions: [] };
     const m = buildGroupReportModel(input);

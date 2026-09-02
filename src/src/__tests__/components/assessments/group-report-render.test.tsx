@@ -508,6 +508,74 @@ describe("ScoredGroupReport", () => {
     expect(band).toHaveTextContent(/Needs Focus/);
   });
 
+  it("renders Five Dysfunctions as named individual answers with a team average", () => {
+    const report = scoredReport();
+    report.scored!.sections = report.scored!.sections.map((section) => ({
+      ...section,
+      groupMean: section.teamAvg,
+      groupN: section.n,
+    }));
+    Object.assign(report.scored!.questions[0], {
+      groupMean: 5,
+      groupN: 3,
+      individualResponses: [
+        { respondentId: "r-ceo", name: "John CEOExec", isCEO: true, value: 4 },
+        { respondentId: "r-hr", name: "Kathy HR", isCEO: false, value: 5 },
+        { respondentId: "r-svc", name: "Jeff Services", isCEO: false, value: 6 },
+      ],
+    });
+    report.scored!.appendixB = [
+      {
+        personLabel: "Person 1",
+        domainScores: { people: null, strategy: null, execution: null, cash: null },
+      },
+    ];
+
+    render(
+      <ScoredGroupReport
+        report={report}
+        {...provenance({
+          assessmentName: "The Five Dysfunctions of a Team",
+          templateAlias: "five-dysfunctions",
+        })}
+      />,
+    );
+
+    expect(
+      screen.getByRole("heading", { name: "Your Five Dysfunctions of a Team Report" }),
+    ).toBeInTheDocument();
+    const matrix = screen.getByTestId("group-scored-individual-responses");
+    expect(within(matrix).getByRole("columnheader", { name: /John CEOExec/i })).toBeInTheDocument();
+    expect(within(matrix).getByRole("columnheader", { name: "Kathy HR" })).toBeInTheDocument();
+    expect(within(matrix).getByRole("columnheader", { name: "Jeff Services" })).toBeInTheDocument();
+    expect(within(matrix).getByRole("columnheader", { name: /Team average/i })).toBeInTheDocument();
+    const row = within(matrix).getByTestId("group-scored-individual-question-q_values");
+    expect(within(row).getByText("4")).toBeInTheDocument();
+    expect(within(row).getAllByText("5")).toHaveLength(2);
+    expect(within(row).getByText("6")).toBeInTheDocument();
+    expect(screen.getByText("Individual answers and team average")).toBeInTheDocument();
+    expect(screen.queryByTestId("group-scored-question-q_values")).not.toBeInTheDocument();
+    const teamSummary = screen.getByTestId("group-scored-team-summary");
+    expect(within(teamSummary).getByRole("columnheader", { name: "Team average" })).toBeInTheDocument();
+    expect(within(teamSummary).queryByRole("columnheader", { name: "CEO" })).not.toBeInTheDocument();
+    expect(within(teamSummary).queryByRole("columnheader", { name: "Dev" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("group-scored-profile")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("group-scored-ceo-tier")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("group-scored-appendix-b")).not.toBeInTheDocument();
+  });
+
+  it("keeps the existing CEO-vs-team bars when named responses are absent", () => {
+    render(
+      <ScoredGroupReport
+        report={scoredReport()}
+        {...provenance({ assessmentName: "Rockefeller Habits" })}
+      />,
+    );
+
+    expect(screen.getByTestId("group-scored-question-q_values")).toBeInTheDocument();
+    expect(screen.queryByTestId("group-scored-individual-responses")).not.toBeInTheDocument();
+  });
+
   // ── Wave J / J-2 — Peers benchmark + tier suppression (SU-Full) ────────────
 
   /** SU-Full-shaped scored report: domains + ScaleUp + peers, tier suppressed. */
