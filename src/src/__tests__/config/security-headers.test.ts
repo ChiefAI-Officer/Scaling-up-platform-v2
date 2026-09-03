@@ -1,11 +1,12 @@
 import nextConfig from "../../../next.config";
 import vercelConfig from "../../../vercel.json";
 
-function expectBlobConnectSource(csp: string | undefined) {
+function expectBlobConnectSources(csp: string | undefined) {
   const connectSource = csp
     ?.split("; ")
     .find((directive) => directive.startsWith("connect-src "));
 
+  expect(connectSource?.split(" ")).toContain("https://vercel.com");
   expect(connectSource?.split(" ")).toContain(
     "https://*.vercel-storage.com",
   );
@@ -19,7 +20,7 @@ describe("security headers", () => {
       (header) => header.key === "Content-Security-Policy-Report-Only",
     )?.value;
 
-    expectBlobConnectSource(csp);
+    expectBlobConnectSources(csp);
   });
 
   it("allows Vercel Blob connections in the enforced deployment policy", () => {
@@ -30,6 +31,6 @@ describe("security headers", () => {
       (header) => header.key === "Content-Security-Policy",
     )?.value;
 
-    expectBlobConnectSource(csp);
+    expectBlobConnectSources(csp);
   });
 });
