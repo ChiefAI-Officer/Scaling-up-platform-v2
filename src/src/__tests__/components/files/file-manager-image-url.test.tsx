@@ -37,8 +37,25 @@ describe("FileManager image URLs", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Copy image URL" }));
 
-    expect(await screen.findByText("Image URL copied")).toBeInTheDocument();
+    expect(await screen.findByRole("status")).toHaveTextContent("Image URL copied");
     expect(clipboardWrite).toHaveBeenCalledWith(image.publicUrl);
+  });
+
+  it("replaces stale success feedback when copying fails", async () => {
+    clipboardWrite
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error("clipboard denied"));
+    render(<FileManager initialFiles={[image]} workshops={[]} />);
+
+    const copyButton = screen.getByRole("button", { name: "Copy image URL" });
+    fireEvent.click(copyButton);
+    expect(await screen.findByRole("status")).toHaveTextContent("Image URL copied");
+
+    fireEvent.click(copyButton);
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Could not copy image URL",
+    );
+    expect(screen.queryByText("Image URL copied")).not.toBeInTheDocument();
   });
 
   it("copies an image's public URL from the compact file card", async () => {

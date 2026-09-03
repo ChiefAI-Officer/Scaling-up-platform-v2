@@ -186,6 +186,7 @@ export function FileManager({
 
   async function handleCopyImageUrl(publicUrl: string) {
     setError(null);
+    setSuccess(null);
     try {
       await navigator.clipboard.writeText(publicUrl);
       setSuccess("Image URL copied");
@@ -276,12 +277,12 @@ export function FileManager({
 
       {/* Status Messages */}
       {error && (
-        <div className="rounded-md bg-destructive/10 p-4">
+        <div role="alert" className="rounded-md bg-destructive/10 p-4">
           <p className="text-sm text-destructive">{error}</p>
         </div>
       )}
       {success && (
-        <div className="rounded-md bg-success/10 p-4">
+        <div role="status" className="rounded-md bg-success/10 p-4">
           <p className="text-sm text-success">{success}</p>
         </div>
       )}
