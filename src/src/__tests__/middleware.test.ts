@@ -10,11 +10,11 @@ jest.mock("next-auth/middleware", () => ({
   },
 }));
 
-function response() {
+function response(status = 200) {
   const values = new Map<string, string>();
   return {
     headers: { set: (name: string, value: string) => values.set(name, value), get: (name: string) => values.get(name) },
-    status: 200,
+    status,
   };
 }
 
@@ -22,7 +22,7 @@ jest.mock("next/server", () => ({
   NextResponse: {
     next: () => response(),
     redirect: () => response(),
-    json: () => response(),
+    json: (_body: unknown, init?: { status?: number }) => response(init?.status),
   },
 }));
 jest.mock("@/lib/global-rate-limit", () => ({
@@ -97,5 +97,25 @@ describe("CEO self-report middleware policy", () => {
     const condensed = runMiddleware("/assessments/campaign-1/report/condensed", { sub: "user-1" });
     expect(group.headers.get("Cache-Control")).toBe("no-store, private");
     expect(condensed.headers.get("Cache-Control")).toBe("no-store, private");
+  });
+});
+
+describe("Vercel Blob completion callback middleware policy", () => {
+  it("allows only the signed client-upload callback route through without a session", () => {
+    expect(
+      mockAuthOptions?.callbacks.authorized({
+        token: null,
+        req: request("/api/files/client-upload"),
+      }),
+    ).toBe(true);
+    expect(runMiddleware("/api/files/client-upload").status).toBe(200);
+
+    expect(
+      mockAuthOptions?.callbacks.authorized({
+        token: null,
+        req: request("/api/files"),
+      }),
+    ).toBe(false);
+    expect(runMiddleware("/api/files").status).toBe(401);
   });
 });

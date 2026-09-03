@@ -21,6 +21,7 @@ export const PUBLIC_REFERRAL_REPORT_NO_STORE_REGEX =
   /^\/assessments\/public-submissions\/[^/]+\/report\/?$/;
 const CEO_SELF_REPORT_PATH = "/assessments/self-report";
 const CEO_SELF_REPORT_EXCHANGE_PATH = "/assessments/self-report/exchange";
+const BLOB_CLIENT_UPLOAD_CALLBACK_PATH = "/api/files/client-upload";
 
 function withRateLimitHeaders(
   response: NextResponse,
@@ -95,6 +96,9 @@ export default withAuth(
         pathname.startsWith("/api/inngest") ||
         pathname.startsWith("/api/health") ||
         pathname.startsWith("/api/docs") ||
+        // Vercel Blob signs completion callbacks; the route itself still
+        // requires an authenticated actor before issuing client upload tokens.
+        pathname === BLOB_CLIENT_UPLOAD_CALLBACK_PATH ||
         pathname.match(/^\/api\/workshops\/[^/]+\/register$/) ||
         // Survey fetch and submit are public (survey links in workflow emails must work unauthenticated)
         // Negative lookahead excludes /api/surveys/assign and /api/surveys/workflows (stay protected)
@@ -161,6 +165,7 @@ export default withAuth(
           pathname.startsWith("/api/inngest") ||
           pathname.startsWith("/api/health") ||
           pathname.startsWith("/api/docs") ||
+          pathname === BLOB_CLIENT_UPLOAD_CALLBACK_PATH ||
           (pathname.startsWith("/api/registrations") && !pathname.startsWith("/api/registrations/export")) ||
           pathname.startsWith("/api/checkout") ||
           pathname.match(/^\/api\/workshops\/[^/]+\/register$/) ||
