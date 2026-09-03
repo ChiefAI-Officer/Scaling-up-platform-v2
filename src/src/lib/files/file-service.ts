@@ -145,11 +145,16 @@ export async function getWorkflowStepFiles(workflowStepId: string) {
   });
 }
 
-export function mapFileForClient<T extends { id: string; blobUrl?: string | null }>(file: T) {
-  const { blobUrl: _blobUrl, ...rest } = file;
+export function mapFileForClient<
+  T extends { id: string; blobUrl?: string | null; contentType: string },
+>(file: T) {
+  const { blobUrl, ...rest } = file;
   return {
     ...rest,
     downloadUrl: getSessionDownloadPath(file.id),
+    ...(file.contentType.startsWith("image/") && blobUrl
+      ? { publicUrl: blobUrl }
+      : {}),
   };
 }
 
