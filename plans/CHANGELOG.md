@@ -6,6 +6,19 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="embeddable-workshop-images"></a>
+### 2026-09-03 — Embeddable workshop images <!-- ENTRY_ISO:2026-09-03 ENTRY_SLUG:embeddable-workshop-images -->
+
+**Status: IMPLEMENTED AND VERIFIED; DEDICATED PRODUCTION/PREVIEW BLOB STORE PROVISIONED; AWAITING PR MERGE AND REDEPLOY.** GH #432 completes Jeff's File Manager workflow for custom HTML: the shared client mapper now exposes a Blob `publicUrl` only when the stored content type begins with `image/`, and both desktop and compact File Manager surfaces offer **Copy image URL** with accessible success/failure feedback. Non-image files never receive `publicUrl` and retain the existing authenticated `/api/files/<id>/download` path, preserving the separate protected-document delivery boundary.
+
+**Storage and browser policy.** The `scaling-up` Vercel team now has a dedicated public `scaling-up-file-attachments` Blob store in `iad1`, connected to `scaling-up-platform-v2` for Production and Preview under the default `BLOB` prefix. It replaces the stale manually configured `BLOB_READ_WRITE_TOKEN`; the existing private `scaling-up-summary-reports` store and its `SUMMARY_REPORT_BLOB_*` variables remain unchanged. GH #431 adds both the installed SDK's client-upload API (`https://vercel.com`) and its object hosts (`https://*.vercel-storage.com`) to `connect-src` in the Next.js report-only header and Vercel's enforced deployment header. Live preview diagnosis proved the distinction: token generation returned 200 while the initial Blob transfer remained at 0% until the API origin was allowed. The existing image sanitizer and `img-src` policy already accept HTTPS Vercel Blob URLs.
+
+**Signed completion callback.** The first successful Blob transfer exposed the second half of the previously unexercised client-upload path: Vercel's sessionless, signed `blob.upload-completed` callback was intercepted by global authentication middleware before the route could verify it and create `FileAttachment`. Middleware now admits only the exact `/api/files/client-upload` callback path; the route still requires an authenticated actor for `blob.generate-client-token`, while the Blob SDK verifies completion signatures against the store credential. Every other `/api/files` endpoint remains session-protected.
+
+**Verification receipt.** Image/non-image mapper tests, desktop and compact copy-action tests, clipboard rejection recovery, accessibility announcements, exact callback middleware isolation, authenticated token generation, signed completion persistence, and both CSP layers pass. The file-focused matrix passes **7 suites / 45 tests**, the mapper/CSP matrix passes **2 suites / 4 tests**, and the pre-live-fix complete repository passes **811 suites / 10,129 tests / 16 snapshots**. Exact changed-file ESLint, diff hygiene, all **51** migration-safety checks, Prisma deployment state, Turbopack compilation, TypeScript, and **95/95 pages** pass. Independent specification and standards reviews found no remaining actionable issue before live preview exposed and drove the two client-upload integration corrections above. Final live proof requires the corrected deployment: upload a PNG, confirm the new `FileAttachment` row, copy the image URL, load it logged out, and render it from workshop custom HTML.
+
+---
+
 <a id="five-dysfunctions-named-team-report"></a>
 ### 2026-09-03 — Five Dysfunctions named team report <!-- ENTRY_ISO:2026-09-03 ENTRY_SLUG:five-dysfunctions-named-team-report -->
 

@@ -10,7 +10,7 @@ export interface FileRecord {
   id: string;
   filename: string;
   downloadUrl: string;
-  blobUrl?: string | null;
+  publicUrl?: string;
   contentType: string;
   sizeBytes: number;
   workshopId: string | null;
@@ -42,11 +42,13 @@ export function getFileIcon(contentType: string): string {
 export function FileRecordCard({
   file,
   deleting,
+  onCopyImageUrl,
   onEdit,
   onDelete,
 }: {
   file: FileRecord;
   deleting: boolean;
+  onCopyImageUrl: (publicUrl: string) => void;
   onEdit: (file: FileRecord) => void;
   onDelete: (fileId: string, filename: string) => void;
 }) {
@@ -80,6 +82,20 @@ export function FileRecordCard({
               Download
             </a>
           </ResponsiveActionsItem>
+          {file.contentType.startsWith("image/") && file.publicUrl && (
+            <ResponsiveActionsItem asChild>
+              <button
+                type="button"
+                onClick={() =>
+                  file.publicUrl && onCopyImageUrl(file.publicUrl)
+                }
+                className="flex min-h-11 w-full cursor-pointer items-center rounded-md px-3 text-left text-sm outline-none focus:bg-muted"
+                data-touch-target
+              >
+                Copy image URL
+              </button>
+            </ResponsiveActionsItem>
+          )}
           <ResponsiveActionsItem asChild>
             <button
               type="button"

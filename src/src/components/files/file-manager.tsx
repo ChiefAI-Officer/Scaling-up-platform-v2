@@ -184,6 +184,17 @@ export function FileManager({
     }
   }
 
+  async function handleCopyImageUrl(publicUrl: string) {
+    setError(null);
+    setSuccess(null);
+    try {
+      await navigator.clipboard.writeText(publicUrl);
+      setSuccess("Image URL copied");
+    } catch {
+      setError("Could not copy image URL");
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Upload Form */}
@@ -266,12 +277,12 @@ export function FileManager({
 
       {/* Status Messages */}
       {error && (
-        <div className="rounded-md bg-destructive/10 p-4">
+        <div role="alert" className="rounded-md bg-destructive/10 p-4">
           <p className="text-sm text-destructive">{error}</p>
         </div>
       )}
       {success && (
-        <div className="rounded-md bg-success/10 p-4">
+        <div role="status" className="rounded-md bg-success/10 p-4">
           <p className="text-sm text-success">{success}</p>
         </div>
       )}
@@ -330,6 +341,7 @@ export function FileManager({
                     key={file.id}
                     file={file}
                     deleting={deletingId === file.id}
+                    onCopyImageUrl={handleCopyImageUrl}
                     onEdit={openEdit}
                     onDelete={handleDelete}
                   />
@@ -431,6 +443,17 @@ export function FileManager({
                         >
                           View
                         </a>
+                        {file.contentType.startsWith("image/") && file.publicUrl && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              file.publicUrl && handleCopyImageUrl(file.publicUrl)
+                            }
+                            className="text-sm font-medium text-primary hover:text-primary/80"
+                          >
+                            Copy image URL
+                          </button>
+                        )}
                         <button
                           onClick={() => openEdit(file)}
                           className="text-sm font-medium text-muted-foreground hover:text-foreground"

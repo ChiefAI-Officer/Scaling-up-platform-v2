@@ -35,6 +35,7 @@ describe("FileRecordCard", () => {
       <FileRecordCard
         file={file}
         deleting={false}
+        onCopyImageUrl={jest.fn()}
         onEdit={jest.fn()}
         onDelete={jest.fn()}
       />,
