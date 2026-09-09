@@ -72,19 +72,10 @@ import { isSuFullLandscapeReportEnabled } from "@/lib/assessments/wave-su-full-l
 import { isSuFullPeerPresentationForReport } from "@/lib/assessments/su-full-peer-presentation";
 import { SCALING_UP_FULL_TEMPLATE_ALIAS } from "@/lib/assessments/su-full-question-benchmarks";
 import { ReportHtmlSection } from "@/components/assessments/ReportHtmlSection";
+import { DomainResultsCards } from "@/components/assessments/FiveCategoryResults";
 import type { ReactNode } from "react";
 
 const LOGO_SRC = "/brand/su-logo-white.svg";
-
-// WCAG-AA contrast-safe text colors for the per-decision average numerals.
-// Bright domain colors (People #f7a600 = 2.02:1, Cash #95c11f = 2.12:1) fail
-// the 3.0:1 large-text threshold on white. Use darkened variants per mockup.
-const DOMAIN_TEXT_COLOR: Record<string, string> = {
-  people: "#946b36",    // darkened from #f7a600
-  strategy: "#008bd2",  // already passes (~3.5:1)
-  execution: "#946b36", // already the stripe color — passes
-  cash: "#6f9200",      // darkened from #95c11f
-};
 
 // ── Defensive view of the raw version `sections` JSON ──────────────────────
 // Sections are stored as a flat JSON array of { stableKey, name, domain? }.
@@ -509,7 +500,6 @@ export function LegacyClassicReport({
     return { key: d.key, label: d.label || d.key, color, avg, pct, points, message };
   });
   const hasDomainCards = domainCards.length > 0;
-  const hasDomainMessages = domainCards.some((domain) => domain.message !== null);
   const splitDomainResults = domainResults?.layout === "split";
 
   // ── Recommendations grouped by section (only non-empty) ──────────────────
@@ -730,89 +720,13 @@ export function LegacyClassicReport({
 
       {/* ── 2b. Per-decision cards (domain templates only) ──────────────── */}
       {hasDomainCards && (
-        <section className="su-report-decisions" data-testid="report-decisions">
-          <div className="su-report-eyebrow">{domainResults?.eyebrow ?? "How you scored, by decision"}</div>
-          <h2 className="su-h2 su-report-sec-title">{domainResults?.title ?? "Your Four Decisions"}</h2>
-          <div
-            className={[
-              "su-report-card-grid",
-              hasDomainMessages ? "su-report-card-grid-with-messages" : null,
-              splitDomainResults ? "su-report-card-grid-split" : null,
-            ]
-              .filter(Boolean)
-              .join(" ")}
-          >
-            {domainCards.map((d) => {
-              const scoreContent = (
-                <>
-                  <div className="su-report-decision-head">
-                    <span className="su-report-decision-name">{d.label}</span>
-                    <span
-                      className="su-report-decision-avg"
-                      style={{
-                        color: DOMAIN_TEXT_COLOR[d.key.toLowerCase()] ?? d.color,
-                      }}
-                    >
-                      {d.avg === null ? "—" : formatNumber(d.avg)}
-                    </span>
-                  </div>
-                  <div className="su-report-decision-bar">
-                    <i style={{ width: `${d.pct}%`, backgroundColor: d.color }} />
-                  </div>
-                  <div className="su-report-decision-sub">
-                    {formatNumber(d.points)} points
-                  </div>
-                </>
-              );
-              const messageContent = d.message ? (
-                <p
-                  className="su-report-domain-tier-message"
-                  data-testid={`domain-tier-message-${d.key}`}
-                >
-                  {d.message}
-                </p>
-              ) : null;
-
-              if (splitDomainResults) {
-                return (
-                  <div
-                    className="su-report-domain-result-row"
-                    key={d.key}
-                    data-testid={`decision-card-${d.key}`}
-                  >
-                    <div
-                      className="su-report-decision-card su-report-domain-score-card"
-                      style={{ borderLeftColor: d.color }}
-                    >
-                      {scoreContent}
-                    </div>
-                    {messageContent}
-                  </div>
-                );
-              }
-
-              return (
-                <div
-                  className={hasDomainMessages ? "su-report-decision-card su-report-decision-card-with-message" : "su-report-decision-card"}
-                  key={d.key}
-                  data-testid={`decision-card-${d.key}`}
-                  style={{ borderLeftColor: d.color }}
-                >
-                  {hasDomainMessages ? (
-                    <>
-                      <div className="su-report-decision-score">
-                        {scoreContent}
-                      </div>
-                      {messageContent}
-                    </>
-                  ) : (
-                    scoreContent
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </section>
+        <DomainResultsCards
+          categories={domainCards}
+          eyebrow={domainResults?.eyebrow ?? "How you scored, by decision"}
+          title={domainResults?.title ?? "Your Four Decisions"}
+          testId="report-decisions"
+          split={splitDomainResults}
+        />
       )}
 
       <ReportComparisonContent

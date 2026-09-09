@@ -247,6 +247,59 @@ describe("scored per-question", () => {
     });
   });
 
+  it("builds Five Categories from all-respondent frozen scores and the pinned tier narratives", () => {
+    const input = { ...fixtureRockefeller(), alias: "five-dysfunctions" };
+    input.version = {
+      ...input.version,
+      sections: (input.version.sections as Array<Record<string, unknown>>).map((section) =>
+        section.stableKey === "S1" ? { ...section, domain: "trust" } : section,
+      ),
+      scoringConfig: {
+        tierMetric: "overallAvg",
+        passThreshold: 0,
+        tiers: [{ minMetric: 0, maxMetric: 100, label: "Submitted", message: "" }],
+        domains: [
+          {
+            key: "trust",
+            label: "Trust",
+            tiers: [
+              { minMetric: 1, maxMetric: 3.25, label: "Low", message: "Trust low" },
+              { minMetric: 3.25, maxMetric: 3.75, label: "Medium", message: "Trust medium" },
+              { minMetric: 3.75, maxMetric: 5, label: "High", message: "Trust high" },
+            ],
+          },
+        ],
+      },
+    };
+
+    for (const submission of input.submissions) {
+      const result = submission.result as Record<string, unknown>;
+      const perSection = result.perSection as Array<Record<string, unknown>>;
+      const trust = perSection.find((section) => section.stableKey === "S1")!;
+      result.perDomain = [
+        {
+          key: "trust",
+          label: "Trust",
+          averagePoints: trust.averagePoints,
+          tier: null,
+        },
+      ];
+    }
+
+    const categories = scoredOf(input).categoryResults;
+
+    expect(categories).toEqual([
+      {
+        key: "trust",
+        label: "Trust",
+        averagePoints: 1.5,
+        points: 3,
+        respondentCount: 4,
+        message: "Trust low",
+      },
+    ]);
+  });
+
   it("uses legacy section-embedded question membership when all question metadata lacks a section", () => {
     const base = fixtureRockefeller();
     const questions = (base.version.questions as Array<Record<string, unknown>>).map(
@@ -331,6 +384,7 @@ describe("scored per-question", () => {
     expect(q).not.toHaveProperty("groupN");
     expect(q).not.toHaveProperty("individualResponses");
     expect(scored).not.toHaveProperty("sectionBreakdown");
+    expect(scored).not.toHaveProperty("categoryResults");
   });
 
   it("Five Dysfunctions keeps a named row with a null value when a respondent skipped a question", () => {

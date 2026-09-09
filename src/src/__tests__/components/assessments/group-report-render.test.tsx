@@ -554,6 +554,24 @@ describe("ScoredGroupReport", () => {
         ],
       },
     ];
+    report.scored!.categoryResults = [
+      {
+        key: "trust",
+        label: "Trust",
+        averagePoints: 3.38,
+        points: 27,
+        respondentCount: 3,
+        message: "Your team may need to get more comfortable being vulnerable and open.",
+      },
+      {
+        key: "conflict",
+        label: "Conflict",
+        averagePoints: 4,
+        points: 32,
+        respondentCount: 3,
+        message: "Your team is comfortable engaging in unfiltered discussion around important topics.",
+      },
+    ];
     report.scored!.appendixB = [
       {
         personLabel: "Person 1",
@@ -585,10 +603,19 @@ describe("ScoredGroupReport", () => {
     expect(within(row).getByText("6")).toBeInTheDocument();
     expect(screen.getByText("Individual answers and team average")).toBeInTheDocument();
     expect(screen.queryByTestId("group-scored-question-q_values")).not.toBeInTheDocument();
-    const teamSummary = screen.getByTestId("group-scored-team-summary");
-    expect(within(teamSummary).getByRole("columnheader", { name: "Team average" })).toBeInTheDocument();
-    expect(within(teamSummary).queryByRole("columnheader", { name: "CEO" })).not.toBeInTheDocument();
-    expect(within(teamSummary).queryByRole("columnheader", { name: "Dev" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("group-scored-team-summary")).not.toBeInTheDocument();
+    const categories = screen.getByTestId("group-scored-five-categories");
+    expect(within(categories).getByText("How the team scored, by area")).toBeInTheDocument();
+    expect(within(categories).getByRole("heading", { name: "The Five Categories" })).toBeInTheDocument();
+    expect(within(categories).getAllByTestId(/^decision-card-/)).toHaveLength(2);
+    expect(screen.getByTestId("decision-card-trust")).toHaveClass("su-report-domain-result-row");
+    expect(screen.getByTestId("decision-card-trust").querySelector(".su-report-domain-score-card"))
+      .toHaveClass("su-report-decision-card");
+    expect(within(screen.getByTestId("decision-card-trust")).getByText("3.38")).toBeInTheDocument();
+    expect(within(screen.getByTestId("decision-card-trust")).getByText("27 points")).toBeInTheDocument();
+    expect(screen.getByTestId("domain-tier-message-trust")).toHaveTextContent(
+      "Your team may need to get more comfortable being vulnerable and open.",
+    );
     const breakdown = screen.getByTestId("group-scored-section-breakdown");
     expect(within(breakdown).getByRole("heading", {
       name: "How the team scored, section by section",
@@ -608,7 +635,7 @@ describe("ScoredGroupReport", () => {
         .getByText("2"),
     ).toBeInTheDocument();
     expect(
-      teamSummary.compareDocumentPosition(breakdown)
+      categories.compareDocumentPosition(breakdown)
         & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(

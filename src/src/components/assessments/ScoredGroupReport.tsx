@@ -35,6 +35,7 @@ import type {
   GroupAppendixBRow,
 } from "@/lib/assessments/group-report-model";
 import { APPENDIX_B_DOMAIN_KEYS } from "@/lib/assessments/group-report-model";
+import { FiveCategoryResults } from "@/components/assessments/FiveCategoryResults";
 import {
   GroupReportCover,
   GroupReportAsOf,
@@ -213,40 +214,6 @@ function toProfileRows(sections: GroupScoredSection[]): ProfileRow[] {
     devPeers: s.devPeers,
     devPeersTeam: s.devPeersTeam,
   }));
-}
-
-function TeamSummaryTable({ sections }: { sections: GroupScoredSection[] }) {
-  return (
-    <div className="su-group-prof-scroll">
-      <table
-        className="su-group-prof su-group-team-summary"
-        data-testid="group-scored-team-summary"
-      >
-        <thead>
-          <tr>
-            <th scope="col">Team fundamental</th>
-            <th scope="col">Team average</th>
-            <th scope="col">Responses</th>
-          </tr>
-        </thead>
-        <tbody>
-          {sections.map((section) => (
-            <tr key={section.stableKey}>
-              <th scope="row">{section.name}</th>
-              <td>
-                {section.groupMean == null ? (
-                  <span className="su-group-na">—</span>
-                ) : (
-                  formatGroupNumber(section.groupMean)
-                )}
-              </td>
-              <td>{section.groupN ?? 0}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
 }
 
 function TeamSectionBreakdown({
@@ -670,7 +637,9 @@ export function ScoredGroupReport(props: GroupReportProps) {
                     The team score for each fundamental averages every completed
                     respondent, including the CEO.
                   </p>
-                  <TeamSummaryTable sections={scored.sections} />
+                  {scored.categoryResults && scored.categoryResults.length > 0 ? (
+                    <FiveCategoryResults categories={scored.categoryResults} />
+                  ) : null}
                 </>
               ) : (
                 <>
