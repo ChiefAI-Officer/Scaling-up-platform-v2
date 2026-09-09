@@ -6,6 +6,15 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="five-dysfunctions-group-five-categories"></a>
+### 2026-09-10 — Five Dysfunctions group Five Categories <!-- ENTRY_ISO:2026-09-10 ENTRY_SLUG:five-dysfunctions-group-five-categories -->
+
+**Status: RELEASE SCOPE — IMPLEMENTED AND VERIFIED.** Jeff confirmed that the Five Dysfunctions group-report summary must use the individual report's **The Five Categories** presentation rather than the plain `Team fundamental | Team average | Responses` table. The group report now renders Trust, Conflict, Commitment, Accountability, and Results as the same split score-card and narrative rows used by the individual report: category name, large score, meter, points subtext, and the matching interpretation on the right. The eyebrow is group-specific (**How the team scored, by area**); the title and visual treatment match the individual report.
+
+**Group scoring and compatibility.** Each category score is the mean of every completed respondent's frozen per-domain score, including the CEO. Points are the mean of the corresponding frozen section totals. The interpretation is resolved at that group average from the pinned Template Version's domain tiers, preserving the individual report's exact Low/Medium/High thresholds and messages without hardcoding example values. A single shared renderer now owns the individual and group category markup, preventing future visual drift. The completion/version/CEO provenance strip remains, and Jeff's already-accepted section-by-section statement cards and named-response matrix remain unchanged and in the same order below the category results. Non-5D group reports are unchanged; no schema, migration, environment variable, invitation, response, or persisted report changed.
+
+**Verification receipt.** TDD covered all-respondent frozen-score aggregation, average frozen points, pinned tier narrative selection, alias isolation, removal of the old table, exact split-card anatomy, group wording, values, and ordering before the accepted breakdown and matrix. The focused individual/group/model matrix passes **3 suites / 114 tests / 1 snapshot**. The complete repository passes **811 suites / 10,136 tests / 16 snapshots** after the shared-renderer extraction. Changed-file ESLint and diff hygiene emit no diagnostics, all **51** migration-safety checks pass, and the Turbopack production build compiles, passes TypeScript, and generates **95/95 pages**. Existing missing-local-database, Inngest-key, workspace-root, and middleware-deprecation build warnings remain non-fatal.
+
 <a id="five-dysfunctions-group-section-breakdown"></a>
 ### 2026-09-09 — Five Dysfunctions group section breakdown <!-- ENTRY_ISO:2026-09-09 ENTRY_SLUG:five-dysfunctions-group-section-breakdown -->
 

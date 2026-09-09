@@ -321,6 +321,12 @@ export interface GroupScoredReport {
    */
   sectionBreakdown?: GroupScoredSectionBreakdown[];
   /**
+   * Five Dysfunctions only — the same five category cards shown on an
+   * individual report, aggregated across every completed respondent (CEO
+   * included). Order, labels, and narratives come from the pinned version.
+   */
+  categoryResults?: GroupScoredCategoryResult[];
+  /**
    * Wave J/K (Task 3) — Esperto "Anonymous Team" Appendix B: a pseudonymized,
    * de-identified per-member domain grid. Present iff `domains` is present (i.e.
    * SU-Full, the only scored group report carrying per-domain scores). One row
@@ -333,6 +339,18 @@ export interface GroupScoredReport {
    * non-domain scored report so the renderer omits the grid entirely.
    */
   appendixB?: GroupAppendixBRow[];
+}
+
+export interface GroupScoredCategoryResult {
+  key: string;
+  label: string;
+  /** Mean of the respondents' frozen per-domain averages, CEO included. */
+  averagePoints: number | null;
+  /** Mean of the respondents' frozen section total-points, CEO included. */
+  points: number | null;
+  respondentCount: number;
+  /** Tier narrative resolved from the pinned domain tiers at averagePoints. */
+  message: string | null;
 }
 
 export interface GroupScoredBreakdownRow {
@@ -660,6 +678,7 @@ interface GroupRawSection {
   stableKey: string;
   name: string;
   questionKeys: string[];
+  domain?: string;
 }
 
 function isGroupRawSection(v: unknown): v is Record<string, unknown> {
@@ -684,6 +703,7 @@ function parseGroupSections(sections: unknown): GroupRawSection[] {
       stableKey: r.stableKey as string,
       name: r.name as string,
       questionKeys: extractSectionQuestionKeys(r.questions),
+      ...(typeof r.domain === "string" ? { domain: r.domain } : {}),
     });
   }
   return out;
@@ -1118,6 +1138,8 @@ function buildQualitativeSections(
 interface ParsedScoreResult {
   /** stableKey → averagePoints (finite numbers only). */
   sectionAvg: Map<string, number>;
+  /** stableKey → frozen totalPoints (finite numbers only). */
+  sectionTotal: Map<string, number>;
   /** stableKey → section display name (first-seen wins; for section ordering). */
   sectionName: Map<string, string>;
   /** domain key → averagePoints (finite numbers only; null entries dropped). */
@@ -1151,6 +1173,7 @@ function parseScoreResult(result: unknown): ParsedScoreResult | null {
 
   const parsed: ParsedScoreResult = {
     sectionAvg: new Map(),
+    sectionTotal: new Map(),
     sectionName: new Map(),
     domainAvg: new Map(),
     domainLabel: new Map(),
@@ -1168,6 +1191,8 @@ function parseScoreResult(result: unknown): ParsedScoreResult | null {
       if (typeof s.stableKey !== "string") continue;
       const avg = num(s.averagePoints);
       if (avg !== null) parsed.sectionAvg.set(s.stableKey, avg);
+      const total = num(s.totalPoints);
+      if (total !== null) parsed.sectionTotal.set(s.stableKey, total);
       if (typeof s.name === "string" && !parsed.sectionName.has(s.stableKey)) {
         parsed.sectionName.set(s.stableKey, s.name);
       }
@@ -1264,6 +1289,67 @@ function ceoValueBy(
 const devOf = (ceo: number | null, teamAvg: number | null): number | null =>
   ceo === null || teamAvg === null ? null : ceo - teamAvg;
 
+interface GroupCategoryTierDefinition {
+  minMetric: number;
+  maxMetric?: number;
+  message: string;
+}
+
+interface GroupCategoryDefinition {
+  key: string;
+  label: string;
+  tiers: GroupCategoryTierDefinition[];
+}
+
+function parseFiveDCategoryDefinitions(raw: unknown): GroupCategoryDefinition[] {
+  if (!raw || typeof raw !== "object") return [];
+  const domains = (raw as Record<string, unknown>).domains;
+  if (!Array.isArray(domains)) return [];
+
+  const definitions: GroupCategoryDefinition[] = [];
+  for (const candidate of domains) {
+    if (!candidate || typeof candidate !== "object") continue;
+    const domain = candidate as Record<string, unknown>;
+    if (typeof domain.key !== "string") continue;
+    const tiers: GroupCategoryTierDefinition[] = [];
+    if (Array.isArray(domain.tiers)) {
+      for (const tierCandidate of domain.tiers) {
+        if (!tierCandidate || typeof tierCandidate !== "object") continue;
+        const tier = tierCandidate as Record<string, unknown>;
+        const minMetric = num(tier.minMetric);
+        const maxMetric = num(tier.maxMetric);
+        if (minMetric === null || typeof tier.message !== "string") continue;
+        tiers.push({
+          minMetric,
+          ...(maxMetric !== null ? { maxMetric } : {}),
+          message: tier.message,
+        });
+      }
+    }
+    definitions.push({
+      key: domain.key,
+      label: typeof domain.label === "string" ? domain.label : domain.key,
+      tiers,
+    });
+  }
+  return definitions;
+}
+
+/** Matches scoring.ts boundary semantics: the greatest matching min wins. */
+function resolveConfiguredTier(
+  tiers: GroupCategoryTierDefinition[],
+  value: number,
+): GroupCategoryTierDefinition | null {
+  let matched: GroupCategoryTierDefinition | null = null;
+  for (const tier of tiers) {
+    if (value < tier.minMetric || (tier.maxMetric !== undefined && value > tier.maxMetric)) {
+      continue;
+    }
+    if (!matched || tier.minMetric > matched.minMetric) matched = tier;
+  }
+  return matched;
+}
+
 /**
  * Builds the scored aggregation from each member's parsed FROZEN result. Most
  * scored aliases receive per-section and per-question CEO-vs-team rows plus the
@@ -1279,6 +1365,7 @@ const devOf = (ceo: number | null, teamAvg: number | null): number | null =>
 function buildScoredReport(
   alias: string,
   sectionsRaw: unknown,
+  scoringConfigRaw: unknown,
   questionsByKey: Record<string, QuestionMeta>,
   scoredMembers: ScoredMember[],
   respondents: GroupRespondent[],
@@ -1459,6 +1546,51 @@ function buildScoredReport(
     }
 
     report.sectionBreakdown = breakdown;
+
+    const categoryDefinitions = parseFiveDCategoryDefinitions(scoringConfigRaw);
+    const sectionKeysByDomain = new Map<string, string[]>();
+    for (const section of sectionList) {
+      if (!section.domain) continue;
+      const key = section.domain.toLowerCase().trim();
+      const keys = sectionKeysByDomain.get(key) ?? [];
+      keys.push(section.stableKey);
+      sectionKeysByDomain.set(key, keys);
+    }
+    if (categoryDefinitions.length > 0) {
+      report.categoryResults = categoryDefinitions.map((definition) => {
+        const domainKey = definition.key.toLowerCase().trim();
+        const sectionKeys = sectionKeysByDomain.get(domainKey) ?? [];
+        const score = groupMeanBy(scoredMembers, (parsed) => {
+          const frozenDomainAverage = parsed.domainAvg.get(definition.key);
+          if (frozenDomainAverage !== undefined) return frozenDomainAverage;
+          const sectionAverages = sectionKeys
+            .map((key) => parsed.sectionAvg.get(key))
+            .filter((value): value is number => value !== undefined);
+          return sectionAverages.length > 0 ? meanOf(sectionAverages) : null;
+        });
+        const pointValues = scoredMembers
+          .map((member) => {
+            const totals = sectionKeys
+              .map((key) => member.parsed.sectionTotal.get(key))
+              .filter((value): value is number => value !== undefined);
+            return totals.length > 0 ? totals.reduce((sum, value) => sum + value, 0) : null;
+          })
+          .filter((value): value is number => value !== null);
+        const matchedTier =
+          score.groupMean === null
+            ? null
+            : resolveConfiguredTier(definition.tiers, score.groupMean);
+
+        return {
+          key: definition.key,
+          label: definition.label,
+          averagePoints: score.groupMean,
+          points: pointValues.length > 0 ? meanOf(pointValues) : null,
+          respondentCount: score.groupN,
+          message: matchedTier?.message ?? null,
+        };
+      });
+    }
   }
 
   // Domains block — present iff any submission carried perDomain.
@@ -1854,6 +1986,7 @@ export function buildGroupReportModel(input: GroupReportInput): CampaignGroupRep
     scored = buildScoredReport(
       input?.alias,
       input?.version?.sections,
+      input?.version?.scoringConfig,
       questionsByKey,
       scoredMembers,
       respondents,
