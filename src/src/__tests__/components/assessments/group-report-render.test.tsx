@@ -524,6 +524,36 @@ describe("ScoredGroupReport", () => {
         { respondentId: "r-svc", name: "Jeff Services", isCEO: false, value: 6 },
       ],
     });
+    report.scored!.sectionBreakdown = [
+      {
+        stableKey: "trust",
+        name: "Trust",
+        groupMean: 1.5,
+        groupN: 3,
+        rows: [
+          {
+            stableKey: "q_trust_average",
+            label: "Team members admit their mistakes.",
+            groupMean: 1.5,
+            groupN: 3,
+            max: 3,
+          },
+          {
+            stableKey: "q_trust_unanswered",
+            label: "Team members ask one another for help.",
+            groupMean: null,
+            groupN: 0,
+            max: 3,
+          },
+          {
+            stableKey: "q_trust_unscaled",
+            label: "Team members acknowledge their weaknesses.",
+            groupMean: 2,
+            groupN: 3,
+          },
+        ],
+      },
+    ];
     report.scored!.appendixB = [
       {
         personLabel: "Person 1",
@@ -559,21 +589,58 @@ describe("ScoredGroupReport", () => {
     expect(within(teamSummary).getByRole("columnheader", { name: "Team average" })).toBeInTheDocument();
     expect(within(teamSummary).queryByRole("columnheader", { name: "CEO" })).not.toBeInTheDocument();
     expect(within(teamSummary).queryByRole("columnheader", { name: "Dev" })).not.toBeInTheDocument();
+    const breakdown = screen.getByTestId("group-scored-section-breakdown");
+    expect(within(breakdown).getByRole("heading", {
+      name: "How the team scored, section by section",
+    })).toBeInTheDocument();
+    expect(within(breakdown).getByText(/including the CEO/i)).toBeInTheDocument();
+    expect(within(breakdown).getByRole("heading", { name: "Trust" })).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("group-scored-breakdown-row-q_trust_average"))
+        .getByText("1.5 / 3"),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("group-scored-breakdown-row-q_trust_unanswered"))
+        .getByText("—"),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("group-scored-breakdown-row-q_trust_unscaled"))
+        .getByText("2"),
+    ).toBeInTheDocument();
+    expect(
+      teamSummary.compareDocumentPosition(breakdown)
+        & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      breakdown.compareDocumentPosition(matrix)
+        & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(screen.queryByTestId("group-scored-profile")).not.toBeInTheDocument();
     expect(screen.queryByTestId("group-scored-ceo-tier")).not.toBeInTheDocument();
     expect(screen.queryByTestId("group-scored-appendix-b")).not.toBeInTheDocument();
   });
 
   it("keeps the existing CEO-vs-team bars when named responses are absent", () => {
+    const report = scoredReport();
+    report.scored!.sectionBreakdown = [
+      {
+        stableKey: "people",
+        name: "People",
+        groupMean: 5,
+        groupN: 3,
+        rows: [{ stableKey: "q_values", label: "Values", groupMean: 5, groupN: 3 }],
+      },
+    ];
     render(
       <ScoredGroupReport
-        report={scoredReport()}
+        report={report}
         {...provenance({ assessmentName: "Rockefeller Habits" })}
       />,
     );
 
     expect(screen.getByTestId("group-scored-question-q_values")).toBeInTheDocument();
     expect(screen.queryByTestId("group-scored-individual-responses")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("group-scored-section-breakdown")).not.toBeInTheDocument();
   });
 
   // ── Wave J / J-2 — Peers benchmark + tier suppression (SU-Full) ────────────
@@ -922,9 +989,28 @@ describe("Empty state", () => {
     const empty = scoredReport({
       respondents: [],
       respondentCount: 0,
-      scored: { sections: [], questions: [], tier: { ceo: null, teamDistribution: [] } },
+      scored: {
+        sections: [],
+        questions: [],
+        tier: { ceo: null, teamDistribution: [] },
+        sectionBreakdown: [
+          {
+            stableKey: "trust",
+            name: "Trust",
+            groupMean: null,
+            groupN: 0,
+            rows: [],
+          },
+        ],
+      },
     });
-    render(<GroupReport report={empty} {...provenance({ completedCount: 0 })} />);
+    render(
+      <GroupReport
+        report={empty}
+        {...provenance({ completedCount: 0, templateAlias: "five-dysfunctions" })}
+      />,
+    );
     expect(screen.getByTestId("group-report-empty")).toBeInTheDocument();
+    expect(screen.queryByTestId("group-scored-section-breakdown")).not.toBeInTheDocument();
   });
 });

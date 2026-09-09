@@ -12,8 +12,9 @@
  *   CEO) | Dev, with a ▲/▼ DIRECTIONAL indicator — alignment, not good/bad) →
  *   tier band → optional domains block + ScaleUp score (presence-driven) →
  *   per-question CEO-vs-team bars → footer. Five Dysfunctions replaces those
- *   comparison blocks with the five team-fundamental averages and a named
- *   answer matrix ending in the collective average.
+ *   comparison blocks with the five team-fundamental averages, a statement
+ *   breakdown grouped by fundamental, and a named answer matrix ending in the
+ *   collective average.
  *
  * N<2 fallback: when a section/domain has zero non-CEO contributors, teamAvg
  * and dev are null; the cell shows "—" rather than comparing the CEO to himself.
@@ -30,6 +31,7 @@ import type {
   GroupScoredDomain,
   GroupScoredQuestion,
   GroupScoredIndividualResponse,
+  GroupScoredSectionBreakdown,
   GroupAppendixBRow,
 } from "@/lib/assessments/group-report-model";
 import { APPENDIX_B_DOMAIN_KEYS } from "@/lib/assessments/group-report-model";
@@ -244,6 +246,69 @@ function TeamSummaryTable({ sections }: { sections: GroupScoredSection[] }) {
         </tbody>
       </table>
     </div>
+  );
+}
+
+function TeamSectionBreakdown({
+  breakdown,
+}: {
+  breakdown: GroupScoredSectionBreakdown[];
+}) {
+  return (
+    <section
+      className="su-group-sec su-group-breakdown"
+      data-testid="group-scored-section-breakdown"
+    >
+      <h2 className="su-group-sec-title">
+        How the team scored, section by section
+      </h2>
+      <p className="su-group-intro">
+        Each statement&apos;s team average across every completed respondent,
+        including the CEO.
+      </p>
+      <div className="su-report-grid">
+        {breakdown.map((section) => (
+          <div
+            className="su-report-card"
+            data-testid={`group-scored-breakdown-section-${section.stableKey}`}
+            key={section.stableKey}
+          >
+            <div className="su-report-card-head">
+              <h3 className="su-report-card-title">{section.name}</h3>
+            </div>
+            <ul className="su-report-card-list">
+              {section.rows.map((row) => {
+                const hasMean =
+                  row.groupMean !== null && Number.isFinite(row.groupMean);
+                const hasMax =
+                  typeof row.max === "number" && Number.isFinite(row.max);
+
+                return (
+                  <li
+                    className="su-report-q"
+                    data-testid={`group-scored-breakdown-row-${row.stableKey}`}
+                    key={row.stableKey}
+                  >
+                    <span className="su-report-q-label">{row.label}</span>
+                    <span className="su-report-q-rate">
+                      {hasMean && row.groupMean !== null ? (
+                        `${formatGroupNumber(row.groupMean)}${
+                          hasMax && row.max !== undefined
+                            ? ` / ${formatGroupNumber(row.max)}`
+                            : ""
+                        }`
+                      ) : (
+                        <span className="su-group-na">—</span>
+                      )}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -647,6 +712,12 @@ export function ScoredGroupReport(props: GroupReportProps) {
                 </p>
               )}
             </section>
+
+            {showsNamedTeamResponses &&
+              scored.sectionBreakdown &&
+              scored.sectionBreakdown.length > 0 && (
+                <TeamSectionBreakdown breakdown={scored.sectionBreakdown} />
+              )}
 
             {/* ── Domains (presence-driven) ───────────────────────────────── */}
             {!showsNamedTeamResponses && scored.domains && scored.domains.length > 0 && (

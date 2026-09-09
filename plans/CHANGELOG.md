@@ -6,6 +6,17 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="five-dysfunctions-group-section-breakdown"></a>
+### 2026-09-09 — Five Dysfunctions group section breakdown <!-- ENTRY_ISO:2026-09-09 ENTRY_SLUG:five-dysfunctions-group-section-breakdown -->
+
+**Status: IMPLEMENTED AND VERIFIED FOR PRODUCTION RELEASE IN GH #434.** Jeff's requested individual-style statement breakdown now appears in the coach-side Five Dysfunctions group report immediately after **Team results** and before the existing named-response matrix. Five cards follow the pinned Template Version's section order—Trust, Conflict, Commitment, Accountability, Results—and every scored statement shows the all-respondent group mean, including the CEO, as `X / 5`. The existing five-fundamental summary table and named matrix remain intact; the individual Five Dysfunctions report and every non-5D report remain unchanged.
+
+**Model and compatibility boundary.** The renderer consumes a new Five-Dysfunctions-only `sectionBreakdown` assembled from the already-computed frozen per-question group means; it does not recompute scores or add a database read. Current versions group by each question's `sectionStableKey`; legacy pinned versions fall back only when no question carries that metadata. Version question order is preserved, empty sections are omitted, and any unmatched scored question is retained in one trailing **Other statements** card. No schema, migration, feature flag, production datum, invitation, response, or saved report changed.
+
+**Visual and verification receipt.** Read-only rendering of acceptance Campaign `cmtk5xnel0008gy3h5xdiej0w` proved five cards and all 38 statements with real three-respondent averages. Desktop renders two columns without overflow; 375px mobile collapses to one column; A4 print starts the breakdown on a fresh page and keeps each fundamental card intact before the named matrix. Focused and blast-radius coverage passes **15 suites / 327 tests / 1 snapshot**, including model grouping/fallback/unmapped/sparse cases, renderer placement/formatting/empty-state/alias isolation, the individual report, flags, loader, route, and all group-report variants. Changed-file ESLint and diff hygiene emit no diagnostics, all **51** migration-safety checks pass, and the 4 GB-heap Turbopack production build compiles, passes TypeScript, and generates **95/95 pages**. The first default-heap verification attempt compiled and then exhausted the local worker's approximately 2 GB ceiling; the documented 4 GB rerun passed. Existing local missing-database and Inngest-key build warnings remain non-fatal.
+
+---
+
 <a id="embeddable-workshop-images"></a>
 ### 2026-09-03 — Embeddable workshop images <!-- ENTRY_ISO:2026-09-03 ENTRY_SLUG:embeddable-workshop-images -->
 

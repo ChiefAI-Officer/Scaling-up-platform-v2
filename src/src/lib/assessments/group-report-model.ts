@@ -316,6 +316,11 @@ export interface GroupScoredReport {
   /** CEO tier label + the team's tier-label distribution (CEO-excluded). */
   tier: GroupScoredTier;
   /**
+   * Five Dysfunctions only — statement rows grouped under their fundamental,
+   * carrying the all-respondent team average. Absent for every other alias.
+   */
+  sectionBreakdown?: GroupScoredSectionBreakdown[];
+  /**
    * Wave J/K (Task 3) — Esperto "Anonymous Team" Appendix B: a pseudonymized,
    * de-identified per-member domain grid. Present iff `domains` is present (i.e.
    * SU-Full, the only scored group report carrying per-domain scores). One row
@@ -328,6 +333,24 @@ export interface GroupScoredReport {
    * non-domain scored report so the renderer omits the grid entirely.
    */
   appendixB?: GroupAppendixBRow[];
+}
+
+export interface GroupScoredBreakdownRow {
+  stableKey: string;
+  label: string;
+  /** Mean across every contributing respondent, CEO included. */
+  groupMean: number | null;
+  groupN: number;
+  /** Question scale maximum when declared by the pinned version. */
+  max?: number;
+}
+
+export interface GroupScoredSectionBreakdown {
+  stableKey: string;
+  name: string;
+  groupMean: number | null;
+  groupN: number;
+  rows: GroupScoredBreakdownRow[];
 }
 
 /**
@@ -1375,6 +1398,68 @@ function buildScoredReport(
     questions,
     tier: buildScoredTier(scoredMembers),
   };
+
+  if (showsNamedTeamResponses) {
+    const hasSectionMeta = Object.values(questionsByKey).some(
+      (meta) => Boolean(meta.sectionStableKey),
+    );
+    const assigned = new Set<string>();
+    const breakdown: GroupScoredSectionBreakdown[] = [];
+    const toBreakdownRow = (
+      question: GroupScoredQuestion,
+    ): GroupScoredBreakdownRow => {
+      const max = questionsByKey[question.stableKey]?.max;
+      return {
+        stableKey: question.stableKey,
+        label: question.label,
+        groupMean: question.groupMean ?? null,
+        groupN: question.groupN ?? 0,
+        ...(max !== undefined ? { max } : {}),
+      };
+    };
+
+    for (const section of sections) {
+      const legacyQuestionKeys = new Set(
+        sectionList.find((candidate) => candidate.stableKey === section.stableKey)
+          ?.questionKeys ?? [],
+      );
+      const rows = questions
+        .filter((question) => {
+          const matches = hasSectionMeta
+            ? questionsByKey[question.stableKey]?.sectionStableKey === section.stableKey
+            : legacyQuestionKeys.has(question.stableKey);
+          if (matches) assigned.add(question.stableKey);
+          return matches;
+        })
+        .map(toBreakdownRow);
+
+      if (rows.length > 0) {
+        breakdown.push({
+          stableKey: section.stableKey,
+          name: section.name,
+          groupMean: section.groupMean ?? null,
+          groupN: section.groupN ?? 0,
+          rows,
+        });
+      }
+    }
+
+    const unsectionedRows = questions
+      .filter((question) => !assigned.has(question.stableKey))
+      .map(toBreakdownRow);
+
+    if (unsectionedRows.length > 0) {
+      breakdown.push({
+        stableKey: "__unsectioned",
+        name: "Other statements",
+        groupMean: null,
+        groupN: 0,
+        rows: unsectionedRows,
+      });
+    }
+
+    report.sectionBreakdown = breakdown;
+  }
 
   // Domains block — present iff any submission carried perDomain.
   if (scoredMembers.some((m) => m.parsed.hasDomains)) {
