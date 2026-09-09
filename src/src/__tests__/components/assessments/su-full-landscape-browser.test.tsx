@@ -106,6 +106,8 @@ const SEMANTIC_ESCAPE_CASES = [
 type SemanticAuditPosition = "introduction" | "conclusion";
 
 const TALL_PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAA+gCAIAAAC0f+F8AAAALUlEQVR42u3DAQ0AAAgDoM8uFrKSxQ0ibGR6K4mqqqqqqqqqqqqqqqqqqqq/H9OeIDkSuu58AAAAAElFTkSuQmCC";
+const AUTHORED_BANNER_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABEAAAAJCAIAAABbilBbAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAFUlEQVQYlWPQFHMhFTGM6nEZzGEAAIZoTky0C/2LAAAAAElFTkSuQmCC";
+const AUTHORED_BANNER_HTML = `<a href="https://calendly.com/example" aria-label="Book a free call"><img src="${AUTHORED_BANNER_SRC}" alt="Promotional banner" width="1530" height="810"></a>`;
 const SEMANTIC_AUDIT_LIMITS = {
   introduction: { elements: 64, text: 2_200, rows: 8, columns: 4, cells: 24, headings: 4, breaks: 8, lines: 200 },
   conclusion: { elements: 36, text: 900, rows: 6, columns: 3, cells: 12, headings: 2, breaks: 4, lines: 200 },
@@ -450,6 +452,54 @@ async function authoredClipping(page: Page) {
       }] : [];
     }),
   ));
+}
+
+async function expectAuthoredBannerContained(page: Page) {
+  const geometry = await page.locator("[data-testid='report-html-conclusion'] img")
+    .evaluate((image) => {
+      const container = image.closest<HTMLElement>(".su-report-custom-html");
+      if (!container) throw new Error("Authored banner is missing its report container");
+      const imageRect = image.getBoundingClientRect();
+      const containerRect = container.getBoundingClientRect();
+      const containerStyle = getComputedStyle(container);
+      return {
+        imageWidth: imageRect.width,
+        imageHeight: imageRect.height,
+        containerContentWidth:
+          containerRect.width -
+          parseFloat(containerStyle.paddingLeft) -
+          parseFloat(containerStyle.paddingRight),
+      };
+    });
+
+  expect(geometry.imageWidth).toBeGreaterThanOrEqual(geometry.containerContentWidth * 0.9);
+  expect(geometry.imageWidth).toBeLessThanOrEqual(geometry.containerContentWidth + 1);
+  expect(geometry.imageHeight / geometry.imageWidth).toBeCloseTo(810 / 1530, 2);
+  expect(await horizontalOverflow(page)).toMatchObject({ offenders: [] });
+  expect(await authoredClipping(page)).toEqual([]);
+}
+
+async function expectPdfContainsAuthoredBanner(
+  page: Page,
+  options: { format: "A4" | "Letter"; landscape?: boolean },
+) {
+  const directory = mkdtempSync(join(tmpdir(), "authored-banner-pdf-"));
+  const pdfPath = join(directory, "report.pdf");
+  try {
+    await page.pdf({
+      path: pdfPath,
+      format: options.format,
+      landscape: options.landscape,
+      preferCSSPageSize: true,
+      printBackground: true,
+    });
+    const embeddedImages = execFileSync("pdfimages", ["-list", pdfPath], {
+      encoding: "utf8",
+    });
+    expect(embeddedImages).toMatch(/\s17\s+9\s/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 }
 
 async function rockefellerOfferGeometry(page: Page) {
@@ -824,6 +874,54 @@ describe("SU Full landscape browser and PDF contract", () => {
       }
     },
   );
+
+  it.each([
+    "CLASSIC_SCORED",
+    "CLASSIC_QUALITATIVE",
+    "EXECUTIVE_BOARDROOM",
+    "MODERN_DASHBOARD",
+  ] as const)("honors a bounded authored banner in %s across screen and print", async (style) => {
+    const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+    try {
+      await load(page, alternateStyleMarkup(style, AUTHORED_BANNER_HTML));
+      await expectAuthoredBannerContained(page);
+      await page.emulateMedia({ media: "print" });
+      await expectAuthoredBannerContained(page);
+      await expectPdfContainsAuthoredBanner(page, { format: "Letter" });
+    } finally {
+      await page.close();
+    }
+  });
+
+  it("honors a bounded authored banner in Scaling Up Full across screen and print", async () => {
+    const prepared = prepareReportHtmlForStorage({
+      reportHtml: {
+        schemaVersion: 1,
+        introductionHtml: null,
+        conclusionHtml: AUTHORED_BANNER_HTML,
+      },
+    });
+    if (!prepared.ok) throw new Error("Scaling Up Full banner fixture must remain inside storage limits");
+    const source = reportForPhase(4);
+    const report = {
+      ...source,
+      reportHtml: (prepared.reportConfig as { reportHtml: typeof source.reportHtml }).reportHtml,
+    };
+    const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+    try {
+      await load(page, routeMarkup(report).html);
+      await expectAuthoredBannerContained(page);
+      await page.emulateMedia({ media: "print" });
+      await expectAuthoredBannerContained(page);
+      expect(await authoredContentOutsidePhysicalPage(page)).toEqual([]);
+      await expectPdfContainsAuthoredBanner(page, {
+        format: "A4",
+        landscape: true,
+      });
+    } finally {
+      await page.close();
+    }
+  });
 
   it("renders the Rockefeller book offer in both authored landscape positions without overlapping later pages", async () => {
     const prepared = prepareReportHtmlForStorage({

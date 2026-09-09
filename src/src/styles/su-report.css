@@ -3365,9 +3365,14 @@
 }
 
 .su-public-brand.su-report .su-report-custom-html img {
+  object-fit: contain;
+}
+
+/* Keep legacy, unsized images compact. Bounded author dimensions may use the
+   report column, while the shared max-width rule above prevents overflow. */
+.su-public-brand.su-report .su-report-custom-html img:not([width]):not([height]) {
   max-height: 160px;
   width: auto;
-  object-fit: contain;
 }
 
 .su-public-brand.su-report .su-report-custom-html table {
@@ -3376,10 +3381,9 @@
   overflow-x: auto;
 }
 
-/* Jeff's Rockefeller conclusion is authored as a two-cell table. Image width
-   attributes are deliberately stripped at the trust boundary, so the report
-   owns the safe column sizing needed to keep the cover and purchase copy
-   readable in every renderer. */
+/* Jeff's Rockefeller conclusion is authored as a two-cell table. Keep this
+   established composition report-owned even though ordinary authored images
+   may now carry bounded dimensions. */
 .su-public-brand.su-report
   .su-report-custom-html
   table[aria-label="Rockefeller Habits checklist conclusion"] {

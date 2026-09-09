@@ -5,6 +5,7 @@ import type {
   ReportHtmlConfigV1,
 } from "@/lib/assessments/report-html";
 import {
+  REPORT_HTML_IMAGE_DIMENSION_MAX,
   REPORT_HTML_LIMITS,
   reportHtmlSourceCharacterIssue,
 } from "@/lib/assessments/report-html-sanitizer";
@@ -67,6 +68,13 @@ function HtmlRegion({
               </span>
             </div>
             <p className="mt-1 text-xs text-muted-foreground">{helper}</p>
+            {position === "conclusion" ? (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Closing images may use paired whole-number width and height attributes
+                from 1 to {REPORT_HTML_IMAGE_DIMENSION_MAX.toLocaleString()} pixels.
+                Images stay inside the report column and keep their proportions.
+              </p>
+            ) : null}
           </div>
           <label className="sr-only" htmlFor={id}>
             {label}

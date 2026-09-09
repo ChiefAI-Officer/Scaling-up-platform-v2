@@ -6,6 +6,15 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="report-html-bounded-image-sizing"></a>
+### 2026-09-10 — Report HTML bounded image sizing <!-- ENTRY_ISO:2026-09-10 ENTRY_SLUG:report-html-bounded-image-sizing -->
+
+**Status: IMPLEMENTED AND VERIFIED; AWAITING PR MERGE AND DEPLOYMENT.** Jeff's report **Closing message** can now preserve paired bare-integer image `width` and `height` attributes from 1 through 2,000 instead of silently stripping them. The shared report renderer no longer forces dimensioned images under the legacy 160px height cap: authored banners may fill the available report column, stay under `max-width: 100%`, and preserve their aspect ratio. Images without a valid dimension pair retain the existing compact cap. The established Rockefeller, QSP v2, and Scaling Up Full compositions keep their more-specific report-owned layouts.
+
+**Trust boundary and author guidance.** Unpaired attributes, units, percentages, zero, negatives, calculations, and values above 2,000 remain closed, as do all container sizing and layout CSS. Save and defensive read now use the same canonical dimension policy without drift. The Closing editor states the paired-attribute rule, accepted range, and containment behavior beside the field. Because the former sanitizer permanently removed Jeff's saved attributes, he must re-paste the dimensioned HTML into his draft and publish that Template Version after this release; existing published report content is not rewritten. Browser/print report HTML remains separate from email, group reports, custom slides, and campaign-level configuration. [ADR-0034](../docs/adr/0034-report-html-images-use-bounded-author-dimensions.md) records the boundary.
+
+**Verification receipt.** RED/GREEN coverage proves Jeff's 1530×810 linked-image shape through canonical save/read, rejects unpaired, hostile, and oversized values, and verifies contained authored sizing in Classic scored, Classic qualitative, Executive Boardroom, Modern Dashboard, and Scaling Up Full under screen and print media. Each generated PDF is inspected for the embedded banner image rather than only file creation. Desktop visual review confirms both the full-column banner treatment and the Closing editor's guidance hierarchy/readability. The report-focused matrix passes **14 suites / 310 tests / 1 snapshot**; changed-file ESLint and diff hygiene emit no diagnostics; all **51** migration-safety checks pass; and the 4 GB-heap Turbopack production build compiles, passes TypeScript, and generates **95/95 pages**. Existing workspace-root, middleware-deprecation, missing local Inngest keys, and build-time `DATABASE_URL` warnings remain non-fatal.
+
 <a id="five-dysfunctions-group-five-categories"></a>
 ### 2026-09-10 — Five Dysfunctions group Five Categories <!-- ENTRY_ISO:2026-09-10 ENTRY_SLUG:five-dysfunctions-group-five-categories -->
 
