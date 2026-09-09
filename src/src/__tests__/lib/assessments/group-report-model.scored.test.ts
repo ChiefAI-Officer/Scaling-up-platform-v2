@@ -214,6 +214,114 @@ describe("scored per-question", () => {
     });
   });
 
+  it("Five Dysfunctions groups all-respondent question averages by version section order", () => {
+    const input = { ...fixtureRockefeller(), alias: "five-dysfunctions" };
+    const breakdown = scoredOf(input).sectionBreakdown;
+
+    expect(breakdown?.map((section) => section.stableKey)).toEqual([
+      "S1",
+      "S2",
+      "S3",
+    ]);
+    expect(breakdown?.[0]).toMatchObject({
+      stableKey: "S1",
+      name: "The executive team is healthy and aligned.",
+      groupMean: 1.5,
+      groupN: 4,
+      rows: [
+        {
+          stableKey: "Q1_1",
+          label: "The executive team is healthy and aligned. — statement 1",
+          groupMean: 1.5,
+          groupN: 4,
+          max: 3,
+        },
+        {
+          stableKey: "Q1_2",
+          label: "The executive team is healthy and aligned. — statement 2",
+          groupMean: 1.5,
+          groupN: 4,
+          max: 3,
+        },
+      ],
+    });
+  });
+
+  it("uses legacy section-embedded question membership when all question metadata lacks a section", () => {
+    const base = fixtureRockefeller();
+    const questions = (base.version.questions as Array<Record<string, unknown>>).map(
+      (question) => {
+        const withoutSection = { ...question };
+        delete withoutSection.sectionStableKey;
+        return withoutSection;
+      },
+    );
+    const sections = (base.version.sections as Array<Record<string, unknown>>).map(
+      (section) => ({
+        ...section,
+        questions: [1, 2].map((index) => ({
+          stableKey: `Q${String(section.stableKey).slice(1)}_${index}`,
+        })),
+      }),
+    );
+    const breakdown = scoredOf({
+      ...base,
+      alias: "five-dysfunctions",
+      version: { ...base.version, questions, sections },
+    }).sectionBreakdown;
+
+    expect(breakdown?.map((section) => ({
+      stableKey: section.stableKey,
+      rows: section.rows.map((row) => row.stableKey),
+    }))).toEqual([
+      { stableKey: "S1", rows: ["Q1_1", "Q1_2"] },
+      { stableKey: "S2", rows: ["Q2_1", "Q2_2"] },
+      { stableKey: "S3", rows: ["Q3_1", "Q3_2"] },
+    ]);
+  });
+
+  it("puts a scored question with no matching section into one trailing Other statements bucket", () => {
+    const base = fixtureRockefeller();
+    const questions = (base.version.questions as Array<Record<string, unknown>>).map(
+      (question) => question.stableKey === "Q2_2"
+        ? { ...question, sectionStableKey: "UNKNOWN" }
+        : question,
+    );
+    const breakdown = scoredOf({
+      ...base,
+      alias: "five-dysfunctions",
+      version: { ...base.version, questions },
+    }).sectionBreakdown!;
+
+    expect(breakdown.at(-1)).toMatchObject({
+      stableKey: "__unsectioned",
+      name: "Other statements",
+      groupMean: null,
+      groupN: 0,
+      rows: [{ stableKey: "Q2_2", groupMean: 2, groupN: 4, max: 3 }],
+    });
+    expect(
+      breakdown.flatMap((section) => section.rows).filter((row) => row.stableKey === "Q2_2"),
+    ).toHaveLength(1);
+  });
+
+  it("keeps sparse contributor counts and omits questions that nobody scored", () => {
+    const input = {
+      ...fixtureRockefellerSparseCash(),
+      alias: "five-dysfunctions",
+    };
+    const breakdown = scoredOf(input).sectionBreakdown!;
+    const rows = breakdown.flatMap((section) => section.rows);
+
+    expect(rows.find((row) => row.stableKey === "Q3_1")).toMatchObject({
+      groupMean: 2,
+      groupN: 1,
+      max: 3,
+    });
+    expect(rows.some((row) => row.stableKey === "Q3_2")).toBe(false);
+    expect(breakdown.some((section) => section.stableKey === "__unsectioned")).toBe(false);
+  });
+
   it("keeps named individual-answer data scoped to Five Dysfunctions", () => {
     const scored = scoredOf();
     const q = findQuestion(scored.questions, "Q1_1")!;
@@ -222,6 +330,7 @@ describe("scored per-question", () => {
     expect(q).not.toHaveProperty("groupMean");
     expect(q).not.toHaveProperty("groupN");
     expect(q).not.toHaveProperty("individualResponses");
+    expect(scored).not.toHaveProperty("sectionBreakdown");
   });
 
   it("Five Dysfunctions keeps a named row with a null value when a respondent skipped a question", () => {

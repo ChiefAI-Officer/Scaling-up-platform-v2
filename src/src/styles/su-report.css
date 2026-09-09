@@ -2222,6 +2222,15 @@
     break-inside: avoid;
     page-break-inside: avoid;
   }
+  /* Five Dysfunctions can span several pages; keep each statement card intact
+     while allowing the overall breakdown section to paginate naturally. Start
+     it on a fresh page so its heading is never orphaned below Team results. */
+  .su-public-brand .su-group-breakdown {
+    break-before: page;
+    break-inside: auto;
+    page-break-before: always;
+    page-break-inside: auto;
+  }
   .su-public-brand .su-group-mtx tr,
   .su-public-brand .su-group-prof tr,
   .su-public-brand .su-group-rat-row,
