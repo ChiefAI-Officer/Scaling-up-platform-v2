@@ -6,6 +6,15 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="scaling-up-profits-html-promotion"></a>
+### 2026-09-10 — Scaling Up Profits HTML promotion <!-- ENTRY_ISO:2026-09-10 ENTRY_SLUG:scaling-up-profits-html-promotion -->
+
+**Status: IMPLEMENTED AND VERIFIED; AWAITING PR MERGE, DEPLOYMENT, AND DRAFT CONTENT UPDATE.** Jeff asked for the Scaling Up Profits Closing banner to be recreated as structured HTML rather than a single linked screenshot. The report-owned composition now reproduces the source banner's 1530×810 proportions, plum and gold palette, typography hierarchy, explanatory copy, two metric cards, and pill call-to-action. The only retained raster content is a dedicated crop of the exact Scaling Up Profit brand mark; the remaining content and layout are semantic HTML and responsive CSS. The entire promotion remains one Calendly link.
+
+**Scope and compatibility.** Styling is activated only by the promotion's explicit accessible labels inside report Closing HTML, so unrelated authored content and all generated report sections remain unchanged. The markup stays within the existing sanitizer's element, depth, text, table, URL, and attribute limits without widening the authored CSS allowlist. Desktop and print preserve the landscape composition; narrow screens switch to a contained stacked layout. The existing production draft remains on its prior linked-image HTML until the new composition is deliberately pasted and saved after deployment.
+
+**Verification receipt.** Browser regression coverage first failed on the source aspect-ratio contract, then passed the completed composition's dimensions, colors, spacing, logo ratio, copy/metrics separation, rounded metric cards, CTA geometry, horizontal containment, authored-content clipping, print rendering, and 390px mobile behavior. The complete report browser suite passes **63/63 tests**; changed-file ESLint and diff hygiene emit no diagnostics; all **51** migration-safety checks pass; and the 4 GB-heap Turbopack production build compiles, passes TypeScript, and generates **95/95 pages**. The initial default-heap build compiled and then exhausted the local TypeScript worker's approximately 2 GB ceiling; the documented 4 GB rerun passed. Existing workspace-root, middleware-deprecation, missing local Inngest keys, and build-time `DATABASE_URL` warnings remain non-fatal.
+
 <a id="report-html-bounded-image-sizing"></a>
 ### 2026-09-10 — Report HTML bounded image sizing <!-- ENTRY_ISO:2026-09-10 ENTRY_SLUG:report-html-bounded-image-sizing -->
 
