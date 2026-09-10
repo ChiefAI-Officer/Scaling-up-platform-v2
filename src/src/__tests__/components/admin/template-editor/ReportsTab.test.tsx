@@ -26,6 +26,8 @@ describe("ReportsTab", () => {
     expect(screen.getByText("Replaces the default Welcome content on page 2.")).toBeInTheDocument();
     expect(screen.getByText("Closing message")).toBeInTheDocument();
     expect(screen.getByText("Appears after the respondent's score and strongest/focus summary on page 25. It replaces only the default next steps and coach link.")).toBeInTheDocument();
+    expect(screen.getByText("Closing images may use paired whole-number width and height attributes from 1 to 2,000 pixels. Images stay inside the report column and keep their proportions.")).toBeInTheDocument();
+    expect(screen.getAllByText(/images may use paired whole-number width/i)).toHaveLength(1);
     expect(screen.getByText("Scores, phase, You and Peers comparisons, explanations, feedback, and question order are generated automatically and cannot be replaced here.")).toBeInTheDocument();
     expect(screen.queryByText(/Add HTML before and after/i)).toBeNull();
     expect(screen.getByLabelText("Introduction / preface HTML")).toHaveValue(

@@ -81,6 +81,27 @@ describe("report HTML configuration", () => {
     expect(prepared.didStripContent).toBe(true);
   });
 
+  it("stores and defensively reloads bounded Closing image dimensions without drift", () => {
+    const onDrift = jest.fn();
+    const prepared = prepareReportHtmlForStorage({
+      reportHtml: {
+        schemaVersion: 1,
+        introductionHtml: null,
+        conclusionHtml:
+          '<a href="https://calendly.com/example"><img src="https://cdn.scalingup.com/banner.png" alt="Book a free call" width="1530" height="810" referrerpolicy="no-referrer" /></a>',
+      },
+    });
+
+    expect(prepared).toMatchObject({ ok: true, didStripContent: false });
+    if (!prepared.ok) throw new Error("expected bounded dimensions to be stored");
+    expect(loadSafeReportHtml(prepared.reportConfig, { onDrift })).toEqual({
+      introductionHtml: null,
+      conclusionHtml:
+        '<a href="https://calendly.com/example"><img src="https://cdn.scalingup.com/banner.png" alt="Book a free call" width="1530" height="810" referrerpolicy="no-referrer" /></a>',
+    });
+    expect(onDrift).not.toHaveBeenCalled();
+  });
+
   it("rejects unsupported report placeholders before storage", () => {
     const prepared = prepareReportHtmlForStorage({
       reportHtml: {

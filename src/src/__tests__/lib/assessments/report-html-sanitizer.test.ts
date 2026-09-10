@@ -46,7 +46,7 @@ describe("sanitizeReportHtmlFragment", () => {
 
       expect(result).toMatchObject({
         ok: true,
-        didStripContent: true,
+        didStripContent: false,
       });
       expect(result.html).toContain(
         '<table aria-label="Rockefeller Habits checklist conclusion">',
@@ -56,7 +56,8 @@ describe("sanitizeReportHtmlFragment", () => {
       );
       expect(result.html).toContain("Order your own personal copy");
       expect(result.html).toContain('href="https://amzn.to/4xtRFrS"');
-      expect(result.html).not.toMatch(/\s(?:width|height)="/);
+      expect(result.html).toContain('width="269"');
+      expect(result.html).toContain('height="403"');
     },
   );
 
@@ -397,6 +398,51 @@ describe("sanitizeReportHtmlFragment", () => {
     expect(svgImage).not.toContain("data:image/svg+xml");
   });
 
+  it("preserves Jeff's bounded integer banner dimensions in Closing HTML", () => {
+    const result = sanitizeReportHtmlFragment(
+      '<a href="https://calendly.com/example"><img src="https://cdn.scalingup.com/banner.png" alt="Book a free call" width="1530" height="810"></a>',
+      "conclusion",
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.html).toContain('width="1530"');
+    expect(result.html).toContain('height="810"');
+    expect(result.html).toContain('href="https://calendly.com/example"');
+  });
+
+  it.each([
+    ["width", "0"],
+    ["width", "2001"],
+    ["width", "100%"],
+    ["width", "600px"],
+    ["width", "-1"],
+    ["width", "calc(100% - 1px)"],
+    ["height", "0"],
+    ["height", "2001"],
+    ["height", "100vh"],
+  ] as const)("strips an unsafe image %s value of %s", (attribute, value) => {
+    const result = sanitizeReportHtmlFragment(
+      `<img src="https://cdn.scalingup.com/banner.png" ${attribute}="${value}">`,
+      "conclusion",
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.html).not.toContain(`${attribute}=`);
+  });
+
+  it.each([
+    ["width", "1530"],
+    ["height", "810"],
+  ] as const)("strips an unpaired bounded image %s", (attribute, value) => {
+    const result = sanitizeReportHtmlFragment(
+      `<img src="https://cdn.scalingup.com/banner.png" ${attribute}="${value}">`,
+      "conclusion",
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.html).not.toMatch(/\s(?:width|height)="/);
+  });
+
   it.each(["introduction", "conclusion"] as const)("rejects a fragment over the %s source limit", (position) => {
     const result = sanitizeReportHtmlFragment(
       "x".repeat(limits[position].rawCharacters + 1),
@@ -469,7 +515,7 @@ describe("sanitizeReportHtmlFragment", () => {
     expect(result.issue).toMatch(/row/i);
   });
 
-  it("removes layout-affecting CSS and image dimensions while keeping bounded content", () => {
+  it("removes container layout CSS while preserving bounded image dimensions", () => {
     const result = sanitizeReportHtmlFragment(
       '<section style="width:100px;max-width:90px;min-width:10px;height:100px;min-height:10px;max-height:90px;margin:-1px;padding:1vw;display:grid;gap:2vh;color:red"><h2>Heading</h2><a href="https://scalingup.com">Link</a><ul><li>Item</li></ul><img src="https://cdn.scalingup.com/report.png" width="400" height="300"><table><tbody><tr><td>Cell</td></tr></tbody></table></section>',
       "introduction",
@@ -481,6 +527,9 @@ describe("sanitizeReportHtmlFragment", () => {
     expect(result.html).toContain("<ul><li>Item</li></ul>");
     expect(result.html).toContain("<table><tbody><tr><td>Cell</td></tr></tbody></table>");
     expect(result.html).toContain('src="https://cdn.scalingup.com/report.png"');
-    expect(result.html).not.toMatch(/(?:width|height|grid|flex|vw|vh|-1px)/i);
+    expect(result.html).toContain('width="400"');
+    expect(result.html).toContain('height="300"');
+    expect(result.html).toContain('style="color:red"');
+    expect(result.html).not.toMatch(/(?:max-width|min-width|min-height|max-height|grid|flex|vw|vh|-1px)/i);
   });
 });

@@ -122,6 +122,8 @@ const ALLOWED_ATTRIBUTES: Record<string, string[]> = {
     "title",
     "loading",
     "referrerpolicy",
+    "width",
+    "height",
     ...COMMON_ATTRIBUTES,
   ],
   table: ["summary", ...COMMON_ATTRIBUTES],
@@ -154,8 +156,28 @@ const ALLOWED_STYLES = {
 
 const DATA_IMAGE = /^data:\s*image\//i;
 const DATA_SVG = /^data:\s*image\/svg\+xml/i;
+export const REPORT_HTML_IMAGE_DIMENSION_MAX = 2_000;
+const REPORT_HTML_IMAGE_DIMENSION = /^[1-9]\d*$/;
 const OBSCURED_OR_FETCH_CAPABLE_CSS =
   /\/\*|\*\/|\\|url\s*\(|expression\s*\(|@import|javascript\s*:/i;
+
+function removeUnsafeImageDimensions(attributes: Record<string, string>): void {
+  const width = attributes.width?.trim();
+  const height = attributes.height?.trim();
+  const isSafe = (value: string | undefined): value is string =>
+    value !== undefined &&
+    REPORT_HTML_IMAGE_DIMENSION.test(value) &&
+    Number(value) <= REPORT_HTML_IMAGE_DIMENSION_MAX;
+
+  if (!isSafe(width) || !isSafe(height)) {
+    delete attributes.width;
+    delete attributes.height;
+    return;
+  }
+
+  attributes.width = width;
+  attributes.height = height;
+}
 
 function removeObscuredCss(attributes: Record<string, string>): void {
   const style = attributes.style;
@@ -499,6 +521,7 @@ export function sanitizeReportHtmlFragment(
       },
       img: (tagName, attributes) => {
         removeObscuredCss(attributes);
+        removeUnsafeImageDimensions(attributes);
         const src = (attributes.src ?? "").trim();
         if (src && DATA_IMAGE.test(src) && DATA_SVG.test(src)) {
           delete attributes.src;
