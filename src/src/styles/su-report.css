@@ -3386,13 +3386,6 @@
    approved 1530x810 composition without widening the authored CSS allowlist. */
 .su-public-brand.su-report
   .su-report-custom-html--conclusion
-  a[aria-label="Scaling Up Profits — book a free call"] {
-  display: block;
-  color: inherit;
-  text-decoration: none;
-}
-.su-public-brand.su-report
-  .su-report-custom-html--conclusion
   [aria-label="Scaling Up Profits promotion"] {
   position: relative;
   box-sizing: border-box;
