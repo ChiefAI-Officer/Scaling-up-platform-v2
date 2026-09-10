@@ -3421,10 +3421,13 @@
   position: relative;
   display: block;
   box-sizing: border-box;
-  width: 220px;
-  height: 52px;
+  /* Percentage widths resolve against the promotion's padded content box.
+     Compensate so the visible mark remains 323/1530 of the full banner. */
+  width: 23.62%;
+  height: auto;
+  aspect-ratio: 323 / 72;
   margin: 0;
-  padding: 8px 10px;
+  padding: 0;
   overflow: hidden;
   background: #000000;
 }
@@ -3432,23 +3435,12 @@
   .su-report-custom-html--conclusion
   [aria-label="Scaling Up Profits brand"] img {
   display: block;
-  width: 180px;
-  height: 24px;
+  width: 100%;
+  height: auto;
+  max-width: 100%;
   max-height: none;
   margin: 0;
   object-fit: contain;
-}
-.su-public-brand.su-report
-  .su-report-custom-html--conclusion
-  [aria-label="Scaling Up Profits brand"] small {
-  position: absolute;
-  left: 66px;
-  bottom: 4px;
-  color: #ffffff;
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: .2px;
-  line-height: 1;
 }
 .su-public-brand.su-report
   .su-report-custom-html--conclusion
