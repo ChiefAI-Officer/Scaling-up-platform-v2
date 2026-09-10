@@ -107,7 +107,11 @@ type SemanticAuditPosition = "introduction" | "conclusion";
 
 const TALL_PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAA+gCAIAAAC0f+F8AAAALUlEQVR42u3DAQ0AAAgDoM8uFrKSxQ0ibGR6K4mqqqqqqqqqqqqqqqqqqqq/H9OeIDkSuu58AAAAAElFTkSuQmCC";
 const AUTHORED_BANNER_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABEAAAAJCAIAAABbilBbAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAFUlEQVQYlWPQFHMhFTGM6nEZzGEAAIZoTky0C/2LAAAAAElFTkSuQmCC";
+const SCALING_UP_LOGO_SRC = `data:image/png;base64,${readFileSync(
+  join(process.cwd(), "public", "brand", "su-logo-white.png"),
+).toString("base64")}`;
 const AUTHORED_BANNER_HTML = `<a href="https://calendly.com/example" aria-label="Book a free call"><img src="${AUTHORED_BANNER_SRC}" alt="Promotional banner" width="1530" height="810"></a>`;
+const SCALING_UP_PROFITS_PROMOTION_HTML = `<a href="https://calendly.com/example" aria-label="Scaling Up Profits — book a free call"><section aria-label="Scaling Up Profits promotion"><header aria-label="Scaling Up Profits brand"><img src="${SCALING_UP_LOGO_SRC}" alt="Scaling Up" width="480" height="64"><small>PROFIT</small></header><p aria-label="Scaling Up Profits eyebrow">A resource from Scaling Up</p><h2>There May Be Money Hiding In Your Numbers</h2><p aria-label="Scaling Up Profits description">Beyond what this assessment measures, many growing companies are also leaving cash on the table in day-to-day costs — insurance, payment processing, staffing, benefits, and more. Scaling Up Profits is a vetted specialist network that finds it, often at no upfront cost, and puts it straight to your bottom line.</p><table aria-label="Scaling Up Profits metrics and call to action"><tr><td><strong>100%</strong><small>TO YOUR BOTTOM LINE</small></td><td><strong>5x–10x</strong><small>EBITDA MULTIPLIER</small></td><td><span aria-label="Book a free call">Book a Free Call →</span></td></tr></table></section></a>`;
 const SEMANTIC_AUDIT_LIMITS = {
   introduction: { elements: 64, text: 2_200, rows: 8, columns: 4, cells: 24, headings: 4, breaks: 8, lines: 200 },
   conclusion: { elements: 36, text: 900, rows: 6, columns: 3, cells: 12, headings: 2, breaks: 4, lines: 200 },
@@ -477,6 +481,47 @@ async function expectAuthoredBannerContained(page: Page) {
   expect(geometry.imageHeight / geometry.imageWidth).toBeCloseTo(810 / 1530, 2);
   expect(await horizontalOverflow(page)).toMatchObject({ offenders: [] });
   expect(await authoredClipping(page)).toEqual([]);
+}
+
+async function scalingUpProfitsPromotionGeometry(page: Page) {
+  return page.locator('[aria-label="Scaling Up Profits promotion"]').evaluate((promotion) => {
+    const brand = promotion.querySelector<HTMLElement>('[aria-label="Scaling Up Profits brand"]');
+    const headline = promotion.querySelector<HTMLElement>("h2");
+    const description = promotion.querySelector<HTMLElement>('[aria-label="Scaling Up Profits description"]');
+    const metricCells = [...promotion.querySelectorAll<HTMLElement>("td")];
+    const cta = promotion.querySelector<HTMLElement>('[aria-label="Book a free call"]');
+    if (!brand || !headline || !description || metricCells.length !== 3 || !cta) {
+      throw new Error("Incomplete Scaling Up Profits promotion");
+    }
+    const promotionRect = promotion.getBoundingClientRect();
+    const headlineRect = headline.getBoundingClientRect();
+    const descriptionRect = description.getBoundingClientRect();
+    const metricsRect = metricCells[0].closest("table")?.getBoundingClientRect();
+    if (!metricsRect) throw new Error("Missing Scaling Up Profits metrics table");
+    const ctaRect = cta.getBoundingClientRect();
+    const promotionStyle = getComputedStyle(promotion);
+    const brandStyle = getComputedStyle(brand);
+    const headlineStyle = getComputedStyle(headline);
+    const metricStyles = metricCells.slice(0, 2).map((cell) => getComputedStyle(cell));
+    const ctaStyle = getComputedStyle(cta);
+    return {
+      aspectRatio: promotionRect.width / promotionRect.height,
+      backgroundColor: promotionStyle.backgroundColor,
+      paddingRatio: parseFloat(promotionStyle.paddingLeft) / promotionRect.width,
+      brandWidth: brand.getBoundingClientRect().width,
+      brandBackground: brandStyle.backgroundColor,
+      headlineFontSize: parseFloat(headlineStyle.fontSize),
+      headlineLeftRatio: (headlineRect.left - promotionRect.left) / promotionRect.width,
+      descriptionWidth: descriptionRect.width,
+      descriptionBottom: descriptionRect.bottom - promotionRect.top,
+      metricsTop: metricsRect.top - promotionRect.top,
+      metricRadius: metricStyles.map((style) => parseFloat(style.borderTopLeftRadius)),
+      metricBorderWidths: metricStyles.map((style) => parseFloat(style.borderTopWidth)),
+      ctaWidth: ctaRect.width,
+      ctaRadius: parseFloat(ctaStyle.borderTopLeftRadius),
+      ctaBackground: ctaStyle.backgroundColor,
+    };
+  });
 }
 
 async function expectPdfContainsAuthoredBanner(
@@ -918,6 +963,51 @@ describe("SU Full landscape browser and PDF contract", () => {
         format: "A4",
         landscape: true,
       });
+    } finally {
+      await page.close();
+    }
+  });
+
+  it("recreates the Scaling Up Profits reference as a composed HTML promotion", async () => {
+    const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+    try {
+      await load(page, alternateStyleMarkup("CLASSIC_SCORED", SCALING_UP_PROFITS_PROMOTION_HTML));
+      const geometry = await scalingUpProfitsPromotionGeometry(page);
+
+      expect(geometry.aspectRatio).toBeCloseTo(1530 / 810, 1);
+      expect(geometry.backgroundColor).toBe("rgb(43, 22, 72)");
+      expect(geometry.paddingRatio).toBeCloseTo(0.053, 2);
+      expect(geometry.brandWidth).toBeGreaterThanOrEqual(220);
+      expect(geometry.brandWidth).toBeLessThanOrEqual(280);
+      expect(geometry.brandBackground).toBe("rgb(0, 0, 0)");
+      expect(geometry.headlineFontSize).toBeGreaterThanOrEqual(30);
+      expect(geometry.headlineLeftRatio).toBeCloseTo(0.053, 2);
+      expect(geometry.descriptionWidth).toBeLessThanOrEqual(760);
+      expect(geometry.descriptionBottom).toBeLessThanOrEqual(geometry.metricsTop - 12);
+      expect(geometry.metricRadius.every((radius) => radius >= 12)).toBe(true);
+      expect(geometry.metricBorderWidths.every((width) => width >= 1)).toBe(true);
+      expect(geometry.ctaWidth).toBeGreaterThanOrEqual(240);
+      expect(geometry.ctaRadius).toBeGreaterThanOrEqual(24);
+      expect(geometry.ctaBackground).toBe("rgb(211, 154, 0)");
+      expect(await horizontalOverflow(page)).toMatchObject({ offenders: [] });
+      expect(await authoredClipping(page)).toEqual([]);
+      await saveVisualArtifact(
+        page,
+        "scaling-up-profits-promotion",
+        '[aria-label="Scaling Up Profits promotion"]',
+      );
+
+      await page.emulateMedia({ media: "print" });
+      const printGeometry = await scalingUpProfitsPromotionGeometry(page);
+      expect(printGeometry.aspectRatio).toBeCloseTo(1530 / 810, 1);
+      expect(printGeometry.backgroundColor).toBe("rgb(43, 22, 72)");
+      expect(printGeometry.descriptionBottom).toBeLessThanOrEqual(printGeometry.metricsTop - 12);
+      expect(await authoredClipping(page)).toEqual([]);
+
+      await page.emulateMedia({ media: "screen" });
+      await page.setViewportSize({ width: 390, height: 844 });
+      expect(await horizontalOverflow(page)).toMatchObject({ offenders: [] });
+      expect(await authoredClipping(page)).toEqual([]);
     } finally {
       await page.close();
     }

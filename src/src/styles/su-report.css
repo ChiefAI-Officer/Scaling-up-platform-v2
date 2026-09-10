@@ -3381,6 +3381,239 @@
   overflow-x: auto;
 }
 
+/* Scaling Up Profits closing promotion. The content remains portable,
+   sanitizer-safe semantic HTML; this report-owned treatment reproduces the
+   approved 1530x810 composition without widening the authored CSS allowlist. */
+.su-public-brand.su-report
+  .su-report-custom-html--conclusion
+  a[aria-label="Scaling Up Profits — book a free call"] {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+.su-public-brand.su-report
+  .su-report-custom-html--conclusion
+  [aria-label="Scaling Up Profits promotion"] {
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  aspect-ratio: 1530 / 810;
+  overflow: hidden;
+  padding: 4.6% 5.3%;
+  background: #2b1648;
+  color: #ffffff;
+  font-family: Inter, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.su-public-brand.su-report
+  .su-report-custom-html--conclusion
+  [aria-label="Scaling Up Profits promotion"]::before {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 6px;
+  background: #d39a00;
+  content: "";
+}
+.su-public-brand.su-report
+  .su-report-custom-html--conclusion
+  [aria-label="Scaling Up Profits brand"] {
+  position: relative;
+  display: block;
+  box-sizing: border-box;
+  width: 220px;
+  height: 52px;
+  margin: 0;
+  padding: 8px 10px;
+  overflow: hidden;
+  background: #000000;
+}
+.su-public-brand.su-report
+  .su-report-custom-html--conclusion
+  [aria-label="Scaling Up Profits brand"] img {
+  display: block;
+  width: 180px;
+  height: 24px;
+  max-height: none;
+  margin: 0;
+  object-fit: contain;
+}
+.su-public-brand.su-report
+  .su-report-custom-html--conclusion
+  [aria-label="Scaling Up Profits brand"] small {
+  position: absolute;
+  left: 66px;
+  bottom: 4px;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: .2px;
+  line-height: 1;
+}
+.su-public-brand.su-report
+  .su-report-custom-html--conclusion
+  [aria-label="Scaling Up Profits eyebrow"] {
+  margin: 22px 0 12px;
+  padding: 0;
+  color: #d39a00;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 3px;
+  line-height: 1.2;
+  text-align: left;
+  text-transform: uppercase;
+}
+.su-public-brand.su-report
+  .su-report-custom-html--conclusion
+  [aria-label="Scaling Up Profits promotion"] > h2 {
+  width: 78%;
+  margin: 0 0 14px;
+  padding: 0;
+  color: #ffffff;
+  font-size: clamp(26px, 2.5vw, 40px);
+  font-weight: 800;
+  letter-spacing: -.5px;
+  line-height: 1.12;
+  text-align: left;
+}
+.su-public-brand.su-report
+  .su-report-custom-html--conclusion
+  [aria-label="Scaling Up Profits description"] {
+  width: 78%;
+  margin: 0;
+  padding: 0;
+  color: #c9c1d2;
+  font-size: clamp(12px, 1.1vw, 18px);
+  line-height: 1.45;
+  text-align: left;
+}
+.su-public-brand.su-report
+  .su-report-custom-html--conclusion
+  table[aria-label="Scaling Up Profits metrics and call to action"] {
+  position: absolute;
+  right: 5.3%;
+  bottom: 4.2%;
+  left: 5.3%;
+  display: block;
+  width: auto;
+  max-width: none;
+  margin: 0;
+  overflow: visible;
+  border: 0;
+  border-collapse: separate;
+}
+.su-public-brand.su-report
+  .su-report-custom-html--conclusion
+  table[aria-label="Scaling Up Profits metrics and call to action"] tbody,
+.su-public-brand.su-report
+  .su-report-custom-html--conclusion
+  table[aria-label="Scaling Up Profits metrics and call to action"] tr {
+  display: block;
+  width: 100%;
+}
+.su-public-brand.su-report
+  .su-report-custom-html--conclusion
+  table[aria-label="Scaling Up Profits metrics and call to action"] tr {
+  display: grid;
+  grid-template-columns: minmax(145px, 1fr) minmax(145px, 1fr) minmax(230px, 1.7fr);
+  gap: 16px;
+  align-items: stretch;
+}
+.su-public-brand.su-report
+  .su-report-custom-html--conclusion
+  table[aria-label="Scaling Up Profits metrics and call to action"] td {
+  box-sizing: border-box;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #6e5d7e;
+  border-radius: 14px;
+  background: #3b2458;
+  color: #ffffff;
+  text-align: center;
+  vertical-align: middle;
+}
+.su-public-brand.su-report
+  .su-report-custom-html--conclusion
+  table[aria-label="Scaling Up Profits metrics and call to action"] td strong,
+.su-public-brand.su-report
+  .su-report-custom-html--conclusion
+  table[aria-label="Scaling Up Profits metrics and call to action"] td small {
+  display: block;
+}
+.su-public-brand.su-report
+  .su-report-custom-html--conclusion
+  table[aria-label="Scaling Up Profits metrics and call to action"] td strong {
+  color: #d39a00;
+  font-size: 20px;
+  line-height: 1.05;
+}
+.su-public-brand.su-report
+  .su-report-custom-html--conclusion
+  table[aria-label="Scaling Up Profits metrics and call to action"] td small {
+  margin-top: 5px;
+  color: #c9c1d2;
+  font-size: 9px;
+  line-height: 1.1;
+}
+.su-public-brand.su-report
+  .su-report-custom-html--conclusion
+  table[aria-label="Scaling Up Profits metrics and call to action"] td:last-child {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.su-public-brand.su-report
+  .su-report-custom-html--conclusion
+  [aria-label="Book a free call"] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 58px;
+  padding: 14px 24px;
+  border-radius: 999px;
+  background: #d39a00;
+  color: #2b1648;
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1.1;
+  text-align: center;
+  text-decoration: none;
+}
+
+@media (max-width: 640px) {
+  .su-public-brand.su-report
+    .su-report-custom-html--conclusion
+    [aria-label="Scaling Up Profits promotion"] {
+    aspect-ratio: auto;
+    min-height: 540px;
+    padding: 28px 24px;
+  }
+  .su-public-brand.su-report
+    .su-report-custom-html--conclusion
+    [aria-label="Scaling Up Profits promotion"] > h2,
+  .su-public-brand.su-report
+    .su-report-custom-html--conclusion
+    [aria-label="Scaling Up Profits description"] {
+    width: 100%;
+  }
+  .su-public-brand.su-report
+    .su-report-custom-html--conclusion
+    table[aria-label="Scaling Up Profits metrics and call to action"] {
+    position: static;
+    margin-top: 24px;
+  }
+  .su-public-brand.su-report
+    .su-report-custom-html--conclusion
+    table[aria-label="Scaling Up Profits metrics and call to action"] tr {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Jeff's Rockefeller conclusion is authored as a two-cell table. Keep this
    established composition report-owned even though ordinary authored images
    may now carry bounded dimensions. */
