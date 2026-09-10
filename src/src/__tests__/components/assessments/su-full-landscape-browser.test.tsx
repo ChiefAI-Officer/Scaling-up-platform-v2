@@ -109,7 +109,7 @@ const TALL_PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAA+gCAIAAAC0
 const AUTHORED_BANNER_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABEAAAAJCAIAAABbilBbAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAFUlEQVQYlWPQFHMhFTGM6nEZzGEAAIZoTky0C/2LAAAAAElFTkSuQmCC";
 const SCALING_UP_PROFITS_LOGO_SRC = "https://platformtest.scalingup.com/brand/scaling-up-profits-logo.png";
 const AUTHORED_BANNER_HTML = `<a href="https://calendly.com/example" aria-label="Book a free call"><img src="${AUTHORED_BANNER_SRC}" alt="Promotional banner" width="1530" height="810"></a>`;
-const SCALING_UP_PROFITS_PROMOTION_HTML = `<a href="https://calendly.com/example" aria-label="Scaling Up Profits — book a free call"><section aria-label="Scaling Up Profits promotion"><header aria-label="Scaling Up Profits brand"><img src="${SCALING_UP_PROFITS_LOGO_SRC}" alt="Scaling Up Profit" width="646" height="144"></header><p aria-label="Scaling Up Profits eyebrow">A resource from Scaling Up</p><h2>There May Be Money Hiding In Your Numbers</h2><p aria-label="Scaling Up Profits description">Beyond what this assessment measures, many growing companies are also leaving cash on the table in day-to-day costs — insurance, payment processing, staffing, benefits, and more. Scaling Up Profits is a vetted specialist network that finds it, often at no upfront cost, and puts it straight to your bottom line.</p><table aria-label="Scaling Up Profits metrics and call to action"><tr><td><strong>100%</strong><small>TO YOUR BOTTOM LINE</small></td><td><strong>5x–10x</strong><small>EBITDA MULTIPLIER</small></td><td><span aria-label="Book a free call">Book a Free Call →</span></td></tr></table></section></a>`;
+const SCALING_UP_PROFITS_PROMOTION_HTML = `<section aria-label="Scaling Up Profits promotion"><header aria-label="Scaling Up Profits brand"><img src="${SCALING_UP_PROFITS_LOGO_SRC}" alt="Scaling Up Profit" width="646" height="144"></header><p aria-label="Scaling Up Profits eyebrow">A resource from Scaling Up</p><h2>There May Be Money Hiding In Your Numbers</h2><p aria-label="Scaling Up Profits description">Beyond what this assessment measures, many growing companies are also leaving cash on the table in day-to-day costs — insurance, payment processing, staffing, benefits, and more. Scaling Up Profits is a vetted specialist network that finds it, often at no upfront cost, and puts it straight to your bottom line.</p><table aria-label="Scaling Up Profits metrics and call to action"><tr><td><strong>100%</strong><small>TO YOUR BOTTOM LINE</small></td><td><strong>5x–10x</strong><small>EBITDA MULTIPLIER</small></td><td><a href="https://calendly.com/example" aria-label="Book a free call">Book a Free Call →</a></td></tr></table></section>`;
 const SEMANTIC_AUDIT_LIMITS = {
   introduction: { elements: 64, text: 2_200, rows: 8, columns: 4, cells: 24, headings: 4, breaks: 8, lines: 200 },
   conclusion: { elements: 36, text: 900, rows: 6, columns: 3, cells: 12, headings: 2, breaks: 4, lines: 200 },
@@ -992,6 +992,9 @@ describe("SU Full landscape browser and PDF contract", () => {
       expect(geometry.ctaWidth).toBeGreaterThanOrEqual(240);
       expect(geometry.ctaRadius).toBeGreaterThanOrEqual(24);
       expect(geometry.ctaBackground).toBe("rgb(211, 154, 0)");
+      expect(await page.locator('[aria-label="Scaling Up Profits promotion"] > a').count()).toBe(0);
+      expect(await page.locator('[aria-label="Book a free call"]').getAttribute("href"))
+        .toBe("https://calendly.com/example");
       expect(await horizontalOverflow(page)).toMatchObject({ offenders: [] });
       expect(await authoredClipping(page)).toEqual([]);
       await saveVisualArtifact(
