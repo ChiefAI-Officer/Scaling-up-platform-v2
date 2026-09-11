@@ -57,6 +57,17 @@ export async function POST(
     }
 
     const { id: campaignId } = await params;
+    const expectedStatus = new URL(request.url).searchParams.get("expectedStatus");
+    if (
+      expectedStatus !== null &&
+      expectedStatus !== "DRAFT" &&
+      expectedStatus !== "ACTIVE"
+    ) {
+      return NextResponse.json(
+        { success: false, error: "Invalid expected campaign status" },
+        { status: 400 }
+      );
+    }
 
     // Parse the body. Treat any parse failure (missing body, empty body,
     // bad JSON) as `{}` — the schema's reason field is optional. Only
@@ -112,11 +123,23 @@ export async function POST(
 
     const fromStatus = campaign.status;
     const now = new Date();
-    const updated = await db.assessmentCampaign.update({
-      where: { id: campaignId },
-      data: { status: "CLOSED", closeAt: now },
-      select: { id: true, status: true },
-    });
+    if (expectedStatus) {
+      const result = await db.assessmentCampaign.updateMany({
+        where: { id: campaignId, deletedAt: null, status: expectedStatus },
+        data: { status: "CLOSED" },
+      });
+      if (result.count !== 1) {
+        return NextResponse.json(
+          { success: false, code: "ALREADY_CLOSED" },
+          { status: 409 }
+        );
+      }
+    } else {
+      await db.assessmentCampaign.update({
+        where: { id: campaignId },
+        data: { status: "CLOSED" },
+      });
+    }
 
     await logAudit({
       entityType: "AssessmentCampaign",
@@ -133,8 +156,8 @@ export async function POST(
     return NextResponse.json({
       success: true,
       data: {
-        id: updated.id,
-        status: updated.status,
+        id: campaignId,
+        status: "CLOSED",
         closedAt: now.toISOString(),
       },
     });

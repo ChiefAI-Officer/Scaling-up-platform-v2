@@ -329,7 +329,7 @@ describe("PublicCampaignList", () => {
     );
   });
 
-  it("replaces a closed row locally with the closed status and availability", async () => {
+  it("replaces a closed row locally without redefining its scheduled cutoff", async () => {
     const activeCampaign = campaigns[1];
     global.fetch = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       if (String(input) === "/api/admin/public-campaigns" && !init?.method) {
@@ -359,7 +359,7 @@ describe("PublicCampaignList", () => {
     expect(row).not.toBeNull();
     await waitFor(() => {
       expect(within(row!).getByText("Closed", { selector: "span" })).toBeInTheDocument();
-      expect(within(row!).getByText("Closed Sep 11, 2026", { selector: "td" })).toBeInTheDocument();
+      expect(within(row!).getByText("Closed Sep 30, 2030", { selector: "td" })).toBeInTheDocument();
     });
     expect(within(row!).getByRole("button", { name: "Delete" })).toBeInTheDocument();
     expect(global.fetch).toHaveBeenCalledTimes(2);
@@ -411,6 +411,44 @@ describe("PublicCampaignList", () => {
       'Campaign "Annual planning readiness" deleted.',
     );
     expect(deletionStatus).toHaveFocus();
+  });
+
+  it("refocuses the deletion announcement for consecutive duplicate names", async () => {
+    const duplicateCampaigns = [
+      { ...campaigns[0], id: "duplicate-draft", name: "Quarterly pulse" },
+      { ...campaigns[2], id: "duplicate-closed", name: "Quarterly pulse" },
+    ];
+    global.fetch = jest.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === "/api/admin/public-campaigns") {
+        return response({ success: true, data: duplicateCampaigns });
+      }
+      return response({ success: true, message: "Campaign deleted" });
+    }) as jest.MockedFunction<typeof fetch>;
+
+    render(<PublicCampaignList lifecycleActionsEnabled />);
+
+    let rows = (await screen.findAllByText("Quarterly pulse")).map((name) =>
+      name.closest("tr"),
+    );
+    fireEvent.click(within(rows[0]!).getByRole("button", { name: "Delete" }));
+    fireEvent.click(
+      within(await screen.findByRole("dialog")).getByRole("button", {
+        name: "Delete campaign",
+      }),
+    );
+    const deletionStatus = await screen.findByRole("status");
+    await waitFor(() => expect(deletionStatus).toHaveFocus());
+
+    rows = screen.getAllByText("Quarterly pulse").map((name) => name.closest("tr"));
+    fireEvent.click(within(rows[0]!).getByRole("button", { name: "Delete" }));
+    fireEvent.click(
+      within(await screen.findByRole("dialog")).getByRole("button", {
+        name: "Delete campaign",
+      }),
+    );
+
+    await waitFor(() => expect(deletionStatus).toHaveFocus());
+    expect(deletionStatus).toHaveTextContent('Campaign "Quarterly pulse" deleted.');
   });
 
   it("keeps visited response panels mounted and makes responses exclusive", async () => {

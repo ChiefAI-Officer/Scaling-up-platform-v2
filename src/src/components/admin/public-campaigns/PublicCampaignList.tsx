@@ -36,7 +36,10 @@ export function PublicCampaignList({
   const [visitedResponseIds, setVisitedResponseIds] = useState<ReadonlySet<string>>(
     () => new Set(),
   );
-  const [deletedCampaignName, setDeletedCampaignName] = useState<string | null>(null);
+  const [deletedCampaign, setDeletedCampaign] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
   const createdStatusRef = useRef<HTMLDivElement>(null);
   const deletedStatusRef = useRef<HTMLDivElement>(null);
   const origin = typeof window === "undefined" ? "" : window.location.origin;
@@ -76,14 +79,14 @@ export function PublicCampaignList({
   }, [createdCampaignExists, loading]);
 
   useEffect(() => {
-    if (deletedCampaignName) {
+    if (deletedCampaign) {
       deletedStatusRef.current?.focus();
     }
-  }, [deletedCampaignName]);
+  }, [deletedCampaign]);
 
   function patchCampaign(
     campaignId: string,
-    updates: Partial<Pick<PublicCampaignViewModel, "status" | "closeAt">>,
+    updates: Pick<PublicCampaignViewModel, "status">,
   ) {
     setCampaigns((current) =>
       current.map((campaign) =>
@@ -105,7 +108,7 @@ export function PublicCampaignList({
       next.delete(campaignId);
       return next;
     });
-    setDeletedCampaignName(campaignName);
+    setDeletedCampaign({ id: campaignId, name: campaignName });
   }
 
   function toggleResponses(campaignId: string) {
@@ -139,14 +142,14 @@ export function PublicCampaignList({
 
   return (
     <section aria-label="Public campaigns">
-      {deletedCampaignName && (
+      {deletedCampaign && (
         <div
           ref={deletedStatusRef}
           role="status"
           tabIndex={-1}
           className="mb-4 rounded-md border border-success/20 bg-success/10 px-4 py-3 text-sm font-semibold text-success"
         >
-          Campaign &quot;{deletedCampaignName}&quot; deleted.
+          Campaign &quot;{deletedCampaign.name}&quot; deleted.
         </div>
       )}
 

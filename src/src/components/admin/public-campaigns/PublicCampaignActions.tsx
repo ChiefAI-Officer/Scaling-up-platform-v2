@@ -20,9 +20,7 @@ import {
 interface PublicCampaignActionsProps {
   campaign: PublicCampaignViewModel;
   origin: string;
-  onCampaignUpdated: (
-    updates: Partial<Pick<PublicCampaignViewModel, "status" | "closeAt">>,
-  ) => void;
+  onCampaignUpdated: (updates: Pick<PublicCampaignViewModel, "status">) => void;
   onCampaignDeleted: () => void;
   onToggleResponses: () => void;
   responsesExpanded: boolean;
@@ -117,24 +115,22 @@ export function PublicCampaignActions({
 
     try {
       const response = await fetch(
-        `/api/assessment-campaigns/${campaign.id}/close`,
+        `/api/assessment-campaigns/${campaign.id}/close?expectedStatus=${campaign.status}`,
         { method: "POST" },
       );
       const body = (await response.json()) as {
         success?: boolean;
         code?: unknown;
-        data?: { id?: unknown; status?: unknown; closedAt?: unknown };
+        data?: { id?: unknown; status?: unknown };
       };
 
       if (
         response.ok &&
         body.success === true &&
         body.data?.id === campaign.id &&
-        body.data.status === "CLOSED" &&
-        typeof body.data.closedAt === "string" &&
-        Number.isFinite(Date.parse(body.data.closedAt))
+        body.data.status === "CLOSED"
       ) {
-        onCampaignUpdated({ status: "CLOSED", closeAt: body.data.closedAt });
+        onCampaignUpdated({ status: "CLOSED" });
         setNotice({
           kind: "status",
           message: "Campaign closed. Its public link is disabled.",

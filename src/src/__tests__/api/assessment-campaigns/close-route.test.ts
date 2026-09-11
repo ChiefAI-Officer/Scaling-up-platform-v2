@@ -22,7 +22,7 @@ jest.mock("@/lib/db", () => ({
       // findUnique so existing sequencing is preserved.
       const findUnique = jest.fn();
       const findFirst = jest.fn((args) => findUnique(args));
-      return { findUnique, findFirst, update: jest.fn() };
+      return { findUnique, findFirst, update: jest.fn(), updateMany: jest.fn() };
     })(),
     auditLog: { create: jest.fn().mockResolvedValue(undefined) },
   },
@@ -59,6 +59,13 @@ function postReq(body?: unknown): Request {
     headers: { "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
+}
+
+function conditionalPostReq(expectedStatus: "DRAFT" | "ACTIVE"): Request {
+  return new Request(
+    `http://localhost/api/assessment-campaigns/c1/close?expectedStatus=${expectedStatus}`,
+    { method: "POST" },
+  );
 }
 
 function mockOwningCampaign(status: "DRAFT" | "ACTIVE" | "CLOSED") {
@@ -144,7 +151,7 @@ describe("POST /api/assessment-campaigns/[id]/close", () => {
     expect(db.assessmentCampaign.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: "c1" },
-        data: { status: "CLOSED", closeAt: expect.any(Date) },
+        data: { status: "CLOSED" },
       }),
     );
     expect(db.auditLog.create).toHaveBeenCalledTimes(1);
@@ -187,6 +194,28 @@ describe("POST /api/assessment-campaigns/[id]/close", () => {
     const body = await res.json();
     expect(body.success).toBe(false);
     expect(body.code).toBe("ALREADY_CLOSED");
+    expect(db.assessmentCampaign.update).not.toHaveBeenCalled();
+    expect(db.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it("atomically rejects a concurrent close when expectedStatus no longer matches", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    mockOwningCampaign("ACTIVE");
+    (db.assessmentCampaign.updateMany as jest.Mock).mockResolvedValue({ count: 0 });
+
+    const res = await POST(
+      conditionalPostReq("ACTIVE") as never,
+      detailParams("c1"),
+    );
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({
+      success: false,
+      code: "ALREADY_CLOSED",
+    });
+    expect(db.assessmentCampaign.updateMany).toHaveBeenCalledWith({
+      where: { id: "c1", deletedAt: null, status: "ACTIVE" },
+      data: { status: "CLOSED" },
+    });
     expect(db.assessmentCampaign.update).not.toHaveBeenCalled();
     expect(db.auditLog.create).not.toHaveBeenCalled();
   });

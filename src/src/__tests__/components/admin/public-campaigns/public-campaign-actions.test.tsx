@@ -348,13 +348,10 @@ describe("PublicCampaignActions", () => {
     );
 
     await waitFor(() => {
-      expect(onCampaignUpdated).toHaveBeenCalledWith({
-        status: "CLOSED",
-        closeAt: "2026-09-11T08:00:00.000Z",
-      });
+      expect(onCampaignUpdated).toHaveBeenCalledWith({ status: "CLOSED" });
     });
     expect(global.fetch).toHaveBeenCalledWith(
-      "/api/assessment-campaigns/campaign-august/close",
+      "/api/assessment-campaigns/campaign-august/close?expectedStatus=ACTIVE",
       { method: "POST" },
     );
     expect(screen.getByRole("status")).toHaveTextContent(
