@@ -100,6 +100,49 @@ describe("PublicCampaignActions", () => {
   });
 
   it.each([
+    ["ACTIVE", "Close campaign", "Close campaign"],
+    ["CLOSED", "Delete", "Delete campaign"],
+  ] as const)(
+    "gives responsive %s confirmation actions a direct 44px target contract",
+    async (status, triggerName, confirmName) => {
+      const shared = {
+        campaign: campaign({ status }),
+        origin: "https://host.example",
+        onCampaignUpdated: jest.fn(),
+        onCampaignDeleted: jest.fn(),
+        onToggleResponses: jest.fn(),
+        responsesExpanded: false,
+        lifecycleActionsEnabled: true,
+      };
+      const { rerender } = render(
+        <PublicCampaignActions {...shared} responsiveEnabled />,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: triggerName }));
+      let dialog = await screen.findByRole("dialog");
+      for (const name of ["Cancel", confirmName]) {
+        expect(within(dialog).getByRole("button", { name })).toHaveClass(
+          "min-h-11",
+          "min-w-11",
+        );
+      }
+
+      fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+
+      rerender(<PublicCampaignActions {...shared} responsiveEnabled={false} />);
+      fireEvent.click(screen.getByRole("button", { name: triggerName }));
+      dialog = await screen.findByRole("dialog");
+      for (const name of ["Cancel", confirmName]) {
+        expect(within(dialog).getByRole("button", { name })).not.toHaveClass(
+          "min-h-11",
+          "min-w-11",
+        );
+      }
+    },
+  );
+
+  it.each([
     ["DRAFT", ["Publish", "Delete"], ["Copy link", "View responses", "Close campaign"]],
     ["ACTIVE", ["Copy link", "View responses", "Close campaign"], ["Publish", "Delete"]],
     ["CLOSED", ["View responses", "Delete"], ["Publish", "Copy link", "Close campaign"]],
@@ -305,7 +348,10 @@ describe("PublicCampaignActions", () => {
     );
 
     await waitFor(() => {
-      expect(onCampaignUpdated).toHaveBeenCalledWith({ status: "CLOSED" });
+      expect(onCampaignUpdated).toHaveBeenCalledWith({
+        status: "CLOSED",
+        closeAt: "2026-09-11T08:00:00.000Z",
+      });
     });
     expect(global.fetch).toHaveBeenCalledWith(
       "/api/assessment-campaigns/campaign-august/close",
@@ -386,9 +432,28 @@ describe("PublicCampaignActions", () => {
 
     await waitFor(() => expect(onCampaignDeleted).toHaveBeenCalledTimes(1));
     expect(global.fetch).toHaveBeenCalledWith(
-      "/api/assessment-campaigns/campaign-august",
+      "/api/assessment-campaigns/campaign-august?expectedStatus=DRAFT",
       { method: "DELETE" },
     );
+  });
+
+  it("retains the row when a campaign becomes active before deletion", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue(
+      response({ success: false, code: "CAMPAIGN_STATUS_CHANGED" }, false, 409),
+    );
+    const { onCampaignDeleted } = renderActions(campaign());
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    fireEvent.click(
+      within(await screen.findByRole("dialog")).getByRole("button", {
+        name: "Delete campaign",
+      }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "This campaign changed status. Refresh the page and try again.",
+    );
+    expect(onCampaignDeleted).not.toHaveBeenCalled();
   });
 
   it("retains the campaign row when deletion fails", async () => {

@@ -20,7 +20,9 @@ import {
 interface PublicCampaignActionsProps {
   campaign: PublicCampaignViewModel;
   origin: string;
-  onCampaignUpdated: (updates: Pick<PublicCampaignViewModel, "status">) => void;
+  onCampaignUpdated: (
+    updates: Partial<Pick<PublicCampaignViewModel, "status" | "closeAt">>,
+  ) => void;
   onCampaignDeleted: () => void;
   onToggleResponses: () => void;
   responsesExpanded: boolean;
@@ -121,16 +123,18 @@ export function PublicCampaignActions({
       const body = (await response.json()) as {
         success?: boolean;
         code?: unknown;
-        data?: { id?: unknown; status?: unknown };
+        data?: { id?: unknown; status?: unknown; closedAt?: unknown };
       };
 
       if (
         response.ok &&
         body.success === true &&
         body.data?.id === campaign.id &&
-        body.data.status === "CLOSED"
+        body.data.status === "CLOSED" &&
+        typeof body.data.closedAt === "string" &&
+        Number.isFinite(Date.parse(body.data.closedAt))
       ) {
-        onCampaignUpdated({ status: "CLOSED" });
+        onCampaignUpdated({ status: "CLOSED", closeAt: body.data.closedAt });
         setNotice({
           kind: "status",
           message: "Campaign closed. Its public link is disabled.",
@@ -166,10 +170,19 @@ export function PublicCampaignActions({
     setNotice(null);
 
     try {
-      const response = await fetch(`/api/assessment-campaigns/${campaign.id}`, {
-        method: "DELETE",
-      });
-      const body = (await response.json()) as { success?: boolean };
+      const response = await fetch(
+        `/api/assessment-campaigns/${campaign.id}?expectedStatus=${campaign.status}`,
+        { method: "DELETE" },
+      );
+      const body = (await response.json()) as { success?: boolean; code?: unknown };
+      if (response.status === 409 && body.code === "CAMPAIGN_STATUS_CHANGED") {
+        setNotice({
+          kind: "alert",
+          message: "This campaign changed status. Refresh the page and try again.",
+        });
+        setDeleteOpen(false);
+        return;
+      }
       if (!response.ok || body.success !== true) {
         throw new Error("Invalid delete response");
       }
@@ -273,7 +286,12 @@ export function PublicCampaignActions({
               </DialogHeader>
               <DialogFooter>
                 <DialogClose asChild>
-                  <Button type="button" variant="outline" disabled={closing}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={closing}
+                    className={responsiveEnabled ? "min-h-11 min-w-11" : undefined}
+                  >
                     Cancel
                   </Button>
                 </DialogClose>
@@ -282,6 +300,7 @@ export function PublicCampaignActions({
                   variant="destructive"
                   disabled={closing}
                   onClick={closeCampaign}
+                  className={responsiveEnabled ? "min-h-11 min-w-11" : undefined}
                 >
                   {closing ? "Closing…" : "Close campaign"}
                 </Button>
@@ -318,7 +337,12 @@ export function PublicCampaignActions({
               </DialogHeader>
               <DialogFooter>
                 <DialogClose asChild>
-                  <Button type="button" variant="outline" disabled={deleting}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={deleting}
+                    className={responsiveEnabled ? "min-h-11 min-w-11" : undefined}
+                  >
                     Cancel
                   </Button>
                 </DialogClose>
@@ -327,6 +351,7 @@ export function PublicCampaignActions({
                   variant="destructive"
                   disabled={deleting}
                   onClick={deleteCampaign}
+                  className={responsiveEnabled ? "min-h-11 min-w-11" : undefined}
                 >
                   {deleting ? "Deleting…" : "Delete campaign"}
                 </Button>

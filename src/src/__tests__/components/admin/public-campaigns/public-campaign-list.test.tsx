@@ -330,10 +330,7 @@ describe("PublicCampaignList", () => {
   });
 
   it("replaces a closed row locally with the closed status and availability", async () => {
-    const activeCampaign = {
-      ...campaigns[1],
-      closeAt: null,
-    };
+    const activeCampaign = campaigns[1];
     global.fetch = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       if (String(input) === "/api/admin/public-campaigns" && !init?.method) {
         return response({ success: true, data: [activeCampaign] });
@@ -362,7 +359,7 @@ describe("PublicCampaignList", () => {
     expect(row).not.toBeNull();
     await waitFor(() => {
       expect(within(row!).getByText("Closed", { selector: "span" })).toBeInTheDocument();
-      expect(within(row!).getByText("Closed", { selector: "td" })).toBeInTheDocument();
+      expect(within(row!).getByText("Closed Sep 11, 2026", { selector: "td" })).toBeInTheDocument();
     });
     expect(within(row!).getByRole("button", { name: "Delete" })).toBeInTheDocument();
     expect(global.fetch).toHaveBeenCalledTimes(2);
@@ -378,7 +375,7 @@ describe("PublicCampaignList", () => {
         return response({ success: true, data: [] });
       }
       if (
-        url === "/api/assessment-campaigns/campaign-closed" &&
+        url === "/api/assessment-campaigns/campaign-closed?expectedStatus=CLOSED" &&
         init?.method === "DELETE"
       ) {
         return response({ success: true, message: "Campaign deleted" });
@@ -409,6 +406,11 @@ describe("PublicCampaignList", () => {
     expect(screen.queryByText("No responses yet.")).not.toBeInTheDocument();
     expect(screen.getByText("August lead campaign")).toBeInTheDocument();
     expect(screen.getByText("Quarterly habits check")).toBeInTheDocument();
+    const deletionStatus = screen.getByRole("status");
+    expect(deletionStatus).toHaveTextContent(
+      'Campaign "Annual planning readiness" deleted.',
+    );
+    expect(deletionStatus).toHaveFocus();
   });
 
   it("keeps visited response panels mounted and makes responses exclusive", async () => {

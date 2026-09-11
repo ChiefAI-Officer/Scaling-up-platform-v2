@@ -5,9 +5,9 @@
 - Guidance: Share an assessment with anyone using a public link.
 - Primary action: Create campaign
 - Columns: Campaign, Assessment, Status, Availability, Responses, Actions
-- Draft actions: Publish
-- Live actions: Copy link, View responses
-- Closed actions: View responses
+- Draft actions: Publish, Delete
+- Live actions: Copy link, View responses, Close campaign
+- Closed actions: View responses, Delete
 
 ## Create state
 - Heading: Create a public campaign
@@ -53,6 +53,14 @@ wizard.
 - **Inline responses:** `View responses` expands the selected campaign in place and
   lazy-loads its response rows. Each response retains its existing details and
   `View report` action; no separate response-management page is introduced.
+- **Terminal close:** `Close campaign` is available only for Live campaigns. Its
+  confirmation explains that the public link and new responses stop immediately
+  and that the action cannot be undone. The actual close time replaces any
+  previously scheduled end date.
+- **Soft delete:** `Delete` is available only for Draft and Closed campaigns. Its
+  confirmation states how many responses are retained but made unreachable from
+  this page, and that the action cannot be undone. A status announcement receives
+  focus after the row is removed.
 - **Narrow-laptop reflow:** at 1024 px, each campaign row reflows into a labelled
   grid with actions on their own line. Controls may wrap but must not overlap or
   clip; the creation form remains legible without horizontal scrolling.

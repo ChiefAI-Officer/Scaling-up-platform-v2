@@ -36,7 +36,9 @@ export function PublicCampaignList({
   const [visitedResponseIds, setVisitedResponseIds] = useState<ReadonlySet<string>>(
     () => new Set(),
   );
+  const [deletedCampaignName, setDeletedCampaignName] = useState<string | null>(null);
   const createdStatusRef = useRef<HTMLDivElement>(null);
+  const deletedStatusRef = useRef<HTMLDivElement>(null);
   const origin = typeof window === "undefined" ? "" : window.location.origin;
   const createdCampaignExists = campaigns.some(
     (campaign) => campaign.id === createdCampaignId,
@@ -73,9 +75,15 @@ export function PublicCampaignList({
     }
   }, [createdCampaignExists, loading]);
 
+  useEffect(() => {
+    if (deletedCampaignName) {
+      deletedStatusRef.current?.focus();
+    }
+  }, [deletedCampaignName]);
+
   function patchCampaign(
     campaignId: string,
-    updates: Pick<PublicCampaignViewModel, "status">,
+    updates: Partial<Pick<PublicCampaignViewModel, "status" | "closeAt">>,
   ) {
     setCampaigns((current) =>
       current.map((campaign) =>
@@ -84,7 +92,7 @@ export function PublicCampaignList({
     );
   }
 
-  function removeCampaign(campaignId: string) {
+  function removeCampaign(campaignId: string, campaignName: string) {
     setCampaigns((current) =>
       current.filter((campaign) => campaign.id !== campaignId),
     );
@@ -97,6 +105,7 @@ export function PublicCampaignList({
       next.delete(campaignId);
       return next;
     });
+    setDeletedCampaignName(campaignName);
   }
 
   function toggleResponses(campaignId: string) {
@@ -130,6 +139,17 @@ export function PublicCampaignList({
 
   return (
     <section aria-label="Public campaigns">
+      {deletedCampaignName && (
+        <div
+          ref={deletedStatusRef}
+          role="status"
+          tabIndex={-1}
+          className="mb-4 rounded-md border border-success/20 bg-success/10 px-4 py-3 text-sm font-semibold text-success"
+        >
+          Campaign &quot;{deletedCampaignName}&quot; deleted.
+        </div>
+      )}
+
       {createdCampaignExists && (
         <div
           ref={createdStatusRef}
@@ -255,7 +275,9 @@ export function PublicCampaignList({
                         onCampaignUpdated={(updates) =>
                           patchCampaign(campaign.id, updates)
                         }
-                        onCampaignDeleted={() => removeCampaign(campaign.id)}
+                        onCampaignDeleted={() =>
+                          removeCampaign(campaign.id, campaign.name)
+                        }
                         onToggleResponses={() => toggleResponses(campaign.id)}
                         responsesExpanded={responsesExpanded}
                         lifecycleActionsEnabled={lifecycleActionsEnabled}

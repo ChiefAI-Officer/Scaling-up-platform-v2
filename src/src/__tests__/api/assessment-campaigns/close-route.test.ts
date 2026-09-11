@@ -144,7 +144,7 @@ describe("POST /api/assessment-campaigns/[id]/close", () => {
     expect(db.assessmentCampaign.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: "c1" },
-        data: { status: "CLOSED" },
+        data: { status: "CLOSED", closeAt: expect.any(Date) },
       }),
     );
     expect(db.auditLog.create).toHaveBeenCalledTimes(1);

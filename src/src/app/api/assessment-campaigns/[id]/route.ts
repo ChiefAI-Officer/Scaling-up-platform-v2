@@ -764,6 +764,17 @@ export async function DELETE(
     }
 
     const { id } = await params;
+    const expectedStatus = new URL(request.url).searchParams.get("expectedStatus");
+    if (
+      expectedStatus !== null &&
+      expectedStatus !== "DRAFT" &&
+      expectedStatus !== "CLOSED"
+    ) {
+      return NextResponse.json(
+        { success: false, error: "Invalid expected campaign status" },
+        { status: 400 }
+      );
+    }
 
     // Load the LIVE campaign (soft-deleted → null → 404). A deleted or
     // non-existent campaign is treated identically.
@@ -796,12 +807,27 @@ export async function DELETE(
       );
     }
 
-    // Soft-delete only — responses/invitations are preserved. Deletable in
-    // ANY state (DRAFT/ACTIVE/CLOSED).
-    await db.assessmentCampaign.update({
-      where: { id },
-      data: { deletedAt: new Date() },
-    });
+    // Soft-delete only — responses/invitations are preserved. Existing callers
+    // may delete any state; lifecycle UIs can opt into an atomic status
+    // precondition so a concurrently published campaign is not removed.
+    const deletedAt = new Date();
+    if (expectedStatus) {
+      const result = await db.assessmentCampaign.updateMany({
+        where: { id, deletedAt: null, status: expectedStatus },
+        data: { deletedAt },
+      });
+      if (result.count !== 1) {
+        return NextResponse.json(
+          { success: false, code: "CAMPAIGN_STATUS_CHANGED" },
+          { status: 409 }
+        );
+      }
+    } else {
+      await db.assessmentCampaign.update({
+        where: { id },
+        data: { deletedAt },
+      });
+    }
 
     await logAudit({
       entityType: "AssessmentCampaign",

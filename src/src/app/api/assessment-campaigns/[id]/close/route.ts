@@ -114,7 +114,7 @@ export async function POST(
     const now = new Date();
     const updated = await db.assessmentCampaign.update({
       where: { id: campaignId },
-      data: { status: "CLOSED" },
+      data: { status: "CLOSED", closeAt: now },
       select: { id: true, status: true },
     });
 

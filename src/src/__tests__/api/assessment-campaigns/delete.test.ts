@@ -6,7 +6,8 @@
  * coach who later lost template/org access can still delete (ownership
  * cleanup). Deletable in ANY state (DRAFT/ACTIVE/CLOSED); soft-delete only
  * (sets deletedAt). Already-deleted / non-existent live → 404. Audited.
- * Rate-limited.
+ * Rate-limited. An optional expectedStatus query parameter makes deletion
+ * conditional for lifecycle UIs without changing legacy callers.
  *
  * Also includes a regression for the publish-resurrect gap (Part C #1):
  * publishing a soft-deleted PUBLIC campaign must be blocked (404).
@@ -31,6 +32,7 @@ jest.mock("@/lib/db", () => ({
       findFirst: jest.fn(),
       findUnique: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
     },
     auditLog: { create: jest.fn().mockResolvedValue(undefined) },
   },
@@ -78,8 +80,9 @@ function params(id: string) {
   return { params: Promise.resolve({ id }) };
 }
 
-function delReq(): Request {
-  return new Request("http://localhost/api/assessment-campaigns/c1", {
+function delReq(expectedStatus?: "DRAFT" | "CLOSED"): Request {
+  const suffix = expectedStatus ? `?expectedStatus=${expectedStatus}` : "";
+  return new Request(`http://localhost/api/assessment-campaigns/c1${suffix}`, {
     method: "DELETE",
   });
 }
@@ -158,6 +161,44 @@ describe("DELETE /api/assessment-campaigns/[id]", () => {
 
     const res = await DELETE(delReq() as never, params("c1"));
     expect(res.status).toBe(200);
+  });
+
+  it("atomically rejects deletion when the campaign status changed", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    (db.assessmentCampaign.findFirst as jest.Mock).mockResolvedValue({
+      id: "c1",
+      createdByCoachId: null,
+      status: "DRAFT",
+      deletedAt: null,
+    });
+    (db.assessmentCampaign.updateMany as jest.Mock).mockResolvedValue({ count: 0 });
+
+    const res = await DELETE(delReq("DRAFT") as never, params("c1"));
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({
+      success: false,
+      code: "CAMPAIGN_STATUS_CHANGED",
+    });
+    expect(db.assessmentCampaign.updateMany).toHaveBeenCalledWith({
+      where: { id: "c1", deletedAt: null, status: "DRAFT" },
+      data: { deletedAt: expect.any(Date) },
+    });
+    expect(db.assessmentCampaign.update).not.toHaveBeenCalled();
+    expect(db.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it("400 for an invalid expected status", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    const request = new Request(
+      "http://localhost/api/assessment-campaigns/c1?expectedStatus=ACTIVE",
+      { method: "DELETE" },
+    );
+
+    const res = await DELETE(request as never, params("c1"));
+    expect(res.status).toBe(400);
+    expect(db.assessmentCampaign.findFirst).not.toHaveBeenCalled();
+    expect(db.assessmentCampaign.update).not.toHaveBeenCalled();
+    expect(db.assessmentCampaign.updateMany).not.toHaveBeenCalled();
   });
 
   it("403 when a DIFFERENT coach attempts to delete", async () => {
