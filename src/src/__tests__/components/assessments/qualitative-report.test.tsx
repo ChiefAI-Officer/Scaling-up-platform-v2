@@ -47,7 +47,7 @@ function baseReport(overrides: Partial<RespondentReport> = {}): RespondentReport
 }
 
 describe("QualitativeReport — respondent identity and next steps", () => {
-  it("shows the taker's email and the shared next-step links", () => {
+  it("shows the taker's email and Learn More without the default coach CTA", () => {
     render(
       <QualitativeReport
         report={lvaReport()}
@@ -61,8 +61,11 @@ describe("QualitativeReport — respondent identity and next steps", () => {
       "https://scalingup.com",
     );
     expect(
-      screen.getByRole("link", { name: /talk to a coach/i }),
-    ).toHaveAttribute("href", "mailto:coach%40example.com");
+      screen.queryByRole("link", { name: /talk to a coach/i }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("report-conclusion")).not.toHaveTextContent(
+      /connect with a coach/i,
+    );
   });
 
   it("keeps Learn More but honors an instrument's Coach-action opt-out", () => {
@@ -231,6 +234,9 @@ describe("BrandedReport — qualitative dispatch", () => {
       expect(screen.getByText("100")).toBeInTheDocument();
       expect(screen.queryByText("Five Decisions")).not.toBeInTheDocument();
       expect(screen.queryByText(/scorecard/i)).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("link", { name: /talk to a coach/i }),
+      ).not.toBeInTheDocument();
       unmount();
     },
   );

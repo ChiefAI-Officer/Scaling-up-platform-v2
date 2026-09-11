@@ -36,10 +36,9 @@ export interface ReportConfig {
    */
   showTier: boolean;
   /**
-   * #81 — whether the scored per-respondent report shows the "Talk to your
-   * Scaling Up Certified Coach" CTA (BrandedReport conclusion + the emailed
-   * report). Optional; OMITTED means shown (back-compatible). Only
-   * five-dysfunctions opts out (`false`). Read as `showCoachCta !== false`.
+   * Whether the per-respondent report shows the coach CTA on screen, in the
+   * adaptive styles, and in email. Optional; OMITTED means hidden. A template
+   * must explicitly opt in with `true`.
    */
   showCoachCta?: boolean;
   /**
@@ -52,7 +51,7 @@ export interface ReportConfig {
   readonly domainResults?: DomainResultsPresentation;
 }
 
-/** Default = current behaviour (back-compatible): scored report with the table and tier shown, coach CTA shown. */
+/** Default: scored report with the table and tier shown; the coach CTA is hidden unless opted in. */
 export const DEFAULT_REPORT_CONFIG: ReportConfig = {
   reportType: "scored",
   showScoreTable: true,

@@ -451,12 +451,13 @@ describe("buildReportEmailHtml — GH 228 branded chrome", () => {
 describe("buildReportEmailHtml — coach CTA gating (#81)", () => {
   const CTA = "Talk to your Scaling Up Certified Coach";
 
-  it("scored email shows the coach CTA by default", () => {
+  it("scored email keeps Learn More but hides the coach CTA by default", () => {
     const { bodyHtml } = buildReportEmailHtml({
       report: fourDecisionsReport(),
       recipientRole: "TAKER_COPY",
     });
-    expect(bodyHtml).toContain(CTA);
+    expect(bodyHtml).toContain('href="https://scalingup.com"');
+    expect(bodyHtml).not.toContain(CTA);
   });
 
   it("five-dysfunctions scored email hides the coach CTA", () => {
@@ -483,7 +484,7 @@ describe("buildReportEmailHtml — coach CTA gating (#81)", () => {
 });
 
 describe("buildReportEmailHtml — report identity and next steps", () => {
-  it("shows the taker's email plus Learn More and the verified coach link", () => {
+  it("shows the taker's email plus Learn More without a coach link", () => {
     const { bodyHtml } = buildReportEmailHtml({
       report: fourDecisionsReport({
         respondentEmail: "taker@example.com",
@@ -494,7 +495,7 @@ describe("buildReportEmailHtml — report identity and next steps", () => {
 
     expect(bodyHtml).toContain("taker@example.com");
     expect(bodyHtml).toContain('href="https://scalingup.com"');
-    expect(bodyHtml).toContain('href="mailto:coach%40example.com"');
+    expect(bodyHtml).not.toContain('href="mailto:coach%40example.com"');
   });
 
   it("gives the coach a taker-contact link instead of emailing themselves", () => {

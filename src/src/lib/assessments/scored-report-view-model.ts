@@ -461,7 +461,7 @@ export function buildScoredReportViewModel(report: RespondentReport): ScoredRepo
     recommendations,
     findingRecommendations,
     additionalResponses,
-    cta: ctaFor(normalizeContactEmail(report.referringCoachEmail), config.showCoachCta !== false),
+    cta: ctaFor(normalizeContactEmail(report.referringCoachEmail), config.showCoachCta === true),
     coach: { name: report.coachName ?? null, logoUrl: report.coachLogoUrl ?? null },
     provenance: buildReportProvenance(report),
     closingGreeting: greetingName(report.respondentName),

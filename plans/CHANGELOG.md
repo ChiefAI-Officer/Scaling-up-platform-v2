@@ -6,6 +6,15 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="default-report-coach-cta-removed"></a>
+### 2026-09-11 — Default report coach CTA removed <!-- ENTRY_ISO:2026-09-11 ENTRY_SLUG:default-report-coach-cta-removed -->
+
+**Status: IMPLEMENTED AND LOCALLY VERIFIED; NOT MERGED OR DEPLOYED.** Jeff directed that the default assessment-report footer remove **Talk to a Coach** while retaining **Learn More**. The coach action is now opt-in: an omitted or false `showCoachCta` hides it, while an explicit `true` restores the existing verified-coach email or generic coach-form destination. The convention applies to Classic scored, Classic qualitative, Executive Boardroom, Modern Dashboard, report email, and the same DOM used for print/PDF. The on-screen default copy no longer promises a coach action that is absent.
+
+**Boundary.** The reusable CTA code, contact-email resolution, and generic coach URL remain intact for reversibility. Referring-coach email copies retain their separate **Contact the Taker** action. Public Marketing Result and the version-owned Marketing CTA compiler remain outside the report-footer flag and continue resolving their coach actions unchanged. No report HTML authoring, template content, schema, migration, flag, environment value, campaign, submission, invitation, or Production data changed.
+
+**Verification receipt.** TDD first failed the default Classic scored, Classic qualitative, adaptive report-model, email, and shared next-step seams, then passed after the opt-in inversion. The report and public-marketing matrix passes **12 suites / 248 tests / 3 snapshots**. Headless Chromium visual review of synthetic scored and qualitative conclusions confirms the heading, revised copy, and centered Learn More button remain balanced with no coach-button gap. Changed-file ESLint emits no diagnostics, changelog freshness passes **4/4**, all **51** migration-safety checks pass, and the clean-install Turbopack production build compiles, passes TypeScript, and generates **95/95 pages**. The first build attempt used the primary checkout's stale shared dependencies and failed before compiling the change; `npm ci` against this worktree's lockfile restored the declared `@react-pdf/renderer` and `@vercel/blob` versions, after which the exact build passed. Existing workspace-root, middleware-deprecation, missing local Inngest keys, and build-time `DATABASE_URL` warnings remain non-fatal.
+
 <a id="scaling-up-profits-html-promotion"></a>
 ### 2026-09-10 — Scaling Up Profits HTML promotion <!-- ENTRY_ISO:2026-09-10 ENTRY_SLUG:scaling-up-profits-html-promotion -->
 

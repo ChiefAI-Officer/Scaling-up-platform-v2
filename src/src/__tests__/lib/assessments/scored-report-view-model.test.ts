@@ -119,7 +119,7 @@ describe("buildScoredReportViewModel", () => {
       { stableKey: "choices", label: "Which habits matter?", answer: "Weekly meeting" },
     ]);
     expect(view.cta).toEqual({
-      eligible: true,
+      eligible: false,
       contactEmail: "coach@example.test",
       label: "Talk to a Coach →",
       href: "mailto:coach%40example.test",
@@ -151,7 +151,7 @@ describe("buildScoredReportViewModel", () => {
     const emptyOverride = applyScoredReportContactEmailOverride(base, "  ");
 
     expect(overridden.cta).toEqual(expect.objectContaining({
-      eligible: true,
+      eligible: false,
       label: "Talk to a Coach →",
       contactEmail: "override@example.test",
       href: "mailto:override%40example.test",

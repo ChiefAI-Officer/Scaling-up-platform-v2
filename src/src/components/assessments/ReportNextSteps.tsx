@@ -9,7 +9,7 @@ interface ReportNextStepsProps {
 
 export function ReportNextSteps({
   contactEmail,
-  showCoachLink = true,
+  showCoachLink = false,
   publicResultActions,
 }: ReportNextStepsProps) {
   const email = contactEmail?.trim() ?? "";

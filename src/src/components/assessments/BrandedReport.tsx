@@ -988,13 +988,13 @@ export function LegacyClassicReport({
             Keep Scaling, {greetingName(report.respondentName)}.
           </h3>
           <p>
-            You&apos;ve completed your assessment. Turn these results into a
-            90-day plan with your coach.
+            You&apos;ve completed your assessment. Learn more about Scaling Up to
+            turn these results into action.
           </p>
           <ReportNextSteps
             contactEmail={contactEmail ?? report.referringCoachEmail}
             showCoachLink={
-              reportConfigFor(report.templateAlias).showCoachCta !== false
+              reportConfigFor(report.templateAlias).showCoachCta === true
             }
             publicResultActions={
               report.publicLeadActions

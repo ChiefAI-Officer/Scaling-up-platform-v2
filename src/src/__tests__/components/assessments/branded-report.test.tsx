@@ -99,7 +99,7 @@ describe("BrandedReport — respondent identity and next steps", () => {
     expect(screen.queryByText(/\{\{respondentName\}\}/)).not.toBeInTheDocument();
   });
 
-  it("shows the taker's email and both next-step links", () => {
+  it("shows the taker's email and Learn More without the default coach link", () => {
     render(
       <BrandedReport
         report={rockefellerReport()}
@@ -113,16 +113,16 @@ describe("BrandedReport — respondent identity and next steps", () => {
       "https://scalingup.com",
     );
     expect(
-      screen.getByRole("link", { name: /talk to a coach/i }),
-    ).toHaveAttribute("href", "mailto:coach%40example.com");
+      screen.queryByRole("link", { name: /talk to a coach/i }),
+    ).not.toBeInTheDocument();
   });
 
-  it("falls back to Jeff's Talk-to-a-Coach form when no verified email exists", () => {
+  it("does not fall back to the generic coach form when no verified email exists", () => {
     render(<BrandedReport report={rockefellerReport()} />);
 
     expect(
-      screen.getByRole("link", { name: /talk to a coach/i }),
-    ).toHaveAttribute("href", "https://coaches.scalingup.com/find-a-coach-contact-form");
+      screen.queryByRole("link", { name: /talk to a coach/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("renders the three source actions for a SunHub public result", () => {
@@ -1074,9 +1074,10 @@ describe("BrandedReport — additional responses (H9)", () => {
 // ════════════════════════════════════════════════════════════════════════════
 
 describe("BrandedReport — conclusion + footer", () => {
-  it("renders a coach CTA as text and a clean footer (#25): submission date + credit, no provenance", () => {
+  it("renders Learn More without a coach CTA and keeps a clean footer (#25)", () => {
     render(<BrandedReport report={rockefellerReport()} />);
-    expect(screen.getByTestId("report-conclusion").textContent).toMatch(
+    expect(screen.getByTestId("report-conclusion")).toHaveTextContent(/Learn More/i);
+    expect(screen.getByTestId("report-conclusion")).not.toHaveTextContent(
       /Talk to a Coach/i,
     );
     const footer = screen.getByTestId("report-footer");

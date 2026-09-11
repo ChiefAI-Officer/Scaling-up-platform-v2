@@ -575,13 +575,12 @@ export function QualitativeReport({
         >
           <h3 className="su-h2 su-report-conclude-title">What&apos;s next?</h3>
           <p>
-            Learn more about Scaling Up or connect with a coach to turn these
-            answers into action.
+            Learn more about Scaling Up to turn these answers into action.
           </p>
           <ReportNextSteps
             contactEmail={contactEmail ?? report.referringCoachEmail}
             showCoachLink={
-              reportConfigFor(report.templateAlias).showCoachCta !== false
+              reportConfigFor(report.templateAlias).showCoachCta === true
             }
           />
         </section>
