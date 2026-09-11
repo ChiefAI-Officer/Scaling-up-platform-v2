@@ -21,8 +21,10 @@ interface PublicCampaignActionsProps {
   campaign: PublicCampaignViewModel;
   origin: string;
   onCampaignUpdated: (updates: Pick<PublicCampaignViewModel, "status">) => void;
+  onCampaignDeleted: () => void;
   onToggleResponses: () => void;
   responsesExpanded: boolean;
+  lifecycleActionsEnabled?: boolean;
   responsiveEnabled?: boolean;
 }
 
@@ -32,14 +34,22 @@ export function PublicCampaignActions({
   campaign,
   origin,
   onCampaignUpdated,
+  onCampaignDeleted,
   onToggleResponses,
   responsesExpanded,
+  lifecycleActionsEnabled = false,
   responsiveEnabled = false,
 }: PublicCampaignActionsProps) {
   const [publishOpen, setPublishOpen] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [closeOpen, setCloseOpen] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
   const [manualUrl, setManualUrl] = useState<string | null>(null);
+
+  const actionClassName = `${responsiveEnabled ? "min-h-11 min-w-11 " : ""}text-destructive`;
 
   async function publishCampaign() {
     setPublishing(true);
@@ -95,6 +105,85 @@ export function PublicCampaignActions({
         kind: "alert",
         message: "We couldn't copy the link. Select and copy it manually.",
       });
+    }
+  }
+
+  async function closeCampaign() {
+    if (closing) return;
+    setClosing(true);
+    setNotice(null);
+
+    try {
+      const response = await fetch(
+        `/api/assessment-campaigns/${campaign.id}/close`,
+        { method: "POST" },
+      );
+      const body = (await response.json()) as {
+        success?: boolean;
+        code?: unknown;
+        data?: { id?: unknown; status?: unknown };
+      };
+
+      if (
+        response.ok &&
+        body.success === true &&
+        body.data?.id === campaign.id &&
+        body.data.status === "CLOSED"
+      ) {
+        onCampaignUpdated({ status: "CLOSED" });
+        setNotice({
+          kind: "status",
+          message: "Campaign closed. Its public link is disabled.",
+        });
+        setCloseOpen(false);
+        return;
+      }
+
+      if (response.status === 409 && body.code === "ALREADY_CLOSED") {
+        setNotice({
+          kind: "alert",
+          message: "This campaign is already closed. Refresh the page.",
+        });
+        setCloseOpen(false);
+        return;
+      }
+
+      throw new Error("Invalid close response");
+    } catch {
+      setNotice({
+        kind: "alert",
+        message: "We couldn't close this campaign. Try again.",
+      });
+      setCloseOpen(false);
+    } finally {
+      setClosing(false);
+    }
+  }
+
+  async function deleteCampaign() {
+    if (deleting) return;
+    setDeleting(true);
+    setNotice(null);
+
+    try {
+      const response = await fetch(`/api/assessment-campaigns/${campaign.id}`, {
+        method: "DELETE",
+      });
+      const body = (await response.json()) as { success?: boolean };
+      if (!response.ok || body.success !== true) {
+        throw new Error("Invalid delete response");
+      }
+
+      setDeleteOpen(false);
+      onCampaignDeleted();
+    } catch {
+      setNotice({
+        kind: "alert",
+        message: "We couldn't delete this campaign. Try again.",
+      });
+      setDeleteOpen(false);
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -155,6 +244,95 @@ export function PublicCampaignActions({
           >
             {responsesExpanded ? "Hide responses" : "View responses"}
           </Button>
+        )}
+
+        {lifecycleActionsEnabled && campaign.status === "ACTIVE" && (
+          <Dialog
+            open={closeOpen}
+            onOpenChange={(open) => {
+              if (!closing) setCloseOpen(open);
+            }}
+          >
+            <DialogTrigger asChild>
+              <Button
+                size="sm"
+                type="button"
+                variant="outline"
+                className={actionClassName}
+              >
+                Close campaign
+              </Button>
+            </DialogTrigger>
+            <DialogContent responsiveEnabled={responsiveEnabled}>
+              <DialogHeader>
+                <DialogTitle>Close &quot;{campaign.name}&quot;?</DialogTitle>
+                <DialogDescription>
+                  This immediately disables the public link and stops new responses.
+                  This cannot be undone.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <DialogClose asChild>
+                  <Button type="button" variant="outline" disabled={closing}>
+                    Cancel
+                  </Button>
+                </DialogClose>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  disabled={closing}
+                  onClick={closeCampaign}
+                >
+                  {closing ? "Closing…" : "Close campaign"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
+
+        {lifecycleActionsEnabled && campaign.status !== "ACTIVE" && (
+          <Dialog
+            open={deleteOpen}
+            onOpenChange={(open) => {
+              if (!deleting) setDeleteOpen(open);
+            }}
+          >
+            <DialogTrigger asChild>
+              <Button
+                size="sm"
+                type="button"
+                variant="outline"
+                className={actionClassName}
+              >
+                Delete
+              </Button>
+            </DialogTrigger>
+            <DialogContent responsiveEnabled={responsiveEnabled}>
+              <DialogHeader>
+                <DialogTitle>Delete &quot;{campaign.name}&quot;?</DialogTitle>
+                <DialogDescription>
+                  {campaign.responseCount} {campaign.responseCount === 1 ? "response is" : "responses are"}{" "}
+                  retained but will no longer be reachable from this page. This cannot
+                  be undone.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <DialogClose asChild>
+                  <Button type="button" variant="outline" disabled={deleting}>
+                    Cancel
+                  </Button>
+                </DialogClose>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  disabled={deleting}
+                  onClick={deleteCampaign}
+                >
+                  {deleting ? "Deleting…" : "Delete campaign"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         )}
       </div>
 

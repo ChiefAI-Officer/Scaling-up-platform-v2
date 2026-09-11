@@ -42,17 +42,20 @@ function response(body: unknown, ok = true, status = 200): Response {
 
 function renderActions(value: PublicCampaignViewModel) {
   const onCampaignUpdated = jest.fn();
+  const onCampaignDeleted = jest.fn();
   const onToggleResponses = jest.fn();
   render(
     <PublicCampaignActions
       campaign={value}
       origin="https://host.example"
       onCampaignUpdated={onCampaignUpdated}
+      onCampaignDeleted={onCampaignDeleted}
       onToggleResponses={onToggleResponses}
       responsesExpanded={false}
+      lifecycleActionsEnabled
     />,
   );
-  return { onCampaignUpdated, onToggleResponses };
+  return { onCampaignDeleted, onCampaignUpdated, onToggleResponses };
 }
 
 beforeEach(() => {
@@ -73,21 +76,23 @@ describe("PublicCampaignActions", () => {
       campaign: campaign({ status: "ACTIVE" }),
       origin: "https://host.example",
       onCampaignUpdated: jest.fn(),
+      onCampaignDeleted: jest.fn(),
       onToggleResponses: jest.fn(),
       responsesExpanded: false,
+      lifecycleActionsEnabled: true,
     };
     const { rerender } = render(
       <PublicCampaignActions {...shared} responsiveEnabled />,
     );
 
-    for (const name of ["Copy link", "View responses"]) {
+    for (const name of ["Copy link", "View responses", "Close campaign"]) {
       const button = screen.getByRole("button", { name });
       expect(button).toHaveClass("min-h-11");
       expect(button).toHaveClass("min-w-11");
     }
 
     rerender(<PublicCampaignActions {...shared} responsiveEnabled={false} />);
-    for (const name of ["Copy link", "View responses"]) {
+    for (const name of ["Copy link", "View responses", "Close campaign"]) {
       const button = screen.getByRole("button", { name });
       expect(button).not.toHaveClass("min-h-11");
       expect(button).not.toHaveClass("min-w-11");
@@ -95,9 +100,9 @@ describe("PublicCampaignActions", () => {
   });
 
   it.each([
-    ["DRAFT", ["Publish"], ["Copy link", "View responses"]],
-    ["ACTIVE", ["Copy link", "View responses"], ["Publish"]],
-    ["CLOSED", ["View responses"], ["Publish", "Copy link"]],
+    ["DRAFT", ["Publish", "Delete"], ["Copy link", "View responses", "Close campaign"]],
+    ["ACTIVE", ["Copy link", "View responses", "Close campaign"], ["Publish", "Delete"]],
+    ["CLOSED", ["View responses", "Delete"], ["Publish", "Copy link", "Close campaign"]],
   ] as const)(
     "shows only useful %s actions (catches the wrong lifecycle branch)",
     (status, shown, hidden) => {
@@ -110,6 +115,34 @@ describe("PublicCampaignActions", () => {
         expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
       }
       expect(screen.queryByText("More")).not.toBeInTheDocument();
+    },
+  );
+
+  it.each([
+    ["DRAFT", ["Publish"], ["Copy link", "View responses", "Close campaign", "Delete"]],
+    ["ACTIVE", ["Copy link", "View responses"], ["Publish", "Close campaign", "Delete"]],
+    ["CLOSED", ["View responses"], ["Publish", "Copy link", "Close campaign", "Delete"]],
+  ] as const)(
+    "keeps the existing %s action set when lifecycle actions are disabled",
+    (status, shown, hidden) => {
+      render(
+        <PublicCampaignActions
+          campaign={campaign({ status })}
+          origin="https://host.example"
+          onCampaignUpdated={jest.fn()}
+          onCampaignDeleted={jest.fn()}
+          onToggleResponses={jest.fn()}
+          responsesExpanded={false}
+          lifecycleActionsEnabled={false}
+        />,
+      );
+
+      for (const name of shown) {
+        expect(screen.getByRole("button", { name })).toBeInTheDocument();
+      }
+      for (const name of hidden) {
+        expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
+      }
     },
   );
 
@@ -233,6 +266,151 @@ describe("PublicCampaignActions", () => {
     expect(alert).not.toHaveTextContent("confidential detail");
   });
 
+  it("requires confirmation before closing an active campaign", async () => {
+    renderActions(campaign({ status: "ACTIVE" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Close campaign" }));
+
+    const dialog = await screen.findByRole("dialog", {
+      name: 'Close "August lead campaign"?',
+    });
+    expect(dialog).toHaveTextContent(
+      "This immediately disables the public link and stops new responses. This cannot be undone.",
+    );
+    expect(global.fetch).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("closes an active campaign and emits only the new status", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue(
+      response({
+        success: true,
+        data: {
+          id: "campaign-august",
+          status: "CLOSED",
+          closedAt: "2026-09-11T08:00:00.000Z",
+        },
+      }),
+    );
+    const { onCampaignUpdated } = renderActions(campaign({ status: "ACTIVE" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Close campaign" }));
+    fireEvent.click(
+      within(await screen.findByRole("dialog")).getByRole("button", {
+        name: "Close campaign",
+      }),
+    );
+
+    await waitFor(() => {
+      expect(onCampaignUpdated).toHaveBeenCalledWith({ status: "CLOSED" });
+    });
+    expect(global.fetch).toHaveBeenCalledWith(
+      "/api/assessment-campaigns/campaign-august/close",
+      { method: "POST" },
+    );
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Campaign closed. Its public link is disabled.",
+    );
+  });
+
+  it("shows a friendly already-closed message without changing local status", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue(
+      response({ success: false, code: "ALREADY_CLOSED" }, false, 409),
+    );
+    const { onCampaignUpdated } = renderActions(campaign({ status: "ACTIVE" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Close campaign" }));
+    fireEvent.click(
+      within(await screen.findByRole("dialog")).getByRole("button", {
+        name: "Close campaign",
+      }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "This campaign is already closed. Refresh the page.",
+    );
+    expect(onCampaignUpdated).not.toHaveBeenCalled();
+  });
+
+  it("keeps an active campaign unchanged when closing fails", async () => {
+    (global.fetch as jest.Mock).mockRejectedValue(new Error("network detail"));
+    const { onCampaignUpdated } = renderActions(campaign({ status: "ACTIVE" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Close campaign" }));
+    fireEvent.click(
+      within(await screen.findByRole("dialog")).getByRole("button", {
+        name: "Close campaign",
+      }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "We couldn't close this campaign. Try again.",
+    );
+    expect(screen.getByRole("button", { name: "Close campaign" })).toBeInTheDocument();
+    expect(onCampaignUpdated).not.toHaveBeenCalled();
+  });
+
+  it("requires confirmation before deleting and names retained responses", async () => {
+    renderActions(campaign({ status: "CLOSED", responseCount: 24 }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+    const dialog = await screen.findByRole("dialog", {
+      name: 'Delete "August lead campaign"?',
+    });
+    expect(dialog).toHaveTextContent(
+      "24 responses are retained but will no longer be reachable from this page. This cannot be undone.",
+    );
+    expect(global.fetch).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("deletes a draft campaign and asks the list to remove its row", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue(
+      response({ success: true, message: "Campaign deleted" }),
+    );
+    const { onCampaignDeleted } = renderActions(campaign());
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    fireEvent.click(
+      within(await screen.findByRole("dialog")).getByRole("button", {
+        name: "Delete campaign",
+      }),
+    );
+
+    await waitFor(() => expect(onCampaignDeleted).toHaveBeenCalledTimes(1));
+    expect(global.fetch).toHaveBeenCalledWith(
+      "/api/assessment-campaigns/campaign-august",
+      { method: "DELETE" },
+    );
+  });
+
+  it("retains the campaign row when deletion fails", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue(
+      response({ success: false, error: "internal detail" }, false, 500),
+    );
+    const { onCampaignDeleted } = renderActions(campaign({ status: "CLOSED" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    fireEvent.click(
+      within(await screen.findByRole("dialog")).getByRole("button", {
+        name: "Delete campaign",
+      }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "We couldn't delete this campaign. Try again.",
+    );
+    expect(screen.getByRole("button", { name: "Delete" })).toBeInTheDocument();
+    expect(onCampaignDeleted).not.toHaveBeenCalled();
+  });
+
   it("copies the complete encoded public link without exposing it (catches incomplete or visible links)", async () => {
     const canonicalUrl = "https://host.example/quiz/august%20lead%2Fcampaign";
     const encodedAlias = "august%20lead%2Fcampaign";
@@ -241,8 +419,10 @@ describe("PublicCampaignActions", () => {
         campaign={campaign({ status: "ACTIVE" })}
         origin="https://host.example"
         onCampaignUpdated={jest.fn()}
+        onCampaignDeleted={jest.fn()}
         onToggleResponses={jest.fn()}
         responsesExpanded={false}
+        lifecycleActionsEnabled
       />,
     );
 
@@ -294,8 +474,10 @@ describe("PublicCampaignActions", () => {
         campaign={campaign({ status: "CLOSED" })}
         origin="https://host.example"
         onCampaignUpdated={jest.fn()}
+        onCampaignDeleted={jest.fn()}
         onToggleResponses={onToggleResponses}
         responsesExpanded
+        lifecycleActionsEnabled
       />,
     );
 

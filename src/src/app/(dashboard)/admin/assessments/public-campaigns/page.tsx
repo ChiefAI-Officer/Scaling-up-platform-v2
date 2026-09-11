@@ -19,6 +19,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth/auth";
 import { PublicCampaignsManager } from "@/components/admin/PublicCampaignsManager";
 import { PublicCampaignList } from "@/components/admin/public-campaigns/PublicCampaignList";
+import { isPublicCampaignLifecycleEnabled } from "@/lib/assessments/wave-public-campaign-lifecycle-flags";
 import { isPublicCampaignsSimpleUiEnabled } from "@/lib/assessments/wave-public-campaigns-simple-ui-flags";
 import { PageHeader } from "@/components/ui/page-header";
 import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
@@ -90,6 +91,9 @@ export default async function AdminPublicCampaignsPage({
 
         <PublicCampaignList
           createdCampaignId={createdCampaignId}
+          {...(isPublicCampaignLifecycleEnabled()
+            ? { lifecycleActionsEnabled: true }
+            : {})}
           {...(mobileResponsiveEnabled ? { responsiveEnabled: true } : {})}
         />
       </div>

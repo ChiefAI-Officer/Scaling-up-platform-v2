@@ -12,6 +12,7 @@ import {
 
 interface PublicCampaignListProps {
   createdCampaignId?: string;
+  lifecycleActionsEnabled?: boolean;
   responsiveEnabled?: boolean;
 }
 
@@ -25,6 +26,7 @@ const cellClassName =
 
 export function PublicCampaignList({
   createdCampaignId,
+  lifecycleActionsEnabled = false,
   responsiveEnabled = false,
 }: PublicCampaignListProps) {
   const [campaigns, setCampaigns] = useState<PublicCampaignViewModel[]>([]);
@@ -80,6 +82,21 @@ export function PublicCampaignList({
         campaign.id === campaignId ? { ...campaign, ...updates } : campaign,
       ),
     );
+  }
+
+  function removeCampaign(campaignId: string) {
+    setCampaigns((current) =>
+      current.filter((campaign) => campaign.id !== campaignId),
+    );
+    setResponsesExpandedId((current) =>
+      current === campaignId ? null : current,
+    );
+    setVisitedResponseIds((current) => {
+      if (!current.has(campaignId)) return current;
+      const next = new Set(current);
+      next.delete(campaignId);
+      return next;
+    });
   }
 
   function toggleResponses(campaignId: string) {
@@ -238,8 +255,10 @@ export function PublicCampaignList({
                         onCampaignUpdated={(updates) =>
                           patchCampaign(campaign.id, updates)
                         }
+                        onCampaignDeleted={() => removeCampaign(campaign.id)}
                         onToggleResponses={() => toggleResponses(campaign.id)}
                         responsesExpanded={responsesExpanded}
+                        lifecycleActionsEnabled={lifecycleActionsEnabled}
                         responsiveEnabled={responsiveEnabled}
                       />
                     </td>

@@ -20,6 +20,11 @@ jest.mock("@/lib/assessments/wave-public-campaigns-simple-ui-flags", () => ({
   isPublicCampaignsSimpleUiEnabled: () => mockIsEnabled(),
 }));
 
+const mockLifecycleEnabled = jest.fn();
+jest.mock("@/lib/assessments/wave-public-campaign-lifecycle-flags", () => ({
+  isPublicCampaignLifecycleEnabled: () => mockLifecycleEnabled(),
+}));
+
 const mockResponsiveEnabled = jest.fn();
 jest.mock("@/lib/mobile-responsive-flags", () => ({
   isMobileResponsiveEnabled: () => mockResponsiveEnabled(),
@@ -33,9 +38,17 @@ jest.mock("@/components/admin/PublicCampaignsManager", () => ({
   ),
 }));
 
-let listProps: { createdCampaignId?: string; responsiveEnabled?: boolean } | null = null;
+let listProps: {
+  createdCampaignId?: string;
+  lifecycleActionsEnabled?: boolean;
+  responsiveEnabled?: boolean;
+} | null = null;
 jest.mock("@/components/admin/public-campaigns/PublicCampaignList", () => ({
-  PublicCampaignList: (props: { createdCampaignId?: string; responsiveEnabled?: boolean }) => {
+  PublicCampaignList: (props: {
+    createdCampaignId?: string;
+    lifecycleActionsEnabled?: boolean;
+    responsiveEnabled?: boolean;
+  }) => {
     listProps = props;
     return (
       <section aria-label="Simple public campaign list">
@@ -60,6 +73,7 @@ beforeEach(() => {
   listProps = null;
   mockGetServerSession.mockResolvedValue({ user: { role: "ADMIN" } });
   mockIsEnabled.mockReturnValue(false);
+  mockLifecycleEnabled.mockReturnValue(false);
   mockResponsiveEnabled.mockReturnValue(false);
 });
 
@@ -156,6 +170,18 @@ describe("AdminPublicCampaignsPage release composition", () => {
     expect(listProps).toEqual({
       createdCampaignId: undefined,
       responsiveEnabled: true,
+    });
+  });
+
+  it("forwards lifecycle actions only when their nested release gate is active", async () => {
+    mockIsEnabled.mockReturnValue(true);
+    mockLifecycleEnabled.mockReturnValue(true);
+
+    await renderPage();
+
+    expect(listProps).toEqual({
+      createdCampaignId: undefined,
+      lifecycleActionsEnabled: true,
     });
   });
 
