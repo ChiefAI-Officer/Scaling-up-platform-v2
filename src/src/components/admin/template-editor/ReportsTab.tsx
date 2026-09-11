@@ -7,6 +7,7 @@ import type {
 import {
   REPORT_HTML_IMAGE_DIMENSION_MAX,
   REPORT_HTML_LIMITS,
+  reportHtmlCssCharacterIssue,
   reportHtmlSourceCharacterIssue,
 } from "@/lib/assessments/report-html-sanitizer";
 import {
@@ -14,6 +15,7 @@ import {
   reportPlaceholderIssue,
   type ReportPlaceholderToken,
 } from "@/lib/assessments/report-placeholders";
+import { reportHtmlCssIssue } from "@/lib/assessments/report-html-css";
 
 function HtmlRegion({
   id,
@@ -38,6 +40,8 @@ function HtmlRegion({
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
   const authoringIssue =
     reportHtmlSourceCharacterIssue(html, position) ??
+    reportHtmlCssCharacterIssue(html, position) ??
+    reportHtmlCssIssue(html, position) ??
     reportPlaceholderIssue(html, title);
   const errorId = `${id}-error`;
 
@@ -64,10 +68,19 @@ function HtmlRegion({
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-base font-semibold text-foreground">{title}</h3>
               <span className="rounded-full bg-muted px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Optional HTML
+                HTML + CSS
               </span>
             </div>
             <p className="mt-1 text-xs text-muted-foreground">{helper}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Use classes for styling. CSS cannot use global definitions such as
+              @keyframes or @property; responsive @media, @supports, @container, and
+              nested @scope rules are supported. @import and non-HTTPS URLs are
+              blocked. Position supports only static, relative, or absolute. CSS
+              escapes, variables, and attribute/environment substitution are not
+              supported. Scripts, event handlers, and platform page-shell class names
+              are removed on save.
+            </p>
             {position === "conclusion" ? (
               <p className="mt-1 text-xs text-muted-foreground">
                 Closing images may use paired whole-number width and height attributes
@@ -127,7 +140,7 @@ function HtmlRegion({
               </span>
             ) : (
               <span>
-                Paste HTML. Unsafe scripts and attributes are removed when you save the draft.
+                {"Write HTML and optional CSS in a <style> tag. Styles apply only inside this section."}
               </span>
             )}
             <span className={`shrink-0 ${authoringIssue ? "font-semibold text-destructive" : ""}`}>

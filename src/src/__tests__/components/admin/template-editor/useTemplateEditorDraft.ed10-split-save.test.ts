@@ -234,7 +234,7 @@ describe("useTemplateEditorDraft — Save-Draft metadata body (ED10 trim)", () =
     });
   });
 
-  it("rehydrates canonical report HTML before clearing its dirty state", async () => {
+  it("keeps the author's source in the editor while previewing the stored safe HTML", async () => {
     const { result } = renderDraft({ ed10Active: true });
     patchResponseBody = {
       success: true,
@@ -264,7 +264,7 @@ describe("useTemplateEditorDraft — Save-Draft metadata body (ED10 trim)", () =
     expect(result.current.reportConfig).toMatchObject({
       reportHtml: {
         schemaVersion: 1,
-        introductionHtml: "<p>Safe intro</p>",
+        introductionHtml: '<p onclick="bad()">Safe intro</p>',
         conclusionHtml: "<p>CTA</p>",
       },
     });
@@ -274,7 +274,10 @@ describe("useTemplateEditorDraft — Save-Draft metadata body (ED10 trim)", () =
     });
     expect(result.current.dirtyFlags.reportConfig).toBeUndefined();
     expect(toastMock).toHaveBeenCalledWith(
-      expect.objectContaining({ title: "Unsafe report HTML was removed" }),
+      expect.objectContaining({
+        title: "Report HTML was adjusted",
+        description: "Your source remains in the editor. Preview shows the safe HTML that was saved.",
+      }),
     );
   });
 
