@@ -51,9 +51,9 @@ describe("reportConfigFor", () => {
     expect(reportConfigFor(undefined).domainResults).toBeUndefined();
   });
 
-  it("every other scored report shows the coach CTA by default (#81) — only five-dysfunctions opts out", () => {
+  it("keeps the coach CTA hidden unless a template explicitly opts in", () => {
     for (const a of ["RockHabits", "scaling-up-full", "scaling-up-quick", "nope", null, undefined]) {
-      expect(reportConfigFor(a).showCoachCta).not.toBe(false);
+      expect(reportConfigFor(a).showCoachCta).not.toBe(true);
     }
   });
 

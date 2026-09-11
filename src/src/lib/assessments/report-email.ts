@@ -233,7 +233,7 @@ const FONT =
 function buildEmailNextSteps(
   report: RespondentReport,
   recipientRole: ReportEmailRecipientRole,
-  showCoachLink = true,
+  showCoachLink = false,
 ): string {
   const publicResultActions = report.publicLeadActions
     ? reportConfigFor(report.templateAlias).publicResultActions
@@ -666,7 +666,7 @@ function buildQualitativeReportEmail({
   const nextSteps = buildEmailNextSteps(
     report,
     recipientRole,
-    reportConfigFor(report.templateAlias).showCoachCta !== false,
+    reportConfigFor(report.templateAlias).showCoachCta === true,
   );
 
   const shell = (inner: string): string => `<!DOCTYPE html>
@@ -1096,10 +1096,10 @@ export function buildReportEmailHtml({
       ? `Reach out to turn these results into a 90-day plan together.`
       : `You&rsquo;ve completed your assessment. Turn these results into a 90-day plan with your Scaling Up Certified Coach.`;
 
-  // #81 — Five Dysfunctions suppresses the coach CTA (report-config), same as
-  // the on-screen BrandedReport. Omitted config = shown.
+  // The default report footer suppresses the coach CTA. A template must opt in
+  // explicitly; referring-coach copies retain their separate taker-contact link.
   const showCoachCta =
-    reportConfigFor(report.templateAlias).showCoachCta !== false;
+    reportConfigFor(report.templateAlias).showCoachCta === true;
 
   const conclusion = `
   <tr>

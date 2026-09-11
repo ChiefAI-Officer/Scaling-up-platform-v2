@@ -239,14 +239,21 @@ describe("BrandedReport — coach CTA gating (#81)", () => {
     expect(screen.queryByText(CTA)).toBeNull();
   });
 
-  it("shows the CTA for a default scored report", () => {
+  it("keeps Learn More but hides the coach CTA for a default scored report", () => {
     render(<BrandedReport report={baseReport({ templateAlias: undefined })} />);
-    expect(screen.getByText(CTA)).not.toBeNull();
+    expect(screen.getByRole("link", { name: /Learn More/ })).toHaveAttribute(
+      "href",
+      "https://scalingup.com",
+    );
+    expect(screen.queryByText(CTA)).toBeNull();
+    expect(screen.getByTestId("report-conclusion")).not.toHaveTextContent(
+      /with your coach/i,
+    );
   });
 
-  it("shows the CTA for other scored aliases (e.g. Rockefeller)", () => {
+  it("hides the CTA for other scored aliases (e.g. Rockefeller)", () => {
     render(<BrandedReport report={baseReport({ templateAlias: "RockHabits" })} />);
-    expect(screen.getByText(CTA)).not.toBeNull();
+    expect(screen.queryByText(CTA)).toBeNull();
   });
 });
 

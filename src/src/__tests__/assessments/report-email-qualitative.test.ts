@@ -145,7 +145,8 @@ describe("buildReportEmailHtml — qualitative dispatch", () => {
 
     expect(bodyHtml).toContain("jane@example.com");
     expect(bodyHtml).toContain('href="https://scalingup.com"');
-    expect(bodyHtml).toContain('href="mailto:coach%40example.com"');
+    expect(bodyHtml).not.toContain('href="mailto:coach%40example.com"');
+    expect(bodyHtml).not.toContain("Talk to your Scaling Up Certified Coach");
   });
 
   it("renders the respondent's answer text (qsp-v2 qualitative alias)", () => {
