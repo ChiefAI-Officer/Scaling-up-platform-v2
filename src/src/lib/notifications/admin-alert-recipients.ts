@@ -2,8 +2,14 @@ import { db } from "@/lib/db";
 
 const DEFAULT_ADMIN_EMAIL = "admin@scalingup.com";
 
+export function getConfiguredAdminAlertEmail(
+  fallbackEmail = DEFAULT_ADMIN_EMAIL,
+): string {
+  return process.env.ADMIN_EMAIL || fallbackEmail;
+}
+
 function fallbackRecipient(): string[] {
-  const email = process.env.ADMIN_EMAIL?.trim().toLowerCase() || DEFAULT_ADMIN_EMAIL;
+  const email = getConfiguredAdminAlertEmail().trim().toLowerCase();
   return [email];
 }
 

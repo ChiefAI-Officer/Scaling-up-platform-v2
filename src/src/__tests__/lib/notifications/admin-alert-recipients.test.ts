@@ -7,7 +7,10 @@ jest.mock("@/lib/db", () => ({
 }));
 
 import { db } from "@/lib/db";
-import { resolveAdminAlertRecipients } from "@/lib/notifications/admin-alert-recipients";
+import {
+  getConfiguredAdminAlertEmail,
+  resolveAdminAlertRecipients,
+} from "@/lib/notifications/admin-alert-recipients";
 
 const mockFindMany = db.user.findMany as jest.Mock;
 
@@ -66,5 +69,17 @@ describe("resolveAdminAlertRecipients", () => {
     ]);
     expect(errorSpy).toHaveBeenCalled();
     errorSpy.mockRestore();
+  });
+
+  it("centralizes the configured address while preserving a caller's legacy fallback", () => {
+    process.env.ADMIN_EMAIL = "Configured@Example.com";
+    expect(getConfiguredAdminAlertEmail("suzanne@scalingup.com")).toBe(
+      "Configured@Example.com",
+    );
+
+    delete process.env.ADMIN_EMAIL;
+    expect(getConfiguredAdminAlertEmail("suzanne@scalingup.com")).toBe(
+      "suzanne@scalingup.com",
+    );
   });
 });

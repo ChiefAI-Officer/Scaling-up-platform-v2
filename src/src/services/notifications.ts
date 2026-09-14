@@ -1633,16 +1633,16 @@ async function sendTeamsNotification(data: { title: string; text: string; link: 
 /**
  * STRICT variant of registration notification — Stripe webhook fix (May 2026 v5).
  *
- * Calls sendEmailViaSMTP DIRECTLY (no try/catch swallow), so SMTP failures
- * propagate to the caller. Use ONLY in retryable contexts (the
+ * Captures each SMTP failure, attempts every recipient, then throws the first
+ * failure to the caller. Use ONLY in retryable contexts (the
  * processPaymentCompleted Inngest function step). Inngest's retry semantics
- * are what make this safe — a thrown error retries the step, not silent loss.
+ * are what make this safe — the deferred error retries the step, not silent loss.
  *
  * Sends one email per resolved admin/staff recipient, then one coach
  * notification and one attendee confirmation (with ICS calendar attachment).
  *
- * Every admin/staff delivery is attempted before an admin delivery error is
- * rethrown. If any delivery fails, Inngest retries the entire step — emails
+ * Every delivery is attempted before the first delivery error is rethrown.
+ * If any delivery fails, Inngest retries the entire step — emails
  * already sent on this attempt may resend on retry.
  * Acceptable for paid-registration confirmations: better duplicate than missing.
  */
