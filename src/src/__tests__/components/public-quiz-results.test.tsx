@@ -604,7 +604,7 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
     expect(body.referringCoachEmail).toBe("coach@example.com");
   });
 
-  it("uses only the server-verified coach email in the results CTA", async () => {
+  it("does not restore the default coach CTA when the server verifies a coach", async () => {
     mockSearchParams = { coach: "forged@example.com" };
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
@@ -631,10 +631,10 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
     );
 
     expect(screen.getByText(/jane@example\.com/)).toBeInTheDocument();
-    expect(
-      screen.getByRole("link", { name: /talk to a coach/i }),
-    ).toHaveAttribute("href", "mailto:verified%40example.com");
+    expect(screen.queryByRole("link", { name: /talk to a coach/i })).toBeNull();
+    expect(document.querySelector('a[href="mailto:verified%40example.com"]')).toBeNull();
     expect(document.querySelector('a[href="mailto:forged%40example.com"]')).toBeNull();
+    expect(screen.getByRole("link", { name: /learn more/i })).toBeInTheDocument();
   });
 
   it("does not trust the query email when the server does not verify a coach", async () => {
@@ -662,9 +662,9 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
     await waitFor(() =>
       expect(screen.getByTestId("quiz-results")).toBeInTheDocument(),
     );
-    expect(
-      screen.getByRole("link", { name: /talk to a coach/i }),
-    ).toHaveAttribute("href", "https://coaches.scalingup.com/find-a-coach-contact-form");
+    expect(screen.queryByRole("link", { name: /talk to a coach/i })).toBeNull();
+    expect(document.querySelector('a[href="mailto:forged%40example.com"]')).toBeNull();
+    expect(screen.getByRole("link", { name: /learn more/i })).toBeInTheDocument();
   });
 
   it("omits referringCoachEmail entirely when no ?coach= param is present", async () => {

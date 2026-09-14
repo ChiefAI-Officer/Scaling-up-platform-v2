@@ -102,6 +102,26 @@ describe("report HTML configuration", () => {
     expect(onDrift).not.toHaveBeenCalled();
   });
 
+  it("stores and defensively reloads authored CSS without canonical drift", () => {
+    const html = '<style>.promo { display: flex; gap: 16px; }</style><section class="promo">Promotion</section>';
+    const prepared = prepareReportHtmlForStorage({
+      reportHtml: {
+        schemaVersion: 1,
+        introductionHtml: null,
+        conclusionHtml: html,
+      },
+    });
+    expect(prepared.ok).toBe(true);
+    if (!prepared.ok) throw new Error("expected authored CSS to be accepted");
+
+    const onDrift = jest.fn();
+    expect(loadSafeReportHtml(prepared.reportConfig, { onDrift })).toEqual({
+      introductionHtml: null,
+      conclusionHtml: html,
+    });
+    expect(onDrift).not.toHaveBeenCalled();
+  });
+
   it("rejects unsupported report placeholders before storage", () => {
     const prepared = prepareReportHtmlForStorage({
       reportHtml: {

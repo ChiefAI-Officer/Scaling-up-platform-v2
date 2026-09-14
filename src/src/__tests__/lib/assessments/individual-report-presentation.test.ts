@@ -317,9 +317,7 @@ describe("buildIndividualReportPresentation", () => {
       blocksOfKind(presentation.blocks, "additional-response")[0].responses[0]
         .stableKey,
     ).toBe("strategy-answer");
-    expect(blocksOfKind(presentation.blocks, "coach-cta")).toEqual([
-      { kind: "coach-cta", ...canonical.cta },
-    ]);
+    expect(blocksOfKind(presentation.blocks, "coach-cta")).toEqual([]);
     expect(blocksOfKind(presentation.blocks, "closing")).toEqual([
       {
         kind: "closing",

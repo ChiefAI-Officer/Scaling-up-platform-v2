@@ -3,6 +3,7 @@ import {
   type ReportHtmlPersonalization,
   type SafeReportHtmlFragment,
 } from "@/lib/assessments/report-html";
+import { scopeReportHtmlCss } from "@/lib/assessments/report-html-css";
 
 export function ReportHtmlSection({
   position,
@@ -17,6 +18,7 @@ export function ReportHtmlSection({
     ? personalizeSafeReportHtml(html, personalization, position)
     : html;
   if (!personalizedHtml) return null;
+  const renderedHtml = scopeReportHtmlCss(personalizedHtml, position);
 
   return (
     <section
@@ -24,7 +26,7 @@ export function ReportHtmlSection({
       data-testid={`report-html-${position}`}
       // Sole audited injection seam. `SafeReportHtmlFragment` can only be
       // produced after server-side allowlist sanitization and defensive load.
-      dangerouslySetInnerHTML={{ __html: personalizedHtml }}
+      dangerouslySetInnerHTML={{ __html: renderedHtml }}
     />
   );
 }

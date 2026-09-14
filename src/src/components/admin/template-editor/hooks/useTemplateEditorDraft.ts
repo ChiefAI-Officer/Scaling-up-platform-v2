@@ -1184,20 +1184,14 @@ export function useTemplateEditorDraft({
           }
         | undefined;
       if (dirtyFlags.reportConfig && versionBody?.data?.reportHtml) {
-        const canonical = mergeReportHtml(
-          reportConfigRef.current,
-          versionBody.data.reportHtml,
-        );
-        reportConfigRef.current = canonical;
-        setReportConfig(canonical);
         setReportHtmlPreview({
           introductionHtml: versionBody.data.reportHtml.introductionHtml,
           conclusionHtml: versionBody.data.reportHtml.conclusionHtml,
         });
         if (versionBody.data.didStripContent) {
           toast({
-            title: "Unsafe report HTML was removed",
-            description: "The saved source and preview now show the safe version.",
+            title: "Report HTML was adjusted",
+            description: "Your source remains in the editor. Preview shows the safe HTML that was saved.",
           });
         }
       }

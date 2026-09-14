@@ -8,6 +8,7 @@ import { join } from "node:path";
 import { chromium, type Browser, type Page } from "playwright";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import sharp from "sharp";
 
 import { REPORT_HTML_PEER_FIXTURES } from "../../../../scripts/capture-report-html-peers-previews";
 import { BrandedReport } from "@/components/assessments/BrandedReport";
@@ -109,7 +110,166 @@ const TALL_PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAA+gCAIAAAC0
 const AUTHORED_BANNER_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABEAAAAJCAIAAABbilBbAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAFUlEQVQYlWPQFHMhFTGM6nEZzGEAAIZoTky0C/2LAAAAAElFTkSuQmCC";
 const SCALING_UP_PROFITS_LOGO_SRC = "https://platformtest.scalingup.com/brand/scaling-up-profits-logo.png";
 const AUTHORED_BANNER_HTML = `<a href="https://calendly.com/example" aria-label="Book a free call"><img src="${AUTHORED_BANNER_SRC}" alt="Promotional banner" width="1530" height="810"></a>`;
-const SCALING_UP_PROFITS_PROMOTION_HTML = `<section aria-label="Scaling Up Profits promotion"><header aria-label="Scaling Up Profits brand"><img src="${SCALING_UP_PROFITS_LOGO_SRC}" alt="Scaling Up Profit" width="646" height="144"></header><p aria-label="Scaling Up Profits eyebrow">A resource from Scaling Up</p><h2>There May Be Money Hiding In Your Numbers</h2><p aria-label="Scaling Up Profits description">Beyond what this assessment measures, many growing companies are also leaving cash on the table in day-to-day costs — insurance, payment processing, staffing, benefits, and more. Scaling Up Profits is a vetted specialist network that finds it, often at no upfront cost, and puts it straight to your bottom line.</p><table aria-label="Scaling Up Profits metrics and call to action"><tr><td><strong>100%</strong><small>TO YOUR BOTTOM LINE</small></td><td><strong>5x–10x</strong><small>EBITDA MULTIPLIER</small></td><td><a href="https://calendly.com/example" aria-label="Book a free call">Book a Free Call →</a></td></tr></table></section>`;
+const AUTHORED_CSS_ACCEPTANCE_HTML = '<style>.promo{display:flex;gap:16px;padding:32px;background:#3b2458;border-radius:16px}.metric{border:1px solid #6e5d7e;border-radius:14px;padding:10px;text-align:center}</style><div class="promo"><div class="metric"><strong>100%</strong><small>TO YOUR BOTTOM LINE</small></div></div>';
+const SCALING_UP_PROFITS_PROMOTION_HTML = `<style>
+.sup-promo {
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  aspect-ratio: 1530 / 810;
+  overflow: hidden;
+  padding: 4.6% 5.3%;
+  border-top: 6px solid #d39a00;
+  background: #2b1648;
+  color: #ffffff;
+  font-family: Inter, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.sup-brand {
+  display: block;
+  box-sizing: border-box;
+  width: 23.62%;
+  aspect-ratio: 323 / 72;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: #000000;
+}
+.sup-brand img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  max-height: none;
+  margin: 0;
+  object-fit: contain;
+}
+.sup-eyebrow {
+  margin: 22px 0 12px;
+  padding: 0;
+  color: #d39a00;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 3px;
+  line-height: 1.2;
+  text-align: left;
+  text-transform: uppercase;
+}
+.sup-promo > h2 {
+  width: 78%;
+  margin: 0 0 14px;
+  padding: 0;
+  color: #ffffff;
+  font-size: clamp(26px, 2.5vw, 40px);
+  font-weight: 800;
+  letter-spacing: -.5px;
+  line-height: 1.12;
+  text-align: left;
+}
+.sup-description {
+  width: 78%;
+  margin: 0;
+  padding: 0;
+  color: #c9c1d2;
+  font-size: clamp(12px, 1.1vw, 18px);
+  line-height: 1.45;
+  text-align: left;
+}
+.sup-actions {
+  position: absolute;
+  right: 5.3%;
+  bottom: 4.2%;
+  left: 5.3%;
+  display: block;
+  width: auto;
+  max-width: none;
+  margin: 0;
+  overflow: visible;
+  border: 0;
+  border-collapse: separate;
+}
+.sup-actions tbody,
+.sup-actions tr {
+  display: block;
+  width: 100%;
+}
+.sup-actions tr {
+  display: grid;
+  grid-template-columns: minmax(145px, 1fr) minmax(145px, 1fr) minmax(230px, 1.7fr);
+  gap: 16px;
+  align-items: stretch;
+}
+.sup-actions td {
+  box-sizing: border-box;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #6e5d7e;
+  border-radius: 14px;
+  background: #3b2458;
+  color: #ffffff;
+  text-align: center;
+  vertical-align: middle;
+}
+.sup-actions strong,
+.sup-actions small {
+  display: block;
+}
+.sup-actions strong {
+  color: #d39a00;
+  font-size: 20px;
+  line-height: 1.05;
+}
+.sup-actions small {
+  margin-top: 5px;
+  color: #c9c1d2;
+  font-size: 9px;
+  line-height: 1.1;
+}
+.sup-actions td:last-child {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.sup-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 58px;
+  padding: 14px 24px;
+  border-radius: 999px;
+  background: #d39a00;
+  color: #2b1648;
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1.1;
+  text-align: center;
+  text-decoration: none;
+}
+@media (max-width: 640px) {
+  .sup-promo {
+    aspect-ratio: auto;
+    min-height: 540px;
+    padding: 28px 24px;
+  }
+  .sup-promo > h2,
+  .sup-description {
+    width: 100%;
+  }
+  .sup-actions {
+    position: static;
+    margin-top: 24px;
+  }
+  .sup-actions tr {
+    grid-template-columns: 1fr;
+  }
+}
+</style><section class="sup-promo" aria-label="Scaling Up Profits promotion"><header class="sup-brand" aria-label="Scaling Up Profits brand"><img src="${SCALING_UP_PROFITS_LOGO_SRC}" alt="Scaling Up Profit" width="646" height="144"></header><p class="sup-eyebrow" aria-label="Scaling Up Profits eyebrow">A resource from Scaling Up</p><h2>There May Be Money Hiding In Your Numbers</h2><p class="sup-description" aria-label="Scaling Up Profits description">Beyond what this assessment measures, many growing companies are also leaving cash on the table in day-to-day costs — insurance, payment processing, staffing, benefits, and more. Scaling Up Profits is a vetted specialist network that finds it, often at no upfront cost, and puts it straight to your bottom line.</p><table class="sup-actions" aria-label="Scaling Up Profits metrics and call to action"><tr><td><strong>100%</strong><small>TO YOUR BOTTOM LINE</small></td><td><strong>5x–10x</strong><small>EBITDA MULTIPLIER</small></td><td><a class="sup-cta" href="https://calendly.com/example" aria-label="Book a free call">Book a Free Call →</a></td></tr></table></section>`;
 const SEMANTIC_AUDIT_LIMITS = {
   introduction: { elements: 64, text: 2_200, rows: 8, columns: 4, cells: 24, headings: 4, breaks: 8, lines: 200 },
   conclusion: { elements: 36, text: 900, rows: 6, columns: 3, cells: 12, headings: 2, breaks: 4, lines: 200 },
@@ -520,6 +680,65 @@ async function scalingUpProfitsPromotionGeometry(page: Page) {
       ctaBackground: ctaStyle.backgroundColor,
     };
   });
+}
+
+async function expectScalingUpProfitsAuthoredCssInPdf(
+  browser: Browser,
+  authoredRegionMarkup: string,
+) {
+  const directory = mkdtempSync(join(tmpdir(), "authored-css-pdf-"));
+  const pdfPath = join(directory, "promotion.pdf");
+  const pngPrefix = join(directory, "promotion");
+  const pdfPage = await browser.newPage({ viewport: { width: 816, height: 1056 } });
+  try {
+    await pdfPage.route(SCALING_UP_PROFITS_LOGO_SRC, async (route) => {
+      await route.fulfill({
+        contentType: "image/png",
+        body: readFileSync(join(process.cwd(), "public", "brand", "scaling-up-profits-logo.png")),
+      });
+    });
+    await pdfPage.setContent(
+      `<style>html,body{margin:0;background:#fff}.su-report-custom-html{box-sizing:border-box;width:100%;padding:24px}</style>${authoredRegionMarkup}`,
+      { waitUntil: "networkidle" },
+    );
+    await pdfPage.pdf({
+      path: pdfPath,
+      format: "Letter",
+      printBackground: true,
+    });
+
+    const searchableText = normalize(execFileSync("pdftotext", [pdfPath, "-"], {
+      encoding: "utf8",
+    }));
+    expect(searchableText).toContain("There May Be Money Hiding In Your Numbers");
+    expect(searchableText).toContain("Book a Free Call");
+
+    execFileSync("pdftoppm", [
+      "-f", "1", "-l", "1", "-singlefile", "-png", "-r", "72", pdfPath, pngPrefix,
+    ]);
+    const { data, info } = await sharp(`${pngPrefix}.png`)
+      .removeAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    let plumPixels = 0;
+    let goldPixels = 0;
+    for (let index = 0; index < data.length; index += info.channels) {
+      const red = data[index];
+      const green = data[index + 1];
+      const blue = data[index + 2];
+      if (Math.abs(red - 43) <= 4 && Math.abs(green - 22) <= 4 && Math.abs(blue - 72) <= 4) {
+        plumPixels += 1;
+      }
+      if (Math.abs(red - 211) <= 4 && Math.abs(green - 154) <= 4 && blue <= 6) {
+        goldPixels += 1;
+      }
+    }
+    expect(plumPixels).toBeGreaterThan(50_000);
+    expect(goldPixels).toBeGreaterThan(3_000);
+  } finally {
+    await pdfPage.close();
+    rmSync(directory, { recursive: true, force: true });
+  }
 }
 
 async function expectPdfContainsAuthoredBanner(
@@ -1009,11 +1228,92 @@ describe("SU Full landscape browser and PDF contract", () => {
       expect(printGeometry.backgroundColor).toBe("rgb(43, 22, 72)");
       expect(printGeometry.descriptionBottom).toBeLessThanOrEqual(printGeometry.metricsTop - 12);
       expect(await authoredClipping(page)).toEqual([]);
+      await saveVisualArtifact(
+        page,
+        "scaling-up-profits-promotion-print",
+        '[aria-label="Scaling Up Profits promotion"]',
+      );
+      await expectScalingUpProfitsAuthoredCssInPdf(
+        browser,
+        await page.locator(".su-report-custom-html--conclusion").evaluate(
+          (region) => region.outerHTML,
+        ),
+      );
 
       await page.emulateMedia({ media: "screen" });
       await page.setViewportSize({ width: 390, height: 844 });
       expect(await horizontalOverflow(page)).toMatchObject({ offenders: [] });
       expect(await authoredClipping(page)).toEqual([]);
+      await saveVisualArtifact(
+        page,
+        "scaling-up-profits-promotion-mobile",
+        '[aria-label="Scaling Up Profits promotion"]',
+      );
+    } finally {
+      await page.close();
+    }
+  });
+
+  it.each([
+    "CLASSIC_SCORED",
+    "CLASSIC_QUALITATIVE",
+    "EXECUTIVE_BOARDROOM",
+    "MODERN_DASHBOARD",
+  ] as const)("renders author-written HTML and CSS in %s", async (style) => {
+    const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+    try {
+      await load(page, alternateStyleMarkup(style, AUTHORED_CSS_ACCEPTANCE_HTML));
+      const geometry = await page.locator(".su-report-custom-html--conclusion .promo").evaluate((promo) => {
+        const metric = promo.querySelector<HTMLElement>(".metric");
+        if (!metric) throw new Error("Missing authored metric");
+        const promoStyle = getComputedStyle(promo);
+        const metricStyle = getComputedStyle(metric);
+        return {
+          display: promoStyle.display,
+          gap: promoStyle.gap,
+          padding: promoStyle.paddingTop,
+          background: promoStyle.backgroundColor,
+          radius: metricStyle.borderRadius,
+          border: metricStyle.borderTopWidth,
+        };
+      });
+
+      expect(geometry).toEqual({
+        display: "flex",
+        gap: "16px",
+        padding: "32px",
+        background: "rgb(59, 36, 88)",
+        radius: "14px",
+        border: "1px",
+      });
+    } finally {
+      await page.close();
+    }
+  });
+
+  it("renders author-written HTML and CSS in Scaling Up Full landscape", async () => {
+    const prepared = prepareReportHtmlForStorage({
+      reportHtml: {
+        schemaVersion: 1,
+        introductionHtml: null,
+        conclusionHtml: AUTHORED_CSS_ACCEPTANCE_HTML,
+      },
+    });
+    if (!prepared.ok) throw new Error("Authored CSS fixture must remain inside storage limits");
+    const source = reportForPhase(4);
+    const report = {
+      ...source,
+      reportHtml: (prepared.reportConfig as { reportHtml: typeof source.reportHtml }).reportHtml,
+    };
+    const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+    try {
+      await load(page, routeMarkup(report).html);
+      expect(await page.locator(".su-report-custom-html--conclusion .promo").evaluate(
+        (element) => getComputedStyle(element).display,
+      )).toBe("flex");
+      expect(await page.locator(".su-report-custom-html--conclusion .metric").evaluate(
+        (element) => getComputedStyle(element).borderRadius,
+      )).toBe("14px");
     } finally {
       await page.close();
     }
@@ -1798,7 +2098,7 @@ describe("SU Full landscape browser and PDF contract", () => {
       throw new Error(JSON.stringify({ unsafe, acceptedSafe, unexpectedlyRejected }, null, 2));
     }
     expect(acceptedSafe).toHaveLength(SEMANTIC_ACCEPTED_CAP_CASES.length * 2);
-  });
+  }, 120_000);
 
   it("rejects every former escape and explicit over-cap semantic composition with a plain issue", () => {
     const accepted: string[] = [];

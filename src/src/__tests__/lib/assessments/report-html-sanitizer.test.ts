@@ -67,7 +67,7 @@ describe("sanitizeReportHtmlFragment", () => {
     const expectedWeighted = [
       "article", "aside", "blockquote", "br", "caption", "col", "colgroup", "dd", "div", "dl", "dt",
       "figcaption", "figure", "h1", "h2", "h3", "h4", "h5", "h6", "header", "hr", "img", "li", "main",
-      "ol", "p", "section", "table", "tbody", "td", "tfoot", "th", "thead", "tr", "ul",
+      "ol", "p", "section", "style", "table", "tbody", "td", "tfoot", "th", "thead", "tr", "ul",
     ];
     const entries = Object.entries(REPORT_HTML_TAG_POLICY);
     const inline = entries.filter(([, policy]) => policy.classification === "safe-inline-zero-cost").map(([tag]) => tag).sort();
@@ -93,26 +93,127 @@ describe("sanitizeReportHtmlFragment", () => {
     expect(result.html).toContain('href="https://scalingup.com"');
   });
 
-  it("strips selector-bearing attributes while retaining a plain accessible label", () => {
+  it("keeps authored class names and embedded CSS used to compose a report region", () => {
     const result = sanitizeReportHtmlFragment(
-      '<section class="report-callout" id="custom-report" data-region="cta" data-testid="authored" role="status" aria-labelledby="report-style-actions-title" aria-label="Next step"><h2>Next step</h2></section>',
+      '<style>.promo { display: flex; gap: 16px; padding: 32px; background: #2b1648; } .metric { border: 1px solid #6e5d7e; border-radius: 14px; }</style><section class="promo"><div class="metric">100%</div></section>',
+      "conclusion",
+    );
+
+    expect(result).toMatchObject({ ok: true, didStripContent: false });
+    expect(result.html).toContain("<style>.promo { display: flex;");
+    expect(result.html).toContain('<section class="promo">');
+    expect(result.html).toContain('<div class="metric">100%</div>');
+  });
+
+  it.each([
+    ["external stylesheet imports", '@import "https://example.com/report.css";', /import/i],
+    ["font downloads", '@font-face { font-family: Promo; src: url("https://example.com/promo.woff2"); }', /font/i],
+    ["global keyframe names", "@keyframes promo-pulse { from { opacity: .5; } to { opacity: 1; } }", /keyframes/i],
+    ["global custom property registrations", '@property --promo-color { syntax: "<color>"; inherits: false; initial-value: red; }', /property/i],
+    ["global position fallback names", "@position-try --promo-position { inset: 0; }", /position-try/i],
+    ["global font-feature names", "@font-feature-values Promo { @styleset { display: 1; } }", /font-feature-values/i],
+    ["global cascade layer order", "@layer authored, platform;", /layer/i],
+    ["non-HTTPS CSS URL fetches", '.promo { background-image: url("http://example.com/pixel.png"); }', /https/i],
+    ["non-HTTPS image-set string fetches", '.promo { background-image: image-set("http://example.com/pixel.png" 1x); }', /https/i],
+    ["non-HTTPS prefixed image-set string fetches", '.promo { background-image: -webkit-image-set("http://example.com/pixel.png" 1x); }', /https/i],
+    ["report-wide page rules", "@page { size: landscape; }", /page/i],
+    ["fixed overlays", ".promo { position: fixed; }", /position/i],
+    ["sticky overlays", ".promo { position: sticky; }", /position/i],
+    ["vendor-prefixed sticky overlays", ".promo { position: -webkit-sticky; }", /position/i],
+    ["escaped property names", String.raw`.promo { p\6fsition: fixed; }`, /escaped/i],
+    ["escaped image function names", String.raw`.promo { background-image: image\2d set("http://example.com/pixel.png" 1x); }`, /escaped/i],
+    ["custom property indirection", ".promo { --placement: fixed; position: var(--placement); }", /custom properties|var/i],
+    ["attribute substitution", ".promo { position: attr(title type(<custom-ident>), static); }", /attr/i],
+    ["environment substitution", ".promo { position: env(report-position, fixed); }", /position/i],
+    ["conditional substitution", ".promo { position: if(style(--chapter-color): fixed; else: static); }", /position|parsed/i],
+  ] as const)("rejects %s with a clear authoring issue", (_risk, css, issue) => {
+    const result = sanitizeReportHtmlFragment(
+      `<style>${css}</style><section class="promo">Promotion</section>`,
+      "conclusion",
+    );
+
+    expect(result).toMatchObject({ ok: false, html: "" });
+    expect(result.issue).toMatch(issue);
+  });
+
+  it("allows an HTTPS image referenced by authored CSS", () => {
+    const result = sanitizeReportHtmlFragment(
+      '<style>.promo { background-image: url("https://example.com/promo.png"); background-image: image-set("https://example.com/promo@2x.png" 2x); }</style><section class="promo">Promotion</section>',
+      "conclusion",
+    );
+
+    expect(result).toMatchObject({ ok: true, didStripContent: false });
+  });
+
+  it("allows region-safe responsive and conditional at-rules", () => {
+    const result = sanitizeReportHtmlFragment(
+      '<style>@media (max-width:640px){.promo{display:block}}@supports(display:grid){.promo{display:grid}}@container (min-width:300px){.promo{gap:1rem}}@scope (.inner){.promo{color:white}}</style><section class="inner"><div class="promo">Promotion</div></section>',
+      "conclusion",
+    );
+
+    expect(result).toMatchObject({ ok: true, didStripContent: false });
+  });
+
+  it("rejects CSS beyond the per-region CSS limit", () => {
+    const result = sanitizeReportHtmlFragment(
+      `<style type="text/css">${".x{color:red}".repeat(400)}</style><p class="x">Promotion</p>`,
+      "conclusion",
+    );
+
+    expect(result).toMatchObject({ ok: false, html: "" });
+    expect(result.issue).toMatch(/CSS.*4,000/i);
+  });
+
+  it("rejects malformed CSS that could escape the rendered scope", () => {
+    const result = sanitizeReportHtmlFragment(
+      '<style>.promo { color: red; }}</style><section class="promo">Promotion</section>',
+      "conclusion",
+    );
+
+    expect(result).toMatchObject({ ok: false, html: "" });
+    expect(result.issue).toMatch(/could not be parsed/i);
+  });
+
+  it("keeps author classes while stripping ids, data attributes, and roles", () => {
+    const result = sanitizeReportHtmlFragment(
+      '<section class="author-callout" id="custom-report" data-region="cta" data-testid="authored" role="status" aria-labelledby="report-style-actions-title" aria-label="Next step"><h2>Next step</h2></section>',
       "introduction",
     );
 
     expect(result.ok).toBe(true);
-    expect(result.html).toBe('<section aria-label="Next step"><h2>Next step</h2></section>');
+    expect(result.html).toBe('<section class="author-callout" aria-label="Next step"><h2>Next step</h2></section>');
     expect(result.didStripContent).toBe(true);
   });
 
-  it("strips production page classes from authored content", () => {
+  it("keeps every authored class name without a hidden naming policy", () => {
     const result = sanitizeReportHtmlFragment(
-      '<div class="su-full-landscape-page">Authored content</div>',
+      '<div class="su-promo report-promo">Authored content</div>',
       "conclusion",
     );
 
-    expect(result.ok).toBe(true);
-    expect(result.html).toBe("<div>Authored content</div>");
-    expect(result.html).not.toContain("su-full-landscape-page");
+    expect(result).toMatchObject({ ok: true, didStripContent: false });
+    expect(result.html).toBe('<div class="su-promo report-promo">Authored content</div>');
+  });
+
+  it.each([
+    "su-full-landscape-page",
+    "su-full-landscape-page--cover",
+    "su-full-landscape-page--authored",
+    "su-full-landscape-page--chapter",
+    "su-full-landscape-page--detail",
+    "su-full-landscape-page--appendix",
+    "report-page",
+    "report-page-break",
+    "report-page--dashboard-cover",
+    "report-page--executive-cover",
+  ])("removes the exact internal %s shell class", (shellClass) => {
+    const result = sanitizeReportHtmlFragment(
+      `<div class="su-promo ${shellClass} report-promo">Authored content</div>`,
+      "conclusion",
+    );
+
+    expect(result).toMatchObject({ ok: true, didStripContent: true });
+    expect(result.html).toBe('<div class="su-promo report-promo">Authored content</div>');
   });
 
   it("removes page-breaking typography and spacing declarations", () => {
@@ -335,15 +436,14 @@ describe("sanitizeReportHtmlFragment", () => {
     });
   });
 
-  it("removes executable and interactive content", () => {
+  it("removes executable and interactive HTML while retaining authored CSS", () => {
     const result = sanitizeReportHtmlFragment(
       '<style>body{display:none}</style><script>alert(1)</script><form><input></form><iframe src="https://evil.test"></iframe><a href="javascript:alert(1)" onclick="x()">x</a>',
       "introduction",
     );
 
-    expect(result.html).not.toMatch(
-      /script|style|form|input|iframe|javascript:|onclick/i,
-    );
+    expect(result.html).toContain("<style>body{display:none}</style>");
+    expect(result.html).not.toMatch(/script|form|input|iframe|javascript:|onclick/i);
     expect(result.didStripContent).toBe(true);
   });
 

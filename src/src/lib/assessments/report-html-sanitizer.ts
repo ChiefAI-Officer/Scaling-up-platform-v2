@@ -1,8 +1,14 @@
 import sanitizeHtml from "sanitize-html";
+import {
+  reportHtmlCssCharacterCount,
+  reportHtmlCssIssue,
+  type ReportHtmlPosition as ReportHtmlCssPosition,
+} from "@/lib/assessments/report-html-css";
 
 export const REPORT_HTML_LIMITS = {
   introduction: {
     rawCharacters: 12_000,
+    cssCharacters: 4_000,
     textCharacters: 2_200,
     elements: 64,
     depth: 8,
@@ -20,6 +26,7 @@ export const REPORT_HTML_LIMITS = {
   },
   conclusion: {
     rawCharacters: 12_000,
+    cssCharacters: 4_000,
     textCharacters: 900,
     elements: 36,
     depth: 6,
@@ -85,6 +92,7 @@ export const REPORT_HTML_TAG_POLICY = {
   colgroup: { classification: "positive-weighted-or-limited", weight: 0.25 },
   col: { classification: "positive-weighted-or-limited", weight: 0.1 },
   img: { classification: "positive-weighted-or-limited", weight: 6 },
+  style: { classification: "positive-weighted-or-limited", weight: 1 },
   span: { classification: "safe-inline-zero-cost" },
   code: { classification: "safe-inline-zero-cost" },
   strong: { classification: "safe-inline-zero-cost" },
@@ -110,6 +118,7 @@ const COMMON_ATTRIBUTES = [
   "lang",
   "dir",
   "style",
+  "class",
   "aria-label",
 ];
 
@@ -130,6 +139,7 @@ const ALLOWED_ATTRIBUTES: Record<string, string[]> = {
   th: ["scope", ...COMMON_ATTRIBUTES],
   td: ["headers", ...COMMON_ATTRIBUTES],
   col: COMMON_ATTRIBUTES,
+  style: [],
 };
 
 const HEX_COLOR = "#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})";
@@ -160,6 +170,36 @@ export const REPORT_HTML_IMAGE_DIMENSION_MAX = 2_000;
 const REPORT_HTML_IMAGE_DIMENSION = /^[1-9]\d*$/;
 const OBSCURED_OR_FETCH_CAPABLE_CSS =
   /\/\*|\*\/|\\|url\s*\(|expression\s*\(|@import|javascript\s*:/i;
+const RESERVED_REPORT_SHELL_CLASSES = new Set([
+  "su-report",
+  "su-full-landscape",
+  "su-full-landscape-report",
+  "su-full-landscape-page",
+  "su-full-landscape-page-header",
+  "su-full-landscape-page-body",
+  "su-full-landscape-page-footer",
+  "report-page",
+  "report-page-break",
+]);
+
+function removeReservedReportShellClasses(
+  attributes: Record<string, string>,
+): void {
+  const className = attributes.class;
+  if (!className) return;
+
+  const authorClasses = className
+    .split(/\s+/)
+    .filter(
+      (token) =>
+        token &&
+        !RESERVED_REPORT_SHELL_CLASSES.has(token) &&
+        !token.startsWith("su-full-landscape-page--") &&
+        !token.startsWith("report-page--"),
+    );
+  if (authorClasses.length === 0) delete attributes.class;
+  else attributes.class = authorClasses.join(" ");
+}
 
 function removeUnsafeImageDimensions(attributes: Record<string, string>): void {
   const width = attributes.width?.trim();
@@ -211,7 +251,7 @@ function visibleTextLengthWithinTags(html: string, tags: readonly string[]): num
   }, 0);
 }
 
-export type ReportHtmlPosition = keyof typeof REPORT_HTML_LIMITS;
+export type ReportHtmlPosition = ReportHtmlCssPosition;
 
 const VOID_TAGS = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"]);
 const TAG_TOKEN = /<\/?([a-z][a-z0-9:-]*)(?:\s[^<>]*?)?\s*\/?>/gi;
@@ -463,18 +503,31 @@ export function reportHtmlSourceCharacterIssue(
   return `${field} is ${over.toLocaleString()} character${over === 1 ? "" : "s"} over the ${limit.toLocaleString()}-character limit (${raw.length.toLocaleString()} entered).`;
 }
 
+export function reportHtmlCssCharacterIssue(
+  raw: string,
+  position: ReportHtmlPosition,
+): string | null {
+  const count = reportHtmlCssCharacterCount(raw);
+  const limit = REPORT_HTML_LIMITS[position].cssCharacters;
+  if (count <= limit) return null;
+
+  const field = position === "introduction" ? "Welcome section" : "Closing message";
+  return `${field} CSS must be ${limit.toLocaleString()} characters or fewer (${count.toLocaleString()} entered).`;
+}
+
 export function sanitizeReportHtmlFragment(
   raw: string,
   position: ReportHtmlPosition,
 ): SanitizeReportHtmlResult {
   const sourceCharacterIssue = reportHtmlSourceCharacterIssue(raw, position);
+  const cssCharacterIssue = reportHtmlCssCharacterIssue(raw, position);
   const limits = REPORT_HTML_LIMITS[position];
-  if (sourceCharacterIssue) {
+  if (sourceCharacterIssue || cssCharacterIssue) {
     return {
       ok: false,
       html: "",
       didStripContent: false,
-      issue: sourceCharacterIssue,
+      issue: sourceCharacterIssue ?? cssCharacterIssue ?? undefined,
     };
   }
 
@@ -490,10 +543,13 @@ export function sanitizeReportHtmlFragment(
     allowProtocolRelative: false,
     allowedStyles: ALLOWED_STYLES,
     parseStyleAttributes: true,
+    // `sanitize-html` warns for style tags because unvalidated CSS can fetch
+    // or affect the containing page. Report CSS is validated below and scoped
+    // to its authored region at render time.
+    allowVulnerableTags: true,
     disallowedTagsMode: "discard",
     nonTextTags: [
       "script",
-      "style",
       "iframe",
       "object",
       "embed",
@@ -509,10 +565,12 @@ export function sanitizeReportHtmlFragment(
     ],
     transformTags: {
       "*": (tagName, attributes) => {
+        removeReservedReportShellClasses(attributes);
         removeObscuredCss(attributes);
         return { tagName, attribs: attributes };
       },
       a: (tagName, attributes) => {
+        removeReservedReportShellClasses(attributes);
         removeObscuredCss(attributes);
         if (attributes.target === "_blank") {
           attributes.rel = "noopener noreferrer";
@@ -520,6 +578,7 @@ export function sanitizeReportHtmlFragment(
         return { tagName, attribs: attributes };
       },
       img: (tagName, attributes) => {
+        removeReservedReportShellClasses(attributes);
         removeObscuredCss(attributes);
         removeUnsafeImageDimensions(attributes);
         const src = (attributes.src ?? "").trim();
@@ -531,6 +590,18 @@ export function sanitizeReportHtmlFragment(
       },
     },
   });
+
+  const cssIssue =
+    reportHtmlCssCharacterIssue(html, position) ??
+    reportHtmlCssIssue(html, position);
+  if (cssIssue) {
+    return {
+      ok: false,
+      html: "",
+      didStripContent: html !== raw.trim(),
+      issue: cssIssue,
+    };
+  }
 
   const structure = measureStructure(html);
   if (!structure.hasValidTableStructure) {
