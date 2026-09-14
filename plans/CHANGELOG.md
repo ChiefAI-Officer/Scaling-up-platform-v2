@@ -6,6 +6,15 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="admin-alert-live-staff-fanout"></a>
+### 2026-09-14 — Admin alert live-staff fan-out <!-- ENTRY_ISO:2026-09-14 ENTRY_SLUG:admin-alert-live-staff-fanout -->
+
+**Status: IMPLEMENTED AND LOCALLY VERIFIED; NOT MERGED OR DEPLOYED.** Admin-facing approval, workshop-request, registration, custom-pricing, counter-offer, and workshop-completion alerts now resolve every activated, non-deleted `ADMIN` or `STAFF` user and send one private email per recipient. The shared resolver normalizes and deduplicates addresses, excludes system accounts without a password hash and soft-deleted accounts, and falls back to the existing `ADMIN_EMAIL` destination if the database lookup fails or returns no eligible people. The four legacy sender APIs that accepted an admin address retain an optional explicit override, while production callers now use the shared audience. No user role, production datum, schema, migration, or environment variable changed.
+
+**Delivery behavior and observability.** Best-effort alerts continue after an individual SMTP failure. The strict paid-registration path attempts every admin/staff, coach, and attendee delivery before rethrowing its first failure so the surrounding Inngest retry contract remains intact. Approval, enriched-approval, and escalation messages now emit per-delivery `EMAIL_DELIVERY` telemetry. Escalation remains routed only through its existing explicit `ESCALATION_EMAIL` path, and the approval API's existing `routedTo` response remains unchanged. Coach- and attendee-facing message content and recipient counts are unchanged.
+
+**Verification receipt.** TDD captured the strict-path suppression of coach and attendee attempts before the corrected implementation passed. The impacted notification, approval, workshop, registration, Stripe, and Inngest matrix passes **19 suites / 195 tests**; focused fan-out coverage includes all ten senders, exact live-person filtering, system/deleted exclusions, normalization, deduplication, fallback, per-recipient failure isolation, strict retry behavior, telemetry, and unchanged escalation routing. Changelog freshness passes **4/4**, changed-file ESLint and diff hygiene emit no diagnostics, all **51** migration-safety checks pass, and the Turbopack production build compiles, passes TypeScript, and generates **95/95 pages**. The first build compiled and then reached the local Node 22 worker's default approximately 2 GB heap limit; the documented 4 GB rerun passed. Existing workspace-root, middleware-deprecation, missing local Inngest keys, and build-time `DATABASE_URL` warnings remain non-fatal. The complete repository run reached **811 passing suites / 10,171 passing tests / 16 passing snapshots**; its remaining **3 suites / 4 tests** are unchanged report-CTA expectations from the current `origin/main` baseline and lie outside this alert-only scope.
+
 <a id="report-html-author-css"></a>
 ### 2026-09-11 — Report HTML author CSS <!-- ENTRY_ISO:2026-09-11 ENTRY_SLUG:report-html-author-css -->
 

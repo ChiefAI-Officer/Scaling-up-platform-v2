@@ -1568,33 +1568,40 @@ async function sendAdminNotificationEmail(
     options: Omit<NotificationEmailOptions, "to">,
     recipientOverride?: string,
 ): Promise<void> {
-    const recipients = recipientOverride
-        ? [recipientOverride.trim().toLowerCase()]
-        : await resolveAdminAlertRecipients();
+    const recipients = await resolveAdminNotificationRecipients(recipientOverride);
 
     for (const recipient of recipients) {
         await sendNotificationEmail({ ...options, to: recipient });
     }
 }
 
+async function resolveAdminNotificationRecipients(recipientOverride?: string): Promise<string[]> {
+    const normalizedOverride = recipientOverride?.trim().toLowerCase();
+    return normalizedOverride ? [normalizedOverride] : resolveAdminAlertRecipients();
+}
+
+async function attemptStrictNotificationEmail(options: SendEmailOptions): Promise<unknown | undefined> {
+    try {
+        await sendEmailViaSMTP(options);
+        return undefined;
+    } catch (error) {
+        return error;
+    }
+}
+
 async function sendStrictAdminNotificationEmail(
     options: Omit<SendEmailOptions, "to">,
     recipientOverride?: string,
-): Promise<void> {
-    const recipients = recipientOverride
-        ? [recipientOverride.trim().toLowerCase()]
-        : await resolveAdminAlertRecipients();
+): Promise<unknown | undefined> {
+    const recipients = await resolveAdminNotificationRecipients(recipientOverride);
     let firstError: unknown;
 
     for (const recipient of recipients) {
-        try {
-            await sendEmailViaSMTP({ ...options, to: recipient });
-        } catch (error) {
-            firstError ??= error;
-        }
+        const error = await attemptStrictNotificationEmail({ ...options, to: recipient });
+        firstError ??= error;
     }
 
-    if (firstError) throw firstError;
+    return firstError;
 }
 
 async function sendTeamsNotification(data: { title: string; text: string; link: string }): Promise<void> {
@@ -1671,9 +1678,9 @@ export async function sendPaidRegistrationNotificationStrict(data: {
         contentType: "text/calendar",
     }];
 
-    // Admin emails — attempt every recipient, then propagate the first SMTP
-    // failure so the surrounding Inngest step retains its retry contract.
-    await sendStrictAdminNotificationEmail({
+    // Attempt every recipient even after an SMTP failure. Once all deliveries
+    // have been tried, propagate the first failure for the Inngest retry contract.
+    let firstError = await sendStrictAdminNotificationEmail({
         subject: `[Registration] ${data.registrantName} registered for ${data.workshopTitle}`,
         html: adminCoachHtml,
         telemetry: {
@@ -1683,8 +1690,7 @@ export async function sendPaidRegistrationNotificationStrict(data: {
         },
     });
 
-    // Coach email — strict.
-    await sendEmailViaSMTP({
+    const coachError = await attemptStrictNotificationEmail({
         to: data.coachEmail,
         subject: `New registration: ${data.registrantName} for ${data.workshopTitle}`,
         html: adminCoachHtml,
@@ -1694,6 +1700,7 @@ export async function sendPaidRegistrationNotificationStrict(data: {
             recipientRole: "COACH" as const,
         },
     });
+    firstError ??= coachError;
 
     // Attendee confirmation — strict, includes ICS attachment.
     // ENH-MAY6-11: uses admin-editable template if present.
@@ -1708,7 +1715,7 @@ export async function sendPaidRegistrationNotificationStrict(data: {
         venueName: data.venueName,
         venueAddress: data.venueAddress,
     });
-    await sendEmailViaSMTP({
+    const attendeeError = await attemptStrictNotificationEmail({
         to: data.registrantEmail,
         subject: composed.subject,
         html: composed.html,
@@ -1719,4 +1726,7 @@ export async function sendPaidRegistrationNotificationStrict(data: {
             recipientRole: "ATTENDEE" as const,
         },
     });
+    firstError ??= attendeeError;
+
+    if (firstError) throw firstError;
 }

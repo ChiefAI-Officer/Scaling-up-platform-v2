@@ -73,6 +73,63 @@ describe("admin alert notification fan-out", () => {
     }
   });
 
+  it("does not send alerts to system or soft-deleted admin/staff accounts", async () => {
+    const accounts = [
+      {
+        email: "live-admin@example.com",
+        role: "ADMIN",
+        deletedAt: null,
+        passwordHash: "activated-hash",
+      },
+      {
+        email: "system-seed@scalingup.platform",
+        role: "STAFF",
+        deletedAt: null,
+        passwordHash: null,
+      },
+      {
+        email: "gabriel+waveq-drill@chiefaiofficer.com",
+        role: "ADMIN",
+        deletedAt: new Date("2026-07-03T00:00:00Z"),
+        passwordHash: "activated-hash",
+      },
+    ] as const;
+
+    mockFindUsers.mockImplementation(async ({ where }) => {
+      expect(where).toEqual({
+        role: { in: ["ADMIN", "STAFF"] },
+        deletedAt: null,
+        passwordHash: { not: null },
+      });
+
+      return accounts
+        .filter((account) =>
+          where.role.in.includes(account.role) &&
+          account.deletedAt === where.deletedAt &&
+          account.passwordHash !== where.passwordHash.not,
+        )
+        .map(({ email }) => ({ email }));
+    });
+
+    await sendApprovalRequest({
+      id: "approval-people-only",
+      type: "CUSTOM_PRICING",
+      coachName: "Casey Coach",
+      details: "Requested a custom price",
+      requestedAt: new Date("2026-09-11T12:00:00Z"),
+    });
+
+    expect(mockSendEmail.mock.calls.map(([email]) => email.to)).toEqual([
+      "live-admin@example.com",
+    ]);
+    expect(mockSendEmail).not.toHaveBeenCalledWith(
+      expect.objectContaining({ to: "system-seed@scalingup.platform" }),
+    );
+    expect(mockSendEmail).not.toHaveBeenCalledWith(
+      expect.objectContaining({ to: "gabriel+waveq-drill@chiefaiofficer.com" }),
+    );
+  });
+
   it("sends an enriched approval request to every admin/staff recipient with telemetry", async () => {
     await sendEnrichedApprovalRequest({
       approvalId: "approval-2",
@@ -303,7 +360,7 @@ describe("admin alert notification fan-out", () => {
     errorSpy.mockRestore();
   });
 
-  it("attempts every strict admin delivery before propagating failure for retry", async () => {
+  it("attempts every strict delivery before propagating failure for retry", async () => {
     mockSendEmail
       .mockRejectedValueOnce(new Error("temporary SMTP failure"))
       .mockResolvedValueOnce(undefined);
@@ -324,6 +381,8 @@ describe("admin alert notification fan-out", () => {
     expect(mockSendEmail.mock.calls.map(([email]) => email.to)).toEqual([
       "admin-one@example.com",
       "staff-two@example.com",
+      "casey@example.com",
+      "riley@example.com",
     ]);
   });
 

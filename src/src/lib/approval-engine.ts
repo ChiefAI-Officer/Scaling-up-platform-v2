@@ -1,14 +1,14 @@
 /**
  * Approval Engine
  * Evaluates requests and determines if they can be auto-approved
- * or need to be routed to admin/staff for manual review.
+ * or need to be routed to Suzanne/Jeff for manual review.
  * 
  * Approval Triggers (from PRD):
  * - Workshop Request: Auto-approve if standard pricing AND certification ≥85%
- * - Custom Pricing: Never auto-approve → admin/staff
- * - Cancellation: Never auto-approve → admin/staff
- * - Date Change: Never auto-approve → admin/staff
- * - Refund > $250: Never auto-approve → admin/staff
+ * - Custom Pricing: Never auto-approve → Suzanne
+ * - Cancellation: Never auto-approve → Suzanne
+ * - Date Change: Never auto-approve → Suzanne
+ * - Refund > $250: Never auto-approve → Suzanne
  */
 
 import { db } from "@/lib/db";
@@ -259,13 +259,13 @@ async function evaluateHubSpotAutoApprove(
 }
 
 /**
- * Create a manual approval request and notify all live admin/staff people
+ * Create a manual approval request and notify Suzanne
  */
 async function createManualApproval(
     input: ApprovalEvaluationInput,
     reason: string
 ): Promise<ApprovalEvaluationResult> {
-    const routeTo = "all live admin/staff users";
+    const routeTo = process.env.ADMIN_EMAIL || "suzanne@scalingup.com";
 
     // BUG-06–08: seed the initial coach message inline for CUSTOM_PRICING so
     // the thread is complete from the moment the approval lands. Prisma
@@ -301,7 +301,7 @@ async function createManualApproval(
         }
     });
 
-    // Send notification to every live admin/staff person.
+    // Send notification to Suzanne
     await sendApprovalRequest({
         id: approval.id,
         type: input.type,
