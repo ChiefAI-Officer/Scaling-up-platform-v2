@@ -126,7 +126,6 @@ export async function POST(
                     if (w) workshopTitle = w.title;
                 }
                 await sendApprovalCoachRespondedEmail({
-                    adminEmail: process.env.ADMIN_EMAIL || "admin@scalingup.com",
                     coachName: coach ? `${coach.firstName} ${coach.lastName}` : "Coach",
                     workshopTitle,
                     approvalId: id,
@@ -241,7 +240,6 @@ export async function POST(
                     if (w) workshopTitle = w.title;
                 }
                 await sendCounterOfferAcceptedEmail({
-                    adminEmail: process.env.ADMIN_EMAIL || "admin@scalingup.com",
                     coachName: coach ? `${coach.firstName} ${coach.lastName}` : "Coach",
                     workshopTitle,
                     approvalId: id,
@@ -327,7 +325,6 @@ export async function POST(
                         if (w) workshopTitle = w.title;
                     }
                     await sendCoachDeclinedCounterEmail({
-                        adminEmail: process.env.ADMIN_EMAIL || "admin@scalingup.com",
                         coachName: coach ? `${coach.firstName} ${coach.lastName}` : "Coach",
                         workshopTitle,
                         approvalId: id,
@@ -390,7 +387,6 @@ export async function POST(
                         if (w) workshopTitle = w.title;
                     }
                     await sendCoachDeclinedCounterEmail({
-                        adminEmail: process.env.ADMIN_EMAIL || "admin@scalingup.com",
                         coachName: coach ? `${coach.firstName} ${coach.lastName}` : "Coach",
                         workshopTitle,
                         approvalId: id,

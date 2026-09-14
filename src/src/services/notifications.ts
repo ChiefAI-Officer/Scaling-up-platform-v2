@@ -44,6 +44,7 @@ import {
 import { SU_LOGO_PNG, SU_LOGO_CID } from "@/lib/assets/invitation-logo";
 import { resolveInvitationHtmlMode } from "@/lib/assessments/invitation-html-policy";
 import { safeImageSrc } from "@/lib/assessments/safe-image-src";
+import { resolveAdminAlertRecipients } from "@/lib/notifications/admin-alert-recipients";
 
 // ============================================
 // Types
@@ -71,7 +72,7 @@ export interface ApprovalRequest {
 // ============================================
 
 /**
- * Send an approval request notification to Suzanne/Admins
+ * Send an approval request notification to all live admin/staff people.
  */
 export async function sendApprovalRequest(approval: ApprovalRequest): Promise<void> {
     const approvalUrl = `${process.env.APP_URL}/admin/approvals/${approval.id}`;
@@ -97,10 +98,13 @@ export async function sendApprovalRequest(approval: ApprovalRequest): Promise<vo
     <a href="${approvalUrl}" style="background-color: #1D4ED8; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Review Request</a>
   `;
 
-    await sendNotificationEmail({
-        to: process.env.ADMIN_EMAIL || "admin@scalingup.com",
+    await sendAdminNotificationEmail({
         subject: `${subjectPrefix}[ACTION REQUIRED] ${typeLabel} — ${approval.coachName}`,
         html,
+        telemetry: {
+            recipientRole: "STAFF",
+            metadata: { type: "approval_request", approvalId: approval.id },
+        },
     });
 
     if (process.env.TEAMS_WEBHOOK_URL) {
@@ -134,11 +138,15 @@ export async function sendEscalation(
         to: escalateToEmail,
         subject: `[ESCALATION] Pending Approval: ${approval.type}`,
         html,
+        telemetry: {
+            recipientRole: "STAFF",
+            metadata: { type: "approval_escalation", approvalId: approval.id },
+        },
     });
 }
 
 /**
- * JV-26: Send registration notification to admin + coach
+ * JV-26: Send registration notification to admin/staff + coach
  */
 export async function sendRegistrationNotification(data: {
     workshopId?: string;
@@ -166,8 +174,7 @@ export async function sendRegistrationNotification(data: {
         ? [{ filename: data.icsAttachment.filename, content: data.icsAttachment.content, contentType: "text/calendar" }]
         : [];
 
-    await sendNotificationEmail({
-        to: process.env.ADMIN_EMAIL || "admin@scalingup.com",
+    await sendAdminNotificationEmail({
         subject: `[Registration] ${data.registrantName} registered for ${data.workshopTitle}`,
         html,
         telemetry: {
@@ -288,10 +295,13 @@ export async function sendEnrichedApprovalRequest(data: {
     <a href="${approvalUrl}" style="background-color: #1D4ED8; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Review Request</a>
     `;
 
-    await sendNotificationEmail({
-        to: process.env.ADMIN_EMAIL || "admin@scalingup.com",
+    await sendAdminNotificationEmail({
         subject: `${subjectPrefix}[ACTION REQUIRED] ${typeLabel} — ${data.coachName}`,
         html,
+        telemetry: {
+            recipientRole: "STAFF",
+            metadata: { type: "enriched_approval_request", approvalId: data.approvalId },
+        },
     });
 
     if (process.env.TEAMS_WEBHOOK_URL) {
@@ -308,7 +318,7 @@ export async function sendEnrichedApprovalRequest(data: {
 // ============================================
 
 /**
- * Rev 21: Email sent to coach + admin when a workshop is requested
+ * Rev 21: Email sent to coach + admin/staff when a workshop is requested
  */
 export async function sendWorkshopRequestedEmail(data: {
     coachEmail: string;
@@ -347,8 +357,7 @@ export async function sendWorkshopRequestedEmail(data: {
     <p>— The Scaling Up Team</p>
     `;
 
-    await sendNotificationEmail({
-        to: process.env.ADMIN_EMAIL || "admin@scalingup.com",
+    await sendAdminNotificationEmail({
         subject: `[Workshop Requested] ${data.workshopTitle} — ${data.coachName}`,
         html: adminHtml,
         telemetry: { workshopId: data.workshopId, recipientRole: "STAFF" as const },
@@ -475,7 +484,7 @@ export async function sendWorkshopBuiltEmail(data: {
 }
 
 /**
- * Send workshop completion summary email to admin
+ * Send workshop completion summary email to admin/staff
  * Includes attendee list and revenue breakdown.
  */
 export async function sendWorkshopCompletionSummary(data: {
@@ -556,8 +565,7 @@ export async function sendWorkshopCompletionSummary(data: {
     <p>— Scaling Up Platform</p>
     `;
 
-    await sendNotificationEmail({
-        to: process.env.ADMIN_EMAIL || "admin@scalingup.com",
+    await sendAdminNotificationEmail({
         subject: `Workshop Completed: ${data.workshopTitle} (${data.workshopCode})`,
         html,
         telemetry: { workshopId: data.workshopId, workshopCode: data.workshopCode, recipientRole: "STAFF" as const },
@@ -622,7 +630,7 @@ export async function sendAdminInviteEmail(data: {
  * ApprovalQueue entry and sends this email to trigger manual review.
  */
 export async function sendCustomPriceChangeEmail(params: {
-    adminEmail: string;
+    adminEmail?: string; // Explicit override; omitted uses the live admin/staff resolver.
     coachName: string;
     workshopTitle: string;
     workshopCode: string;
@@ -677,8 +685,7 @@ export async function sendCustomPriceChangeEmail(params: {
     </div>
   `;
 
-    await sendNotificationEmail({
-        to: params.adminEmail,
+    await sendAdminNotificationEmail({
         subject: `[CUSTOM PRICING] Price Change Request — ${params.coachName} / ${params.workshopTitle}`,
         html,
         telemetry: {
@@ -687,7 +694,7 @@ export async function sendCustomPriceChangeEmail(params: {
             recipientRole: "STAFF" as const,
             metadata: { type: "custom_pricing_request" },
         },
-    });
+    }, params.adminEmail);
 }
 
 // ============================================
@@ -1006,7 +1013,7 @@ export async function sendApprovalInfoRequestEmail(data: {
 }
 
 export async function sendApprovalCoachRespondedEmail(data: {
-    adminEmail: string;
+    adminEmail?: string; // Explicit override; omitted uses the live admin/staff resolver.
     coachName: string;
     workshopTitle: string;
     approvalId: string;
@@ -1035,15 +1042,14 @@ export async function sendApprovalCoachRespondedEmail(data: {
     </div>
   `;
 
-    await sendNotificationEmail({
-        to: data.adminEmail,
+    await sendAdminNotificationEmail({
         subject: `Coach Responded: "${data.workshopTitle}" — Ready for Review`,
         html,
         telemetry: {
             recipientRole: "STAFF",
             metadata: { type: "approval_coach_responded", approvalId: data.approvalId },
         },
-    });
+    }, data.adminEmail);
 }
 
 export async function sendCounterOfferEmail(data: {
@@ -1102,7 +1108,7 @@ export async function sendCounterOfferEmail(data: {
 }
 
 export async function sendCounterOfferAcceptedEmail(data: {
-    adminEmail: string;
+    adminEmail?: string; // Explicit override; omitted uses the live admin/staff resolver.
     coachName: string;
     workshopTitle: string;
     approvalId: string;
@@ -1128,19 +1134,18 @@ export async function sendCounterOfferAcceptedEmail(data: {
       <p style="color:#9ca3af;font-size:12px;">&mdash; Scaling Up Workshop Platform</p>
     </div>
   `;
-    await sendNotificationEmail({
-        to: data.adminEmail,
+    await sendAdminNotificationEmail({
         subject: `Counter-Offer Accepted: "${data.workshopTitle}" — ${priceFormatted}`,
         html,
         telemetry: {
             recipientRole: "STAFF",
             metadata: { type: "counter_offer_accepted", approvalId: data.approvalId },
         },
-    });
+    }, data.adminEmail);
 }
 
 export async function sendCoachDeclinedCounterEmail(data: {
-    adminEmail: string;
+    adminEmail?: string; // Explicit override; omitted uses the live admin/staff resolver.
     coachName: string;
     workshopTitle: string;
     approvalId: string;
@@ -1170,15 +1175,14 @@ export async function sendCoachDeclinedCounterEmail(data: {
       <p style="color:#9ca3af;font-size:12px;">&mdash; Scaling Up Workshop Platform</p>
     </div>
   `;
-    await sendNotificationEmail({
-        to: data.adminEmail,
+    await sendAdminNotificationEmail({
         subject,
         html,
         telemetry: {
             recipientRole: "STAFF",
             metadata: { type: isNewOffer ? "counter_declined_new_price" : "counter_declined_final", approvalId: data.approvalId },
         },
-    });
+    }, data.adminEmail);
 }
 
 // ============================================
@@ -1526,7 +1530,7 @@ function buildLegacyInvitationEmailOptions(data: {
 // Internal Helpers
 // ============================================
 
-async function sendNotificationEmail(options: {
+type NotificationEmailOptions = {
     to: string;
     subject: string;
     html: string;
@@ -1537,7 +1541,9 @@ async function sendNotificationEmail(options: {
         recipientRole?: "STAFF" | "COACH" | "ATTENDEE" | "CUSTOM";
         metadata?: Record<string, unknown>;
     };
-}): Promise<void> {
+};
+
+async function sendNotificationEmail(options: NotificationEmailOptions): Promise<void> {
     try {
         await sendEmailViaSMTP({
             to: options.to,
@@ -1556,6 +1562,39 @@ async function sendNotificationEmail(options: {
         console.error("Failed to send notification email:", error);
         // Don't throw — notifications shouldn't break the main flow.
     }
+}
+
+async function sendAdminNotificationEmail(
+    options: Omit<NotificationEmailOptions, "to">,
+    recipientOverride?: string,
+): Promise<void> {
+    const recipients = recipientOverride
+        ? [recipientOverride.trim().toLowerCase()]
+        : await resolveAdminAlertRecipients();
+
+    for (const recipient of recipients) {
+        await sendNotificationEmail({ ...options, to: recipient });
+    }
+}
+
+async function sendStrictAdminNotificationEmail(
+    options: Omit<SendEmailOptions, "to">,
+    recipientOverride?: string,
+): Promise<void> {
+    const recipients = recipientOverride
+        ? [recipientOverride.trim().toLowerCase()]
+        : await resolveAdminAlertRecipients();
+    let firstError: unknown;
+
+    for (const recipient of recipients) {
+        try {
+            await sendEmailViaSMTP({ ...options, to: recipient });
+        } catch (error) {
+            firstError ??= error;
+        }
+    }
+
+    if (firstError) throw firstError;
 }
 
 async function sendTeamsNotification(data: { title: string; text: string; link: string }): Promise<void> {
@@ -1592,13 +1631,12 @@ async function sendTeamsNotification(data: { title: string; text: string; link: 
  * processPaymentCompleted Inngest function step). Inngest's retry semantics
  * are what make this safe — a thrown error retries the step, not silent loss.
  *
- * Sends 3 emails, same as the silent variant:
- *   1. admin notification
- *   2. coach notification
- *   3. attendee confirmation (with ICS calendar attachment)
+ * Sends one email per resolved admin/staff recipient, then one coach
+ * notification and one attendee confirmation (with ICS calendar attachment).
  *
- * If any of the 3 fails, the whole helper throws and Inngest retries the
- * entire step — emails already sent on this attempt may resend on retry.
+ * Every admin/staff delivery is attempted before an admin delivery error is
+ * rethrown. If any delivery fails, Inngest retries the entire step — emails
+ * already sent on this attempt may resend on retry.
  * Acceptable for paid-registration confirmations: better duplicate than missing.
  */
 export async function sendPaidRegistrationNotificationStrict(data: {
@@ -1633,9 +1671,9 @@ export async function sendPaidRegistrationNotificationStrict(data: {
         contentType: "text/calendar",
     }];
 
-    // Admin email — strict (propagates SMTP errors).
-    await sendEmailViaSMTP({
-        to: process.env.ADMIN_EMAIL || "admin@scalingup.com",
+    // Admin emails — attempt every recipient, then propagate the first SMTP
+    // failure so the surrounding Inngest step retains its retry contract.
+    await sendStrictAdminNotificationEmail({
         subject: `[Registration] ${data.registrantName} registered for ${data.workshopTitle}`,
         html: adminCoachHtml,
         telemetry: {
