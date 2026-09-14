@@ -82,7 +82,10 @@ import { lockReportStyleForFirstCompletion } from "@/lib/assessments/report-styl
 import { isReportComparisonEnabled } from "@/lib/assessments/wave-report-comparison-flags";
 import { createCeoReportAccessToken } from "@/lib/assessments/ceo-report-access-token";
 import { resolvePeerReportEnhancements } from "@/lib/assessments/peer-report-resolver";
-import { resolveActiveReportHtml } from "@/lib/assessments/report-html";
+import {
+  resolveActiveReportHtml,
+  resolvePublishedReportHtmlForTemplate,
+} from "@/lib/assessments/report-html";
 import {
   currentGrowthPhaseFromAnswers,
   SU_FULL_PHASE_DRIVER_KEY,
@@ -491,24 +494,28 @@ interface EmailRenderFingerprint {
   onScreen: string;
 }
 
-function emailRenderFingerprint(campaign: {
-  id: string;
-  sendResultsToRespondent: boolean;
-  notifyCoachOnCompletion: boolean;
-  showResultsOnScreen: boolean;
-  createdByCoachId: string | null;
-  creatorCoach: {
-    email: string;
-    firstName: string;
-    lastName: string;
-    profileImage: string | null;
-  } | null;
-  version: { id: string };
-  template: {
-    alias: string;
-    resultsEmailContentApprovedHash: string | null;
-  } | null;
-}, respondentFirstName: string | null): EmailRenderFingerprint {
+function emailRenderFingerprint(
+  campaign: {
+    id: string;
+    sendResultsToRespondent: boolean;
+    notifyCoachOnCompletion: boolean;
+    showResultsOnScreen: boolean;
+    createdByCoachId: string | null;
+    creatorCoach: {
+      email: string;
+      firstName: string;
+      lastName: string;
+      profileImage: string | null;
+    } | null;
+    version: { id: string };
+    template: {
+      alias: string;
+      resultsEmailContentApprovedHash: string | null;
+    } | null;
+  },
+  respondentFirstName: string | null,
+  presentationVersionId?: string,
+): EmailRenderFingerprint {
   const chrome = reportEmailChromeForCampaign(campaign.id);
   const brandedCoach =
     chrome === "gh228"
@@ -538,6 +545,7 @@ function emailRenderFingerprint(campaign: {
       campaign.showResultsOnScreen,
       campaign.template?.alias ?? null,
       campaign.version.id,
+      presentationVersionId ?? null,
     ]),
   };
 }
@@ -551,6 +559,7 @@ interface LockedInvitationForIntent {
   respondent: { email: string; firstName: string } | null;
   campaign: {
     templateId: string;
+    language: string;
     accessMode: string;
     deletedAt: Date | null;
     status: string;
@@ -1139,9 +1148,15 @@ export async function POST(
 
       let respondentReport: RespondentReport | null = null;
 
-      const reportHtml = resolveActiveReportHtml(
-        invitation.campaign.version.reportConfig,
-      );
+      const publishedPresentation =
+        await resolvePublishedReportHtmlForTemplate(
+          db,
+          invitation.campaign.templateId,
+          invitation.campaign.language,
+        );
+      const reportHtml =
+        publishedPresentation?.reportHtml ??
+        resolveActiveReportHtml(invitation.campaign.version.reportConfig);
       const buildReportCandidate = (
         frozenScoreResult: ScoreResult,
         reportStyle: ReportStyleKey,
@@ -1166,6 +1181,12 @@ export async function POST(
             questions: renderCampaign.version.questions,
             scoringConfig: renderCampaign.version.scoringConfig,
             ...(reportHtml ? { reportHtml } : {}),
+            ...(publishedPresentation
+              ? {
+                  pinnedVersionId: invitation.campaign.version.id,
+                  presentationVersionId: publishedPresentation.versionId,
+                }
+              : {}),
             rawAnswers,
             submittedAt,
             submissionId: "",
@@ -1252,6 +1273,7 @@ export async function POST(
       const phase1Fingerprint = emailRenderFingerprint(
         renderCampaign,
         invitation.respondent?.firstName ?? null,
+        publishedPresentation?.versionId,
       );
 
       // ── Final locked tx: re-validate → freeze → create submission ─────────
@@ -1286,6 +1308,7 @@ export async function POST(
                 id: true,
                 alias: true,
                 templateId: true,
+                language: true,
                 organizationId: true,
                 accessMode: true,
                 deletedAt: true,
@@ -1431,9 +1454,16 @@ export async function POST(
         // Capture the final gate/render fingerprint while the invitation and
         // campaign state are locked. The already-rendered candidate is accepted
         // only against this immutable decision snapshot.
+        const lockedPresentation =
+          await resolvePublishedReportHtmlForTemplate(
+            tx,
+            locked.campaign.templateId,
+            locked.campaign.language,
+          );
         const phase2Fingerprint = emailRenderFingerprint(
           locked.campaign,
           locked.respondent?.firstName ?? null,
+          lockedPresentation?.versionId,
         );
         const rowsToPersist = preparedRows.filter((row) => {
           if (row.hasCeoSelfAccessUrl && !ceoSelfAccessAuthorized) {

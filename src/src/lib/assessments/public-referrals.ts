@@ -14,6 +14,10 @@ import {
 } from "@/lib/assessments/respondent-report";
 import type { ReportStyleKey } from "@/lib/assessments/report-style-registry";
 import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
+import {
+  resolvePublishedReportHtmlForTemplate,
+} from "@/lib/assessments/report-html";
+import type { ActiveVersionDb } from "@/lib/assessments/active-version";
 
 interface PublicSubmissionFindFirst {
   findFirst: (args: {
@@ -33,6 +37,7 @@ interface PublicReferralReportDb {
   $transaction: <T>(
     callback: (tx: {
       assessmentSubmission: PublicSubmissionFindFirst;
+      assessmentTemplateVersion: ActiveVersionDb["assessmentTemplateVersion"];
     }) => Promise<T>,
     options?: { maxWait?: number; timeout?: number },
   ) => Promise<T>;
@@ -99,6 +104,7 @@ interface RawPublicSubmission {
   campaign: {
     id: string;
     name: string | null;
+    language: string;
     reportStyle: ReportStyleKey;
     importManifest?: unknown;
     template: {
@@ -843,6 +849,7 @@ export async function getPublicReferralReport(
             select: {
               id: true,
               name: true,
+              language: true,
               reportStyle: true,
               importManifest: true,
               template: {
@@ -890,6 +897,11 @@ export async function getPublicReferralReport(
         }
       }
 
+      const presentation = await resolvePublishedReportHtmlForTemplate(
+        tx,
+        submission.campaign.template.id,
+        submission.campaign.language,
+      );
       const report = buildStoredRespondentReport({
         submission: {
           id: submission.id,
@@ -898,6 +910,12 @@ export async function getPublicReferralReport(
           result: submission.result,
         },
         respondent: publicTakerForReport(submission.publicTaker),
+        ...(presentation
+          ? {
+              reportHtml: presentation.reportHtml,
+              presentationVersionId: presentation.versionId,
+            }
+          : {}),
         campaign: {
           name: submission.campaign.name,
           reportStyle: submission.campaign.reportStyle,

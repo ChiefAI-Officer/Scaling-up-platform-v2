@@ -121,6 +121,7 @@ const GOOD_SUBMISSION = {
   },
   campaign: {
     name: "Acme Q1 Campaign",
+    language: "enUS",
     reportStyle: "MODERN_DASHBOARD" as const,
     template: {
       id: "tpl-1",
@@ -141,15 +142,22 @@ const GOOD_SUBMISSION = {
 
 interface MockTx {
   assessmentSubmission: { findFirst: jest.Mock };
+  assessmentTemplateVersion: { findFirst: jest.Mock };
 }
 
 /** Build a mock db whose $transaction calls the callback with tx. */
-function makeMockDb(submission: typeof GOOD_SUBMISSION | null) {
+function makeMockDb(
+  submission: typeof GOOD_SUBMISSION | null,
+  activeVersion: Record<string, unknown> | null = null,
+) {
   const txFindFirst = jest.fn().mockResolvedValue(submission);
 
   const tx: MockTx = {
     assessmentSubmission: {
       findFirst: txFindFirst,
+    },
+    assessmentTemplateVersion: {
+      findFirst: jest.fn().mockResolvedValue(activeVersion),
     },
   };
 
@@ -171,6 +179,8 @@ beforeEach(() => {
   delete process.env.WAVE_ED10_PREVIEW_SETTINGS_KILL;
   delete process.env.WAVE_REPORT_HTML_AUTHORING_ENABLED;
   delete process.env.WAVE_REPORT_HTML_AUTHORING_KILL;
+  delete process.env.WAVE_REPORT_HTML_ACTIVE_VERSION_ENABLED;
+  delete process.env.WAVE_REPORT_HTML_ACTIVE_VERSION_KILL;
 });
 
 test("buildStoredRespondentReport exposes the shared pure frozen-report seam", () => {
@@ -229,6 +239,39 @@ describe("pinned report HTML", () => {
       },
     });
   }
+
+  test("uses the published presentation supplied by the loader without changing pinned content", () => {
+    enableReportHtml();
+    const report = buildStoredRespondentReport({
+      submission: {
+        id: GOOD_SUBMISSION.id,
+        submittedAt: GOOD_SUBMISSION.submittedAt,
+        answers: GOOD_SUBMISSION.answers,
+        result: GOOD_SCORE_RESULT,
+      },
+      respondent: GOOD_SUBMISSION.respondent,
+      reportHtml: {
+        introductionHtml: "<p>Active intro</p>" as never,
+        conclusionHtml: "<p>Active conclusion</p>" as never,
+      },
+      presentationVersionId: "ver-active",
+      campaign: {
+        ...GOOD_SUBMISSION.campaign,
+        organizationName: GOOD_SUBMISSION.campaign.organization.name,
+      },
+    });
+
+    expect(report.reportHtml).toEqual({
+      introductionHtml: "<p>Active intro</p>",
+      conclusionHtml: "<p>Active conclusion</p>",
+    });
+    expect(report.sections).toBe(GOOD_VERSION.sections);
+    expect(report.scoringConfig).toBe(GOOD_VERSION.scoringConfig);
+    expect(report.provenance).toMatchObject({
+      versionId: "ver-1",
+      presentationVersionId: "ver-active",
+    });
+  });
 
   test("uses safe fragments from the campaign's pinned published version", () => {
     enableReportHtml();
@@ -434,6 +477,48 @@ test("1. owning coach + submission → status:ok, all fields populated, provenan
 
   // Not degraded
   expect(report.degraded).toBe(false);
+});
+
+test("stored individual report uses published-version HTML/CSS and pinned scoring", async () => {
+  process.env.WAVE_ED10_PREVIEW_SETTINGS_ENABLED = "1";
+  process.env.WAVE_REPORT_HTML_AUTHORING_ENABLED = "1";
+  process.env.WAVE_REPORT_HTML_ACTIVE_VERSION_ENABLED = "1";
+  mockCanManageCampaign.mockResolvedValue(true);
+  const activeVersion = {
+    id: "ver-active",
+    language: "enUS",
+    versionNumber: 8,
+    publishedAt: new Date("2026-09-14T00:00:00.000Z"),
+    archivedAt: null,
+    reportConfig: {
+      reportHtml: {
+        schemaVersion: 1,
+        introductionHtml: "<p>Active intro</p>",
+        conclusionHtml: "<p>Active conclusion</p>",
+      },
+    },
+  };
+  const { $transaction } = makeMockDb(GOOD_SUBMISSION, activeVersion);
+
+  const result = await getRespondentReport(
+    { $transaction } as unknown as Parameters<typeof getRespondentReport>[0],
+    makeActor(),
+    "camp-1",
+    "resp-1",
+  );
+
+  expect(result.status).toBe("ok");
+  if (result.status !== "ok") return;
+  expect(result.report.reportHtml).toEqual({
+    introductionHtml: "<p>Active intro</p>",
+    conclusionHtml: "<p>Active conclusion</p>",
+  });
+  expect(result.report.sections).toBe(GOOD_VERSION.sections);
+  expect(result.report.scoringConfig).toBe(GOOD_VERSION.scoringConfig);
+  expect(result.report.provenance).toMatchObject({
+    versionId: "ver-1",
+    presentationVersionId: "ver-active",
+  });
 });
 
 test("1b. gate false propagates exactly while preserving the frozen non-Classic appearance", async () => {

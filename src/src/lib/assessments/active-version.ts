@@ -60,6 +60,8 @@ export interface ActiveVersionRow {
   versionNumber: number;
   publishedAt: Date | null;
   archivedAt: Date | null;
+  /** Present on full Prisma rows; optional so identity-only test stubs stay narrow. */
+  reportConfig?: unknown;
 }
 
 /**

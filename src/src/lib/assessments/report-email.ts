@@ -156,8 +156,11 @@ export interface BuildRespondentReportArgs {
   coachName?: string | null;
   /** True when the frozen result is not ScoreResult-shaped → renders the notice. */
   degraded?: boolean;
-  /** Already-resolved pinned fragments for web reports. Email ignores them. */
+  /** Already-resolved web report fragments. Email ignores them. */
   reportHtml?: SafeReportHtml;
+  /** Pinned content/scoring version, supplied when presentation provenance is split. */
+  pinnedVersionId?: string;
+  presentationVersionId?: string;
 }
 
 /**
@@ -207,9 +210,12 @@ export function buildRespondentReportFromSubmission(
     ...(args.reportHtml ? { reportHtml: args.reportHtml } : {}),
     provenance: {
       submissionId: args.submissionId,
-      versionId: "",
+      versionId: args.pinnedVersionId ?? "",
       contentHash: "",
       templateName: args.assessmentName,
+      ...(args.presentationVersionId
+        ? { presentationVersionId: args.presentationVersionId }
+        : {}),
     },
     degraded: args.degraded ?? false,
     coachLogoUrl: args.coachLogoUrl ?? null,

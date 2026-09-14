@@ -6,6 +6,15 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="published-report-html-parity-implemented"></a>
+### 2026-09-15 — Published report HTML parity <!-- ENTRY_ISO:2026-09-15 ENTRY_SLUG:published-report-html-parity-implemented -->
+
+**Status: IMPLEMENTED, DEFAULT OFF, NOT DEPLOYED.** Publishing a newer Template Version can now make its authored Welcome and Closing HTML/CSS the presentation source for every individual report screen belonging to the same Assessment Template and language. The generic resolver is shared by public on-screen results, invited on-screen results, authenticated stored respondent reports, Coach Referred Results, and CEO self-access. New Assessment Templates inherit the behavior without alias-specific code. The Template Version editor Preview remains tied to the version being edited, including drafts.
+
+**Compatibility boundary.** Only authored report presentation follows the latest published, non-archived version. Campaign questions, sections, scoring configuration, stored answers, and computed results remain pinned, preserving historical result meaning. Report provenance now distinguishes the pinned scoring `versionId` from the `presentationVersionId`. `WAVE_REPORT_HTML_ACTIVE_VERSION_ENABLED` controls the behavior and `WAVE_REPORT_HTML_ACTIVE_VERSION_KILL` wins; flag-off performs no additional lookup. A missing or failed Active-version lookup safely falls back to the Campaign's pinned HTML/CSS. Report email, group/aggregate output, Marketing CTA, and graph behavior are unchanged. No schema, migration, or customer-data write is involved. [ADR-0036](../docs/adr/0036-published-report-html-follows-active-version.md) records the boundary.
+
+**Verification receipt.** TDD first demonstrated the pinned-versus-published mismatch. The focused report matrix passes **8 suites / 157 tests**, covering public, invited, stored, referral, Active-version, HTML/CSS, flag-off, kill-switch, database-failure fallback, pinned scoring, concurrent publishing, and version-specific editor Preview behavior. The complete repository gate passes **817/817 suites, 10,238/10,238 tests, and 16/16 snapshots**. Changed-file ESLint and diff hygiene emit no diagnostics, all **51** migration-safety checks pass, and the Turbopack production build compiles, passes TypeScript, and generates **95/95 pages**. The build emits only the repository's existing workspace-root, middleware-deprecation, missing local Inngest-key, and build-time `DATABASE_URL` warnings.
+
 <a id="admin-alert-live-staff-fanout"></a>
 ### 2026-09-14 — Admin alert live-staff fan-out <!-- ENTRY_ISO:2026-09-14 ENTRY_SLUG:admin-alert-live-staff-fanout -->
 

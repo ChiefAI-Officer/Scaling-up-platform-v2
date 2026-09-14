@@ -8,6 +8,7 @@ jest.mock("next/navigation", () => ({
 
 const mockCampaignFindUnique = jest.fn();
 const mockVersionFindUnique = jest.fn();
+const mockVersionFindFirst = jest.fn();
 jest.mock("@/lib/db", () => ({
   db: {
     assessmentCampaign: {
@@ -15,6 +16,7 @@ jest.mock("@/lib/db", () => ({
     },
     assessmentTemplateVersion: {
       findUnique: (...args: unknown[]) => mockVersionFindUnique(...args),
+      findFirst: (...args: unknown[]) => mockVersionFindFirst(...args),
     },
   },
 }));
@@ -53,6 +55,7 @@ const baseCampaign = {
   status: "ACTIVE",
   openAt: new Date("2026-07-01T00:00:00Z"),
   closeAt: null,
+  language: "enUS",
   versionId: "version-83",
   deletedAt: null,
   customSlides: null,
@@ -71,6 +74,8 @@ beforeEach(() => {
   delete process.env.WAVE_ED10_PREVIEW_SETTINGS_KILL;
   delete process.env.WAVE_REPORT_HTML_AUTHORING_ENABLED;
   delete process.env.WAVE_REPORT_HTML_AUTHORING_KILL;
+  delete process.env.WAVE_REPORT_HTML_ACTIVE_VERSION_ENABLED;
+  delete process.env.WAVE_REPORT_HTML_ACTIVE_VERSION_KILL;
   mockIsReferredResultsEnabled.mockReturnValue(false);
   mockCampaignFindUnique.mockResolvedValue(baseCampaign);
   mockVersionFindUnique.mockResolvedValue({
@@ -78,6 +83,7 @@ beforeEach(() => {
     sections: [],
     publishedAt: new Date("2026-06-01T00:00:00Z"),
   });
+  mockVersionFindFirst.mockResolvedValue(null);
 });
 
 async function renderPage() {
@@ -211,7 +217,7 @@ describe("PublicQuizPage referred-results disclosure boundary", () => {
     expect(props).not.toHaveProperty("reportHtml");
   });
 
-  it("passes safe report HTML props while the successor experience is active", async () => {
+  it("keeps the pinned presentation unchanged while Active-version parity is off", async () => {
     process.env.WAVE_ED10_PREVIEW_SETTINGS_ENABLED = "1";
     process.env.WAVE_REPORT_HTML_AUTHORING_ENABLED = "1";
     mockVersionFindUnique.mockResolvedValue({
@@ -221,8 +227,50 @@ describe("PublicQuizPage referred-results disclosure boundary", () => {
       reportConfig: {
         reportHtml: {
           schemaVersion: 1,
-          introductionHtml: '<p onclick="bad()">Intro</p>',
-          conclusionHtml: "<p>Conclusion</p>",
+          introductionHtml: "<p>Pinned intro</p>",
+          conclusionHtml: "<p>Pinned conclusion</p>",
+        },
+      },
+    });
+
+    const props = await renderPage();
+
+    expect(props).toHaveProperty("reportHtml", {
+      introductionHtml: "<p>Pinned intro</p>",
+      conclusionHtml: "<p>Pinned conclusion</p>",
+    });
+    expect(props).not.toHaveProperty("pinnedVersionId");
+    expect(props).not.toHaveProperty("presentationVersionId");
+    expect(mockVersionFindFirst).not.toHaveBeenCalled();
+  });
+
+  it("passes report HTML from the template's published Active version while campaign content stays pinned", async () => {
+    process.env.WAVE_ED10_PREVIEW_SETTINGS_ENABLED = "1";
+    process.env.WAVE_REPORT_HTML_AUTHORING_ENABLED = "1";
+    process.env.WAVE_REPORT_HTML_ACTIVE_VERSION_ENABLED = "1";
+    mockVersionFindUnique.mockResolvedValue({
+      questions: [{ stableKey: "pinned-question" }],
+      sections: [{ stableKey: "pinned-section" }],
+      publishedAt: new Date("2026-06-01T00:00:00Z"),
+      reportConfig: {
+        reportHtml: {
+          schemaVersion: 1,
+          introductionHtml: "<p>Pinned intro</p>",
+          conclusionHtml: "<p>Pinned conclusion</p>",
+        },
+      },
+    });
+    mockVersionFindFirst.mockResolvedValue({
+      id: "version-active",
+      language: "enUS",
+      versionNumber: 8,
+      publishedAt: new Date("2026-09-11T00:00:00Z"),
+      archivedAt: null,
+      reportConfig: {
+        reportHtml: {
+          schemaVersion: 1,
+          introductionHtml: '<p onclick="bad()">Active intro</p>',
+          conclusionHtml: "<p>Active conclusion</p>",
         },
       },
     });
@@ -231,8 +279,12 @@ describe("PublicQuizPage referred-results disclosure boundary", () => {
 
     expect(props).toHaveProperty("reportHtmlExperienceActive", true);
     expect(props).toHaveProperty("reportHtml", {
-      introductionHtml: "<p>Intro</p>",
-      conclusionHtml: "<p>Conclusion</p>",
+      introductionHtml: "<p>Active intro</p>",
+      conclusionHtml: "<p>Active conclusion</p>",
     });
+    expect(props).toHaveProperty("pinnedVersionId", "version-83");
+    expect(props).toHaveProperty("presentationVersionId", "version-active");
+    expect(props).toHaveProperty("questions", [{ stableKey: "pinned-question" }]);
+    expect(props).toHaveProperty("sections", [{ stableKey: "pinned-section" }]);
   });
 });
