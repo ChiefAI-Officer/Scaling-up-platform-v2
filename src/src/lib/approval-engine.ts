@@ -16,6 +16,7 @@ import { verifyCertification } from "@/services/circle";
 import { sendApprovalRequest, sendEscalation } from "@/services/notifications";
 import { logAudit } from "@/lib/audit";
 import { formatApprovalMessage } from "@/lib/approvals/approval-thread";
+import { getConfiguredAdminAlertEmail } from "@/lib/notifications/admin-alert-recipients";
 import { getHubSpotCoachContractStatus } from "@/services/hubspot";
 import { inngest } from "@/inngest/client";
 
@@ -265,7 +266,7 @@ async function createManualApproval(
     input: ApprovalEvaluationInput,
     reason: string
 ): Promise<ApprovalEvaluationResult> {
-    const routeTo = process.env.ADMIN_EMAIL || "suzanne@scalingup.com";
+    const routeTo = getConfiguredAdminAlertEmail("suzanne@scalingup.com");
 
     // BUG-06–08: seed the initial coach message inline for CUSTOM_PRICING so
     // the thread is complete from the moment the approval lands. Prisma

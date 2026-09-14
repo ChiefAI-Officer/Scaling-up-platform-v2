@@ -284,9 +284,8 @@ export async function PATCH(
           },
         });
 
-        // Fire-and-forget email notification to admin
+        // Fire-and-forget email notification to all live admin/staff people.
         sendCustomPriceChangeEmail({
-          adminEmail: process.env.ADMIN_EMAIL || "admin@scalingup.com",
           coachName,
           workshopTitle: existing.title,
           workshopCode: existing.workshopCode ?? "",
