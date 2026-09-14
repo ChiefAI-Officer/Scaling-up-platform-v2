@@ -3,6 +3,11 @@ import {
   type SanitizeReportHtmlResult,
 } from "@/lib/assessments/report-html-sanitizer";
 import { isReportHtmlExperienceEnabled } from "@/lib/assessments/wave-report-html-authoring-flags";
+import {
+  resolveActiveVersion,
+  type ActiveVersionDb,
+} from "@/lib/assessments/active-version";
+import { isReportHtmlActiveVersionEnabled } from "@/lib/assessments/wave-report-html-active-version-flags";
 import { greetingName } from "@/lib/assessments/respondent-display-name";
 import { reportPlaceholderIssue } from "@/lib/assessments/report-placeholders";
 
@@ -22,6 +27,11 @@ export type SafeReportHtmlFragment = string & {
 export interface SafeReportHtml {
   introductionHtml: SafeReportHtmlFragment | null;
   conclusionHtml: SafeReportHtmlFragment | null;
+}
+
+export interface PublishedReportHtmlPresentation {
+  versionId: string;
+  reportHtml: SafeReportHtml;
 }
 
 function escapeReportHtmlText(value: string): string {
@@ -296,4 +306,32 @@ export function resolveActiveReportHtml(
     return undefined;
   }
   return loadSafeReportHtml(reportConfig);
+}
+
+/**
+ * Resolve report-only presentation from the latest published, non-archived
+ * Template Version. Questions, sections, and scoring remain campaign-pinned.
+ */
+export async function resolvePublishedReportHtmlForTemplate(
+  db: ActiveVersionDb,
+  templateId: string,
+  language: string,
+): Promise<PublishedReportHtmlPresentation | undefined> {
+  if (!isReportHtmlActiveVersionEnabled()) return undefined;
+
+  try {
+    const version = await resolveActiveVersion(db, templateId, language);
+    if (!version) return undefined;
+    return {
+      versionId: version.id,
+      reportHtml: loadSafeReportHtml(version.reportConfig),
+    };
+  } catch (error) {
+    console.warn("[report-html] Active presentation unavailable; using pinned version", {
+      templateId,
+      language,
+      errorName: error instanceof Error ? error.name : "UnknownError",
+    });
+    return undefined;
+  }
 }

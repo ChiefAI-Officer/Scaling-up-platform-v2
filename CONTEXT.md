@@ -11,7 +11,7 @@ A named diagnostic instrument (e.g. "Rockefeller Habits Checklist"). Holds metad
 _Avoid_: quiz, survey, questionnaire (the public route is `/quiz/...` and the legacy survey tool is separate — neither is the canonical term here).
 
 **Template Version**:
-An immutable-once-published snapshot of a template's questions + sections + scoringConfig + reportConfig, including any **Marketing CTA**. A campaign pins exactly one version; editing published content requires a *new* version.
+An immutable-once-published snapshot of a template's questions + sections + scoringConfig + reportConfig, including any **Marketing CTA**. A campaign pins exactly one version; editing published content requires a *new* version. Individual-report HTML/CSS is the narrow presentation exception: report screens read it from the **Active version**, while questions, scoring, answers, and computed results stay pinned (ADR-0036).
 _Avoid_: revision, draft (a draft is just a version with `publishedAt = null`).
 
 **Assessment delivery type**:
@@ -27,7 +27,7 @@ A fixed starting snapshot copied into a draft Marketing CTA: **Full Marketing**,
 _Avoid_: a permanent CTA type or shared global record; assuming all Public marketing quizzes use the same preset.
 
 **Active version** (a.k.a. live version):
-Among a template's published versions, the **latest** one — the version a *new* **Campaign** automatically pins. Older published versions stay published only to keep serving the campaigns already sent with them. There is exactly one Active version per template+language, and correction is **forward-only**: publish a newer version to supersede — never resurrect an older one (that would break longitudinal comparability, see ADR-0016).
+Among a template's published versions, the **latest** one — the version a *new* **Campaign** automatically pins. Older published versions stay published to preserve the questions and scoring of campaigns already sent with them. Individual-report HTML/CSS is intentionally read from the Active version on report screens, so a published presentation correction appears across existing reports without recomputing their results (ADR-0036). There is exactly one Active version per template+language, and correction is **forward-only**: publish a newer version to supersede — never resurrect an older one (that would break longitudinal comparability, see ADR-0016).
 _Avoid_: treating every "Published" version as interchangeable — only the Active (latest published) version goes out on new sends.
 
 **Disabled template** (Wave Q, Jeff July-1 #6):

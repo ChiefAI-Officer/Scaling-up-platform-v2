@@ -127,8 +127,10 @@ interface PublicQuizClientProps {
   marketingResultConfig?: PublicMarketingResultConfig | null;
   /** Strictly parsed current template Welcome copy for PUBLIC campaigns. */
   welcomeConfig?: InvitedWelcomeConfig;
-  /** Server-resolved fragments from this campaign's pinned version. */
+  /** Server-resolved published fragments, with campaign-pinned fallback. */
   reportHtml?: SafeReportHtml;
+  pinnedVersionId?: string;
+  presentationVersionId?: string;
   /** Composite successor decision resolved by the server page. */
   reportHtmlExperienceActive?: boolean;
 }
@@ -153,6 +155,8 @@ export function PublicQuizClient({
   marketingResultConfig = null,
   welcomeConfig,
   reportHtml = { introductionHtml: null, conclusionHtml: null },
+  pinnedVersionId,
+  presentationVersionId,
   reportHtmlExperienceActive = false,
 }: PublicQuizClientProps) {
   const sections = useMemo(() => toSections(rawSections), [rawSections]);
@@ -495,9 +499,10 @@ export function PublicQuizClient({
       reportHtml,
       provenance: {
         submissionId: submittedId,
-        versionId: "",
+        versionId: pinnedVersionId ?? "",
         contentHash: "",
         templateName,
+        ...(presentationVersionId ? { presentationVersionId } : {}),
       },
       degraded: false,
       publicLeadActions: true,

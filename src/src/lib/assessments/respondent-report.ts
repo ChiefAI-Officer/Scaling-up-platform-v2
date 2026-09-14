@@ -34,8 +34,10 @@ import type { CeoReportSessionPayload } from "@/lib/assessments/ceo-report-acces
 import type { SuFullPeerPresentation } from "@/lib/assessments/su-full-peer-presentation";
 import {
   resolveActiveReportHtml,
+  resolvePublishedReportHtmlForTemplate,
   type SafeReportHtml,
 } from "@/lib/assessments/report-html";
+import type { ActiveVersionDb } from "@/lib/assessments/active-version";
 
 // Re-export so existing `import { QuestionMeta } from "respondent-report"`
 // consumers keep working after the shared builder extraction.
@@ -61,6 +63,7 @@ interface ReportDb {
       assessmentSubmission: SubmissionFindFirst;
       assessmentCampaignParticipant: CeoReportAccessTransaction["assessmentCampaignParticipant"];
       assessmentInvitation: CeoReportAccessTransaction["assessmentInvitation"];
+      assessmentTemplateVersion: ActiveVersionDb["assessmentTemplateVersion"];
     }) => Promise<T>,
     options?: { maxWait?: number; timeout?: number },
   ) => Promise<T>;
@@ -92,6 +95,7 @@ interface RawSubmission {
   };
   campaign: {
     name: string | null;
+    language: string;
     reportStyle: ReportStyleKey;
     /** Wave V (V-3): Wave O import-round manifest; non-null ⇒ historical import. */
     importManifest?: unknown;
@@ -122,6 +126,8 @@ export interface ReportProvenance {
   versionId: string;
   contentHash: string;
   templateName: string;
+  /** Template Version that supplied report-only HTML/CSS presentation. */
+  presentationVersionId?: string;
 }
 
 export interface RespondentReport {
@@ -166,7 +172,7 @@ export interface RespondentReport {
   rawAnswers: unknown;
   /** version.scoringConfig (raw) */
   scoringConfig: unknown;
-  /** Safe web-only fragments resolved from the campaign's pinned version. */
+  /** Safe web-only fragments from the published presentation, with pinned fallback. */
   reportHtml?: SafeReportHtml;
   provenance: ReportProvenance;
   /**
@@ -232,6 +238,9 @@ export interface StoredRespondentReportInput {
     email: string;
     jobTitle?: string | null;
   };
+  /** Report-only HTML/CSS resolved by the caller from the published version. */
+  reportHtml?: SafeReportHtml;
+  presentationVersionId?: string;
   campaign: {
     name: string | null;
     reportStyle: ReportStyleKey;
@@ -278,9 +287,9 @@ export function buildStoredRespondentReport(
   }
 
   const creatorCoach = input.campaign.creatorCoach;
-  const reportHtml = resolveActiveReportHtml(
-    input.campaign.version.reportConfig,
-  );
+  const reportHtml =
+    input.reportHtml ??
+    resolveActiveReportHtml(input.campaign.version.reportConfig);
 
   return {
     respondentName: respondentDisplayName(
@@ -311,6 +320,9 @@ export function buildStoredRespondentReport(
       versionId: input.campaign.version.id,
       contentHash: input.campaign.version.contentHash,
       templateName: input.campaign.template.name,
+      ...(input.presentationVersionId
+        ? { presentationVersionId: input.presentationVersionId }
+        : {}),
     },
     degraded: !isScoreResult(input.submission.result),
     coachLogoUrl: creatorCoach?.profileImage ?? null,
@@ -322,10 +334,16 @@ export function buildStoredRespondentReport(
 }
 
 /** The shared row-to-report body; authorization always happens before this seam. */
-function reportOutcomeFromStoredSubmission(
+async function reportOutcomeFromStoredSubmission(
+  db: ActiveVersionDb,
   submission: RawSubmission,
   campaignId: string,
-): RespondentReportOutcome {
+): Promise<RespondentReportOutcome> {
+  const presentation = await resolvePublishedReportHtmlForTemplate(
+    db,
+    submission.campaign.template.id,
+    submission.campaign.language,
+  );
   return {
     status: "ok",
     report: buildStoredRespondentReport({
@@ -336,6 +354,12 @@ function reportOutcomeFromStoredSubmission(
         result: submission.result,
       },
       respondent: submission.respondent,
+      ...(presentation
+        ? {
+            reportHtml: presentation.reportHtml,
+            presentationVersionId: presentation.versionId,
+          }
+        : {}),
       campaign: {
         name: submission.campaign.name,
         reportStyle: submission.campaign.reportStyle,
@@ -362,6 +386,7 @@ const respondentReportSelect = {
   campaign: {
     select: {
       name: true,
+      language: true,
       reportStyle: true,
       importManifest: true,
       template: { select: { id: true, name: true, alias: true } },
@@ -413,7 +438,7 @@ export async function getRespondentReport(
       return { status: "not-found" } as const;
     }
 
-    return reportOutcomeFromStoredSubmission(submission, campaignId);
+    return reportOutcomeFromStoredSubmission(tx, submission, campaignId);
   },
   // V-4 (Wave V): explicit budget over Prisma's 5s interactive-transaction
   // default — a Neon cold start / high-latency client can P2028 a report
@@ -491,7 +516,7 @@ export async function getCeoSelfRespondentReport(
       select: respondentReportSelect,
     });
     return submission
-      ? reportOutcomeFromStoredSubmission(submission, authorized.focusCampaignId)
+      ? reportOutcomeFromStoredSubmission(tx, submission, authorized.focusCampaignId)
       : { status: "not-found" };
   }, { maxWait: 10_000, timeout: 15_000 });
 }

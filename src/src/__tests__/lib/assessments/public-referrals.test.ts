@@ -260,6 +260,7 @@ const PUBLIC_SUBMISSION = {
   campaign: {
     id: "campaign-public",
     name: "Quick Assessment",
+    language: "enUS",
     reportStyle: "MODERN_DASHBOARD",
     status: "ACTIVE",
     accessMode: "PUBLIC",
@@ -276,6 +277,13 @@ const PUBLIC_SUBMISSION = {
       id: "version-1",
       contentHash: "frozen-content-hash",
       publishedAt: new Date("2026-07-01T00:00:00.000Z"),
+      reportConfig: {
+        reportHtml: {
+          schemaVersion: 1,
+          introductionHtml: "<p>Pinned introduction</p>",
+          conclusionHtml: null,
+        },
+      },
       sections: [{ stableKey: "people", name: "People", domain: "people" }],
       questions: [
         {
@@ -303,23 +311,42 @@ function actor(overrides: Partial<ApiActor> = {}): ApiActor {
 
 interface MockTx {
   assessmentSubmission: { findFirst: jest.Mock };
+  assessmentTemplateVersion: { findFirst: jest.Mock };
 }
 
-function makeReportDb(submission: typeof PUBLIC_SUBMISSION | null) {
+function makeReportDb(
+  submission: typeof PUBLIC_SUBMISSION | null,
+  activeVersion: Record<string, unknown> | null = null,
+) {
   const findFirst = jest.fn().mockResolvedValue(submission);
-  const tx: MockTx = { assessmentSubmission: { findFirst } };
+  const activeVersionFindFirst = jest.fn().mockResolvedValue(activeVersion);
+  const tx: MockTx = {
+    assessmentSubmission: { findFirst },
+    assessmentTemplateVersion: { findFirst: activeVersionFindFirst },
+  };
   const $transaction = jest
     .fn()
     .mockImplementation(async (callback: (value: MockTx) => Promise<unknown>) =>
       callback(tx),
     );
 
-  return { $transaction, findFirst };
+  return { $transaction, findFirst, activeVersionFindFirst };
 }
 
 describe("getPublicReferralReport", () => {
   beforeEach(() => {
     mockReportStylesEnabled.mockClear().mockReturnValue(true);
+    process.env.WAVE_ED10_PREVIEW_SETTINGS_ENABLED = "1";
+    process.env.WAVE_REPORT_HTML_AUTHORING_ENABLED = "1";
+    delete process.env.WAVE_REPORT_HTML_ACTIVE_VERSION_ENABLED;
+    delete process.env.WAVE_REPORT_HTML_ACTIVE_VERSION_KILL;
+  });
+
+  afterEach(() => {
+    delete process.env.WAVE_ED10_PREVIEW_SETTINGS_ENABLED;
+    delete process.env.WAVE_REPORT_HTML_AUTHORING_ENABLED;
+    delete process.env.WAVE_REPORT_HTML_ACTIVE_VERSION_ENABLED;
+    delete process.env.WAVE_REPORT_HTML_ACTIVE_VERSION_KILL;
   });
 
   it("returns the frozen public report to its immutable active Coach owner", async () => {
@@ -369,6 +396,50 @@ describe("getPublicReferralReport", () => {
       referredResultsDeletedAt: null,
     });
     expect(db.$transaction).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses the latest published HTML while preserving the submission's pinned result", async () => {
+    process.env.WAVE_REPORT_HTML_ACTIVE_VERSION_ENABLED = "1";
+    const db = makeReportDb(PUBLIC_SUBMISSION, {
+      id: "version-active",
+      language: "enUS",
+      versionNumber: 2,
+      publishedAt: new Date("2026-09-15T00:00:00.000Z"),
+      archivedAt: null,
+      reportConfig: {
+        reportHtml: {
+          schemaVersion: 1,
+          introductionHtml: "<p>Published introduction</p>",
+          conclusionHtml: "<p>Published conclusion</p>",
+        },
+      },
+    });
+
+    const outcome = await getPublicReferralReport(
+      db as never,
+      actor(),
+      "sub-1",
+    );
+
+    expect(outcome.status).toBe("ok");
+    if (outcome.status !== "ok") return;
+    expect(outcome.report.reportHtml).toEqual({
+      introductionHtml: "<p>Published introduction</p>",
+      conclusionHtml: "<p>Published conclusion</p>",
+    });
+    expect(outcome.report.result).toBe(FROZEN_RESULT);
+    expect(outcome.report.provenance).toMatchObject({
+      versionId: "version-1",
+      presentationVersionId: "version-active",
+    });
+    expect(db.activeVersionFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          templateId: "template-four-decisions",
+          language: "enUS",
+        }),
+      }),
+    );
   });
 
   it("propagates gate false exactly while preserving the frozen non-Classic appearance", async () => {

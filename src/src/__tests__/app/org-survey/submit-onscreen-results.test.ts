@@ -62,6 +62,9 @@ const txMock = {
   assessmentCampaignParticipant: {
     findUnique: jest.fn(),
   },
+  assessmentTemplateVersion: {
+    findFirst: jest.fn().mockResolvedValue(null),
+  },
 };
 
 // eslint-disable-next-line no-var
@@ -73,6 +76,7 @@ var dbMock: {
   assessmentInvitation: { findUnique: jest.Mock };
   assessmentCampaignParticipant: { findUnique: jest.Mock };
   auditLog: { create: jest.Mock };
+  assessmentTemplateVersion: { findFirst: jest.Mock };
 };
 
 jest.mock("@/lib/db", () => {
@@ -88,6 +92,7 @@ jest.mock("@/lib/db", () => {
     assessmentInvitation: { findUnique: jest.fn() },
     assessmentCampaignParticipant: { findUnique: jest.fn() },
     auditLog: { create: jest.fn().mockResolvedValue(undefined) },
+    assessmentTemplateVersion: { findFirst: jest.fn().mockResolvedValue(null) },
   };
   return { db: dbMock };
 });
@@ -277,6 +282,7 @@ function invitationFixture(overrides?: {
     campaign: {
       id: "c1",
       templateId: "tpl-1",
+      language: "enUS",
       organizationId: "org-1",
       reportStyle: overrides?.reportStyle ?? "MODERN_DASHBOARD",
       alias: "demo",
@@ -292,6 +298,13 @@ function invitationFixture(overrides?: {
       creatorCoach: { email: "coach@example.com" },
       version: {
         id: "v1",
+        reportConfig: {
+          reportHtml: {
+            schemaVersion: 1,
+            introductionHtml: "<p>Pinned intro</p>",
+            conclusionHtml: "<p>Pinned conclusion</p>",
+          },
+        },
         questions: goodVersion.questions,
         sections: goodVersion.sections,
         scoringConfig: goodVersion.scoringConfig,
@@ -366,10 +379,16 @@ beforeEach(() => {
   peerResolverState.transactionStates = [];
   mockOnscreenTransactionActive = false;
   process.env.APP_URL = "https://app.example.com";
+  delete process.env.WAVE_ED10_PREVIEW_SETTINGS_ENABLED;
+  delete process.env.WAVE_REPORT_HTML_AUTHORING_ENABLED;
+  delete process.env.WAVE_REPORT_HTML_ACTIVE_VERSION_ENABLED;
+  delete process.env.WAVE_REPORT_HTML_ACTIVE_VERSION_KILL;
   txMock.assessmentSubmission.create.mockResolvedValue({ id: "sub-1" });
   txMock.assessmentEmailOutbox.create.mockResolvedValue({});
   dbMock.assessmentCampaignParticipant.findUnique.mockResolvedValue(null);
+  dbMock.assessmentTemplateVersion.findFirst.mockResolvedValue(null);
   txMock.assessmentCampaignParticipant.findUnique.mockResolvedValue(null);
+  txMock.assessmentTemplateVersion.findFirst.mockResolvedValue(null);
 });
 
 describe("report style first-completion freeze with on-screen results", () => {
@@ -681,6 +700,40 @@ describe("Wave OSR — the decision is made under the Phase-2 lock", () => {
     expect(txMock.assessmentEmailOutbox.create).not.toHaveBeenCalled();
   });
 
+  it("drops a stale report when a newer version is published inside the lock window", async () => {
+    process.env.WAVE_ED10_PREVIEW_SETTINGS_ENABLED = "1";
+    process.env.WAVE_REPORT_HTML_AUTHORING_ENABLED = "1";
+    process.env.WAVE_REPORT_HTML_ACTIVE_VERSION_ENABLED = "1";
+    dbMock.assessmentTemplateVersion.findFirst.mockResolvedValue({
+      id: "v2-active",
+      language: "enUS",
+      versionNumber: 2,
+      publishedAt: new Date("2026-09-14T00:00:00.000Z"),
+      archivedAt: null,
+      reportConfig: null,
+    });
+    txMock.assessmentTemplateVersion.findFirst.mockResolvedValue({
+      id: "v3-newly-published",
+      language: "enUS",
+      versionNumber: 3,
+      publishedAt: new Date("2026-09-15T00:00:00.000Z"),
+      archivedAt: null,
+      reportConfig: null,
+    });
+    mockInvitation({ showResultsOnScreen: true });
+
+    const response = await POST(
+      jsonReq(goodAnswers) as never,
+      aliasParams("demo"),
+    );
+    const body = (await response.json()) as SubmitBody;
+
+    expect(response.status).toBe(200);
+    expect(body.data?.submissionId).toBe("sub-1");
+    expect(body.data?.report).toBeUndefined();
+    expect(txMock.assessmentSubmission.create).toHaveBeenCalledTimes(1);
+  });
+
   it("re-reads showResultsOnScreen inside the locked transaction", async () => {
     mockInvitation({ showResultsOnScreen: true });
     await POST(jsonReq(goodAnswers) as never, aliasParams("demo"));
@@ -731,6 +784,43 @@ describe("Wave OSR — the selected report candidate is reused", () => {
     expect((body.data?.report as { templateAlias?: string })?.templateAlias).toBe(
       "rockefeller",
     );
+  });
+
+  it("uses published-version HTML/CSS for the invited respondent screen", async () => {
+    process.env.WAVE_ED10_PREVIEW_SETTINGS_ENABLED = "1";
+    process.env.WAVE_REPORT_HTML_AUTHORING_ENABLED = "1";
+    process.env.WAVE_REPORT_HTML_ACTIVE_VERSION_ENABLED = "1";
+    const activeVersion = {
+      id: "v2-active",
+      language: "enUS",
+      versionNumber: 2,
+      publishedAt: new Date("2026-09-14T00:00:00.000Z"),
+      archivedAt: null,
+      reportConfig: {
+        reportHtml: {
+          schemaVersion: 1,
+          introductionHtml: "<p>Active intro</p>",
+          conclusionHtml: "<p>Active conclusion</p>",
+        },
+      },
+    };
+    dbMock.assessmentTemplateVersion.findFirst.mockResolvedValue(activeVersion);
+    txMock.assessmentTemplateVersion.findFirst.mockResolvedValue(activeVersion);
+    mockInvitation({ showResultsOnScreen: true });
+
+    const response = await POST(jsonReq(goodAnswers) as never, aliasParams("demo"));
+
+    expect(response.status).toBe(200);
+    expect(buildState.calls[0]).toMatchObject({
+      reportHtml: {
+        introductionHtml: "<p>Active intro</p>",
+        conclusionHtml: "<p>Active conclusion</p>",
+      },
+      pinnedVersionId: "v1",
+      presentationVersionId: "v2-active",
+    });
+    expect(buildState.calls[0]?.questions).toBe(goodVersion.questions);
+    expect(buildState.calls[0]?.scoringConfig).toBe(goodVersion.scoringConfig);
   });
 
   it("passes the campaign's frozen reportStyle into the shared report model", async () => {

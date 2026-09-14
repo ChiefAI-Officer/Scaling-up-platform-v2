@@ -4,6 +4,7 @@ import {
   mergeReportHtml,
   personalizeSafeReportHtml,
   prepareReportHtmlForStorage,
+  resolvePublishedReportHtmlForTemplate,
 } from "@/lib/assessments/report-html";
 import { sanitizeReportHtmlFragment } from "@/lib/assessments/report-html-sanitizer";
 import { QSP_V2_PREFACE_HTML } from "@/lib/assessments/qsp-v2-report-content";
@@ -12,6 +13,104 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 describe("report HTML configuration", () => {
+  describe("published report presentation", () => {
+    beforeEach(() => {
+      process.env.WAVE_ED10_PREVIEW_SETTINGS_ENABLED = "1";
+      process.env.WAVE_REPORT_HTML_AUTHORING_ENABLED = "1";
+      process.env.WAVE_REPORT_HTML_ACTIVE_VERSION_ENABLED = "1";
+      delete process.env.WAVE_REPORT_HTML_ACTIVE_VERSION_KILL;
+    });
+
+    afterEach(() => {
+      delete process.env.WAVE_ED10_PREVIEW_SETTINGS_ENABLED;
+      delete process.env.WAVE_REPORT_HTML_AUTHORING_ENABLED;
+      delete process.env.WAVE_REPORT_HTML_ACTIVE_VERSION_ENABLED;
+      delete process.env.WAVE_REPORT_HTML_ACTIVE_VERSION_KILL;
+    });
+
+    it("resolves authored HTML and CSS from the template's published Active version", async () => {
+      const findFirst = jest.fn().mockResolvedValue({
+        id: "version-active",
+        language: "enUS",
+        versionNumber: 8,
+        publishedAt: new Date("2026-09-11T00:00:00.000Z"),
+        archivedAt: null,
+        reportConfig: {
+          reportHtml: {
+            schemaVersion: 1,
+            introductionHtml: '<style>.hero { color: #522583; }</style><p class="hero">Active introduction</p>',
+            conclusionHtml: "<p>Active conclusion</p>",
+          },
+        },
+      });
+
+      await expect(
+        resolvePublishedReportHtmlForTemplate(
+          { assessmentTemplateVersion: { findFirst } },
+          "template-1",
+          "enUS",
+        ),
+      ).resolves.toEqual({
+        versionId: "version-active",
+        reportHtml: {
+          introductionHtml: '<style>.hero { color: #522583; }</style><p class="hero">Active introduction</p>',
+          conclusionHtml: "<p>Active conclusion</p>",
+        },
+      });
+      expect(findFirst).toHaveBeenCalledWith({
+        where: {
+          templateId: "template-1",
+          language: "enUS",
+          publishedAt: { not: null },
+          archivedAt: null,
+        },
+        orderBy: { versionNumber: "desc" },
+      });
+    });
+
+    it("fails open when the Active version cannot be loaded", async () => {
+      const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+      const findFirst = jest.fn().mockRejectedValue(new Error("database unavailable"));
+
+      await expect(
+        resolvePublishedReportHtmlForTemplate(
+          { assessmentTemplateVersion: { findFirst } },
+          "template-1",
+          "enUS",
+        ),
+      ).resolves.toBeUndefined();
+      warn.mockRestore();
+    });
+
+    it("does not query the Active version while the rollout is disabled", async () => {
+      delete process.env.WAVE_REPORT_HTML_ACTIVE_VERSION_ENABLED;
+      const findFirst = jest.fn();
+
+      await expect(
+        resolvePublishedReportHtmlForTemplate(
+          { assessmentTemplateVersion: { findFirst } },
+          "template-1",
+          "enUS",
+        ),
+      ).resolves.toBeUndefined();
+      expect(findFirst).not.toHaveBeenCalled();
+    });
+
+    it("lets the kill switch override the enabled flag", async () => {
+      process.env.WAVE_REPORT_HTML_ACTIVE_VERSION_KILL = "1";
+      const findFirst = jest.fn();
+
+      await expect(
+        resolvePublishedReportHtmlForTemplate(
+          { assessmentTemplateVersion: { findFirst } },
+          "template-1",
+          "enUS",
+        ),
+      ).resolves.toBeUndefined();
+      expect(findFirst).not.toHaveBeenCalled();
+    });
+  });
+
   it.each([
     ["a newly issued report", "introductionHtml"],
     ["a historical pinned report", "conclusionHtml"],
