@@ -260,7 +260,9 @@ export function PublicCampaignList({
                       data-label="Availability"
                       className={`${cellClassName} text-muted-foreground`}
                     >
-                      {publicCampaignScheduleLabel(campaign)}
+                      {lifecycleActionsEnabled && campaign.status === "CLOSED"
+                        ? "Closed"
+                        : publicCampaignScheduleLabel(campaign)}
                     </td>
                     <td
                       data-label="Responses"

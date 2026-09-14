@@ -246,6 +246,7 @@ describe("PublicCampaignList", () => {
     );
     expect(within(table).getByText("Opens when published · No end date")).toBeInTheDocument();
     expect(within(table).getByText("Open until Sep 30, 2030")).toBeInTheDocument();
+    expect(within(table).getByText("Closed Jul 31, 2026")).toBeInTheDocument();
     expect(within(table).getByText("24 responses")).toBeInTheDocument();
     expect(within(table).getByText("Assessment unavailable")).toBeInTheDocument();
 
@@ -329,7 +330,7 @@ describe("PublicCampaignList", () => {
     );
   });
 
-  it("replaces a closed row locally without redefining its scheduled cutoff", async () => {
+  it("replaces a closed row locally without presenting its cutoff as a closure date", async () => {
     const activeCampaign = campaigns[1];
     global.fetch = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       if (String(input) === "/api/admin/public-campaigns" && !init?.method) {
@@ -359,7 +360,8 @@ describe("PublicCampaignList", () => {
     expect(row).not.toBeNull();
     await waitFor(() => {
       expect(within(row!).getByText("Closed", { selector: "span" })).toBeInTheDocument();
-      expect(within(row!).getByText("Closed Sep 30, 2030", { selector: "td" })).toBeInTheDocument();
+      expect(within(row!).getByText("Closed", { selector: "td" })).toBeInTheDocument();
+      expect(within(row!).queryByText("Closed Sep 30, 2030")).not.toBeInTheDocument();
     });
     expect(within(row!).getByRole("button", { name: "Delete" })).toBeInTheDocument();
     expect(global.fetch).toHaveBeenCalledTimes(2);

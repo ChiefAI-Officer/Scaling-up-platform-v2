@@ -56,7 +56,8 @@ wizard.
 - **Terminal close:** `Close campaign` is available only for Live campaigns. Its
   confirmation explains that the public link and new responses stop immediately
   and that the action cannot be undone. The scheduled intake cutoff remains
-  unchanged; terminal `Closed` status is the explicit lifecycle transition.
+  unchanged in storage; lifecycle-enabled Closed rows show `Closed` without
+  presenting that cutoff as an actual closure date.
 - **Soft delete:** `Delete` is available only for Draft and Closed campaigns. Its
   confirmation states how many responses are retained but made unreachable from
   this page, and that the action cannot be undone. A status announcement receives
