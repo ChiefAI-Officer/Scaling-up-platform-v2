@@ -243,4 +243,52 @@ describe("ReportsTab", () => {
       expect(button).toBeDisabled();
     }
   });
+
+  it("shows canonical source, CSS, layout, and structure capacity when expanded limits are enabled", () => {
+    render(
+      <ReportsTab
+        value={{
+          ...value,
+          introductionHtml:
+            '<style>.hero{display:grid}</style><section class="hero"><img src="https://cdn.scalingup.com/one.png"><img src="https://cdn.scalingup.com/two.png"><h2>Welcome</h2><table><tbody><tr><td>Cell</td></tr></tbody></table></section>',
+        }}
+        previewHref="/preview-report"
+        historicalPreviewHref={null}
+        previewDisabled={false}
+        onChange={jest.fn()}
+        isReadOnly={false}
+        limitsExpansionEnabled
+      />,
+    );
+
+    expect(
+      screen.getAllByText(
+        "Images may use paired whole-number width and height attributes from 1 to 2,000 pixels. Images stay inside the report column and keep their proportions.",
+      ),
+    ).toHaveLength(2);
+    expect(screen.getByTestId("report-introduction-html-capacity")).toHaveTextContent(
+      "Source",
+    );
+    expect(screen.getByTestId("report-introduction-html-capacity")).toHaveTextContent(
+      "CSS",
+    );
+    expect(screen.getByTestId("report-introduction-html-capacity")).toHaveTextContent(
+      "Layout",
+    );
+    expect(screen.getByTestId("report-introduction-html-capacity")).toHaveTextContent(
+      "Text",
+    );
+    expect(screen.getByTestId("report-introduction-html-capacity")).toHaveTextContent(
+      "Elements",
+    );
+    expect(screen.getByTestId("report-introduction-html-capacity")).toHaveTextContent(
+      "Depth",
+    );
+    expect(screen.getByTestId("report-introduction-html-capacity")).toHaveTextContent(
+      "2 images",
+    );
+    expect(screen.getByTestId("report-introduction-html-capacity")).toHaveTextContent(
+      "Rows 1 / 8",
+    );
+  });
 });
