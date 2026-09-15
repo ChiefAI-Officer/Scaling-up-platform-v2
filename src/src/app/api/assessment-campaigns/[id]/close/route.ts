@@ -36,6 +36,10 @@ const CloseBodySchema = z.object({
     .optional(),
 });
 
+const CloseQuerySchema = z.object({
+  expectedStatus: z.enum(["DRAFT", "ACTIVE"]).optional(),
+});
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -107,20 +111,18 @@ export async function POST(
     }
     const lifecyclePublic =
       campaign.accessMode === "PUBLIC" && isPublicCampaignLifecycleEnabled();
-    const requestedCloseStatus =
-      expectedStatus === "DRAFT" || expectedStatus === "ACTIVE"
-        ? expectedStatus
-        : null;
-    if (
-      lifecyclePublic &&
-      expectedStatus !== null &&
-      requestedCloseStatus === null
-    ) {
+    const parsedQuery = CloseQuerySchema.safeParse({
+      expectedStatus: expectedStatus ?? undefined,
+    });
+    if (lifecyclePublic && !parsedQuery.success) {
       return NextResponse.json(
         { success: false, error: "Invalid expected campaign status" },
         { status: 400 }
       );
     }
+    const requestedCloseStatus = parsedQuery.success
+      ? parsedQuery.data.expectedStatus ?? null
+      : null;
     if (campaign.status === "CLOSED") {
       return NextResponse.json(
         {
@@ -142,14 +144,33 @@ export async function POST(
 
     const fromStatus = campaign.status;
     const now = new Date();
+    const auditChanges = {
+      fromStatus,
+      toStatus: "CLOSED",
+      reason,
+    };
     if (lifecyclePublic) {
-      const result = await db.assessmentCampaign.updateMany({
-        where: {
-          id: campaignId,
-          deletedAt: null,
-          status: requestedCloseStatus ?? fromStatus,
-        },
-        data: { status: "CLOSED", closedAt: now },
+      const result = await db.$transaction(async (tx) => {
+        const transition = await tx.assessmentCampaign.updateMany({
+          where: {
+            id: campaignId,
+            deletedAt: null,
+            status: requestedCloseStatus ?? fromStatus,
+          },
+          data: { status: "CLOSED", closedAt: now },
+        });
+        if (transition.count !== 1) return transition;
+
+        await tx.auditLog.create({
+          data: {
+            entityType: "AssessmentCampaign",
+            entityId: campaign.id,
+            action: "CLOSE",
+            performedBy: actor.email,
+            changes: JSON.stringify(auditChanges),
+          },
+        });
+        return transition;
       });
       if (result.count !== 1) {
         const authoritative = await db.assessmentCampaign.findUnique({
@@ -178,19 +199,14 @@ export async function POST(
         where: { id: campaignId },
         data: { status: "CLOSED" },
       });
+      await logAudit({
+        entityType: "AssessmentCampaign",
+        entityId: campaign.id,
+        action: "CLOSE",
+        performedBy: actor.email,
+        changes: auditChanges,
+      });
     }
-
-    await logAudit({
-      entityType: "AssessmentCampaign",
-      entityId: campaign.id,
-      action: "CLOSE",
-      performedBy: actor.email,
-      changes: {
-        fromStatus,
-        toStatus: "CLOSED",
-        reason,
-      },
-    });
 
     return NextResponse.json({
       success: true,

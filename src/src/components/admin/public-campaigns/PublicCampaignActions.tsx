@@ -138,10 +138,11 @@ export function PublicCampaignActions({
         data?: { id?: unknown; status?: unknown; closedAt?: unknown };
       };
 
-      const hasAuthoritativeClosedState =
+      const hasMatchingClosedState =
         body.data?.id === campaign.id &&
-        body.data.status === "CLOSED" &&
-        isValidTimestamp(body.data.closedAt);
+        body.data.status === "CLOSED";
+      const hasAuthoritativeClosedState =
+        hasMatchingClosedState && isValidTimestamp(body.data?.closedAt);
 
       if (response.ok && body.success === true && hasAuthoritativeClosedState) {
         onCampaignUpdated({
@@ -160,11 +161,12 @@ export function PublicCampaignActions({
       if (
         response.status === 409 &&
         body.code === "ALREADY_CLOSED" &&
-        hasAuthoritativeClosedState
+        hasMatchingClosedState &&
+        (body.data?.closedAt === null || isValidTimestamp(body.data?.closedAt))
       ) {
         onCampaignUpdated({
           status: "CLOSED",
-          closedAt: body.data!.closedAt as string,
+          closedAt: body.data!.closedAt as string | null,
         });
         setNotice({
           kind: "status",

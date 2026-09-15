@@ -1,4 +1,5 @@
 import {
+  decodePublicCampaignList,
   publicCampaignCreateError,
   publicCampaignScheduleLabel,
   publicCampaignStatusLabel,
@@ -24,6 +25,29 @@ function schedule(
 }
 
 describe("public campaign UI language", () => {
+  it("normalizes a flag-off legacy payload without closedAt", () => {
+    const decoded = decodePublicCampaignList([
+      {
+        id: "campaign-1",
+        name: "Legacy campaign",
+        alias: "legacy-campaign",
+        status: "CLOSED",
+        openAt: "2026-08-01T00:00:00.000Z",
+        closeAt: null,
+        responseCount: 0,
+        reportStyle: "CLASSIC",
+        reportStyleSource: "TEMPLATE_DEFAULT",
+        reportStyleLockedAt: null,
+        reportStylesAvailable: false,
+        template: null,
+      },
+    ]);
+
+    expect(decoded).toEqual([
+      expect.objectContaining({ id: "campaign-1", closedAt: null }),
+    ]);
+  });
+
   it.each([
     ["DRAFT", "Draft"],
     ["ACTIVE", "Live"],

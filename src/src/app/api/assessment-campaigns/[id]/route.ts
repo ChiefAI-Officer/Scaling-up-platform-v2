@@ -9,10 +9,12 @@
  * DISTINCT ownership predicate — admin/privileged OR the campaign creator
  * coach (createdByCoachId === actor.coachId) — NOT canManageCampaign,
  * because delete is ownership cleanup that must survive a later loss of
- * template/org access. Deletable in ANY state (DRAFT/ACTIVE/CLOSED).
+ * template/org access. Existing callers may delete any state; lifecycle-enabled
+ * PUBLIC campaigns must Close before Delete.
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { db } from "@/lib/db";
 import { updateAssessmentCampaignSchema } from "@/lib/validations";
 import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
@@ -49,6 +51,10 @@ import {
 import { Prisma } from "@prisma/client";
 import { isInvitationBannerEnabled } from "@/lib/assessments/wave-invitation-banner-flags";
 import { isPublicCampaignLifecycleEnabled } from "@/lib/assessments/wave-public-campaign-lifecycle-flags";
+
+const PublicCampaignDeleteQuerySchema = z.object({
+  expectedStatus: z.enum(["DRAFT", "CLOSED"]).optional(),
+});
 
 function withoutInvitedWelcomeSnapshot<
   T extends { invitedWelcomeSnapshot?: unknown },
@@ -801,20 +807,18 @@ export async function DELETE(
 
     const lifecyclePublic =
       campaign.accessMode === "PUBLIC" && isPublicCampaignLifecycleEnabled();
-    const requestedDeleteStatus =
-      expectedStatus === "DRAFT" || expectedStatus === "CLOSED"
-        ? expectedStatus
-        : null;
-    if (
-      lifecyclePublic &&
-      expectedStatus !== null &&
-      requestedDeleteStatus === null
-    ) {
+    const parsedDeleteQuery = PublicCampaignDeleteQuerySchema.safeParse({
+      expectedStatus: expectedStatus ?? undefined,
+    });
+    if (lifecyclePublic && !parsedDeleteQuery.success) {
       return NextResponse.json(
         { success: false, error: "Invalid expected campaign status" },
         { status: 400 }
       );
     }
+    const requestedDeleteStatus = parsedDeleteQuery.success
+      ? parsedDeleteQuery.data.expectedStatus ?? null
+      : null;
     if (lifecyclePublic && campaign.status === "ACTIVE") {
       return NextResponse.json(
         { success: false, code: "CAMPAIGN_STATUS_CHANGED" },

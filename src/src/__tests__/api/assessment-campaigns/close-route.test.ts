@@ -12,21 +12,28 @@ jest.mock("next/server", () => ({
   },
 }));
 
-jest.mock("@/lib/db", () => ({
-  db: {
+jest.mock("@/lib/db", () => {
+  const assessmentCampaign = (() => {
+    // SEC-M6: canManageCampaign now loads via findFirst → delegate to
+    // findUnique so existing sequencing is preserved.
+    const findUnique = jest.fn();
+    const findFirst = jest.fn((args) => findUnique(args));
+    return { findUnique, findFirst, update: jest.fn(), updateMany: jest.fn() };
+  })();
+  const auditLog = { create: jest.fn().mockResolvedValue(undefined) };
+  return {
+    db: {
     organization: { findUnique: jest.fn() },
     accessGroupCoach: { findMany: jest.fn().mockResolvedValue([]) },
     accessGroupTemplate: { findMany: jest.fn().mockResolvedValue([]) },
-    assessmentCampaign: (() => {
-      // SEC-M6: canManageCampaign now loads via findFirst → delegate to
-      // findUnique so existing sequencing is preserved.
-      const findUnique = jest.fn();
-      const findFirst = jest.fn((args) => findUnique(args));
-      return { findUnique, findFirst, update: jest.fn(), updateMany: jest.fn() };
-    })(),
-    auditLog: { create: jest.fn().mockResolvedValue(undefined) },
-  },
-}));
+      assessmentCampaign,
+      auditLog,
+      $transaction: jest.fn((callback) =>
+        callback({ assessmentCampaign, auditLog }),
+      ),
+    },
+  };
+});
 
 jest.mock("@/lib/auth/authorization", () => ({
   getApiActor: jest.fn(),
@@ -112,6 +119,7 @@ function mockOwningCampaign(
 
 beforeEach(() => {
   jest.clearAllMocks();
+  (db.auditLog.create as jest.Mock).mockResolvedValue(undefined);
   (isPublicCampaignLifecycleEnabled as jest.Mock).mockReturnValue(false);
   (db.accessGroupCoach.findMany as jest.Mock).mockResolvedValue([
     {
@@ -247,7 +255,32 @@ describe("POST /api/assessment-campaigns/[id]/close", () => {
     expect(update.data.status).toBe("CLOSED");
     expect(update.data.closedAt).toBeInstanceOf(Date);
     expect(body.data.closedAt).toBe(update.data.closedAt.toISOString());
+    expect(db.$transaction).toHaveBeenCalledTimes(1);
+    expect(db.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        entityType: "AssessmentCampaign",
+        entityId: "c1",
+        action: "CLOSE",
+        performedBy: "admin@example.com",
+      }),
+    });
     expect(db.assessmentCampaign.update).not.toHaveBeenCalled();
+  });
+
+  it("fails the flagged PUBLIC transaction when its close audit cannot persist", async () => {
+    (isPublicCampaignLifecycleEnabled as jest.Mock).mockReturnValue(true);
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    mockOwningCampaign("ACTIVE", "PUBLIC");
+    (db.assessmentCampaign.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+    (db.auditLog.create as jest.Mock).mockRejectedValue(new Error("audit unavailable"));
+
+    const res = await POST(
+      conditionalPostReq("ACTIVE", { reason: "launch cleanup" }) as never,
+      detailParams("c1"),
+    );
+
+    expect(res.status).toBe(500);
+    expect(db.$transaction).toHaveBeenCalledTimes(1);
   });
 
   it("keeps the legacy status-only write for PUBLIC campaigns while the flag is off", async () => {

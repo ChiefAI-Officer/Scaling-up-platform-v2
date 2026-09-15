@@ -78,7 +78,7 @@ No admin-specific duplicate endpoint is added.
 
 ### Flagged PUBLIC close
 
-The action may send the row's current state as `expectedStatus`. The route performs a conditional transition so only one concurrent request can move the row into `CLOSED`. The winning transition writes `status = CLOSED` and `closedAt = now`; it audit-logs the optional reason and returns that persisted timestamp.
+The action may send the row's current state as `expectedStatus`. The route performs a conditional transition so only one concurrent request can move the row into `CLOSED`. The winning transition writes `status = CLOSED` and `closedAt = now` and creates the optional-reason audit record in the same transaction; it returns that persisted timestamp only after both writes commit.
 
 If another request already closed the campaign, return `409 ALREADY_CLOSED` with the authoritative Closed state and `closedAt`. The client reconciles the row to Closed instead of leaving a false Live state.
 

@@ -430,6 +430,36 @@ describe("PublicCampaignActions", () => {
     });
   });
 
+  it("reconciles a legacy already-closed response with no lifecycle timestamp", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue(
+      response({
+        success: false,
+        code: "ALREADY_CLOSED",
+        data: {
+          id: "campaign-august",
+          status: "CLOSED",
+          closedAt: null,
+        },
+      }, false, 409),
+    );
+    const { onCampaignUpdated } = renderActions(campaign({ status: "ACTIVE" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    fireEvent.click(
+      within(await screen.findByRole("dialog")).getByRole("button", {
+        name: "Close campaign",
+      }),
+    );
+
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Campaign was already closed. The list is up to date.",
+    );
+    expect(onCampaignUpdated).toHaveBeenCalledWith({
+      status: "CLOSED",
+      closedAt: null,
+    });
+  });
+
   it.each([undefined, "not-a-date"]) (
     "rejects a successful close envelope with invalid closedAt %s",
     async (closedAt) => {

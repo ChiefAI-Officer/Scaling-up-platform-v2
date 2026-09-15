@@ -86,11 +86,18 @@ function isPublicCampaignViewModel(
 export function decodePublicCampaignList(
   value: unknown,
 ): PublicCampaignViewModel[] | null {
-  if (!Array.isArray(value) || !value.every(isPublicCampaignViewModel)) {
+  if (!Array.isArray(value)) {
     return null;
   }
 
-  return value;
+  const normalized = value.map((campaign) =>
+    isRecord(campaign) && campaign.closedAt === undefined
+      ? { ...campaign, closedAt: null }
+      : campaign,
+  );
+  if (!normalized.every(isPublicCampaignViewModel)) return null;
+
+  return normalized;
 }
 
 export function publicCampaignStatusLabel(status: PublicCampaignStatus): string {
