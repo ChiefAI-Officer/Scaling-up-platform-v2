@@ -10,12 +10,15 @@ const now = new Date("2026-08-10T00:00:00.000Z");
 const format = (value: Date) => value.toISOString().slice(0, 10);
 
 function schedule(
-  overrides: Partial<Pick<PublicCampaignViewModel, "status" | "openAt" | "closeAt">> = {},
+  overrides: Partial<
+    Pick<PublicCampaignViewModel, "status" | "openAt" | "closeAt" | "closedAt">
+  > = {},
 ) {
   return {
     status: "DRAFT" as const,
     openAt: "2026-08-09T00:00:00.000Z",
     closeAt: null,
+    closedAt: null,
     ...overrides,
   };
 }
@@ -87,6 +90,18 @@ describe("public campaign UI language", () => {
       now,
       format,
     )).toBe("Closed 2026-08-09");
+  });
+
+  it("prefers the lifecycle closure time over the scheduled cutoff", () => {
+    expect(publicCampaignScheduleLabel(
+      schedule({
+        status: "CLOSED",
+        closeAt: "2026-08-20T00:00:00.000Z",
+        closedAt: "2026-08-11T00:00:00.000Z",
+      }),
+      now,
+      format,
+    )).toBe("Closed 2026-08-11");
   });
 
   it("describes a closed campaign without a close date (catches null-close fallback regression)", () => {

@@ -13,6 +13,7 @@ function campaign(
     status: "DRAFT",
     openAt: "2026-08-18T12:00:00.000Z",
     closeAt: null,
+    closedAt: null,
     responseCount: 0,
     reportStyle: "CLASSIC",
     reportStyleSource: "TEMPLATE_DEFAULT",

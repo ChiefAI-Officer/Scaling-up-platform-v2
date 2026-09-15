@@ -163,6 +163,7 @@ const mockCampaign = {
   openAt: new Date("2026-07-01"),
   endMode: "OPEN_END",
   closeAt: null,
+  closedAt: null,
   createdAt: new Date(),
   updatedAt: new Date(),
   invitedWelcomeSnapshot: null,
@@ -220,6 +221,28 @@ describe("GET /api/admin/public-campaigns — LIST", () => {
           deletedAt: null,
         },
       }),
+    );
+  });
+
+  it("serializes the persisted lifecycle closure timestamp", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    const closedAt = new Date("2026-09-15T01:02:03.000Z");
+    (db.assessmentCampaign.findMany as jest.Mock).mockResolvedValue([
+      {
+        ...mockCampaign,
+        status: "CLOSED",
+        closedAt,
+        reportStyle: "CLASSIC",
+        reportStyleSource: "TEMPLATE_DEFAULT",
+        reportStyleLockedAt: null,
+      },
+    ]);
+
+    const res = await listGet();
+
+    expect((await res.json()).data[0]).toHaveProperty(
+      "closedAt",
+      closedAt.toISOString(),
     );
   });
 

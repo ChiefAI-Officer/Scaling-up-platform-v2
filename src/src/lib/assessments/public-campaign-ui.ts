@@ -13,6 +13,7 @@ export interface PublicCampaignViewModel {
   status: PublicCampaignStatus;
   openAt: string;
   closeAt: string | null;
+  closedAt: string | null;
   responseCount: number;
   reportStyle: ReportStyleKey;
   reportStyleSource: "TEMPLATE_DEFAULT" | "CAMPAIGN_OVERRIDE";
@@ -66,6 +67,7 @@ function isPublicCampaignViewModel(
       value.status === "CLOSED") &&
     isDateString(value.openAt) &&
     (value.closeAt === null || isDateString(value.closeAt)) &&
+    (value.closedAt === null || isDateString(value.closedAt)) &&
     typeof value.responseCount === "number" &&
     Number.isFinite(value.responseCount) &&
     value.responseCount >= 0 &&
@@ -100,7 +102,10 @@ export function publicCampaignUrl(origin: string, alias: string): string {
 }
 
 export function publicCampaignScheduleLabel(
-  input: Pick<PublicCampaignViewModel, "status" | "openAt" | "closeAt">,
+  input: Pick<
+    PublicCampaignViewModel,
+    "status" | "openAt" | "closeAt" | "closedAt"
+  >,
   now = new Date(),
   format: (date: Date) => string = defaultFormatter,
 ): string {
@@ -108,7 +113,9 @@ export function publicCampaignScheduleLabel(
   const closeAt = input.closeAt ? new Date(input.closeAt) : null;
 
   if (input.status === "CLOSED") {
-    return closeAt ? `Closed ${format(closeAt)}` : "Closed";
+    const closedAt = input.closedAt ? new Date(input.closedAt) : null;
+    const effectiveClose = closedAt ?? closeAt;
+    return effectiveClose ? `Closed ${format(effectiveClose)}` : "Closed";
   }
 
   if (openAt > now) {
