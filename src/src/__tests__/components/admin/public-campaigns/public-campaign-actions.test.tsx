@@ -86,14 +86,14 @@ describe("PublicCampaignActions", () => {
       <PublicCampaignActions {...shared} responsiveEnabled />,
     );
 
-    for (const name of ["Copy link", "View responses", "Close campaign"]) {
+    for (const name of ["Copy link", "View responses", "Close"]) {
       const button = screen.getByRole("button", { name });
       expect(button).toHaveClass("min-h-11");
       expect(button).toHaveClass("min-w-11");
     }
 
     rerender(<PublicCampaignActions {...shared} responsiveEnabled={false} />);
-    for (const name of ["Copy link", "View responses", "Close campaign"]) {
+    for (const name of ["Copy link", "View responses", "Close"]) {
       const button = screen.getByRole("button", { name });
       expect(button).not.toHaveClass("min-h-11");
       expect(button).not.toHaveClass("min-w-11");
@@ -101,7 +101,7 @@ describe("PublicCampaignActions", () => {
   });
 
   it.each([
-    ["ACTIVE", "Close campaign", "Close campaign"],
+    ["ACTIVE", "Close", "Close campaign"],
     ["CLOSED", "Delete", "Delete campaign"],
   ] as const)(
     "gives responsive %s confirmation actions a direct 44px target contract",
@@ -144,9 +144,21 @@ describe("PublicCampaignActions", () => {
   );
 
   it.each([
-    ["DRAFT", ["Publish", "Delete"], ["Copy link", "View responses", "Close campaign"]],
-    ["ACTIVE", ["Copy link", "View responses", "Close campaign"], ["Publish", "Delete"]],
-    ["CLOSED", ["View responses", "Delete"], ["Publish", "Copy link", "Close campaign"]],
+    ["ACTIVE", "Close"],
+    ["CLOSED", "Delete"],
+  ] as const)("uses destructive styling for the %s lifecycle action", (status, name) => {
+    renderActions(campaign({ status }));
+
+    expect(screen.getByRole("button", { name })).toHaveClass(
+      "bg-destructive",
+      "text-destructive-foreground",
+    );
+  });
+
+  it.each([
+    ["DRAFT", ["Publish", "Delete"], ["Copy link", "View responses", "Close"]],
+    ["ACTIVE", ["Copy link", "View responses", "Close"], ["Publish", "Delete"]],
+    ["CLOSED", ["View responses", "Delete"], ["Publish", "Copy link", "Close"]],
   ] as const)(
     "shows only useful %s actions (catches the wrong lifecycle branch)",
     (status, shown, hidden) => {
@@ -163,9 +175,9 @@ describe("PublicCampaignActions", () => {
   );
 
   it.each([
-    ["DRAFT", ["Publish"], ["Copy link", "View responses", "Close campaign", "Delete"]],
-    ["ACTIVE", ["Copy link", "View responses"], ["Publish", "Close campaign", "Delete"]],
-    ["CLOSED", ["View responses"], ["Publish", "Copy link", "Close campaign", "Delete"]],
+    ["DRAFT", ["Publish"], ["Copy link", "View responses", "Close", "Delete"]],
+    ["ACTIVE", ["Copy link", "View responses"], ["Publish", "Close", "Delete"]],
+    ["CLOSED", ["View responses"], ["Publish", "Copy link", "Close", "Delete"]],
   ] as const)(
     "keeps the existing %s action set when lifecycle actions are disabled",
     (status, shown, hidden) => {
@@ -313,14 +325,19 @@ describe("PublicCampaignActions", () => {
   it("requires confirmation before closing an active campaign", async () => {
     renderActions(campaign({ status: "ACTIVE" }));
 
-    fireEvent.click(screen.getByRole("button", { name: "Close campaign" }));
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
 
     const dialog = await screen.findByRole("dialog", {
-      name: 'Close "August lead campaign"?',
+      name: "Close August lead campaign?",
     });
     expect(dialog).toHaveTextContent(
-      "This immediately disables the public link and stops new responses. This cannot be undone.",
+      "The public link stops working immediately. People who already started will not be able to submit. Responses collected so far are kept. This cannot be undone.",
     );
+    const reason = within(dialog).getByLabelText("Reason");
+    expect(reason).toHaveAttribute("maxlength", "500");
+    expect(dialog).toHaveTextContent("0/500");
+    fireEvent.change(reason, { target: { value: "Campaign window is complete" } });
+    expect(dialog).toHaveTextContent("27/500");
     expect(global.fetch).not.toHaveBeenCalled();
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
@@ -328,7 +345,23 @@ describe("PublicCampaignActions", () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
-  it("closes an active campaign and emits only the new status", async () => {
+  it.each([
+    ["ACTIVE", "Close"],
+    ["CLOSED", "Delete"],
+  ] as const)("restores focus when Escape cancels the %s lifecycle dialog", async (status, name) => {
+    renderActions(campaign({ status }));
+
+    const trigger = screen.getByRole("button", { name });
+    trigger.focus();
+    fireEvent.click(trigger);
+    await screen.findByRole("dialog");
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(trigger).toHaveFocus();
+  });
+
+  it("closes an active campaign and emits the authoritative lifecycle fields", async () => {
     (global.fetch as jest.Mock).mockResolvedValue(
       response({
         success: true,
@@ -341,49 +374,92 @@ describe("PublicCampaignActions", () => {
     );
     const { onCampaignUpdated } = renderActions(campaign({ status: "ACTIVE" }));
 
-    fireEvent.click(screen.getByRole("button", { name: "Close campaign" }));
-    fireEvent.click(
-      within(await screen.findByRole("dialog")).getByRole("button", {
-        name: "Close campaign",
-      }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText("Reason"), {
+      target: { value: "Campaign window is complete" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Close campaign" }));
 
     await waitFor(() => {
-      expect(onCampaignUpdated).toHaveBeenCalledWith({ status: "CLOSED" });
+      expect(onCampaignUpdated).toHaveBeenCalledWith({
+        status: "CLOSED",
+        closedAt: "2026-09-11T08:00:00.000Z",
+      });
     });
     expect(global.fetch).toHaveBeenCalledWith(
       "/api/assessment-campaigns/campaign-august/close?expectedStatus=ACTIVE",
-      { method: "POST" },
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: "Campaign window is complete" }),
+      },
     );
     expect(screen.getByRole("status")).toHaveTextContent(
       "Campaign closed. Its public link is disabled.",
     );
   });
 
-  it("shows a friendly already-closed message without changing local status", async () => {
+  it("reconciles an authoritative already-closed response into the local row", async () => {
     (global.fetch as jest.Mock).mockResolvedValue(
-      response({ success: false, code: "ALREADY_CLOSED" }, false, 409),
+      response({
+        success: false,
+        code: "ALREADY_CLOSED",
+        data: {
+          id: "campaign-august",
+          status: "CLOSED",
+          closedAt: "2026-09-11T08:00:00.000Z",
+        },
+      }, false, 409),
     );
     const { onCampaignUpdated } = renderActions(campaign({ status: "ACTIVE" }));
 
-    fireEvent.click(screen.getByRole("button", { name: "Close campaign" }));
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
     fireEvent.click(
       within(await screen.findByRole("dialog")).getByRole("button", {
         name: "Close campaign",
       }),
     );
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "This campaign is already closed. Refresh the page.",
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Campaign was already closed. The list is up to date.",
     );
-    expect(onCampaignUpdated).not.toHaveBeenCalled();
+    expect(onCampaignUpdated).toHaveBeenCalledWith({
+      status: "CLOSED",
+      closedAt: "2026-09-11T08:00:00.000Z",
+    });
   });
+
+  it.each([undefined, "not-a-date"]) (
+    "rejects a successful close envelope with invalid closedAt %s",
+    async (closedAt) => {
+      (global.fetch as jest.Mock).mockResolvedValue(
+        response({
+          success: true,
+          data: { id: "campaign-august", status: "CLOSED", closedAt },
+        }),
+      );
+      const { onCampaignUpdated } = renderActions(campaign({ status: "ACTIVE" }));
+
+      fireEvent.click(screen.getByRole("button", { name: "Close" }));
+      fireEvent.click(
+        within(await screen.findByRole("dialog")).getByRole("button", {
+          name: "Close campaign",
+        }),
+      );
+
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "We couldn't close this campaign. Try again.",
+      );
+      expect(onCampaignUpdated).not.toHaveBeenCalled();
+    },
+  );
 
   it("keeps an active campaign unchanged when closing fails", async () => {
     (global.fetch as jest.Mock).mockRejectedValue(new Error("network detail"));
     const { onCampaignUpdated } = renderActions(campaign({ status: "ACTIVE" }));
 
-    fireEvent.click(screen.getByRole("button", { name: "Close campaign" }));
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
     fireEvent.click(
       within(await screen.findByRole("dialog")).getByRole("button", {
         name: "Close campaign",
@@ -393,21 +469,23 @@ describe("PublicCampaignActions", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "We couldn't close this campaign. Try again.",
     );
-    expect(screen.getByRole("button", { name: "Close campaign" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
     expect(onCampaignUpdated).not.toHaveBeenCalled();
   });
 
-  it("requires confirmation before deleting and names retained responses", async () => {
-    renderActions(campaign({ status: "CLOSED", responseCount: 24 }));
+  it.each([
+    [0, "This campaign will be removed from this page. This cannot be undone."],
+    [1, "1 response is kept but will no longer be reachable from this page. This cannot be undone."],
+    [24, "24 responses are kept but will no longer be reachable from this page. This cannot be undone."],
+  ] as const)("requires confirmation before deleting with %s responses", async (responseCount, copy) => {
+    renderActions(campaign({ status: "CLOSED", responseCount }));
 
     fireEvent.click(screen.getByRole("button", { name: "Delete" }));
 
     const dialog = await screen.findByRole("dialog", {
-      name: 'Delete "August lead campaign"?',
+      name: "Delete August lead campaign?",
     });
-    expect(dialog).toHaveTextContent(
-      "24 responses are retained but will no longer be reachable from this page. This cannot be undone.",
-    );
+    expect(dialog).toHaveTextContent(copy);
     expect(global.fetch).not.toHaveBeenCalled();
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));

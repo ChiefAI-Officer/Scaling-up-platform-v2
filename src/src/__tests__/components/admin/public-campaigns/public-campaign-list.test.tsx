@@ -352,7 +352,7 @@ describe("PublicCampaignList", () => {
     render(<PublicCampaignList lifecycleActionsEnabled />);
 
     const campaignName = await screen.findByText("Quarterly habits check");
-    fireEvent.click(screen.getByRole("button", { name: "Close campaign" }));
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
     fireEvent.click(
       within(await screen.findByRole("dialog")).getByRole("button", {
         name: "Close campaign",
@@ -363,7 +363,7 @@ describe("PublicCampaignList", () => {
     expect(row).not.toBeNull();
     await waitFor(() => {
       expect(within(row!).getByText("Closed", { selector: "span" })).toBeInTheDocument();
-      expect(within(row!).getByText("Closed", { selector: "td" })).toBeInTheDocument();
+      expect(within(row!).getByText("Closed Sep 11, 2026", { selector: "td" })).toBeInTheDocument();
       expect(within(row!).queryByText("Closed Sep 30, 2030")).not.toBeInTheDocument();
     });
     expect(within(row!).getByRole("button", { name: "Delete" })).toBeInTheDocument();

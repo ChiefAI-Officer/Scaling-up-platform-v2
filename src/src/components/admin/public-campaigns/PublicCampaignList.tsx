@@ -86,7 +86,8 @@ export function PublicCampaignList({
 
   function patchCampaign(
     campaignId: string,
-    updates: Pick<PublicCampaignViewModel, "status">,
+    updates: Pick<PublicCampaignViewModel, "status"> &
+      Partial<Pick<PublicCampaignViewModel, "closedAt">>,
   ) {
     setCampaigns((current) =>
       current.map((campaign) =>
@@ -260,9 +261,7 @@ export function PublicCampaignList({
                       data-label="Availability"
                       className={`${cellClassName} text-muted-foreground`}
                     >
-                      {lifecycleActionsEnabled && campaign.status === "CLOSED"
-                        ? "Closed"
-                        : publicCampaignScheduleLabel(campaign)}
+                      {publicCampaignScheduleLabel(campaign)}
                     </td>
                     <td
                       data-label="Responses"

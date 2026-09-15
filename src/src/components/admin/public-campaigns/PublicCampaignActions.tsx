@@ -20,7 +20,10 @@ import {
 interface PublicCampaignActionsProps {
   campaign: PublicCampaignViewModel;
   origin: string;
-  onCampaignUpdated: (updates: Pick<PublicCampaignViewModel, "status">) => void;
+  onCampaignUpdated: (
+    updates: Pick<PublicCampaignViewModel, "status"> &
+      Partial<Pick<PublicCampaignViewModel, "closedAt">>,
+  ) => void;
   onCampaignDeleted: () => void;
   onToggleResponses: () => void;
   responsesExpanded: boolean;
@@ -29,6 +32,12 @@ interface PublicCampaignActionsProps {
 }
 
 type Notice = { kind: "status" | "alert"; message: string } | null;
+
+const CLOSE_REASON_MAX_LENGTH = 500;
+
+function isValidTimestamp(value: unknown): value is string {
+  return typeof value === "string" && Number.isFinite(Date.parse(value));
+}
 
 export function PublicCampaignActions({
   campaign,
@@ -44,12 +53,13 @@ export function PublicCampaignActions({
   const [publishing, setPublishing] = useState(false);
   const [closeOpen, setCloseOpen] = useState(false);
   const [closing, setClosing] = useState(false);
+  const [closeReason, setCloseReason] = useState("");
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
   const [manualUrl, setManualUrl] = useState<string | null>(null);
 
-  const actionClassName = `${responsiveEnabled ? "min-h-11 min-w-11 " : ""}text-destructive`;
+  const actionClassName = responsiveEnabled ? "min-h-11 min-w-11" : undefined;
 
   async function publishCampaign() {
     setPublishing(true);
@@ -116,34 +126,51 @@ export function PublicCampaignActions({
     try {
       const response = await fetch(
         `/api/assessment-campaigns/${campaign.id}/close?expectedStatus=${campaign.status}`,
-        { method: "POST" },
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reason: closeReason.trim() || undefined }),
+        },
       );
       const body = (await response.json()) as {
         success?: boolean;
         code?: unknown;
-        data?: { id?: unknown; status?: unknown };
+        data?: { id?: unknown; status?: unknown; closedAt?: unknown };
       };
 
-      if (
-        response.ok &&
-        body.success === true &&
+      const hasAuthoritativeClosedState =
         body.data?.id === campaign.id &&
-        body.data.status === "CLOSED"
-      ) {
-        onCampaignUpdated({ status: "CLOSED" });
+        body.data.status === "CLOSED" &&
+        isValidTimestamp(body.data.closedAt);
+
+      if (response.ok && body.success === true && hasAuthoritativeClosedState) {
+        onCampaignUpdated({
+          status: "CLOSED",
+          closedAt: body.data!.closedAt as string,
+        });
         setNotice({
           kind: "status",
           message: "Campaign closed. Its public link is disabled.",
         });
+        setCloseReason("");
         setCloseOpen(false);
         return;
       }
 
-      if (response.status === 409 && body.code === "ALREADY_CLOSED") {
-        setNotice({
-          kind: "alert",
-          message: "This campaign is already closed. Refresh the page.",
+      if (
+        response.status === 409 &&
+        body.code === "ALREADY_CLOSED" &&
+        hasAuthoritativeClosedState
+      ) {
+        onCampaignUpdated({
+          status: "CLOSED",
+          closedAt: body.data!.closedAt as string,
         });
+        setNotice({
+          kind: "status",
+          message: "Campaign was already closed. The list is up to date.",
+        });
+        setCloseReason("");
         setCloseOpen(false);
         return;
       }
@@ -259,27 +286,51 @@ export function PublicCampaignActions({
           <Dialog
             open={closeOpen}
             onOpenChange={(open) => {
-              if (!closing) setCloseOpen(open);
+              if (closing) return;
+              setCloseOpen(open);
+              if (!open) setCloseReason("");
             }}
           >
             <DialogTrigger asChild>
               <Button
                 size="sm"
                 type="button"
-                variant="outline"
+                variant="destructive"
                 className={actionClassName}
               >
-                Close campaign
+                Close
               </Button>
             </DialogTrigger>
             <DialogContent responsiveEnabled={responsiveEnabled}>
               <DialogHeader>
-                <DialogTitle>Close &quot;{campaign.name}&quot;?</DialogTitle>
+                <DialogTitle>Close {campaign.name}?</DialogTitle>
                 <DialogDescription>
-                  This immediately disables the public link and stops new responses.
-                  This cannot be undone.
+                  The public link stops working immediately. People who already
+                  started will not be able to submit. Responses collected so far are
+                  kept. This cannot be undone.
                 </DialogDescription>
               </DialogHeader>
+              <div className="space-y-2">
+                <label
+                  htmlFor={`public-campaign-close-reason-${campaign.id}`}
+                  className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
+                  Reason
+                </label>
+                <textarea
+                  id={`public-campaign-close-reason-${campaign.id}`}
+                  value={closeReason}
+                  onChange={(event) => setCloseReason(event.target.value)}
+                  maxLength={CLOSE_REASON_MAX_LENGTH}
+                  rows={3}
+                  placeholder="Optional — appears in audit log"
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  disabled={closing}
+                />
+                <div className="text-right text-xs tabular-nums text-muted-foreground">
+                  {closeReason.length}/{CLOSE_REASON_MAX_LENGTH}
+                </div>
+              </div>
               <DialogFooter>
                 <DialogClose asChild>
                   <Button
@@ -316,7 +367,7 @@ export function PublicCampaignActions({
               <Button
                 size="sm"
                 type="button"
-                variant="outline"
+                variant="destructive"
                 className={actionClassName}
               >
                 Delete
@@ -324,11 +375,11 @@ export function PublicCampaignActions({
             </DialogTrigger>
             <DialogContent responsiveEnabled={responsiveEnabled}>
               <DialogHeader>
-                <DialogTitle>Delete &quot;{campaign.name}&quot;?</DialogTitle>
+                <DialogTitle>Delete {campaign.name}?</DialogTitle>
                 <DialogDescription>
-                  {campaign.responseCount} {campaign.responseCount === 1 ? "response is" : "responses are"}{" "}
-                  retained but will no longer be reachable from this page. This cannot
-                  be undone.
+                  {campaign.responseCount === 0
+                    ? "This campaign will be removed from this page. This cannot be undone."
+                    : `${campaign.responseCount} ${campaign.responseCount === 1 ? "response is" : "responses are"} kept but will no longer be reachable from this page. This cannot be undone.`}
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter>
