@@ -26,6 +26,7 @@ import {
 } from "@/lib/assessments/access-control";
 import { logAudit } from "@/lib/audit";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
+import { isPublicCampaignLifecycleEnabled } from "@/lib/assessments/wave-public-campaign-lifecycle-flags";
 
 const CloseBodySchema = z.object({
   reason: z
@@ -58,16 +59,6 @@ export async function POST(
 
     const { id: campaignId } = await params;
     const expectedStatus = new URL(request.url).searchParams.get("expectedStatus");
-    if (
-      expectedStatus !== null &&
-      expectedStatus !== "DRAFT" &&
-      expectedStatus !== "ACTIVE"
-    ) {
-      return NextResponse.json(
-        { success: false, error: "Invalid expected campaign status" },
-        { status: 400 }
-      );
-    }
 
     // Parse the body. Treat any parse failure (missing body, empty body,
     // bad JSON) as `{}` — the schema's reason field is optional. Only
@@ -106,7 +97,7 @@ export async function POST(
 
     const campaign = await db.assessmentCampaign.findUnique({
       where: { id: campaignId },
-      select: { id: true, status: true },
+      select: { id: true, status: true, accessMode: true, closedAt: true },
     });
     if (!campaign) {
       return NextResponse.json(
@@ -114,23 +105,68 @@ export async function POST(
         { status: 404 }
       );
     }
+    const lifecyclePublic =
+      campaign.accessMode === "PUBLIC" && isPublicCampaignLifecycleEnabled();
+    if (
+      lifecyclePublic &&
+      expectedStatus !== null &&
+      expectedStatus !== "DRAFT" &&
+      expectedStatus !== "ACTIVE"
+    ) {
+      return NextResponse.json(
+        { success: false, error: "Invalid expected campaign status" },
+        { status: 400 }
+      );
+    }
     if (campaign.status === "CLOSED") {
       return NextResponse.json(
-        { success: false, code: "ALREADY_CLOSED" },
+        {
+          success: false,
+          code: "ALREADY_CLOSED",
+          ...(lifecyclePublic
+            ? {
+                data: {
+                  id: campaign.id,
+                  status: "CLOSED",
+                  closedAt: campaign.closedAt?.toISOString() ?? null,
+                },
+              }
+            : {}),
+        },
         { status: 409 }
       );
     }
 
     const fromStatus = campaign.status;
     const now = new Date();
-    if (expectedStatus) {
+    if (lifecyclePublic) {
       const result = await db.assessmentCampaign.updateMany({
-        where: { id: campaignId, deletedAt: null, status: expectedStatus },
-        data: { status: "CLOSED" },
+        where: {
+          id: campaignId,
+          deletedAt: null,
+          status: expectedStatus ?? fromStatus,
+        },
+        data: { status: "CLOSED", closedAt: now },
       });
       if (result.count !== 1) {
+        const authoritative = await db.assessmentCampaign.findUnique({
+          where: { id: campaignId },
+          select: { id: true, status: true, closedAt: true },
+        });
         return NextResponse.json(
-          { success: false, code: "ALREADY_CLOSED" },
+          {
+            success: false,
+            code: "ALREADY_CLOSED",
+            ...(authoritative?.status === "CLOSED"
+              ? {
+                  data: {
+                    id: authoritative.id,
+                    status: "CLOSED",
+                    closedAt: authoritative.closedAt?.toISOString() ?? null,
+                  },
+                }
+              : {}),
+          },
           { status: 409 }
         );
       }

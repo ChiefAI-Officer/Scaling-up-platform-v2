@@ -38,15 +38,27 @@ jest.mock("@/lib/rate-limit", () => ({
   withRateLimit: jest.fn().mockResolvedValue({ allowed: true, headers: {} }),
 }));
 
+jest.mock("@/lib/assessments/wave-public-campaign-lifecycle-flags", () => ({
+  isPublicCampaignLifecycleEnabled: jest.fn(),
+}));
+
 import { POST } from "@/app/api/assessment-campaigns/[id]/close/route";
 import { db } from "@/lib/db";
 import { getApiActor } from "@/lib/auth/authorization";
+import { isPublicCampaignLifecycleEnabled } from "@/lib/assessments/wave-public-campaign-lifecycle-flags";
 
 const coachActor = {
   userId: "u1",
   email: "coach@example.com",
   role: "COACH" as const,
   coachId: "coach-1",
+};
+
+const adminActor = {
+  userId: "admin-1",
+  email: "admin@example.com",
+  role: "ADMIN" as const,
+  coachId: null,
 };
 
 function detailParams(id: string) {
@@ -61,14 +73,25 @@ function postReq(body?: unknown): Request {
   });
 }
 
-function conditionalPostReq(expectedStatus: "DRAFT" | "ACTIVE"): Request {
+function conditionalPostReq(
+  expectedStatus: "DRAFT" | "ACTIVE",
+  body?: unknown,
+): Request {
   return new Request(
     `http://localhost/api/assessment-campaigns/c1/close?expectedStatus=${expectedStatus}`,
-    { method: "POST" },
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    },
   );
 }
 
-function mockOwningCampaign(status: "DRAFT" | "ACTIVE" | "CLOSED") {
+function mockOwningCampaign(
+  status: "DRAFT" | "ACTIVE" | "CLOSED",
+  accessMode: "INVITED" | "PUBLIC" = "INVITED",
+  closedAt: Date | null = null,
+) {
   // canManageCampaign's internal findUnique call
   (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValueOnce({
     id: "c1",
@@ -76,16 +99,20 @@ function mockOwningCampaign(status: "DRAFT" | "ACTIVE" | "CLOSED") {
     templateId: "tpl-1",
     createdByCoachId: "coach-1",
     status,
+    accessMode,
   });
   // The route's second findUnique
   (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValueOnce({
     id: "c1",
     status,
+    accessMode,
+    closedAt,
   });
 }
 
 beforeEach(() => {
   jest.clearAllMocks();
+  (isPublicCampaignLifecycleEnabled as jest.Mock).mockReturnValue(false);
   (db.accessGroupCoach.findMany as jest.Mock).mockResolvedValue([
     {
       accessGroupId: "g1",
@@ -198,10 +225,72 @@ describe("POST /api/assessment-campaigns/[id]/close", () => {
     expect(db.auditLog.create).not.toHaveBeenCalled();
   });
 
-  it("atomically rejects a concurrent close when expectedStatus no longer matches", async () => {
+  it("persists closedAt atomically for a lifecycle-enabled PUBLIC campaign", async () => {
+    (isPublicCampaignLifecycleEnabled as jest.Mock).mockReturnValue(true);
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    mockOwningCampaign("ACTIVE", "PUBLIC");
+    (db.assessmentCampaign.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+
+    const res = await POST(
+      conditionalPostReq("ACTIVE", { reason: "launch cleanup" }) as never,
+      detailParams("c1"),
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    const update = (db.assessmentCampaign.updateMany as jest.Mock).mock.calls[0][0];
+    expect(update.where).toEqual({
+      id: "c1",
+      deletedAt: null,
+      status: "ACTIVE",
+    });
+    expect(update.data.status).toBe("CLOSED");
+    expect(update.data.closedAt).toBeInstanceOf(Date);
+    expect(body.data.closedAt).toBe(update.data.closedAt.toISOString());
+    expect(db.assessmentCampaign.update).not.toHaveBeenCalled();
+  });
+
+  it("keeps the legacy status-only write for PUBLIC campaigns while the flag is off", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    mockOwningCampaign("ACTIVE", "PUBLIC");
+    (db.assessmentCampaign.update as jest.Mock).mockResolvedValue({ id: "c1" });
+
+    await POST(conditionalPostReq("ACTIVE") as never, detailParams("c1"));
+
+    expect(db.assessmentCampaign.update).toHaveBeenCalledWith({
+      where: { id: "c1" },
+      data: { status: "CLOSED" },
+    });
+    expect(db.assessmentCampaign.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("keeps the legacy status-only write for INVITED campaigns while the flag is on", async () => {
+    (isPublicCampaignLifecycleEnabled as jest.Mock).mockReturnValue(true);
     (getApiActor as jest.Mock).mockResolvedValue(coachActor);
-    mockOwningCampaign("ACTIVE");
+    mockOwningCampaign("ACTIVE", "INVITED");
+    (db.assessmentCampaign.update as jest.Mock).mockResolvedValue({ id: "c1" });
+
+    await POST(conditionalPostReq("ACTIVE") as never, detailParams("c1"));
+
+    expect(db.assessmentCampaign.update).toHaveBeenCalledWith({
+      where: { id: "c1" },
+      data: { status: "CLOSED" },
+    });
+    expect(db.assessmentCampaign.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("returns authoritative closure data when a concurrent PUBLIC close wins", async () => {
+    (isPublicCampaignLifecycleEnabled as jest.Mock).mockReturnValue(true);
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    mockOwningCampaign("ACTIVE", "PUBLIC");
     (db.assessmentCampaign.updateMany as jest.Mock).mockResolvedValue({ count: 0 });
+    const winnerClosedAt = new Date("2026-09-15T03:04:05.000Z");
+    (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValueOnce({
+      id: "c1",
+      status: "CLOSED",
+      accessMode: "PUBLIC",
+      closedAt: winnerClosedAt,
+    });
 
     const res = await POST(
       conditionalPostReq("ACTIVE") as never,
@@ -211,10 +300,15 @@ describe("POST /api/assessment-campaigns/[id]/close", () => {
     expect(await res.json()).toMatchObject({
       success: false,
       code: "ALREADY_CLOSED",
+      data: {
+        id: "c1",
+        status: "CLOSED",
+        closedAt: winnerClosedAt.toISOString(),
+      },
     });
     expect(db.assessmentCampaign.updateMany).toHaveBeenCalledWith({
       where: { id: "c1", deletedAt: null, status: "ACTIVE" },
-      data: { status: "CLOSED" },
+      data: { status: "CLOSED", closedAt: expect.any(Date) },
     });
     expect(db.assessmentCampaign.update).not.toHaveBeenCalled();
     expect(db.auditLog.create).not.toHaveBeenCalled();
