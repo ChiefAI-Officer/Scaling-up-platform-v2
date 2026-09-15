@@ -22,16 +22,104 @@ function fieldLabel(position: ReportHtmlPosition): string {
   return position === "introduction" ? "Welcome section" : "Closing message";
 }
 
-function parseCss(css: string): CssNode {
+function parseCss(
+  css: string,
+  context: "stylesheet" | "declarationList" = "stylesheet",
+): CssNode {
   let parseError = false;
   const ast = parse(css, {
-    context: "stylesheet",
+    context,
+    positions: true,
     onParseError: () => {
       parseError = true;
     },
   });
   if (parseError) throw new Error("Invalid CSS");
   return ast;
+}
+
+function cssAstIssue(
+  ast: CssNode,
+  position: ReportHtmlPosition,
+): string | null {
+  let issue: string | null = null;
+  const functionStack: string[] = [];
+  walk(ast, {
+    enter(node: CssNode) {
+      if (node.type === "Function") {
+        functionStack.push(node.name.toLowerCase());
+      }
+      if (issue) return;
+
+      if (node.type === "Atrule") {
+        const name = node.name.toLowerCase();
+        const reason = BLOCKED_AT_RULES.get(name);
+        if (reason) {
+          issue = `${fieldLabel(position)} CSS cannot use ${reason}.`;
+        } else if (!SCOPED_AT_RULES.has(name)) {
+          issue = `${fieldLabel(position)} CSS cannot use @${name}. Only @media, @supports, @container, and nested @scope rules are supported.`;
+        }
+        return;
+      }
+
+      if (node.type === "Url") {
+        try {
+          if (new URL(node.value).protocol !== "https:") {
+            issue = `${fieldLabel(position)} CSS can only load images over HTTPS.`;
+          }
+        } catch {
+          issue = `${fieldLabel(position)} CSS can only load images over HTTPS.`;
+        }
+        return;
+      }
+
+      if (
+        node.type === "String" &&
+        IMAGE_SET_FUNCTIONS.has(functionStack.at(-1) ?? "")
+      ) {
+        try {
+          if (new URL(node.value).protocol !== "https:") {
+            issue = `${fieldLabel(position)} CSS can only load images over HTTPS.`;
+          }
+        } catch {
+          issue = `${fieldLabel(position)} CSS can only load images over HTTPS.`;
+        }
+        return;
+      }
+
+      if (node.type === "Function") {
+        const name = node.name.toLowerCase();
+        if (
+          name === "url" ||
+          name === "expression" ||
+          name === "var" ||
+          name === "attr" ||
+          name === "env"
+        ) {
+          issue = `${fieldLabel(position)} CSS cannot use ${name}().`;
+        }
+        return;
+      }
+
+      if (node.type === "Declaration") {
+        const property = node.property.toLowerCase();
+        if (property.startsWith("--")) {
+          issue = `${fieldLabel(position)} CSS cannot declare custom properties.`;
+          return;
+        }
+        if (property === "position") {
+          const value = generate(node.value).trim().toLowerCase();
+          if (!SAFE_POSITION_VALUES.has(value)) {
+            issue = `${fieldLabel(position)} CSS position can only be static, relative, or absolute.`;
+          }
+        }
+      }
+    },
+    leave(node: CssNode) {
+      if (node.type === "Function") functionStack.pop();
+    },
+  });
+  return issue;
 }
 
 export function reportHtmlCssCharacterCount(html: string): number {
@@ -59,86 +147,33 @@ export function reportHtmlCssIssue(
       return `${fieldLabel(position)} contains CSS that could not be parsed.`;
     }
 
-    let issue: string | null = null;
-    const functionStack: string[] = [];
-    walk(ast, {
-      enter(node: CssNode) {
-        if (node.type === "Function") {
-          functionStack.push(node.name.toLowerCase());
-        }
-        if (issue) return;
-
-        if (node.type === "Atrule") {
-          const name = node.name.toLowerCase();
-          const reason = BLOCKED_AT_RULES.get(name);
-          if (reason) {
-            issue = `${fieldLabel(position)} CSS cannot use ${reason}.`;
-          } else if (!SCOPED_AT_RULES.has(name)) {
-            issue = `${fieldLabel(position)} CSS cannot use @${name}. Only @media, @supports, @container, and nested @scope rules are supported.`;
-          }
-          return;
-        }
-
-        if (node.type === "Url") {
-          try {
-            if (new URL(node.value).protocol !== "https:") {
-              issue = `${fieldLabel(position)} CSS can only load images over HTTPS.`;
-            }
-          } catch {
-            issue = `${fieldLabel(position)} CSS can only load images over HTTPS.`;
-          }
-          return;
-        }
-
-        if (
-          node.type === "String" &&
-          IMAGE_SET_FUNCTIONS.has(functionStack.at(-1) ?? "")
-        ) {
-          try {
-            if (new URL(node.value).protocol !== "https:") {
-              issue = `${fieldLabel(position)} CSS can only load images over HTTPS.`;
-            }
-          } catch {
-            issue = `${fieldLabel(position)} CSS can only load images over HTTPS.`;
-          }
-          return;
-        }
-
-        if (node.type === "Function") {
-          const name = node.name.toLowerCase();
-          if (
-            name === "url" ||
-            name === "expression" ||
-            name === "var" ||
-            name === "attr" ||
-            name === "env"
-          ) {
-            issue = `${fieldLabel(position)} CSS cannot use ${name}().`;
-          }
-          return;
-        }
-
-        if (node.type === "Declaration") {
-          const property = node.property.toLowerCase();
-          if (property.startsWith("--")) {
-            issue = `${fieldLabel(position)} CSS cannot declare custom properties.`;
-            return;
-          }
-          if (property === "position") {
-            const value = generate(node.value).trim().toLowerCase();
-            if (!SAFE_POSITION_VALUES.has(value)) {
-              issue = `${fieldLabel(position)} CSS position can only be static, relative, or absolute.`;
-            }
-          }
-        }
-      },
-      leave(node: CssNode) {
-        if (node.type === "Function") functionStack.pop();
-      },
-    });
+    const issue = cssAstIssue(ast, position);
     if (issue) return issue;
   }
   return null;
+}
+
+export function sanitizeReportHtmlInlineStyle(
+  style: string,
+  position: ReportHtmlPosition,
+): string {
+  let ast: CssNode;
+  try {
+    ast = parseCss(style, "declarationList");
+  } catch {
+    return "";
+  }
+  if (ast.type !== "DeclarationList") return "";
+
+  const safeDeclarations: string[] = [];
+  ast.children.forEach((node) => {
+    if (node.type !== "Declaration" || !node.loc) return;
+    const source = style.slice(node.loc.start.offset, node.loc.end.offset);
+    if (/\/\*|\*\/|\\/.test(source)) return;
+    if (cssAstIssue(node, position)) return;
+    safeDeclarations.push(generate(node));
+  });
+  return safeDeclarations.join(";");
 }
 
 export function scopeReportHtmlCss(

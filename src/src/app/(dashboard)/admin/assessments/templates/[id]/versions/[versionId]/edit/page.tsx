@@ -53,6 +53,7 @@ import {
 import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 import { isPublicMarketingCtaEnabled } from "@/lib/assessments/wave-public-marketing-cta-flags";
 import { isReportHtmlExperienceEnabled } from "@/lib/assessments/wave-report-html-authoring-flags";
+import { isReportHtmlLimitsEnabled } from "@/lib/assessments/wave-report-html-limits-flags";
 import { loadSafeReportHtml } from "@/lib/assessments/report-html";
 
 export default async function AdminAssessmentVersionEditPage({
@@ -339,6 +340,7 @@ export default async function AdminAssessmentVersionEditPage({
         // kill = flag off + redeploy.
         previewSettingsEnabled={isPreviewSettingsEnabled()}
         reportsActive={reportsActive}
+        reportHtmlLimitsEnabled={isReportHtmlLimitsEnabled()}
         mobileResponsiveEnabled={mobileResponsiveEnabled}
         // Template-creation simplification — resolved on this server page and
         // forwarded solely to the existing Scoring & Tiers presentation.

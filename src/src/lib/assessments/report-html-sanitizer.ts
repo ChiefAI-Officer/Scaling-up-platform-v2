@@ -2,8 +2,10 @@ import sanitizeHtml from "sanitize-html";
 import {
   reportHtmlCssCharacterCount,
   reportHtmlCssIssue,
+  sanitizeReportHtmlInlineStyle,
   type ReportHtmlPosition as ReportHtmlCssPosition,
 } from "@/lib/assessments/report-html-css";
+import { isReportHtmlLimitsEnabled } from "@/lib/assessments/wave-report-html-limits-flags";
 
 export const REPORT_HTML_LIMITS = {
   introduction: {
@@ -44,11 +46,59 @@ export const REPORT_HTML_LIMITS = {
   },
 } as const;
 
+export const REPORT_HTML_EXPANDED_LIMITS = {
+  introduction: {
+    rawCharacters: 12_000,
+    cssCharacters: 4_000,
+    textCharacters: 2_200,
+    elements: 200,
+    depth: 16,
+    tableRows: 8,
+    tableColumns: 4,
+    tableCells: 24,
+    tableCaptions: 1,
+    tableCaptionCharacters: 60,
+    estimatedLines: 200,
+  },
+  conclusion: {
+    rawCharacters: 12_000,
+    cssCharacters: 4_000,
+    textCharacters: 900,
+    elements: 200,
+    depth: 16,
+    tableRows: 6,
+    tableColumns: 3,
+    tableCells: 12,
+    tableCaptions: 1,
+    tableCaptionCharacters: 60,
+    estimatedLines: 200,
+  },
+} as const;
+
+export type ReportHtmlStructureMetrics = {
+  elements: number;
+  depth: number;
+  images: number;
+  tables: number;
+  tableRows: number;
+  tableColumns: number;
+  tableCells: number;
+  tableCaptions: number;
+  tableCaptionCharacters: number;
+  figureCaptions: number;
+  headings: number;
+  lineBreaks: number;
+  estimatedLines: number;
+  hasValidTableStructure: boolean;
+  text: string;
+};
+
 export type SanitizeReportHtmlResult = {
   ok: boolean;
   html: string;
   didStripContent: boolean;
   issue?: string;
+  metrics?: ReportHtmlStructureMetrics;
 };
 
 type ReportHtmlTagPolicy =
@@ -113,6 +163,21 @@ export const REPORT_HTML_ALLOWED_TAGS = Object.entries(REPORT_HTML_TAG_POLICY)
   .filter(([, policy]) => policy.classification !== "unwrapped-or-disallowed")
   .map(([tag]) => tag);
 
+export const REPORT_HTML_EXPANDED_TAG_POLICY = {
+  ...REPORT_HTML_TAG_POLICY,
+  picture: { classification: "positive-weighted-or-limited", weight: 1 },
+  source: { classification: "positive-weighted-or-limited", weight: 0.25 },
+  details: { classification: "positive-weighted-or-limited", weight: 2 },
+  summary: { classification: "positive-weighted-or-limited", weight: 2 },
+  nav: { classification: "positive-weighted-or-limited", weight: 1 },
+} as const satisfies Record<string, ReportHtmlTagPolicy>;
+
+export const REPORT_HTML_EXPANDED_ALLOWED_TAGS = Object.entries(
+  REPORT_HTML_EXPANDED_TAG_POLICY,
+)
+  .filter(([, policy]) => policy.classification !== "unwrapped-or-disallowed")
+  .map(([tag]) => tag);
+
 const COMMON_ATTRIBUTES = [
   "title",
   "lang",
@@ -135,6 +200,8 @@ const ALLOWED_ATTRIBUTES: Record<string, string[]> = {
     "height",
     ...COMMON_ATTRIBUTES,
   ],
+  details: ["open", ...COMMON_ATTRIBUTES],
+  source: ["srcset", "media", "type", "sizes", ...COMMON_ATTRIBUTES],
   table: ["summary", ...COMMON_ATTRIBUTES],
   th: ["scope", ...COMMON_ATTRIBUTES],
   td: ["headers", ...COMMON_ATTRIBUTES],
@@ -236,6 +303,17 @@ function removeObscuredCss(attributes: Record<string, string>): void {
   else attributes.style = declarations.join(";");
 }
 
+function applyExpandedInlineStylePolicy(
+  attributes: Record<string, string>,
+  position: ReportHtmlPosition,
+): void {
+  const style = attributes.style;
+  if (!style) return;
+  const sanitized = sanitizeReportHtmlInlineStyle(style, position);
+  if (sanitized) attributes.style = sanitized;
+  else delete attributes.style;
+}
+
 function visibleText(raw: string): string {
   return sanitizeHtml(raw, {
     allowedTags: [],
@@ -321,7 +399,10 @@ function tableTagHasValidParent(
   return false;
 }
 
-function measureStructure(html: string) {
+function measureStructure(
+  html: string,
+  limitsExpansionEnabled: boolean,
+): ReportHtmlStructureMetrics {
   let elements = 0;
   let depth = 0;
   let maximumDepth = 0;
@@ -406,7 +487,11 @@ function measureStructure(html: string) {
     if (tag === "figcaption") figureCaptions += 1;
     if (HEADING_TAGS.has(tag)) headings += 1;
     if (tag === "br") lineBreaks += 1;
-    const policy = REPORT_HTML_TAG_POLICY[tag as keyof typeof REPORT_HTML_TAG_POLICY];
+    const policy = limitsExpansionEnabled
+      ? REPORT_HTML_EXPANDED_TAG_POLICY[
+          tag as keyof typeof REPORT_HTML_EXPANDED_TAG_POLICY
+        ]
+      : REPORT_HTML_TAG_POLICY[tag as keyof typeof REPORT_HTML_TAG_POLICY];
     if (!policy || policy.classification === "unwrapped-or-disallowed") {
       throw new Error(`Sanitized report HTML tag ${tag} has no allowed layout policy.`);
     }
@@ -468,9 +553,9 @@ function issueForTableStructure(position: ReportHtmlPosition): string {
 function issueForLimit(
   position: ReportHtmlPosition,
   kind: "rawCharacters" | "textCharacters" | "elements" | "depth" | "images" | "tables" | "tableRows" | "tableColumns" | "tableCells" | "tableCaptions" | "tableCaptionCharacters" | "figureCaptions" | "headings" | "lineBreaks" | "estimatedLines",
+  limit: number = REPORT_HTML_LIMITS[position][kind],
 ): string {
   const field = position === "introduction" ? "Welcome section" : "Closing message";
-  const limit = REPORT_HTML_LIMITS[position][kind];
   const messages = {
     rawCharacters: `must be ${limit.toLocaleString()} characters or fewer.`,
     textCharacters: `must contain ${limit.toLocaleString()} visible text characters or fewer.`,
@@ -518,10 +603,21 @@ export function reportHtmlCssCharacterIssue(
 export function sanitizeReportHtmlFragment(
   raw: string,
   position: ReportHtmlPosition,
+  options: { limitsExpansionEnabled?: boolean } = {},
 ): SanitizeReportHtmlResult {
-  const sourceCharacterIssue = reportHtmlSourceCharacterIssue(raw, position);
-  const cssCharacterIssue = reportHtmlCssCharacterIssue(raw, position);
-  const limits = REPORT_HTML_LIMITS[position];
+  const limitsExpansionEnabled =
+    options.limitsExpansionEnabled ?? isReportHtmlLimitsEnabled();
+  const limits = limitsExpansionEnabled
+    ? REPORT_HTML_EXPANDED_LIMITS[position]
+    : REPORT_HTML_LIMITS[position];
+  const sourceCharacterIssue =
+    raw.length > limits.rawCharacters
+      ? reportHtmlSourceCharacterIssue(raw, position)
+      : null;
+  const cssCharacterIssue =
+    reportHtmlCssCharacterCount(raw) > limits.cssCharacters
+      ? reportHtmlCssCharacterIssue(raw, position)
+      : null;
   if (sourceCharacterIssue || cssCharacterIssue) {
     return {
       ok: false,
@@ -532,16 +628,19 @@ export function sanitizeReportHtmlFragment(
   }
 
   const html = sanitizeHtml(raw, {
-    allowedTags: REPORT_HTML_ALLOWED_TAGS,
+    allowedTags: limitsExpansionEnabled
+      ? REPORT_HTML_EXPANDED_ALLOWED_TAGS
+      : REPORT_HTML_ALLOWED_TAGS,
     allowedAttributes: ALLOWED_ATTRIBUTES,
     allowedSchemes: ["https", "mailto", "tel"],
     allowedSchemesByTag: {
       a: ["https", "mailto", "tel"],
       img: ["https", "data"],
+      source: ["https"],
     },
     allowedSchemesAppliedToAttributes: ["href", "src"],
     allowProtocolRelative: false,
-    allowedStyles: ALLOWED_STYLES,
+    allowedStyles: limitsExpansionEnabled ? undefined : ALLOWED_STYLES,
     parseStyleAttributes: true,
     // `sanitize-html` warns for style tags because unvalidated CSS can fetch
     // or affect the containing page. Report CSS is validated below and scoped
@@ -566,12 +665,20 @@ export function sanitizeReportHtmlFragment(
     transformTags: {
       "*": (tagName, attributes) => {
         removeReservedReportShellClasses(attributes);
-        removeObscuredCss(attributes);
+        if (limitsExpansionEnabled) {
+          applyExpandedInlineStylePolicy(attributes, position);
+        } else {
+          removeObscuredCss(attributes);
+        }
         return { tagName, attribs: attributes };
       },
       a: (tagName, attributes) => {
         removeReservedReportShellClasses(attributes);
-        removeObscuredCss(attributes);
+        if (limitsExpansionEnabled) {
+          applyExpandedInlineStylePolicy(attributes, position);
+        } else {
+          removeObscuredCss(attributes);
+        }
         if (attributes.target === "_blank") {
           attributes.rel = "noopener noreferrer";
         }
@@ -579,7 +686,11 @@ export function sanitizeReportHtmlFragment(
       },
       img: (tagName, attributes) => {
         removeReservedReportShellClasses(attributes);
-        removeObscuredCss(attributes);
+        if (limitsExpansionEnabled) {
+          applyExpandedInlineStylePolicy(attributes, position);
+        } else {
+          removeObscuredCss(attributes);
+        }
         removeUnsafeImageDimensions(attributes);
         const src = (attributes.src ?? "").trim();
         if (src && DATA_IMAGE.test(src) && DATA_SVG.test(src)) {
@@ -603,37 +714,56 @@ export function sanitizeReportHtmlFragment(
     };
   }
 
-  const structure = measureStructure(html);
+  const structure = measureStructure(html, limitsExpansionEnabled);
   if (!structure.hasValidTableStructure) {
     return {
       ok: false,
       html: "",
       didStripContent: html !== raw.trim(),
       issue: issueForTableStructure(position),
+      ...(limitsExpansionEnabled ? { metrics: structure } : {}),
     };
   }
-  for (const [kind, value] of [
-    ["textCharacters", structure.text.length],
-    ["elements", structure.elements],
-    ["depth", structure.depth],
-    ["images", structure.images],
-    ["tables", structure.tables],
-    ["tableRows", structure.tableRows],
-    ["tableColumns", structure.tableColumns],
-    ["tableCells", structure.tableCells],
-    ["tableCaptions", structure.tableCaptions],
-    ["tableCaptionCharacters", structure.tableCaptionCharacters],
-    ["figureCaptions", structure.figureCaptions],
-    ["headings", structure.headings],
-    ["lineBreaks", structure.lineBreaks],
-    ["estimatedLines", structure.estimatedLines],
-  ] as const) {
-    if (value > limits[kind]) {
+  const sharedChecks = [
+    ["textCharacters", structure.text.length, limits.textCharacters],
+    ["elements", structure.elements, limits.elements],
+    ["depth", structure.depth, limits.depth],
+    ["tableRows", structure.tableRows, limits.tableRows],
+    ["tableColumns", structure.tableColumns, limits.tableColumns],
+    ["tableCells", structure.tableCells, limits.tableCells],
+    ["tableCaptions", structure.tableCaptions, limits.tableCaptions],
+    [
+      "tableCaptionCharacters",
+      structure.tableCaptionCharacters,
+      limits.tableCaptionCharacters,
+    ],
+    ["estimatedLines", structure.estimatedLines, limits.estimatedLines],
+  ] as const;
+  const legacyChecks = [
+    ["images", structure.images, REPORT_HTML_LIMITS[position].images],
+    ["tables", structure.tables, REPORT_HTML_LIMITS[position].tables],
+    [
+      "figureCaptions",
+      structure.figureCaptions,
+      REPORT_HTML_LIMITS[position].figureCaptions,
+    ],
+    ["headings", structure.headings, REPORT_HTML_LIMITS[position].headings],
+    [
+      "lineBreaks",
+      structure.lineBreaks,
+      REPORT_HTML_LIMITS[position].lineBreaks,
+    ],
+  ] as const;
+  for (const [kind, value, limit] of limitsExpansionEnabled
+    ? sharedChecks
+    : [...sharedChecks, ...legacyChecks]) {
+    if (value > limit) {
       return {
         ok: false,
         html: "",
         didStripContent: html !== raw.trim(),
-        issue: issueForLimit(position, kind),
+        issue: issueForLimit(position, kind, limit),
+        ...(limitsExpansionEnabled ? { metrics: structure } : {}),
       };
     }
   }
@@ -642,5 +772,6 @@ export function sanitizeReportHtmlFragment(
     ok: true,
     html,
     didStripContent: html !== raw.trim(),
+    ...(limitsExpansionEnabled ? { metrics: structure } : {}),
   };
 }

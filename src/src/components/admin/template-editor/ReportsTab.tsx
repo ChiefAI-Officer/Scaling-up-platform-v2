@@ -6,16 +6,21 @@ import type {
 } from "@/lib/assessments/report-html";
 import {
   REPORT_HTML_IMAGE_DIMENSION_MAX,
+  REPORT_HTML_EXPANDED_LIMITS,
   REPORT_HTML_LIMITS,
   reportHtmlCssCharacterIssue,
   reportHtmlSourceCharacterIssue,
+  sanitizeReportHtmlFragment,
 } from "@/lib/assessments/report-html-sanitizer";
 import {
   REPORT_PLACEHOLDERS,
   reportPlaceholderIssue,
   type ReportPlaceholderToken,
 } from "@/lib/assessments/report-placeholders";
-import { reportHtmlCssIssue } from "@/lib/assessments/report-html-css";
+import {
+  reportHtmlCssCharacterCount,
+  reportHtmlCssIssue,
+} from "@/lib/assessments/report-html-css";
 
 function HtmlRegion({
   id,
@@ -26,6 +31,7 @@ function HtmlRegion({
   position,
   onChange,
   isReadOnly,
+  limitsExpansionEnabled,
 }: {
   id: string;
   title: string;
@@ -35,14 +41,19 @@ function HtmlRegion({
   position: "introduction" | "conclusion";
   onChange: (value: string) => void;
   isReadOnly: boolean;
+  limitsExpansionEnabled: boolean;
 }) {
   const html = value ?? "";
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+  const expandedResult = limitsExpansionEnabled
+    ? sanitizeReportHtmlFragment(html, position, { limitsExpansionEnabled: true })
+    : null;
   const authoringIssue =
     reportHtmlSourceCharacterIssue(html, position) ??
     reportHtmlCssCharacterIssue(html, position) ??
     reportHtmlCssIssue(html, position) ??
-    reportPlaceholderIssue(html, title);
+    reportPlaceholderIssue(html, title) ??
+    (expandedResult && !expandedResult.ok ? expandedResult.issue : null);
   const errorId = `${id}-error`;
 
   function insertPlaceholder(token: ReportPlaceholderToken) {
@@ -81,9 +92,9 @@ function HtmlRegion({
               supported. Scripts, event handlers, and platform page-shell class names
               are removed on save.
             </p>
-            {position === "conclusion" ? (
+            {limitsExpansionEnabled || position === "conclusion" ? (
               <p className="mt-1 text-xs text-muted-foreground">
-                Closing images may use paired whole-number width and height attributes
+                {limitsExpansionEnabled ? "Images" : "Closing images"} may use paired whole-number width and height attributes
                 from 1 to {REPORT_HTML_IMAGE_DIMENSION_MAX.toLocaleString()} pixels.
                 Images stay inside the report column and keep their proportions.
               </p>
@@ -143,10 +154,36 @@ function HtmlRegion({
                 {"Write HTML and optional CSS in a <style> tag. Styles apply only inside this section."}
               </span>
             )}
-            <span className={`shrink-0 ${authoringIssue ? "font-semibold text-destructive" : ""}`}>
-              {html.length.toLocaleString()} / {REPORT_HTML_LIMITS[position].rawCharacters.toLocaleString()}
-            </span>
+            {!limitsExpansionEnabled ? (
+              <span className={`shrink-0 ${authoringIssue ? "font-semibold text-destructive" : ""}`}>
+                {html.length.toLocaleString()} / {REPORT_HTML_LIMITS[position].rawCharacters.toLocaleString()}
+              </span>
+            ) : null}
           </div>
+          {limitsExpansionEnabled ? (
+            <div
+              data-testid={`${id}-capacity`}
+              className="mt-2 flex flex-wrap gap-x-4 gap-y-1 border-t border-border pt-2 text-[11px] tabular-nums text-muted-foreground"
+            >
+              <span>Source {html.length.toLocaleString()} / {REPORT_HTML_EXPANDED_LIMITS[position].rawCharacters.toLocaleString()}</span>
+              <span>CSS {reportHtmlCssCharacterCount(html).toLocaleString()} / {REPORT_HTML_EXPANDED_LIMITS[position].cssCharacters.toLocaleString()}</span>
+              <span>Text {expandedResult?.metrics?.text.length.toLocaleString() ?? "—"} / {REPORT_HTML_EXPANDED_LIMITS[position].textCharacters.toLocaleString()}</span>
+              <span>Layout {expandedResult?.metrics?.estimatedLines.toLocaleString() ?? "—"} / {REPORT_HTML_EXPANDED_LIMITS[position].estimatedLines} lines</span>
+              <span>Elements {expandedResult?.metrics?.elements.toLocaleString() ?? "—"} / {REPORT_HTML_EXPANDED_LIMITS[position].elements}</span>
+              <span>Depth {expandedResult?.metrics?.depth.toLocaleString() ?? "—"} / {REPORT_HTML_EXPANDED_LIMITS[position].depth}</span>
+              <span>{expandedResult?.metrics?.images.toLocaleString() ?? "—"} images</span>
+              {(expandedResult?.metrics?.tables ?? 0) > 0 ? (
+                <>
+                  <span>{expandedResult?.metrics?.tables.toLocaleString()} tables</span>
+                  <span>Rows {expandedResult?.metrics?.tableRows.toLocaleString()} / {REPORT_HTML_EXPANDED_LIMITS[position].tableRows}</span>
+                  <span>Columns {expandedResult?.metrics?.tableColumns.toLocaleString()} / {REPORT_HTML_EXPANDED_LIMITS[position].tableColumns}</span>
+                  <span>Cells {expandedResult?.metrics?.tableCells.toLocaleString()} / {REPORT_HTML_EXPANDED_LIMITS[position].tableCells}</span>
+                  <span>Table captions {expandedResult?.metrics?.tableCaptions.toLocaleString()} / {REPORT_HTML_EXPANDED_LIMITS[position].tableCaptions}</span>
+                  <span>Caption text {expandedResult?.metrics?.tableCaptionCharacters.toLocaleString()} / {REPORT_HTML_EXPANDED_LIMITS[position].tableCaptionCharacters}</span>
+                </>
+              ) : null}
+            </div>
+          ) : null}
       </div>
     </section>
   );
@@ -181,6 +218,7 @@ export function ReportsTab({
   previewDisabled,
   onChange,
   isReadOnly,
+  limitsExpansionEnabled = false,
 }: {
   value: ReportHtmlConfigV1;
   previewHref: string;
@@ -188,6 +226,7 @@ export function ReportsTab({
   previewDisabled: boolean;
   onChange: (next: ReportHtmlConfigV1) => void;
   isReadOnly: boolean;
+  limitsExpansionEnabled?: boolean;
 }) {
   return (
     <div className="space-y-4" data-testid="reports-tab">
@@ -209,6 +248,7 @@ export function ReportsTab({
           onChange({ ...value, introductionHtml })
         }
         isReadOnly={isReadOnly}
+        limitsExpansionEnabled={limitsExpansionEnabled}
       />
 
       <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
@@ -250,6 +290,7 @@ export function ReportsTab({
         position="conclusion"
         onChange={(conclusionHtml) => onChange({ ...value, conclusionHtml })}
         isReadOnly={isReadOnly}
+        limitsExpansionEnabled={limitsExpansionEnabled}
       />
     </div>
   );

@@ -1,5 +1,6 @@
 import {
   REPORT_HTML_ALLOWED_TAGS,
+  REPORT_HTML_EXPANDED_LIMITS,
   REPORT_HTML_TAG_POLICY,
   sanitizeReportHtmlFragment,
 } from "@/lib/assessments/report-html-sanitizer";
@@ -631,5 +632,160 @@ describe("sanitizeReportHtmlFragment", () => {
     expect(result.html).toContain('height="300"');
     expect(result.html).toContain('style="color:red"');
     expect(result.html).not.toMatch(/(?:max-width|min-width|min-height|max-height|grid|flex|vw|vh|-1px)/i);
+  });
+});
+
+describe("expanded report HTML authoring limits", () => {
+  const enabledKey = "WAVE_REPORT_HTML_LIMITS_ENABLED";
+  const killKey = "WAVE_REPORT_HTML_LIMITS_KILL";
+  const savedEnabled = process.env[enabledKey];
+  const savedKill = process.env[killKey];
+
+  beforeEach(() => {
+    process.env[enabledKey] = "1";
+    delete process.env[killKey];
+  });
+
+  afterAll(() => {
+    if (savedEnabled === undefined) delete process.env[enabledKey];
+    else process.env[enabledKey] = savedEnabled;
+    if (savedKill === undefined) delete process.env[killKey];
+    else process.env[killKey] = savedKill;
+  });
+
+  it.each(["introduction", "conclusion"] as const)(
+    "accepts multiple bounded images in %s content",
+    (position) => {
+      const result = sanitizeReportHtmlFragment(
+        '<img src="https://cdn.scalingup.com/one.png" width="400" height="300"><img src="https://cdn.scalingup.com/two.png" width="600" height="400">',
+        position,
+      );
+
+      expect(result).toMatchObject({ ok: true, didStripContent: true });
+      expect(result.html.match(/<img\b/g)).toHaveLength(2);
+      expect(result.html.match(/referrerpolicy="no-referrer"/g)).toHaveLength(2);
+      expect(result.html).toContain('width="400" height="300"');
+      expect(result.html).toContain('width="600" height="400"');
+    },
+  );
+
+  it("independently enforces source and dimension policy across multiple images", () => {
+    const result = sanitizeReportHtmlFragment(
+      '<img src="https://cdn.scalingup.com/safe.png" width="400" height="300"><img src="javascript:alert(1)" width="2001" height="300"><img src="https://cdn.scalingup.com/unpaired.png" width="600">',
+      "introduction",
+    );
+
+    expect(result).toMatchObject({ ok: true, didStripContent: true });
+    expect(result.html.match(/<img\b/g)).toHaveLength(3);
+    expect(result.html.match(/referrerpolicy="no-referrer"/g)).toHaveLength(3);
+    expect(result.html).toContain(
+      'src="https://cdn.scalingup.com/safe.png" width="400" height="300"',
+    );
+    expect(result.html).not.toContain("javascript:");
+    expect(result.html).not.toContain('width="2001"');
+    expect(result.html).not.toContain('src="https://cdn.scalingup.com/unpaired.png" width');
+  });
+
+  it("restores the exact legacy result shape and image cap when the kill switch wins", () => {
+    process.env[killKey] = "1";
+    const result = sanitizeReportHtmlFragment(
+      '<img src="https://cdn.scalingup.com/one.png"><img src="https://cdn.scalingup.com/two.png">',
+      "introduction",
+    );
+
+    expect(result).toEqual({
+      ok: false,
+      html: "",
+      didStripContent: true,
+      issue: "Welcome section can contain 1 image or fewer.",
+    });
+  });
+
+  it("keeps responsive, disclosure, and navigation markup while filtering source URLs", () => {
+    const result = sanitizeReportHtmlFragment(
+      '<nav aria-label="Report links"><a href="https://scalingup.com">Home</a></nav><picture><source media="(min-width: 800px)" type="image/webp" srcset="https://cdn.scalingup.com/hero.webp 1x, javascript:alert(1) 2x"><img src="https://cdn.scalingup.com/hero.png" alt="Team"></picture><details open><summary>Read more</summary><p>Detail</p></details>',
+      "introduction",
+    );
+
+    expect(result).toMatchObject({ ok: true });
+    expect(result.html).toContain('<nav aria-label="Report links">');
+    expect(result.html).toContain("<picture><source");
+    expect(result.html).toContain('srcset="https://cdn.scalingup.com/hero.webp 1x"');
+    expect(result.html).not.toContain("javascript:");
+    expect(result.html).toContain("<details open");
+    expect(result.html).toContain("<summary>Read more</summary>");
+  });
+
+  it("keeps safe inline layout CSS with the same policy as a style block", () => {
+    const result = sanitizeReportHtmlFragment(
+      '<div style="display:flex;gap:1rem;padding:12px;margin-top:8px;background-image:url(https://cdn.scalingup.com/pattern.png)">Layout</div>',
+      "introduction",
+    );
+
+    expect(result).toMatchObject({ ok: true, didStripContent: false });
+    expect(result.html).toContain("display:flex");
+    expect(result.html).toContain("gap:1rem");
+    expect(result.html).toContain("padding:12px");
+    expect(result.html).toContain("margin-top:8px");
+    expect(result.html).toContain(
+      "background-image:url(https://cdn.scalingup.com/pattern.png)",
+    );
+  });
+
+  it("still strips unsafe inline declarations while retaining safe siblings", () => {
+    const result = sanitizeReportHtmlFragment(
+      '<div style="position:fixed;color:red;background-image:url(http://evil.test/pixel.png);--overlay:fixed">Layout</div>',
+      "introduction",
+    );
+
+    expect(result.html).toBe('<div style="color:red">Layout</div>');
+  });
+
+  it("accepts multiple tables and headings while preserving table-shape guards", () => {
+    const result = sanitizeReportHtmlFragment(
+      `${"<h3>Heading</h3>".repeat(6)}<table><tbody><tr><td>One</td></tr></tbody></table><table><tbody><tr><td>Two</td></tr></tbody></table>`,
+      "introduction",
+    );
+
+    expect(result).toMatchObject({ ok: true });
+    const tooManyColumns = sanitizeReportHtmlFragment(
+      `<table><tbody><tr>${"<td>x</td>".repeat(REPORT_HTML_EXPANDED_LIMITS.introduction.tableColumns + 1)}</tr></tbody></table>`,
+      "introduction",
+    );
+    expect(tooManyColumns).toMatchObject({
+      ok: false,
+      issue: expect.stringMatching(/table columns/i),
+    });
+  });
+
+  it.each(["introduction", "conclusion"] as const)(
+    "keeps estimated lines as the vertical governor for %s content",
+    (position) => {
+      const images = Math.floor(
+        REPORT_HTML_EXPANDED_LIMITS[position].estimatedLines / 6,
+      ) + 1;
+      const result = sanitizeReportHtmlFragment(
+        Array.from(
+          { length: images },
+          (_, index) =>
+            `<img src="https://cdn.scalingup.com/${index}.png" alt="Image ${index}">`,
+        ).join(""),
+        position,
+      );
+
+      expect(result).toMatchObject({
+        ok: false,
+        issue: expect.stringContaining("200 estimated lines"),
+      });
+    },
+  );
+
+  it("continues discarding executable content including SVG", () => {
+    const result = sanitizeReportHtmlFragment(
+      '<script>script-marker</script><iframe>iframe-marker</iframe><form>form-marker</form><svg><text>svg-marker</text></svg><p>safe-marker</p>',
+      "introduction",
+    );
+
+    expect(result.html).toBe("<p>safe-marker</p>");
   });
 });

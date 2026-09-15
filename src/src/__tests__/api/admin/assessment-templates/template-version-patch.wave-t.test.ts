@@ -166,6 +166,8 @@ afterEach(() => {
   delete process.env.WAVE_REPORT_HTML_AUTHORING_KILL;
   delete process.env.WAVE_ED10_PREVIEW_SETTINGS_ENABLED;
   delete process.env.WAVE_ED10_PREVIEW_SETTINGS_KILL;
+  delete process.env.WAVE_REPORT_HTML_LIMITS_ENABLED;
+  delete process.env.WAVE_REPORT_HTML_LIMITS_KILL;
   delete process.env.WAVE_PUBLIC_MARKETING_CTA_ENABLED;
 });
 
@@ -264,6 +266,40 @@ describe("PATCH version — Wave T question validation", () => {
     });
     expect(db.assessmentTemplateVersion.update).not.toHaveBeenCalled();
   });
+
+  it.each(["introductionHtml", "conclusionHtml"] as const)(
+    "stores multiple safe images in %s when expanded limits are enabled",
+    async (field) => {
+      enableReportHtmlExperience();
+      process.env.WAVE_REPORT_HTML_LIMITS_ENABLED = "1";
+      const images =
+        '<img src="https://cdn.scalingup.com/one.png" alt="One"><img src="https://cdn.scalingup.com/two.png" alt="Two">';
+      const request = new Request("http://l", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          questions: mixedPayload,
+          sections: [],
+          scoringConfig: { tiers: [] },
+          reportConfig: {
+            reportHtml: {
+              schemaVersion: 1,
+              introductionHtml: field === "introductionHtml" ? images : null,
+              conclusionHtml: field === "conclusionHtml" ? images : null,
+            },
+          },
+        }),
+      });
+
+      const response = await PATCH(request as never, versionParams);
+
+      expect(response.status).toBe(200);
+      const stored = (db.assessmentTemplateVersion.update as jest.Mock).mock
+        .calls[0][0].data.reportConfig.reportHtml[field];
+      expect(stored.match(/<img\b/g)).toHaveLength(2);
+      expect(stored.match(/referrerpolicy="no-referrer"/g)).toHaveLength(2);
+    },
+  );
 
   it("server-compiles public Marketing CTA HTML instead of trusting the client", async () => {
     process.env.WAVE_PUBLIC_MARKETING_CTA_ENABLED = "1";

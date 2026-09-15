@@ -380,6 +380,8 @@ export interface TabbedShellProps {
   publicMarketingCtaEnabled?: boolean;
   /** Server-resolved composite gate for report HTML authoring and rendering. */
   reportsActive?: boolean;
+  /** Expands safe report markup/CSS capacity and reveals canonical counters. */
+  reportHtmlLimitsEnabled?: boolean;
 }
 
 /**
@@ -502,6 +504,7 @@ export function TabbedShell({
   peerBenchmarkRows = null,
   publicMarketingCtaEnabled = false,
   reportsActive = false,
+  reportHtmlLimitsEnabled = false,
   model,
 }: TabbedShellProps & {
   /**
@@ -1259,6 +1262,7 @@ export function TabbedShell({
                 previewDisabled={Boolean(dirtyFlags.reportConfig)}
                 onChange={handleReportHtmlChange}
                 isReadOnly={isPublished}
+                limitsExpansionEnabled={reportHtmlLimitsEnabled}
               />
             </div>
           </TabsContent>
