@@ -48,6 +48,7 @@ import {
 } from "@/lib/assessments/custom-slides-write";
 import { Prisma } from "@prisma/client";
 import { isInvitationBannerEnabled } from "@/lib/assessments/wave-invitation-banner-flags";
+import { isPublicCampaignLifecycleEnabled } from "@/lib/assessments/wave-public-campaign-lifecycle-flags";
 
 function withoutInvitedWelcomeSnapshot<
   T extends { invitedWelcomeSnapshot?: unknown },
@@ -765,16 +766,6 @@ export async function DELETE(
 
     const { id } = await params;
     const expectedStatus = new URL(request.url).searchParams.get("expectedStatus");
-    if (
-      expectedStatus !== null &&
-      expectedStatus !== "DRAFT" &&
-      expectedStatus !== "CLOSED"
-    ) {
-      return NextResponse.json(
-        { success: false, error: "Invalid expected campaign status" },
-        { status: 400 }
-      );
-    }
 
     // Load the LIVE campaign (soft-deleted → null → 404). A deleted or
     // non-existent campaign is treated identically.
@@ -782,8 +773,9 @@ export async function DELETE(
       id: string;
       createdByCoachId: string | null;
       status: "DRAFT" | "ACTIVE" | "CLOSED";
+      accessMode: "INVITED" | "PUBLIC";
     }>(db.assessmentCampaign, id, {
-      select: { id: true, createdByCoachId: true, status: true },
+      select: { id: true, createdByCoachId: true, status: true, accessMode: true },
     });
     if (!campaign) {
       return NextResponse.json(
@@ -807,13 +799,37 @@ export async function DELETE(
       );
     }
 
+    const lifecyclePublic =
+      campaign.accessMode === "PUBLIC" && isPublicCampaignLifecycleEnabled();
+    if (
+      lifecyclePublic &&
+      expectedStatus !== null &&
+      expectedStatus !== "DRAFT" &&
+      expectedStatus !== "CLOSED"
+    ) {
+      return NextResponse.json(
+        { success: false, error: "Invalid expected campaign status" },
+        { status: 400 }
+      );
+    }
+    if (lifecyclePublic && campaign.status === "ACTIVE") {
+      return NextResponse.json(
+        { success: false, code: "CAMPAIGN_STATUS_CHANGED" },
+        { status: 409 }
+      );
+    }
+
     // Soft-delete only — responses/invitations are preserved. Existing callers
     // may delete any state; lifecycle UIs can opt into an atomic status
     // precondition so a concurrently published campaign is not removed.
     const deletedAt = new Date();
-    if (expectedStatus) {
+    if (lifecyclePublic) {
       const result = await db.assessmentCampaign.updateMany({
-        where: { id, deletedAt: null, status: expectedStatus },
+        where: {
+          id,
+          deletedAt: null,
+          status: expectedStatus ?? campaign.status,
+        },
         data: { deletedAt },
       });
       if (result.count !== 1) {

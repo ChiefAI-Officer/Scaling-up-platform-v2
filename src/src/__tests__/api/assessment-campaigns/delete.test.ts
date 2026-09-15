@@ -52,10 +52,15 @@ jest.mock("@/lib/rate-limit", () => ({
   })),
 }));
 
+jest.mock("@/lib/assessments/wave-public-campaign-lifecycle-flags", () => ({
+  isPublicCampaignLifecycleEnabled: jest.fn(),
+}));
+
 import { DELETE } from "@/app/api/assessment-campaigns/[id]/route";
 import { POST as PUBLISH } from "@/app/api/admin/public-campaigns/[id]/publish/route";
 import { db } from "@/lib/db";
 import { getApiActor } from "@/lib/auth/authorization";
+import { isPublicCampaignLifecycleEnabled } from "@/lib/assessments/wave-public-campaign-lifecycle-flags";
 
 const adminActor = {
   userId: "admin-1",
@@ -90,6 +95,7 @@ function delReq(expectedStatus?: "DRAFT" | "CLOSED"): Request {
 beforeEach(() => {
   jest.clearAllMocks();
   allowRateLimit = true;
+  (isPublicCampaignLifecycleEnabled as jest.Mock).mockReturnValue(false);
 });
 
 describe("DELETE /api/assessment-campaigns/[id]", () => {
@@ -163,12 +169,59 @@ describe("DELETE /api/assessment-campaigns/[id]", () => {
     expect(res.status).toBe(200);
   });
 
-  it("atomically rejects deletion when the campaign status changed", async () => {
+  it("rejects direct deletion of a lifecycle-enabled ACTIVE public campaign", async () => {
+    (isPublicCampaignLifecycleEnabled as jest.Mock).mockReturnValue(true);
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    (db.assessmentCampaign.findFirst as jest.Mock).mockResolvedValue({
+      id: "c1",
+      createdByCoachId: null,
+      status: "ACTIVE",
+      accessMode: "PUBLIC",
+      deletedAt: null,
+    });
+
+    const res = await DELETE(delReq() as never, params("c1"));
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({
+      success: false,
+      code: "CAMPAIGN_STATUS_CHANGED",
+    });
+    expect(db.assessmentCampaign.update).not.toHaveBeenCalled();
+    expect(db.assessmentCampaign.updateMany).not.toHaveBeenCalled();
+    expect(db.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it("soft-deletes a lifecycle-enabled DRAFT public campaign conditionally", async () => {
+    (isPublicCampaignLifecycleEnabled as jest.Mock).mockReturnValue(true);
     (getApiActor as jest.Mock).mockResolvedValue(adminActor);
     (db.assessmentCampaign.findFirst as jest.Mock).mockResolvedValue({
       id: "c1",
       createdByCoachId: null,
       status: "DRAFT",
+      accessMode: "PUBLIC",
+      deletedAt: null,
+    });
+    (db.assessmentCampaign.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+
+    const res = await DELETE(delReq("DRAFT") as never, params("c1"));
+
+    expect(res.status).toBe(200);
+    expect(db.assessmentCampaign.updateMany).toHaveBeenCalledWith({
+      where: { id: "c1", deletedAt: null, status: "DRAFT" },
+      data: { deletedAt: expect.any(Date) },
+    });
+    expect(db.assessmentCampaign.update).not.toHaveBeenCalled();
+  });
+
+  it("atomically rejects deletion when a lifecycle-enabled public campaign status changed", async () => {
+    (isPublicCampaignLifecycleEnabled as jest.Mock).mockReturnValue(true);
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    (db.assessmentCampaign.findFirst as jest.Mock).mockResolvedValue({
+      id: "c1",
+      createdByCoachId: null,
+      status: "DRAFT",
+      accessMode: "PUBLIC",
       deletedAt: null,
     });
     (db.assessmentCampaign.updateMany as jest.Mock).mockResolvedValue({ count: 0 });
@@ -187,16 +240,61 @@ describe("DELETE /api/assessment-campaigns/[id]", () => {
     expect(db.auditLog.create).not.toHaveBeenCalled();
   });
 
-  it("400 for an invalid expected status", async () => {
+  it("keeps legacy any-state deletion for PUBLIC campaigns while the flag is off", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    (db.assessmentCampaign.findFirst as jest.Mock).mockResolvedValue({
+      id: "c1",
+      createdByCoachId: null,
+      status: "ACTIVE",
+      accessMode: "PUBLIC",
+      deletedAt: null,
+    });
+    (db.assessmentCampaign.update as jest.Mock).mockResolvedValue({ id: "c1" });
+
+    const res = await DELETE(delReq() as never, params("c1"));
+
+    expect(res.status).toBe(200);
+    expect(db.assessmentCampaign.update).toHaveBeenCalledTimes(1);
+    expect(db.assessmentCampaign.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("keeps legacy any-state deletion for INVITED campaigns while the flag is on", async () => {
+    (isPublicCampaignLifecycleEnabled as jest.Mock).mockReturnValue(true);
+    (getApiActor as jest.Mock).mockResolvedValue(ownerCoach);
+    (db.assessmentCampaign.findFirst as jest.Mock).mockResolvedValue({
+      id: "c1",
+      createdByCoachId: "coach-1",
+      status: "ACTIVE",
+      accessMode: "INVITED",
+      deletedAt: null,
+    });
+    (db.assessmentCampaign.update as jest.Mock).mockResolvedValue({ id: "c1" });
+
+    const res = await DELETE(delReq() as never, params("c1"));
+
+    expect(res.status).toBe(200);
+    expect(db.assessmentCampaign.update).toHaveBeenCalledTimes(1);
+    expect(db.assessmentCampaign.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("400 for an invalid expected status on a lifecycle-enabled PUBLIC campaign", async () => {
+    (isPublicCampaignLifecycleEnabled as jest.Mock).mockReturnValue(true);
     (getApiActor as jest.Mock).mockResolvedValue(adminActor);
     const request = new Request(
       "http://localhost/api/assessment-campaigns/c1?expectedStatus=ACTIVE",
       { method: "DELETE" },
     );
+    (db.assessmentCampaign.findFirst as jest.Mock).mockResolvedValue({
+      id: "c1",
+      createdByCoachId: null,
+      status: "DRAFT",
+      accessMode: "PUBLIC",
+      deletedAt: null,
+    });
 
     const res = await DELETE(request as never, params("c1"));
     expect(res.status).toBe(400);
-    expect(db.assessmentCampaign.findFirst).not.toHaveBeenCalled();
+    expect(db.assessmentCampaign.findFirst).toHaveBeenCalled();
     expect(db.assessmentCampaign.update).not.toHaveBeenCalled();
     expect(db.assessmentCampaign.updateMany).not.toHaveBeenCalled();
   });
