@@ -1308,6 +1308,7 @@ model AssessmentCampaign {
   openAt              DateTime
   endMode             AssessmentCampaignEndMode
   closeAt             DateTime?
+  closedAt            DateTime?                    // terminal lifecycle transition timestamp
   notifyAdminOnSubmit Boolean                      @default(true)
   // Task O — per-campaign invitation email overrides (null = fall back to template defaults)
   invitationSubject       String?

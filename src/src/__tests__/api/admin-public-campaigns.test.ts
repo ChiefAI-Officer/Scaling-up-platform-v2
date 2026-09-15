@@ -76,6 +76,10 @@ jest.mock("@/lib/assessments/wave-public-campaigns-simple-ui-flags", () => ({
   isPublicCampaignsSimpleUiEnabled: jest.fn(),
 }));
 
+jest.mock("@/lib/assessments/wave-public-campaign-lifecycle-flags", () => ({
+  isPublicCampaignLifecycleEnabled: jest.fn(),
+}));
+
 // ─── imports (after mocks) ───────────────────────────────────────────────────
 import {
   GET as listGet,
@@ -90,6 +94,7 @@ import {
 } from "@/lib/assessments/campaign-create-service";
 import { logAudit } from "@/lib/audit";
 import { isPublicCampaignsSimpleUiEnabled } from "@/lib/assessments/wave-public-campaigns-simple-ui-flags";
+import { isPublicCampaignLifecycleEnabled } from "@/lib/assessments/wave-public-campaign-lifecycle-flags";
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -163,6 +168,7 @@ const mockCampaign = {
   openAt: new Date("2026-07-01"),
   endMode: "OPEN_END",
   closeAt: null,
+  closedAt: null,
   createdAt: new Date(),
   updatedAt: new Date(),
   invitedWelcomeSnapshot: null,
@@ -183,6 +189,7 @@ beforeEach(() => {
   delete process.env.WAVE_INVITATION_BANNER_CANARY;
   delete process.env.WAVE_INVITATION_BANNER_KILL;
   (isPublicCampaignsSimpleUiEnabled as jest.Mock).mockReturnValue(false);
+  (isPublicCampaignLifecycleEnabled as jest.Mock).mockReturnValue(false);
   (resolvePublishedTemplateVersion as jest.Mock).mockResolvedValue(mockVersion);
   (db.assessmentTemplate.findUnique as jest.Mock).mockResolvedValue(
     { ...mockTemplate, disabledAt: null, defaultReportStyle: "MODERN_DASHBOARD" }
@@ -209,9 +216,9 @@ describe("GET /api/admin/public-campaigns — LIST", () => {
     const res = await listGet();
 
     expect(res.status).toBe(200);
-    expect((await res.json()).data[0]).not.toHaveProperty(
-      "invitedWelcomeSnapshot",
-    );
+    const body = await res.json();
+    expect(body.data[0]).not.toHaveProperty("invitedWelcomeSnapshot");
+    expect(body.data[0]).not.toHaveProperty("closedAt");
     expect(db.assessmentCampaign.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
@@ -220,6 +227,29 @@ describe("GET /api/admin/public-campaigns — LIST", () => {
           deletedAt: null,
         },
       }),
+    );
+  });
+
+  it("serializes the persisted lifecycle closure timestamp", async () => {
+    (isPublicCampaignLifecycleEnabled as jest.Mock).mockReturnValue(true);
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    const closedAt = new Date("2026-09-15T01:02:03.000Z");
+    (db.assessmentCampaign.findMany as jest.Mock).mockResolvedValue([
+      {
+        ...mockCampaign,
+        status: "CLOSED",
+        closedAt,
+        reportStyle: "CLASSIC",
+        reportStyleSource: "TEMPLATE_DEFAULT",
+        reportStyleLockedAt: null,
+      },
+    ]);
+
+    const res = await listGet();
+
+    expect((await res.json()).data[0]).toHaveProperty(
+      "closedAt",
+      closedAt.toISOString(),
     );
   });
 

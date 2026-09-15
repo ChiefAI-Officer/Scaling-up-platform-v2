@@ -32,12 +32,21 @@ import {
 import { resolveCampaignReportStyle } from "@/lib/assessments/report-style-policy";
 import { isReportStyleSelectionEnabled } from "@/lib/assessments/wave-report-styles-flags";
 import { isPublicCampaignsSimpleUiEnabled } from "@/lib/assessments/wave-public-campaigns-simple-ui-flags";
+import { isPublicCampaignLifecycleEnabled } from "@/lib/assessments/wave-public-campaign-lifecycle-flags";
 
 function withoutInvitedWelcomeSnapshot<
   T extends { invitedWelcomeSnapshot?: unknown },
 >(campaign: T): Omit<T, "invitedWelcomeSnapshot"> {
   const response = { ...campaign };
   delete response.invitedWelcomeSnapshot;
+  return response;
+}
+
+function withoutLifecycleClosedAt<T extends { closedAt?: unknown }>(
+  campaign: T,
+): Omit<T, "closedAt"> {
+  const response = { ...campaign };
+  delete response.closedAt;
   return response;
 }
 
@@ -100,6 +109,7 @@ export async function GET() {
     }
 
     const simpleUiEnabled = isPublicCampaignsSimpleUiEnabled();
+    const lifecycleEnabled = isPublicCampaignLifecycleEnabled();
     const campaigns = await db.assessmentCampaign.findMany({
       where: {
         accessMode: "PUBLIC",
@@ -158,8 +168,11 @@ export async function GET() {
         delete campaignPayload.version;
         const responseCount = campaignPayload._count?.submissions ?? 0;
         if (simpleUiEnabled) delete campaignPayload._count;
+        const visibleCampaignPayload = lifecycleEnabled
+          ? campaignPayload
+          : withoutLifecycleClosedAt(campaignPayload);
         return {
-          ...campaignPayload,
+          ...visibleCampaignPayload,
           ...(simpleUiEnabled ? { responseCount } : {}),
           reportStylesAvailable,
           ...(reportStylesAvailable

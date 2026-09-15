@@ -12,6 +12,7 @@ import {
 
 interface PublicCampaignListProps {
   createdCampaignId?: string;
+  lifecycleActionsEnabled?: boolean;
   responsiveEnabled?: boolean;
 }
 
@@ -25,6 +26,7 @@ const cellClassName =
 
 export function PublicCampaignList({
   createdCampaignId,
+  lifecycleActionsEnabled = false,
   responsiveEnabled = false,
 }: PublicCampaignListProps) {
   const [campaigns, setCampaigns] = useState<PublicCampaignViewModel[]>([]);
@@ -34,7 +36,12 @@ export function PublicCampaignList({
   const [visitedResponseIds, setVisitedResponseIds] = useState<ReadonlySet<string>>(
     () => new Set(),
   );
+  const [deletedCampaign, setDeletedCampaign] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
   const createdStatusRef = useRef<HTMLDivElement>(null);
+  const deletedStatusRef = useRef<HTMLDivElement>(null);
   const origin = typeof window === "undefined" ? "" : window.location.origin;
   const createdCampaignExists = campaigns.some(
     (campaign) => campaign.id === createdCampaignId,
@@ -71,15 +78,38 @@ export function PublicCampaignList({
     }
   }, [createdCampaignExists, loading]);
 
+  useEffect(() => {
+    if (deletedCampaign) {
+      deletedStatusRef.current?.focus();
+    }
+  }, [deletedCampaign]);
+
   function patchCampaign(
     campaignId: string,
-    updates: Pick<PublicCampaignViewModel, "status">,
+    updates: Pick<PublicCampaignViewModel, "status"> &
+      Partial<Pick<PublicCampaignViewModel, "closedAt">>,
   ) {
     setCampaigns((current) =>
       current.map((campaign) =>
         campaign.id === campaignId ? { ...campaign, ...updates } : campaign,
       ),
     );
+  }
+
+  function removeCampaign(campaignId: string, campaignName: string) {
+    setCampaigns((current) =>
+      current.filter((campaign) => campaign.id !== campaignId),
+    );
+    setResponsesExpandedId((current) =>
+      current === campaignId ? null : current,
+    );
+    setVisitedResponseIds((current) => {
+      if (!current.has(campaignId)) return current;
+      const next = new Set(current);
+      next.delete(campaignId);
+      return next;
+    });
+    setDeletedCampaign({ id: campaignId, name: campaignName });
   }
 
   function toggleResponses(campaignId: string) {
@@ -113,6 +143,17 @@ export function PublicCampaignList({
 
   return (
     <section aria-label="Public campaigns">
+      {deletedCampaign && (
+        <div
+          ref={deletedStatusRef}
+          role="status"
+          tabIndex={-1}
+          className="mb-4 rounded-md border border-success/20 bg-success/10 px-4 py-3 text-sm font-semibold text-success"
+        >
+          Campaign &quot;{deletedCampaign.name}&quot; deleted.
+        </div>
+      )}
+
       {createdCampaignExists && (
         <div
           ref={createdStatusRef}
@@ -238,8 +279,12 @@ export function PublicCampaignList({
                         onCampaignUpdated={(updates) =>
                           patchCampaign(campaign.id, updates)
                         }
+                        onCampaignDeleted={() =>
+                          removeCampaign(campaign.id, campaign.name)
+                        }
                         onToggleResponses={() => toggleResponses(campaign.id)}
                         responsesExpanded={responsesExpanded}
+                        lifecycleActionsEnabled={lifecycleActionsEnabled}
                         responsiveEnabled={responsiveEnabled}
                       />
                     </td>

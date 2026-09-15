@@ -26,6 +26,7 @@ import {
 } from "@/lib/assessments/access-control";
 import { logAudit } from "@/lib/audit";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
+import { isPublicCampaignLifecycleEnabled } from "@/lib/assessments/wave-public-campaign-lifecycle-flags";
 
 const CloseBodySchema = z.object({
   reason: z
@@ -33,6 +34,10 @@ const CloseBodySchema = z.object({
     .trim()
     .max(500, "Reason must be 500 characters or fewer")
     .optional(),
+});
+
+const CloseQuerySchema = z.object({
+  expectedStatus: z.enum(["DRAFT", "ACTIVE"]).optional(),
 });
 
 export async function POST(
@@ -57,6 +62,7 @@ export async function POST(
     }
 
     const { id: campaignId } = await params;
+    const expectedStatus = new URL(request.url).searchParams.get("expectedStatus");
 
     // Parse the body. Treat any parse failure (missing body, empty body,
     // bad JSON) as `{}` — the schema's reason field is optional. Only
@@ -95,7 +101,7 @@ export async function POST(
 
     const campaign = await db.assessmentCampaign.findUnique({
       where: { id: campaignId },
-      select: { id: true, status: true },
+      select: { id: true, status: true, accessMode: true, closedAt: true },
     });
     if (!campaign) {
       return NextResponse.json(
@@ -103,38 +109,110 @@ export async function POST(
         { status: 404 }
       );
     }
+    const lifecyclePublic =
+      campaign.accessMode === "PUBLIC" && isPublicCampaignLifecycleEnabled();
+    const parsedQuery = CloseQuerySchema.safeParse({
+      expectedStatus: expectedStatus ?? undefined,
+    });
+    if (lifecyclePublic && !parsedQuery.success) {
+      return NextResponse.json(
+        { success: false, error: "Invalid expected campaign status" },
+        { status: 400 }
+      );
+    }
+    const requestedCloseStatus = parsedQuery.success
+      ? parsedQuery.data.expectedStatus ?? null
+      : null;
     if (campaign.status === "CLOSED") {
       return NextResponse.json(
-        { success: false, code: "ALREADY_CLOSED" },
+        {
+          success: false,
+          code: "ALREADY_CLOSED",
+          ...(lifecyclePublic
+            ? {
+                data: {
+                  id: campaign.id,
+                  status: "CLOSED",
+                  closedAt: campaign.closedAt?.toISOString() ?? null,
+                },
+              }
+            : {}),
+        },
         { status: 409 }
       );
     }
 
     const fromStatus = campaign.status;
     const now = new Date();
-    const updated = await db.assessmentCampaign.update({
-      where: { id: campaignId },
-      data: { status: "CLOSED" },
-      select: { id: true, status: true },
-    });
+    const auditChanges = {
+      fromStatus,
+      toStatus: "CLOSED",
+      reason,
+    };
+    if (lifecyclePublic) {
+      const result = await db.$transaction(async (tx) => {
+        const transition = await tx.assessmentCampaign.updateMany({
+          where: {
+            id: campaignId,
+            deletedAt: null,
+            status: requestedCloseStatus ?? fromStatus,
+          },
+          data: { status: "CLOSED", closedAt: now },
+        });
+        if (transition.count !== 1) return transition;
 
-    await logAudit({
-      entityType: "AssessmentCampaign",
-      entityId: campaign.id,
-      action: "CLOSE",
-      performedBy: actor.email,
-      changes: {
-        fromStatus,
-        toStatus: "CLOSED",
-        reason,
-      },
-    });
+        await tx.auditLog.create({
+          data: {
+            entityType: "AssessmentCampaign",
+            entityId: campaign.id,
+            action: "CLOSE",
+            performedBy: actor.email,
+            changes: JSON.stringify(auditChanges),
+          },
+        });
+        return transition;
+      });
+      if (result.count !== 1) {
+        const authoritative = await db.assessmentCampaign.findUnique({
+          where: { id: campaignId },
+          select: { id: true, status: true, closedAt: true },
+        });
+        return NextResponse.json(
+          {
+            success: false,
+            code: "ALREADY_CLOSED",
+            ...(authoritative?.status === "CLOSED"
+              ? {
+                  data: {
+                    id: authoritative.id,
+                    status: "CLOSED",
+                    closedAt: authoritative.closedAt?.toISOString() ?? null,
+                  },
+                }
+              : {}),
+          },
+          { status: 409 }
+        );
+      }
+    } else {
+      await db.assessmentCampaign.update({
+        where: { id: campaignId },
+        data: { status: "CLOSED" },
+      });
+      await logAudit({
+        entityType: "AssessmentCampaign",
+        entityId: campaign.id,
+        action: "CLOSE",
+        performedBy: actor.email,
+        changes: auditChanges,
+      });
+    }
 
     return NextResponse.json({
       success: true,
       data: {
-        id: updated.id,
-        status: updated.status,
+        id: campaignId,
+        status: "CLOSED",
         closedAt: now.toISOString(),
       },
     });

@@ -11,6 +11,7 @@ const campaigns: PublicCampaignViewModel[] = [
     status: "DRAFT",
     openAt: "2020-08-01T12:00:00.000Z",
     closeAt: null,
+    closedAt: null,
     responseCount: 0,
     reportStyle: "CLASSIC",
     reportStyleSource: "TEMPLATE_DEFAULT",
@@ -34,6 +35,7 @@ const campaigns: PublicCampaignViewModel[] = [
     status: "ACTIVE",
     openAt: "2020-08-01T12:00:00.000Z",
     closeAt: "2030-09-30T12:00:00.000Z",
+    closedAt: null,
     responseCount: 24,
     reportStyle: "EXECUTIVE_BOARDROOM",
     reportStyleSource: "CAMPAIGN_OVERRIDE",
@@ -52,6 +54,7 @@ const campaigns: PublicCampaignViewModel[] = [
     status: "CLOSED",
     openAt: "2020-01-01T12:00:00.000Z",
     closeAt: "2026-07-31T12:00:00.000Z",
+    closedAt: null,
     responseCount: 86,
     reportStyle: "MODERN_DASHBOARD",
     reportStyleSource: "TEMPLATE_DEFAULT",
@@ -246,6 +249,7 @@ describe("PublicCampaignList", () => {
     );
     expect(within(table).getByText("Opens when published · No end date")).toBeInTheDocument();
     expect(within(table).getByText("Open until Sep 30, 2030")).toBeInTheDocument();
+    expect(within(table).getByText("Closed Jul 31, 2026")).toBeInTheDocument();
     expect(within(table).getByText("24 responses")).toBeInTheDocument();
     expect(within(table).getByText("Assessment unavailable")).toBeInTheDocument();
 
@@ -327,6 +331,129 @@ describe("PublicCampaignList", () => {
       "/api/admin/public-campaigns/campaign-new/publish",
       { method: "POST" },
     );
+  });
+
+  it("replaces a closed row locally without presenting its cutoff as a closure date", async () => {
+    const activeCampaign = campaigns[1];
+    global.fetch = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) === "/api/admin/public-campaigns" && !init?.method) {
+        return response({ success: true, data: [activeCampaign] });
+      }
+      return response({
+        success: true,
+        data: {
+          id: "campaign-live",
+          status: "CLOSED",
+          closedAt: "2026-09-11T08:00:00.000Z",
+        },
+      });
+    }) as jest.MockedFunction<typeof fetch>;
+
+    render(<PublicCampaignList lifecycleActionsEnabled />);
+
+    const campaignName = await screen.findByText("Quarterly habits check");
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    fireEvent.click(
+      within(await screen.findByRole("dialog")).getByRole("button", {
+        name: "Close campaign",
+      }),
+    );
+
+    const row = campaignName.closest("tr");
+    expect(row).not.toBeNull();
+    await waitFor(() => {
+      expect(within(row!).getByText("Closed", { selector: "span" })).toBeInTheDocument();
+      expect(within(row!).getByText("Closed Sep 11, 2026", { selector: "td" })).toBeInTheDocument();
+      expect(within(row!).queryByText("Closed Sep 30, 2030")).not.toBeInTheDocument();
+    });
+    expect(within(row!).getByRole("button", { name: "Delete" })).toBeInTheDocument();
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("removes only the deleted row and collapses its expanded responses", async () => {
+    global.fetch = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/admin/public-campaigns") {
+        return response({ success: true, data: campaigns });
+      }
+      if (url.endsWith("/submissions")) {
+        return response({ success: true, data: [] });
+      }
+      if (
+        url === "/api/assessment-campaigns/campaign-closed?expectedStatus=CLOSED" &&
+        init?.method === "DELETE"
+      ) {
+        return response({ success: true, message: "Campaign deleted" });
+      }
+      return response({ success: false }, false, 500);
+    }) as jest.MockedFunction<typeof fetch>;
+
+    render(<PublicCampaignList lifecycleActionsEnabled />);
+
+    const deletedName = await screen.findByText("Annual planning readiness");
+    const deletedRow = deletedName.closest("tr");
+    expect(deletedRow).not.toBeNull();
+    fireEvent.click(
+      within(deletedRow!).getByRole("button", { name: "View responses" }),
+    );
+    expect(await screen.findByText("No responses yet.")).toBeInTheDocument();
+
+    fireEvent.click(within(deletedRow!).getByRole("button", { name: "Delete" }));
+    fireEvent.click(
+      within(await screen.findByRole("dialog")).getByRole("button", {
+        name: "Delete campaign",
+      }),
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByText("Annual planning readiness")).not.toBeInTheDocument();
+    });
+    expect(screen.queryByText("No responses yet.")).not.toBeInTheDocument();
+    expect(screen.getByText("August lead campaign")).toBeInTheDocument();
+    expect(screen.getByText("Quarterly habits check")).toBeInTheDocument();
+    const deletionStatus = screen.getByRole("status");
+    expect(deletionStatus).toHaveTextContent(
+      'Campaign "Annual planning readiness" deleted.',
+    );
+    expect(deletionStatus).toHaveFocus();
+  });
+
+  it("refocuses the deletion announcement for consecutive duplicate names", async () => {
+    const duplicateCampaigns = [
+      { ...campaigns[0], id: "duplicate-draft", name: "Quarterly pulse" },
+      { ...campaigns[2], id: "duplicate-closed", name: "Quarterly pulse" },
+    ];
+    global.fetch = jest.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === "/api/admin/public-campaigns") {
+        return response({ success: true, data: duplicateCampaigns });
+      }
+      return response({ success: true, message: "Campaign deleted" });
+    }) as jest.MockedFunction<typeof fetch>;
+
+    render(<PublicCampaignList lifecycleActionsEnabled />);
+
+    let rows = (await screen.findAllByText("Quarterly pulse")).map((name) =>
+      name.closest("tr"),
+    );
+    fireEvent.click(within(rows[0]!).getByRole("button", { name: "Delete" }));
+    fireEvent.click(
+      within(await screen.findByRole("dialog")).getByRole("button", {
+        name: "Delete campaign",
+      }),
+    );
+    const deletionStatus = await screen.findByRole("status");
+    await waitFor(() => expect(deletionStatus).toHaveFocus());
+
+    rows = screen.getAllByText("Quarterly pulse").map((name) => name.closest("tr"));
+    fireEvent.click(within(rows[0]!).getByRole("button", { name: "Delete" }));
+    fireEvent.click(
+      within(await screen.findByRole("dialog")).getByRole("button", {
+        name: "Delete campaign",
+      }),
+    );
+
+    await waitFor(() => expect(deletionStatus).toHaveFocus());
+    expect(deletionStatus).toHaveTextContent('Campaign "Quarterly pulse" deleted.');
   });
 
   it("keeps visited response panels mounted and makes responses exclusive", async () => {

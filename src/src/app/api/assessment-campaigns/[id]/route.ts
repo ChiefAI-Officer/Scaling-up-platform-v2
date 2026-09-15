@@ -9,10 +9,12 @@
  * DISTINCT ownership predicate — admin/privileged OR the campaign creator
  * coach (createdByCoachId === actor.coachId) — NOT canManageCampaign,
  * because delete is ownership cleanup that must survive a later loss of
- * template/org access. Deletable in ANY state (DRAFT/ACTIVE/CLOSED).
+ * template/org access. Existing callers may delete any state; lifecycle-enabled
+ * PUBLIC campaigns must Close before Delete.
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { db } from "@/lib/db";
 import { updateAssessmentCampaignSchema } from "@/lib/validations";
 import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
@@ -48,6 +50,11 @@ import {
 } from "@/lib/assessments/custom-slides-write";
 import { Prisma } from "@prisma/client";
 import { isInvitationBannerEnabled } from "@/lib/assessments/wave-invitation-banner-flags";
+import { isPublicCampaignLifecycleEnabled } from "@/lib/assessments/wave-public-campaign-lifecycle-flags";
+
+const PublicCampaignDeleteQuerySchema = z.object({
+  expectedStatus: z.enum(["DRAFT", "CLOSED"]).optional(),
+});
 
 function withoutInvitedWelcomeSnapshot<
   T extends { invitedWelcomeSnapshot?: unknown },
@@ -764,6 +771,7 @@ export async function DELETE(
     }
 
     const { id } = await params;
+    const expectedStatus = new URL(request.url).searchParams.get("expectedStatus");
 
     // Load the LIVE campaign (soft-deleted → null → 404). A deleted or
     // non-existent campaign is treated identically.
@@ -771,8 +779,9 @@ export async function DELETE(
       id: string;
       createdByCoachId: string | null;
       status: "DRAFT" | "ACTIVE" | "CLOSED";
+      accessMode: "INVITED" | "PUBLIC";
     }>(db.assessmentCampaign, id, {
-      select: { id: true, createdByCoachId: true, status: true },
+      select: { id: true, createdByCoachId: true, status: true, accessMode: true },
     });
     if (!campaign) {
       return NextResponse.json(
@@ -796,12 +805,52 @@ export async function DELETE(
       );
     }
 
-    // Soft-delete only — responses/invitations are preserved. Deletable in
-    // ANY state (DRAFT/ACTIVE/CLOSED).
-    await db.assessmentCampaign.update({
-      where: { id },
-      data: { deletedAt: new Date() },
+    const lifecyclePublic =
+      campaign.accessMode === "PUBLIC" && isPublicCampaignLifecycleEnabled();
+    const parsedDeleteQuery = PublicCampaignDeleteQuerySchema.safeParse({
+      expectedStatus: expectedStatus ?? undefined,
     });
+    if (lifecyclePublic && !parsedDeleteQuery.success) {
+      return NextResponse.json(
+        { success: false, error: "Invalid expected campaign status" },
+        { status: 400 }
+      );
+    }
+    const requestedDeleteStatus = parsedDeleteQuery.success
+      ? parsedDeleteQuery.data.expectedStatus ?? null
+      : null;
+    if (lifecyclePublic && campaign.status === "ACTIVE") {
+      return NextResponse.json(
+        { success: false, code: "CAMPAIGN_STATUS_CHANGED" },
+        { status: 409 }
+      );
+    }
+
+    // Soft-delete only — responses/invitations are preserved. Existing callers
+    // may delete any state; lifecycle UIs can opt into an atomic status
+    // precondition so a concurrently published campaign is not removed.
+    const deletedAt = new Date();
+    if (lifecyclePublic) {
+      const result = await db.assessmentCampaign.updateMany({
+        where: {
+          id,
+          deletedAt: null,
+          status: requestedDeleteStatus ?? campaign.status,
+        },
+        data: { deletedAt },
+      });
+      if (result.count !== 1) {
+        return NextResponse.json(
+          { success: false, code: "CAMPAIGN_STATUS_CHANGED" },
+          { status: 409 }
+        );
+      }
+    } else {
+      await db.assessmentCampaign.update({
+        where: { id },
+        data: { deletedAt },
+      });
+    }
 
     await logAudit({
       entityType: "AssessmentCampaign",
