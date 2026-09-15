@@ -107,11 +107,14 @@ export async function POST(
     }
     const lifecyclePublic =
       campaign.accessMode === "PUBLIC" && isPublicCampaignLifecycleEnabled();
+    const requestedCloseStatus =
+      expectedStatus === "DRAFT" || expectedStatus === "ACTIVE"
+        ? expectedStatus
+        : null;
     if (
       lifecyclePublic &&
       expectedStatus !== null &&
-      expectedStatus !== "DRAFT" &&
-      expectedStatus !== "ACTIVE"
+      requestedCloseStatus === null
     ) {
       return NextResponse.json(
         { success: false, error: "Invalid expected campaign status" },
@@ -144,7 +147,7 @@ export async function POST(
         where: {
           id: campaignId,
           deletedAt: null,
-          status: expectedStatus ?? fromStatus,
+          status: requestedCloseStatus ?? fromStatus,
         },
         data: { status: "CLOSED", closedAt: now },
       });

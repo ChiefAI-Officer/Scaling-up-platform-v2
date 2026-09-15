@@ -801,11 +801,14 @@ export async function DELETE(
 
     const lifecyclePublic =
       campaign.accessMode === "PUBLIC" && isPublicCampaignLifecycleEnabled();
+    const requestedDeleteStatus =
+      expectedStatus === "DRAFT" || expectedStatus === "CLOSED"
+        ? expectedStatus
+        : null;
     if (
       lifecyclePublic &&
       expectedStatus !== null &&
-      expectedStatus !== "DRAFT" &&
-      expectedStatus !== "CLOSED"
+      requestedDeleteStatus === null
     ) {
       return NextResponse.json(
         { success: false, error: "Invalid expected campaign status" },
@@ -828,7 +831,7 @@ export async function DELETE(
         where: {
           id,
           deletedAt: null,
-          status: expectedStatus ?? campaign.status,
+          status: requestedDeleteStatus ?? campaign.status,
         },
         data: { deletedAt },
       });

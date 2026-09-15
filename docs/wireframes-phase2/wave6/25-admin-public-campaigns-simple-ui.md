@@ -6,7 +6,7 @@
 - Primary action: Create campaign
 - Columns: Campaign, Assessment, Status, Availability, Responses, Actions
 - Draft actions: Publish, Delete
-- Live actions: Copy link, View responses, Close campaign
+- Live actions: Copy link, View responses, Close
 - Closed actions: View responses, Delete
 
 ## Create state
@@ -53,15 +53,19 @@ wizard.
 - **Inline responses:** `View responses` expands the selected campaign in place and
   lazy-loads its response rows. Each response retains its existing details and
   `View report` action; no separate response-management page is introduced.
-- **Terminal close:** `Close campaign` is available only for Live campaigns. Its
-  confirmation explains that the public link and new responses stop immediately
-  and that the action cannot be undone. The scheduled intake cutoff remains
-  unchanged in storage; lifecycle-enabled Closed rows show `Closed` without
-  presenting that cutoff as an actual closure date.
-- **Soft delete:** `Delete` is available only for Draft and Closed campaigns. Its
-  confirmation states how many responses are retained but made unreachable from
-  this page, and that the action cannot be undone. A status announcement receives
-  focus after the row is removed.
+- **Terminal close:** `Close` is available only for Live campaigns. `Close
+  {campaign name}?` explains that the public link stops immediately, people who
+  already started cannot submit, collected responses are kept, and the action
+  cannot be undone. An optional **Reason** is limited to 500 characters and appears
+  in the audit log. The scheduled intake cutoff remains unchanged in `closeAt`;
+  the real transition is stored separately in `closedAt`. Closed availability
+  prefers `closedAt`, falls back to `closeAt` for legacy rows, then bare `Closed`.
+- **Soft delete:** `Delete` is available only for Draft and Closed campaigns, and
+  the server rejects deletion of a flagged Live public campaign even from a stale
+  or direct client. For zero responses, confirmation says the campaign will be
+  removed from this page. Otherwise it states how many responses are kept but made
+  unreachable from this page. Both versions say the action cannot be undone. A
+  status announcement receives focus after the row is removed.
 - **Narrow-laptop reflow:** at 1024 px, each campaign row reflows into a labelled
   grid with actions on their own line. Controls may wrap but must not overlap or
   clip; the creation form remains legible without horizontal scrolling.
