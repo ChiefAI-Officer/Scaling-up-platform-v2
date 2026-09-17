@@ -72,7 +72,7 @@ the panel are what make the member path findable in spite of it.
   to remember.
 - Field: Email address
 - Primary action: Email me a link
-- Footer note: Links work once and expire after 14 days.
+- Footer note: Links work once and expire after 1 hour.
 - **Escape hatch, persistent:** Coach or staff? Sign in with your password →
 
 ### Why the audience line and the escape hatch are load-bearing
@@ -170,7 +170,7 @@ US-time expiry has no way to know when their link dies.
 
 - Heading: Check your email
 - Body: If {email} is on file, we've just sent a sign-in link. It works once and
-  expires in 14 days.
+  expires in 1 hour.
 - Secondary action: Send another link
 - **Escape hatch, repeated:** Coaches and staff sign in with a password instead →
 - The body copy is identical whether or not the address exists. It must stay that
@@ -184,7 +184,7 @@ came to the wrong door.
 
 - Route: `/member/sign-in` with an exhausted, expired, or unrecognised token
 - Heading: This link is no longer valid
-- Body: Sign-in links work once and expire after 14 days. Request a new one and
+- Body: Sign-in links work once and expire after 1 hour. Request a new one and
   we'll email it to you.
 - Primary action: Email me a new link
 

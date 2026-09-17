@@ -11,9 +11,11 @@ they are the CEO.
 
 **Architecture:** A new `(member)` route group whose every endpoint lives under `/member/`, so
 a sealed iron-session cookie can be path-scoped there and never reach an admin or coach route.
-The emailed credential travels in the **URL fragment** and is exchanged client-side for that
-session, reusing the invited-survey pattern so the raw token never reaches a server log or a
-`Referer` header. Report rendering goes through the **existing** ADR-0012 report gate, widened
+The emailed credential travels in the **query string**, and landing on the link does nothing:
+redemption happens only on a POST raised by an explicit button click, which is the documented
+defence against email scanners that open links. The token is redacted from our own request logs
+and the page sends `Referrer-Policy: no-referrer`. Its real safety property is a **one-hour,
+single-use** life, not concealment. Report rendering goes through the **existing** ADR-0012 report gate, widened
 by three additive changes (a `"member"` surface, an optional `auditPrincipal`, `"tolerate"` on
 no actor) and served by two new loaders that own their own authorization — membership of a
 freshly resolved identity **set**, re-checked on every render. Renderers, report config, and
@@ -41,8 +43,13 @@ PostgreSQL (Neon), `iron-session`, Jest/Testing Library, Playwright, Tailwind + 
   set. A session proves someone signed in on this browser, never *whose* report is requested.
 - **No member report content in `sessionStorage`, `localStorage`, or any client store.** This
   portal exists partly because ADR-0027 needed one; it must not inherit that store.
-- **The raw token never touches the server outside the exchange POST body** — not in a path, not
-  in a query string, not in a log, not in an email subject, not in a response body.
+- **A GET never redeems a token.** Redemption happens only on a POST raised by the button. A
+  scanner that opens the link must leave it usable. This is the single rule the whole
+  query-string form rests on.
+- **The raw token never appears in a log, an email subject, or any response body.** It arrives in
+  the query string by design, so `t` must be in the request-log redaction list, the sign-in page
+  must send `Referrer-Policy: no-referrer`, and the URL must be replaced immediately after
+  redemption so a spent token does not sit in the address bar or browser history.
 - **The coach never receives a member's sign-in link** in any form.
 - **The sign-in response is identical** in status, body, and copy for unknown, ineligible, and
   eligible addresses, and when throttled. Only an *issued* link is audited, and a refusal never
@@ -72,7 +79,7 @@ PostgreSQL (Neon), `iron-session`, Jest/Testing Library, Playwright, Tailwind + 
 - `src/src/lib/assessments/member-report.ts` — `getMemberRespondentReport`, `getMemberGroupReport`.
 - `src/src/lib/assessments/member-report-gate.ts` — the two member gate adapters.
 - `src/src/app/(member)/layout.tsx` — public brand chrome, no admin shell.
-- `src/src/app/(member)/member/sign-in/page.tsx` — request · Link-sent · Link-not-valid · fragment exchange host.
+- `src/src/app/(member)/member/sign-in/page.tsx` — request · Link-sent · Link-not-valid · token landing with the click-to-redeem button.
 - `src/src/app/(member)/member/sign-in/request/route.ts` — POST, always the same response.
 - `src/src/app/(member)/member/sign-in/exchange/route.ts` — POST, atomic redeem → session.
 - `src/src/app/(member)/member/sign-out/route.ts` — POST, destroy session.
@@ -149,8 +156,10 @@ Ships the entire mechanism. 21 of 22 live roster members exercise it.
 `__tests__/lib/members/sign-in-token.test.ts`
 
 - [ ] Add `MemberSignInToken` exactly as specified (§7.1) — keyed on `normalizedEmail`, **not**
-      on a respondent id. Additive; no existing table is touched.
+      on a respondent id, with a **1-hour** expiry. Additive; no existing table is touched.
 - [ ] Generate the migration; run the Migration Safety Gate.
+- [ ] RED: the issued expiry is **1 hour**, asserted as a constant the test names — not 14 days.
+      A test that reads the constant back from the implementation proves nothing; pin the number.
 - [ ] RED: `issue()` returns a raw token and persists only its sha256; the raw value appears
       nowhere in the row. `redeem()` succeeds once and the second call fails. **Two concurrent
       redeems of the same token: exactly one wins** (assert on the `updateMany` count, not on
@@ -237,9 +246,15 @@ This is a refactor of a load-bearing file. It ships alone, guarded by the existi
 **Files:** `lib/members/sign-in-email.ts`, `__tests__/lib/members/sign-in-email.test.ts`
 
 - [ ] RED: subject is `Your Scaling Up reports`; the body carries the Scaling Up mark and **no
-      coach logo**; the fine print **names a timezone** and never prints a bare timestamp; the
-      closing "Didn't ask for this?" line is present; the raw token appears in the href **and
-      nowhere else** — not in the subject, not in the text alternative, not in an `alt`.
+      coach logo**; the fine print reads `expires in 1 hour — at {time} {timezone}` and **names
+      the zone**, never a bare timestamp; the closing "Didn't ask for this?" line is present; the
+      raw token appears in the href **and nowhere else** — not in the subject, not in the text
+      alternative, not in an `alt`.
+- [ ] RED: the link is an HTML `<a href>`, and the raw URL does **not** appear as bare text in
+      either part. Outlook's documented autolink truncates a bare-text URL at the first space,
+      and RFC 5322's 78-char line guidance means a sender that hard-wraps splits a long URL
+      permanently. Our invitation email does both of these things today
+      (`invitation-email.ts:226` and `:342`) — do not copy the pattern here.
 - [ ] RED: the rendered body shares no distinguishing sentence with the invitation email (assert
       against `invitation-email.ts`'s output for the same recipient) — two emails, two jobs.
 - [ ] GREEN: pure module, no I/O, following `report-email.ts` inline-style conventions and the
@@ -271,9 +286,15 @@ This is a refactor of a load-bearing file. It ships alone, guarded by the existi
       completed-nothing, and eligible; a throttled request returns the same again; the response
       never reveals whether an email was sent.
 - [ ] RED: rate limiting keys on a **hashed** address and on IP, `RateLimits.auth`.
-- [ ] RED: `exchange` with a valid token sets the session and returns success; expired, already
-      redeemed, unknown, and malformed all return one indistinguishable failure; a token whose
-      address is no longer eligible fails; the raw token is never echoed in the response.
+- [ ] RED (the load-bearing one): **a GET to `/member/sign-in?t=<valid>` does not redeem it.**
+      After the GET, the token is still unused and a subsequent POST succeeds. Name the test so
+      nobody "optimises" the click away — this is what stops an email scanner burning the link
+      before the member reaches it.
+- [ ] RED: `exchange` (POST) with a valid token sets the session and returns success; expired,
+      already redeemed, unknown, and malformed all return one indistinguishable failure; a token
+      whose address is no longer eligible fails; the raw token is never echoed in the response.
+- [ ] RED: the sign-in page response carries `Referrer-Policy: no-referrer`, and `t` is redacted
+      wherever the request path is logged.
 - [ ] RED: `sign-out` destroys the cookie and is a no-op without one.
 - [ ] RED: all three 404 when the flag is off.
 - [ ] GREEN: implement. Zod-validate the bodies. The exchange audits `MEMBER_LINK_REDEEMED`.
@@ -300,9 +321,12 @@ This is a refactor of a load-bearing file. It ships alone, guarded by the existi
       at 375 px with nothing clipped or overlapping.
 - [ ] RED: `/member/reports/[submissionId]` renders `BrandedReport` for an owned report and
       404s for one that is not owned, for one on a deleted campaign, and with no session.
+- [ ] RED: arriving with `?t=<token>` shows a single **View my reports** button and no report
+      data; the redemption POST fires only from that click; after success the URL is replaced so
+      the spent token leaves the address bar.
 - [ ] GREEN: server components throughout; ownership decided per request from the freshly
-      resolved set; the fragment exchange runs client-side in the sign-in page only. **No report
-      content is written to any client-side store.**
+      resolved set; the redemption POST is the only client-side behaviour on the sign-in page.
+      **No report content is written to any client-side store.**
 - [ ] Verify · commit.
 
 ### Task 13: The `/login` member panel
@@ -390,8 +414,13 @@ against a single observation.
       per-person sends to one; a not-yet-completed respondent is refused; **the response body
       contains no token and no link, in any shape**; the caller must pass the campaign's existing
       authorization; the flag off → 404.
-- [ ] RED: a coach-issued token obeys every rule a self-issued one does — single use, same
-      expiry, same completion requirement, no extension.
+- [ ] RED: a coach-issued token obeys every rule a self-issued one does — single use, the same
+      one-hour expiry, same completion requirement, no extension.
+- [ ] ⚠️ Surface to the operator before building: a bulk send now hands out **one-hour** links.
+      A coach who sends at the end of the day reaches members whose links expire before they
+      read the mail. The recovery is self-service (**Send another link**), but the bulk button's
+      confirmation copy should say the links are short-lived rather than let a coach assume
+      otherwise.
 - [ ] GREEN: reuse `sendMemberSignInLink` with `via: "COACH"`. One template, three triggers.
 - [ ] Verify · commit.
 
@@ -425,5 +454,7 @@ against a single observation.
       boundary (Task 6).
 - [ ] No test asserts that the sign-in response *differs* for a known address.
 - [ ] No new code path writes a member's address to an audit row on a refusal.
+- [ ] A GET never redeems — asserted explicitly, not implied by the UI shape.
+- [ ] The one-hour expiry is pinned as a literal in at least one test.
 - [ ] The raw token is asserted absent from every response body, log, and email field but the href.
 - [ ] Every claim of "verified" in the CHANGELOG entry corresponds to a command that was run.

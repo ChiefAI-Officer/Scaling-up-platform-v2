@@ -54,6 +54,7 @@ Recorded up front because each looks like a defect to anyone comparing the two s
 |---|---|---|
 | `POST /login` routes by email and returns six distinguishable answers, including `Login failed` for an unknown address | The front door never probes the email; the member path is a link the person clicks | That endpoint is a user-enumeration oracle. Our existing "Invalid email or password" already avoids it and must not be undone |
 | Expiry printed as `2026-09-29 15:39:13`, no timezone | The expiry line names a zone explicitly | A member in Sydney reading a US-time expiry has no way to know when their link dies — this is punch-list item 1 arriving inside the feature we are copying |
+| Sign-in link valid **14 days** | **1 hour** | 14 days is a standing key to someone's reports sitting in a mailbox that may be shared, forwarded, archived or breached. Every auth vendor surveyed uses minutes to an hour |
 | Members may optionally set a password | Emailed link only | Removes a whole category of support request, and Jeff's framing was *"there's no username, no password, nothing"* |
 | Level × report-type × scope access matrix, plus person-to-person shares | One fixed rule | Jeff chose the smaller v1 and asked that the gap be documented — Deltas 1 and 2 |
 
@@ -73,7 +74,7 @@ share it. Uniqueness is only `(organizationId, dedupeSource, dedupeValue)`, so o
 legitimately map to several rows across organizations. The identity is the address; the set is
 resolved fresh on every access and is never collapsed to one row.
 
-**Member sign-in link.** A single-use, 14-day, DB-backed credential emailed to an address,
+**Member sign-in link.** A single-use, one-hour, DB-backed credential emailed to an address,
 which can be exchanged once for a member session. Distinct from the **invitation link**
 (reusable, campaign-scoped, says *take this assessment*). *Avoid:* "magic link" — the
 member-facing word is **sign-in link**.
@@ -105,25 +106,54 @@ precedent exactly; there is no `/api/member/*`.
 `/login` gains one member panel beneath a divider. `(member)/layout.tsx` carries the public
 brand chrome (`su-public-brand.css`) and none of the admin shell.
 
-### 5.1 The link is delivered in the URL fragment
+### 5.1 The link carries its secret in the query string, and a GET never redeems it
 
-The emailed link is `{APP_URL}/member/sign-in#t=<raw token>`. The page reads the fragment
-client-side, POSTs it to `/member/sign-in/exchange`, and on success replaces the URL and
-navigates to `/member/reports`.
+The emailed link is `{APP_URL}/member/sign-in?t=<raw token>`. Landing on it **does nothing**.
+The page shows a single **View my reports** button; clicking it POSTs the token to
+`/member/sign-in/exchange`, which redeems it and mints the session.
 
-This is the invited-survey exchange pattern (`invitation-tokens.ts` + `invitation-cookie.ts`),
-reused for the reason it was chosen there: **a fragment is never sent to the server**, so the
-raw credential cannot land in an access log, a proxy log, or a `Referer` header. A path- or
-query-parameter token — which is what Esperto uses — lands in all three.
+**Why the query string and not the URL fragment.** The fragment was the initial choice, on the
+reasoning that a fragment is never transmitted to a server and so cannot reach an access log or
+a `Referer` header. Research on 2026-09-17 (`docs/research/2026-09-17-email-link-rewriting-and-url-fragments.md`)
+established three things that overturn it:
 
-Two consequences to carry forward, both already true of the invited survey:
+1. **A fragment hides nothing from the scanner.** Safe Links reads the whole email body in order
+   to decide what to rewrite, so Microsoft holds the complete link — `#` and all — regardless.
+   The fragment only stops an HTTP *fetch* from seeing the secret; it never stopped the *read*.
+2. **Fragment handling through a rewriting proxy is undocumented at every vendor** — Microsoft,
+   Google and Apple all say nothing, in any product doc or known-issues page. Of the three
+   plausible behaviours, one percent-encodes the fragment into the wrapper's `?url=` value,
+   which puts our secret into **Microsoft's** server logs — strictly worse than our own — and
+   another drops it, which breaks sign-in silently, with no error available to anyone.
+3. **No auth vendor does it.** Auth0, Okta, Stytch, Supabase, Clerk, WorkOS and Firebase all put
+   the credential in the query string. The consensus safety mechanism is not concealment; it is
+   a **short life plus single use plus a device/session binding**.
 
-- The exchange **requires JavaScript**. A no-JS member sees the Link-not-valid state. Accepted;
-  the survey they already completed has the same requirement.
-- The exchange **strips the fragment**, so a reload of `/member/sign-in` does not re-enter the
-  exchange branch. It therefore lands on the request form, not an error. This is the exact
-  mechanism that made the ADR-0027 PII leak the common path rather than an exotic one, so
-  nothing about the member portal may cache report content client-side. §9 makes that binding.
+What the fragment did genuinely buy was keeping the secret out of *our own* logs. That is
+achieved directly instead — see the scrubbing rule below — without taking a dependency on
+undocumented third-party behaviour that can change without notice and fails invisibly.
+
+**Three rules make the query-string form safe, and all three are load-bearing:**
+
+- **A GET never consumes the token.** Redemption happens only on a POST originating from the
+  button. This is the documented defence against scanners that open links in email — a real,
+  vendor-acknowledged failure mode that WorkOS deprecated its entire magic-link product over,
+  and which Supabase documents as the root cause of its most common auth support issue. It would
+  have been required with the fragment too (a scanner that renders JavaScript would have burned
+  an auto-redeeming link), so it is not a cost of this choice.
+- **The token is scrubbed from our own logs.** `t` is added to the request-log redaction list,
+  and the sign-in page sets `Referrer-Policy: no-referrer` so the token cannot ride a `Referer`
+  header to any third party.
+- **The URL is replaced immediately after redemption**, so the spent token does not sit in the
+  browser's address bar or history.
+
+**One consequence to carry forward:** the exchange requires JavaScript for the button POST. A
+no-JS member reaches the Link-not-valid state. Accepted — the assessment they already completed
+has the same requirement.
+
+**Not to be confused with the invitation link.** That one deliberately keeps its `#t=` fragment
+(`services/notifications.ts:1129`) and stays **reusable**, so a scanner opening it costs
+nothing. Do not "harmonise" the two, and do not make the invitation link single-use.
 
 ## 6. Identity, eligibility and the two grants
 
@@ -217,7 +247,12 @@ is allowed to change between issue and redemption.
 
 - **Raw token:** 32 random bytes, base64url — `generateRawToken()` from `invitation-tokens.ts`, reused unchanged.
 - **Stored:** `hashToken(raw)` only. A database leak alone cannot mint a session.
-- **Expiry:** 14 days.
+- **Expiry:** **1 hour.** Deliberately not Esperto's 14 days — see §3. This is the primary
+  safety property of the whole design: a credential that dies in an hour is low-value wherever
+  it happens to be written down, which is what lets the token live in the query string at all.
+  Stytch and Supabase default to 1 hour; Clerk and WorkOS use 10 minutes; Auth0 uses 3. One hour
+  is the long end of the industry range, chosen because the audience is executives who may not
+  open email until the evening, and the recovery is a self-service **Send another link**.
 - **Single use, atomically:** redemption is
   `updateMany({ where: { tokenHash, redeemedAt: null, expiresAt: { gt: now } }, data: { redeemedAt: now } })`
   and succeeds only on `count === 1`. Two concurrent redemptions of the same link: exactly one wins.
@@ -371,8 +406,12 @@ One template, three triggers (self-service, results-page link, coach-initiated).
 Scaling Up mark and **no coach logo** — the member requested this from the platform, not from
 their coach. Copy is fixed by the wireframe; the two load-bearing parts:
 
-- **Fine print:** `This link works once and expires on {date} at {time} {timezone}.` The
-  timezone is **named**, never a bare timestamp (§3).
+- **Fine print:** `This link works once and expires in 1 hour — at {time} {timezone}.` The
+  relative phrasing leads because it is the part a member can act on without arithmetic; the
+  absolute time follows for anyone reading the mail later. The timezone is **named**, never a
+  bare timestamp (§3). ⚠️ A one-hour window makes this line materially more important than a
+  14-day one did — if the wording is wrong or the zone is missing, the member finds out by
+  failing, not by reading.
 - **Closing:** `Didn't ask for this? You can ignore this email — the link expires on its own and nothing changes.`
 
 It must be unmistakably distinct from the coach's invitation email. Two emails, two jobs: the
@@ -425,7 +464,7 @@ not-yet-submitted case, and there is nothing to sign in to before completion.
 respondent's address — never rendered, returned in a response body, logged, or copyable. A
 coach who could read it could open someone else's reports, which is the entire point of a
 single-use credential. Coach-sent links obey every rule a self-requested one does: single use,
-same 14-day expiry, same completion requirement. A coach cannot mint a link for someone who has
+same one-hour expiry, same completion requirement. A coach cannot mint a link for someone who has
 not completed, and cannot extend one.
 
 **The confirmation dialog is a deliberate upgrade.** The two buttons beside it use native
