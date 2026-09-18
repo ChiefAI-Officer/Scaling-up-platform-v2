@@ -43,7 +43,7 @@ Exactly three rules, evaluated against data we already store. No configuration s
 
 | Member's level (`OrgRespondent.roleType`) | Sees |
 |---|---|
-| CEO/founder family (`ceofounder`, `ceofounderwithteam`, `ceofounderalone`, legacy `CEO`) | Every report in **their organization** |
+| CEO/founder family (`ceofounder`, `ceofounderwithteam`, `ceofounderalone`) | Every report in **their organization** (§6.0) |
 | `teamleader` — a **department head** | Their **own team and every team beneath it**, minus any CEO-family member |
 | `employee`, `guest`, unset, unrecognised | **Their own reports only** |
 
@@ -181,7 +181,7 @@ there is no `/api/member/*`.
 | `/member/home` | page | Greeting + the two tiles |
 | `/member/reports` | page | The card grid |
 | `/member/reports/[submissionId]` | page | One personal report |
-| `/member/reports/team/[campaignId]` | page | One team report |
+| `/member/reports/team/[campaignId]` | page | One group report |
 | `/member/evaluations` | page | Invitations the member can still complete |
 | `/member/evaluations/[invitationId]/open` | GET → redirect | Server-side handoff into the survey (§6.5) |
 | `/member/sign-out` | POST | Destroy the session |
@@ -194,11 +194,14 @@ chrome (`su-public-brand.css`) and none of the admin shell.
 Taken from the 2026-09-15 recording, 03:47–05:15. These are the shapes to match; exact copy and
 layout come from the redrawn artboards (§19).
 
-**Home** (03:47). A greeting naming the member and their level — Esperto renders
-*"Good morning CEO John Adams !"* — then a short welcome paragraph, then two side-by-side
-panels, **Evaluations** and **Reports**, each with a one-line description and a large round
-button. Esperto's descriptions: *"Here you can see which questionnaires you've been invited to
-complete"* and *"Here you see the results of completed assessments"*.
+**Home** (03:47). A time-of-day greeting, then a short welcome line, then two side-by-side
+panels — **Evaluations** and **Reports** — each with a one-line description and a large round
+button.
+
+**The greeting names the level only for the CEO family.** Esperto renders *"Good morning CEO John
+Adams !"* for everyone with a level. That flatters a CEO and labels everyone else: *"Good morning
+Employee, Jane"* reads badly, and on a shared screen it announces someone's tier. So: CEO/founder
+gets the prefix, everyone else gets their name.
 
 **Reports** (05:05). Not a list — a **card grid**. Each card carries a report thumbnail, the
 report's name, and its own action. Above the grid: a search field and filter controls
@@ -211,11 +214,22 @@ per-card **Share** button (§18) and the multi-select checkboxes that exist to d
 Our cards carry a single **View report** action. Dropping multi-select removes the only reason
 for *Select all* / *Deselect all*, so those go too; search stays.
 
-⚠️ The grid needs a thumbnail per report and **we have no thumbnail pipeline.** Generating one
-per report is a real piece of work with a real cost on a four-week timeline. The cheap
-substitute that preserves the scanning affordance is a per-instrument card graphic — one static
-image per template alias, reused for every report of that instrument — which is close to what
-the Esperto frame actually shows. Confirm before building (§19).
+**The card's instrument treatment is typographic, not an image.** Esperto's cards carry a report
+thumbnail; we have no rendering pipeline for that, **and no instrument artwork exists in the repo
+either** — nothing under `src/public` for any of the five configured aliases. So the card gets a
+coloured header block with the instrument name set large, one colour per instrument. That does
+the graphic's entire job on this screen — telling a Rockefeller from an LVA at a glance — costs
+nothing to produce, never goes stale when an instrument is renamed, and adds no asset pipeline.
+
+**The company appears on a card only when the member spans more than one.** Same rule, and same
+reason, as the person's name: show what disambiguates, hide what is noise. A member in a single
+engagement never sees a company line; a CEO of one company who is also an employee at another
+sees both labelled. This matters more than it did in revision 1, because the hierarchy means one
+member can now see a whole company's reports interleaved with their own from elsewhere.
+
+**No pagination in v1.** Search only, unbounded grid. The largest possible list today is a
+handful; the grid is the cheapest thing in this design to change later; and paging now means
+designing empty-page and filtered-page states nobody will see this year.
 
 **Evaluations.** Esperto shows status per invitation (`new` / `invited` / `started` /
 `completed`) and a days-to-complete countdown. Ours lists the member's own open invitations with
@@ -264,15 +278,26 @@ undocumented third-party behaviour that can change without notice and fails invi
 - **The URL is replaced immediately after redemption**, so the spent token does not sit in the
   browser's address bar or history.
 
-**One consequence to carry forward:** the exchange requires JavaScript for the button POST. A
-no-JS member reaches the Link-not-valid state. Accepted — the assessment they already completed
-has the same requirement.
+**No JavaScript is required anywhere in the sign-in path.** The button is a plain HTML form that
+POSTs the token. (An earlier draft said the exchange needed JS — that was inherited from the
+fragment design, where a script had to read the `#`. It does not apply here.)
 
 **Not to be confused with the invitation link.** That one deliberately keeps its `#t=` fragment
 (`services/notifications.ts:1129`) and stays **reusable**, so a scanner opening it costs
 nothing. Do not "harmonise" the two, and do not make the invitation link single-use.
 
 ## 6. Identity, eligibility and entitlement
+
+### 6.0 What "organization" means here
+
+An `Organization` row is **one coach's engagement with a company**, not the company itself
+(operator, 2026-09-18). The same real business engaged by two coaches is two rows — production
+already carries `ABC Corp` and `1_ABC-Corp` — and a CEO tagged in one sees only that engagement.
+
+This bounds the CEO scope to something defensible: *everything your coach has run with you*. It
+also means a member may legitimately hold different levels in different rows, which is why
+entitlement is computed per row and unioned (§6.3), and why the reports list labels the company
+when a member spans more than one (§5.0).
 
 ### 6.1 Resolution — an address maps to a set of roster rows
 
@@ -320,8 +345,8 @@ scopeFor(row):
   return own
 ```
 
-`normalizeLevel` maps known legacy values onto the canonical six and returns the input unchanged
-otherwise; unrecognised values fall through to own-only. See §6.3.1.
+`normalizeLevel` exists only to enforce the canonical six; it aliases nothing and returns unknown
+values unchanged, so they fall through to own-only. See §6.3.1.
 
 The member's total entitlement is the union across rows. A report is openable iff its
 submission's `respondentId` is in that union **and** its campaign is live.
@@ -347,19 +372,22 @@ Production contains `roleType` values the code does not know: **`CEO`** (1 row) 
 **`TEAM_MEMBER`** (2 rows), neither in `RESPONDENT_LEVELS`. `isCEOFamily("CEO")` returns **false**
 today, so a person labelled CEO would silently get own-reports-only.
 
-- `normalizeLevel` carries an **explicit** alias map. `CEO` → the CEO family. Nothing else is
-  mapped by inference.
-- **`TEAM_MEMBER` is deliberately left unmapped** and therefore resolves to own-only. It could
-  plausibly mean a rank-and-file team member or a leadership-team member, and the two differ by a
-  whole tier of visibility. Guessing in the granting direction is the one mistake this design
-  cannot take back.
+- **Nothing is aliased. The map is empty, deliberately.** Neither `CEO` nor `TEAM_MEMBER` is
+  mapped, so both resolve to own-reports-only.
+- The earlier draft mapped `CEO` into the CEO family on the grounds that its meaning was obvious.
+  Reversed 2026-09-18: it is one row, its provenance is unexplained, and the mapping would grant
+  the **widest scope in the system** from a guess about a string. Failing closed means a person
+  sees too little and says so; failing open means they see too much and nobody finds out.
+- `TEAM_MEMBER` is likewise unmapped — it could mean rank-and-file or leadership-team, a whole
+  tier apart.
+- **The fix for both is data, not code:** a coach sets a real level (§13.2 surfaces it).
 - A test enumerates every distinct `roleType` present in production and fails when one is neither
   canonical nor explicitly aliased. That is what turns the next unknown value into a red test
   instead of a silent denial — or, worse, a silent grant.
 - The alias map is code, not a data migration: reversible by revert, and it never rewrites a row
   a coach can see and edit.
 
-### 6.4 The team report
+### 6.4 The group report
 
 A member sees a campaign's team/group report when they are entitled to **every** completed
 respondent in that campaign under §6.3. In practice that is the CEO for a whole-company campaign
@@ -383,13 +411,47 @@ The Evaluations surface lists live `AssessmentInvitation` rows for the member's 
 ids — **own only, never the hierarchy**. Seeing a colleague's *report* is a reporting decision;
 opening their *questionnaire* is not something any level grants.
 
-⚠️ **Integration point that needs a decision before build.** The survey runner authorizes through
-a path-scoped invitation cookie exchanged from a `#t=` token (`invitation-cookie.ts`), so a
-member cannot simply be linked into `/org-survey/{alias}` from the portal. The clean route is a
-server-side handoff: the portal mints a fresh invitation token for that member's own invitation
-and redirects. It reuses existing machinery and issues no credential the member could not
-already request — but it is new code on an authorization boundary, so it gets its own task and
-its own tests.
+**Continue grants the invitation session directly. It does NOT mint a token.**
+
+An earlier draft proposed minting a fresh invitation token and redirecting. Research on
+2026-09-18 established that this breaks the Jeff #65 stable-links machinery in four independent
+ways, any one of which is disqualifying:
+
+- `AssessmentInvitationToken.source` is a **closed enum** (`LEGACY_CURRENT | ORIGINAL | REMINDER`)
+  with identity assertions in five places. A portal token has no legal value; labelling it
+  `REMINDER` bumps `resentCount` and records a delivery for an email nobody sent.
+- A staged token is **resolvable immediately**, before any send — directly contradicting the
+  contract's *"a failed reminder send creates no newly usable link."*
+- With `WAVE_J65_STABLE_LINKS_KILL` flipped for containment, minting degrades to the legacy
+  overwrite and **destroys the respondent's real emailed link**.
+- Minting overwrites the parent `expiresAt`, silently moving the invitation's expiry.
+
+None of that is necessary, because **the member is already authenticated when they press
+Continue.** A token is a credential you post to someone you cannot yet identify; a session is what
+you hand a person you have identified. So:
+
+```
+GET /member/evaluations/{invitationId}/open
+  1. require a member session
+  2. load the invitation; 404 unless its respondentId ∈ this member's OWN ids
+  3. run classifyInvitationExchangeAvailability — the same eight lifecycle gates the
+     emailed-link exchange applies (campaign live, ACTIVE, open, not closed, invitation
+     not revoked/expired/SUBMITTED). Refuse BEFORE granting anything.
+  4. seal the invitation session for that campaign alias
+  5. redirect to /org-survey/{alias}
+```
+
+Nothing is minted, nothing rotates, no history row is written, no counter moves.
+
+**Two implementation notes.** `getInvitationSession` is currently private to the exchange route;
+it must be exported as an explicit grant seam rather than reached into. And step 3 must run
+before step 4 — the emailed paths refuse a closed campaign *before* touching state, and this one
+must too, or a member gets a dead end after a write.
+
+**Accepted side effect:** entering a survey flips the respondent's status from Pending/Sent to
+**Viewed**, which coaches see on the campaign dashboard. That is already true of the emailed link,
+so the portal is consistent rather than novel — but a coach watching a campaign will see statuses
+move without having sent anything.
 
 ### 6.6 Deleted campaigns
 
@@ -431,7 +493,12 @@ is allowed to change between issue and redemption.
 
 - **Raw token:** 32 random bytes, base64url — `generateRawToken()` from `invitation-tokens.ts`, reused unchanged.
 - **Stored:** `hashToken(raw)` only. A database leak alone cannot mint a session.
-- **Expiry:** **1 hour.** Deliberately not Esperto's 14 days — see §3. This is the primary
+- **Expiry:** **1 hour** for a self-service request; **24 hours** when a coach sends it (§13).
+  The two differ because the risk does: a self-requested link answers an anonymous form, while a
+  coach-sent one is a deliberate act by an authenticated user against a roster they own. A
+  one-hour coach link is also unusable in practice — a campaign wrapped up at 5pm would post
+  thirty links that die before anyone reads their evening mail. The stored `expiresAt` is the
+  single source of truth and the email interpolates it; there is one template, not two. Deliberately not Esperto's 14 days — see §3. This is the primary
   safety property of the whole design: a credential that dies in an hour is low-value wherever
   it happens to be written down, which is what lets the token live in the query string at all.
   Stytch and Supabase default to 1 hour; Clerk and WorkOS use 10 minutes; Auth0 uses 3. One hour
@@ -513,10 +580,31 @@ The extraction is guarded by the existing `respondent-report` tests, which must 
 before the member loader is written. This is a refactor of a load-bearing file and gets its own
 red/green task.
 
-`getMemberGroupReport(db, { normalizedEmail, campaignId })` does the same over
-`getCampaignGroupReport`: entitlement must cover **every completed respondent in the campaign**
-(§6.4) on a live campaign, then delegate. Note this is a superset test, not a flag check — a
-member entitled to all but one respondent gets `forbidden`, not a partial report.
+`getMemberGroupReport(db, { normalizedEmail, campaignId })` applies the §6.4 superset test —
+entitlement must cover **every completed respondent in the campaign** on a live campaign. Not a
+flag check: a member entitled to all but one gets `forbidden`, never a partial report.
+
+⚠️ **It performs its own authorization; it does not delegate through `canViewGroupReport`.** That
+function is the coach/admin bulk-PII gate and expects a signed-in `ApiActor`, which a member does
+not have. A build that "delegates to the existing loader" would either pass a null actor and get
+a permanent `forbidden`, or — far worse — loosen the coach gate to accommodate the portal. The
+member loader reaches the report data past that gate, carrying its own stricter test.
+
+**Why the superset test is the whole defence.** The rendered group report is **not anonymous**:
+on LVA, QSP and Five Dysfunctions it names every respondent, shows their individual answers and
+prints their verbatim free text; scored reports carry the CEO's own column; every archetype
+prints `CEO: <name>` in the header; and there is **no small-n suppression**, so in a two-person
+campaign "Team avg (excl. CEO)" is one named person's score wearing a label. The superset test is
+what makes that safe: a member can only open a group report when they were already entitled to
+every individual report inside it. Because the CEO-family guard (§1.1) removes CEOs from a
+department head's scope, a head can never be entitled to a campaign a CEO completed, and so can
+never reach a report containing the CEO's column.
+
+**One accepted residual.** The header renders `CEO: <name>` even when the CEO has not completed —
+and the degrade note names them too. So a department head entitled to a campaign no CEO submitted
+to still sees the CEO named. It is a name, not a score, and one the member already knows.
+Suppressing it would mean a member-specific variant of a shared renderer, which is how renderers
+start forking. Accepted, deliberately, and recorded here so it is not rediscovered as a defect.
 
 ### 9.2 Entitlement is recomputed on every render — and why that is not boilerplate
 
@@ -600,14 +688,20 @@ afterwards.
 
 One template, three triggers (self-service, results-page link, coach-initiated). Carries the
 Scaling Up mark and **no coach logo** — the member requested this from the platform, not from
-their coach. Copy is fixed by the wireframe; the two load-bearing parts:
+their coach. Copy is fixed by the wireframe; the three load-bearing parts:
 
-- **Fine print:** `This link works once and expires in 1 hour — at {time} {timezone}.` The
-  relative phrasing leads because it is the part a member can act on without arithmetic; the
-  absolute time follows for anyone reading the mail later. The timezone is **named**, never a
-  bare timestamp (§3). ⚠️ A one-hour window makes this line materially more important than a
-  14-day one did — if the wording is wrong or the zone is missing, the member finds out by
-  failing, not by reading.
+- **Subject: `Your Scaling Up sign-in link`.** Repointed 2026-09-18. It used to read *"Your
+  Scaling Up reports"*, written when only someone who had completed an assessment could receive
+  one. Under the current gate a member added this morning can request a link and land on an empty
+  Reports list, so the subject and body now name the **portal**, not its contents. Body: *"Here's
+  your link to your Scaling Up assessments and reports."*
+- **Fine print:** `This link works once and expires in {duration} — at {time} {timezone}.` Both
+  values are interpolated from the stored `expiresAt`, which is **1 hour** for a self-service
+  request and **24 hours** when a coach sent it (§7.2) — one template, not two. The relative
+  phrasing leads because it is what a member can act on without arithmetic; the absolute time
+  follows for anyone reading later. The timezone is **named**, never a bare timestamp (§3).
+  ⚠️ A one-hour window makes this line materially more important than a 14-day one did — if the
+  wording is wrong or the zone is missing, the member finds out by failing, not by reading.
 - **Closing:** `Didn't ask for this? You can ignore this email — the link expires on its own and nothing changes.`
 
 It must be unmistakably distinct from the coach's invitation email. Two emails, two jobs: the
@@ -665,10 +759,17 @@ single-use credential. Coach-sent links obey every rule a self-requested one doe
 same one-hour expiry, same completion requirement. A coach cannot mint a link for someone who has
 not completed, and cannot extend one.
 
-**The confirmation dialog is a deliberate upgrade.** The two buttons beside it use native
-`window.confirm()` (`CampaignDetail.tsx` `handleSendInvitations` / `handleSendReminders`); the
-design shows a proper dialog with counts, matching the newer campaign-delete pattern. This
-diverges from its immediate neighbours and needs a conscious yes — §19.
+**Coach-sent links live 24 hours**, not one (§7.2), and the coach is told so.
+
+**The confirmation is a proper dialog, not `window.confirm()`.** The two buttons beside it use
+the native one (`CampaignDetail.tsx` `handleSendInvitations` / `handleSendReminders`); this one
+matches the newer campaign-delete pattern instead. That began as a style preference and became a
+functional requirement: the dialog has to state the count **and** that the links expire in 24
+hours, and a browser alert is a bad place to put a caveat people need to read.
+
+**Rate limiting is its own.** The self-service request is limited to 10/minute per IP; a coach
+bulk-sending thirty links from one office IP would trip that at ten. The coach path is
+authenticated and authorized against a campaign they own, so it carries a separate, higher limit.
 
 ### 13.1 One nudge in the member editor
 
@@ -680,7 +781,20 @@ The member editor shows an inline note when that combination is saved: the level
 they can see, and it needs a team to act on. Not a validation error — a coach may legitimately set
 the level before the team structure exists.
 
-This is the only place the portal touches a coach screen other than §13 and §14.
+### 13.2 Surfacing a level that grants nothing
+
+With §6.3.1 aliasing nothing, a member stored as `CEO` or `TEAM_MEMBER` silently gets
+own-reports-only. Nobody finds out until that person says "I can't see my team."
+
+The member editor shows an inline warning when the stored level is not one of the canonical six:
+*this level isn't recognised and grants no additional access — pick one below.* The editor
+already tolerates unknown slugs by passing them through the dropdown, so the coach can see the
+value; what is missing is being told it is inert.
+
+The three existing rows are also corrected by hand before launch. Both halves matter: fixing the
+rows clears today's data, and the warning stops the next import quietly recreating the problem.
+
+These two are the only places the portal touches a coach screen other than §13 and §14.
 
 ## 14. Adjacent change — the campaign delete warning
 
@@ -739,7 +853,7 @@ possible, not by what is easiest to observe.
    report render, the email, the `/login` panel, the delete-dialog clause. Entitlement code is
    present but every member resolves to own-only — the three rules ship in step 2.
 2. **The hierarchy (Jeff's #4), both rules.** `scopeFor`, the CEO scope, the department-head
-   scope, the CEO-family guard, the legacy-value alias map, and the team report derived from
+   scope, the CEO-family guard, the legacy-value alias map, and the group report derived from
    them. Shipping this second is deliberate: it is the piece most likely to leak if it is wrong,
    and it is far easier to review against a portal that already works.
 
@@ -805,38 +919,50 @@ remains out:
 
 ## 19. Open decisions
 
-**Settled** — entry gate is a roster row (§1.2). Entitlement is the three fixed rules (§1.1).
-`teamleader` means **department head** (operator, 2026-09-18), resolving the label ambiguity that
-revision 2 flagged. The portal matches Esperto's screens (§5.0). The sign-in token is a one-hour,
-single-use, click-to-redeem query parameter (§5.1). Bulk member import is **deferred** (§16.1).
+**All design decisions are settled.** A sixteen-question grill on 2026-09-18 closed the frontier;
+the answers are folded into the sections above and summarised here so a build environment can see
+what was decided rather than inferring it.
+
+| # | Decision |
+|---|---|
+| 1 | An Organization is one **coach's engagement** with a company (§6.0) |
+| 2 | The company appears on a report card **only when the member spans more than one** (§5.0) |
+| 3 | Legacy `CEO` and `TEAM_MEMBER` are **not aliased**; both grant own-only (§6.3.1) |
+| 4 | Self-service links **1 hour**, coach-sent links **24 hours** (§7.2) |
+| 5 | The email is repointed: subject **"Your Scaling Up sign-in link"** (§11) |
+| 6 | The greeting names the level **only for the CEO family** (§5.0) |
+| 7 | The group report's `CEO: <name>` header is **accepted** (§9.1) |
+| 8 | Evaluations → Continue **grants the invitation session**; mints nothing (§6.5) |
+| 9 | The member editor **warns on an unrecognised level**, and the existing rows are fixed (§13.2) |
+| 10 | Finishing an assessment started from the portal behaves **exactly as from an email** — no back-link, no redirect. One path, not two |
+| 11 | Card treatment is **per instrument**, not per report (§5.0) |
+| 12 | Reports grid is **search only, no pagination** (§5.0) |
+| 13 | The instrument treatment is **typographic**, not image files — none exist (§5.0) |
+| 14 | **"Group report"** on both surfaces. Esperto says *summary report*, which collides with our own Summary Reporting feature (§4) |
+| 15 | **Send report links** uses a proper dialog, not `window.confirm()` (§13) |
+| 16 | The gate stays **"whoever has an email in the system"**; an empty portal is an acceptable first impression (§1.2) |
 
 **Measured, 2026-09-18** — read-only production counts, all of which are test data (the operator
 confirms production carries no real customer records): 22 live members across 10 organizations;
 levels `teamleader` 7 · unset 5 · `ceofounderwithteam` 3 · `TEAM_MEMBER` 2 · `ceofounder` 2 ·
-`ceofounderalone` 1 · `employee` 1 · `CEO` 1; only 8 of 22 attached to a team; 5 teams total
-across 3 organizations, 1 nested, max depth 2; 6 organizations have a CEO-family member and
-**none has more than one**; largest CEO scope 6 people; 101 submissions with a roster row, 36 on
-live campaigns. **Re-measure before any launch claim** — and treat these as a description of the
-test fixtures, not of customer behaviour.
+`ceofounderalone` 1 · `employee` 1 · `CEO` 1; only 8 of 22 attached to a team; 5 teams across 3
+organizations, 1 nested, max depth 2; 6 organizations have a CEO-family member and **none has
+more than one**; largest CEO scope 6 people; 101 submissions with a roster row, 36 on live
+campaigns. **Re-measure before any launch claim** — and treat these as a description of the test
+fixtures, not of customer behaviour.
 
-**Needs a decision before build**
+**Still outstanding, and not design decisions**
 
-1. **Report card thumbnails.** No rendering pipeline exists. Recommended: one static graphic per
-   template alias (§5.0).
-2. **The artboards need redrawing** for the home screen, Evaluations, and the card grid.
-3. **The survey handoff in §6.5** — confirm mint-and-redirect before it is built.
-
-**Needs Jeff**
-
-4. **"Team report" wording.** Coaches say group report; the member screen says Team report.
-5. **The remaining items in §16.1** — timezone handling, campaign close-date extension,
-   multiple CEOs, multi-language.
+- The **artboards need redrawing** for §5.0's screens. The existing ten were drawn for a flat
+  list with no home screen and no Evaluations.
+- **Needs Jeff:** the remaining items in §16.1 — timezone handling on close dates, campaign
+  close-date extension, multiple CEOs, multi-language.
 
 **Known limitation, accepted**
 
-6. A department head recorded in a shared leadership-team node sees their peers (§6.3). The
-   CEO-family guard stops it reaching upward; nothing stops it reaching sideways. Closing it would
-   need a "team I lead" field distinct from "team I am in".
+A department head recorded in a shared leadership-team node sees their peers (§6.3). The
+CEO-family guard stops it reaching upward; nothing stops it reaching sideways. Closing it would
+need a "team I lead" field distinct from "team I am in".
 
 ## 20. Design gate
 
