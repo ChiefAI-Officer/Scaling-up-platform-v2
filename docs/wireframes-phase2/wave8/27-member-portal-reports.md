@@ -108,6 +108,8 @@ A screen, not a redirect. The member lands and **nothing has happened yet**.
 - Body: For your security, this link only works when you open it yourself.
 - Primary action: **View my reports**
 
+The button is a plain form. **Nothing on this path needs JavaScript.**
+
 **This click is not decoration.** Email security scanners open links automatically to check them
 for malware; a link that signed the member in on arrival would be consumed by the scanner before
 the member ever saw it, and they would arrive to a dead link with no explanation. WorkOS retired
@@ -136,9 +138,10 @@ more than they need, and buys nothing — the recovery is identical.
 
 The first screen after signing in. Jeff demonstrated this; it is not a landing page we invented.
 
-- Greeting: **Good morning, {first name}** — time-of-day aware. When the member's level is set,
-  Esperto prefixes the role (*"Good morning CEO John Adams"*); ours does the same using the
-  friendly level label, and omits it when unset.
+- Greeting: **Good morning, {first name}** — time-of-day aware. **The level is prefixed only for
+  the CEO family** — *"Good morning CEO John Adams"*. Esperto prefixes it for everyone, which
+  flatters a CEO and labels everyone else (*"Good morning Employee, Jane"*) and announces
+  someone's tier on a shared screen. Everyone below CEO gets their name alone.
 - Sub-line: Everything from your assessments, in one place.
 - Two panels, side by side, each with a title, one line of description, and a large round button:
 
@@ -160,13 +163,16 @@ likely visitor on a phone.
 - Intro: An overview of the reports available to you.
 - **Search field** — filters by report name as you type.
 - **A card grid**, not a list. Each card carries:
-  - the instrument graphic (see Visual contract)
+  - the **instrument treatment** — a coloured header block with the instrument name set large,
+    one colour per instrument. Not an image: none exists in the product, and the block does the
+    graphic's whole job here, which is telling a Rockefeller from an LVA at a glance.
   - the report name
   - the person it is about, **only when that is not the signed-in member**
+  - the company, **only when the member's reports span more than one company**
   - the date it was completed
-  - a **Team report** marker when it is one
+  - a **Group report** marker when it is one
   - one action: **View report**
-- Sort: most recently completed first.
+- Sort: most recently completed first. **No pagination** — search only.
 
 ### What is deliberately not copied from Esperto
 
@@ -174,12 +180,15 @@ Esperto's equivalent screen carries a **Share** button on every card and multi-s
 with *Select all* / *Deselect all*. The checkboxes exist only to drive a bulk share. Sharing is
 out of scope, so the checkboxes have no purpose — all three go. Search stays.
 
-### Why a person's name appears on some cards
+### Why the name and the company appear conditionally
 
-Under the hierarchy a member may be entitled to reports that are not their own — a CEO sees
-their whole company, a department head sees their team. A card that does not say whose report it
-is would be unreadable for them, and a card that always said would be noise for everyone else.
-So: show it only when it is somebody else's.
+Under the hierarchy a member may be entitled to reports that are not their own — a CEO sees their
+whole company, a department head sees their team. A card that never said whose report it is would
+be unreadable for them; a card that always said would be noise for everyone else. Same for the
+company: a member attached to two companies sees a whole company's reports interleaved with their
+own from elsewhere, and needs to tell them apart. A member in one company never does.
+
+One rule, applied twice: **show what disambiguates, hide what is noise.**
 
 ---
 
@@ -196,6 +205,14 @@ questionnaire is not something any level grants.
 
 **Continue** hands the member into the assessment they already have access to. They do not sign
 in again and they do not need to find the original email.
+
+Behind it: the member is already signed in, so the platform **grants them the survey session
+directly** rather than manufacturing a new emailed-style link. Nothing about their original
+invitation changes — the link in their inbox still works, and its expiry does not move.
+
+**Finishing behaves exactly as it does from the emailed link** — the thank-you page, or the
+on-screen report where the campaign shows one. No back-link into the portal, no redirect. One
+path through the assessment, not two.
 
 ---
 
@@ -229,11 +246,15 @@ it.
 The only artifact that leaves the platform, and the one a member looks at hardest. It must be
 unmistakably distinct from the coach's invitation email.
 
-- Subject: **Your Scaling Up reports**
+- Subject: **Your Scaling Up sign-in link**
 - Opening: Hi {first name},
-- Body: Here's your link to your reports. There's no password to enter.
+- Body: Here's your link to your Scaling Up assessments and reports. There's no password to enter.
 - Primary action: **View my reports**
-- Fine print, directly beneath: This link works once and expires in 1 hour — at {time} {timezone}.
+- Fine print, directly beneath: This link works once and expires in {1 hour / 24 hours} — at
+  {time} {timezone}.
+
+> ⚠️ The subject used to read *"Your Scaling Up reports"*. Under the current gate a member can
+> receive this before they have any, so the email names the portal rather than its contents.
 - Closing: Didn't ask for this? You can ignore this email — the link expires on its own and
   nothing changes.
 
@@ -243,6 +264,10 @@ the platform, not from their coach.
 **Name the timezone.** Never a bare timestamp. Esperto prints `2026-09-29 15:39:13` with no zone
 at all, and Jeff raised timezone handling as its own defect on the same call — shipping that bug
 inside the feature that copies it would be absurd.
+
+**Two lifetimes, one template.** A link the member requested themselves lasts **1 hour**; a link
+a coach sent lasts **24 hours**. The duration is interpolated from the real expiry, never
+hardcoded in the copy.
 
 **One hour makes this line matter more than it did.** Under a 14-day link a vague expiry was
 harmless. At one hour, a member who misreads it finds out by failing.
@@ -272,8 +297,12 @@ Both send **the same email** as self-service — one template, three triggers. *
 sees the link:** not displayed, not copyable, not returned to the browser. A coach who could read
 it could open someone else's reports.
 
-Confirmation states how many people will be emailed and **says the links are short-lived** — a
-coach sending at 5pm should not be surprised when members find them expired in the morning.
+Coach-sent links last **24 hours**, not one — a one-hour link sent at 5pm is dead before anyone
+reads their evening mail.
+
+Confirmation is a **proper dialog, not a browser alert**: it states how many people will be
+emailed *and* that the links expire in 24 hours. The two buttons beside it use the native
+`confirm()`; this one diverges because it has a caveat people actually need to read.
 
 ### Campaign delete warning
 
@@ -284,14 +313,20 @@ coach sending at 5pm should not be surprised when members find them expired in t
 Both halves stay: gone for the member, kept for the coach. Ships with or before the portal, never
 after. The public-campaign dialog is a separate component and is unchanged.
 
-### Member editor nudge
+### Member editor — two warnings
 
-Setting a member to **Leadership team member** without putting them in a team grants them
-nothing — the rule falls through to own-reports-only. Four of the seven people currently holding
-that level have no team, so this is the common case.
+Both are inline notes, **not** validation errors. Both saves succeed.
 
-Show an inline note, **not** a validation error: a coach may legitimately set the level before
-the team structure exists.
+**Level set without a team.** Setting a member to **Leadership team member** without putting them
+in a team grants nothing — the rule falls through to own-reports-only. Four of the seven people
+currently holding that level have no team, so this is the common case. A coach may legitimately
+set the level before the team structure exists.
+
+**A level the platform doesn't recognise.** Production contains levels outside the standard set —
+`CEO` and `TEAM_MEMBER`. They grant nothing, deliberately: guessing what an unexplained label
+means, in the direction of granting access, is the one mistake this design cannot take back. The
+editor already shows the stored value; what was missing is telling the coach it is inert —
+*this level isn't recognised and grants no additional access.*
 
 ---
 
@@ -353,8 +388,13 @@ These are written as testable assertions deliberately.
   that *someone* signed in on this browser — never *what* they may open.
 - **Nobody sees above themselves.** A department head never sees a CEO's report, even when the
   CEO is in their own team.
-- **Unknown levels grant nothing.** An unrecognised level, a missing level, or Leadership team
-  member with no team all fall through to own-reports-only.
+- **Unknown levels grant nothing.** An unrecognised level — including `CEO` and `TEAM_MEMBER` — a
+  missing level, or Leadership team member with no team all fall through to own-reports-only.
+  Nothing is aliased.
+- **Continue mints nothing.** Entering an assessment from Evaluations leaves the invitation's
+  token and expiry untouched, creates no token history, and moves no counter. The member's
+  emailed link still works afterwards.
+- **No JavaScript is required to sign in.**
 - **Evaluations are own-only** at every level.
 - **Email resolves to a set, never a row.** One address may map to several roster rows, with
   different levels in different companies. Entitlement is the union of each row's scope.

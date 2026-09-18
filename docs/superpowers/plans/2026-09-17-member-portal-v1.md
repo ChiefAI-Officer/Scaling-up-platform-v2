@@ -88,7 +88,7 @@ every `/member/*` route 404s.
 - `src/src/app/(member)/member/home/page.tsx` — greeting + the two tiles.
 - `src/src/app/(member)/member/reports/page.tsx` — the card grid.
 - `src/src/app/(member)/member/reports/[submissionId]/page.tsx` — one personal report.
-- `src/src/app/(member)/member/reports/team/[campaignId]/page.tsx` — one team report.
+- `src/src/app/(member)/member/reports/team/[campaignId]/page.tsx` — one group report.
 - `src/src/app/(member)/member/evaluations/page.tsx` — open invitations.
 - `src/src/app/(member)/member/evaluations/[invitationId]/open/route.ts` — the survey handoff.
 - `src/src/components/members/` — `MemberSignInCard.tsx`, `MemberHomeTiles.tsx`, `MemberReportGrid.tsx`, `MemberReportCard.tsx`, `MemberEvaluationList.tsx`, `MemberPortalLink.tsx`.
@@ -183,10 +183,10 @@ the thing most likely to be got wrong, and they are far easier to test in isolat
 a page.
 
 - [ ] RED: `employee`, `guest`, `null`, and an unrecognised slug → own respondent id only.
-- [ ] RED (`normalizeLevel`): legacy **`CEO`** maps into the CEO family; **`TEAM_MEMBER` is NOT
-      mapped** and resolves to own-only; any other unrecognised value returns unchanged and
-      resolves to own-only. Guessing in the granting direction is the one mistake this design
-      cannot take back — assert that `TEAM_MEMBER` grants nothing.
+- [ ] RED (`normalizeLevel`): **nothing is aliased.** `CEO`, `TEAM_MEMBER` and any other
+      unrecognised value all resolve to **own-only**. Assert `CEO` explicitly and by name — an
+      earlier draft mapped it into the CEO family and that was reversed, so a future reader with
+      good intentions is the realistic threat here.
 - [ ] RED (the enumeration guard): a test lists every distinct `roleType` observed in production
       (Task 0's table) and **fails** when one is neither canonical nor explicitly aliased. This is
       what turns the next unknown value into a red test instead of a silent denial or grant.
@@ -216,9 +216,11 @@ a page.
 **Files:** `prisma/schema.prisma`, migration, `lib/members/sign-in-token.ts`, tests
 
 - [ ] Add `MemberSignInToken` as specified (spec §7.1) — keyed on `normalizedEmail`, **not** a
-      respondent id, **1-hour** expiry. Additive; no existing table touched.
+      respondent id. Additive; no existing table touched.
 - [ ] Generate the migration; run the Migration Safety Gate.
-- [ ] RED: the expiry is **1 hour**, pinned as a literal in the test.
+- [ ] RED: **two expiries.** A self-service issue expires in **1 hour**; a coach-initiated issue
+      expires in **24 hours**. Both pinned as literals. `issuedVia` decides, and the stored
+      `expiresAt` is the only source of truth downstream — nothing recomputes a duration.
 - [ ] RED: `issue()` persists only the sha256; the raw value appears nowhere in the row.
 - [ ] RED: `redeem()` succeeds once, fails the second time; **two concurrent redeems — exactly
       one wins** (assert on the `updateMany` count, not read-then-write); an expired token fails;
@@ -299,9 +301,13 @@ Ships alone, guarded by existing tests.
 
 **Files:** `lib/members/sign-in-email.ts`, tests
 
-- [ ] RED: subject `Your Scaling Up reports`; Scaling Up mark and **no coach logo**; fine print
-      reads `expires in 1 hour — at {time} {timezone}` and **names the zone**; the "Didn't ask for
-      this?" closing line present; the raw token in the href **and nowhere else**.
+- [ ] RED: subject **`Your Scaling Up sign-in link`** — not "Your Scaling Up reports"; the body
+      names the portal, not its contents, because a member may have no reports at all.
+- [ ] RED: Scaling Up mark and **no coach logo**; the "Didn't ask for this?" closing line present;
+      the raw token in the href **and nowhere else**.
+- [ ] RED: the fine print interpolates from the stored `expiresAt` — renders "1 hour" for a
+      self-service token and "24 hours" for a coach-issued one from **one template** — and
+      **names the timezone**, never a bare timestamp.
 - [ ] RED: the link is an HTML `<a href>` and the raw URL does **not** appear as bare text in
       either part. Outlook truncates a bare-text URL at the first space, and a hard-wrapping
       sender splits a long URL permanently. `invitation-email.ts:226` and `:342` do both of these
@@ -337,6 +343,8 @@ Ships alone, guarded by existing tests.
 - [ ] RED (load-bearing): **a GET to `/member/sign-in?t=<valid>` does not redeem it.** After the
       GET the token is still unused and a subsequent POST succeeds. Name the test so nobody
       optimises the click away.
+- [ ] RED: the landing works with **JavaScript disabled** — the button is a plain HTML form that
+      POSTs. No script runs anywhere in the sign-in path.
 - [ ] RED: `exchange` (POST) with a valid token sets the session; expired, redeemed, unknown and
       malformed all return one indistinguishable failure; the raw token is never echoed.
 - [ ] RED: the sign-in page response carries `Referrer-Policy: no-referrer`, and `t` is redacted
@@ -361,11 +369,19 @@ Ships alone, guarded by existing tests.
       `submission`, `participant`, `accessMode`, `INVITED`, `PUBLIC`, `isCEO`, `organizationId`,
       `templateAlias`, `versionId`, `deletedAt`, `token`, `roleType`, `magic link`, a raw id, or a
       standalone assessment alias. Drive it from a shared constant so later releases inherit it.
-- [ ] RED: `/member/home` greets the member by name, shows the **Evaluations** and **Reports**
-      tiles, and the Evaluations tile is present but inert until Release 3 (it must not 404).
+- [ ] RED: `/member/home` greets the member by name and shows the **Evaluations** and **Reports**
+      tiles; the Evaluations tile is present but inert until Release 3 (it must not 404).
+- [ ] RED: the greeting prefixes the level **only for the CEO family** — a `ceofounder` sees
+      "Good morning CEO {name}", an `employee` sees "Good morning {name}" with no label.
 - [ ] RED: `/member/reports` renders a **card grid** with a search field that filters by report
-      name; no multi-select, no Share, no *Select all* / *Deselect all*; each card carries one
-      **View report** action.
+      name; **no pagination**; no multi-select, no Share, no *Select all* / *Deselect all*; each
+      card carries one **View report** action.
+- [ ] RED: a card names the **person** only when the report is not the signed-in member's, and
+      names the **company** only when the member's identity spans more than one organization.
+      Assert both negatives — a single-company member seeing only their own reports gets neither
+      line.
+- [ ] RED: the instrument treatment is **typographic** — a coloured header block per instrument,
+      no image asset. Assert no `<img>` on the card.
 - [ ] RED: the empty state is reachable and correct for a member with no reports — **the common
       case now**, not a rarity — and links across to Evaluations when they have open invitations.
 - [ ] RED: the signed-in member's name is visible (shared devices); Sign out ends the session.
@@ -450,17 +466,17 @@ without Task 0's numbers.**
       rules go live together.** No new rules are written here; Task 3 already has them under test.
 - [ ] Verify · commit.
 
-### Task 17: The team report
+### Task 17: The group report
 
 - [ ] RED: `/member/reports/team/[campaignId]` renders `GroupReport` when entitlement covers every
       completed respondent; 404s when it covers all but one; 404s for a deleted campaign and with
       no session; the loader's `empty` and `notApplicable` panels render as they do for a coach.
-- [ ] RED: the grid marks team reports distinctly from personal ones.
+- [ ] RED: the grid marks group reports distinctly from personal ones.
 - [ ] GREEN: reuse Task 7's `getMemberGroupReport` and Task 8's adapter; `generatedAt = new Date()`
       at the page boundary, keeping gate and loader clock-free.
 - [ ] Verify · commit · SoT hygiene · launch as in Task 15.
 
-### Task 17b: The member-editor nudge
+### Task 17b: Two member-editor warnings
 
 **Files:** `components/organizations/edit-member-modal.tsx`, `add-member-modal.tsx`, tests
 
@@ -470,7 +486,15 @@ without Task 0's numbers.**
 - [ ] RED: the note is absent when the portal flag is off.
 - [ ] GREEN · verify · commit.
 
-Four of the seven people currently holding that level have no team, so this is the common case.
+- [ ] RED: an **unrecognised level** (`CEO`, `TEAM_MEMBER`, anything outside the canonical six)
+      shows an inline warning — *this level isn't recognised and grants no additional access* —
+      while still displaying the stored value in the dropdown, as the editor does today.
+- [ ] RED: neither warning is a validation error; both saves succeed.
+- [ ] Separately, as an ops step: correct the three existing rows by hand. The warning stops the
+      next import recreating them; fixing the rows clears today's data. Both halves are needed.
+
+Four of the seven people currently holding the `teamleader` level have no team, so the first
+warning is the common case, not an edge one.
 
 ---
 
@@ -483,17 +507,33 @@ Four of the seven people currently holding that level have no team, so this is t
 - [ ] RED: revoked, submitted and expired invitations are excluded; deleted campaigns excluded.
 - [ ] GREEN · verify · commit.
 
-### Task 19: The survey handoff
+### Task 19: The survey handoff — grant the session, mint nothing
 
-**The one new authorization boundary in this release. Confirm the approach (spec §6.5) first.**
+**The one new authorization boundary in this release.** Read spec §6.5 in full before starting.
+An earlier draft minted an invitation token here; that breaks the Jeff #65 stable-links machinery
+four separate ways and must not be reintroduced.
 
-- [ ] RED: `/member/evaluations/[invitationId]/open` redirects into the survey **only** for an
-      invitation belonging to the signed-in member; 404s for anyone else's invitation id, for a
-      revoked or submitted one, and with no session.
-- [ ] RED: the minted token is fresh, and the response carries no token in its body — only in the
-      redirect `Location`, exactly as the invitation email does.
-- [ ] GREEN: mint a fresh invitation token for that member's own invitation and redirect. Reuses
-      existing machinery and issues nothing the member could not already request.
+- [ ] RED: `/member/evaluations/[invitationId]/open` grants and redirects **only** for an
+      invitation whose `respondentId` is one of the signed-in member's **own** ids — not the
+      hierarchy. 404s for anyone else's invitation id, and with no session.
+- [ ] RED (load-bearing): **no token is minted and nothing rotates.** After a successful Continue,
+      assert `AssessmentInvitation.tokenHash` and `expiresAt` are byte-identical to before, no
+      `AssessmentInvitationToken` row was created, and `resentCount` / `lastResentAt` are
+      unchanged. This is the test that stops someone "simplifying" it back into a mint.
+- [ ] RED: the eight lifecycle gates run **before** anything is granted — reuse
+      `classifyInvitationExchangeAvailability`. A closed campaign, a revoked invitation, a
+      SUBMITTED one, one outside `openAt`/`closeAt`: each refuses with no state change at all.
+      The emailed paths refuse before touching state and this one must too, or a member gets a
+      dead end after a write.
+- [ ] RED: the response body carries no token and no session material.
+- [ ] GREEN: export `getInvitationSession` as an explicit grant seam rather than reaching into
+      the exchange route's internals; seal the session for that campaign alias; redirect to
+      `/org-survey/{alias}`.
+- [ ] Accepted and asserted: entering flips the respondent's status Pending/Sent → **Viewed**,
+      which coaches see. Already true of the emailed link, so the portal is consistent, not novel.
+- [ ] Accepted: finishing an assessment started from the portal behaves **exactly as it does from
+      an email** — thank-you page or on-screen report, no back-link, no redirect into the portal.
+      One path, not two.
 - [ ] Verify · commit · SoT hygiene · launch as in Task 15.
 
 ---
@@ -507,11 +547,13 @@ Four of the seven people currently holding that level have no team, so this is t
       any shape**; the caller must pass the campaign's existing authorization; flag off → 404.
 - [ ] RED: a coach-issued token obeys every rule a self-issued one does — single use, the same
       one-hour expiry, no extension.
-- [ ] ⚠️ The confirmation copy must say the links are short-lived. A coach sending at 5pm hands
-      out links that expire before the evening's inbox check; the recovery is self-service, but
-      the coach should not be surprised by it.
+- [ ] RED: a coach-issued token expires in **24 hours**, not 1 hour, and the dialog says so
+      alongside the count.
+- [ ] RED: the coach path has **its own rate limit**, not the anonymous 10/minute per-IP one — a
+      bulk send of thirty from one office IP must not trip at ten. Assert thirty succeed.
 - [ ] GREEN: reuse `sendMemberSignInLink` with `via: "COACH"`; a counted dialog following the
-      campaign-delete pattern, **not** `window.confirm()`.
+      campaign-delete pattern, **not** `window.confirm()` — it has to carry the expiry caveat, and
+      a browser alert is a bad place for something people need to read.
 - [ ] Verify · commit.
 
 ### Task 21: Discovery lines
@@ -546,6 +588,10 @@ Four of the seven people currently holding that level have no team, so this is t
 - [x] Task 0 ran; its numbers are recorded above and must be re-measured before launch.
 - [ ] `TEAM_MEMBER` is asserted to grant nothing; no legacy value is mapped by inference.
 - [ ] The CEO-family guard is asserted both as a pure rule (Task 3) and through the loader (Task 16).
+- [ ] `normalizeLevel` aliases nothing, and `CEO` is asserted by name to grant own-only.
+- [ ] Task 19 asserts that Continue mints nothing and rotates nothing.
+- [ ] The coach bulk send is proven not to trip the anonymous rate limiter.
+- [ ] The sign-in path is proven to work with JavaScript disabled.
 - [ ] Every task has a RED step that fails for the stated reason before implementation.
 - [ ] No task both refactors a shared module and adds a feature (Task 6 ships alone).
 - [ ] Flag-off byte-identity is asserted in Tasks 11–14, 17, 20, 21 — not assumed once.
