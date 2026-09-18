@@ -1,382 +1,398 @@
-# 27 — Member portal: sign in and your reports
+# 27 — Member portal: sign in, your reports, your evaluations
 
-The platform's first surface built for people who are neither coaches nor admins.
-A **member** is a person on an organization's roster who has completed at least one
-invited assessment. They sign in with an emailed link — no password — and see the
-reports that belong to them.
+**Revision 2 — 2026-09-18.** Rewritten after the 2026-09-15 recording was watched directly.
+Revision 1 described a flat list of reports behind a completion gate; both were wrong. See
+§ Provenance.
 
-Scope is v1 as agreed with Jeff on 2026-09-16: **own reports, plus the team report
-if they are the campaign's CEO.** Everything else is deliberately out (see Non-goals).
+The platform's first surface built for people who are neither coaches nor admins — Jeff's
+"third screen". A **member** is a person a coach has entered into the system. They sign in with
+an emailed link, no password, and see the reports they are entitled to see plus the assessments
+they can still complete.
+
+**Design spec:** [`../../superpowers/specs/2026-09-17-member-portal-v1-design.md`](../../superpowers/specs/2026-09-17-member-portal-v1-design.md) — authoritative for rules; this document is authoritative for screens and copy.
+
+---
 
 ## How a member reaches this portal
 
-Nothing in this journey is new until step 5. Steps 1–4 already exist and are
-unchanged; they are written out because the portal is meaningless without them and
-because step 5 is easy to confuse with step 2.
+Nothing here is new until step 4. Steps 1–3 exist today and are unchanged.
 
-1. **A coach adds the person to a campaign.** Roster entry and campaign setup stay
-   entirely with the coach. Nothing about this grants portal access.
-2. **The coach's invitation email goes out** — "take this assessment" — carrying a
-   durable link that resumes in place. This is the existing invitation, untouched.
-3. **The person completes the assessment.** Their answers are saved as they go and
-   the link resumes them if they stop.
-4. **Their report is generated** as it is today.
-5. **Later, and separately, they sign in to see it.** From a coach-sent link, from
-   the link on their results page, or — failing both — from `/login`, where the
-   member path sits beneath the staff form. They enter their email and receive a
-   *different* email containing a sign-in link.
+1. **A coach adds the person to a company.** Members & Teams → Add member, the import wizard, or
+   while building a campaign. **This alone makes them a member.**
+2. **The coach's invitation email goes out** — *take this assessment* — carrying a durable link
+   that resumes in place. Unchanged.
+3. **They complete it and their report is generated**, as today. *(Optional. A member who has
+   completed nothing can still sign in — they will see their Evaluations and an empty Reports
+   list.)*
+4. **They sign in to see it.** From a coach-sent link, from the line on their results page, or
+   from `/login`, where the member path sits beneath the staff form.
 
-**Two emails, two jobs.** Step 2 says *take this*; step 5 says *see what you did*.
-They are triggered by different people at different times — the coach sends the
-first, the member requests the second — and they must not look like each other or
-be confused in copy, subject lines, or support conversations.
+**Two emails, two jobs.** Step 2 says *take this*, sent by the coach. Step 4 says *see what you
+did*, requested by the member. They must not look like each other, or be confused in copy,
+subject lines, or support conversations.
 
 There is no acceptance step, no registration page, and no password at any point.
-**Completing an assessment is the acceptance.** Before step 3 a person cannot sign
-in at all; after it, they can, for as long as their reports remain visible.
+
+---
 
 ## Front door — `/login`, unchanged for staff
 
-There is **one** sign-in address for the whole platform. `/login` keeps exactly what
-it has today — email, password, Forgot password, "New coach? Create an account" —
-and gains one member path beneath a divider:
+One sign-in address for the whole platform. `/login` keeps exactly what it has — email,
+password, Forgot password, "New coach? Create an account" — and gains one member path beneath a
+divider:
 
-- Heading: Taken an assessment?
+- Heading: **Taken an assessment?**
 - Body: We'll email you a link to your reports. No password needed.
-- Action: Get a link to my reports → (goes to the member sign-in below)
+- Action: **Get a link to my reports →**
 
-**Nothing on this page probes the email.** The member path is a link the person
-clicks deliberately, not a branch the server picks for them. That is what keeps the
-page from revealing which addresses exist — the failure Esperto ships, where an
-unknown address gets a red *"Login failed"* while a real one gets a password prompt.
-Our existing "Invalid email or password" already avoids that, and this addition must
-not undo it.
+**Nothing on this page probes the email.** The member path is a link the person clicks, never a
+branch the server picks after inspecting the address. That is what stops the page revealing
+which addresses exist — the failure Esperto ships, where an unknown address gets a red *"Login
+failed"* and a real one gets a password prompt. The existing "Invalid email or password"
+behaviour stays exactly as it is.
 
-Why one door rather than a separate member address: a member's realistic route is a
-coach-sent link or the link on their results page, both of which land them straight
-in the portal without seeing a sign-in screen at all. The login page matters only
-for someone who bookmarks the site or types the URL — and for them, one address that
-works for everybody beats a second address nobody told them about.
+The accepted cost: a client landing here sees a password field that is not for them, against
+Jeff's *"there's no username, no password, nothing"*. The divider and the panel are what make
+the member path findable in spite of it.
 
-The accepted cost is that a client who lands here sees a password field that is not
-for them, against Jeff's "there's no username, no password, nothing". The divider and
-the panel are what make the member path findable in spite of it.
+---
 
-## Member sign-in state
+## Sign-in — `/member/sign-in`
 
-- Route: `/member/sign-in` — reached from the front door, not advertised separately
-- Heading: Sign in to your reports
-- **Audience line (directly beneath the heading):** For people who've completed a
-  Scaling Up assessment.
-- Guidance: Enter your email and we'll send you a secure link. There's no password
-  to remember.
+- Heading: **Sign in to your reports**
+- **Audience line, directly beneath:** For people who've been set up by a Scaling Up coach.
+- Guidance: Enter your email and we'll send you a secure link. There's no password to remember.
 - Field: Email address
-- Primary action: Email me a link
+- Primary action: **Email me a link**
 - Footer note: Links work once and expire after 1 hour.
 - **Escape hatch, persistent:** Coach or staff? Sign in with your password →
 
+> ⚠️ Revision 1's audience line read *"For people who've completed a Scaling Up assessment."*
+> That is now false — being added by a coach is enough. Do not restore it.
+
 ### Why the audience line and the escape hatch are load-bearing
 
-Most people reach this screen by clicking through from the front door, so they have
-already self-selected. But a bookmark or a forwarded URL can land someone here
-directly, and coaches have reports too — "Sign in to your reports" disambiguates
-nothing on its own.
+Most people arrive by clicking through from the front door and have self-selected. But a
+bookmark or a forwarded URL lands someone here directly, and coaches have reports too — "Sign in
+to your reports" disambiguates nothing on its own.
 
-The escape hatch is not politeness, it is the only recovery available. Because a
-link is issued only to someone who has completed an assessment, and because the
-response is deliberately identical either way, a coach who lands here types their
-email, sees the Link-sent screen, and **no email ever arrives** — with nothing to
-tell them why. The anti-enumeration rule is what removes our ability to correct
-them afterwards, so the correction has to be on the page in advance.
+The escape hatch is the only recovery available. Because the response is deliberately identical
+whether or not the address is known, a coach who lands here types their email, sees Check your
+email, and **nothing ever arrives** — with nothing to tell them why. The anti-enumeration rule
+removes our ability to correct them afterwards, so the correction has to be on the page in
+advance.
 
-**Three production accounts are both** (two coaches and one admin, all with
-completed assessments). They are not an error state: both paths genuinely work for
-them, and they pick whichever they want. What must never happen is a screen that
-implies they have to choose correctly.
+**Three production accounts are both** coach/admin *and* member. Both paths genuinely work for
+them. What must never happen is a screen implying they have to choose correctly.
 
-## How a member learns the portal exists
+---
 
-Access is self-service, but **discovery is not** — nothing tells a respondent this
-portal is there. Esperto has the same hole; it was invisible in the recording only
-because Jeff controlled the demo mailbox and could operate the respondent's sign-in
-himself. A real respondent cannot be handed a link that way.
+## Link sent
 
-This matters more than it sounds. Of **25 live invited campaigns, 11 show the
-respondent nothing at all after they submit** — no results email, no on-screen
-report. For those, the portal is not a convenience for revisiting a report; it is
-the first time that person ever sees their own result.
-
-Three routes, all in v1:
-
-1. **On the results page**, after submitting — a line pointing to the portal.
-2. **In the results email**, where one is sent — the same line.
-3. **From the coach** — the surface below, for the campaigns where neither of the
-   above is switched on, and for the "I can't find my report" conversation.
-
-Routes 1 and 2 cover only the campaigns that have those switches on (13 and 4
-of 25 respectively today), which is exactly why route 3 is not a fallback.
-
-## Coach surface — sending a report link
-
-Lives in the existing campaign detail screen, in the admin shell. Two additions,
-no new page:
-
-- **Bulk**, beside the existing `Send Invitations` / `Send Reminders`:
-  **Send report links** — emails everyone who has completed. This is the one a
-  coach reaches for when a campaign wraps up.
-- **Per person**, in the respondent row's action cluster beside `Resend`:
-  **Send report link** — for a single follow-up.
-
-Both appear **only for respondents who have completed**; there is nothing to sign
-in to before that, and the row's existing `Resend` already covers the
-not-yet-submitted case.
-
-Both send **the same email** as the self-service sign-in — one template, three
-triggers. A coach-sent link is a real, working sign-in link, not a pointer saying
-"go to the portal and sign in": it lands in the respondent's own inbox, which is
-exactly where a self-requested one would go, and it saves a pointless round-trip.
-**The coach never sees the link.** It is not displayed, not copyable, and not
-returned to the browser — the only copy goes to the respondent's address.
-
-Confirmation copy follows the existing bulk-send pattern: state how many people
-will be emailed, and name the action rather than the mechanism.
-
-## The sign-in email
-
-The only artifact of this design that leaves the platform, and the one a member
-will look at hardest. It must be unmistakably distinct from the coach's invitation
-email (see the journey above).
-
-- Subject: Your Scaling Up reports
-- Opening: Hi {first name},
-- Body: Here's your link to the reports you've completed. It opens straight to
-  them — there's no password to enter.
-- Primary action: **View my reports**
-- Fine print, directly beneath the button: This link works once and expires on
-  {date} at {time} {timezone}.
-- Closing note: Didn't ask for this? You can ignore this email — the link expires
-  on its own and nothing changes.
-
-Carries the Scaling Up mark and nothing else. No coach logo — the member did not
-request this from their coach, they requested it from the platform.
-
-**Name the timezone.** The expiry line states a zone explicitly rather than
-printing a bare timestamp. Esperto's equivalent email prints
-`2026-09-29 15:39:13` with no zone at all, which is the same defect as punch-list
-item 1 arriving inside the feature we are copying. A member in Sydney reading a
-US-time expiry has no way to know when their link dies.
-
-## Link-sent state
-
-- Heading: Check your email
-- Body: If {email} is on file, we've just sent a sign-in link. It works once and
-  expires in 1 hour.
-- Secondary action: Send another link
+- Heading: **Check your email**
+- Body: If {email} is on file, we've just sent a sign-in link. It works once and expires in 1 hour.
+- Secondary action: **Send another link**
 - **Escape hatch, repeated:** Coaches and staff sign in with a password instead →
-- The body copy is identical whether or not the address exists. It must stay that
-  way — see Acceptance notes.
 
-The escape hatch repeats here deliberately. This is the screen a person stares at
-when the email does not arrive, so it is the last place we can redirect someone who
-came to the wrong door.
+The body copy is identical whether or not the address exists, and stays that way — see
+Acceptance notes. The escape hatch repeats deliberately: this is the screen someone stares at
+when no email arrives, and the last place to redirect them.
 
-## Link-not-valid state
+---
 
-- Route: `/member/sign-in` with an exhausted, expired, or unrecognised token
-- Heading: This link is no longer valid
-- Body: Sign-in links work once and expire after 1 hour. Request a new one and
-  we'll email it to you.
-- Primary action: Email me a new link
+## Opening the link — `/member/sign-in?t=…`
 
-A single state covers used, expired, and unrecognised. Distinguishing them tells
-the holder of a token slightly more than they need, and buys little: the recovery
-action is the same in all three cases.
+A screen, not a redirect. The member lands and **nothing has happened yet**.
 
-## Reports state
+- Heading: **You're one click from your reports**
+- Body: For your security, this link only works when you open it yourself.
+- Primary action: **View my reports**
 
-- Route: `/member/reports`
-- Heading: Your reports
-- Guidance: Reports from assessments you've completed.
-- Per report: assessment name, the date it was completed, and a **View report**
-  action.
-- A team report carries a **Team report** marker; a personal report carries none.
+**This click is not decoration.** Email security scanners open links automatically to check them
+for malware; a link that signed the member in on arrival would be consumed by the scanner before
+the member ever saw it, and they would arrive to a dead link with no explanation. WorkOS retired
+their whole magic-link product over this. The click is what makes the difference between a
+machine touching the link and a person using it.
+
+After the click, the address bar is cleaned so the spent link is not left sitting in browser
+history.
+
+---
+
+## Link not valid
+
+- Route: `/member/sign-in` with a used, expired, or unrecognised token
+- Heading: **This link is no longer valid**
+- Body: Sign-in links work once and expire after 1 hour. Request a new one and we'll email it to
+  you.
+- Primary action: **Email me a new link**
+
+One state covers all three cases. Distinguishing them tells whoever holds the token slightly
+more than they need, and buys nothing — the recovery is identical.
+
+---
+
+## Home — `/member/home`
+
+The first screen after signing in. Jeff demonstrated this; it is not a landing page we invented.
+
+- Greeting: **Good morning, {first name}** — time-of-day aware. When the member's level is set,
+  Esperto prefixes the role (*"Good morning CEO John Adams"*); ours does the same using the
+  friendly level label, and omits it when unset.
+- Sub-line: Everything from your assessments, in one place.
+- Two panels, side by side, each with a title, one line of description, and a large round button:
+
+| Panel | Description | Button |
+|---|---|---|
+| **Evaluations** | The assessments you've been invited to complete. Your answers save as you go. | Go to evaluations |
+| **Reports** | The results of the assessments you've completed. | Go to reports |
+
+- Persistent: the signed-in member's name, and **Sign out**.
+
+At 375 px the panels stack, Evaluations first — someone who has not finished yet is the more
+likely visitor on a phone.
+
+---
+
+## Reports — `/member/reports`
+
+- Heading: **Your reports**
+- Intro: An overview of the reports available to you.
+- **Search field** — filters by report name as you type.
+- **A card grid**, not a list. Each card carries:
+  - the instrument graphic (see Visual contract)
+  - the report name
+  - the person it is about, **only when that is not the signed-in member**
+  - the date it was completed
+  - a **Team report** marker when it is one
+  - one action: **View report**
 - Sort: most recently completed first.
-- Persistent action: Sign out.
 
-One flat list, sorted by date. No grouping, no company column, no filters.
+### What is deliberately not copied from Esperto
 
-### Why no company grouping
+Esperto's equivalent screen carries a **Share** button on every card and multi-select checkboxes
+with *Select all* / *Deselect all*. The checkboxes exist only to drive a bulk share. Sharing is
+out of scope, so the checkboxes have no purpose — all three go. Search stays.
 
-Production shows four email addresses on more than one company's roster — but all
-four are free-mail personas, and **none of the ten corporate addresses appears in
-more than one company.** That is test data, not a business pattern. Esperto cannot
-represent the case at all (its member record holds a single `company`), so it is
-not a parity requirement either.
+### Why a person's name appears on some cards
 
-If a genuine multi-company member ever appears, this list still behaves correctly:
-their reports simply sit together in date order. Adding a company line at that
-point is trivial. Designing for it now would impose structure on every member to
-serve none.
+Under the hierarchy a member may be entitled to reports that are not their own — a CEO sees
+their whole company, a department head sees their team. A card that does not say whose report it
+is would be unreadable for them, and a card that always said would be noise for everyone else.
+So: show it only when it is somebody else's.
 
-## Empty state
+---
 
-- Heading: No reports yet
-- Body: When you complete an assessment, your report will appear here.
+## Evaluations — `/member/evaluations`
 
-Rare by construction: a link is only issued to someone who has completed an
-assessment, so the sole route here is a member whose reports have *all* since
-landed on deleted campaigns. The copy must not imply the member did something
-wrong, and must not hint that reports once existed and were removed.
+- Heading: **Your evaluations**
+- Intro: Assessments you've been invited to complete.
+- Per row: the assessment name, the closing date when one is set, and **Continue**.
+- Sort: soonest closing date first; those without a closing date last.
+
+**Own invitations only, never the hierarchy.** A CEO sees every report in their company and
+**nobody else's questionnaire**. Seeing someone's result is a reporting decision; opening their
+questionnaire is not something any level grants.
+
+**Continue** hands the member into the assessment they already have access to. They do not sign
+in again and they do not need to find the original email.
+
+---
+
+## Empty states
+
+Both are ordinary, not exceptional. A member added this morning sees both.
+
+| Screen | Heading | Body |
+|---|---|---|
+| Reports, nothing yet | **No reports yet** | When you complete an assessment, your report will appear here. *(plus a link to Evaluations when any are open)* |
+| Evaluations, nothing open | **Nothing to complete right now** | When your coach invites you to an assessment, it'll appear here. |
+
+> ⚠️ Revision 1 called the empty Reports state "rare by construction". Under the completion gate
+> it was. It is now the **first thing a new member sees**, and the copy carries that weight.
+
+Neither may imply the member did something wrong, and neither may hint that something existed
+and was removed.
+
+---
 
 ## Report view
 
-No new screen. **View report** opens the existing individual report at its current
-route. The report renders exactly as it does for a coach or admin viewing the same
-respondent — same renderer, same authored Welcome/Closing HTML, same print path.
+No new screen. **View report** opens the existing report — same renderer, same authored
+Welcome/Closing HTML, same print path — rendered exactly as a coach viewing the same person sees
+it.
+
+---
+
+## The sign-in email
+
+The only artifact that leaves the platform, and the one a member looks at hardest. It must be
+unmistakably distinct from the coach's invitation email.
+
+- Subject: **Your Scaling Up reports**
+- Opening: Hi {first name},
+- Body: Here's your link to your reports. There's no password to enter.
+- Primary action: **View my reports**
+- Fine print, directly beneath: This link works once and expires in 1 hour — at {time} {timezone}.
+- Closing: Didn't ask for this? You can ignore this email — the link expires on its own and
+  nothing changes.
+
+Carries the Scaling Up mark and nothing else. **No coach logo** — the member requested this from
+the platform, not from their coach.
+
+**Name the timezone.** Never a bare timestamp. Esperto prints `2026-09-29 15:39:13` with no zone
+at all, and Jeff raised timezone handling as its own defect on the same call — shipping that bug
+inside the feature that copies it would be absurd.
+
+**One hour makes this line matter more than it did.** Under a 14-day link a vague expiry was
+harmless. At one hour, a member who misreads it finds out by failing.
+
+**Deliver the link as a button.** The raw URL must not also appear as bare text: Outlook
+truncates bare-text URLs at the first space, and a hard-wrapping sender can split a long one
+permanently.
+
+---
+
+## Coach surfaces
+
+### Sending a report link
+
+In the existing campaign detail screen. Two additions, no new page:
+
+- **Bulk**, beside `Send Invitations` / `Send Reminders`: **Send report links**
+- **Per person**, beside `Resend`: **Send report link**
+
+Both target **everyone on the campaign**, finished or not — the gate is being in the system, and
+a link is useful to someone who has not started, because it shows them their Evaluations.
+
+> ⚠️ Revision 1 restricted both to people who had completed. That followed from the completion
+> gate and is no longer correct.
+
+Both send **the same email** as self-service — one template, three triggers. **The coach never
+sees the link:** not displayed, not copyable, not returned to the browser. A coach who could read
+it could open someone else's reports.
+
+Confirmation states how many people will be emailed and **says the links are short-lived** — a
+coach sending at 5pm should not be surprised when members find them expired in the morning.
+
+### Campaign delete warning
+
+> **Delete this campaign?**
+> {N} invited and {M} completed participants will lose access — including the reports they can
+> see today. Their responses stay in your records. This is not reversible.
+
+Both halves stay: gone for the member, kept for the coach. Ships with or before the portal, never
+after. The public-campaign dialog is a separate component and is unchanged.
+
+### Member editor nudge
+
+Setting a member to **Leadership team member** without putting them in a team grants them
+nothing — the rule falls through to own-reports-only. Four of the seven people currently holding
+that level have no team, so this is the common case.
+
+Show an inline note, **not** a validation error: a coach may legitimately set the level before
+the team structure exists.
+
+---
 
 ## Forbidden visible copy
 
-`campaign`, `respondent`, `submission`, `participant`, `accessMode`, `INVITED`,
-`PUBLIC`, `isCEO`, `organizationId`, `templateAlias`, `versionId`, `deletedAt`,
-`token`, raw IDs, and standalone assessment aliases.
+`campaign`, `respondent`, `submission`, `participant`, `accessMode`, `INVITED`, `PUBLIC`,
+`isCEO`, `roleType`, `organizationId`, `templateAlias`, `versionId`, `deletedAt`, `token`, raw
+IDs, and standalone assessment aliases.
 
-A member has never heard of a campaign and did not "submit" anything. They took an
-assessment and got a report. `magic link` is also out — say *sign-in link*.
+A member has never heard of a campaign and did not "submit" anything — they took an assessment
+and got a report. `magic link` is out: say **sign-in link**. `level` is fine in the coach UI and
+out in the member UI.
+
+---
 
 ## Visual contract
 
-The member portal is the quietest surface in the platform. It carries the Scaling
-Up mark and the shared palette and type, but none of the admin shell: no sidebar,
-no group navigation, no counts, no status pills. A member arrives to do one thing
-and leave.
+The quietest surface in the platform. It carries the Scaling Up mark, the shared palette and
+type (`su-public-brand.css`), and none of the admin shell: no sidebar, no group navigation, no
+counts, no status pills.
 
-Sign-in is a single centred card on a plain ground — one field, one button, no
-secondary paths, no sign-up, no password affordance to explain away.
+**Sign-in** is a single centred card on a plain ground — one field, one button, no sign-up, no
+password affordance to explain away.
 
-The reports list is a single column of restrained cards on the same ground. Each
-card is text-first: assessment name, then date and company in the muted tone, then
-the action. No thumbnails, no score previews, no badges beyond the Team report
-marker. Nothing on this page competes with the report itself.
+**Home** is two panels on the same ground, weighted equally. Nothing else competes.
+
+**Reports** is a card grid: text-first cards, generous spacing, one action each.
+
+**The card graphic is per instrument, not per report.** One static image for every Rockefeller
+report, one for every LVA, and so on. Per-report thumbnails would need a rendering pipeline we do
+not have, and the graphic's job here is scanning — telling a Rockefeller from an LVA at a glance
+— which a per-instrument image does completely.
+
+At 375 px everything reflows to one column with actions on their own line. Nothing clips or
+overlaps.
+
+---
 
 ## Acceptance notes
 
-- **A coach-sent link is never disclosed to the coach.** It is generated
-  server-side and delivered only to the respondent's address — never rendered,
-  returned, logged, or copyable. A coach who could read it could open someone
-  else's reports, which is the whole point of the single-use token.
-- **Coach-sent links obey every rule a self-requested one does** — single use,
-  same expiry, same completion requirement. A coach cannot mint a link for someone
-  who has not completed an assessment, and cannot extend one.
-- **One door, two paths, never one identity.** `/login` is the single front door,
-  but the two paths behind it stay separate sessions. A person may legitimately hold
-  both — three do in production today — and taking the member path never touches
-  their staff session, nor the reverse. A member session grants member access only:
-  holding a staff account confers nothing here, and holding a member session confers
-  nothing in the admin or coach surfaces.
-- **The front door must never probe the email.** The member path is a link the
-  person clicks, never a branch the server picks after inspecting the address.
-  Deciding which path an address belongs to and showing that decision is precisely
-  the enumeration answer we refuse to give — it is what makes Esperto's login return
-  "Login failed" for an address it does not recognise. The existing "Invalid email or
-  password" behaviour on the staff form stays exactly as it is.
-- **Completion is the entry ticket.** A sign-in link is issued only to an address
-  with at least one completed assessment on a live campaign. Being added to a
-  roster grants nothing on its own — otherwise a coach adding a contact would
-  silently create a portal account for someone who has done nothing. This follows
-  Jeff's wording directly: *"Once a campaign recipient completes an assessment,
-  they can now login."* There is no acceptance or activation step, and no password
-  is ever set; the completed assessment is the acceptance.
-- **No enumeration.** The sign-in response, its wording, its status code, and its
-  timing are identical for a known and an unknown address — and identical again
-  for a known address that has not completed anything. All three reach the
-  Link-sent state; only the first causes an email. Esperto's equivalent endpoint
-  returns three distinguishable answers for member, coach, and unknown; we do not
-  copy that.
-- **Rate limiting.** Repeated requests for the same address are throttled, and the
-  Link-sent state is still what the member sees when throttled. Throttling must
-  not become an enumeration side channel.
-- **Single use.** Redeeming a link consumes it. A second visit to the same link
-  reaches Link-not-valid, including from the same browser.
-- **Ownership is re-verified on every report.** The session cannot be path-scoped
-  the way the existing per-report cookie is, because the portal spans many reports.
-  Every report render must therefore re-confirm server-side that the report belongs
-  to the signed-in member. A live session proves only that *someone* signed in on
-  this browser — never *whose* report is being requested. This is the ADR-0027
-  failure repeating by a new route if it is skipped.
-- **Email resolves to a set, never a row.** The schema permits one address to map
-  to several roster rows — uniqueness is only `(organizationId, dedupeSource,
-  dedupeValue)`. Today that happens solely to test personas, and the list needs no
-  special treatment for it, but the resolver must still return a set and every
-  access must check membership of it. Collapsing to "the first matching row" would
-  serve one person another's report the day a real duplicate appears.
-- **Deleted campaigns are invisible here.** Reports whose campaign has been deleted
-  do not appear and cannot be opened, matching the existing respondent-facing rule.
-  Coaches and admins keep their own access.
-- **Shared devices.** Sign out ends the session immediately. The signed-in member's
-  name is visible on the reports page so a second person on the same browser can
-  see whose session is open.
-- **Narrow screens.** The list reflows to a single column with the action on its
-  own line. Nothing clips or overlaps at 375 px.
+These are written as testable assertions deliberately.
 
-## Adjacent change — campaign delete confirmation
+- **Being in the system is the entry ticket.** A sign-in link is issued to any address with a
+  live roster row. Completing an assessment is **not** required. Jeff, 2026-09-15: *"Whoever has
+  an email in the system. So if a coach puts an email into the system, they would get access."*
+- **No enumeration.** The sign-in response — wording, status code, and timing envelope — is
+  identical for a known address, an unknown one, and a throttled request. Only the first causes
+  an email. Esperto's equivalent returns three distinguishable answers; we do not copy that.
+- **A GET never signs anyone in.** Opening the link does nothing until the button is clicked.
+  Assert that a GET leaves the token unused.
+- **Single use.** Redeeming consumes it. A second visit reaches Link-not-valid, including from
+  the same browser.
+- **Rate limiting.** Repeated requests for one address are throttled, and the member still sees
+  Check your email. Throttling must not become an enumeration side channel.
+- **The front door never probes the email.** No request on blur, on change, or on any path but
+  the deliberate password submit.
+- **Entitlement is recomputed on every report render**, server-side, from the member's live level
+  and team. Never stored in the session, never cached in the browser. A live session proves only
+  that *someone* signed in on this browser — never *what* they may open.
+- **Nobody sees above themselves.** A department head never sees a CEO's report, even when the
+  CEO is in their own team.
+- **Unknown levels grant nothing.** An unrecognised level, a missing level, or Leadership team
+  member with no team all fall through to own-reports-only.
+- **Evaluations are own-only** at every level.
+- **Email resolves to a set, never a row.** One address may map to several roster rows, with
+  different levels in different companies. Entitlement is the union of each row's scope.
+- **Deleted campaigns are invisible here** and cannot be opened. Coaches keep their access.
+- **A coach-sent link is never disclosed to the coach.**
+- **One door, two paths, never one identity.** A member session grants member access only; a
+  staff account confers nothing here, and the reverse.
+- **Shared devices.** Sign out ends the session immediately, and the signed-in member's name is
+  visible so a second person can see whose session is open.
+- **Narrow screens.** Nothing clips or overlaps at 375 px.
 
-The existing invited-campaign delete dialog says *"{N} invited and {M} completed
-participants will lose access. Responses are retained. This is not reversible."*
-
-Once this portal exists, "lose access" silently acquires a second meaning: the
-member's finished reports disappear from their dashboard. Jeff asked on 2026-09-16
-that the warning say so. Revised direction:
-
-> **Delete this campaign?**
-> {N} invited and {M} completed participants will lose access — including the
-> reports they can see today. Their responses stay in your records. This is not
-> reversible.
-
-Both halves must stay: gone for the member, kept for the coach. This copy ships
-**with or before** the portal, never after — otherwise there is a window in which
-coaches delete campaigns under the old meaning and silently empty members'
-dashboards.
-
-The public-campaign delete dialog is a separate component and is unchanged. Public
-quiz takers are not members and never reach this portal.
+---
 
 ## Non-goals
 
-Deliberately excluded from v1, each with its reason:
+- **Person-to-person report sharing** — Esperto's per-card Share, with expiry and
+  viewonly/editor. Not requested.
+- **A configurable access matrix** — Esperto lets an admin configure level × report type ×
+  own/own-group/parent-group. Jeff described a behaviour, never a screen; we ship three fixed
+  rules.
+- **Parent-group visibility** — Esperto has the scope; Jeff said nobody sees above them.
+- **Multiple CEOs per campaign** — Jeff's item #5, deferred by him.
+- **Member-run campaign management** — Esperto members can add participants and change a
+  campaign's expiry. Jeff asked for the close-date change as a *coach* capability.
+- **A profile screen, in-portal help, passwords, self sign-up.**
+- **Public quiz takers** — excluded by Jeff, 2026-09-15.
 
-- **An Evaluations tab** (unfinished assessments). Members already get a durable
-  emailed link that resumes in place; Jeff's view was that routing them through a
-  portal login instead "seems like the long way".
-- **The per-level access matrix.** Esperto lets an admin configure, per member
-  level and per report type, what is visible across own / own-group / parent-group
-  scopes. Jeff chose the smaller v1 and asked that the gap be documented.
-- **Person-to-person report sharing.** Esperto supports it with an expiry and
-  viewonly/editor access types. Not requested.
-- **Multiple CEOs per campaign.** Currently prevented by a database constraint.
-  Tied to the matrix gap above.
-- **Member-run campaign management.** Esperto's portal lets a member add
-  participants to a campaign, see how many responses have arrived, and change the
-  campaign's expiration date. It is the largest thing their portal does that ours
-  will not. Nobody has asked for it, and it needs a product decision — whether
-  coaches currently rely on clients to chase their own teams — before it is worth
-  sizing. See Delta 4 in the scope-and-deltas document.
-- **A profile screen or in-portal help.** Member details stay coach-maintained;
-  Esperto's FAQ/Videos/Links/feedback panel has no equivalent here.
-- **Public quiz takers.** Excluded by Jeff on the 2026-09-15 call.
+---
 
 ## Provenance
 
-- Jeff's Slack request, 2026-09-15: token-based member login to a dashboard of
-  completed reports.
-- Recorded walkthrough of the incumbent system, 2026-09-15 — the source for the
-  sign-in page, portal home, and reports list.
-- Jeff's v1 scope decision and the delete-warning request, 2026-09-16.
-- Direct study of the incumbent system, 2026-09-15/16 — its live API, its Angular
-  bundles, and its published UI string tables. This is where the journey above, the
-  two-email distinction, and the member-run campaign capability came from; none of
-  it was visible in the recording. Recorded in full in the appendix of
-  `docs/MEMBER_PORTAL_V1_SCOPE_AND_DELTAS.md`.
-
-The scope-and-deltas document is the source of truth for everything this wireframe
-deliberately leaves out. Keep the two in step: a Non-goal here should have a Delta
-there.
+- Jeff's Slack request, 2026-09-15: token-based member login to a dashboard of reports.
+- **The 2026-09-15 recording, watched directly 2026-09-18** — the source for the entry gate
+  (05:09), the hierarchy (04:07), the home screen and reports grid (03:47, 05:05), and the pilot
+  timeline (07:31). Revision 1 of this document was written from a summary of that call and got
+  the gate and the access model wrong.
+- The operator, 2026-09-18: Leadership team member **means department head**; bulk import
+  deferred; production contains no real customer data.
+- Direct study of the incumbent system, 2026-09-15/16 — recorded in the appendix of
+  [`../../MEMBER_PORTAL_V1_SCOPE_AND_DELTAS.md`](../../MEMBER_PORTAL_V1_SCOPE_AND_DELTAS.md).
+  ⚠️ That document's Delta 1 and its "no concept of level" claim are superseded by the design spec.
