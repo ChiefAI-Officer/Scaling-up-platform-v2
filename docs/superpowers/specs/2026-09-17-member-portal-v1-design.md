@@ -4,33 +4,83 @@
 
 **Date:** 2026-09-17
 
-**Scope:** a person who has completed an invited assessment signs in with an emailed single-use link — no password — and sees the reports from assessments they personally completed, plus the team report for any campaign where they are the CEO. Everything else Esperto's member portal does is out; see §18.
+**Scope:** a person a coach has entered into the system signs in with an emailed link — no
+password — and sees the reports they are entitled to see, where entitlement follows the member
+**hierarchy**: their own reports always, everything in the company if they are CEO/founder,
+their own team and below if they lead a team. Plus the evaluations they have been invited to.
 
-**Canonical product record:** [`../../MEMBER_PORTAL_V1_SCOPE_AND_DELTAS.md`](../../MEMBER_PORTAL_V1_SCOPE_AND_DELTAS.md) (Jeff-facing scope + Appendix A1–A6, the durable Esperto/production record)
+**Revision 2 (2026-09-18):** rewritten after watching the 2026-09-15 recording directly. Three
+things in revision 1 were wrong, all inherited from a second-hand summary. They are recorded in
+§3 so nobody reintroduces them.
 
-**Canonical UI record:** [`../../wireframes-phase2/wave8/27-member-portal-reports.md`](../../wireframes-phase2/wave8/27-member-portal-reports.md) (states, copy, forbidden vocabulary, visual contract)
+**Canonical product record:** [`../../MEMBER_PORTAL_V1_SCOPE_AND_DELTAS.md`](../../MEMBER_PORTAL_V1_SCOPE_AND_DELTAS.md) — ⚠️ its Delta 1 and its "no concept of level" claim are superseded by this document.
 
-**Visual design:** <https://claude.ai/artifact/4wmRTct1wDpvFuN6z9n8rj> (10 artboards)
+**Canonical UI record:** [`../../wireframes-phase2/wave8/27-member-portal-reports.md`](../../wireframes-phase2/wave8/27-member-portal-reports.md) — ⚠️ its Non-goals list is superseded; its security Acceptance notes stand.
+
+**Link-security research:** [`../../research/2026-09-17-email-link-rewriting-and-url-fragments.md`](../../research/2026-09-17-email-link-rewriting-and-url-fragments.md)
+
+**Visual design:** <https://claude.ai/artifact/4wmRTct1wDpvFuN6z9n8rj> — ⚠️ 10 artboards drawn against revision 1's smaller surface; needs redrawing for §5.
 
 ---
 
 ## 1. Outcome
 
-The platform's first surface built for someone who is neither a coach nor an admin.
+The platform's first surface built for someone who is neither a coach nor an admin. Jeff called
+it "the third screen" and "the biggest one" of the gaps he found.
 
-1. A member reaches `/member/sign-in` — from a coach-sent link, from the line on their
-   results page or results email, or from the member panel beneath the staff form on `/login`.
-2. They enter their email. The response is the Link-sent state, always.
-3. If — and only if — that address has at least one completed assessment on a live campaign,
-   a single-use link is emailed to it.
-4. Clicking it exchanges the link for a short-lived sealed session and lands on `/member/reports`.
-5. The list shows every report they completed, newest first, plus a **Team report** entry for
-   each live campaign where they are the CEO.
-6. Opening one renders the *existing* report, through the *existing* renderer, with ownership
-   re-verified server-side on that render.
+1. A coach enters a person into the system, as they do today. **That alone makes them a member.**
+2. The member reaches `/member/sign-in`, enters their email, and receives a single-use link.
+3. They land on a **home screen** — a greeting, and two tiles: **Evaluations** and **Reports**.
+4. **Reports** shows every report they are entitled to see, as a card grid with search.
+5. **Evaluations** shows the assessments they have been invited to and can still complete.
+6. Opening a report renders the existing report, with entitlement re-checked server-side.
 
-No password is ever set. No registration step exists. **Completing an assessment is the
-acceptance.**
+No password is ever set. No registration step exists.
+
+### 1.1 The entitlement rule — Jeff's item #4
+
+Exactly three rules, evaluated against data we already store. No configuration screen.
+
+| Member's level (`OrgRespondent.roleType`) | Sees |
+|---|---|
+| CEO/founder family (`ceofounder`, `ceofounderwithteam`, `ceofounderalone`) | Every report in **their organization** |
+| `teamleader` | Their **own team and every team beneath it** in the `OrgTeam` tree |
+| `employee`, `guest`, unset | **Their own reports only** |
+
+Everyone sees their own reports regardless of level. Nobody ever sees **above** themselves —
+Jeff was explicit: *"the department heads can see their people, but nobody above them."*
+
+Jeff's words, 2026-09-15 at 04:07:
+
+> "it's using the hierarchy that we built into the member setup, right? So the CEO can see
+> everything. If you have multiple departments, the department heads can see their people, but
+> nobody above them. So it's using that hierarchy that's in there to do it."
+
+**Why this is fixed rules and not Esperto's matrix.** Esperto ships an administrator screen
+configuring, per level and per report type, visibility across own / own-group / parent-group.
+Jeff never asked for that screen; he described a behaviour and asked us to think it through.
+Three fixed rules deliver the behaviour, need no new UI, and can be replaced by a configurable
+matrix later without changing what a member sees on day one. Building the matrix first would be
+configuring three scopes across every report type for coaches who may only ever need one setting.
+
+### 1.2 The entry gate — being in the system
+
+A member may request a sign-in link if a coach has entered them into the system: a live
+`OrgRespondent` row in a live organization. **Completing an assessment is not required.**
+
+Jeff's words, 2026-09-15 at 05:09, answering "Who gets access to this?":
+
+> "Whoever has an email in the system. So if a coach puts an email into the system, they would
+> get access to it. I wouldn't assume people from the public would get it. Anybody taking one of
+> the public quizzes — but anybody that's taking a campaign led report that the coach has put
+> them into the system would be able to log in."
+
+Public quiz takers are excluded. They have no roster row, so the rule excludes them by
+construction rather than by a special case.
+
+**A member with nothing to show is a normal state, not an edge case.** Under revision 1's
+completion gate the empty state was "rare by construction"; it is now the *first* thing a newly
+added member sees. The Reports empty state and the Evaluations list carry that weight — see §17.
 
 ## 2. Evidence precedence
 
@@ -46,65 +96,119 @@ When evidence conflicts, apply in this order:
 Production figures quoted here were measured read-only on 2026-09-16/17 against a small
 pre-launch dataset. **Re-measure before any launch claim rests on one.**
 
-## 3. Four deliberate divergences from Esperto
+## 3. Corrections to revision 1, and where we still diverge from Esperto
 
-Recorded up front because each looks like a defect to anyone comparing the two systems.
+### 3.1 Three things revision 1 got wrong
+
+All three came from building on a written summary of the 2026-09-15 call instead of the call.
+Recorded so they are not reintroduced.
+
+| Revision 1 said | The recording says | Where |
+|---|---|---|
+| Entry gate is **completing an assessment** | *"Whoever has an email in the system"* | 05:09 |
+| Department-head visibility is out of scope (Delta 1) | Jeff describes it as the requirement and says *"I'm more concerned with four"* | 04:07, 09:56 |
+| We have **no concept of level**, so one must be built | `lib/assessments/respondent-levels.ts` already holds the six Esperto levels with `isCEOFamily()`; `/portal/members` displays a **Level** column; `OrgTeam.parentTeamId` already nests | code |
+
+⚠️ The third has a sharp edge. The level data is **stored and editable** — member modal, import
+wizard, organizations API, `/portal/members` — but it drives **no access decision anywhere**
+today. `isCEOFamily()` has exactly one caller, suggesting a CEO in the campaign wizard. Treat
+this as *wiring existing data into a new rule*, not as a feature that half exists.
+
+### 3.2 Where we still diverge, deliberately
 
 | Esperto | Ours | Why |
 |---|---|---|
-| `POST /login` routes by email and returns six distinguishable answers, including `Login failed` for an unknown address | The front door never probes the email; the member path is a link the person clicks | That endpoint is a user-enumeration oracle. Our existing "Invalid email or password" already avoids it and must not be undone |
-| Expiry printed as `2026-09-29 15:39:13`, no timezone | The expiry line names a zone explicitly | A member in Sydney reading a US-time expiry has no way to know when their link dies — this is punch-list item 1 arriving inside the feature we are copying |
-| Sign-in link valid **14 days** | **1 hour** | 14 days is a standing key to someone's reports sitting in a mailbox that may be shared, forwarded, archived or breached. Every auth vendor surveyed uses minutes to an hour |
-| Members may optionally set a password | Emailed link only | Removes a whole category of support request, and Jeff's framing was *"there's no username, no password, nothing"* |
-| Level × report-type × scope access matrix, plus person-to-person shares | One fixed rule | Jeff chose the smaller v1 and asked that the gap be documented — Deltas 1 and 2 |
+| `POST /login` routes by email and returns six distinguishable answers, including `Login failed` for an unknown address | The front door never probes the email | That endpoint is a user-enumeration oracle |
+| Expiry printed as `2026-09-29 15:39:13`, no timezone | The expiry line names a zone explicitly | Jeff raised timezone handling as its own defect on the same call (06:14) — shipping it inside this feature would be the bug arriving with its own fix |
+| Sign-in link valid **14 days** | **1 hour** | Every auth vendor surveyed uses minutes to an hour; 14 days is a standing key in a mailbox |
+| Members may optionally set a password | Emailed link only | Jeff: *"there's no username, no password, nothing"* (03:44) |
+| An admin matrix configuring level × report-type × own/own-group/parent-group | **Three fixed rules** (§1.1) | Jeff described a behaviour, not a screen. See §1.1 |
+| Person-to-person report **sharing** (a `Share` button on every report card) | Not in v1 | Visible in the recording at 05:05 and genuinely separate from the hierarchy — see §18 |
 
 ## 4. Domain additions
 
-These are new words. They belong in `CONTEXT.md` before implementation begins, because three
-of them collide with words the codebase already uses for something else.
+New words, for `CONTEXT.md`. Three collide with words the codebase already uses.
 
-**Member.** A person on an organization's roster (`OrgRespondent`) who has completed at least
-one assessment on a live campaign, considered as *someone who can sign in*. Not a `User`; has
-no role, no password, and no row of their own. *Avoid:* "respondent" (the roster person,
-whether or not they can sign in), "participant" (that person's inclusion in one campaign),
-"user" (an ADMIN/STAFF/COACH account).
+**Member.** A person on an organization's roster (`OrgRespondent`), considered as *someone who
+can sign in*. Not a `User`; no role, no password, no row of their own. *Avoid:* "respondent"
+(the roster person in the assessment domain), "participant" (that person's inclusion in one
+campaign), "user" (an ADMIN/STAFF/COACH account).
 
-**Member identity.** An email address, plus the **set** of live `OrgRespondent` rows that
-share it. Uniqueness is only `(organizationId, dedupeSource, dedupeValue)`, so one address may
-legitimately map to several rows across organizations. The identity is the address; the set is
-resolved fresh on every access and is never collapsed to one row.
+**Member identity.** An email address plus the **set** of live `OrgRespondent` rows sharing it.
+The address is the identity; the set is resolved fresh on every request and never collapsed.
+
+**Level.** `OrgRespondent.roleType` — one of six Esperto-aligned values. Already stored and
+editable; from this wave on it also **decides what a member may see** (§1.1). *Avoid:* "role"
+(that is `User.role`, ADMIN/STAFF/COACH — a different axis entirely), "job title"
+(`OrgRespondent.jobTitle`, free text, decides nothing).
+
+**Entitlement.** The set of respondents whose reports a member may open, derived per request from
+level and team (§6.3). *Avoid:* "permission" (implies something stored or granted), "ownership"
+(too narrow — a CEO is entitled to reports they do not own).
 
 **Member sign-in link.** A single-use, one-hour, DB-backed credential emailed to an address,
-which can be exchanged once for a member session. Distinct from the **invitation link**
-(reusable, campaign-scoped, says *take this assessment*). *Avoid:* "magic link" — the
-member-facing word is **sign-in link**.
+exchanged once for a member session. Distinct from the **invitation link**, which is reusable,
+campaign-scoped, and says *take this assessment*. *Avoid:* "magic link" — say **sign-in link**.
 
-**Member session.** A short-lived sealed cookie scoped to `/member`, proving only that
-*someone* redeemed a link for a given address on this browser. It is never proof of ownership
-of a particular report.
-
-**Team report.** The member-facing name for what coaches call the group or aggregate report.
-Same artifact, same renderer. ⚠️ Unvalidated — see §19.
+**Member session.** A short-lived sealed cookie scoped to `/member`, proving only that someone
+redeemed a link for that address on this browser. Never proof of entitlement to any report.
 
 ## 5. Surfaces and routes
 
 A new route group `(member)`. Every member endpoint lives **under `/member/`**, including the
-POST handlers, so the session cookie can be path-scoped to `/member` and never travels to an
-admin or coach route. This follows the `(public)/org-survey/[campaignAlias]/me/route.ts`
-precedent exactly; there is no `/api/member/*`.
+POST handlers, so the session cookie can be path-scoped to `/member` and never travel to an admin
+or coach route. This follows the `(public)/org-survey/[campaignAlias]/me/route.ts` precedent;
+there is no `/api/member/*`.
 
 | Route | Kind | Purpose |
 |---|---|---|
-| `/member/sign-in` | page | Request form · Link-sent · Link-not-valid · the token-exchange host |
-| `/member/sign-in/request` | POST handler | Issue a link. Always the same response |
-| `/member/sign-in/exchange` | POST handler | Redeem a raw token for a session |
-| `/member/reports` | page (server) | The list |
-| `/member/reports/[submissionId]` | page (server) | One personal report |
-| `/member/reports/team/[campaignId]` | page (server) | One team report |
-| `/member/sign-out` | POST handler | Destroy the session |
+| `/member/sign-in` | page | Request form · Link-sent · Link-not-valid · the token landing |
+| `/member/sign-in/request` | POST | Issue a link. Always the same response |
+| `/member/sign-in/exchange` | POST | Redeem a token for a session. Never a GET |
+| `/member/home` | page | Greeting + the two tiles |
+| `/member/reports` | page | The card grid |
+| `/member/reports/[submissionId]` | page | One personal report |
+| `/member/reports/team/[campaignId]` | page | One team report |
+| `/member/evaluations` | page | Invitations the member can still complete |
+| `/member/evaluations/[invitationId]/open` | GET → redirect | Server-side handoff into the survey (§6.5) |
+| `/member/sign-out` | POST | Destroy the session |
 
-`/login` gains one member panel beneath a divider. `(member)/layout.tsx` carries the public
-brand chrome (`su-public-brand.css`) and none of the admin shell.
+`/login` gains one member panel beneath a divider. `(member)/layout.tsx` carries the public brand
+chrome (`su-public-brand.css`) and none of the admin shell.
+
+### 5.0 The screens, as Jeff demonstrated them
+
+Taken from the 2026-09-15 recording, 03:47–05:15. These are the shapes to match; exact copy and
+layout come from the redrawn artboards (§19).
+
+**Home** (03:47). A greeting naming the member and their level — Esperto renders
+*"Good morning CEO John Adams !"* — then a short welcome paragraph, then two side-by-side
+panels, **Evaluations** and **Reports**, each with a one-line description and a large round
+button. Esperto's descriptions: *"Here you can see which questionnaires you've been invited to
+complete"* and *"Here you see the results of completed assessments"*.
+
+**Reports** (05:05). Not a list — a **card grid**. Each card carries a report thumbnail, the
+report's name, and its own action. Above the grid: a search field and filter controls
+(Esperto: *All reports* / *Select all* / *Deselect all*), with the intro line *"This is an
+overview of all reports available to you. This includes your personal and summary reports as
+well as the ones shared with you."*
+
+⚠️ Two things visible in that frame are **not** in v1 and must not be copied by reflex: the
+per-card **Share** button (§18) and the multi-select checkboxes that exist to drive a bulk share.
+Our cards carry a single **View report** action. Dropping multi-select removes the only reason
+for *Select all* / *Deselect all*, so those go too; search stays.
+
+⚠️ The grid needs a thumbnail per report and **we have no thumbnail pipeline.** Generating one
+per report is a real piece of work with a real cost on a four-week timeline. The cheap
+substitute that preserves the scanning affordance is a per-instrument card graphic — one static
+image per template alias, reused for every report of that instrument — which is close to what
+the Esperto frame actually shows. Confirm before building (§19).
+
+**Evaluations.** Esperto shows status per invitation (`new` / `invited` / `started` /
+`completed`) and a days-to-complete countdown. Ours lists the member's own open invitations with
+the assessment name, the close date if one is set, and a **Continue** action.
+
+**Report view.** No new screen: the existing report, existing renderer, existing print path.
 
 ### 5.1 The link carries its secret in the query string, and a GET never redeems it
 
@@ -155,62 +259,98 @@ has the same requirement.
 (`services/notifications.ts:1129`) and stays **reusable**, so a scanner opening it costs
 nothing. Do not "harmonise" the two, and do not make the invitation link single-use.
 
-## 6. Identity, eligibility and the two grants
+## 6. Identity, eligibility and entitlement
 
-### 6.1 Resolution
+### 6.1 Resolution — an address maps to a set of roster rows
 
-`resolveMemberIdentity(db, email) → { normalizedEmail, respondentIds: string[] }`
+`resolveMemberIdentity(db, email) → { normalizedEmail, members: MemberRow[] }`
 
-- Normalize: trim, lowercase. Match on `OrgRespondent.normalizedEmail`, falling back to a
-  lowercased `email` comparison for rows written before that column was populated.
+where each `MemberRow` carries `{ respondentId, organizationId, teamId, roleType }`.
+
+- Normalize: trim, lowercase. Match `OrgRespondent.normalizedEmail`, falling back to a lowercased
+  `email` comparison for rows written before that column was populated.
 - Filter to `OrgRespondent.deletedAt IS NULL` **and** `Organization.deletedAt IS NULL`.
-- Return the **set**. Never `findFirst`. Collapsing to the first matching row serves one person
-  another's report the day a real duplicate appears — today all four multi-org addresses are
-  free-mail test personas, which is exactly why this is easy to get wrong and never notice.
+- Return the **set**. Never `findFirst`.
 
-### 6.2 Eligibility — the entry ticket
+Why the set matters more now than it did in revision 1: entitlement is computed **per row**, not
+per person. One address may be a CEO at one company and an employee at another, and the correct
+result is CEO-scope in the first and own-reports-only in the second. Collapsing to one row would
+either leak a whole company's reports or hide them.
 
-A sign-in link is issued iff there exists at least one `AssessmentSubmission` where:
+Production note: all four multi-organization addresses today are free-mail test personas, and
+none of the ten corporate addresses spans organizations. That is exactly why this is easy to get
+wrong and never notice.
 
-- `respondentId ∈ respondentIds`, and
-- the submission's campaign has `deletedAt IS NULL`.
+### 6.2 Eligibility — a live roster row, nothing more
 
-Being on a roster grants nothing. Jeff's wording is the rule: *"Once a campaign recipient
-completes an assessment, they can now login."* Without this, a coach adding a contact silently
-creates a portal account for someone who has done nothing.
+A sign-in link is issued iff `members` is non-empty. See §1.2 for Jeff's wording and why
+completion is **not** required.
 
-### 6.3 Grant A — own reports
+### 6.3 Entitlement — what the member may open
 
-Every `AssessmentSubmission` where `respondentId ∈ respondentIds` and the campaign is live.
-Sorted by `submittedAt` descending. One flat list; no grouping, no company column, no filters
-(reasoning in the wireframe — all cross-org members are test personas, and Esperto cannot
-represent the case at all).
+Computed fresh on every request, never stored in the session, never cached client-side.
 
-### 6.4 Grant B — the team report
+For each `MemberRow`, the set of respondents whose reports it can reach:
 
-Every live `AssessmentCampaign` that has an `AssessmentCampaignParticipant` row with
-`respondentId ∈ respondentIds` **and** `isCEO = true`.
+```
+scopeFor(row):
+  own        = { row.respondentId }                       # always
+  if isCEOFamily(row.roleType):
+      return every live respondent in row.organizationId
+  if row.roleType == "teamleader" and row.teamId != null:
+      return own ∪ every live respondent whose teamId is row.teamId
+                   or any descendant of row.teamId in the OrgTeam tree
+  return own
+```
 
-Listed whenever that row exists, without pre-computing whether the report has content: the
-existing group-report loader already returns `empty` and `notApplicable` outcomes and the
-existing panels render them. Pre-filtering would duplicate the loader's judgment in the list.
+The member's total entitlement is the union across rows. A report is openable iff its
+submission's `respondentId` is in that union **and** its campaign is live.
 
-**Production reality check: exactly one person in production would see a team report today**
-(2 summary reports exist). That is why §16 sequences personal reports as the tracer and the CEO
-rule behind it — not because the rule is hard, but because it is nearly unobservable and would
-be the wrong thing to debug first.
+Three properties worth stating because they are the ones a reviewer should attack:
 
-**One CEO per campaign is enforced**, by the partial unique index
-`assessment_campaign_participants_ceo_unique` on `(campaignId) WHERE isCEO = true`. A company
-with two co-founders hits this immediately. It is Delta 3, not a v1 bug, but v1's rule is
-literally "the team report if you are the CEO", so the constraint is load-bearing here rather
-than incidental.
+- **Strictly downward.** Nothing in `scopeFor` walks to a parent team. Esperto has a
+  parent-group scope; we do not implement it, because Jeff said nobody sees above them.
+- **Organization-bounded.** A CEO's scope is their organization, never the platform. There is no
+  cross-organization visibility at any level.
+- **`teamleader` with no team sees only themselves.** A level without a team is not an error
+  state — it is common in the current data — and it must fail closed, not open.
 
-### 6.5 Deleted campaigns
+### 6.4 The team report
 
-Invisible to members, retained for coaches. Every query above filters `campaign.deletedAt IS
-NULL`, and the per-report loaders re-apply it. This matches the existing respondent-facing rule
-and is what §14 makes coaches aware of before they delete.
+A member sees a campaign's team/group report when they are entitled to **every** completed
+respondent in that campaign under §6.3. In practice that is the CEO for a whole-company campaign
+and a team leader for a campaign confined to their team.
+
+This replaces revision 1's rule, which keyed on `AssessmentCampaignParticipant.isCEO`. Deriving
+it from §6.3 instead means there is **one** entitlement rule in the system rather than two that
+can disagree.
+
+⚠️ **Two CEO concepts now coexist and they are not the same thing.** `OrgRespondent.roleType` is
+a property of the *person*; `AssessmentCampaignParticipant.isCEO` is a property of their
+*participation in one campaign*, is DB-enforced unique per campaign, and drives group-report
+composition today. This spec uses `roleType` for portal entitlement and leaves `isCEO` alone.
+Do not unify them in this wave — that is Jeff's item #5, which he explicitly deferred
+(*"I'm more concerned with four and we'll deal with five as we can"*, 09:56), and it is the
+reason multiple co-founders cannot both be tagged today.
+
+### 6.5 Evaluations — what the member may still complete
+
+The Evaluations surface lists live `AssessmentInvitation` rows for the member's own respondent
+ids — **own only, never the hierarchy**. Seeing a colleague's *report* is a reporting decision;
+opening their *questionnaire* is not something any level grants.
+
+⚠️ **Integration point that needs a decision before build.** The survey runner authorizes through
+a path-scoped invitation cookie exchanged from a `#t=` token (`invitation-cookie.ts`), so a
+member cannot simply be linked into `/org-survey/{alias}` from the portal. The clean route is a
+server-side handoff: the portal mints a fresh invitation token for that member's own invitation
+and redirects. It reuses existing machinery and issues no credential the member could not
+already request — but it is new code on an authorization boundary, so it gets its own task and
+its own tests.
+
+### 6.6 Deleted campaigns
+
+Invisible to members, retained for coaches. Every query filters `campaign.deletedAt IS NULL`, and
+the per-report loaders re-apply it.
 
 ## 7. The sign-in link
 
@@ -316,19 +456,25 @@ function. The member loader needs the same projection under a different authoriz
   **no** authorization in it.
 - `getRespondentReport` keeps its signature and behaviour, now delegating the shaping.
 - Add `getMemberRespondentReport(db, { normalizedEmail, submissionId })`: inside **one**
-  transaction, resolve the identity set, load the submission by id, and return `forbidden`
-  unless `submission.respondentId ∈ set` and `submission.campaign.deletedAt IS NULL`. Then
-  project.
+  transaction, resolve the identity set, compute entitlement (§6.3), load the submission by id,
+  and return `forbidden` unless `submission.respondentId ∈ entitlement` and
+  `submission.campaign.deletedAt IS NULL`. Then project.
+
+  **Entitlement is computed inside that transaction, not passed in.** A caller that hands the
+  loader a precomputed scope has moved the authorization decision out of the loader, which is
+  exactly what ADR-0012 forbids — and a scope computed a request earlier can be stale by the time
+  it is used (a coach can change a member's level or team at any moment).
 
 The extraction is guarded by the existing `respondent-report` tests, which must pass unchanged
 before the member loader is written. This is a refactor of a load-bearing file and gets its own
 red/green task.
 
 `getMemberGroupReport(db, { normalizedEmail, campaignId })` does the same over
-`getCampaignGroupReport`: membership of the identity set **with `isCEO = true`** on a live
-campaign, then delegate.
+`getCampaignGroupReport`: entitlement must cover **every completed respondent in the campaign**
+(§6.4) on a live campaign, then delegate. Note this is a superset test, not a flag check — a
+member entitled to all but one respondent gets `forbidden`, not a partial report.
 
-### 9.2 Ownership is re-verified on every render — and why that sentence is not boilerplate
+### 9.2 Entitlement is recomputed on every render — and why that is not boilerplate
 
 The existing per-report cookie is path-scoped to one campaign, so possession of it *is* the
 grant. A portal cookie spans many reports and cannot be scoped that way, so possession proves
@@ -339,6 +485,12 @@ the first fix for it was also wrong: gating a rehydrate on a `/me` 410 time-boun
 without closing it, because **`sessionStorage` is per-tab while cookies are per-origin** — a
 410 proves some live credential exists in this browser, never *whose* report sits in a tab's
 slot. It was closed only by putting **ownership on top of authorization**.
+
+The hierarchy makes this sharper, not softer. Under revision 1 a stale check could only ever
+serve a member their own report. Now a mistake in `scopeFor` serves one company's reports to
+another company's employee. **Entitlement must be recomputed per render from the live level and
+team**, never carried in the session, never cached in the client, and never trusted from a
+previous request.
 
 Binding consequences for this design:
 
@@ -457,8 +609,10 @@ Two additions inside the existing campaign detail screen (`CampaignDetail.tsx`).
   emails everyone who has completed.
 - **Per person:** `Send report link`, in the respondent row's action cluster beside `Resend`.
 
-Both appear **only for respondents who have completed**; `Resend` already covers the
-not-yet-submitted case, and there is nothing to sign in to before completion.
+Both appear for **any respondent on the campaign**, completed or not — the entry gate is a
+roster row, so a link is useful to someone who has not finished yet (it shows them their
+Evaluations). This is a change from revision 1, which restricted both actions to completers on
+the assumption that completion was the gate.
 
 **The coach never sees the link.** It is generated server-side and delivered only to the
 respondent's address — never rendered, returned in a response body, logged, or copyable. A
@@ -521,17 +675,34 @@ REST API as `type:"encrypted"`, and redeploy — env injects at build time.
 
 ## 16. Sequencing
 
-Three releases, each shippable and separately observable. The order is set by observability, not
-by size.
+Jeff wants a coach pilot **mid-October** and to be live October/November (2026-09-15 at 07:31).
+That is roughly four weeks from this revision, so the sequence is set by what makes a pilot
+possible, not by what is easiest to observe.
 
-1. **Tracer — sign in and see your own reports.** Token, session, list, personal report render,
-   the email, the `/login` panel, the delete-dialog clause. This is the whole mechanism; 21 of
-   22 live roster members exercise it.
-2. **Discovery + the CEO team report.** The three discovery surfaces and Grant B. The team
-   report is sequenced second deliberately: **exactly one person in production would see one**,
-   so shipping it inside the tracer would mean debugging the hardest authorization path against
-   a single observation.
-3. **Coach-initiated send.** The bulk and per-person actions plus the confirmation dialog.
+1. **Sign in and see your own reports.** Token, session, home screen, reports grid, personal
+   report render, the email, the `/login` panel, the delete-dialog clause. Entitlement code is
+   present but every member resolves to own-only — the three rules ship in step 2.
+2. **The hierarchy (Jeff's #4).** `scopeFor`, the CEO and team-leader scopes, and the team
+   report derived from them. Shipping this second is deliberate: it is the piece most likely to
+   leak if it is wrong, and it is far easier to review against a portal that already works.
+3. **Evaluations**, including the survey handoff (§6.5).
+4. **Coach-initiated send** and the discovery surfaces.
+
+⚠️ **Steps 1 and 2 are both needed before the pilot means anything.** A CEO in the pilot who
+signs in and sees only their own report will report the feature as broken, because Jeff
+demonstrated the opposite. If the timeline forces a cut, cut step 3 or 4, never step 2.
+
+### 16.1 Raised on the same call, not in this spec
+
+Jeff listed four other items in the same conversation. None belongs to this wave, and all four
+should be tracked somewhere before they are forgotten:
+
+| Item | His words | Note |
+|---|---|---|
+| Timezone handling on close dates | An Australian campaign *"closed 12 hours early because it closed on Eastern time"* (06:22) | Touches this wave only via the expiry line in §11 |
+| Bulk import of members from Excel | *"if they are onboarding a new customer, they could take an Excel list and bring everybody in"* (06:54) | An import wizard already exists at `/portal/members/import` — verify against his ask before scoping |
+| Extending a campaign's close date | *"I'm okay with… changing the close date for everybody and not try to get as granular as a single person"* (08:44) | He explicitly rejected Esperto's per-person version |
+| Multiple CEOs / co-founders | *"I'm more concerned with four and we'll deal with five as we can"* (09:56) | Blocked today by the partial unique index on `isCEO`; see §6.4 |
 
 ## 17. Failure behaviour
 
@@ -543,58 +714,74 @@ by size.
 | Session expired | Sign-in request form | — |
 | Report not owned | 404 | `authz_deny` metric, no audit row |
 | Report on a deleted campaign | 404 | Same as not-owned; indistinguishable by design |
-| Member with zero live reports | Empty state — *"When you complete an assessment, your report will appear here."* | Rare by construction: only reachable when every one of their reports has since landed on a deleted campaign. Copy must not imply they did something wrong, nor hint that reports existed and were removed |
+| Member with zero live reports | Empty state — *"When you complete an assessment, your report will appear here."* — with a link across to Evaluations when they have open invitations | **Common, not rare.** Any newly added member sees this before they complete anything. Copy must not imply they did something wrong, nor hint that reports existed and were removed |
+| Member entitled to nobody but themselves, with a CEO-family level | Their own reports only | A level with no matching organization data fails closed. Silent by design — a member is never told what they cannot see |
+| `teamleader` with `teamId` null | Their own reports only | Fails closed (§6.3); common in current data, not an error |
 | SMTP failure | Link-sent (already shown) | `member_signin.send_failed`; member's recovery is Send another link |
 
 ## 18. Non-goals
 
-Each has a Delta in the scope document; keep the two in step.
+Revision 1's non-goals were written against a smaller scope; most of them are now in. What
+remains out:
 
-- **Per-level access matrix** (Delta 1) — Esperto's level × report-type × own/own-group/parent-group configuration. The largest item, and worth doing only once we know which combinations coaches actually use.
-- **Person-to-person report sharing** (Delta 2) — and note this is *not* covered by the matrix. It is how a CEO in Esperto actually reaches an individual team member's report; any expectation of "the CEO can open anyone's report" depends on this, not on Delta 1.
-- **Multiple CEOs per campaign** (Delta 3) — DB-enforced today.
-- **Member-run campaign management** (Delta 4) — add participants, change the expiry. The largest thing Esperto's portal does that ours will not. Needs a product decision (do coaches rely on clients chasing their own teams?), not a schedule.
-- **An Evaluations tab** — invitation links already resume in place; Jeff called the portal route *"the long way"*.
-- **A profile screen, in-portal help, a home screen, passwords, self sign-up** (Delta 5).
-- **Public quiz takers** — excluded by Jeff on 2026-09-15.
+- **Person-to-person report sharing.** Esperto puts a `Share` button on every report card
+  (visible at 05:05) with an expiry and viewonly/editor access levels. Nobody has asked for it,
+  and it is genuinely separate from the hierarchy: sharing is how a CEO in Esperto reaches a
+  report their *level* does not grant. Ours grants by level, so the common case is covered.
+- **The configurable access matrix.** We ship the behaviour as fixed rules (§1.1). The matrix is
+  worth building only once we know which combinations coaches actually use.
+- **Parent-group visibility.** Esperto has the scope; Jeff said nobody sees above them.
+- **Multiple CEOs per campaign.** Jeff's #5, explicitly deferred by him.
+- **Member-run campaign management.** Esperto members can add participants and change a
+  campaign's expiry. Jeff asked for the close-date change as a **coach** capability (08:44) and
+  said nothing about members doing it. Large, unrequested.
+- **A profile screen, in-portal help, passwords, self sign-up.**
+- **Public quiz takers.** Excluded by Jeff at 05:28.
+- **Multi-language.** Jeff: *"the bottom of the pile, just where it is"* (10:53).
 
 ## 19. Open decisions
 
-**Needs Jeff or the operator, before the spec is final**
+**Settled since revision 1** — entry gate is a roster row (§1.2); entitlement is the three fixed
+rules (§1.1); the portal matches Esperto's screens (§5.0); the sign-in token is a one-hour,
+single-use, click-to-redeem query parameter (§5.1).
 
-1. **"Team report" wording.** Coaches say *group report*. The member-facing screen currently
-   reads *Team report*, unvalidated. A change here is copy-only but touches the marker, the
-   list, and the route name.
-2. **The bulk-send confirmation dialog** (§13) — a deliberate divergence from the two native
-   `confirm()` buttons beside it. Worth a conscious yes.
-3. **Delta 4** — decide, don't schedule.
+**Needs a decision before build**
 
-**Needs a design decision before implementation**
+1. **Report card thumbnails.** Per-report thumbnails need a rendering pipeline we do not have.
+   Recommended: one static graphic per template alias. Confirm (§5.0).
+2. **The artboards need redrawing.** The existing ten were drawn for a flat list with no home
+   screen and no Evaluations. The visual review cannot sign off screens that do not exist yet.
+3. **The survey handoff in §6.5** — confirm the mint-and-redirect approach before it is built.
+4. **`teamleader` is labelled "Leadership team member"** in `respondent-levels.ts`, which reads
+   like a peer, not a department head. If coaches have been setting it with the label's meaning
+   in mind, the level that grants team-wide visibility may be set on people who should not have
+   it. **Check the production distribution of `roleType` before step 2 ships** — this is a data
+   question, not a design one, and it is the cheapest possible way to find out that the
+   hierarchy would misfire.
 
-4. Where exactly the portal line sits on the results page, the thank-you page, and in the
-   results email.
-5. §10's timing residual: accept-and-bound (recommended) or fixed-floor.
+**Needs Jeff**
 
-**Unverified, and honestly so**
+5. **"Team report" wording.** Coaches say group report; the member screen says Team report.
+6. **The four items in §16.1** — where they go.
 
-6. Whether a brand-new Esperto member can request a portal link with no prior activation. The
-   only definitive test creates a member — **a write to the client's production system** — so
-   it needs explicit authorisation. Evidence so far says no activation step exists for members.
-7. How Esperto resolves a conflict between a level grant and a report-type withhold. Only
-   matters if Delta 1 is ever built, and it should then be decided on its merits rather than
-   assumed to match.
+**Unverified**
+
+7. Whether a brand-new Esperto member can request a portal link with no prior activation. The
+   definitive test writes to the client's production system and needs explicit authorisation.
+   Now lower stakes: our own rule is settled by Jeff's words, not by Esperto's behaviour.
 
 ## 20. Design gate
 
 Before any feature code:
 
-- [ ] Grill this specification (`mattpocock-skills:grilling`). The recurring failure mode in the
-      investigation session was confident claims from thin evidence.
-- [ ] Resolve §19 items 1, 2, 4, 5.
+- [ ] Grill this specification. Revision 1 passed an internal read and still had three factual
+      errors in it, every one of them inherited rather than invented.
+- [ ] Resolve §19 items 1–4.
+- [ ] Redraw the artboards for the screens in §5.0, and get a visual sign-off.
+- [ ] Check the production distribution of `OrgRespondent.roleType` and `teamId` (§19.4).
 - [ ] Add the §4 terms to `CONTEXT.md`.
-- [ ] Write ADRs: **member identity is an address plus a set, never a row**; **the member
-      session authenticates, the loader authorizes** (extending ADR-0012 and ADR-0027).
-- [ ] Visual review of the 10 artboards against the wireframe's visual contract (the standing
-      editor-simplicity rule: every UI/UX decision gets a visual review first).
+- [ ] Write ADRs: **member identity is an address and a set**; **entitlement is derived per
+      request from level and team, never stored**; **the member session authenticates, the loader
+      authorizes** (extending ADR-0012 and ADR-0027).
 - [ ] `/co-validate` the implementation plan.
 - [ ] Explicit approval to build.
