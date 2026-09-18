@@ -43,12 +43,25 @@ Exactly three rules, evaluated against data we already store. No configuration s
 
 | Member's level (`OrgRespondent.roleType`) | Sees |
 |---|---|
-| CEO/founder family (`ceofounder`, `ceofounderwithteam`, `ceofounderalone`) | Every report in **their organization** |
-| `teamleader` | Their **own team and every team beneath it** in the `OrgTeam` tree |
-| `employee`, `guest`, unset | **Their own reports only** |
+| CEO/founder family (`ceofounder`, `ceofounderwithteam`, `ceofounderalone`, legacy `CEO`) | Every report in **their organization** |
+| `teamleader` — a **department head** | Their **own team and every team beneath it**, minus any CEO-family member |
+| `employee`, `guest`, unset, unrecognised | **Their own reports only** |
 
 Everyone sees their own reports regardless of level. Nobody ever sees **above** themselves —
 Jeff was explicit: *"the department heads can see their people, but nobody above them."*
+
+**`teamleader` means department head.** Confirmed by the operator, 2026-09-18: in Scaling Up's
+language the leadership team *is* the department heads, one rung below the CEO. The stored
+label, "Leadership team member", reads like a peer and had been flagged as ambiguous; it is not.
+
+**The CEO-family guard is load-bearing, not belt-and-braces.** A team leader never sees a
+CEO-family member's report, whatever the team tree says. The reason is §6.3's third property:
+`teamId` records which team a person is **in**, not which team they **lead**, and those diverge
+the moment a coach models the leadership team as its own team — which is a natural thing to do
+and is exactly the shape sitting in the current data (`ABC Corp → Engineering → Exec Team`).
+Without the guard, a department head recorded in "Exec Team" would see every other department
+head *and the CEO*: the precise inverse of the rule. The guard enforces "nobody above them"
+directly instead of hoping the hierarchy was drawn the right way round.
 
 Jeff's words, 2026-09-15 at 04:07:
 
@@ -294,26 +307,57 @@ For each `MemberRow`, the set of respondents whose reports it can reach:
 
 ```
 scopeFor(row):
-  own        = { row.respondentId }                       # always
-  if isCEOFamily(row.roleType):
+  own = { row.respondentId }                              # always
+
+  if isCEOFamily(normalizeLevel(row.roleType)):
       return every live respondent in row.organizationId
-  if row.roleType == "teamleader" and row.teamId != null:
-      return own ∪ every live respondent whose teamId is row.teamId
-                   or any descendant of row.teamId in the OrgTeam tree
+
+  if normalizeLevel(row.roleType) == "teamleader" and row.teamId != null:
+      team = every live respondent whose teamId is row.teamId
+             or any descendant of row.teamId in the OrgTeam tree
+      return own ∪ { r ∈ team : not isCEOFamily(normalizeLevel(r.roleType)) }
+
   return own
 ```
+
+`normalizeLevel` maps known legacy values onto the canonical six and returns the input unchanged
+otherwise; unrecognised values fall through to own-only. See §6.3.1.
 
 The member's total entitlement is the union across rows. A report is openable iff its
 submission's `respondentId` is in that union **and** its campaign is live.
 
 Three properties worth stating because they are the ones a reviewer should attack:
 
-- **Strictly downward.** Nothing in `scopeFor` walks to a parent team. Esperto has a
-  parent-group scope; we do not implement it, because Jeff said nobody sees above them.
+- **Strictly downward, twice over.** Nothing in `scopeFor` walks to a parent team, *and* the
+  CEO-family subtraction means a leader cannot reach upward even when the tree is drawn so that
+  they would. Esperto has a parent-group scope; we do not implement it.
+- **The guard does not fix peer visibility, and that is accepted.** A department head recorded in
+  a shared "leadership team" node still sees the other department heads in it. Closing that would
+  need a "team I lead" field distinct from "team I am in", which nobody has asked for. The
+  mitigation is guidance — record a department head in the department they run — plus the coach-UI
+  nudge in §13.1.
 - **Organization-bounded.** A CEO's scope is their organization, never the platform. There is no
   cross-organization visibility at any level.
 - **`teamleader` with no team sees only themselves.** A level without a team is not an error
   state — it is common in the current data — and it must fail closed, not open.
+
+### 6.3.1 Legacy level values
+
+Production contains `roleType` values the code does not know: **`CEO`** (1 row) and
+**`TEAM_MEMBER`** (2 rows), neither in `RESPONDENT_LEVELS`. `isCEOFamily("CEO")` returns **false**
+today, so a person labelled CEO would silently get own-reports-only.
+
+- `normalizeLevel` carries an **explicit** alias map. `CEO` → the CEO family. Nothing else is
+  mapped by inference.
+- **`TEAM_MEMBER` is deliberately left unmapped** and therefore resolves to own-only. It could
+  plausibly mean a rank-and-file team member or a leadership-team member, and the two differ by a
+  whole tier of visibility. Guessing in the granting direction is the one mistake this design
+  cannot take back.
+- A test enumerates every distinct `roleType` present in production and fails when one is neither
+  canonical nor explicitly aliased. That is what turns the next unknown value into a red test
+  instead of a silent denial — or, worse, a silent grant.
+- The alias map is code, not a data migration: reversible by revert, and it never rewrites a row
+  a coach can see and edit.
 
 ### 6.4 The team report
 
@@ -626,6 +670,18 @@ not completed, and cannot extend one.
 design shows a proper dialog with counts, matching the newer campaign-delete pattern. This
 diverges from its immediate neighbours and needs a conscious yes — §19.
 
+### 13.1 One nudge in the member editor
+
+Setting a member's level to **Leadership team member** without also putting them in a team grants
+nothing — the rule falls through to own-only (§6.3). Four of the seven people currently holding
+that level have no team, so this is the common case, not an edge one.
+
+The member editor shows an inline note when that combination is saved: the level decides what
+they can see, and it needs a team to act on. Not a validation error — a coach may legitimately set
+the level before the team structure exists.
+
+This is the only place the portal touches a coach screen other than §13 and §14.
+
 ## 14. Adjacent change — the campaign delete warning
 
 Today: *"{N} invited and {M} completed participants will lose access. Responses are retained.
@@ -682,9 +738,17 @@ possible, not by what is easiest to observe.
 1. **Sign in and see your own reports.** Token, session, home screen, reports grid, personal
    report render, the email, the `/login` panel, the delete-dialog clause. Entitlement code is
    present but every member resolves to own-only — the three rules ship in step 2.
-2. **The hierarchy (Jeff's #4).** `scopeFor`, the CEO and team-leader scopes, and the team
-   report derived from them. Shipping this second is deliberate: it is the piece most likely to
-   leak if it is wrong, and it is far easier to review against a portal that already works.
+2. **The hierarchy (Jeff's #4), both rules.** `scopeFor`, the CEO scope, the department-head
+   scope, the CEO-family guard, the legacy-value alias map, and the team report derived from
+   them. Shipping this second is deliberate: it is the piece most likely to leak if it is wrong,
+   and it is far easier to review against a portal that already works.
+
+   ⚠️ **Correctness here is proven by seeded fixtures, not by production.** There is no real team
+   structure in the database to smoke-test against — 5 teams across 10 organizations, 1 nested,
+   named `Test` and `TEST DELETE ME 2026-05-28 sub-team`. The first real org charts will arrive
+   with the pilot coaches. That makes the unit tests in the plan's Task 3 the whole of the
+   assurance, and it makes the CEO-family guard more valuable, not less: it holds whatever shape
+   the pilot's trees turn out to have.
 3. **Evaluations**, including the survey handoff (§6.5).
 4. **Coach-initiated send** and the discovery surfaces.
 
@@ -700,7 +764,7 @@ should be tracked somewhere before they are forgotten:
 | Item | His words | Note |
 |---|---|---|
 | Timezone handling on close dates | An Australian campaign *"closed 12 hours early because it closed on Eastern time"* (06:22) | Touches this wave only via the expiry line in §11 |
-| Bulk import of members from Excel | *"if they are onboarding a new customer, they could take an Excel list and bring everybody in"* (06:54) | An import wizard already exists at `/portal/members/import` — verify against his ask before scoping |
+| Bulk import of members from Excel | *"if they are onboarding a new customer, they could take an Excel list and bring everybody in"* (06:54) | **Deferred by the operator, 2026-09-18.** Partly built already — `/portal/members/import` plus an **Import from Esperto** action on the Members & Teams header — but the plumbing is in development and not trusted. It is the natural way real org structures and levels arrive, so it gates how useful the hierarchy is in practice; it does not gate building it |
 | Extending a campaign's close date | *"I'm okay with… changing the close date for everybody and not try to get as granular as a single person"* (08:44) | He explicitly rejected Esperto's per-person version |
 | Multiple CEOs / co-founders | *"I'm more concerned with four and we'll deal with five as we can"* (09:56) | Blocked today by the partial unique index on `isCEO`; see §6.4 |
 
@@ -741,34 +805,38 @@ remains out:
 
 ## 19. Open decisions
 
-**Settled since revision 1** — entry gate is a roster row (§1.2); entitlement is the three fixed
-rules (§1.1); the portal matches Esperto's screens (§5.0); the sign-in token is a one-hour,
-single-use, click-to-redeem query parameter (§5.1).
+**Settled** — entry gate is a roster row (§1.2). Entitlement is the three fixed rules (§1.1).
+`teamleader` means **department head** (operator, 2026-09-18), resolving the label ambiguity that
+revision 2 flagged. The portal matches Esperto's screens (§5.0). The sign-in token is a one-hour,
+single-use, click-to-redeem query parameter (§5.1). Bulk member import is **deferred** (§16.1).
+
+**Measured, 2026-09-18** — read-only production counts, all of which are test data (the operator
+confirms production carries no real customer records): 22 live members across 10 organizations;
+levels `teamleader` 7 · unset 5 · `ceofounderwithteam` 3 · `TEAM_MEMBER` 2 · `ceofounder` 2 ·
+`ceofounderalone` 1 · `employee` 1 · `CEO` 1; only 8 of 22 attached to a team; 5 teams total
+across 3 organizations, 1 nested, max depth 2; 6 organizations have a CEO-family member and
+**none has more than one**; largest CEO scope 6 people; 101 submissions with a roster row, 36 on
+live campaigns. **Re-measure before any launch claim** — and treat these as a description of the
+test fixtures, not of customer behaviour.
 
 **Needs a decision before build**
 
-1. **Report card thumbnails.** Per-report thumbnails need a rendering pipeline we do not have.
-   Recommended: one static graphic per template alias. Confirm (§5.0).
-2. **The artboards need redrawing.** The existing ten were drawn for a flat list with no home
-   screen and no Evaluations. The visual review cannot sign off screens that do not exist yet.
-3. **The survey handoff in §6.5** — confirm the mint-and-redirect approach before it is built.
-4. **`teamleader` is labelled "Leadership team member"** in `respondent-levels.ts`, which reads
-   like a peer, not a department head. If coaches have been setting it with the label's meaning
-   in mind, the level that grants team-wide visibility may be set on people who should not have
-   it. **Check the production distribution of `roleType` before step 2 ships** — this is a data
-   question, not a design one, and it is the cheapest possible way to find out that the
-   hierarchy would misfire.
+1. **Report card thumbnails.** No rendering pipeline exists. Recommended: one static graphic per
+   template alias (§5.0).
+2. **The artboards need redrawing** for the home screen, Evaluations, and the card grid.
+3. **The survey handoff in §6.5** — confirm mint-and-redirect before it is built.
 
 **Needs Jeff**
 
-5. **"Team report" wording.** Coaches say group report; the member screen says Team report.
-6. **The four items in §16.1** — where they go.
+4. **"Team report" wording.** Coaches say group report; the member screen says Team report.
+5. **The remaining items in §16.1** — timezone handling, campaign close-date extension,
+   multiple CEOs, multi-language.
 
-**Unverified**
+**Known limitation, accepted**
 
-7. Whether a brand-new Esperto member can request a portal link with no prior activation. The
-   definitive test writes to the client's production system and needs explicit authorisation.
-   Now lower stakes: our own rule is settled by Jeff's words, not by Esperto's behaviour.
+6. A department head recorded in a shared leadership-team node sees their peers (§6.3). The
+   CEO-family guard stops it reaching upward; nothing stops it reaching sideways. Closing it would
+   need a "team I lead" field distinct from "team I am in".
 
 ## 20. Design gate
 
@@ -776,9 +844,10 @@ Before any feature code:
 
 - [ ] Grill this specification. Revision 1 passed an internal read and still had three factual
       errors in it, every one of them inherited rather than invented.
-- [ ] Resolve §19 items 1–4.
+- [ ] Resolve §19 items 1–3.
 - [ ] Redraw the artboards for the screens in §5.0, and get a visual sign-off.
-- [ ] Check the production distribution of `OrgRespondent.roleType` and `teamId` (§19.4).
+- [x] Check the production distribution of `OrgRespondent.roleType` and `teamId` — done
+      2026-09-18, numbers in §19.
 - [ ] Add the §4 terms to `CONTEXT.md`.
 - [ ] Write ADRs: **member identity is an address and a set**; **entitlement is derived per
       request from level and team, never stored**; **the member session authenticates, the loader

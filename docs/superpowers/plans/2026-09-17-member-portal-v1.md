@@ -116,28 +116,34 @@ every `/member/*` route 404s.
 
 ---
 
-### Task 0: Measure the production level and team data — BLOCKING, read-only
+### Task 0: Measure the production level and team data — ✅ DONE 2026-09-18
 
-This runs **before** any code and can change the design. It is cheap and it is the only way to
-find out that the hierarchy would misfire before it does.
+Ran read-only against production, aggregates only, no writes. **All production data is test
+data** (operator, 2026-09-18), so read these as a description of the fixtures, not of customers.
 
-The level that grants team-wide visibility is `teamleader`, whose label in
-`lib/assessments/respondent-levels.ts` is **"Leadership team member"** — which reads like a peer,
-not a department head. If coaches have been setting it with the label's meaning in mind, step 2
-would hand a whole team's reports to people tagged as colleagues.
+| | |
+|---|---|
+| Live members | **22**, across 10 live organizations |
+| Levels | `teamleader` 7 · *(not set)* 5 · `ceofounderwithteam` 3 · `TEAM_MEMBER` 2 · `ceofounder` 2 · `ceofounderalone` 1 · `employee` 1 · `CEO` 1 |
+| Attached to a team | 8 of 22 — including only **3 of the 7** `teamleader` rows |
+| Teams | 5 across 3 organizations; **1 nested**; max depth 2; named `Engineering`, `Exec Team`, `Test`, `TEST DELETE ME 2026-05-28 sub-team` |
+| CEO reach | 6 organizations have a CEO-family member; **0 have more than one**; largest scope 6 people; 17 of 22 sit inside some CEO scope |
+| Submissions with a roster row | 101, of which **36** on live campaigns |
 
-- [ ] Against production, read-only, aggregates only (see the method notes in the scope
-      document's appendix — Neon suspends when idle, tables are snake_case with quoted camelCase
-      columns, scripts must sit inside `src/`):
-      - count of live `OrgRespondent` rows per `roleType`, per organization
-      - how many carry a non-null `teamId`
-      - how many organizations have more than one `OrgTeam`, and the maximum tree depth
-      - how many live respondents would fall into CEO scope under §1.1, per organization
-- [ ] **Emit aggregates only.** No names, no addresses.
-- [ ] Record the numbers in the plan's launch entry, and re-measure before any launch claim.
-- [ ] **Decision point:** if `teamleader` is widely set on people who are not department heads,
-      or if `teamId` is largely null, say so and stop — the rule needs revisiting with Jeff
-      before step 2, and steps 1/3/4 can proceed without it.
+**Three things this changed, all now in the spec:**
+
+1. **`CEO` and `TEAM_MEMBER` exist as levels and the code does not know them.**
+   `isCEOFamily("CEO")` returns false, so a person labelled CEO would silently get own-only.
+   → `normalizeLevel` with an explicit alias map, spec §6.3.1. Task 3 covers it.
+2. **`teamleader` means department head** — confirmed by the operator, resolving the label
+   ambiguity this task was written to surface.
+3. **There is no real team structure to smoke-test against.** The single nested relationship in
+   the whole database is `Exec Team` under `Engineering`. Correctness of the descendant walk is
+   therefore proven by seeded fixtures only, and the CEO-family guard exists because the shape of
+   real trees is unknown. Re-measure once pilot coaches have built real org charts.
+
+**Re-run this before any launch claim.** The script was temporary and deliberately not committed;
+the queries are reproducible from the table above.
 
 ---
 
@@ -177,11 +183,26 @@ the thing most likely to be got wrong, and they are far easier to test in isolat
 a page.
 
 - [ ] RED: `employee`, `guest`, `null`, and an unrecognised slug → own respondent id only.
+- [ ] RED (`normalizeLevel`): legacy **`CEO`** maps into the CEO family; **`TEAM_MEMBER` is NOT
+      mapped** and resolves to own-only; any other unrecognised value returns unchanged and
+      resolves to own-only. Guessing in the granting direction is the one mistake this design
+      cannot take back — assert that `TEAM_MEMBER` grants nothing.
+- [ ] RED (the enumeration guard): a test lists every distinct `roleType` observed in production
+      (Task 0's table) and **fails** when one is neither canonical nor explicitly aliased. This is
+      what turns the next unknown value into a red test instead of a silent denial or grant.
 - [ ] RED: each of the three CEO-family slugs → every live respondent in **that row's**
       organization, and **no** respondent from any other organization.
 - [ ] RED: `teamleader` with a team → own ∪ that team ∪ **all descendant teams**, to a depth of
       at least three. Siblings excluded. The parent team excluded — assert this explicitly, it is
       the "nobody above them" rule.
+- [ ] RED (the CEO-family guard, load-bearing): a `teamleader` whose own team **contains a
+      CEO-family member** — the "leadership team modelled as a team" shape, which is exactly what
+      `ABC Corp → Engineering → Exec Team` looks like today — does **not** see that member's
+      report, while still seeing the non-CEO members of the same team. Assert it for a CEO in the
+      leader's own team *and* for one in a descendant team.
+- [ ] RED: the guard subtracts only CEO-family members. A department head still sees their peers
+      in a shared leadership-team node — that is the accepted limitation in spec §6.3, and the
+      test records it deliberately so nobody "fixes" it by accident.
 - [ ] RED: `teamleader` with `teamId` null → own only. Fails closed.
 - [ ] RED: a member with rows in two organizations gets the **union**, and the CEO scope of one
       does not widen the employee scope of the other.
@@ -416,14 +437,17 @@ Ships alone, guarded by existing tests.
 The piece most likely to leak, shipped against a portal that already works. **Do not start
 without Task 0's numbers.**
 
-### Task 16: Enable the CEO and team-leader scopes
+### Task 16: Enable the CEO and department-head scopes
 
 - [ ] RED: an entitled-but-not-owned report opens for a CEO and for the right team leader, and
       404s for an employee, for a sibling team's leader, and for a member of another organization.
 - [ ] RED: changing a member's `roleType` or `teamId` changes what they can open **on the next
       request**, with no sign-out — proves entitlement is not cached in the session.
-- [ ] GREEN: switch the loaders from own-only to `entitlementFor(members)` from Task 3. No new
-      rules are written here; Task 3 already has them under test.
+- [ ] RED: a department head does not see the CEO's report even when the CEO sits in their own
+      team — the end-to-end form of Task 3's guard, asserted through the loader rather than the
+      pure rule.
+- [ ] GREEN: switch the loaders from own-only to `entitlementFor(members)` from Task 3. **Both
+      rules go live together.** No new rules are written here; Task 3 already has them under test.
 - [ ] Verify · commit.
 
 ### Task 17: The team report
@@ -435,6 +459,18 @@ without Task 0's numbers.**
 - [ ] GREEN: reuse Task 7's `getMemberGroupReport` and Task 8's adapter; `generatedAt = new Date()`
       at the page boundary, keeping gate and loader clock-free.
 - [ ] Verify · commit · SoT hygiene · launch as in Task 15.
+
+### Task 17b: The member-editor nudge
+
+**Files:** `components/organizations/edit-member-modal.tsx`, `add-member-modal.tsx`, tests
+
+- [ ] RED: saving a member as **Leadership team member** with no team shows an inline note that
+      the level needs a team to grant anything; saving with a team shows nothing; **it is not a
+      validation error** — a coach may legitimately set the level before the structure exists.
+- [ ] RED: the note is absent when the portal flag is off.
+- [ ] GREEN · verify · commit.
+
+Four of the seven people currently holding that level have no team, so this is the common case.
 
 ---
 
@@ -495,14 +531,21 @@ without Task 0's numbers.**
 - Alerting on `member_signin.send_failed` beyond human-read `vercel logs`.
 - Person-to-person report sharing; the configurable access matrix; parent-group scope; multiple
   CEOs per campaign (Jeff's #5); member-run campaign management.
-- Jeff's other four items from the same call — timezone handling on close dates, Excel member
-  import, campaign close-date extension, multi-language. See spec §16.1; none belongs to this wave.
+- **Bulk member import** — deferred by the operator, 2026-09-18. Partly built already
+  (`/portal/members/import` plus an **Import from Esperto** action on the Members & Teams header),
+  but the plumbing is in development and not trusted. It is how real org structures and levels will
+  actually arrive, so it governs how useful the hierarchy is in practice — it does not block
+  building it, and it should be picked up before the mid-October pilot if anything is to be loaded.
+- Jeff's other items from the same call — timezone handling on close dates, campaign close-date
+  extension, multiple CEOs, multi-language. See spec §16.1; none belongs to this wave.
 - Retiring the ADR-0027 `sessionStorage` rehydrate now that a durable authorized results URL
   exists.
 
 ## Plan Self-Review Checklist
 
-- [ ] Task 0 ran, and its numbers are in the launch entry.
+- [x] Task 0 ran; its numbers are recorded above and must be re-measured before launch.
+- [ ] `TEAM_MEMBER` is asserted to grant nothing; no legacy value is mapped by inference.
+- [ ] The CEO-family guard is asserted both as a pure rule (Task 3) and through the loader (Task 16).
 - [ ] Every task has a RED step that fails for the stated reason before implementation.
 - [ ] No task both refactors a shared module and adds a feature (Task 6 ships alone).
 - [ ] Flag-off byte-identity is asserted in Tasks 11–14, 17, 20, 21 — not assumed once.
