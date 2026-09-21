@@ -6,6 +6,15 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="member-portal-release-three-implemented"></a>
+### 2026-09-21 — Member portal Release 3 implemented <!-- ENTRY_ISO:2026-09-21 ENTRY_SLUG:member-portal-release-three-implemented -->
+
+**Status: IMPLEMENTED AND VERIFIED; DARK BY DEFAULT; NOT MERGED, DEPLOYED, OR ENABLED.** Release 3 adds the Member **Evaluations** list and the handoff into the existing invited-assessment experience. Discovery starts from every live roster identity carried by the signed-in normalized email but returns only invitations addressed to those exact Respondent rows—never CEO or team hierarchy scope. Revoked, expired, submitted, inactive, not-yet-open, closed, and deleted-Campaign invitations remain absent. Open invitations are ordered by the soonest Campaign close time, with undated Campaigns last, and each card uses an explicit non-prefetched **Continue** link.
+
+**Canonical invited-flow handoff.** Continue re-resolves the Member identity and exact invitation in one transaction, runs the shared invitation-exchange lifecycle classifier before any grant, and fails closed unless the invitation still belongs to the Member and remains usable. It grants the existing Campaign invitation session directly and redirects to `/org-survey/{alias}`; it does not mint, rotate, hash, or disclose a token, extend expiry, add token history, or change resend counters/timestamps. Only `PENDING` or `SENT` advances to `VIEWED`; the canonical invited flow remains responsible for autosave, submission, thank-you, and report behavior. Release 4 Coach-initiated send/discovery remains out of scope.
+
+**Verification receipt.** Independent Spec and Standards re-reviews found no actionable findings after the explicit-click and shared-identity corrections. The focused lifecycle, handoff, exchange, middleware, and no-store matrix passes **7 suites / 64 tests**; the complete repository passes **839/839 suites, 10,424/10,424 tests, and 16/16 snapshots**. Changed-file ESLint emits no diagnostics, all **53** migration-safety checks pass, and `git diff --check` is clean. The fresh 4 GB-heap Turbopack production build compiles, passes TypeScript, and generates **98/98 pages**. Build output contains only the inherited middleware-deprecation, missing local Inngest-key, and build-time `DATABASE_URL` warnings. No Production database write, member email, invitation credential mutation, environment change, merge, deployment, or flag activation occurred.
+
 <a id="member-portal-release-two-implemented"></a>
 ### 2026-09-21 — Member portal Release 2 implemented <!-- ENTRY_ISO:2026-09-21 ENTRY_SLUG:member-portal-release-two-implemented -->
 
