@@ -39,7 +39,7 @@ export default async function ThankYouPage({
           : "Thank you — your coach will review your results with you."}
       </p>
       {resultsEmailSent && isMemberPortalEnabled() ? (
-        <MemberPortalLink className="mt-5 text-sm text-slate-600" />
+        <MemberPortalLink className="mt-5 text-sm text-muted-foreground" />
       ) : null}
     </main>
   );

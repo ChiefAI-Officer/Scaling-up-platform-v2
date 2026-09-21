@@ -829,7 +829,7 @@ export function CampaignDetail({
     setSendingMemberLinks(true);
     try {
       const body = memberLinkTarget
-        ? { respondentIds: [memberLinkTarget.respondent.id] }
+        ? { respondentId: memberLinkTarget.respondent.id }
         : {};
       const res = await fetch(
         `/api/assessment-campaigns/${campaign.id}/member-links`,

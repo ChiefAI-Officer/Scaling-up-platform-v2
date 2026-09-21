@@ -17,6 +17,7 @@ import { render, screen } from "@testing-library/react";
 // no mocking needed.
 
 import ThankYouPage from "@/app/(public)/org-survey/[campaignAlias]/thank-you/page";
+import { MEMBER_FORBIDDEN_VISIBLE_WORDS } from "@/lib/members/copy";
 
 describe("Invited ThankYouPage — adaptive copy (#15)", () => {
   afterEach(() => {
@@ -68,9 +69,9 @@ describe("Invited ThankYouPage — adaptive copy (#15)", () => {
       "href",
       "/member/sign-in",
     );
-    expect(view.container.textContent).not.toMatch(
-      /campaign|respondent|submission|participant|token|magic link/i,
-    );
+    for (const term of MEMBER_FORBIDDEN_VISIBLE_WORDS) {
+      expect(view.container.textContent?.toLowerCase()).not.toContain(term.toLowerCase());
+    }
 
     view.unmount();
     delete process.env.WAVE_MP_MEMBER_PORTAL_ENABLED;

@@ -242,6 +242,9 @@ export default async function CampaignDetailPage({ params }: PageProps) {
     }
   }
 
+  const memberPortalCampaignEnabled =
+    campaignForFlag?.accessMode === "INVITED" && isMemberPortalEnabled();
+
   return (
     <CampaignDetail
       responsiveEnabled={mobileResponsiveEnabled}
@@ -280,12 +283,8 @@ export default async function CampaignDetailPage({ params }: PageProps) {
       }
       canEditReportAppearance={canEditReportAppearance}
       legacyOverTimeRespondentIds={legacyOverTimeRespondentIds}
-      memberPortalAccessWarning={
-        campaignForFlag?.accessMode === "INVITED" && isMemberPortalEnabled()
-      }
-      memberPortalSendEnabled={
-        campaignForFlag?.accessMode === "INVITED" && isMemberPortalEnabled()
-      }
+      memberPortalAccessWarning={memberPortalCampaignEnabled}
+      memberPortalSendEnabled={memberPortalCampaignEnabled}
     />
   );
 }

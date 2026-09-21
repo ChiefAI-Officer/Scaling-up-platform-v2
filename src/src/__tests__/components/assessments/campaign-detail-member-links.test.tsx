@@ -116,7 +116,7 @@ describe("CampaignDetail member report links", () => {
 
     await waitFor(() => {
       const init = (global.fetch as jest.Mock).mock.calls[0][1];
-      expect(JSON.parse(init.body)).toEqual({ respondentIds: ["respondent-pending"] });
+      expect(JSON.parse(init.body)).toEqual({ respondentId: "respondent-pending" });
     });
   });
 

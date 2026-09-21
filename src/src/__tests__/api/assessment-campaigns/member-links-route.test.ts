@@ -99,7 +99,7 @@ describe("POST campaign member links", () => {
   });
 
   it("sends to exactly one requested campaign respondent, completed or not", async () => {
-    const response = await POST(request({ respondentIds: ["respondent-2"] }), {
+    const response = await POST(request({ respondentId: "respondent-2" }), {
       params: Promise.resolve({ id: "campaign-1" }),
     });
 
@@ -111,6 +111,19 @@ describe("POST campaign member links", () => {
     );
   });
 
+  it.each([
+    { respondentIds: ["respondent-1", "respondent-2"] },
+    { respondentIds: [] },
+  ])("rejects selectors other than exactly one respondent or all: %j", async (body) => {
+    const response = await POST(request(body), {
+      params: Promise.resolve({ id: "campaign-1" }),
+    });
+
+    expect(response.status).toBe(400);
+    expect(mockFindCampaign).not.toHaveBeenCalled();
+    expect(mockSendLink).not.toHaveBeenCalled();
+  });
+
   it("fails closed before lookup or send when disabled, unauthenticated, or unauthorized", async () => {
     mockEnabled.mockReturnValue(false);
     let response = await POST(request(), { params: Promise.resolve({ id: "campaign-1" }) });
@@ -118,11 +131,11 @@ describe("POST campaign member links", () => {
     expect(mockFindCampaign).not.toHaveBeenCalled();
     expect(mockSendLink).not.toHaveBeenCalled();
 
-    mockEnabled.mockReturnValue(true);
     mockActor.mockResolvedValue(null);
     response = await POST(request(), { params: Promise.resolve({ id: "campaign-1" }) });
     expect(response.status).toBe(401);
 
+    mockEnabled.mockReturnValue(true);
     mockActor.mockResolvedValue({ userId: "user-1", role: "COACH", coachId: "coach-1" });
     mockCanManage.mockResolvedValue(false);
     response = await POST(request(), { params: Promise.resolve({ id: "campaign-1" }) });
@@ -134,7 +147,7 @@ describe("POST campaign member links", () => {
     mockFindCampaign.mockResolvedValue(campaign(1));
 
     const response = await POST(
-      request({ respondentIds: ["respondent-2", "not-on-campaign"] }),
+      request({ respondentId: "not-on-campaign" }),
       { params: Promise.resolve({ id: "campaign-1" }) },
     );
 

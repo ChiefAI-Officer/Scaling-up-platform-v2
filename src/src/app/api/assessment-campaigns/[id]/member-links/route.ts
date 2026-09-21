@@ -8,23 +8,23 @@ import { sendMemberSignInLink } from "@/lib/members/send-sign-in-link";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
 
 const BodySchema = z.object({
-  respondentIds: z.array(z.string().min(1)).optional(),
-});
+  respondentId: z.string().min(1).optional(),
+}).strict();
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  if (!isMemberPortalEnabled()) {
-    return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
-  }
-
   const actor = await getApiActor();
   if (!actor) {
     return NextResponse.json(
       { success: false, error: "Authentication required" },
       { status: 401 },
     );
+  }
+
+  if (!isMemberPortalEnabled()) {
+    return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
   }
 
   const { id: campaignId } = await params;
@@ -71,10 +71,9 @@ export async function POST(
     return NextResponse.json({ success: false, error: "Campaign not found" }, { status: 404 });
   }
 
-  const requestedIds = parsed.data.respondentIds;
-  const wanted = requestedIds?.length ? new Set(requestedIds) : null;
+  const respondentId = parsed.data.respondentId;
   const targets = campaign.participants.filter(
-    (participant) => wanted === null || wanted.has(participant.respondentId),
+    (participant) => respondentId === undefined || respondentId === participant.respondentId,
   );
   if (targets.length === 0) {
     return NextResponse.json(

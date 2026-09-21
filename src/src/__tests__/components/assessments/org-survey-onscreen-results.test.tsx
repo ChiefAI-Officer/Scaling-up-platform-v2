@@ -25,6 +25,7 @@ import {
   completeSuFullPeerReport,
 } from "@/__tests__/fixtures/su-full-peer";
 import { buildSuFullPeerPresentationResult } from "@/lib/assessments/su-full-peer-presentation";
+import { MEMBER_FORBIDDEN_VISIBLE_WORDS } from "@/lib/members/copy";
 
 jest.mock("next/navigation", () => ({
   useRouter: () => ({ push: jest.fn(), replace: jest.fn() }),
@@ -240,9 +241,9 @@ describe("the rendered report", () => {
     await waitFor(() => {
       expect(screen.getByRole("link", { name: "Open the member portal" })).toBeInTheDocument();
     });
-    expect(view.container.textContent).not.toMatch(
-      /campaign|respondent|submission|participant|token|magic link/i,
-    );
+    for (const term of MEMBER_FORBIDDEN_VISIBLE_WORDS) {
+      expect(view.container.textContent?.toLowerCase()).not.toContain(term.toLowerCase());
+    }
 
     view.unmount();
     render(<OrgSurveyClient campaignAlias={ALIAS} />);

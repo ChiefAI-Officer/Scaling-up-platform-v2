@@ -14,6 +14,7 @@ import {
   buildResultsEmailHtml,
   buildCoachNotifyEmail,
 } from "@/lib/assessments/results-email";
+import { MEMBER_FORBIDDEN_VISIBLE_WORDS } from "@/lib/members/copy";
 
 describe("respondent first-name personalization", () => {
   it("replaces every exact subject token and strips subject control characters", () => {
@@ -154,7 +155,9 @@ describe("buildResultsEmailHtml", () => {
     expect(enabled).toContain(
       'href="https://app.example.com/member/sign-in?from=results&amp;safe=1"',
     );
-    expect(enabled).not.toMatch(/token|campaign|respondent|submission|participant|magic link/i);
+    for (const term of MEMBER_FORBIDDEN_VISIBLE_WORDS) {
+      expect(enabled.toLowerCase()).not.toContain(term.toLowerCase());
+    }
     expect(disabled).not.toContain("member/sign-in");
   });
 

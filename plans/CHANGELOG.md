@@ -6,6 +6,15 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="member-portal-release-four-implemented"></a>
+### 2026-09-22 — Member portal Release 4 implemented <!-- ENTRY_ISO:2026-09-22 ENTRY_SLUG:member-portal-release-four-implemented -->
+
+**Status: IMPLEMENTED AND VERIFIED; DARK BY DEFAULT; NOT MERGED, DEPLOYED, ENABLED, OR EMAILED.** Release 4 adds authenticated Coach-initiated Member sign-in sends to invited Campaign Detail and three gated discovery surfaces: the in-place respondent result, the result-email thank-you page, and the respondent results email. Coach bulk sends target every live Campaign roster row regardless of completion; a row action targets exactly one person. The endpoint reuses the canonical `sendMemberSignInLink` path with `via: "COACH"`, records the existing issuance audit, uses its own 100-per-minute lane, and returns counts without a raw link, token, session, or email address. A counted application dialog—not a browser confirmation—states that each private link is single-use and expires after 24 hours.
+
+**Authorization, copy, and compatibility boundary.** Authentication precedes the global feature gate, authenticated flag-off requests 404, and the existing Campaign write authorization still conceals inaccessible Campaigns. The Campaign query admits only live Respondent rows in live Organizations. The request contract is deliberately two-state: `{}` means every eligible Campaign respondent and `{ respondentId }` means exactly one; arbitrary subsets and unknown fields are rejected before lookup or send. Discovery uses one shared Member-facing component plus an escaped email equivalent, the complete shared forbidden-vocabulary list, and an HTTPS-only absolute-URL policy with local-development HTTP support. Flag-off omits every new control, link, and email fragment; existing invitation credentials, submission/report behavior, and self-issued one-hour links are unchanged.
+
+**Verification receipt.** The independent fixed-point Spec and Standards review found and drove closure of the partial-subset endpoint ambiguity, incomplete vocabulary assertions, semantic-color drift, URL-policy duplication, auth-order conflict, and source-of-truth gap. The post-review focused matrix passes **6 suites / 72 tests**; the complete repository passes **842/842 suites, 10,443/10,443 tests, and 16/16 snapshots**. Changed-file ESLint emits no diagnostics, all **53** migration-safety checks pass, and `git diff --check` is clean. The fresh 4 GB-heap Turbopack production build compiles, passes TypeScript, and generates **98/98 pages**. Its only messages are the inherited middleware-deprecation, missing local Inngest-key, and build-time `DATABASE_URL` warnings. No Production database write, Member email, invitation credential mutation, environment change, merge, deployment, or flag activation occurred.
+
 <a id="member-portal-release-three-implemented"></a>
 ### 2026-09-21 — Member portal Release 3 implemented <!-- ENTRY_ISO:2026-09-21 ENTRY_SLUG:member-portal-release-three-implemented -->
 
