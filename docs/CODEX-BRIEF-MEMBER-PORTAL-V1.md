@@ -140,6 +140,46 @@ If the timeline squeezes, cut Release 3 or 4. Never cut Release 2 and ship Relea
 were the feature — a CEO in the pilot who signs in and sees only their own report will report it
 as broken, because that is the opposite of what was demonstrated.
 
+
+### 8.1 The 22 tasks, so you can see the whole shape
+
+Titles only. **Every task's steps, files and tests are in the plan** —
+`docs/superpowers/plans/2026-09-17-member-portal-v1.md`. Do not work from this list alone; it
+exists so you know the scope before you open anything.
+
+**Done already**
+- Task 0 — Measure the production level and team data *(ran 2026-09-18; numbers are in the plan)*
+
+**Release 1 — sign in and see your own reports** (15 tasks)
+1. Dark-launch state and the flag
+2. Member identity resolves to a set of rows
+3. The entitlement rules ← *all three rules and their full test suite land here, even though Release 1 only exercises own-only*
+4. The single-use token primitive
+5. Session and middleware
+6. Split authorization from projection in the respondent report ← *ships alone; existing tests must pass unchanged*
+7. Member report loaders
+8. Widen the report gate — additively
+9. The sign-in email
+10. Issue and dispatch
+11. The sign-in route handlers
+12. The member screens ← *the biggest single task*
+13. The `/login` member panel
+14. The campaign delete warning
+15. Release 1 proof and source-of-truth hygiene
+
+**Release 2 — the hierarchy** (3 tasks) — ⚠️ *confirm scope with the operator first, see §8*
+16. Enable the CEO and department-head scopes
+17. The group report
+17b. Two member-editor warnings *(numbering wart: inserted late, not renumbered so cross-references stay valid)*
+
+**Release 3 — Evaluations** (2 tasks)
+18. The evaluations list
+19. The survey handoff — grant the session, mint nothing
+
+**Release 4 — coach-initiated send and discovery** (2 tasks)
+20. The send endpoint and coach surface
+21. Discovery lines
+
 ## 9. Definition of done, per release
 
 - Every task's tests written red first, then green.
