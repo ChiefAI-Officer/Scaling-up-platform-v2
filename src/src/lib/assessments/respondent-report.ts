@@ -19,13 +19,10 @@ import {
   asAccessDb,
 } from "@/lib/assessments/access-control";
 import type { ScoreResult } from "@/lib/assessments/scoring";
-import { respondentDisplayName } from "@/lib/assessments/respondent-display-name";
 import {
-  buildQuestionMetaByKey,
   type QuestionMeta,
 } from "@/lib/assessments/question-meta";
 import type { ReportStyleKey } from "@/lib/assessments/report-style-registry";
-import { isReportStylesEnabled } from "@/lib/assessments/wave-report-styles-flags";
 import {
   revalidateCeoReportAccessInTransaction,
   type CeoReportAccessTransaction,
@@ -33,11 +30,15 @@ import {
 import type { CeoReportSessionPayload } from "@/lib/assessments/ceo-report-access-cookie";
 import type { SuFullPeerPresentation } from "@/lib/assessments/su-full-peer-presentation";
 import {
-  resolveActiveReportHtml,
-  resolvePublishedReportHtmlForTemplate,
   type SafeReportHtml,
 } from "@/lib/assessments/report-html";
 import type { ActiveVersionDb } from "@/lib/assessments/active-version";
+import { projectRespondentReport } from "@/lib/assessments/respondent-report-projection";
+
+export {
+  buildStoredRespondentReport,
+  isScoreResult,
+} from "@/lib/assessments/respondent-report-projection";
 
 // Re-export so existing `import { QuestionMeta } from "respondent-report"`
 // consumers keep working after the shared builder extraction.
@@ -80,7 +81,7 @@ export interface StoredReportVersion {
   scoringConfig: unknown;
 }
 
-interface RawSubmission {
+export interface RawSubmission {
   id: string;
   submittedAt: Date;
   answers: unknown;
@@ -260,123 +261,6 @@ export interface StoredRespondentReportInput {
   };
 }
 
-// ─── Guard helpers ────────────────────────────────────────────────────────
-
-export function isScoreResult(value: unknown): value is ScoreResult {
-  if (!value || typeof value !== "object") return false;
-  const v = value as Record<string, unknown>;
-  return Array.isArray(v.perSection) && Array.isArray(v.perQuestion);
-}
-
-/**
- * Builds the canonical Results report model from a frozen stored submission.
- *
- * This function is deliberately pure: callers provide the submission's frozen
- * result/answers and its pinned published Template Version. It never scores or
- * loads mutable template content.
- */
-export function buildStoredRespondentReport(
-  input: StoredRespondentReportInput,
-): RespondentReport {
-  const questionsByKey: Record<string, QuestionMeta> = buildQuestionMetaByKey(
-    input.campaign.version.questions,
-  );
-  const questionByKey: Record<string, string> = {};
-  for (const [key, meta] of Object.entries(questionsByKey)) {
-    questionByKey[key] = meta.label;
-  }
-
-  const creatorCoach = input.campaign.creatorCoach;
-  const reportHtml =
-    input.reportHtml ??
-    resolveActiveReportHtml(input.campaign.version.reportConfig);
-
-  return {
-    respondentName: respondentDisplayName(
-      input.respondent.firstName,
-      input.respondent.lastName,
-      input.respondent.email,
-    ),
-    respondentEmail: input.respondent.email?.trim() || null,
-    jobTitle: input.respondent.jobTitle ?? null,
-    companyName: input.campaign.organizationName,
-    assessmentName: input.campaign.template.name,
-    templateAlias: input.campaign.template.alias,
-    reportStyle: input.campaign.reportStyle,
-    campaignLabel:
-      input.campaign.name && input.campaign.name.trim() !== ""
-        ? input.campaign.name
-        : null,
-    submittedAt: input.submission.submittedAt,
-    result: input.submission.result as ScoreResult,
-    sections: input.campaign.version.sections,
-    questionByKey,
-    questionsByKey,
-    rawAnswers: input.submission.answers,
-    scoringConfig: input.campaign.version.scoringConfig,
-    ...(reportHtml ? { reportHtml } : {}),
-    provenance: {
-      submissionId: input.submission.id,
-      versionId: input.campaign.version.id,
-      contentHash: input.campaign.version.contentHash,
-      templateName: input.campaign.template.name,
-      ...(input.presentationVersionId
-        ? { presentationVersionId: input.presentationVersionId }
-        : {}),
-    },
-    degraded: !isScoreResult(input.submission.result),
-    coachLogoUrl: creatorCoach?.profileImage ?? null,
-    coachName: creatorCoach
-      ? `${creatorCoach.firstName} ${creatorCoach.lastName}`
-      : null,
-    isImported: input.campaign.importManifest != null,
-  };
-}
-
-/** The shared row-to-report body; authorization always happens before this seam. */
-async function reportOutcomeFromStoredSubmission(
-  db: ActiveVersionDb,
-  submission: RawSubmission,
-  campaignId: string,
-): Promise<RespondentReportOutcome> {
-  const presentation = await resolvePublishedReportHtmlForTemplate(
-    db,
-    submission.campaign.template.id,
-    submission.campaign.language,
-  );
-  return {
-    status: "ok",
-    report: buildStoredRespondentReport({
-      submission: {
-        id: submission.id,
-        submittedAt: submission.submittedAt,
-        answers: submission.answers,
-        result: submission.result,
-      },
-      respondent: submission.respondent,
-      ...(presentation
-        ? {
-            reportHtml: presentation.reportHtml,
-            presentationVersionId: presentation.versionId,
-          }
-        : {}),
-      campaign: {
-        name: submission.campaign.name,
-        reportStyle: submission.campaign.reportStyle,
-        organizationName: submission.campaign.organization.name,
-        template: submission.campaign.template,
-        creatorCoach: submission.campaign.creatorCoach,
-        version: submission.campaign.version,
-        importManifest: submission.campaign.importManifest,
-      },
-    }),
-    reportStylesAvailable: isReportStylesEnabled({
-      templateId: submission.campaign.template.id,
-      campaignId,
-    }),
-  };
-}
-
 const respondentReportSelect = {
   id: true,
   submittedAt: true,
@@ -438,7 +322,7 @@ export async function getRespondentReport(
       return { status: "not-found" } as const;
     }
 
-    return reportOutcomeFromStoredSubmission(tx, submission, campaignId);
+    return projectRespondentReport(tx, submission, campaignId);
   },
   // V-4 (Wave V): explicit budget over Prisma's 5s interactive-transaction
   // default — a Neon cold start / high-latency client can P2028 a report
@@ -516,7 +400,7 @@ export async function getCeoSelfRespondentReport(
       select: respondentReportSelect,
     });
     return submission
-      ? reportOutcomeFromStoredSubmission(tx, submission, authorized.focusCampaignId)
+      ? projectRespondentReport(tx, submission, authorized.focusCampaignId)
       : { status: "not-found" };
   }, { maxWait: 10_000, timeout: 15_000 });
 }
