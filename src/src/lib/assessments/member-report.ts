@@ -6,6 +6,11 @@ import {
   type RespondentReportOutcome,
 } from "@/lib/assessments/respondent-report";
 import { projectRespondentReport } from "@/lib/assessments/respondent-report-projection";
+import {
+  getCampaignGroupReportForMember,
+  type GroupReportDb,
+  type GroupReportResult,
+} from "@/lib/assessments/group-report";
 import { resolveMemberIdentity } from "@/lib/members/identity";
 
 type MemberReportTx = ActiveVersionDb & {
@@ -71,5 +76,29 @@ export async function getMemberRespondentReport(
       return projectRespondentReport(tx, submission, submission.campaign.id ?? "");
     },
     { maxWait: 10_000, timeout: 15_000 },
+  );
+}
+
+export async function getMemberGroupReport(
+  db: MemberReportDb,
+  input: { normalizedEmail: string; campaignId: string; now?: Date },
+): Promise<GroupReportResult> {
+  return getCampaignGroupReportForMember(
+    db as unknown as GroupReportDb,
+    input.campaignId,
+    input.now ?? new Date(),
+    async (tx, completedRespondentIds, organizationId) => {
+      const identity = await resolveMemberIdentity(
+        tx as unknown as MemberReportTx,
+        input.normalizedEmail,
+      );
+      if (!identity.members.some((member) => member.organizationId === organizationId)) {
+        return false;
+      }
+      const entitledRespondentIds = releaseOneRespondentIds(identity.members);
+      return completedRespondentIds.every((respondentId) =>
+        entitledRespondentIds.has(respondentId),
+      );
+    },
   );
 }

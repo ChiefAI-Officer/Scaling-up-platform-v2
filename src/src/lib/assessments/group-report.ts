@@ -89,7 +89,7 @@ interface BenchmarkFindMany {
   }) => Promise<RawBenchmarkRow[]>;
 }
 
-interface GroupReportTx {
+export interface GroupReportTx {
   assessmentCampaign: CampaignFindFirst;
   assessmentCampaignParticipant: ParticipantFindMany;
   assessmentSubmission: SubmissionFindMany;
@@ -323,11 +323,18 @@ function countAppliedPeerBenchmarks(report: CampaignGroupReport): number {
  *  6. contentHash over a stable serialization of the inputs (no generatedAt).
  *  7. ceoParticipantId = the participant row with isCEO === true (or null).
  */
-export async function getCampaignGroupReport(
+type CompletedCohortAuthorization = (
+  tx: GroupReportTx,
+  completedRespondentIds: string[],
+  organizationId: string,
+) => Promise<boolean>;
+
+async function getCampaignGroupReportWithAuthorization(
   db: GroupReportDb,
   actor: ApiActor | null,
   campaignId: string,
   generatedAt: Date,
+  authorizeCompletedCohort?: CompletedCohortAuthorization,
 ): Promise<GroupReportResult> {
   return db.$transaction(
     async (tx): Promise<GroupReportResult> => {
@@ -396,11 +403,13 @@ export async function getCampaignGroupReport(
 
       // Authorization — STRICTER bulk-PII gate (admin/staff bypass; coach
       // currency checks). actor may be null (unauthenticated) → forbidden.
-      const allowed = actor
-        ? await canViewGroupReport(asAccessDb(tx), actor, campaignId)
-        : false;
-      if (!allowed) {
-        return { kind: "forbidden" } as const;
+      if (!authorizeCompletedCohort) {
+        const allowed = actor
+          ? await canViewGroupReport(asAccessDb(tx), actor, campaignId)
+          : false;
+        if (!allowed) {
+          return { kind: "forbidden" } as const;
+        }
       }
 
       // INVITED-only: a PUBLIC campaign has no team group report.
@@ -478,6 +487,19 @@ export async function getCampaignGroupReport(
           },
         },
       });
+
+      if (
+        authorizeCompletedCohort &&
+        !(await authorizeCompletedCohort(
+          tx,
+          submissionRows.flatMap((row) =>
+            row.respondentId === null ? [] : [row.respondentId],
+          ),
+          campaign.organizationId,
+        ))
+      ) {
+        return { kind: "forbidden" } as const;
+      }
 
       // invitedCount = non-revoked invitations on the campaign.
       const invitedCount = await tx.assessmentInvitation.count({
@@ -608,5 +630,30 @@ export async function getCampaignGroupReport(
       maxWait: 10_000,
       timeout: 15_000,
     },
+  );
+}
+
+export async function getCampaignGroupReport(
+  db: GroupReportDb,
+  actor: ApiActor | null,
+  campaignId: string,
+  generatedAt: Date,
+): Promise<GroupReportResult> {
+  return getCampaignGroupReportWithAuthorization(db, actor, campaignId, generatedAt);
+}
+
+/** Member adapter seam: authorization runs over the completed cohort in the same snapshot. */
+export async function getCampaignGroupReportForMember(
+  db: GroupReportDb,
+  campaignId: string,
+  generatedAt: Date,
+  authorizeCompletedCohort: CompletedCohortAuthorization,
+): Promise<GroupReportResult> {
+  return getCampaignGroupReportWithAuthorization(
+    db,
+    null,
+    campaignId,
+    generatedAt,
+    authorizeCompletedCohort,
   );
 }

@@ -1,4 +1,14 @@
-import { getMemberRespondentReport } from "@/lib/assessments/member-report";
+// eslint-disable-next-line no-var -- Jest evaluates this mock factory before imports.
+var mockMemberGroupLoader = jest.fn();
+jest.mock("@/lib/assessments/group-report", () => ({
+  ...jest.requireActual("@/lib/assessments/group-report"),
+  getCampaignGroupReportForMember: (...args: unknown[]) => mockMemberGroupLoader(...args),
+}));
+
+import {
+  getMemberGroupReport,
+  getMemberRespondentReport,
+} from "@/lib/assessments/member-report";
 
 const submission = (overrides: Record<string, unknown> = {}) => ({
   id: "submission-1",
@@ -99,5 +109,66 @@ describe("getMemberRespondentReport", () => {
         submissionId: "submission-1",
       }),
     ).resolves.toEqual({ status: "forbidden" });
+  });
+});
+
+describe("getMemberGroupReport", () => {
+  const identityTx = {
+    orgRespondent: {
+      findMany: jest.fn().mockResolvedValue([
+        { id: "respondent-1", organizationId: "org-1", teamId: null, roleType: "employee" },
+        { id: "respondent-2", organizationId: "org-1", teamId: null, roleType: "employee" },
+      ]),
+    },
+  };
+
+  beforeEach(() => mockMemberGroupLoader.mockReset());
+
+  it("allows only when own-only entitlement covers the entire completed cohort", async () => {
+    mockMemberGroupLoader.mockImplementation(
+      async (_db, _campaignId, _generatedAt, authorize) =>
+        (await authorize(identityTx, ["respondent-1", "respondent-2"], "org-1"))
+          ? { kind: "ok", report: {}, provenance: {} }
+          : { kind: "forbidden" },
+    );
+    await expect(
+      getMemberGroupReport({} as never, {
+        normalizedEmail: "member@example.com",
+        campaignId: "campaign-1",
+      }),
+    ).resolves.toMatchObject({ kind: "ok" });
+    expect(identityTx.orgRespondent.findMany).toHaveBeenCalled();
+  });
+
+  it("forbids when entitlement covers all but one completed respondent", async () => {
+    mockMemberGroupLoader.mockImplementation(
+      async (_db, _campaignId, _generatedAt, authorize) =>
+        (await authorize(
+          identityTx,
+          ["respondent-1", "respondent-2", "respondent-3"],
+          "org-1",
+        ))
+          ? { kind: "ok" }
+          : { kind: "forbidden" },
+    );
+    await expect(
+      getMemberGroupReport({} as never, {
+        normalizedEmail: "member@example.com",
+        campaignId: "campaign-1",
+      }),
+    ).resolves.toEqual({ kind: "forbidden" });
+  });
+
+  it.each([
+    { kind: "empty", provenance: { completedCount: 0 } },
+    { kind: "notApplicable", reason: "public", templateAlias: "lva" },
+  ])("passes the shared loader's $kind outcome through", async (outcome) => {
+    mockMemberGroupLoader.mockResolvedValue(outcome);
+    await expect(
+      getMemberGroupReport({} as never, {
+        normalizedEmail: "member@example.com",
+        campaignId: "campaign-1",
+      }),
+    ).resolves.toEqual(outcome);
   });
 });
