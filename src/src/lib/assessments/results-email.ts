@@ -15,6 +15,8 @@
  */
 
 import { escapeHtml } from "@/lib/templates/interpolate-content-html";
+import { renderMemberPortalDiscoveryEmail } from "@/lib/members/discovery";
+import { safeAbsoluteWebUrl } from "@/lib/safe-absolute-web-url";
 
 const PURPLE = "#522583";
 const RESPONDENT_FIRST_NAME_TOKEN = "{{respondentFirstName}}";
@@ -30,24 +32,6 @@ export function renderResultsEmailSubject(
   return subject
     .split(RESPONDENT_FIRST_NAME_TOKEN)
     .join(stripSubjectControlCharacters(respondentFirstName));
-}
-
-/** A CEO capability must never be delivered via an ambiguous or remote HTTP URL. */
-function safeCeoSelfAccessHref(raw: string | null | undefined): string | null {
-  if (!raw) return null;
-  try {
-    const url = new URL(raw.trim());
-    if (url.username || url.password) return null;
-    if (url.protocol === "https:") return url.href;
-    const localHost =
-      url.hostname === "localhost" ||
-      url.hostname === "127.0.0.1" ||
-      url.hostname === "[::1]" ||
-      url.hostname.endsWith(".test");
-    return url.protocol === "http:" && localHost ? url.href : null;
-  } catch {
-    return null;
-  }
 }
 
 /** Accept only http(s) and root-relative URLs in markdown links. */
@@ -108,6 +92,8 @@ export interface BuildResultsEmailArgs {
   respondentFirstName: string;
   /** Purpose-bound CEO self-access URL, delivered only through approved #15 email. */
   ceoSelfAccessUrl?: string | null;
+  /** Server-resolved Release 4 discovery URL; absent preserves existing bytes. */
+  memberPortalUrl?: string | null;
 }
 
 /**
@@ -120,16 +106,18 @@ export function buildResultsEmailHtml({
   reportHtml,
   respondentFirstName,
   ceoSelfAccessUrl,
+  memberPortalUrl,
 }: BuildResultsEmailArgs): string {
   const intro = renderResultsEmailBodyHtml(bodyMarkdown, respondentFirstName);
   const introBlock = intro
     ? `<div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;max-width:640px;margin:0 auto 16px;padding:0 8px;">${intro}</div>`
     : "";
-  const href = safeCeoSelfAccessHref(ceoSelfAccessUrl);
+  const href = safeAbsoluteWebUrl(ceoSelfAccessUrl);
   const ceoSelfAccessCta = href
     ? `<p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;text-align:center;margin:20px 0;"><a href="${escapeHtml(href)}" style="display:inline-block;background:${PURPLE};color:#ffffff;padding:12px 22px;text-decoration:none;border-radius:8px;font-weight:700;font-size:14px;">View and compare your reports</a></p>`
     : "";
-  return `${introBlock}${reportHtml}${ceoSelfAccessCta}`;
+  const memberPortalDiscovery = renderMemberPortalDiscoveryEmail(memberPortalUrl);
+  return `${introBlock}${reportHtml}${ceoSelfAccessCta}${memberPortalDiscovery}`;
 }
 
 export interface BuildCoachNotifyArgs {

@@ -242,6 +242,12 @@ export const RateLimits = {
     interval: 60 * 1000,
     maxRequests: 10,
   },
+  // Authenticated Coach sends may legitimately target an entire campaign.
+  // Keep this lane separate from the anonymous member sign-in limiter.
+  memberPortalCoachSend: {
+    interval: 60 * 1000,
+    maxRequests: 100,
+  },
   // Registration endpoints - 20 requests per minute
   registration: {
     interval: 60 * 1000,

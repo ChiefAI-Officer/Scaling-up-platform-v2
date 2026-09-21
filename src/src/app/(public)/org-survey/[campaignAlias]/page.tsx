@@ -9,6 +9,7 @@
 import type { Metadata } from "next";
 import { OrgSurveyClient } from "@/components/assessments/org-survey-client";
 import { isQspStoryGroupEnabled } from "@/lib/assessments/wave-48-flags";
+import { isMemberPortalEnabled } from "@/lib/members/flags";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -34,6 +35,7 @@ export default async function OrgSurveyPage({
       {...(isQspStoryGroupEnabled()
         ? { qspStoryGroupEnabled: true }
         : {})}
+      {...(isMemberPortalEnabled() ? { memberPortalEnabled: true } : {})}
     />
   );
 }

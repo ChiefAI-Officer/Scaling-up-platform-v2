@@ -72,6 +72,8 @@ export interface EditMemberModalProps {
   /** Flat list of teams for this org (pre-fetched by parent). */
   teams: ApiTeamNode[];
   responsiveEnabled?: boolean;
+  /** Shows report-access guidance. Resolve this server-side from the member-portal flag. */
+  memberPortalEnabled?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -85,6 +87,7 @@ export function EditMemberModal({
   member,
   teams,
   responsiveEnabled = false,
+  memberPortalEnabled = false,
 }: EditMemberModalProps) {
   const firstNameId = useId();
   const lastNameId  = useId();
@@ -332,6 +335,11 @@ export function EditMemberModal({
                   </option>
                 ))}
               </select>
+              {memberPortalEnabled && roleType === "teamleader" && !teamId && (
+                <p className="text-xs text-amber-700 dark:text-amber-400">
+                  Leadership team member needs a team to grant additional report access.
+                </p>
+              )}
             </div>
 
             {/* ---- Level (optional) ---- */}
@@ -365,6 +373,12 @@ export function EditMemberModal({
                     </option>
                   )}
               </select>
+              {memberPortalEnabled && roleType !== "" &&
+                !(RESPONDENT_LEVEL_VALUES as readonly string[]).includes(roleType) && (
+                  <p className="text-xs text-amber-700 dark:text-amber-400">
+                    This level isn&apos;t recognised and grants no additional access.
+                  </p>
+                )}
             </div>
 
             {/* ---- Inline error ---- */}

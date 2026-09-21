@@ -331,6 +331,7 @@ export function CampaignWizard({
   onScreenResultsEnabled = false,
   adminOwnedPresentation = false,
   responsiveEnabled = false,
+  memberPortalEnabled = false,
 }: {
   /** Wave D #20 — gate the custom-HTML invitation editor (mirrors the server flag). */
   customHtmlEmailEnabled?: boolean;
@@ -393,6 +394,8 @@ export function CampaignWizard({
   adminOwnedPresentation?: boolean;
   /** Mobile-foundation presentation gate. Defaults off to preserve legacy DOM. */
   responsiveEnabled?: boolean;
+  /** Enables report-access guidance in the quick-add member editor. */
+  memberPortalEnabled?: boolean;
 } = {}) {
   const router = useRouter();
   const { toast } = useToast();
@@ -1092,6 +1095,7 @@ export function CampaignWizard({
         {state.step === 2 && (
           <ParticipantsStep
             responsiveEnabled={responsiveEnabled}
+            memberPortalEnabled={memberPortalEnabled}
             organizationId={state.organizationId}
             orgName={state.orgName}
             respondentIds={state.respondentIds}
@@ -1432,6 +1436,7 @@ type CeoPickSource = "auto" | "user" | null;
 
 function ParticipantsStep({
   responsiveEnabled,
+  memberPortalEnabled,
   organizationId,
   orgName,
   respondentIds,
@@ -1441,6 +1446,7 @@ function ParticipantsStep({
   onNext,
 }: {
   responsiveEnabled: boolean;
+  memberPortalEnabled: boolean;
   organizationId: string;
   /** Display name of the selected org — used for the quick-add modal hint. */
   orgName: string;
@@ -1873,6 +1879,7 @@ function ParticipantsStep({
         defaultTeamId={null}
         description={`Adds this person to ${orgName || "this company"}'s roster (not just this campaign).`}
         responsiveEnabled={responsiveEnabled}
+        memberPortalEnabled={memberPortalEnabled}
       />
     </div>
   );

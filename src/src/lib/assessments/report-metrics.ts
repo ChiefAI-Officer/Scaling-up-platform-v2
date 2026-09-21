@@ -16,7 +16,7 @@
  * below is defensive; callers must also never PASS identifying fields.
  */
 
-export type ReportSurface = "respondent" | "group";
+export type ReportSurface = "respondent" | "group" | "member";
 
 /** The structured `assessment.<surface>_report.<event>` event names. */
 export type ReportMetricEvent =
@@ -34,6 +34,7 @@ export type ReportMetricEvent =
 const SURFACE_NAMESPACE: Record<ReportSurface, string> = {
   respondent: "respondent_report",
   group: "group_report",
+  member: "member_report",
 };
 
 // Identifying / free-form keys that must NEVER appear on a metric. Enforced at
@@ -41,6 +42,7 @@ const SURFACE_NAMESPACE: Record<ReportSurface, string> = {
 const FORBIDDEN_FIELD_KEYS = new Set([
   "name",
   "email",
+  "normalizedEmail",
   "answer",
   "answers",
   "message",

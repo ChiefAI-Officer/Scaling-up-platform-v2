@@ -379,6 +379,8 @@ beforeEach(() => {
   peerResolverState.transactionStates = [];
   mockOnscreenTransactionActive = false;
   process.env.APP_URL = "https://app.example.com";
+  delete process.env.WAVE_MP_MEMBER_PORTAL_ENABLED;
+  delete process.env.WAVE_MP_MEMBER_PORTAL_KILL;
   delete process.env.WAVE_ED10_PREVIEW_SETTINGS_ENABLED;
   delete process.env.WAVE_REPORT_HTML_AUTHORING_ENABLED;
   delete process.env.WAVE_REPORT_HTML_ACTIVE_VERSION_ENABLED;
@@ -932,6 +934,27 @@ describe("Wave OSR — the report model is built only when a consumer wants it",
     });
     await POST(jsonReq(goodAnswers) as never, aliasParams("demo"));
     expect(buildState.calls).toHaveLength(3);
+  });
+});
+
+describe("member portal discovery in the approved results email", () => {
+  it("passes the absolute sign-in URL only while the member portal is enabled", async () => {
+    process.env.WAVE_MP_MEMBER_PORTAL_ENABLED = "1";
+    mockInvitation({
+      showResultsOnScreen: false,
+      sendResultsToRespondent: true,
+    });
+    const { buildResultsEmailHtml } = jest.requireMock(
+      "@/lib/assessments/results-email",
+    ) as { buildResultsEmailHtml: jest.Mock };
+
+    await POST(jsonReq(goodAnswers) as never, aliasParams("demo"));
+
+    expect(buildResultsEmailHtml).toHaveBeenCalledWith(
+      expect.objectContaining({
+        memberPortalUrl: "https://app.example.com/member/sign-in",
+      }),
+    );
   });
 });
 

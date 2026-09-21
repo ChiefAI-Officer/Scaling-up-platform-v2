@@ -19,6 +19,7 @@ import {
   type OrgSummary,
 } from "@/components/organizations/members-teams-view";
 import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
+import { isMemberPortalEnabled } from "@/lib/members/flags";
 
 export default async function MembersPage() {
   const { coach } = await requireCoach();
@@ -52,6 +53,7 @@ export default async function MembersPage() {
         <MembersTeamsView
           initialOrganizations={items}
           responsiveEnabled={mobileResponsiveEnabled}
+          memberPortalEnabled={isMemberPortalEnabled()}
         />
       </FadeUp>
     </div>

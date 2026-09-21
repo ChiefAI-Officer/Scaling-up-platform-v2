@@ -18,7 +18,7 @@ the full workshop lifecycle from request through post-event follow-up.
 | **Client** | Jeff Verdun, CIO - Scaling Up |
 | **Operations** | Suzanne (handles manual approvals) |
 | **Integrated main history** | Recent launch receipts: `plans/CHANGELOG.md`. |
-| **Last Updated** | <!-- LAST_UPDATED_ISO:2026-09-15 LAST_UPDATED_SLUG:report-html-authoring-limits-expanded --> September 15 — **Report Welcome and Closing multi-image pagination capacity, broader safe static HTML/CSS, and canonical capacity counters are globally enabled and Production-health-verified.** |
+| **Last Updated** | <!-- LAST_UPDATED_ISO:2026-09-22 LAST_UPDATED_SLUG:member-portal-release-four-implemented --> September 22 — **Releases 1–4 verified dark; Release 4 adds Coach sends/discovery. Nothing merged/deployed/enabled/sent.** |
 | **Jeff #48 validation** | Pre-launch validation passed 15/15 focused suites and 224/224 tests plus the production-context real-component harness/editor Preview coverage. Live production verification was read-only: the invited QSP route returned `200` with `qspStoryGroupEnabled=true`; no valid token was opened, no assessment was submitted, no authenticated editor session was used, and no PUBLIC QSP campaign exists. |
 | **Latest progress** | The [July 10 ledger](docs/agents/jul10-feedback-closeout.md) records 50 DONE, 0 PARTIAL, and 3 NEEDS DECISION. Only #33, #41, and #45 remain; each requires content or report-specific intent before implementation. The [August 1–7 delta](docs/agents/jul10-progress-delta-2026-08-01-to-2026-08-07.md) remains 12 outcomes because later acceptances began after August 7. |
 | **Work Logs** | Session work logs at `~/.claude/worklogs/` — invoke `/log-session` to log or generate reports |
@@ -161,6 +161,7 @@ src/
 │   │   │       ├── settings/  # Profile + password change
 │   │   │       ├── templates/ # Available templates
 │   │   │       └── follow-up/ # 90-day follow-up
+│   │   ├── (member)/          # Member
 │   │   ├── (public)/          # Public pages (no auth)
 │   │   │   ├── login/         # Credentials login
 │   │   │   ├── register/      # Coach signup
@@ -175,7 +176,7 @@ src/
 │   │   │   ├── admin/financials/ # Financial dashboard (JV-21)
 │   │   │   ├── admin/pricing/    # Pricing tier CRUD (JV-17)
 │   │   │   └── admin/settings/   # Admin settings + password change
-│   │   └── api/               # API routes (see below)
+│   │   └── api/               # See below
 │   ├── components/
 │   │   ├── admin/             # Admin surfaces, including AssessmentEmailDeliveryHolds
 │   │   ├── ui/                # shadcn/ui + custom (status-pill, copy-url-button)
@@ -187,6 +188,7 @@ src/
 │   │   ├── surveys/           # Survey components (template-editor)
 │   │   ├── files/             # File management components
 │   │   ├── assessments/       # Assessment UI, including QspStoryGroup and ReferredResultsList
+│   │   ├── members/           # UI
 │   │   └── affiliate/         # Partner/affiliate components
 │   ├── lib/                   # Core business logic
 │   │   ├── auth/              # Auth: auth.ts, authorization.ts, password-reset.ts, auth-posture.ts, access-control.ts
@@ -196,6 +198,7 @@ src/
 │   │   ├── workflows/         # Workflow logic: workflow-service.ts, workflow-types.ts
 │   │   ├── files/             # File logic: file-service.ts, file-access.ts, file-download-path.ts, file-rules.ts
 │   │   ├── assessments/       # Scoring, referral ownership/access, frozen reports, feature flags, delivery-intent ledger/reconciliation/operator controls
+│   │   ├── members/           # Domain
 │   │   ├── approval-engine.ts # Auto-approval logic (cert confidence >=85%)
 │   │   ├── smtp-transport.ts  # Shared SMTP transport (single source of truth for email sending)
 │   │   ├── registration-service.ts # Registration with capacity/duplicate checks
@@ -242,6 +245,7 @@ src/
 | `/api/coaches/[id]/certifications` | POST, DELETE | Grant/revoke workshop type certification | Admin |
 | `/api/assessments/referred-results` | GET | Coach-owned public submissions with scoped pagination/search | Coach |
 | `/api/assessments/referred-results/[submissionId]` | DELETE | Coach-owned collection soft removal | Coach |
+| `/api/assessment-campaigns/[id]/member-links` | POST | Send Member sign-in links | Campaign Coach/Admin/Staff |
 | `/api/admin/public-campaigns/[id]/submissions` | GET | Public campaign submissions with result/report oversight | Admin/Staff |
 | `/api/admin/assessment-email-delivery-intents` | GET | Paginated HELD assessment-email recovery intents with masked identity | Admin/Staff |
 | `/api/admin/assessment-email-delivery-intents/[id]` | GET | Audited frozen-payload and authorization-drift review detail | Admin/Staff |

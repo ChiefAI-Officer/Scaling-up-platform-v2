@@ -67,6 +67,8 @@ export interface ViewReportOptions<TOutcome> {
   noActorPolicy: NoActorPolicy;
   /** Stable non-user identity for capability-based report access audits. */
   auditActor?: string;
+  /** Address identity for member-session report access audits. */
+  auditPrincipal?: string;
   /** group: () => isGroupReportEnabled(actor, {id}); respondent: omitted. */
   flagGate?: () => boolean;
   ip: string;
@@ -159,7 +161,8 @@ export async function viewReport<TOutcome>(
         entityType: spec.entityType,
         entityId: spec.entityId,
         action: spec.action,
-        performedBy: opts.auditActor ?? opts.actor?.email ?? "anon",
+        performedBy:
+          opts.auditPrincipal ?? opts.auditActor ?? opts.actor?.email ?? "anon",
         changes: JSON.stringify(spec.changes),
         ipAddress: opts.ip,
         userAgent: opts.userAgent,

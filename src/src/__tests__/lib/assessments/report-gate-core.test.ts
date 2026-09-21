@@ -188,6 +188,31 @@ describe("viewReport core protocol", () => {
     });
   });
 
+  it("uses an explicit member audit principal without changing actor-backed audits", async () => {
+    const memberDeps = makeDeps();
+    await viewReport(
+      memberDeps,
+      makeOpts({
+        actor: null,
+        noActorPolicy: "tolerate",
+        auditPrincipal: "member@example.com",
+      }),
+    );
+    expect(
+      (memberDeps as { auditSink: { create: jest.Mock } }).auditSink.create,
+    ).toHaveBeenCalledWith({
+      data: expect.objectContaining({ performedBy: "member@example.com" }),
+    });
+
+    const actorDeps = makeDeps();
+    await viewReport(actorDeps, makeOpts());
+    expect(
+      (actorDeps as { auditSink: { create: jest.Mock } }).auditSink.create,
+    ).toHaveBeenCalledWith({
+      data: expect.objectContaining({ performedBy: "admin@example.com" }),
+    });
+  });
+
   // Task 6 — passthrough (empty / notApplicable) NOT 404'd, returned by reference
   it("passthrough → returns outcome by reference; no notFound, no audit, no metric", async () => {
     for (const o of [{ kind: "empty", provenance: {} }, { kind: "notApplicable" }]) {

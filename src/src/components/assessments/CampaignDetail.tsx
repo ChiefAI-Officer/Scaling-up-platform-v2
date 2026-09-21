@@ -199,6 +199,10 @@ export interface CampaignDetailProps {
   hidePortalOnlyLinks?: boolean;
   /** Mobile-foundation presentation gate. Defaults off to preserve legacy DOM. */
   responsiveEnabled?: boolean;
+  /** Release 1 member-portal blast-radius copy, resolved server-side for invited campaigns only. */
+  memberPortalAccessWarning?: boolean;
+  /** Release 4 Coach send controls, resolved server-side for invited campaigns only. */
+  memberPortalSendEnabled?: boolean;
 }
 
 interface OrgRespondentRow {
@@ -305,6 +309,8 @@ export function CampaignDetail({
   basePath = "/portal/assessments",
   hidePortalOnlyLinks = false,
   responsiveEnabled = false,
+  memberPortalAccessWarning = false,
+  memberPortalSendEnabled = false,
 }: CampaignDetailProps) {
   const { toast } = useToast();
   const router = useRouter();
@@ -360,6 +366,10 @@ export function CampaignDetail({
 
   // Task N — Bulk reminders state.
   const [sendingReminders, setSendingReminders] = useState(false);
+  const [memberLinksDialogOpen, setMemberLinksDialogOpen] = useState(false);
+  const [memberLinkTarget, setMemberLinkTarget] =
+    useState<CampaignRespondentRow | null>(null);
+  const [sendingMemberLinks, setSendingMemberLinks] = useState(false);
 
   // Send Initial Invitations — fires /invite endpoint to first-send emails
   // for respondents who don't have an invitation row yet (or have a PENDING
@@ -806,6 +816,47 @@ export function CampaignDetail({
       });
     } finally {
       setSendingReminders(false);
+    }
+  }
+
+  function openMemberLinksDialog(target: CampaignRespondentRow | null) {
+    setMemberLinkTarget(target);
+    setMemberLinksDialogOpen(true);
+  }
+
+  async function handleSendMemberLinks() {
+    if (sendingMemberLinks) return;
+    setSendingMemberLinks(true);
+    try {
+      const body = memberLinkTarget
+        ? { respondentId: memberLinkTarget.respondent.id }
+        : {};
+      const res = await fetch(
+        `/api/assessment-campaigns/${campaign.id}/member-links`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        },
+      );
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload.error || `HTTP ${res.status}`);
+      const sent = typeof payload.data?.sent === "number" ? payload.data.sent : 0;
+      const skipped = typeof payload.data?.skipped === "number" ? payload.data.skipped : 0;
+      setMemberLinksDialogOpen(false);
+      setMemberLinkTarget(null);
+      toast({
+        title: sent === 1 ? "Report link sent" : "Report links sent",
+        description: `Emailed ${sent}${skipped > 0 ? `; skipped ${skipped}` : ""}.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Could not send report links",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSendingMemberLinks(false);
     }
   }
 
@@ -2339,6 +2390,18 @@ export function CampaignDetail({
                   )}
                   Send Reminders
                 </button>
+                {memberPortalSendEnabled && (
+                  <button
+                    type="button"
+                    onClick={() => openMemberLinksDialog(null)}
+                    disabled={sendingMemberLinks}
+                    className={responsiveEnabled ? "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50" : "inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-border bg-card text-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"}
+                    data-testid="send-member-links-btn"
+                  >
+                    <Mail className="w-3.5 h-3.5" />
+                    Send report links
+                  </button>
+                )}
               </>
             )}
             <a
@@ -2637,6 +2700,18 @@ export function CampaignDetail({
                               Resend
                             </button>
                           )}
+                          {memberPortalSendEnabled && (
+                            <button
+                              type="button"
+                              onClick={() => openMemberLinksDialog(row)}
+                              disabled={sendingMemberLinks}
+                              className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded border border-border text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
+                              data-testid={`send-member-link-${row.respondent.id}`}
+                            >
+                              <Mail className="w-3.5 h-3.5" />
+                              Send report link
+                            </button>
+                          )}
                           {canRemove && (
                             <button
                               type="button"
@@ -2670,6 +2745,52 @@ export function CampaignDetail({
           </table>
         )}
       </div>
+
+      <Dialog
+        open={memberLinksDialogOpen}
+        onOpenChange={(open) => {
+          if (sendingMemberLinks) return;
+          setMemberLinksDialogOpen(open);
+          if (!open) setMemberLinkTarget(null);
+        }}
+      >
+        <DialogContent data-testid="member-links-dialog">
+          <DialogHeader>
+            <DialogTitle>
+              {memberLinkTarget ? "Send report link?" : "Send report links?"}
+            </DialogTitle>
+            <DialogDescription>
+              {memberLinkTarget
+                ? `This will email ${memberLinkTarget.respondent.firstName} ${memberLinkTarget.respondent.lastName} a private sign-in link.`
+                : `This will email ${respondents.length} ${respondents.length === 1 ? "person" : "people"} a private sign-in link.`}{" "}
+              Each link works once and will expire in 24 hours. You will not see or receive the links.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={() => {
+                setMemberLinksDialogOpen(false);
+                setMemberLinkTarget(null);
+              }}
+              disabled={sendingMemberLinks}
+              className="inline-flex items-center justify-center text-sm font-medium px-4 py-2 rounded-lg border border-border bg-card text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSendMemberLinks}
+              disabled={sendingMemberLinks}
+              className="inline-flex items-center justify-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              data-testid="member-links-confirm"
+            >
+              {sendingMemberLinks && <Loader2 className="w-4 h-4 animate-spin" />}
+              Send {memberLinkTarget ? "link" : "links"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={addDialogOpen}
@@ -2899,10 +3020,21 @@ export function CampaignDetail({
           <DialogHeader>
             <DialogTitle>Delete this campaign?</DialogTitle>
             <DialogDescription>
-              {headerMetrics.invited > 0 || headerMetrics.completed > 0
-                ? `${headerMetrics.invited} invited and ${headerMetrics.completed} completed participants will lose access. Responses are retained.`
-                : "Invited participants will lose access. Responses are retained."}
-              {" "}This is not reversible.
+              {memberPortalAccessWarning ? (
+                <>
+                  {headerMetrics.invited > 0 || headerMetrics.completed > 0
+                    ? `${headerMetrics.invited} invited and ${headerMetrics.completed} completed participants`
+                    : "Invited participants"}{" "}
+                  will lose access — including the reports they can see today. Their responses stay in your records. This is not reversible.
+                </>
+              ) : (
+                <>
+                  {headerMetrics.invited > 0 || headerMetrics.completed > 0
+                    ? `${headerMetrics.invited} invited and ${headerMetrics.completed} completed participants will lose access. Responses are retained.`
+                    : "Invited participants will lose access. Responses are retained."}
+                  {" "}This is not reversible.
+                </>
+              )}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

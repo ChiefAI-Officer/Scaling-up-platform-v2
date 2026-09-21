@@ -14,6 +14,7 @@ import {
   buildResultsEmailHtml,
   buildCoachNotifyEmail,
 } from "@/lib/assessments/results-email";
+import { MEMBER_FORBIDDEN_VISIBLE_WORDS } from "@/lib/members/copy";
 
 describe("respondent first-name personalization", () => {
   it("replaces every exact subject token and strips subject control characters", () => {
@@ -135,6 +136,29 @@ describe("buildResultsEmailHtml", () => {
     });
 
     expect(nullOption).toBe(withoutOption);
+  });
+
+  it("adds the member-portal discovery line only when given its flag-resolved URL", () => {
+    const enabled = buildResultsEmailHtml({
+      bodyMarkdown: "Your results are ready.",
+      reportHtml: "<table>REPORT</table>",
+      respondentFirstName: "Jane",
+      memberPortalUrl: "https://app.example.com/member/sign-in?from=results&safe=1",
+    });
+    const disabled = buildResultsEmailHtml({
+      bodyMarkdown: "Your results are ready.",
+      reportHtml: "<table>REPORT</table>",
+      respondentFirstName: "Jane",
+    });
+
+    expect(enabled).toContain("See all your assessments and reports in one place.");
+    expect(enabled).toContain(
+      'href="https://app.example.com/member/sign-in?from=results&amp;safe=1"',
+    );
+    for (const term of MEMBER_FORBIDDEN_VISIBLE_WORDS) {
+      expect(enabled.toLowerCase()).not.toContain(term.toLowerCase());
+    }
+    expect(disabled).not.toContain("member/sign-in");
   });
 
   it.each([

@@ -8,6 +8,8 @@
  * copy is shown.
  */
 import type { Metadata } from "next";
+import { MemberPortalLink } from "@/components/members/MemberPortalLink";
+import { isMemberPortalEnabled } from "@/lib/members/flags";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -36,6 +38,9 @@ export default async function ThankYouPage({
           ? "We are sending you your results."
           : "Thank you — your coach will review your results with you."}
       </p>
+      {resultsEmailSent && isMemberPortalEnabled() ? (
+        <MemberPortalLink className="mt-5 text-sm text-muted-foreground" />
+      ) : null}
     </main>
   );
 }

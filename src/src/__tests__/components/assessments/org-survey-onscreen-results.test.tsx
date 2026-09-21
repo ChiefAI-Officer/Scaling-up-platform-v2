@@ -25,6 +25,7 @@ import {
   completeSuFullPeerReport,
 } from "@/__tests__/fixtures/su-full-peer";
 import { buildSuFullPeerPresentationResult } from "@/lib/assessments/su-full-peer-presentation";
+import { MEMBER_FORBIDDEN_VISIBLE_WORDS } from "@/lib/members/copy";
 
 jest.mock("next/navigation", () => ({
   useRouter: () => ({ push: jest.fn(), replace: jest.fn() }),
@@ -232,6 +233,26 @@ describe("rehydrate authorization (the /me 410 gate)", () => {
 });
 
 describe("the rendered report", () => {
+  it("shows the member-portal discovery line only when the server-resolved gate is enabled", async () => {
+    writeOnScreenResult(ALIAS, REPORT, KEY);
+    installFetch(410);
+
+    const view = render(<OrgSurveyClient campaignAlias={ALIAS} memberPortalEnabled />);
+    await waitFor(() => {
+      expect(screen.getByRole("link", { name: "Open the member portal" })).toBeInTheDocument();
+    });
+    for (const term of MEMBER_FORBIDDEN_VISIBLE_WORDS) {
+      expect(view.container.textContent?.toLowerCase()).not.toContain(term.toLowerCase());
+    }
+
+    view.unmount();
+    render(<OrgSurveyClient campaignAlias={ALIAS} />);
+    await waitFor(() => {
+      expect(screen.getByTestId("org-survey-results")).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("link", { name: "Open the member portal" })).not.toBeInTheDocument();
+  });
+
   it("forwards the revived peer presentation to BrandedReport without recomputing it", async () => {
     writeOnScreenResult(
       ALIAS,

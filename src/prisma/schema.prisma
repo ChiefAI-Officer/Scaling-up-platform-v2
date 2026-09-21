@@ -1171,6 +1171,25 @@ model OrgRespondent {
   @@map("org_respondents")
 }
 
+// Member portal address-scoped, single-use sign-in credential. This is
+// intentionally separate from the vestigial submission-scoped resultsToken*
+// columns and from reusable assessment invitation tokens.
+model MemberSignInToken {
+  id              String    @id @default(cuid())
+  tokenHash       String    @unique
+  normalizedEmail String
+  issuedAt        DateTime  @default(now())
+  expiresAt       DateTime
+  redeemedAt      DateTime?
+  issuedVia       String
+  issuedByUserId  String?
+  campaignId      String?
+
+  @@index([normalizedEmail, issuedAt])
+  @@index([expiresAt])
+  @@map("member_sign_in_tokens")
+}
+
 enum AssessmentReportStyle {
   CLASSIC
   EXECUTIVE_BOARDROOM

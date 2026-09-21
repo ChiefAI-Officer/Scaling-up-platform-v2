@@ -119,3 +119,34 @@ describe("Vercel Blob completion callback middleware policy", () => {
     expect(runMiddleware("/api/files").status).toBe(401);
   });
 });
+
+describe("member portal middleware policy", () => {
+  it("allows member routes without a NextAuth account", () => {
+    expect(
+      mockAuthOptions?.callbacks.authorized({ token: null, req: request("/member/sign-in") }),
+    ).toBe(true);
+    expect(
+      mockAuthOptions?.callbacks.authorized({ token: null, req: request("/member/reports/sub-1") }),
+    ).toBe(true);
+  });
+
+  it("marks every member route private and no-store", () => {
+    for (const pathname of [
+      "/member/sign-in",
+      "/member/sign-in/request",
+      "/member/sign-in/exchange",
+      "/member/home",
+      "/member/reports",
+      "/member/reports/submission-1",
+      "/member/reports/team/campaign-1",
+      "/member/sign-out",
+    ]) {
+      expect(runMiddleware(pathname).headers.get("Cache-Control")).toBe("no-store, private");
+    }
+  });
+
+  it("does not change admin or coach portal authentication", () => {
+    expect(mockAuthOptions?.callbacks.authorized({ token: null, req: request("/portal/home") })).toBe(false);
+    expect(mockAuthOptions?.callbacks.authorized({ token: null, req: request("/dashboard") })).toBe(false);
+  });
+});
