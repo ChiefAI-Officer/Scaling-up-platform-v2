@@ -6,6 +6,15 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="member-portal-releases-one-four-launched"></a>
+### 2026-09-22 — Member portal Releases 1–4 launched <!-- ENTRY_ISO:2026-09-22 ENTRY_SLUG:member-portal-releases-one-four-launched -->
+
+**Status: LAUNCHED + GLOBALLY ENABLED + PRODUCTION-HEALTH-VERIFIED.** PR #453 squash-merged as `98cd3536`. The first dark deployment, `dpl_CQfNtwRBAHsaAXY9tsZbyNAfGdFh`, reached Ready on that merge and claimed both canonical aliases. `MEMBER_SESSION_SECRET` was then generated independently and stored as a Production-only encrypted variable; `WAVE_MP_MEMBER_PORTAL_ENABLED=1` was created the same way, while `WAVE_MP_MEMBER_PORTAL_KILL` remains absent and available for immediate containment. Activated rebuild `dpl_Biq8eumzgbHhAFTTQBCoqiU6sTuX` rebuilt the merged source, reached Ready, and owns `scaling-up-platform-v2.vercel.app` and `platformtest.scalingup.com`.
+
+**Launch data gate.** The required read-only remeasurement found **22** live Members, **6** attached to a team, **5** live teams, and the same three unrecognised synthetic GH #427 Levels. GH #427's acceptance record identifies that cohort as one CEO and two non-CEO team members, so a compare-and-swap transaction changed only those exact live ABC Corp fixture rows: `CEO` → `ceofounder`, and each `TEAM_MEMBER` → `employee`. Each write has an `OrgRespondent` `UPDATE` audit row naming the old value, new value, and launch reason. Post-write verification reports canonical-only Levels—`teamleader` 7, unset 5, `ceofounderwithteam` 3, `ceofounder` 3, `employee` 3, `ceofounderalone` 1—and zero unrecognised rows. No customer row was involved.
+
+**Verification receipt.** Immediately before merge, the exact tree passed **842/842 suites, 10,443/10,443 tests, and 16/16 snapshots**; every hosted Build, Migration Safety Gate, PostgreSQL lease, Vercel, and Preview Comment check passed. Both canonical `/api/health` endpoints now return HTTP 200 with healthy database and safe auth posture. Read-only browser smoke confirms `/member/sign-in` renders the passwordless Member card, `/login` renders **Taken an assessment?** with **Get a link to my reports**, unauthenticated `/member/home` returns to Member sign-in, and the sign-in response is private/no-store with `Referrer-Policy: no-referrer`. The only console messages are the established disabled Vercel Insights script 404/MIME pair. No form was submitted, no Member token was minted, no customer email was sent, and no assessment, Campaign, response, report, or invitation credential was changed during smoke verification.
+
 <a id="member-portal-release-four-implemented"></a>
 ### 2026-09-22 — Member portal Release 4 implemented <!-- ENTRY_ISO:2026-09-22 ENTRY_SLUG:member-portal-release-four-implemented -->
 
