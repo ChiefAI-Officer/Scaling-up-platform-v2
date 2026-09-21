@@ -83,6 +83,7 @@ export interface StoredReportVersion {
 
 export interface RawSubmission {
   id: string;
+  respondentId?: string | null;
   submittedAt: Date;
   answers: unknown;
   result: unknown;
@@ -95,6 +96,8 @@ export interface RawSubmission {
     jobTitle?: string | null;
   };
   campaign: {
+    id?: string;
+    deletedAt?: Date | null;
     name: string | null;
     language: string;
     reportStyle: ReportStyleKey;
@@ -261,14 +264,17 @@ export interface StoredRespondentReportInput {
   };
 }
 
-const respondentReportSelect = {
+export const respondentReportSelect = {
   id: true,
+  respondentId: true,
   submittedAt: true,
   answers: true,
   result: true,
   respondent: { select: { id: true, firstName: true, lastName: true, email: true, jobTitle: true } },
   campaign: {
     select: {
+      id: true,
+      deletedAt: true,
       name: true,
       language: true,
       reportStyle: true,
