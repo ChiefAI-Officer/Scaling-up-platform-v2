@@ -42,7 +42,7 @@ export default async function MemberReportsPage() {
           <section className="rounded-2xl border border-slate-200 bg-white p-8 text-center">
             <h2 className="text-2xl font-semibold">No reports yet</h2>
             <p className="mt-2 text-slate-600">When you complete an assessment, your report will appear here.</p>
-            {model.hasOpenEvaluations ? <Link href="/member/home" className="mt-4 inline-block font-semibold text-[#522583]">Go to Evaluations</Link> : null}
+            {model.hasOpenEvaluations ? <Link href="/member/evaluations" className="mt-4 inline-block font-semibold text-[#522583]">Go to Evaluations</Link> : null}
           </section>
         )}
       </div>

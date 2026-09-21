@@ -30,13 +30,23 @@ export const invitationForExchangeArgs = Prisma.validator<
 export type InvitationWithCampaign =
   Prisma.AssessmentInvitationGetPayload<typeof invitationForExchangeArgs>;
 
+export type InvitationAvailabilityInput = Pick<
+  InvitationWithCampaign,
+  "revokedAt" | "expiresAt" | "status"
+> & {
+  campaign: Pick<
+    InvitationWithCampaign["campaign"],
+    "deletedAt" | "status" | "openAt" | "closeAt"
+  >;
+};
+
 export type InvitationExchangeAvailability =
   | "USABLE"
   | "NOT_YET_OPEN"
   | "UNAVAILABLE";
 
 export function classifyInvitationExchangeAvailability(
-  invitation: InvitationWithCampaign,
+  invitation: InvitationAvailabilityInput,
   now: Date,
 ): InvitationExchangeAvailability {
   if (invitation.campaign.deletedAt !== null) return "UNAVAILABLE";
