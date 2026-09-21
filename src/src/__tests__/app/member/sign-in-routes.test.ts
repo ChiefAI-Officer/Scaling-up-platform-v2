@@ -108,5 +108,6 @@ describe("member sign-in routes", () => {
     mockEnabled.mockReturnValue(false);
     await expect(requestLink(formRequest("/member/sign-in/request", { email: "x@example.com" }))).resolves.toMatchObject({ status: 404 });
     await expect(exchangeLink(formRequest("/member/sign-in/exchange", { token: "long-enough-token-value" }))).resolves.toMatchObject({ status: 404 });
+    await expect(signOut(formRequest("/member/sign-out", {}))).resolves.toMatchObject({ status: 404 });
   });
 });
