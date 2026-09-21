@@ -15,6 +15,7 @@
  */
 
 import { escapeHtml } from "@/lib/templates/interpolate-content-html";
+import { renderMemberPortalDiscoveryEmail } from "@/lib/members/discovery";
 
 const PURPLE = "#522583";
 const RESPONDENT_FIRST_NAME_TOKEN = "{{respondentFirstName}}";
@@ -108,6 +109,8 @@ export interface BuildResultsEmailArgs {
   respondentFirstName: string;
   /** Purpose-bound CEO self-access URL, delivered only through approved #15 email. */
   ceoSelfAccessUrl?: string | null;
+  /** Server-resolved Release 4 discovery URL; absent preserves existing bytes. */
+  memberPortalUrl?: string | null;
 }
 
 /**
@@ -120,6 +123,7 @@ export function buildResultsEmailHtml({
   reportHtml,
   respondentFirstName,
   ceoSelfAccessUrl,
+  memberPortalUrl,
 }: BuildResultsEmailArgs): string {
   const intro = renderResultsEmailBodyHtml(bodyMarkdown, respondentFirstName);
   const introBlock = intro
@@ -129,7 +133,8 @@ export function buildResultsEmailHtml({
   const ceoSelfAccessCta = href
     ? `<p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;text-align:center;margin:20px 0;"><a href="${escapeHtml(href)}" style="display:inline-block;background:${PURPLE};color:#ffffff;padding:12px 22px;text-decoration:none;border-radius:8px;font-weight:700;font-size:14px;">View and compare your reports</a></p>`
     : "";
-  return `${introBlock}${reportHtml}${ceoSelfAccessCta}`;
+  const memberPortalDiscovery = renderMemberPortalDiscoveryEmail(memberPortalUrl);
+  return `${introBlock}${reportHtml}${ceoSelfAccessCta}${memberPortalDiscovery}`;
 }
 
 export interface BuildCoachNotifyArgs {

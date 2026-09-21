@@ -19,6 +19,11 @@ import { render, screen } from "@testing-library/react";
 import ThankYouPage from "@/app/(public)/org-survey/[campaignAlias]/thank-you/page";
 
 describe("Invited ThankYouPage — adaptive copy (#15)", () => {
+  afterEach(() => {
+    delete process.env.WAVE_MP_MEMBER_PORTAL_ENABLED;
+    delete process.env.WAVE_MP_MEMBER_PORTAL_KILL;
+  });
+
   it("shows 'sending you your results' when results=1 searchParam is present", async () => {
     const page = await ThankYouPage({
       params: Promise.resolve({ campaignAlias: "test-alias" }),
@@ -50,5 +55,30 @@ describe("Invited ThankYouPage — adaptive copy (#15)", () => {
     expect(
       screen.getByText(/coach will.*review your results/i),
     ).toBeInTheDocument();
+  });
+
+  it("shows the member-portal discovery line for results=1 only while the portal is enabled", async () => {
+    process.env.WAVE_MP_MEMBER_PORTAL_ENABLED = "1";
+    let page = await ThankYouPage({
+      params: Promise.resolve({ campaignAlias: "test-alias" }),
+      searchParams: Promise.resolve({ results: "1" }),
+    });
+    const view = render(page as React.ReactElement);
+    expect(screen.getByRole("link", { name: "Open the member portal" })).toHaveAttribute(
+      "href",
+      "/member/sign-in",
+    );
+    expect(view.container.textContent).not.toMatch(
+      /campaign|respondent|submission|participant|token|magic link/i,
+    );
+
+    view.unmount();
+    delete process.env.WAVE_MP_MEMBER_PORTAL_ENABLED;
+    page = await ThankYouPage({
+      params: Promise.resolve({ campaignAlias: "test-alias" }),
+      searchParams: Promise.resolve({ results: "1" }),
+    });
+    render(page as React.ReactElement);
+    expect(screen.queryByRole("link", { name: "Open the member portal" })).not.toBeInTheDocument();
   });
 });

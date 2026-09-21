@@ -56,7 +56,6 @@ function campaign(count = 2) {
       respondent: {
         id: `respondent-${index + 1}`,
         email: `member-${index + 1}@example.com`,
-        deletedAt: null,
       },
     })),
   };
@@ -131,10 +130,8 @@ describe("POST campaign member links", () => {
     expect(mockSendLink).not.toHaveBeenCalled();
   });
 
-  it("never sends to a soft-deleted or non-participating respondent", async () => {
-    const rows = campaign(2);
-    rows.participants[1].respondent.deletedAt = new Date("2026-09-21T00:00:00.000Z");
-    mockFindCampaign.mockResolvedValue(rows);
+  it("queries only live roster rows and never sends to a non-participant", async () => {
+    mockFindCampaign.mockResolvedValue(campaign(1));
 
     const response = await POST(
       request({ respondentIds: ["respondent-2", "not-on-campaign"] }),
@@ -143,5 +140,16 @@ describe("POST campaign member links", () => {
 
     expect(response.status).toBe(400);
     expect(mockSendLink).not.toHaveBeenCalled();
+    expect(mockFindCampaign).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({
+          participants: expect.objectContaining({
+            where: {
+              respondent: { deletedAt: null, organization: { deletedAt: null } },
+            },
+          }),
+        }),
+      }),
+    );
   });
 });

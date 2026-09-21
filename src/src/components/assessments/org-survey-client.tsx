@@ -66,6 +66,7 @@ import {
 } from "@/lib/assessments/onscreen-result-store";
 import { exchangeCeoReportAccessUrl } from "@/lib/assessments/ceo-report-access-client";
 import { AssessmentWelcomeCard } from "@/components/assessments/AssessmentWelcomeCard";
+import { MemberPortalLink } from "@/components/members/MemberPortalLink";
 import {
   invitedWelcomeConfigSchema,
   resolveLegacyInvitedWelcomeConfig,
@@ -168,9 +169,11 @@ type Phase =
 export function OrgSurveyClient({
   campaignAlias,
   qspStoryGroupEnabled = false,
+  memberPortalEnabled = false,
 }: {
   campaignAlias: string;
   qspStoryGroupEnabled?: boolean;
+  memberPortalEnabled?: boolean;
 }) {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>({ kind: "exchanging" });
@@ -604,6 +607,9 @@ export function OrgSurveyClient({
                 Your coach will review these results with you. Use Print or
                 Download PDF above if you would like to keep a copy.
               </p>
+              {memberPortalEnabled ? (
+                <MemberPortalLink className="su-report-onscreen-note" />
+              ) : null}
             </div>
             <BrandedReport
               report={phase.report}

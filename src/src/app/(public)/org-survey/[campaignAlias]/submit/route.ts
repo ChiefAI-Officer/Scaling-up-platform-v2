@@ -81,6 +81,8 @@ import {
 import { lockReportStyleForFirstCompletion } from "@/lib/assessments/report-style-lock";
 import { isReportComparisonEnabled } from "@/lib/assessments/wave-report-comparison-flags";
 import { createCeoReportAccessToken } from "@/lib/assessments/ceo-report-access-token";
+import { isMemberPortalEnabled } from "@/lib/members/flags";
+import { memberPortalSignInUrl } from "@/lib/members/discovery";
 import { resolvePeerReportEnhancements } from "@/lib/assessments/peer-report-resolver";
 import {
   resolveActiveReportHtml,
@@ -316,6 +318,9 @@ function buildWaveDOutboxRows({
                   reportHtml,
                   respondentFirstName: respondent.firstName,
                   ceoSelfAccessUrl,
+                  memberPortalUrl: isMemberPortalEnabled()
+                    ? memberPortalSignInUrl(process.env.APP_URL ?? "")
+                    : null,
                 }),
               }
             : null;

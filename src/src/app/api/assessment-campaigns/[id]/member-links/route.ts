@@ -57,9 +57,12 @@ export async function POST(
     select: {
       id: true,
       participants: {
+        where: {
+          respondent: { deletedAt: null, organization: { deletedAt: null } },
+        },
         select: {
           respondentId: true,
-          respondent: { select: { id: true, email: true, deletedAt: true } },
+          respondent: { select: { id: true, email: true } },
         },
       },
     },
@@ -71,9 +74,7 @@ export async function POST(
   const requestedIds = parsed.data.respondentIds;
   const wanted = requestedIds?.length ? new Set(requestedIds) : null;
   const targets = campaign.participants.filter(
-    (participant) =>
-      participant.respondent.deletedAt === null &&
-      (wanted === null || wanted.has(participant.respondentId)),
+    (participant) => wanted === null || wanted.has(participant.respondentId),
   );
   if (targets.length === 0) {
     return NextResponse.json(

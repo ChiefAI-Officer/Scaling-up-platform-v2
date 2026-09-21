@@ -232,6 +232,26 @@ describe("rehydrate authorization (the /me 410 gate)", () => {
 });
 
 describe("the rendered report", () => {
+  it("shows the member-portal discovery line only when the server-resolved gate is enabled", async () => {
+    writeOnScreenResult(ALIAS, REPORT, KEY);
+    installFetch(410);
+
+    const view = render(<OrgSurveyClient campaignAlias={ALIAS} memberPortalEnabled />);
+    await waitFor(() => {
+      expect(screen.getByRole("link", { name: "Open the member portal" })).toBeInTheDocument();
+    });
+    expect(view.container.textContent).not.toMatch(
+      /campaign|respondent|submission|participant|token|magic link/i,
+    );
+
+    view.unmount();
+    render(<OrgSurveyClient campaignAlias={ALIAS} />);
+    await waitFor(() => {
+      expect(screen.getByTestId("org-survey-results")).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("link", { name: "Open the member portal" })).not.toBeInTheDocument();
+  });
+
   it("forwards the revived peer presentation to BrandedReport without recomputing it", async () => {
     writeOnScreenResult(
       ALIAS,
