@@ -129,6 +129,7 @@ export default withAuth(
     // unchanged because only the exact respondent-report regex is public.
     const passthrough = NextResponse.next();
     if (
+      pathname === "/member/sign-in" ||
       pathname === CEO_SELF_REPORT_PATH ||
       pathname === CEO_SELF_REPORT_EXCHANGE_PATH ||
       RESPONDENT_REPORT_REGEX.test(pathname) ||

@@ -1,0 +1,17 @@
+export const MEMBER_FORBIDDEN_VISIBLE_WORDS = Object.freeze([
+  "campaign",
+  "respondent",
+  "submission",
+  "participant",
+  "accessMode",
+  "INVITED",
+  "PUBLIC",
+  "isCEO",
+  "organizationId",
+  "templateAlias",
+  "versionId",
+  "deletedAt",
+  "token",
+  "roleType",
+  "magic link",
+]);
