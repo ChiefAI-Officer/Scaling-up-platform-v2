@@ -16,6 +16,13 @@ what to do.
    - `docs/wireframes-phase2/wave8/27-member-portal-reports.md` — revision 2, authoritative for screens and copy
 4. **The artboards**, 13 screens: <https://claude.ai/artifact/4wmRTct1wDpvFuN6z9n8rj>
 
+   ⚠️ **If you cannot open that link, you are not blocked.** It is hosted behind the operator's
+   account. The wireframe is the authoritative source for screens and copy, it is text, and it
+   covers every one of those 13 screens with the exact wording — plus four things the pictures
+   cannot carry: the forbidden-vocabulary list, the acceptance notes written as assertions, the
+   visual contract, and the report view. Build from the wireframe. The artboards exist so the
+   client can see the design before code does, not as a spec you need.
+
 ## 2. ⚠️ When the sources disagree, the recording wins
 
 **This has already bitten once and it will look like a defect to you.**
