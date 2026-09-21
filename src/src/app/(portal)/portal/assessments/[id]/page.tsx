@@ -53,6 +53,7 @@ import {
 import type { CustomSlide } from "@/lib/assessments/custom-slides";
 import type { CustomSlidesPanelSection } from "@/components/assessments/CustomSlidesPanel";
 import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
+import { isMemberPortalEnabled } from "@/lib/members/flags";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -279,6 +280,9 @@ export default async function CampaignDetailPage({ params }: PageProps) {
       }
       canEditReportAppearance={canEditReportAppearance}
       legacyOverTimeRespondentIds={legacyOverTimeRespondentIds}
+      memberPortalAccessWarning={
+        campaignForFlag?.accessMode === "INVITED" && isMemberPortalEnabled()
+      }
     />
   );
 }

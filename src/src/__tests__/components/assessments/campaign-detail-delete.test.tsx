@@ -77,12 +77,14 @@ function renderDetail(
   status: "DRAFT" | "ACTIVE" | "CLOSED" = "ACTIVE",
   respondents: CampaignRespondentRow[] = noRespondents,
   responsiveEnabled = false,
+  memberPortalAccessWarning = false,
 ) {
   return render(
     <CampaignDetail
       initialOverview={makeOverview(status)}
       initialRespondents={respondents}
       responsiveEnabled={responsiveEnabled}
+      memberPortalAccessWarning={memberPortalAccessWarning}
       canViewGroupReport
       groupReportHref={`/assessments/${CAMPAIGN_ID}/report`}
     />,
@@ -112,6 +114,22 @@ describe("CampaignDetail — Delete campaign dialog", () => {
     expect(
       screen.getByText(/responses are retained/i),
     ).toBeInTheDocument();
+  });
+
+  it("warns invited campaigns about member report access when the portal is enabled", () => {
+    renderDetail("ACTIVE", noRespondents, false, true);
+    fireEvent.click(screen.getByTestId("campaign-delete-btn"));
+
+    expect(screen.getByText(/including the reports they can see today/i)).toBeInTheDocument();
+    expect(screen.getByText(/their responses stay in your records/i)).toBeInTheDocument();
+  });
+
+  it("keeps the current warning copy when the member portal is disabled", () => {
+    renderDetail("ACTIVE");
+    fireEvent.click(screen.getByTestId("campaign-delete-btn"));
+
+    expect(screen.getByText(/responses are retained/i)).toBeInTheDocument();
+    expect(screen.queryByText(/reports they can see today/i)).not.toBeInTheDocument();
   });
 
   it("keeps the group report primary and puts secondary actions in the responsive menu", () => {

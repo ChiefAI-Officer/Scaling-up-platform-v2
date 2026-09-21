@@ -50,6 +50,7 @@ import { isReportStyleSelectionEnabled } from "@/lib/assessments/wave-report-sty
 import { deriveReportStylePreviewCapabilities } from "@/lib/assessments/report-style-registry";
 import { isInvitationBannerEnabled } from "@/lib/assessments/wave-invitation-banner-flags";
 import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
+import { isMemberPortalEnabled } from "@/lib/members/flags";
 
 const ADMIN_CAMPAIGNS = "/admin/assessments/campaigns";
 
@@ -176,6 +177,9 @@ export default async function AdminCampaignDetailPage({ params }: PageProps) {
         canEditReportAppearance={false}
         basePath={ADMIN_CAMPAIGNS}
         hidePortalOnlyLinks
+        memberPortalAccessWarning={
+          campaignForFlag?.accessMode === "INVITED" && isMemberPortalEnabled()
+        }
       />
     </div>
   );

@@ -199,6 +199,8 @@ export interface CampaignDetailProps {
   hidePortalOnlyLinks?: boolean;
   /** Mobile-foundation presentation gate. Defaults off to preserve legacy DOM. */
   responsiveEnabled?: boolean;
+  /** Release 1 member-portal blast-radius copy, resolved server-side for invited campaigns only. */
+  memberPortalAccessWarning?: boolean;
 }
 
 interface OrgRespondentRow {
@@ -305,6 +307,7 @@ export function CampaignDetail({
   basePath = "/portal/assessments",
   hidePortalOnlyLinks = false,
   responsiveEnabled = false,
+  memberPortalAccessWarning = false,
 }: CampaignDetailProps) {
   const { toast } = useToast();
   const router = useRouter();
@@ -2899,10 +2902,21 @@ export function CampaignDetail({
           <DialogHeader>
             <DialogTitle>Delete this campaign?</DialogTitle>
             <DialogDescription>
-              {headerMetrics.invited > 0 || headerMetrics.completed > 0
-                ? `${headerMetrics.invited} invited and ${headerMetrics.completed} completed participants will lose access. Responses are retained.`
-                : "Invited participants will lose access. Responses are retained."}
-              {" "}This is not reversible.
+              {memberPortalAccessWarning ? (
+                <>
+                  {headerMetrics.invited > 0 || headerMetrics.completed > 0
+                    ? `${headerMetrics.invited} invited and ${headerMetrics.completed} completed participants`
+                    : "Invited participants"}{" "}
+                  will lose access — including the reports they can see today. Their responses stay in your records. This is not reversible.
+                </>
+              ) : (
+                <>
+                  {headerMetrics.invited > 0 || headerMetrics.completed > 0
+                    ? `${headerMetrics.invited} invited and ${headerMetrics.completed} completed participants will lose access. Responses are retained.`
+                    : "Invited participants will lose access. Responses are retained."}
+                  {" "}This is not reversible.
+                </>
+              )}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
