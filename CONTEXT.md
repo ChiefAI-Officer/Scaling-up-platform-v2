@@ -66,6 +66,28 @@ The participant UI tints each section by its **Domain** using the Scaling Up bra
 
 ### Sending & answering
 
+**Member**:
+A person on an organization's roster (`OrgRespondent`), considered as someone who can sign in. A Member is not a `User`: they have no ADMIN/STAFF/COACH role, password, or separate member row.
+_Avoid_: "respondent" (the roster person in the assessment domain), "participant" (that person's inclusion in one Campaign), "user" (an ADMIN/STAFF/COACH account).
+
+**Member identity**:
+An email address plus the **set** of live `OrgRespondent` rows sharing it. The address is the identity; the set is resolved fresh on every request and is never collapsed to one row.
+
+**Level**:
+`OrgRespondent.roleType`, the Esperto-aligned value that determines the report scope derived for a Member. It is distinct from both account role and free-text job title. Unknown, missing, and unmapped values fail closed to own reports only.
+_Avoid_: "role" (`User.role`, the ADMIN/STAFF/COACH axis), "job title" (`OrgRespondent.jobTitle`, which grants nothing).
+
+**Entitlement**:
+The set of Respondents whose reports a Member may open, derived per request from the Member identity's current Level and team. It is never stored in the Member session or accepted from a caller.
+_Avoid_: "permission" (suggests a stored grant), "ownership" (too narrow for hierarchy-derived access).
+
+**Member sign-in link**:
+A single-use, one-hour, database-backed credential emailed to a Member identity and exchanged by an explicit POST for a Member session. It is distinct from the reusable, Campaign-scoped **invitation link** that opens an assessment.
+_Avoid_: "magic link"; use **sign-in link**.
+
+**Member session**:
+A short-lived sealed cookie scoped to `/member`, proving only that someone redeemed a sign-in link for that address in this browser. It carries no Respondent or report ids and is never proof of Entitlement to a report.
+
 **Campaign**:
 One send of a template version to a chosen subset of a company's members. Its unchanged `closeAt` is a clock-based intake cutoff, while stored `status = CLOSED` is an explicit lifecycle transition. For an Email Delivery Intent created by a valid submission, merely passing `closeAt` does not revoke the obligation; changing the deadline or stored status triggers review.
 _Avoid_: assessment instance, test, run.
