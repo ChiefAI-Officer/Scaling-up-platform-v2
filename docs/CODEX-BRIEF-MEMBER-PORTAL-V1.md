@@ -10,7 +10,7 @@ what to do.
    member portal and states the requirement in his own words. The operator will point you at it.
 2. **Read the Slack thread** around 2026-09-15/16 for context on scope.
 3. **Then read, in the repo, in this order:**
-   - `docs/HANDOFF-MEMBER-PORTAL-V1-BUILD.md` — the reference handoff
+   - `docs/HANDOFF-MEMBER-PORTAL-V1.md` — the reference handoff
    - `docs/superpowers/specs/2026-09-17-member-portal-v1-design.md` — revision 3, authoritative for rules
    - `docs/superpowers/plans/2026-09-17-member-portal-v1.md` — revision 3, your task list
    - `docs/wireframes-phase2/wave8/27-member-portal-reports.md` — revision 2, authoritative for screens and copy
