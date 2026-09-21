@@ -7,17 +7,27 @@ const mockNotFound = jest.fn(() => {
 const mockEnabled = jest.fn(() => true);
 const mockSession = jest.fn();
 const mockList = jest.fn();
+const mockResolveIdentity = jest.fn();
 
 jest.mock("next/navigation", () => ({ notFound: () => mockNotFound() }));
+// Regression sentinel: a future switch back to Next Link must fail the no-prefetch assertion.
+jest.mock("next/link", () => ({
+  __esModule: true,
+  default: ({ children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) =>
+    React.createElement("a", { ...props, "data-next-link": "true" }, children),
+}));
 jest.mock("@/lib/members/flags", () => ({ isMemberPortalEnabled: () => mockEnabled() }));
 jest.mock("@/lib/members/session", () => ({ requireMemberSession: () => mockSession() }));
+jest.mock("@/lib/members/identity", () => ({
+  resolveMemberIdentity: (...args: unknown[]) => mockResolveIdentity(...args),
+}));
 jest.mock("@/lib/members/member-evaluations", () => ({
   listMemberEvaluations: (...args: unknown[]) => mockList(...args),
 }));
 jest.mock("@/lib/db", () => ({
   db: {
     orgRespondent: {
-      findFirst: jest.fn().mockResolvedValue({ firstName: "Casey", lastName: "Member" }),
+      findUnique: jest.fn().mockResolvedValue({ firstName: "Casey", lastName: "Member" }),
     },
   },
 }));
@@ -31,6 +41,10 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockEnabled.mockReturnValue(true);
   mockSession.mockResolvedValue({ normalizedEmail: "casey@example.com" });
+  mockResolveIdentity.mockResolvedValue({
+    normalizedEmail: "casey@example.com",
+    members: [{ respondentId: "respondent-1" }],
+  });
 });
 
 describe("member evaluations page", () => {
@@ -49,10 +63,9 @@ describe("member evaluations page", () => {
     expect(screen.getByRole("heading", { name: "Your evaluations" })).toBeInTheDocument();
     expect(screen.getByText("Leadership Alignment")).toBeInTheDocument();
     expect(screen.getByText(/Closes/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Continue" })).toHaveAttribute(
-      "href",
-      "/member/evaluations/inv-1/open",
-    );
+    const continueLink = screen.getByRole("link", { name: "Continue" });
+    expect(continueLink).toHaveAttribute("href", "/member/evaluations/inv-1/open");
+    expect(continueLink).not.toHaveAttribute("data-next-link");
   });
 
   it("renders the accepted empty state", async () => {

@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { MemberPortalHeader } from "@/components/members/MemberPortalHeader";
 import { isMemberPortalEnabled } from "@/lib/members/flags";
+import { resolveMemberIdentity } from "@/lib/members/identity";
 import { listMemberEvaluations } from "@/lib/members/member-evaluations";
 import { requireMemberSession } from "@/lib/members/session";
 
@@ -13,17 +13,15 @@ export default async function MemberEvaluationsPage() {
   if (!isMemberPortalEnabled()) notFound();
   const session = await requireMemberSession();
   const normalizedEmail = session.normalizedEmail!;
-  const profile = await db.orgRespondent.findFirst({
-    where: {
-      deletedAt: null,
-      organization: { deletedAt: null },
-      OR: [
-        { normalizedEmail },
-        { normalizedEmail: null, email: { equals: normalizedEmail, mode: "insensitive" } },
-      ],
-    },
+  const identity = await resolveMemberIdentity(
+    db as unknown as Parameters<typeof resolveMemberIdentity>[0],
+    normalizedEmail,
+  );
+  const primary = identity.members[0];
+  if (!primary) notFound();
+  const profile = await db.orgRespondent.findUnique({
+    where: { id: primary.respondentId },
     select: { firstName: true, lastName: true },
-    orderBy: { id: "asc" },
   });
   if (!profile) notFound();
 
@@ -65,12 +63,12 @@ export default async function MemberEvaluationsPage() {
                     </p>
                   ) : null}
                 </div>
-                <Link
+                <a
                   href={evaluation.href}
-                  className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#522583] px-5 py-3 font-semibold text-white"
+                  className="inline-flex min-h-11 items-center justify-center rounded-full bg-primary px-5 py-3 font-semibold text-primary-foreground"
                 >
                   Continue
-                </Link>
+                </a>
               </article>
             ))}
           </div>

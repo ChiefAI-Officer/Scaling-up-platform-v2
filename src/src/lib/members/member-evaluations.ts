@@ -47,6 +47,8 @@ export async function listMemberEvaluations(
     const ownIds = new Set(identity.members.map((member) => member.respondentId));
     if (ownIds.size === 0) return [];
 
+    // Keep this query selective for bounded member reads. The shared classifier below
+    // remains the authoritative lifecycle gate and must run before an item is exposed.
     const rows = await tx.assessmentInvitation.findMany({
       where: {
         respondentId: { in: [...ownIds] },

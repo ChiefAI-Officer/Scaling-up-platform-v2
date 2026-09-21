@@ -42,7 +42,7 @@ export default async function MemberHomePage() {
           <section className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm">
             <h2 className="text-2xl font-semibold">Evaluations</h2>
             <p className="mt-2 text-slate-600">The assessments you&apos;ve been invited to complete. Your answers save as you go.</p>
-            <Link href="/member/evaluations" className="mt-6 inline-flex rounded-full bg-[#522583] px-5 py-3 font-semibold text-white">Go to evaluations</Link>
+            <Link href="/member/evaluations" className="mt-6 inline-flex rounded-full bg-primary px-5 py-3 font-semibold text-primary-foreground">Go to evaluations</Link>
           </section>
           <section className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm">
             <h2 className="text-2xl font-semibold">Reports</h2>
