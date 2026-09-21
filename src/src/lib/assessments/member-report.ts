@@ -12,20 +12,37 @@ import {
   type GroupReportResult,
 } from "@/lib/assessments/group-report";
 import { resolveMemberIdentity } from "@/lib/members/identity";
+import {
+  entitlementFor,
+  type EntitlementReader,
+  type ScopedRespondent,
+  type TeamNode,
+} from "@/lib/members/entitlement";
 
 type MemberReportTx = ActiveVersionDb & {
   orgRespondent: {
     findMany(args: {
       where: Record<string, unknown>;
       select: Record<string, boolean>;
-    }): Promise<
-      Array<{
-        id: string;
-        organizationId: string;
-        teamId: string | null;
-        roleType: string | null;
-      }>
-    >;
+    }): Promise<Array<{
+      id: string;
+      organizationId: string;
+      teamId: string | null;
+      roleType: string | null;
+      deletedAt?: Date | null;
+      organization?: { deletedAt: Date | null };
+    }>>;
+  };
+  orgTeam: {
+    findMany(args: {
+      where: Record<string, unknown>;
+      select: Record<string, boolean>;
+    }): Promise<Array<{
+      id: string;
+      organizationId: string;
+      parentTeamId: string | null;
+      deletedAt: Date | null;
+    }>>;
   };
   assessmentSubmission: {
     findUnique(args: {
@@ -42,12 +59,47 @@ type MemberReportDb = {
   ): Promise<T>;
 };
 
-/**
- * Release 1 intentionally activates own-only scope. Task 16 replaces this
- * projection with the already-tested hierarchy entitlement after approval.
- */
-function releaseOneRespondentIds(members: Array<{ respondentId: string }>): Set<string> {
-  return new Set(members.map((member) => member.respondentId));
+function entitlementReader(tx: MemberReportTx): EntitlementReader {
+  return {
+    async respondentsForOrganization(organizationId): Promise<ScopedRespondent[]> {
+      const rows = await tx.orgRespondent.findMany({
+        where: { organizationId, deletedAt: null, organization: { deletedAt: null } },
+        select: {
+          id: true,
+          organizationId: true,
+          teamId: true,
+          roleType: true,
+          deletedAt: true,
+          organization: true,
+        },
+      });
+      return rows.map((row) => ({
+        respondentId: row.id,
+        organizationId: row.organizationId,
+        teamId: row.teamId,
+        roleType: row.roleType,
+        deletedAt: row.deletedAt ?? null,
+        organizationDeletedAt: row.organization?.deletedAt ?? null,
+      }));
+    },
+    async teamsForOrganization(organizationId): Promise<TeamNode[]> {
+      const rows = await tx.orgTeam.findMany({
+        where: { organizationId, deletedAt: null },
+        select: {
+          id: true,
+          organizationId: true,
+          parentTeamId: true,
+          deletedAt: true,
+        },
+      });
+      return rows.map((row) => ({
+        teamId: row.id,
+        organizationId: row.organizationId,
+        parentTeamId: row.parentTeamId,
+        deletedAt: row.deletedAt,
+      }));
+    },
+  };
 }
 
 export async function getMemberRespondentReport(
@@ -57,7 +109,10 @@ export async function getMemberRespondentReport(
   return db.$transaction(
     async (tx) => {
       const identity = await resolveMemberIdentity(tx, input.normalizedEmail);
-      const entitledRespondentIds = releaseOneRespondentIds(identity.members);
+      const entitledRespondentIds = await entitlementFor(
+        identity.members,
+        entitlementReader(tx),
+      );
       const submission = await tx.assessmentSubmission.findUnique({
         where: { id: input.submissionId },
         select: respondentReportSelect,
@@ -95,7 +150,10 @@ export async function getMemberGroupReport(
       if (!identity.members.some((member) => member.organizationId === organizationId)) {
         return false;
       }
-      const entitledRespondentIds = releaseOneRespondentIds(identity.members);
+      const entitledRespondentIds = await entitlementFor(
+        identity.members,
+        entitlementReader(tx as unknown as MemberReportTx),
+      );
       return completedRespondentIds.every((respondentId) =>
         entitledRespondentIds.has(respondentId),
       );
