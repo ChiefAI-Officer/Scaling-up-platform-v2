@@ -12,38 +12,13 @@ import {
   type GroupReportResult,
 } from "@/lib/assessments/group-report";
 import { resolveMemberIdentity } from "@/lib/members/identity";
+import { entitlementFor } from "@/lib/members/entitlement";
 import {
-  entitlementFor,
-  type EntitlementReader,
-  type ScopedRespondent,
-  type TeamNode,
-} from "@/lib/members/entitlement";
+  createMemberEntitlementReader,
+  type MemberEntitlementDb,
+} from "@/lib/members/entitlement-reader";
 
-type MemberReportTx = ActiveVersionDb & {
-  orgRespondent: {
-    findMany(args: {
-      where: Record<string, unknown>;
-      select: Record<string, boolean>;
-    }): Promise<Array<{
-      id: string;
-      organizationId: string;
-      teamId: string | null;
-      roleType: string | null;
-      deletedAt?: Date | null;
-      organization?: { deletedAt: Date | null };
-    }>>;
-  };
-  orgTeam: {
-    findMany(args: {
-      where: Record<string, unknown>;
-      select: Record<string, boolean>;
-    }): Promise<Array<{
-      id: string;
-      organizationId: string;
-      parentTeamId: string | null;
-      deletedAt: Date | null;
-    }>>;
-  };
+type MemberReportTx = ActiveVersionDb & MemberEntitlementDb & {
   assessmentSubmission: {
     findUnique(args: {
       where: { id: string };
@@ -59,49 +34,6 @@ type MemberReportDb = {
   ): Promise<T>;
 };
 
-function entitlementReader(tx: MemberReportTx): EntitlementReader {
-  return {
-    async respondentsForOrganization(organizationId): Promise<ScopedRespondent[]> {
-      const rows = await tx.orgRespondent.findMany({
-        where: { organizationId, deletedAt: null, organization: { deletedAt: null } },
-        select: {
-          id: true,
-          organizationId: true,
-          teamId: true,
-          roleType: true,
-          deletedAt: true,
-          organization: true,
-        },
-      });
-      return rows.map((row) => ({
-        respondentId: row.id,
-        organizationId: row.organizationId,
-        teamId: row.teamId,
-        roleType: row.roleType,
-        deletedAt: row.deletedAt ?? null,
-        organizationDeletedAt: row.organization?.deletedAt ?? null,
-      }));
-    },
-    async teamsForOrganization(organizationId): Promise<TeamNode[]> {
-      const rows = await tx.orgTeam.findMany({
-        where: { organizationId, deletedAt: null },
-        select: {
-          id: true,
-          organizationId: true,
-          parentTeamId: true,
-          deletedAt: true,
-        },
-      });
-      return rows.map((row) => ({
-        teamId: row.id,
-        organizationId: row.organizationId,
-        parentTeamId: row.parentTeamId,
-        deletedAt: row.deletedAt,
-      }));
-    },
-  };
-}
-
 export async function getMemberRespondentReport(
   db: MemberReportDb,
   input: { normalizedEmail: string; submissionId: string },
@@ -111,7 +43,7 @@ export async function getMemberRespondentReport(
       const identity = await resolveMemberIdentity(tx, input.normalizedEmail);
       const entitledRespondentIds = await entitlementFor(
         identity.members,
-        entitlementReader(tx),
+        createMemberEntitlementReader(tx),
       );
       const submission = await tx.assessmentSubmission.findUnique({
         where: { id: input.submissionId },
@@ -152,7 +84,7 @@ export async function getMemberGroupReport(
       }
       const entitledRespondentIds = await entitlementFor(
         identity.members,
-        entitlementReader(tx as unknown as MemberReportTx),
+        createMemberEntitlementReader(tx as unknown as MemberReportTx),
       );
       return completedRespondentIds.every((respondentId) =>
         entitledRespondentIds.has(respondentId),

@@ -215,18 +215,22 @@ describe("getMemberRespondentReport", () => {
 });
 
 describe("getMemberGroupReport", () => {
-  const identityTx = {
-    orgRespondent: {
-      findMany: jest.fn().mockResolvedValue([
-        { id: "respondent-1", organizationId: "org-1", teamId: null, roleType: "employee" },
-        { id: "respondent-2", organizationId: "org-1", teamId: null, roleType: "employee" },
-      ]),
-    },
-  };
-
   beforeEach(() => mockMemberGroupLoader.mockReset());
 
-  it("allows only when own-only entitlement covers the entire completed cohort", async () => {
+  it("allows a CEO-family member when their organization scope covers the completed cohort", async () => {
+    const identityTx = {
+      orgRespondent: {
+        findMany: jest.fn(async (args: { where?: { organizationId?: string } }) =>
+          args.where?.organizationId
+            ? [
+                { id: "respondent-1", organizationId: "org-1", teamId: null, roleType: "ceofounder", deletedAt: null, organization: { deletedAt: null } },
+                { id: "respondent-2", organizationId: "org-1", teamId: null, roleType: "employee", deletedAt: null, organization: { deletedAt: null } },
+              ]
+            : [{ id: "respondent-1", organizationId: "org-1", teamId: null, roleType: "ceofounder" }],
+        ),
+      },
+      orgTeam: { findMany: jest.fn().mockResolvedValue([]) },
+    };
     mockMemberGroupLoader.mockImplementation(
       async (_db, _campaignId, _generatedAt, authorize) =>
         (await authorize(identityTx, ["respondent-1", "respondent-2"], "org-1"))
@@ -242,12 +246,29 @@ describe("getMemberGroupReport", () => {
     expect(identityTx.orgRespondent.findMany).toHaveBeenCalled();
   });
 
-  it("forbids when entitlement covers all but one completed respondent", async () => {
+  it("forbids a team leader when the cohort contains a CEO in their team", async () => {
+    const identityTx = {
+      orgRespondent: {
+        findMany: jest.fn(async (args: { where?: { organizationId?: string } }) =>
+          args.where?.organizationId
+            ? [
+                { id: "leader", organizationId: "org-1", teamId: "team-1", roleType: "teamleader", deletedAt: null, organization: { deletedAt: null } },
+                { id: "ceo", organizationId: "org-1", teamId: "team-1", roleType: "ceofounder", deletedAt: null, organization: { deletedAt: null } },
+              ]
+            : [{ id: "leader", organizationId: "org-1", teamId: "team-1", roleType: "teamleader" }],
+        ),
+      },
+      orgTeam: {
+        findMany: jest.fn().mockResolvedValue([
+          { id: "team-1", organizationId: "org-1", parentTeamId: null, deletedAt: null },
+        ]),
+      },
+    };
     mockMemberGroupLoader.mockImplementation(
       async (_db, _campaignId, _generatedAt, authorize) =>
         (await authorize(
           identityTx,
-          ["respondent-1", "respondent-2", "respondent-3"],
+          ["leader", "ceo"],
           "org-1",
         ))
           ? { kind: "ok" }

@@ -39,10 +39,16 @@ export function MemberReportGrid({ reports }: { reports: MemberReportListItem[] 
             </div>
             <div className="space-y-2 p-5">
               <h2 className="text-lg font-semibold text-slate-900">{report.reportName}</h2>
+              {report.kind === "group" ? (
+                <p className="text-sm font-semibold text-[#522583]">Group report</p>
+              ) : null}
               {report.personName ? <p className="text-sm text-slate-600">For {report.personName}</p> : null}
               {report.companyName ? <p className="text-sm text-slate-600">{report.companyName}</p> : null}
               <p className="text-sm text-slate-500">Completed {report.completedAt.toLocaleDateString("en-US", { dateStyle: "medium" })}</p>
-              <Link className="inline-flex rounded-lg bg-[#522583] px-4 py-2 font-semibold text-white" href={`/member/reports/${encodeURIComponent(report.submissionId)}`}>
+              <Link
+                className="inline-flex rounded-lg bg-[#522583] px-4 py-2 font-semibold text-white"
+                href={report.href ?? `/member/reports/${encodeURIComponent(report.submissionId)}`}
+              >
                 View report
               </Link>
             </div>
