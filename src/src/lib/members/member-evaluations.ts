@@ -1,3 +1,7 @@
+import type {
+  AssessmentCampaignStatus,
+  AssessmentInvitationStatus,
+} from "@prisma/client";
 import { resolveMemberIdentity } from "@/lib/members/identity";
 import { classifyInvitationExchangeAvailability } from "@/lib/assessments/stable-invitation-tokens";
 
@@ -11,14 +15,14 @@ export type MemberEvaluationListItem = {
 type EvaluationRow = {
   id: string;
   respondentId: string;
-  status: string;
+  status: AssessmentInvitationStatus;
   expiresAt: Date;
   revokedAt: Date | null;
   createdAt: Date;
   campaign: {
     alias: string;
     name: string;
-    status: string;
+    status: AssessmentCampaignStatus;
     openAt: Date;
     closeAt: Date | null;
     deletedAt: Date | null;
