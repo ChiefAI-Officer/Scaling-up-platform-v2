@@ -31,9 +31,10 @@ The durable rules are:
 - a group report is allowed only when that Entitlement covers every completed
   Respondent represented in it.
 
-Release 1 activates only the own-report subset. The hierarchy implementation and
-tests land with Release 1 but do not become an authorization grant until the
-separately approved Release 2 switch.
+Release 1 activated only the own-report subset. Release 2 now applies the full
+hierarchy on every personal- and group-report request, still behind the global
+Member portal gate. Group cards and routes additionally retain the existing
+per-instrument group-report gate and publish guard.
 
 ## Consequences
 

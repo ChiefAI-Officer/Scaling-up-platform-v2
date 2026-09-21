@@ -6,6 +6,17 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="member-portal-release-two-implemented"></a>
+### 2026-09-21 — Member portal Release 2 implemented <!-- ENTRY_ISO:2026-09-21 ENTRY_SLUG:member-portal-release-two-implemented -->
+
+**Status: IMPLEMENTED AND VERIFIED; DARK BY DEFAULT; NOT MERGED, DEPLOYED, OR ENABLED.** Release 2 activates the hierarchy Jeff described inside the already-gated Member surface. A canonical CEO/founder Level can open every live Respondent report in the same organization. A `teamleader` with a team can open reports for that team and all descendants, while every CEO-family Respondent remains excluded from that scope. Missing, unknown, and unrecognised Levels—and team leaders without a team—continue to fail closed to own-only. Identity, Level, roster, team ancestry, and report authorization are recomputed in the same database snapshot on every request, so a Coach edit takes effect without a new Member session.
+
+**Report discovery and group authorization.** The Member report grid now contains every entitled personal report and, for an eligible completed cohort, one clearly marked group-report card linking to `/member/reports/team/[campaignId]`. The route reuses the canonical group-report model, renderers, empty state, print path, metrics, per-instrument group flag, alias allowlist, and scored-report publish guard. It authorizes the completed cohort as a strict superset check: every represented Respondent must be inside the Member's freshly derived Entitlement or the request fails closed. Group cards use that same eligibility rule, so discovery does not advertise a broader report than the loader will open.
+
+**Roster guidance and operational boundary.** Add/Edit Member surfaces show a non-blocking warning when `teamleader` has no team; Edit Member also warns when the stored Level is outside the six canonical values, while preserving that legacy value on an unchanged save. The guidance is passed from server-resolved Member-portal state and is absent when the global gate is off. The three known Production rows with unrecognised Level values were **not** rewritten: no Production database write was authorized, so their correction remains an explicit operator task before launch. Release 3 evaluations and Release 4 Coach-initiated send/discovery remain out of scope.
+
+**Verification receipt.** The expanded Member, hierarchy, personal/group loader and gate, route, canonical report, middleware, login, roster-editor, campaign-wizard, and delete-warning matrix passes **27 suites / 309 tests** with zero failures. All **53** migration-safety checks pass. Changed-file ESLint has no new errors (two inherited `members-teams-view.tsx` unused-variable warnings remain), `git diff --check` is clean, and the fresh 4 GB-heap Turbopack production build compiles, passes TypeScript, and generates **98/98 pages**, including the new Member group route. Build output contains only the inherited middleware-deprecation, missing local Inngest-key, and build-time `DATABASE_URL` warnings. No Production database write, member email, environment mutation, merge, deployment, or flag activation occurred.
+
 <a id="member-portal-release-one-implemented"></a>
 ### 2026-09-21 — Member portal Release 1 implemented <!-- ENTRY_ISO:2026-09-21 ENTRY_SLUG:member-portal-release-one-implemented -->
 
