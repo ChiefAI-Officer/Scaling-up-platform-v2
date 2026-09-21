@@ -5,6 +5,8 @@ import { MemberPortalHeader } from "@/components/members/MemberPortalHeader";
 import { isMemberPortalEnabled } from "@/lib/members/flags";
 
 export const metadata: Metadata = { referrer: "no-referrer" };
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function MemberSignInPage({
   searchParams,

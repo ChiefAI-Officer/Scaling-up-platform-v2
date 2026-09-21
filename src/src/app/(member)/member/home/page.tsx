@@ -7,6 +7,9 @@ import { resolveMemberIdentity } from "@/lib/members/identity";
 import { memberGreeting } from "@/lib/members/greeting";
 import { requireMemberSession } from "@/lib/members/session";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function MemberHomePage() {
   if (!isMemberPortalEnabled()) notFound();
   const session = await requireMemberSession();

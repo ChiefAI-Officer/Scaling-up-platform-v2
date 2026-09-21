@@ -130,11 +130,16 @@ describe("member portal middleware policy", () => {
     ).toBe(true);
   });
 
-  it("marks member report lists, personal reports, and group reports private and no-store", () => {
+  it("marks every member route private and no-store", () => {
     for (const pathname of [
+      "/member/sign-in",
+      "/member/sign-in/request",
+      "/member/sign-in/exchange",
+      "/member/home",
       "/member/reports",
       "/member/reports/submission-1",
       "/member/reports/team/campaign-1",
+      "/member/sign-out",
     ]) {
       expect(runMiddleware(pathname).headers.get("Cache-Control")).toBe("no-store, private");
     }
