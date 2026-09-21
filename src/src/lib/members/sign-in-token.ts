@@ -14,7 +14,7 @@ export type MemberTokenIssuer = "SELF" | "COACH";
 
 type TokenDb = {
   memberSignInToken: {
-    create(args: { data: Record<string, unknown> }): Promise<unknown>;
+    create(args: { data: Record<string, unknown> }): Promise<{ id: string }>;
     findUnique(args: {
       where: { tokenHash: string };
       select: { normalizedEmail: true };
@@ -31,7 +31,7 @@ type TokenDb = {
 };
 
 export async function issueMemberSignInToken(
-  db: Pick<TokenDb, "memberSignInToken">,
+  db: { memberSignInToken: Pick<TokenDb["memberSignInToken"], "create"> },
   input: {
     normalizedEmail: string;
     issuedVia: MemberTokenIssuer;
@@ -39,13 +39,13 @@ export async function issueMemberSignInToken(
     campaignId?: string | null;
     now?: Date;
   },
-): Promise<{ rawToken: string; expiresAt: Date }> {
+): Promise<{ tokenId: string; rawToken: string; expiresAt: Date }> {
   const now = input.now ?? new Date();
   const ttl = input.issuedVia === "COACH" ? COACH_TOKEN_TTL_MS : SELF_TOKEN_TTL_MS;
   const expiresAt = new Date(now.getTime() + ttl);
   const rawToken = generateRawToken();
 
-  await db.memberSignInToken.create({
+  const row = await db.memberSignInToken.create({
     data: {
       tokenHash: hashToken(rawToken),
       normalizedEmail: normalizeMemberEmail(input.normalizedEmail),
@@ -57,7 +57,7 @@ export async function issueMemberSignInToken(
     },
   });
 
-  return { rawToken, expiresAt };
+  return { tokenId: row.id, rawToken, expiresAt };
 }
 
 export async function redeemMemberSignInToken(
