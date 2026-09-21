@@ -93,6 +93,52 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("EditMemberModal", () => {
+  test("warns when a leadership team member has no team while the member portal is enabled", () => {
+    renderModal({
+      memberPortalEnabled: true,
+      member: { ...MEMBER, roleType: "teamleader", teamId: null },
+    });
+
+    expect(
+      screen.getByText("Leadership team member needs a team to grant additional report access.")
+    ).toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId("select-team"), {
+      target: { value: TEAM_ENG.id },
+    });
+    expect(
+      screen.queryByText("Leadership team member needs a team to grant additional report access.")
+    ).not.toBeInTheDocument();
+  });
+
+  test("warns for an unrecognised stored level without blocking legacy passthrough", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, data: {} }),
+    });
+    const { onUpdated } = renderModal({
+      memberPortalEnabled: true,
+      member: { ...MEMBER, roleType: "CEO" },
+    });
+
+    expect(
+      screen.getByText("This level isn't recognised and grants no additional access.")
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(onUpdated).toHaveBeenCalledTimes(1));
+    const request = (global.fetch as jest.Mock).mock.calls[0][1];
+    expect(JSON.parse(request.body)).not.toHaveProperty("roleType");
+  });
+
+  test("does not render member-access warnings while the member portal is disabled", () => {
+    renderModal({ member: { ...MEMBER, roleType: "CEO", teamId: null } });
+
+    expect(
+      screen.queryByText("This level isn't recognised and grants no additional access.")
+    ).not.toBeInTheDocument();
+  });
+
   test("responsive in-flight state locks only submit and leaves inputs and cancel available", async () => {
     (global.fetch as jest.Mock).mockReturnValue(new Promise(() => {}));
     renderModal({ responsiveEnabled: true });

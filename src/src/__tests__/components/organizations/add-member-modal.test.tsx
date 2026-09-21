@@ -83,6 +83,37 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("AddMemberModal", () => {
+  test("warns when a leadership team member has no team while the member portal is enabled", () => {
+    renderModal({ memberPortalEnabled: true });
+
+    fireEvent.change(screen.getByTestId("select-level"), {
+      target: { value: "teamleader" },
+    });
+
+    expect(
+      screen.getByText("Leadership team member needs a team to grant additional report access.")
+    ).toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId("select-team"), {
+      target: { value: TEAM_ENG.id },
+    });
+    expect(
+      screen.queryByText("Leadership team member needs a team to grant additional report access.")
+    ).not.toBeInTheDocument();
+  });
+
+  test("does not render member-access warnings while the member portal is disabled", () => {
+    renderModal();
+
+    fireEvent.change(screen.getByTestId("select-level"), {
+      target: { value: "teamleader" },
+    });
+
+    expect(
+      screen.queryByText("Leadership team member needs a team to grant additional report access.")
+    ).not.toBeInTheDocument();
+  });
+
   test("responsive in-flight state locks only submit and leaves inputs and cancel available", async () => {
     (global.fetch as jest.Mock).mockReturnValue(new Promise(() => {}));
     renderModal({ responsiveEnabled: true });

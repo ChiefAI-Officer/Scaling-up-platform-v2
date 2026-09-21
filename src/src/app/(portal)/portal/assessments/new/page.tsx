@@ -27,6 +27,7 @@ import { isAdminOwnedAssessmentPresentationEnabled } from "@/lib/assessments/wav
 import { getInvitationBannerAuthoringGate } from "@/lib/assessments/wave-invitation-banner-flags";
 import { campaignPickerTemplateWhere } from "@/lib/assessments/campaign-picker-template-scope";
 import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
+import { isMemberPortalEnabled } from "@/lib/members/flags";
 
 export default async function NewCampaignPage() {
   const { session, coach } = await requireCoach();
@@ -97,6 +98,7 @@ export default async function NewCampaignPage() {
         waveQDefaultsEnabled={waveQDefaultsEnabled}
         onScreenResultsEnabled={onScreenResultsEnabled}
         adminOwnedPresentation={adminOwnedPresentation}
+        memberPortalEnabled={isMemberPortalEnabled()}
       />
     </div>
   );

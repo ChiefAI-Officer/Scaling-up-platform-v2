@@ -26,6 +26,7 @@ import {
 } from "@/components/organizations/members-teams-view";
 import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 import { PageHeader } from "@/components/ui/page-header";
+import { isMemberPortalEnabled } from "@/lib/members/flags";
 
 export default async function AdminAssessmentOrganizationsPage() {
   const mobileResponsiveEnabled = isMobileResponsiveEnabled();
@@ -96,6 +97,7 @@ export default async function AdminAssessmentOrganizationsPage() {
         hideEspertoImport
         allowGroupByCoach
         responsiveEnabled={mobileResponsiveEnabled}
+        memberPortalEnabled={isMemberPortalEnabled()}
       />
     </div>
   );

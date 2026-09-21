@@ -77,6 +77,8 @@ export interface AddMemberModalProps {
    */
   description?: string;
   responsiveEnabled?: boolean;
+  /** Shows report-access guidance. Resolve this server-side from the member-portal flag. */
+  memberPortalEnabled?: boolean;
 }
 
 type FieldError = { id: string; message: string };
@@ -104,6 +106,7 @@ export function AddMemberModal({
   loadingTeams = false,
   description,
   responsiveEnabled = false,
+  memberPortalEnabled = false,
 }: AddMemberModalProps) {
   const firstNameId = useId();
   const lastNameId  = useId();
@@ -389,6 +392,11 @@ export function AddMemberModal({
                   </>
                 )}
               </select>
+              {memberPortalEnabled && roleType === "teamleader" && !teamId && (
+                <p className="text-xs text-amber-700 dark:text-amber-400">
+                  Leadership team member needs a team to grant additional report access.
+                </p>
+              )}
             </div>
 
             {/* ---- Level (optional) ---- */}

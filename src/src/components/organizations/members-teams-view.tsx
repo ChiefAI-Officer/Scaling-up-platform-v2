@@ -110,6 +110,8 @@ export interface MembersTeamsViewProps {
   allowGroupByCoach?: boolean;
   /** Enables the adaptive compact drill-in presentation. */
   responsiveEnabled?: boolean;
+  /** Enables member-portal report-access guidance in member editors. */
+  memberPortalEnabled?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -211,6 +213,7 @@ export function MembersTeamsView({
   hideEspertoImport = false,
   allowGroupByCoach = false,
   responsiveEnabled = false,
+  memberPortalEnabled = false,
 }: MembersTeamsViewProps) {
   // Companies list — may grow when a new Company is created via the modal
   const [organizations, setOrganizations] = useState<OrgSummary[]>(initialOrganizations);
@@ -1103,6 +1106,7 @@ export function MembersTeamsView({
             defaultTeamId={modalDefaultTeamId}
             loadingTeams={orgStates[modalOrgId]?.loadingTeams ?? false}
             responsiveEnabled={responsiveEnabled}
+            memberPortalEnabled={memberPortalEnabled}
           />
         );
       })()}
@@ -1160,6 +1164,7 @@ export function MembersTeamsView({
             member={memberBeingEdited}
             teams={editMemberTeams}
             responsiveEnabled={responsiveEnabled}
+            memberPortalEnabled={memberPortalEnabled}
           />
         );
       })()}
