@@ -19,6 +19,7 @@ export const SELF_COMPARISON_REPORT_REGEX =
   /^\/assessments\/[^/]+\/self-comparison\/?$/;
 export const PUBLIC_REFERRAL_REPORT_NO_STORE_REGEX =
   /^\/assessments\/public-submissions\/[^/]+\/report\/?$/;
+export const MEMBER_REPORT_NO_STORE_REGEX = /^\/member\/reports(?:\/.*)?$/;
 const CEO_SELF_REPORT_PATH = "/assessments/self-report";
 const CEO_SELF_REPORT_EXCHANGE_PATH = "/assessments/self-report/exchange";
 const BLOB_CLIENT_UPLOAD_CALLBACK_PATH = "/api/files/client-upload";
@@ -138,7 +139,8 @@ export default withAuth(
     } else if (
       GROUP_REPORT_NO_STORE_REGEX.test(pathname) ||
       CONDENSED_REPORT_NO_STORE_REGEX.test(pathname) ||
-      PUBLIC_REFERRAL_REPORT_NO_STORE_REGEX.test(pathname)
+      PUBLIC_REFERRAL_REPORT_NO_STORE_REGEX.test(pathname) ||
+      MEMBER_REPORT_NO_STORE_REGEX.test(pathname)
     ) {
       passthrough.headers.set("Cache-Control", "no-store, private");
     }
@@ -175,6 +177,8 @@ export default withAuth(
           pathname.startsWith("/org-survey/") ||
           pathname.startsWith("/quiz/") ||
           pathname.startsWith("/api/quiz/") ||
+          pathname === "/member" ||
+          pathname.startsWith("/member/") ||
           (
             isReportComparisonRolloutActive() &&
             (
