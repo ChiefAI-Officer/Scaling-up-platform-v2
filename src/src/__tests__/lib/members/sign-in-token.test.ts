@@ -50,11 +50,12 @@ describe("member sign-in token", () => {
 
   it("atomically redeems once and only once", async () => {
     const db = tokenDb();
-    db.memberSignInToken.findUnique.mockResolvedValue({ normalizedEmail: "person@example.com" });
+    db.memberSignInToken.findUnique.mockResolvedValue({ id: "token-1", normalizedEmail: "person@example.com" });
     db.memberSignInToken.updateMany.mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 0 });
     const isEligible = jest.fn().mockResolvedValue(true);
 
     await expect(redeemMemberSignInToken(db, "raw", isEligible, NOW)).resolves.toEqual({
+      tokenId: "token-1",
       normalizedEmail: "person@example.com",
       redeemedAt: NOW,
     });
@@ -67,7 +68,7 @@ describe("member sign-in token", () => {
 
   it("allows exactly one winner across concurrent redemption attempts", async () => {
     const db = tokenDb();
-    db.memberSignInToken.findUnique.mockResolvedValue({ normalizedEmail: "person@example.com" });
+    db.memberSignInToken.findUnique.mockResolvedValue({ id: "token-1", normalizedEmail: "person@example.com" });
     let available = true;
     db.memberSignInToken.updateMany.mockImplementation(async () => {
       if (!available) return { count: 0 };
@@ -84,6 +85,7 @@ describe("member sign-in token", () => {
   it("refuses missing tokens and addresses with no live roster row before redemption", async () => {
     const db = tokenDb();
     db.memberSignInToken.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce({
+      id: "token-removed",
       normalizedEmail: "removed@example.com",
     });
     await expect(redeemMemberSignInToken(db, "missing", async () => true, NOW)).resolves.toBeNull();
@@ -93,7 +95,7 @@ describe("member sign-in token", () => {
 
   it("fails an expired token through the guarded atomic update", async () => {
     const db = tokenDb();
-    db.memberSignInToken.findUnique.mockResolvedValue({ normalizedEmail: "person@example.com" });
+    db.memberSignInToken.findUnique.mockResolvedValue({ id: "token-1", normalizedEmail: "person@example.com" });
     db.memberSignInToken.updateMany.mockResolvedValue({ count: 0 });
     await expect(redeemMemberSignInToken(db, "expired", async () => true, NOW)).resolves.toBeNull();
   });

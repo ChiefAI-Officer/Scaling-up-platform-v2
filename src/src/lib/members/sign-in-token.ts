@@ -17,8 +17,8 @@ type TokenDb = {
     create(args: { data: Record<string, unknown> }): Promise<{ id: string }>;
     findUnique(args: {
       where: { tokenHash: string };
-      select: { normalizedEmail: true };
-    }): Promise<{ normalizedEmail: string } | null>;
+      select: { id: true; normalizedEmail: true };
+    }): Promise<{ id: string; normalizedEmail: string } | null>;
     updateMany(args: {
       where: {
         tokenHash: string;
@@ -65,11 +65,11 @@ export async function redeemMemberSignInToken(
   rawToken: string,
   isEligible: (normalizedEmail: string) => Promise<boolean>,
   now: Date = new Date(),
-): Promise<{ normalizedEmail: string; redeemedAt: Date } | null> {
+): Promise<{ tokenId: string; normalizedEmail: string; redeemedAt: Date } | null> {
   const tokenHash = hashToken(rawToken);
   const token = await db.memberSignInToken.findUnique({
     where: { tokenHash },
-    select: { normalizedEmail: true },
+    select: { id: true, normalizedEmail: true },
   });
   if (!token || !(await isEligible(token.normalizedEmail))) return null;
 
@@ -79,5 +79,5 @@ export async function redeemMemberSignInToken(
   });
   if (claimed.count !== 1) return null;
 
-  return { normalizedEmail: token.normalizedEmail, redeemedAt: now };
+  return { tokenId: token.id, normalizedEmail: token.normalizedEmail, redeemedAt: now };
 }
