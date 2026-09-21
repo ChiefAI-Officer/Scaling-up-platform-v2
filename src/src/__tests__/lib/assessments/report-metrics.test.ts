@@ -45,6 +45,13 @@ describe("emitReportMetric", () => {
     expect(p.role).toBe("COACH");
   });
 
+  it("namespaces the member surface as assessment.member_report.<event>", () => {
+    emitReportMetric("member", "view", { role: "MEMBER" });
+    const p = lastPayload(infoSpy);
+    expect(p.marker).toBe("assessment.member_report.view");
+    expect(p.surface).toBe("member");
+  });
+
   it("drops undefined fields (only present signals are emitted)", () => {
     emitReportMetric("respondent", "rate_limited", {
       role: "ADMIN",
