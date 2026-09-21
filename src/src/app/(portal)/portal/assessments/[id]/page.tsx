@@ -283,6 +283,9 @@ export default async function CampaignDetailPage({ params }: PageProps) {
       memberPortalAccessWarning={
         campaignForFlag?.accessMode === "INVITED" && isMemberPortalEnabled()
       }
+      memberPortalSendEnabled={
+        campaignForFlag?.accessMode === "INVITED" && isMemberPortalEnabled()
+      }
     />
   );
 }
