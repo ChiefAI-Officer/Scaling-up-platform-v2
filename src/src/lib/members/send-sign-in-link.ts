@@ -8,6 +8,7 @@ import { prepareEmailViaSMTP } from "@/lib/smtp-transport";
 import { resolveMemberIdentity } from "@/lib/members/identity";
 import { issueMemberSignInToken, type MemberTokenIssuer } from "@/lib/members/sign-in-token";
 import { renderMemberSignInEmail } from "@/lib/members/sign-in-email";
+import { after } from "next/server";
 
 type SignInLinkDb = {
   orgRespondent: {
@@ -101,9 +102,24 @@ export async function sendMemberSignInLink(
           cid: SU_LOGO_CID,
         },
       ],
+      telemetry: {
+        recipientRole: "CUSTOM",
+        metadata: {
+          emailType: "MEMBER_SIGN_IN_LINK",
+          issuedVia: input.via,
+          campaignId: input.campaignId ?? null,
+          tokenId: issued.tokenId,
+        },
+      },
       redactErrors: true,
     });
-    void prepared.send().catch(emitSendFailure);
+    after(async () => {
+      try {
+        await prepared.send();
+      } catch (error) {
+        emitSendFailure(error);
+      }
+    });
   } catch (error) {
     emitSendFailure(error);
   }
