@@ -34,5 +34,17 @@
     "level": "teamleader",
     "testuser": false,
     "extra": []
+  },
+  {
+    "memberid": "NullLevel01",
+    "title": "Analyst",
+    "firstname": "Test",
+    "middlename": "",
+    "lastname": "Unassigned",
+    "email": "unassigned@example.com",
+    "status": "active",
+    "level": null,
+    "testuser": false,
+    "extra": []
   }
 ]

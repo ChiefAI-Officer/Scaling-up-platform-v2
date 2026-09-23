@@ -60,7 +60,7 @@ export const EspertoMemberSchema = z
     lastname: z.string(),
     email: z.string(),
     status: z.string(),
-    level: z.string(),
+    level: z.string().nullable(),
     testuser: z.boolean(),
     extra: z.array(z.unknown()),
   })

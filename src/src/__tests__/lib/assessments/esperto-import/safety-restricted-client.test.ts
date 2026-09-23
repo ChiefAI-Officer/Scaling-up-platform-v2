@@ -317,13 +317,13 @@ describe("S1 restricted-client guard — commitRosterImport uses ONLY allowed op
     const db = makeDb(tx);
     const plan = rosterPlanFromFixture();
 
-    // Sanity-check the plan is non-trivial (3 real creates, no blocks).
+    // Sanity-check the plan is non-trivial (4 synthetic creates, no blocks).
     expect(plan.blocks).toHaveLength(0);
-    expect(plan.creates).toHaveLength(3);
+    expect(plan.creates).toHaveLength(4);
 
     await expect(
       commitRosterImport(db as never, plan, actor),
-    ).resolves.toMatchObject({ orgAction: "create", created: 3 });
+    ).resolves.toMatchObject({ orgAction: "create", created: 4 });
 
     // Belt-and-suspenders: no destructive op was even CALLED.
     for (const spy of [...spies.delete, ...spies.deleteMany, ...spies.updateMany]) {

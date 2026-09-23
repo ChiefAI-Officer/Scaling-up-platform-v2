@@ -110,7 +110,7 @@ export function normalizeEmail(email: string): string {
 function toNewRespondent(m: EspertoMember): NewRespondent {
   const lastName = m.lastname.trim() === "" ? "—" : m.lastname;
   const jobTitle = m.title.trim() === "" ? null : m.title;
-  const roleType = m.level.trim() === "" ? null : m.level; // passthrough unknown slugs
+  const roleType = m.level === null || m.level.trim() === "" ? null : m.level; // passthrough unknown slugs
   return {
     memberid: m.memberid,
     email: m.email,

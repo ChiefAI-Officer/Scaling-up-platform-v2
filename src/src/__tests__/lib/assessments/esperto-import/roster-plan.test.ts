@@ -103,6 +103,33 @@ describe("buildRosterImportPlan — field map", () => {
     expect(plan.creates[0].roleType).toBe("some-legacy-slug");
   });
 
+  it("plans a mixed batch with an unassigned level and CEO/Founder", () => {
+    const parsed = parseEspertoExport([
+      member({ memberid: "CEO1", email: "ceo@example.com", level: "ceofounder" }),
+      member({
+        memberid: "UNASSIGNED1",
+        email: "unassigned@example.com",
+        level: null,
+      }),
+    ]);
+    if (parsed.kind !== "members") throw new Error("fixture is not members");
+
+    const plan = buildRosterImportPlan({
+      parsedMembers: parsed.data,
+      ownerCoachId: OWNER,
+      companyName: COMPANY,
+      existing: { orgId: null, respondents: [] },
+    });
+
+    expect(plan.blocks).toHaveLength(0);
+    expect(plan.creates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ memberid: "CEO1", roleType: "ceofounder" }),
+        expect.objectContaining({ memberid: "UNASSIGNED1", roleType: null }),
+      ]),
+    );
+  });
+
   it("orgAction=create when no existing org id is supplied", () => {
     const plan = buildRosterImportPlan({
       parsedMembers: [member()],
@@ -277,18 +304,21 @@ describe("buildRosterImportPlan — in-file ambiguity blocks (edge 14)", () => {
 });
 
 describe("buildRosterImportPlan — fixture smoke", () => {
-  it("plans all three sanitized fixture members as creates against an empty org", () => {
+  it("plans the mixed-level fixture and gives an unassigned member no level", () => {
     const plan = buildRosterImportPlan({
       parsedMembers: loadMembers(),
       ownerCoachId: OWNER,
       companyName: COMPANY,
       existing: { orgId: null, respondents: [] },
     });
-    expect(plan.creates).toHaveLength(3);
+    expect(plan.creates).toHaveLength(4);
     expect(plan.skips).toHaveLength(0);
     expect(plan.blocks).toHaveLength(0);
     expect(plan.creates.map((c) => c.externalId).sort()).toEqual(
-      ["CVMmsiWPTP", "MxRWB1GIwu", "mWSw2H9f6E"].sort(),
+      ["CVMmsiWPTP", "MxRWB1GIwu", "NullLevel01", "mWSw2H9f6E"].sort(),
     );
+    expect(
+      plan.creates.find((c) => c.memberid === "NullLevel01")?.roleType,
+    ).toBeNull();
   });
 });
