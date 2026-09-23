@@ -65,11 +65,11 @@ describe("classifyEspertoExport", () => {
 });
 
 describe("parseEspertoExport — happy paths", () => {
-  it("parses members into { kind: 'members', data } with 3 rows", () => {
+  it("parses a mixed members export containing an unassigned level", () => {
     const parsed = parseEspertoExport(members);
     expect(parsed.kind).toBe("members");
     if (parsed.kind !== "members") throw new Error("narrowing");
-    expect(parsed.data).toHaveLength(3);
+    expect(parsed.data).toHaveLength(4);
     expect(parsed.data[0]).toMatchObject({
       memberid: expect.any(String),
       email: expect.any(String),
@@ -82,7 +82,11 @@ describe("parseEspertoExport — happy paths", () => {
       "ceo@example.com",
       "cfo@example.com",
       "svc@example.com",
+      "unassigned@example.com",
     ]);
+    expect(
+      parsed.data.find((m) => m.memberid === "NullLevel01")?.level,
+    ).toBeNull();
   });
 
   it("parses report into { kind: 'report', data } with 3 personal rows", () => {
