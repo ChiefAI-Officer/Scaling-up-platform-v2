@@ -46,8 +46,8 @@ export interface EspertoMember {
   email: string;
   /** Esperto lifecycle ("active", …) — import gate. */
   status: string;
-  /** Esperto Level slug ("ceofounderwithteam", "teamleader", …) → roleType. */
-  level: string;
+  /** Esperto Level slug, or null when unassigned, mapped to roleType. */
+  level: string | null;
   /** Hard-excluded when true. */
   testuser: boolean;
   /** Empty in observed exports; opaque metadata. */

@@ -9,7 +9,7 @@
  *   ROSTER:  parseEspertoExport(members.json)
  *            → buildRosterImportPlan (no existing org/respondents)
  *            → commitRosterImport(statefulDb, …)
- *            ⇒ 1 org + 3 respondents created, each dedupeSource "external",
+ *            ⇒ 1 org + 4 respondents created, each dedupeSource "external",
  *              externalId === its memberid.
  *
  *   RESULTS: parseEspertoExport(report-qsp-v2.json)
@@ -382,7 +382,7 @@ function makeResultsCtx(organizationId: string, templateId = "tmpl-qsp-v2") {
 // ────────────────────────────────────────────────────────────────────────
 
 describe("Esperto import — end-to-end on sanitized fixtures", () => {
-  it("ROSTER: parse → plan → commit creates 1 org + 3 external respondents", async () => {
+  it("ROSTER: parse → plan → commit creates 1 org + 4 external respondents", async () => {
     const { db, state } = makeStatefulStore();
 
     const parsed = parseEspertoExport(members as unknown as EspertoMembers);
@@ -395,18 +395,18 @@ describe("Esperto import — end-to-end on sanitized fixtures", () => {
       companyName: "Acme Corp",
       existing: { orgId: null, respondents: [] },
     });
-    // members.json has 3 active, non-test rows → 3 creates, no skips/blocks.
+    // members.json has 4 active, non-test rows → 4 creates, no skips/blocks.
     expect(plan.orgAction).toBe("create");
-    expect(plan.creates).toHaveLength(3);
+    expect(plan.creates).toHaveLength(4);
     expect(plan.skips).toHaveLength(0);
     expect(plan.blocks).toHaveLength(0);
 
     const result = await commitRosterImport(db as never, plan, actor);
     expect(result.orgAction).toBe("create");
-    expect(result.created).toBe(3);
+    expect(result.created).toBe(4);
 
     expect(state.orgs).toHaveLength(1);
-    expect(state.respondents).toHaveLength(3);
+    expect(state.respondents).toHaveLength(4);
 
     // Each respondent is dedupeSource "external" with externalId === memberid.
     for (const r of state.respondents) {
@@ -415,7 +415,12 @@ describe("Esperto import — end-to-end on sanitized fixtures", () => {
       expect(typeof r.externalId).toBe("string");
     }
     const extIds = state.respondents.map((r) => r.externalId).sort();
-    expect(extIds).toEqual(["CVMmsiWPTP", "MxRWB1GIwu", "mWSw2H9f6E"].sort());
+    expect(extIds).toEqual(
+      ["CVMmsiWPTP", "MxRWB1GIwu", "NullLevel01", "mWSw2H9f6E"].sort(),
+    );
+    expect(
+      state.respondents.find((r) => r.externalId === "NullLevel01")?.roleType,
+    ).toBeNull();
 
     // Exactly one audit row for the roster import.
     expect(state.audits).toHaveLength(1);
