@@ -6,6 +6,15 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="member-led-teams-authority-activated"></a>
+### 2026-09-23 — Member led-team authority activated <!-- ENTRY_ISO:2026-09-23 ENTRY_SLUG:member-led-teams-authority-activated -->
+
+**Status: LAUNCHED + GLOBALLY ENABLED + PRODUCTION-VERIFIED.** `WAVE_MP_LED_TEAMS_ENABLED=1` is stored as a Production-only encrypted variable; `WAVE_MP_LED_TEAMS_KILL` remains absent and available for immediate containment. Rebuild `dpl_D14ekzsS8FHoyshmuyB19wFuZS7M` deployed the unchanged R2 source commit `14eee747` and owns both canonical aliases. Both `/api/health` endpoints return HTTP `200` with healthy database and safe auth posture.
+
+**Activation data gate.** The read-only Production verification re-measured **31** live memberships: **11** live `teamleader` rows, **6** with a membership team, and exactly **6** `backfill-0040` authority edges. There are zero missing or unexpected backfill rows, zero three-way organization-integrity violations, and **zero legacy/new scope mismatches across all 31 live memberships**. Activation is therefore the intended behavioral no-op at cutover.
+
+**Known authority correction remains R3.** Four of the six inferred edges preserve peer visibility that Decision 11 rejects: three leaders share an `Exec Team` node and one leader is attached to a `folder` root. Activation alone cannot correct those inferred grants because Decision 10 intentionally preserved prior access. PR [#461](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/461) commits the canonical design and ADR-0040 with this receipt. R3 must add the Coach-facing **Leads** control, inferred-edge confirmation, no-led-teams guidance, and peer-visibility warning before those fixture relationships are deliberately corrected; R4 CSV and R5 Esperto mapping also remain unimplemented.
+
 <a id="member-led-teams-core-launched"></a>
 ### 2026-09-23 — Member led-team authority core launched default-off <!-- ENTRY_ISO:2026-09-23 ENTRY_SLUG:member-led-teams-core-launched -->
 
