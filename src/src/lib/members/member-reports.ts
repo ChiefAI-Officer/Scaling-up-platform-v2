@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { resolveMemberIdentity } from "@/lib/members/identity";
 import { entitlementFor } from "@/lib/members/entitlement";
 import {
@@ -76,10 +77,9 @@ export async function listMemberReports(
     );
     const organizationIds = [...new Set(identity.members.map((member) => member.organizationId))];
     const organizationCount = organizationIds.length;
-    const rows = await tx.assessmentSubmission.findMany({
+    const submissionQuery = {
       where: {
         respondentId: { not: null },
-        submittedAt: { not: null },
         campaign: { deletedAt: null, organizationId: { in: organizationIds } },
       },
       select: {
@@ -102,7 +102,8 @@ export async function listMemberReports(
         },
       },
       orderBy: { submittedAt: "desc" },
-    });
+    } satisfies Prisma.AssessmentSubmissionFindManyArgs;
+    const rows = await tx.assessmentSubmission.findMany(submissionQuery);
     const ownSet = new Set(ownIds);
     const personalReports: MemberReportListItem[] = rows
       .filter((row) => row.respondentId !== null && entitledIds.has(row.respondentId))

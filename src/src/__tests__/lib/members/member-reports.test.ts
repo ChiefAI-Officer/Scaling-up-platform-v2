@@ -93,4 +93,13 @@ describe("listMemberReports hierarchy", () => {
     expect(result.reports).toHaveLength(1);
     expect(result.reports[0]).toMatchObject({ submissionId: "submission-own" });
   });
+
+  it("builds a Prisma-valid submission query for member reports", async () => {
+    const testContext = fixture("ceofounder");
+
+    await listMemberReports(testContext.db as never, "ceo@example.com");
+
+    const query = testContext.tx.assessmentSubmission.findMany.mock.calls[0]?.[0];
+    expect(query?.where).not.toHaveProperty("submittedAt");
+  });
 });

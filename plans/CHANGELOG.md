@@ -6,6 +6,13 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="member-reports-crash-fixed"></a>
+### 2026-09-23 — Member reports crash fixed <!-- ENTRY_ISO:2026-09-23 ENTRY_SLUG:member-reports-crash-fixed -->
+
+**Status: IMPLEMENTED AND VERIFIED; RELEASE PENDING.** The Member Reports loader no longer sends Prisma the impossible `submittedAt: { not: null }` predicate for the non-nullable `AssessmentSubmission.submittedAt` field. That predicate caused a deterministic `PrismaClientValidationError` before SQL and sent every signed-in Member loading `/member/reports` to the app-wide error boundary. Removing it does not broaden report access: submission rows are created only by completed submit/import paths, and the existing respondent, organization, entitlement, and group-report invitation-status gates remain unchanged.
+
+**Regression boundary and verification.** The submission query is now checked locally against Prisma's generated `AssessmentSubmissionFindManyArgs`, while the member-reports regression asserts that the exact query passed to the database boundary contains no nullable `submittedAt` filter. TDD reproduced the old predicate as a failing assertion before the one-line runtime fix. The Member library passes **11 suites / 64 tests**; changed-file ESLint, diff hygiene, and all **53** migration-safety checks pass. A 4 GB-heap Turbopack production build compiles, passes TypeScript, and generates **98/98 pages**; the first unchanged 2 GB run compiled and then exhausted memory during TypeScript, while the bounded rerun passed. The build emitted only the established workspace-root, middleware-deprecation, missing local Inngest-key, and build-time `DATABASE_URL` warnings. Signed-in Production verification of the reports grid, one report detail, the evaluations empty state, and the CEO-family entitlement path remains required after release. No schema, migration, feature flag, assessment, Campaign, response, report, email, environment, or Production datum changed.
+
 <a id="member-sign-in-email-dispatch-fixed"></a>
 ### 2026-09-23 — Member sign-in email dispatch fixed <!-- ENTRY_ISO:2026-09-23 ENTRY_SLUG:member-sign-in-email-dispatch-fixed -->
 
