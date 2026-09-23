@@ -1111,11 +1111,12 @@ model Organization {
   updatedAt     DateTime  @updatedAt
   deletedAt     DateTime?
 
-  owner            Coach                          @relation(fields: [ownerCoachId], references: [id])
-  teams            OrgTeam[]
-  respondents      OrgRespondent[]
-  campaigns        AssessmentCampaign[]
-  ownershipEvents  OrganizationOwnershipEvent[]
+  owner              Coach                      @relation(fields: [ownerCoachId], references: [id])
+  teams              OrgTeam[]
+  respondents        OrgRespondent[]
+  respondentLedTeams OrgRespondentLedTeam[]
+  campaigns          AssessmentCampaign[]
+  ownershipEvents    OrganizationOwnershipEvent[]
 
   @@index([ownerCoachId])
   @@map("organizations")
@@ -1136,6 +1137,7 @@ model OrgTeam {
   parentTeam   OrgTeam?        @relation("TeamHierarchy", fields: [parentTeamId], references: [id])
   childTeams   OrgTeam[]       @relation("TeamHierarchy")
   respondents  OrgRespondent[]
+  ledByMembers OrgRespondentLedTeam[]
 
   @@index([organizationId, parentTeamId])
   @@map("org_teams")
@@ -1163,12 +1165,31 @@ model OrgRespondent {
   participants AssessmentCampaignParticipant[]
   invitations  AssessmentInvitation[]
   submissions  AssessmentSubmission[]
+  ledTeams     OrgRespondentLedTeam[]
 
   @@unique([organizationId, dedupeSource, dedupeValue])
   @@index([organizationId, email])
   @@index([organizationId, normalizedEmail])
   @@index([externalId])
   @@map("org_respondents")
+}
+
+model OrgRespondentLedTeam {
+  respondentId   String
+  teamId         String
+  organizationId String
+  createdAt      DateTime @default(now())
+  createdBy      String
+  source         String
+
+  respondent   OrgRespondent @relation(fields: [respondentId], references: [id], onDelete: Cascade)
+  team         OrgTeam       @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@id([respondentId, teamId])
+  @@index([teamId])
+  @@index([organizationId])
+  @@map("org_respondent_led_teams")
 }
 
 // Member portal address-scoped, single-use sign-in credential. This is

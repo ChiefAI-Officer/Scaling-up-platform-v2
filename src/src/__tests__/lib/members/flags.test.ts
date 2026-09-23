@@ -1,16 +1,25 @@
-import { isMemberPortalEnabled } from "@/lib/members/flags";
+import {
+  isMemberLedTeamsEnabled,
+  isMemberPortalEnabled,
+} from "@/lib/members/flags";
 
 const ENABLED = "WAVE_MP_MEMBER_PORTAL_ENABLED";
 const KILL = "WAVE_MP_MEMBER_PORTAL_KILL";
+const LED_TEAMS_ENABLED = "WAVE_MP_LED_TEAMS_ENABLED";
+const LED_TEAMS_KILL = "WAVE_MP_LED_TEAMS_KILL";
 
 const originalEnv = {
   enabled: process.env[ENABLED],
   kill: process.env[KILL],
+  ledTeamsEnabled: process.env[LED_TEAMS_ENABLED],
+  ledTeamsKill: process.env[LED_TEAMS_KILL],
 };
 
 afterEach(() => {
   delete process.env[ENABLED];
   delete process.env[KILL];
+  delete process.env[LED_TEAMS_ENABLED];
+  delete process.env[LED_TEAMS_KILL];
 });
 
 afterAll(() => {
@@ -19,6 +28,22 @@ afterAll(() => {
 
   if (originalEnv.kill === undefined) delete process.env[KILL];
   else process.env[KILL] = originalEnv.kill;
+
+  if (originalEnv.ledTeamsEnabled === undefined) delete process.env[LED_TEAMS_ENABLED];
+  else process.env[LED_TEAMS_ENABLED] = originalEnv.ledTeamsEnabled;
+
+  if (originalEnv.ledTeamsKill === undefined) delete process.env[LED_TEAMS_KILL];
+  else process.env[LED_TEAMS_KILL] = originalEnv.ledTeamsKill;
+});
+
+describe("isMemberLedTeamsEnabled", () => {
+  it("defaults off, reads at call time, and lets kill win", () => {
+    expect(isMemberLedTeamsEnabled()).toBe(false);
+    process.env[LED_TEAMS_ENABLED] = "1";
+    expect(isMemberLedTeamsEnabled()).toBe(true);
+    process.env[LED_TEAMS_KILL] = "true";
+    expect(isMemberLedTeamsEnabled()).toBe(false);
+  });
 });
 
 describe("isMemberPortalEnabled", () => {

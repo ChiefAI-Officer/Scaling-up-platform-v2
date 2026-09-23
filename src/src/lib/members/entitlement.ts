@@ -1,5 +1,6 @@
 import { isCEOFamily } from "@/lib/assessments/respondent-levels";
 import type { MemberRow } from "@/lib/members/identity";
+import { isMemberLedTeamsEnabled } from "@/lib/members/flags";
 
 /** Deliberately empty: unknown stored levels must fail closed to own-only. */
 export const LEVEL_ALIASES: Readonly<Record<string, string>> = Object.freeze({});
@@ -19,6 +20,10 @@ export type TeamNode = {
 export type EntitlementReader = {
   respondentsForOrganization(organizationId: string): Promise<ScopedRespondent[]>;
   teamsForOrganization(organizationId: string): Promise<TeamNode[]>;
+  ledTeamIdsForRespondent(
+    respondentId: string,
+    organizationId: string,
+  ): Promise<string[]>;
 };
 
 export function normalizeLevel(level: string | null): string | null {
@@ -50,7 +55,13 @@ function descendantTeamIds(rootTeamId: string, teams: TeamNode[]): Set<string> {
   return included;
 }
 
-export async function scopeFor(row: MemberRow, reader: EntitlementReader): Promise<Set<string>> {
+export type MemberTeamAuthorityMode = "membership" | "led-teams";
+
+export async function scopeForAuthorityMode(
+  row: MemberRow,
+  reader: EntitlementReader,
+  authorityMode: MemberTeamAuthorityMode,
+): Promise<Set<string>> {
   const scope = new Set([row.respondentId]);
   const level = normalizeLevel(row.roleType);
 
@@ -62,13 +73,25 @@ export async function scopeFor(row: MemberRow, reader: EntitlementReader): Promi
     return scope;
   }
 
-  if (level !== "teamleader" || row.teamId === null) return scope;
+  if (level !== "teamleader") return scope;
+
+  const rootTeamIds = authorityMode === "led-teams"
+    ? await reader.ledTeamIdsForRespondent(row.respondentId, row.organizationId)
+    : row.teamId === null
+      ? []
+      : [row.teamId];
+  if (rootTeamIds.length === 0) return scope;
 
   const [respondents, teams] = await Promise.all([
     reader.respondentsForOrganization(row.organizationId),
     reader.teamsForOrganization(row.organizationId),
   ]);
-  const teamIds = descendantTeamIds(row.teamId, teams);
+  const teamIds = new Set<string>();
+  for (const rootTeamId of rootTeamIds) {
+    for (const teamId of descendantTeamIds(rootTeamId, teams)) {
+      teamIds.add(teamId);
+    }
+  }
   for (const respondent of respondents) {
     if (
       isLive(respondent) &&
@@ -80,6 +103,17 @@ export async function scopeFor(row: MemberRow, reader: EntitlementReader): Promi
     }
   }
   return scope;
+}
+
+export function scopeFor(
+  row: MemberRow,
+  reader: EntitlementReader,
+): Promise<Set<string>> {
+  return scopeForAuthorityMode(
+    row,
+    reader,
+    isMemberLedTeamsEnabled() ? "led-teams" : "membership",
+  );
 }
 
 export async function entitlementFor(

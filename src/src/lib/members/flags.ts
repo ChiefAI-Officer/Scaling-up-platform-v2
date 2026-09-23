@@ -12,3 +12,9 @@ export function isMemberPortalEnabled(): boolean {
   if (isOn(process.env.WAVE_MP_MEMBER_PORTAL_KILL)) return false;
   return isOn(process.env.WAVE_MP_MEMBER_PORTAL_ENABLED);
 }
+
+/** Whether member report scope is derived from explicit Led teams. */
+export function isMemberLedTeamsEnabled(): boolean {
+  if (isOn(process.env.WAVE_MP_LED_TEAMS_KILL)) return false;
+  return isOn(process.env.WAVE_MP_LED_TEAMS_ENABLED);
+}
