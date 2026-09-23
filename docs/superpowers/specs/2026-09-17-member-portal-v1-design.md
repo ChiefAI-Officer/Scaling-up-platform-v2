@@ -661,11 +661,11 @@ typed address on the refusal path would reconstruct exactly the answer the respo
 give, for anyone who can read audit rows.
 
 **The residual, stated honestly.** The wireframe says the response "and its timing are
-identical". That cannot be literally true: the eligible path performs one additional INSERT and
-enqueues an email. The design reduces it — the email send is dispatched **without being
-awaited**, so SMTP latency (the large, variable term) never reaches the response — but a
-single-INSERT delta remains. Two options, and this is a decision for the grill, not a silent
-choice:
+identical". That cannot be literally true: after the common identity lookup, the eligible path
+adds a token INSERT, a greeting SELECT, an audit INSERT, and deterministic email preparation.
+The design removes the largest variable term — the email send is scheduled with Next.js
+`after()`, whose callback awaits SMTP only after the response has finished — but a multi-query
+delta remains. Two options, and this is a decision for the grill, not a silent choice:
 
 - **(a) Accept and bound it.** Measure the delta; if it is inside normal request jitter, record
   it as a known residual. Cheapest and honest.
@@ -673,9 +673,9 @@ choice:
   eligible path. Closes the channel; costs a slower screen for everyone and a new failure mode
   if the floor is ever exceeded.
 
-Recommended: **(a)**, with the measurement recorded in the launch entry. An attacker who can
-measure a sub-millisecond INSERT across the public internet against a Neon database that
-cold-starts has a far better oracle available in the noise.
+Recommended: **(a)** only if the production measurement records the actual eligible-versus-
+ineligible envelope as acceptably inside normal request jitter. The decision must be based on
+that measured multi-query delta, not on an assumed single-INSERT cost.
 
 The cost of the no-enumeration rule is real and is paid on the page, not afterwards: a coach who
 lands here types their email, sees Link-sent, and no email ever arrives. That is why the
@@ -712,9 +712,17 @@ main foreseeable support cost of this feature.
 **Delivery lane.** `AssessmentEmailOutbox` is `submissionId`-scoped with
 `@@unique([submissionId, recipientRole])`; a sign-in link is address-scoped and belongs to no
 submission, so it **cannot** use that outbox without a schema change that would weaken the
-outbox's own idempotency key. v1 sends directly through `lib/smtp-transport.ts`, the same lane
-as the invitation and reminder emails, dispatched without awaiting (§10), with structured error
-logging and a `member_signin.send_failed` metric.
+outbox's own idempotency key. v1 sends directly through `lib/smtp-transport.ts`. The eligible
+request prepares the message, then schedules a Next.js `after()` callback which awaits
+`prepared.send()` after the response has finished (§10). Invitation and reminder sends use the
+same SMTP transport but are awaited by their request handler or durable worker; they were never
+precedent for a floating promise. Member-link delivery records error-redacted `EMAIL_DELIVERY`
+telemetry and emits `member_signin.send_failed` on failure. The eligible recipient remains in
+delivery telemetry. On self-service sends that address is already present in
+`MEMBER_LINK_ISSUED.performedBy`; on coach-issued sends the delivery row adds the eligible roster
+address to the audit data available to operators, an accepted observability disclosure.
+Ineligible addresses never reach either record. This lane is not durable: it has no retry and
+remains bounded by the route's maximum invocation duration.
 
 The accepted consequence: a send failure is invisible to the member, whose recovery is the
 **Send another link** action already on the Link-sent screen. Bringing sign-in links under an
