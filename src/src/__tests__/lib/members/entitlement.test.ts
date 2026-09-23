@@ -28,14 +28,44 @@ const respondent = (overrides: Partial<ScopedRespondent> = {}): ScopedRespondent
   ...overrides,
 });
 
-function reader(respondents: ScopedRespondent[], teams: TeamNode[] = []): EntitlementReader {
+function reader(
+  respondents: ScopedRespondent[],
+  teams: TeamNode[] = [],
+  ledTeams: Record<string, string[]> = {},
+): EntitlementReader {
   return {
     respondentsForOrganization: async (organizationId) =>
       respondents.filter((row) => row.organizationId === organizationId),
     teamsForOrganization: async (organizationId) =>
       teams.filter((team) => team.organizationId === organizationId),
+    ledTeamIdsForRespondent: async (respondentId, organizationId) =>
+      (ledTeams[respondentId] ?? []).filter((teamId) =>
+        teams.some(
+          (team) =>
+            team.teamId === teamId &&
+            team.organizationId === organizationId &&
+            team.deletedAt === null,
+        ),
+      ),
   };
 }
+
+const LED_TEAMS_ENABLED = "WAVE_MP_LED_TEAMS_ENABLED";
+const LED_TEAMS_KILL = "WAVE_MP_LED_TEAMS_KILL";
+const originalLedTeamsEnabled = process.env[LED_TEAMS_ENABLED];
+const originalLedTeamsKill = process.env[LED_TEAMS_KILL];
+
+afterEach(() => {
+  delete process.env[LED_TEAMS_ENABLED];
+  delete process.env[LED_TEAMS_KILL];
+});
+
+afterAll(() => {
+  if (originalLedTeamsEnabled === undefined) delete process.env[LED_TEAMS_ENABLED];
+  else process.env[LED_TEAMS_ENABLED] = originalLedTeamsEnabled;
+  if (originalLedTeamsKill === undefined) delete process.env[LED_TEAMS_KILL];
+  else process.env[LED_TEAMS_KILL] = originalLedTeamsKill;
+});
 
 describe("member entitlement", () => {
   it.each(["employee", "guest", null, "unknown", "CEO", "TEAM_MEMBER"])(
@@ -146,5 +176,80 @@ describe("member entitlement", () => {
         reader(rows),
       ),
     ).resolves.toEqual(new Set(["ceo-self", "a-peer", "employee-self"]));
+  });
+
+  it("uses explicit Led teams for the Northwind fixture when the flag is on", async () => {
+    process.env[LED_TEAMS_ENABLED] = "1";
+    const teams: TeamNode[] = [
+      { teamId: "company", organizationId: "org-a", parentTeamId: null, deletedAt: null },
+      { teamId: "sales", organizationId: "org-a", parentTeamId: "company", deletedAt: null },
+      { teamId: "sdr", organizationId: "org-a", parentTeamId: "sales", deletedAt: null },
+      { teamId: "engineering", organizationId: "org-a", parentTeamId: "company", deletedAt: null },
+    ];
+    const rows = [
+      respondent({ respondentId: "dana", teamId: "company", roleType: "ceofounder" }),
+      respondent({ respondentId: "sam", teamId: "sales", roleType: "teamleader" }),
+      respondent({ respondentId: "riley", teamId: "engineering", roleType: "teamleader" }),
+      respondent({ respondentId: "jamie", teamId: "sales" }),
+      respondent({ respondentId: "alex", teamId: "sdr" }),
+      respondent({ respondentId: "morgan", teamId: "engineering" }),
+      respondent({ respondentId: "casey", teamId: null, roleType: "teamleader" }),
+      respondent({ respondentId: "jordan", teamId: "company", roleType: "teamleader" }),
+    ];
+    const fixtureReader = reader(rows, teams, {
+      sam: ["sales"],
+      riley: ["engineering"],
+    });
+
+    await expect(
+      scopeFor(
+        member({ respondentId: "jordan", teamId: "company", roleType: "teamleader" }),
+        fixtureReader,
+      ),
+    ).resolves.toEqual(new Set(["jordan"]));
+    await expect(
+      scopeFor(
+        member({ respondentId: "sam", teamId: "sales", roleType: "teamleader" }),
+        fixtureReader,
+      ),
+    ).resolves.toEqual(new Set(["sam", "jamie", "alex"]));
+    await expect(
+      scopeFor(
+        member({ respondentId: "riley", teamId: "engineering", roleType: "teamleader" }),
+        fixtureReader,
+      ),
+    ).resolves.toEqual(new Set(["riley", "morgan"]));
+    await expect(
+      scopeFor(
+        member({ respondentId: "dana", teamId: "company", roleType: "ceofounder" }),
+        fixtureReader,
+      ),
+    ).resolves.toEqual(
+      new Set(["dana", "sam", "riley", "jamie", "alex", "morgan", "casey", "jordan"]),
+    );
+  });
+
+  it("unions two Led-team subtrees without crossing organizations", async () => {
+    process.env[LED_TEAMS_ENABLED] = "1";
+    const teams: TeamNode[] = [
+      { teamId: "sales", organizationId: "org-a", parentTeamId: null, deletedAt: null },
+      { teamId: "sdr", organizationId: "org-a", parentTeamId: "sales", deletedAt: null },
+      { teamId: "engineering", organizationId: "org-a", parentTeamId: null, deletedAt: null },
+      { teamId: "foreign", organizationId: "org-b", parentTeamId: null, deletedAt: null },
+    ];
+    const rows = [
+      respondent({ respondentId: "vp", roleType: "teamleader" }),
+      respondent({ respondentId: "sales-person", teamId: "sales" }),
+      respondent({ respondentId: "sdr-person", teamId: "sdr" }),
+      respondent({ respondentId: "engineer", teamId: "engineering" }),
+      respondent({ respondentId: "foreign-person", organizationId: "org-b", teamId: "foreign" }),
+    ];
+
+    await expect(
+      scopeFor(
+        member({ respondentId: "vp", roleType: "teamleader" }),
+        reader(rows, teams, { vp: ["sales", "engineering", "foreign"] }),
+      ),
+    ).resolves.toEqual(new Set(["vp", "sales-person", "sdr-person", "engineer"]));
   });
 });

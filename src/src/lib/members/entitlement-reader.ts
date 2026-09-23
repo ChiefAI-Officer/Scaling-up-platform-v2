@@ -29,6 +29,12 @@ export type MemberEntitlementDb = {
       deletedAt: Date | null;
     }>>;
   };
+  orgRespondentLedTeam: {
+    findMany(args: {
+      where: Record<string, unknown>;
+      select: { teamId: true };
+    }): Promise<Array<{ teamId: string }>>;
+  };
 };
 
 /** Prisma-backed reader for the pure hierarchy entitlement rules. */
@@ -71,6 +77,22 @@ export function createMemberEntitlementReader(db: MemberEntitlementDb): Entitlem
         parentTeamId: row.parentTeamId,
         deletedAt: row.deletedAt,
       }));
+    },
+    async ledTeamIdsForRespondent(respondentId, organizationId): Promise<string[]> {
+      const rows = await db.orgRespondentLedTeam.findMany({
+        where: {
+          respondentId,
+          organizationId,
+          respondent: {
+            organizationId,
+            deletedAt: null,
+            organization: { deletedAt: null },
+          },
+          team: { organizationId, deletedAt: null },
+        },
+        select: { teamId: true },
+      });
+      return rows.map((row) => row.teamId);
     },
   };
 }
