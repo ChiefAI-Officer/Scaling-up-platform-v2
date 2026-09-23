@@ -1,8 +1,9 @@
 # ADR-0040 — Report authority comes from led teams, not from team membership
 
-**Status:** Accepted (2026-09-23). Core implemented and deployed; **not yet activated** —
-`WAVE_MP_LED_TEAMS_ENABLED` is default-off in Production, so entitlement still reads the legacy
-`teamId` roots. Shipped as R1 (PR #459, `e86edd49`) and R2 (PR #460, `14eee747`).
+**Status:** Accepted and **active** (2026-09-23). Shipped as R1 (PR #459, `e86edd49`) and R2
+(PR #460, `14eee747`); activated by `WAVE_MP_LED_TEAMS_ENABLED=1` with rebuild
+`dpl_D14ekzsS8FHoyshmuyB19wFuZS7M`. Entitlement now reads led-team roots. `WAVE_MP_LED_TEAMS_KILL`
+is absent and reverts to the legacy `teamId` roots if introduced.
 Coach UI, CSV contract and Esperto mapping remain R3–R5.
 **Amends:** [ADR-0039](0039-member-report-entitlement-is-derived-per-request.md) (its `teamleader`
 rule only; the per-request derivation principle is unchanged).

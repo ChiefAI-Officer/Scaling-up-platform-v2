@@ -1,6 +1,8 @@
 # Member led teams — design
 
-**Status:** R1 and R2 implemented and deployed 2026-09-23 (PRs #459 / #460); flag default-off.
+**Status:** R1 and R2 implemented, deployed and **activated** 2026-09-23 (PRs #459 / #460).
+`WAVE_MP_LED_TEAMS_ENABLED=1` in Production since deployment `dpl_D14ekzsS8FHoyshmuyB19wFuZS7M`;
+`WAVE_MP_LED_TEAMS_KILL` absent and available for containment.
 R3 (coach UI), R4 (CSV contract) and R5 (Esperto mapping) are **not** implemented and are not
 authorized by this document.
 
